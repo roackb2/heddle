@@ -1,0 +1,5 @@
+# Local files
+local/
+
+# Dependencies
+node_modules/

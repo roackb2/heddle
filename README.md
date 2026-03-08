@@ -1,0 +1,43 @@
+# Heddle
+
+A minimal TypeScript runtime for tool-using agents.
+
+## What It Is
+
+Heddle is not a full agent framework. It is a small, executable loop that lets an LLM use tools against a real environment, records every step as a trace, and stops when the agent finishes, hits a budget limit, or encounters an unrecoverable error.
+
+The design philosophy is **behavior-first**: get a working loop running, observe what the agent actually struggles with, and only then harden recurring failure modes into deterministic runtime support.
+
+## What It Is Not
+
+- A prompt orchestration library
+- A multi-agent framework
+- A pre-defined cognitive architecture with phases, plans, and world-state ontologies
+- Another LangChain wrapper
+
+## Core Loop
+
+```
+goal
+  -> prompt model with available tools + prior transcript
+  -> model either answers or requests a tool call
+  -> execute tool
+  -> append result to transcript
+  -> continue
+  -> stop on done / max steps / unrecoverable error
+```
+
+## Status
+
+Early development. v0 in progress.
+
+## Design Principles
+
+1. **Don't over-abstract early** — no concept becomes a first-class abstraction until a recurring failure mode justifies it
+2. **Trace is a first-class citizen** — every step is recorded; the trace is the primary diagnostic artifact
+3. **Runtime supports the agent, doesn't govern it** — the agent decides; the runtime executes and records
+4. **Abstractions must have a root cause** — every module must answer: what recurring problem does this solve?
+
+## License
+
+MIT
