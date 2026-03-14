@@ -16,6 +16,8 @@ So the project stance is:
 - current implementation: a minimal execution loop
 - growth model: add abstractions only after real traces justify them
 
+Longer-term framework direction is documented in [docs/framework-vision.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/framework-vision.md), including future concepts like situation awareness and knowledge persistence.
+
 ## What It Is Not
 
 - A prompt orchestration library
