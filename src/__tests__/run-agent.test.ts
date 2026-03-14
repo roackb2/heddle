@@ -44,7 +44,7 @@ describe('runAgent', () => {
     expect(seenMessages).toHaveLength(2);
     expect(seenMessages[1]).toContainEqual({
       role: 'tool',
-      content: JSON.stringify('README.md\nsrc/'),
+      content: JSON.stringify({ ok: true, output: 'README.md\nsrc/' }),
       toolCallId: 'call-1',
     });
     expect(result.trace.map((event) => event.type)).toEqual([
@@ -106,9 +106,11 @@ describe('runAgent', () => {
     expect(result.summary).toBe('I should stop repeating the same directory listing.');
     expect(seenMessages[2]).toContainEqual({
       role: 'tool',
-      content: JSON.stringify(
-        'Duplicate tool call blocked: list_files was already called with the same input earlier in this run. Try a different tool or different input.',
-      ),
+      content: JSON.stringify({
+        ok: false,
+        error:
+          'Duplicate tool call blocked: list_files was already called with the same input earlier in this run. Try a different tool or different input.',
+      }),
       toolCallId: 'call-2',
     });
     expect(result.trace[6]).toMatchObject({

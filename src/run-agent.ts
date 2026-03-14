@@ -131,7 +131,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
         // Append tool result to transcript
         messages.push({
           role: 'tool',
-          content: JSON.stringify(result.output ?? result.error ?? ''),
+          content: JSON.stringify(result),
           toolCallId: call.id,
         });
       }
