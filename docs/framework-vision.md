@@ -16,6 +16,29 @@ The intended stable core is:
 
 The project should be able to support domains like coding, design, operations, research, or other tool-using workflows without replacing the core run loop each time.
 
+## Original System Shape
+
+The original target shape for a general agentic system had three major pillars:
+
+- execution loop
+- situation awareness
+- knowledge persistence
+
+Those ideas remain part of the destination, even though Heddle is only implementing the minimal loop first.
+
+### Execution Loop
+
+The long-term execution pattern is broader than the current v0 loop:
+
+- requirement
+- information gathering
+- plan
+- review
+- execution
+- verify
+
+Heddle should not hard-code that full structure into the runtime yet, but it is still a useful picture of the eventual operating model.
+
 ## Current Phase
 
 The project is intentionally not building the full framework top-down.
@@ -37,11 +60,13 @@ Two long-term capability areas matter beyond the basic execution loop.
 
 The agent should eventually have a strong awareness layer for understanding the environment it operates in.
 
-Examples:
+Target capabilities:
 
-- filesystem and repository state
-- change awareness through version control
-- runtime and infrastructure inspection
+- holistic view through mature tools such as `ls -r`, `grep`, `cat`, `find`, `sort`, `jq`
+- change awareness through tools like `git`
+- inspection of external systems
+- infrastructure inspection such as `aws-cli` or `kubectl`
+- system inspection such as logs and metrics
 - domain-specific environment sensing such as design documents, canvases, or artifact trees
 
 The exact tools will differ by domain, but the framework should support a coherent notion of environment inspection and evidence gathering.
@@ -50,15 +75,27 @@ The exact tools will differ by domain, but the framework should support a cohere
 
 The agent should eventually have durable knowledge and context beyond the immediate transcript.
 
-Examples:
+Target memory layers:
 
-- workspace memory for current task artifacts
-- domain memory for stable system or product knowledge
-- preference memory for user style, conventions, and policies
-- learnings from prior runs and feedback
-- evolving understanding of how a system or domain behaves
+- workspace memory for current task artifacts such as plans, analysis, reports, and notes
+- domain memory for stable system or product knowledge such as service readmes
+- preference memory for tone, security policy, and conventions
+- learnings from prior interactions and feedback
+- understanding as a continuously refined model of how the system or domain behaves
 
 This should not be forced into v0. It is a destination to grow toward once real traces make the need concrete.
+
+## Tool Philosophy
+
+One important part of the long-term direction is to avoid increasing agent cognitive load by inventing unnecessary tool abstractions.
+
+The preference is:
+
+- reuse mature tools humans already use in real work whenever possible
+- avoid redundant wrapper abstractions unless they clearly reduce recurring failure modes
+- let domain adapters expose real capabilities without forcing every domain into the same artificial tool vocabulary
+
+For code and repo work, this means tools like file inspection, grep, git, and shell access are not incidental conveniences. They are examples of the broader principle that the agent should be able to act through practical, reality-based interfaces.
 
 ## Architectural Direction
 
