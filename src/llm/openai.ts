@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import OpenAI from 'openai';
-import type { ResponseInputItem, FunctionTool, ResponseFunctionToolCall } from 'openai/resources/responses/responses.js';
+import type { ResponseInputItem, FunctionTool, ResponseFunctionToolCall, ResponseReasoningItem, Response } from 'openai/resources/responses/responses.js';
 import type { LlmAdapter, ChatMessage, LlmResponse } from './types.js';
 import type { ToolDefinition, ToolCall } from '../types.js';
 
@@ -27,9 +27,11 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
         model,
         input: toResponseInput(messages),
         tools: tools.length > 0 ? tools.map(toResponseTool) : undefined,
+        reasoning: {
+          summary: 'detailed',
+        },
       });
 
-      const content = response.output_text || undefined;
       const toolCalls = response.output
         .filter((item): item is ResponseFunctionToolCall => item.type === 'function_call')
         .map((item): ToolCall => ({
@@ -37,6 +39,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
           tool: item.name,
           input: JSON.parse(item.arguments),
         }));
+      const content = extractAssistantContent(response, toolCalls.length > 0);
 
       return { content, toolCalls: toolCalls.length > 0 ? toolCalls : undefined };
     },
@@ -46,6 +49,25 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
 // ---------------------------------------------------------------------------
 // Internal converters
 // ---------------------------------------------------------------------------
+
+function extractAssistantContent(response: Response, hasToolCalls: boolean): string | undefined {
+  if (response.output_text) {
+    return response.output_text;
+  }
+
+  if (!hasToolCalls) {
+    return undefined;
+  }
+
+  const reasoningSummary = response.output
+    .filter((item): item is ResponseReasoningItem => item.type === 'reasoning')
+    .flatMap((item) => item.summary)
+    .map((summary) => summary.text.trim())
+    .filter(Boolean)
+    .join(' ');
+
+  return reasoningSummary || undefined;
+}
 
 function toResponseInput(messages: ChatMessage[]): ResponseInputItem[] {
   return messages.flatMap((message) => toResponseInputItems(message));

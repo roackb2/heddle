@@ -68,6 +68,39 @@ describe('runAgent', () => {
     });
   });
 
+  it('records assistant rationale on tool turns when the model provides text with tool calls', async () => {
+    const fakeLlm: LlmAdapter = {
+      async chat(): Promise<LlmResponse> {
+        return {
+          content: 'I will inspect the repo root before answering.',
+          toolCalls: [{ id: 'call-1', tool: 'list_files', input: { path: '.' } }],
+        };
+      },
+    };
+
+    const listFilesTool: ToolDefinition = {
+      name: 'list_files',
+      description: 'Lists files in a directory',
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: 'README.md\nsrc/' };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Inspect this repo.',
+      llm: fakeLlm,
+      tools: [listFilesTool],
+      maxSteps: 1,
+    });
+
+    expect(result.trace[1]).toMatchObject({
+      type: 'assistant.turn',
+      content: 'I will inspect the repo root before answering.',
+      requestedTools: true,
+    });
+  });
+
   it('blocks duplicate tool calls with identical input and feeds the error back to the model', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
