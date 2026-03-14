@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { listFilesTool } from '../tools/list-files.js';
 import { readFileTool } from '../tools/read-file.js';
+import { createRunShellTool } from '../tools/run-shell.js';
 import { searchFilesTool } from '../tools/search-files.js';
 
 describe('tool input validation', () => {
@@ -67,5 +68,26 @@ describe('searchFilesTool', () => {
     expect(result.output).toContain('src/main.ts');
     expect(result.output).not.toContain('dist/generated.ts');
     expect(result.output).not.toContain('node_modules/pkg.ts');
+  });
+});
+
+describe('runShellTool', () => {
+  it('documents repo-oriented shell usage and expanded safe prefixes', () => {
+    const tool = createRunShellTool();
+
+    expect(tool.description).toContain('Prefer this when mature CLI tools like rg, git, sed, or ls are a better fit');
+    expect(tool.description).toContain('git rev-parse');
+    expect(tool.description).toContain('git ls-files');
+    expect(tool.description).toContain('rg');
+  });
+
+  it('rejects shell control operators even when the prefix is allowed', async () => {
+    const tool = createRunShellTool();
+    const result = await tool.execute({ command: 'ls | wc -l' });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Command not allowed. Shell control operators such as pipes, redirects, command chaining, or subshells are blocked.',
+    });
   });
 });

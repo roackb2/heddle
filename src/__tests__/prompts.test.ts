@@ -9,5 +9,6 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Use tools purposefully');
     expect(prompt).toContain('Start from the current workspace and nearby context');
     expect(prompt).toContain('Do not invent extra fields');
+    expect(prompt).toContain('If a tool reports invalid input or suggests a better tool, correct the call immediately');
   });
 });

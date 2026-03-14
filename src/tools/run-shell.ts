@@ -20,7 +20,9 @@ const DEFAULT_ALLOWLIST: string[] = [
   'tail',
   'wc',
   'grep',
+  'rg',
   'find',
+  'sed',
   'sort',
   'uniq',
   'jq',
@@ -35,6 +37,9 @@ const DEFAULT_ALLOWLIST: string[] = [
   'git diff',
   'git status',
   'git show',
+  'git rev-parse',
+  'git ls-files',
+  'git grep',
   'git branch',
   'git tag',
   'git remote',
@@ -50,7 +55,7 @@ export function createRunShellTool(options: RunShellOptions = {}): ToolDefinitio
   return {
     name: 'run_shell',
     description:
-      `Run a shell command. For safety, only the following command prefixes are allowed: ${allowlist.join(', ')}. The command must start with one of these prefixes.`,
+      `Run a read-oriented shell command inside the current workspace. Prefer this when mature CLI tools like rg, git, sed, or ls are a better fit than bespoke file tools. For safety, only the following command prefixes are allowed: ${allowlist.join(', ')}. The command must start with one of these prefixes and may not use shell control operators like pipes, redirects, or command chaining.`,
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -69,6 +74,13 @@ export function createRunShellTool(options: RunShellOptions = {}): ToolDefinitio
 
       const input: RunShellInput = raw;
       const cmd = input.command.trim();
+
+      if (containsShellControlOperators(cmd)) {
+        return {
+          ok: false,
+          error: 'Command not allowed. Shell control operators such as pipes, redirects, command chaining, or subshells are blocked.',
+        };
+      }
 
       const isAllowed = allowlist.some((prefix) => cmd.startsWith(prefix));
       if (!isAllowed) {
@@ -107,4 +119,8 @@ function isRunShellInput(raw: unknown): raw is RunShellInput {
   }
 
   return typeof input.command === 'string';
+}
+
+function containsShellControlOperators(command: string): boolean {
+  return /[|;&><`]/.test(command) || command.includes('&&') || command.includes('||') || command.includes('$(');
 }
