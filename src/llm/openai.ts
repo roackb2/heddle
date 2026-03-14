@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import OpenAI from 'openai';
-import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions.js';
+import type { ResponseInputItem, FunctionTool, ResponseFunctionToolCall } from 'openai/resources/responses/responses.js';
 import type { LlmAdapter, ChatMessage, LlmResponse } from './types.js';
 import type { ToolDefinition, ToolCall } from '../types.js';
 
@@ -23,30 +23,22 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
 
   return {
     async chat(messages: ChatMessage[], tools: ToolDefinition[]): Promise<LlmResponse> {
-      const openaiMessages = messages.map(toOpenAiMessage);
-      const openaiTools = tools.length > 0 ? tools.map(toOpenAiTool) : undefined;
-
-      const response = await client.chat.completions.create({
+      const response = await client.responses.create({
         model,
-        messages: openaiMessages,
-        tools: openaiTools,
+        input: toResponseInput(messages),
+        tools: tools.length > 0 ? tools.map(toResponseTool) : undefined,
       });
 
-      const choice = response.choices[0];
-      if (!choice) {
-        return { content: '' };
-      }
+      const content = response.output_text || undefined;
+      const toolCalls = response.output
+        .filter((item): item is ResponseFunctionToolCall => item.type === 'function_call')
+        .map((item): ToolCall => ({
+          id: item.call_id,
+          tool: item.name,
+          input: JSON.parse(item.arguments),
+        }));
 
-      const content = choice.message.content ?? undefined;
-      const toolCalls = choice.message.tool_calls?.map(
-        (tc): ToolCall => ({
-          id: tc.id,
-          tool: tc.function.name,
-          input: JSON.parse(tc.function.arguments),
-        }),
-      );
-
-      return { content, toolCalls };
+      return { content, toolCalls: toolCalls.length > 0 ? toolCalls : undefined };
     },
   };
 }
@@ -55,43 +47,50 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
 // Internal converters
 // ---------------------------------------------------------------------------
 
-function toOpenAiMessage(msg: ChatMessage): ChatCompletionMessageParam {
+function toResponseInput(messages: ChatMessage[]): ResponseInputItem[] {
+  return messages.flatMap((message) => toResponseInputItems(message));
+}
+
+function toResponseInputItems(msg: ChatMessage): ResponseInputItem[] {
   switch (msg.role) {
     case 'system':
-      return { role: 'system', content: msg.content };
+      return [{ type: 'message', role: 'system', content: msg.content }];
     case 'user':
-      return { role: 'user', content: msg.content };
+      return [{ type: 'message', role: 'user', content: msg.content }];
     case 'assistant': {
-      const toolCalls = msg.toolCalls?.map((tc) => ({
-        id: tc.id,
-        type: 'function' as const,
-        function: {
-          name: tc.tool,
-          arguments: JSON.stringify(tc.input),
-        },
-      }));
-      return {
-        role: 'assistant',
-        content: msg.content,
-        ...(toolCalls && toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
-      };
+      const items: ResponseInputItem[] = [];
+      if (msg.content) {
+        items.push({ type: 'message', role: 'assistant', content: msg.content });
+      }
+      if (msg.toolCalls) {
+        for (const call of msg.toolCalls) {
+          items.push({
+            type: 'function_call',
+            call_id: call.id,
+            name: call.tool,
+            arguments: JSON.stringify(call.input),
+          });
+        }
+      }
+      return items;
     }
     case 'tool':
-      return {
-        role: 'tool',
-        content: msg.content,
-        tool_call_id: msg.toolCallId,
-      };
+      return [
+        {
+          type: 'function_call_output',
+          call_id: msg.toolCallId,
+          output: msg.content,
+        },
+      ];
   }
 }
 
-function toOpenAiTool(tool: ToolDefinition): ChatCompletionTool {
+function toResponseTool(tool: ToolDefinition): FunctionTool {
   return {
     type: 'function',
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters,
-    },
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters,
+    strict: false,
   };
 }

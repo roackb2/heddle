@@ -24,12 +24,13 @@ async function main() {
     console.error('Usage: npx tsx examples/repo-investigator.ts "<goal>"');
     process.exit(1);
   }
+  const model = process.env.OPENAI_MODEL ?? 'gpt-5.1-codex-mini';
 
   const logger = createLogger({ pretty: true, level: 'debug' });
 
-  logger.info({ goal }, '🧵 Heddle — Repo Investigator');
+  logger.info({ goal, model }, '🧵 Heddle — Repo Investigator');
 
-  const llm = createOpenAiAdapter();
+  const llm = createOpenAiAdapter({ model });
   const tools = [listFilesTool, readFileTool, searchFilesTool, createRunShellTool()];
 
   const result = await runAgent({ goal, llm, tools, maxSteps: 15, logger });
