@@ -3,7 +3,7 @@
 // A minimal, executable agent loop.
 // ---------------------------------------------------------------------------
 
-import type { RunInput, RunResult, ToolDefinition, TraceEvent, StopReason } from './types.js';
+import type { RunInput, RunResult, ToolDefinition, StopReason } from './types.js';
 import type { LlmAdapter } from './llm/types.js';
 import type { ChatMessage } from './llm/types.js';
 import { createToolRegistry } from './tools/registry.js';
@@ -82,10 +82,14 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
 
     // Case 1: model returned tool calls
     if (response.toolCalls && response.toolCalls.length > 0) {
-      // If there's also content, record it
-      if (response.content) {
-        trace.record({ type: 'model.message', content: response.content, step, timestamp: now() });
-      }
+      trace.record({
+        type: 'assistant.turn',
+        content: response.content ?? '',
+        requestedTools: true,
+        toolCalls: response.toolCalls,
+        step,
+        timestamp: now(),
+      });
 
       // Record the assistant message with tool calls for the transcript
       messages.push({
@@ -129,7 +133,13 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
 
     // Case 2: model returned content only → agent is done
     if (response.content) {
-      trace.record({ type: 'model.message', content: response.content, step, timestamp: now() });
+      trace.record({
+        type: 'assistant.turn',
+        content: response.content,
+        requestedTools: false,
+        step,
+        timestamp: now(),
+      });
       messages.push({ role: 'assistant', content: response.content });
 
       outcome = 'done';

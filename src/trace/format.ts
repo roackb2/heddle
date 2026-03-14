@@ -31,13 +31,26 @@ export function formatTraceForConsole(trace: TraceEvent[]): string {
         );
         break;
 
-      case 'model.message':
+      case 'assistant.turn': {
+        const requestedToolNames = event.toolCalls?.map((call) => call.tool) ?? [];
         lines.push(
-          `${COLORS.magenta}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}Model:${COLORS.reset}`,
-          `  ${truncate(event.content, 500)}`,
-          '',
+          `${COLORS.magenta}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}Assistant:${COLORS.reset}`,
         );
+        if (event.content) {
+          lines.push(`  ${truncate(event.content, 500)}`);
+        } else if (event.requestedTools) {
+          lines.push(
+            `  (no text content; requested ${requestedToolNames.length} tool call${requestedToolNames.length === 1 ? '' : 's'})`,
+          );
+        }
+        if (event.requestedTools) {
+          lines.push(
+            `  Requested Tools: ${requestedToolNames.join(', ')} (${requestedToolNames.length})`,
+          );
+        }
+        lines.push('');
         break;
+      }
 
       case 'tool.call':
         lines.push(
