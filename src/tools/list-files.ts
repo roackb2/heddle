@@ -13,9 +13,10 @@ type ListFilesInput = {
 export const listFilesTool: ToolDefinition = {
   name: 'list_files',
   description:
-    'List files and directories at the given path. Defaults to the current working directory. Returns a flat list of names. Directories end with /.',
+    'List files and directories inside a directory path. Use this to inspect folders, not to read file contents. Defaults to the current working directory. Returns a flat list of names. Directories end with /.',
   parameters: {
     type: 'object',
+    additionalProperties: false,
     properties: {
       path: {
         type: 'string',
@@ -24,7 +25,11 @@ export const listFilesTool: ToolDefinition = {
     },
   },
   async execute(raw: unknown): Promise<ToolResult> {
-    const input = raw as ListFilesInput;
+    if (!isListFilesInput(raw)) {
+      return { ok: false, error: 'Invalid input for list_files. Allowed fields: path.' };
+    }
+
+    const input: ListFilesInput = raw;
     const dir = resolve(input.path ?? '.');
 
     try {
@@ -32,7 +37,24 @@ export const listFilesTool: ToolDefinition = {
       const names = entries.map((e) => (e.isDirectory() ? `${e.name}/` : e.name));
       return { ok: true, output: names.join('\n') };
     } catch (err) {
+      if (err instanceof Error && 'code' in err && err.code === 'ENOTDIR') {
+        return { ok: false, error: `Failed to list ${dir}: path is a file, not a directory. Use read_file for file contents.` };
+      }
       return { ok: false, error: `Failed to list ${dir}: ${err instanceof Error ? err.message : String(err)}` };
     }
   },
 };
+
+function isListFilesInput(raw: unknown): raw is ListFilesInput {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return false;
+  }
+
+  const input = raw as Record<string, unknown>;
+  const keys = Object.keys(input);
+  if (keys.some((key) => key !== 'path')) {
+    return false;
+  }
+
+  return input.path === undefined || typeof input.path === 'string';
+}

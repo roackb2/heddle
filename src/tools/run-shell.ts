@@ -53,6 +53,7 @@ export function createRunShellTool(options: RunShellOptions = {}): ToolDefinitio
       `Run a shell command. For safety, only the following command prefixes are allowed: ${allowlist.join(', ')}. The command must start with one of these prefixes.`,
     parameters: {
       type: 'object',
+      additionalProperties: false,
       properties: {
         command: {
           type: 'string',
@@ -62,7 +63,11 @@ export function createRunShellTool(options: RunShellOptions = {}): ToolDefinitio
       required: ['command'],
     },
     async execute(raw: unknown): Promise<ToolResult> {
-      const input = raw as RunShellInput;
+      if (!isRunShellInput(raw)) {
+        return { ok: false, error: 'Invalid input for run_shell. Required field: command.' };
+      }
+
+      const input: RunShellInput = raw;
       const cmd = input.command.trim();
 
       const isAllowed = allowlist.some((prefix) => cmd.startsWith(prefix));
@@ -88,4 +93,18 @@ export function createRunShellTool(options: RunShellOptions = {}): ToolDefinitio
       }
     },
   };
+}
+
+function isRunShellInput(raw: unknown): raw is RunShellInput {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return false;
+  }
+
+  const input = raw as Record<string, unknown>;
+  const keys = Object.keys(input);
+  if (keys.length !== 1 || keys[0] !== 'command') {
+    return false;
+  }
+
+  return typeof input.command === 'string';
 }

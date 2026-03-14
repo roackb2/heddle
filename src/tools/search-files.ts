@@ -12,12 +12,15 @@ type SearchFilesInput = {
   path?: string;
 };
 
+const DEFAULT_EXCLUDED_DIRS = ['.git', 'dist', 'node_modules', 'local'];
+
 export const searchFilesTool: ToolDefinition = {
   name: 'search_files',
   description:
-    'Search for a text pattern in files using grep. Returns matching lines with file paths and line numbers.',
+    'Search for a text pattern in files using grep. Returns matching lines with file paths and line numbers. Ignores generated directories like .git, dist, node_modules, and local.',
   parameters: {
     type: 'object',
+    additionalProperties: false,
     properties: {
       query: {
         type: 'string',
@@ -31,13 +34,18 @@ export const searchFilesTool: ToolDefinition = {
     required: ['query'],
   },
   async execute(raw: unknown): Promise<ToolResult> {
-    const input = raw as SearchFilesInput;
+    if (!isSearchFilesInput(raw)) {
+      return { ok: false, error: 'Invalid input for search_files. Required field: query. Optional field: path.' };
+    }
+
+    const input: SearchFilesInput = raw;
     const dir = resolve(input.path ?? '.');
+    const excludedDirs = DEFAULT_EXCLUDED_DIRS.map((name) => `--exclude-dir=${escapeShellArg(name)}`).join(' ');
 
     try {
       // -r recursive, -n line numbers, -I skip binary, --include common text files
       const output = execSync(
-        `grep -rnI --include='*.ts' --include='*.js' --include='*.json' --include='*.md' --include='*.txt' --include='*.yaml' --include='*.yml' ${escapeShellArg(input.query)} ${escapeShellArg(dir)}`,
+        `grep -rnI ${excludedDirs} --include='*.ts' --include='*.js' --include='*.json' --include='*.md' --include='*.txt' --include='*.yaml' --include='*.yml' ${escapeShellArg(input.query)} ${escapeShellArg(dir)}`,
         { encoding: 'utf-8', timeout: 15_000, maxBuffer: 1024 * 1024 },
       );
       return { ok: true, output: output.trim() };
@@ -50,6 +58,24 @@ export const searchFilesTool: ToolDefinition = {
     }
   },
 };
+
+function isSearchFilesInput(raw: unknown): raw is SearchFilesInput {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return false;
+  }
+
+  const input = raw as Record<string, unknown>;
+  const keys = Object.keys(input);
+  if (keys.some((key) => key !== 'query' && key !== 'path')) {
+    return false;
+  }
+
+  if (typeof input.query !== 'string') {
+    return false;
+  }
+
+  return input.path === undefined || typeof input.path === 'string';
+}
 
 function escapeShellArg(arg: string): string {
   return `'${arg.replace(/'/g, "'\\''")}'`;
