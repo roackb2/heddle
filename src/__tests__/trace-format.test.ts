@@ -53,4 +53,29 @@ describe('formatTraceForConsole', () => {
     expect(output).toContain('The repo contains README.md and src/.');
     expect(output).not.toContain('Requested Tools:');
   });
+
+  it('renders structured tool outputs readably instead of object coercions', () => {
+    const output = formatTraceForConsole([
+      {
+        type: 'tool.result',
+        tool: 'run_shell',
+        result: {
+          ok: true,
+          output: {
+            command: 'pwd',
+            exitCode: 0,
+            stdout: '/repo',
+            stderr: '',
+          },
+        },
+        step: 2,
+        timestamp: '2024-01-01T00:00:01Z',
+      },
+    ]);
+
+    expect(output).toContain('run_shell');
+    expect(output).toContain('"command": "pwd"');
+    expect(output).toContain('"stdout": "/repo"');
+    expect(output).not.toContain('[object Object]');
+  });
 });

@@ -63,7 +63,7 @@ export function formatTraceForConsole(trace: TraceEvent[]): string {
         const color = event.result.ok ? COLORS.green : COLORS.red;
         const status = event.result.ok ? '✓' : '✗';
         const content = event.result.ok
-          ? truncate(String(event.result.output ?? ''), 300)
+          ? formatToolResultOutput(event.result.output)
           : `ERROR: ${event.result.error}`;
         lines.push(
           `${color}  ${status} ${event.tool}${COLORS.reset}: ${content}`,
@@ -93,4 +93,16 @@ export function formatTraceForConsole(trace: TraceEvent[]): string {
 function truncate(str: string, maxLen: number): string {
   if (str.length <= maxLen) return str;
   return str.slice(0, maxLen) + '…';
+}
+
+function formatToolResultOutput(output: unknown): string {
+  if (output == null) {
+    return '';
+  }
+
+  if (typeof output === 'string') {
+    return truncate(output, 300);
+  }
+
+  return truncate(JSON.stringify(output, null, 2), 300);
 }
