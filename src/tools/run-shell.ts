@@ -3,7 +3,7 @@
 // Safe by default — only allowlisted command prefixes are permitted.
 // ---------------------------------------------------------------------------
 
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import type { ToolDefinition, ToolResult } from '../types.js';
 
 type RunShellInput = {
@@ -49,6 +49,13 @@ export type RunShellOptions = {
   allowlist?: string[];
 };
 
+type RunShellOutput = {
+  command: string;
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+};
+
 export function createRunShellTool(options: RunShellOptions = {}): ToolDefinition {
   const allowlist = options.allowlist ?? DEFAULT_ALLOWLIST;
 
@@ -91,12 +98,36 @@ export function createRunShellTool(options: RunShellOptions = {}): ToolDefinitio
       }
 
       try {
-        const output = execSync(cmd, {
+        const result = spawnSync(cmd, {
+          shell: true,
           encoding: 'utf-8',
           timeout: 30_000,
           maxBuffer: 1024 * 1024,
         });
-        return { ok: true, output: output.trim() };
+
+        if (result.error) {
+          return {
+            ok: false,
+            error: `Shell command failed: ${result.error.message}`,
+          };
+        }
+
+        const output: RunShellOutput = {
+          command: cmd,
+          exitCode: result.status ?? 0,
+          stdout: (result.stdout ?? '').trim(),
+          stderr: (result.stderr ?? '').trim(),
+        };
+
+        if ((result.status ?? 0) !== 0) {
+          return {
+            ok: false,
+            error: `Shell command failed with exit code ${output.exitCode}`,
+            output,
+          };
+        }
+
+        return { ok: true, output };
       } catch (err) {
         return {
           ok: false,

@@ -90,4 +90,31 @@ describe('runShellTool', () => {
       error: 'Command not allowed. Shell control operators such as pipes, redirects, command chaining, or subshells are blocked.',
     });
   });
+
+  it('returns structured stdout and exit code for successful commands', async () => {
+    const tool = createRunShellTool();
+    const result = await tool.execute({ command: 'pwd' });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({
+      command: 'pwd',
+      exitCode: 0,
+      stderr: '',
+    });
+    expect(typeof (result.output as { stdout: unknown }).stdout).toBe('string');
+  });
+
+  it('returns structured failure details for allowed commands that exit non-zero', async () => {
+    const tool = createRunShellTool();
+    const result = await tool.execute({ command: 'grep definitely-not-present README.md' });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: 'Shell command failed with exit code 1',
+      output: {
+        command: 'grep definitely-not-present README.md',
+        exitCode: 1,
+      },
+    });
+  });
 });
