@@ -186,6 +186,60 @@ describe('runAgent', () => {
       requestedTools: false,
     });
   });
+
+  it('blocks duplicate tool calls with identical input and feeds the error back to the model', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(messages);
+
+        if (seenMessages.length < 3) {
+          return {
+            toolCalls: [{ id: `call-${seenMessages.length}`, tool: 'list_files', input: { path: '.' } }],
+          };
+        }
+
+        return {
+          content: 'I should stop repeating the same directory listing.',
+        };
+      },
+    };
+
+    const listFilesTool: ToolDefinition = {
+      name: 'list_files',
+      description: 'Lists files in a directory',
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: 'README.md\nsrc/' };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Inspect this repo.',
+      llm: fakeLlm,
+      tools: [listFilesTool],
+      maxSteps: 4,
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('I should stop repeating the same directory listing.');
+    expect(seenMessages[2]).toContainEqual({
+      role: 'tool',
+      content: JSON.stringify(
+        'Duplicate tool call blocked: list_files was already called with the same input earlier in this run. Try a different tool or different input.',
+      ),
+      toolCallId: 'call-2',
+    });
+    expect(result.trace[6]).toMatchObject({
+      type: 'tool.result',
+      tool: 'list_files',
+      result: {
+        ok: false,
+        error:
+          'Duplicate tool call blocked: list_files was already called with the same input earlier in this run. Try a different tool or different input.',
+      },
+    });
+  });
 });
 
 describe('tool input validation', () => {

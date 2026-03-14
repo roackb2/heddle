@@ -40,6 +40,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   const registry = createToolRegistry(tools);
   const trace = createTraceRecorder();
   const budget = createBudget(maxSteps);
+  const seenToolCalls = new Set<string>();
 
   // Start trace
   const now = () => new Date().toISOString();
@@ -103,7 +104,14 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
         log.info({ step, tool: call.tool }, 'Executing tool');
         trace.record({ type: 'tool.call', call, step, timestamp: now() });
 
-        const result = await executeTool(registry, call);
+        const signature = `${call.tool}:${stableSerialize(call.input)}`;
+        const result = seenToolCalls.has(signature)
+          ? {
+              ok: false as const,
+              error: `Duplicate tool call blocked: ${call.tool} was already called with the same input earlier in this run. Try a different tool or different input.`,
+            }
+          : await executeTool(registry, call);
+        seenToolCalls.add(signature);
         log.debug({ step, tool: call.tool, ok: result.ok }, 'Tool result');
         trace.record({ type: 'tool.result', tool: call.tool, result, step, timestamp: now() });
 
@@ -161,4 +169,17 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   log.warn({ step, maxSteps }, 'Budget exhausted');
   trace.record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
   return { outcome, summary, trace: trace.getTrace() };
+}
+
+function stableSerialize(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableSerialize(item)).join(',')}]`;
+  }
+
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right));
+    return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${stableSerialize(entryValue)}`).join(',')}}`;
+  }
+
+  return JSON.stringify(value);
 }
