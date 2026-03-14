@@ -107,6 +107,31 @@ The likely long-term shape is:
 
 In other words, the loop should stay stable while the support system around it becomes more capable.
 
+## Mid-Term Environment Roadmap
+
+One likely mid-term direction is to treat sandboxed shell execution as a more first-class environment surface rather than encoding every capability as a bespoke tool.
+
+The intended stance is:
+
+- keep a small number of structured tools where they add clarity or safety
+- improve shell execution as a realistic environment adapter for domains that already have strong CLI workflows
+- let future domains use other environment adapters where shell is a poor fit, such as design APIs or visual tools
+
+This still fits Heddle's overall goal. A sandboxed shell is not a deviation from the framework direction; it is one plausible action surface inside that framework.
+
+What matters is that shell execution be bounded by runtime support:
+
+- workspace scoping
+- safety policy
+- traceability
+- resource limits
+- approval or capability boundaries where needed
+
+That means the long-term framework should support both:
+
+- structured tools
+- richer environment adapters such as shell, browser, or domain-specific APIs
+
 ## Decision Rule
 
 When deciding whether to add a concept now, ask:
