@@ -3,9 +3,11 @@
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from 'vitest';
+import { runAgent } from '../run-agent.js';
 import { createToolRegistry } from '../tools/registry.js';
 import { createBudget } from '../utils/budget.js';
 import { createTraceRecorder } from '../trace/recorder.js';
+import type { ChatMessage, LlmAdapter, LlmResponse } from '../llm/types.js';
 import type { ToolDefinition, TraceEvent } from '../types.js';
 
 // ---------------------------------------------------------------------------
@@ -105,5 +107,64 @@ describe('createTraceRecorder', () => {
     const trace = recorder.getTrace();
     trace.pop();
     expect(recorder.getTrace()).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Agent Loop
+// ---------------------------------------------------------------------------
+
+describe('runAgent', () => {
+  it('executes tool calls, appends tool output, and finishes with a final answer', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(messages);
+
+        if (seenMessages.length === 1) {
+          return {
+            content: 'I will inspect the repo first.',
+            toolCalls: [{ id: 'call-1', tool: 'list_files', input: { path: '.' } }],
+          };
+        }
+
+        return {
+          content: 'The repo contains README.md and src/.',
+        };
+      },
+    };
+
+    const listFilesTool: ToolDefinition = {
+      name: 'list_files',
+      description: 'Lists files in a directory',
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: 'README.md\nsrc/' };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'What is in this repo?',
+      llm: fakeLlm,
+      tools: [listFilesTool],
+      maxSteps: 3,
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('The repo contains README.md and src/.');
+    expect(seenMessages).toHaveLength(2);
+    expect(seenMessages[1]).toContainEqual({
+      role: 'tool',
+      content: JSON.stringify('README.md\nsrc/'),
+      toolCallId: 'call-1',
+    });
+    expect(result.trace.map((event) => event.type)).toEqual([
+      'run.started',
+      'model.message',
+      'tool.call',
+      'tool.result',
+      'model.message',
+      'run.finished',
+    ]);
   });
 });

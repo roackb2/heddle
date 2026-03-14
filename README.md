@@ -31,6 +31,10 @@ goal
 
 Early development. v0 in progress.
 
+## Next Step
+
+The immediate next step is to run `examples/repo-investigator.ts` against this repo, save the trace, and review concrete failure modes before adding new abstractions. A review template lives in [docs/first-run-review.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/first-run-review.md).
+
 ## Design Principles
 
 1. **Don't over-abstract early** — no concept becomes a first-class abstraction until a recurring failure mode justifies it
