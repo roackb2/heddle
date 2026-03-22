@@ -8,6 +8,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx examples/repo-investigator.ts",
+    "repo-investigator:dev": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" tsx examples/repo-investigator.ts",
     "test": "vitest run"
   },
   "keywords": [

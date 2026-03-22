@@ -5,6 +5,7 @@
 // Core loop
 export { runAgent } from './run-agent.js';
 export type { RunAgentOptions } from './run-agent.js';
+export { DEFAULT_OPENAI_MODEL } from './config.js';
 
 // Types
 export type {

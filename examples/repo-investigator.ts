@@ -8,6 +8,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  DEFAULT_OPENAI_MODEL,
   runAgent,
   createOpenAiAdapter,
   listFilesTool,
@@ -24,7 +25,7 @@ async function main() {
     console.error('Usage: npx tsx examples/repo-investigator.ts "<goal>"');
     process.exit(1);
   }
-  const model = process.env.OPENAI_MODEL ?? 'gpt-5.1-codex-mini';
+  const model = process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
 
   const logger = createLogger({ pretty: true, level: 'debug' });
 

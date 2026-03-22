@@ -6,6 +6,7 @@ import OpenAI from 'openai';
 import type { ResponseInputItem, FunctionTool, ResponseFunctionToolCall, ResponseReasoningItem, Response } from 'openai/resources/responses/responses.js';
 import type { LlmAdapter, ChatMessage, LlmResponse } from './types.js';
 import type { ToolDefinition, ToolCall } from '../types.js';
+import { DEFAULT_OPENAI_MODEL } from '../config.js';
 
 export type OpenAiAdapterOptions = {
   apiKey?: string;
@@ -19,7 +20,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
   const client = new OpenAI({
     apiKey: options.apiKey ?? process.env.OPENAI_API_KEY,
   });
-  const model = options.model ?? 'gpt-4o';
+  const model = options.model ?? DEFAULT_OPENAI_MODEL;
 
   return {
     async chat(messages: ChatMessage[], tools: ToolDefinition[]): Promise<LlmResponse> {
