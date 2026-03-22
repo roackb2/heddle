@@ -79,6 +79,60 @@ That suggests:
 - a small `KnowledgeStore` contract
 - domain adapters that implement awareness for code, infra, docs, or other environments
 
+## Tool Design Principle
+
+The agent-facing tool layer must stay more concrete than the architecture layer.
+
+Terms like `AwarenessProvider` and `KnowledgeStore` are useful for system design, but they are not necessarily good tool names. Agents need tools with simple, legible mental models and predictable behavior.
+
+The default rule is:
+
+- architecture terms explain why a subsystem exists
+- tool names explain what the agent can do right now
+
+Examples:
+
+- good architecture terms: `AwarenessProvider`, `KnowledgeStore`
+- good agent-facing tool names: `list_artifacts`, `search_artifacts`, `read_artifact`, `summarize_changes`, `suggest_starting_points`, `search_notes`, `save_note`
+
+Avoid exposing vague agent-facing tools with names like `understand_environment` or `find_relevant_context` unless the behavior is narrow enough to be predictable from the name alone.
+
+## Mental Model Rule
+
+Agent tools should feel like stable instruments, not smart assistants.
+
+Even when the implementation is sophisticated, the tool contract should still communicate a clear mental model:
+
+- deterministic vs heuristic
+- exhaustive vs best-effort
+- raw results vs synthesized suggestions
+
+Good tools usually fit one of a few simple shapes:
+
+- enumerate
+- filter
+- search
+- read
+- summarize
+- transform
+- suggest
+
+Blending too many of those behaviors behind one vague verb makes the tool harder for agents to use correctly.
+
+One practical consequence is that Heddle should be cautious about inventing wrappers for every external system. If an existing tool already has a mature and legible interface, exposing it through a safe environment adapter may be better than creating a new bespoke tool with fuzzier semantics.
+
+## Inspectable By Default
+
+Heuristic outputs should always be easy to verify with simpler deterministic tools.
+
+For example:
+
+- `suggest_starting_points` suggests likely places to inspect
+- `read_artifact` verifies one target directly
+- `search_artifacts` broadens or checks the evidence
+
+This keeps the system legible. A heuristic tool can help the agent start faster, but it should not behave like an opaque oracle.
+
 ## AwarenessProvider
 
 An awareness provider helps the runtime or agent gather and summarize current-environment evidence for a goal.
@@ -140,6 +194,17 @@ Examples:
 - an infra adapter might use services, logs, metrics, or deployment state
 - a docs adapter might use document trees, metadata, and text search
 
+This is an internal interface shape, not a recommended agent-facing tool vocabulary.
+
+An adapter may expose this capability to the agent through clearer tool contracts such as:
+
+- `list_artifacts`
+- `search_artifacts`
+- `summarize_changes`
+- `suggest_starting_points`
+
+Those names communicate behavior more directly than the architecture term `findRelevantContext`.
+
 ## KnowledgeStore
 
 A knowledge store is durable memory scoped to a tenant, workspace, project, or task family.
@@ -194,6 +259,14 @@ This interface deliberately avoids overcommitting to storage internals:
 
 The interface should preserve those options.
 
+Agent-facing persistence tools should follow the same rule. Prefer concrete verbs like:
+
+- `search_notes`
+- `save_note`
+- `list_notes`
+
+over abstract names like `query_memory` unless the behavior is equally clear.
+
 ## Relationship Between Them
 
 The intended data flow is:
@@ -222,6 +295,8 @@ The core runtime should not hardcode:
 
 Those belong in adapters, policies, or hosted-service infrastructure.
 
+The core runtime should also avoid leaking architecture vocabulary directly into the agent-facing tool layer unless the term is behaviorally obvious.
+
 ## Code Adapter As One Example
 
 A code adapter may eventually implement awareness with capabilities such as:
@@ -233,6 +308,15 @@ A code adapter may eventually implement awareness with capabilities such as:
 - retrieval from file content, structure, or index
 
 That should be treated as one domain adapter, not the definition of the framework.
+
+At the tool boundary, the preferred approach is still to expose a small number of legible operations with familiar mental models, not a single opaque "understand the repo" command.
+
+The likely near-term pattern is:
+
+- structured tools for high-frequency CRUD-style operations with very clear semantics
+- shell or other environment adapters for the long tail of domain-specific capabilities and edge cases
+
+That keeps the agent-facing surface compact without forcing the framework to wrap every existing operational tool.
 
 ## Storage Direction
 

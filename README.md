@@ -17,6 +17,7 @@ So the project stance is:
 - growth model: add abstractions only after real traces justify them
 
 Longer-term framework direction is documented in [docs/framework-vision.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/framework-vision.md), including future concepts like situation awareness and knowledge persistence.
+
 A current boundary sketch for those layers lives in [docs/awareness-and-memory.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/awareness-and-memory.md).
 
 ## What It Is Not
@@ -55,6 +56,8 @@ The example runner defaults to `gpt-5.1-codex-mini`. Override it with `OPENAI_MO
 2. **Trace is a first-class citizen** — every step is recorded; the trace is the primary diagnostic artifact
 3. **Runtime supports the agent, doesn't govern it** — the agent decides; the runtime executes and records
 4. **Abstractions must have a root cause** — every module must answer: what recurring problem does this solve?
+5. **Tools need clear mental models** — agent-facing tools should behave like stable instruments, with predictable semantics and explicit heuristic vs deterministic boundaries
+6. **Prefer safe environments over endless wrappers** — keep a few high-frequency structured tools, but rely on bounded shell or other environment adapters for the long tail of real-world capabilities
 
 ## Roadmap Shape
 

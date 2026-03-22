@@ -97,6 +97,24 @@ The preference is:
 - avoid redundant wrapper abstractions unless they clearly reduce recurring failure modes
 - let domain adapters expose real capabilities without forcing every domain into the same artificial tool vocabulary
 
+The stronger rule is:
+
+- agent-facing tools should have simple mental models and predictable behavior
+- architecture terminology should stay mostly internal unless it is also behaviorally clear at the tool boundary
+- heuristic tools should declare themselves as suggestions rather than pretending to be exhaustive search or proof
+- heuristic outputs should be easy to verify with simpler deterministic tools
+
+The current product tension is between:
+
+- adding structured tools with very clear semantics
+- relying on a safe shell environment that exposes mature existing tools directly
+
+The current leaning is:
+
+- keep a small set of high-frequency structured tools where they clearly improve clarity, safety, or reliability
+- avoid wrapping every ecosystem CLI or infrastructure command family into bespoke Heddle tools
+- invest in a safe, well-bounded shell environment so agents can use mature tools like `grep`, `git`, `aws`, or `kubectl` directly when appropriate
+
 For code and repo work, this means tools like file inspection, grep, git, and shell access are not incidental conveniences. They are examples of the broader principle that the agent should be able to act through practical, reality-based interfaces.
 
 ## Architectural Direction
@@ -118,6 +136,8 @@ The intended stance is:
 - keep a small number of structured tools where they add clarity or safety
 - improve shell execution as a realistic environment adapter for domains that already have strong CLI workflows
 - let future domains use other environment adapters where shell is a poor fit, such as design APIs or visual tools
+
+Structured tools should be biased toward high-frequency CRUD-style operations with simple semantics, such as listing, reading, or searching common artifacts. Shell should cover the long tail and domain-specific edge cases where wrapping every capability would create unnecessary abstraction debt.
 
 This still fits Heddle's overall goal. A sandboxed shell is not a deviation from the framework direction; it is one plausible action surface inside that framework.
 
