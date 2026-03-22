@@ -17,6 +17,7 @@ So the project stance is:
 - growth model: add abstractions only after real traces justify them
 
 Longer-term framework direction is documented in [docs/framework-vision.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/framework-vision.md), including future concepts like situation awareness and knowledge persistence.
+A current boundary sketch for those layers lives in [docs/awareness-and-memory.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/awareness-and-memory.md).
 
 ## What It Is Not
 
