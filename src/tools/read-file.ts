@@ -14,7 +14,7 @@ type ReadFileInput = {
 export const readFileTool: ToolDefinition = {
   name: 'read_file',
   description:
-    'Read the contents of a file. Use this when you already know the file path and want its contents, not when you want to inspect a directory. Optionally limit to the first N lines with maxLines. Returns the file text directly, or just the first N lines when maxLines is provided. Example input: { "path": "path/to/file.txt" }',
+    'Read the contents of a file. Use this when you already know the file path and want its contents, not when you want to inspect a directory. Relative paths are resolved from the current working directory and may also point to nearby parent or sibling folders. Optionally limit to the first N lines with maxLines. Returns the file text directly, or just the first N lines when maxLines is provided. Example inputs: { "path": "path/to/file.txt" }, { "path": "../shared-notes/summary.md" }',
   parameters: {
     type: 'object',
     additionalProperties: false,
