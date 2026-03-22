@@ -27,15 +27,16 @@ async function main() {
     process.exit(1);
   }
   const model = process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
+  const maxSteps = parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 40;
 
   const logger = createLogger({ pretty: true, level: 'debug' });
 
-  logger.info({ goal, model }, '🧵 Heddle — Repo Investigator');
+  logger.info({ goal, model, maxSteps }, '🧵 Heddle — Repo Investigator');
 
   const llm = createOpenAiAdapter({ model });
   const tools = [listFilesTool, readFileTool, searchFilesTool, reportStateTool, createRunShellTool()];
 
-  const result = await runAgent({ goal, llm, tools, maxSteps: 15, logger });
+  const result = await runAgent({ goal, llm, tools, maxSteps, logger });
 
   // Print formatted trace
   console.log(formatTraceForConsole(result.trace));
@@ -52,3 +53,16 @@ main().catch((err) => {
   console.error('Fatal error:', err);
   process.exit(1);
 });
+
+function parsePositiveInt(raw: string | undefined): number | undefined {
+  if (!raw) {
+    return undefined;
+  }
+
+  const value = Number.parseInt(raw, 10);
+  if (!Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+
+  return value;
+}

@@ -48,7 +48,7 @@ Early development. v0 in progress.
 The immediate next step is to run `examples/repo-investigator.ts` against this repo, save the trace, and review concrete failure modes before adding new abstractions. A review template lives in [docs/first-run-review.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/first-run-review.md).
 An eval batch prompt set lives in [docs/eval-prompts.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/eval-prompts.md), with a batch review template in [docs/eval-review.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/eval-review.md).
 
-The example runner defaults to `gpt-5.1-codex-mini`. Override it with `OPENAI_MODEL` if you want to compare models.
+The example runner defaults to `gpt-5.1-codex-mini` and a 40-step budget. Override them with `OPENAI_MODEL` and `HEDDLE_MAX_STEPS` if you want to compare models or cap exploration more tightly.
 
 ## Design Principles
 
