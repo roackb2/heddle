@@ -186,3 +186,5 @@ That design should answer:
 - what behavior requires a stricter boundary later?
 
 That is the right next design step because it can unlock broader agent behavior without prematurely implementing the larger framework layers.
+
+A concrete contract proposal for that next step now lives in [docs/run-shell-v1.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/run-shell-v1.md).

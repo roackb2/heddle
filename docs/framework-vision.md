@@ -142,6 +142,7 @@ Structured tools should be biased toward high-frequency CRUD-style operations wi
 This still fits Heddle's overall goal. A sandboxed shell is not a deviation from the framework direction; it is one plausible action surface inside that framework.
 
 A current design checkpoint for that direction lives in [docs/shell-direction.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/shell-direction.md).
+The current v1 contract proposal lives in [docs/run-shell-v1.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/run-shell-v1.md).
 
 What matters is that shell execution be bounded by runtime support:
 

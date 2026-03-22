@@ -21,6 +21,7 @@ Longer-term framework direction is documented in [docs/framework-vision.md](/Use
 A current boundary sketch for those layers lives in [docs/awareness-and-memory.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/awareness-and-memory.md).
 
 The current next-step design direction for shell as a real environment surface lives in [docs/shell-direction.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/shell-direction.md).
+The proposed v1 shell contract lives in [docs/run-shell-v1.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/run-shell-v1.md).
 
 ## What It Is Not
 
