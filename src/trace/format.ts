@@ -48,6 +48,15 @@ export function formatTraceForConsole(trace: TraceEvent[]): string {
             `  Requested Tools: ${requestedToolNames.join(', ')} (${requestedToolNames.length})`,
           );
         }
+        if (event.diagnostics?.missing?.length) {
+          lines.push(`  Missing: ${event.diagnostics.missing.join('; ')}`);
+        }
+        if (event.diagnostics?.wantedTools?.length) {
+          lines.push(`  Wanted Tools: ${event.diagnostics.wantedTools.join(', ')}`);
+        }
+        if (event.diagnostics?.wantedInputs?.length) {
+          lines.push(`  Wanted Inputs: ${event.diagnostics.wantedInputs.join('; ')}`);
+        }
         lines.push('');
         break;
       }

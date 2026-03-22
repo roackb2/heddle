@@ -38,6 +38,28 @@ describe('formatTraceForConsole', () => {
     expect(output).toContain('Requested Tools: list_files, read_file (2)');
   });
 
+  it('renders assistant diagnostics for missing gaps and desired tools', () => {
+    const output = formatTraceForConsole([
+      {
+        type: 'assistant.turn',
+        content: 'I need to inspect the environment before answering.',
+        diagnostics: {
+          missing: ['Need the current directory contents'],
+          wantedTools: ['list_files'],
+          wantedInputs: ['path=.'],
+        },
+        requestedTools: true,
+        toolCalls: [{ id: 'call-1', tool: 'list_files', input: { path: '.' } }],
+        step: 1,
+        timestamp: '2024-01-01T00:00:00Z',
+      },
+    ]);
+
+    expect(output).toContain('Missing: Need the current directory contents');
+    expect(output).toContain('Wanted Tools: list_files');
+    expect(output).toContain('Wanted Inputs: path=.');
+  });
+
   it('renders assistant turns with final text only', () => {
     const output = formatTraceForConsole([
       {

@@ -31,6 +31,16 @@ export type ToolCall = {
 };
 
 /**
+ * Optional self-reported assistant diagnostics for observability.
+ */
+export type AssistantDiagnostics = {
+  rationale?: string;
+  missing?: string[];
+  wantedTools?: string[];
+  wantedInputs?: string[];
+};
+
+/**
  * What came back from executing a tool.
  */
 export type ToolResult = {
@@ -53,6 +63,7 @@ export type TraceEvent =
       type: 'assistant.turn';
       content: string;
       requestedTools: boolean;
+      diagnostics?: AssistantDiagnostics;
       toolCalls?: ToolCall[];
       step: number;
       timestamp: string;

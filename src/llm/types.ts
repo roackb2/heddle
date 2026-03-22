@@ -2,7 +2,7 @@
 // LLM Adapter — interface types
 // ---------------------------------------------------------------------------
 
-import type { ToolCall, ToolDefinition } from '../types.js';
+import type { AssistantDiagnostics, ToolCall, ToolDefinition } from '../types.js';
 
 /**
  * A message in the chat transcript.
@@ -18,6 +18,7 @@ export type ChatMessage =
  */
 export type LlmResponse = {
   content?: string;
+  diagnostics?: AssistantDiagnostics;
   toolCalls?: ToolCall[];
 };
 

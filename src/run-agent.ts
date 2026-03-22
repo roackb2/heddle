@@ -86,6 +86,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
       trace.record({
         type: 'assistant.turn',
         content: response.content ?? '',
+        diagnostics: response.diagnostics,
         requestedTools: true,
         toolCalls: response.toolCalls,
         step,
@@ -144,6 +145,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
       trace.record({
         type: 'assistant.turn',
         content: response.content,
+        diagnostics: response.diagnostics,
         requestedTools: false,
         step,
         timestamp: now(),

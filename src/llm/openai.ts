@@ -5,7 +5,7 @@
 import OpenAI from 'openai';
 import type { ResponseInputItem, FunctionTool, ResponseFunctionToolCall, ResponseReasoningItem, Response } from 'openai/resources/responses/responses.js';
 import type { LlmAdapter, ChatMessage, LlmResponse } from './types.js';
-import type { ToolDefinition, ToolCall } from '../types.js';
+import type { AssistantDiagnostics, ToolDefinition, ToolCall } from '../types.js';
 import { DEFAULT_OPENAI_MODEL } from '../config.js';
 
 export type OpenAiAdapterOptions = {
@@ -40,9 +40,14 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
           tool: item.name,
           input: JSON.parse(item.arguments),
         }));
-      const content = extractAssistantContent(response, toolCalls.length > 0);
+      const diagnostics = extractAssistantDiagnostics(response, toolCalls.length > 0);
+      const content = diagnostics?.rationale ?? extractAssistantContent(response, toolCalls.length > 0);
 
-      return { content, toolCalls: toolCalls.length > 0 ? toolCalls : undefined };
+      return {
+        content,
+        diagnostics,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+      };
     },
   };
 }
@@ -68,6 +73,25 @@ function extractAssistantContent(response: Response, hasToolCalls: boolean): str
     .join(' ');
 
   return reasoningSummary || undefined;
+}
+
+function extractAssistantDiagnostics(response: Response, hasToolCalls: boolean): AssistantDiagnostics | undefined {
+  if (!hasToolCalls) {
+    return undefined;
+  }
+
+  const rationale = response.output
+    .filter((item): item is ResponseReasoningItem => item.type === 'reasoning')
+    .flatMap((item) => item.summary)
+    .map((summary) => summary.text.trim())
+    .filter(Boolean)
+    .join(' ');
+
+  if (!rationale) {
+    return undefined;
+  }
+
+  return { rationale };
 }
 
 function toResponseInput(messages: ChatMessage[]): ResponseInputItem[] {

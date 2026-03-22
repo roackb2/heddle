@@ -73,6 +73,12 @@ describe('runAgent', () => {
       async chat(): Promise<LlmResponse> {
         return {
           content: 'I will inspect the repo root before answering.',
+          diagnostics: {
+            rationale: 'I will inspect the repo root before answering.',
+            missing: ['Need the top-level file listing'],
+            wantedTools: ['list_files'],
+            wantedInputs: ['path=.'],
+          },
           toolCalls: [{ id: 'call-1', tool: 'list_files', input: { path: '.' } }],
         };
       },
@@ -97,6 +103,12 @@ describe('runAgent', () => {
     expect(result.trace[1]).toMatchObject({
       type: 'assistant.turn',
       content: 'I will inspect the repo root before answering.',
+      diagnostics: {
+        rationale: 'I will inspect the repo root before answering.',
+        missing: ['Need the top-level file listing'],
+        wantedTools: ['list_files'],
+        wantedInputs: ['path=.'],
+      },
       requestedTools: true,
     });
   });

@@ -13,7 +13,7 @@ type ListFilesInput = {
 export const listFilesTool: ToolDefinition = {
   name: 'list_files',
   description:
-    'List files and directories inside a directory path. Use this to inspect folders, not to read file contents. Prefer this when you need an initial view of the workspace or want to explore an obvious folder such as src/, src/tools/, or docs/ before using broader search. Defaults to the current working directory. Returns a flat newline-separated list of entry names; directories end with /. Example input: { "path": "." }',
+    'List files and directories inside a directory path. Use this to inspect folders, not to read file contents. Prefer this when you need an initial view of the workspace or want to explore an obvious nearby folder before using broader search. Defaults to the current working directory. Returns a flat newline-separated list of entry names; directories end with /. Example input: { "path": "." }',
   parameters: {
     type: 'object',
     additionalProperties: false,
