@@ -13,3 +13,7 @@ local/
 
 # OS
 .DS_Store
+
+# IDE
+.claude/
+

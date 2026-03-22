@@ -13,7 +13,7 @@ describe('tool input validation', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: 'Invalid input for list_files. Allowed fields: path.',
+      error: 'Invalid input for list_files. Allowed fields: path. Example: { "path": "." }',
     });
   });
 
@@ -28,7 +28,15 @@ describe('tool input validation', () => {
 
   it('tool descriptions distinguish directories from files', () => {
     expect(listFilesTool.description).toContain('Use this to inspect folders, not to read file contents');
+    expect(listFilesTool.description).toContain('explore an obvious folder such as src/, src/tools/, or docs/');
+    expect(listFilesTool.description).toContain('newline-separated list of entry names');
     expect(readFileTool.description).toContain('not when you want to inspect a directory');
+    expect(readFileTool.description).toContain('Returns the file text directly');
+    expect(listFilesTool.description).toContain('{ "path": "." }');
+    expect(readFileTool.description).toContain('{ "path": "README.md" }');
+    expect(searchFilesTool.description).toContain('locate a specific symbol or text string');
+    expect(searchFilesTool.description).toContain('grep-style path:line:content format');
+    expect(searchFilesTool.description).toContain('{ "query": "runAgent" }');
   });
 });
 
@@ -76,6 +84,7 @@ describe('runShellTool', () => {
     const tool = createRunShellTool();
 
     expect(tool.description).toContain('Prefer this when mature CLI tools like rg, git, sed, or ls are a better fit');
+    expect(tool.description).toContain('Returns structured output with command, exitCode, stdout, and stderr');
     expect(tool.description).toContain('git rev-parse');
     expect(tool.description).toContain('git ls-files');
     expect(tool.description).toContain('rg');

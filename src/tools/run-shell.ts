@@ -62,7 +62,7 @@ export function createRunShellTool(options: RunShellOptions = {}): ToolDefinitio
   return {
     name: 'run_shell',
     description:
-      `Run a read-oriented shell command inside the current workspace. Prefer this when mature CLI tools like rg, git, sed, or ls are a better fit than bespoke file tools. For safety, only the following command prefixes are allowed: ${allowlist.join(', ')}. The command must start with one of these prefixes and may not use shell control operators like pipes, redirects, or command chaining.`,
+      `Run a read-oriented shell command inside the current workspace. Prefer this when mature CLI tools like rg, git, sed, or ls are a better fit than bespoke file tools. Returns structured output with command, exitCode, stdout, and stderr. For safety, only the following command prefixes are allowed: ${allowlist.join(', ')}. The command must start with one of these prefixes and may not use shell control operators like pipes, redirects, or command chaining.`,
     parameters: {
       type: 'object',
       additionalProperties: false,

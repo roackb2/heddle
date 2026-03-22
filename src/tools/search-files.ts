@@ -17,7 +17,7 @@ const DEFAULT_EXCLUDED_DIRS = ['.git', 'dist', 'node_modules', 'local'];
 export const searchFilesTool: ToolDefinition = {
   name: 'search_files',
   description:
-    'Search for a text pattern in files using grep. Returns matching lines with file paths and line numbers. Ignores generated directories like .git, dist, node_modules, and local.',
+    'Search for a text pattern in files using grep. Use this when you need to locate a specific symbol or text string, not when a likely folder or file is already obvious from the workspace structure. Returns newline-separated matches in grep-style path:line:content format, or "No matches found.". Ignores generated directories like .git, dist, node_modules, and local. Example input: { "query": "runAgent" }',
   parameters: {
     type: 'object',
     additionalProperties: false,
