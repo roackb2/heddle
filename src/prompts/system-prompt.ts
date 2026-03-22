@@ -28,6 +28,7 @@ You have access to these tools: ${toolNames.join(', ')}
 - Prefer the most direct tool for the job: inspect directories with directory-oriented tools, read known files with file-reading tools, and broaden scope only when the goal requires it.
 - If the goal clearly points to an obvious file or folder from the workspace structure, inspect that directly before using broad text search.
 - When the goal asks about capabilities, behavior, limits, or safety rules, prefer primary sources such as implementation artifacts, tool definitions, or direct system evidence over higher-level summaries.
+- If you are blocked, uncertain, missing key information, or recovering from repeated low-value exploration, use report_state to record what is missing and what would help next before continuing.
 - If a tool reports invalid input or suggests a better tool, correct the call immediately instead of exploring unrelated paths.
 - Before calling tools, briefly state what you are about to check when that would help a human follow your process.
 - Avoid repeating the same action if it already gave you the answer.

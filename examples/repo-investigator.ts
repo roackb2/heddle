@@ -14,6 +14,7 @@ import {
   listFilesTool,
   readFileTool,
   searchFilesTool,
+  reportStateTool,
   createRunShellTool,
   formatTraceForConsole,
   createLogger,
@@ -32,7 +33,7 @@ async function main() {
   logger.info({ goal, model }, '🧵 Heddle — Repo Investigator');
 
   const llm = createOpenAiAdapter({ model });
-  const tools = [listFilesTool, readFileTool, searchFilesTool, createRunShellTool()];
+  const tools = [listFilesTool, readFileTool, searchFilesTool, reportStateTool, createRunShellTool()];
 
   const result = await runAgent({ goal, llm, tools, maxSteps: 15, logger });
 

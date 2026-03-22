@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { listFilesTool } from '../tools/list-files.js';
 import { readFileTool } from '../tools/read-file.js';
+import { reportStateTool } from '../tools/report-state.js';
 import { createRunShellTool } from '../tools/run-shell.js';
 import { searchFilesTool } from '../tools/search-files.js';
 
@@ -38,6 +39,8 @@ describe('tool input validation', () => {
     expect(searchFilesTool.description).toContain('Prefer searching for concrete terms');
     expect(searchFilesTool.description).toContain('grep-style path:line:content format');
     expect(searchFilesTool.description).toContain('{ "query": "createUser" }');
+    expect(reportStateTool.description).toContain('Use this when you are blocked, uncertain');
+    expect(reportStateTool.description).toContain('Returns the same structured report back');
   });
 });
 
@@ -125,6 +128,41 @@ describe('runShellTool', () => {
         command: 'grep definitely-not-present README.md',
         exitCode: 1,
       },
+    });
+  });
+});
+
+describe('reportStateTool', () => {
+  it('accepts structured missing-gap reports and echoes them back', async () => {
+    const result = await reportStateTool.execute({
+      rationale: 'I need to inspect the top-level directory first.',
+      missing: ['Top-level directory contents'],
+      wantedTools: ['list_files'],
+      wantedInputs: ['path=.'],
+      confidence: 'medium',
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      output: {
+        rationale: 'I need to inspect the top-level directory first.',
+        missing: ['Top-level directory contents'],
+        wantedTools: ['list_files'],
+        wantedInputs: ['path=.'],
+        confidence: 'medium',
+      },
+    });
+  });
+
+  it('rejects invalid report_state input', async () => {
+    const result = await reportStateTool.execute({
+      missing: ['Need more context'],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error:
+        'Invalid input for report_state. Required field: rationale. Optional fields: missing, wantedTools, wantedInputs, confidence.',
     });
   });
 });
