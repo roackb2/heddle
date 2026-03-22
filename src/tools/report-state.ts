@@ -8,15 +8,13 @@ import type { ToolDefinition, ToolResult } from '../types.js';
 type ReportStateInput = {
   rationale: string;
   missing?: string[];
-  wantedTools?: string[];
-  wantedInputs?: string[];
-  confidence?: 'low' | 'medium' | 'high';
+  nextNeed?: string;
 };
 
 export const reportStateTool: ToolDefinition = {
   name: 'report_state',
   description:
-    'Report your current reasoning state in a structured way. Use this when you are blocked, uncertain, missing information, recovering from repeated low-value exploration, or about to take a speculative path. This does not inspect or change the environment. It records what you think is missing and what tool or input would help next. Returns the same structured report back. Example input: { "rationale": "I need to inspect the top-level directory first.", "missing": ["Top-level directory contents"], "wantedTools": ["list_files"], "wantedInputs": ["path=."], "confidence": "medium" }',
+    'Report your current reasoning state in a structured way. Use this when you are blocked, uncertain, missing information, recovering from repeated low-value exploration, or about to take a speculative path. This does not inspect or change the environment. It records what is missing and the single most important next thing you need. Use it to tell the library author what capability, input, or support was missing so future agents are less likely to get stuck on the same problem. Returns the same structured report back. Example input: { "rationale": "I need to inspect the top-level directory first.", "missing": ["Top-level directory contents"], "nextNeed": "list_files on ." }',
   parameters: {
     type: 'object',
     additionalProperties: false,
@@ -30,20 +28,9 @@ export const reportStateTool: ToolDefinition = {
         items: { type: 'string' },
         description: 'Information or evidence you are missing',
       },
-      wantedTools: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Tools that would help next',
-      },
-      wantedInputs: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Inputs or arguments that would help next',
-      },
-      confidence: {
+      nextNeed: {
         type: 'string',
-        enum: ['low', 'medium', 'high'],
-        description: 'Current confidence in your direction',
+        description: 'The single most important next thing you need, such as a tool call, input, or piece of evidence',
       },
     },
     required: ['rationale'],
@@ -53,7 +40,7 @@ export const reportStateTool: ToolDefinition = {
       return {
         ok: false,
         error:
-          'Invalid input for report_state. Required field: rationale. Optional fields: missing, wantedTools, wantedInputs, confidence.',
+          'Invalid input for report_state. Required field: rationale. Optional fields: missing, nextNeed.',
       };
     }
 
@@ -73,9 +60,7 @@ function isReportStateInput(raw: unknown): raw is ReportStateInput {
       (key) =>
         key !== 'rationale' &&
         key !== 'missing' &&
-        key !== 'wantedTools' &&
-        key !== 'wantedInputs' &&
-        key !== 'confidence',
+        key !== 'nextNeed',
     )
   ) {
     return false;
@@ -89,20 +74,7 @@ function isReportStateInput(raw: unknown): raw is ReportStateInput {
     return false;
   }
 
-  if (input.wantedTools !== undefined && !isStringArray(input.wantedTools)) {
-    return false;
-  }
-
-  if (input.wantedInputs !== undefined && !isStringArray(input.wantedInputs)) {
-    return false;
-  }
-
-  if (
-    input.confidence !== undefined &&
-    input.confidence !== 'low' &&
-    input.confidence !== 'medium' &&
-    input.confidence !== 'high'
-  ) {
+  if (input.nextNeed !== undefined && typeof input.nextNeed !== 'string') {
     return false;
   }
 

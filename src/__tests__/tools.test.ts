@@ -40,7 +40,9 @@ describe('tool input validation', () => {
     expect(searchFilesTool.description).toContain('grep-style path:line:content format');
     expect(searchFilesTool.description).toContain('{ "query": "createUser" }');
     expect(reportStateTool.description).toContain('Use this when you are blocked, uncertain');
+    expect(reportStateTool.description).toContain('tell the library author what capability, input, or support was missing');
     expect(reportStateTool.description).toContain('Returns the same structured report back');
+    expect(reportStateTool.description).toContain('"nextNeed": "list_files on ."');
   });
 });
 
@@ -137,9 +139,7 @@ describe('reportStateTool', () => {
     const result = await reportStateTool.execute({
       rationale: 'I need to inspect the top-level directory first.',
       missing: ['Top-level directory contents'],
-      wantedTools: ['list_files'],
-      wantedInputs: ['path=.'],
-      confidence: 'medium',
+      nextNeed: 'list_files on .',
     });
 
     expect(result).toEqual({
@@ -147,9 +147,7 @@ describe('reportStateTool', () => {
       output: {
         rationale: 'I need to inspect the top-level directory first.',
         missing: ['Top-level directory contents'],
-        wantedTools: ['list_files'],
-        wantedInputs: ['path=.'],
-        confidence: 'medium',
+        nextNeed: 'list_files on .',
       },
     });
   });
@@ -162,7 +160,7 @@ describe('reportStateTool', () => {
     expect(result).toEqual({
       ok: false,
       error:
-        'Invalid input for report_state. Required field: rationale. Optional fields: missing, wantedTools, wantedInputs, confidence.',
+        'Invalid input for report_state. Required field: rationale. Optional fields: missing, nextNeed.',
     });
   });
 });
