@@ -18,6 +18,10 @@ So the project stance is:
 
 Longer-term framework direction is documented in [docs/framework-vision.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/framework-vision.md), including future concepts like situation awareness and knowledge persistence.
 
+The project-level statement of why Heddle exists and how it decides what to build versus borrow lives in [docs/project-purpose.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/project-purpose.md).
+
+The phased roadmap for turning Heddle into a conversational coding agent that can eventually help build itself lives in [docs/coding-agent-roadmap.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/coding-agent-roadmap.md).
+
 A current boundary sketch for those layers lives in [docs/awareness-and-memory.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/awareness-and-memory.md).
 
 The current next-step design direction for shell as a real environment surface lives in [docs/shell-direction.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/shell-direction.md).
@@ -45,6 +49,11 @@ goal
 ## Status
 
 Early development. v0 in progress.
+
+The repo now also has an early conversational terminal entrypoint for Phase 0 of the coding-agent roadmap:
+
+- `yarn chat`
+- `yarn chat:dev`
 
 ## Next Step
 

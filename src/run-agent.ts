@@ -23,6 +23,7 @@ export type RunAgentOptions = {
   tools: ToolDefinition[];
   maxSteps?: number;
   logger?: Logger;
+  history?: ChatMessage[];
 };
 
 /**
@@ -36,7 +37,7 @@ export type RunAgentOptions = {
  * 6. Repeat
  */
 export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
-  const { goal, llm, tools, maxSteps = DEFAULT_MAX_STEPS, logger: log = defaultLogger } = options;
+  const { goal, llm, tools, maxSteps = DEFAULT_MAX_STEPS, logger: log = defaultLogger, history = [] } = options;
   const registry = createToolRegistry(tools);
   const trace = createTraceRecorder();
   const budget = createBudget(maxSteps);
@@ -53,6 +54,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   // Build initial messages
   const messages: ChatMessage[] = [
     { role: 'system', content: buildSystemPrompt(goal, registry.names()) },
+    ...history,
     { role: 'user', content: goal },
   ];
 
@@ -78,7 +80,12 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
         step,
         timestamp: now(),
       });
-      return { outcome: 'error', summary: `LLM error: ${errMsg}`, trace: trace.getTrace() };
+      return {
+        outcome: 'error',
+        summary: `LLM error: ${errMsg}`,
+        trace: trace.getTrace(),
+        transcript: messages.slice(1),
+      };
     }
 
     // Case 1: model returned tool calls
@@ -123,7 +130,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
             outcome = 'error';
             summary = `Stopped after ${MAX_CONSECUTIVE_ERRORS} consecutive tool errors. Last error: ${result.error}`;
             trace.record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
-            return { outcome, summary, trace: trace.getTrace() };
+            return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
           }
         } else {
           consecutiveErrors = 0;
@@ -156,21 +163,21 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
       summary = response.content;
       log.info({ step, outcome }, 'Agent run finished');
       trace.record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
-      return { outcome, summary, trace: trace.getTrace() };
+      return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
     }
 
     // Case 3: empty response — shouldn't happen but handle gracefully
     outcome = 'error';
     summary = 'Model returned an empty response';
     trace.record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
-    return { outcome, summary, trace: trace.getTrace() };
+    return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
   }
 
   // Budget exhausted
   summary = `Reached maximum step limit (${maxSteps})`;
   log.warn({ step, maxSteps }, 'Budget exhausted');
   trace.record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
-  return { outcome, summary, trace: trace.getTrace() };
+  return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
 }
 
 function stableSerialize(value: unknown): string {

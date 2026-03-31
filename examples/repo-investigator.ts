@@ -33,7 +33,10 @@ async function main() {
 
   logger.info({ goal, model, maxSteps }, '🧵 Heddle — Repo Investigator');
 
-  const llm = createOpenAiAdapter({ model });
+  const llm = createOpenAiAdapter({
+    model,
+    apiKey: process.env.OPENAI_API_KEY ?? process.env.PERSONAL_OPENAI_API_KEY,
+  });
   const tools = [listFilesTool, readFileTool, searchFilesTool, reportStateTool, createRunShellTool()];
 
   const result = await runAgent({ goal, llm, tools, maxSteps, logger });

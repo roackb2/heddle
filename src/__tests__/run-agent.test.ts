@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { runAgent } from '../run-agent.js';
 import type { ChatMessage, LlmAdapter, LlmResponse } from '../llm/types.js';
 import type { ToolDefinition } from '../types.js';
+import { createLogger } from '../utils/logger.js';
+
+const silentLogger = createLogger({ level: 'silent', console: false });
 
 describe('runAgent', () => {
   it('executes tool calls, appends tool output, and finishes with a final answer', async () => {
@@ -37,10 +40,25 @@ describe('runAgent', () => {
       llm: fakeLlm,
       tools: [listFilesTool],
       maxSteps: 3,
+      logger: silentLogger,
     });
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe('The repo contains README.md and src/.');
+    expect(result.transcript).toEqual([
+      { role: 'user', content: 'What is in this repo?' },
+      {
+        role: 'assistant',
+        content: 'I will inspect the repo first.',
+        toolCalls: [{ id: 'call-1', tool: 'list_files', input: { path: '.' } }],
+      },
+      {
+        role: 'tool',
+        content: JSON.stringify({ ok: true, output: 'README.md\nsrc/' }),
+        toolCallId: 'call-1',
+      },
+      { role: 'assistant', content: 'The repo contains README.md and src/.' },
+    ]);
     expect(seenMessages).toHaveLength(2);
     expect(seenMessages[1]).toContainEqual({
       role: 'tool',
@@ -98,6 +116,7 @@ describe('runAgent', () => {
       llm: fakeLlm,
       tools: [listFilesTool],
       maxSteps: 1,
+      logger: silentLogger,
     });
 
     expect(result.trace[1]).toMatchObject({
@@ -145,6 +164,7 @@ describe('runAgent', () => {
       llm: fakeLlm,
       tools: [listFilesTool],
       maxSteps: 4,
+      logger: silentLogger,
     });
 
     expect(result.outcome).toBe('done');
@@ -167,5 +187,42 @@ describe('runAgent', () => {
           'Duplicate tool call blocked: list_files was already called with the same input earlier in this run. Try a different tool or different input.',
       },
     });
+  });
+
+  it('carries prior transcript into a later turn when history is provided', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+        return {
+          content: 'I can answer using the earlier conversation context.',
+        };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'What did I ask before this?',
+      llm: fakeLlm,
+      tools: [],
+      history: [
+        { role: 'user', content: 'Inspect the repo root.' },
+        { role: 'assistant', content: 'The repo contains README.md and src/.' },
+      ],
+      maxSteps: 1,
+      logger: silentLogger,
+    });
+
+    expect(seenMessages[0]).toEqual([
+      expect.objectContaining({ role: 'system' }),
+      { role: 'user', content: 'Inspect the repo root.' },
+      { role: 'assistant', content: 'The repo contains README.md and src/.' },
+      { role: 'user', content: 'What did I ask before this?' },
+    ]);
+    expect(result.transcript).toEqual([
+      { role: 'user', content: 'Inspect the repo root.' },
+      { role: 'assistant', content: 'The repo contains README.md and src/.' },
+      { role: 'user', content: 'What did I ask before this?' },
+      { role: 'assistant', content: 'I can answer using the earlier conversation context.' },
+    ]);
   });
 });
