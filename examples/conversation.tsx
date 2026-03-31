@@ -1,8 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import React, { useMemo, useState } from 'react';
-import { Box, Text, render } from 'ink';
-import { TextInput } from '@inkjs/ui';
+import { Box, Text, render, useInput } from 'ink';
 import type { ChatMessage, TraceEvent } from '../src/index.js';
 import {
   DEFAULT_OPENAI_MODEL,
@@ -44,7 +43,8 @@ const logger = createLogger({
 });
 
 function App() {
-  const llm = useMemo(() => createOpenAiAdapter({ model, apiKey }), []);
+  const [activeModel, setActiveModel] = useState(model);
+  const llm = useMemo(() => createOpenAiAdapter({ model: activeModel, apiKey }), [activeModel]);
   const tools = useMemo(
     () => [listFilesTool, readFileTool, searchFilesTool, reportStateTool, createRunShellTool()],
     [],
@@ -88,10 +88,39 @@ function App() {
     setError(undefined);
     setIsRunning(true);
     setStatus('Running');
+    const nextUserMessage: ConversationLine = { id: `user-${Date.now()}`, role: 'user', text: prompt };
     setMessages((current: ConversationLine[]) => [
       ...current,
-      { id: `user-${Date.now()}`, role: 'user', text: prompt },
+      nextUserMessage,
     ]);
+
+    const commandResult = runLocalCommand({
+      prompt,
+      activeModel,
+      setActiveModel,
+      clearConversation: () => {
+        setHistory([]);
+        setTurns([]);
+        setMessages([
+          {
+            id: 'intro',
+            role: 'assistant',
+            text:
+              'Heddle conversational mode. Ask a question about this workspace. Each turn runs the current agent loop and carries the transcript into the next turn.',
+          },
+        ]);
+      },
+    });
+
+    if (commandResult.handled) {
+      setMessages((current: ConversationLine[]) => [
+        ...current,
+        { id: `command-${Date.now()}`, role: 'assistant', text: commandResult.message },
+      ]);
+      setStatus('Idle');
+      setIsRunning(false);
+      return;
+    }
 
     try {
       const result = await runAgent({
@@ -138,7 +167,7 @@ function App() {
       <Box flexDirection="column" marginBottom={1}>
         <Text bold>Heddle Chat</Text>
         <Text color="cyan">
-          model={model} maxSteps={maxSteps} cwd={process.cwd()}
+          model={activeModel} maxSteps={maxSteps} cwd={process.cwd()}
         </Text>
         <Text dimColor>logs={logFile}</Text>
         <Text color={error ? 'red' : isRunning ? 'yellow' : 'green'}>
@@ -188,7 +217,8 @@ function App() {
         <Box>
           <Text color="cyan">{'>'} </Text>
           <Box flexGrow={1}>
-            <TextInput
+            <PromptInput
+              value={draft}
               isDisabled={isRunning}
               placeholder="Ask Heddle about this repo"
               onChange={setDraft}
@@ -203,6 +233,8 @@ function App() {
           <Text dimColor>{draft ? `${draft.length} chars` : 'Enter to send'}</Text>
           <Text dimColor>Ctrl+C to exit</Text>
         </Box>
+        <Text dimColor>/model &lt;name&gt; switches models • /help shows commands</Text>
+        <Text dimColor>Cmd+Backspace or Ctrl+U clears to line start</Text>
       </Box>
     </Box>
   );
@@ -264,4 +296,149 @@ function parsePositiveInt(raw: string | undefined): number | undefined {
   }
 
   return value;
+}
+
+type LocalCommandArgs = {
+  prompt: string;
+  activeModel: string;
+  setActiveModel: (model: string) => void;
+  clearConversation: () => void;
+};
+
+function runLocalCommand(args: LocalCommandArgs): { handled: boolean; message: string } {
+  const trimmed = args.prompt.trim();
+  if (!trimmed.startsWith('/')) {
+    return { handled: false, message: '' };
+  }
+
+  if (trimmed === '/help') {
+    return {
+      handled: true,
+      message:
+        'Local commands: /model <name> switches the current model, /model shows the active model, /clear resets the current chat transcript, /help shows this message.',
+    };
+  }
+
+  if (trimmed === '/model') {
+    return {
+      handled: true,
+      message: `Current model: ${args.activeModel}`,
+    };
+  }
+
+  if (trimmed.startsWith('/model ')) {
+    const nextModel = trimmed.slice('/model '.length).trim();
+    if (!nextModel) {
+      return {
+        handled: true,
+        message: 'Usage: /model <name>',
+      };
+    }
+
+    args.setActiveModel(nextModel);
+    return {
+      handled: true,
+      message: `Switched model to ${nextModel}`,
+    };
+  }
+
+  if (trimmed === '/clear') {
+    args.clearConversation();
+    return {
+      handled: true,
+      message: 'Cleared the current chat transcript.',
+    };
+  }
+
+  return {
+    handled: true,
+    message: `Unknown command: ${trimmed}. Use /help for available commands.`,
+  };
+}
+
+type PromptInputProps = {
+  value: string;
+  isDisabled: boolean;
+  placeholder: string;
+  onChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+};
+
+function PromptInput({ value, isDisabled, placeholder, onChange, onSubmit }: PromptInputProps) {
+  const [cursor, setCursor] = useState(value.length);
+
+  useInput((input, key) => {
+    if (isDisabled) {
+      return;
+    }
+
+    if (key.return) {
+      onSubmit(value);
+      setCursor(0);
+      return;
+    }
+
+    if ((key.meta && key.backspace) || (key.ctrl && input === 'u')) {
+      onChange(value.slice(cursor));
+      setCursor(0);
+      return;
+    }
+
+    if (key.backspace || key.delete) {
+      if (cursor === 0) {
+        return;
+      }
+
+      onChange(value.slice(0, cursor - 1) + value.slice(cursor));
+      setCursor(cursor - 1);
+      return;
+    }
+
+    if (key.leftArrow) {
+      setCursor(Math.max(0, cursor - 1));
+      return;
+    }
+
+    if (key.rightArrow) {
+      setCursor(Math.min(value.length, cursor + 1));
+      return;
+    }
+
+    if (key.home) {
+      setCursor(0);
+      return;
+    }
+
+    if (key.end) {
+      setCursor(value.length);
+      return;
+    }
+
+    if (key.ctrl || key.meta || key.escape || key.tab) {
+      return;
+    }
+
+    if (!input) {
+      return;
+    }
+
+    onChange(value.slice(0, cursor) + input + value.slice(cursor));
+    setCursor(cursor + input.length);
+  }, { isActive: !isDisabled });
+
+  const beforeCursor = value.slice(0, cursor);
+  const activeChar = value[cursor] ?? ' ';
+  const afterCursor = value.slice(cursor + (cursor < value.length ? 1 : 0));
+
+  if (!value) {
+    return <Text dimColor>{placeholder}</Text>;
+  }
+
+  return (
+    <Text>
+      {beforeCursor}
+      <Text inverse>{activeChar}</Text>
+      {afterCursor}
+    </Text>
+  );
 }
