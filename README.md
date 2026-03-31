@@ -22,11 +22,6 @@ The project-level statement of why Heddle exists and how it decides what to buil
 
 The phased roadmap for turning Heddle into a conversational coding agent that can eventually help build itself lives in [docs/coding-agent-roadmap.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/coding-agent-roadmap.md).
 
-A current boundary sketch for those layers lives in [docs/awareness-and-memory.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/awareness-and-memory.md).
-
-The current next-step design direction for shell as a real environment surface lives in [docs/shell-direction.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/shell-direction.md).
-The proposed v1 shell contract lives in [docs/run-shell-v1.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/run-shell-v1.md).
-
 ## What It Is Not
 
 - A prompt orchestration library
@@ -68,8 +63,8 @@ Phase 1 has also started at the tool-contract layer:
 
 ## Next Step
 
-The immediate next step is to keep tightening the Phase 1 coding-agent surface around git-native review and explanation: stronger `git status` / `git diff` workflows, clearer change summaries, and better operator confidence after bounded edits. A review template lives in [docs/first-run-review.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/first-run-review.md).
-An eval batch prompt set lives in [docs/eval-prompts.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/eval-prompts.md), with a batch review template in [docs/eval-review.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/eval-review.md).
+The immediate next step is to keep tightening the Phase 1 coding-agent surface around git-native review and explanation: stronger `git status` / `git diff` workflows, clearer change summaries, and better operator confidence after bounded edits.
+An eval batch prompt set lives in [docs/eval-prompts.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/eval-prompts.md).
 
 The example runner defaults to `gpt-5.1-codex-mini` and a 40-step budget. Override them with `OPENAI_MODEL` and `HEDDLE_MAX_STEPS` if you want to compare models or cap exploration more tightly.
 

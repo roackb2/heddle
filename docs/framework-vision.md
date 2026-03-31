@@ -26,8 +26,6 @@ The original target shape for a general agentic system had three major pillars:
 
 Those ideas remain part of the destination, even though Heddle is only implementing the minimal loop first.
 
-A current boundary sketch for awareness and persistence lives in [docs/awareness-and-memory.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/awareness-and-memory.md).
-
 ### Execution Loop
 
 The long-term execution pattern is broader than the current v0 loop:
@@ -140,9 +138,6 @@ The intended stance is:
 Structured tools should be biased toward high-frequency CRUD-style operations with simple semantics, such as listing, reading, or searching common artifacts. Shell should cover the long tail and domain-specific edge cases where wrapping every capability would create unnecessary abstraction debt.
 
 This still fits Heddle's overall goal. A sandboxed shell is not a deviation from the framework direction; it is one plausible action surface inside that framework.
-
-A current design checkpoint for that direction lives in [docs/shell-direction.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/shell-direction.md).
-The current v1 contract proposal lives in [docs/run-shell-v1.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/run-shell-v1.md).
 
 What matters is that shell execution be bounded by runtime support:
 
