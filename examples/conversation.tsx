@@ -43,6 +43,8 @@ type PendingApproval = {
   resolve: (decision: { approved: boolean; reason?: string }) => void;
 };
 
+type ApprovalChoice = 'approve' | 'deny';
+
 const model = process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
 const maxSteps = parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 40;
 const apiKey = process.env.OPENAI_API_KEY ?? process.env.PERSONAL_OPENAI_API_KEY;
@@ -50,6 +52,7 @@ const sessionId = `chat-${Date.now()}`;
 const logFile = join(process.cwd(), 'local', 'logs', `${sessionId}.log`);
 const knownModels = ['gpt-5.1-codex-mini', 'gpt-5.1-codex'];
 const workingFrames = ['.', '..', '...'];
+const MAX_VISIBLE_INPUT_CHARS = 96;
 const logger = createLogger({
   pretty: false,
   level: 'debug',
@@ -98,22 +101,49 @@ function App() {
   const [workingFrame, setWorkingFrame] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | undefined>();
+  const [approvalChoice, setApprovalChoice] = useState<ApprovalChoice>('approve');
 
-  useInput((input) => {
+  useInput((input, key) => {
     if (!pendingApproval) {
+      return;
+    }
+
+    if (key.leftArrow || key.upArrow || key.tab) {
+      setApprovalChoice('approve');
+      return;
+    }
+
+    if (key.rightArrow || key.downArrow) {
+      setApprovalChoice('deny');
+      return;
+    }
+
+    if (key.return) {
+      const approved = approvalChoice === 'approve';
+      pendingApproval.resolve({
+        approved,
+        reason: approved ? 'Approved in chat UI' : 'Denied in chat UI',
+      });
+      setPendingApproval(undefined);
+      setApprovalChoice('approve');
       return;
     }
 
     const normalized = input.toLowerCase();
     if (normalized === 'y') {
-      pendingApproval.resolve({ approved: true, reason: 'Approved in chat UI' });
-      setPendingApproval(undefined);
+      setApprovalChoice('approve');
       return;
     }
 
     if (normalized === 'n') {
+      setApprovalChoice('deny');
+      return;
+    }
+
+    if (key.escape) {
       pendingApproval.resolve({ approved: false, reason: 'Denied in chat UI' });
       setPendingApproval(undefined);
+      setApprovalChoice('approve');
     }
   }, { isActive: Boolean(pendingApproval) });
 
@@ -134,7 +164,7 @@ function App() {
   }, [isRunning]);
 
   const submitPrompt = async (value: string) => {
-    const prompt = value.trim();
+    const prompt = normalizeInlineText(value);
     if (!prompt || isRunning) {
       return;
     }
@@ -249,7 +279,7 @@ function App() {
         </Text>
         <Text dimColor>/model &lt;name&gt; • /models • /clear • /help</Text>
         <Text dimColor>
-          {pendingApproval ? 'Y approves • N denies • Ctrl+C exits' : 'Cmd+Backspace or Ctrl+U clears to line start • Ctrl+C exits'}
+          {pendingApproval ? '←/→ choose • Enter confirms • Esc denies • Ctrl+C exits' : 'Cmd+Backspace or Ctrl+U clears to line start • Ctrl+C exits'}
         </Text>
         {error ? <Text color="red">{error}</Text> : null}
       </Box>
@@ -280,42 +310,35 @@ function App() {
         </>
       )}
 
-      <Box flexDirection="column" borderStyle="round" borderColor={pendingApproval ? 'red' : isRunning ? 'yellow' : 'cyan'} paddingX={1} paddingY={0}>
-        <Text bold>
-          {pendingApproval ? 'Approve Action' : isRunning ? `Working${workingFrames[workingFrame]}` : 'Prompt'}
+      <Box flexDirection="column" borderStyle="round" borderColor={pendingApproval ? 'yellow' : isRunning ? 'yellow' : 'cyan'} paddingX={1} paddingY={0}>
+        <Text bold color={pendingApproval ? 'yellow' : undefined}>
+          {pendingApproval ? 'Approval Required' : isRunning ? `Working${workingFrames[workingFrame]}` : 'Prompt'}
         </Text>
-        {pendingApproval ? (
-          <Text color="red">
-            {formatApprovalPrompt(pendingApproval)}
-          </Text>
-        ) : null}
-        <Box>
-          <Text color="cyan">{'>'} </Text>
-          <Box flexGrow={1}>
-            <PromptInput
-              value={draft}
-              isDisabled={isRunning || Boolean(pendingApproval)}
-              placeholder="Ask Heddle about this repo"
-              onChange={setDraft}
-              onSubmit={(value) => {
-                setDraft('');
-                void submitPrompt(value);
-              }}
-            />
-          </Box>
-        </Box>
-        <Box justifyContent="space-between">
-          <Text dimColor>
-            {pendingApproval ? 'Press Y to approve or N to deny'
-            : draft ? `${draft.length} chars`
-            : 'Enter to send'}
-          </Text>
-          <Text dimColor>
-            {pendingApproval ? 'Mutation tool requested approval'
-            : isRunning ? `${elapsedSeconds}s elapsed`
-            : 'Enter to send'}
-          </Text>
-        </Box>
+        {pendingApproval ?
+          <ApprovalComposer pendingApproval={pendingApproval} approvalChoice={approvalChoice} />
+        : (
+          <>
+            <Box>
+              <Text color="cyan">{'>'} </Text>
+              <Box flexGrow={1}>
+                <PromptInput
+                  value={draft}
+                  isDisabled={isRunning}
+                  placeholder="Ask Heddle about this repo"
+                  onChange={setDraft}
+                  onSubmit={(value) => {
+                    setDraft('');
+                    void submitPrompt(value);
+                  }}
+                />
+              </Box>
+            </Box>
+            <Box justifyContent="space-between">
+              <Text dimColor>{draft ? `${draft.length} chars` : 'Enter to send'}</Text>
+              <Text dimColor>{isRunning ? `${elapsedSeconds}s elapsed` : 'Enter to send'}</Text>
+            </Box>
+          </>
+        )}
       </Box>
     </Box>
   );
@@ -383,7 +406,7 @@ function ActivityPanel({ isRunning, workingFrame, elapsedSeconds, liveEvents, pe
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Text bold>Current Activity</Text>
-      <Text color={pendingApproval ? 'red' : isRunning ? 'yellow' : 'gray'}>
+      <Text color={pendingApproval ? 'yellow' : isRunning ? 'yellow' : 'gray'}>
         {currentActivityText(liveEvents, isRunning, elapsedSeconds, pendingApproval)}
       </Text>
       {visibleEvents.map((event) => (
@@ -391,6 +414,43 @@ function ActivityPanel({ isRunning, workingFrame, elapsedSeconds, liveEvents, pe
           <Text dimColor>{event.text}</Text>
         </Box>
       ))}
+    </Box>
+  );
+}
+
+type ApprovalComposerProps = {
+  pendingApproval: PendingApproval;
+  approvalChoice: ApprovalChoice;
+};
+
+function ApprovalComposer({ pendingApproval, approvalChoice }: ApprovalComposerProps) {
+  return (
+    <>
+      <Text color="white">{formatApprovalPrompt(pendingApproval)}</Text>
+      <Text dimColor>{formatApprovalHint(pendingApproval)}</Text>
+      <ApprovalSelector choice={approvalChoice} />
+      <Box justifyContent="space-between">
+        <Text dimColor>Use ←/→ then Enter</Text>
+        <Text dimColor>Input paused during approval</Text>
+      </Box>
+    </>
+  );
+}
+
+type ApprovalSelectorProps = {
+  choice: ApprovalChoice;
+};
+
+function ApprovalSelector({ choice }: ApprovalSelectorProps) {
+  return (
+    <Box marginBottom={0}>
+      <Text color={choice === 'approve' ? 'green' : 'gray'}>
+        {choice === 'approve' ? '◉ Approve' : '○ Approve'}
+      </Text>
+      <Text dimColor>   </Text>
+      <Text color={choice === 'deny' ? 'red' : 'gray'}>
+        {choice === 'deny' ? '◉ Deny' : '○ Deny'}
+      </Text>
     </Box>
   );
 }
@@ -496,7 +556,16 @@ function currentActivityText(
 }
 
 function formatApprovalPrompt(pendingApproval: PendingApproval): string {
-  return `Approve ${summarizeToolCall(pendingApproval.call.tool, pendingApproval.call.input)}?`;
+  const command = extractShellCommand(pendingApproval.call.input);
+  if (command) {
+    return `Allow mutation command: ${command}`;
+  }
+
+  return `Allow ${pendingApproval.call.tool}`;
+}
+
+function formatApprovalHint(pendingApproval: PendingApproval): string {
+  return `Tool: ${pendingApproval.call.tool}`;
 }
 
 function summarizeToolCall(tool: string, input: unknown): string {
@@ -531,6 +600,10 @@ function truncate(value: string, maxLength: number): string {
   }
 
   return `${value.slice(0, maxLength - 1)}…`;
+}
+
+function normalizeInlineText(value: string): string {
+  return value.replace(/\r?\n+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function parsePositiveInt(raw: string | undefined): number | undefined {
@@ -680,23 +753,40 @@ function PromptInput({ value, isDisabled, placeholder, onChange, onSubmit }: Pro
       return;
     }
 
-    onChange(value.slice(0, cursor) + input + value.slice(cursor));
-    setCursor(cursor + input.length);
+    const nextInput = normalizePastedInput(input);
+    onChange(value.slice(0, cursor) + nextInput + value.slice(cursor));
+    setCursor(cursor + nextInput.length);
   }, { isActive: !isDisabled });
-
-  const beforeCursor = value.slice(0, cursor);
-  const activeChar = value[cursor] ?? ' ';
-  const afterCursor = value.slice(cursor + (cursor < value.length ? 1 : 0));
 
   if (!value) {
     return <Text dimColor>{placeholder}</Text>;
   }
 
-  return (
-    <Text>
-      {beforeCursor}
-      <Text inverse>{activeChar}</Text>
-      {afterCursor}
-    </Text>
-  );
+  return <Text>{buildPromptViewport(value, cursor)}</Text>;
+}
+
+function normalizePastedInput(input: string): string {
+  return input.replace(/\r?\n+/g, ' ');
+}
+
+function buildPromptViewport(value: string, cursor: number): string {
+  const withCursor = `${value.slice(0, cursor)}|${value.slice(cursor)}`;
+
+  if (withCursor.length <= MAX_VISIBLE_INPUT_CHARS) {
+    return withCursor;
+  }
+
+  const targetCursor = cursor + 1;
+  const half = Math.floor(MAX_VISIBLE_INPUT_CHARS / 2);
+  let start = Math.max(0, targetCursor - half);
+  let end = Math.min(withCursor.length, start + MAX_VISIBLE_INPUT_CHARS);
+
+  if (end - start < MAX_VISIBLE_INPUT_CHARS) {
+    start = Math.max(0, end - MAX_VISIBLE_INPUT_CHARS);
+  }
+
+  const prefix = start > 0 ? '…' : '';
+  const suffix = end < withCursor.length ? '…' : '';
+  const slice = withCursor.slice(start, end);
+  return `${prefix}${slice}${suffix}`;
 }
