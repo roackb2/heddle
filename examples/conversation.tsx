@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, render, useInput } from 'ink';
-import type { ChatMessage, TraceEvent } from '../src/index.js';
+import type { ChatMessage, ToolCall, ToolDefinition, TraceEvent } from '../src/index.js';
 import {
   DEFAULT_OPENAI_MODEL,
   runAgent,
@@ -11,7 +11,8 @@ import {
   readFileTool,
   searchFilesTool,
   reportStateTool,
-  createRunShellTool,
+  createRunShellInspectTool,
+  createRunShellMutateTool,
   createLogger,
 } from '../src/index.js';
 
@@ -36,6 +37,12 @@ type LiveEvent = {
   text: string;
 };
 
+type PendingApproval = {
+  call: ToolCall;
+  tool: ToolDefinition;
+  resolve: (decision: { approved: boolean; reason?: string }) => void;
+};
+
 const model = process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
 const maxSteps = parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 40;
 const apiKey = process.env.OPENAI_API_KEY ?? process.env.PERSONAL_OPENAI_API_KEY;
@@ -54,7 +61,14 @@ function App() {
   const [activeModel, setActiveModel] = useState(model);
   const llm = useMemo(() => createOpenAiAdapter({ model: activeModel, apiKey }), [activeModel]);
   const tools = useMemo(
-    () => [listFilesTool, readFileTool, searchFilesTool, reportStateTool, createRunShellTool()],
+    () => [
+      listFilesTool,
+      readFileTool,
+      searchFilesTool,
+      reportStateTool,
+      createRunShellInspectTool(),
+      createRunShellMutateTool(),
+    ],
     [],
   );
 
@@ -83,6 +97,25 @@ function App() {
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [workingFrame, setWorkingFrame] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [pendingApproval, setPendingApproval] = useState<PendingApproval | undefined>();
+
+  useInput((input) => {
+    if (!pendingApproval) {
+      return;
+    }
+
+    const normalized = input.toLowerCase();
+    if (normalized === 'y') {
+      pendingApproval.resolve({ approved: true, reason: 'Approved in chat UI' });
+      setPendingApproval(undefined);
+      return;
+    }
+
+    if (normalized === 'n') {
+      pendingApproval.resolve({ approved: false, reason: 'Denied in chat UI' });
+      setPendingApproval(undefined);
+    }
+  }, { isActive: Boolean(pendingApproval) });
 
   useEffect(() => {
     if (!isRunning) {
@@ -166,6 +199,10 @@ function App() {
 
           setLiveEvents((current) => [...current, { id: `${Date.now()}-${current.length}`, text: next }].slice(-8));
         },
+        approveToolCall: (call, tool) =>
+          new Promise((resolve) => {
+            setPendingApproval({ call, tool, resolve });
+          }),
       });
 
       setHistory(result.transcript);
@@ -208,10 +245,12 @@ function App() {
         </Text>
         <Text dimColor>logs={logFile}</Text>
         <Text color={error ? 'red' : isRunning ? 'yellow' : 'green'}>
-          status={isRunning ? 'running' : status}
+          status={pendingApproval ? 'awaiting approval' : isRunning ? 'running' : status}
         </Text>
         <Text dimColor>/model &lt;name&gt; • /models • /clear • /help</Text>
-        <Text dimColor>Cmd+Backspace or Ctrl+U clears to line start • Ctrl+C exits</Text>
+        <Text dimColor>
+          {pendingApproval ? 'Y approves • N denies • Ctrl+C exits' : 'Cmd+Backspace or Ctrl+U clears to line start • Ctrl+C exits'}
+        </Text>
         {error ? <Text color="red">{error}</Text> : null}
       </Box>
 
@@ -224,6 +263,7 @@ function App() {
             workingFrame={workingFrame}
             elapsedSeconds={elapsedSeconds}
             liveEvents={liveEvents}
+            pendingApproval={pendingApproval}
           />
         </>
       ) : (
@@ -234,19 +274,27 @@ function App() {
             workingFrame={workingFrame}
             elapsedSeconds={elapsedSeconds}
             liveEvents={liveEvents}
+            pendingApproval={pendingApproval}
           />
           <ConversationPanel messages={messages} />
         </>
       )}
 
-      <Box flexDirection="column" borderStyle="round" borderColor={isRunning ? 'yellow' : 'cyan'} paddingX={1} paddingY={0}>
-        <Text bold>{isRunning ? `Working${workingFrames[workingFrame]}` : 'Prompt'}</Text>
+      <Box flexDirection="column" borderStyle="round" borderColor={pendingApproval ? 'red' : isRunning ? 'yellow' : 'cyan'} paddingX={1} paddingY={0}>
+        <Text bold>
+          {pendingApproval ? 'Approve Action' : isRunning ? `Working${workingFrames[workingFrame]}` : 'Prompt'}
+        </Text>
+        {pendingApproval ? (
+          <Text color="red">
+            {formatApprovalPrompt(pendingApproval)}
+          </Text>
+        ) : null}
         <Box>
           <Text color="cyan">{'>'} </Text>
           <Box flexGrow={1}>
             <PromptInput
               value={draft}
-              isDisabled={isRunning}
+              isDisabled={isRunning || Boolean(pendingApproval)}
               placeholder="Ask Heddle about this repo"
               onChange={setDraft}
               onSubmit={(value) => {
@@ -257,8 +305,16 @@ function App() {
           </Box>
         </Box>
         <Box justifyContent="space-between">
-          <Text dimColor>{draft ? `${draft.length} chars` : 'Enter to send'}</Text>
-          <Text dimColor>{isRunning ? `${elapsedSeconds}s elapsed` : 'Enter to send'}</Text>
+          <Text dimColor>
+            {pendingApproval ? 'Press Y to approve or N to deny'
+            : draft ? `${draft.length} chars`
+            : 'Enter to send'}
+          </Text>
+          <Text dimColor>
+            {pendingApproval ? 'Mutation tool requested approval'
+            : isRunning ? `${elapsedSeconds}s elapsed`
+            : 'Enter to send'}
+          </Text>
         </Box>
       </Box>
     </Box>
@@ -318,16 +374,17 @@ type ActivityPanelProps = {
   workingFrame: number;
   elapsedSeconds: number;
   liveEvents: LiveEvent[];
+  pendingApproval?: PendingApproval;
 };
 
-function ActivityPanel({ isRunning, workingFrame, elapsedSeconds, liveEvents }: ActivityPanelProps) {
+function ActivityPanel({ isRunning, workingFrame, elapsedSeconds, liveEvents, pendingApproval }: ActivityPanelProps) {
   const visibleEvents = isRunning ? liveEvents.slice(-3) : liveEvents.slice(-1);
 
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Text bold>Current Activity</Text>
-      <Text color={isRunning ? 'yellow' : 'gray'}>
-        {currentActivityText(liveEvents, isRunning, elapsedSeconds)}
+      <Text color={pendingApproval ? 'red' : isRunning ? 'yellow' : 'gray'}>
+        {currentActivityText(liveEvents, isRunning, elapsedSeconds, pendingApproval)}
       </Text>
       {visibleEvents.map((event) => (
         <Box key={event.id}>
@@ -366,11 +423,23 @@ function summarizeTrace(trace: TraceEvent[]): string[] {
   return trace.flatMap((event) => {
     switch (event.type) {
       case 'assistant.turn':
-        return [event.requestedTools ? `assistant requested ${event.toolCalls?.map((call) => call.tool).join(', ')}` : 'assistant answered'];
+        return [
+          event.requestedTools ?
+            `assistant requested ${event.toolCalls?.map((call) => summarizeToolCall(call.tool, call.input)).join(', ')}`
+          : 'assistant answered',
+        ];
+      case 'tool.approval_requested':
+        return [`approval requested for ${summarizeToolCall(event.call.tool, event.call.input)}`];
+      case 'tool.approval_resolved':
+        return [
+          `approval ${event.approved ? 'granted' : 'denied'} for ${summarizeToolCall(event.call.tool, event.call.input)}`,
+        ];
       case 'tool.call':
-        return [`tool call ${event.call.tool}`];
+        return [`tool call ${summarizeToolCall(event.call.tool, event.call.input)}`];
       case 'tool.result':
-        return [`tool result ${event.tool}: ${event.result.ok ? 'ok' : event.result.error ?? 'error'}`];
+        return [
+          `tool result ${summarizeToolResult(event.tool, extractShellCommand(event.result.output))}: ${event.result.ok ? 'ok' : event.result.error ?? 'error'}`,
+        ];
       case 'run.finished':
         return [`run finished: ${event.outcome}`];
       default:
@@ -392,18 +461,31 @@ function toLiveEvent(event: TraceEvent): string | undefined {
         return undefined;
       }
       return `answer ready`;
+    case 'tool.approval_requested':
+      return `approval needed for ${summarizeToolCall(event.call.tool, event.call.input)}`;
+    case 'tool.approval_resolved':
+      return `approval ${event.approved ? 'granted' : 'denied'} for ${summarizeToolCall(event.call.tool, event.call.input)}`;
     case 'tool.call':
-      return `running ${event.call.tool}`;
+      return `running ${summarizeToolCall(event.call.tool, event.call.input)}`;
     case 'tool.result':
-      return `${event.tool} ${event.result.ok ? 'completed' : `failed: ${event.result.error ?? 'error'}`}`;
+      return `${summarizeToolResult(event.tool, extractShellCommand(event.result.output))} ${event.result.ok ? 'completed' : `failed: ${event.result.error ?? 'error'}`}`;
     case 'run.finished':
-      return event.outcome === 'done' ? 'done' : `stopped: ${event.outcome}`;
+      return event.outcome === 'done' ? undefined : `stopped: ${event.outcome}`;
     default:
       return undefined;
   }
 }
 
-function currentActivityText(liveEvents: LiveEvent[], isRunning: boolean, elapsedSeconds: number): string {
+function currentActivityText(
+  liveEvents: LiveEvent[],
+  isRunning: boolean,
+  elapsedSeconds: number,
+  pendingApproval?: PendingApproval,
+): string {
+  if (pendingApproval) {
+    return formatApprovalPrompt(pendingApproval);
+  }
+
   const current = liveEvents[liveEvents.length - 1]?.text;
 
   if (isRunning) {
@@ -411,6 +493,36 @@ function currentActivityText(liveEvents: LiveEvent[], isRunning: boolean, elapse
   }
 
   return current ?? 'idle';
+}
+
+function formatApprovalPrompt(pendingApproval: PendingApproval): string {
+  return `Approve ${summarizeToolCall(pendingApproval.call.tool, pendingApproval.call.input)}?`;
+}
+
+function summarizeToolCall(tool: string, input: unknown): string {
+  const shellCommand = extractShellCommand(input);
+  if (shellCommand) {
+    return `${tool} (${shellCommand})`;
+  }
+
+  return tool;
+}
+
+function summarizeToolResult(tool: string, command: string | undefined): string {
+  if (command) {
+    return `${tool} (${command})`;
+  }
+
+  return tool;
+}
+
+function extractShellCommand(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const command = (value as { command?: unknown }).command;
+  return typeof command === 'string' && command.trim() ? command.trim() : undefined;
 }
 
 function truncate(value: string, maxLength: number): string {

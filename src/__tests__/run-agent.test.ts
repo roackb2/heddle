@@ -225,4 +225,54 @@ describe('runAgent', () => {
       { role: 'assistant', content: 'I can answer using the earlier conversation context.' },
     ]);
   });
+
+  it('requires approval for tools marked as approval-gated and feeds denials back to the model', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+
+        if (seenMessages.length === 1) {
+          return {
+            toolCalls: [{ id: 'call-1', tool: 'run_shell_mutate', input: { command: 'yarn test' } }],
+          };
+        }
+
+        return {
+          content: 'The mutation command was denied, so I will stop and report that.',
+        };
+      },
+    };
+
+    const mutateTool: ToolDefinition = {
+      name: 'run_shell_mutate',
+      description: 'Runs a bounded workspace mutation command',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: { command: 'yarn test', exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Run tests if needed.',
+      llm: fakeLlm,
+      tools: [mutateTool],
+      maxSteps: 3,
+      logger: silentLogger,
+      approveToolCall: async () => ({ approved: false, reason: 'User denied in test' }),
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(seenMessages[1]).toContainEqual({
+      role: 'tool',
+      content: JSON.stringify({
+        ok: false,
+        error: 'Approval denied for run_shell_mutate: User denied in test',
+      }),
+      toolCallId: 'call-1',
+    });
+    expect(result.trace.map((event) => event.type)).toContain('tool.approval_requested');
+    expect(result.trace.map((event) => event.type)).toContain('tool.approval_resolved');
+  });
 });

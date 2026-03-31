@@ -50,14 +50,23 @@ goal
 
 Early development. v0 in progress.
 
-The repo now also has an early conversational terminal entrypoint for Phase 0 of the coding-agent roadmap:
+The repo now has:
 
 - `yarn chat`
 - `yarn chat:dev`
 
+as an early conversational terminal entrypoint from Phase 0 of the coding-agent roadmap.
+
+Phase 1 has also started at the tool-contract layer:
+
+- shell capability is now split into `run_shell_inspect` and `run_shell_mutate`
+- inspect vs mutate intent is explicit in tool names, descriptions, and traces
+- examples expose both shell modes to the agent runtime
+- chat mode now pauses for human approval before `run_shell_mutate` executes
+
 ## Next Step
 
-The immediate next step is to run `examples/repo-investigator.ts` against this repo, save the trace, and review concrete failure modes before adding new abstractions. A review template lives in [docs/first-run-review.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/first-run-review.md).
+The immediate next step is to keep tightening the Phase 1 coding-agent surface: better verification-first workflows after edits, stronger repo-native operation patterns, and clearer interrupt or continue behavior during longer interactive runs. A review template lives in [docs/first-run-review.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/first-run-review.md).
 An eval batch prompt set lives in [docs/eval-prompts.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/eval-prompts.md), with a batch review template in [docs/eval-review.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/eval-review.md).
 
 The example runner defaults to `gpt-5.1-codex-mini` and a 40-step budget. Override them with `OPENAI_MODEL` and `HEDDLE_MAX_STEPS` if you want to compare models or cap exploration more tightly.

@@ -19,6 +19,7 @@ export type RunInput = {
 export type ToolDefinition = {
   name: string;
   description: string;
+  requiresApproval?: boolean;
   parameters: Record<string, unknown>; // JSON Schema object
   execute: (input: unknown) => Promise<ToolResult>;
 };
@@ -67,6 +68,15 @@ export type TraceEvent =
       requestedTools: boolean;
       diagnostics?: AssistantDiagnostics;
       toolCalls?: ToolCall[];
+      step: number;
+      timestamp: string;
+    }
+  | { type: 'tool.approval_requested'; call: ToolCall; step: number; timestamp: string }
+  | {
+      type: 'tool.approval_resolved';
+      call: ToolCall;
+      approved: boolean;
+      reason?: string;
       step: number;
       timestamp: string;
     }

@@ -80,7 +80,7 @@ describe('formatTraceForConsole', () => {
     const output = formatTraceForConsole([
       {
         type: 'tool.result',
-        tool: 'run_shell',
+        tool: 'run_shell_inspect',
         result: {
           ok: true,
           output: {
@@ -95,9 +95,41 @@ describe('formatTraceForConsole', () => {
       },
     ]);
 
-    expect(output).toContain('run_shell');
+    expect(output).toContain('run_shell_inspect');
     expect(output).toContain('"command": "pwd"');
     expect(output).toContain('"stdout": "/repo"');
     expect(output).not.toContain('[object Object]');
+  });
+
+  it('renders approval events readably', () => {
+    const output = formatTraceForConsole([
+      {
+        type: 'tool.approval_requested',
+        call: {
+          id: 'call-1',
+          tool: 'run_shell_mutate',
+          input: { command: 'yarn test' },
+        },
+        step: 2,
+        timestamp: '2024-01-01T00:00:01Z',
+      },
+      {
+        type: 'tool.approval_resolved',
+        call: {
+          id: 'call-1',
+          tool: 'run_shell_mutate',
+          input: { command: 'yarn test' },
+        },
+        approved: false,
+        reason: 'User denied in test',
+        step: 2,
+        timestamp: '2024-01-01T00:00:02Z',
+      },
+    ]);
+
+    expect(output).toContain('Approval Required');
+    expect(output).toContain('run_shell_mutate');
+    expect(output).toContain('Approval Denied');
+    expect(output).toContain('User denied in test');
   });
 });

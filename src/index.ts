@@ -31,6 +31,7 @@ export { listFilesTool } from './tools/list-files.js';
 export { readFileTool } from './tools/read-file.js';
 export { searchFilesTool } from './tools/search-files.js';
 export { reportStateTool } from './tools/report-state.js';
+export { createRunShellInspectTool, createRunShellMutateTool } from './tools/run-shell.js';
 export { createRunShellTool } from './tools/run-shell.js';
 export type { RunShellOptions } from './tools/run-shell.js';
 

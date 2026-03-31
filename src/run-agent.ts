@@ -3,7 +3,7 @@
 // A minimal, executable agent loop.
 // ---------------------------------------------------------------------------
 
-import type { RunInput, RunResult, ToolDefinition, StopReason } from './types.js';
+import type { RunInput, RunResult, ToolDefinition, StopReason, ToolCall } from './types.js';
 import type { LlmAdapter } from './llm/types.js';
 import type { ChatMessage } from './llm/types.js';
 import { createToolRegistry } from './tools/registry.js';
@@ -25,6 +25,7 @@ export type RunAgentOptions = {
   logger?: Logger;
   history?: ChatMessage[];
   onEvent?: (event: import('./types.js').TraceEvent) => void;
+  approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
 };
 
 /**
@@ -38,7 +39,16 @@ export type RunAgentOptions = {
  * 6. Repeat
  */
 export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
-  const { goal, llm, tools, maxSteps = DEFAULT_MAX_STEPS, logger: log = defaultLogger, history = [], onEvent } = options;
+  const {
+    goal,
+    llm,
+    tools,
+    maxSteps = DEFAULT_MAX_STEPS,
+    logger: log = defaultLogger,
+    history = [],
+    onEvent,
+    approveToolCall,
+  } = options;
   const registry = createToolRegistry(tools);
   const trace = createTraceRecorder();
   const budget = createBudget(maxSteps);
@@ -114,6 +124,49 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
 
       // Execute each tool call
       for (const call of response.toolCalls) {
+        const tool = registry.get(call.tool);
+        if (tool?.requiresApproval) {
+          record({ type: 'tool.approval_requested', call, step, timestamp: now() });
+          const approval =
+            approveToolCall ? await approveToolCall(call, tool)
+            : {
+                approved: false,
+                reason: `No approval handler configured for ${call.tool}`,
+              };
+          record({
+            type: 'tool.approval_resolved',
+            call,
+            approved: approval.approved,
+            reason: approval.reason,
+            step,
+            timestamp: now(),
+          });
+
+          if (!approval.approved) {
+            const result = {
+              ok: false as const,
+              error:
+                approval.reason ? `Approval denied for ${call.tool}: ${approval.reason}`
+                : `Approval denied for ${call.tool}`,
+            };
+            log.warn({ step, tool: call.tool, reason: approval.reason }, 'Tool execution denied by approval policy');
+            record({ type: 'tool.result', tool: call.tool, result, step, timestamp: now() });
+            consecutiveErrors++;
+            if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+              outcome = 'error';
+              summary = `Stopped after ${MAX_CONSECUTIVE_ERRORS} consecutive tool errors. Last error: ${result.error}`;
+              record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
+              return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
+            }
+            messages.push({
+              role: 'tool',
+              content: JSON.stringify(result),
+              toolCallId: call.id,
+            });
+            continue;
+          }
+        }
+
         log.info({ step, tool: call.tool }, 'Executing tool');
         record({ type: 'tool.call', call, step, timestamp: now() });
 

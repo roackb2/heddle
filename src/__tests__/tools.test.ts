@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { listFilesTool } from '../tools/list-files.js';
 import { readFileTool } from '../tools/read-file.js';
 import { reportStateTool } from '../tools/report-state.js';
-import { createRunShellTool } from '../tools/run-shell.js';
+import { createRunShellInspectTool, createRunShellMutateTool } from '../tools/run-shell.js';
 import { searchFilesTool } from '../tools/search-files.js';
 
 describe('tool input validation', () => {
@@ -91,19 +91,31 @@ describe('searchFilesTool', () => {
   });
 });
 
-describe('runShellTool', () => {
-  it('documents repo-oriented shell usage and expanded safe prefixes', () => {
-    const tool = createRunShellTool();
+describe('runShell tools', () => {
+  it('documents inspect-oriented shell usage and safe prefixes', () => {
+    const tool = createRunShellInspectTool();
 
-    expect(tool.description).toContain('Prefer this when mature CLI tools like rg, git, sed, or ls are a better fit');
+    expect(tool.name).toBe('run_shell_inspect');
+    expect(tool.description).toContain('Use this for CLI-native inspection, search, diff, and git state checks');
     expect(tool.description).toContain('Returns structured output with command, exitCode, stdout, and stderr');
     expect(tool.description).toContain('git rev-parse');
     expect(tool.description).toContain('git ls-files');
     expect(tool.description).toContain('rg');
   });
 
-  it('rejects shell control operators even when the prefix is allowed', async () => {
-    const tool = createRunShellTool();
+  it('documents mutate-oriented shell usage and bounded workspace actions', () => {
+    const tool = createRunShellMutateTool();
+
+    expect(tool.name).toBe('run_shell_mutate');
+    expect(tool.requiresApproval).toBe(true);
+    expect(tool.description).toContain('Use this only when inspection is not enough');
+    expect(tool.description).toContain('formatting, test execution, type-checking');
+    expect(tool.description).toContain('yarn test');
+    expect(tool.description).toContain('prettier --write');
+  });
+
+  it('rejects shell control operators even when the inspect prefix is allowed', async () => {
+    const tool = createRunShellInspectTool();
     const result = await tool.execute({ command: 'ls | wc -l' });
 
     expect(result).toEqual({
@@ -112,8 +124,8 @@ describe('runShellTool', () => {
     });
   });
 
-  it('returns structured stdout and exit code for successful commands', async () => {
-    const tool = createRunShellTool();
+  it('returns structured stdout and exit code for successful inspect commands', async () => {
+    const tool = createRunShellInspectTool();
     const result = await tool.execute({ command: 'pwd' });
 
     expect(result.ok).toBe(true);
@@ -125,8 +137,8 @@ describe('runShellTool', () => {
     expect(typeof (result.output as { stdout: unknown }).stdout).toBe('string');
   });
 
-  it('returns structured failure details for allowed commands that exit non-zero', async () => {
-    const tool = createRunShellTool();
+  it('returns structured failure details for allowed inspect commands that exit non-zero', async () => {
+    const tool = createRunShellInspectTool();
     const result = await tool.execute({ command: 'grep definitely-not-present README.md' });
 
     expect(result).toMatchObject({
@@ -136,6 +148,39 @@ describe('runShellTool', () => {
         command: 'grep definitely-not-present README.md',
         exitCode: 1,
       },
+    });
+  });
+
+  it('rejects invalid inspect input using the new tool name', async () => {
+    const tool = createRunShellInspectTool();
+    const result = await tool.execute({ path: '.' });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Invalid input for run_shell_inspect. Required field: command.',
+    });
+  });
+
+  it('allows bounded mutate commands with structured output', async () => {
+    const tool = createRunShellMutateTool();
+    const result = await tool.execute({ command: 'tsc --version' });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({
+      command: 'tsc --version',
+      exitCode: 0,
+      stderr: '',
+    });
+  });
+
+  it('rejects inspect-only commands on mutate when not allowlisted', async () => {
+    const tool = createRunShellMutateTool();
+    const result = await tool.execute({ command: 'pwd' });
+
+    expect(result).toEqual({
+      ok: false,
+      error:
+        'Command not allowed. The command must start with one of: yarn test, yarn build, yarn lint, yarn format, yarn prettier, yarn eslint, yarn vitest, npx prettier --write, npx eslint --fix, prettier --write, eslint --fix, vitest, tsc',
     });
   });
 });

@@ -15,7 +15,8 @@ import {
   readFileTool,
   searchFilesTool,
   reportStateTool,
-  createRunShellTool,
+  createRunShellInspectTool,
+  createRunShellMutateTool,
   formatTraceForConsole,
   createLogger,
 } from '../src/index.js';
@@ -37,7 +38,14 @@ async function main() {
     model,
     apiKey: process.env.OPENAI_API_KEY ?? process.env.PERSONAL_OPENAI_API_KEY,
   });
-  const tools = [listFilesTool, readFileTool, searchFilesTool, reportStateTool, createRunShellTool()];
+  const tools = [
+    listFilesTool,
+    readFileTool,
+    searchFilesTool,
+    reportStateTool,
+    createRunShellInspectTool(),
+    createRunShellMutateTool(),
+  ];
 
   const result = await runAgent({ goal, llm, tools, maxSteps, logger });
 

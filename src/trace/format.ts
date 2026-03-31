@@ -68,6 +68,20 @@ export function formatTraceForConsole(trace: TraceEvent[]): string {
         );
         break;
 
+      case 'tool.approval_requested':
+        lines.push(
+          `${COLORS.yellow}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}Approval Required:${COLORS.reset} ${event.call.tool}`,
+          `  Input: ${truncate(JSON.stringify(event.call.input), 200)}`,
+        );
+        break;
+
+      case 'tool.approval_resolved':
+        lines.push(
+          `${event.approved ? COLORS.green : COLORS.red}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}Approval ${event.approved ? 'Granted' : 'Denied'}:${COLORS.reset} ${event.call.tool}`,
+          `  Reason: ${event.reason ?? (event.approved ? 'approved' : 'no reason provided')}`,
+        );
+        break;
+
       case 'tool.result': {
         const color = event.result.ok ? COLORS.green : COLORS.red;
         const status = event.result.ok ? '✓' : '✗';
