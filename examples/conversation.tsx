@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, render, useInput } from 'ink';
 import type { ChatMessage, TraceEvent } from '../src/index.js';
 import {
@@ -19,6 +19,7 @@ type TurnSummary = {
   id: string;
   prompt: string;
   outcome: string;
+  summary: string;
   steps: number;
   traceFile: string;
   events: string[];
@@ -30,11 +31,18 @@ type ConversationLine = {
   text: string;
 };
 
+type LiveEvent = {
+  id: string;
+  text: string;
+};
+
 const model = process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
 const maxSteps = parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 40;
 const apiKey = process.env.OPENAI_API_KEY ?? process.env.PERSONAL_OPENAI_API_KEY;
 const sessionId = `chat-${Date.now()}`;
 const logFile = join(process.cwd(), 'local', 'logs', `${sessionId}.log`);
+const knownModels = ['gpt-5.1-codex-mini', 'gpt-5.1-codex'];
+const workingFrames = ['.', '..', '...'];
 const logger = createLogger({
   pretty: false,
   level: 'debug',
@@ -72,6 +80,25 @@ function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [draft, setDraft] = useState('');
+  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
+  const [workingFrame, setWorkingFrame] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!isRunning) {
+      setWorkingFrame(0);
+      setElapsedSeconds(0);
+      return;
+    }
+
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      setWorkingFrame((current) => (current + 1) % workingFrames.length);
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 300);
+
+    return () => clearInterval(timer);
+  }, [isRunning]);
 
   const submitPrompt = async (value: string) => {
     const prompt = value.trim();
@@ -88,6 +115,7 @@ function App() {
     setError(undefined);
     setIsRunning(true);
     setStatus('Running');
+    setLiveEvents([]);
     const nextUserMessage: ConversationLine = { id: `user-${Date.now()}`, role: 'user', text: prompt };
     setMessages((current: ConversationLine[]) => [
       ...current,
@@ -130,6 +158,14 @@ function App() {
         maxSteps,
         logger,
         history,
+        onEvent: (event) => {
+          const next = toLiveEvent(event);
+          if (!next) {
+            return;
+          }
+
+          setLiveEvents((current) => [...current, { id: `${Date.now()}-${current.length}`, text: next }].slice(-8));
+        },
       });
 
       setHistory(result.transcript);
@@ -140,6 +176,7 @@ function App() {
         id: String(Date.now()),
         prompt,
         outcome: result.outcome,
+        summary: result.summary,
         steps: countAssistantSteps(result.trace),
         traceFile,
         events: summarizeTrace(result.trace),
@@ -173,47 +210,37 @@ function App() {
         <Text color={error ? 'red' : isRunning ? 'yellow' : 'green'}>
           status={isRunning ? 'running' : status}
         </Text>
+        <Text dimColor>/model &lt;name&gt; • /models • /clear • /help</Text>
+        <Text dimColor>Cmd+Backspace or Ctrl+U clears to line start • Ctrl+C exits</Text>
         {error ? <Text color="red">{error}</Text> : null}
-        <Text dimColor>Ctrl+C to exit</Text>
       </Box>
 
-      <Box flexDirection="column" marginBottom={1}>
-        <Text bold>Conversation</Text>
-        {messages.slice(-10).map((message) => (
-          <Box key={message.id} borderStyle="round" borderColor={message.role === 'user' ? 'cyan' : 'gray'} paddingX={1} marginBottom={1}>
-            <Text color={message.role === 'user' ? 'cyan' : 'white'}>
-              {message.role === 'user' ? 'You' : 'Heddle'}: {message.text}
-            </Text>
-          </Box>
-        ))}
-      </Box>
-
-      <Box flexDirection="column" marginBottom={1}>
-        <Text bold>Recent Turns</Text>
-        {turns.length === 0 ?
-          <Text dimColor>No completed turns yet.</Text>
-        : turns.slice(-3).map((turn) => (
-            <Box key={turn.id} flexDirection="column" marginBottom={1}>
-              <Text color="magenta">
-                {turn.prompt}
-              </Text>
-              <Text dimColor>
-                outcome={turn.outcome} steps={turn.steps} trace={turn.traceFile}
-              </Text>
-              {turn.events.slice(0, 6).map((event, index) => (
-                <Box key={`${turn.id}-${index}`}>
-                  <Text dimColor>
-                    {event}
-                  </Text>
-                </Box>
-              ))}
-            </Box>
-          ))
-        }
-      </Box>
+      {isRunning ? (
+        <>
+          <ConversationPanel messages={messages} />
+          <RecentTurnsPanel turns={turns} />
+          <ActivityPanel
+            isRunning={isRunning}
+            workingFrame={workingFrame}
+            elapsedSeconds={elapsedSeconds}
+            liveEvents={liveEvents}
+          />
+        </>
+      ) : (
+        <>
+          <RecentTurnsPanel turns={turns} />
+          <ActivityPanel
+            isRunning={isRunning}
+            workingFrame={workingFrame}
+            elapsedSeconds={elapsedSeconds}
+            liveEvents={liveEvents}
+          />
+          <ConversationPanel messages={messages} />
+        </>
+      )}
 
       <Box flexDirection="column" borderStyle="round" borderColor={isRunning ? 'yellow' : 'cyan'} paddingX={1} paddingY={0}>
-        <Text bold>{isRunning ? 'Working...' : 'Prompt'}</Text>
+        <Text bold>{isRunning ? `Working${workingFrames[workingFrame]}` : 'Prompt'}</Text>
         <Box>
           <Text color="cyan">{'>'} </Text>
           <Box flexGrow={1}>
@@ -231,11 +258,82 @@ function App() {
         </Box>
         <Box justifyContent="space-between">
           <Text dimColor>{draft ? `${draft.length} chars` : 'Enter to send'}</Text>
-          <Text dimColor>Ctrl+C to exit</Text>
+          <Text dimColor>{isRunning ? `${elapsedSeconds}s elapsed` : 'Enter to send'}</Text>
         </Box>
-        <Text dimColor>/model &lt;name&gt; switches models • /help shows commands</Text>
-        <Text dimColor>Cmd+Backspace or Ctrl+U clears to line start</Text>
       </Box>
+    </Box>
+  );
+}
+
+type ConversationPanelProps = {
+  messages: ConversationLine[];
+};
+
+function ConversationPanel({ messages }: ConversationPanelProps) {
+  return (
+    <Box flexDirection="column" marginBottom={1}>
+      <Text bold>Conversation</Text>
+      {messages.slice(-8).map((message) => (
+        <Box key={message.id} borderStyle="round" borderColor={message.role === 'user' ? 'cyan' : 'gray'} paddingX={1} marginBottom={1}>
+          <Text color={message.role === 'user' ? 'cyan' : 'white'}>
+            {message.role === 'user' ? 'You' : 'Heddle'}: {message.text}
+          </Text>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+type RecentTurnsPanelProps = {
+  turns: TurnSummary[];
+};
+
+function RecentTurnsPanel({ turns }: RecentTurnsPanelProps) {
+  const latestTurn = turns[turns.length - 1];
+
+  return (
+    <Box flexDirection="column" marginBottom={1}>
+      <Text bold>Recent Turns</Text>
+      {!latestTurn ?
+        <Text dimColor>No completed turns yet.</Text>
+      : (
+        <Box flexDirection="column">
+          <Text color="magenta">{truncate(latestTurn.prompt, 120)}</Text>
+          <Text dimColor>
+            outcome={latestTurn.outcome} steps={latestTurn.steps} trace={latestTurn.traceFile}
+          </Text>
+          {latestTurn.outcome !== 'done' ? <Text color="red">{latestTurn.summary}</Text> : null}
+          <Text dimColor>
+            {latestTurn.events.slice(0, 4).join(' • ')}
+          </Text>
+        </Box>
+      )
+      }
+    </Box>
+  );
+}
+
+type ActivityPanelProps = {
+  isRunning: boolean;
+  workingFrame: number;
+  elapsedSeconds: number;
+  liveEvents: LiveEvent[];
+};
+
+function ActivityPanel({ isRunning, workingFrame, elapsedSeconds, liveEvents }: ActivityPanelProps) {
+  const visibleEvents = isRunning ? liveEvents.slice(-3) : liveEvents.slice(-1);
+
+  return (
+    <Box flexDirection="column" marginBottom={1}>
+      <Text bold>Current Activity</Text>
+      <Text color={isRunning ? 'yellow' : 'gray'}>
+        {currentActivityText(liveEvents, isRunning, elapsedSeconds)}
+      </Text>
+      {visibleEvents.map((event) => (
+        <Box key={event.id}>
+          <Text dimColor>{event.text}</Text>
+        </Box>
+      ))}
     </Box>
   );
 }
@@ -285,6 +383,44 @@ function countAssistantSteps(trace: TraceEvent[]): number {
   return trace.filter((event) => event.type === 'assistant.turn').length;
 }
 
+function toLiveEvent(event: TraceEvent): string | undefined {
+  switch (event.type) {
+    case 'run.started':
+      return `thinking`;
+    case 'assistant.turn':
+      if (event.requestedTools) {
+        return undefined;
+      }
+      return `answer ready`;
+    case 'tool.call':
+      return `running ${event.call.tool}`;
+    case 'tool.result':
+      return `${event.tool} ${event.result.ok ? 'completed' : `failed: ${event.result.error ?? 'error'}`}`;
+    case 'run.finished':
+      return event.outcome === 'done' ? 'done' : `stopped: ${event.outcome}`;
+    default:
+      return undefined;
+  }
+}
+
+function currentActivityText(liveEvents: LiveEvent[], isRunning: boolean, elapsedSeconds: number): string {
+  const current = liveEvents[liveEvents.length - 1]?.text;
+
+  if (isRunning) {
+    return current ? `${current} · ${elapsedSeconds}s` : 'waiting for first agent event...';
+  }
+
+  return current ?? 'idle';
+}
+
+function truncate(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength - 1)}…`;
+}
+
 function parsePositiveInt(raw: string | undefined): number | undefined {
   if (!raw) {
     return undefined;
@@ -315,7 +451,14 @@ function runLocalCommand(args: LocalCommandArgs): { handled: boolean; message: s
     return {
       handled: true,
       message:
-        'Local commands: /model <name> switches the current model, /model shows the active model, /clear resets the current chat transcript, /help shows this message.',
+        'Local commands: /model <name> switches the current model, /model shows the active model, /models lists common model names, /clear resets the current chat transcript, /help shows this message.',
+    };
+  }
+
+  if (trimmed === '/models') {
+    return {
+      handled: true,
+      message: `Common model choices: ${knownModels.join(', ')}`,
     };
   }
 
@@ -338,7 +481,10 @@ function runLocalCommand(args: LocalCommandArgs): { handled: boolean; message: s
     args.setActiveModel(nextModel);
     return {
       handled: true,
-      message: `Switched model to ${nextModel}`,
+      message:
+        knownModels.includes(nextModel) ?
+          `Switched model to ${nextModel}`
+        : `Switched model to ${nextModel}. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.`,
     };
   }
 

@@ -24,6 +24,7 @@ export type RunAgentOptions = {
   maxSteps?: number;
   logger?: Logger;
   history?: ChatMessage[];
+  onEvent?: (event: import('./types.js').TraceEvent) => void;
 };
 
 /**
@@ -37,7 +38,7 @@ export type RunAgentOptions = {
  * 6. Repeat
  */
 export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
-  const { goal, llm, tools, maxSteps = DEFAULT_MAX_STEPS, logger: log = defaultLogger, history = [] } = options;
+  const { goal, llm, tools, maxSteps = DEFAULT_MAX_STEPS, logger: log = defaultLogger, history = [], onEvent } = options;
   const registry = createToolRegistry(tools);
   const trace = createTraceRecorder();
   const budget = createBudget(maxSteps);
@@ -45,11 +46,15 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
 
   // Start trace
   const now = () => new Date().toISOString();
+  const record = (event: import('./types.js').TraceEvent) => {
+    trace.record(event);
+    onEvent?.(event);
+  };
   let step = 0;
   let consecutiveErrors = 0;
 
   log.info({ goal, maxSteps, tools: registry.names() }, 'Agent run started');
-  trace.record({ type: 'run.started', goal, timestamp: now() });
+  record({ type: 'run.started', goal, timestamp: now() });
 
   // Build initial messages
   const messages: ChatMessage[] = [
@@ -73,7 +78,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       log.error({ step, error: errMsg }, 'LLM call failed');
-      trace.record({
+      record({
         type: 'run.finished',
         outcome: 'error',
         summary: `LLM error: ${errMsg}`,
@@ -90,7 +95,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
 
     // Case 1: model returned tool calls
     if (response.toolCalls && response.toolCalls.length > 0) {
-      trace.record({
+      record({
         type: 'assistant.turn',
         content: response.content ?? '',
         diagnostics: response.diagnostics,
@@ -110,7 +115,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
       // Execute each tool call
       for (const call of response.toolCalls) {
         log.info({ step, tool: call.tool }, 'Executing tool');
-        trace.record({ type: 'tool.call', call, step, timestamp: now() });
+        record({ type: 'tool.call', call, step, timestamp: now() });
 
         const signature = `${call.tool}:${stableSerialize(call.input)}`;
         const result = seenToolCalls.has(signature)
@@ -121,7 +126,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
           : await executeTool(registry, call);
         seenToolCalls.add(signature);
         log.debug({ step, tool: call.tool, ok: result.ok }, 'Tool result');
-        trace.record({ type: 'tool.result', tool: call.tool, result, step, timestamp: now() });
+        record({ type: 'tool.result', tool: call.tool, result, step, timestamp: now() });
 
         // Track consecutive errors
         if (!result.ok) {
@@ -129,7 +134,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
           if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
             outcome = 'error';
             summary = `Stopped after ${MAX_CONSECUTIVE_ERRORS} consecutive tool errors. Last error: ${result.error}`;
-            trace.record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
+            record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
             return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
           }
         } else {
@@ -149,7 +154,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
 
     // Case 2: model returned content only → agent is done
     if (response.content) {
-      trace.record({
+      record({
         type: 'assistant.turn',
         content: response.content,
         diagnostics: response.diagnostics,
@@ -162,21 +167,21 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
       outcome = 'done';
       summary = response.content;
       log.info({ step, outcome }, 'Agent run finished');
-      trace.record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
+      record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
       return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
     }
 
     // Case 3: empty response — shouldn't happen but handle gracefully
     outcome = 'error';
     summary = 'Model returned an empty response';
-    trace.record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
+    record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
     return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
   }
 
   // Budget exhausted
   summary = `Reached maximum step limit (${maxSteps})`;
   log.warn({ step, maxSteps }, 'Budget exhausted');
-  trace.record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
+  record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
   return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
 }
 
