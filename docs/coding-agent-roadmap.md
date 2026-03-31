@@ -82,6 +82,29 @@ Remaining priority:
 - stronger git-native review and explanation flow after changes
 - clearer summaries of what changed, what was verified, and what remains uncertain
 - more polished operator experience around interrupted or resumed runs
+- begin evolving shell policy from a narrow command-prefix allowlist toward a real execution-policy model based on risk, scope, approval, and auditability
+
+Direction for shell evolution:
+
+- the current allowlist-based `run_shell_mutate` is a bootstrap, not the intended end state
+- serious usefulness requires a bounded general execution surface, not an ever-growing list of specific commands
+- future shell policy should classify actions by risk and scope rather than by enumerating all allowed CLIs
+
+Target direction:
+
+- keep `run_shell_inspect` as the low-risk evidence-gathering surface
+- evolve mutation/execution into a host-governed policy surface that can eventually support real commands such as project-local scripts, file operations, `aws`, `kubectl`, `gh`, or similar tools when the current environment allows them
+- make decisions based on:
+  - workspace scope
+  - external-system scope
+  - destructive risk
+  - approval requirement
+  - trace/audit requirements
+
+Near-term implication:
+
+- the next shell work should not be "add more prefixes forever"
+- it should move toward capability classes and host-side execution policy
 
 ## Phase 2: Reliability And Session Quality
 
@@ -115,6 +138,7 @@ Scope:
 - test-failure digestion
 - resumable sessions
 - richer approval and audit model
+- broader policy-based execution surfaces beyond the current narrow mutate allowlist
 
 Exit criteria:
 

@@ -66,6 +66,8 @@ Phase 1 has also started at the tool-contract layer:
 The immediate next step is to keep tightening the Phase 1 coding-agent surface around git-native review and explanation: stronger `git status` / `git diff` workflows, clearer change summaries, and better operator confidence after bounded edits.
 An eval batch prompt set lives in [docs/eval-prompts.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/eval-prompts.md).
 
+The shell direction is also intentionally moving toward a policy-based execution surface rather than an ever-growing allowlist of specific commands.
+
 The example runner defaults to `gpt-5.1-codex-mini` and a 40-step budget. Override them with `OPENAI_MODEL` and `HEDDLE_MAX_STEPS` if you want to compare models or cap exploration more tightly.
 
 ## Design Principles
