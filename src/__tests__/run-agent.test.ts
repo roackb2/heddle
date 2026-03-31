@@ -275,4 +275,121 @@ describe('runAgent', () => {
     expect(result.trace.map((event) => event.type)).toContain('tool.approval_requested');
     expect(result.trace.map((event) => event.type)).toContain('tool.approval_resolved');
   });
+
+  it('requires repo review and verification before finalizing after a workspace-changing mutate command', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+        const hostReminder = [...messages].reverse().find(
+          (message: ChatMessage) =>
+            message.role === 'system' &&
+            message.content.includes('Host requirement: before giving a final answer'),
+        );
+
+        if (seenMessages.length === 1) {
+          return {
+            toolCalls: [{ id: 'call-1', tool: 'run_shell_mutate', input: { command: 'eslint --fix src/example.ts' } }],
+          };
+        }
+
+        if (!hostReminder) {
+          return {
+            content: 'The workspace-changing command is complete.',
+          };
+        }
+
+        if (seenMessages.length === 3) {
+          return {
+            toolCalls: [{ id: 'call-2', tool: 'run_shell_inspect', input: { command: 'git diff --stat' } }],
+          };
+        }
+
+        if (seenMessages.length === 4) {
+          return {
+            toolCalls: [{ id: 'call-3', tool: 'run_shell_mutate', input: { command: 'yarn test' } }],
+          };
+        }
+
+        return {
+          content: 'I fixed the file, reviewed the diff, and verification passed.',
+        };
+      },
+    };
+
+    const mutateTool: ToolDefinition = {
+      name: 'run_shell_mutate',
+      description: 'Runs a bounded workspace mutation or verification command',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const command = (input as { command: string }).command;
+        return { ok: true, output: { command, exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
+    const inspectTool: ToolDefinition = {
+      name: 'run_shell_inspect',
+      description: 'Runs a read-only shell inspection command',
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const command = (input as { command: string }).command;
+        return { ok: true, output: { command, exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Apply the fix and tell me it worked.',
+      llm: fakeLlm,
+      tools: [mutateTool, inspectTool],
+      maxSteps: 6,
+      logger: silentLogger,
+      approveToolCall: async () => ({ approved: true }),
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('I fixed the file, reviewed the diff, and verification passed.');
+    expect(seenMessages[2]).toContainEqual({
+      role: 'system',
+      content:
+        'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with a git review command such as git status or git diff and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
+    });
+  });
+
+  it('returns an interrupted outcome when the host requests a stop between steps', async () => {
+    let shouldStop = false;
+    const fakeLlm: LlmAdapter = {
+      async chat(): Promise<LlmResponse> {
+        shouldStop = true;
+        return {
+          toolCalls: [{ id: 'call-1', tool: 'list_files', input: { path: '.' } }],
+        };
+      },
+    };
+
+    const listFilesTool: ToolDefinition = {
+      name: 'list_files',
+      description: 'Lists files in a directory',
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: 'README.md\nsrc/' };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Inspect this repo and then stop.',
+      llm: fakeLlm,
+      tools: [listFilesTool],
+      maxSteps: 3,
+      logger: silentLogger,
+      shouldStop: () => shouldStop,
+    });
+
+    expect(result.outcome).toBe('interrupted');
+    expect(result.summary).toBe('Run interrupted by host request');
+    expect(result.trace[result.trace.length - 1]).toMatchObject({
+      type: 'run.finished',
+      outcome: 'interrupted',
+    });
+  });
 });

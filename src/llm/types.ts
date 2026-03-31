@@ -27,5 +27,5 @@ export type LlmResponse = {
  * Swap implementations to change providers.
  */
 export interface LlmAdapter {
-  chat(messages: ChatMessage[], tools: ToolDefinition[]): Promise<LlmResponse>;
+  chat(messages: ChatMessage[], tools: ToolDefinition[], signal?: AbortSignal): Promise<LlmResponse>;
 }

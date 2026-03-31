@@ -23,7 +23,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
   const model = options.model ?? DEFAULT_OPENAI_MODEL;
 
   return {
-    async chat(messages: ChatMessage[], tools: ToolDefinition[]): Promise<LlmResponse> {
+    async chat(messages: ChatMessage[], tools: ToolDefinition[], signal?: AbortSignal): Promise<LlmResponse> {
       const response = await client.responses.create({
         model,
         input: toResponseInput(messages),
@@ -31,7 +31,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
         reasoning: {
           summary: 'detailed',
         },
-      });
+      }, { signal });
 
       const toolCalls = response.output
         .filter((item): item is ResponseFunctionToolCall => item.type === 'function_call')

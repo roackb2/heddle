@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Text, render, useInput } from 'ink';
 import type { ChatMessage, ToolCall, ToolDefinition, TraceEvent } from '../src/index.js';
 import {
@@ -44,6 +44,10 @@ type PendingApproval = {
 };
 
 type ApprovalChoice = 'approve' | 'deny';
+type LocalCommandResult =
+  | { handled: false }
+  | { handled: true; kind: 'message'; message: string }
+  | { handled: true; kind: 'continue' };
 
 const model = process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
 const maxSteps = parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 40;
@@ -102,9 +106,18 @@ function App() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | undefined>();
   const [approvalChoice, setApprovalChoice] = useState<ApprovalChoice>('approve');
+  const [interruptRequested, setInterruptRequested] = useState(false);
+  const [lastContinuePrompt, setLastContinuePrompt] = useState<string | undefined>();
+  const interruptRequestedRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | undefined>(undefined);
 
   useInput((input, key) => {
     if (!pendingApproval) {
+      if (isRunning && key.escape) {
+        interruptRequestedRef.current = true;
+        setInterruptRequested(true);
+        abortControllerRef.current?.abort();
+      }
       return;
     }
 
@@ -145,7 +158,7 @@ function App() {
       setPendingApproval(undefined);
       setApprovalChoice('approve');
     }
-  }, { isActive: Boolean(pendingApproval) });
+  }, { isActive: Boolean(pendingApproval) || isRunning });
 
   useEffect(() => {
     if (!isRunning) {
@@ -163,8 +176,7 @@ function App() {
     return () => clearInterval(timer);
   }, [isRunning]);
 
-  const submitPrompt = async (value: string) => {
-    const prompt = normalizeInlineText(value);
+  const executeTurn = async (prompt: string, displayText?: string) => {
     if (!prompt || isRunning) {
       return;
     }
@@ -178,39 +190,18 @@ function App() {
     setError(undefined);
     setIsRunning(true);
     setStatus('Running');
+    interruptRequestedRef.current = false;
+    setInterruptRequested(false);
+    abortControllerRef.current = new AbortController();
     setLiveEvents([]);
-    const nextUserMessage: ConversationLine = { id: `user-${Date.now()}`, role: 'user', text: prompt };
-    setMessages((current: ConversationLine[]) => [
-      ...current,
-      nextUserMessage,
-    ]);
+    setLastContinuePrompt(prompt);
 
-    const commandResult = runLocalCommand({
-      prompt,
-      activeModel,
-      setActiveModel,
-      clearConversation: () => {
-        setHistory([]);
-        setTurns([]);
-        setMessages([
-          {
-            id: 'intro',
-            role: 'assistant',
-            text:
-              'Heddle conversational mode. Ask a question about this workspace. Each turn runs the current agent loop and carries the transcript into the next turn.',
-          },
-        ]);
-      },
-    });
-
-    if (commandResult.handled) {
+    if (displayText) {
+      const nextUserMessage: ConversationLine = { id: `user-${Date.now()}`, role: 'user', text: displayText };
       setMessages((current: ConversationLine[]) => [
         ...current,
-        { id: `command-${Date.now()}`, role: 'assistant', text: commandResult.message },
+        nextUserMessage,
       ]);
-      setStatus('Idle');
-      setIsRunning(false);
-      return;
     }
 
     try {
@@ -233,6 +224,8 @@ function App() {
           new Promise((resolve) => {
             setPendingApproval({ call, tool, resolve });
           }),
+        shouldStop: () => interruptRequestedRef.current,
+        abortSignal: abortControllerRef.current.signal,
       });
 
       setHistory(result.transcript);
@@ -263,7 +256,65 @@ function App() {
       ]);
     } finally {
       setIsRunning(false);
+      interruptRequestedRef.current = false;
+      setInterruptRequested(false);
+      abortControllerRef.current = undefined;
     }
+  };
+
+  const submitPrompt = async (value: string) => {
+    const prompt = normalizeInlineText(value);
+    if (!prompt || isRunning) {
+      return;
+    }
+
+    const commandResult = runLocalCommand({
+      prompt,
+      activeModel,
+      setActiveModel,
+      clearConversation: () => {
+        setHistory([]);
+        setTurns([]);
+        setLastContinuePrompt(undefined);
+        setMessages([
+          {
+            id: 'intro',
+            role: 'assistant',
+            text:
+              'Heddle conversational mode. Ask a question about this workspace. Each turn runs the current agent loop and carries the transcript into the next turn.',
+          },
+        ]);
+      },
+    });
+
+    if (commandResult.handled) {
+      if (commandResult.kind === 'message') {
+        setMessages((current: ConversationLine[]) => [
+          ...current,
+          { id: `command-${Date.now()}`, role: 'assistant', text: commandResult.message },
+        ]);
+        setStatus('Idle');
+        return;
+      }
+
+      if (!history.length || !lastContinuePrompt) {
+        setMessages((current: ConversationLine[]) => [
+          ...current,
+          { id: `command-${Date.now()}`, role: 'assistant', text: 'There is no interrupted or prior run to continue yet.' },
+        ]);
+        setStatus('Idle');
+        return;
+      }
+
+      setMessages((current: ConversationLine[]) => [
+        ...current,
+        { id: `command-${Date.now()}`, role: 'assistant', text: 'Continuing from the current transcript.' },
+      ]);
+      await executeTurn('Continue from where you left off.', 'Continue');
+      return;
+    }
+
+    await executeTurn(prompt, prompt);
   };
 
   return (
@@ -275,11 +326,13 @@ function App() {
         </Text>
         <Text dimColor>logs={logFile}</Text>
         <Text color={error ? 'red' : isRunning ? 'yellow' : 'green'}>
-          status={pendingApproval ? 'awaiting approval' : isRunning ? 'running' : status}
+          status={pendingApproval ? 'awaiting approval' : interruptRequested ? 'interrupt requested' : isRunning ? 'running' : status}
         </Text>
         <Text dimColor>/model &lt;name&gt; • /models • /clear • /help</Text>
         <Text dimColor>
-          {pendingApproval ? '←/→ choose • Enter confirms • Esc denies • Ctrl+C exits' : 'Cmd+Backspace or Ctrl+U clears to line start • Ctrl+C exits'}
+          {pendingApproval ? '←/→ choose • Enter confirms • Esc denies • Ctrl+C exits'
+          : isRunning ? 'Esc requests stop after the current step • Ctrl+C exits'
+          : 'Cmd+Backspace or Ctrl+U clears to line start • Ctrl+C exits'}
         </Text>
         {error ? <Text color="red">{error}</Text> : null}
       </Box>
@@ -294,6 +347,7 @@ function App() {
             elapsedSeconds={elapsedSeconds}
             liveEvents={liveEvents}
             pendingApproval={pendingApproval}
+            interruptRequested={interruptRequested}
           />
         </>
       ) : (
@@ -305,6 +359,7 @@ function App() {
             elapsedSeconds={elapsedSeconds}
             liveEvents={liveEvents}
             pendingApproval={pendingApproval}
+            interruptRequested={interruptRequested}
           />
           <ConversationPanel messages={messages} />
         </>
@@ -398,16 +453,17 @@ type ActivityPanelProps = {
   elapsedSeconds: number;
   liveEvents: LiveEvent[];
   pendingApproval?: PendingApproval;
+  interruptRequested: boolean;
 };
 
-function ActivityPanel({ isRunning, workingFrame, elapsedSeconds, liveEvents, pendingApproval }: ActivityPanelProps) {
+function ActivityPanel({ isRunning, workingFrame, elapsedSeconds, liveEvents, pendingApproval, interruptRequested }: ActivityPanelProps) {
   const visibleEvents = isRunning ? liveEvents.slice(-3) : liveEvents.slice(-1);
 
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Text bold>Current Activity</Text>
-      <Text color={pendingApproval ? 'yellow' : isRunning ? 'yellow' : 'gray'}>
-        {currentActivityText(liveEvents, isRunning, elapsedSeconds, pendingApproval)}
+      <Text color={pendingApproval ? 'yellow' : interruptRequested ? 'yellow' : isRunning ? 'yellow' : 'gray'}>
+        {currentActivityText(liveEvents, isRunning, elapsedSeconds, pendingApproval, interruptRequested)}
       </Text>
       {visibleEvents.map((event) => (
         <Box key={event.id}>
@@ -541,9 +597,14 @@ function currentActivityText(
   isRunning: boolean,
   elapsedSeconds: number,
   pendingApproval?: PendingApproval,
+  interruptRequested?: boolean,
 ): string {
   if (pendingApproval) {
     return formatApprovalPrompt(pendingApproval);
+  }
+
+  if (interruptRequested) {
+    return 'interrupt requested; waiting for the current step to finish';
   }
 
   const current = liveEvents[liveEvents.length - 1]?.text;
@@ -626,23 +687,25 @@ type LocalCommandArgs = {
   clearConversation: () => void;
 };
 
-function runLocalCommand(args: LocalCommandArgs): { handled: boolean; message: string } {
+function runLocalCommand(args: LocalCommandArgs): LocalCommandResult {
   const trimmed = args.prompt.trim();
   if (!trimmed.startsWith('/')) {
-    return { handled: false, message: '' };
+    return { handled: false };
   }
 
   if (trimmed === '/help') {
     return {
       handled: true,
+      kind: 'message',
       message:
-        'Local commands: /model <name> switches the current model, /model shows the active model, /models lists common model names, /clear resets the current chat transcript, /help shows this message.',
+        'Local commands: /model <name> switches the current model, /model shows the active model, /models lists common model names, /continue resumes from the current transcript, /clear resets the current chat transcript, /help shows this message.',
     };
   }
 
   if (trimmed === '/models') {
     return {
       handled: true,
+      kind: 'message',
       message: `Common model choices: ${knownModels.join(', ')}`,
     };
   }
@@ -650,6 +713,7 @@ function runLocalCommand(args: LocalCommandArgs): { handled: boolean; message: s
   if (trimmed === '/model') {
     return {
       handled: true,
+      kind: 'message',
       message: `Current model: ${args.activeModel}`,
     };
   }
@@ -659,6 +723,7 @@ function runLocalCommand(args: LocalCommandArgs): { handled: boolean; message: s
     if (!nextModel) {
       return {
         handled: true,
+        kind: 'message',
         message: 'Usage: /model <name>',
       };
     }
@@ -666,6 +731,7 @@ function runLocalCommand(args: LocalCommandArgs): { handled: boolean; message: s
     args.setActiveModel(nextModel);
     return {
       handled: true,
+      kind: 'message',
       message:
         knownModels.includes(nextModel) ?
           `Switched model to ${nextModel}`
@@ -677,12 +743,21 @@ function runLocalCommand(args: LocalCommandArgs): { handled: boolean; message: s
     args.clearConversation();
     return {
       handled: true,
+      kind: 'message',
       message: 'Cleared the current chat transcript.',
+    };
+  }
+
+  if (trimmed === '/continue') {
+    return {
+      handled: true,
+      kind: 'continue',
     };
   }
 
   return {
     handled: true,
+    kind: 'message',
     message: `Unknown command: ${trimmed}. Use /help for available commands.`,
   };
 }

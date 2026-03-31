@@ -69,6 +69,20 @@ Exit criteria:
 
 - Heddle can inspect, edit, verify, and explain bounded changes in a real repository with a usable operator experience
 
+Current progress:
+
+- conversational terminal is working and usable enough for short coding-agent sessions
+- shell capability is split into `run_shell_inspect` and `run_shell_mutate`
+- `run_shell_mutate` is approval-gated in chat mode
+- workspace-changing mutate commands trigger host-side pressure to inspect repo state and run verification before final answer
+- chat mode now supports interrupt via `Esc` and resume via `/continue`
+
+Remaining priority:
+
+- stronger git-native review and explanation flow after changes
+- clearer summaries of what changed, what was verified, and what remains uncertain
+- more polished operator experience around interrupted or resumed runs
+
 ## Phase 2: Reliability And Session Quality
 
 Goal:

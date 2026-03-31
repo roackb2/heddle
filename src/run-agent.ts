@@ -26,6 +26,8 @@ export type RunAgentOptions = {
   history?: ChatMessage[];
   onEvent?: (event: import('./types.js').TraceEvent) => void;
   approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
+  shouldStop?: () => boolean;
+  abortSignal?: AbortSignal;
 };
 
 /**
@@ -48,6 +50,8 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
     history = [],
     onEvent,
     approveToolCall,
+    shouldStop,
+    abortSignal,
   } = options;
   const registry = createToolRegistry(tools);
   const trace = createTraceRecorder();
@@ -62,6 +66,8 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   };
   let step = 0;
   let consecutiveErrors = 0;
+  let pendingVerification = false;
+  let pendingChangeReview = false;
 
   log.info({ goal, maxSteps, tools: registry.names() }, 'Agent run started');
   record({ type: 'run.started', goal, timestamp: now() });
@@ -77,6 +83,14 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   let summary = '';
 
   while (!budget.exhausted()) {
+    if (shouldStop?.()) {
+      outcome = 'interrupted';
+      summary = 'Run interrupted by host request';
+      log.info({ step, outcome }, 'Agent run interrupted before next step');
+      record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
+      return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
+    }
+
     step++;
     budget.step();
 
@@ -84,8 +98,29 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
     log.debug({ step, budgetRemaining: budget.remaining() }, 'Calling LLM');
     let response;
     try {
-      response = await llm.chat(messages, registry.list());
+      if (abortSignal?.aborted) {
+        outcome = 'interrupted';
+        summary = 'Run interrupted by host request';
+        log.info({ step, outcome }, 'Agent run interrupted before LLM call');
+        record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
+        return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
+      }
+
+      response = await llm.chat(messages, registry.list(), abortSignal);
     } catch (err) {
+      if (isAbortError(err) || abortSignal?.aborted || shouldStop?.()) {
+        outcome = 'interrupted';
+        summary = 'Run interrupted by host request';
+        log.info({ step, outcome }, 'Agent run interrupted during LLM call');
+        record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
+        return {
+          outcome,
+          summary,
+          trace: trace.getTrace(),
+          transcript: messages.slice(1),
+        };
+      }
+
       const errMsg = err instanceof Error ? err.message : String(err);
       log.error({ step, error: errMsg }, 'LLM call failed');
       record({
@@ -124,6 +159,14 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
 
       // Execute each tool call
       for (const call of response.toolCalls) {
+        if (shouldStop?.()) {
+          outcome = 'interrupted';
+          summary = 'Run interrupted by host request';
+          log.info({ step, outcome }, 'Agent run interrupted before tool execution');
+          record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
+          return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
+        }
+
         const tool = registry.get(call.tool);
         if (tool?.requiresApproval) {
           record({ type: 'tool.approval_requested', call, step, timestamp: now() });
@@ -192,6 +235,21 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
           }
         } else {
           consecutiveErrors = 0;
+          const command = extractShellCommand(call.input);
+          if (call.tool === 'run_shell_mutate' && command) {
+            if (isWorkspaceChangeMutateCommand(command)) {
+              pendingVerification = true;
+              pendingChangeReview = true;
+            }
+
+            if (isVerificationMutateCommand(command)) {
+              pendingVerification = false;
+            }
+          }
+
+          if (call.tool === 'run_shell_inspect' && command && isRepoReviewCommand(command)) {
+            pendingChangeReview = false;
+          }
         }
 
         // Append tool result to transcript
@@ -207,6 +265,23 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
 
     // Case 2: model returned content only → agent is done
     if (response.content) {
+      if (pendingVerification || pendingChangeReview) {
+        const hostRequirement = buildPostMutationRequirement({
+          pendingVerification,
+          pendingChangeReview,
+        });
+        log.info(
+          {
+            step,
+            pendingVerification,
+            pendingChangeReview,
+          },
+          'Blocking premature final answer until mutation follow-up is complete',
+        );
+        messages.push({ role: 'system', content: hostRequirement });
+        continue;
+      }
+
       record({
         type: 'assistant.turn',
         content: response.content,
@@ -238,6 +313,59 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
 }
 
+function extractShellCommand(input: unknown): string | undefined {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return undefined;
+  }
+
+  const command = (input as { command?: unknown }).command;
+  return typeof command === 'string' && command.trim() ? command.trim() : undefined;
+}
+
+function isWorkspaceChangeMutateCommand(command: string): boolean {
+  return (
+    /^yarn format\b/.test(command) ||
+    /^yarn prettier\b/.test(command) ||
+    /^yarn eslint\b/.test(command) ||
+    /^npx prettier --write\b/.test(command) ||
+    /^npx eslint --fix\b/.test(command) ||
+    /^prettier --write\b/.test(command) ||
+    /^eslint --fix\b/.test(command)
+  );
+}
+
+function isVerificationMutateCommand(command: string): boolean {
+  return (
+    /^yarn test\b/.test(command) ||
+    /^yarn build\b/.test(command) ||
+    /^yarn lint\b/.test(command) ||
+    /^yarn vitest\b/.test(command) ||
+    /^vitest\b/.test(command) ||
+    /^tsc\b/.test(command)
+  );
+}
+
+function isRepoReviewCommand(command: string): boolean {
+  return /^git status\b/.test(command) || /^git diff\b/.test(command);
+}
+
+function buildPostMutationRequirement(options: {
+  pendingVerification: boolean;
+  pendingChangeReview: boolean;
+}): string {
+  const requirements: string[] = [];
+
+  if (options.pendingChangeReview) {
+    requirements.push('inspect the resulting repo state with a git review command such as git status or git diff');
+  }
+
+  if (options.pendingVerification) {
+    requirements.push('run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc');
+  }
+
+  return `Host requirement: before giving a final answer after a workspace-changing mutate command, you must ${requirements.join(' and ')}. After doing that, then provide the final answer.`;
+}
+
 function stableSerialize(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map((item) => stableSerialize(item)).join(',')}]`;
@@ -249,4 +377,16 @@ function stableSerialize(value: unknown): string {
   }
 
   return JSON.stringify(value);
+}
+
+function isAbortError(err: unknown): boolean {
+  if (!(err instanceof Error)) {
+    return false;
+  }
+
+  return (
+    err.name === 'AbortError' ||
+    err.name === 'APIUserAbortError' ||
+    /aborted/i.test(err.message)
+  );
 }

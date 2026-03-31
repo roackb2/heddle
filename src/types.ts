@@ -55,7 +55,7 @@ export type ToolResult = {
 /**
  * Why the run stopped.
  */
-export type StopReason = 'done' | 'max_steps' | 'error';
+export type StopReason = 'done' | 'max_steps' | 'error' | 'interrupted';
 
 /**
  * A single event in the run trace. Discriminated union on `type`.
