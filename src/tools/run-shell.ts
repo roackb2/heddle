@@ -3,7 +3,7 @@
 // Policy-based shell execution with explicit scope/risk metadata.
 // ---------------------------------------------------------------------------
 
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import type { ToolDefinition, ToolResult } from '../types.js';
 
 type RunShellInput = {
@@ -40,7 +40,7 @@ export type RunShellOptions = {
   rules?: RunShellRule[];
 };
 
-const DEFAULT_INSPECT_RULES: RunShellRule[] = [
+export const DEFAULT_INSPECT_RULES: RunShellRule[] = [
   inspectRule('ls', 'workspace listing'),
   inspectRule('cat', 'file inspection'),
   inspectRule('head', 'file inspection'),
@@ -72,7 +72,7 @@ const DEFAULT_INSPECT_RULES: RunShellRule[] = [
   inspectRule('git', 'git remote inspection', ['remote']),
 ];
 
-const DEFAULT_MUTATE_RULES: RunShellRule[] = [
+export const DEFAULT_MUTATE_RULES: RunShellRule[] = [
   workspaceRule('yarn', 'medium', 'workspace dependency install command', ['add']),
   workspaceRule('yarn', 'medium', 'workspace dependency install command', ['install']),
   workspaceRule('yarn', 'medium', 'workspace dependency removal command', ['remove']),
@@ -105,7 +105,7 @@ export function createRunShellInspectTool(options: RunShellOptions = {}): ToolDe
     description:
       `Run a read-oriented shell command inside the current workspace. Use this for CLI-native inspection, search, diff, and git state checks when mature commands like rg, git, sed, or ls are a better fit than bespoke file tools. Returns structured output with command, exitCode, stdout, stderr, and policy metadata. This tool is governed by low-risk inspect rules, not arbitrary shell access. Shell control operators like pipes, redirects, chaining, and subshells are blocked.`,
     parameters: buildParameters(),
-    execute: (raw) => executeRunShell(raw, {
+    execute: (raw) => runShellCommand(raw, {
       toolName: 'run_shell_inspect',
       rules,
       allowUnknown: false,
@@ -122,7 +122,7 @@ export function createRunShellMutateTool(options: RunShellOptions = {}): ToolDef
     description:
       `Run a bounded workspace execution command inside the current workspace. Use this only when inspection is not enough and you need verification, formatting, staging, or another explicit workspace action. Returns structured output with command, exitCode, stdout, stderr, and policy metadata. This tool is governed by host-side workspace execution rules with explicit risk classification rather than open-ended shell access. Shell control operators like pipes, redirects, chaining, and subshells are blocked.`,
     parameters: buildParameters(),
-    execute: (raw) => executeRunShell(raw, {
+    execute: (raw) => runShellCommand(raw, {
       toolName: 'run_shell_mutate',
       rules,
       allowUnknown: true,
@@ -148,13 +148,14 @@ function buildParameters(): Record<string, unknown> {
   };
 }
 
-function executeRunShell(
+export function runShellCommand(
   raw: unknown,
   options: {
     toolName: string;
     rules: RunShellRule[];
     allowUnknown: boolean;
   },
+  signal?: AbortSignal,
 ): Promise<ToolResult> {
   if (!isRunShellInput(raw)) {
     return Promise.resolve({
@@ -188,44 +189,120 @@ function executeRunShell(
     });
   }
 
-  try {
-    const result = spawnSync(cmd, {
+  return new Promise<ToolResult>((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    let timedOut = false;
+    let aborted = false;
+
+    const child = spawn(cmd, {
       shell: true,
-      encoding: 'utf-8',
-      timeout: 30_000,
-      maxBuffer: 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
 
-    if (result.error) {
-      return Promise.resolve({
-        ok: false,
-        error: `Shell command failed: ${result.error.message}`,
-      });
-    }
-
-    const output: RunShellOutput = {
-      command: cmd,
-      exitCode: result.status ?? 0,
-      stdout: (result.stdout ?? '').trim(),
-      stderr: (result.stderr ?? '').trim(),
-      policy,
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      if (signal) {
+        signal.removeEventListener('abort', onAbort);
+      }
     };
 
-    if ((result.status ?? 0) !== 0) {
-      return Promise.resolve({
-        ok: false,
-        error: `Shell command failed with exit code ${output.exitCode}`,
-        output,
-      });
+    const finish = (result: ToolResult) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      resolve(result);
+    };
+
+    const onAbort = () => {
+      aborted = true;
+      child.kill('SIGTERM');
+      setTimeout(() => {
+        if (!child.killed) {
+          child.kill('SIGKILL');
+        }
+      }, 500).unref();
+    };
+
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+      setTimeout(() => {
+        if (!child.killed) {
+          child.kill('SIGKILL');
+        }
+      }, 500).unref();
+    }, 30_000);
+
+    if (signal?.aborted) {
+      onAbort();
+    } else if (signal) {
+      signal.addEventListener('abort', onAbort, { once: true });
     }
 
-    return Promise.resolve({ ok: true, output });
-  } catch (err) {
-    return Promise.resolve({
-      ok: false,
-      error: `Shell command failed: ${err instanceof Error ? err.message : String(err)}`,
+    child.stdout?.on('data', (chunk) => {
+      stdout += chunk.toString();
+      if (stdout.length > 1024 * 1024) {
+        stdout = stdout.slice(-1024 * 1024);
+      }
     });
-  }
+
+    child.stderr?.on('data', (chunk) => {
+      stderr += chunk.toString();
+      if (stderr.length > 1024 * 1024) {
+        stderr = stderr.slice(-1024 * 1024);
+      }
+    });
+
+    child.on('error', (error) => {
+      finish({
+        ok: false,
+        error: `Shell command failed: ${error.message}`,
+      });
+    });
+
+    child.on('close', (code) => {
+      const output: RunShellOutput = {
+        command: cmd,
+        exitCode: code ?? 0,
+        stdout: stdout.trim(),
+        stderr: stderr.trim(),
+        policy,
+      };
+
+      if (aborted) {
+        finish({
+          ok: false,
+          error: 'Shell command aborted by host request',
+          output,
+        });
+        return;
+      }
+
+      if (timedOut) {
+        finish({
+          ok: false,
+          error: 'Shell command timed out after 30000ms',
+          output,
+        });
+        return;
+      }
+
+      if ((code ?? 0) !== 0) {
+        finish({
+          ok: false,
+          error: `Shell command failed with exit code ${output.exitCode}`,
+          output,
+        });
+        return;
+      }
+
+      finish({ ok: true, output });
+    });
+  });
 }
 
 function classifyCommand(

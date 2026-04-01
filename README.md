@@ -45,12 +45,51 @@ goal
 
 Early development. v0 in progress.
 
+## Install And Run
+
+Heddle can now be linked or installed as a CLI and run against the current working directory instead of only this repo.
+
+Local development:
+
+- `yarn install`
+- `npm link`
+- from any project directory: `heddle`
+
+One-shot usage:
+
+- `heddle ask "What does this project do?"`
+- `heddle ask "What does this project do?" --cwd /path/to/project`
+
+Chat usage:
+
+- `heddle`
+- `heddle chat`
+- `heddle --cwd /path/to/project`
+- `heddle chat --model gpt-5.1-codex-mini --max-steps 20`
+
+The chat and ask commands both use the directory you launch them from as the workspace root. Traces, logs, and saved chat sessions are written under `./local/` in that project.
+
+Per-project defaults:
+
+- create `heddle.config.json` in the target project root
+
+```json
+{
+  "model": "gpt-5.1-codex",
+  "maxSteps": 40
+}
+```
+
+CLI flags override `heddle.config.json`, and `heddle.config.json` overrides environment defaults.
+
 The repo now has:
 
 - `yarn chat`
 - `yarn chat:light`
 - `yarn chat:dev`
 - `yarn chat:dev:light`
+- `heddle`
+- `heddle ask "<goal>"`
 
 as an early conversational terminal entrypoint from Phase 0 of the coding-agent roadmap.
 
@@ -64,10 +103,10 @@ Phase 1 has also started at the tool-contract layer:
 - known inspect commands remain narrowly classified, while unclassified mutate commands now fall back to explicit approval instead of hard rejection
 - workspace-changing mutate commands now trigger host-side follow-up requirements before final answer: review repo state and run verification
 - after workspace-changing mutate runs, the host now also requires a short operator-style final summary with `Changed:`, `Verified:`, and `Remaining uncertainty:`
-- chat mode now supports real interrupt via `Esc` and resume via `/continue`
+- chat mode now supports real interrupt via `Esc` for agent turns and direct `!command` runs, plus resume via `/continue`
 - chat mode now persists local sessions and supports `/session list`, `/session switch <id>`, and `/session continue <id>`
 - chat mode now auto-titles generic sessions in the background with `gpt-5.1-codex-mini`
-- chat mode now supports direct shell commands with a `!command` prefix, using the same inspect/execute policy and approval flow
+- chat mode now supports direct shell commands with a `!command` prefix; user-entered direct commands run immediately under the same shell policy, and their results are stored in the session transcript for later turns
 
 ## Next Step
 

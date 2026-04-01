@@ -3,8 +3,16 @@
   "version": "0.0.1",
   "description": "A minimal TypeScript runtime for tool-using agents",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "bin": {
+    "heddle": "dist/src/cli/main.js"
+  },
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsx examples/repo-investigator.ts",
@@ -13,7 +21,8 @@
     "repo-investigator:dev": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" tsx examples/repo-investigator.ts",
     "chat:dev": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" tsx examples/conversation.tsx",
     "chat:dev:light": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" OPENAI_MODEL=gpt-5.1-codex-mini tsx examples/conversation.tsx",
-    "test": "vitest run src/__tests__"
+    "test": "vitest run src/__tests__",
+    "prepare": "yarn build"
   },
   "keywords": [
     "agent",
