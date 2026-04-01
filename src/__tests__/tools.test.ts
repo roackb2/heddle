@@ -126,13 +126,29 @@ describe('runShell tools', () => {
     expect(tool.description).toContain('workspace execution rules');
   });
 
-  it('rejects shell control operators even when the inspect prefix is allowed', async () => {
+  it('allows read-only pipes in inspect mode', async () => {
     const tool = createRunShellInspectTool();
-    const result = await tool.execute({ command: 'ls | wc -l' });
+    const result = await tool.execute({ command: 'cat README.md | head -n 1' });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({
+      command: 'cat README.md | head -n 1',
+      exitCode: 0,
+      policy: {
+        binary: 'cat',
+        scope: 'inspect',
+        risk: 'low',
+      },
+    });
+  });
+
+  it('still rejects blocked shell operators in inspect mode', async () => {
+    const tool = createRunShellInspectTool();
+    const result = await tool.execute({ command: 'ls > out.txt' });
 
     expect(result).toEqual({
       ok: false,
-      error: 'Command not allowed. Shell control operators such as pipes, redirects, command chaining, or subshells are blocked.',
+      error: 'Command not allowed. Inspect mode permits read-only pipes, but redirects, command chaining, backgrounding, and subshells are blocked.',
     });
   });
 
@@ -187,6 +203,16 @@ describe('runShell tools', () => {
       command: 'tsc --version',
       exitCode: 0,
       stderr: '',
+    });
+  });
+
+  it('rejects pipes in mutate mode', async () => {
+    const tool = createRunShellMutateTool();
+    const result = await tool.execute({ command: 'yarn test | cat' });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Command not allowed. Shell control operators such as pipes, redirects, command chaining, or subshells are blocked.',
     });
   });
 

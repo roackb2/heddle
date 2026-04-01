@@ -14,6 +14,8 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('You MUST call report_state before continuing');
     expect(prompt).toContain('Do not lead with internal tool names or implementation details');
     expect(prompt).toContain('prefer plain-language descriptions over enumerating internal tool names');
+    expect(prompt).toContain('prefer carrying the task through implementation and verification instead of stopping at analysis or a plan unless you are blocked');
+    expect(prompt).toContain('If the user asks to improve tests or coverage');
   });
 
   it('includes project-specific context when provided', () => {

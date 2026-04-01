@@ -103,7 +103,7 @@ export function createRunShellInspectTool(options: RunShellOptions = {}): ToolDe
   return {
     name: 'run_shell_inspect',
     description:
-      `Run a read-oriented shell command inside the current workspace. Use this for CLI-native inspection, search, diff, and git state checks when mature commands like rg, git, sed, or ls are a better fit than bespoke file tools. Returns structured output with command, exitCode, stdout, stderr, and policy metadata. This tool is governed by low-risk inspect rules, not arbitrary shell access. Shell control operators like pipes, redirects, chaining, and subshells are blocked.`,
+      `Run a read-oriented shell command inside the current workspace. Use this for CLI-native inspection, search, diff, and git state checks when mature commands like rg, git, sed, or ls are a better fit than bespoke file tools. Returns structured output with command, exitCode, stdout, stderr, and policy metadata. This tool is governed by low-risk inspect rules, not arbitrary shell access. Read-only pipelines with | are allowed for inspection commands, but redirects, command chaining, and subshells are blocked.`,
     parameters: buildParameters(),
     execute: (raw) => runShellCommand(raw, {
       toolName: 'run_shell_inspect',
@@ -166,10 +166,13 @@ export function runShellCommand(
 
   const cmd = raw.command.trim();
 
-  if (containsShellControlOperators(cmd)) {
+  if (containsBlockedShellControlOperators(cmd, options.toolName === 'run_shell_inspect')) {
     return Promise.resolve({
       ok: false,
-      error: 'Command not allowed. Shell control operators such as pipes, redirects, command chaining, or subshells are blocked.',
+      error:
+        options.toolName === 'run_shell_inspect' ?
+          'Command not allowed. Inspect mode permits read-only pipes, but redirects, command chaining, backgrounding, and subshells are blocked.'
+        : 'Command not allowed. Shell control operators such as pipes, redirects, command chaining, or subshells are blocked.',
     });
   }
 
@@ -364,8 +367,9 @@ function isRunShellInput(raw: unknown): raw is RunShellInput {
   return typeof input.command === 'string';
 }
 
-function containsShellControlOperators(command: string): boolean {
-  return /[|;&><`]/.test(command) || command.includes('&&') || command.includes('||') || command.includes('$(');
+function containsBlockedShellControlOperators(command: string, allowPipes: boolean): boolean {
+  const pattern = allowPipes ? /[;&><`]/ : /[|;&><`]/;
+  return pattern.test(command) || command.includes('&&') || command.includes('||') || command.includes('$(');
 }
 
 function inspectRule(binary: string, reason: string, argsPrefix?: string[]): RunShellRule {
