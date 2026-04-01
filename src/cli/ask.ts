@@ -21,6 +21,7 @@ export type AskCliOptions = {
   workspaceRoot?: string;
   stateDir?: string;
   searchIgnoreDirs?: string[];
+  systemContext?: string;
 };
 
 export async function runAskCli(goal: string, options: AskCliOptions = {}) {
@@ -49,7 +50,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
     createRunShellMutateTool(),
   ];
 
-  const result = await runAgent({ goal, llm, tools, maxSteps, logger });
+  const result = await runAgent({ goal, llm, tools, maxSteps, logger, systemContext: options.systemContext });
   process.stdout.write(`${formatTraceForConsole(result.trace)}\n`);
 
   const traceDir = join(stateRoot, 'traces');

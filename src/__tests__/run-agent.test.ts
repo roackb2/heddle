@@ -132,13 +132,13 @@ describe('runAgent', () => {
     });
   });
 
-  it('blocks duplicate tool calls with identical input and feeds the error back to the model', async () => {
+  it('allows one repeated identical tool call, then blocks excessive repetition', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
         seenMessages.push(messages);
 
-        if (seenMessages.length < 3) {
+        if (seenMessages.length < 4) {
           return {
             toolCalls: [{ id: `call-${seenMessages.length}`, tool: 'list_files', input: { path: '.' } }],
           };
@@ -163,33 +163,33 @@ describe('runAgent', () => {
       goal: 'Inspect this repo.',
       llm: fakeLlm,
       tools: [listFilesTool],
-      maxSteps: 4,
+      maxSteps: 5,
       logger: silentLogger,
     });
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe('I should stop repeating the same directory listing.');
-    expect(seenMessages[2]).toContainEqual({
+    expect(seenMessages[3]).toContainEqual({
       role: 'tool',
       content: JSON.stringify({
         ok: false,
         error:
-          'Duplicate tool call blocked: list_files was already called with the same input earlier in this run. Try a different tool or different input.',
+          'Repeated tool call blocked: list_files was already called 2 times with the same input earlier in this run. Try a different tool or different input.',
       }),
-      toolCallId: 'call-2',
+      toolCallId: 'call-3',
     });
-    expect(result.trace[6]).toMatchObject({
+    expect(result.trace[9]).toMatchObject({
       type: 'tool.result',
       tool: 'list_files',
       result: {
         ok: false,
         error:
-          'Duplicate tool call blocked: list_files was already called with the same input earlier in this run. Try a different tool or different input.',
+          'Repeated tool call blocked: list_files was already called 2 times with the same input earlier in this run. Try a different tool or different input.',
       },
     });
   });
 
-  it('treats equivalent path spellings like "." and "./" as duplicate tool calls', async () => {
+  it('normalizes equivalent path spellings and only blocks them after repeated retries', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
@@ -204,6 +204,12 @@ describe('runAgent', () => {
         if (seenMessages.length === 2) {
           return {
             toolCalls: [{ id: 'call-2', tool: 'list_files', input: { path: './' } }],
+          };
+        }
+
+        if (seenMessages.length === 3) {
+          return {
+            toolCalls: [{ id: 'call-3', tool: 'list_files', input: { path: '.' } }],
           };
         }
 
@@ -226,19 +232,19 @@ describe('runAgent', () => {
       goal: 'Inspect this repo.',
       llm: fakeLlm,
       tools: [listFilesTool],
-      maxSteps: 4,
+      maxSteps: 5,
       logger: silentLogger,
     });
 
     expect(result.outcome).toBe('done');
-    expect(seenMessages[2]).toContainEqual({
+    expect(seenMessages[3]).toContainEqual({
       role: 'tool',
       content: JSON.stringify({
         ok: false,
         error:
-          'Duplicate tool call blocked: list_files was already called with the same input earlier in this run. Try a different tool or different input.',
+          'Repeated tool call blocked: list_files was already called 2 times with the same input earlier in this run. Try a different tool or different input.',
       }),
-      toolCallId: 'call-2',
+      toolCallId: 'call-3',
     });
   });
 

@@ -16,6 +16,7 @@ import type { Logger } from 'pino';
 
 const DEFAULT_MAX_STEPS = 20;
 const MAX_CONSECUTIVE_ERRORS = 3;
+const MAX_IDENTICAL_TOOL_CALLS = 2;
 
 export type RunAgentOptions = {
   goal: string;
@@ -24,6 +25,7 @@ export type RunAgentOptions = {
   maxSteps?: number;
   logger?: Logger;
   history?: ChatMessage[];
+  systemContext?: string;
   onEvent?: (event: import('./types.js').TraceEvent) => void;
   approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
   shouldStop?: () => boolean;
@@ -48,6 +50,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
     maxSteps = DEFAULT_MAX_STEPS,
     logger: log = defaultLogger,
     history = [],
+    systemContext,
     onEvent,
     approveToolCall,
     shouldStop,
@@ -56,7 +59,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   const registry = createToolRegistry(tools);
   const trace = createTraceRecorder();
   const budget = createBudget(maxSteps);
-  const seenToolCalls = new Set<string>();
+  const seenToolCalls = new Map<string, number>();
 
   // Start trace
   const now = () => new Date().toISOString();
@@ -78,7 +81,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
 
   // Build initial messages
   const messages: ChatMessage[] = [
-    { role: 'system', content: buildSystemPrompt(goal, registry.names()) },
+    { role: 'system', content: buildSystemPrompt(goal, registry.names(), systemContext) },
     ...history,
     { role: 'user', content: goal },
   ];
@@ -218,13 +221,14 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
         record({ type: 'tool.call', call, step, timestamp: now() });
 
         const signature = `${call.tool}:${stableSerialize(normalizeToolInput(call.tool, call.input))}`;
-        const result = seenToolCalls.has(signature)
+        const seenCount = seenToolCalls.get(signature) ?? 0;
+        const result = seenCount >= MAX_IDENTICAL_TOOL_CALLS
           ? {
               ok: false as const,
-              error: `Duplicate tool call blocked: ${call.tool} was already called with the same input earlier in this run. Try a different tool or different input.`,
+              error: `Repeated tool call blocked: ${call.tool} was already called ${MAX_IDENTICAL_TOOL_CALLS} times with the same input earlier in this run. Try a different tool or different input.`,
             }
           : await executeTool(registry, call);
-        seenToolCalls.add(signature);
+        seenToolCalls.set(signature, seenCount + 1);
         log.debug({ step, tool: call.tool, ok: result.ok }, 'Tool result');
         record({ type: 'tool.result', tool: call.tool, result, step, timestamp: now() });
 
@@ -478,7 +482,7 @@ function isRecoverableToolError(error: string | undefined): boolean {
     return false;
   }
 
-  return error.startsWith('Invalid input for ') || error.startsWith('Duplicate tool call blocked:');
+  return error.startsWith('Invalid input for ') || error.startsWith('Repeated tool call blocked:');
 }
 
 function isAbortError(err: unknown): boolean {

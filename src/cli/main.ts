@@ -18,6 +18,7 @@ type HeddleProjectConfig = {
   stateDir?: string;
   directShellApproval?: 'always' | 'never';
   searchIgnoreDirs?: string[];
+  agentContextPaths?: string[];
 };
 
 async function main() {
@@ -32,6 +33,7 @@ async function main() {
     stateDir: projectConfig.stateDir ?? '.heddle',
     directShellApproval: projectConfig.directShellApproval ?? 'never',
     searchIgnoreDirs: projectConfig.searchIgnoreDirs ?? [],
+    systemContext: loadProjectAgentContext(workspaceRoot, projectConfig.agentContextPaths ?? ['AGENTS.md']),
   };
 
   chdir(workspaceRoot);
@@ -131,6 +133,10 @@ function loadProjectConfig(workspaceRoot: string): HeddleProjectConfig {
         Array.isArray(candidate.searchIgnoreDirs) && candidate.searchIgnoreDirs.every((value) => typeof value === 'string') ?
           candidate.searchIgnoreDirs
         : undefined,
+      agentContextPaths:
+        Array.isArray(candidate.agentContextPaths) && candidate.agentContextPaths.every((value) => typeof value === 'string') ?
+          candidate.agentContextPaths
+        : undefined,
     };
   } catch {
     return {};
@@ -150,7 +156,7 @@ function printHelp() {
       '',
       'Project config:',
       '  heddle.config.json in the target workspace root',
-      '  { "model": "gpt-5.1-codex", "maxSteps": 40, "stateDir": ".heddle", "directShellApproval": "never", "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"] }',
+      '  { "model": "gpt-5.1-codex", "maxSteps": 40, "stateDir": ".heddle", "directShellApproval": "never", "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"], "agentContextPaths": ["AGENTS.md"] }',
       '',
       'Environment:',
       '  OPENAI_API_KEY or PERSONAL_OPENAI_API_KEY',
@@ -172,12 +178,34 @@ function initializeProjectConfig(workspaceRoot: string) {
     stateDir: '.heddle',
     directShellApproval: 'never',
     searchIgnoreDirs: ['.git', 'dist', 'node_modules', '.heddle'],
+    agentContextPaths: ['AGENTS.md'],
   };
   writeFileSync(configPath, `${JSON.stringify(template, null, 2)}\n`);
   process.stdout.write(`Created ${configPath}\n`);
 }
 
 const DEFAULT_MODEL_FOR_CONFIG = 'gpt-5.1-codex';
+
+function loadProjectAgentContext(workspaceRoot: string, paths: string[]): string | undefined {
+  const sections = paths.flatMap((relativePath) => {
+    const filePath = resolve(workspaceRoot, relativePath);
+    if (!existsSync(filePath)) {
+      return [];
+    }
+
+    try {
+      const content = readFileSync(filePath, 'utf8').trim();
+      if (!content) {
+        return [];
+      }
+      return [`Source: ${relativePath}\n${truncate(content, 12000)}`];
+    } catch {
+      return [];
+    }
+  });
+
+  return sections.length > 0 ? sections.join('\n\n') : undefined;
+}
 
 function parsePositiveInt(raw: string | undefined): number | undefined {
   if (!raw) {
@@ -190,6 +218,14 @@ function parsePositiveInt(raw: string | undefined): number | undefined {
   }
 
   return value;
+}
+
+function truncate(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength - 1)}…`;
 }
 
 main().catch((error) => {

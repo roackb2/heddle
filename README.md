@@ -79,7 +79,8 @@ Per-project defaults:
   "maxSteps": 40,
   "stateDir": ".heddle",
   "directShellApproval": "never",
-  "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"]
+  "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"],
+  "agentContextPaths": ["AGENTS.md"]
 }
 ```
 
@@ -90,6 +91,7 @@ Notes:
 - `stateDir` controls where traces, logs, and saved chat sessions are stored relative to the project root.
 - `directShellApproval` controls whether explicit user `!command` input in chat is auto-approved (`"never"`) or still goes through the approval UI (`"always"`).
 - `searchIgnoreDirs` controls which directories `search_files` skips for that project.
+- `agentContextPaths` controls which project instruction files are injected into Heddle's system prompt. By default, Heddle looks for `AGENTS.md`.
 
 The repo now has:
 

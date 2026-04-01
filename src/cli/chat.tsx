@@ -74,6 +74,7 @@ export type ChatCliOptions = {
   stateDir?: string;
   directShellApproval?: 'always' | 'never';
   searchIgnoreDirs?: string[];
+  systemContext?: string;
 };
 
 type ChatRuntimeConfig = {
@@ -86,6 +87,7 @@ type ChatRuntimeConfig = {
   workspaceRoot: string;
   directShellApproval: 'always' | 'never';
   searchIgnoreDirs: string[];
+  systemContext?: string;
 };
 
 function App({ runtime }: { runtime: ChatRuntimeConfig }) {
@@ -405,6 +407,7 @@ function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         maxSteps: runtime.maxSteps,
         logger,
         history: sessionHistory,
+        systemContext: runtime.systemContext,
         onEvent: (event) => {
           const next = toLiveEvent(event);
           if (!next) {
@@ -1494,6 +1497,7 @@ function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeConfig {
     traceDir: join(stateRoot, 'traces'),
     directShellApproval: options.directShellApproval ?? 'never',
     searchIgnoreDirs: options.searchIgnoreDirs ?? [],
+    systemContext: options.systemContext,
   };
 }
 

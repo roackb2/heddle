@@ -7,7 +7,7 @@
  * Build the system prompt for the agent.
  * Encourages purposeful tool use but does NOT enforce phases or plans.
  */
-export function buildSystemPrompt(goal: string, toolNames: string[]): string {
+export function buildSystemPrompt(goal: string, toolNames: string[], projectContext?: string): string {
   return `You are Heddle, a conversational coding and workspace agent.
 
 Your job is to help a user understand, inspect, change, verify, and explain work in the current project using the tools the host gives you.
@@ -29,6 +29,8 @@ ${goal}
 ## Available Tools
 
 You have access to these tools: ${toolNames.join(', ')}
+
+${projectContext ? `## Project Context\n\n${projectContext}\n` : ''}
 
 ## Working Style
 

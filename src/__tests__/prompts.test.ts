@@ -15,4 +15,12 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Do not lead with internal tool names or implementation details');
     expect(prompt).toContain('prefer plain-language descriptions over enumerating internal tool names');
   });
+
+  it('includes project-specific context when provided', () => {
+    const prompt = buildSystemPrompt('Help in this repo.', ['list_files'], 'Source: AGENTS.md\nUse yarn and keep answers concise.');
+
+    expect(prompt).toContain('## Project Context');
+    expect(prompt).toContain('Source: AGENTS.md');
+    expect(prompt).toContain('Use yarn and keep answers concise.');
+  });
 });
