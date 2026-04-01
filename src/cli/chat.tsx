@@ -7,10 +7,9 @@ import {
   DEFAULT_OPENAI_MODEL,
   runAgent,
   createOpenAiAdapter,
-  createToolRegistry,
   listFilesTool,
   readFileTool,
-  searchFilesTool,
+  createSearchFilesTool,
   reportStateTool,
   createRunShellInspectTool,
   createRunShellMutateTool,
@@ -72,6 +71,9 @@ export type ChatCliOptions = {
   maxSteps?: number;
   apiKey?: string;
   workspaceRoot?: string;
+  stateDir?: string;
+  directShellApproval?: 'always' | 'never';
+  searchIgnoreDirs?: string[];
 };
 
 type ChatRuntimeConfig = {
@@ -80,7 +82,10 @@ type ChatRuntimeConfig = {
   apiKey?: string;
   logFile: string;
   sessionsFile: string;
+  traceDir: string;
   workspaceRoot: string;
+  directShellApproval: 'always' | 'never';
+  searchIgnoreDirs: string[];
 };
 
 function App({ runtime }: { runtime: ChatRuntimeConfig }) {
@@ -100,14 +105,13 @@ function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     () => [
       listFilesTool,
       readFileTool,
-      searchFilesTool,
+      createSearchFilesTool({ excludedDirs: runtime.searchIgnoreDirs }),
       reportStateTool,
       createRunShellInspectTool(),
       createRunShellMutateTool(),
     ],
     [],
   );
-  const toolRegistry = useMemo(() => createToolRegistry(tools), [tools]);
   const logger = useMemo(
     () =>
       createLogger({
@@ -429,7 +433,7 @@ function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         messages: buildConversationMessages(result.transcript),
       }));
 
-      const traceFile = saveTrace(result.trace);
+      const traceFile = saveTrace(runtime.traceDir, result.trace);
       const nextTurn: TurnSummary = {
         id: nextLocalId(),
         prompt,
@@ -515,6 +519,26 @@ function App({ runtime }: { runtime: ChatRuntimeConfig }) {
           tool: 'run_shell_mutate',
           input: { command },
         };
+        if (runtime.directShellApproval === 'always') {
+          const directShellTool = tools.find((tool) => tool.name === 'run_shell_mutate');
+          if (!directShellTool) {
+            throw new Error('run_shell_mutate tool is not registered');
+          }
+          const approval = await new Promise<{ approved: boolean; reason?: string }>((resolve) => {
+            setPendingApproval({ call: mutateCall, tool: directShellTool, resolve });
+          });
+          if (!approval.approved) {
+            const denialMessage =
+              approval.reason ? `Command denied.\n${approval.reason}` : 'Command denied.';
+            updateActiveSession((session) => ({
+              ...session,
+              messages: [...session.messages, { id: nextLocalId(), role: 'assistant', text: denialMessage }],
+            }));
+            setLiveEvents([{ id: nextLocalId(), text: `approval denied for ${summarizeToolCall(mutateCall.tool, mutateCall.input)}` }]);
+            setStatus('Idle');
+            return;
+          }
+        }
         chosenCall = mutateCall;
         chosenResult = await runShellCommand(
           mutateCall.input,
@@ -873,8 +897,7 @@ function buildConversationMessages(history: ChatMessage[]): ConversationLine[] {
   });
 }
 
-function saveTrace(trace: TraceEvent[]): string {
-  const traceDir = join(process.cwd(), 'local', 'traces');
+function saveTrace(traceDir: string, trace: TraceEvent[]): string {
   mkdirSync(traceDir, { recursive: true });
   const traceFile = join(traceDir, `trace-${Date.now()}.json`);
   writeFileSync(traceFile, JSON.stringify(trace, null, 2));
@@ -1460,13 +1483,17 @@ function summarizeSession(session: ChatSession): string {
 function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeConfig {
   const workspaceRoot = resolve(options.workspaceRoot ?? process.cwd());
   const sessionId = `chat-${Date.now()}`;
+  const stateRoot = resolve(workspaceRoot, options.stateDir ?? '.heddle');
   return {
     model: options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL,
     maxSteps: options.maxSteps ?? parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 40,
     apiKey: options.apiKey ?? process.env.OPENAI_API_KEY ?? process.env.PERSONAL_OPENAI_API_KEY,
     workspaceRoot,
-    logFile: join(workspaceRoot, 'local', 'logs', `${sessionId}.log`),
-    sessionsFile: join(workspaceRoot, 'local', 'chat-sessions.json'),
+    logFile: join(stateRoot, 'logs', `${sessionId}.log`),
+    sessionsFile: join(stateRoot, 'chat-sessions.json'),
+    traceDir: join(stateRoot, 'traces'),
+    directShellApproval: options.directShellApproval ?? 'never',
+    searchIgnoreDirs: options.searchIgnoreDirs ?? [],
   };
 }
 

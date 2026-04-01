@@ -15,6 +15,9 @@ type CliFlags = {
 type HeddleProjectConfig = {
   model?: string;
   maxSteps?: number;
+  stateDir?: string;
+  directShellApproval?: 'always' | 'never';
+  searchIgnoreDirs?: string[];
 };
 
 async function main() {
@@ -26,6 +29,9 @@ async function main() {
     model: parsed.flags.model ?? projectConfig.model,
     maxSteps: parsed.flags.maxSteps ?? projectConfig.maxSteps,
     apiKey: process.env.OPENAI_API_KEY ?? process.env.PERSONAL_OPENAI_API_KEY,
+    stateDir: projectConfig.stateDir ?? '.heddle',
+    directShellApproval: projectConfig.directShellApproval ?? 'never',
+    searchIgnoreDirs: projectConfig.searchIgnoreDirs ?? [],
   };
 
   chdir(workspaceRoot);
@@ -116,6 +122,15 @@ function loadProjectConfig(workspaceRoot: string): HeddleProjectConfig {
         typeof candidate.maxSteps === 'number' && Number.isFinite(candidate.maxSteps) && candidate.maxSteps > 0 ?
           candidate.maxSteps
         : undefined,
+      stateDir: typeof candidate.stateDir === 'string' ? candidate.stateDir : undefined,
+      directShellApproval:
+        candidate.directShellApproval === 'always' || candidate.directShellApproval === 'never' ?
+          candidate.directShellApproval
+        : undefined,
+      searchIgnoreDirs:
+        Array.isArray(candidate.searchIgnoreDirs) && candidate.searchIgnoreDirs.every((value) => typeof value === 'string') ?
+          candidate.searchIgnoreDirs
+        : undefined,
     };
   } catch {
     return {};
@@ -135,7 +150,7 @@ function printHelp() {
       '',
       'Project config:',
       '  heddle.config.json in the target workspace root',
-      '  { "model": "gpt-5.1-codex", "maxSteps": 40 }',
+      '  { "model": "gpt-5.1-codex", "maxSteps": 40, "stateDir": ".heddle", "directShellApproval": "never", "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"] }',
       '',
       'Environment:',
       '  OPENAI_API_KEY or PERSONAL_OPENAI_API_KEY',
@@ -154,6 +169,9 @@ function initializeProjectConfig(workspaceRoot: string) {
   const template = {
     model: DEFAULT_MODEL_FOR_CONFIG,
     maxSteps: 40,
+    stateDir: '.heddle',
+    directShellApproval: 'never',
+    searchIgnoreDirs: ['.git', 'dist', 'node_modules', '.heddle'],
   };
   writeFileSync(configPath, `${JSON.stringify(template, null, 2)}\n`);
   process.stdout.write(`Created ${configPath}\n`);

@@ -67,7 +67,7 @@ Chat usage:
 - `heddle --cwd /path/to/project`
 - `heddle chat --model gpt-5.1-codex-mini --max-steps 20`
 
-The chat and ask commands both use the directory you launch them from as the workspace root. Traces, logs, and saved chat sessions are written under `./local/` in that project.
+The chat and ask commands both use the directory you launch them from as the workspace root. Traces, logs, and saved chat sessions are written under `./.heddle/` in that project by default.
 
 Per-project defaults:
 
@@ -76,11 +76,20 @@ Per-project defaults:
 ```json
 {
   "model": "gpt-5.1-codex",
-  "maxSteps": 40
+  "maxSteps": 40,
+  "stateDir": ".heddle",
+  "directShellApproval": "never",
+  "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"]
 }
 ```
 
 CLI flags override `heddle.config.json`, and `heddle.config.json` overrides environment defaults.
+
+Notes:
+
+- `stateDir` controls where traces, logs, and saved chat sessions are stored relative to the project root.
+- `directShellApproval` controls whether explicit user `!command` input in chat is auto-approved (`"never"`) or still goes through the approval UI (`"always"`).
+- `searchIgnoreDirs` controls which directories `search_files` skips for that project.
 
 The repo now has:
 

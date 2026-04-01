@@ -6,7 +6,7 @@ import { listFilesTool } from '../tools/list-files.js';
 import { readFileTool } from '../tools/read-file.js';
 import { reportStateTool } from '../tools/report-state.js';
 import { createRunShellInspectTool, createRunShellMutateTool } from '../tools/run-shell.js';
-import { searchFilesTool } from '../tools/search-files.js';
+import { createSearchFilesTool, searchFilesTool } from '../tools/search-files.js';
 
 describe('tool input validation', () => {
   it('rejects unexpected fields for list_files', async () => {
@@ -88,6 +88,21 @@ describe('searchFilesTool', () => {
     expect(result.output).toContain('src/main.ts');
     expect(result.output).not.toContain('dist/generated.ts');
     expect(result.output).not.toContain('node_modules/pkg.ts');
+  });
+
+  it('supports project-specific excluded directories', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-search-config-'));
+    await mkdir(join(root, 'src'));
+    await mkdir(join(root, 'vendor'));
+    await writeFile(join(root, 'src', 'main.ts'), 'const needle = true;\n');
+    await writeFile(join(root, 'vendor', 'hidden.ts'), 'const needle = true;\n');
+
+    const tool = createSearchFilesTool({ excludedDirs: ['vendor'] });
+    const result = await tool.execute({ query: 'needle', path: root });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('src/main.ts');
+    expect(result.output).not.toContain('vendor/hidden.ts');
   });
 });
 

@@ -6,7 +6,7 @@ import {
   createOpenAiAdapter,
   listFilesTool,
   readFileTool,
-  searchFilesTool,
+  createSearchFilesTool,
   reportStateTool,
   createRunShellInspectTool,
   createRunShellMutateTool,
@@ -19,6 +19,8 @@ export type AskCliOptions = {
   maxSteps?: number;
   apiKey?: string;
   workspaceRoot?: string;
+  stateDir?: string;
+  searchIgnoreDirs?: string[];
 };
 
 export async function runAskCli(goal: string, options: AskCliOptions = {}) {
@@ -29,6 +31,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
   const model = options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
   const maxSteps = options.maxSteps ?? parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 40;
   const workspaceRoot = options.workspaceRoot ?? process.cwd();
+  const stateRoot = join(workspaceRoot, options.stateDir ?? '.heddle');
   const logger = createLogger({ pretty: true, level: 'debug' });
 
   logger.info({ goal, model, maxSteps, cwd: workspaceRoot }, 'Heddle');
@@ -40,7 +43,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
   const tools = [
     listFilesTool,
     readFileTool,
-    searchFilesTool,
+    createSearchFilesTool({ excludedDirs: options.searchIgnoreDirs }),
     reportStateTool,
     createRunShellInspectTool(),
     createRunShellMutateTool(),
@@ -49,7 +52,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
   const result = await runAgent({ goal, llm, tools, maxSteps, logger });
   process.stdout.write(`${formatTraceForConsole(result.trace)}\n`);
 
-  const traceDir = join(process.cwd(), 'local', 'traces');
+  const traceDir = join(stateRoot, 'traces');
   mkdirSync(traceDir, { recursive: true });
   const traceFile = join(traceDir, `trace-${Date.now()}.json`);
   writeFileSync(traceFile, JSON.stringify(result.trace, null, 2));

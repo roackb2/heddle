@@ -6,6 +6,7 @@ dist/
 
 # Local files
 local/
+.heddle/
 
 # Environment
 .env
@@ -16,4 +17,3 @@ local/
 
 # IDE
 .claude/
-
