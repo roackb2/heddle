@@ -9,9 +9,11 @@
     "build": "tsc",
     "dev": "tsx examples/repo-investigator.ts",
     "chat": "tsx examples/conversation.tsx",
+    "chat:light": "OPENAI_MODEL=gpt-5.1-codex-mini tsx examples/conversation.tsx",
     "repo-investigator:dev": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" tsx examples/repo-investigator.ts",
     "chat:dev": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" tsx examples/conversation.tsx",
-    "test": "vitest run"
+    "chat:dev:light": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" OPENAI_MODEL=gpt-5.1-codex-mini tsx examples/conversation.tsx",
+    "test": "vitest run src/__tests__"
   },
   "keywords": [
     "agent",

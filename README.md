@@ -48,7 +48,9 @@ Early development. v0 in progress.
 The repo now has:
 
 - `yarn chat`
+- `yarn chat:light`
 - `yarn chat:dev`
+- `yarn chat:dev:light`
 
 as an early conversational terminal entrypoint from Phase 0 of the coding-agent roadmap.
 
@@ -63,6 +65,9 @@ Phase 1 has also started at the tool-contract layer:
 - workspace-changing mutate commands now trigger host-side follow-up requirements before final answer: review repo state and run verification
 - after workspace-changing mutate runs, the host now also requires a short operator-style final summary with `Changed:`, `Verified:`, and `Remaining uncertainty:`
 - chat mode now supports real interrupt via `Esc` and resume via `/continue`
+- chat mode now persists local sessions and supports `/session list`, `/session switch <id>`, and `/session continue <id>`
+- chat mode now auto-titles generic sessions in the background with `gpt-5.1-codex-mini`
+- chat mode now supports direct shell commands with a `!command` prefix, using the same inspect/execute policy and approval flow
 
 ## Next Step
 
@@ -71,7 +76,7 @@ An eval batch prompt set lives in [docs/eval-prompts.md](/Users/roackb2/Studio/p
 
 The shell direction is also intentionally moving toward a policy-based execution surface rather than an ever-growing allowlist of specific commands.
 
-The example runner and chat mode now default to `gpt-5.1-codex` and a 40-step budget. Override them with `OPENAI_MODEL` and `HEDDLE_MAX_STEPS` if you want to compare models or cap exploration more tightly.
+The example runner and chat mode now default to `gpt-5.1-codex` and a 40-step budget. Use `yarn chat:light` or `yarn chat:dev:light` for `gpt-5.1-codex-mini`, or override manually with `OPENAI_MODEL` and `HEDDLE_MAX_STEPS` if you want to compare models or cap exploration more tightly.
 
 ## Design Principles
 

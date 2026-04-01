@@ -217,7 +217,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
         log.info({ step, tool: call.tool }, 'Executing tool');
         record({ type: 'tool.call', call, step, timestamp: now() });
 
-        const signature = `${call.tool}:${stableSerialize(call.input)}`;
+        const signature = `${call.tool}:${stableSerialize(normalizeToolInput(call.tool, call.input))}`;
         const result = seenToolCalls.has(signature)
           ? {
               ok: false as const,
@@ -230,7 +230,15 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
 
         // Track consecutive errors
         if (!result.ok) {
-          consecutiveErrors++;
+          if (isRecoverableToolError(result.error)) {
+            messages.push({
+              role: 'system',
+              content:
+                `Host reminder: the last tool call failed due to invalid or repeated tool use: ${result.error}. Correct the call immediately, switch tools, or use report_state if you are blocked. Do not keep retrying the same failing pattern.`,
+            });
+          } else {
+            consecutiveErrors++;
+          }
           if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
             outcome = 'error';
             summary = `Stopped after ${MAX_CONSECUTIVE_ERRORS} consecutive tool errors. Last error: ${result.error}`;
@@ -436,6 +444,41 @@ function stableSerialize(value: unknown): string {
   }
 
   return JSON.stringify(value);
+}
+
+function normalizeToolInput(tool: string, input: unknown): unknown {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return input;
+  }
+
+  const normalized = { ...(input as Record<string, unknown>) };
+
+  if ((tool === 'list_files' || tool === 'read_file' || tool === 'search_files') && typeof normalized.path === 'string') {
+    normalized.path = normalizePathValue(normalized.path);
+  }
+
+  if ((tool === 'run_shell_inspect' || tool === 'run_shell_mutate') && typeof normalized.command === 'string') {
+    normalized.command = normalized.command.trim().replace(/\s+/g, ' ');
+  }
+
+  return normalized;
+}
+
+function normalizePathValue(path: string): string {
+  const trimmed = path.trim();
+  if (trimmed === './' || trimmed === '.') {
+    return '.';
+  }
+
+  return trimmed.replace(/\/+$/, '') || '.';
+}
+
+function isRecoverableToolError(error: string | undefined): boolean {
+  if (!error) {
+    return false;
+  }
+
+  return error.startsWith('Invalid input for ') || error.startsWith('Duplicate tool call blocked:');
 }
 
 function isAbortError(err: unknown): boolean {

@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Text, render, useInput } from 'ink';
@@ -7,6 +7,8 @@ import {
   DEFAULT_OPENAI_MODEL,
   runAgent,
   createOpenAiAdapter,
+  createToolRegistry,
+  executeTool,
   listFilesTool,
   readFileTool,
   searchFilesTool,
@@ -37,6 +39,17 @@ type LiveEvent = {
   text: string;
 };
 
+type ChatSession = {
+  id: string;
+  name: string;
+  history: ChatMessage[];
+  messages: ConversationLine[];
+  turns: TurnSummary[];
+  createdAt: string;
+  updatedAt: string;
+  lastContinuePrompt?: string;
+};
+
 type PendingApproval = {
   call: ToolCall;
   tool: ToolDefinition;
@@ -47,7 +60,7 @@ type ApprovalChoice = 'approve' | 'deny';
 type LocalCommandResult =
   | { handled: false }
   | { handled: true; kind: 'message'; message: string }
-  | { handled: true; kind: 'continue' };
+  | { handled: true; kind: 'continue'; sessionId?: string; message?: string };
 
 const model = process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
 const maxSteps = parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 40;
@@ -57,6 +70,9 @@ const logFile = join(process.cwd(), 'local', 'logs', `${sessionId}.log`);
 const knownModels = ['gpt-5.1-codex-mini', 'gpt-5.1-codex'];
 const workingFrames = ['.', '..', '...'];
 const MAX_VISIBLE_INPUT_CHARS = 96;
+const SESSION_TITLE_MODEL = 'gpt-5.1-codex-mini';
+const MAX_SHELL_OUTPUT_CHARS = 1400;
+const sessionsFile = join(process.cwd(), 'local', 'chat-sessions.json');
 const logger = createLogger({
   pretty: false,
   level: 'debug',
@@ -66,8 +82,17 @@ const logger = createLogger({
 
 function App() {
   const nextIdRef = useRef(0);
+  const nextSessionNumberRef = useRef(2);
+  const initialSessionsRef = useRef<ChatSession[] | undefined>(undefined);
+  if (!initialSessionsRef.current) {
+    initialSessionsRef.current = loadChatSessions(Boolean(apiKey));
+  }
   const [activeModel, setActiveModel] = useState(model);
   const llm = useMemo(() => createOpenAiAdapter({ model: activeModel, apiKey }), [activeModel]);
+  const titleLlm = useMemo(
+    () => createOpenAiAdapter({ model: SESSION_TITLE_MODEL, apiKey }),
+    [],
+  );
   const tools = useMemo(
     () => [
       listFilesTool,
@@ -79,25 +104,10 @@ function App() {
     ],
     [],
   );
+  const toolRegistry = useMemo(() => createToolRegistry(tools), [tools]);
 
-  const [history, setHistory] = useState<ChatMessage[]>([]);
-  const [messages, setMessages] = useState<ConversationLine[]>([
-    {
-      id: 'intro',
-      role: 'assistant',
-      text:
-        'Heddle conversational mode. Ask a question about this workspace. Each turn runs the current agent loop and carries the transcript into the next turn.',
-    },
-    ...(!apiKey ?
-      [{
-        id: 'missing-key',
-        role: 'assistant' as const,
-        text:
-          'No OpenAI API key detected. Set OPENAI_API_KEY or PERSONAL_OPENAI_API_KEY, or use yarn chat:dev if your shell exposes PERSONAL_OPENAI_API_KEY.',
-      }]
-    : []),
-  ]);
-  const [turns, setTurns] = useState<TurnSummary[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>(initialSessionsRef.current);
+  const [activeSessionId, setActiveSessionId] = useState(initialSessionsRef.current[0]?.id ?? 'session-1');
   const [status, setStatus] = useState('Idle');
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -108,10 +118,171 @@ function App() {
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | undefined>();
   const [approvalChoice, setApprovalChoice] = useState<ApprovalChoice>('approve');
   const [interruptRequested, setInterruptRequested] = useState(false);
-  const [lastContinuePrompt, setLastContinuePrompt] = useState<string | undefined>();
   const interruptRequestedRef = useRef(false);
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
   const nextLocalId = () => `ui-${Date.now()}-${nextIdRef.current++}`;
+  const activeSession = sessions.find((session) => session.id === activeSessionId) ?? sessions[0];
+  const history = activeSession?.history ?? [];
+  const messages = activeSession?.messages ?? [];
+  const turns = activeSession?.turns ?? [];
+  const continuePrompt = activeSession?.lastContinuePrompt;
+
+  const updateActiveSession = (updater: (session: ChatSession) => ChatSession) => {
+    updateSessionById(activeSessionId, updater);
+  };
+
+  const updateSessionById = (sessionId: string, updater: (session: ChatSession) => ChatSession) => {
+    setSessions((current) =>
+      current.map((session) =>
+        session.id === sessionId ?
+          touchSession(updater(session))
+        : session),
+    );
+  };
+
+  useEffect(() => {
+    saveChatSessions(sessions);
+  }, [sessions]);
+
+  useEffect(() => {
+    if (!sessions.some((session) => session.id === activeSessionId) && sessions[0]) {
+      setActiveSessionId(sessions[0].id);
+    }
+  }, [activeSessionId, sessions]);
+
+  useEffect(() => {
+    if (sessions.length === 0) {
+      const fallback = createChatSession({
+        id: 'session-1',
+        name: 'Session 1',
+        apiKeyPresent: Boolean(apiKey),
+      });
+      setSessions([fallback]);
+      setActiveSessionId(fallback.id);
+    }
+  }, [apiKey, sessions]);
+
+  const createSession = (name?: string) => {
+    const id = `session-${Date.now()}`;
+    const nextSession = createChatSession({
+      id,
+      name: name?.trim() || `Session ${nextSessionNumberRef.current++}`,
+      apiKeyPresent: Boolean(apiKey),
+    });
+    setSessions((current) => [touchSession(nextSession), ...current].slice(0, 24));
+    setActiveSessionId(id);
+    return nextSession;
+  };
+
+  const switchSession = (id: string) => {
+    setActiveSessionId(id);
+    setStatus('Idle');
+    setError(undefined);
+    setDraft('');
+    setLiveEvents([]);
+    setPendingApproval(undefined);
+    setApprovalChoice('approve');
+    setInterruptRequested(false);
+    interruptRequestedRef.current = false;
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = undefined;
+    setIsRunning(false);
+  };
+
+  const renameSession = (name: string) => {
+    updateActiveSession((session) => ({
+      ...session,
+      name,
+    }));
+  };
+
+  const removeSession = (id: string) => {
+    setSessions((current) => {
+      const remaining = current.filter((session) => session.id !== id);
+      if (remaining.length > 0) {
+        return remaining;
+      }
+
+      return [
+        createChatSession({
+          id: 'session-1',
+          name: 'Session 1',
+          apiKeyPresent: Boolean(apiKey),
+        }),
+      ];
+    });
+    if (id === activeSessionId) {
+      const next = sessions.find((session) => session.id !== id);
+      setActiveSessionId(next?.id ?? 'session-1');
+      setStatus('Idle');
+      setError(undefined);
+      setLiveEvents([]);
+    }
+  };
+
+  const recentSessions = useMemo(
+    () =>
+      [...sessions]
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+        .slice(0, 8),
+    [sessions],
+  );
+
+  const activeSessionSummary = activeSession ? summarizeSession(activeSession) : undefined;
+  const listRecentSessionsMessage = recentSessions.length > 0 ?
+      [
+        'Recent sessions:',
+        ...recentSessions.map(
+          (session, index) =>
+            `${session.id === activeSessionId ? '*' : `${index + 1}.`} ${session.id} (${session.name})`,
+        ),
+        '',
+        'Use /session switch <id> to jump to one, or /session continue <id> to switch and resume immediately.',
+      ]
+    : ['No saved sessions yet.'];
+
+  const maybeAutoNameSession = (sessionId: string, prompt: string, responseText: string) => {
+    const session = sessions.find((candidate) => candidate.id === sessionId);
+    if (!session || !isGenericSessionName(session.name) || !apiKey) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const result = await titleLlm.chat(
+          [
+            {
+              role: 'system',
+              content:
+                'You name terminal chat sessions. Return only a short 3 to 6 word title in plain text. No quotes, no punctuation, no prefix.',
+            },
+            {
+              role: 'user',
+              content: `User prompt:\n${prompt}\n\nAssistant or tool summary:\n${responseText}\n\nCreate a concise session title.`,
+            },
+          ],
+          [],
+        );
+        const title = normalizeSessionTitle(result.content);
+        if (!title) {
+          return;
+        }
+
+        setSessions((current) =>
+          current.map((candidate) =>
+            candidate.id === sessionId && isGenericSessionName(candidate.name) ?
+              touchSession({ ...candidate, name: title })
+            : candidate,
+          ),
+        );
+      } catch (error) {
+        logger.debug(
+          { error: error instanceof Error ? error.message : String(error), sessionId },
+          'Session auto-title failed',
+        );
+      }
+    })();
+  };
 
   useInput((input, key) => {
     if (!pendingApproval) {
@@ -178,7 +349,7 @@ function App() {
     return () => clearInterval(timer);
   }, [isRunning]);
 
-  const executeTurn = async (prompt: string, displayText?: string) => {
+  const executeTurn = async (prompt: string, displayText?: string, sessionIdOverride = activeSessionId) => {
     if (!prompt || isRunning) {
       return;
     }
@@ -196,15 +367,18 @@ function App() {
     setInterruptRequested(false);
     abortControllerRef.current = new AbortController();
     setLiveEvents([]);
-    setLastContinuePrompt(prompt);
+    updateSessionById(sessionIdOverride, (session) => ({ ...session, lastContinuePrompt: prompt }));
 
     if (displayText) {
       const nextUserMessage: ConversationLine = { id: nextLocalId(), role: 'user', text: displayText };
-      setMessages((current: ConversationLine[]) => [
-        ...current,
-        nextUserMessage,
-      ]);
+      updateSessionById(sessionIdOverride, (session) => ({
+        ...session,
+        messages: [...session.messages, nextUserMessage],
+      }));
     }
+
+    const session = sessions.find((candidate) => candidate.id === sessionIdOverride);
+    const sessionHistory = session?.history ?? [];
 
     try {
       const result = await runAgent({
@@ -213,7 +387,7 @@ function App() {
         tools,
         maxSteps,
         logger,
-        history,
+        history: sessionHistory,
         onEvent: (event) => {
           const next = toLiveEvent(event);
           if (!next) {
@@ -236,8 +410,11 @@ function App() {
         abortSignal: abortControllerRef.current.signal,
       });
 
-      setHistory(result.transcript);
-      setMessages(buildConversationMessages(result.transcript));
+      updateSessionById(sessionIdOverride, (session) => ({
+        ...session,
+        history: result.transcript,
+        messages: buildConversationMessages(result.transcript),
+      }));
 
       const traceFile = saveTrace(result.trace);
       const nextTurn: TurnSummary = {
@@ -249,7 +426,14 @@ function App() {
         traceFile,
         events: summarizeTrace(result.trace),
       };
-      setTurns((current: TurnSummary[]) => [...current, nextTurn].slice(-8));
+      updateSessionById(sessionIdOverride, (session) => ({
+        ...session,
+        turns: [...session.turns, nextTurn].slice(-8),
+      }));
+      const assistantText =
+        buildConversationMessages(result.transcript).filter((message) => message.role === 'assistant').at(-1)?.text ??
+        result.summary;
+      maybeAutoNameSession(sessionIdOverride, prompt, assistantText);
       if (result.outcome === 'error') {
         setError(result.summary);
       }
@@ -258,15 +442,112 @@ function App() {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
       setStatus('Error');
-      setMessages((current: ConversationLine[]) => [
-        ...current,
-        { id: nextLocalId(), role: 'assistant', text: `Run failed before a final answer: ${message}` },
-      ]);
+      updateSessionById(sessionIdOverride, (session) => ({
+        ...session,
+        messages: [
+          ...session.messages,
+          { id: nextLocalId(), role: 'assistant', text: `Run failed before a final answer: ${message}` },
+        ],
+      }));
     } finally {
       setIsRunning(false);
       interruptRequestedRef.current = false;
       setInterruptRequested(false);
       abortControllerRef.current = undefined;
+    }
+  };
+
+  const executeDirectShellCommand = async (rawCommand: string) => {
+    const command = rawCommand.trim();
+    if (!command || isRunning) {
+      return;
+    }
+
+    const shellDisplay = `!${command}`;
+    setError(undefined);
+    setIsRunning(true);
+    setStatus('Running');
+    setLiveEvents([{ id: nextLocalId(), text: `running direct shell (${command})` }]);
+    updateActiveSession((session) => ({
+      ...session,
+      messages: [...session.messages, { id: nextLocalId(), role: 'user', text: shellDisplay }],
+      lastContinuePrompt: undefined,
+    }));
+
+    try {
+      const inspectCall: ToolCall = {
+        id: `direct-shell-${Date.now()}-inspect`,
+        tool: 'run_shell_inspect',
+        input: { command },
+      };
+      const inspectResult = await executeTool(toolRegistry, inspectCall);
+
+      let chosenCall = inspectCall;
+      let chosenResult = inspectResult;
+
+      if (shouldFallbackToMutate(inspectResult.error)) {
+        const mutateCall: ToolCall = {
+          id: `direct-shell-${Date.now()}-mutate`,
+          tool: 'run_shell_mutate',
+          input: { command },
+        };
+        const mutateTool = toolRegistry.get(mutateCall.tool);
+        if (!mutateTool) {
+          throw new Error('run_shell_mutate tool is not registered');
+        }
+
+        if (mutateTool.requiresApproval) {
+          const approval = await new Promise<{ approved: boolean; reason?: string }>((resolve) => {
+            setPendingApproval({ call: mutateCall, tool: mutateTool, resolve });
+          });
+          if (!approval.approved) {
+            const denialMessage =
+              approval.reason ? `Command denied.\n${approval.reason}` : 'Command denied.';
+            updateActiveSession((session) => ({
+              ...session,
+              messages: [...session.messages, { id: nextLocalId(), role: 'assistant', text: denialMessage }],
+            }));
+            setLiveEvents([{ id: nextLocalId(), text: `approval denied for ${summarizeToolCall(mutateCall.tool, mutateCall.input)}` }]);
+            setStatus('Idle');
+            return;
+          }
+        }
+
+        chosenCall = mutateCall;
+        chosenResult = await executeTool(toolRegistry, mutateCall);
+      }
+
+      const responseText = formatDirectShellResponse(chosenCall.tool, command, chosenResult);
+      updateActiveSession((session) => ({
+        ...session,
+        messages: [...session.messages, { id: nextLocalId(), role: 'assistant', text: responseText }],
+      }));
+      setLiveEvents([
+        {
+          id: nextLocalId(),
+          text:
+            chosenResult.ok ?
+              `${summarizeToolCall(chosenCall.tool, chosenCall.input)} completed`
+            : `${summarizeToolCall(chosenCall.tool, chosenCall.input)} failed`,
+        },
+      ]);
+      setStatus(chosenResult.ok ? 'Idle' : 'Stopped: error');
+      if (!chosenResult.ok && chosenResult.error) {
+        setError(chosenResult.error);
+      }
+      maybeAutoNameSession(activeSessionId, shellDisplay, responseText);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setError(message);
+      setStatus('Error');
+      updateActiveSession((session) => ({
+        ...session,
+        messages: [...session.messages, { id: nextLocalId(), role: 'assistant', text: `Direct shell execution failed:\n${message}` }],
+      }));
+    } finally {
+      setPendingApproval(undefined);
+      setApprovalChoice('approve');
+      setIsRunning(false);
     }
   };
 
@@ -276,49 +557,82 @@ function App() {
       return;
     }
 
+    if (prompt.startsWith('!')) {
+      await executeDirectShellCommand(prompt.slice(1).trim());
+      return;
+    }
+
     const commandResult = runLocalCommand({
       prompt,
       activeModel,
       setActiveModel,
+      sessions,
+      recentSessions,
+      activeSessionId,
+      switchSession,
+      createSession,
+      renameSession,
+      removeSession,
       clearConversation: () => {
-        setHistory([]);
-        setTurns([]);
-        setLastContinuePrompt(undefined);
-        setMessages([
-          {
-            id: 'intro',
-            role: 'assistant',
-            text:
-              'Heddle conversational mode. Ask a question about this workspace. Each turn runs the current agent loop and carries the transcript into the next turn.',
-          },
-        ]);
+        updateActiveSession((session) => ({
+          ...session,
+          history: [],
+          turns: [],
+          lastContinuePrompt: undefined,
+          messages: createInitialMessages(Boolean(apiKey)),
+        }));
       },
+      listRecentSessionsMessage,
     });
 
     if (commandResult.handled) {
       if (commandResult.kind === 'message') {
-        setMessages((current: ConversationLine[]) => [
-          ...current,
-          { id: nextLocalId(), role: 'assistant', text: commandResult.message },
-        ]);
+        updateActiveSession((session) => ({
+          ...session,
+          messages: [...session.messages, { id: nextLocalId(), role: 'assistant', text: commandResult.message }],
+        }));
         setStatus('Idle');
         return;
       }
 
-      if (!history.length || !lastContinuePrompt) {
-        setMessages((current: ConversationLine[]) => [
-          ...current,
-          { id: nextLocalId(), role: 'assistant', text: 'There is no interrupted or prior run to continue yet.' },
-        ]);
+      if (commandResult.sessionId) {
+        switchSession(commandResult.sessionId);
+      }
+
+      const targetSession = commandResult.sessionId ? sessions.find((session) => session.id === commandResult.sessionId) : activeSession;
+      const targetHistory = targetSession?.history ?? [];
+      const targetContinuePrompt = targetSession?.lastContinuePrompt;
+
+      if (commandResult.message) {
+        const targetId = commandResult.sessionId ?? activeSessionId;
+        updateSessionById(targetId, (session) => ({
+          ...session,
+          messages: [
+            ...session.messages,
+            { id: nextLocalId(), role: 'assistant', text: commandResult.message as string },
+          ],
+        }));
+      }
+
+      if (!targetHistory.length || !targetContinuePrompt) {
+        updateActiveSession((session) => ({
+          ...session,
+          messages: [
+            ...session.messages,
+            { id: nextLocalId(), role: 'assistant', text: 'There is no interrupted or prior run to continue yet.' },
+          ],
+        }));
         setStatus('Idle');
         return;
       }
 
-      setMessages((current: ConversationLine[]) => [
-        ...current,
-        { id: nextLocalId(), role: 'assistant', text: 'Continuing from the current transcript.' },
-      ]);
-      await executeTurn('Continue from where you left off.', 'Continue');
+      if (!commandResult.message) {
+        updateActiveSession((session) => ({
+          ...session,
+          messages: [...session.messages, { id: nextLocalId(), role: 'assistant', text: 'Continuing from the current transcript.' }],
+        }));
+      }
+      await executeTurn('Continue from where you left off.', 'Continue', commandResult.sessionId ?? activeSessionId);
       return;
     }
 
@@ -332,11 +646,15 @@ function App() {
         <Text color="cyan">
           model={activeModel} maxSteps={maxSteps} cwd={process.cwd()}
         </Text>
+        <Text dimColor>
+          session={activeSession?.name ?? 'unknown'} id={activeSession?.id ?? 'unknown'}
+          {activeSessionSummary ? ` • ${activeSessionSummary}` : ''}
+        </Text>
         <Text dimColor>logs={logFile}</Text>
         <Text color={error ? 'red' : isRunning ? 'yellow' : 'green'}>
           status={pendingApproval ? 'awaiting approval' : interruptRequested ? 'interrupt requested' : isRunning ? 'running' : status}
         </Text>
-        <Text dimColor>/model &lt;name&gt; • /models • /clear • /help</Text>
+        <Text dimColor>/model &lt;name&gt; • /models • /session list • /help • !command</Text>
         <Text dimColor>
           {pendingApproval ? '←/→ choose • Enter confirms • Esc denies • Ctrl+C exits'
           : isRunning ? 'Esc requests stop after the current step • Ctrl+C exits'
@@ -381,6 +699,11 @@ function App() {
           <ApprovalComposer pendingApproval={pendingApproval} approvalChoice={approvalChoice} />
         : (
           <>
+            {shouldShowSlashHints(draft) ?
+              <SlashHintPanel draft={draft} activeSessionId={activeSession?.id ?? ''} sessions={sessions} />
+            : shouldShowCommandHint(draft) ?
+              <CommandHintPanel draft={draft} />
+            : null}
             <Box>
               <Text color="cyan">{'>'} </Text>
               <Box flexGrow={1}>
@@ -696,7 +1019,15 @@ type LocalCommandArgs = {
   prompt: string;
   activeModel: string;
   setActiveModel: (model: string) => void;
+  sessions: ChatSession[];
+  recentSessions: ChatSession[];
+  activeSessionId: string;
+  switchSession: (id: string) => void;
+  createSession: (name?: string) => ChatSession;
+  renameSession: (name: string) => void;
+  removeSession: (id: string) => void;
   clearConversation: () => void;
+  listRecentSessionsMessage: string[];
 };
 
 function runLocalCommand(args: LocalCommandArgs): LocalCommandResult {
@@ -709,8 +1040,48 @@ function runLocalCommand(args: LocalCommandArgs): LocalCommandResult {
     return {
       handled: true,
       kind: 'message',
-      message:
-        'Local commands: /model <name> switches the current model, /model shows the active model, /models lists common model names, /continue resumes from the current transcript, /clear resets the current chat transcript, /help shows this message.',
+      message: [
+        'Local commands',
+        '',
+        '/model',
+        'Show the active model.',
+        '',
+        '/model <name>',
+        'Switch the current model.',
+        '',
+        '/models',
+        'List common model choices.',
+        '',
+        '/continue',
+        'Resume the current session from its last interrupted or prior run.',
+        '',
+        '/clear',
+        'Reset the current session transcript.',
+        '',
+        '/session list',
+        'List recent saved sessions.',
+        '',
+        '/session new [name]',
+        'Create and switch to a new session.',
+        '',
+        '/session switch <id>',
+        'Switch to another saved session.',
+        '',
+        '/session continue <id>',
+        'Switch to another saved session and immediately resume it.',
+        '',
+        '/session rename <name>',
+        'Rename the current session.',
+        '',
+        '/session close <id>',
+        'Remove a saved session.',
+        '',
+        '!<command>',
+        'Run a shell command directly in chat using the current inspect or execute policy.',
+        '',
+        '/help',
+        'Show this message.',
+      ].join('\n'),
     };
   }
 
@@ -764,6 +1135,94 @@ function runLocalCommand(args: LocalCommandArgs): LocalCommandResult {
     return {
       handled: true,
       kind: 'continue',
+    };
+  }
+
+  if (trimmed === '/session list') {
+    const lines = args.sessions.map((session) =>
+      `${session.id === args.activeSessionId ? '*' : '-'} ${session.id} (${session.name}) • ${summarizeSession(session)}`,
+    );
+    return {
+      handled: true,
+      kind: 'message',
+      message: lines.length > 0 ? args.listRecentSessionsMessage.join('\n') : 'No sessions available.',
+    };
+  }
+
+  if (trimmed.startsWith('/session new')) {
+    const maybeName = trimmed.slice('/session new'.length).trim();
+    const session = args.createSession(maybeName || undefined);
+    return {
+      handled: true,
+      kind: 'message',
+      message: `Created and switched to ${session.id} (${session.name}).`,
+    };
+  }
+
+  if (trimmed.startsWith('/session switch ')) {
+    const id = trimmed.slice('/session switch '.length).trim();
+    const session = args.sessions.find((candidate) => candidate.id === id);
+    if (!session) {
+      return {
+        handled: true,
+        kind: 'message',
+        message: `Unknown session: ${id}. Use /session list to inspect available sessions.`,
+      };
+    }
+    args.switchSession(id);
+    return {
+      handled: true,
+      kind: 'message',
+      message: `Switched to ${session.id} (${session.name}).\n${summarizeSession(session)}`,
+    };
+  }
+
+  if (trimmed.startsWith('/session continue ')) {
+    const id = trimmed.slice('/session continue '.length).trim();
+    const session = args.sessions.find((candidate) => candidate.id === id);
+    if (!session) {
+      return {
+        handled: true,
+        kind: 'message',
+        message: `Unknown session: ${id}.\nUse /session list to inspect available sessions.`,
+      };
+    }
+    return {
+      handled: true,
+      kind: 'continue',
+      sessionId: id,
+      message: `Switched to ${session.id} (${session.name}).\nContinuing from that session transcript.`,
+    };
+  }
+
+  if (trimmed.startsWith('/session rename ')) {
+    const name = trimmed.slice('/session rename '.length).trim();
+    if (!name) {
+      return { handled: true, kind: 'message', message: 'Usage: /session rename <name>' };
+    }
+    args.renameSession(name);
+    return {
+      handled: true,
+      kind: 'message',
+      message: `Renamed current session to ${name}.`,
+    };
+  }
+
+  if (trimmed.startsWith('/session close ')) {
+    const id = trimmed.slice('/session close '.length).trim();
+    const session = args.sessions.find((candidate) => candidate.id === id);
+    if (!session) {
+      return {
+        handled: true,
+        kind: 'message',
+        message: `Unknown session: ${id}.\nUse /session list to inspect available sessions.`,
+      };
+    }
+    args.removeSession(id);
+    return {
+      handled: true,
+      kind: 'message',
+      message: `Closed ${session.id} (${session.name}).`,
     };
   }
 
@@ -856,6 +1315,232 @@ function normalizePastedInput(input: string): string {
   return input.replace(/\r?\n+/g, ' ');
 }
 
+function createInitialMessages(apiKeyPresent: boolean): ConversationLine[] {
+  return [
+    {
+      id: 'intro',
+      role: 'assistant',
+      text:
+        'Heddle conversational mode.\n\nAsk a question about this workspace.\nEach turn runs the current agent loop and carries the transcript into the next turn.\nUse !<command> to run a shell command directly in chat.',
+    },
+    ...(!apiKeyPresent ?
+      [{
+        id: 'missing-key',
+        role: 'assistant' as const,
+        text:
+          'No OpenAI API key detected. Set OPENAI_API_KEY or PERSONAL_OPENAI_API_KEY, or use yarn chat:dev if your shell exposes PERSONAL_OPENAI_API_KEY.',
+      }]
+    : []),
+  ];
+}
+
+function createChatSession(options: {
+  id: string;
+  name: string;
+  apiKeyPresent: boolean;
+}): ChatSession {
+  const now = new Date().toISOString();
+  return {
+    id: options.id,
+    name: options.name,
+    history: [],
+    messages: createInitialMessages(options.apiKeyPresent),
+    turns: [],
+    createdAt: now,
+    updatedAt: now,
+    lastContinuePrompt: undefined,
+  };
+}
+
+type SlashHintPanelProps = {
+  draft: string;
+  activeSessionId: string;
+  sessions: ChatSession[];
+};
+
+function SlashHintPanel({ draft, activeSessionId, sessions }: SlashHintPanelProps) {
+  const hints = getSlashHints(draft, activeSessionId, sessions).slice(0, 10);
+
+  return (
+    <Box flexDirection="column" marginBottom={1}>
+      <Text dimColor>Slash commands</Text>
+      {hints.map((hint) => (
+        <Text key={hint.command} dimColor>
+          {hint.command} {hint.description}
+        </Text>
+      ))}
+    </Box>
+  );
+}
+
+function shouldShowSlashHints(draft: string): boolean {
+  return draft.trimStart().startsWith('/');
+}
+
+function shouldShowCommandHint(draft: string): boolean {
+  return draft.trimStart().startsWith('!');
+}
+
+type CommandHintPanelProps = {
+  draft: string;
+};
+
+function CommandHintPanel({ draft }: CommandHintPanelProps) {
+  const command = draft.trim().slice(1).trim();
+  return (
+    <Box flexDirection="column" marginBottom={1}>
+      <Text dimColor>Direct shell</Text>
+      <Text dimColor>
+        {command ?
+          `Run ${command} directly in chat. Read-oriented commands stay in inspect mode; other commands fall back to approval-gated execution.`
+        : 'Start with ! to run a shell command directly in chat.'}
+      </Text>
+    </Box>
+  );
+}
+
+function getSlashHints(
+  draft: string,
+  activeSessionId: string,
+  sessions: ChatSession[],
+): Array<{ command: string; description: string }> {
+  const base = [
+    { command: '/help', description: 'show available local commands' },
+    { command: '/model', description: 'show the active model' },
+    { command: '/model <name>', description: 'switch the current model' },
+    { command: '/models', description: 'list common model choices' },
+    { command: '/continue', description: 'resume from the current transcript' },
+    { command: '/clear', description: 'reset the current session transcript' },
+    { command: '/session list', description: 'list local chat sessions' },
+    { command: '/session new [name]', description: 'create and switch to a new session' },
+    { command: '/session switch <id>', description: 'switch to another session' },
+    { command: '/session continue <id>', description: 'switch to a session and resume it' },
+    { command: '/session rename <name>', description: 'rename the current session' },
+    { command: '/session close <id>', description: 'remove a saved session' },
+  ];
+
+  const trimmed = draft.trim();
+  const filtered = base.filter((hint) => hint.command.startsWith(trimmed) || trimmed === '/');
+  if (trimmed.startsWith('/session switch ')) {
+    const sessionHints = sessions.map((session) => ({
+      command: `/session switch ${session.id}`,
+      description: `${session.id === activeSessionId ? '(current) ' : ''}${session.name}`,
+    }));
+    return sessionHints.filter((hint) => hint.command.startsWith(trimmed));
+  }
+
+  return filtered.length > 0 ? filtered : base;
+}
+
+function touchSession(session: ChatSession): ChatSession {
+  return { ...session, updatedAt: new Date().toISOString() };
+}
+
+function summarizeSession(session: ChatSession): string {
+  const latestTurn = session.turns[session.turns.length - 1];
+  const latestPrompt = latestTurn ? truncate(latestTurn.prompt, 44) : 'no turns yet';
+  return `${session.turns.length} turns • ${latestPrompt}`;
+}
+
+function loadChatSessions(apiKeyPresent: boolean): ChatSession[] {
+  try {
+    if (!existsSync(sessionsFile)) {
+      return [
+        createChatSession({
+          id: 'session-1',
+          name: 'Session 1',
+          apiKeyPresent,
+        }),
+      ];
+    }
+
+    const raw = readFileSync(sessionsFile, 'utf8');
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      throw new Error('Expected session array');
+    }
+
+    const sessions = parsed.flatMap((value) => parseSavedSession(value, apiKeyPresent));
+    if (sessions.length > 0) {
+      return sessions.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    }
+  } catch (error) {
+    logger.warn({ error: error instanceof Error ? error.message : String(error) }, 'Failed to load chat sessions');
+  }
+
+  return [
+    createChatSession({
+      id: 'session-1',
+      name: 'Session 1',
+      apiKeyPresent,
+    }),
+  ];
+}
+
+function saveChatSessions(sessions: ChatSession[]) {
+  mkdirSync(join(process.cwd(), 'local'), { recursive: true });
+  writeFileSync(sessionsFile, JSON.stringify(sessions, null, 2));
+}
+
+function parseSavedSession(value: unknown, apiKeyPresent: boolean): ChatSession[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return [];
+  }
+
+  const candidate = value as Partial<ChatSession>;
+  if (typeof candidate.id !== 'string' || typeof candidate.name !== 'string') {
+    return [];
+  }
+
+  const createdAt = typeof candidate.createdAt === 'string' ? candidate.createdAt : new Date().toISOString();
+  const updatedAt = typeof candidate.updatedAt === 'string' ? candidate.updatedAt : createdAt;
+
+  return [{
+    id: candidate.id,
+    name: candidate.name,
+    history: Array.isArray(candidate.history) ? candidate.history : [],
+    messages:
+      Array.isArray(candidate.messages) && candidate.messages.length > 0 ?
+        candidate.messages.filter(isConversationLine)
+      : createInitialMessages(apiKeyPresent),
+    turns: Array.isArray(candidate.turns) ? candidate.turns.filter(isTurnSummary) : [],
+    createdAt,
+    updatedAt,
+    lastContinuePrompt: typeof candidate.lastContinuePrompt === 'string' ? candidate.lastContinuePrompt : undefined,
+  }];
+}
+
+function isConversationLine(value: unknown): value is ConversationLine {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const candidate = value as Partial<ConversationLine>;
+  return (
+    typeof candidate.id === 'string' &&
+    (candidate.role === 'user' || candidate.role === 'assistant') &&
+    typeof candidate.text === 'string'
+  );
+}
+
+function isTurnSummary(value: unknown): value is TurnSummary {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const candidate = value as Partial<TurnSummary>;
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.prompt === 'string' &&
+    typeof candidate.outcome === 'string' &&
+    typeof candidate.summary === 'string' &&
+    typeof candidate.steps === 'number' &&
+    typeof candidate.traceFile === 'string' &&
+    Array.isArray(candidate.events) &&
+    candidate.events.every((event) => typeof event === 'string')
+  );
+}
+
 function buildPromptViewport(value: string, cursor: number): string {
   const withCursor = `${value.slice(0, cursor)}|${value.slice(cursor)}`;
 
@@ -876,4 +1561,105 @@ function buildPromptViewport(value: string, cursor: number): string {
   const suffix = end < withCursor.length ? '…' : '';
   const slice = withCursor.slice(start, end);
   return `${prefix}${slice}${suffix}`;
+}
+
+function shouldFallbackToMutate(error: string | undefined): boolean {
+  if (!error) {
+    return false;
+  }
+
+  return error.includes('run_shell_inspect policy');
+}
+
+function formatDirectShellResponse(toolName: string, command: string, result: import('../src/index.js').ToolResult): string {
+  const lines = [
+    `Direct shell result`,
+    '',
+    `Command: ${command}`,
+    `Tool: ${toolName}`,
+  ];
+
+  const output = result.output;
+  const policy = extractPolicySummary(output);
+  if (policy) {
+    lines.push(`Policy: ${policy}`);
+  }
+
+  if (result.ok) {
+    const stdout = extractTextOutput(output, 'stdout');
+    const stderr = extractTextOutput(output, 'stderr');
+    lines.push('Outcome: success');
+    if (stdout) {
+      lines.push('', 'stdout:', truncate(stdout, MAX_SHELL_OUTPUT_CHARS));
+    }
+    if (stderr) {
+      lines.push('', 'stderr:', truncate(stderr, MAX_SHELL_OUTPUT_CHARS));
+    }
+    if (!stdout && !stderr) {
+      lines.push('', 'No stdout or stderr output.');
+    }
+    return lines.join('\n');
+  }
+
+  lines.push(`Outcome: failed`);
+  if (result.error) {
+    lines.push('', `Error: ${result.error}`);
+  }
+  const stdout = extractTextOutput(output, 'stdout');
+  const stderr = extractTextOutput(output, 'stderr');
+  if (stdout) {
+    lines.push('', 'stdout:', truncate(stdout, MAX_SHELL_OUTPUT_CHARS));
+  }
+  if (stderr) {
+    lines.push('', 'stderr:', truncate(stderr, MAX_SHELL_OUTPUT_CHARS));
+  }
+  return lines.join('\n');
+}
+
+function extractTextOutput(value: unknown, field: 'stdout' | 'stderr'): string | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const candidate = (value as Record<string, unknown>)[field];
+  return typeof candidate === 'string' && candidate.trim() ? candidate.trim() : undefined;
+}
+
+function extractPolicySummary(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const policy = (value as { policy?: unknown }).policy;
+  if (!policy || typeof policy !== 'object' || Array.isArray(policy)) {
+    return undefined;
+  }
+
+  const candidate = policy as Record<string, unknown>;
+  const scope = typeof candidate.scope === 'string' ? candidate.scope : undefined;
+  const risk = typeof candidate.risk === 'string' ? candidate.risk : undefined;
+  const reason = typeof candidate.reason === 'string' ? candidate.reason : undefined;
+  const parts = [scope, risk, reason].filter(Boolean);
+  return parts.length > 0 ? parts.join(' • ') : undefined;
+}
+
+function isGenericSessionName(name: string): boolean {
+  return /^Session \d+$/.test(name.trim());
+}
+
+function normalizeSessionTitle(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/["'`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  return truncate(normalized, 48);
 }

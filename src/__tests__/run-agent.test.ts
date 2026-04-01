@@ -189,6 +189,112 @@ describe('runAgent', () => {
     });
   });
 
+  it('treats equivalent path spellings like "." and "./" as duplicate tool calls', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+
+        if (seenMessages.length === 1) {
+          return {
+            toolCalls: [{ id: 'call-1', tool: 'list_files', input: { path: '.' } }],
+          };
+        }
+
+        if (seenMessages.length === 2) {
+          return {
+            toolCalls: [{ id: 'call-2', tool: 'list_files', input: { path: './' } }],
+          };
+        }
+
+        return {
+          content: 'I should stop repeating equivalent directory listings.',
+        };
+      },
+    };
+
+    const listFilesTool: ToolDefinition = {
+      name: 'list_files',
+      description: 'Lists files in a directory',
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: 'README.md\nsrc/' };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Inspect this repo.',
+      llm: fakeLlm,
+      tools: [listFilesTool],
+      maxSteps: 4,
+      logger: silentLogger,
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(seenMessages[2]).toContainEqual({
+      role: 'tool',
+      content: JSON.stringify({
+        ok: false,
+        error:
+          'Duplicate tool call blocked: list_files was already called with the same input earlier in this run. Try a different tool or different input.',
+      }),
+      toolCallId: 'call-2',
+    });
+  });
+
+  it('does not stop the run after repeated recoverable tool misuse errors', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+
+        if (seenMessages.length === 1) {
+          return {
+            toolCalls: [{ id: 'call-1', tool: 'list_files', input: { path: '.', maxEntries: 200 } }],
+          };
+        }
+
+        if (seenMessages.length === 2) {
+          return {
+            toolCalls: [{ id: 'call-2', tool: 'list_files', input: { path: '.', maxEntries: 100 } }],
+          };
+        }
+
+        return {
+          content: 'I corrected course instead of dying on invalid list_files parameters.',
+        };
+      },
+    };
+
+    const listFilesTool: ToolDefinition = {
+      name: 'list_files',
+      description: 'Lists files in a directory',
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        if ('maxEntries' in (input as Record<string, unknown>)) {
+          return { ok: false, error: 'Invalid input for list_files. Allowed fields: path. Example: { "path": "." }' };
+        }
+        return { ok: true, output: 'README.md\nsrc/' };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Inspect this repo.',
+      llm: fakeLlm,
+      tools: [listFilesTool],
+      maxSteps: 4,
+      logger: silentLogger,
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('I corrected course instead of dying on invalid list_files parameters.');
+    expect(seenMessages[1]).toContainEqual({
+      role: 'system',
+      content:
+        'Host reminder: the last tool call failed due to invalid or repeated tool use: Invalid input for list_files. Allowed fields: path. Example: { "path": "." }. Correct the call immediately, switch tools, or use report_state if you are blocked. Do not keep retrying the same failing pattern.',
+    });
+  });
+
   it('carries prior transcript into a later turn when history is provided', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
