@@ -118,6 +118,14 @@ Phase 1 has also started at the tool-contract layer:
 - chat mode now persists local sessions and supports `/session list`, `/session switch <id>`, and `/session continue <id>`
 - chat mode now auto-titles generic sessions in the background with `gpt-5.1-codex-mini`
 - chat mode now supports direct shell commands with a `!command` prefix; user-entered direct commands run immediately under the same shell policy, and their results are stored in the session transcript for later turns
+- interrupted or incomplete tool-call history is now sanitized before the next run so saved sessions do not poison later turns with missing tool outputs
+- `Recent Turns` is a completed-turn summary, not a live run panel; while a run is in progress it may still show the previous turn until the current one finishes
+
+Chat usage notes:
+
+- use `/continue` for built-in resume behavior; plain `continue` is treated as a normal user prompt
+- if a long-running turn appears stuck, `Esc` requests an interrupt for the current run
+- current shell policy is still conservative about heredocs, redirects, and similar shell syntax; the longer-term direction is to rely less on naive shell-character blocking and more on approval, scope, and audit policy
 
 ## Next Step
 
@@ -125,6 +133,8 @@ The immediate next step is to keep tightening the Phase 1 coding-agent surface a
 An eval batch prompt set lives in [docs/eval-prompts.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/eval-prompts.md).
 
 The shell direction is also intentionally moving toward a policy-based execution surface rather than an ever-growing allowlist of specific commands.
+
+One current limitation is worth calling out explicitly: Heddle can now recover from interrupted tool-call history correctly, but it still sometimes stops after discovering a safe execution path instead of carrying a requested change through to completion. Closing that follow-through gap is part of making the agent genuinely useful.
 
 The example runner and chat mode now default to `gpt-5.1-codex` and a 40-step budget. Use `yarn chat:light` or `yarn chat:dev:light` for `gpt-5.1-codex-mini`, or override manually with `OPENAI_MODEL` and `HEDDLE_MAX_STEPS` if you want to compare models or cap exploration more tightly.
 

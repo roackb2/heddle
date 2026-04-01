@@ -75,6 +75,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   const executedMutationCommands: string[] = [];
   const executedReviewCommands: string[] = [];
   const executedVerificationCommands: string[] = [];
+  const sanitizedHistory = sanitizeHistory(history);
 
   log.info({ goal, maxSteps, tools: registry.names() }, 'Agent run started');
   record({ type: 'run.started', goal, timestamp: now() });
@@ -82,7 +83,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   // Build initial messages
   const messages: ChatMessage[] = [
     { role: 'system', content: buildSystemPrompt(goal, registry.names(), systemContext) },
-    ...history,
+    ...sanitizedHistory,
     { role: 'user', content: goal },
   ];
 
@@ -345,6 +346,45 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   log.warn({ step, maxSteps }, 'Budget exhausted');
   record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
   return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
+}
+
+function sanitizeHistory(history: ChatMessage[]): ChatMessage[] {
+  const resolvedToolCallIds = new Set<string>();
+  const introducedToolCallIds = new Set<string>();
+
+  for (const message of history) {
+    if (message.role === 'assistant' && message.toolCalls) {
+      for (const call of message.toolCalls) {
+        introducedToolCallIds.add(call.id);
+      }
+      continue;
+    }
+
+    if (message.role === 'tool') {
+      resolvedToolCallIds.add(message.toolCallId);
+    }
+  }
+
+  return history.flatMap((message) => {
+    if (message.role === 'assistant' && message.toolCalls) {
+      const resolvedToolCalls = message.toolCalls.filter((call) => resolvedToolCallIds.has(call.id));
+      if (resolvedToolCalls.length > 0) {
+        return [{ ...message, toolCalls: resolvedToolCalls }];
+      }
+
+      if (message.content.trim()) {
+        return [{ role: 'assistant' as const, content: message.content }];
+      }
+
+      return [];
+    }
+
+    if (message.role === 'tool' && !introducedToolCallIds.has(message.toolCallId)) {
+      return [];
+    }
+
+    return [message];
+  });
 }
 
 function extractShellCommand(input: unknown): string | undefined {

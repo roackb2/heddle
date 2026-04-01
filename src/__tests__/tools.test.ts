@@ -206,6 +206,17 @@ describe('runShell tools', () => {
     });
   });
 
+  it('does not treat > inside quoted node -e source as a shell redirect', async () => {
+    const tool = createRunShellMutateTool();
+    const result = await tool.execute({ command: 'node -e "const fn = () => 1; console.log(fn())"' });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({
+      command: 'node -e "const fn = () => 1; console.log(fn())"',
+      exitCode: 0,
+    });
+  });
+
   it('rejects pipes in mutate mode', async () => {
     const tool = createRunShellMutateTool();
     const result = await tool.execute({ command: 'yarn test | cat' });

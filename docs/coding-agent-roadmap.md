@@ -79,13 +79,16 @@ Current progress:
 - workspace-changing mutate commands trigger host-side pressure to inspect repo state and run verification before final answer
 - workspace-changing mutate runs now also require a short operator-style final answer with explicit `Changed`, `Verified`, and `Remaining uncertainty` sections
 - chat mode now supports interrupt via `Esc` and resume via `/continue`
+- carried-over session history is sanitized before the next run so interrupted tool calls do not poison later turns with missing tool-output API errors
 
 Remaining priority:
 
 - stronger git-native review flow after changes
 - better use of concrete diff/status evidence in those summaries
-- more polished operator experience around interrupted or resumed runs
+- more polished operator experience around interrupted or resumed runs, especially clearer separation between active-run state and previously completed turn summaries
 - begin evolving shell policy from a narrow command-prefix allowlist toward a real execution-policy model based on risk, scope, approval, and auditability
+- reduce reliance on shell-syntax blocking as a safety mechanism; serious workflows will need broader command expressiveness than the current heredoc/redirect restrictions allow
+- strengthen host-side follow-through so when the agent discovers a safe path for a bounded change, it executes it instead of stopping at explanation
 
 Direction for shell evolution:
 

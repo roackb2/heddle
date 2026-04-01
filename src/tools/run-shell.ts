@@ -368,8 +368,57 @@ function isRunShellInput(raw: unknown): raw is RunShellInput {
 }
 
 function containsBlockedShellControlOperators(command: string, allowPipes: boolean): boolean {
-  const pattern = allowPipes ? /[;&><`]/ : /[|;&><`]/;
-  return pattern.test(command) || command.includes('&&') || command.includes('||') || command.includes('$(');
+  let quote: '"' | "'" | undefined;
+  let escaped = false;
+
+  for (let index = 0; index < command.length; index++) {
+    const current = command[index] ?? '';
+    const next = command[index + 1] ?? '';
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (current === '\\') {
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      if (current === quote) {
+        quote = undefined;
+      }
+      continue;
+    }
+
+    if (current === '"' || current === "'") {
+      quote = current;
+      continue;
+    }
+
+    if (current === '|' && !allowPipes) {
+      return true;
+    }
+
+    if (current === '&' || current === ';' || current === '>' || current === '<' || current === '`') {
+      return true;
+    }
+
+    if (current === '|' && next === '|') {
+      return true;
+    }
+
+    if (current === '&' && next === '&') {
+      return true;
+    }
+
+    if (current === '$' && next === '(') {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function inspectRule(binary: string, reason: string, argsPrefix?: string[]): RunShellRule {

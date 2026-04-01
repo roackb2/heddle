@@ -338,6 +338,47 @@ describe('runAgent', () => {
     ]);
   });
 
+  it('sanitizes unresolved prior tool calls before sending history back to the model', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+        return {
+          content: 'I retried without carrying over the interrupted tool call.',
+        };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Can you try again?',
+      llm: fakeLlm,
+      tools: [],
+      history: [
+        { role: 'user', content: 'Continue on test coverage.' },
+        {
+          role: 'assistant',
+          content: 'I will inspect run-agent next.',
+          toolCalls: [{ id: 'call-1', tool: 'read_file', input: { path: 'src/run-agent.ts' } }],
+        },
+      ],
+      maxSteps: 1,
+      logger: silentLogger,
+    });
+
+    expect(seenMessages[0]).toEqual([
+      expect.objectContaining({ role: 'system' }),
+      { role: 'user', content: 'Continue on test coverage.' },
+      { role: 'assistant', content: 'I will inspect run-agent next.' },
+      { role: 'user', content: 'Can you try again?' },
+    ]);
+    expect(result.transcript).toEqual([
+      { role: 'user', content: 'Continue on test coverage.' },
+      { role: 'assistant', content: 'I will inspect run-agent next.' },
+      { role: 'user', content: 'Can you try again?' },
+      { role: 'assistant', content: 'I retried without carrying over the interrupted tool call.' },
+    ]);
+  });
+
   it('requires approval for tools marked as approval-gated and feeds denials back to the model', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
