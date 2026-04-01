@@ -58,12 +58,14 @@ Phase 1 has also started at the tool-contract layer:
 - inspect vs mutate intent is explicit in tool names, descriptions, and traces
 - examples expose both shell modes to the agent runtime
 - chat mode now pauses for human approval before `run_shell_mutate` executes
+- shell execution is now governed by explicit workspace/inspect policy rules with scope and risk metadata, rather than only a flat command-prefix list
 - workspace-changing mutate commands now trigger host-side follow-up requirements before final answer: review repo state and run verification
+- after workspace-changing mutate runs, the host now also requires a short operator-style final summary with `Changed:`, `Verified:`, and `Remaining uncertainty:`
 - chat mode now supports real interrupt via `Esc` and resume via `/continue`
 
 ## Next Step
 
-The immediate next step is to keep tightening the Phase 1 coding-agent surface around git-native review and explanation: stronger `git status` / `git diff` workflows, clearer change summaries, and better operator confidence after bounded edits.
+The immediate next step is to keep tightening the Phase 1 coding-agent surface around git-native review and explanation: better use of concrete diff/status evidence, stronger operator confidence after bounded edits, and continued evolution toward policy-based execution instead of narrow command-prefix allowlists.
 An eval batch prompt set lives in [docs/eval-prompts.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/eval-prompts.md).
 
 The shell direction is also intentionally moving toward a policy-based execution surface rather than an ever-growing allowlist of specific commands.

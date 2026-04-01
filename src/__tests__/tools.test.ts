@@ -97,10 +97,8 @@ describe('runShell tools', () => {
 
     expect(tool.name).toBe('run_shell_inspect');
     expect(tool.description).toContain('Use this for CLI-native inspection, search, diff, and git state checks');
-    expect(tool.description).toContain('Returns structured output with command, exitCode, stdout, and stderr');
-    expect(tool.description).toContain('git rev-parse');
-    expect(tool.description).toContain('git ls-files');
-    expect(tool.description).toContain('rg');
+    expect(tool.description).toContain('policy metadata');
+    expect(tool.description).toContain('low-risk inspect rules');
   });
 
   it('documents mutate-oriented shell usage and bounded workspace actions', () => {
@@ -109,9 +107,8 @@ describe('runShell tools', () => {
     expect(tool.name).toBe('run_shell_mutate');
     expect(tool.requiresApproval).toBe(true);
     expect(tool.description).toContain('Use this only when inspection is not enough');
-    expect(tool.description).toContain('formatting, test execution, type-checking');
-    expect(tool.description).toContain('yarn test');
-    expect(tool.description).toContain('prettier --write');
+    expect(tool.description).toContain('verification, formatting, staging');
+    expect(tool.description).toContain('workspace execution rules');
   });
 
   it('rejects shell control operators even when the inspect prefix is allowed', async () => {
@@ -133,6 +130,11 @@ describe('runShell tools', () => {
       command: 'pwd',
       exitCode: 0,
       stderr: '',
+      policy: {
+        binary: 'pwd',
+        scope: 'inspect',
+        risk: 'low',
+      },
     });
     expect(typeof (result.output as { stdout: unknown }).stdout).toBe('string');
   });
@@ -180,8 +182,37 @@ describe('runShell tools', () => {
     expect(result).toEqual({
       ok: false,
       error:
-        'Command not allowed. The command must start with one of: yarn test, yarn build, yarn lint, yarn format, yarn prettier, yarn eslint, yarn vitest, npx prettier --write, npx eslint --fix, prettier --write, eslint --fix, vitest, tsc',
+        'Command not allowed by run_shell_mutate policy. This tool only permits bounded commands that match its configured workspace risk/scope rules.',
     });
+  });
+
+  it('allows bounded workspace file operations on mutate with policy metadata', async () => {
+    const tool = createRunShellMutateTool();
+    const root = await mkdtemp(join(tmpdir(), 'heddle-shell-'));
+    const fromPath = join(root, 'from.txt');
+    const toPath = join(root, 'to.txt');
+    await writeFile(fromPath, 'hello\n');
+    const previousCwd = process.cwd();
+    process.chdir(root);
+
+    try {
+      const result = await tool.execute({ command: 'mv from.txt to.txt' });
+
+      expect(result.ok).toBe(true);
+      expect(result.output).toMatchObject({
+        command: 'mv from.txt to.txt',
+        exitCode: 0,
+        policy: {
+          binary: 'mv',
+          scope: 'workspace',
+          risk: 'medium',
+        },
+      });
+    } finally {
+      process.chdir(previousCwd);
+    }
+
+    expect(toPath).not.toBe(fromPath);
   });
 });
 

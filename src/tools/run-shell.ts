@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // Tools: run_shell_inspect / run_shell_mutate
-// Safe by default — only allowlisted command prefixes are permitted.
+// Policy-based shell execution with explicit scope/risk metadata.
 // ---------------------------------------------------------------------------
 
 import { spawnSync } from 'node:child_process';
@@ -10,56 +10,22 @@ type RunShellInput = {
   command: string;
 };
 
-const DEFAULT_INSPECT_ALLOWLIST: string[] = [
-  'ls',
-  'cat',
-  'head',
-  'tail',
-  'wc',
-  'grep',
-  'rg',
-  'find',
-  'sed',
-  'sort',
-  'uniq',
-  'jq',
-  'echo',
-  'pwd',
-  'which',
-  'file',
-  'tree',
-  'du',
-  'df',
-  'git log',
-  'git diff',
-  'git status',
-  'git show',
-  'git rev-parse',
-  'git ls-files',
-  'git grep',
-  'git branch',
-  'git tag',
-  'git remote',
-];
+export type RunShellScope = 'inspect' | 'workspace';
+export type RunShellRisk = 'low' | 'medium';
 
-const DEFAULT_MUTATE_ALLOWLIST: string[] = [
-  'yarn test',
-  'yarn build',
-  'yarn lint',
-  'yarn format',
-  'yarn prettier',
-  'yarn eslint',
-  'yarn vitest',
-  'npx prettier --write',
-  'npx eslint --fix',
-  'prettier --write',
-  'eslint --fix',
-  'vitest',
-  'tsc',
-];
+export type RunShellPolicyDecision = {
+  binary: string;
+  scope: RunShellScope;
+  risk: RunShellRisk;
+  reason: string;
+};
 
-export type RunShellOptions = {
-  allowlist?: string[];
+type RunShellRule = {
+  binary: string;
+  argsPrefix?: string[];
+  scope: RunShellScope;
+  risk: RunShellRisk;
+  reason: string;
 };
 
 type RunShellOutput = {
@@ -67,43 +33,98 @@ type RunShellOutput = {
   exitCode: number;
   stdout: string;
   stderr: string;
+  policy: RunShellPolicyDecision;
 };
 
+export type RunShellOptions = {
+  rules?: RunShellRule[];
+};
+
+const DEFAULT_INSPECT_RULES: RunShellRule[] = [
+  inspectRule('ls', 'workspace listing'),
+  inspectRule('cat', 'file inspection'),
+  inspectRule('head', 'file inspection'),
+  inspectRule('tail', 'file inspection'),
+  inspectRule('wc', 'workspace inspection'),
+  inspectRule('grep', 'workspace inspection'),
+  inspectRule('rg', 'workspace inspection'),
+  inspectRule('find', 'workspace inspection'),
+  inspectRule('sed', 'workspace inspection'),
+  inspectRule('sort', 'workspace inspection'),
+  inspectRule('uniq', 'workspace inspection'),
+  inspectRule('jq', 'structured output inspection'),
+  inspectRule('echo', 'simple shell inspection'),
+  inspectRule('pwd', 'workspace location check'),
+  inspectRule('which', 'binary discovery'),
+  inspectRule('file', 'file metadata inspection'),
+  inspectRule('tree', 'workspace tree inspection'),
+  inspectRule('du', 'workspace disk inspection'),
+  inspectRule('df', 'filesystem inspection'),
+  inspectRule('git', 'git history inspection', ['log']),
+  inspectRule('git', 'git diff inspection', ['diff']),
+  inspectRule('git', 'git status inspection', ['status']),
+  inspectRule('git', 'git object inspection', ['show']),
+  inspectRule('git', 'git revision inspection', ['rev-parse']),
+  inspectRule('git', 'git file inventory inspection', ['ls-files']),
+  inspectRule('git', 'git content search inspection', ['grep']),
+  inspectRule('git', 'git branch inspection', ['branch']),
+  inspectRule('git', 'git tag inspection', ['tag']),
+  inspectRule('git', 'git remote inspection', ['remote']),
+];
+
+const DEFAULT_MUTATE_RULES: RunShellRule[] = [
+  workspaceRule('yarn', 'low', 'workspace verification command', ['test']),
+  workspaceRule('yarn', 'low', 'workspace verification command', ['build']),
+  workspaceRule('yarn', 'low', 'workspace verification command', ['lint']),
+  workspaceRule('yarn', 'low', 'workspace verification command', ['vitest']),
+  workspaceRule('vitest', 'low', 'workspace verification command'),
+  workspaceRule('tsc', 'low', 'workspace verification command'),
+  workspaceRule('yarn', 'medium', 'workspace formatting command', ['format']),
+  workspaceRule('yarn', 'medium', 'workspace formatting command', ['prettier']),
+  workspaceRule('yarn', 'medium', 'workspace formatting command', ['eslint']),
+  workspaceRule('npx', 'medium', 'workspace formatting command', ['prettier', '--write']),
+  workspaceRule('npx', 'medium', 'workspace formatting command', ['eslint', '--fix']),
+  workspaceRule('prettier', 'medium', 'workspace formatting command', ['--write']),
+  workspaceRule('eslint', 'medium', 'workspace formatting command', ['--fix']),
+  workspaceRule('mkdir', 'medium', 'workspace file operation'),
+  workspaceRule('touch', 'medium', 'workspace file operation'),
+  workspaceRule('mv', 'medium', 'workspace file operation'),
+  workspaceRule('cp', 'medium', 'workspace file operation'),
+  workspaceRule('git', 'medium', 'git staging operation', ['add']),
+  workspaceRule('git', 'medium', 'git file move operation', ['mv']),
+];
+
 export function createRunShellInspectTool(options: RunShellOptions = {}): ToolDefinition {
-  const allowlist = options.allowlist ?? DEFAULT_INSPECT_ALLOWLIST;
+  const rules = options.rules ?? DEFAULT_INSPECT_RULES;
 
   return {
     name: 'run_shell_inspect',
     description:
-      `Run a read-oriented shell command inside the current workspace. Use this for CLI-native inspection, search, diff, and git state checks when mature commands like rg, git, sed, or ls are a better fit than bespoke file tools. Returns structured output with command, exitCode, stdout, and stderr. For safety, only the following command prefixes are allowed: ${allowlist.join(', ')}. The command must start with one of these prefixes and may not use shell control operators like pipes, redirects, or command chaining.`,
+      `Run a read-oriented shell command inside the current workspace. Use this for CLI-native inspection, search, diff, and git state checks when mature commands like rg, git, sed, or ls are a better fit than bespoke file tools. Returns structured output with command, exitCode, stdout, stderr, and policy metadata. This tool is governed by low-risk inspect rules, not arbitrary shell access. Shell control operators like pipes, redirects, chaining, and subshells are blocked.`,
     parameters: buildParameters(),
     execute: (raw) => executeRunShell(raw, {
       toolName: 'run_shell_inspect',
-      allowlist,
+      rules,
     }),
   };
 }
 
 export function createRunShellMutateTool(options: RunShellOptions = {}): ToolDefinition {
-  const allowlist = options.allowlist ?? DEFAULT_MUTATE_ALLOWLIST;
+  const rules = options.rules ?? DEFAULT_MUTATE_RULES;
 
   return {
     name: 'run_shell_mutate',
     requiresApproval: true,
     description:
-      `Run a bounded workspace mutation or verification command inside the current workspace. Use this only when inspection is not enough and you need formatting, test execution, type-checking, or another explicit workspace action. Returns structured output with command, exitCode, stdout, and stderr. For safety, only the following command prefixes are allowed: ${allowlist.join(', ')}. The command must start with one of these prefixes and may not use shell control operators like pipes, redirects, or command chaining.`,
+      `Run a bounded workspace execution command inside the current workspace. Use this only when inspection is not enough and you need verification, formatting, staging, or another explicit workspace action. Returns structured output with command, exitCode, stdout, stderr, and policy metadata. This tool is governed by host-side workspace execution rules with explicit risk classification rather than open-ended shell access. Shell control operators like pipes, redirects, chaining, and subshells are blocked.`,
     parameters: buildParameters(),
     execute: (raw) => executeRunShell(raw, {
       toolName: 'run_shell_mutate',
-      allowlist,
+      rules,
     }),
   };
 }
 
-/**
- * Backward-compatible alias for the legacy single shell tool name.
- * Prefer createRunShellInspectTool / createRunShellMutateTool for new callers.
- */
 export function createRunShellTool(options: RunShellOptions = {}): ToolDefinition {
   return createRunShellInspectTool(options);
 }
@@ -126,7 +147,7 @@ function executeRunShell(
   raw: unknown,
   options: {
     toolName: string;
-    allowlist: string[];
+    rules: RunShellRule[];
   },
 ): Promise<ToolResult> {
   if (!isRunShellInput(raw)) {
@@ -145,11 +166,19 @@ function executeRunShell(
     });
   }
 
-  const isAllowed = options.allowlist.some((prefix) => cmd.startsWith(prefix));
-  if (!isAllowed) {
+  const argv = tokenizeCommand(cmd);
+  if (argv.length === 0) {
     return Promise.resolve({
       ok: false,
-      error: `Command not allowed. The command must start with one of: ${options.allowlist.join(', ')}`,
+      error: 'Command not allowed. The command must not be empty.',
+    });
+  }
+
+  const policy = classifyCommand(argv, options.rules);
+  if (!policy) {
+    return Promise.resolve({
+      ok: false,
+      error: `Command not allowed by ${options.toolName} policy. This tool only permits bounded commands that match its configured workspace risk/scope rules.`,
     });
   }
 
@@ -173,6 +202,7 @@ function executeRunShell(
       exitCode: result.status ?? 0,
       stdout: (result.stdout ?? '').trim(),
       stderr: (result.stderr ?? '').trim(),
+      policy,
     };
 
     if ((result.status ?? 0) !== 0) {
@@ -192,6 +222,40 @@ function executeRunShell(
   }
 }
 
+function classifyCommand(argv: string[], rules: RunShellRule[]): RunShellPolicyDecision | undefined {
+  const binary = argv[0] ?? '';
+  const args = argv.slice(1);
+  const rule = rules.find((candidate) => {
+    if (candidate.binary !== binary) {
+      return false;
+    }
+
+    if (!candidate.argsPrefix || candidate.argsPrefix.length === 0) {
+      return true;
+    }
+
+    return candidate.argsPrefix.every((part, index) => args[index] === part);
+  });
+
+  if (!rule) {
+    return undefined;
+  }
+
+  return {
+    binary: rule.binary,
+    scope: rule.scope,
+    risk: rule.risk,
+    reason: rule.reason,
+  };
+}
+
+function tokenizeCommand(command: string): string[] {
+  return command
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
 function isRunShellInput(raw: unknown): raw is RunShellInput {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return false;
@@ -208,4 +272,29 @@ function isRunShellInput(raw: unknown): raw is RunShellInput {
 
 function containsShellControlOperators(command: string): boolean {
   return /[|;&><`]/.test(command) || command.includes('&&') || command.includes('||') || command.includes('$(');
+}
+
+function inspectRule(binary: string, reason: string, argsPrefix?: string[]): RunShellRule {
+  return {
+    binary,
+    argsPrefix,
+    scope: 'inspect',
+    risk: 'low',
+    reason,
+  };
+}
+
+function workspaceRule(
+  binary: string,
+  risk: RunShellRisk,
+  reason: string,
+  argsPrefix?: string[],
+): RunShellRule {
+  return {
+    binary,
+    argsPrefix,
+    scope: 'workspace',
+    risk,
+    reason,
+  };
 }

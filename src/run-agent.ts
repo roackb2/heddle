@@ -68,6 +68,10 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   let consecutiveErrors = 0;
   let pendingVerification = false;
   let pendingChangeReview = false;
+  let requiresStructuredChangeSummary = false;
+  const executedMutationCommands: string[] = [];
+  const executedReviewCommands: string[] = [];
+  const executedVerificationCommands: string[] = [];
 
   log.info({ goal, maxSteps, tools: registry.names() }, 'Agent run started');
   record({ type: 'run.started', goal, timestamp: now() });
@@ -240,15 +244,19 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
             if (isWorkspaceChangeMutateCommand(command)) {
               pendingVerification = true;
               pendingChangeReview = true;
+              requiresStructuredChangeSummary = true;
+              executedMutationCommands.push(command);
             }
 
             if (isVerificationMutateCommand(command)) {
               pendingVerification = false;
+              executedVerificationCommands.push(command);
             }
           }
 
           if (call.tool === 'run_shell_inspect' && command && isRepoReviewCommand(command)) {
             pendingChangeReview = false;
+            executedReviewCommands.push(command);
           }
         }
 
@@ -278,6 +286,20 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
           },
           'Blocking premature final answer until mutation follow-up is complete',
         );
+        messages.push({ role: 'system', content: hostRequirement });
+        continue;
+      }
+
+      if (
+        requiresStructuredChangeSummary &&
+        !hasStructuredChangeSummary(response.content)
+      ) {
+        const hostRequirement = buildStructuredChangeSummaryRequirement({
+          mutationCommands: executedMutationCommands,
+          reviewCommands: executedReviewCommands,
+          verificationCommands: executedVerificationCommands,
+        });
+        log.info({ step }, 'Blocking vague final answer until structured change summary is provided');
         messages.push({ role: 'system', content: hostRequirement });
         continue;
       }
@@ -327,6 +349,12 @@ function isWorkspaceChangeMutateCommand(command: string): boolean {
     /^yarn format\b/.test(command) ||
     /^yarn prettier\b/.test(command) ||
     /^yarn eslint\b/.test(command) ||
+    /^mkdir\b/.test(command) ||
+    /^touch\b/.test(command) ||
+    /^mv\b/.test(command) ||
+    /^cp\b/.test(command) ||
+    /^git add\b/.test(command) ||
+    /^git mv\b/.test(command) ||
     /^npx prettier --write\b/.test(command) ||
     /^npx eslint --fix\b/.test(command) ||
     /^prettier --write\b/.test(command) ||
@@ -364,6 +392,34 @@ function buildPostMutationRequirement(options: {
   }
 
   return `Host requirement: before giving a final answer after a workspace-changing mutate command, you must ${requirements.join(' and ')}. After doing that, then provide the final answer.`;
+}
+
+function hasStructuredChangeSummary(content: string): boolean {
+  const normalized = content.toLowerCase();
+
+  return (
+    /(?:^|\n)changed\s*:/.test(normalized) &&
+    /(?:^|\n)verified\s*:/.test(normalized) &&
+    /(?:^|\n)(?:remaining uncertainty|uncertainty|remaining risks?)\s*:/.test(normalized)
+  );
+}
+
+function buildStructuredChangeSummaryRequirement(options: {
+  mutationCommands: string[];
+  reviewCommands: string[];
+  verificationCommands: string[];
+}): string {
+  const mutationSummary = options.mutationCommands.length > 0
+    ? options.mutationCommands.join('; ')
+    : 'workspace-changing command(s) already executed';
+  const reviewSummary = options.reviewCommands.length > 0
+    ? options.reviewCommands.join('; ')
+    : 'no repo review command recorded';
+  const verificationSummary = options.verificationCommands.length > 0
+    ? options.verificationCommands.join('; ')
+    : 'no verification command recorded';
+
+  return `Host requirement: after a workspace-changing mutate command, your final answer must be a short operator review with exactly these labels on separate lines: "Changed:", "Verified:", and "Remaining uncertainty:". Mention the concrete change work (${mutationSummary}), the repo review evidence (${reviewSummary}), and the verification evidence (${verificationSummary}). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".`;
 }
 
 function stableSerialize(value: unknown): string {

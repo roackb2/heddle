@@ -74,13 +74,15 @@ Current progress:
 - conversational terminal is working and usable enough for short coding-agent sessions
 - shell capability is split into `run_shell_inspect` and `run_shell_mutate`
 - `run_shell_mutate` is approval-gated in chat mode
+- shell tools now classify allowed commands by bounded workspace/inspect policy rules and return scope/risk metadata
 - workspace-changing mutate commands trigger host-side pressure to inspect repo state and run verification before final answer
+- workspace-changing mutate runs now also require a short operator-style final answer with explicit `Changed`, `Verified`, and `Remaining uncertainty` sections
 - chat mode now supports interrupt via `Esc` and resume via `/continue`
 
 Remaining priority:
 
-- stronger git-native review and explanation flow after changes
-- clearer summaries of what changed, what was verified, and what remains uncertain
+- stronger git-native review flow after changes
+- better use of concrete diff/status evidence in those summaries
 - more polished operator experience around interrupted or resumed runs
 - begin evolving shell policy from a narrow command-prefix allowlist toward a real execution-policy model based on risk, scope, approval, and auditability
 
