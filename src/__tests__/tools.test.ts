@@ -175,14 +175,37 @@ describe('runShell tools', () => {
     });
   });
 
-  it('rejects inspect-only commands on mutate when not allowlisted', async () => {
+  it('allows approved dependency install commands through mutate policy', async () => {
+    const tool = createRunShellMutateTool();
+    const result = await tool.execute({ command: 'yarn add --help' });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({
+      command: 'yarn add --help',
+      exitCode: 0,
+      policy: {
+        binary: 'yarn',
+        scope: 'workspace',
+        risk: 'medium',
+        reason: 'workspace dependency install command',
+      },
+    });
+  });
+
+  it('treats unclassified mutate commands as approval-gated unknown workspace commands instead of hard rejecting them', async () => {
     const tool = createRunShellMutateTool();
     const result = await tool.execute({ command: 'pwd' });
 
-    expect(result).toEqual({
-      ok: false,
-      error:
-        'Command not allowed by run_shell_mutate policy. This tool only permits bounded commands that match its configured workspace risk/scope rules.',
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({
+      command: 'pwd',
+      exitCode: 0,
+      policy: {
+        binary: 'pwd',
+        scope: 'workspace',
+        risk: 'unknown',
+        reason: 'unclassified workspace command requiring explicit approval',
+      },
     });
   });
 

@@ -11,7 +11,7 @@ type RunShellInput = {
 };
 
 export type RunShellScope = 'inspect' | 'workspace';
-export type RunShellRisk = 'low' | 'medium';
+export type RunShellRisk = 'low' | 'medium' | 'unknown';
 
 export type RunShellPolicyDecision = {
   binary: string;
@@ -73,6 +73,9 @@ const DEFAULT_INSPECT_RULES: RunShellRule[] = [
 ];
 
 const DEFAULT_MUTATE_RULES: RunShellRule[] = [
+  workspaceRule('yarn', 'medium', 'workspace dependency install command', ['add']),
+  workspaceRule('yarn', 'medium', 'workspace dependency install command', ['install']),
+  workspaceRule('yarn', 'medium', 'workspace dependency removal command', ['remove']),
   workspaceRule('yarn', 'low', 'workspace verification command', ['test']),
   workspaceRule('yarn', 'low', 'workspace verification command', ['build']),
   workspaceRule('yarn', 'low', 'workspace verification command', ['lint']),
@@ -105,6 +108,7 @@ export function createRunShellInspectTool(options: RunShellOptions = {}): ToolDe
     execute: (raw) => executeRunShell(raw, {
       toolName: 'run_shell_inspect',
       rules,
+      allowUnknown: false,
     }),
   };
 }
@@ -121,6 +125,7 @@ export function createRunShellMutateTool(options: RunShellOptions = {}): ToolDef
     execute: (raw) => executeRunShell(raw, {
       toolName: 'run_shell_mutate',
       rules,
+      allowUnknown: true,
     }),
   };
 }
@@ -148,6 +153,7 @@ function executeRunShell(
   options: {
     toolName: string;
     rules: RunShellRule[];
+    allowUnknown: boolean;
   },
 ): Promise<ToolResult> {
   if (!isRunShellInput(raw)) {
@@ -174,7 +180,7 @@ function executeRunShell(
     });
   }
 
-  const policy = classifyCommand(argv, options.rules);
+  const policy = classifyCommand(argv, options.rules, options.allowUnknown);
   if (!policy) {
     return Promise.resolve({
       ok: false,
@@ -222,7 +228,11 @@ function executeRunShell(
   }
 }
 
-function classifyCommand(argv: string[], rules: RunShellRule[]): RunShellPolicyDecision | undefined {
+function classifyCommand(
+  argv: string[],
+  rules: RunShellRule[],
+  allowUnknown: boolean,
+): RunShellPolicyDecision | undefined {
   const binary = argv[0] ?? '';
   const args = argv.slice(1);
   const rule = rules.find((candidate) => {
@@ -238,7 +248,14 @@ function classifyCommand(argv: string[], rules: RunShellRule[]): RunShellPolicyD
   });
 
   if (!rule) {
-    return undefined;
+    return allowUnknown ?
+        {
+          binary,
+          scope: 'workspace',
+          risk: 'unknown',
+          reason: 'unclassified workspace command requiring explicit approval',
+        }
+      : undefined;
   }
 
   return {

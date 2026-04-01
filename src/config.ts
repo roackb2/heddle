@@ -2,4 +2,4 @@
 // Shared runtime configuration
 // ---------------------------------------------------------------------------
 
-export const DEFAULT_OPENAI_MODEL = 'gpt-5.1-codex-mini';
+export const DEFAULT_OPENAI_MODEL = 'gpt-5.1-codex';

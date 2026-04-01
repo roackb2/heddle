@@ -59,6 +59,7 @@ Phase 1 has also started at the tool-contract layer:
 - examples expose both shell modes to the agent runtime
 - chat mode now pauses for human approval before `run_shell_mutate` executes
 - shell execution is now governed by explicit workspace/inspect policy rules with scope and risk metadata, rather than only a flat command-prefix list
+- known inspect commands remain narrowly classified, while unclassified mutate commands now fall back to explicit approval instead of hard rejection
 - workspace-changing mutate commands now trigger host-side follow-up requirements before final answer: review repo state and run verification
 - after workspace-changing mutate runs, the host now also requires a short operator-style final summary with `Changed:`, `Verified:`, and `Remaining uncertainty:`
 - chat mode now supports real interrupt via `Esc` and resume via `/continue`
@@ -70,7 +71,7 @@ An eval batch prompt set lives in [docs/eval-prompts.md](/Users/roackb2/Studio/p
 
 The shell direction is also intentionally moving toward a policy-based execution surface rather than an ever-growing allowlist of specific commands.
 
-The example runner defaults to `gpt-5.1-codex-mini` and a 40-step budget. Override them with `OPENAI_MODEL` and `HEDDLE_MAX_STEPS` if you want to compare models or cap exploration more tightly.
+The example runner and chat mode now default to `gpt-5.1-codex` and a 40-step budget. Override them with `OPENAI_MODEL` and `HEDDLE_MAX_STEPS` if you want to compare models or cap exploration more tightly.
 
 ## Design Principles
 

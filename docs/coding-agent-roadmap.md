@@ -75,6 +75,7 @@ Current progress:
 - shell capability is split into `run_shell_inspect` and `run_shell_mutate`
 - `run_shell_mutate` is approval-gated in chat mode
 - shell tools now classify allowed commands by bounded workspace/inspect policy rules and return scope/risk metadata
+- unclassified mutate commands now fall back to explicit approval with `unknown` risk metadata instead of immediate rejection
 - workspace-changing mutate commands trigger host-side pressure to inspect repo state and run verification before final answer
 - workspace-changing mutate runs now also require a short operator-style final answer with explicit `Changed`, `Verified`, and `Remaining uncertainty` sections
 - chat mode now supports interrupt via `Esc` and resume via `/continue`

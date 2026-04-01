@@ -349,6 +349,9 @@ function isWorkspaceChangeMutateCommand(command: string): boolean {
     /^yarn format\b/.test(command) ||
     /^yarn prettier\b/.test(command) ||
     /^yarn eslint\b/.test(command) ||
+    /^yarn add\b/.test(command) ||
+    /^yarn install\b/.test(command) ||
+    /^yarn remove\b/.test(command) ||
     /^mkdir\b/.test(command) ||
     /^touch\b/.test(command) ||
     /^mv\b/.test(command) ||

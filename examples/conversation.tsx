@@ -65,6 +65,7 @@ const logger = createLogger({
 });
 
 function App() {
+  const nextIdRef = useRef(0);
   const [activeModel, setActiveModel] = useState(model);
   const llm = useMemo(() => createOpenAiAdapter({ model: activeModel, apiKey }), [activeModel]);
   const tools = useMemo(
@@ -110,6 +111,7 @@ function App() {
   const [lastContinuePrompt, setLastContinuePrompt] = useState<string | undefined>();
   const interruptRequestedRef = useRef(false);
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
+  const nextLocalId = () => `ui-${Date.now()}-${nextIdRef.current++}`;
 
   useInput((input, key) => {
     if (!pendingApproval) {
@@ -197,7 +199,7 @@ function App() {
     setLastContinuePrompt(prompt);
 
     if (displayText) {
-      const nextUserMessage: ConversationLine = { id: `user-${Date.now()}`, role: 'user', text: displayText };
+      const nextUserMessage: ConversationLine = { id: nextLocalId(), role: 'user', text: displayText };
       setMessages((current: ConversationLine[]) => [
         ...current,
         nextUserMessage,
@@ -217,8 +219,14 @@ function App() {
           if (!next) {
             return;
           }
+          setLiveEvents((current) => {
+            const previous = current[current.length - 1];
+            if (previous?.text === next) {
+              return current;
+            }
 
-          setLiveEvents((current) => [...current, { id: `${Date.now()}-${current.length}`, text: next }].slice(-8));
+            return [...current, { id: nextLocalId(), text: next }].slice(-8);
+          });
         },
         approveToolCall: (call, tool) =>
           new Promise((resolve) => {
@@ -233,7 +241,7 @@ function App() {
 
       const traceFile = saveTrace(result.trace);
       const nextTurn: TurnSummary = {
-        id: String(Date.now()),
+        id: nextLocalId(),
         prompt,
         outcome: result.outcome,
         summary: result.summary,
@@ -252,7 +260,7 @@ function App() {
       setStatus('Error');
       setMessages((current: ConversationLine[]) => [
         ...current,
-        { id: `error-${Date.now()}`, role: 'assistant', text: `Run failed before a final answer: ${message}` },
+        { id: nextLocalId(), role: 'assistant', text: `Run failed before a final answer: ${message}` },
       ]);
     } finally {
       setIsRunning(false);
@@ -291,7 +299,7 @@ function App() {
       if (commandResult.kind === 'message') {
         setMessages((current: ConversationLine[]) => [
           ...current,
-          { id: `command-${Date.now()}`, role: 'assistant', text: commandResult.message },
+          { id: nextLocalId(), role: 'assistant', text: commandResult.message },
         ]);
         setStatus('Idle');
         return;
@@ -300,7 +308,7 @@ function App() {
       if (!history.length || !lastContinuePrompt) {
         setMessages((current: ConversationLine[]) => [
           ...current,
-          { id: `command-${Date.now()}`, role: 'assistant', text: 'There is no interrupted or prior run to continue yet.' },
+          { id: nextLocalId(), role: 'assistant', text: 'There is no interrupted or prior run to continue yet.' },
         ]);
         setStatus('Idle');
         return;
@@ -308,7 +316,7 @@ function App() {
 
       setMessages((current: ConversationLine[]) => [
         ...current,
-        { id: `command-${Date.now()}`, role: 'assistant', text: 'Continuing from the current transcript.' },
+        { id: nextLocalId(), role: 'assistant', text: 'Continuing from the current transcript.' },
       ]);
       await executeTurn('Continue from where you left off.', 'Continue');
       return;
@@ -520,7 +528,7 @@ function buildConversationMessages(history: ChatMessage[]): ConversationLine[] {
         return [];
       }
 
-      return [{ id: `${message.role}-${index}`, role: message.role, text: message.content }];
+      return [{ id: `${message.role}-${index}-${message.content}`, role: message.role, text: message.content }];
     }
 
     return [];
@@ -540,6 +548,7 @@ function summarizeTrace(trace: TraceEvent[]): string[] {
     switch (event.type) {
       case 'assistant.turn':
         return [
+          ...(event.diagnostics?.rationale ? [`reasoning: ${truncate(event.diagnostics.rationale, 140)}`] : []),
           event.requestedTools ?
             `assistant requested ${event.toolCalls?.map((call) => summarizeToolCall(call.tool, call.input)).join(', ')}`
           : 'assistant answered',
@@ -573,6 +582,9 @@ function toLiveEvent(event: TraceEvent): string | undefined {
     case 'run.started':
       return `thinking`;
     case 'assistant.turn':
+      if (event.diagnostics?.rationale) {
+        return `reasoning: ${truncate(event.diagnostics.rationale, 140)}`;
+      }
       if (event.requestedTools) {
         return undefined;
       }
