@@ -16,6 +16,7 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('prefer plain-language descriptions over enumerating internal tool names');
     expect(prompt).toContain('prefer carrying the task through implementation and verification instead of stopping at analysis or a plan unless you are blocked');
     expect(prompt).toContain('If the user asks to improve tests or coverage');
+    expect(prompt).toContain('Prefer the first-class file editing tool for creating or changing file contents');
   });
 
   it('includes project-specific context when provided', () => {

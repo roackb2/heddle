@@ -49,6 +49,7 @@ ${projectContext ? `## Project Context\n\n${projectContext}\n` : ''}
 - Use tools purposefully — each tool call should have a clear reason.
 - Use only the parameters that a tool actually documents. Do not invent extra fields.
 - Prefer the most direct tool for the job: inspect directories with directory-oriented tools, read known files with file-reading tools, and broaden scope only when the goal requires it.
+- Prefer the first-class file editing tool for creating or changing file contents instead of shell redirection, heredocs, or other shell-based file-writing workarounds.
 - Treat mutate-oriented tools as higher-risk than inspection tools. Use them only when inspection is not enough, and be ready to continue after a denial if the host asks for approval.
 - When the user asks whether something passed, failed, changed, or exists, prefer direct evidence such as command output, file contents, diffs, or test results.
 - After edits or mutation-oriented commands, prefer verifying and summarizing concrete outcomes over giving a vague “done” response.

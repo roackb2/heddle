@@ -1,9 +1,10 @@
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { listFilesTool } from '../tools/list-files.js';
 import { readFileTool } from '../tools/read-file.js';
+import { editFileTool } from '../tools/edit-file.js';
 import { reportStateTool } from '../tools/report-state.js';
 import { createRunShellInspectTool, createRunShellMutateTool } from '../tools/run-shell.js';
 import { createSearchFilesTool, searchFilesTool } from '../tools/search-files.js';
@@ -27,6 +28,16 @@ describe('tool input validation', () => {
     });
   });
 
+  it('rejects ambiguous edit_file input', async () => {
+    const result = await editFileTool.execute({ path: 'README.md', newText: 'x' });
+
+    expect(result).toEqual({
+      ok: false,
+      error:
+        'Invalid input for edit_file. Use either { "path", "oldText", "newText", "replaceAll?" } or { "path", "content", "createIfMissing?" }.',
+    });
+  });
+
   it('tool descriptions distinguish directories from files', () => {
     expect(listFilesTool.description).toContain('Use this to inspect folders, not to read file contents');
     expect(listFilesTool.description).toContain('explore an obvious nearby folder');
@@ -35,6 +46,10 @@ describe('tool input validation', () => {
     expect(readFileTool.description).toContain('not when you want to inspect a directory');
     expect(readFileTool.description).toContain('may also point to nearby parent or sibling folders');
     expect(readFileTool.description).toContain('Returns the file text directly');
+    expect(editFileTool.description).toContain('Edit a file directly inside the current workspace');
+    expect(editFileTool.description).toContain('Prefer this over shell commands');
+    expect(editFileTool.description).toContain('exact replacement');
+    expect(editFileTool.description).toContain('overwrite an existing file or create a new one explicitly');
     expect(listFilesTool.description).toContain('{ "path": "." }');
     expect(listFilesTool.description).toContain('{ "path": ".." }');
     expect(readFileTool.description).toContain('{ "path": "path/to/file.txt" }');
@@ -103,6 +118,103 @@ describe('searchFilesTool', () => {
     expect(result.ok).toBe(true);
     expect(result.output).toContain('src/main.ts');
     expect(result.output).not.toContain('vendor/hidden.ts');
+  });
+});
+
+describe('editFileTool', () => {
+  it('creates a new file when explicitly allowed', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-edit-create-'));
+    const previousCwd = process.cwd();
+    process.chdir(root);
+
+    try {
+      const result = await editFileTool.execute({
+        path: 'notes/output.txt',
+        content: 'hello\n',
+        createIfMissing: true,
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        output: {
+          path: 'notes/output.txt',
+          action: 'created',
+          bytesWritten: Buffer.byteLength('hello\n', 'utf8'),
+        },
+      });
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+
+  it('replaces an exact single match in an existing file', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-edit-replace-'));
+    const filePath = join(root, 'sample.ts');
+    await writeFile(filePath, 'const mode = "old";\n');
+    const previousCwd = process.cwd();
+    process.chdir(root);
+
+    try {
+      const result = await editFileTool.execute({
+        path: 'sample.ts',
+        oldText: '"old"',
+        newText: '"new"',
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        output: {
+          path: 'sample.ts',
+          action: 'replaced',
+          matchCount: 1,
+          bytesWritten: Buffer.byteLength('const mode = "new";\n', 'utf8'),
+        },
+      });
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+
+  it('rejects ambiguous replacements unless replaceAll is set', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-edit-multi-'));
+    const filePath = join(root, 'sample.ts');
+    await writeFile(filePath, 'value\nvalue\n');
+    const previousCwd = process.cwd();
+    process.chdir(root);
+
+    try {
+      const result = await editFileTool.execute({
+        path: 'sample.ts',
+        oldText: 'value',
+        newText: 'next',
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('edit_file found 2 matches for oldText');
+      expect(result.error).toContain('sample.ts');
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+
+  it('refuses to write outside the current workspace root', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-edit-scope-'));
+    const previousCwd = process.cwd();
+    process.chdir(root);
+
+    try {
+      const result = await editFileTool.execute({
+        path: '../outside.txt',
+        content: 'nope\n',
+        createIfMissing: true,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('edit_file only writes inside the current workspace root');
+      expect(result.error).toContain('outside.txt');
+    } finally {
+      process.chdir(previousCwd);
+    }
   });
 });
 

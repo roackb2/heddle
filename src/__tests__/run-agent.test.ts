@@ -512,6 +512,63 @@ describe('runAgent', () => {
     });
   });
 
+  it('treats edit_file as a workspace-changing action that requires review and verification follow-up', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+        const hostReminder = [...messages].reverse().find(
+          (message: ChatMessage) =>
+            message.role === 'system' &&
+            message.content.includes('Host requirement: before giving a final answer'),
+        );
+
+        if (seenMessages.length === 1) {
+          return {
+            toolCalls: [{ id: 'call-1', tool: 'edit_file', input: { path: 'README.md', oldText: 'old', newText: 'new' } }],
+          };
+        }
+
+        if (!hostReminder) {
+          return {
+            content: 'I updated the file.',
+          };
+        }
+
+        return {
+          content:
+            'Changed: updated README.md via edit_file.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+        };
+      },
+    };
+
+    const editTool: ToolDefinition = {
+      name: 'edit_file',
+      description: 'Edits a file directly in the workspace',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: { path: 'README.md', action: 'replaced', matchCount: 1 } };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Update the README and tell me it worked.',
+      llm: fakeLlm,
+      tools: [editTool],
+      maxSteps: 3,
+      logger: silentLogger,
+      approveToolCall: async () => ({ approved: true }),
+    });
+
+    expect(result.outcome).toBe('max_steps');
+    expect(seenMessages[2]).toContainEqual({
+      role: 'system',
+      content:
+        'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with a git review command such as git status or git diff and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
+    });
+  });
+
   it('rejects a vague final answer after mutation follow-up until it includes changed, verified, and remaining uncertainty labels', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {

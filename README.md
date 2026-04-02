@@ -43,7 +43,7 @@ goal
 
 ## Status
 
-Early development. v0 in progress.
+Early development. v0 in progress. Phase 1 now has a first-class edit_file tool.
 
 ## Install And Run
 
@@ -107,6 +107,7 @@ as an early conversational terminal entrypoint from Phase 0 of the coding-agent 
 Phase 1 has also started at the tool-contract layer:
 
 - shell capability is now split into `run_shell_inspect` and `run_shell_mutate`
+- file editing now has a first-class `edit_file` tool instead of depending only on shell-based file-writing workarounds
 - inspect vs mutate intent is explicit in tool names, descriptions, and traces
 - examples expose both shell modes to the agent runtime
 - chat mode now pauses for human approval before `run_shell_mutate` executes

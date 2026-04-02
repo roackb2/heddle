@@ -29,6 +29,7 @@ export type { ToolRegistry } from './tools/registry.js';
 export { executeTool } from './tools/execute-tool.js';
 export { listFilesTool } from './tools/list-files.js';
 export { readFileTool } from './tools/read-file.js';
+export { editFileTool } from './tools/edit-file.js';
 export { searchFilesTool, createSearchFilesTool, DEFAULT_SEARCH_EXCLUDED_DIRS } from './tools/search-files.js';
 export type { SearchFilesOptions } from './tools/search-files.js';
 export { reportStateTool } from './tools/report-state.js';

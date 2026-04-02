@@ -73,6 +73,7 @@ Current progress:
 
 - conversational terminal is working and usable enough for short coding-agent sessions
 - shell capability is split into `run_shell_inspect` and `run_shell_mutate`
+- file creation and editing now have a first-class `edit_file` tool instead of relying only on shell-based file-writing workarounds
 - `run_shell_mutate` is approval-gated in chat mode
 - shell tools now classify allowed commands by bounded workspace/inspect policy rules and return scope/risk metadata
 - unclassified mutate commands now fall back to explicit approval with `unknown` risk metadata instead of immediate rejection

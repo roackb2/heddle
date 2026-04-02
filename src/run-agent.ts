@@ -267,6 +267,13 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
             }
           }
 
+          if (call.tool === 'edit_file') {
+            pendingVerification = true;
+            pendingChangeReview = true;
+            requiresStructuredChangeSummary = true;
+            executedMutationCommands.push(describeEditMutation(call.input));
+          }
+
           if (call.tool === 'run_shell_inspect' && command && isRepoReviewCommand(command)) {
             pendingChangeReview = false;
             executedReviewCommands.push(command);
@@ -396,6 +403,15 @@ function extractShellCommand(input: unknown): string | undefined {
   return typeof command === 'string' && command.trim() ? command.trim() : undefined;
 }
 
+function describeEditMutation(input: unknown): string {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return 'edit_file';
+  }
+
+  const path = (input as { path?: unknown }).path;
+  return typeof path === 'string' && path.trim() ? `edit_file ${path.trim()}` : 'edit_file';
+}
+
 function isWorkspaceChangeMutateCommand(command: string): boolean {
   return (
     /^yarn format\b/.test(command) ||
@@ -498,6 +514,10 @@ function normalizeToolInput(tool: string, input: unknown): unknown {
   const normalized = { ...(input as Record<string, unknown>) };
 
   if ((tool === 'list_files' || tool === 'read_file' || tool === 'search_files') && typeof normalized.path === 'string') {
+    normalized.path = normalizePathValue(normalized.path);
+  }
+
+  if (tool === 'edit_file' && typeof normalized.path === 'string') {
     normalized.path = normalizePathValue(normalized.path);
   }
 

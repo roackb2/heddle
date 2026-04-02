@@ -13,6 +13,7 @@ import {
   createOpenAiAdapter,
   listFilesTool,
   readFileTool,
+  editFileTool,
   searchFilesTool,
   reportStateTool,
   createRunShellInspectTool,
@@ -41,6 +42,7 @@ async function main() {
   const tools = [
     listFilesTool,
     readFileTool,
+    editFileTool,
     searchFilesTool,
     reportStateTool,
     createRunShellInspectTool(),

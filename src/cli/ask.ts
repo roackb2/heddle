@@ -6,6 +6,7 @@ import {
   createOpenAiAdapter,
   listFilesTool,
   readFileTool,
+  editFileTool,
   createSearchFilesTool,
   reportStateTool,
   createRunShellInspectTool,
@@ -44,6 +45,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
   const tools = [
     listFilesTool,
     readFileTool,
+    editFileTool,
     createSearchFilesTool({ excludedDirs: options.searchIgnoreDirs }),
     reportStateTool,
     createRunShellInspectTool(),
