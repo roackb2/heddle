@@ -11,12 +11,11 @@ import {
   createRunShellMutateTool,
   createLogger,
 } from '../index.js';
-import type { ApprovalChoice, LiveEvent, PendingApproval } from './chat-types.js';
-import { normalizeInlineText, normalizeSessionTitle } from './chat-format.js';
+import { normalizeSessionTitle } from './chat-format.js';
 import { executeAgentTurn, executeDirectShellCommand as runDirectShellAction } from './chat-actions.js';
-import { runLocalCommand } from './chat-local-commands.js';
 import { useChatRunState } from './useChatRunState.js';
 import { useChatSessions } from './useChatSessions.js';
+import { submitChatPrompt } from './chat-submit.js';
 import {
   ActivityPanel,
   ApprovalComposer,
@@ -28,7 +27,7 @@ import {
   shouldShowSlashHints,
   SlashHintPanel,
 } from './chat-panels.js';
-import { createInitialMessages, isGenericSessionName } from './chat-storage.js';
+import { isGenericSessionName } from './chat-storage.js';
 import { resolveChatRuntimeConfig } from './chat-runtime.js';
 import type { ChatCliOptions, ChatRuntimeConfig } from './chat-runtime.js';
 
@@ -192,93 +191,28 @@ function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   };
 
   const submitPrompt = async (value: string) => {
-    const prompt = normalizeInlineText(value);
-    if (!prompt || isRunning) {
-      return;
-    }
-
-    if (prompt.startsWith('!')) {
-      await executeDirectShellCommand(prompt.slice(1).trim());
-      return;
-    }
-
-    const commandResult = runLocalCommand({
-      prompt,
+    await submitChatPrompt({
+      value,
+      isRunning,
       activeModel,
       setActiveModel,
       sessions,
       recentSessions,
       activeSessionId,
+      activeSession,
+      apiKeyPresent: Boolean(runtime.apiKey),
+      nextLocalId,
+      setStatus,
       switchSession,
+      closeSession,
+      updateSessionById,
+      updateActiveSession,
       createSession,
       renameSession,
-      removeSession: closeSession,
-      clearConversation: () => {
-        updateActiveSession((session) => ({
-          ...session,
-          history: [],
-          turns: [],
-          lastContinuePrompt: undefined,
-          messages: createInitialMessages(Boolean(runtime.apiKey)),
-        }));
-      },
       listRecentSessionsMessage,
+      executeTurn,
+      executeDirectShellCommand,
     });
-
-    if (commandResult.handled) {
-      if (commandResult.kind === 'message') {
-        updateActiveSession((session) => ({
-          ...session,
-          messages: [...session.messages, { id: nextLocalId(), role: 'assistant', text: commandResult.message }],
-        }));
-        setStatus('Idle');
-        return;
-      }
-
-      if (commandResult.sessionId) {
-        switchSession(commandResult.sessionId);
-      }
-
-      const targetId = commandResult.sessionId ?? activeSessionId;
-      const targetSession = sessions.find((session) => session.id === targetId) ?? activeSession;
-      const targetHistory = targetSession?.history ?? [];
-      const targetContinuePrompt = targetSession?.lastContinuePrompt;
-
-      const continueMessage = commandResult.message;
-      if (continueMessage) {
-        updateSessionById(targetId, (session) => ({
-          ...session,
-          messages: [...session.messages, { id: nextLocalId(), role: 'assistant', text: continueMessage }],
-        }));
-      }
-
-      if (!targetHistory.length || !targetContinuePrompt) {
-        updateSessionById(targetId, (session) => ({
-          ...session,
-          messages: [
-            ...session.messages,
-            { id: nextLocalId(), role: 'assistant', text: 'There is no interrupted or prior run to continue yet.' },
-          ],
-        }));
-        setStatus('Idle');
-        return;
-      }
-
-      if (!continueMessage) {
-        updateSessionById(targetId, (session) => ({
-          ...session,
-          messages: [
-            ...session.messages,
-            { id: nextLocalId(), role: 'assistant', text: 'Continuing from the current transcript.' },
-          ],
-        }));
-      }
-
-      await executeTurn('Continue from where you left off.', 'Continue', targetId);
-      return;
-    }
-
-    await executeTurn(prompt, prompt);
   };
 
   return (
