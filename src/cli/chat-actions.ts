@@ -1,0 +1,321 @@
+import type { MutableRefObject } from 'react';
+import type { Logger } from 'pino';
+import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition, ToolResult } from '../index.js';
+import { runAgent } from '../index.js';
+import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../tools/run-shell.js';
+import {
+  appendDirectShellHistory,
+  buildConversationMessages,
+  countAssistantSteps,
+  formatDirectShellResponse,
+  shouldFallbackToMutate,
+  summarizeTrace,
+  summarizeToolCall,
+  toLiveEvent,
+} from './chat-format.js';
+import { saveTrace } from './chat-runtime.js';
+import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval, TurnSummary } from './chat-types.js';
+import type { ChatRuntimeConfig } from './chat-runtime.js';
+
+type StateSetter<T> = (value: T | ((current: T) => T)) => void;
+
+type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
+
+type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => void;
+
+export type ActionState = {
+  isRunning: boolean;
+  nextLocalId: () => string;
+  setError: (value: string | undefined) => void;
+  setStatus: (value: string) => void;
+  setIsRunning: (value: boolean) => void;
+  setInterruptRequested: (value: boolean) => void;
+  setLiveEvents: StateSetter<LiveEvent[]>;
+  setPendingApproval: (value: PendingApproval | undefined) => void;
+  setApprovalChoice: (value: ApprovalChoice) => void;
+  interruptRequestedRef: MutableRefObject<boolean>;
+  abortControllerRef: MutableRefObject<AbortController | undefined>;
+};
+
+type ExecuteTurnArgs = {
+  prompt: string;
+  displayText?: string;
+  sessionId: string;
+  sessionHistory: ChatMessage[];
+  runtime: ChatRuntimeConfig;
+  llm: LlmAdapter;
+  tools: ToolDefinition[];
+  logger: Logger;
+  state: ActionState;
+  updateSessionById: SessionUpdater;
+  maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
+};
+
+type ExecuteDirectShellArgs = {
+  rawCommand: string;
+  activeSessionId: string;
+  runtime: ChatRuntimeConfig;
+  tools: ToolDefinition[];
+  state: ActionState;
+  updateActiveSession: ActiveSessionUpdater;
+  maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
+};
+
+export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult | undefined> {
+  const {
+    prompt,
+    displayText,
+    sessionId,
+    sessionHistory,
+    runtime,
+    llm,
+    tools,
+    logger,
+    state,
+    updateSessionById,
+    maybeAutoNameSession,
+  } = args;
+
+  if (!prompt || state.isRunning) {
+    return undefined;
+  }
+
+  if (!runtime.apiKey) {
+    state.setError('Missing OpenAI API key');
+    state.setStatus('Error');
+    return undefined;
+  }
+
+  state.setError(undefined);
+  state.setIsRunning(true);
+  state.setStatus('Running');
+  state.interruptRequestedRef.current = false;
+  state.setInterruptRequested(false);
+  state.abortControllerRef.current = new AbortController();
+  state.setLiveEvents([]);
+  updateSessionById(sessionId, (session) => ({ ...session, lastContinuePrompt: prompt }));
+
+  if (displayText) {
+    updateSessionById(sessionId, (session) => ({
+      ...session,
+      messages: [...session.messages, { id: state.nextLocalId(), role: 'user', text: displayText }],
+    }));
+  }
+
+  try {
+    const result = await runAgent({
+      goal: prompt,
+      llm,
+      tools,
+      maxSteps: runtime.maxSteps,
+      logger,
+      history: sessionHistory,
+      systemContext: runtime.systemContext,
+      onEvent: (event) => {
+        const next = toLiveEvent(event);
+        if (!next) {
+          return;
+        }
+
+        state.setLiveEvents((current) => {
+          const previous = current[current.length - 1];
+          if (previous?.text === next) {
+            return current;
+          }
+
+          return [...current, { id: state.nextLocalId(), text: next }].slice(-8);
+        });
+      },
+      approveToolCall: (call, tool) =>
+        new Promise((resolve) => {
+          state.setPendingApproval({ call, tool, resolve });
+        }),
+      shouldStop: () => state.interruptRequestedRef.current,
+      abortSignal: state.abortControllerRef.current.signal,
+    });
+
+    updateSessionById(sessionId, (sessionToUpdate) => ({
+      ...sessionToUpdate,
+      history: result.transcript,
+      messages: buildConversationMessages(result.transcript),
+    }));
+
+    const traceFile = saveTrace(runtime.traceDir, result.trace);
+    const nextTurn: TurnSummary = {
+      id: state.nextLocalId(),
+      prompt,
+      outcome: result.outcome,
+      summary: result.summary,
+      steps: countAssistantSteps(result.trace),
+      traceFile,
+      events: summarizeTrace(result.trace),
+    };
+    updateSessionById(sessionId, (sessionToUpdate) => ({
+      ...sessionToUpdate,
+      turns: [...sessionToUpdate.turns, nextTurn].slice(-8),
+    }));
+
+    const assistantText =
+      buildConversationMessages(result.transcript).filter((message) => message.role === 'assistant').at(-1)?.text ??
+      result.summary;
+    maybeAutoNameSession(sessionId, prompt, assistantText);
+    if (result.outcome === 'error') {
+      state.setError(result.summary);
+    }
+    state.setStatus(result.outcome === 'done' ? 'Idle' : `Stopped: ${result.outcome}`);
+    return result;
+  } catch (runError) {
+    const message = runError instanceof Error ? runError.message : String(runError);
+    state.setError(message);
+    state.setStatus('Error');
+    updateSessionById(sessionId, (sessionToUpdate) => ({
+      ...sessionToUpdate,
+      messages: [
+        ...sessionToUpdate.messages,
+        { id: state.nextLocalId(), role: 'assistant', text: `Run failed before a final answer: ${message}` },
+      ],
+    }));
+    return undefined;
+  } finally {
+    state.setIsRunning(false);
+    state.interruptRequestedRef.current = false;
+    state.setInterruptRequested(false);
+    state.abortControllerRef.current = undefined;
+  }
+}
+
+export async function executeDirectShellCommand(args: ExecuteDirectShellArgs): Promise<void> {
+  const {
+    rawCommand,
+    activeSessionId,
+    runtime,
+    tools,
+    state,
+    updateActiveSession,
+    maybeAutoNameSession,
+  } = args;
+
+  const command = rawCommand.trim();
+  if (!command || state.isRunning) {
+    return;
+  }
+
+  const shellDisplay = `!${command}`;
+  state.setError(undefined);
+  state.setIsRunning(true);
+  state.setStatus('Running');
+  state.interruptRequestedRef.current = false;
+  state.setInterruptRequested(false);
+  state.abortControllerRef.current = new AbortController();
+  state.setLiveEvents([{ id: state.nextLocalId(), text: `running direct shell (${command})` }]);
+  updateActiveSession((session) => ({
+    ...session,
+    messages: [...session.messages, { id: state.nextLocalId(), role: 'user', text: shellDisplay }],
+    lastContinuePrompt: undefined,
+  }));
+
+  try {
+    const inspectCall: ToolCall = {
+      id: `direct-shell-${Date.now()}-inspect`,
+      tool: 'run_shell_inspect',
+      input: { command },
+    };
+    const inspectResult = await runShellCommand(
+      inspectCall.input,
+      {
+        toolName: inspectCall.tool,
+        rules: DEFAULT_INSPECT_RULES,
+        allowUnknown: false,
+      },
+      state.abortControllerRef.current.signal,
+    );
+
+    let chosenCall = inspectCall;
+    let chosenResult: ToolResult = inspectResult;
+
+    if (shouldFallbackToMutate(inspectResult.error)) {
+      const mutateCall: ToolCall = {
+        id: `direct-shell-${Date.now()}-mutate`,
+        tool: 'run_shell_mutate',
+        input: { command },
+      };
+
+      if (runtime.directShellApproval === 'always') {
+        const directShellTool = tools.find((tool) => tool.name === 'run_shell_mutate');
+        if (!directShellTool) {
+          throw new Error('run_shell_mutate tool is not registered');
+        }
+
+        const approval = await new Promise<{ approved: boolean; reason?: string }>((resolve) => {
+          state.setPendingApproval({ call: mutateCall, tool: directShellTool, resolve });
+        });
+
+        if (!approval.approved) {
+          const denialMessage = approval.reason ? `Command denied.\n${approval.reason}` : 'Command denied.';
+          updateActiveSession((session) => ({
+            ...session,
+            messages: [...session.messages, { id: state.nextLocalId(), role: 'assistant', text: denialMessage }],
+          }));
+          state.setLiveEvents([
+            {
+              id: state.nextLocalId(),
+              text: `approval denied for ${summarizeToolCall(mutateCall.tool, mutateCall.input)}`,
+            },
+          ]);
+          state.setStatus('Idle');
+          return;
+        }
+      }
+
+      chosenCall = mutateCall;
+      chosenResult = await runShellCommand(
+        mutateCall.input,
+        {
+          toolName: mutateCall.tool,
+          rules: DEFAULT_MUTATE_RULES,
+          allowUnknown: true,
+        },
+        state.abortControllerRef.current.signal,
+      );
+    }
+
+    const responseText = formatDirectShellResponse(chosenCall.tool, command, chosenResult);
+    updateActiveSession((session) => ({
+      ...session,
+      messages: [...session.messages, { id: state.nextLocalId(), role: 'assistant', text: responseText }],
+      history: appendDirectShellHistory(session.history, shellDisplay, chosenCall.tool, chosenResult),
+    }));
+    state.setLiveEvents([
+      {
+        id: state.nextLocalId(),
+        text:
+          chosenResult.ok ?
+            `${summarizeToolCall(chosenCall.tool, chosenCall.input)} completed`
+          : `${summarizeToolCall(chosenCall.tool, chosenCall.input)} failed`,
+      },
+    ]);
+    state.setStatus(chosenResult.ok ? 'Idle' : 'Stopped: error');
+    if (!chosenResult.ok && chosenResult.error) {
+      state.setError(chosenResult.error);
+    }
+    maybeAutoNameSession(activeSessionId, shellDisplay, responseText);
+  } catch (shellError) {
+    const message = shellError instanceof Error ? shellError.message : String(shellError);
+    state.setError(message);
+    state.setStatus('Error');
+    updateActiveSession((session) => ({
+      ...session,
+      messages: [
+        ...session.messages,
+        { id: state.nextLocalId(), role: 'assistant', text: `Direct shell execution failed:\n${message}` },
+      ],
+    }));
+  } finally {
+    state.setPendingApproval(undefined);
+    state.setApprovalChoice('approve');
+    state.interruptRequestedRef.current = false;
+    state.setInterruptRequested(false);
+    state.abortControllerRef.current = undefined;
+    state.setIsRunning(false);
+  }
+}

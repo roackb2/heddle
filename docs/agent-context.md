@@ -33,11 +33,14 @@ When additional project context is needed, read in this order:
 ## Agent Memory Usage
 
 - `../heddle-workspace-notes/agent-memory/` is writable project memory for CLI agents across sessions.
+- Treat `../heddle-workspace-notes/agent-memory/` as cross-tool session memory shared across coding agents such as Cascade/Windsurf, Codex, Claude Code, or similar tools.
 - Agents may add or update useful persistent context there when doing so will reduce repeated rediscovery in future sessions.
 - Prefer `docs/agent-context.md` for stable shared workflow instructions inside this repo.
 - Prefer `../heddle-workspace-notes/agent-memory/` for evolving cross-session memory, project-state notes, and reminders primarily meant for future agents rather than end users.
 - When the user asks to "note this down" or preserve working context, update the most appropriate file in `../heddle-workspace-notes/agent-memory/` unless the information is better treated as stable repo guidance in this repo.
+- After meaningful implementation progress, update the relevant task plan and `../heddle-workspace-notes/agent-memory/project-context.md` so another coding agent can resume without rediscovering the current checkpoint.
+- Keep agent-memory entries concrete: current repo state, what changed, what remains, verification status, and the next recommended step.
 
 ## Maintenance
 
-After meaningful implementation progress, update `../heddle-workspace-notes/agent-memory/project-context.md` so future CLI agent sessions can recover current context quickly.
+- After meaningful implementation progress, update the relevant task plan and `../heddle-workspace-notes/agent-memory/project-context.md` so another coding agent can resume without rediscovering the current checkpoint.
