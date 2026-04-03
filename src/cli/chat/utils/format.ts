@@ -1,4 +1,5 @@
 import type { ChatMessage, ToolCall, TraceEvent, ToolResult } from '../../../index.js';
+import type { EditFilePreview } from '../../../tools/edit-file.js';
 import {
   classifyShellCommandPolicy,
   DEFAULT_MUTATE_RULES,
@@ -444,26 +445,14 @@ function renderToolHistoryMessage(message: Extract<ChatMessage, { role: 'tool' }
     return undefined;
   }
 
-  const lines = [
-    `## Edited \`${editResult.path}\``,
-    '',
-    `Action: ${editResult.action}`,
-  ];
-
-  if (typeof editResult.matchCount === 'number') {
-    lines.push(`Matches changed: ${editResult.matchCount}`);
-  }
-
-  lines.push(`Bytes written: ${editResult.bytesWritten}`);
-
-  if (editResult.diff?.diff) {
-    lines.push('', '```diff', editResult.diff.diff, '```');
-    if (editResult.diff.truncated) {
-      lines.push('', 'Preview truncated.');
-    }
-  }
-
-  return lines.join('\n');
+  return formatEditHistoryMessage({
+    path: editResult.path,
+    action: editResult.action,
+    matchCount: editResult.matchCount,
+    bytesWritten: editResult.bytesWritten,
+    diff: editResult.diff?.diff,
+    truncated: editResult.diff?.truncated,
+  });
 }
 
 function renderUpdatePlanHistoryMessage(output: unknown): string | undefined {
@@ -509,6 +498,48 @@ function planStatusMarker(status: 'pending' | 'in_progress' | 'completed'): stri
     return '[-]';
   }
   return '[ ]';
+}
+
+export function formatEditPreviewHistoryMessage(preview: EditFilePreview): string {
+  return formatEditHistoryMessage({
+    path: preview.path,
+    action: preview.action,
+    diff: preview.diff,
+    truncated: preview.truncated,
+  });
+}
+
+function formatEditHistoryMessage(options: {
+  path: string;
+  action: string;
+  matchCount?: number;
+  bytesWritten?: number;
+  diff?: string;
+  truncated?: boolean;
+}): string {
+  const lines = [
+    `## Edited \`${options.path}\``,
+    '',
+    `Action: ${options.action}`,
+  ];
+
+  if (typeof options.matchCount === 'number') {
+    lines.push(`Matches changed: ${options.matchCount}`);
+  }
+
+  if (typeof options.bytesWritten === 'number') {
+    lines.push(`Bytes written: ${options.bytesWritten}`);
+  }
+
+  if (options.diff) {
+    lines.push('', '```diff', options.diff, '```');
+  }
+
+  if (options.truncated) {
+    lines.push('', 'Preview truncated.');
+  }
+
+  return lines.join('\n');
 }
 
 function findToolCallForResult(history: ChatMessage[], index: number, toolCallId: string): ToolCall | undefined {

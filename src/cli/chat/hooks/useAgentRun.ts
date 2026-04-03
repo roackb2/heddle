@@ -23,6 +23,7 @@ import {
   appendDirectShellHistory,
   buildConversationMessages,
   countAssistantSteps,
+  formatEditPreviewHistoryMessage,
   formatDirectShellResponse,
   shouldFallbackToMutate,
   summarizeTrace,
@@ -255,6 +256,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   state.setCurrentEditPreview(undefined);
   state.setCurrentPlan(undefined);
   updateSessionById(sessionId, (session) => ({ ...session, lastContinuePrompt: prompt }));
+  const appendedEditPreviewIds = new Set<string>();
 
   if (displayText) {
     updateSessionById(sessionId, (session) => ({
@@ -275,15 +277,26 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       onEvent: (event) => {
         if (event.type === 'tool.call' && event.call.tool === 'edit_file') {
           void previewEditFileInput(event.call.input).then((preview) => {
-            state.setCurrentEditPreview(preview);
+            if (!preview || appendedEditPreviewIds.has(event.call.id)) {
+              return;
+            }
+
+            appendedEditPreviewIds.add(event.call.id);
+            updateSessionById(sessionId, (session) => ({
+              ...session,
+              messages: [
+                ...session.messages,
+                {
+                  id: state.nextLocalId(),
+                  role: 'assistant',
+                  text: formatEditPreviewHistoryMessage(preview),
+                },
+              ],
+            }));
           });
         }
 
         if (event.type === 'tool.result') {
-          if (event.tool === 'edit_file') {
-            state.setCurrentEditPreview(undefined);
-          }
-
           if (event.tool === 'update_plan') {
             state.setCurrentPlan(parsePlanStateFromToolResult(event.result.output));
           }
@@ -364,7 +377,6 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       state.setError(result.summary);
     }
     state.setStatus(result.outcome === 'done' ? 'Idle' : `Stopped: ${result.outcome}`);
-    state.setCurrentEditPreview(undefined);
     return result;
   } catch (runError) {
     const message = runError instanceof Error ? runError.message : String(runError);

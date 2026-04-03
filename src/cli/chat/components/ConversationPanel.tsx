@@ -1,7 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { ConversationLine } from '../state/types.js';
-import type { EditFilePreview } from '../../../tools/edit-file.js';
 import type { PlanItem } from '../../../tools/update-plan.js';
 
 export function ConversationPanel({
@@ -13,7 +12,6 @@ export function ConversationPanel({
     title: string;
     lines: string[];
     error?: string;
-    currentEditPreview?: EditFilePreview;
     currentPlan?: {
       explanation?: string;
       items: PlanItem[];
@@ -45,7 +43,6 @@ export function ConversationPanel({
               <Text key={line} dimColor>{line}</Text>
             ))}
             {activeTurn.currentPlan ? <ActivePlanPanel plan={activeTurn.currentPlan} /> : null}
-            {activeTurn.currentEditPreview ? <ActiveEditPreview preview={activeTurn.currentEditPreview} /> : null}
             {activeTurn.error ? <Text color="red">{activeTurn.error}</Text> : null}
           </Box>
           <Text dimColor>└</Text>
@@ -66,17 +63,6 @@ function ActivePlanPanel({ plan }: { plan: { explanation?: string; items: PlanIt
           <InlineText text={item.step} color={taskTextColor(planStatusMarker(item.status), 'assistant')} />
         </Text>
       ))}
-    </Box>
-  );
-}
-
-function ActiveEditPreview({ preview }: { preview: EditFilePreview }) {
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text bold color="yellow">Current edit preview</Text>
-      <Text dimColor>{preview.path}</Text>
-      <DiffCodeBlock text={preview.diff} />
-      {preview.truncated ? <Text dimColor>Preview truncated.</Text> : null}
     </Box>
   );
 }

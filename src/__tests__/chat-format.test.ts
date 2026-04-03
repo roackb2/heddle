@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildConversationMessages } from '../cli/chat/utils/format.js';
+import { buildConversationMessages, formatEditPreviewHistoryMessage } from '../cli/chat/utils/format.js';
 import type { ChatMessage } from '../llm/types.js';
 
 describe('buildConversationMessages', () => {
@@ -102,5 +102,19 @@ describe('buildConversationMessages', () => {
     expect(messages[2]?.text).toContain('- [x] Inspect roadmap and runtime state');
     expect(messages[2]?.text).toContain('- [-] Implement the next bounded capability');
     expect(messages[2]?.text).toContain('- [ ] Verify with tests and build');
+  });
+
+  it('formats a live edit preview into the same visible diff block shape', () => {
+    const rendered = formatEditPreviewHistoryMessage({
+      path: 'src/example.ts',
+      action: 'replaced',
+      diff: ['--- a/src/example.ts', '+++ b/src/example.ts', '@@ -1 +1 @@', '-old', '+new'].join('\n'),
+      truncated: false,
+    });
+
+    expect(rendered).toContain('## Edited `src/example.ts`');
+    expect(rendered).toContain('Action: replaced');
+    expect(rendered).toContain('```diff');
+    expect(rendered).toContain('+new');
   });
 });
