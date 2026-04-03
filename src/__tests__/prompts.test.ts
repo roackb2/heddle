@@ -17,6 +17,8 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('prefer carrying the task through implementation and verification instead of stopping at analysis or a plan unless you are blocked');
     expect(prompt).toContain('If the user asks to improve tests or coverage');
     expect(prompt).toContain('Prefer the first-class file editing tool for creating or changing file contents');
+    expect(prompt).toContain('If a shell command is arbitrary, uses inline scripts, needs redirects/heredocs, or inspect rejects it, switch to run_shell_mutate');
+    expect(prompt).toContain('do not stop at "inspect is blocked."');
   });
 
   it('includes project-specific context when provided', () => {

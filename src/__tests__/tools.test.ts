@@ -8,6 +8,7 @@ import { editFileTool } from '../tools/edit-file.js';
 import { reportStateTool } from '../tools/report-state.js';
 import {
   classifyShellCommandPolicy,
+  DEFAULT_INSPECT_RULES,
   createRunShellInspectTool,
   createRunShellMutateTool,
   DEFAULT_MUTATE_RULES,
@@ -238,9 +239,9 @@ describe('runShell tools', () => {
 
     expect(tool.name).toBe('run_shell_mutate');
     expect(tool.requiresApproval).toBe(true);
-    expect(tool.description).toContain('Use this only when inspection is not enough');
-    expect(tool.description).toContain('verification, formatting, staging');
-    expect(tool.description).toContain('workspace execution rules');
+    expect(tool.description).toContain('Use this when inspection is not enough');
+    expect(tool.description).toContain('inline scripts or broader shell expressiveness');
+    expect(tool.description).toContain('host-side execution rules');
   });
 
   it('allows read-only pipes in inspect mode', async () => {
@@ -259,13 +260,30 @@ describe('runShell tools', () => {
     });
   });
 
+  it('allows numbered file inspection in inspect mode', async () => {
+    const tool = createRunShellInspectTool();
+    const result = await tool.execute({ command: 'nl -ba README.md' });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({
+      command: 'nl -ba README.md',
+      exitCode: 0,
+      policy: {
+        binary: 'nl',
+        scope: 'inspect',
+        risk: 'low',
+        capability: 'file_inspection',
+      },
+    });
+  });
+
   it('still rejects blocked shell operators in inspect mode', async () => {
     const tool = createRunShellInspectTool();
     const result = await tool.execute({ command: 'ls > out.txt' });
 
     expect(result).toEqual({
       ok: false,
-      error: 'Command not allowed. Inspect mode permits read-only pipes, but redirects, command chaining, backgrounding, and subshells are blocked.',
+      error: 'Command not allowed. Inspect mode permits read-only pipes, but redirects, command chaining, backgrounding, and subshells are blocked. If the command is still needed, retry with run_shell_mutate.',
     });
   });
 
@@ -335,13 +353,21 @@ describe('runShell tools', () => {
     });
   });
 
-  it('rejects pipes in mutate mode', async () => {
+  it('allows pipes in mutate mode because mutate is approval-gated', async () => {
     const tool = createRunShellMutateTool();
-    const result = await tool.execute({ command: 'yarn test | cat' });
+    const result = await tool.execute({ command: 'echo ok | cat' });
 
-    expect(result).toEqual({
-      ok: false,
-      error: 'Command not allowed. Shell control operators such as pipes, redirects, command chaining, or subshells are blocked.',
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({
+      command: 'echo ok | cat',
+      exitCode: 0,
+      policy: {
+        binary: 'echo',
+        scope: 'workspace',
+        risk: 'unknown',
+        capability: 'unknown_workspace',
+        reason: 'unclassified workspace command requiring explicit approval',
+      },
     });
   });
 
@@ -399,44 +425,19 @@ describe('runShell tools', () => {
     });
   });
 
-  it('classifies known external CLIs with explicit external scope metadata', () => {
-    const result = classifyShellCommandPolicy('gh pr view 123', {
+  it('treats unclassified mutate commands as approval-gated unknown commands instead of hard rejecting them', () => {
+    const result = classifyShellCommandPolicy('ffmpeg -i input.mp4 output.gif', {
       toolName: 'run_shell_mutate',
       rules: DEFAULT_MUTATE_RULES,
       allowUnknown: true,
     });
 
     expect(result).toEqual({
-      binary: 'gh',
-      scope: 'external',
-      risk: 'medium',
-      capability: 'github_cli',
-      reason: 'external GitHub CLI command',
-    });
-  });
-
-  it('falls back to unknown external-system metadata for unclassified external commands', () => {
-    const result = classifyShellCommandPolicy('gh extension list', {
-      toolName: 'run_shell_mutate',
-      rules: [
-        {
-          binary: 'gh',
-          argsPrefix: ['pr'],
-          scope: 'external',
-          risk: 'medium',
-          capability: 'github_cli',
-          reason: 'external GitHub CLI command',
-        },
-      ],
-      allowUnknown: true,
-    });
-
-    expect(result).toEqual({
-      binary: 'gh',
-      scope: 'external',
+      binary: 'ffmpeg',
+      scope: 'workspace',
       risk: 'unknown',
-      capability: 'external_system',
-      reason: 'unclassified external-system command requiring explicit approval',
+      capability: 'unknown_workspace',
+      reason: 'unclassified workspace command requiring explicit approval',
     });
   });
 

@@ -50,7 +50,8 @@ ${projectContext ? `## Project Context\n\n${projectContext}\n` : ''}
 - Use only the parameters that a tool actually documents. Do not invent extra fields.
 - Prefer the most direct tool for the job: inspect directories with directory-oriented tools, read known files with file-reading tools, and broaden scope only when the goal requires it.
 - Prefer the first-class file editing tool for creating or changing file contents instead of shell redirection, heredocs, or other shell-based file-writing workarounds.
-- Treat mutate-oriented tools as higher-risk than inspection tools. Use them only when inspection is not enough, and be ready to continue after a denial if the host asks for approval.
+- Treat mutate-oriented tools as higher-risk than inspection tools, but do not treat them as forbidden. Use run_shell_inspect for bounded read-oriented commands the host is likely to allow directly. If a shell command is arbitrary, uses inline scripts, needs redirects/heredocs, or inspect rejects it, switch to run_shell_mutate and continue through approval instead of concluding the command cannot be run.
+- If run_shell_inspect fails with a policy restriction, do not stop at "inspect is blocked." Either rely on the host's mutate fallback or explicitly retry with run_shell_mutate when the command is still needed.
 - When the user asks whether something passed, failed, changed, or exists, prefer direct evidence such as command output, file contents, diffs, or test results.
 - After edits or mutation-oriented commands, prefer verifying and summarizing concrete outcomes over giving a vague “done” response.
 - After workspace-changing actions, prefer explicit repo review evidence such as git status --short or git diff --stat, and mention the exact review and verification commands you used in the final summary.

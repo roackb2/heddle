@@ -60,16 +60,27 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   } = useApprovalFlow(nextLocalId);
   const messages = activeSession?.messages ?? [];
   const activityText = currentActivityText(liveEvents, isRunning, elapsedSeconds, pendingApproval, interruptRequested);
-  const activityLines = (isRunning ? liveEvents.slice(-3, -1) : liveEvents.slice(0, -1))
-    .filter((event, index, events) => {
-      return events.findIndex((candidate) => candidate.text === event.text) === index;
-    })
-    .map((event) => event.text);
+  const activityLines = liveEvents
+    .slice(-4)
+    .filter((event, index, events) => events.findIndex((candidate) => candidate.text === event.text) === index)
+    .map((event, index, events) => {
+      if (isRunning && index === events.length - 1) {
+        return `${event.text} · ${elapsedSeconds}s`;
+      }
+
+      return event.text;
+    });
   const activeTurn =
     isRunning || pendingApproval || interruptRequested || error ?
       {
-        title: activityText,
-        lines: activityLines,
+        title:
+          pendingApproval ? activityText
+          : error ? 'Recent activity before failure'
+          : isRunning ? 'Recent activity'
+          : activityText,
+        lines:
+          pendingApproval ? activityLines.filter((line) => line !== activityText)
+          : activityLines,
         error,
       }
     : undefined;

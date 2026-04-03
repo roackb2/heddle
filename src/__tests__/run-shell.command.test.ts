@@ -46,7 +46,7 @@ describe('runShellCommand', () => {
     });
   });
 
-  it('rejects commands containing shell control operators', async () => {
+  it('rejects commands containing blocked inspect shell control operators', async () => {
     const controlCommand = 'ls && echo hi';
     const result = await runShellCommand(
       { command: controlCommand },
@@ -59,6 +59,34 @@ describe('runShellCommand', () => {
 
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/read-only pipes|Shell control operators|command chaining/);
+  });
+
+  it('allows heredoc-style mutate commands because mutate is approval-gated', async () => {
+    const { child, stdout } = createFakeChildProcess();
+    spawnMock.mockReturnValue(child);
+
+    const execution = runShellCommand(
+      { command: "python - <<'PY'\nprint('ok')\nPY" },
+      {
+        toolName: 'run_shell_mutate',
+        rules: DEFAULT_MUTATE_RULES,
+        allowUnknown: true,
+      },
+    );
+
+    stdout.emit('data', 'ok\n');
+    child.emit('close', 0);
+
+    const result = await execution;
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({
+      exitCode: 0,
+      policy: {
+        binary: 'python',
+        scope: 'workspace',
+        risk: 'unknown',
+      },
+    });
   });
 
   it('rejects commands that violate the inspect policy', async () => {
@@ -74,7 +102,7 @@ describe('runShellCommand', () => {
     expect(result).toEqual({
       ok: false,
       error:
-        'Command not allowed by run_shell_inspect policy. This tool only permits bounded commands that match its configured workspace risk/scope rules.',
+        'Command not allowed by run_shell_inspect policy. This tool only permits bounded read-oriented commands that match its configured workspace risk/scope rules. If the command is still needed, retry with run_shell_mutate.',
     });
   });
 

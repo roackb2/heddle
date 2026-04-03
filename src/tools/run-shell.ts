@@ -25,10 +25,6 @@ export type RunShellCapability =
   | 'file_operation'
   | 'git_staging'
   | 'project_script'
-  | 'github_cli'
-  | 'cloud_cli'
-  | 'cluster_cli'
-  | 'external_system'
   | 'unknown_workspace';
 
 export type RunShellPolicyDecision = {
@@ -62,6 +58,7 @@ export type RunShellOptions = {
 
 export const DEFAULT_INSPECT_RULES: RunShellRule[] = [
   inspectRule('ls', 'workspace_listing', 'workspace listing'),
+  inspectRule('nl', 'file_inspection', 'numbered file inspection'),
   inspectRule('cat', 'file_inspection', 'file inspection'),
   inspectRule('head', 'file_inspection', 'file inspection'),
   inspectRule('tail', 'file_inspection', 'file inspection'),
@@ -116,12 +113,7 @@ export const DEFAULT_MUTATE_RULES: RunShellRule[] = [
   workspaceRule('cp', 'medium', 'file_operation', 'workspace file operation'),
   workspaceRule('git', 'medium', 'git_staging', 'git staging operation', ['add']),
   workspaceRule('git', 'medium', 'file_operation', 'git file move operation', ['mv']),
-  externalRule('gh', 'medium', 'github_cli', 'external GitHub CLI command'),
-  externalRule('aws', 'medium', 'cloud_cli', 'external cloud CLI command'),
-  externalRule('kubectl', 'medium', 'cluster_cli', 'external cluster CLI command'),
 ];
-
-const KNOWN_EXTERNAL_BINARIES = new Set(['gh', 'aws', 'kubectl']);
 
 export function createRunShellInspectTool(options: RunShellOptions = {}): ToolDefinition {
   const rules = options.rules ?? DEFAULT_INSPECT_RULES;
@@ -129,7 +121,7 @@ export function createRunShellInspectTool(options: RunShellOptions = {}): ToolDe
   return {
     name: 'run_shell_inspect',
     description:
-      `Run a read-oriented shell command inside the current workspace. Use this for CLI-native inspection, search, diff, and git state checks when mature commands like rg, git, sed, or ls are a better fit than bespoke file tools. Returns structured output with command, exitCode, stdout, stderr, and policy metadata. This tool is governed by low-risk inspect rules, not arbitrary shell access. Read-only pipelines with | are allowed for inspection commands, but redirects, command chaining, and subshells are blocked.`,
+      `Run a bounded read-oriented shell command inside the current workspace. Use this for CLI-native inspection, search, diff, and git state checks when mature commands like rg, git, sed, or ls are a better fit than bespoke file tools. Returns structured output with command, exitCode, stdout, stderr, and policy metadata. This tool is governed by low-risk inspect rules, not arbitrary shell access. Use this when the command is clearly read-oriented and likely to fit the inspect policy. If inspect rejects a command because it is arbitrary, uses inline scripts, or needs broader shell expressiveness, retry with run_shell_mutate instead of concluding the command cannot be run. Read-only pipelines with | are allowed for inspection commands, but redirects, command chaining, and subshells are blocked.`,
     parameters: buildParameters(),
     execute: (raw) => runShellCommand(raw, {
       toolName: 'run_shell_inspect',
@@ -146,7 +138,7 @@ export function createRunShellMutateTool(options: RunShellOptions = {}): ToolDef
     name: 'run_shell_mutate',
     requiresApproval: true,
     description:
-      `Run a bounded workspace execution command inside the current workspace. Use this only when inspection is not enough and you need verification, formatting, staging, or another explicit workspace action. Returns structured output with command, exitCode, stdout, stderr, and policy metadata. This tool is governed by host-side workspace execution rules with explicit risk classification rather than open-ended shell access. Shell control operators like pipes, redirects, chaining, and subshells are blocked.`,
+      `Run an approval-gated shell command inside the current workspace. Use this when inspection is not enough, when the command is arbitrary or unclassified, when you need inline scripts or broader shell expressiveness, or when run_shell_inspect rejects a still-necessary command. Returns structured output with command, exitCode, stdout, stderr, and policy metadata. This tool is governed by host-side execution rules with explicit risk classification and approval instead of a narrow command allowlist. Arbitrary commands are allowed here through approval; do not assume a command is impossible just because inspect refused it.`,
     parameters: buildParameters(),
     execute: (raw) => runShellCommand(raw, {
       toolName: 'run_shell_mutate',
@@ -192,12 +184,12 @@ export function runShellCommand(
 
   const cmd = raw.command.trim();
 
-  if (containsBlockedShellControlOperators(cmd, options.toolName === 'run_shell_inspect')) {
+  if (containsBlockedShellControlOperators(cmd, options.toolName)) {
     return Promise.resolve({
       ok: false,
       error:
         options.toolName === 'run_shell_inspect' ?
-          'Command not allowed. Inspect mode permits read-only pipes, but redirects, command chaining, backgrounding, and subshells are blocked.'
+          'Command not allowed. Inspect mode permits read-only pipes, but redirects, command chaining, backgrounding, and subshells are blocked. If the command is still needed, retry with run_shell_mutate.'
         : 'Command not allowed. Shell control operators such as pipes, redirects, command chaining, or subshells are blocked.',
     });
   }
@@ -214,7 +206,10 @@ export function runShellCommand(
   if (!policy) {
     return Promise.resolve({
       ok: false,
-      error: `Command not allowed by ${options.toolName} policy. This tool only permits bounded commands that match its configured workspace risk/scope rules.`,
+      error:
+        options.toolName === 'run_shell_inspect' ?
+          `Command not allowed by ${options.toolName} policy. This tool only permits bounded read-oriented commands that match its configured workspace risk/scope rules. If the command is still needed, retry with run_shell_mutate.`
+        : `Command not allowed by ${options.toolName} policy. This tool only permits bounded commands that match its configured workspace risk/scope rules.`,
     });
   }
 
@@ -347,7 +342,7 @@ export function classifyShellCommandPolicy(
     return { error: 'Command not allowed. The command must not be empty.' };
   }
 
-  if (containsBlockedShellControlOperators(normalized, options.toolName === 'run_shell_inspect')) {
+  if (containsBlockedShellControlOperators(normalized, options.toolName)) {
     return {
       error:
         options.toolName === 'run_shell_inspect' ?
@@ -395,16 +390,6 @@ function classifyCommand(
       return undefined;
     }
 
-    if (KNOWN_EXTERNAL_BINARIES.has(binary)) {
-      return {
-        binary,
-        scope: 'external',
-        risk: 'unknown',
-        capability: 'external_system',
-        reason: 'unclassified external-system command requiring explicit approval',
-      };
-    }
-
     return {
       binary,
       scope: 'workspace',
@@ -444,7 +429,8 @@ function isRunShellInput(raw: unknown): raw is RunShellInput {
   return typeof input.command === 'string';
 }
 
-function containsBlockedShellControlOperators(command: string, allowPipes: boolean): boolean {
+function containsBlockedShellControlOperators(command: string, toolName: string): boolean {
+  const inspectMode = toolName === 'run_shell_inspect';
   let quote: '"' | "'" | undefined;
   let escaped = false;
 
@@ -474,19 +460,23 @@ function containsBlockedShellControlOperators(command: string, allowPipes: boole
       continue;
     }
 
-    if (current === '|' && !allowPipes) {
-      return true;
-    }
-
-    if (current === '&' || current === ';' || current === '>' || current === '<' || current === '`') {
-      return true;
-    }
-
-    if (current === '|' && next === '|') {
+    if (current === '|' && inspectMode && next === '|') {
       return true;
     }
 
     if (current === '&' && next === '&') {
+      return true;
+    }
+
+    if (current === ';' || current === '`') {
+      return true;
+    }
+
+    if (current === '&') {
+      return true;
+    }
+
+    if (inspectMode && (current === '>' || current === '<')) {
       return true;
     }
 
@@ -525,23 +515,6 @@ function workspaceRule(
     binary,
     argsPrefix,
     scope: 'workspace',
-    risk,
-    capability,
-    reason,
-  };
-}
-
-function externalRule(
-  binary: string,
-  risk: RunShellRisk,
-  capability: RunShellCapability,
-  reason: string,
-  argsPrefix?: string[],
-): RunShellRule {
-  return {
-    binary,
-    argsPrefix,
-    scope: 'external',
     risk,
     capability,
     reason,

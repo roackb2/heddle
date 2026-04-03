@@ -71,9 +71,9 @@ describe('project approval rules', () => {
       {
         tool: 'run_shell_mutate',
         mode: 'exact',
-        command: 'gh pr view 123',
-        scope: 'external',
-        capability: 'github_cli',
+        command: 'ffmpeg -i input.mp4 output.gif',
+        scope: 'workspace',
+        capability: 'unknown_workspace',
         createdAt: new Date().toISOString(),
       },
     ]);

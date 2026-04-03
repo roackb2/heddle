@@ -36,7 +36,9 @@ export function summarizeTrace(trace: TraceEvent[]): string[] {
       case 'tool.approval_requested':
         return [`approval requested for ${summarizeToolCall(event.call.tool, event.call.input)}`];
       case 'tool.approval_resolved':
-        return [`approval ${event.approved ? 'granted' : 'denied'} for ${summarizeToolCall(event.call.tool, event.call.input)}`];
+        return [
+          `approval ${event.approved ? 'granted' : 'denied'} for ${summarizeToolCall(event.call.tool, event.call.input)}${event.reason ? ` (${truncate(event.reason, 80)})` : ''}`,
+        ];
       case 'tool.call':
         return [`tool call ${summarizeToolCall(event.call.tool, event.call.input)}`];
       case 'tool.result':
@@ -70,7 +72,7 @@ export function toLiveEvent(event: TraceEvent): string | undefined {
     case 'tool.approval_requested':
       return `approval needed for ${summarizeToolCall(event.call.tool, event.call.input)}`;
     case 'tool.approval_resolved':
-      return `approval ${event.approved ? 'granted' : 'denied'} for ${summarizeToolCall(event.call.tool, event.call.input)}`;
+      return `approval ${event.approved ? 'granted' : 'denied'} for ${summarizeToolCall(event.call.tool, event.call.input)}${event.reason ? ` (${truncate(event.reason, 80)})` : ''}`;
     case 'tool.call':
       return `running ${summarizeToolCall(event.call.tool, event.call.input)}`;
     case 'tool.result':
@@ -196,7 +198,7 @@ export function shouldFallbackToMutate(error: string | undefined): boolean {
     return false;
   }
 
-  return error.includes('run_shell_inspect policy');
+  return error.includes('run_shell_inspect policy') || error.includes('Inspect mode permits read-only pipes');
 }
 
 export function formatDirectShellResponse(toolName: string, command: string, result: ToolResult): string {
