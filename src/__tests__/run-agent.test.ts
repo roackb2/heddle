@@ -1451,13 +1451,11 @@ describe('runAgent', () => {
     expect(immediateReminder).toBeDefined();
   });
 
-  it('does not allow a final answer while a recorded plan still has unfinished items', async () => {
-    const seenMessages: ChatMessage[][] = [];
+  it('allows a final answer even when a recorded plan still has unfinished items', async () => {
     let stage = 0;
     const fakeLlm: LlmAdapter = {
-      async chat(messages): Promise<LlmResponse> {
+      async chat(): Promise<LlmResponse> {
         stage += 1;
-        seenMessages.push(structuredClone(messages));
 
         if (stage === 1) {
           return {
@@ -1499,11 +1497,14 @@ describe('runAgent', () => {
       logger: silentLogger,
     });
 
-    expect(result.outcome).toBe('max_steps');
-    expect(result.transcript).toContainEqual({
-      role: 'system',
-      content:
-        'Host reminder: you recorded a plan and it still has unfinished items (in_progress: Implement the next bounded change; pending: Verify with tests). Continue the planned work, or update the plan to mark items completed or no longer needed before giving the final answer.',
-    });
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('The work is done.');
+    expect(
+      result.transcript.some(
+        (message) =>
+          message.role === 'system' &&
+          message.content.includes('you recorded a plan and it still has unfinished items'),
+      ),
+    ).toBe(false);
   });
 });

@@ -407,12 +407,6 @@ function finalizeAssistantResponse(context: RunContext, response: LlmResponse): 
     return finishRun(context, 'error', 'Model returned an empty response');
   }
 
-  const planBlocker = getPlanCompletionBlocker(context);
-  if (planBlocker) {
-    context.messages.push({ role: 'system', content: planBlocker });
-    return 'continue';
-  }
-
   const completionBlocker = getCompletionBlocker(context, response.content);
   if (completionBlocker) {
     const forcedSummary = buildForcedStructuredChangeSummary(context, response.content);
@@ -450,28 +444,6 @@ function finalizeAssistantResponse(context: RunContext, response: LlmResponse): 
     logLevel: 'info',
     logMessage: 'Agent run finished',
   });
-}
-
-function getPlanCompletionBlocker(context: RunContext): string | undefined {
-  const activePlan = context.state.activePlan;
-  if (!activePlan) {
-    return undefined;
-  }
-
-  const remainingItems = activePlan.items.filter((item) => item.status !== 'completed');
-  if (remainingItems.length === 0) {
-    return undefined;
-  }
-
-  const remainingSummary = remainingItems.map((item) => `${item.status}: ${item.step}`).join('; ');
-  context.log.info(
-    {
-      step: context.state.step,
-      remainingPlanItems: remainingItems.length,
-    },
-    'Blocking final answer until recorded plan is completed or updated',
-  );
-  return `Host reminder: you recorded a plan and it still has unfinished items (${remainingSummary}). Continue the planned work, or update the plan to mark items completed or no longer needed before giving the final answer.`;
 }
 
 function getCompletionBlocker(context: RunContext, responseContent: string): string | undefined {

@@ -61,6 +61,34 @@ describe('runShellCommand', () => {
     expect(result.error).toMatch(/read-only pipes|Shell control operators|command chaining/);
   });
 
+  it('allows mutate shell control syntax because mutate is approval-gated', async () => {
+    const { child, stdout } = createFakeChildProcess();
+    spawnMock.mockReturnValue(child);
+
+    const execution = runShellCommand(
+      { command: 'echo ok && echo done' },
+      {
+        toolName: 'run_shell_mutate',
+        rules: DEFAULT_MUTATE_RULES,
+        allowUnknown: true,
+      },
+    );
+
+    stdout.emit('data', 'ok\ndone\n');
+    child.emit('close', 0);
+
+    const result = await execution;
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({
+      exitCode: 0,
+      policy: {
+        binary: 'echo',
+        scope: 'workspace',
+        risk: 'unknown',
+      },
+    });
+  });
+
   it('allows heredoc-style mutate commands because mutate is approval-gated', async () => {
     const { child, stdout } = createFakeChildProcess();
     spawnMock.mockReturnValue(child);
@@ -135,6 +163,23 @@ describe('runShellCommand', () => {
         risk: 'unknown',
         reason: 'unclassified workspace command requiring explicit approval',
       },
+    });
+  });
+
+  it('blocks catastrophically destructive mutate commands even in approval-gated mode', async () => {
+    const result = await runShellCommand(
+      { command: 'rm -rf ~/' },
+      {
+        toolName: 'run_shell_mutate',
+        rules: DEFAULT_MUTATE_RULES,
+        allowUnknown: true,
+      },
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error:
+        'Command not allowed. This command appears catastrophically destructive (home/root/disk-level) and is blocked even in approval-gated mutate mode.',
     });
   });
 

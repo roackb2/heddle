@@ -184,13 +184,19 @@ export function runShellCommand(
 
   const cmd = raw.command.trim();
 
+  const mutateCatastrophicError = getCatastrophicCommandError(cmd, options.toolName);
+  if (mutateCatastrophicError) {
+    return Promise.resolve({
+      ok: false,
+      error: mutateCatastrophicError,
+    });
+  }
+
   if (containsBlockedShellControlOperators(cmd, options.toolName)) {
     return Promise.resolve({
       ok: false,
       error:
-        options.toolName === 'run_shell_inspect' ?
-          'Command not allowed. Inspect mode permits read-only pipes, but redirects, command chaining, backgrounding, and subshells are blocked. If the command is still needed, retry with run_shell_mutate.'
-        : 'Command not allowed. Shell control operators such as pipes, redirects, command chaining, or subshells are blocked.',
+        'Command not allowed. Inspect mode permits read-only pipes, but redirects, command chaining, backgrounding, and subshells are blocked. If the command is still needed, retry with run_shell_mutate.',
     });
   }
 
@@ -342,12 +348,15 @@ export function classifyShellCommandPolicy(
     return { error: 'Command not allowed. The command must not be empty.' };
   }
 
+  const mutateCatastrophicError = getCatastrophicCommandError(normalized, options.toolName);
+  if (mutateCatastrophicError) {
+    return { error: mutateCatastrophicError };
+  }
+
   if (containsBlockedShellControlOperators(normalized, options.toolName)) {
     return {
       error:
-        options.toolName === 'run_shell_inspect' ?
-          'Command not allowed. Inspect mode permits read-only pipes, but redirects, command chaining, backgrounding, and subshells are blocked.'
-        : 'Command not allowed. Shell control operators such as pipes, redirects, command chaining, or subshells are blocked.',
+        'Command not allowed. Inspect mode permits read-only pipes, but redirects, command chaining, backgrounding, and subshells are blocked.',
     };
   }
 
@@ -426,6 +435,9 @@ function isRunShellInput(raw: unknown): raw is RunShellInput {
 
 function containsBlockedShellControlOperators(command: string, toolName: string): boolean {
   const inspectMode = toolName === 'run_shell_inspect';
+  if (!inspectMode) {
+    return false;
+  }
   let quote: '"' | "'" | undefined;
   let escaped = false;
 
@@ -481,6 +493,32 @@ function containsBlockedShellControlOperators(command: string, toolName: string)
   }
 
   return false;
+}
+
+function getCatastrophicCommandError(command: string, toolName: string): string | undefined {
+  if (toolName !== 'run_shell_mutate') {
+    return undefined;
+  }
+
+  const normalized = command.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!normalized) {
+    return undefined;
+  }
+
+  const catastrophicPatterns = [
+    /(?:^|[;&|])\s*rm\s+-rf\s+\/$/,
+    /(?:^|[;&|])\s*rm\s+-rf\s+\/\s/,
+    /(?:^|[;&|])\s*rm\s+-rf\s+~(?:\/|$)/,
+    /(?:^|[;&|])\s*rm\s+-rf\s+\$home(?:\/|$)/,
+    /(?:^|[;&|])\s*rm\s+-rf\s+"?\/"?(?:\s|$)/,
+    /(?:^|[;&|])\s*rm\s+-rf\s+"?~"?(?:\s|$)/,
+    /(?:^|[;&|])\s*mkfs(?:\.[^\s]+)?\b/,
+    /(?:^|[;&|])\s*dd\b.*\bof=\/dev\//,
+  ];
+
+  return catastrophicPatterns.some((pattern) => pattern.test(normalized)) ?
+      'Command not allowed. This command appears catastrophically destructive (home/root/disk-level) and is blocked even in approval-gated mutate mode.'
+    : undefined;
 }
 
 function inspectRule(
