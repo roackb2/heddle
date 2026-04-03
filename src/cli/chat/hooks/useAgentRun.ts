@@ -26,6 +26,7 @@ import {
   toLiveEvent,
 } from '../utils/format.js';
 import { saveTrace } from '../utils/runtime.js';
+import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../state/approval-rules.js';
 import { isGenericSessionName } from '../state/storage.js';
 import { normalizeSessionTitle } from '../utils/format.js';
 import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval, TurnSummary } from '../state/types.js';
@@ -281,10 +282,12 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
         }
 
         return new Promise((resolve) => {
+          const rememberedRule = createProjectApprovalRuleForCall(call);
           state.setPendingApproval({
             call,
             tool,
             rememberForProject: () => rememberProjectApproval(call),
+            rememberLabel: rememberedRule ? describeProjectApprovalRule(rememberedRule) : undefined,
             resolve,
           });
         });
@@ -411,10 +414,12 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
           isProjectApproved(mutateCall) ?
             { approved: true, reason: 'Approved by saved project rule' }
           : await new Promise<{ approved: boolean; reason?: string }>((resolve) => {
+              const rememberedRule = createProjectApprovalRuleForCall(mutateCall);
               state.setPendingApproval({
                 call: mutateCall,
                 tool: directShellTool,
                 rememberForProject: () => rememberProjectApproval(mutateCall),
+                rememberLabel: rememberedRule ? describeProjectApprovalRule(rememberedRule) : undefined,
                 resolve,
               });
             });

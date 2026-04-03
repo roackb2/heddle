@@ -116,13 +116,19 @@ export function formatApprovalPrompt(pendingApproval: PendingApproval): string {
     return `Allow mutation command: ${truncate(command, 120)}`;
   }
 
+  const editPath = extractEditPath(pendingApproval.call.input);
+  if (pendingApproval.call.tool === 'edit_file' && editPath) {
+    return `Allow edit_file on ${truncate(editPath, 120)}`;
+  }
+
   return `Allow ${pendingApproval.call.tool}`;
 }
 
 export function formatApprovalHint(pendingApproval: PendingApproval): string {
   const policy = describePendingApprovalPolicy(pendingApproval);
   const policySummary = policy ? ` • ${policy.scope} • ${policy.capability} • ${policy.risk} risk` : '';
-  return `Tool: ${pendingApproval.call.tool}${policySummary} • Y approve • A allow for project • N deny`;
+  const rememberLabel = pendingApproval.rememberLabel ? `A ${pendingApproval.rememberLabel}` : 'A allow for project';
+  return `Tool: ${pendingApproval.call.tool}${policySummary} • Y approve • ${rememberLabel} • N deny`;
 }
 
 export function summarizeToolCall(tool: string, input: unknown): string {
@@ -149,6 +155,15 @@ export function extractShellCommand(value: unknown): string | undefined {
 
   const command = (value as { command?: unknown }).command;
   return typeof command === 'string' && command.trim() ? command.trim() : undefined;
+}
+
+export function extractEditPath(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const path = (value as { path?: unknown }).path;
+  return typeof path === 'string' && path.trim() ? path.trim() : undefined;
 }
 
 export function truncate(value: string, maxLength: number): string {

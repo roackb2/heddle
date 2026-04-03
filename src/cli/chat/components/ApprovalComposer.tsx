@@ -31,7 +31,7 @@ function ApprovalSelector({ choice }: { choice: ApprovalChoice }) {
       </Text>
       <Text dimColor>   </Text>
       <Text color={choice === 'allow_project' ? 'cyan' : 'gray'}>
-        {choice === 'allow_project' ? '◉ Allow For Project' : '○ Allow For Project'}
+        {choice === 'allow_project' ? '◉ Remember' : '○ Remember'}
       </Text>
       <Text dimColor>   </Text>
       <Text color={choice === 'deny' ? 'red' : 'gray'}>

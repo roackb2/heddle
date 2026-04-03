@@ -60,12 +60,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   } = useApprovalFlow(nextLocalId);
   const messages = activeSession?.messages ?? [];
   const activityText = currentActivityText(liveEvents, isRunning, elapsedSeconds, pendingApproval, interruptRequested);
-  const activityLines = (isRunning ? liveEvents.slice(-3) : liveEvents.slice(-1))
+  const activityLines = (isRunning ? liveEvents.slice(-3, -1) : liveEvents.slice(0, -1))
     .filter((event, index, events) => {
-      if (event.text === activityText) {
-        return false;
-      }
-
       return events.findIndex((candidate) => candidate.text === event.text) === index;
     })
     .map((event) => event.text);

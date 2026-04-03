@@ -123,6 +123,8 @@ Phase 1 has also started at the tool-contract layer:
 - chat mode now supports direct shell commands with a `!command` prefix; user-entered direct commands run immediately under the same shell policy, and their results are stored in the session transcript for later turns
 - chat approval UI now supports remembering an exact mutate command for the current project, so repeated commands can be auto-approved from the project's local state
 - remembered project approvals now update immediately in memory, so `Allow for project` applies on the next matching command without waiting for a session reload
+- saved project approvals now load legacy on-disk rules without dropping them, and low-risk workspace verification commands such as `yarn test ...` can be remembered as a reusable command family instead of only an exact command string
+- `edit_file` now participates in project approvals too, so approving it for a project avoids repeated prompts on later file edits
 - mutate approval prompts now expose policy metadata such as scope, capability, and risk before approval
 - interrupted or incomplete tool-call history is now sanitized before the next run so saved sessions do not poison later turns with missing tool outputs
 - the chat screen now keeps the conversation as the main reading surface, folds active run state into that flow, and applies basic response formatting for headings, lists, inline code, and fenced code blocks

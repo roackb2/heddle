@@ -36,6 +36,7 @@ export type PendingApproval = {
   call: ToolCall;
   tool: ToolDefinition;
   rememberForProject?: () => void;
+  rememberLabel?: string;
   resolve: (decision: { approved: boolean; reason?: string }) => void;
 };
 

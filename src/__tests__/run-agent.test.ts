@@ -591,22 +591,31 @@ describe('runAgent', () => {
 
   it('requires post-mutation review, verification, and structured summary before finishing', async () => {
     const seenMessages: ChatMessage[][] = [];
+    let stage = 0;
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
+        stage += 1;
         seenMessages.push(structuredClone(messages));
-        if (seenMessages.length === 1) {
+
+        if (stage === 1) {
           return {
             toolCalls: [{ id: 'call-1', tool: 'run_shell_mutate', input: { command: 'eslint --fix src/example.ts' } }],
           };
         }
 
-        if (seenMessages.length === 2) {
+        if (stage === 2) {
+          return {
+            content: 'The change is ready to be reported.',
+          };
+        }
+
+        if (stage === 3) {
           return {
             toolCalls: [{ id: 'call-2', tool: 'run_shell_inspect', input: { command: 'git diff --stat' } }],
           };
         }
 
-        if (seenMessages.length === 3) {
+        if (stage === 4) {
           return {
             toolCalls: [{ id: 'call-3', tool: 'run_shell_mutate', input: { command: 'yarn test' } }],
           };
@@ -661,7 +670,10 @@ describe('runAgent', () => {
           message.role === 'system' &&
           message.content.includes('Host requirement: before giving a final answer after a workspace-changing mutate command'),
       );
-    expect(hostRequirement?.content).toContain('Host requirement: before giving a final answer after a workspace-changing mutate command');
+    expect(hostRequirement).toBeDefined();
+    expect(hostRequirement?.content).toContain(
+      'Host requirement: before giving a final answer after a workspace-changing mutate command',
+    );
   });
 
   it('rejects a vague final answer after mutation follow-up until it includes changed, verified, and remaining uncertainty labels', async () => {

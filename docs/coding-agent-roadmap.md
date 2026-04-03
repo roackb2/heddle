@@ -83,6 +83,7 @@ Current progress:
 - chat mode now supports interrupt via `Esc` and resume via `/continue`
 - carried-over session history is sanitized before the next run so interrupted tool calls do not poison later turns with missing tool-output API errors
 - approval prompts now surface scope/capability/risk metadata, and exact per-project approvals apply immediately after being remembered
+- project approval memory is now backward-compatible with older saved rules, supports low-risk workspace verification command families such as `yarn test ...`, and can remember `edit_file` at the project level
 - the chat view is now more stable for multi-turn use: conversation stays the anchor, active run state is rendered inline with that flow, and basic response formatting now makes lists/code easier to read
 
 Remaining priority:
