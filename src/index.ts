@@ -19,12 +19,25 @@ export type {
 } from './types.js';
 
 // LLM
-export type { LlmAdapter, ChatMessage, LlmResponse, LlmProvider, LlmAdapterCapabilities, LlmAdapterInfo } from './llm/types.js';
+export type {
+  LlmAdapter,
+  ChatMessage,
+  LlmResponse,
+  LlmProvider,
+  LlmAdapterCapabilities,
+  LlmAdapterInfo,
+  LlmUsage,
+} from './llm/types.js';
 export { createLlmAdapter, inferProviderFromModel, resolveLlmProvider } from './llm/factory.js';
 export type { CreateLlmAdapterOptions } from './llm/factory.js';
 export { createOpenAiAdapter } from './llm/openai.js';
 export type { OpenAiAdapterOptions } from './llm/openai.js';
-export { OPENAI_MODEL_GROUPS, COMMON_OPENAI_MODELS, formatOpenAiModelGroups } from './llm/openai-models.js';
+export {
+  OPENAI_MODEL_GROUPS,
+  COMMON_OPENAI_MODELS,
+  formatOpenAiModelGroups,
+  estimateOpenAiContextWindow,
+} from './llm/openai-models.js';
 export type { OpenAiModelGroup } from './llm/openai-models.js';
 
 // Tools

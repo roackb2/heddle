@@ -19,6 +19,15 @@ export type LlmAdapterInfo = {
   capabilities: LlmAdapterCapabilities;
 };
 
+export type LlmUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  cachedInputTokens?: number;
+  reasoningTokens?: number;
+  requests?: number;
+};
+
 /**
  * A message in the chat transcript.
  */
@@ -35,6 +44,7 @@ export type LlmResponse = {
   content?: string;
   diagnostics?: AssistantDiagnostics;
   toolCalls?: ToolCall[];
+  usage?: LlmUsage;
 };
 
 /**

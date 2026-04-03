@@ -22,6 +22,17 @@ export type LiveEvent = {
   text: string;
 };
 
+export type ChatContextStats = {
+  estimatedHistoryTokens: number;
+  lastRunInputTokens?: number;
+  lastRunOutputTokens?: number;
+  lastRunTotalTokens?: number;
+  cachedInputTokens?: number;
+  reasoningTokens?: number;
+  compactedMessages?: number;
+  compactedAt?: string;
+};
+
 export type ChatSession = {
   id: string;
   name: string;
@@ -31,6 +42,7 @@ export type ChatSession = {
   createdAt: string;
   updatedAt: string;
   lastContinuePrompt?: string;
+  context?: ChatContextStats;
 };
 
 export type PendingApproval = {

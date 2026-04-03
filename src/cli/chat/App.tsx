@@ -11,7 +11,7 @@ import {
   shouldShowSlashHints,
   SlashHintPanel,
 } from './components/index.js';
-import { filterOpenAiModels } from '../../llm/openai-models.js';
+import { estimateOpenAiContextWindow, filterOpenAiModels } from '../../llm/openai-models.js';
 import { useApprovalFlow } from './hooks/useApprovalFlow.js';
 import { useAgentRun } from './hooks/useAgentRun.js';
 import { useChatSessions } from './hooks/useChatSessions.js';
@@ -77,9 +77,10 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   } = useApprovalFlow(nextLocalId);
   const messages = activeSession?.messages ?? [];
   const activityText = currentActivityText(liveEvents, isRunning, elapsedSeconds, pendingApproval, interruptRequested);
+  const contextStatus = formatContextStatus(activeModel, activeSession?.context?.estimatedHistoryTokens);
   const promptStatusLine = [
     `model=${activeModel}`,
-    'context=unknown',
+    contextStatus,
     `session=${activeSession?.id ?? activeSessionId}${activeSession?.name ? ` (${activeSession.name})` : ''}`,
   ].join(' • ');
   const activityLines = liveEvents
@@ -388,4 +389,30 @@ function handlePickerKeys(options: {
   }
 
   return false;
+}
+
+function formatContextStatus(model: string, estimatedHistoryTokens?: number): string {
+  if (estimatedHistoryTokens === undefined) {
+    return 'context=unknown';
+  }
+
+  const contextWindow = estimateOpenAiContextWindow(model);
+  if (!contextWindow) {
+    return `context≈${formatTokenCount(estimatedHistoryTokens)} used`;
+  }
+
+  const remainingTokens = Math.max(contextWindow - estimatedHistoryTokens, 0);
+  return `context≈${formatTokenCount(remainingTokens)} left`;
+}
+
+function formatTokenCount(value: number): string {
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  }
+
+  if (value >= 1_000) {
+    return `${Math.round(value / 1_000)}k`;
+  }
+
+  return `${value}`;
 }

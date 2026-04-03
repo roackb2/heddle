@@ -4,6 +4,7 @@ import {
   DEFAULT_MUTATE_RULES,
   type RunShellPolicyDecision,
 } from '../../../tools/run-shell.js';
+import { isCompactedHistorySummary } from '../state/compaction.js';
 import type { ConversationLine, LiveEvent, PendingApproval } from '../state/types.js';
 
 const MAX_SHELL_OUTPUT_CHARS = 1400;
@@ -11,6 +12,14 @@ const MAX_TOOL_CALL_SUMMARY_CHARS = 96;
 
 export function buildConversationMessages(history: ChatMessage[]): ConversationLine[] {
   return history.flatMap((message, index) => {
+    if (isCompactedHistorySummary(message)) {
+      return [{
+        id: `compacted-${index}`,
+        role: 'assistant',
+        text: 'Earlier conversation history was compacted to preserve context for longer chats.',
+      }];
+    }
+
     if (message.role === 'user' || message.role === 'assistant') {
       if (!message.content.trim()) {
         return [];
@@ -514,7 +523,7 @@ export function appendDirectShellHistory(
   const summary = buildDirectShellHistorySummary(toolName, result);
   const userMessage: ChatMessage = { role: 'user', content: shellDisplay };
   const assistantMessage: ChatMessage = { role: 'assistant', content: summary };
-  return [...history, userMessage, assistantMessage].slice(-60);
+  return [...history, userMessage, assistantMessage];
 }
 
 function buildDirectShellHistorySummary(toolName: string, result: ToolResult): string {

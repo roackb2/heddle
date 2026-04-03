@@ -37,6 +37,10 @@ export const OPENAI_MODEL_GROUPS: OpenAiModelGroup[] = [
 
 export const COMMON_OPENAI_MODELS = OPENAI_MODEL_GROUPS.flatMap((group) => group.models);
 
+const OPENAI_CONTEXT_WINDOW_ESTIMATES = new Map<string, number>(
+  COMMON_OPENAI_MODELS.map((model) => [model, inferContextWindowEstimate(model)]),
+);
+
 export function formatOpenAiModelGroups(): string {
   return OPENAI_MODEL_GROUPS.map((group) => `${group.label}: ${group.models.join(', ')}`).join('\n');
 }
@@ -48,4 +52,21 @@ export function filterOpenAiModels(query: string): string[] {
   }
 
   return COMMON_OPENAI_MODELS.filter((model) => model.toLowerCase().includes(normalized));
+}
+
+export function estimateOpenAiContextWindow(model: string): number | undefined {
+  const normalized = model.trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  return OPENAI_CONTEXT_WINDOW_ESTIMATES.get(normalized) ?? inferContextWindowEstimate(normalized);
+}
+
+function inferContextWindowEstimate(model: string): number {
+  if (model.startsWith('gpt-4.1')) {
+    return 128_000;
+  }
+
+  return 200_000;
 }

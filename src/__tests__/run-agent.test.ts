@@ -152,6 +152,63 @@ describe('runAgent', () => {
     });
   });
 
+  it('aggregates token usage across model calls', async () => {
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        if (messages.some((message) => message.role === 'tool')) {
+          return {
+            content: 'Done.',
+            usage: {
+              inputTokens: 140,
+              outputTokens: 20,
+              totalTokens: 160,
+              requests: 1,
+            },
+          };
+        }
+
+        return {
+          content: 'Inspecting first.',
+          toolCalls: [{ id: 'call-1', tool: 'list_files', input: { path: '.' } }],
+          usage: {
+            inputTokens: 120,
+            outputTokens: 30,
+            totalTokens: 150,
+            cachedInputTokens: 10,
+            reasoningTokens: 6,
+            requests: 1,
+          },
+        };
+      },
+    };
+
+    const listFilesTool: ToolDefinition = {
+      name: 'list_files',
+      description: 'Lists files in a directory',
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: 'README.md\nsrc/' };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Inspect this repo.',
+      llm: fakeLlm,
+      tools: [listFilesTool],
+      maxSteps: 3,
+      logger: silentLogger,
+    });
+
+    expect(result.usage).toEqual({
+      inputTokens: 260,
+      outputTokens: 50,
+      totalTokens: 310,
+      cachedInputTokens: 10,
+      reasoningTokens: 6,
+      requests: 2,
+    });
+  });
+
   it('allows one repeated identical tool call, then blocks excessive repetition', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { ChatMessage } from '../../../index.js';
-import type { ChatSession, ConversationLine, TurnSummary } from './types.js';
+import type { ChatContextStats, ChatSession, ConversationLine, TurnSummary } from './types.js';
 import { truncate } from '../utils/format.js';
 
 export function createInitialMessages(apiKeyPresent: boolean): ConversationLine[] {
@@ -38,6 +38,7 @@ export function createChatSession(options: {
     createdAt: now,
     updatedAt: now,
     lastContinuePrompt: undefined,
+    context: undefined,
   };
 }
 
@@ -122,6 +123,7 @@ function parseSavedSession(value: unknown, apiKeyPresent: boolean): ChatSession[
     createdAt,
     updatedAt,
     lastContinuePrompt: typeof candidate.lastContinuePrompt === 'string' ? candidate.lastContinuePrompt : undefined,
+    context: isChatContextStats(candidate.context) ? candidate.context : undefined,
   }];
 }
 
@@ -153,5 +155,23 @@ function isTurnSummary(value: unknown): value is TurnSummary {
     typeof candidate.traceFile === 'string' &&
     Array.isArray(candidate.events) &&
     candidate.events.every((event) => typeof event === 'string')
+  );
+}
+
+function isChatContextStats(value: unknown): value is ChatContextStats {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const candidate = value as Partial<ChatContextStats>;
+  return (
+    typeof candidate.estimatedHistoryTokens === 'number' &&
+    (candidate.lastRunInputTokens === undefined || typeof candidate.lastRunInputTokens === 'number') &&
+    (candidate.lastRunOutputTokens === undefined || typeof candidate.lastRunOutputTokens === 'number') &&
+    (candidate.lastRunTotalTokens === undefined || typeof candidate.lastRunTotalTokens === 'number') &&
+    (candidate.cachedInputTokens === undefined || typeof candidate.cachedInputTokens === 'number') &&
+    (candidate.reasoningTokens === undefined || typeof candidate.reasoningTokens === 'number') &&
+    (candidate.compactedMessages === undefined || typeof candidate.compactedMessages === 'number') &&
+    (candidate.compactedAt === undefined || typeof candidate.compactedAt === 'string')
   );
 }

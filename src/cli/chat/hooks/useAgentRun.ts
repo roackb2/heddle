@@ -28,6 +28,7 @@ import {
 } from '../utils/format.js';
 import { saveTrace } from '../utils/runtime.js';
 import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../state/approval-rules.js';
+import { compactChatHistory } from '../state/compaction.js';
 import { isGenericSessionName } from '../state/storage.js';
 import { normalizeSessionTitle } from '../utils/format.js';
 import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval, TurnSummary } from '../state/types.js';
@@ -72,6 +73,7 @@ type ExecuteTurnArgs = {
 
 type ExecuteDirectShellArgs = {
   rawCommand: string;
+  model: string;
   activeSessionId: string;
   runtime: ChatRuntimeConfig;
   tools: ToolDefinition[];
@@ -190,6 +192,7 @@ export function useAgentRun(args: UseAgentRunArgs) {
   const executeDirectShellCommand = async (rawCommand: string) => {
     await runDirectShellAction({
       rawCommand,
+      model: activeModel,
       activeSessionId,
       runtime,
       tools,
@@ -300,10 +303,16 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       abortSignal: state.abortControllerRef.current.signal,
     });
 
+    const compacted = compactChatHistory({
+      history: result.transcript,
+      model: llm.info?.model ?? runtime.model,
+      usage: result.usage,
+    });
     updateSessionById(sessionId, (sessionToUpdate) => ({
       ...sessionToUpdate,
-      history: result.transcript,
-      messages: buildConversationMessages(result.transcript),
+      history: compacted.history,
+      context: compacted.context,
+      messages: buildConversationMessages(compacted.history),
     }));
 
     const traceFile = saveTrace(runtime.traceDir, result.trace);
@@ -322,7 +331,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     }));
 
     const assistantText =
-      buildConversationMessages(result.transcript).filter((message) => message.role === 'assistant').at(-1)?.text ??
+      buildConversationMessages(compacted.history).filter((message) => message.role === 'assistant').at(-1)?.text ??
       result.summary;
     maybeAutoNameSession(sessionId, prompt, assistantText);
     if (result.outcome === 'error') {
@@ -353,6 +362,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
 async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void> {
   const {
     rawCommand,
+    model,
     activeSessionId,
     runtime,
     tools,
@@ -460,8 +470,18 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
     const responseText = formatDirectShellResponse(chosenCall.tool, command, chosenResult);
     updateActiveSession((session) => ({
       ...session,
-      messages: [...session.messages, { id: state.nextLocalId(), role: 'assistant', text: responseText }],
-      history: appendDirectShellHistory(session.history, shellDisplay, chosenCall.tool, chosenResult),
+      ...(() => {
+        const compacted = compactChatHistory({
+          history: appendDirectShellHistory(session.history, shellDisplay, chosenCall.tool, chosenResult),
+          model,
+        });
+
+        return {
+          history: compacted.history,
+          context: compacted.context,
+          messages: buildConversationMessages(compacted.history),
+        };
+      })(),
     }));
     state.setLiveEvents([
       {

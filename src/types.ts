@@ -3,7 +3,7 @@
 // Minimal types only. No premature abstractions.
 // ---------------------------------------------------------------------------
 
-import type { ChatMessage } from './llm/types.js';
+import type { ChatMessage, LlmUsage } from './llm/types.js';
 
 /**
  * Input to the agent loop.
@@ -100,4 +100,5 @@ export type RunResult = {
   summary: string;
   trace: TraceEvent[];
   transcript: ChatMessage[];
+  usage?: LlmUsage;
 };

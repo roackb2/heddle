@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import type { RunInput, RunResult, ToolDefinition, StopReason, ToolCall } from './types.js';
-import type { LlmAdapter } from './llm/types.js';
+import type { LlmAdapter, LlmUsage } from './llm/types.js';
 import type { ChatMessage } from './llm/types.js';
 import { createToolRegistry } from './tools/registry.js';
 import { createTraceRecorder } from './trace/recorder.js';
@@ -80,6 +80,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   };
   let step = 0;
   let consecutiveErrors = 0;
+  let usage: LlmUsage | undefined;
 
   log.info({ goal, maxSteps, tools: registry.names() }, 'Agent run started');
   record({ type: 'run.started', goal, timestamp: now() });
@@ -100,7 +101,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
       summary = 'Run interrupted by host request';
       log.info({ step, outcome }, 'Agent run interrupted before next step');
       record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
-      return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
+      return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1), usage };
     }
 
     step++;
@@ -115,10 +116,11 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
         summary = 'Run interrupted by host request';
         log.info({ step, outcome }, 'Agent run interrupted before LLM call');
         record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
-        return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
+        return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1), usage };
       }
 
       response = await llm.chat(messages, registry.list(), abortSignal);
+      usage = accumulateUsage(usage, response.usage);
     } catch (err) {
       if (isAbortError(err) || abortSignal?.aborted || shouldStop?.()) {
         outcome = 'interrupted';
@@ -130,6 +132,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
           summary,
           trace: trace.getTrace(),
           transcript: messages.slice(1),
+          usage,
         };
       }
 
@@ -147,6 +150,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
         summary: `LLM error: ${errMsg}`,
         trace: trace.getTrace(),
         transcript: messages.slice(1),
+        usage,
       };
     }
 
@@ -174,7 +178,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
           summary = 'Run interrupted by host request';
           log.info({ step, outcome }, 'Agent run interrupted before tool execution');
           record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
-          return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
+          return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1), usage };
         }
 
         const tool = registry.get(call.tool);
@@ -193,7 +197,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
             outcome = 'error';
             summary = `Stopped after ${MAX_CONSECUTIVE_ERRORS} consecutive tool errors. Last error: ${approvalDeniedResult.error}`;
             record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
-            return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
+            return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1), usage };
           }
           messages.push({
             role: 'tool',
@@ -230,7 +234,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
             outcome = 'error';
             summary = `Stopped after ${MAX_CONSECUTIVE_ERRORS} consecutive tool errors. Last error: ${result.error}`;
             record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
-            return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
+            return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1), usage };
           }
         } else {
           consecutiveErrors = 0;
@@ -303,19 +307,42 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
       summary = response.content;
       log.info({ step, outcome }, 'Agent run finished');
       record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
-      return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
+      return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1), usage };
     }
 
     // Case 3: empty response — shouldn't happen but handle gracefully
     outcome = 'error';
     summary = 'Model returned an empty response';
     record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
-    return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
+    return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1), usage };
   }
 
   // Budget exhausted
   summary = `Reached maximum step limit (${maxSteps})`;
   log.warn({ step, maxSteps }, 'Budget exhausted');
   record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
-  return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
+  return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1), usage };
+}
+
+function accumulateUsage(current: LlmUsage | undefined, next: LlmUsage | undefined): LlmUsage | undefined {
+  if (!next) {
+    return current;
+  }
+
+  if (!current) {
+    return { ...next };
+  }
+
+  const cachedInputTokens = (current.cachedInputTokens ?? 0) + (next.cachedInputTokens ?? 0);
+  const reasoningTokens = (current.reasoningTokens ?? 0) + (next.reasoningTokens ?? 0);
+  const requests = (current.requests ?? 0) + (next.requests ?? 0);
+
+  return {
+    inputTokens: current.inputTokens + next.inputTokens,
+    outputTokens: current.outputTokens + next.outputTokens,
+    totalTokens: current.totalTokens + next.totalTokens,
+    cachedInputTokens: cachedInputTokens || undefined,
+    reasoningTokens: reasoningTokens || undefined,
+    requests: requests || undefined,
+  };
 }

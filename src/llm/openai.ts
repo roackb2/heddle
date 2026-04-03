@@ -4,7 +4,7 @@
 
 import OpenAI from 'openai';
 import type { ResponseInputItem, FunctionTool, ResponseFunctionToolCall, ResponseReasoningItem, Response } from 'openai/resources/responses/responses.js';
-import type { LlmAdapter, ChatMessage, LlmResponse, LlmAdapterCapabilities } from './types.js';
+import type { LlmAdapter, ChatMessage, LlmResponse, LlmAdapterCapabilities, LlmUsage } from './types.js';
 import type { AssistantDiagnostics, ToolDefinition, ToolCall } from '../types.js';
 import { DEFAULT_OPENAI_MODEL } from '../config.js';
 
@@ -58,6 +58,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
         content,
         diagnostics,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        usage: extractUsage(response),
       };
     },
   };
@@ -103,6 +104,21 @@ function extractAssistantDiagnostics(response: Response, hasToolCalls: boolean):
   }
 
   return { rationale };
+}
+
+function extractUsage(response: Response): LlmUsage | undefined {
+  if (!response.usage) {
+    return undefined;
+  }
+
+  return {
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+    totalTokens: response.usage.total_tokens,
+    cachedInputTokens: response.usage.input_tokens_details.cached_tokens || undefined,
+    reasoningTokens: response.usage.output_tokens_details.reasoning_tokens || undefined,
+    requests: 1,
+  };
 }
 
 function toResponseInput(messages: ChatMessage[]): ResponseInputItem[] {
