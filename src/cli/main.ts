@@ -3,7 +3,7 @@
 import { chdir } from 'node:process';
 import { resolve } from 'node:path';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { startChatCli } from './chat.js';
+import { startChatCli } from './chat/index.js';
 import { runAskCli } from './ask.js';
 
 type CliFlags = {

@@ -1,5 +1,5 @@
-import type { ChatSession, LocalCommandResult } from './chat-types.js';
-import { summarizeSession } from './chat-storage.js';
+import type { ChatSession, LocalCommandResult } from './types.js';
+import { summarizeSession } from './storage.js';
 
 const knownModels = ['gpt-5.1-codex-mini', 'gpt-5.1-codex'];
 

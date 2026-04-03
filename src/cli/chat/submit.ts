@@ -1,7 +1,7 @@
-import { runLocalCommand } from './chat-local-commands.js';
-import { normalizeInlineText } from './chat-format.js';
-import { createInitialMessages } from './chat-storage.js';
-import type { ChatSession, ConversationLine } from './chat-types.js';
+import { runLocalCommand } from './state/local-commands.js';
+import { createInitialMessages } from './state/storage.js';
+import type { ChatSession, ConversationLine } from './state/types.js';
+import { normalizeInlineText } from './utils/format.js';
 
 type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
 

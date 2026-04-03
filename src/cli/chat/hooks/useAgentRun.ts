@@ -1,8 +1,20 @@
+import { useMemo } from 'react';
 import type { MutableRefObject } from 'react';
 import type { Logger } from 'pino';
-import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition, ToolResult } from '../index.js';
-import { runAgent } from '../index.js';
-import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../tools/run-shell.js';
+import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition, ToolResult } from '../../../index.js';
+import {
+  createLogger,
+  createOpenAiAdapter,
+  createRunShellInspectTool,
+  createRunShellMutateTool,
+  createSearchFilesTool,
+  editFileTool,
+  listFilesTool,
+  readFileTool,
+  reportStateTool,
+  runAgent,
+} from '../../../index.js';
+import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../tools/run-shell.js';
 import {
   appendDirectShellHistory,
   buildConversationMessages,
@@ -12,10 +24,12 @@ import {
   summarizeTrace,
   summarizeToolCall,
   toLiveEvent,
-} from './chat-format.js';
-import { saveTrace } from './chat-runtime.js';
-import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval, TurnSummary } from './chat-types.js';
-import type { ChatRuntimeConfig } from './chat-runtime.js';
+} from '../utils/format.js';
+import { saveTrace } from '../utils/runtime.js';
+import { isGenericSessionName } from '../state/storage.js';
+import { normalizeSessionTitle } from '../utils/format.js';
+import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval, TurnSummary } from '../state/types.js';
+import type { ChatRuntimeConfig } from '../utils/runtime.js';
 
 type StateSetter<T> = (value: T | ((current: T) => T)) => void;
 
@@ -60,6 +74,126 @@ type ExecuteDirectShellArgs = {
   updateActiveSession: ActiveSessionUpdater;
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
 };
+
+type UseAgentRunArgs = {
+  runtime: ChatRuntimeConfig;
+  activeModel: string;
+  sessionTitleModel: string;
+  activeSessionId: string;
+  sessions: ChatSession[];
+  state: ActionState;
+  updateSessionById: SessionUpdater;
+  updateActiveSession: ActiveSessionUpdater;
+};
+
+export function useAgentRun(args: UseAgentRunArgs) {
+  const { runtime, activeModel, sessionTitleModel, activeSessionId, sessions, state, updateSessionById, updateActiveSession } = args;
+
+  const llm = useMemo(
+    () => createOpenAiAdapter({ model: activeModel, apiKey: runtime.apiKey }),
+    [activeModel, runtime.apiKey],
+  );
+  const titleLlm = useMemo(
+    () => createOpenAiAdapter({ model: sessionTitleModel, apiKey: runtime.apiKey }),
+    [runtime.apiKey, sessionTitleModel],
+  );
+  const tools = useMemo(
+    () => [
+      listFilesTool,
+      readFileTool,
+      editFileTool,
+      createSearchFilesTool({ excludedDirs: runtime.searchIgnoreDirs }),
+      reportStateTool,
+      createRunShellInspectTool(),
+      createRunShellMutateTool(),
+    ],
+    [runtime.searchIgnoreDirs],
+  );
+  const logger = useMemo<Logger>(
+    () =>
+      createLogger({
+        pretty: false,
+        level: 'debug',
+        console: false,
+        logFilePath: runtime.logFile,
+      }),
+    [runtime.logFile],
+  );
+
+  const maybeAutoNameSession = (sessionId: string, prompt: string, responseText: string) => {
+    const session = sessions.find((candidate) => candidate.id === sessionId);
+    if (!session || !isGenericSessionName(session.name) || !runtime.apiKey) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const result = await titleLlm.chat(
+          [
+            {
+              role: 'system',
+              content:
+                'You name terminal chat sessions. Return only a short 3 to 6 word title in plain text. No quotes, no punctuation, no prefix.',
+            },
+            {
+              role: 'user',
+              content: `User prompt:\n${prompt}\n\nAssistant or tool summary:\n${responseText}\n\nCreate a concise session title.`,
+            },
+          ],
+          [],
+        );
+
+        const title = normalizeSessionTitle(result.content);
+        if (!title) {
+          return;
+        }
+
+        updateSessionById(sessionId, (candidate) =>
+          isGenericSessionName(candidate.name) ? { ...candidate, name: title } : candidate,
+        );
+      } catch (titleError) {
+        logger.debug(
+          { error: titleError instanceof Error ? titleError.message : String(titleError), sessionId },
+          'Session auto-title failed',
+        );
+      }
+    })();
+  };
+
+  const executeTurn = async (prompt: string, displayText?: string, sessionIdOverride = activeSessionId) => {
+    const session = sessions.find((candidate) => candidate.id === sessionIdOverride);
+    await executeAgentTurn({
+      prompt,
+      displayText,
+      sessionId: sessionIdOverride,
+      sessionHistory: session?.history ?? [],
+      runtime,
+      llm,
+      tools,
+      logger,
+      state,
+      updateSessionById,
+      maybeAutoNameSession,
+    });
+  };
+
+  const executeDirectShellCommand = async (rawCommand: string) => {
+    await runDirectShellAction({
+      rawCommand,
+      activeSessionId,
+      runtime,
+      tools,
+      state,
+      updateActiveSession,
+      maybeAutoNameSession,
+    });
+  };
+
+  return {
+    executeTurn,
+    executeDirectShellCommand,
+  };
+}
 
 export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult | undefined> {
   const {
@@ -184,7 +318,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   }
 }
 
-export async function executeDirectShellCommand(args: ExecuteDirectShellArgs): Promise<void> {
+async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void> {
   const {
     rawCommand,
     activeSessionId,

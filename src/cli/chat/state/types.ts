@@ -1,4 +1,4 @@
-import type { ChatMessage, ToolCall, ToolDefinition } from '../index.js';
+import type { ChatMessage, ToolCall, ToolDefinition } from '../../../index.js';
 
 export type TurnSummary = {
   id: string;

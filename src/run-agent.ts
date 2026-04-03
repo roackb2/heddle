@@ -75,6 +75,8 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   const executedMutationCommands: string[] = [];
   const executedReviewCommands: string[] = [];
   const executedVerificationCommands: string[] = [];
+  const executedReviewEvidence: string[] = [];
+  const executedVerificationEvidence: string[] = [];
   const sanitizedHistory = sanitizeHistory(history);
 
   log.info({ goal, maxSteps, tools: registry.names() }, 'Agent run started');
@@ -277,6 +279,11 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
           if (call.tool === 'run_shell_inspect' && command && isRepoReviewCommand(command)) {
             pendingChangeReview = false;
             executedReviewCommands.push(command);
+            executedReviewEvidence.push(summarizeCommandEvidence(result.output));
+          }
+
+          if (call.tool === 'run_shell_mutate' && command && isVerificationMutateCommand(command)) {
+            executedVerificationEvidence.push(summarizeCommandEvidence(result.output));
           }
         }
 
@@ -312,12 +319,18 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
 
       if (
         requiresStructuredChangeSummary &&
-        !hasStructuredChangeSummary(response.content)
+        !hasStructuredChangeSummary(response.content, {
+          mutationCommands: executedMutationCommands,
+          reviewCommands: executedReviewCommands,
+          verificationCommands: executedVerificationCommands,
+        })
       ) {
         const hostRequirement = buildStructuredChangeSummaryRequirement({
           mutationCommands: executedMutationCommands,
           reviewCommands: executedReviewCommands,
           verificationCommands: executedVerificationCommands,
+          reviewEvidence: executedReviewEvidence,
+          verificationEvidence: executedVerificationEvidence,
         });
         log.info({ step }, 'Blocking vague final answer until structured change summary is provided');
         messages.push({ role: 'system', content: hostRequirement });
@@ -455,7 +468,9 @@ function buildPostMutationRequirement(options: {
   const requirements: string[] = [];
 
   if (options.pendingChangeReview) {
-    requirements.push('inspect the resulting repo state with a git review command such as git status or git diff');
+    requirements.push(
+      'inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat',
+    );
   }
 
   if (options.pendingVerification) {
@@ -465,20 +480,52 @@ function buildPostMutationRequirement(options: {
   return `Host requirement: before giving a final answer after a workspace-changing mutate command, you must ${requirements.join(' and ')}. After doing that, then provide the final answer.`;
 }
 
-function hasStructuredChangeSummary(content: string): boolean {
+function hasStructuredChangeSummary(
+  content: string,
+  options: {
+    mutationCommands: string[];
+    reviewCommands: string[];
+    verificationCommands: string[];
+  },
+): boolean {
   const normalized = content.toLowerCase();
 
-  return (
-    /(?:^|\n)changed\s*:/.test(normalized) &&
-    /(?:^|\n)verified\s*:/.test(normalized) &&
-    /(?:^|\n)(?:remaining uncertainty|uncertainty|remaining risks?)\s*:/.test(normalized)
-  );
+  if (
+    !/(?:^|\n)changed\s*:/.test(normalized) ||
+    !/(?:^|\n)verified\s*:/.test(normalized) ||
+    !/(?:^|\n)(?:remaining uncertainty|uncertainty|remaining risks?)\s*:/.test(normalized)
+  ) {
+    return false;
+  }
+
+  const changedLine = extractStructuredSummaryLine(content, 'Changed');
+  const verifiedLine = extractStructuredSummaryLine(content, 'Verified');
+  if (!changedLine || !verifiedLine) {
+    return false;
+  }
+
+  const normalizedChangedLine = changedLine.toLowerCase();
+  const normalizedVerifiedLine = verifiedLine.toLowerCase();
+
+  const mentionsMutation =
+    options.mutationCommands.length === 0 ||
+    options.mutationCommands.some((command) => normalizedChangedLine.includes(command.toLowerCase()));
+  const mentionsReview =
+    options.reviewCommands.length === 0 ||
+    options.reviewCommands.some((command) => normalizedVerifiedLine.includes(command.toLowerCase()));
+  const mentionsVerification =
+    options.verificationCommands.length === 0 ||
+    options.verificationCommands.some((command) => normalizedVerifiedLine.includes(command.toLowerCase()));
+
+  return mentionsMutation && mentionsReview && mentionsVerification;
 }
 
 function buildStructuredChangeSummaryRequirement(options: {
   mutationCommands: string[];
   reviewCommands: string[];
   verificationCommands: string[];
+  reviewEvidence: string[];
+  verificationEvidence: string[];
 }): string {
   const mutationSummary = options.mutationCommands.length > 0
     ? options.mutationCommands.join('; ')
@@ -489,8 +536,39 @@ function buildStructuredChangeSummaryRequirement(options: {
   const verificationSummary = options.verificationCommands.length > 0
     ? options.verificationCommands.join('; ')
     : 'no verification command recorded';
+  const reviewEvidenceSummary = options.reviewEvidence.length > 0
+    ? options.reviewEvidence.join('; ')
+    : 'no repo review evidence captured';
+  const verificationEvidenceSummary = options.verificationEvidence.length > 0
+    ? options.verificationEvidence.join('; ')
+    : 'no verification evidence captured';
 
-  return `Host requirement: after a workspace-changing mutate command, your final answer must be a short operator review with exactly these labels on separate lines: "Changed:", "Verified:", and "Remaining uncertainty:". Mention the concrete change work (${mutationSummary}), the repo review evidence (${reviewSummary}), and the verification evidence (${verificationSummary}). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".`;
+  return `Host requirement: after a workspace-changing mutate command, your final answer must be a short operator review with exactly these labels on separate lines: "Changed:", "Verified:", and "Remaining uncertainty:". In "Changed:", mention the concrete change work and name the exact command(s) or edit action used (${mutationSummary}). In "Verified:", name the exact repo review command(s) (${reviewSummary}) and exact verification command(s) (${verificationSummary}), and ground them in concrete evidence from the command results (${reviewEvidenceSummary}; ${verificationEvidenceSummary}). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".`;
+}
+
+function extractStructuredSummaryLine(content: string, label: 'Changed' | 'Verified'): string | undefined {
+  const match = content.match(new RegExp(`(?:^|\\n)${label}\\s*:\\s*([^\\n]+)`, 'i'));
+  return match?.[1]?.trim();
+}
+
+function summarizeCommandEvidence(output: unknown): string {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) {
+    return 'no structured command output recorded';
+  }
+
+  const candidate = output as {
+    command?: unknown;
+    stdout?: unknown;
+    stderr?: unknown;
+    exitCode?: unknown;
+  };
+  const command = typeof candidate.command === 'string' && candidate.command.trim() ? candidate.command.trim() : 'command';
+  const stdout = typeof candidate.stdout === 'string' ? candidate.stdout.trim() : '';
+  const stderr = typeof candidate.stderr === 'string' ? candidate.stderr.trim() : '';
+  const exitCode = typeof candidate.exitCode === 'number' ? candidate.exitCode : 0;
+  const body = stdout || stderr;
+  const snippet = body ? body.replace(/\s+/g, ' ').slice(0, 120) : 'no stdout/stderr output';
+  return `${command} => exit ${exitCode}, ${snippet}`;
 }
 
 function stableSerialize(value: unknown): string {

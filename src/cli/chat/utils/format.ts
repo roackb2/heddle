@@ -1,5 +1,5 @@
-import type { ChatMessage, TraceEvent, ToolResult } from '../index.js';
-import type { ConversationLine, LiveEvent, PendingApproval } from './chat-types.js';
+import type { ChatMessage, TraceEvent, ToolResult } from '../../../index.js';
+import type { ConversationLine, LiveEvent, PendingApproval } from '../state/types.js';
 
 const MAX_SHELL_OUTPUT_CHARS = 1400;
 const MAX_TOOL_CALL_SUMMARY_CHARS = 96;

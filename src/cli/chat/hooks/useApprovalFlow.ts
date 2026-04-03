@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useInput } from 'ink';
-import type { ActionState } from './chat-actions.js';
-import type { ApprovalChoice, LiveEvent, PendingApproval } from './chat-types.js';
+import type { ActionState } from './useAgentRun.js';
+import type { ApprovalChoice, LiveEvent, PendingApproval } from '../state/types.js';
 
 const WORKING_FRAMES = ['.', '..', '...'];
 
-export function useChatRunState(nextLocalId: () => string) {
+export function useApprovalFlow(nextLocalId: () => string) {
   const [status, setStatus] = useState('Idle');
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | undefined>();

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ChatSession } from './chat-types.js';
+import type { ChatSession } from '../state/types.js';
 import {
   createChatSession,
   isGenericSessionName,
@@ -7,7 +7,7 @@ import {
   saveChatSessions,
   summarizeSession,
   touchSession,
-} from './chat-storage.js';
+} from '../state/storage.js';
 
 type UseChatSessionsArgs = {
   sessionsFile: string;

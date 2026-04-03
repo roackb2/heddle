@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { ChatMessage } from '../index.js';
-import type { ChatSession, ConversationLine, TurnSummary } from './chat-types.js';
-import { truncate } from './chat-format.js';
+import type { ChatMessage } from '../../../index.js';
+import type { ChatSession, ConversationLine, TurnSummary } from './types.js';
+import { truncate } from '../utils/format.js';
 
 export function createInitialMessages(apiKeyPresent: boolean): ConversationLine[] {
   return [

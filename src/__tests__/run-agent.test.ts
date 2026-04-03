@@ -466,7 +466,7 @@ describe('runAgent', () => {
 
         return {
           content:
-            'Changed: fixed src/example.ts via eslint --fix.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+            'Changed: fixed src/example.ts via eslint --fix src/example.ts.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
         };
       },
     };
@@ -503,12 +503,12 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe(
-      'Changed: fixed src/example.ts via eslint --fix.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+      'Changed: fixed src/example.ts via eslint --fix src/example.ts.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
     );
     expect(seenMessages[2]).toContainEqual({
       role: 'system',
       content:
-        'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with a git review command such as git status or git diff and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
+        'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
     });
   });
 
@@ -565,7 +565,7 @@ describe('runAgent', () => {
     expect(seenMessages[2]).toContainEqual({
       role: 'system',
       content:
-        'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with a git review command such as git status or git diff and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
+        'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
     });
   });
 
@@ -612,7 +612,7 @@ describe('runAgent', () => {
 
         return {
           content:
-            'Changed: fixed src/example.ts via eslint --fix.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+            'Changed: fixed src/example.ts via eslint --fix src/example.ts.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
         };
       },
     };
@@ -649,12 +649,99 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe(
-      'Changed: fixed src/example.ts via eslint --fix.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+      'Changed: fixed src/example.ts via eslint --fix src/example.ts.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
     );
     expect(seenMessages[5]).toContainEqual({
       role: 'system',
       content:
-        'Host requirement: after a workspace-changing mutate command, your final answer must be a short operator review with exactly these labels on separate lines: "Changed:", "Verified:", and "Remaining uncertainty:". Mention the concrete change work (eslint --fix src/example.ts), the repo review evidence (git diff --stat), and the verification evidence (yarn test). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".',
+        'Host requirement: after a workspace-changing mutate command, your final answer must be a short operator review with exactly these labels on separate lines: "Changed:", "Verified:", and "Remaining uncertainty:". In "Changed:", mention the concrete change work and name the exact command(s) or edit action used (eslint --fix src/example.ts). In "Verified:", name the exact repo review command(s) (git diff --stat) and exact verification command(s) (yarn test), and ground them in concrete evidence from the command results (git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".',
+    });
+  });
+
+  it('rejects a structured summary that omits the actual review and verification commands', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+        const structuredReminder = [...messages].reverse().find(
+          (message: ChatMessage) =>
+            message.role === 'system' &&
+            message.content.includes('your final answer must be a short operator review'),
+        );
+
+        if (seenMessages.length === 1) {
+          return {
+            toolCalls: [{ id: 'call-1', tool: 'run_shell_mutate', input: { command: 'eslint --fix src/example.ts' } }],
+          };
+        }
+
+        if (seenMessages.length === 2) {
+          return { content: 'The workspace-changing command is complete.' };
+        }
+
+        if (seenMessages.length === 3) {
+          return {
+            toolCalls: [{ id: 'call-2', tool: 'run_shell_inspect', input: { command: 'git diff --stat' } }],
+          };
+        }
+
+        if (seenMessages.length === 4) {
+          return {
+            toolCalls: [{ id: 'call-3', tool: 'run_shell_mutate', input: { command: 'yarn test' } }],
+          };
+        }
+
+        if (!structuredReminder) {
+          return {
+            content: 'Changed: fixed src/example.ts.\nVerified: reviewed the repo and tests passed.\nRemaining uncertainty: none.',
+          };
+        }
+
+        return {
+          content:
+            'Changed: fixed src/example.ts via eslint --fix src/example.ts.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+        };
+      },
+    };
+
+    const mutateTool: ToolDefinition = {
+      name: 'run_shell_mutate',
+      description: 'Runs a bounded workspace mutation or verification command',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const command = (input as { command: string }).command;
+        return { ok: true, output: { command, exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
+    const inspectTool: ToolDefinition = {
+      name: 'run_shell_inspect',
+      description: 'Runs a read-only shell inspection command',
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const command = (input as { command: string }).command;
+        return { ok: true, output: { command, exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Apply the fix and tell me it worked.',
+      llm: fakeLlm,
+      tools: [mutateTool, inspectTool],
+      maxSteps: 8,
+      logger: silentLogger,
+      approveToolCall: async () => ({ approved: true }),
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe(
+      'Changed: fixed src/example.ts via eslint --fix src/example.ts.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+    );
+    expect(seenMessages[5]).toContainEqual({
+      role: 'system',
+      content:
+        'Host requirement: after a workspace-changing mutate command, your final answer must be a short operator review with exactly these labels on separate lines: "Changed:", "Verified:", and "Remaining uncertainty:". In "Changed:", mention the concrete change work and name the exact command(s) or edit action used (eslint --fix src/example.ts). In "Verified:", name the exact repo review command(s) (git diff --stat) and exact verification command(s) (yarn test), and ground them in concrete evidence from the command results (git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".',
     });
   });
 
@@ -747,7 +834,7 @@ describe('runAgent', () => {
     expect(seenMessages[2]).toContainEqual({
       role: 'system',
       content:
-        'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with a git review command such as git status or git diff and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
+        'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
     });
   });
 });

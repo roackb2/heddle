@@ -1,8 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import type { TraceEvent } from '../index.js';
-import { DEFAULT_OPENAI_MODEL } from '../index.js';
-import { parsePositiveInt } from './chat-format.js';
+import type { TraceEvent } from '../../../index.js';
+import { DEFAULT_OPENAI_MODEL } from '../../../index.js';
+import { parsePositiveInt } from './format.js';
 
 export type ChatCliOptions = {
   model?: string;

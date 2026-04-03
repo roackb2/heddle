@@ -1,21 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { Box, Text, render } from 'ink';
-import {
-  createOpenAiAdapter,
-  listFilesTool,
-  readFileTool,
-  editFileTool,
-  createSearchFilesTool,
-  reportStateTool,
-  createRunShellInspectTool,
-  createRunShellMutateTool,
-  createLogger,
-} from '../index.js';
-import { normalizeSessionTitle } from './chat-format.js';
-import { executeAgentTurn, executeDirectShellCommand as runDirectShellAction } from './chat-actions.js';
-import { useChatRunState } from './useChatRunState.js';
-import { useChatSessions } from './useChatSessions.js';
-import { submitChatPrompt } from './chat-submit.js';
+import React, { useRef, useState } from 'react';
+import { Box, Text } from 'ink';
 import {
   ActivityPanel,
   ApprovalComposer,
@@ -26,49 +10,20 @@ import {
   shouldShowCommandHint,
   shouldShowSlashHints,
   SlashHintPanel,
-} from './chat-panels.js';
-import { isGenericSessionName } from './chat-storage.js';
-import { resolveChatRuntimeConfig } from './chat-runtime.js';
-import type { ChatCliOptions, ChatRuntimeConfig } from './chat-runtime.js';
+} from './components/index.js';
+import { useApprovalFlow } from './hooks/useApprovalFlow.js';
+import { useAgentRun } from './hooks/useAgentRun.js';
+import { useChatSessions } from './hooks/useChatSessions.js';
+import { submitChatPrompt } from './submit.js';
+import type { ChatRuntimeConfig } from './utils/runtime.js';
 
 const SESSION_TITLE_MODEL = 'gpt-5.1-codex-mini';
-export type { ChatCliOptions } from './chat-runtime.js';
 
-function App({ runtime }: { runtime: ChatRuntimeConfig }) {
+export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   const nextIdRef = useRef(0);
   const [activeModel, setActiveModel] = useState(runtime.model);
   const [draft, setDraft] = useState('');
   const nextLocalId = () => `ui-${Date.now()}-${nextIdRef.current++}`;
-  const llm = useMemo(
-    () => createOpenAiAdapter({ model: activeModel, apiKey: runtime.apiKey }),
-    [activeModel, runtime.apiKey],
-  );
-  const titleLlm = useMemo(
-    () => createOpenAiAdapter({ model: SESSION_TITLE_MODEL, apiKey: runtime.apiKey }),
-    [runtime.apiKey],
-  );
-  const tools = useMemo(
-    () => [
-      listFilesTool,
-      readFileTool,
-      editFileTool,
-      createSearchFilesTool({ excludedDirs: runtime.searchIgnoreDirs }),
-      reportStateTool,
-      createRunShellInspectTool(),
-      createRunShellMutateTool(),
-    ],
-    [runtime.searchIgnoreDirs],
-  );
-  const logger = useMemo(
-    () =>
-      createLogger({
-        pretty: false,
-        level: 'debug',
-        console: false,
-        logFilePath: runtime.logFile,
-      }),
-    [runtime.logFile],
-  );
 
   const {
     sessions,
@@ -103,7 +58,7 @@ function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     resetRunState,
     actionState,
     workingFrames,
-  } = useChatRunState(nextLocalId);
+  } = useApprovalFlow(nextLocalId);
   const messages = activeSession?.messages ?? [];
   const turns = activeSession?.turns ?? [];
 
@@ -121,74 +76,16 @@ function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     }
   };
 
-  const maybeAutoNameSession = (sessionId: string, prompt: string, responseText: string) => {
-    const session = sessions.find((candidate) => candidate.id === sessionId);
-    if (!session || !isGenericSessionName(session.name) || !runtime.apiKey) {
-      return;
-    }
-
-    void (async () => {
-      try {
-        const result = await titleLlm.chat(
-          [
-            {
-              role: 'system',
-              content:
-                'You name terminal chat sessions. Return only a short 3 to 6 word title in plain text. No quotes, no punctuation, no prefix.',
-            },
-            {
-              role: 'user',
-              content: `User prompt:\n${prompt}\n\nAssistant or tool summary:\n${responseText}\n\nCreate a concise session title.`,
-            },
-          ],
-          [],
-        );
-
-        const title = normalizeSessionTitle(result.content);
-        if (!title) {
-          return;
-        }
-
-        updateSessionById(sessionId, (candidate) =>
-          isGenericSessionName(candidate.name) ? { ...candidate, name: title } : candidate,
-        );
-      } catch (titleError) {
-        logger.debug(
-          { error: titleError instanceof Error ? titleError.message : String(titleError), sessionId },
-          'Session auto-title failed',
-        );
-      }
-    })();
-  };
-
-  const executeTurn = async (prompt: string, displayText?: string, sessionIdOverride = activeSessionId) => {
-    const session = sessions.find((candidate) => candidate.id === sessionIdOverride);
-    await executeAgentTurn({
-      prompt,
-      displayText,
-      sessionId: sessionIdOverride,
-      sessionHistory: session?.history ?? [],
-      runtime,
-      llm,
-      tools,
-      logger,
-      state: actionState,
-      updateSessionById,
-      maybeAutoNameSession,
-    });
-  };
-
-  const executeDirectShellCommand = async (rawCommand: string) => {
-    await runDirectShellAction({
-      rawCommand,
-      activeSessionId,
-      runtime,
-      tools,
-      state: actionState,
-      updateActiveSession,
-      maybeAutoNameSession,
-    });
-  };
+  const { executeTurn, executeDirectShellCommand } = useAgentRun({
+    runtime,
+    activeModel,
+    sessionTitleModel: SESSION_TITLE_MODEL,
+    activeSessionId,
+    sessions,
+    state: actionState,
+    updateSessionById,
+    updateActiveSession,
+  });
 
   const submitPrompt = async (value: string) => {
     await submitChatPrompt({
@@ -304,9 +201,4 @@ function App({ runtime }: { runtime: ChatRuntimeConfig }) {
       </Box>
     </Box>
   );
-}
-
-export function startChatCli(options: ChatCliOptions = {}) {
-  const runtime = resolveChatRuntimeConfig(options);
-  render(<App runtime={runtime} />);
 }

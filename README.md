@@ -113,8 +113,8 @@ Phase 1 has also started at the tool-contract layer:
 - chat mode now pauses for human approval before `run_shell_mutate` executes
 - shell execution is now governed by explicit workspace/inspect policy rules with scope and risk metadata, rather than only a flat command-prefix list
 - known inspect commands remain narrowly classified, while unclassified mutate commands now fall back to explicit approval instead of hard rejection
-- workspace-changing mutate commands now trigger host-side follow-up requirements before final answer: review repo state and run verification
-- after workspace-changing mutate runs, the host now also requires a short operator-style final summary with `Changed:`, `Verified:`, and `Remaining uncertainty:`
+- workspace-changing mutate commands now trigger host-side follow-up requirements before final answer: gather concrete repo review evidence such as `git status --short` or `git diff --stat`, then run verification
+- after workspace-changing mutate runs, the host now also requires a short operator-style final summary with `Changed:`, `Verified:`, and `Remaining uncertainty:`, including the exact review and verification commands used
 - chat mode now supports real interrupt via `Esc` for agent turns and direct `!command` runs, plus resume via `/continue`
 - chat mode now persists local sessions and supports `/session list`, `/session switch <id>`, and `/session continue <id>`
 - chat mode now auto-titles generic sessions in the background with `gpt-5.1-codex-mini`

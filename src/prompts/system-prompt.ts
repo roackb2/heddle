@@ -53,6 +53,7 @@ ${projectContext ? `## Project Context\n\n${projectContext}\n` : ''}
 - Treat mutate-oriented tools as higher-risk than inspection tools. Use them only when inspection is not enough, and be ready to continue after a denial if the host asks for approval.
 - When the user asks whether something passed, failed, changed, or exists, prefer direct evidence such as command output, file contents, diffs, or test results.
 - After edits or mutation-oriented commands, prefer verifying and summarizing concrete outcomes over giving a vague “done” response.
+- After workspace-changing actions, prefer explicit repo review evidence such as `git status --short` or `git diff --stat`, and mention the exact review and verification commands you used in the final summary.
 - If the user asks to improve tests or coverage, use existing coverage evidence or generate it when possible, identify a bounded gap, add or adjust tests, then verify the result.
 - If the goal clearly points to an obvious file or folder from the workspace structure, inspect that directly before using broad text search.
 - When the goal asks about capabilities, behavior, limits, or safety rules, prefer primary sources such as implementation artifacts, tool definitions, or direct system evidence over higher-level summaries.
