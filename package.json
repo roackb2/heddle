@@ -15,12 +15,14 @@
   ],
   "scripts": {
     "build": "tsc",
-    "dev": "tsx examples/repo-investigator.ts",
-    "chat": "tsx examples/conversation.tsx",
-    "chat:light": "OPENAI_MODEL=gpt-5.1-codex-mini tsx examples/conversation.tsx",
-    "repo-investigator:dev": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" tsx examples/repo-investigator.ts",
-    "chat:dev": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" tsx examples/conversation.tsx",
-    "chat:dev:light": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" OPENAI_MODEL=gpt-5.1-codex-mini tsx examples/conversation.tsx",
+    "dev": "tsx --no-cache examples/repo-investigator.ts",
+    "chat": "tsx --no-cache examples/conversation.tsx",
+    "chat:light": "OPENAI_MODEL=gpt-5.1-codex-mini tsx --no-cache examples/conversation.tsx",
+    "repo-investigator:dev": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" tsx --no-cache examples/repo-investigator.ts",
+    "chat:dev": "tsx --no-cache examples/conversation.tsx",
+    "chat:dev:openai": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" tsx --no-cache examples/conversation.tsx",
+    "chat:dev:openai:light": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" OPENAI_MODEL=gpt-5.1-codex-mini tsx --no-cache examples/conversation.tsx",
+    "chat:dev:anthropic": "ANTHROPIC_API_KEY=\"$PERSONAL_ANTHROPIC_API_KEY\" tsx --no-cache examples/conversation.tsx",
     "test": "vitest run src/__tests__",
     "prepare": "yarn build"
   },
@@ -33,6 +35,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.54.0",
     "@inkjs/ui": "^2.0.0",
     "ink": "^6.8.0",
     "openai": "^4.86.2",

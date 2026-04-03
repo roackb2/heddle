@@ -32,6 +32,7 @@ import {
   toLiveEvent,
 } from '../utils/format.js';
 import { saveTrace } from '../utils/runtime.js';
+import { resolveApiKeyForModel } from '../utils/runtime.js';
 import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../state/approval-rules.js';
 import { compactChatHistory } from '../state/compaction.js';
 import { isGenericSessionName } from '../state/storage.js';
@@ -108,14 +109,16 @@ type UseAgentRunArgs = {
 export function useAgentRun(args: UseAgentRunArgs) {
   const { runtime, activeModel, sessionTitleModel, activeSessionId, sessions, state, updateSessionById, updateActiveSession } = args;
   const projectApprovals = useProjectApprovals(runtime.approvalsFile);
+  const activeApiKey = resolveApiKeyForModel(activeModel, runtime);
+  const titleApiKey = resolveApiKeyForModel(sessionTitleModel, runtime);
 
   const llm = useMemo(
-    () => createLlmAdapter({ model: activeModel, apiKey: runtime.apiKey }),
-    [activeModel, runtime.apiKey],
+    () => createLlmAdapter({ model: activeModel, apiKey: activeApiKey }),
+    [activeApiKey, activeModel],
   );
   const titleLlm = useMemo(
-    () => createLlmAdapter({ model: sessionTitleModel, apiKey: runtime.apiKey }),
-    [runtime.apiKey, sessionTitleModel],
+    () => createLlmAdapter({ model: sessionTitleModel, apiKey: titleApiKey }),
+    [sessionTitleModel, titleApiKey],
   );
   const tools = useMemo(
     () => [
@@ -143,7 +146,7 @@ export function useAgentRun(args: UseAgentRunArgs) {
 
   const maybeAutoNameSession = (sessionId: string, prompt: string, responseText: string) => {
     const session = sessions.find((candidate) => candidate.id === sessionId);
-    if (!session || !isGenericSessionName(session.name) || !runtime.apiKey) {
+    if (!session || !isGenericSessionName(session.name) || !titleApiKey) {
       return;
     }
 
@@ -242,7 +245,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     return undefined;
   }
 
-  if (!runtime.apiKey) {
+  if (!resolveApiKeyForModel(llm.info?.model ?? runtime.model, runtime)) {
     state.setError('Missing provider API key');
     state.setStatus('Error');
     return undefined;

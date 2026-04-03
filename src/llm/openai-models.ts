@@ -1,68 +1,101 @@
 // ---------------------------------------------------------------------------
 // Built-in model shortlist used by Heddle's current UI and local commands.
 // Keep this curated rather than mirroring the entire provider catalog.
-// Phase 0 keeps the current OpenAI-backed behavior while exposing more
-// provider-neutral helper names for future providers.
 // ---------------------------------------------------------------------------
 
-export type OpenAiModelGroup = {
+export type BuiltInModelGroup = {
   label: string;
   models: string[];
 };
 
-export const OPENAI_MODEL_GROUPS: OpenAiModelGroup[] = [
+export const BUILT_IN_MODEL_GROUPS: BuiltInModelGroup[] = [
   {
-    label: 'GPT-5.4',
+    label: 'OpenAI · GPT-5.4',
     models: ['gpt-5.4', 'gpt-5.4-pro', 'gpt-5.4-mini', 'gpt-5.4-nano'],
   },
   {
-    label: 'GPT-5 family',
+    label: 'OpenAI · GPT-5 family',
     models: ['gpt-5', 'gpt-5-pro', 'gpt-5-mini', 'gpt-5-nano'],
   },
   {
-    label: 'Earlier GPT-5 releases',
+    label: 'OpenAI · Earlier GPT-5 releases',
     models: ['gpt-5.2', 'gpt-5.2-pro', 'gpt-5.1'],
   },
   {
-    label: 'GPT-4.1',
+    label: 'OpenAI · GPT-4.1',
     models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano'],
   },
   {
-    label: 'Reasoning series',
+    label: 'OpenAI · Reasoning series',
     models: ['o3-pro', 'o3', 'o3-mini', 'o4-mini'],
   },
   {
-    label: 'Coding-optimized',
+    label: 'OpenAI · Coding-optimized',
     models: ['gpt-5.1-codex', 'gpt-5.1-codex-max', 'gpt-5.1-codex-mini'],
+  },
+  {
+    label: 'Anthropic · Claude 4',
+    models: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
+  },
+  {
+    label: 'Anthropic · Earlier Claude 4',
+    models: ['claude-opus-4-1', 'claude-opus-4-0', 'claude-sonnet-4-0'],
+  },
+  {
+    label: 'Anthropic · Claude 3.7',
+    models: ['claude-3-7-sonnet-latest'],
+  },
+  {
+    label: 'Anthropic · Claude 3.5',
+    models: ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest'],
   },
 ];
 
-export const COMMON_OPENAI_MODELS = OPENAI_MODEL_GROUPS.flatMap((group) => group.models);
-export const COMMON_BUILT_IN_MODELS = COMMON_OPENAI_MODELS;
+export const OPENAI_MODEL_GROUPS: BuiltInModelGroup[] = BUILT_IN_MODEL_GROUPS.filter((group) =>
+  group.label.startsWith('OpenAI · '),
+);
 
-const OPENAI_CONTEXT_WINDOW_ESTIMATES = new Map<string, number>(
+export const COMMON_BUILT_IN_MODELS = BUILT_IN_MODEL_GROUPS.flatMap((group) => group.models);
+export const COMMON_OPENAI_MODELS = OPENAI_MODEL_GROUPS.flatMap((group) => group.models);
+
+const BUILT_IN_CONTEXT_WINDOW_ESTIMATES = new Map<string, number>(
   COMMON_BUILT_IN_MODELS.map((model) => [model, inferContextWindowEstimate(model)]),
 );
 
 export function formatOpenAiModelGroups(): string {
-  return formatBuiltInModelGroups();
+  return OPENAI_MODEL_GROUPS
+    .map((group) => [
+      group.label.replace(/^OpenAI · /, ''),
+      ...group.models.map((model) => `  - ${model}`),
+    ].join('\n'))
+    .join('\n\n');
 }
 
 export function formatBuiltInModelGroups(): string {
-  return OPENAI_MODEL_GROUPS.map((group) => `${group.label}: ${group.models.join(', ')}`).join('\n');
+  return BUILT_IN_MODEL_GROUPS
+    .map((group) => [
+      `${group.label}`,
+      ...group.models.map((model) => `  - ${model}`),
+    ].join('\n'))
+    .join('\n\n');
 }
 
 export function filterOpenAiModels(query: string): string[] {
-  return filterBuiltInModels(query);
-}
-
-export function filterBuiltInModels(query: string): string[] {
   const normalized = query.trim().toLowerCase();
   if (!normalized) {
     return COMMON_OPENAI_MODELS;
   }
 
   return COMMON_OPENAI_MODELS.filter((model) => model.toLowerCase().includes(normalized));
+}
+
+export function filterBuiltInModels(query: string): string[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return COMMON_BUILT_IN_MODELS;
+  }
+
+  return COMMON_BUILT_IN_MODELS.filter((model) => model.toLowerCase().includes(normalized));
 }
 
 export function estimateOpenAiContextWindow(model: string): number | undefined {
@@ -75,7 +108,7 @@ export function estimateBuiltInContextWindow(model: string): number | undefined 
     return undefined;
   }
 
-  return OPENAI_CONTEXT_WINDOW_ESTIMATES.get(normalized) ?? inferContextWindowEstimate(normalized);
+  return BUILT_IN_CONTEXT_WINDOW_ESTIMATES.get(normalized) ?? inferContextWindowEstimate(normalized);
 }
 
 function inferContextWindowEstimate(model: string): number {

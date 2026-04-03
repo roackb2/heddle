@@ -29,7 +29,6 @@ async function main() {
     workspaceRoot,
     model: parsed.flags.model ?? projectConfig.model,
     maxSteps: parsed.flags.maxSteps ?? projectConfig.maxSteps,
-    apiKey: process.env.OPENAI_API_KEY ?? process.env.PERSONAL_OPENAI_API_KEY,
     stateDir: projectConfig.stateDir ?? '.heddle',
     directShellApproval: projectConfig.directShellApproval ?? 'never',
     searchIgnoreDirs: projectConfig.searchIgnoreDirs ?? [],
@@ -159,7 +158,8 @@ function printHelp() {
       '  { "model": "gpt-5.1-codex", "maxSteps": 40, "stateDir": ".heddle", "directShellApproval": "never", "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"], "agentContextPaths": ["AGENTS.md"] }',
       '',
       'Environment:',
-      '  OPENAI_API_KEY or PERSONAL_OPENAI_API_KEY',
+      '  OPENAI_API_KEY or ANTHROPIC_API_KEY',
+      '  Dev fallback conventions also supported: PERSONAL_OPENAI_API_KEY, PERSONAL_ANTHROPIC_API_KEY',
       '',
     ].join('\n'),
   );

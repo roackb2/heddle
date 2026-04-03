@@ -2,7 +2,38 @@ import { describe, expect, it, vi } from 'vitest';
 import { runLocalCommand } from '../cli/chat/state/local-commands.js';
 
 describe('runLocalCommand', () => {
-  it('lists grouped common built-in model choices', () => {
+  it('lists grouped common built-in model choices with multi-line formatting', () => {
+    const result = runLocalCommand({
+      prompt: '/model list',
+      activeModel: 'gpt-5.1-codex',
+      setActiveModel: vi.fn(),
+      sessions: [],
+      recentSessions: [],
+      activeSessionId: 'session-1',
+      switchSession: vi.fn(),
+      createSession: vi.fn(),
+      renameSession: vi.fn(),
+      removeSession: vi.fn(),
+      clearConversation: vi.fn(),
+      listRecentSessionsMessage: [],
+    });
+
+    expect(result).toMatchObject({
+      handled: true,
+      kind: 'message',
+    });
+    if (!result.handled || result.kind !== 'message') {
+      throw new Error('expected /model list to return a message result');
+    }
+    expect(result.message).toContain('Common built-in model choices');
+    expect(result.message).toContain('OpenAI · GPT-5.4\n  - gpt-5.4\n  - gpt-5.4-pro\n  - gpt-5.4-mini\n  - gpt-5.4-nano');
+    expect(result.message).toContain('OpenAI · GPT-4.1\n  - gpt-4.1\n  - gpt-4.1-mini\n  - gpt-4.1-nano');
+    expect(result.message).toContain('Anthropic · Claude 4\n  - claude-opus-4-6\n  - claude-sonnet-4-6\n  - claude-haiku-4-5');
+    expect(result.message).toContain('Anthropic · Earlier Claude 4\n  - claude-opus-4-1\n  - claude-opus-4-0\n  - claude-sonnet-4-0');
+    expect(result.message).toContain('Anthropic · Claude 3.5\n  - claude-3-5-sonnet-latest\n  - claude-3-5-haiku-latest');
+  });
+
+  it('keeps /models as a compatibility alias for /model list', () => {
     const result = runLocalCommand({
       prompt: '/models',
       activeModel: 'gpt-5.1-codex',
@@ -25,9 +56,9 @@ describe('runLocalCommand', () => {
     if (!result.handled || result.kind !== 'message') {
       throw new Error('expected /models to return a message result');
     }
-    expect(result.message).toContain('GPT-5.4: gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano');
-    expect(result.message).toContain('GPT-4.1: gpt-4.1, gpt-4.1-mini, gpt-4.1-nano');
-    expect(result.message).toContain('Reasoning series: o3-pro, o3, o3-mini, o4-mini');
+    expect(result.message).toContain('Common built-in model choices');
+    expect(result.message).toContain('OpenAI · GPT-5.4\n  - gpt-5.4');
+    expect(result.message).toContain('Anthropic · Claude 4\n  - claude-opus-4-6');
   });
 
   it('recognizes supported shortlist models when switching', () => {
@@ -53,33 +84,6 @@ describe('runLocalCommand', () => {
       kind: 'message',
       message: 'Switched model to gpt-5.4-mini',
     });
-  });
-
-  it('treats /model list as the grouped model listing command', () => {
-    const result = runLocalCommand({
-      prompt: '/model list',
-      activeModel: 'gpt-5.1-codex',
-      setActiveModel: vi.fn(),
-      sessions: [],
-      recentSessions: [],
-      activeSessionId: 'session-1',
-      switchSession: vi.fn(),
-      createSession: vi.fn(),
-      renameSession: vi.fn(),
-      removeSession: vi.fn(),
-      clearConversation: vi.fn(),
-      listRecentSessionsMessage: [],
-    });
-
-    expect(result).toMatchObject({
-      handled: true,
-      kind: 'message',
-    });
-    if (!result.handled || result.kind !== 'message') {
-      throw new Error('expected /model list to return a message result');
-    }
-    expect(result.message).toContain('Common built-in model choices');
-    expect(result.message).toContain('GPT-5.4: gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano');
   });
 
   it('does not treat /model set as a literal model name', () => {

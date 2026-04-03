@@ -4,6 +4,8 @@ import {
   DEFAULT_OPENAI_MODEL,
   runAgent,
   createLlmAdapter,
+  inferProviderFromModel,
+  type LlmProvider,
   listFilesTool,
   readFileTool,
   editFileTool,
@@ -30,17 +32,18 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
     throw new Error('Usage: heddle ask "<goal>"');
   }
 
-  const model = options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
+  const model = options.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
   const maxSteps = options.maxSteps ?? parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 40;
   const workspaceRoot = options.workspaceRoot ?? process.cwd();
   const stateRoot = join(workspaceRoot, options.stateDir ?? '.heddle');
   const logger = createLogger({ pretty: true, level: 'debug' });
+  const provider = inferProviderFromModel(model);
 
-  logger.info({ goal, model, maxSteps, cwd: workspaceRoot }, 'Heddle');
+  logger.info({ goal, model, provider, maxSteps, cwd: workspaceRoot }, 'Heddle');
 
   const llm = createLlmAdapter({
     model,
-    apiKey: options.apiKey ?? process.env.OPENAI_API_KEY ?? process.env.PERSONAL_OPENAI_API_KEY,
+    apiKey: options.apiKey ?? resolveProviderApiKey(provider),
   });
   const tools = [
     listFilesTool,
@@ -73,4 +76,19 @@ function parsePositiveInt(raw: string | undefined): number | undefined {
   }
 
   return value;
+}
+
+function resolveProviderApiKey(provider: LlmProvider): string | undefined {
+  switch (provider) {
+    case 'openai':
+      return firstDefinedNonEmpty(process.env.OPENAI_API_KEY, process.env.PERSONAL_OPENAI_API_KEY);
+    case 'anthropic':
+      return firstDefinedNonEmpty(process.env.ANTHROPIC_API_KEY, process.env.PERSONAL_ANTHROPIC_API_KEY);
+    case 'google':
+      return undefined;
+  }
+}
+
+function firstDefinedNonEmpty(...values: Array<string | undefined>): string | undefined {
+  return values.find((value) => typeof value === 'string' && value.trim().length > 0);
 }

@@ -24,7 +24,7 @@ export type OpenAiAdapterOptions = {
  */
 export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdapter {
   const client = new OpenAI({
-    apiKey: options.apiKey ?? process.env.OPENAI_API_KEY,
+    apiKey: firstDefinedNonEmpty(options.apiKey, process.env.OPENAI_API_KEY, process.env.PERSONAL_OPENAI_API_KEY),
   });
   const model = options.model ?? DEFAULT_OPENAI_MODEL;
   const capabilities: LlmAdapterCapabilities = {
@@ -102,6 +102,10 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
       };
     },
   };
+}
+
+function firstDefinedNonEmpty(...values: Array<string | undefined>): string | undefined {
+  return values.find((value) => typeof value === 'string' && value.trim().length > 0);
 }
 
 // ---------------------------------------------------------------------------
