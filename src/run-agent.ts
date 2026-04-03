@@ -382,6 +382,23 @@ function finalizeAssistantResponse(context: RunContext, response: LlmResponse): 
 
   const completionBlocker = getCompletionBlocker(context, response.content);
   if (completionBlocker) {
+    const forcedSummary = buildForcedStructuredChangeSummary(context, response.content);
+    if (forcedSummary) {
+      context.record({
+        type: 'assistant.turn',
+        content: forcedSummary,
+        diagnostics: response.diagnostics,
+        requestedTools: false,
+        step: context.state.step,
+        timestamp: context.now(),
+      });
+      context.messages.push({ role: 'assistant', content: forcedSummary });
+      return finishRun(context, 'done', forcedSummary, {
+        logLevel: 'info',
+        logMessage: 'Agent run finished with host-enforced structured change summary',
+      });
+    }
+
     context.messages.push({ role: 'system', content: completionBlocker });
     return 'continue';
   }
@@ -456,6 +473,55 @@ function getCompletionBlocker(context: RunContext, responseContent: string): str
   }
 
   return undefined;
+}
+
+function buildForcedStructuredChangeSummary(context: RunContext, responseContent: string): string | undefined {
+  if (context.mutation.pendingVerification || context.mutation.pendingChangeReview) {
+    return undefined;
+  }
+
+  if (!context.mutation.requiresStructuredChangeSummary) {
+    return undefined;
+  }
+
+  if (hasStructuredChangeSummary(responseContent, {
+    mutationCommands: context.mutation.executedMutationCommands,
+    reviewCommands: context.mutation.executedReviewCommands,
+    verificationCommands: context.mutation.executedVerificationCommands,
+  })) {
+    return undefined;
+  }
+
+  const lead = extractSummaryLead(responseContent) ?? 'Completed the requested change.';
+  const changed = context.mutation.executedMutationCommands.length > 0 ?
+    context.mutation.executedMutationCommands.join('; ')
+  : 'workspace-changing command(s) already executed';
+  const review = context.mutation.executedReviewEvidence.length > 0 ?
+    context.mutation.executedReviewEvidence.join('; ')
+  : context.mutation.executedReviewCommands.join('; ') || 'no repo review evidence captured';
+  const verification = context.mutation.executedVerificationEvidence.length > 0 ?
+    context.mutation.executedVerificationEvidence.join('; ')
+  : context.mutation.executedVerificationCommands.join('; ') || 'no verification evidence captured';
+
+  return `${lead}\n\n- Changed: ${changed}\n- Verified: ${review}; ${verification}\n- Remaining uncertainty: none`;
+}
+
+function extractSummaryLead(content: string): string | undefined {
+  const lines = content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const first = lines[0];
+  if (!first) {
+    return undefined;
+  }
+
+  if (/^(?:[-*]\s+)?(?:changed|verified|remaining uncertainty|uncertainty|remaining risks?)\s*:/i.test(first)) {
+    return undefined;
+  }
+
+  return first;
 }
 
 function maybeFinishInterrupted(context: RunContext, logMessage: string): RunResult | undefined {

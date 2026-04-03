@@ -12,12 +12,16 @@ import {
 type UseChatSessionsArgs = {
   sessionsFile: string;
   apiKeyPresent: boolean;
+  defaultModel: string;
 };
 
-export function useChatSessions({ sessionsFile, apiKeyPresent }: UseChatSessionsArgs) {
+export function useChatSessions({ sessionsFile, apiKeyPresent, defaultModel }: UseChatSessionsArgs) {
   const initialSessionsRef = useRef<ChatSession[] | undefined>(undefined);
   if (!initialSessionsRef.current) {
-    initialSessionsRef.current = loadChatSessions(sessionsFile, apiKeyPresent);
+    initialSessionsRef.current = loadChatSessions(sessionsFile, apiKeyPresent).map((session) => ({
+      ...session,
+      model: session.model ?? defaultModel,
+    }));
   }
 
   const nextSessionNumberRef = useRef(getNextSessionNumber(initialSessionsRef.current));
@@ -27,6 +31,13 @@ export function useChatSessions({ sessionsFile, apiKeyPresent }: UseChatSessions
   useEffect(() => {
     saveChatSessions(sessionsFile, sessions);
   }, [sessionsFile, sessions]);
+
+  const setSessionModel = (sessionId: string, model: string) => {
+    updateSessionById(sessionId, (session) => ({
+      ...session,
+      model,
+    }));
+  };
 
   useEffect(() => {
     if (!sessions.some((session) => session.id === activeSessionId) && sessions[0]) {
@@ -43,6 +54,7 @@ export function useChatSessions({ sessionsFile, apiKeyPresent }: UseChatSessions
       id: 'session-1',
       name: 'Session 1',
       apiKeyPresent,
+      model: defaultModel,
     });
     setSessions([fallback]);
     setActiveSessionId(fallback.id);
@@ -86,6 +98,7 @@ export function useChatSessions({ sessionsFile, apiKeyPresent }: UseChatSessions
       id,
       name: name?.trim() || `Session ${nextSessionNumberRef.current++}`,
       apiKeyPresent,
+      model: defaultModel,
     });
     setSessions((current) => [touchSession(nextSession), ...current].slice(0, 24));
     setActiveSessionId(id);
@@ -111,6 +124,7 @@ export function useChatSessions({ sessionsFile, apiKeyPresent }: UseChatSessions
           id: 'session-1',
           name: 'Session 1',
           apiKeyPresent,
+          model: defaultModel,
         }),
       ];
     });
@@ -132,6 +146,7 @@ export function useChatSessions({ sessionsFile, apiKeyPresent }: UseChatSessions
     listRecentSessionsMessage,
     updateSessionById,
     updateActiveSession,
+    setSessionModel,
     createSession,
     renameSession,
     removeSession,

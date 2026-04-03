@@ -27,6 +27,7 @@ export function createChatSession(options: {
   id: string;
   name: string;
   apiKeyPresent: boolean;
+  model?: string;
 }): ChatSession {
   const now = new Date().toISOString();
   return {
@@ -37,6 +38,7 @@ export function createChatSession(options: {
     turns: [],
     createdAt: now,
     updatedAt: now,
+    model: options.model,
     lastContinuePrompt: undefined,
     context: undefined,
   };
@@ -122,6 +124,7 @@ function parseSavedSession(value: unknown, apiKeyPresent: boolean): ChatSession[
     turns: Array.isArray(candidate.turns) ? candidate.turns.filter(isTurnSummary) : [],
     createdAt,
     updatedAt,
+    model: typeof candidate.model === 'string' ? candidate.model : undefined,
     lastContinuePrompt: typeof candidate.lastContinuePrompt === 'string' ? candidate.lastContinuePrompt : undefined,
     context: isChatContextStats(candidate.context) ? candidate.context : undefined,
   }];

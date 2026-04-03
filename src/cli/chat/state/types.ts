@@ -41,6 +41,7 @@ export type ChatSession = {
   turns: TurnSummary[];
   createdAt: string;
   updatedAt: string;
+  model?: string;
   lastContinuePrompt?: string;
   context?: ChatContextStats;
 };

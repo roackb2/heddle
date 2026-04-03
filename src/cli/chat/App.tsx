@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Box, Text } from 'ink';
 import {
   ApprovalComposer,
@@ -45,12 +45,14 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     listRecentSessionsMessage,
     updateSessionById,
     updateActiveSession,
+    setSessionModel,
     createSession,
     renameSession,
     removeSession,
   } = useChatSessions({
     sessionsFile: runtime.sessionsFile,
     apiKeyPresent: Boolean(runtime.apiKey),
+    defaultModel: runtime.model,
   });
   const sessionPickerQuery = getSessionPickerQuery(draft);
   const sessionPickerVisible = sessionPickerQuery !== undefined;
@@ -58,6 +60,17 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   const safeSessionPickerIndex =
     filteredSessions.length === 0 ? 0 : Math.min(sessionPickerIndex, Math.max(0, filteredSessions.length - 1));
   const highlightedSession = filteredSessions[safeSessionPickerIndex];
+
+  useEffect(() => {
+    if (!activeSession) {
+      return;
+    }
+
+    const sessionModel = activeSession.model ?? runtime.model;
+    if (sessionModel !== activeModel) {
+      setActiveModel(sessionModel);
+    }
+  }, [activeModel, activeSession, runtime.model]);
   const {
     status,
     setStatus,
@@ -115,6 +128,13 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     resetRunState({ abortInFlight: true });
   };
 
+  const applyActiveModel = (model: string) => {
+    setActiveModel(model);
+    if (activeSession && activeSession.model !== model) {
+      setSessionModel(activeSession.id, model);
+    }
+  };
+
   const closeSession = (id: string) => {
     const removedActive = removeSession(id);
     if (removedActive) {
@@ -142,7 +162,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         value: `/model ${highlightedModel}`,
         isRunning,
         activeModel,
-        setActiveModel,
+        setActiveModel: applyActiveModel,
         sessions,
         recentSessions,
         activeSessionId,
@@ -170,7 +190,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         value: `/session switch ${highlightedSession.id}`,
         isRunning,
         activeModel,
-        setActiveModel,
+        setActiveModel: applyActiveModel,
         sessions,
         recentSessions,
         activeSessionId,
@@ -197,7 +217,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
       value,
       isRunning,
       activeModel,
-      setActiveModel,
+      setActiveModel: applyActiveModel,
       sessions,
       recentSessions,
       activeSessionId,
