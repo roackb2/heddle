@@ -2,17 +2,276 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { ConversationLine } from '../state/types.js';
 
-export function ConversationPanel({ messages }: { messages: ConversationLine[] }) {
+export function ConversationPanel({
+  messages,
+  activeTurn,
+}: {
+  messages: ConversationLine[];
+  activeTurn?: {
+    title: string;
+    lines: string[];
+    error?: string;
+  };
+}) {
+  const visibleMessages = messages.slice(-8);
+
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Text bold>Conversation</Text>
-      {messages.slice(-8).map((message) => (
-        <Box key={message.id} borderStyle="round" borderColor={message.role === 'user' ? 'cyan' : 'gray'} paddingX={1} marginBottom={1}>
-          <Text color={message.role === 'user' ? 'cyan' : 'white'}>
-            {message.role === 'user' ? 'You' : 'Heddle'}: {message.text}
+      {visibleMessages.map((message, index) => (
+        <Box key={message.id} flexDirection="column" marginBottom={1}>
+          <Text dimColor>{message.role === 'user' ? '┌ You' : '┌ Heddle'}</Text>
+          <Box paddingLeft={2}>
+            <MessageBody role={message.role} text={message.text} />
+          </Box>
+          <Text dimColor>
+            {index === visibleMessages.length - 1 ? '└' : '└────────────────────────────────────────────────────────'}
           </Text>
         </Box>
       ))}
+      {activeTurn ?
+        <Box flexDirection="column" marginBottom={1}>
+          <Text dimColor>┌ Heddle</Text>
+          <Box paddingLeft={2} flexDirection="column">
+            <Text color={activeTurn.error ? 'red' : 'yellow'}>{activeTurn.title}</Text>
+            {activeTurn.lines.map((line) => (
+              <Text key={line} dimColor>{line}</Text>
+            ))}
+            {activeTurn.error ? <Text color="red">{activeTurn.error}</Text> : null}
+          </Box>
+          <Text dimColor>└</Text>
+        </Box>
+      : null}
     </Box>
   );
+}
+
+function MessageBody({
+  role,
+  text,
+}: {
+  role: 'user' | 'assistant';
+  text: string;
+}) {
+  const blocks = parseMessageBlocks(text);
+
+  return (
+    <Box flexDirection="column">
+      {blocks.map((block, index) => (
+        <React.Fragment key={`${block.kind}-${index}-${block.text}`}>
+          {renderBlock(block, role)}
+        </React.Fragment>
+      ))}
+    </Box>
+  );
+}
+
+type MessageBlock =
+  | { kind: 'blank'; text: '' }
+  | { kind: 'paragraph'; text: string }
+  | { kind: 'heading'; text: string }
+  | { kind: 'bullet'; text: string }
+  | { kind: 'numbered'; text: string; marker: string }
+  | { kind: 'quote'; text: string }
+  | { kind: 'code'; text: string };
+
+function parseMessageBlocks(text: string): MessageBlock[] {
+  const lines = text.split(/\r?\n/);
+  const blocks: MessageBlock[] = [];
+  let inCodeBlock = false;
+  let codeLines: string[] = [];
+
+  for (const line of lines) {
+    if (line.trim().startsWith('```')) {
+      if (inCodeBlock) {
+        blocks.push({ kind: 'code', text: codeLines.join('\n') });
+        codeLines = [];
+        inCodeBlock = false;
+      } else {
+        inCodeBlock = true;
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeLines.push(line);
+      continue;
+    }
+
+    const trimmed = line.trim();
+    if (!trimmed) {
+      blocks.push({ kind: 'blank', text: '' });
+      continue;
+    }
+
+    if (/^#{1,3}\s+/.test(trimmed)) {
+      blocks.push({ kind: 'heading', text: trimmed.replace(/^#{1,3}\s+/, '') });
+      continue;
+    }
+
+    if (/^[-*]\s+/.test(trimmed)) {
+      blocks.push({ kind: 'bullet', text: trimmed.replace(/^[-*]\s+/, '') });
+      continue;
+    }
+
+    const numberedMatch = trimmed.match(/^(\d+\.)\s+(.*)$/);
+    if (numberedMatch) {
+      blocks.push({ kind: 'numbered', marker: numberedMatch[1], text: numberedMatch[2] });
+      continue;
+    }
+
+    if (/^>\s+/.test(trimmed)) {
+      blocks.push({ kind: 'quote', text: trimmed.replace(/^>\s+/, '') });
+      continue;
+    }
+
+    blocks.push({ kind: 'paragraph', text: line });
+  }
+
+  if (codeLines.length > 0) {
+    blocks.push({ kind: 'code', text: codeLines.join('\n') });
+  }
+
+  return collapseParagraphBlocks(blocks);
+}
+
+function collapseParagraphBlocks(blocks: MessageBlock[]): MessageBlock[] {
+  const collapsed: MessageBlock[] = [];
+
+  for (const block of blocks) {
+    const previous = collapsed.at(-1);
+    if (block.kind === 'paragraph' && previous?.kind === 'paragraph') {
+      previous.text = `${previous.text} ${block.text.trim()}`;
+      continue;
+    }
+
+    collapsed.push(block);
+  }
+
+  return collapsed;
+}
+
+function renderBlock(
+  block: MessageBlock,
+  role: 'user' | 'assistant',
+) {
+  switch (block.kind) {
+    case 'blank':
+      return <Text>{' '}</Text>;
+    case 'heading':
+      return (
+        <Text bold color={role === 'user' ? 'cyan' : 'green'}>
+          <InlineText text={block.text} color={role === 'user' ? 'cyan' : 'green'} />
+        </Text>
+      );
+    case 'bullet':
+      return (
+        <Text color={role === 'user' ? 'cyan' : 'white'}>
+          <Text color="gray">• </Text>
+          <InlineText text={block.text} color={role === 'user' ? 'cyan' : 'white'} />
+        </Text>
+      );
+    case 'numbered':
+      return (
+        <Text color={role === 'user' ? 'cyan' : 'white'}>
+          <Text color="gray">{block.marker} </Text>
+          <InlineText text={block.text} color={role === 'user' ? 'cyan' : 'white'} />
+        </Text>
+      );
+    case 'quote':
+      return (
+        <Text color="gray">
+          │ <InlineText text={block.text} color="gray" />
+        </Text>
+      );
+    case 'code':
+      return (
+        <Box borderStyle="round" borderColor="gray" paddingX={1} marginY={0}>
+          <Text color="cyan">{block.text}</Text>
+        </Box>
+      );
+    case 'paragraph':
+      return (
+        <Text color={role === 'user' ? 'cyan' : 'white'}>
+          <InlineText text={block.text} color={role === 'user' ? 'cyan' : 'white'} />
+        </Text>
+      );
+  }
+}
+
+function InlineText({
+  text,
+  color,
+}: {
+  text: string;
+  color: string;
+}) {
+  const segments = parseInlineSegments(text);
+
+  return (
+    <>
+      {segments.map((segment, index) => {
+        if (segment.kind === 'code') {
+          return (
+            <Text key={`${segment.kind}-${index}-${segment.text}`} color="cyan">
+              {segment.text}
+            </Text>
+          );
+        }
+
+        if (segment.kind === 'bold') {
+          return (
+            <Text key={`${segment.kind}-${index}-${segment.text}`} bold color={color}>
+              {segment.text}
+            </Text>
+          );
+        }
+
+        return (
+          <Text key={`${segment.kind}-${index}-${segment.text}`} color={color}>
+            {segment.text}
+          </Text>
+        );
+      })}
+    </>
+  );
+}
+
+type InlineSegment =
+  | { kind: 'text'; text: string }
+  | { kind: 'bold'; text: string }
+  | { kind: 'code'; text: string };
+
+function parseInlineSegments(text: string): InlineSegment[] {
+  const segments: InlineSegment[] = [];
+  let index = 0;
+
+  while (index < text.length) {
+    if (text.startsWith('**', index)) {
+      const end = text.indexOf('**', index + 2);
+      if (end !== -1) {
+        segments.push({ kind: 'bold', text: text.slice(index + 2, end) });
+        index = end + 2;
+        continue;
+      }
+    }
+
+    if (text[index] === '`') {
+      const end = text.indexOf('`', index + 1);
+      if (end !== -1) {
+        segments.push({ kind: 'code', text: text.slice(index + 1, end) });
+        index = end + 1;
+        continue;
+      }
+    }
+
+    const nextBold = text.indexOf('**', index);
+    const nextCode = text.indexOf('`', index);
+    const nextStopCandidates = [nextBold, nextCode].filter((candidate) => candidate !== -1);
+    const nextStop = nextStopCandidates.length > 0 ? Math.min(...nextStopCandidates) : text.length;
+    segments.push({ kind: 'text', text: text.slice(index, nextStop) });
+    index = nextStop;
+  }
+
+  return segments.filter((segment) => segment.text.length > 0);
 }

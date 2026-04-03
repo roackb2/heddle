@@ -10,7 +10,7 @@ type RunShellInput = {
   command: string;
 };
 
-export type RunShellScope = 'inspect' | 'workspace';
+export type RunShellScope = 'inspect' | 'workspace' | 'external';
 export type RunShellRisk = 'low' | 'medium' | 'unknown';
 export type RunShellCapability =
   | 'workspace_listing'
@@ -25,6 +25,10 @@ export type RunShellCapability =
   | 'file_operation'
   | 'git_staging'
   | 'project_script'
+  | 'github_cli'
+  | 'cloud_cli'
+  | 'cluster_cli'
+  | 'external_system'
   | 'unknown_workspace';
 
 export type RunShellPolicyDecision = {
@@ -112,7 +116,12 @@ export const DEFAULT_MUTATE_RULES: RunShellRule[] = [
   workspaceRule('cp', 'medium', 'file_operation', 'workspace file operation'),
   workspaceRule('git', 'medium', 'git_staging', 'git staging operation', ['add']),
   workspaceRule('git', 'medium', 'file_operation', 'git file move operation', ['mv']),
+  externalRule('gh', 'medium', 'github_cli', 'external GitHub CLI command'),
+  externalRule('aws', 'medium', 'cloud_cli', 'external cloud CLI command'),
+  externalRule('kubectl', 'medium', 'cluster_cli', 'external cluster CLI command'),
 ];
+
+const KNOWN_EXTERNAL_BINARIES = new Set(['gh', 'aws', 'kubectl']);
 
 export function createRunShellInspectTool(options: RunShellOptions = {}): ToolDefinition {
   const rules = options.rules ?? DEFAULT_INSPECT_RULES;
@@ -325,6 +334,43 @@ export function runShellCommand(
   });
 }
 
+export function classifyShellCommandPolicy(
+  command: string,
+  options: {
+    toolName: string;
+    rules: RunShellRule[];
+    allowUnknown: boolean;
+  },
+): RunShellPolicyDecision | { error: string } {
+  const normalized = command.trim();
+  if (!normalized) {
+    return { error: 'Command not allowed. The command must not be empty.' };
+  }
+
+  if (containsBlockedShellControlOperators(normalized, options.toolName === 'run_shell_inspect')) {
+    return {
+      error:
+        options.toolName === 'run_shell_inspect' ?
+          'Command not allowed. Inspect mode permits read-only pipes, but redirects, command chaining, backgrounding, and subshells are blocked.'
+        : 'Command not allowed. Shell control operators such as pipes, redirects, command chaining, or subshells are blocked.',
+    };
+  }
+
+  const argv = tokenizeCommand(normalized);
+  if (argv.length === 0) {
+    return { error: 'Command not allowed. The command must not be empty.' };
+  }
+
+  const policy = classifyCommand(argv, options.rules, options.allowUnknown);
+  if (!policy) {
+    return {
+      error: `Command not allowed by ${options.toolName} policy. This tool only permits bounded commands that match its configured workspace risk/scope rules.`,
+    };
+  }
+
+  return policy;
+}
+
 function classifyCommand(
   argv: string[],
   rules: RunShellRule[],
@@ -345,15 +391,27 @@ function classifyCommand(
   });
 
   if (!rule) {
-    return allowUnknown ?
-        {
-          binary,
-          scope: 'workspace',
-          risk: 'unknown',
-          capability: 'unknown_workspace',
-          reason: 'unclassified workspace command requiring explicit approval',
-        }
-      : undefined;
+    if (!allowUnknown) {
+      return undefined;
+    }
+
+    if (KNOWN_EXTERNAL_BINARIES.has(binary)) {
+      return {
+        binary,
+        scope: 'external',
+        risk: 'unknown',
+        capability: 'external_system',
+        reason: 'unclassified external-system command requiring explicit approval',
+      };
+    }
+
+    return {
+      binary,
+      scope: 'workspace',
+      risk: 'unknown',
+      capability: 'unknown_workspace',
+      reason: 'unclassified workspace command requiring explicit approval',
+    };
   }
 
   return {
@@ -467,6 +525,23 @@ function workspaceRule(
     binary,
     argsPrefix,
     scope: 'workspace',
+    risk,
+    capability,
+    reason,
+  };
+}
+
+function externalRule(
+  binary: string,
+  risk: RunShellRisk,
+  capability: RunShellCapability,
+  reason: string,
+  argsPrefix?: string[],
+): RunShellRule {
+  return {
+    binary,
+    argsPrefix,
+    scope: 'external',
     risk,
     capability,
     reason,

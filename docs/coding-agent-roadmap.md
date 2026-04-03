@@ -77,16 +77,18 @@ Current progress:
 - `run_shell_mutate` is approval-gated in chat mode
 - shell tools now classify allowed commands by bounded workspace/inspect policy rules and return scope/risk/capability metadata
 - unclassified mutate commands now fall back to explicit approval with `unknown` risk metadata instead of immediate rejection
+- known external CLIs such as `gh`, `aws`, and `kubectl` now classify under explicit external-system scope instead of looking like generic workspace commands
 - workspace-changing mutate commands trigger host-side pressure to inspect repo state with concrete git evidence and run verification before final answer
 - workspace-changing mutate runs now also require a short operator-style final answer with explicit `Changed`, `Verified`, and `Remaining uncertainty` sections, naming the exact review and verification commands used
 - chat mode now supports interrupt via `Esc` and resume via `/continue`
 - carried-over session history is sanitized before the next run so interrupted tool calls do not poison later turns with missing tool-output API errors
+- approval prompts now surface scope/capability/risk metadata, and exact per-project approvals apply immediately after being remembered
+- the chat view is now more stable for multi-turn use: conversation stays the anchor, active run state is rendered inline with that flow, and basic response formatting now makes lists/code easier to read
 
 Remaining priority:
 
 - stronger git-native review flow after changes
 - better use of concrete diff/status evidence in those summaries
-- more polished operator experience around interrupted or resumed runs, especially clearer separation between active-run state and previously completed turn summaries
 - begin evolving shell policy from a narrow command-prefix allowlist toward a real execution-policy model based on risk, scope, approval, and auditability
 - reduce reliance on shell-syntax blocking as a safety mechanism; serious workflows will need broader command expressiveness than the current heredoc/redirect restrictions allow
 - strengthen host-side follow-through so when the agent discovers a safe path for a bounded change, it executes it instead of stopping at explanation
@@ -112,7 +114,7 @@ Near-term implication:
 
 - the next shell work should not be "add more prefixes forever"
 - it should move toward capability classes and host-side execution policy
-- an early step in that direction is now live: mutate policy can classify `yarn run ...` as a project-script capability instead of treating it as only an unknown command
+- early steps in that direction are now live: mutate policy can classify `yarn run ...` as a project-script capability, and known external CLIs now classify under explicit external-system scope
 
 ## Phase 2: Reliability And Session Quality
 

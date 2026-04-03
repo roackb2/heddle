@@ -10,6 +10,7 @@ export function ActivityPanel({
   liveEvents,
   pendingApproval,
   interruptRequested,
+  error,
 }: {
   isRunning: boolean;
   workingFrame: number;
@@ -17,20 +18,39 @@ export function ActivityPanel({
   liveEvents: LiveEvent[];
   pendingApproval?: PendingApproval;
   interruptRequested: boolean;
+  error?: string;
 }) {
+  if (!isRunning && !pendingApproval && !interruptRequested && !error) {
+    return null;
+  }
+
   const visibleEvents = isRunning ? liveEvents.slice(-3) : liveEvents.slice(-1);
+  const activityText = currentActivityText(liveEvents, isRunning, elapsedSeconds, pendingApproval, interruptRequested);
+  const dedupedEvents = visibleEvents.filter((event, index, events) => {
+    if (event.text === activityText) {
+      return false;
+    }
+
+    return events.findIndex((candidate) => candidate.text === event.text) === index;
+  });
 
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Text bold>Current Activity</Text>
       <Text color={pendingApproval ? 'yellow' : interruptRequested ? 'yellow' : isRunning ? 'yellow' : 'gray'}>
-        {currentActivityText(liveEvents, isRunning, elapsedSeconds, pendingApproval, interruptRequested)}
+        {activityText}
       </Text>
-      {visibleEvents.map((event) => (
+      {dedupedEvents.map((event) => (
         <Box key={event.id}>
           <Text dimColor>{truncate(event.text, 160)}</Text>
         </Box>
       ))}
+      {error ?
+        <Box marginTop={1} flexDirection="column">
+          <Text color="red">Last error</Text>
+          <Text color="red">{error}</Text>
+        </Box>
+      : null}
     </Box>
   );
 }

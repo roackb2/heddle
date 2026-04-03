@@ -122,8 +122,10 @@ Phase 1 has also started at the tool-contract layer:
 - chat mode now auto-titles generic sessions in the background with `gpt-5.1-codex-mini`
 - chat mode now supports direct shell commands with a `!command` prefix; user-entered direct commands run immediately under the same shell policy, and their results are stored in the session transcript for later turns
 - chat approval UI now supports remembering an exact mutate command for the current project, so repeated commands can be auto-approved from the project's local state
+- remembered project approvals now update immediately in memory, so `Allow for project` applies on the next matching command without waiting for a session reload
+- mutate approval prompts now expose policy metadata such as scope, capability, and risk before approval
 - interrupted or incomplete tool-call history is now sanitized before the next run so saved sessions do not poison later turns with missing tool outputs
-- `Recent Turns` is a completed-turn summary, not a live run panel; while a run is in progress it may still show the previous turn until the current one finishes
+- the chat screen now keeps the conversation as the main reading surface, folds active run state into that flow, and applies basic response formatting for headings, lists, inline code, and fenced code blocks
 
 Chat usage notes:
 
@@ -137,7 +139,7 @@ Chat usage notes:
 The immediate next step is to keep tightening the Phase 1 coding-agent surface around git-native review and explanation: better use of concrete diff/status evidence, stronger operator confidence after bounded edits, and continued evolution toward policy-based execution instead of narrow command-prefix allowlists.
 An eval batch prompt set lives in [docs/eval-prompts.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/eval-prompts.md).
 
-The shell direction is also intentionally moving toward a policy-based execution surface rather than an ever-growing allowlist of specific commands.
+The shell direction is also intentionally moving toward a policy-based execution surface rather than an ever-growing allowlist of specific commands, with explicit distinction between workspace-local and external-system commands.
 
 One current limitation is worth calling out explicitly: Heddle can now recover from interrupted tool-call history correctly, but it still sometimes stops after discovering a safe execution path instead of carrying a requested change through to completion. Closing that follow-through gap is part of making the agent genuinely useful.
 

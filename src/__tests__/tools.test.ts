@@ -6,7 +6,12 @@ import { listFilesTool } from '../tools/list-files.js';
 import { readFileTool } from '../tools/read-file.js';
 import { editFileTool } from '../tools/edit-file.js';
 import { reportStateTool } from '../tools/report-state.js';
-import { createRunShellInspectTool, createRunShellMutateTool } from '../tools/run-shell.js';
+import {
+  classifyShellCommandPolicy,
+  createRunShellInspectTool,
+  createRunShellMutateTool,
+  DEFAULT_MUTATE_RULES,
+} from '../tools/run-shell.js';
 import { createSearchFilesTool, searchFilesTool } from '../tools/search-files.js';
 
 describe('tool input validation', () => {
@@ -391,6 +396,47 @@ describe('runShell tools', () => {
         capability: 'unknown_workspace',
         reason: 'unclassified workspace command requiring explicit approval',
       },
+    });
+  });
+
+  it('classifies known external CLIs with explicit external scope metadata', () => {
+    const result = classifyShellCommandPolicy('gh pr view 123', {
+      toolName: 'run_shell_mutate',
+      rules: DEFAULT_MUTATE_RULES,
+      allowUnknown: true,
+    });
+
+    expect(result).toEqual({
+      binary: 'gh',
+      scope: 'external',
+      risk: 'medium',
+      capability: 'github_cli',
+      reason: 'external GitHub CLI command',
+    });
+  });
+
+  it('falls back to unknown external-system metadata for unclassified external commands', () => {
+    const result = classifyShellCommandPolicy('gh extension list', {
+      toolName: 'run_shell_mutate',
+      rules: [
+        {
+          binary: 'gh',
+          argsPrefix: ['pr'],
+          scope: 'external',
+          risk: 'medium',
+          capability: 'github_cli',
+          reason: 'external GitHub CLI command',
+        },
+      ],
+      allowUnknown: true,
+    });
+
+    expect(result).toEqual({
+      binary: 'gh',
+      scope: 'external',
+      risk: 'unknown',
+      capability: 'external_system',
+      reason: 'unclassified external-system command requiring explicit approval',
     });
   });
 

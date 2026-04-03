@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runShellCommand, DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES } from '../tools/run-shell.js';
 
 const spawnMock = vi.fn();
@@ -10,27 +10,24 @@ vi.mock('node:child_process', () => ({
 }));
 
 function createFakeChildProcess() {
-  const stdout = new EventEmitter() as ChildProcessWithoutNullStreams['stdout'];
-  const stderr = new EventEmitter() as ChildProcessWithoutNullStreams['stderr'];
-  const child = new EventEmitter() as ChildProcessWithoutNullStreams & {
-    stdout: EventEmitter;
-    stderr: EventEmitter;
-    kill: (signal?: string) => boolean;
-    killed?: boolean;
-  };
-
-  child.stdout = stdout;
-  child.stderr = stderr;
-  child.kill = vi.fn(() => {
-    child.killed = true;
-    return true;
+  const stdout = new EventEmitter();
+  const stderr = new EventEmitter();
+  const child = new EventEmitter() as ChildProcessWithoutNullStreams;
+  (child as any).stdout = stdout;
+  (child as any).stderr = stderr;
+  (child as any).kill = vi.fn(() => {
+    (child as any).killed = true;
   });
-  child.killed = false;
-
+  (child as any).killed = false;
   return { child, stdout, stderr };
 }
 
-describe('runShellCommand helper', () => {
+describe('runShellCommand', () => {
+  beforeEach(() => {
+    const { child } = createFakeChildProcess();
+    spawnMock.mockReturnValue(child);
+  });
+
   afterEach(() => {
     vi.resetAllMocks();
     vi.useRealTimers();
@@ -49,34 +46,44 @@ describe('runShellCommand helper', () => {
     });
   });
 
-  it('rejects commands that contain control operators', async () => {
+  it('rejects commands containing shell control operators', async () => {
+    const controlCommand = 'ls && echo hi';
     const result = await runShellCommand(
-      { command: 'ls && echo hi' },
-      { toolName: 'run_shell_inspect', rules: DEFAULT_INSPECT_RULES, allowUnknown: false },
+      { command: controlCommand },
+      {
+        toolName: 'run_shell_inspect',
+        rules: DEFAULT_INSPECT_RULES,
+        allowUnknown: false,
+      },
     );
 
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/command chaining|Shell control operators/);
+    expect(result.error).toMatch(/read-only pipes|Shell control operators|command chaining/);
   });
 
-  it('rejects commands that violate the inspect policy when allowUnknown is false', async () => {
+  it('rejects commands that violate the inspect policy', async () => {
     const result = await runShellCommand(
-      { command: 'unlisted-command' },
-      { toolName: 'run_shell_inspect', rules: DEFAULT_INSPECT_RULES, allowUnknown: false },
+      { command: 'foo' },
+      {
+        toolName: 'run_shell_inspect',
+        rules: DEFAULT_INSPECT_RULES,
+        allowUnknown: false,
+      },
     );
 
     expect(result).toEqual({
       ok: false,
-      error: 'Command not allowed by run_shell_inspect policy. This tool only permits bounded commands that match its configured workspace risk/scope rules.',
+      error:
+        'Command not allowed by run_shell_inspect policy. This tool only permits bounded commands that match its configured workspace risk/scope rules.',
     });
   });
 
-  it('allows unknown commands when allowUnknown is true and returns unknown policy metadata', async () => {
+  it('runs unknown commands when allowUnknown is true and surfaces approval metadata', async () => {
     const { child, stdout } = createFakeChildProcess();
     spawnMock.mockReturnValue(child);
 
-    const promise = runShellCommand(
-      { command: 'unlisted-command' },
+    const execution = runShellCommand(
+      { command: 'foo' },
       {
         toolName: 'run_shell_mutate',
         rules: DEFAULT_MUTATE_RULES,
@@ -87,15 +94,15 @@ describe('runShellCommand helper', () => {
     stdout.emit('data', 'ok\n');
     child.emit('close', 0);
 
-    const result = await promise;
+    const result = await execution;
     expect(result.ok).toBe(true);
     expect(result.output).toMatchObject({
-      command: 'unlisted-command',
+      command: 'foo',
       exitCode: 0,
       stdout: 'ok',
       stderr: '',
       policy: {
-        binary: 'unlisted-command',
+        binary: 'foo',
         scope: 'workspace',
         risk: 'unknown',
         reason: 'unclassified workspace command requiring explicit approval',
@@ -103,11 +110,11 @@ describe('runShellCommand helper', () => {
     });
   });
 
-  it('reports failure when the command exits with non-zero status', async () => {
+  it('reports failure for non-zero exit codes', async () => {
     const { child, stderr } = createFakeChildProcess();
     spawnMock.mockReturnValue(child);
 
-    const promise = runShellCommand(
+    const execution = runShellCommand(
       { command: 'git status' },
       {
         toolName: 'run_shell_inspect',
@@ -116,10 +123,10 @@ describe('runShellCommand helper', () => {
       },
     );
 
-    stderr.emit('data', 'fatal\n');
+    stderr.emit('data', 'error\n');
     child.emit('close', 1);
 
-    const result = await promise;
+    const result = await execution;
     expect(result.ok).toBe(false);
     expect(result.error).toBe('Shell command failed with exit code 1');
     expect(result.output).toMatchObject({
@@ -127,12 +134,12 @@ describe('runShellCommand helper', () => {
     });
   });
 
-  it('returns an abort error when the signal is triggered', async () => {
+  it('returns an abort error when the host aborts the signal', async () => {
     const { child } = createFakeChildProcess();
     spawnMock.mockReturnValue(child);
 
     const controller = new AbortController();
-    const promise = runShellCommand(
+    const execution = runShellCommand(
       { command: 'git rev-parse HEAD' },
       {
         toolName: 'run_shell_inspect',
@@ -145,17 +152,19 @@ describe('runShellCommand helper', () => {
     controller.abort();
     child.emit('close', 0);
 
-    const result = await promise;
+    const result = await execution;
     expect(result.ok).toBe(false);
     expect(result.error).toBe('Shell command aborted by host request');
   });
 
-  it('times out after 30 seconds and reports the timeout error', async () => {
+  it('times out after 30 seconds with a timeout error', async () => {
     vi.useFakeTimers();
+    vi.setSystemTime(0);
+
     const { child } = createFakeChildProcess();
     spawnMock.mockReturnValue(child);
 
-    const promise = runShellCommand(
+    const execution = runShellCommand(
       { command: 'sleep 1' },
       {
         toolName: 'run_shell_mutate',
@@ -167,7 +176,7 @@ describe('runShellCommand helper', () => {
     vi.advanceTimersByTime(30000);
     child.emit('close', 0);
 
-    const result = await promise;
+    const result = await execution;
     expect(result.ok).toBe(false);
     expect(result.error).toBe('Shell command timed out after 30000ms');
   });

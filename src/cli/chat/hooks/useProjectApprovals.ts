@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ToolCall } from '../../../index.js';
 import {
   createProjectApprovalRule,
@@ -11,19 +11,19 @@ import { extractShellCommand } from '../utils/format.js';
 
 export function useProjectApprovals(approvalsFile: string) {
   const [rules, setRules] = useState<ProjectApprovalRule[]>(() => loadProjectApprovalRules(approvalsFile));
+  const rulesRef = useRef<ProjectApprovalRule[]>(rules);
+
+  useEffect(() => {
+    rulesRef.current = rules;
+  }, [rules]);
 
   useEffect(() => {
     saveProjectApprovalRules(approvalsFile, rules);
   }, [approvalsFile, rules]);
 
-  const ruleMap = useMemo(
-    () => new Set(rules.map((rule) => `${rule.tool}:${rule.command}`)),
-    [rules],
-  );
-
   const isApproved = (call: ToolCall): boolean => {
     const command = extractShellCommand(call.input);
-    return Boolean(findMatchingApprovalRule(rules, call.tool, command));
+    return Boolean(findMatchingApprovalRule(rulesRef.current, call.tool, command));
   };
 
   const rememberApproval = (call: ToolCall) => {
@@ -33,12 +33,13 @@ export function useProjectApprovals(approvalsFile: string) {
     }
 
     const rule = createProjectApprovalRule(command);
-    const key = `${rule.tool}:${rule.command}`;
-    if (ruleMap.has(key)) {
+    if (findMatchingApprovalRule(rulesRef.current, rule.tool, rule.command)) {
       return;
     }
 
-    setRules((current) => [...current, rule]);
+    const nextRules = [...rulesRef.current, rule];
+    rulesRef.current = nextRules;
+    setRules(nextRules);
   };
 
   return {

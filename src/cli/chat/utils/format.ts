@@ -1,4 +1,9 @@
 import type { ChatMessage, TraceEvent, ToolResult } from '../../../index.js';
+import {
+  classifyShellCommandPolicy,
+  DEFAULT_MUTATE_RULES,
+  type RunShellPolicyDecision,
+} from '../../../tools/run-shell.js';
 import type { ConversationLine, LiveEvent, PendingApproval } from '../state/types.js';
 
 const MAX_SHELL_OUTPUT_CHARS = 1400;
@@ -103,6 +108,11 @@ export function currentActivityText(
 export function formatApprovalPrompt(pendingApproval: PendingApproval): string {
   const command = extractShellCommand(pendingApproval.call.input);
   if (command) {
+    const policy = describePendingApprovalPolicy(pendingApproval);
+    if (policy) {
+      return `Allow ${policy.scope} mutation command (${policy.capability}, ${policy.risk} risk): ${truncate(command, 120)}`;
+    }
+
     return `Allow mutation command: ${truncate(command, 120)}`;
   }
 
@@ -110,7 +120,9 @@ export function formatApprovalPrompt(pendingApproval: PendingApproval): string {
 }
 
 export function formatApprovalHint(pendingApproval: PendingApproval): string {
-  return `Tool: ${pendingApproval.call.tool} • Y approve • A allow for project • N deny`;
+  const policy = describePendingApprovalPolicy(pendingApproval);
+  const policySummary = policy ? ` • ${policy.scope} • ${policy.capability} • ${policy.risk} risk` : '';
+  return `Tool: ${pendingApproval.call.tool}${policySummary} • Y approve • A allow for project • N deny`;
 }
 
 export function summarizeToolCall(tool: string, input: unknown): string {
@@ -174,9 +186,9 @@ export function shouldFallbackToMutate(error: string | undefined): boolean {
 
 export function formatDirectShellResponse(toolName: string, command: string, result: ToolResult): string {
   const lines = [
-    'Direct shell result',
+    '## Direct shell result',
     '',
-    `Command: ${command}`,
+    `Command: \`${command}\``,
     `Tool: ${toolName}`,
   ];
 
@@ -190,10 +202,10 @@ export function formatDirectShellResponse(toolName: string, command: string, res
     const stderr = extractTextOutput(result.output, 'stderr');
     lines.push('Outcome: success');
     if (stdout) {
-      lines.push('', 'stdout:', truncate(stdout, MAX_SHELL_OUTPUT_CHARS));
+      lines.push('', '### stdout', '```text', truncate(stdout, MAX_SHELL_OUTPUT_CHARS), '```');
     }
     if (stderr) {
-      lines.push('', 'stderr:', truncate(stderr, MAX_SHELL_OUTPUT_CHARS));
+      lines.push('', '### stderr', '```text', truncate(stderr, MAX_SHELL_OUTPUT_CHARS), '```');
     }
     if (!stdout && !stderr) {
       lines.push('', 'No stdout or stderr output.');
@@ -208,10 +220,10 @@ export function formatDirectShellResponse(toolName: string, command: string, res
   const stdout = extractTextOutput(result.output, 'stdout');
   const stderr = extractTextOutput(result.output, 'stderr');
   if (stdout) {
-    lines.push('', 'stdout:', truncate(stdout, MAX_SHELL_OUTPUT_CHARS));
+    lines.push('', '### stdout', '```text', truncate(stdout, MAX_SHELL_OUTPUT_CHARS), '```');
   }
   if (stderr) {
-    lines.push('', 'stderr:', truncate(stderr, MAX_SHELL_OUTPUT_CHARS));
+    lines.push('', '### stderr', '```text', truncate(stderr, MAX_SHELL_OUTPUT_CHARS), '```');
   }
   return lines.join('\n');
 }
@@ -241,6 +253,25 @@ export function extractPolicySummary(value: unknown): string | undefined {
   const reason = typeof candidate.reason === 'string' ? candidate.reason : undefined;
   const parts = [scope, risk, reason].filter(Boolean);
   return parts.length > 0 ? parts.join(' • ') : undefined;
+}
+
+function describePendingApprovalPolicy(pendingApproval: PendingApproval): RunShellPolicyDecision | undefined {
+  if (pendingApproval.call.tool !== 'run_shell_mutate') {
+    return undefined;
+  }
+
+  const command = extractShellCommand(pendingApproval.call.input);
+  if (!command) {
+    return undefined;
+  }
+
+  const result = classifyShellCommandPolicy(command, {
+    toolName: 'run_shell_mutate',
+    rules: DEFAULT_MUTATE_RULES,
+    allowUnknown: true,
+  });
+
+  return 'error' in result ? undefined : result;
 }
 
 export function isGenericSessionName(name: string): boolean {
@@ -277,7 +308,7 @@ export function appendDirectShellHistory(
 }
 
 function buildDirectShellHistorySummary(toolName: string, result: ToolResult): string {
-  const lines = [`Direct shell command via ${toolName}.`];
+  const lines = [`## Direct shell command via \`${toolName}\``];
   const policy = extractPolicySummary(result.output);
   if (policy) {
     lines.push(`Policy: ${policy}`);
@@ -290,10 +321,10 @@ function buildDirectShellHistorySummary(toolName: string, result: ToolResult): s
   const stdout = extractTextOutput(result.output, 'stdout');
   const stderr = extractTextOutput(result.output, 'stderr');
   if (stdout) {
-    lines.push(`stdout:\n${truncate(stdout, 1200)}`);
+    lines.push('### stdout', '```text', truncate(stdout, 1200), '```');
   }
   if (stderr) {
-    lines.push(`stderr:\n${truncate(stderr, 800)}`);
+    lines.push('### stderr', '```text', truncate(stderr, 800), '```');
   }
 
   return lines.join('\n\n');

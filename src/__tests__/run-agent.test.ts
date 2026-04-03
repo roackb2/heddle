@@ -86,6 +86,26 @@ describe('runAgent', () => {
     });
   });
 
+  it('records an error outcome when the LLM chat throws a non-abort error', async () => {
+    const fakeLlm: LlmAdapter = {
+      async chat(): Promise<LlmResponse> {
+        throw new Error('boom');
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Handle LLM errors gracefully.',
+      llm: fakeLlm,
+      tools: [],
+      maxSteps: 1,
+      logger: silentLogger,
+    });
+
+    expect(result.outcome).toBe('error');
+    expect(result.summary).toBe('LLM error: boom');
+    expect(result.trace.some((event) => event.type === 'run.finished')).toBe(true);
+  });
+
   it('records assistant rationale on tool turns when the model provides text with tool calls', async () => {
     const fakeLlm: LlmAdapter = {
       async chat(): Promise<LlmResponse> {
@@ -567,6 +587,81 @@ describe('runAgent', () => {
       content:
         'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
     });
+  });
+
+  it('requires post-mutation review, verification, and structured summary before finishing', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+        if (seenMessages.length === 1) {
+          return {
+            toolCalls: [{ id: 'call-1', tool: 'run_shell_mutate', input: { command: 'eslint --fix src/example.ts' } }],
+          };
+        }
+
+        if (seenMessages.length === 2) {
+          return {
+            toolCalls: [{ id: 'call-2', tool: 'run_shell_inspect', input: { command: 'git diff --stat' } }],
+          };
+        }
+
+        if (seenMessages.length === 3) {
+          return {
+            toolCalls: [{ id: 'call-3', tool: 'run_shell_mutate', input: { command: 'yarn test' } }],
+          };
+        }
+
+        return {
+          content:
+            'Changed: eslint --fix src/example.ts applied to src/example.ts.\nVerified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output.\nRemaining uncertainty: none.',
+        };
+      },
+    };
+
+    const mutateTool: ToolDefinition = {
+      name: 'run_shell_mutate',
+      description: 'Runs a bounded workspace mutation or verification command',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const command = (input as { command: string }).command;
+        return { ok: true, output: { command, exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
+    const inspectTool: ToolDefinition = {
+      name: 'run_shell_inspect',
+      description: 'Runs a read-only shell inspection command',
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const command = (input as { command: string }).command;
+        return { ok: true, output: { command, exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Apply lint fix and summarize.',
+      llm: fakeLlm,
+      tools: [mutateTool, inspectTool],
+      maxSteps: 8,
+      logger: silentLogger,
+      approveToolCall: async () => ({ approved: true }),
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe(
+      'Changed: eslint --fix src/example.ts applied to src/example.ts.\nVerified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output.\nRemaining uncertainty: none.',
+    );
+
+    const hostRequirement = seenMessages
+      .flat()
+      .find(
+        (message) =>
+          message.role === 'system' &&
+          message.content.includes('Host requirement: before giving a final answer after a workspace-changing mutate command'),
+      );
+    expect(hostRequirement?.content).toContain('Host requirement: before giving a final answer after a workspace-changing mutate command');
   });
 
   it('rejects a vague final answer after mutation follow-up until it includes changed, verified, and remaining uncertainty labels', async () => {
