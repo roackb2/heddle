@@ -12,11 +12,26 @@ type RunShellInput = {
 
 export type RunShellScope = 'inspect' | 'workspace';
 export type RunShellRisk = 'low' | 'medium' | 'unknown';
+export type RunShellCapability =
+  | 'workspace_listing'
+  | 'file_inspection'
+  | 'workspace_search'
+  | 'structured_inspection'
+  | 'environment_inspection'
+  | 'git_inspection'
+  | 'dependency'
+  | 'verification'
+  | 'formatting'
+  | 'file_operation'
+  | 'git_staging'
+  | 'project_script'
+  | 'unknown_workspace';
 
 export type RunShellPolicyDecision = {
   binary: string;
   scope: RunShellScope;
   risk: RunShellRisk;
+  capability: RunShellCapability;
   reason: string;
 };
 
@@ -25,6 +40,7 @@ type RunShellRule = {
   argsPrefix?: string[];
   scope: RunShellScope;
   risk: RunShellRisk;
+  capability: RunShellCapability;
   reason: string;
 };
 
@@ -41,60 +57,61 @@ export type RunShellOptions = {
 };
 
 export const DEFAULT_INSPECT_RULES: RunShellRule[] = [
-  inspectRule('ls', 'workspace listing'),
-  inspectRule('cat', 'file inspection'),
-  inspectRule('head', 'file inspection'),
-  inspectRule('tail', 'file inspection'),
-  inspectRule('wc', 'workspace inspection'),
-  inspectRule('grep', 'workspace inspection'),
-  inspectRule('rg', 'workspace inspection'),
-  inspectRule('find', 'workspace inspection'),
-  inspectRule('sed', 'workspace inspection'),
-  inspectRule('sort', 'workspace inspection'),
-  inspectRule('uniq', 'workspace inspection'),
-  inspectRule('jq', 'structured output inspection'),
-  inspectRule('echo', 'simple shell inspection'),
-  inspectRule('pwd', 'workspace location check'),
-  inspectRule('which', 'binary discovery'),
-  inspectRule('file', 'file metadata inspection'),
-  inspectRule('tree', 'workspace tree inspection'),
-  inspectRule('du', 'workspace disk inspection'),
-  inspectRule('df', 'filesystem inspection'),
-  inspectRule('git', 'git history inspection', ['log']),
-  inspectRule('git', 'git diff inspection', ['diff']),
-  inspectRule('git', 'git status inspection', ['status']),
-  inspectRule('git', 'git object inspection', ['show']),
-  inspectRule('git', 'git revision inspection', ['rev-parse']),
-  inspectRule('git', 'git file inventory inspection', ['ls-files']),
-  inspectRule('git', 'git content search inspection', ['grep']),
-  inspectRule('git', 'git branch inspection', ['branch']),
-  inspectRule('git', 'git tag inspection', ['tag']),
-  inspectRule('git', 'git remote inspection', ['remote']),
+  inspectRule('ls', 'workspace_listing', 'workspace listing'),
+  inspectRule('cat', 'file_inspection', 'file inspection'),
+  inspectRule('head', 'file_inspection', 'file inspection'),
+  inspectRule('tail', 'file_inspection', 'file inspection'),
+  inspectRule('wc', 'file_inspection', 'workspace inspection'),
+  inspectRule('grep', 'workspace_search', 'workspace inspection'),
+  inspectRule('rg', 'workspace_search', 'workspace inspection'),
+  inspectRule('find', 'workspace_search', 'workspace inspection'),
+  inspectRule('sed', 'file_inspection', 'workspace inspection'),
+  inspectRule('sort', 'structured_inspection', 'workspace inspection'),
+  inspectRule('uniq', 'structured_inspection', 'workspace inspection'),
+  inspectRule('jq', 'structured_inspection', 'structured output inspection'),
+  inspectRule('echo', 'environment_inspection', 'simple shell inspection'),
+  inspectRule('pwd', 'environment_inspection', 'workspace location check'),
+  inspectRule('which', 'environment_inspection', 'binary discovery'),
+  inspectRule('file', 'file_inspection', 'file metadata inspection'),
+  inspectRule('tree', 'workspace_listing', 'workspace tree inspection'),
+  inspectRule('du', 'environment_inspection', 'workspace disk inspection'),
+  inspectRule('df', 'environment_inspection', 'filesystem inspection'),
+  inspectRule('git', 'git_inspection', 'git history inspection', ['log']),
+  inspectRule('git', 'git_inspection', 'git diff inspection', ['diff']),
+  inspectRule('git', 'git_inspection', 'git status inspection', ['status']),
+  inspectRule('git', 'git_inspection', 'git object inspection', ['show']),
+  inspectRule('git', 'git_inspection', 'git revision inspection', ['rev-parse']),
+  inspectRule('git', 'git_inspection', 'git file inventory inspection', ['ls-files']),
+  inspectRule('git', 'git_inspection', 'git content search inspection', ['grep']),
+  inspectRule('git', 'git_inspection', 'git branch inspection', ['branch']),
+  inspectRule('git', 'git_inspection', 'git tag inspection', ['tag']),
+  inspectRule('git', 'git_inspection', 'git remote inspection', ['remote']),
 ];
 
 export const DEFAULT_MUTATE_RULES: RunShellRule[] = [
-  workspaceRule('yarn', 'medium', 'workspace dependency install command', ['add']),
-  workspaceRule('yarn', 'medium', 'workspace dependency install command', ['install']),
-  workspaceRule('yarn', 'medium', 'workspace dependency removal command', ['remove']),
-  workspaceRule('yarn', 'low', 'workspace verification command', ['test']),
-  workspaceRule('yarn', 'low', 'workspace verification command', ['build']),
-  workspaceRule('yarn', 'low', 'workspace verification command', ['lint']),
-  workspaceRule('yarn', 'low', 'workspace verification command', ['vitest']),
-  workspaceRule('vitest', 'low', 'workspace verification command'),
-  workspaceRule('tsc', 'low', 'workspace verification command'),
-  workspaceRule('yarn', 'medium', 'workspace formatting command', ['format']),
-  workspaceRule('yarn', 'medium', 'workspace formatting command', ['prettier']),
-  workspaceRule('yarn', 'medium', 'workspace formatting command', ['eslint']),
-  workspaceRule('npx', 'medium', 'workspace formatting command', ['prettier', '--write']),
-  workspaceRule('npx', 'medium', 'workspace formatting command', ['eslint', '--fix']),
-  workspaceRule('prettier', 'medium', 'workspace formatting command', ['--write']),
-  workspaceRule('eslint', 'medium', 'workspace formatting command', ['--fix']),
-  workspaceRule('mkdir', 'medium', 'workspace file operation'),
-  workspaceRule('touch', 'medium', 'workspace file operation'),
-  workspaceRule('mv', 'medium', 'workspace file operation'),
-  workspaceRule('cp', 'medium', 'workspace file operation'),
-  workspaceRule('git', 'medium', 'git staging operation', ['add']),
-  workspaceRule('git', 'medium', 'git file move operation', ['mv']),
+  workspaceRule('yarn', 'medium', 'dependency', 'workspace dependency install command', ['add']),
+  workspaceRule('yarn', 'medium', 'dependency', 'workspace dependency install command', ['install']),
+  workspaceRule('yarn', 'medium', 'dependency', 'workspace dependency removal command', ['remove']),
+  workspaceRule('yarn', 'low', 'verification', 'workspace verification command', ['test']),
+  workspaceRule('yarn', 'low', 'verification', 'workspace verification command', ['build']),
+  workspaceRule('yarn', 'low', 'verification', 'workspace verification command', ['lint']),
+  workspaceRule('yarn', 'low', 'verification', 'workspace verification command', ['vitest']),
+  workspaceRule('vitest', 'low', 'verification', 'workspace verification command'),
+  workspaceRule('tsc', 'low', 'verification', 'workspace verification command'),
+  workspaceRule('yarn', 'medium', 'project_script', 'workspace project script command', ['run']),
+  workspaceRule('yarn', 'medium', 'formatting', 'workspace formatting command', ['format']),
+  workspaceRule('yarn', 'medium', 'formatting', 'workspace formatting command', ['prettier']),
+  workspaceRule('yarn', 'medium', 'formatting', 'workspace formatting command', ['eslint']),
+  workspaceRule('npx', 'medium', 'formatting', 'workspace formatting command', ['prettier', '--write']),
+  workspaceRule('npx', 'medium', 'formatting', 'workspace formatting command', ['eslint', '--fix']),
+  workspaceRule('prettier', 'medium', 'formatting', 'workspace formatting command', ['--write']),
+  workspaceRule('eslint', 'medium', 'formatting', 'workspace formatting command', ['--fix']),
+  workspaceRule('mkdir', 'medium', 'file_operation', 'workspace file operation'),
+  workspaceRule('touch', 'medium', 'file_operation', 'workspace file operation'),
+  workspaceRule('mv', 'medium', 'file_operation', 'workspace file operation'),
+  workspaceRule('cp', 'medium', 'file_operation', 'workspace file operation'),
+  workspaceRule('git', 'medium', 'git_staging', 'git staging operation', ['add']),
+  workspaceRule('git', 'medium', 'file_operation', 'git file move operation', ['mv']),
 ];
 
 export function createRunShellInspectTool(options: RunShellOptions = {}): ToolDefinition {
@@ -333,6 +350,7 @@ function classifyCommand(
           binary,
           scope: 'workspace',
           risk: 'unknown',
+          capability: 'unknown_workspace',
           reason: 'unclassified workspace command requiring explicit approval',
         }
       : undefined;
@@ -342,6 +360,7 @@ function classifyCommand(
     binary: rule.binary,
     scope: rule.scope,
     risk: rule.risk,
+    capability: rule.capability,
     reason: rule.reason,
   };
 }
@@ -421,12 +440,18 @@ function containsBlockedShellControlOperators(command: string, allowPipes: boole
   return false;
 }
 
-function inspectRule(binary: string, reason: string, argsPrefix?: string[]): RunShellRule {
+function inspectRule(
+  binary: string,
+  capability: RunShellCapability,
+  reason: string,
+  argsPrefix?: string[],
+): RunShellRule {
   return {
     binary,
     argsPrefix,
     scope: 'inspect',
     risk: 'low',
+    capability,
     reason,
   };
 }
@@ -434,6 +459,7 @@ function inspectRule(binary: string, reason: string, argsPrefix?: string[]): Run
 function workspaceRule(
   binary: string,
   risk: RunShellRisk,
+  capability: RunShellCapability,
   reason: string,
   argsPrefix?: string[],
 ): RunShellRule {
@@ -442,6 +468,7 @@ function workspaceRule(
     argsPrefix,
     scope: 'workspace',
     risk,
+    capability,
     reason,
   };
 }

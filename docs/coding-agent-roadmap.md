@@ -75,7 +75,7 @@ Current progress:
 - shell capability is split into `run_shell_inspect` and `run_shell_mutate`
 - file creation and editing now have a first-class `edit_file` tool instead of relying only on shell-based file-writing workarounds
 - `run_shell_mutate` is approval-gated in chat mode
-- shell tools now classify allowed commands by bounded workspace/inspect policy rules and return scope/risk metadata
+- shell tools now classify allowed commands by bounded workspace/inspect policy rules and return scope/risk/capability metadata
 - unclassified mutate commands now fall back to explicit approval with `unknown` risk metadata instead of immediate rejection
 - workspace-changing mutate commands trigger host-side pressure to inspect repo state with concrete git evidence and run verification before final answer
 - workspace-changing mutate runs now also require a short operator-style final answer with explicit `Changed`, `Verified`, and `Remaining uncertainty` sections, naming the exact review and verification commands used
@@ -112,6 +112,7 @@ Near-term implication:
 
 - the next shell work should not be "add more prefixes forever"
 - it should move toward capability classes and host-side execution policy
+- an early step in that direction is now live: mutate policy can classify `yarn run ...` as a project-script capability instead of treating it as only an unknown command
 
 ## Phase 2: Reliability And Session Quality
 

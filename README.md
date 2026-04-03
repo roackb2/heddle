@@ -111,8 +111,9 @@ Phase 1 has also started at the tool-contract layer:
 - inspect vs mutate intent is explicit in tool names, descriptions, and traces
 - examples expose both shell modes to the agent runtime
 - chat mode now pauses for human approval before `run_shell_mutate` executes
-- shell execution is now governed by explicit workspace/inspect policy rules with scope and risk metadata, rather than only a flat command-prefix list
+- shell execution is now governed by explicit workspace/inspect policy rules with scope, risk, and capability metadata, rather than only a flat command-prefix list
 - known inspect commands remain narrowly classified, while unclassified mutate commands now fall back to explicit approval instead of hard rejection
+- mutate policy now includes an explicit project-script capability for commands such as `yarn run ...`, which is a small step toward broader capability-based execution instead of per-command allowlist growth
 - workspace-changing mutate commands now trigger host-side follow-up requirements before final answer: gather concrete repo review evidence such as `git status --short` or `git diff --stat`, then run verification
 - after workspace-changing mutate runs, the host now also requires a short operator-style final summary with `Changed:`, `Verified:`, and `Remaining uncertainty:`, including the exact review and verification commands used
 - chat mode now supports real interrupt via `Esc` for agent turns and direct `!command` runs, plus resume via `/continue`

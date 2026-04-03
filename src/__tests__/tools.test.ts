@@ -277,6 +277,7 @@ describe('runShell tools', () => {
         binary: 'pwd',
         scope: 'inspect',
         risk: 'low',
+        capability: 'environment_inspection',
       },
     });
     expect(typeof (result.output as { stdout: unknown }).stdout).toBe('string');
@@ -351,7 +352,26 @@ describe('runShell tools', () => {
         binary: 'yarn',
         scope: 'workspace',
         risk: 'medium',
+        capability: 'dependency',
         reason: 'workspace dependency install command',
+      },
+    });
+  });
+
+  it('allows project-local script execution through mutate policy metadata', async () => {
+    const tool = createRunShellMutateTool();
+    const result = await tool.execute({ command: 'yarn run --help' });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({
+      command: 'yarn run --help',
+      exitCode: 0,
+      policy: {
+        binary: 'yarn',
+        scope: 'workspace',
+        risk: 'medium',
+        capability: 'project_script',
+        reason: 'workspace project script command',
       },
     });
   });
@@ -368,6 +388,7 @@ describe('runShell tools', () => {
         binary: 'pwd',
         scope: 'workspace',
         risk: 'unknown',
+        capability: 'unknown_workspace',
         reason: 'unclassified workspace command requiring explicit approval',
       },
     });
@@ -393,6 +414,7 @@ describe('runShell tools', () => {
           binary: 'mv',
           scope: 'workspace',
           risk: 'medium',
+          capability: 'file_operation',
         },
       });
     } finally {
