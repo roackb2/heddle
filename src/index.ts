@@ -50,6 +50,8 @@ export { editFileTool } from './tools/edit-file.js';
 export { searchFilesTool, createSearchFilesTool, DEFAULT_SEARCH_EXCLUDED_DIRS } from './tools/search-files.js';
 export type { SearchFilesOptions } from './tools/search-files.js';
 export { reportStateTool } from './tools/report-state.js';
+export { updatePlanTool } from './tools/update-plan.js';
+export type { PlanItem, PlanItemStatus } from './tools/update-plan.js';
 export { createRunShellInspectTool, createRunShellMutateTool } from './tools/run-shell.js';
 export { createRunShellTool } from './tools/run-shell.js';
 export type { RunShellOptions } from './tools/run-shell.js';

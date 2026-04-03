@@ -71,6 +71,7 @@ type MessageBlock =
   | { kind: 'paragraph'; text: string }
   | { kind: 'heading'; text: string }
   | { kind: 'bullet'; text: string }
+  | { kind: 'task'; text: string; marker: '[ ]' | '[-]' | '[x]' }
   | { kind: 'numbered'; text: string; marker: string }
   | { kind: 'quote'; text: string }
   | { kind: 'code'; text: string; info?: string };
@@ -113,6 +114,15 @@ function parseMessageBlocks(text: string): MessageBlock[] {
     }
 
     if (/^[-*]\s+/.test(trimmed)) {
+      const taskMatch = trimmed.match(/^[-*]\s+(\[(?: |x|-)\])\s+(.*)$/i);
+      if (taskMatch) {
+        const marker = normalizeTaskMarker(taskMatch[1]);
+        if (marker) {
+          blocks.push({ kind: 'task', marker, text: taskMatch[2] });
+          continue;
+        }
+      }
+
       blocks.push({ kind: 'bullet', text: trimmed.replace(/^[-*]\s+/, '') });
       continue;
     }
@@ -172,6 +182,13 @@ function renderBlock(
         <Text color={role === 'user' ? 'cyan' : 'white'}>
           <Text color="gray">• </Text>
           <InlineText text={block.text} color={role === 'user' ? 'cyan' : 'white'} />
+        </Text>
+      );
+    case 'task':
+      return (
+        <Text color={taskTextColor(block.marker, role)}>
+          <Text color={taskMarkerColor(block.marker)}>{block.marker} </Text>
+          <InlineText text={block.text} color={taskTextColor(block.marker, role)} />
         </Text>
       );
     case 'numbered':
@@ -270,6 +287,38 @@ function InlineText({
       })}
     </>
   );
+}
+
+function normalizeTaskMarker(value: string): '[ ]' | '[-]' | '[x]' | undefined {
+  const normalized = value.toLowerCase();
+  if (normalized === '[ ]') {
+    return '[ ]';
+  }
+  if (normalized === '[-]') {
+    return '[-]';
+  }
+  if (normalized === '[x]') {
+    return '[x]';
+  }
+  return undefined;
+}
+
+function taskMarkerColor(marker: '[ ]' | '[-]' | '[x]'): string {
+  if (marker === '[x]') {
+    return 'green';
+  }
+  if (marker === '[-]') {
+    return 'yellow';
+  }
+  return 'gray';
+}
+
+function taskTextColor(marker: '[ ]' | '[-]' | '[x]', role: 'user' | 'assistant'): string {
+  if (role === 'user') {
+    return 'cyan';
+  }
+
+  return marker === '[x]' ? 'green' : 'white';
 }
 
 type InlineSegment =

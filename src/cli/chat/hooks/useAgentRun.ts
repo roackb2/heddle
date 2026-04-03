@@ -12,6 +12,7 @@ import {
   listFilesTool,
   readFileTool,
   reportStateTool,
+  updatePlanTool,
   runAgent,
 } from '../../../index.js';
 import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../tools/run-shell.js';
@@ -114,6 +115,7 @@ export function useAgentRun(args: UseAgentRunArgs) {
       editFileTool,
       createSearchFilesTool({ excludedDirs: runtime.searchIgnoreDirs }),
       reportStateTool,
+      updatePlanTool,
       createRunShellInspectTool(),
       createRunShellMutateTool(),
     ],

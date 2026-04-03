@@ -158,6 +158,11 @@ export function formatApprovalHint(pendingApproval: PendingApproval): string {
 }
 
 export function summarizeToolCall(tool: string, input: unknown): string {
+  const planSummary = summarizePlanInput(tool, input);
+  if (planSummary) {
+    return planSummary;
+  }
+
   const shellCommand = extractShellCommand(input);
   if (shellCommand) {
     return `${tool} (${truncate(shellCommand, MAX_TOOL_CALL_SUMMARY_CHARS)})`;
@@ -396,14 +401,41 @@ function summarizeSearchInput(tool: string, input: unknown): string | undefined 
   return `${tool} (${querySummary})`;
 }
 
+function summarizePlanInput(tool: string, input: unknown): string | undefined {
+  if (tool !== 'update_plan') {
+    return undefined;
+  }
+
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return tool;
+  }
+
+  const plan = (input as { plan?: unknown }).plan;
+  if (!Array.isArray(plan) || plan.length === 0) {
+    return tool;
+  }
+
+  const current = plan.find((item) => item && typeof item === 'object' && !Array.isArray(item) && (item as { status?: unknown }).status === 'in_progress');
+  const currentStep = current && typeof (current as { step?: unknown }).step === 'string' ? (current as { step: string }).step : undefined;
+  return currentStep ? `${tool} (${truncate(currentStep, MAX_TOOL_CALL_SUMMARY_CHARS)})` : `${tool} (${plan.length} items)`;
+}
+
 function renderToolHistoryMessage(message: Extract<ChatMessage, { role: 'tool' }>, history: ChatMessage[], index: number): string | undefined {
   const toolCall = findToolCallForResult(history, index, message.toolCallId);
-  if (!toolCall || toolCall.tool !== 'edit_file') {
+  if (!toolCall) {
     return undefined;
   }
 
   const result = parseToolResultPayload(message.content);
   if (!result?.ok) {
+    return undefined;
+  }
+
+  if (toolCall.tool === 'update_plan') {
+    return renderUpdatePlanHistoryMessage(result.output);
+  }
+
+  if (toolCall.tool !== 'edit_file') {
     return undefined;
   }
 
@@ -432,6 +464,51 @@ function renderToolHistoryMessage(message: Extract<ChatMessage, { role: 'tool' }
   }
 
   return lines.join('\n');
+}
+
+function renderUpdatePlanHistoryMessage(output: unknown): string | undefined {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) {
+    return undefined;
+  }
+
+  const candidate = output as { explanation?: unknown; plan?: unknown };
+  if (!Array.isArray(candidate.plan) || candidate.plan.length === 0) {
+    return undefined;
+  }
+
+  const lines = ['## Plan'];
+  if (typeof candidate.explanation === 'string' && candidate.explanation.trim()) {
+    lines.push('', candidate.explanation.trim());
+  }
+
+  lines.push(
+    '',
+    ...candidate.plan.flatMap((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return [];
+      }
+
+      const step = typeof (item as { step?: unknown }).step === 'string' ? (item as { step: string }).step.trim() : '';
+      const status = (item as { status?: unknown }).status;
+      if (!step || (status !== 'pending' && status !== 'in_progress' && status !== 'completed')) {
+        return [];
+      }
+
+      return [`- ${planStatusMarker(status)} ${step}`];
+    }),
+  );
+
+  return lines.join('\n');
+}
+
+function planStatusMarker(status: 'pending' | 'in_progress' | 'completed'): string {
+  if (status === 'completed') {
+    return '[x]';
+  }
+  if (status === 'in_progress') {
+    return '[-]';
+  }
+  return '[ ]';
 }
 
 function findToolCallForResult(history: ChatMessage[], index: number, toolCallId: string): ToolCall | undefined {

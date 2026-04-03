@@ -31,6 +31,9 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('If you identify a reasonable bounded change that directly serves the user goal, make it and verify it instead of only describing it.');
     expect(prompt).toContain('Once you choose a concrete next step, execute that step instead of repeatedly restating the plan');
     expect(prompt).toContain('Do not spend multiple turns narrating the same intent without either gathering new evidence or making progress on the implementation.');
+    expect(prompt).toContain('record a short plan with update_plan');
+    expect(prompt).toContain('If you recorded a plan, do not stop after only one small slice');
+    expect(prompt).toContain('Use update_plan for substantial tasks');
   });
 
   it('includes project-specific context when provided', () => {

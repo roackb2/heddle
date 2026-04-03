@@ -68,4 +68,39 @@ describe('buildConversationMessages', () => {
       { id: 'assistant-1-I will inspect.', role: 'assistant', text: 'I will inspect.' },
     ]);
   });
+
+  it('renders update_plan tool results into visible checklist history', () => {
+    const history: ChatMessage[] = [
+      { role: 'user', content: 'Move the project forward.' },
+      {
+        role: 'assistant',
+        content: 'I will plan the work first.',
+        toolCalls: [{ id: 'call-1', tool: 'update_plan', input: { plan: [{ step: 'Inspect roadmap', status: 'completed' }] } }],
+      },
+      {
+        role: 'tool',
+        toolCallId: 'call-1',
+        content: JSON.stringify({
+          ok: true,
+          output: {
+            explanation: 'Tracking the next implementation slice.',
+            plan: [
+              { step: 'Inspect roadmap and runtime state', status: 'completed' },
+              { step: 'Implement the next bounded capability', status: 'in_progress' },
+              { step: 'Verify with tests and build', status: 'pending' },
+            ],
+          },
+        }),
+      },
+    ];
+
+    const messages = buildConversationMessages(history);
+
+    expect(messages).toHaveLength(3);
+    expect(messages[2]?.text).toContain('## Plan');
+    expect(messages[2]?.text).toContain('Tracking the next implementation slice.');
+    expect(messages[2]?.text).toContain('- [x] Inspect roadmap and runtime state');
+    expect(messages[2]?.text).toContain('- [-] Implement the next bounded capability');
+    expect(messages[2]?.text).toContain('- [ ] Verify with tests and build');
+  });
 });

@@ -6,6 +6,7 @@ import { listFilesTool } from '../tools/list-files.js';
 import { readFileTool } from '../tools/read-file.js';
 import { editFileTool, previewEditFileInput } from '../tools/edit-file.js';
 import { reportStateTool } from '../tools/report-state.js';
+import { updatePlanTool } from '../tools/update-plan.js';
 import {
   classifyShellCommandPolicy,
   DEFAULT_INSPECT_RULES,
@@ -71,6 +72,46 @@ describe('tool input validation', () => {
     expect(reportStateTool.description).toContain('tell the library author what capability, input, or support was missing');
     expect(reportStateTool.description).toContain('Returns the same structured report back');
     expect(reportStateTool.description).toContain('"nextNeed": "list_files on ."');
+    expect(updatePlanTool.description).toContain('Record or revise a short working plan');
+    expect(updatePlanTool.description).toContain('At most one item may be in_progress');
+  });
+
+  it('validates structured update_plan input', async () => {
+    const result = await updatePlanTool.execute({
+      explanation: 'Starting implementation.',
+      plan: [
+        { step: 'Inspect current flow', status: 'completed' },
+        { step: 'Implement bounded change', status: 'in_progress' },
+        { step: 'Verify with tests', status: 'pending' },
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      output: {
+        explanation: 'Starting implementation.',
+        plan: [
+          { step: 'Inspect current flow', status: 'completed' },
+          { step: 'Implement bounded change', status: 'in_progress' },
+          { step: 'Verify with tests', status: 'pending' },
+        ],
+      },
+    });
+  });
+
+  it('rejects update_plan input with multiple in-progress items', async () => {
+    const result = await updatePlanTool.execute({
+      plan: [
+        { step: 'A', status: 'in_progress' },
+        { step: 'B', status: 'in_progress' },
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error:
+        'Invalid input for update_plan. Required field: plan. Optional field: explanation. Each plan item must have step and status (pending, in_progress, completed), with at most one in_progress item.',
+    });
   });
 });
 
