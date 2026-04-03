@@ -80,6 +80,14 @@ export type TraceEvent =
       step: number;
       timestamp: string;
     }
+  | {
+      type: 'tool.fallback';
+      fromCall: ToolCall;
+      toCall: ToolCall;
+      reason: string;
+      step: number;
+      timestamp: string;
+    }
   | { type: 'tool.call'; call: ToolCall; step: number; timestamp: string }
   | { type: 'tool.result'; tool: string; result: ToolResult; step: number; timestamp: string }
   | { type: 'run.finished'; outcome: StopReason; summary: string; step: number; timestamp: string };

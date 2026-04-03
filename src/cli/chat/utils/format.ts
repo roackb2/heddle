@@ -39,6 +39,10 @@ export function summarizeTrace(trace: TraceEvent[]): string[] {
         return [
           `approval ${event.approved ? 'granted' : 'denied'} for ${summarizeToolCall(event.call.tool, event.call.input)}${event.reason ? ` (${truncate(event.reason, 80)})` : ''}`,
         ];
+      case 'tool.fallback':
+        return [
+          `fallback ${summarizeToolCall(event.fromCall.tool, event.fromCall.input)} -> ${summarizeToolCall(event.toCall.tool, event.toCall.input)} (${event.reason})`,
+        ];
       case 'tool.call':
         return [`tool call ${summarizeToolCall(event.call.tool, event.call.input)}`];
       case 'tool.result':
@@ -73,6 +77,8 @@ export function toLiveEvent(event: TraceEvent): string | undefined {
       return `approval needed for ${summarizeToolCall(event.call.tool, event.call.input)}`;
     case 'tool.approval_resolved':
       return `approval ${event.approved ? 'granted' : 'denied'} for ${summarizeToolCall(event.call.tool, event.call.input)}${event.reason ? ` (${truncate(event.reason, 80)})` : ''}`;
+    case 'tool.fallback':
+      return `retrying with ${summarizeToolCall(event.toCall.tool, event.toCall.input)} after ${summarizeToolCall(event.fromCall.tool, event.fromCall.input)} was blocked (${truncate(event.reason, 80)})`;
     case 'tool.call':
       return `running ${summarizeToolCall(event.call.tool, event.call.input)}`;
     case 'tool.result':

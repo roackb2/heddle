@@ -82,6 +82,14 @@ export function formatTraceForConsole(trace: TraceEvent[]): string {
         );
         break;
 
+      case 'tool.fallback':
+        lines.push(
+          `${COLORS.yellow}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}Tool Fallback:${COLORS.reset} ${event.fromCall.tool} → ${event.toCall.tool}`,
+          `  Reason: ${event.reason}`,
+          `  Command: ${truncate(JSON.stringify(event.toCall.input), 200)}`,
+        );
+        break;
+
       case 'tool.result': {
         const color = event.result.ok ? COLORS.green : COLORS.red;
         const status = event.result.ok ? '✓' : '✗';

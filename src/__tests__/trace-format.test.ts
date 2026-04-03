@@ -132,4 +132,30 @@ describe('formatTraceForConsole', () => {
     expect(output).toContain('Approval Denied');
     expect(output).toContain('User denied in test');
   });
+
+  it('renders tool fallback events readably', () => {
+    const output = formatTraceForConsole([
+      {
+        type: 'tool.fallback',
+        fromCall: {
+          id: 'call-1',
+          tool: 'run_shell_inspect',
+          input: { command: 'aws configure list' },
+        },
+        toCall: {
+          id: 'call-1-mutate-fallback',
+          tool: 'run_shell_mutate',
+          input: { command: 'aws configure list' },
+        },
+        reason: 'inspect policy rejected the command',
+        step: 2,
+        timestamp: '2024-01-01T00:00:03Z',
+      },
+    ]);
+
+    expect(output).toContain('Tool Fallback');
+    expect(output).toContain('run_shell_inspect → run_shell_mutate');
+    expect(output).toContain('inspect policy rejected the command');
+    expect(output).toContain('"command":"aws configure list"');
+  });
 });

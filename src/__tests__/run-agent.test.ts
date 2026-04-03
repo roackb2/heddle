@@ -449,6 +449,82 @@ describe('runAgent', () => {
     expect(result.trace.map((event) => event.type)).toContain('tool.approval_resolved');
   });
 
+  it('records an explicit fallback event when inspect retries through mutate', async () => {
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        if (messages.some((message) => message.role === 'tool')) {
+          return {
+            content: 'The fallback command ran successfully.',
+          };
+        }
+
+        return {
+          toolCalls: [{ id: 'call-1', tool: 'run_shell_inspect', input: { command: 'aws configure list' } }],
+        };
+      },
+    };
+
+    const inspectTool: ToolDefinition = {
+      name: 'run_shell_inspect',
+      description: 'Runs a bounded read-only shell command',
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return {
+          ok: false,
+          error:
+            'Command not allowed by run_shell_inspect policy. This tool only permits bounded commands that match its configured workspace risk/scope rules.',
+        };
+      },
+    };
+
+    const mutateTool: ToolDefinition = {
+      name: 'run_shell_mutate',
+      description: 'Runs an approval-gated shell command',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const command = (input as { command: string }).command;
+        return { ok: true, output: { command, exitCode: 0, stdout: 'ok', stderr: '' } };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Try the AWS CLI command.',
+      llm: fakeLlm,
+      tools: [inspectTool, mutateTool],
+      maxSteps: 3,
+      logger: silentLogger,
+      approveToolCall: async () => ({ approved: true, reason: 'remembered project approval' }),
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.trace).toContainEqual({
+      type: 'tool.fallback',
+      fromCall: { id: 'call-1', tool: 'run_shell_inspect', input: { command: 'aws configure list' } },
+      toCall: {
+        id: 'call-1-mutate-fallback',
+        tool: 'run_shell_mutate',
+        input: { command: 'aws configure list' },
+      },
+      reason: 'inspect policy rejected the command',
+      step: 1,
+      timestamp: expect.any(String),
+    });
+    expect(result.trace.map((event) => event.type)).toEqual([
+      'run.started',
+      'assistant.turn',
+      'tool.call',
+      'tool.result',
+      'tool.fallback',
+      'tool.approval_requested',
+      'tool.approval_resolved',
+      'tool.call',
+      'tool.result',
+      'assistant.turn',
+      'run.finished',
+    ]);
+  });
+
   it('requires repo review and verification before finalizing after a workspace-changing mutate command', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {

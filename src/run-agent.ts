@@ -389,7 +389,8 @@ async function executeToolCallWithFallback(args: {
   log: Logger;
 }): Promise<{ effectiveCall: ToolCall; result: Awaited<ReturnType<typeof executeTool>> }> {
   const primary = await executeRecordedToolCall(args.call, args);
-  if (!shouldFallbackInspectResult(args.call, primary.result)) {
+  const fallbackReason = getInspectFallbackReason(args.call, primary.result);
+  if (!fallbackReason) {
     return primary;
   }
 
@@ -403,6 +404,14 @@ async function executeToolCallWithFallback(args: {
     tool: 'run_shell_mutate',
     input: args.call.input,
   };
+  args.record({
+    type: 'tool.fallback',
+    fromCall: args.call,
+    toCall: mutateCall,
+    reason: fallbackReason,
+    step: args.step,
+    timestamp: args.now(),
+  });
   const approvalDeniedResult = await maybeDenyToolCall({
     call: mutateCall,
     tool: mutateTool,
@@ -416,7 +425,10 @@ async function executeToolCallWithFallback(args: {
     return { effectiveCall: mutateCall, result: approvalDeniedResult };
   }
 
-  args.log.info({ step: args.step, from: args.call.tool, to: mutateCall.tool }, 'Retrying inspect failure through mutate fallback');
+  args.log.info(
+    { step: args.step, from: args.call.tool, to: mutateCall.tool, reason: fallbackReason },
+    'Retrying inspect failure through mutate fallback',
+  );
   return executeRecordedToolCall(mutateCall, args);
 }
 
@@ -473,12 +485,15 @@ async function resolveToolApproval(args: {
   return approval;
 }
 
-function shouldFallbackInspectResult(call: ToolCall, result: { ok: boolean; error?: string }): boolean {
-  return (
-    call.tool === 'run_shell_inspect' &&
-    !result.ok &&
-    shouldAutoFallbackInspectToMutate(result.error)
-  );
+function getInspectFallbackReason(
+  call: ToolCall,
+  result: { ok: boolean; error?: string },
+): string | undefined {
+  if (call.tool !== 'run_shell_inspect' || result.ok) {
+    return undefined;
+  }
+
+  return getInspectMutateFallbackReason(result.error);
 }
 
 function buildRepeatedToolCallResult(tool: string): { ok: false; error: string } {
@@ -488,15 +503,20 @@ function buildRepeatedToolCallResult(tool: string): { ok: false; error: string }
   };
 }
 
-function shouldAutoFallbackInspectToMutate(error: string | undefined): boolean {
+function getInspectMutateFallbackReason(error: string | undefined): string | undefined {
   if (!error) {
-    return false;
+    return undefined;
   }
 
-  return (
-    error.includes('run_shell_inspect policy') ||
-    error.includes('Inspect mode permits read-only pipes')
-  );
+  if (error.includes('run_shell_inspect policy')) {
+    return 'inspect policy rejected the command';
+  }
+
+  if (error.includes('Inspect mode permits read-only pipes')) {
+    return 'inspect shell restrictions rejected the command';
+  }
+
+  return undefined;
 }
 
 function sanitizeHistory(history: ChatMessage[]): ChatMessage[] {
