@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Text, useInput } from 'ink';
+import React, { useMemo, useState } from 'react';
+import { Box, Text, useInput } from 'ink';
 
-const MAX_VISIBLE_INPUT_CHARS = 96;
+const DEFAULT_MAX_VISIBLE_INPUT_LINES = 8;
+const FALLBACK_WRAP_WIDTH = 80;
 
 export type PromptKeyInput = {
   input: string;
@@ -19,6 +20,7 @@ export type PromptKeyInput = {
     escape?: boolean;
     ctrl?: boolean;
     meta?: boolean;
+    shift?: boolean;
   };
 };
 
@@ -26,6 +28,7 @@ export function PromptInput({
   value,
   isDisabled,
   placeholder,
+  maxVisibleLines = DEFAULT_MAX_VISIBLE_INPUT_LINES,
   onChange,
   onSubmit,
   onSpecialKey,
@@ -33,6 +36,7 @@ export function PromptInput({
   value: string;
   isDisabled: boolean;
   placeholder: string;
+  maxVisibleLines?: number;
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
   onSpecialKey?: (event: PromptKeyInput) => boolean;
@@ -48,15 +52,50 @@ export function PromptInput({
       return;
     }
 
-    if (key.return) {
+    if (key.return && !key.shift) {
       onSubmit(value);
       setCursor(0);
       return;
     }
 
-    if ((key.meta && key.backspace) || (key.ctrl && input === 'u')) {
+    if (key.return && key.shift) {
+      onChange(insertAtCursor(value, cursor, '\n'));
+      setCursor(cursor + 1);
+      return;
+    }
+
+    if (key.meta && key.backspace) {
+      const nextCursor = findPreviousWordBoundary(value, cursor);
+      onChange(removeRange(value, nextCursor, cursor));
+      setCursor(nextCursor);
+      return;
+    }
+
+    if (key.ctrl && input === 'u') {
       onChange(value.slice(cursor));
       setCursor(0);
+      return;
+    }
+
+    if (key.ctrl && input === 'k') {
+      onChange(value.slice(0, cursor));
+      return;
+    }
+
+    if (key.ctrl && input === 'a') {
+      setCursor(0);
+      return;
+    }
+
+    if (key.ctrl && input === 'e') {
+      setCursor(value.length);
+      return;
+    }
+
+    if (key.ctrl && input === 'w') {
+      const nextCursor = findPreviousWordBoundary(value, cursor);
+      onChange(removeRange(value, nextCursor, cursor));
+      setCursor(nextCursor);
       return;
     }
 
@@ -65,7 +104,7 @@ export function PromptInput({
         return;
       }
 
-      onChange(value.slice(0, cursor - 1) + value.slice(cursor));
+      onChange(removeRange(value, cursor - 1, cursor));
       setCursor(cursor - 1);
       return;
     }
@@ -98,39 +137,70 @@ export function PromptInput({
       return;
     }
 
-    const nextInput = normalizePastedInput(input);
-    onChange(value.slice(0, cursor) + nextInput + value.slice(cursor));
-    setCursor(cursor + nextInput.length);
+    onChange(insertAtCursor(value, cursor, input));
+    setCursor(cursor + input.length);
   }, { isActive: !isDisabled });
+
+  const lines = useMemo(() => buildPromptLines(value, cursor, maxVisibleLines), [value, cursor, maxVisibleLines]);
 
   if (!value) {
     return <Text dimColor>{placeholder}</Text>;
   }
 
-  return <Text>{buildPromptViewport(value, cursor)}</Text>;
+  return (
+    <Box flexDirection="column">
+      {lines.map((line, index) => (
+        <Text key={`${index}-${line}`}>{line || ' '}</Text>
+      ))}
+    </Box>
+  );
 }
 
-function normalizePastedInput(input: string): string {
-  return input.replace(/\r?\n+/g, ' ');
-}
-
-function buildPromptViewport(value: string, cursor: number): string {
+function buildPromptLines(value: string, cursor: number, maxVisibleLines: number): string[] {
   const withCursor = `${value.slice(0, cursor)}|${value.slice(cursor)}`;
-  if (withCursor.length <= MAX_VISIBLE_INPUT_CHARS) {
-    return withCursor;
+  const rawLines = withCursor.split('\n');
+  const wrapped = rawLines.flatMap((line) => wrapLine(line, FALLBACK_WRAP_WIDTH));
+  if (wrapped.length <= maxVisibleLines) {
+    return wrapped;
   }
 
-  const targetCursor = cursor + 1;
-  const half = Math.floor(MAX_VISIBLE_INPUT_CHARS / 2);
-  let start = Math.max(0, targetCursor - half);
-  const maxEnd = withCursor.length;
-  let end = Math.min(maxEnd, start + MAX_VISIBLE_INPUT_CHARS);
-  if (end - start < MAX_VISIBLE_INPUT_CHARS) {
-    start = Math.max(0, end - MAX_VISIBLE_INPUT_CHARS);
+  return wrapped.slice(wrapped.length - maxVisibleLines);
+}
+
+function wrapLine(line: string, width: number): string[] {
+  if (line.length === 0) {
+    return [''];
   }
 
-  const prefix = start > 0 ? '…' : '';
-  const suffix = end < withCursor.length ? '…' : '';
-  const slice = withCursor.slice(start, end);
-  return `${prefix}${slice}${suffix}`;
+  const segments: string[] = [];
+  for (let start = 0; start < line.length; start += width) {
+    segments.push(line.slice(start, start + width));
+  }
+  return segments;
+}
+
+function insertAtCursor(value: string, cursor: number, input: string): string {
+  return `${value.slice(0, cursor)}${input}${value.slice(cursor)}`;
+}
+
+function removeRange(value: string, start: number, end: number): string {
+  return `${value.slice(0, start)}${value.slice(end)}`;
+}
+
+function findPreviousWordBoundary(value: string, cursor: number): number {
+  let index = cursor;
+
+  while (index > 0 && isWordBoundary(value[index - 1])) {
+    index--;
+  }
+
+  while (index > 0 && !isWordBoundary(value[index - 1])) {
+    index--;
+  }
+
+  return index;
+}
+
+function isWordBoundary(char: string | undefined): boolean {
+  return !char || /\s|[.,/#!$%^&*;:{}=\-_`~()\[\]"'<>?\\|]/.test(char);
 }

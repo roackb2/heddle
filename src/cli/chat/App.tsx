@@ -299,6 +299,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
                   value={draft}
                   isDisabled={isRunning}
                   placeholder="Ask Heddle about this project"
+                  maxVisibleLines={10}
                   onChange={setDraft}
                   onSpecialKey={({ key }) => {
                     if (modelPickerVisible) {
