@@ -7,16 +7,24 @@ import type { RunInput, RunResult, ToolDefinition, StopReason, ToolCall } from '
 import type { LlmAdapter } from './llm/types.js';
 import type { ChatMessage } from './llm/types.js';
 import { createToolRegistry } from './tools/registry.js';
-import { executeTool } from './tools/execute-tool.js';
 import { createTraceRecorder } from './trace/recorder.js';
 import { createBudget } from './utils/budget.js';
 import { buildSystemPrompt } from './prompts/system-prompt.js';
 import { logger as defaultLogger } from './utils/logger.js';
 import type { Logger } from 'pino';
 
+import { sanitizeHistory } from './run-agent/history.js';
+import { isAbortError, isRecoverableToolError } from './run-agent/util.js';
+import { createMutationState, trackToolResult } from './run-agent/mutation-tracking.js';
+import {
+  buildPostMutationRequirement,
+  hasStructuredChangeSummary,
+  buildStructuredChangeSummaryRequirement,
+} from './run-agent/post-mutation.js';
+import { maybeDenyToolCall, executeToolCallWithFallback } from './run-agent/tool-dispatch.js';
+
 const DEFAULT_MAX_STEPS = 20;
 const MAX_CONSECUTIVE_ERRORS = 3;
-const MAX_IDENTICAL_TOOL_CALLS = 2;
 
 export type RunAgentOptions = {
   goal: string;
@@ -60,6 +68,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   const trace = createTraceRecorder();
   const budget = createBudget(maxSteps);
   const seenToolCalls = new Map<string, number>();
+  const mutation = createMutationState();
 
   // Start trace
   const now = () => new Date().toISOString();
@@ -69,15 +78,6 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   };
   let step = 0;
   let consecutiveErrors = 0;
-  let pendingVerification = false;
-  let pendingChangeReview = false;
-  let requiresStructuredChangeSummary = false;
-  const executedMutationCommands: string[] = [];
-  const executedReviewCommands: string[] = [];
-  const executedVerificationCommands: string[] = [];
-  const executedReviewEvidence: string[] = [];
-  const executedVerificationEvidence: string[] = [];
-  const sanitizedHistory = sanitizeHistory(history);
 
   log.info({ goal, maxSteps, tools: registry.names() }, 'Agent run started');
   record({ type: 'run.started', goal, timestamp: now() });
@@ -85,7 +85,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   // Build initial messages
   const messages: ChatMessage[] = [
     { role: 'system', content: buildSystemPrompt(goal, registry.names(), systemContext) },
-    ...sanitizedHistory,
+    ...sanitizeHistory(history),
     { role: 'user', content: goal },
   ];
 
@@ -160,14 +160,12 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
         timestamp: now(),
       });
 
-      // Record the assistant message with tool calls for the transcript
       messages.push({
         role: 'assistant',
         content: response.content ?? '',
         toolCalls: response.toolCalls,
       });
 
-      // Execute each tool call
       for (const call of response.toolCalls) {
         if (shouldStop?.()) {
           outcome = 'interrupted';
@@ -234,40 +232,9 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
           }
         } else {
           consecutiveErrors = 0;
-          const command = extractShellCommand(effectiveCall.input);
-          if (effectiveCall.tool === 'run_shell_mutate' && command) {
-            if (isWorkspaceChangeMutateCommand(command)) {
-              pendingVerification = true;
-              pendingChangeReview = true;
-              requiresStructuredChangeSummary = true;
-              executedMutationCommands.push(command);
-            }
-
-            if (isVerificationMutateCommand(command)) {
-              pendingVerification = false;
-              executedVerificationCommands.push(command);
-            }
-          }
-
-          if (effectiveCall.tool === 'edit_file') {
-            pendingVerification = true;
-            pendingChangeReview = true;
-            requiresStructuredChangeSummary = true;
-            executedMutationCommands.push(describeEditMutation(effectiveCall.input));
-          }
-
-          if (effectiveCall.tool === 'run_shell_inspect' && command && isRepoReviewCommand(command)) {
-            pendingChangeReview = false;
-            executedReviewCommands.push(command);
-            executedReviewEvidence.push(summarizeCommandEvidence(result.output));
-          }
-
-          if (effectiveCall.tool === 'run_shell_mutate' && command && isVerificationMutateCommand(command)) {
-            executedVerificationEvidence.push(summarizeCommandEvidence(result.output));
-          }
+          trackToolResult(mutation, effectiveCall, result);
         }
 
-        // Append tool result to transcript
         messages.push({
             role: 'tool',
             content: JSON.stringify(result),
@@ -280,16 +247,16 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
 
     // Case 2: model returned content only → agent is done
     if (response.content) {
-      if (pendingVerification || pendingChangeReview) {
+      if (mutation.pendingVerification || mutation.pendingChangeReview) {
         const hostRequirement = buildPostMutationRequirement({
-          pendingVerification,
-          pendingChangeReview,
+          pendingVerification: mutation.pendingVerification,
+          pendingChangeReview: mutation.pendingChangeReview,
         });
         log.info(
           {
             step,
-            pendingVerification,
-            pendingChangeReview,
+            pendingVerification: mutation.pendingVerification,
+            pendingChangeReview: mutation.pendingChangeReview,
           },
           'Blocking premature final answer until mutation follow-up is complete',
         );
@@ -298,20 +265,14 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
       }
 
       if (
-        requiresStructuredChangeSummary &&
+        mutation.requiresStructuredChangeSummary &&
         !hasStructuredChangeSummary(response.content, {
-          mutationCommands: executedMutationCommands,
-          reviewCommands: executedReviewCommands,
-          verificationCommands: executedVerificationCommands,
+          mutationCommands: mutation.executedMutationCommands,
+          reviewCommands: mutation.executedReviewCommands,
+          verificationCommands: mutation.executedVerificationCommands,
         })
       ) {
-        const hostRequirement = buildStructuredChangeSummaryRequirement({
-          mutationCommands: executedMutationCommands,
-          reviewCommands: executedReviewCommands,
-          verificationCommands: executedVerificationCommands,
-          reviewEvidence: executedReviewEvidence,
-          verificationEvidence: executedVerificationEvidence,
-        });
+        const hostRequirement = buildStructuredChangeSummaryRequirement(mutation);
         log.info({ step }, 'Blocking vague final answer until structured change summary is provided');
         messages.push({ role: 'system', content: hostRequirement });
         continue;
@@ -346,442 +307,4 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   log.warn({ step, maxSteps }, 'Budget exhausted');
   record({ type: 'run.finished', outcome, summary, step, timestamp: now() });
   return { outcome, summary, trace: trace.getTrace(), transcript: messages.slice(1) };
-}
-
-async function maybeDenyToolCall(args: {
-  call: ToolCall;
-  tool: ToolDefinition | undefined;
-  step: number;
-  now: () => string;
-  approveToolCall: RunAgentOptions['approveToolCall'];
-  record: (event: import('./types.js').TraceEvent) => void;
-  log: Logger;
-}): Promise<{ ok: false; error: string } | undefined> {
-  const { call, tool, step, now, approveToolCall, record, log } = args;
-  if (!tool?.requiresApproval) {
-    return undefined;
-  }
-
-  const approval = await resolveToolApproval({ call, tool, step, now, approveToolCall, record });
-  if (approval.approved) {
-    return undefined;
-  }
-
-  const result = {
-    ok: false as const,
-    error:
-      approval.reason ? `Approval denied for ${call.tool}: ${approval.reason}`
-      : `Approval denied for ${call.tool}`,
-  };
-  log.warn({ step, tool: call.tool, reason: approval.reason }, 'Tool execution denied by approval policy');
-  record({ type: 'tool.result', tool: call.tool, result, step, timestamp: now() });
-  return result;
-}
-
-async function executeToolCallWithFallback(args: {
-  call: ToolCall;
-  step: number;
-  now: () => string;
-  registry: ReturnType<typeof createToolRegistry>;
-  seenToolCalls: Map<string, number>;
-  approveToolCall: RunAgentOptions['approveToolCall'];
-  record: (event: import('./types.js').TraceEvent) => void;
-  log: Logger;
-}): Promise<{ effectiveCall: ToolCall; result: Awaited<ReturnType<typeof executeTool>> }> {
-  const primary = await executeRecordedToolCall(args.call, args);
-  const fallbackReason = getInspectFallbackReason(args.call, primary.result);
-  if (!fallbackReason) {
-    return primary;
-  }
-
-  const mutateTool = args.registry.get('run_shell_mutate');
-  if (!mutateTool) {
-    return primary;
-  }
-
-  const mutateCall: ToolCall = {
-    id: `${args.call.id}-mutate-fallback`,
-    tool: 'run_shell_mutate',
-    input: args.call.input,
-  };
-  args.record({
-    type: 'tool.fallback',
-    fromCall: args.call,
-    toCall: mutateCall,
-    reason: fallbackReason,
-    step: args.step,
-    timestamp: args.now(),
-  });
-  const approvalDeniedResult = await maybeDenyToolCall({
-    call: mutateCall,
-    tool: mutateTool,
-    step: args.step,
-    now: args.now,
-    approveToolCall: args.approveToolCall,
-    record: args.record,
-    log: args.log,
-  });
-  if (approvalDeniedResult) {
-    return { effectiveCall: mutateCall, result: approvalDeniedResult };
-  }
-
-  args.log.info(
-    { step: args.step, from: args.call.tool, to: mutateCall.tool, reason: fallbackReason },
-    'Retrying inspect failure through mutate fallback',
-  );
-  return executeRecordedToolCall(mutateCall, args);
-}
-
-async function executeRecordedToolCall(
-  call: ToolCall,
-  args: {
-    step: number;
-    now: () => string;
-    registry: ReturnType<typeof createToolRegistry>;
-    seenToolCalls: Map<string, number>;
-    record: (event: import('./types.js').TraceEvent) => void;
-    log: Logger;
-  },
-): Promise<{ effectiveCall: ToolCall; result: Awaited<ReturnType<typeof executeTool>> }> {
-  const { step, now, registry, seenToolCalls, record, log } = args;
-  log.info({ step, tool: call.tool }, 'Executing tool');
-  record({ type: 'tool.call', call, step, timestamp: now() });
-
-  const signature = `${call.tool}:${stableSerialize(normalizeToolInput(call.tool, call.input))}`;
-  const seenCount = seenToolCalls.get(signature) ?? 0;
-  const result = seenCount >= MAX_IDENTICAL_TOOL_CALLS
-    ? buildRepeatedToolCallResult(call.tool)
-    : await executeTool(registry, call);
-  seenToolCalls.set(signature, seenCount + 1);
-  log.debug({ step, tool: call.tool, ok: result.ok }, 'Tool result');
-  record({ type: 'tool.result', tool: call.tool, result, step, timestamp: now() });
-  return { effectiveCall: call, result };
-}
-
-async function resolveToolApproval(args: {
-  call: ToolCall;
-  tool: ToolDefinition;
-  step: number;
-  now: () => string;
-  approveToolCall: RunAgentOptions['approveToolCall'];
-  record: (event: import('./types.js').TraceEvent) => void;
-}): Promise<{ approved: boolean; reason?: string }> {
-  const { call, tool, step, now, approveToolCall, record } = args;
-  record({ type: 'tool.approval_requested', call, step, timestamp: now() });
-  const approval =
-    approveToolCall ? await approveToolCall(call, tool)
-    : {
-        approved: false,
-        reason: `No approval handler configured for ${call.tool}`,
-      };
-  record({
-    type: 'tool.approval_resolved',
-    call,
-    approved: approval.approved,
-    reason: approval.reason,
-    step,
-    timestamp: now(),
-  });
-  return approval;
-}
-
-function getInspectFallbackReason(
-  call: ToolCall,
-  result: { ok: boolean; error?: string },
-): string | undefined {
-  if (call.tool !== 'run_shell_inspect' || result.ok) {
-    return undefined;
-  }
-
-  return getInspectMutateFallbackReason(result.error);
-}
-
-function buildRepeatedToolCallResult(tool: string): { ok: false; error: string } {
-  return {
-    ok: false,
-    error: `Repeated tool call blocked: ${tool} was already called ${MAX_IDENTICAL_TOOL_CALLS} times with the same input earlier in this run. Try a different tool or different input.`,
-  };
-}
-
-function getInspectMutateFallbackReason(error: string | undefined): string | undefined {
-  if (!error) {
-    return undefined;
-  }
-
-  if (error.includes('run_shell_inspect policy')) {
-    return 'inspect policy rejected the command';
-  }
-
-  if (error.includes('Inspect mode permits read-only pipes')) {
-    return 'inspect shell restrictions rejected the command';
-  }
-
-  return undefined;
-}
-
-function sanitizeHistory(history: ChatMessage[]): ChatMessage[] {
-  const resolvedToolCallIds = new Set<string>();
-  const introducedToolCallIds = new Set<string>();
-
-  for (const message of history) {
-    if (message.role === 'assistant' && message.toolCalls) {
-      for (const call of message.toolCalls) {
-        introducedToolCallIds.add(call.id);
-      }
-      continue;
-    }
-
-    if (message.role === 'tool') {
-      resolvedToolCallIds.add(message.toolCallId);
-    }
-  }
-
-  return history.flatMap((message) => {
-    if (message.role === 'assistant' && message.toolCalls) {
-      const resolvedToolCalls = message.toolCalls.filter((call) => resolvedToolCallIds.has(call.id));
-      if (resolvedToolCalls.length > 0) {
-        return [{ ...message, toolCalls: resolvedToolCalls }];
-      }
-
-      if (message.content.trim()) {
-        return [{ role: 'assistant' as const, content: message.content }];
-      }
-
-      return [];
-    }
-
-    if (message.role === 'tool' && !introducedToolCallIds.has(message.toolCallId)) {
-      return [];
-    }
-
-    return [message];
-  });
-}
-
-function extractShellCommand(input: unknown): string | undefined {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    return undefined;
-  }
-
-  const command = (input as { command?: unknown }).command;
-  return typeof command === 'string' && command.trim() ? command.trim() : undefined;
-}
-
-function describeEditMutation(input: unknown): string {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    return 'edit_file';
-  }
-
-  const path = (input as { path?: unknown }).path;
-  return typeof path === 'string' && path.trim() ? `edit_file ${path.trim()}` : 'edit_file';
-}
-
-function isWorkspaceChangeMutateCommand(command: string): boolean {
-  return (
-    /^yarn format\b/.test(command) ||
-    /^yarn prettier\b/.test(command) ||
-    /^yarn eslint\b/.test(command) ||
-    /^yarn add\b/.test(command) ||
-    /^yarn install\b/.test(command) ||
-    /^yarn remove\b/.test(command) ||
-    /^mkdir\b/.test(command) ||
-    /^touch\b/.test(command) ||
-    /^mv\b/.test(command) ||
-    /^cp\b/.test(command) ||
-    /^git add\b/.test(command) ||
-    /^git mv\b/.test(command) ||
-    /^npx prettier --write\b/.test(command) ||
-    /^npx eslint --fix\b/.test(command) ||
-    /^prettier --write\b/.test(command) ||
-    /^eslint --fix\b/.test(command)
-  );
-}
-
-function isVerificationMutateCommand(command: string): boolean {
-  return (
-    /^yarn test\b/.test(command) ||
-    /^yarn build\b/.test(command) ||
-    /^yarn lint\b/.test(command) ||
-    /^yarn vitest\b/.test(command) ||
-    /^vitest\b/.test(command) ||
-    /^tsc\b/.test(command)
-  );
-}
-
-function isRepoReviewCommand(command: string): boolean {
-  return /^git status\b/.test(command) || /^git diff\b/.test(command);
-}
-
-function buildPostMutationRequirement(options: {
-  pendingVerification: boolean;
-  pendingChangeReview: boolean;
-}): string {
-  const requirements: string[] = [];
-
-  if (options.pendingChangeReview) {
-    requirements.push(
-      'inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat',
-    );
-  }
-
-  if (options.pendingVerification) {
-    requirements.push('run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc');
-  }
-
-  return `Host requirement: before giving a final answer after a workspace-changing mutate command, you must ${requirements.join(' and ')}. After doing that, then provide the final answer.`;
-}
-
-function hasStructuredChangeSummary(
-  content: string,
-  options: {
-    mutationCommands: string[];
-    reviewCommands: string[];
-    verificationCommands: string[];
-  },
-): boolean {
-  const normalized = content.toLowerCase();
-
-  if (
-    !/(?:^|\n)changed\s*:/.test(normalized) ||
-    !/(?:^|\n)verified\s*:/.test(normalized) ||
-    !/(?:^|\n)(?:remaining uncertainty|uncertainty|remaining risks?)\s*:/.test(normalized)
-  ) {
-    return false;
-  }
-
-  const changedLine = extractStructuredSummaryLine(content, 'Changed');
-  const verifiedLine = extractStructuredSummaryLine(content, 'Verified');
-  if (!changedLine || !verifiedLine) {
-    return false;
-  }
-
-  const normalizedChangedLine = changedLine.toLowerCase();
-  const normalizedVerifiedLine = verifiedLine.toLowerCase();
-
-  const mentionsMutation =
-    options.mutationCommands.length === 0 ||
-    options.mutationCommands.some((command) => normalizedChangedLine.includes(command.toLowerCase()));
-  const mentionsReview =
-    options.reviewCommands.length === 0 ||
-    options.reviewCommands.some((command) => normalizedVerifiedLine.includes(command.toLowerCase()));
-  const mentionsVerification =
-    options.verificationCommands.length === 0 ||
-    options.verificationCommands.some((command) => normalizedVerifiedLine.includes(command.toLowerCase()));
-
-  return mentionsMutation && mentionsReview && mentionsVerification;
-}
-
-function buildStructuredChangeSummaryRequirement(options: {
-  mutationCommands: string[];
-  reviewCommands: string[];
-  verificationCommands: string[];
-  reviewEvidence: string[];
-  verificationEvidence: string[];
-}): string {
-  const mutationSummary = options.mutationCommands.length > 0
-    ? options.mutationCommands.join('; ')
-    : 'workspace-changing command(s) already executed';
-  const reviewSummary = options.reviewCommands.length > 0
-    ? options.reviewCommands.join('; ')
-    : 'no repo review command recorded';
-  const verificationSummary = options.verificationCommands.length > 0
-    ? options.verificationCommands.join('; ')
-    : 'no verification command recorded';
-  const reviewEvidenceSummary = options.reviewEvidence.length > 0
-    ? options.reviewEvidence.join('; ')
-    : 'no repo review evidence captured';
-  const verificationEvidenceSummary = options.verificationEvidence.length > 0
-    ? options.verificationEvidence.join('; ')
-    : 'no verification evidence captured';
-
-  return `Host requirement: after a workspace-changing mutate command, your final answer must be a short operator review with exactly these labels on separate lines: "Changed:", "Verified:", and "Remaining uncertainty:". In "Changed:", mention the concrete change work and name the exact command(s) or edit action used (${mutationSummary}). In "Verified:", name the exact repo review command(s) (${reviewSummary}) and exact verification command(s) (${verificationSummary}), and ground them in concrete evidence from the command results (${reviewEvidenceSummary}; ${verificationEvidenceSummary}). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".`;
-}
-
-function extractStructuredSummaryLine(content: string, label: 'Changed' | 'Verified'): string | undefined {
-  const match = content.match(new RegExp(`(?:^|\\n)${label}\\s*:\\s*([^\\n]+)`, 'i'));
-  return match?.[1]?.trim();
-}
-
-function summarizeCommandEvidence(output: unknown): string {
-  if (!output || typeof output !== 'object' || Array.isArray(output)) {
-    return 'no structured command output recorded';
-  }
-
-  const candidate = output as {
-    command?: unknown;
-    stdout?: unknown;
-    stderr?: unknown;
-    exitCode?: unknown;
-  };
-  const command = typeof candidate.command === 'string' && candidate.command.trim() ? candidate.command.trim() : 'command';
-  const stdout = typeof candidate.stdout === 'string' ? candidate.stdout.trim() : '';
-  const stderr = typeof candidate.stderr === 'string' ? candidate.stderr.trim() : '';
-  const exitCode = typeof candidate.exitCode === 'number' ? candidate.exitCode : 0;
-  const body = stdout || stderr;
-  const snippet = body ? body.replace(/\s+/g, ' ').slice(0, 120) : 'no stdout/stderr output';
-  return `${command} => exit ${exitCode}, ${snippet}`;
-}
-
-function stableSerialize(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableSerialize(item)).join(',')}]`;
-  }
-
-  if (value && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right));
-    return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${stableSerialize(entryValue)}`).join(',')}}`;
-  }
-
-  return JSON.stringify(value);
-}
-
-function normalizeToolInput(tool: string, input: unknown): unknown {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    return input;
-  }
-
-  const normalized = { ...(input as Record<string, unknown>) };
-
-  if ((tool === 'list_files' || tool === 'read_file' || tool === 'search_files') && typeof normalized.path === 'string') {
-    normalized.path = normalizePathValue(normalized.path);
-  }
-
-  if (tool === 'edit_file' && typeof normalized.path === 'string') {
-    normalized.path = normalizePathValue(normalized.path);
-  }
-
-  if ((tool === 'run_shell_inspect' || tool === 'run_shell_mutate') && typeof normalized.command === 'string') {
-    normalized.command = normalized.command.trim().replace(/\s+/g, ' ');
-  }
-
-  return normalized;
-}
-
-function normalizePathValue(path: string): string {
-  const trimmed = path.trim();
-  if (trimmed === './' || trimmed === '.') {
-    return '.';
-  }
-
-  return trimmed.replace(/\/+$/, '') || '.';
-}
-
-function isRecoverableToolError(error: string | undefined): boolean {
-  if (!error) {
-    return false;
-  }
-
-  return error.startsWith('Invalid input for ') || error.startsWith('Repeated tool call blocked:');
-}
-
-function isAbortError(err: unknown): boolean {
-  if (!(err instanceof Error)) {
-    return false;
-  }
-
-  return (
-    err.name === 'AbortError' ||
-    err.name === 'APIUserAbortError' ||
-    /aborted/i.test(err.message)
-  );
 }

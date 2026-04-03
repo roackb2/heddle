@@ -41,10 +41,6 @@ goal
   -> stop on done / max steps / unrecoverable error
 ```
 
-## Status
-
-Early development. v0 in progress. Phase 1 now has a first-class edit_file tool.
-
 ## Install And Run
 
 Heddle can now be linked or installed as a CLI and run against the current working directory instead of only this repo.
@@ -94,58 +90,12 @@ Notes:
 - `searchIgnoreDirs` controls which directories `search_files` skips for that project.
 - `agentContextPaths` controls which project instruction files are injected into Heddle's system prompt. By default, Heddle looks for `AGENTS.md`.
 
-The repo now has:
-
-- `yarn chat`
-- `yarn chat:light`
-- `yarn chat:dev`
-- `yarn chat:dev:light`
-- `heddle`
-- `heddle ask "<goal>"`
-
-as an early conversational terminal entrypoint from Phase 0 of the coding-agent roadmap.
-
-Phase 1 has also started at the tool-contract layer:
-
-- shell capability is now split into `run_shell_inspect` and `run_shell_mutate`
-- file editing now has a first-class `edit_file` tool instead of depending only on shell-based file-writing workarounds
-- inspect vs mutate intent is explicit in tool names, descriptions, and traces
-- examples expose both shell modes to the agent runtime
-- chat mode now pauses for human approval before `run_shell_mutate` executes
-- shell execution is now governed by explicit workspace/inspect policy rules with scope, risk, and capability metadata, rather than only a flat command-prefix list
-- known inspect commands remain narrowly classified, while unclassified mutate commands now fall back to explicit approval instead of hard rejection
-- mutate policy now includes an explicit project-script capability for commands such as `yarn run ...`, which is a small step toward broader capability-based execution instead of per-command allowlist growth
-- workspace-changing mutate commands now trigger host-side follow-up requirements before final answer: gather concrete repo review evidence such as `git status --short` or `git diff --stat`, then run verification
-- after workspace-changing mutate runs, the host now also requires a short operator-style final summary with `Changed:`, `Verified:`, and `Remaining uncertainty:`, including the exact review and verification commands used
-- chat mode now supports real interrupt via `Esc` for agent turns and direct `!command` runs, plus resume via `/continue`
-- chat mode now persists local sessions and supports `/session list`, `/session switch <id>`, and `/session continue <id>`
-- chat mode now auto-titles generic sessions in the background with `gpt-5.1-codex-mini`
-- chat mode now supports direct shell commands with a `!command` prefix; user-entered direct commands run immediately under the same shell policy, and their results are stored in the session transcript for later turns
-- chat approval UI now supports remembering an exact mutate command for the current project, so repeated commands can be auto-approved from the project's local state
-- remembered project approvals now update immediately in memory, so `Allow for project` applies on the next matching command without waiting for a session reload
-- saved project approvals now load legacy on-disk rules without dropping them, and low-risk workspace verification commands such as `yarn test ...` can be remembered as a reusable command family instead of only an exact command string
-- `edit_file` now participates in project approvals too, so approving it for a project avoids repeated prompts on later file edits
-- mutate approval prompts now expose policy metadata such as scope, capability, and risk before approval
-- interrupted or incomplete tool-call history is now sanitized before the next run so saved sessions do not poison later turns with missing tool outputs
-- the chat screen now keeps the conversation as the main reading surface, folds active run state into that flow, and applies basic response formatting for headings, lists, inline code, and fenced code blocks
-
 Chat usage notes:
 
 - use `/continue` for built-in resume behavior; plain `continue` is treated as a normal user prompt
 - during approval, `A` remembers the current mutate command for this project, while `Y` approves once and `N` denies
 - if a long-running turn appears stuck, `Esc` requests an interrupt for the current run
 - current shell policy is still conservative about heredocs, redirects, and similar shell syntax; the longer-term direction is to rely less on naive shell-character blocking and more on approval, scope, and audit policy
-
-## Next Step
-
-The immediate next step is to keep tightening the Phase 1 coding-agent surface around git-native review and explanation: better use of concrete diff/status evidence, stronger operator confidence after bounded edits, and continued evolution toward policy-based execution instead of narrow command-prefix allowlists.
-An eval batch prompt set lives in [docs/eval-prompts.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/eval-prompts.md).
-
-The shell direction is also intentionally moving toward a policy-based execution surface rather than an ever-growing allowlist of specific commands, with explicit distinction between workspace-local and external-system commands.
-
-One current limitation is worth calling out explicitly: Heddle can now recover from interrupted tool-call history correctly, but it still sometimes stops after discovering a safe execution path instead of carrying a requested change through to completion. Closing that follow-through gap is part of making the agent genuinely useful.
-
-The example runner and chat mode now default to `gpt-5.1-codex` and a 40-step budget. Use `yarn chat:light` or `yarn chat:dev:light` for `gpt-5.1-codex-mini`, or override manually with `OPENAI_MODEL` and `HEDDLE_MAX_STEPS` if you want to compare models or cap exploration more tightly.
 
 ## Design Principles
 
