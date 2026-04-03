@@ -19,6 +19,8 @@ import { createMutationState, trackToolResult } from './run-agent/mutation-track
 import { createProgressReminderState, buildProgressReminders } from './run-agent/progress-reminders.js';
 import {
   buildPostMutationRequirement,
+  buildImmediateReviewReminder,
+  buildImmediateVerificationReminder,
   hasStructuredChangeSummary,
   buildStructuredChangeSummaryRequirement,
 } from './run-agent/post-mutation.js';
@@ -310,6 +312,7 @@ function handleExecutedToolResult(
     toolCallId,
   });
   pushProgressReminders(context, effectiveCall, result);
+  pushMutationFollowUps(context);
   return undefined;
 }
 
@@ -339,6 +342,30 @@ function pushProgressReminders(context: RunContext, effectiveCall: ToolCall, res
 
   for (const reminder of reminders) {
     context.messages.push({ role: 'system', content: reminder });
+  }
+}
+
+function pushMutationFollowUps(context: RunContext) {
+  if (context.mutation.needsImmediateReviewReminder) {
+    context.mutation.needsImmediateReviewReminder = false;
+    context.messages.push({
+      role: 'system',
+      content: buildImmediateReviewReminder({
+        executedReviewCommands: context.mutation.executedReviewCommands,
+        pendingChangeReview: context.mutation.pendingChangeReview,
+      }),
+    });
+  }
+
+  if (context.mutation.needsImmediateVerificationReminder) {
+    context.mutation.needsImmediateVerificationReminder = false;
+    context.messages.push({
+      role: 'system',
+      content: buildImmediateVerificationReminder({
+        executedVerificationCommands: context.mutation.executedVerificationCommands,
+        pendingVerification: context.mutation.pendingVerification,
+      }),
+    });
   }
 }
 
@@ -412,6 +439,7 @@ function getCompletionBlocker(context: RunContext, responseContent: string): str
       pendingChangeReview: context.mutation.pendingChangeReview,
       reviewCommands: context.mutation.executedReviewCommands,
       verificationCommands: context.mutation.executedVerificationCommands,
+      noteExistingVerification: !context.mutation.pendingVerification,
     });
   }
 
