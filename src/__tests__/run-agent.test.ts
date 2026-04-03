@@ -791,16 +791,11 @@ describe('runAgent', () => {
     });
   });
 
-  it('treats edit_file as a workspace-changing action that requires review and verification follow-up', async () => {
+  it('allows a small edit_file change to finish without forced review and verification follow-up', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
         seenMessages.push(structuredClone(messages));
-        const hostReminder = [...messages].reverse().find(
-          (message: ChatMessage) =>
-            message.role === 'system' &&
-            message.content.includes('Host requirement: before giving a final answer'),
-        );
 
         if (seenMessages.length === 1) {
           return {
@@ -808,15 +803,8 @@ describe('runAgent', () => {
           };
         }
 
-        if (!hostReminder) {
-          return {
-            content: 'I updated the file.',
-          };
-        }
-
         return {
-          content:
-            'Updated the README and verified the follow-up steps.\n- Changed: updated README.md via edit_file.\n- Verified: reviewed git diff --stat and yarn test passed.\n- Remaining uncertainty: none.',
+          content: 'I updated the file.',
         };
       },
     };
@@ -840,12 +828,15 @@ describe('runAgent', () => {
       approveToolCall: async () => ({ approved: true }),
     });
 
-    expect(result.outcome).toBe('max_steps');
-    expect(seenMessages[2]).toContainEqual({
-      role: 'system',
-      content:
-        'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
-    });
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('I updated the file.');
+    expect(
+      seenMessages.flat().some(
+        (message) =>
+          message.role === 'system' &&
+          message.content.includes('Host requirement: before giving a final answer after a workspace-changing mutate command'),
+      ),
+    ).toBe(false);
   });
 
   it('requires post-mutation review, verification, and structured summary before finishing', async () => {

@@ -16,6 +16,7 @@ export type ConversationLine = {
   role: 'user' | 'assistant';
   text: string;
   isStreaming?: boolean;
+  isPending?: boolean;
 };
 
 export type LiveEvent = {

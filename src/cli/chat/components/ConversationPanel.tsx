@@ -59,7 +59,9 @@ const ConversationEntry = React.memo(function ConversationEntry({
 }) {
   return (
     <Box flexDirection="column" marginBottom={1}>
-      <Text dimColor>{message.role === 'user' ? '┌ You' : '┌ Heddle'}</Text>
+      <Text dimColor>
+        {message.role === 'user' ? `┌ You${message.isPending ? ' (queued)' : ''}` : '┌ Heddle'}
+      </Text>
       <Box paddingLeft={2}>
         <MessageBody role={message.role} text={message.text} />
       </Box>

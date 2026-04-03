@@ -64,11 +64,6 @@ export function trackToolResult(
   }
 
   if (effectiveCall.tool === 'edit_file') {
-    state.pendingVerification = true;
-    state.pendingChangeReview = true;
-    state.requiresStructuredChangeSummary = true;
-    state.needsImmediateReviewReminder = true;
-    state.needsImmediateVerificationReminder = true;
     state.executedMutationCommands.push(describeEditMutation(effectiveCall.input));
   }
 

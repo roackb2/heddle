@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import type { ConversationLine } from './state/types.js';
 import { Box, Text } from 'ink';
 import {
   ApprovalComposer,
@@ -25,6 +26,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   const nextIdRef = useRef(0);
   const [activeModel, setActiveModel] = useState(runtime.model);
   const [draft, setDraft] = useState('');
+  const [pendingSubmittedPrompt, setPendingSubmittedPrompt] = useState<string | undefined>();
   const [modelPickerIndex, setModelPickerIndex] = useState(0);
   const [sessionPickerIndex, setSessionPickerIndex] = useState(0);
   const nextLocalId = () => `ui-${Date.now()}-${nextIdRef.current++}`;
@@ -141,9 +143,24 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     const removedActive = removeSession(id);
     if (removedActive) {
       setDraft('');
+      setPendingSubmittedPrompt(undefined);
       resetRunState({ abortInFlight: true });
     }
   };
+
+  const appendPendingUserMessage = useCallback((prompt: string) => {
+    const message: ConversationLine = {
+      id: nextLocalId(),
+      role: 'user',
+      text: prompt,
+      isPending: true,
+    };
+
+    updateActiveSession((session) => ({
+      ...session,
+      messages: [...session.messages, message],
+    }));
+  }, [updateActiveSession]);
 
   const { executeTurn, executeDirectShellCommand } = useAgentRun({
     runtime,
@@ -156,13 +173,40 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     updateActiveSession,
   });
 
-  const submitPrompt = async (value: string) => {
+  const submitPrompt = useCallback(async (value: string, options?: { allowWhileRunning?: boolean }) => {
+    const effectiveIsRunning = options?.allowWhileRunning ? false : isRunning;
+
+    if (effectiveIsRunning && !pendingApproval) {
+      setPendingSubmittedPrompt(value);
+      appendPendingUserMessage(value);
+      return;
+    }
+
+    if (options?.allowWhileRunning && pendingSubmittedPrompt === value) {
+      updateActiveSession((session) => {
+        const pendingIndex = session.messages.findIndex(
+          (message) => message.role === 'user' && message.text === value && message.isPending,
+        );
+
+        if (pendingIndex < 0) {
+          return session;
+        }
+
+        return {
+          ...session,
+          messages: session.messages.map((message, index) =>
+            index === pendingIndex ? { ...message, isPending: false } : message,
+          ),
+        };
+      });
+    }
+
     if (modelPickerVisible && highlightedModel) {
       setDraft('');
       setModelPickerIndex(0);
       await submitChatPrompt({
         value: `/model ${highlightedModel}`,
-        isRunning,
+        isRunning: effectiveIsRunning,
         activeModel,
         setActiveModel: applyActiveModel,
         sessions,
@@ -190,7 +234,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
       setSessionPickerIndex(0);
       await submitChatPrompt({
         value: `/session switch ${highlightedSession.id}`,
-        isRunning,
+        isRunning: effectiveIsRunning,
         activeModel,
         setActiveModel: applyActiveModel,
         sessions,
@@ -217,7 +261,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     setSessionPickerIndex(0);
     await submitChatPrompt({
       value,
-      isRunning,
+      isRunning: effectiveIsRunning,
       activeModel,
       setActiveModel: applyActiveModel,
       sessions,
@@ -237,7 +281,39 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
       executeTurn,
       executeDirectShellCommand,
     });
-  };
+  }, [
+    isRunning,
+    pendingApproval,
+    modelPickerVisible,
+    highlightedModel,
+    sessionPickerVisible,
+    highlightedSession,
+    activeModel,
+    sessions,
+    recentSessions,
+    activeSessionId,
+    activeSession,
+    runtime.apiKey,
+    setStatus,
+    updateSessionById,
+    updateActiveSession,
+    createSession,
+    renameSession,
+    listRecentSessionsMessage,
+    executeTurn,
+    executeDirectShellCommand,
+    appendPendingUserMessage,
+  ]);
+
+  useEffect(() => {
+    if (isRunning || pendingApproval || !pendingSubmittedPrompt) {
+      return;
+    }
+
+    const queuedPrompt = pendingSubmittedPrompt;
+    setPendingSubmittedPrompt(undefined);
+    void submitPrompt(queuedPrompt, { allowWhileRunning: true });
+  }, [isRunning, pendingApproval, pendingSubmittedPrompt, submitPrompt]);
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -253,7 +329,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         </Text>
         <Text dimColor>
           {pendingApproval ? '←/→ choose • Enter confirms • A remembers for this project • Esc denies • Ctrl+C exits'
-          : isRunning ? 'Esc requests stop after the current step • Ctrl+C exits'
+          : isRunning ? 'Type freely • Enter queues prompt • Esc requests stop after the current step • Ctrl+C exits'
           : 'Enter sends • /help shows commands • !command runs shell • Ctrl+C exits'}
         </Text>
       </Box>
@@ -299,8 +375,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
               <Box flexGrow={1}>
                 <PromptInput
                   value={draft}
-                  isDisabled={isRunning}
-                  placeholder="Ask Heddle about this project"
+                  isDisabled={Boolean(pendingApproval)}
+                  placeholder={isRunning ? "Keep typing while Heddle works" : "Ask Heddle about this project"}
                   maxVisibleLines={10}
                   onChange={setDraft}
                   onSpecialKey={({ key }) => {
@@ -336,8 +412,16 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
               </Box>
             </Box>
             <Box justifyContent="space-between">
-              <Text dimColor>{draft ? `${draft.length} chars` : 'Enter to send'}</Text>
-              <Text dimColor>{isRunning ? `${elapsedSeconds}s elapsed` : ''}</Text>
+              <Text dimColor>
+                {draft ? `${draft.length} chars`
+                : isRunning ? 'Enter to queue'
+                : 'Enter to send'}
+              </Text>
+              <Text dimColor>
+                {pendingSubmittedPrompt ? '1 queued'
+                : isRunning ? `${elapsedSeconds}s elapsed`
+                : ''}
+              </Text>
             </Box>
           </>}
       </Box>
