@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useInput } from 'ink';
 import type { ActionState } from './useAgentRun.js';
 import type { ApprovalChoice, LiveEvent, PendingApproval } from '../state/types.js';
+import type { EditFilePreview } from '../../../tools/edit-file.js';
+import type { PlanItem } from '../../../tools/update-plan.js';
 
 const WORKING_FRAMES = ['.', '..', '...'];
 const APPROVAL_CHOICES: ApprovalChoice[] = ['approve', 'allow_project', 'deny'];
@@ -16,6 +18,8 @@ export function useApprovalFlow(nextLocalId: () => string) {
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | undefined>();
   const [approvalChoice, setApprovalChoice] = useState<ApprovalChoice>('approve');
   const [interruptRequested, setInterruptRequested] = useState(false);
+  const [currentEditPreview, setCurrentEditPreview] = useState<EditFilePreview | undefined>();
+  const [currentPlan, setCurrentPlan] = useState<{ explanation?: string; items: PlanItem[] } | undefined>();
   const interruptRequestedRef = useRef(false);
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
 
@@ -111,6 +115,8 @@ export function useApprovalFlow(nextLocalId: () => string) {
     setPendingApproval(undefined);
     setApprovalChoice('approve');
     setInterruptRequested(false);
+    setCurrentEditPreview(undefined);
+    setCurrentPlan(undefined);
     interruptRequestedRef.current = false;
     abortControllerRef.current = undefined;
     setIsRunning(false);
@@ -127,6 +133,8 @@ export function useApprovalFlow(nextLocalId: () => string) {
       setLiveEvents,
       setPendingApproval,
       setApprovalChoice,
+      setCurrentEditPreview,
+      setCurrentPlan,
       interruptRequestedRef,
       abortControllerRef,
     }),
@@ -145,6 +153,8 @@ export function useApprovalFlow(nextLocalId: () => string) {
     pendingApproval,
     approvalChoice,
     interruptRequested,
+    currentEditPreview,
+    currentPlan,
     setLiveEvents,
     resetRunState,
     actionState,

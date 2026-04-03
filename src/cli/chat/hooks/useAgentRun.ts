@@ -17,6 +17,8 @@ import {
 } from '../../../index.js';
 import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../tools/run-shell.js';
 import { previewEditFileInput } from '../../../tools/edit-file.js';
+import type { EditFilePreview } from '../../../tools/edit-file.js';
+import type { PlanItem } from '../../../tools/update-plan.js';
 import {
   appendDirectShellHistory,
   buildConversationMessages,
@@ -36,6 +38,8 @@ import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval, TurnSumma
 import type { ChatRuntimeConfig } from '../utils/runtime.js';
 import { useProjectApprovals } from './useProjectApprovals.js';
 
+const PLAN_ITEM_STATUSES = new Set<PlanItem['status']>(['pending', 'in_progress', 'completed']);
+
 type StateSetter<T> = (value: T | ((current: T) => T)) => void;
 
 type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
@@ -52,6 +56,8 @@ export type ActionState = {
   setLiveEvents: StateSetter<LiveEvent[]>;
   setPendingApproval: (value: PendingApproval | undefined) => void;
   setApprovalChoice: (value: ApprovalChoice) => void;
+  setCurrentEditPreview: (value: EditFilePreview | undefined) => void;
+  setCurrentPlan: (value: { explanation?: string; items: PlanItem[] } | undefined) => void;
   interruptRequestedRef: MutableRefObject<boolean>;
   abortControllerRef: MutableRefObject<AbortController | undefined>;
 };
@@ -246,6 +252,8 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   state.setInterruptRequested(false);
   state.abortControllerRef.current = new AbortController();
   state.setLiveEvents([]);
+  state.setCurrentEditPreview(undefined);
+  state.setCurrentPlan(undefined);
   updateSessionById(sessionId, (session) => ({ ...session, lastContinuePrompt: prompt }));
 
   if (displayText) {
@@ -265,6 +273,22 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       history: sessionHistory,
       systemContext: runtime.systemContext,
       onEvent: (event) => {
+        if (event.type === 'tool.call' && event.call.tool === 'edit_file') {
+          void previewEditFileInput(event.call.input).then((preview) => {
+            state.setCurrentEditPreview(preview);
+          });
+        }
+
+        if (event.type === 'tool.result') {
+          if (event.tool === 'edit_file') {
+            state.setCurrentEditPreview(undefined);
+          }
+
+          if (event.tool === 'update_plan') {
+            state.setCurrentPlan(parsePlanStateFromToolResult(event.result.output));
+          }
+        }
+
         const next = toLiveEvent(event);
         if (!next) {
           return;
@@ -340,6 +364,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       state.setError(result.summary);
     }
     state.setStatus(result.outcome === 'done' ? 'Idle' : `Stopped: ${result.outcome}`);
+    state.setCurrentEditPreview(undefined);
     return result;
   } catch (runError) {
     const message = runError instanceof Error ? runError.message : String(runError);
@@ -359,6 +384,40 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     state.setInterruptRequested(false);
     state.abortControllerRef.current = undefined;
   }
+}
+
+function parsePlanStateFromToolResult(output: unknown): { explanation?: string; items: PlanItem[] } | undefined {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) {
+    return undefined;
+  }
+
+  const candidate = output as { explanation?: unknown; plan?: unknown };
+  if (!Array.isArray(candidate.plan)) {
+    return undefined;
+  }
+
+  const items = candidate.plan.flatMap((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return [];
+    }
+
+    const step = typeof (item as { step?: unknown }).step === 'string' ? (item as { step: string }).step : undefined;
+    const status = (item as { status?: unknown }).status;
+    if (!step || typeof status !== 'string' || !PLAN_ITEM_STATUSES.has(status as PlanItem['status'])) {
+      return [];
+    }
+
+    return [{ step, status: status as PlanItem['status'] }];
+  });
+
+  if (items.length === 0) {
+    return undefined;
+  }
+
+  return {
+    explanation: typeof candidate.explanation === 'string' ? candidate.explanation : undefined,
+    items,
+  };
 }
 
 async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void> {

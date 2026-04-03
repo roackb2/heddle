@@ -8,17 +8,23 @@ import type { MutationState } from './mutation-tracking.js';
 export function buildPostMutationRequirement(options: {
   pendingVerification: boolean;
   pendingChangeReview: boolean;
+  reviewCommands?: string[];
+  verificationCommands?: string[];
 }): string {
   const requirements: string[] = [];
 
   if (options.pendingChangeReview) {
-    requirements.push(
-      'inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat',
-    );
+    const reviewGuidance = options.reviewCommands && options.reviewCommands.length > 0
+      ? `inspect the resulting repo state with concrete git review evidence. Review already captured: ${options.reviewCommands.join('; ')}. Also run the missing git-native review command such as git status --short or git diff --stat`
+      : 'inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat';
+    requirements.push(reviewGuidance);
   }
 
   if (options.pendingVerification) {
-    requirements.push('run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc');
+    const verificationGuidance = options.verificationCommands && options.verificationCommands.length > 0
+      ? `run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. Verification already captured: ${options.verificationCommands.join('; ')}. Re-run or add another verification command only if needed`
+      : 'run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc';
+    requirements.push(verificationGuidance);
   }
 
   return `Host requirement: before giving a final answer after a workspace-changing mutate command, you must ${requirements.join(' and ')}. After doing that, then provide the final answer.`;

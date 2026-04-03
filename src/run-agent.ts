@@ -23,6 +23,9 @@ import {
   buildStructuredChangeSummaryRequirement,
 } from './run-agent/post-mutation.js';
 import { maybeDenyToolCall, executeToolCallWithFallback } from './run-agent/tool-dispatch.js';
+import type { PlanItem } from './tools/update-plan.js';
+
+const PLAN_ITEM_STATUSES = new Set<PlanItem['status']>(['pending', 'in_progress', 'completed']);
 
 const DEFAULT_MAX_STEPS = 20;
 const MAX_CONSECUTIVE_ERRORS = 3;
@@ -48,6 +51,10 @@ type RunState = {
   outcome: StopReason;
   summary: string;
   usage?: LlmUsage;
+  activePlan?: {
+    explanation?: string;
+    items: PlanItem[];
+  };
 };
 
 type RunContext = {
@@ -292,6 +299,9 @@ function handleExecutedToolResult(
   } else {
     context.state.consecutiveErrors = 0;
     trackToolResult(context.mutation, effectiveCall, result);
+    if (effectiveCall.tool === 'update_plan') {
+      context.state.activePlan = parsePlanState(result.output);
+    }
   }
 
   context.messages.push({
@@ -337,6 +347,12 @@ function finalizeAssistantResponse(context: RunContext, response: LlmResponse): 
     return finishRun(context, 'error', 'Model returned an empty response');
   }
 
+  const planBlocker = getPlanCompletionBlocker(context);
+  if (planBlocker) {
+    context.messages.push({ role: 'system', content: planBlocker });
+    return 'continue';
+  }
+
   const completionBlocker = getCompletionBlocker(context, response.content);
   if (completionBlocker) {
     context.messages.push({ role: 'system', content: completionBlocker });
@@ -359,6 +375,28 @@ function finalizeAssistantResponse(context: RunContext, response: LlmResponse): 
   });
 }
 
+function getPlanCompletionBlocker(context: RunContext): string | undefined {
+  const activePlan = context.state.activePlan;
+  if (!activePlan) {
+    return undefined;
+  }
+
+  const remainingItems = activePlan.items.filter((item) => item.status !== 'completed');
+  if (remainingItems.length === 0) {
+    return undefined;
+  }
+
+  const remainingSummary = remainingItems.map((item) => `${item.status}: ${item.step}`).join('; ');
+  context.log.info(
+    {
+      step: context.state.step,
+      remainingPlanItems: remainingItems.length,
+    },
+    'Blocking final answer until recorded plan is completed or updated',
+  );
+  return `Host reminder: you recorded a plan and it still has unfinished items (${remainingSummary}). Continue the planned work, or update the plan to mark items completed or no longer needed before giving the final answer.`;
+}
+
 function getCompletionBlocker(context: RunContext, responseContent: string): string | undefined {
   if (context.mutation.pendingVerification || context.mutation.pendingChangeReview) {
     context.log.info(
@@ -372,6 +410,8 @@ function getCompletionBlocker(context: RunContext, responseContent: string): str
     return buildPostMutationRequirement({
       pendingVerification: context.mutation.pendingVerification,
       pendingChangeReview: context.mutation.pendingChangeReview,
+      reviewCommands: context.mutation.executedReviewCommands,
+      verificationCommands: context.mutation.executedVerificationCommands,
     });
   }
 
@@ -469,5 +509,39 @@ function accumulateUsage(current: LlmUsage | undefined, next: LlmUsage | undefin
     cachedInputTokens: cachedInputTokens || undefined,
     reasoningTokens: reasoningTokens || undefined,
     requests: requests || undefined,
+  };
+}
+
+function parsePlanState(output: unknown): { explanation?: string; items: PlanItem[] } | undefined {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) {
+    return undefined;
+  }
+
+  const candidate = output as { explanation?: unknown; plan?: unknown };
+  if (!Array.isArray(candidate.plan)) {
+    return undefined;
+  }
+
+  const items = candidate.plan.flatMap((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return [];
+    }
+
+    const step = typeof (item as { step?: unknown }).step === 'string' ? (item as { step: string }).step : undefined;
+    const status = (item as { status?: unknown }).status;
+    if (!step || typeof status !== 'string' || !PLAN_ITEM_STATUSES.has(status as PlanItem['status'])) {
+      return [];
+    }
+
+    return [{ step, status: status as PlanItem['status'] }];
+  });
+
+  if (items.length === 0) {
+    return undefined;
+  }
+
+  return {
+    explanation: typeof candidate.explanation === 'string' ? candidate.explanation : undefined,
+    items,
   };
 }

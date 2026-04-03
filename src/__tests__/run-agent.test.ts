@@ -1169,4 +1169,184 @@ describe('runAgent', () => {
         'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
     });
   });
+
+  it('asks for the missing git-native review command when verification already ran after a change', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    let stage = 0;
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        stage += 1;
+        seenMessages.push(structuredClone(messages));
+
+        if (stage === 1) {
+          return {
+            toolCalls: [{ id: 'call-1', tool: 'run_shell_mutate', input: { command: 'eslint --fix src/example.ts' } }],
+          };
+        }
+
+        if (stage === 2) {
+          return {
+            toolCalls: [{ id: 'call-2', tool: 'run_shell_mutate', input: { command: 'yarn test' } }],
+          };
+        }
+
+        return {
+          content: 'The change is done and verified.',
+        };
+      },
+    };
+
+    const mutateTool: ToolDefinition = {
+      name: 'run_shell_mutate',
+      description: 'Runs a bounded workspace mutation or verification command',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const command = (input as { command: string }).command;
+        return { ok: true, output: { command, exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Apply the fix and report back.',
+      llm: fakeLlm,
+      tools: [mutateTool],
+      maxSteps: 4,
+      logger: silentLogger,
+      approveToolCall: async () => ({ approved: true }),
+    });
+
+    expect(result.outcome).toBe('max_steps');
+    expect(seenMessages[3]).toContainEqual({
+      role: 'system',
+      content:
+        'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat. After doing that, then provide the final answer.',
+    });
+  });
+
+  it('asks for the missing git-native review command while noting existing verification evidence', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    let stage = 0;
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        stage += 1;
+        seenMessages.push(structuredClone(messages));
+
+        if (stage === 1) {
+          return {
+            toolCalls: [{ id: 'call-1', tool: 'run_shell_mutate', input: { command: 'eslint --fix src/example.ts' } }],
+          };
+        }
+
+        if (stage === 2) {
+          return {
+            toolCalls: [{ id: 'call-2', tool: 'run_shell_mutate', input: { command: 'yarn test' } }],
+          };
+        }
+
+        if (stage === 3) {
+          return {
+            content: 'The change is ready to be reported.',
+          };
+        }
+
+        return {
+          toolCalls: [{ id: 'call-3', tool: 'run_shell_inspect', input: { command: 'git status --short' } }],
+        };
+      },
+    };
+
+    const mutateTool: ToolDefinition = {
+      name: 'run_shell_mutate',
+      description: 'Runs a bounded workspace mutation or verification command',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const command = (input as { command: string }).command;
+        return { ok: true, output: { command, exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
+    const inspectTool: ToolDefinition = {
+      name: 'run_shell_inspect',
+      description: 'Runs a read-only shell inspection command',
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const command = (input as { command: string }).command;
+        return { ok: true, output: { command, exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Apply the fix and report back.',
+      llm: fakeLlm,
+      tools: [mutateTool, inspectTool],
+      maxSteps: 5,
+      logger: silentLogger,
+      approveToolCall: async () => ({ approved: true }),
+    });
+
+    expect(result.outcome).toBe('max_steps');
+    expect(seenMessages[3]).toContainEqual({
+      role: 'system',
+      content:
+        'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat. After doing that, then provide the final answer.',
+    });
+  });
+
+  it('does not allow a final answer while a recorded plan still has unfinished items', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    let stage = 0;
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        stage += 1;
+        seenMessages.push(structuredClone(messages));
+
+        if (stage === 1) {
+          return {
+            toolCalls: [{
+              id: 'call-1',
+              tool: 'update_plan',
+              input: {
+                explanation: 'Tracking the implementation steps.',
+                plan: [
+                  { step: 'Inspect current implementation', status: 'completed' },
+                  { step: 'Implement the next bounded change', status: 'in_progress' },
+                  { step: 'Verify with tests', status: 'pending' },
+                ],
+              },
+            }],
+          };
+        }
+
+        return {
+          content: 'The work is done.',
+        };
+      },
+    };
+
+    const updatePlanTool: ToolDefinition = {
+      name: 'update_plan',
+      description: 'Records a short working plan.',
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        return { ok: true, output: input };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Implement the next step.',
+      llm: fakeLlm,
+      tools: [updatePlanTool],
+      maxSteps: 2,
+      logger: silentLogger,
+    });
+
+    expect(result.outcome).toBe('max_steps');
+    expect(result.transcript).toContainEqual({
+      role: 'system',
+      content:
+        'Host reminder: you recorded a plan and it still has unfinished items (in_progress: Implement the next bounded change; pending: Verify with tests). Continue the planned work, or update the plan to mark items completed or no longer needed before giving the final answer.',
+    });
+  });
 });

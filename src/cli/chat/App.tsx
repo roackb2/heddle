@@ -70,6 +70,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     pendingApproval,
     approvalChoice,
     interruptRequested,
+    currentEditPreview,
+    currentPlan,
     setLiveEvents,
     resetRunState,
     actionState,
@@ -105,6 +107,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
           pendingApproval ? activityLines.filter((line) => line !== activityText)
           : activityLines,
         error,
+        currentEditPreview,
+        currentPlan,
       }
     : undefined;
   const switchSession = (id: string) => {

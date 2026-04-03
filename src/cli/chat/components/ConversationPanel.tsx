@@ -1,6 +1,8 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { ConversationLine } from '../state/types.js';
+import type { EditFilePreview } from '../../../tools/edit-file.js';
+import type { PlanItem } from '../../../tools/update-plan.js';
 
 export function ConversationPanel({
   messages,
@@ -11,6 +13,11 @@ export function ConversationPanel({
     title: string;
     lines: string[];
     error?: string;
+    currentEditPreview?: EditFilePreview;
+    currentPlan?: {
+      explanation?: string;
+      items: PlanItem[];
+    };
   };
 }) {
   const visibleMessages = messages.slice(-8);
@@ -37,11 +44,39 @@ export function ConversationPanel({
             {activeTurn.lines.map((line) => (
               <Text key={line} dimColor>{line}</Text>
             ))}
+            {activeTurn.currentPlan ? <ActivePlanPanel plan={activeTurn.currentPlan} /> : null}
+            {activeTurn.currentEditPreview ? <ActiveEditPreview preview={activeTurn.currentEditPreview} /> : null}
             {activeTurn.error ? <Text color="red">{activeTurn.error}</Text> : null}
           </Box>
           <Text dimColor>└</Text>
         </Box>
       : null}
+    </Box>
+  );
+}
+
+function ActivePlanPanel({ plan }: { plan: { explanation?: string; items: PlanItem[] } }) {
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Text bold color="yellow">Current plan</Text>
+      {plan.explanation ? <Text dimColor>{plan.explanation}</Text> : null}
+      {plan.items.map((item) => (
+        <Text key={`${item.status}-${item.step}`} color={taskTextColor(planStatusMarker(item.status), 'assistant')}>
+          <Text color={taskMarkerColor(planStatusMarker(item.status))}>{planStatusMarker(item.status)} </Text>
+          <InlineText text={item.step} color={taskTextColor(planStatusMarker(item.status), 'assistant')} />
+        </Text>
+      ))}
+    </Box>
+  );
+}
+
+function ActiveEditPreview({ preview }: { preview: EditFilePreview }) {
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Text bold color="yellow">Current edit preview</Text>
+      <Text dimColor>{preview.path}</Text>
+      <DiffCodeBlock text={preview.diff} />
+      {preview.truncated ? <Text dimColor>Preview truncated.</Text> : null}
     </Box>
   );
 }
@@ -319,6 +354,16 @@ function taskTextColor(marker: '[ ]' | '[-]' | '[x]', role: 'user' | 'assistant'
   }
 
   return marker === '[x]' ? 'green' : 'white';
+}
+
+function planStatusMarker(status: PlanItem['status']): '[ ]' | '[-]' | '[x]' {
+  if (status === 'completed') {
+    return '[x]';
+  }
+  if (status === 'in_progress') {
+    return '[-]';
+  }
+  return '[ ]';
 }
 
 type InlineSegment =
