@@ -35,8 +35,12 @@ export type { OpenAiAdapterOptions } from './llm/openai.js';
 export {
   OPENAI_MODEL_GROUPS,
   COMMON_OPENAI_MODELS,
+  COMMON_BUILT_IN_MODELS,
   formatOpenAiModelGroups,
+  formatBuiltInModelGroups,
   estimateOpenAiContextWindow,
+  estimateBuiltInContextWindow,
+  filterBuiltInModels,
 } from './llm/openai-models.js';
 export type { OpenAiModelGroup } from './llm/openai-models.js';
 

@@ -1,5 +1,5 @@
 import type { ChatMessage, LlmUsage } from '../../../index.js';
-import { estimateOpenAiContextWindow } from '../../../llm/openai-models.js';
+import { estimateBuiltInContextWindow } from '../../../llm/openai-models.js';
 import type { ChatContextStats } from './types.js';
 
 const DEFAULT_CONTEXT_WINDOW_ESTIMATE = 200_000;
@@ -14,7 +14,7 @@ export function compactChatHistory(options: {
   model: string;
   usage?: LlmUsage;
 }): { history: ChatMessage[]; context: ChatContextStats } {
-  const estimatedWindow = estimateOpenAiContextWindow(options.model) ?? DEFAULT_CONTEXT_WINDOW_ESTIMATE;
+  const estimatedWindow = estimateBuiltInContextWindow(options.model) ?? DEFAULT_CONTEXT_WINDOW_ESTIMATE;
   const maxHistoryTokens = Math.floor(estimatedWindow * MAX_HISTORY_RATIO);
   let nextHistory = options.history;
   let compactedMessages = 0;

@@ -1,6 +1,8 @@
 // ---------------------------------------------------------------------------
-// OpenAI model shortlist used by Heddle's UI and local commands.
-// Keep this curated rather than mirroring the entire API catalog.
+// Built-in model shortlist used by Heddle's current UI and local commands.
+// Keep this curated rather than mirroring the entire provider catalog.
+// Phase 0 keeps the current OpenAI-backed behavior while exposing more
+// provider-neutral helper names for future providers.
 // ---------------------------------------------------------------------------
 
 export type OpenAiModelGroup = {
@@ -36,16 +38,25 @@ export const OPENAI_MODEL_GROUPS: OpenAiModelGroup[] = [
 ];
 
 export const COMMON_OPENAI_MODELS = OPENAI_MODEL_GROUPS.flatMap((group) => group.models);
+export const COMMON_BUILT_IN_MODELS = COMMON_OPENAI_MODELS;
 
 const OPENAI_CONTEXT_WINDOW_ESTIMATES = new Map<string, number>(
-  COMMON_OPENAI_MODELS.map((model) => [model, inferContextWindowEstimate(model)]),
+  COMMON_BUILT_IN_MODELS.map((model) => [model, inferContextWindowEstimate(model)]),
 );
 
 export function formatOpenAiModelGroups(): string {
+  return formatBuiltInModelGroups();
+}
+
+export function formatBuiltInModelGroups(): string {
   return OPENAI_MODEL_GROUPS.map((group) => `${group.label}: ${group.models.join(', ')}`).join('\n');
 }
 
 export function filterOpenAiModels(query: string): string[] {
+  return filterBuiltInModels(query);
+}
+
+export function filterBuiltInModels(query: string): string[] {
   const normalized = query.trim().toLowerCase();
   if (!normalized) {
     return COMMON_OPENAI_MODELS;
@@ -55,6 +66,10 @@ export function filterOpenAiModels(query: string): string[] {
 }
 
 export function estimateOpenAiContextWindow(model: string): number | undefined {
+  return estimateBuiltInContextWindow(model);
+}
+
+export function estimateBuiltInContextWindow(model: string): number | undefined {
   const normalized = model.trim();
   if (!normalized) {
     return undefined;

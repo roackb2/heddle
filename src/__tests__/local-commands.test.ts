@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { runLocalCommand } from '../cli/chat/state/local-commands.js';
 
 describe('runLocalCommand', () => {
-  it('lists grouped common OpenAI model choices', () => {
+  it('lists grouped common built-in model choices', () => {
     const result = runLocalCommand({
       prompt: '/models',
       activeModel: 'gpt-5.1-codex',
@@ -78,7 +78,7 @@ describe('runLocalCommand', () => {
     if (!result.handled || result.kind !== 'message') {
       throw new Error('expected /model list to return a message result');
     }
-    expect(result.message).toContain('Common OpenAI model choices');
+    expect(result.message).toContain('Common built-in model choices');
     expect(result.message).toContain('GPT-5.4: gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano');
   });
 

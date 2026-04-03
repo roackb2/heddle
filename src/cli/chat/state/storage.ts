@@ -17,7 +17,7 @@ export function createInitialMessages(apiKeyPresent: boolean): ConversationLine[
         id: 'missing-key',
         role: 'assistant' as const,
         text:
-          'No OpenAI API key detected. Set OPENAI_API_KEY or PERSONAL_OPENAI_API_KEY, or use yarn chat:dev if your shell exposes PERSONAL_OPENAI_API_KEY.',
+          'No provider API key detected. Set OPENAI_API_KEY or PERSONAL_OPENAI_API_KEY for OpenAI models. Future providers such as Claude will need their own provider-specific key wiring.',
       }]
     : []),
   ];

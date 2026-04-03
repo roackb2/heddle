@@ -1,6 +1,6 @@
 import type { ChatSession, LocalCommandResult } from './types.js';
 import { summarizeSession } from './storage.js';
-import { COMMON_OPENAI_MODELS, formatOpenAiModelGroups } from '../../../llm/openai-models.js';
+import { COMMON_BUILT_IN_MODELS, formatBuiltInModelGroups } from '../../../llm/openai-models.js';
 
 export type LocalCommandArgs = {
   prompt: string;
@@ -20,7 +20,7 @@ export type LocalCommandArgs = {
 type ExactCommandHandler = (args: LocalCommandArgs) => LocalCommandResult;
 type PrefixCommandHandler = (args: LocalCommandArgs, value: string) => LocalCommandResult;
 
-const MODEL_LIST_MESSAGE = ['Common OpenAI model choices', '', formatOpenAiModelGroups()].join('\n');
+const MODEL_LIST_MESSAGE = ['Common built-in model choices', '', formatBuiltInModelGroups()].join('\n');
 const MODEL_SET_HELP_MESSAGE = 'Use /model set <query> to filter models, then use arrows and Enter to choose one.';
 const HELP_MESSAGE = [
   'Local commands',
@@ -134,7 +134,7 @@ function handleModelCommand(args: LocalCommandArgs, value: string): LocalCommand
 
   args.setActiveModel(value);
   return messageResult(
-    COMMON_OPENAI_MODELS.includes(value) ?
+    COMMON_BUILT_IN_MODELS.includes(value) ?
       `Switched model to ${value}`
     : `Switched model to ${value}. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.`,
   );

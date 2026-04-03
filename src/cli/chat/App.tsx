@@ -12,7 +12,7 @@ import {
   shouldShowSlashHints,
   SlashHintPanel,
 } from './components/index.js';
-import { estimateOpenAiContextWindow, filterOpenAiModels } from '../../llm/openai-models.js';
+import { estimateBuiltInContextWindow, filterBuiltInModels } from '../../llm/openai-models.js';
 import { useApprovalFlow } from './hooks/useApprovalFlow.js';
 import { useAgentRun } from './hooks/useAgentRun.js';
 import { useChatSessions } from './hooks/useChatSessions.js';
@@ -32,7 +32,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   const nextLocalId = () => `ui-${Date.now()}-${nextIdRef.current++}`;
   const modelPickerQuery = getModelPickerQuery(draft);
   const modelPickerVisible = modelPickerQuery !== undefined;
-  const filteredModels = modelPickerVisible ? filterOpenAiModels(modelPickerQuery) : [];
+  const filteredModels = modelPickerVisible ? filterBuiltInModels(modelPickerQuery) : [];
   const safeModelPickerIndex =
     filteredModels.length === 0 ? 0 : Math.min(modelPickerIndex, Math.max(0, filteredModels.length - 1));
   const highlightedModel = filteredModels[safeModelPickerIndex];
@@ -505,7 +505,7 @@ function formatContextStatus(model: string, estimatedHistoryTokens?: number): st
     return 'context=unknown';
   }
 
-  const contextWindow = estimateOpenAiContextWindow(model);
+  const contextWindow = estimateBuiltInContextWindow(model);
   if (!contextWindow) {
     return `context≈${formatTokenCount(estimatedHistoryTokens)} used`;
   }

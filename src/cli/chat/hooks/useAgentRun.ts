@@ -243,7 +243,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   }
 
   if (!runtime.apiKey) {
-    state.setError('Missing OpenAI API key');
+    state.setError('Missing provider API key');
     state.setStatus('Error');
     return undefined;
   }
