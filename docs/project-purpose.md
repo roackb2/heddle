@@ -164,6 +164,27 @@ That means:
 - keep evaluating environment and delegation patterns
 - avoid mistaking custom orchestration for intrinsic framework value
 
+## Immediate Build Target
+
+The next meaningful step toward the project goal is not another broad reliability pass. It is making the coding-agent proving ground self-closing and trustworthy enough to build Heddle itself with less operator babysitting.
+
+Concretely, that means Phase 1 should now optimize for this loop:
+
+1. the agent can inspect and form a bounded plan
+2. the plan stays visible while work is happening
+3. the conversation reads as an append-only journal of what the agent thought, changed, verified, and concluded
+4. after making a change, the host forces the agent to finish the real follow-through path instead of stopping at a partial slice
+5. the run ends with a grounded operator-facing summary or a clear blocked-state report
+
+This target matters because a "general agent framework" only becomes credible once one proving-ground workflow can reliably close the loop from discovery through change through verification through explanation.
+
+Near-term build decisions should therefore prefer:
+
+- stable conversation and trace surfaces over clever UI churn
+- host-enforced completion behavior over prompt-only encouragement
+- concrete repo evidence over abstract claims of success
+- workflow integrity that makes Heddle usable for building Heddle
+
 The long-term goal is not "build everything ourselves."
 
 The long-term goal is "understand and build agent systems that actually work."

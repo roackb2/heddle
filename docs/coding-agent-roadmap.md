@@ -94,6 +94,14 @@ Remaining priority:
 - reduce reliance on shell-syntax blocking as a safety mechanism; serious workflows will need broader command expressiveness than the current heredoc/redirect restrictions allow
 - strengthen host-side follow-through so when the agent discovers a safe path for a bounded change, it executes it instead of stopping at explanation
 
+Current concrete next step:
+
+- finish the "self-closing coding loop" for Phase 1
+- make the conversation an append-only journal of reasoning, file edits, plan updates, verification, and final outcome instead of a surface that is rebuilt or reordered after the run
+- prevent premature plan completion when post-mutation review or verification is still pending
+- guarantee that every non-successful run still leaves a visible terminal summary in the conversation, not only a status badge
+- use this as the main acceptance bar for asking Heddle to implement the next bounded product improvement itself
+
 Direction for shell evolution:
 
 - the current allowlist-based `run_shell_mutate` is a bootstrap, not the intended end state
@@ -116,6 +124,7 @@ Near-term implication:
 - the next shell work should not be "add more prefixes forever"
 - it should move toward capability classes and host-side execution policy
 - early steps in that direction are now live: mutate policy can classify `yarn run ...` as a project-script capability, and known external CLIs now classify under explicit external-system scope
+- but Phase 1 should not chase broader execution until the agent can reliably finish a bounded coding task and leave behind a trustworthy journal of what happened
 
 ## Phase 2: Reliability And Session Quality
 
