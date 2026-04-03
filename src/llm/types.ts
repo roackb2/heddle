@@ -4,6 +4,21 @@
 
 import type { AssistantDiagnostics, ToolCall, ToolDefinition } from '../types.js';
 
+export type LlmProvider = 'openai' | 'anthropic' | 'google';
+
+export type LlmAdapterCapabilities = {
+  toolCalls: boolean;
+  systemMessages: boolean;
+  reasoningSummaries: boolean;
+  parallelToolCalls: boolean;
+};
+
+export type LlmAdapterInfo = {
+  provider: LlmProvider;
+  model: string;
+  capabilities: LlmAdapterCapabilities;
+};
+
 /**
  * A message in the chat transcript.
  */
@@ -27,5 +42,6 @@ export type LlmResponse = {
  * Swap implementations to change providers.
  */
 export interface LlmAdapter {
+  info?: LlmAdapterInfo;
   chat(messages: ChatMessage[], tools: ToolDefinition[], signal?: AbortSignal): Promise<LlmResponse>;
 }

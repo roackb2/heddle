@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import {
   DEFAULT_OPENAI_MODEL,
   runAgent,
-  createOpenAiAdapter,
+  createLlmAdapter,
   listFilesTool,
   readFileTool,
   editFileTool,
@@ -38,7 +38,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
 
   logger.info({ goal, model, maxSteps, cwd: workspaceRoot }, 'Heddle');
 
-  const llm = createOpenAiAdapter({
+  const llm = createLlmAdapter({
     model,
     apiKey: options.apiKey ?? process.env.OPENAI_API_KEY ?? process.env.PERSONAL_OPENAI_API_KEY,
   });

@@ -4,7 +4,7 @@ import type { Logger } from 'pino';
 import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition, ToolResult } from '../../../index.js';
 import {
   createLogger,
-  createOpenAiAdapter,
+  createLlmAdapter,
   createRunShellInspectTool,
   createRunShellMutateTool,
   createSearchFilesTool,
@@ -98,11 +98,11 @@ export function useAgentRun(args: UseAgentRunArgs) {
   const projectApprovals = useProjectApprovals(runtime.approvalsFile);
 
   const llm = useMemo(
-    () => createOpenAiAdapter({ model: activeModel, apiKey: runtime.apiKey }),
+    () => createLlmAdapter({ model: activeModel, apiKey: runtime.apiKey }),
     [activeModel, runtime.apiKey],
   );
   const titleLlm = useMemo(
-    () => createOpenAiAdapter({ model: sessionTitleModel, apiKey: runtime.apiKey }),
+    () => createLlmAdapter({ model: sessionTitleModel, apiKey: runtime.apiKey }),
     [runtime.apiKey, sessionTitleModel],
   );
   const tools = useMemo(

@@ -4,7 +4,7 @@
 
 import OpenAI from 'openai';
 import type { ResponseInputItem, FunctionTool, ResponseFunctionToolCall, ResponseReasoningItem, Response } from 'openai/resources/responses/responses.js';
-import type { LlmAdapter, ChatMessage, LlmResponse } from './types.js';
+import type { LlmAdapter, ChatMessage, LlmResponse, LlmAdapterCapabilities } from './types.js';
 import type { AssistantDiagnostics, ToolDefinition, ToolCall } from '../types.js';
 import { DEFAULT_OPENAI_MODEL } from '../config.js';
 
@@ -21,8 +21,19 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
     apiKey: options.apiKey ?? process.env.OPENAI_API_KEY,
   });
   const model = options.model ?? DEFAULT_OPENAI_MODEL;
+  const capabilities: LlmAdapterCapabilities = {
+    toolCalls: true,
+    systemMessages: true,
+    reasoningSummaries: true,
+    parallelToolCalls: true,
+  };
 
   return {
+    info: {
+      provider: 'openai',
+      model,
+      capabilities,
+    },
     async chat(messages: ChatMessage[], tools: ToolDefinition[], signal?: AbortSignal): Promise<LlmResponse> {
       const response = await client.responses.create({
         model,

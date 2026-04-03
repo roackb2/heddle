@@ -19,7 +19,9 @@ export type {
 } from './types.js';
 
 // LLM
-export type { LlmAdapter, ChatMessage, LlmResponse } from './llm/types.js';
+export type { LlmAdapter, ChatMessage, LlmResponse, LlmProvider, LlmAdapterCapabilities, LlmAdapterInfo } from './llm/types.js';
+export { createLlmAdapter, inferProviderFromModel, resolveLlmProvider } from './llm/factory.js';
+export type { CreateLlmAdapterOptions } from './llm/factory.js';
 export { createOpenAiAdapter } from './llm/openai.js';
 export type { OpenAiAdapterOptions } from './llm/openai.js';
 
