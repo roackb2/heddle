@@ -321,6 +321,98 @@ describe('runAgent', () => {
     });
   });
 
+  it('adds a follow-through reminder after report_state so the next turn acts on the named blocker', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+
+        if (seenMessages.length === 1) {
+          return {
+            toolCalls: [{
+              id: 'call-1',
+              tool: 'report_state',
+              input: {
+                rationale: 'Need a more precise file slice before editing.',
+                missing: ['A specific line range from src/run-agent.ts'],
+                nextNeed: 'read_file on src/run-agent.ts with offset 200 and maxLines 80',
+              },
+            }],
+          };
+        }
+
+        return {
+          content: 'I will act on the concrete blocker next.',
+        };
+      },
+    };
+
+    const reportStateTool: ToolDefinition = {
+      name: 'report_state',
+      description: 'Records the current blocker',
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        return { ok: true, output: input };
+      },
+    };
+
+    await runAgent({
+      goal: 'Investigate the next implementation step.',
+      llm: fakeLlm,
+      tools: [reportStateTool],
+      maxSteps: 2,
+      logger: silentLogger,
+    });
+
+    expect(seenMessages[1]).toContainEqual({
+      role: 'system',
+      content:
+        'Host reminder: report_state is only a checkpoint. On the next turn, either do the concrete nextNeed you identified (read_file on src/run-agent.ts with offset 200 and maxLines 80) or finish with the best grounded blocker. Do not repeat the same planning state.',
+    });
+  });
+
+  it('adds a low-step reminder after extended evidence gathering so the run converges instead of drifting', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+
+        if (seenMessages.length <= 3) {
+          return {
+            toolCalls: [{ id: `call-${seenMessages.length}`, tool: 'list_files', input: { path: `path-${seenMessages.length}` } }],
+          };
+        }
+
+        return {
+          content: 'I have enough evidence to stop exploring.',
+        };
+      },
+    };
+
+    const listFilesTool: ToolDefinition = {
+      name: 'list_files',
+      description: 'Lists files in a directory',
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: 'README.md\nsrc/' };
+      },
+    };
+
+    await runAgent({
+      goal: 'Figure out the next concrete step.',
+      llm: fakeLlm,
+      tools: [listFilesTool],
+      maxSteps: 4,
+      logger: silentLogger,
+    });
+
+    expect(seenMessages[3]).toContainEqual({
+      role: 'system',
+      content:
+        'Host reminder: only 1 step(s) remain. Do not spend another turn rephrasing the plan. Either execute the single next concrete action needed to finish, or answer with the best grounded blocker.',
+    });
+  });
+
   it('carries prior transcript into a later turn when history is provided', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {

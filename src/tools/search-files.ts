@@ -24,7 +24,7 @@ export function createSearchFilesTool(options: SearchFilesOptions = {}): ToolDef
   return {
     name: 'search_files',
     description:
-      'Search for a text pattern in files using grep. Use this when you need to locate a specific symbol or text string, not when a likely folder or file is already obvious from the workspace structure. Prefer searching for concrete terms such as tool names, symbols, or filenames rather than copying broad question text. Relative paths are resolved from the current working directory and may also point to nearby parent or sibling folders. Returns newline-separated matches in grep-style path:line:content format, or "No matches found.". Ignores generated directories like .git, dist, node_modules, local, and .heddle by default. Example inputs: { "query": "createUser" }, { "query": "incident", "path": "../shared-notes" }',
+      'Search for a text pattern in files using grep. Use this when you need to locate a specific symbol or text string, not when a likely folder or file is already obvious from the workspace structure. Prefer searching for concrete terms such as tool names, symbols, or filenames rather than copying broad question text. Relative paths are resolved from the current working directory and may also point to nearby parent or sibling folders. Returns newline-separated matches in grep-style path:line:content format, or "No matches found.". Ignores generated or state directories like .git, dist, node_modules, local, and .heddle by default, but if you explicitly target one of those directories via path then that path is searched. Example inputs: { "query": "createUser" }, { "query": "incident", "path": "../shared-notes" }',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -47,7 +47,8 @@ export function createSearchFilesTool(options: SearchFilesOptions = {}): ToolDef
 
       const input: SearchFilesInput = raw;
       const dir = resolve(input.path ?? '.');
-      const excludedDirs = excludedDirNames.map((name) => `--exclude-dir=${escapeShellArg(name)}`).join(' ');
+      const effectiveExcludedDirs = excludedDirNames.filter((name) => !isExplicitlyTargetingExcludedDir(dir, name));
+      const excludedDirs = effectiveExcludedDirs.map((name) => `--exclude-dir=${escapeShellArg(name)}`).join(' ');
 
       try {
         // -r recursive, -n line numbers, -I skip binary, --include common text files
@@ -101,4 +102,14 @@ function sanitizeExcludedDirs(custom: string[] | undefined): string[] {
     .map((value) => value.replace(/^\.?\//, '').replace(/\/+$/, ''));
 
   return normalized.length > 0 ? normalized : DEFAULT_SEARCH_EXCLUDED_DIRS;
+}
+
+function isExplicitlyTargetingExcludedDir(dir: string, excludedName: string): boolean {
+  const normalizedExcludedName = excludedName.trim().replace(/^\.?\//, '').replace(/\/+$/, '');
+  if (!normalizedExcludedName) {
+    return false;
+  }
+
+  const segments = dir.split(/[/\\]+/).filter(Boolean);
+  return segments.includes(normalizedExcludedName);
 }

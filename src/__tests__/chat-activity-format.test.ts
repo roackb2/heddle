@@ -15,6 +15,12 @@ describe('chat activity formatting', () => {
     );
   });
 
+  it('includes search_files query and path in tool call summaries', () => {
+    expect(summarizeToolCall('search_files', { query: 'trace-1775195542429', path: '.heddle/traces' })).toBe(
+      'search_files ("trace-1775195542429" in .heddle/traces)',
+    );
+  });
+
   it('includes read paths in live activity events', () => {
     const event: TraceEvent = {
       type: 'tool.call',
@@ -35,5 +41,16 @@ describe('chat activity formatting', () => {
     };
 
     expect(toLiveEvent(event)).toBe('approval needed for list_files (src)');
+  });
+
+  it('includes search query details in live activity events', () => {
+    const event: TraceEvent = {
+      type: 'tool.call',
+      call: { id: 'call-3', tool: 'search_files', input: { query: 'trace', path: '.heddle/traces' } },
+      step: 3,
+      timestamp: '2024-01-01T00:00:02Z',
+    };
+
+    expect(toLiveEvent(event)).toBe('running search_files ("trace" in .heddle/traces)');
   });
 });

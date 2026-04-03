@@ -151,6 +151,18 @@ describe('searchFilesTool', () => {
     expect(result.output).toContain('src/main.ts');
     expect(result.output).not.toContain('vendor/hidden.ts');
   });
+
+  it('searches inside an explicitly targeted excluded directory', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-search-state-'));
+    await mkdir(join(root, '.heddle'));
+    await mkdir(join(root, '.heddle', 'traces'));
+    await writeFile(join(root, '.heddle', 'traces', 'trace-1.json'), '{"needle":true}\n');
+
+    const result = await searchFilesTool.execute({ query: 'needle', path: join(root, '.heddle') });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('.heddle/traces/trace-1.json');
+  });
 });
 
 describe('editFileTool', () => {
@@ -393,6 +405,17 @@ describe('runShell tools', () => {
     });
   });
 
+  it('ignores unrelated extra input fields for inspect commands when command is present', async () => {
+    const tool = createRunShellInspectTool();
+    const result = await tool.execute({ command: 'pwd', maxLines: 400 });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({
+      command: 'pwd',
+      exitCode: 0,
+    });
+  });
+
   it('allows bounded mutate commands with structured output', async () => {
     const tool = createRunShellMutateTool();
     const result = await tool.execute({ command: 'tsc --version' });
@@ -402,6 +425,17 @@ describe('runShell tools', () => {
       command: 'tsc --version',
       exitCode: 0,
       stderr: '',
+    });
+  });
+
+  it('ignores unrelated extra input fields for mutate commands when command is present', async () => {
+    const tool = createRunShellMutateTool();
+    const result = await tool.execute({ command: 'tsc --version', rationale: 'verify compiler exists' });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatchObject({
+      command: 'tsc --version',
+      exitCode: 0,
     });
   });
 

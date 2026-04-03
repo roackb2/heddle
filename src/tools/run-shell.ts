@@ -420,12 +420,7 @@ function isRunShellInput(raw: unknown): raw is RunShellInput {
     return false;
   }
 
-  const input = raw as Record<string, unknown>;
-  const keys = Object.keys(input);
-  if (keys.length !== 1 || keys[0] !== 'command') {
-    return false;
-  }
-
+  const input = raw as { command?: unknown };
   return typeof input.command === 'string';
 }
 

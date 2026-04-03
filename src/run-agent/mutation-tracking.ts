@@ -120,7 +120,12 @@ function normalizeCommand(command: string): string {
 }
 
 function includesFlag(command: string, flag: string): boolean {
-  return command.split(' ').some((part) => part === flag || part.startsWith(`${flag}=`));
+  const pattern = new RegExp(`(?:^|\\s)${escapeRegExp(flag)}(?:=\\S+|\\s|$)`);
+  return pattern.test(command);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function describeEditMutation(input: unknown): string {

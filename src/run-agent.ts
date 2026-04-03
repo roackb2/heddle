@@ -16,6 +16,7 @@ import type { Logger } from 'pino';
 import { sanitizeHistory } from './run-agent/history.js';
 import { isAbortError, isRecoverableToolError } from './run-agent/util.js';
 import { createMutationState, trackToolResult } from './run-agent/mutation-tracking.js';
+import { createProgressReminderState, buildProgressReminders } from './run-agent/progress-reminders.js';
 import {
   buildPostMutationRequirement,
   hasStructuredChangeSummary,
@@ -69,6 +70,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
   const budget = createBudget(maxSteps);
   const seenToolCalls = new Map<string, number>();
   const mutation = createMutationState();
+  const progress = createProgressReminderState();
 
   // Start trace
   const now = () => new Date().toISOString();
@@ -240,6 +242,15 @@ export async function runAgent(options: RunAgentOptions): Promise<RunResult> {
             content: JSON.stringify(result),
             toolCallId: call.id,
         });
+
+        const reminders = buildProgressReminders(progress, {
+          effectiveCall,
+          result,
+          remainingSteps: budget.remaining(),
+        });
+        for (const reminder of reminders) {
+          messages.push({ role: 'system', content: reminder });
+        }
       }
 
       continue;

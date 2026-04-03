@@ -154,6 +154,11 @@ export function summarizeToolCall(tool: string, input: unknown): string {
     return `${tool} (${truncate(shellCommand, MAX_TOOL_CALL_SUMMARY_CHARS)})`;
   }
 
+  const searchSummary = summarizeSearchInput(tool, input);
+  if (searchSummary) {
+    return searchSummary;
+  }
+
   const path = extractPathField(input);
   if (isPathAwareTool(tool) && path) {
     return `${tool} (${truncate(path, MAX_TOOL_CALL_SUMMARY_CHARS)})`;
@@ -195,6 +200,15 @@ export function extractPathField(value: unknown): string | undefined {
 
   const path = (value as { path?: unknown }).path;
   return typeof path === 'string' && path.trim() ? path.trim() : undefined;
+}
+
+export function extractQueryField(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const query = (value as { query?: unknown }).query;
+  return typeof query === 'string' && query.trim() ? query.trim() : undefined;
 }
 
 export function extractOutputPath(value: unknown): string | undefined {
@@ -352,6 +366,25 @@ export function normalizeSessionTitle(value: string | undefined): string | undef
 
 function isPathAwareTool(tool: string): boolean {
   return tool === 'edit_file' || tool === 'read_file' || tool === 'list_files';
+}
+
+function summarizeSearchInput(tool: string, input: unknown): string | undefined {
+  if (tool !== 'search_files') {
+    return undefined;
+  }
+
+  const query = extractQueryField(input);
+  if (!query) {
+    return tool;
+  }
+
+  const path = extractPathField(input);
+  const querySummary = truncate(JSON.stringify(query), Math.max(12, Math.floor(MAX_TOOL_CALL_SUMMARY_CHARS / 2)));
+  if (path) {
+    return `${tool} (${querySummary} in ${truncate(path, Math.max(12, Math.floor(MAX_TOOL_CALL_SUMMARY_CHARS / 2)))})`;
+  }
+
+  return `${tool} (${querySummary})`;
 }
 
 function renderToolHistoryMessage(message: Extract<ChatMessage, { role: 'tool' }>, history: ChatMessage[], index: number): string | undefined {
