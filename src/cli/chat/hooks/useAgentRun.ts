@@ -260,6 +260,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   const appendedAssistantSteps = new Set<number>();
   const appendedEditPreviewIds = new Set<string>();
   const appendedPlanSteps = new Set<number>();
+  const streamingMessageIds = new Map<number, string>();
 
   if (displayText) {
     updateSessionById(sessionId, (session) => ({
@@ -278,19 +279,58 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       history: sessionHistory,
       systemContext: runtime.systemContext,
       onEvent: (event) => {
+        if (event.type === 'assistant.stream') {
+          const existingId = streamingMessageIds.get(event.step);
+          const messageId = existingId ?? state.nextLocalId();
+          if (!existingId) {
+            streamingMessageIds.set(event.step, messageId);
+          }
+
+          updateSessionById(sessionId, (session) => {
+            const existingIndex = session.messages.findIndex((message) => message.id === messageId);
+            const nextMessage = {
+              id: messageId,
+              role: 'assistant' as const,
+              text: event.content,
+              isStreaming: !event.done,
+            };
+
+            if (existingIndex >= 0) {
+              return {
+                ...session,
+                messages: session.messages.map((message, index) => (index === existingIndex ? nextMessage : message)),
+              };
+            }
+
+            return {
+              ...session,
+              messages: [...session.messages, nextMessage],
+            };
+          });
+        }
+
         if (event.type === 'assistant.turn' && event.content.trim() && !appendedAssistantSteps.has(event.step)) {
           appendedAssistantSteps.add(event.step);
-          updateSessionById(sessionId, (session) => ({
-            ...session,
-            messages: [
-              ...session.messages,
-              {
-                id: state.nextLocalId(),
-                role: 'assistant',
-                text: event.content,
-              },
-            ],
-          }));
+          const streamingMessageId = streamingMessageIds.get(event.step);
+          updateSessionById(sessionId, (session) => {
+            const nextMessage = {
+              id: streamingMessageId ?? state.nextLocalId(),
+              role: 'assistant' as const,
+              text: event.content,
+            };
+
+            if (!streamingMessageId) {
+              return {
+                ...session,
+                messages: [...session.messages, nextMessage],
+              };
+            }
+
+            return {
+              ...session,
+              messages: session.messages.map((message) => (message.id === streamingMessageId ? nextMessage : message)),
+            };
+          });
         }
 
         if (event.type === 'tool.call' && event.call.tool === 'edit_file') {

@@ -15,6 +15,7 @@ export type ConversationLine = {
   id: string;
   role: 'user' | 'assistant';
   text: string;
+  isStreaming?: boolean;
 };
 
 export type LiveEvent = {

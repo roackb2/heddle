@@ -4,7 +4,7 @@
 
 import OpenAI from 'openai';
 import type { ResponseInputItem, FunctionTool, ResponseFunctionToolCall, ResponseReasoningItem, Response } from 'openai/resources/responses/responses.js';
-import type { LlmAdapter, ChatMessage, LlmResponse, LlmAdapterCapabilities, LlmUsage } from './types.js';
+import type { LlmAdapter, ChatMessage, LlmResponse, LlmAdapterCapabilities, LlmUsage, LlmStreamEvent } from './types.js';
 import type { AssistantDiagnostics, ToolDefinition, ToolCall } from '../types.js';
 import { DEFAULT_OPENAI_MODEL } from '../config.js';
 
@@ -34,7 +34,12 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
       model,
       capabilities,
     },
-    async chat(messages: ChatMessage[], tools: ToolDefinition[], signal?: AbortSignal): Promise<LlmResponse> {
+    async chat(
+      messages: ChatMessage[],
+      tools: ToolDefinition[],
+      signal?: AbortSignal,
+      onStreamEvent?: (event: LlmStreamEvent) => void,
+    ): Promise<LlmResponse> {
       const response = await client.responses.create({
         model,
         input: toResponseInput(messages),
@@ -53,6 +58,11 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
         }));
       const diagnostics = extractAssistantDiagnostics(response, toolCalls.length > 0);
       const content = diagnostics?.rationale ?? extractAssistantContent(response, toolCalls.length > 0);
+
+      if (content) {
+        onStreamEvent?.({ type: 'content.delta', delta: content });
+        onStreamEvent?.({ type: 'content.done', content });
+      }
 
       return {
         content,

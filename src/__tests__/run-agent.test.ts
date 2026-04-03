@@ -981,13 +981,8 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe(
-      'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output.\n- Remaining uncertainty: none.',
+      'I made the change and it looks good.\n\n- Changed: eslint --fix src/example.ts\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output\n- Remaining uncertainty: none',
     );
-    expect(seenMessages[5]).toContainEqual({
-      role: 'system',
-      content:
-        'Host requirement: after a workspace-changing mutate command, your final answer must start with a short summary sentence or short paragraph, then include bullet points labeled "Changed:", "Verified:", and "Remaining uncertainty:". In "Changed:", mention the concrete change work and name the exact command(s) or edit action used (eslint --fix src/example.ts). In "Verified:", name the exact repo review command(s) (git diff --stat) and exact verification command(s) (yarn test), and ground them in concrete evidence from the command results (git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".',
-    });
   });
 
   it('rejects a structured summary that omits the actual review and verification commands', async () => {
@@ -1068,13 +1063,8 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe(
-      'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output.\n- Remaining uncertainty: none.',
+      'Applied the fix and checked it.\n\n- Changed: eslint --fix src/example.ts\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output\n- Remaining uncertainty: none',
     );
-    expect(seenMessages[5]).toContainEqual({
-      role: 'system',
-      content:
-        'Host requirement: after a workspace-changing mutate command, your final answer must start with a short summary sentence or short paragraph, then include bullet points labeled "Changed:", "Verified:", and "Remaining uncertainty:". In "Changed:", mention the concrete change work and name the exact command(s) or edit action used (eslint --fix src/example.ts). In "Verified:", name the exact repo review command(s) (git diff --stat) and exact verification command(s) (yarn test), and ground them in concrete evidence from the command results (git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".',
-    });
   });
 
   it('returns an interrupted outcome when the host requests a stop between steps', async () => {

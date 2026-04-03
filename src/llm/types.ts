@@ -4,6 +4,10 @@
 
 import type { AssistantDiagnostics, ToolCall, ToolDefinition } from '../types.js';
 
+export type LlmStreamEvent =
+  | { type: 'content.delta'; delta: string }
+  | { type: 'content.done'; content: string };
+
 export type LlmProvider = 'openai' | 'anthropic' | 'google';
 
 export type LlmAdapterCapabilities = {
@@ -53,5 +57,10 @@ export type LlmResponse = {
  */
 export interface LlmAdapter {
   info?: LlmAdapterInfo;
-  chat(messages: ChatMessage[], tools: ToolDefinition[], signal?: AbortSignal): Promise<LlmResponse>;
+  chat(
+    messages: ChatMessage[],
+    tools: ToolDefinition[],
+    signal?: AbortSignal,
+    onStreamEvent?: (event: LlmStreamEvent) => void,
+  ): Promise<LlmResponse>;
 }

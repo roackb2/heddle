@@ -71,6 +71,13 @@ export type TraceEvent =
       step: number;
       timestamp: string;
     }
+  | {
+      type: 'assistant.stream';
+      content: string;
+      done: boolean;
+      step: number;
+      timestamp: string;
+    }
   | { type: 'tool.approval_requested'; call: ToolCall; step: number; timestamp: string }
   | {
       type: 'tool.approval_resolved';

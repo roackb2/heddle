@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import type { RunResult, ToolDefinition, StopReason, ToolCall, ToolResult, TraceEvent } from './types.js';
-import type { LlmAdapter, LlmResponse, LlmUsage, ChatMessage } from './llm/types.js';
+import type { LlmAdapter, LlmResponse, LlmUsage, ChatMessage, LlmStreamEvent } from './llm/types.js';
 import { createToolRegistry } from './tools/registry.js';
 import type { ToolRegistry } from './tools/registry.js';
 import { createTraceRecorder } from './trace/recorder.js';
@@ -189,7 +189,36 @@ async function requestModelTurn(context: RunContext): Promise<LlmResponse | RunR
   }
 
   try {
-    const response = await context.llm.chat(context.messages, context.registry.list(), context.abortSignal);
+    let streamedContent = '';
+    const response = await context.llm.chat(
+      context.messages,
+      context.registry.list(),
+      context.abortSignal,
+      (event: LlmStreamEvent) => {
+        if (event.type === 'content.delta') {
+          streamedContent += event.delta;
+          context.record({
+            type: 'assistant.stream',
+            content: streamedContent,
+            done: false,
+            step: context.state.step,
+            timestamp: context.now(),
+          });
+          return;
+        }
+
+        if (event.type === 'content.done') {
+          streamedContent = event.content;
+          context.record({
+            type: 'assistant.stream',
+            content: streamedContent,
+            done: true,
+            step: context.state.step,
+            timestamp: context.now(),
+          });
+        }
+      },
+    );
     context.state.usage = accumulateUsage(context.state.usage, response.usage);
     return response;
   } catch (error) {
