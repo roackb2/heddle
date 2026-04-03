@@ -402,7 +402,8 @@ function formatContextStatus(model: string, estimatedHistoryTokens?: number): st
   }
 
   const remainingTokens = Math.max(contextWindow - estimatedHistoryTokens, 0);
-  return `context≈${formatTokenCount(remainingTokens)} left`;
+  const remainingPercent = Math.max(Math.round((remainingTokens / contextWindow) * 100), 0);
+  return `context≈${remainingPercent}% left`;
 }
 
 function formatTokenCount(value: number): string {
