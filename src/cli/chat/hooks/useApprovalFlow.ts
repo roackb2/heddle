@@ -4,6 +4,7 @@ import type { ActionState } from './useAgentRun.js';
 import type { ApprovalChoice, LiveEvent, PendingApproval } from '../state/types.js';
 
 const WORKING_FRAMES = ['.', '..', '...'];
+const APPROVAL_CHOICES: ApprovalChoice[] = ['approve', 'allow_project', 'deny'];
 
 export function useApprovalFlow(nextLocalId: () => string) {
   const [status, setStatus] = useState('Idle');
@@ -29,21 +30,27 @@ export function useApprovalFlow(nextLocalId: () => string) {
         return;
       }
 
-      if (key.leftArrow || key.upArrow || key.tab) {
-        setApprovalChoice('approve');
+      if (key.leftArrow || key.upArrow) {
+        setApprovalChoice((current) => cycleApprovalChoice(current, -1));
         return;
       }
 
-      if (key.rightArrow || key.downArrow) {
-        setApprovalChoice('deny');
+      if (key.rightArrow || key.downArrow || key.tab) {
+        setApprovalChoice((current) => cycleApprovalChoice(current, 1));
         return;
       }
 
       if (key.return) {
-        const approved = approvalChoice === 'approve';
+        const approved = approvalChoice !== 'deny';
+        if (approvalChoice === 'allow_project') {
+          pendingApproval.rememberForProject?.();
+        }
         pendingApproval.resolve({
           approved,
-          reason: approved ? 'Approved in chat UI' : 'Denied in chat UI',
+          reason:
+            approvalChoice === 'allow_project' ? 'Approved and remembered for this project in chat UI'
+            : approved ? 'Approved in chat UI'
+            : 'Denied in chat UI',
         });
         setPendingApproval(undefined);
         setApprovalChoice('approve');
@@ -53,6 +60,11 @@ export function useApprovalFlow(nextLocalId: () => string) {
       const normalized = input.toLowerCase();
       if (normalized === 'y') {
         setApprovalChoice('approve');
+        return;
+      }
+
+      if (normalized === 'a') {
+        setApprovalChoice('allow_project');
         return;
       }
 
@@ -138,4 +150,10 @@ export function useApprovalFlow(nextLocalId: () => string) {
     actionState,
     workingFrames: WORKING_FRAMES,
   };
+}
+
+function cycleApprovalChoice(current: ApprovalChoice, direction: -1 | 1): ApprovalChoice {
+  const index = APPROVAL_CHOICES.indexOf(current);
+  const nextIndex = (index + direction + APPROVAL_CHOICES.length) % APPROVAL_CHOICES.length;
+  return APPROVAL_CHOICES[nextIndex] ?? 'approve';
 }

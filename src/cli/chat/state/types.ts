@@ -35,10 +35,11 @@ export type ChatSession = {
 export type PendingApproval = {
   call: ToolCall;
   tool: ToolDefinition;
+  rememberForProject?: () => void;
   resolve: (decision: { approved: boolean; reason?: string }) => void;
 };
 
-export type ApprovalChoice = 'approve' | 'deny';
+export type ApprovalChoice = 'approve' | 'allow_project' | 'deny';
 
 export type LocalCommandResult =
   | { handled: false }

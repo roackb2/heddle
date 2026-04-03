@@ -127,7 +127,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         </Text>
         <Text dimColor>/model &lt;name&gt; • /models • /session list • /help • !command</Text>
         <Text dimColor>
-          {pendingApproval ? '←/→ choose • Enter confirms • Esc denies • Ctrl+C exits'
+          {pendingApproval ? '←/→ choose • Enter confirms • A remembers for this project • Esc denies • Ctrl+C exits'
           : isRunning ? 'Esc requests stop after the current step • Ctrl+C exits'
           : 'Cmd+Backspace or Ctrl+U clears to line start • Ctrl+C exits'}
         </Text>

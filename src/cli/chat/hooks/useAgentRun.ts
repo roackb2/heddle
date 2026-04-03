@@ -30,6 +30,7 @@ import { isGenericSessionName } from '../state/storage.js';
 import { normalizeSessionTitle } from '../utils/format.js';
 import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval, TurnSummary } from '../state/types.js';
 import type { ChatRuntimeConfig } from '../utils/runtime.js';
+import { useProjectApprovals } from './useProjectApprovals.js';
 
 type StateSetter<T> = (value: T | ((current: T) => T)) => void;
 
@@ -63,6 +64,8 @@ type ExecuteTurnArgs = {
   state: ActionState;
   updateSessionById: SessionUpdater;
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
+  isProjectApproved: (call: ToolCall) => boolean;
+  rememberProjectApproval: (call: ToolCall) => void;
 };
 
 type ExecuteDirectShellArgs = {
@@ -73,6 +76,8 @@ type ExecuteDirectShellArgs = {
   state: ActionState;
   updateActiveSession: ActiveSessionUpdater;
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
+  isProjectApproved: (call: ToolCall) => boolean;
+  rememberProjectApproval: (call: ToolCall) => void;
 };
 
 type UseAgentRunArgs = {
@@ -88,6 +93,7 @@ type UseAgentRunArgs = {
 
 export function useAgentRun(args: UseAgentRunArgs) {
   const { runtime, activeModel, sessionTitleModel, activeSessionId, sessions, state, updateSessionById, updateActiveSession } = args;
+  const projectApprovals = useProjectApprovals(runtime.approvalsFile);
 
   const llm = useMemo(
     () => createOpenAiAdapter({ model: activeModel, apiKey: runtime.apiKey }),
@@ -174,6 +180,8 @@ export function useAgentRun(args: UseAgentRunArgs) {
       state,
       updateSessionById,
       maybeAutoNameSession,
+      isProjectApproved: projectApprovals.isApproved,
+      rememberProjectApproval: projectApprovals.rememberApproval,
     });
   };
 
@@ -186,6 +194,8 @@ export function useAgentRun(args: UseAgentRunArgs) {
       state,
       updateActiveSession,
       maybeAutoNameSession,
+      isProjectApproved: projectApprovals.isApproved,
+      rememberProjectApproval: projectApprovals.rememberApproval,
     });
   };
 
@@ -208,6 +218,8 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     state,
     updateSessionById,
     maybeAutoNameSession,
+    isProjectApproved,
+    rememberProjectApproval,
   } = args;
 
   if (!prompt || state.isRunning) {
@@ -260,10 +272,23 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
           return [...current, { id: state.nextLocalId(), text: next }].slice(-8);
         });
       },
-      approveToolCall: (call, tool) =>
-        new Promise((resolve) => {
-          state.setPendingApproval({ call, tool, resolve });
-        }),
+      approveToolCall: (call, tool) => {
+        if (isProjectApproved(call)) {
+          return Promise.resolve({
+            approved: true,
+            reason: 'Approved by saved project rule',
+          });
+        }
+
+        return new Promise((resolve) => {
+          state.setPendingApproval({
+            call,
+            tool,
+            rememberForProject: () => rememberProjectApproval(call),
+            resolve,
+          });
+        });
+      },
       shouldStop: () => state.interruptRequestedRef.current,
       abortSignal: state.abortControllerRef.current.signal,
     });
@@ -327,6 +352,8 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
     state,
     updateActiveSession,
     maybeAutoNameSession,
+    isProjectApproved,
+    rememberProjectApproval,
   } = args;
 
   const command = rawCommand.trim();
@@ -380,9 +407,17 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
           throw new Error('run_shell_mutate tool is not registered');
         }
 
-        const approval = await new Promise<{ approved: boolean; reason?: string }>((resolve) => {
-          state.setPendingApproval({ call: mutateCall, tool: directShellTool, resolve });
-        });
+        const approval =
+          isProjectApproved(mutateCall) ?
+            { approved: true, reason: 'Approved by saved project rule' }
+          : await new Promise<{ approved: boolean; reason?: string }>((resolve) => {
+              state.setPendingApproval({
+                call: mutateCall,
+                tool: directShellTool,
+                rememberForProject: () => rememberProjectApproval(mutateCall),
+                resolve,
+              });
+            });
 
         if (!approval.approved) {
           const denialMessage = approval.reason ? `Command denied.\n${approval.reason}` : 'Command denied.';

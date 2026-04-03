@@ -110,7 +110,7 @@ export function formatApprovalPrompt(pendingApproval: PendingApproval): string {
 }
 
 export function formatApprovalHint(pendingApproval: PendingApproval): string {
-  return `Tool: ${pendingApproval.call.tool}`;
+  return `Tool: ${pendingApproval.call.tool} • Y approve • A allow for project • N deny`;
 }
 
 export function summarizeToolCall(tool: string, input: unknown): string {

@@ -89,6 +89,7 @@ CLI flags override `heddle.config.json`, and `heddle.config.json` overrides envi
 Notes:
 
 - `stateDir` controls where traces, logs, and saved chat sessions are stored relative to the project root.
+- remembered per-project command approvals are also stored under `stateDir` in `command-approvals.json`.
 - `directShellApproval` controls whether explicit user `!command` input in chat is auto-approved (`"never"`) or still goes through the approval UI (`"always"`).
 - `searchIgnoreDirs` controls which directories `search_files` skips for that project.
 - `agentContextPaths` controls which project instruction files are injected into Heddle's system prompt. By default, Heddle looks for `AGENTS.md`.
@@ -120,12 +121,14 @@ Phase 1 has also started at the tool-contract layer:
 - chat mode now persists local sessions and supports `/session list`, `/session switch <id>`, and `/session continue <id>`
 - chat mode now auto-titles generic sessions in the background with `gpt-5.1-codex-mini`
 - chat mode now supports direct shell commands with a `!command` prefix; user-entered direct commands run immediately under the same shell policy, and their results are stored in the session transcript for later turns
+- chat approval UI now supports remembering an exact mutate command for the current project, so repeated commands can be auto-approved from the project's local state
 - interrupted or incomplete tool-call history is now sanitized before the next run so saved sessions do not poison later turns with missing tool outputs
 - `Recent Turns` is a completed-turn summary, not a live run panel; while a run is in progress it may still show the previous turn until the current one finishes
 
 Chat usage notes:
 
 - use `/continue` for built-in resume behavior; plain `continue` is treated as a normal user prompt
+- during approval, `A` remembers the current mutate command for this project, while `Y` approves once and `N` denies
 - if a long-running turn appears stuck, `Esc` requests an interrupt for the current run
 - current shell policy is still conservative about heredocs, redirects, and similar shell syntax; the longer-term direction is to rely less on naive shell-character blocking and more on approval, scope, and audit policy
 
