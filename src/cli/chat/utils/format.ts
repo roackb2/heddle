@@ -509,6 +509,10 @@ export function formatEditPreviewHistoryMessage(preview: EditFilePreview): strin
   });
 }
 
+export function formatPlanHistoryMessage(output: unknown): string | undefined {
+  return renderUpdatePlanHistoryMessage(output);
+}
+
 function formatEditHistoryMessage(options: {
   path: string;
   action: string;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildConversationMessages, formatEditPreviewHistoryMessage } from '../cli/chat/utils/format.js';
+import { buildConversationMessages, formatEditPreviewHistoryMessage, formatPlanHistoryMessage } from '../cli/chat/utils/format.js';
 import type { ChatMessage } from '../llm/types.js';
 
 describe('buildConversationMessages', () => {
@@ -116,5 +116,22 @@ describe('buildConversationMessages', () => {
     expect(rendered).toContain('Action: replaced');
     expect(rendered).toContain('```diff');
     expect(rendered).toContain('+new');
+  });
+
+  it('formats a live plan update into the same visible checklist block shape', () => {
+    const rendered = formatPlanHistoryMessage({
+      explanation: 'Tracking the current implementation slice.',
+      plan: [
+        { step: 'Inspect runtime behavior', status: 'completed' },
+        { step: 'Implement the fix', status: 'in_progress' },
+        { step: 'Verify with tests', status: 'pending' },
+      ],
+    });
+
+    expect(rendered).toContain('## Plan');
+    expect(rendered).toContain('Tracking the current implementation slice.');
+    expect(rendered).toContain('- [x] Inspect runtime behavior');
+    expect(rendered).toContain('- [-] Implement the fix');
+    expect(rendered).toContain('- [ ] Verify with tests');
   });
 });

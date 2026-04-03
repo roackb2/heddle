@@ -24,6 +24,7 @@ import {
   buildConversationMessages,
   countAssistantSteps,
   formatEditPreviewHistoryMessage,
+  formatPlanHistoryMessage,
   formatDirectShellResponse,
   shouldFallbackToMutate,
   summarizeTrace,
@@ -256,7 +257,9 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   state.setCurrentEditPreview(undefined);
   state.setCurrentPlan(undefined);
   updateSessionById(sessionId, (session) => ({ ...session, lastContinuePrompt: prompt }));
+  const appendedAssistantSteps = new Set<number>();
   const appendedEditPreviewIds = new Set<string>();
+  const appendedPlanSteps = new Set<number>();
 
   if (displayText) {
     updateSessionById(sessionId, (session) => ({
@@ -275,6 +278,21 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       history: sessionHistory,
       systemContext: runtime.systemContext,
       onEvent: (event) => {
+        if (event.type === 'assistant.turn' && event.content.trim() && !appendedAssistantSteps.has(event.step)) {
+          appendedAssistantSteps.add(event.step);
+          updateSessionById(sessionId, (session) => ({
+            ...session,
+            messages: [
+              ...session.messages,
+              {
+                id: state.nextLocalId(),
+                role: 'assistant',
+                text: event.content,
+              },
+            ],
+          }));
+        }
+
         if (event.type === 'tool.call' && event.call.tool === 'edit_file') {
           void previewEditFileInput(event.call.input).then((preview) => {
             if (!preview || appendedEditPreviewIds.has(event.call.id)) {
@@ -299,6 +317,24 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
         if (event.type === 'tool.result') {
           if (event.tool === 'update_plan') {
             state.setCurrentPlan(parsePlanStateFromToolResult(event.result.output));
+
+            if (!appendedPlanSteps.has(event.step)) {
+              const renderedPlan = formatPlanHistoryMessage(event.result.output);
+              if (renderedPlan) {
+                appendedPlanSteps.add(event.step);
+                updateSessionById(sessionId, (session) => ({
+                  ...session,
+                  messages: [
+                    ...session.messages,
+                    {
+                      id: state.nextLocalId(),
+                      role: 'assistant',
+                      text: renderedPlan,
+                    },
+                  ],
+                }));
+              }
+            }
           }
         }
 
@@ -351,7 +387,6 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       ...sessionToUpdate,
       history: compacted.history,
       context: compacted.context,
-      messages: buildConversationMessages(compacted.history),
     }));
 
     const traceFile = saveTrace(runtime.traceDir, result.trace);
@@ -369,9 +404,21 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       turns: [...sessionToUpdate.turns, nextTurn].slice(-8),
     }));
 
-    const assistantText =
-      buildConversationMessages(compacted.history).filter((message) => message.role === 'assistant').at(-1)?.text ??
-      result.summary;
+    if (result.outcome !== 'done') {
+      updateSessionById(sessionId, (sessionToUpdate) => ({
+        ...sessionToUpdate,
+        messages: [
+          ...sessionToUpdate.messages,
+          {
+            id: state.nextLocalId(),
+            role: 'assistant',
+            text: `Run stopped: ${result.summary}`,
+          },
+        ],
+      }));
+    }
+
+    const assistantText = result.summary;
     maybeAutoNameSession(sessionId, prompt, assistantText);
     if (result.outcome === 'error') {
       state.setError(result.summary);
