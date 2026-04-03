@@ -1,7 +1,6 @@
 import type { ChatSession, LocalCommandResult } from './types.js';
 import { summarizeSession } from './storage.js';
-
-const knownModels = ['gpt-5.1-codex-mini', 'gpt-5.1-codex'];
+import { COMMON_OPENAI_MODELS, formatOpenAiModelGroups } from '../../../llm/openai-models.js';
 
 export type LocalCommandArgs = {
   prompt: string;
@@ -77,7 +76,7 @@ export function runLocalCommand(args: LocalCommandArgs): LocalCommandResult {
     return {
       handled: true,
       kind: 'message',
-      message: `Common model choices: ${knownModels.join(', ')}`,
+      message: ['Common OpenAI model choices', '', formatOpenAiModelGroups()].join('\n'),
     };
   }
 
@@ -100,7 +99,7 @@ export function runLocalCommand(args: LocalCommandArgs): LocalCommandResult {
       handled: true,
       kind: 'message',
       message:
-        knownModels.includes(nextModel) ?
+        COMMON_OPENAI_MODELS.includes(nextModel) ?
           `Switched model to ${nextModel}`
         : `Switched model to ${nextModel}. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.`,
     };

@@ -24,6 +24,8 @@ export { createLlmAdapter, inferProviderFromModel, resolveLlmProvider } from './
 export type { CreateLlmAdapterOptions } from './llm/factory.js';
 export { createOpenAiAdapter } from './llm/openai.js';
 export type { OpenAiAdapterOptions } from './llm/openai.js';
+export { OPENAI_MODEL_GROUPS, COMMON_OPENAI_MODELS, formatOpenAiModelGroups } from './llm/openai-models.js';
+export type { OpenAiModelGroup } from './llm/openai-models.js';
 
 // Tools
 export { createToolRegistry } from './tools/registry.js';
