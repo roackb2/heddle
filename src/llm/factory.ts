@@ -3,7 +3,8 @@
 // Provider-neutral adapter selection and capability metadata.
 // ---------------------------------------------------------------------------
 
-import { DEFAULT_LLM_PROVIDER, DEFAULT_OPENAI_MODEL } from '../config.js';
+import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_LLM_PROVIDER, DEFAULT_OPENAI_MODEL } from '../config.js';
+import { createAnthropicAdapter } from './anthropic.js';
 import { createOpenAiAdapter } from './openai.js';
 import type { LlmAdapter, LlmProvider } from './types.js';
 
@@ -23,9 +24,10 @@ export function createLlmAdapter(options: CreateLlmAdapterOptions = {}): LlmAdap
         model: options.model ?? DEFAULT_OPENAI_MODEL,
       });
     case 'anthropic':
-      throw new Error(
-        `Model provider "anthropic" is not wired yet. Add an Anthropic adapter before using model ${JSON.stringify(options.model ?? 'claude')}.`,
-      );
+      return createAnthropicAdapter({
+        apiKey: options.apiKey,
+        model: options.model ?? DEFAULT_ANTHROPIC_MODEL,
+      });
     case 'google':
       throw new Error(
         `Model provider "google" is not wired yet. Add a Gemini adapter before using model ${JSON.stringify(options.model ?? 'gemini')}.`,

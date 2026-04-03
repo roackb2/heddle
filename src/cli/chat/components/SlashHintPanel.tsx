@@ -39,7 +39,7 @@ function getSlashHints(
     { command: '/model', description: 'show the active model' },
     { command: '/model <name>', description: 'switch the current model' },
     { command: '/model set [query]', description: 'pick a model with filtering' },
-    { command: '/models', description: 'list common model choices' },
+    { command: '/model list', description: 'list common built-in models' },
     { command: '/continue', description: 'resume from the current transcript' },
     { command: '/clear', description: 'reset the current session transcript' },
     { command: '/session list', description: 'list local chat sessions' },

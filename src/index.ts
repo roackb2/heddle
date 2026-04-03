@@ -5,7 +5,7 @@
 // Core loop
 export { runAgent } from './run-agent.js';
 export type { RunAgentOptions } from './run-agent.js';
-export { DEFAULT_OPENAI_MODEL } from './config.js';
+export { DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL } from './config.js';
 
 // Types
 export type {
@@ -32,6 +32,8 @@ export { createLlmAdapter, inferProviderFromModel, resolveLlmProvider } from './
 export type { CreateLlmAdapterOptions } from './llm/factory.js';
 export { createOpenAiAdapter } from './llm/openai.js';
 export type { OpenAiAdapterOptions } from './llm/openai.js';
+export { createAnthropicAdapter } from './llm/anthropic.js';
+export type { AnthropicAdapterOptions } from './llm/anthropic.js';
 export {
   OPENAI_MODEL_GROUPS,
   COMMON_OPENAI_MODELS,
@@ -42,7 +44,7 @@ export {
   estimateBuiltInContextWindow,
   filterBuiltInModels,
 } from './llm/openai-models.js';
-export type { OpenAiModelGroup } from './llm/openai-models.js';
+export type { BuiltInModelGroup } from './llm/openai-models.js';
 
 // Tools
 export { createToolRegistry } from './tools/registry.js';
