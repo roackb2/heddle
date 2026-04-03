@@ -14,14 +14,16 @@ It is built for repository work such as:
 Global install:
 
 ```bash
-npm install -g heddle
+npm install -g @roackb2/heddle
 ```
 
 Run without a global install:
 
 ```bash
-npx heddle
+npx @roackb2/heddle
 ```
+
+The installed CLI command remains `heddle`.
 
 ## Quick Start
 
@@ -247,6 +249,12 @@ The npm package also exports the core runtime pieces for programmatic use, inclu
 - LLM adapter helpers
 - built-in tools
 - trace utilities
+
+Install as a dependency with:
+
+```bash
+npm install @roackb2/heddle
+```
 
 The public API lives in [src/index.ts](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/src/index.ts).
 

@@ -1,8 +1,11 @@
 {
-  "name": "heddle",
+  "name": "@roackb2/heddle",
   "version": "0.0.2",
   "description": "A minimal TypeScript runtime for tool-using agents",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "heddle": "dist/src/cli/main.js"
   },
