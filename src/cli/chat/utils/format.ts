@@ -1,4 +1,4 @@
-import type { ChatMessage, TraceEvent, ToolResult } from '../../../index.js';
+import type { ChatMessage, ToolCall, TraceEvent, ToolResult } from '../../../index.js';
 import {
   classifyShellCommandPolicy,
   DEFAULT_MUTATE_RULES,
@@ -17,6 +17,15 @@ export function buildConversationMessages(history: ChatMessage[]): ConversationL
       }
 
       return [{ id: `${message.role}-${index}-${message.content}`, role: message.role, text: message.content }];
+    }
+
+    if (message.role === 'tool') {
+      const rendered = renderToolHistoryMessage(message, history, index);
+      if (!rendered) {
+        return [];
+      }
+
+      return [{ id: `tool-${index}-${rendered}`, role: 'assistant', text: rendered }];
     }
 
     return [];
@@ -47,7 +56,7 @@ export function summarizeTrace(trace: TraceEvent[]): string[] {
         return [`tool call ${summarizeToolCall(event.call.tool, event.call.input)}`];
       case 'tool.result':
         return [
-          `tool result ${summarizeToolResult(event.tool, extractShellCommand(event.result.output))}: ${event.result.ok ? 'ok' : event.result.error ?? 'error'}`,
+          `tool result ${summarizeToolResult(event.tool, extractShellCommand(event.result.output), event.result.output)}: ${event.result.ok ? 'ok' : event.result.error ?? 'error'}`,
         ];
       case 'run.finished':
         return [`run finished: ${event.outcome}`];
@@ -82,7 +91,7 @@ export function toLiveEvent(event: TraceEvent): string | undefined {
     case 'tool.call':
       return `running ${summarizeToolCall(event.call.tool, event.call.input)}`;
     case 'tool.result':
-      return `${summarizeToolResult(event.tool, extractShellCommand(event.result.output))} ${event.result.ok ? 'completed' : `failed: ${event.result.error ?? 'error'}`}`;
+      return `${summarizeToolResult(event.tool, extractShellCommand(event.result.output), event.result.output)} ${event.result.ok ? 'completed' : `failed: ${event.result.error ?? 'error'}`}`;
     case 'run.finished':
       return event.outcome === 'done' ? undefined : `stopped: ${event.outcome}`;
     default:
@@ -145,12 +154,22 @@ export function summarizeToolCall(tool: string, input: unknown): string {
     return `${tool} (${truncate(shellCommand, MAX_TOOL_CALL_SUMMARY_CHARS)})`;
   }
 
+  const path = extractPathField(input);
+  if (isPathAwareTool(tool) && path) {
+    return `${tool} (${truncate(path, MAX_TOOL_CALL_SUMMARY_CHARS)})`;
+  }
+
   return tool;
 }
 
-export function summarizeToolResult(tool: string, command: string | undefined): string {
+export function summarizeToolResult(tool: string, command: string | undefined, output?: unknown): string {
   if (command) {
     return `${tool} (${truncate(command, MAX_TOOL_CALL_SUMMARY_CHARS)})`;
+  }
+
+  const outputPath = extractOutputPath(output);
+  if (tool === 'edit_file' && outputPath) {
+    return `${tool} (${truncate(outputPath, MAX_TOOL_CALL_SUMMARY_CHARS)})`;
   }
 
   return tool;
@@ -166,6 +185,19 @@ export function extractShellCommand(value: unknown): string | undefined {
 }
 
 export function extractEditPath(value: unknown): string | undefined {
+  return extractPathField(value);
+}
+
+export function extractPathField(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const path = (value as { path?: unknown }).path;
+  return typeof path === 'string' && path.trim() ? path.trim() : undefined;
+}
+
+export function extractOutputPath(value: unknown): string | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return undefined;
   }
@@ -316,6 +348,128 @@ export function normalizeSessionTitle(value: string | undefined): string | undef
   }
 
   return truncate(normalized, 48);
+}
+
+function isPathAwareTool(tool: string): boolean {
+  return tool === 'edit_file' || tool === 'read_file' || tool === 'list_files';
+}
+
+function renderToolHistoryMessage(message: Extract<ChatMessage, { role: 'tool' }>, history: ChatMessage[], index: number): string | undefined {
+  const toolCall = findToolCallForResult(history, index, message.toolCallId);
+  if (!toolCall || toolCall.tool !== 'edit_file') {
+    return undefined;
+  }
+
+  const result = parseToolResultPayload(message.content);
+  if (!result?.ok) {
+    return undefined;
+  }
+
+  const editResult = parseEditFileResult(result.output);
+  if (!editResult) {
+    return undefined;
+  }
+
+  const lines = [
+    `## Edited \`${editResult.path}\``,
+    '',
+    `Action: ${editResult.action}`,
+  ];
+
+  if (typeof editResult.matchCount === 'number') {
+    lines.push(`Matches changed: ${editResult.matchCount}`);
+  }
+
+  lines.push(`Bytes written: ${editResult.bytesWritten}`);
+
+  if (editResult.diff?.diff) {
+    lines.push('', '```diff', editResult.diff.diff, '```');
+    if (editResult.diff.truncated) {
+      lines.push('', 'Preview truncated.');
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function findToolCallForResult(history: ChatMessage[], index: number, toolCallId: string): ToolCall | undefined {
+  for (let cursor = index - 1; cursor >= 0; cursor--) {
+    const message = history[cursor];
+    if (message?.role !== 'assistant' || !message.toolCalls?.length) {
+      continue;
+    }
+
+    const match = message.toolCalls.find((call) => call.id === toolCallId);
+    if (match) {
+      return match;
+    }
+  }
+
+  return undefined;
+}
+
+function parseToolResultPayload(content: string): ToolResult | undefined {
+  try {
+    const parsed = JSON.parse(content);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || typeof parsed.ok !== 'boolean') {
+      return undefined;
+    }
+
+    return parsed as ToolResult;
+  } catch {
+    return undefined;
+  }
+}
+
+type EditFileHistoryResult = {
+  path: string;
+  action: string;
+  bytesWritten: number;
+  matchCount?: number;
+  diff?: {
+    diff: string;
+    truncated: boolean;
+  };
+};
+
+function parseEditFileResult(output: unknown): EditFileHistoryResult | undefined {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) {
+    return undefined;
+  }
+
+  const candidate = output as Record<string, unknown>;
+  if (typeof candidate.path !== 'string' || typeof candidate.action !== 'string' || typeof candidate.bytesWritten !== 'number') {
+    return undefined;
+  }
+
+  const diff =
+    candidate.diff && typeof candidate.diff === 'object' && !Array.isArray(candidate.diff) ?
+      parseEditDiff(candidate.diff)
+    : undefined;
+
+  return {
+    path: candidate.path,
+    action: candidate.action,
+    bytesWritten: candidate.bytesWritten,
+    matchCount: typeof candidate.matchCount === 'number' ? candidate.matchCount : undefined,
+    diff,
+  };
+}
+
+function parseEditDiff(value: unknown): { diff: string; truncated: boolean } | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  if (typeof candidate.diff !== 'string' || typeof candidate.truncated !== 'boolean') {
+    return undefined;
+  }
+
+  return {
+    diff: candidate.diff,
+    truncated: candidate.truncated,
+  };
 }
 
 export function appendDirectShellHistory(

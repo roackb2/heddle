@@ -106,8 +106,21 @@ export function isVerificationMutateCommand(command: string): boolean {
   );
 }
 
-function isRepoReviewCommand(command: string): boolean {
-  return /^git status\b/.test(command) || /^git diff\b/.test(command);
+export function isRepoReviewCommand(command: string): boolean {
+  const normalized = normalizeCommand(command);
+  return (
+    normalized.startsWith('git status') && includesFlag(normalized, '--short')
+  ) || (
+    normalized.startsWith('git diff') && includesFlag(normalized, '--stat')
+  );
+}
+
+function normalizeCommand(command: string): string {
+  return command.trim().replace(/\s+/g, ' ');
+}
+
+function includesFlag(command: string, flag: string): boolean {
+  return command.split(' ').some((part) => part === flag || part.startsWith(`${flag}=`));
 }
 
 function describeEditMutation(input: unknown): string {

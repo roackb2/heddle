@@ -73,22 +73,25 @@ type MessageBlock =
   | { kind: 'bullet'; text: string }
   | { kind: 'numbered'; text: string; marker: string }
   | { kind: 'quote'; text: string }
-  | { kind: 'code'; text: string };
+  | { kind: 'code'; text: string; info?: string };
 
 function parseMessageBlocks(text: string): MessageBlock[] {
   const lines = text.split(/\r?\n/);
   const blocks: MessageBlock[] = [];
   let inCodeBlock = false;
   let codeLines: string[] = [];
+  let codeInfo: string | undefined;
 
   for (const line of lines) {
     if (line.trim().startsWith('```')) {
       if (inCodeBlock) {
-        blocks.push({ kind: 'code', text: codeLines.join('\n') });
+        blocks.push({ kind: 'code', text: codeLines.join('\n'), info: codeInfo });
         codeLines = [];
+        codeInfo = undefined;
         inCodeBlock = false;
       } else {
         inCodeBlock = true;
+        codeInfo = line.trim().slice(3).trim() || undefined;
       }
       continue;
     }
@@ -129,7 +132,7 @@ function parseMessageBlocks(text: string): MessageBlock[] {
   }
 
   if (codeLines.length > 0) {
-    blocks.push({ kind: 'code', text: codeLines.join('\n') });
+    blocks.push({ kind: 'code', text: codeLines.join('\n'), info: codeInfo });
   }
 
   return collapseParagraphBlocks(blocks);
@@ -185,11 +188,7 @@ function renderBlock(
         </Text>
       );
     case 'code':
-      return (
-        <Box borderStyle="round" borderColor="gray" paddingX={1} marginY={0}>
-          <Text color="cyan">{block.text}</Text>
-        </Box>
-      );
+      return block.info === 'diff' ? <DiffCodeBlock text={block.text} /> : <PlainCodeBlock text={block.text} />;
     case 'paragraph':
       return (
         <Text color={role === 'user' ? 'cyan' : 'white'}>
@@ -197,6 +196,42 @@ function renderBlock(
         </Text>
       );
   }
+}
+
+function PlainCodeBlock({ text }: { text: string }) {
+  return (
+    <Box borderStyle="round" borderColor="gray" paddingX={1} marginY={0}>
+      <Text color="cyan">{text}</Text>
+    </Box>
+  );
+}
+
+function DiffCodeBlock({ text }: { text: string }) {
+  return (
+    <Box borderStyle="round" borderColor="gray" paddingX={1} marginY={0} flexDirection="column">
+      {text.split('\n').map((line, index) => (
+        <Text key={`diff-${index}-${line}`} color={diffLineColor(line)}>
+          {line}
+        </Text>
+      ))}
+    </Box>
+  );
+}
+
+function diffLineColor(line: string): string | undefined {
+  if (line.startsWith('+++') || line.startsWith('---')) {
+    return 'gray';
+  }
+  if (line.startsWith('@@')) {
+    return 'yellow';
+  }
+  if (line.startsWith('+')) {
+    return 'green';
+  }
+  if (line.startsWith('-')) {
+    return 'red';
+  }
+  return 'white';
 }
 
 function InlineText({

@@ -7,6 +7,12 @@ describe('buildSystemPrompt', () => {
 
     expect(prompt).toContain('You are Heddle, a conversational coding and workspace agent.');
     expect(prompt).toContain('You are not a generic chatbot.');
+    expect(prompt).toContain('## Default Workflow');
+    expect(prompt).toContain('1. Clarify the real task.');
+    expect(prompt).toContain('2. Gather the minimum relevant evidence first.');
+    expect(prompt).toContain('3. Form a grounded conclusion or proposal.');
+    expect(prompt).toContain('4. Carry the task through when action is needed.');
+    expect(prompt).toContain('5. Finish with a useful operator answer.');
     expect(prompt).toContain('If the user asks what Heddle itself is');
     expect(prompt).toContain('If the user asks how to use Heddle');
     expect(prompt).toContain('direct shell commands');
@@ -19,6 +25,12 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Prefer the first-class file editing tool for creating or changing file contents');
     expect(prompt).toContain('If a shell command is arbitrary, uses inline scripts, needs redirects/heredocs, or inspect rejects it, switch to run_shell_mutate');
     expect(prompt).toContain('do not stop at "inspect is blocked."');
+    expect(prompt).toContain('Do not ask unnecessary questions when the answer can be discovered from the workspace');
+    expect(prompt).toContain('Do not jump from one narrow local detail to a project-level recommendation');
+    expect(prompt).toContain('If the user asks for the next step, propose a concrete high-leverage next step based on the project goal and current state');
+    expect(prompt).toContain('If you identify a reasonable bounded change that directly serves the user goal, make it and verify it instead of only describing it.');
+    expect(prompt).toContain('Once you choose a concrete next step, execute that step instead of repeatedly restating the plan');
+    expect(prompt).toContain('Do not spend multiple turns narrating the same intent without either gathering new evidence or making progress on the implementation.');
   });
 
   it('includes project-specific context when provided', () => {

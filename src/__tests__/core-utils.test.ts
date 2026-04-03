@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createToolRegistry } from '../tools/registry.js';
 import { createBudget } from '../utils/budget.js';
 import { createTraceRecorder } from '../trace/recorder.js';
+import { isRepoReviewCommand } from '../run-agent/mutation-tracking.js';
 import type { ToolDefinition, TraceEvent } from '../types.js';
 
 describe('createToolRegistry', () => {
@@ -89,5 +90,16 @@ describe('createTraceRecorder', () => {
     const trace = recorder.getTrace();
     trace.pop();
     expect(recorder.getTrace()).toHaveLength(1);
+  });
+});
+
+describe('isRepoReviewCommand', () => {
+  it('only accepts the stricter git evidence commands', () => {
+    expect(isRepoReviewCommand('git diff --stat')).toBe(true);
+    expect(isRepoReviewCommand('git diff --stat=10')).toBe(true);
+    expect(isRepoReviewCommand('git status --short')).toBe(true);
+    expect(isRepoReviewCommand('git diff')).toBe(false);
+    expect(isRepoReviewCommand('git status')).toBe(false);
+    expect(isRepoReviewCommand('git status --long')).toBe(false);
   });
 });

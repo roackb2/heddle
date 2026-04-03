@@ -1,4 +1,5 @@
 import type { ChatMessage, ToolCall, ToolDefinition } from '../../../index.js';
+import type { EditFilePreview } from '../../../tools/edit-file.js';
 
 export type TurnSummary = {
   id: string;
@@ -35,6 +36,7 @@ export type ChatSession = {
 export type PendingApproval = {
   call: ToolCall;
   tool: ToolDefinition;
+  editPreview?: EditFilePreview;
   rememberForProject?: () => void;
   rememberLabel?: string;
   resolve: (decision: { approved: boolean; reason?: string }) => void;

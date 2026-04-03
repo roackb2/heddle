@@ -21,6 +21,16 @@ type WriteEditInput = {
 
 type EditFileInput = ReplaceEditInput | WriteEditInput;
 
+export type EditFilePreview = {
+  path: string;
+  action: 'created' | 'overwritten' | 'replaced';
+  diff: string;
+  truncated: boolean;
+};
+
+const DIFF_CONTEXT_LINES = 2;
+const MAX_DIFF_PREVIEW_LINES = 80;
+
 export const editFileTool: ToolDefinition = {
   name: 'edit_file',
   description:
@@ -86,6 +96,7 @@ export const editFileTool: ToolDefinition = {
 
 async function writeFileContent(input: WriteEditInput, workspaceRoot: string, targetPath: string): Promise<ToolResult> {
   const existed = await pathExists(targetPath);
+  const previousContent = existed ? await readFile(targetPath, 'utf8') : '';
 
   if (!existed && !input.createIfMissing) {
     return {
@@ -103,6 +114,7 @@ async function writeFileContent(input: WriteEditInput, workspaceRoot: string, ta
       path: toWorkspacePath(workspaceRoot, targetPath),
       action: existed ? 'overwritten' : 'created',
       bytesWritten: Buffer.byteLength(input.content, 'utf8'),
+      diff: buildDiffPreview(previousContent, input.content, toWorkspacePath(workspaceRoot, targetPath), existed ? 'overwritten' : 'created'),
     },
   };
 }
@@ -145,8 +157,49 @@ async function replaceFileContent(input: ReplaceEditInput, workspaceRoot: string
       action: 'replaced',
       matchCount,
       bytesWritten: Buffer.byteLength(nextContent, 'utf8'),
+      diff: buildDiffPreview(current, nextContent, toWorkspacePath(workspaceRoot, targetPath), 'replaced'),
     },
   };
+}
+
+export async function previewEditFileInput(raw: unknown, workspaceRoot: string = process.cwd()): Promise<EditFilePreview | undefined> {
+  if (!isEditFileInput(raw)) {
+    return undefined;
+  }
+
+  const targetPath = resolve(raw.path);
+  if (!isInsideWorkspace(workspaceRoot, targetPath)) {
+    return undefined;
+  }
+
+  const workspacePath = toWorkspacePath(workspaceRoot, targetPath);
+
+  if ('content' in raw) {
+    const existed = await pathExists(targetPath);
+    if (!existed && !raw.createIfMissing) {
+      return undefined;
+    }
+
+    const previousContent = existed ? await readFile(targetPath, 'utf8') : '';
+    return buildDiffPreview(previousContent, raw.content, workspacePath, existed ? 'overwritten' : 'created');
+  }
+
+  let current: string;
+  try {
+    current = await readFile(targetPath, 'utf8');
+  } catch {
+    return undefined;
+  }
+
+  const matchCount = countOccurrences(current, raw.oldText);
+  if (matchCount === 0 || (matchCount > 1 && !raw.replaceAll)) {
+    return undefined;
+  }
+
+  const nextContent =
+    raw.replaceAll ? current.split(raw.oldText).join(raw.newText) : replaceFirst(current, raw.oldText, raw.newText);
+
+  return buildDiffPreview(current, nextContent, workspacePath, 'replaced');
 }
 
 function isEditFileInput(raw: unknown): raw is EditFileInput {
@@ -222,4 +275,73 @@ async function pathExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function buildDiffPreview(
+  previousContent: string,
+  nextContent: string,
+  path: string,
+  action: EditFilePreview['action'],
+): EditFilePreview {
+  const previousLines = splitLines(previousContent);
+  const nextLines = splitLines(nextContent);
+  const prefix = countCommonPrefix(previousLines, nextLines);
+  const suffix = countCommonSuffix(previousLines, nextLines, prefix);
+  const previousChangedEnd = previousLines.length - suffix;
+  const nextChangedEnd = nextLines.length - suffix;
+  const contextStart = Math.max(0, prefix - DIFF_CONTEXT_LINES);
+  const previousContextEnd = Math.min(previousLines.length, previousChangedEnd + DIFF_CONTEXT_LINES);
+  const nextContextEnd = Math.min(nextLines.length, nextChangedEnd + DIFF_CONTEXT_LINES);
+
+  const lines = [
+    `--- ${action === 'created' ? '/dev/null' : `a/${path}`}`,
+    `+++ b/${path}`,
+    `@@ -${formatHunkRange(contextStart + 1, previousContextEnd - contextStart)} +${formatHunkRange(contextStart + 1, nextContextEnd - contextStart)} @@`,
+    ...previousLines.slice(contextStart, prefix).map((line) => ` ${line}`),
+    ...previousLines.slice(prefix, previousChangedEnd).map((line) => `-${line}`),
+    ...nextLines.slice(prefix, nextChangedEnd).map((line) => `+${line}`),
+    ...nextLines.slice(nextChangedEnd, nextContextEnd).map((line) => ` ${line}`),
+  ];
+
+  if (lines.length <= MAX_DIFF_PREVIEW_LINES) {
+    return { path, action, diff: lines.join('\n'), truncated: false };
+  }
+
+  const truncatedLines = [
+    ...lines.slice(0, MAX_DIFF_PREVIEW_LINES - 1),
+    '... diff preview truncated ...',
+  ];
+  return { path, action, diff: truncatedLines.join('\n'), truncated: true };
+}
+
+function splitLines(content: string): string[] {
+  if (!content) {
+    return [];
+  }
+
+  return content.replace(/\r\n/g, '\n').split('\n').slice(0, content.endsWith('\n') ? -1 : undefined);
+}
+
+function countCommonPrefix(previousLines: string[], nextLines: string[]): number {
+  let index = 0;
+  while (index < previousLines.length && index < nextLines.length && previousLines[index] === nextLines[index]) {
+    index++;
+  }
+  return index;
+}
+
+function countCommonSuffix(previousLines: string[], nextLines: string[], prefix: number): number {
+  let count = 0;
+  while (
+    previousLines.length - count - 1 >= prefix &&
+    nextLines.length - count - 1 >= prefix &&
+    previousLines[previousLines.length - count - 1] === nextLines[nextLines.length - count - 1]
+  ) {
+    count++;
+  }
+  return count;
+}
+
+function formatHunkRange(start: number, length: number): string {
+  return length === 1 ? `${start}` : `${start},${length}`;
 }

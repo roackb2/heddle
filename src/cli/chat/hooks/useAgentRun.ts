@@ -15,6 +15,7 @@ import {
   runAgent,
 } from '../../../index.js';
 import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../tools/run-shell.js';
+import { previewEditFileInput } from '../../../tools/edit-file.js';
 import {
   appendDirectShellHistory,
   buildConversationMessages,
@@ -273,19 +274,22 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
           return [...current, { id: state.nextLocalId(), text: next }].slice(-8);
         });
       },
-      approveToolCall: (call, tool) => {
+      approveToolCall: async (call, tool) => {
         if (isProjectApproved(call)) {
-          return Promise.resolve({
+          return {
             approved: true,
             reason: 'Approved by saved project rule',
-          });
+          };
         }
+
+        const editPreview = call.tool === 'edit_file' ? await previewEditFileInput(call.input) : undefined;
 
         return new Promise((resolve) => {
           const rememberedRule = createProjectApprovalRuleForCall(call);
           state.setPendingApproval({
             call,
             tool,
+            editPreview,
             rememberForProject: () => rememberProjectApproval(call),
             rememberLabel: rememberedRule ? describeProjectApprovalRule(rememberedRule) : undefined,
             resolve,

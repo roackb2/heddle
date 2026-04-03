@@ -13,6 +13,24 @@ export function ApprovalComposer({
   return (
     <>
       <Text color="white">{formatApprovalPrompt(pendingApproval)}</Text>
+      {pendingApproval.editPreview ?
+        <Box
+          flexDirection="column"
+          borderStyle="round"
+          borderColor="gray"
+          marginTop={1}
+          marginBottom={1}
+          paddingX={1}
+        >
+          <Text bold>Diff Preview</Text>
+          {pendingApproval.editPreview.diff.split('\n').map((line, index) => (
+            <Text key={`${pendingApproval.editPreview?.path}-${index}`} color={diffLineColor(line)}>
+              {line}
+            </Text>
+          ))}
+          {pendingApproval.editPreview.truncated ? <Text dimColor>Preview truncated</Text> : null}
+        </Box>
+      : null}
       <Text dimColor>{formatApprovalHint(pendingApproval)}</Text>
       <ApprovalSelector choice={approvalChoice} />
       <Box justifyContent="space-between">
@@ -39,4 +57,20 @@ function ApprovalSelector({ choice }: { choice: ApprovalChoice }) {
       </Text>
     </Box>
   );
+}
+
+function diffLineColor(line: string): string | undefined {
+  if (line.startsWith('+++') || line.startsWith('---')) {
+    return 'gray';
+  }
+  if (line.startsWith('@@')) {
+    return 'yellow';
+  }
+  if (line.startsWith('+')) {
+    return 'green';
+  }
+  if (line.startsWith('-')) {
+    return 'red';
+  }
+  return undefined;
 }

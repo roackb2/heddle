@@ -2,9 +2,12 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
+import type { ProjectApprovalRule } from '../cli/chat/state/approval-rules.js';
 import {
   createProjectApprovalRule,
   createProjectApprovalRuleForCall,
+  describeProjectApprovalRule,
+  extractApprovalTarget,
   findMatchingApprovalRule,
   loadProjectApprovalRules,
   normalizeApprovedCommand,
@@ -95,5 +98,73 @@ describe('project approval rules', () => {
       mode: 'prefix',
       command: 'yarn test',
     });
+  });
+
+  it('describes approval rules based on tool and mode', () => {
+    const editRule: ProjectApprovalRule = {
+      tool: 'edit_file',
+      mode: 'tool',
+      command: '*',
+      scope: 'workspace',
+      capability: 'file_edit',
+      createdAt: new Date().toISOString(),
+    };
+
+    const prefixRule: ProjectApprovalRule = {
+      tool: 'run_shell_mutate',
+      mode: 'prefix',
+      command: 'yarn lint',
+      scope: 'workspace',
+      capability: 'verification',
+      createdAt: new Date().toISOString(),
+    };
+
+    const exactRule: ProjectApprovalRule = {
+      tool: 'run_shell_mutate',
+      mode: 'exact',
+      command: 'gh pr view 123',
+      scope: 'workspace',
+      capability: 'unknown_workspace',
+      createdAt: new Date().toISOString(),
+    };
+
+    expect(describeProjectApprovalRule(editRule)).toContain('allow edit_file');
+    expect(describeProjectApprovalRule(prefixRule)).toContain('command family');
+    expect(describeProjectApprovalRule(exactRule)).toContain('exact command');
+  });
+
+  it('normalizes run shell and edit file approvals', () => {
+    expect(extractApprovalTarget('run_shell_mutate', '  yarn   test  ')).toBe('yarn test');
+    expect(extractApprovalTarget('run_shell_mutate', { command: ' yarn test src/ ' })).toBe('yarn test src/');
+    expect(extractApprovalTarget('run_shell_mutate', { command: '' })).toBeUndefined();
+    expect(extractApprovalTarget('run_shell_mutate', 42)).toBeUndefined();
+
+    expect(extractApprovalTarget('edit_file', '.')).toBe('.');
+    expect(extractApprovalTarget('edit_file', './')).toBe('.');
+    expect(extractApprovalTarget('edit_file', './src/')).toBe('./src');
+    expect(extractApprovalTarget('edit_file', { path: './foo/bar/' })).toBe('./foo/bar');
+    expect(extractApprovalTarget('edit_file', { path: '' })).toBeUndefined();
+  });
+
+  it('falls back to unknown workspace rules when the shell command is blocked', () => {
+    const rule = createProjectApprovalRule('yarn test; echo hi');
+
+    expect(rule.mode).toBe('exact');
+    expect(rule.scope).toBe('workspace');
+    expect(rule.capability).toBe('unknown_workspace');
+    expect(rule.command).toBe('yarn test; echo hi');
+  });
+
+  it('deduplicates duplicate rules when loading from disk', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-approval-rules-dedupe-'));
+    const filePath = join(root, 'command-approvals.json');
+    const rule = createProjectApprovalRule('yarn lint');
+    const duplicate = { ...rule, createdAt: new Date().toISOString() };
+
+    writeFileSync(filePath, `${JSON.stringify([rule, duplicate], null, 2)}\n`);
+
+    const loaded = loadProjectApprovalRules(filePath);
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0].command).toBe(rule.command);
   });
 });

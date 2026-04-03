@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { listFilesTool } from '../tools/list-files.js';
 import { readFileTool } from '../tools/read-file.js';
-import { editFileTool } from '../tools/edit-file.js';
+import { editFileTool, previewEditFileInput } from '../tools/edit-file.js';
 import { reportStateTool } from '../tools/report-state.js';
 import {
   classifyShellCommandPolicy,
@@ -30,7 +30,7 @@ describe('tool input validation', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: 'Invalid input for read_file. Required field: path. Optional field: maxLines.',
+      error: 'Invalid input for read_file. Required field: path. Optional fields: maxLines, offset.',
     });
   });
 
@@ -52,6 +52,7 @@ describe('tool input validation', () => {
     expect(readFileTool.description).toContain('not when you want to inspect a directory');
     expect(readFileTool.description).toContain('may also point to nearby parent or sibling folders');
     expect(readFileTool.description).toContain('Returns the file text directly');
+    expect(readFileTool.description).toContain('0-based line offset');
     expect(editFileTool.description).toContain('Edit a file directly inside the current workspace');
     expect(editFileTool.description).toContain('Prefer this over shell commands');
     expect(editFileTool.description).toContain('exact replacement');
@@ -90,6 +91,31 @@ describe('tool path mismatch guidance', () => {
       ok: false,
       error: `Failed to read ${join(process.cwd(), 'src')}: path is a directory, not a file. Use list_files to inspect directories.`,
     });
+  });
+});
+
+describe('readFileTool', () => {
+  it('supports paging into later lines with offset and maxLines', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-read-offset-'));
+    const filePath = join(root, 'sample.txt');
+    await writeFile(filePath, ['zero', 'one', 'two', 'three', 'four'].join('\n'));
+    const previousCwd = process.cwd();
+    process.chdir(root);
+
+    try {
+      const result = await readFileTool.execute({
+        path: 'sample.txt',
+        offset: 2,
+        maxLines: 2,
+      });
+
+      expect(result).toEqual({
+        ok: true,
+        output: 'two\nthree',
+      });
+    } finally {
+      process.chdir(previousCwd);
+    }
   });
 });
 
@@ -146,6 +172,12 @@ describe('editFileTool', () => {
           path: 'notes/output.txt',
           action: 'created',
           bytesWritten: Buffer.byteLength('hello\n', 'utf8'),
+          diff: {
+            path: 'notes/output.txt',
+            action: 'created',
+            diff: ['--- /dev/null', '+++ b/notes/output.txt', '@@ -1,0 +1 @@', '+hello'].join('\n'),
+            truncated: false,
+          },
         },
       });
     } finally {
@@ -174,6 +206,12 @@ describe('editFileTool', () => {
           action: 'replaced',
           matchCount: 1,
           bytesWritten: Buffer.byteLength('const mode = "new";\n', 'utf8'),
+          diff: {
+            path: 'sample.ts',
+            action: 'replaced',
+            diff: ['--- a/sample.ts', '+++ b/sample.ts', '@@ -1 +1 @@', '-const mode = "old";', '+const mode = "new";'].join('\n'),
+            truncated: false,
+          },
         },
       });
     } finally {
@@ -218,6 +256,31 @@ describe('editFileTool', () => {
       expect(result.ok).toBe(false);
       expect(result.error).toContain('edit_file only writes inside the current workspace root');
       expect(result.error).toContain('outside.txt');
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+
+  it('builds an approval preview for edit_file before the write happens', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-edit-preview-'));
+    const filePath = join(root, 'sample.ts');
+    await writeFile(filePath, 'const mode = "old";\n');
+    const previousCwd = process.cwd();
+    process.chdir(root);
+
+    try {
+      const preview = await previewEditFileInput({
+        path: 'sample.ts',
+        oldText: '"old"',
+        newText: '"new"',
+      });
+
+      expect(preview).toEqual({
+        path: 'sample.ts',
+        action: 'replaced',
+        diff: ['--- a/sample.ts', '+++ b/sample.ts', '@@ -1 +1 @@', '-const mode = "old";', '+const mode = "new";'].join('\n'),
+        truncated: false,
+      });
     } finally {
       process.chdir(previousCwd);
     }

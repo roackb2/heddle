@@ -9,12 +9,13 @@ import type { ToolDefinition, ToolResult } from '../types.js';
 type ReadFileInput = {
   path: string;
   maxLines?: number;
+  offset?: number;
 };
 
 export const readFileTool: ToolDefinition = {
   name: 'read_file',
   description:
-    'Read the contents of a file. Use this when you already know the file path and want its contents, not when you want to inspect a directory. Relative paths are resolved from the current working directory and may also point to nearby parent or sibling folders. Optionally limit to the first N lines with maxLines. Returns the file text directly, or just the first N lines when maxLines is provided. Example inputs: { "path": "path/to/file.txt" }, { "path": "../shared-notes/summary.md" }',
+    'Read the contents of a file. Use this when you already know the file path and want its contents, not when you want to inspect a directory. Relative paths are resolved from the current working directory and may also point to nearby parent or sibling folders. Optionally limit returned lines with maxLines and start from a 0-based line offset with offset, which is useful for paging through long files. Returns the file text directly, or just the selected window when maxLines and/or offset are provided. Example inputs: { "path": "path/to/file.txt" }, { "path": "../shared-notes/summary.md" }, { "path": "src/run-agent.ts", "offset": 200, "maxLines": 120 }',
   parameters: {
     type: 'object',
     additionalProperties: false,
@@ -25,14 +26,18 @@ export const readFileTool: ToolDefinition = {
       },
       maxLines: {
         type: 'number',
-        description: 'Maximum number of lines to return (from the start of the file)',
+        description: 'Maximum number of lines to return',
+      },
+      offset: {
+        type: 'number',
+        description: '0-based line offset to start reading from',
       },
     },
     required: ['path'],
   },
   async execute(raw: unknown): Promise<ToolResult> {
     if (!isReadFileInput(raw)) {
-      return { ok: false, error: 'Invalid input for read_file. Required field: path. Optional field: maxLines.' };
+      return { ok: false, error: 'Invalid input for read_file. Required field: path. Optional fields: maxLines, offset.' };
     }
 
     const input: ReadFileInput = raw;
@@ -41,9 +46,17 @@ export const readFileTool: ToolDefinition = {
     try {
       const content = await readFile(filePath, 'utf-8');
 
-      if (input.maxLines && input.maxLines > 0) {
-        const lines = content.split('\n').slice(0, input.maxLines);
-        return { ok: true, output: lines.join('\n') };
+      const lines = content.split('\n');
+      const start = input.offset && input.offset > 0 ? Math.floor(input.offset) : 0;
+
+      if ((input.maxLines && input.maxLines > 0) || start > 0) {
+        const end = input.maxLines && input.maxLines > 0 ? start + Math.floor(input.maxLines) : undefined;
+        const windowedLines = lines.slice(start, end);
+        const joined = windowedLines.join('\n');
+        if (content.endsWith('\n') && windowedLines.length > 0 && end !== undefined && end < lines.length) {
+          return { ok: true, output: joined };
+        }
+        return { ok: true, output: joined };
       }
 
       return { ok: true, output: content };
@@ -63,7 +76,7 @@ function isReadFileInput(raw: unknown): raw is ReadFileInput {
 
   const input = raw as Record<string, unknown>;
   const keys = Object.keys(input);
-  if (keys.some((key) => key !== 'path' && key !== 'maxLines')) {
+  if (keys.some((key) => key !== 'path' && key !== 'maxLines' && key !== 'offset')) {
     return false;
   }
 
@@ -71,5 +84,7 @@ function isReadFileInput(raw: unknown): raw is ReadFileInput {
     return false;
   }
 
-  return input.maxLines === undefined || typeof input.maxLines === 'number';
+  const validMaxLines = input.maxLines === undefined || typeof input.maxLines === 'number';
+  const validOffset = input.offset === undefined || typeof input.offset === 'number';
+  return validMaxLines && validOffset;
 }

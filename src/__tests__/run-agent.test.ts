@@ -562,7 +562,7 @@ describe('runAgent', () => {
 
         return {
           content:
-            'Changed: fixed src/example.ts via eslint --fix src/example.ts.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+            'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: reviewed git diff --stat and yarn test passed.\n- Remaining uncertainty: none.',
         };
       },
     };
@@ -599,7 +599,7 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe(
-      'Changed: fixed src/example.ts via eslint --fix src/example.ts.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+      'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: reviewed git diff --stat and yarn test passed.\n- Remaining uncertainty: none.',
     );
     expect(seenMessages[2]).toContainEqual({
       role: 'system',
@@ -633,7 +633,7 @@ describe('runAgent', () => {
 
         return {
           content:
-            'Changed: updated README.md via edit_file.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+            'Updated the README and verified the follow-up steps.\n- Changed: updated README.md via edit_file.\n- Verified: reviewed git diff --stat and yarn test passed.\n- Remaining uncertainty: none.',
         };
       },
     };
@@ -699,7 +699,7 @@ describe('runAgent', () => {
 
         return {
           content:
-            'Changed: eslint --fix src/example.ts applied to src/example.ts.\nVerified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output.\nRemaining uncertainty: none.',
+            'Applied the lint fix and checked the repo and test state.\n- Changed: eslint --fix src/example.ts applied to src/example.ts.\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output.\n- Remaining uncertainty: none.',
         };
       },
     };
@@ -736,7 +736,7 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe(
-      'Changed: eslint --fix src/example.ts applied to src/example.ts.\nVerified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output.\nRemaining uncertainty: none.',
+      'Applied the lint fix and checked the repo and test state.\n- Changed: eslint --fix src/example.ts applied to src/example.ts.\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output.\n- Remaining uncertainty: none.',
     );
 
     const hostRequirement = seenMessages
@@ -760,7 +760,7 @@ describe('runAgent', () => {
         const structuredReminder = [...messages].reverse().find(
           (message: ChatMessage) =>
             message.role === 'system' &&
-            message.content.includes('your final answer must be a short operator review'),
+            message.content.includes('your final answer must start with a short summary sentence or short paragraph'),
         );
 
         if (seenMessages.length === 1) {
@@ -795,7 +795,7 @@ describe('runAgent', () => {
 
         return {
           content:
-            'Changed: fixed src/example.ts via eslint --fix src/example.ts.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+            'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: reviewed git diff --stat and yarn test passed.\n- Remaining uncertainty: none.',
         };
       },
     };
@@ -832,12 +832,12 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe(
-      'Changed: fixed src/example.ts via eslint --fix src/example.ts.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+      'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: reviewed git diff --stat and yarn test passed.\n- Remaining uncertainty: none.',
     );
     expect(seenMessages[5]).toContainEqual({
       role: 'system',
       content:
-        'Host requirement: after a workspace-changing mutate command, your final answer must be a short operator review with exactly these labels on separate lines: "Changed:", "Verified:", and "Remaining uncertainty:". In "Changed:", mention the concrete change work and name the exact command(s) or edit action used (eslint --fix src/example.ts). In "Verified:", name the exact repo review command(s) (git diff --stat) and exact verification command(s) (yarn test), and ground them in concrete evidence from the command results (git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".',
+        'Host requirement: after a workspace-changing mutate command, your final answer must start with a short summary sentence or short paragraph, then include bullet points labeled "Changed:", "Verified:", and "Remaining uncertainty:". In "Changed:", mention the concrete change work and name the exact command(s) or edit action used (eslint --fix src/example.ts). In "Verified:", name the exact repo review command(s) (git diff --stat) and exact verification command(s) (yarn test), and ground them in concrete evidence from the command results (git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".',
     });
   });
 
@@ -849,7 +849,7 @@ describe('runAgent', () => {
         const structuredReminder = [...messages].reverse().find(
           (message: ChatMessage) =>
             message.role === 'system' &&
-            message.content.includes('your final answer must be a short operator review'),
+            message.content.includes('your final answer must start with a short summary sentence or short paragraph'),
         );
 
         if (seenMessages.length === 1) {
@@ -876,13 +876,13 @@ describe('runAgent', () => {
 
         if (!structuredReminder) {
           return {
-            content: 'Changed: fixed src/example.ts.\nVerified: reviewed the repo and tests passed.\nRemaining uncertainty: none.',
+            content: 'Applied the fix and checked it.\n- Changed: fixed src/example.ts.\n- Verified: reviewed the repo and tests passed.\n- Remaining uncertainty: none.',
           };
         }
 
         return {
           content:
-            'Changed: fixed src/example.ts via eslint --fix src/example.ts.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+            'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: reviewed git diff --stat and yarn test passed.\n- Remaining uncertainty: none.',
         };
       },
     };
@@ -919,12 +919,12 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe(
-      'Changed: fixed src/example.ts via eslint --fix src/example.ts.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+      'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: reviewed git diff --stat and yarn test passed.\n- Remaining uncertainty: none.',
     );
     expect(seenMessages[5]).toContainEqual({
       role: 'system',
       content:
-        'Host requirement: after a workspace-changing mutate command, your final answer must be a short operator review with exactly these labels on separate lines: "Changed:", "Verified:", and "Remaining uncertainty:". In "Changed:", mention the concrete change work and name the exact command(s) or edit action used (eslint --fix src/example.ts). In "Verified:", name the exact repo review command(s) (git diff --stat) and exact verification command(s) (yarn test), and ground them in concrete evidence from the command results (git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".',
+        'Host requirement: after a workspace-changing mutate command, your final answer must start with a short summary sentence or short paragraph, then include bullet points labeled "Changed:", "Verified:", and "Remaining uncertainty:". In "Changed:", mention the concrete change work and name the exact command(s) or edit action used (eslint --fix src/example.ts). In "Verified:", name the exact repo review command(s) (git diff --stat) and exact verification command(s) (yarn test), and ground them in concrete evidence from the command results (git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".',
     });
   });
 
@@ -988,7 +988,7 @@ describe('runAgent', () => {
 
         return {
           content:
-            'Changed: moved docs/old.md to docs/new.md.\nVerified: reviewed git diff --stat and yarn test passed.\nRemaining uncertainty: none.',
+            'Moved the file and completed the required follow-up checks.\n- Changed: moved docs/old.md to docs/new.md.\n- Verified: reviewed git diff --stat and yarn test passed.\n- Remaining uncertainty: none.',
         };
       },
     };
