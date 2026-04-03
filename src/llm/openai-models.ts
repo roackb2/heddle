@@ -40,3 +40,12 @@ export const COMMON_OPENAI_MODELS = OPENAI_MODEL_GROUPS.flatMap((group) => group
 export function formatOpenAiModelGroups(): string {
   return OPENAI_MODEL_GROUPS.map((group) => `${group.label}: ${group.models.join(', ')}`).join('\n');
 }
+
+export function filterOpenAiModels(query: string): string[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return COMMON_OPENAI_MODELS;
+  }
+
+  return COMMON_OPENAI_MODELS.filter((model) => model.toLowerCase().includes(normalized));
+}

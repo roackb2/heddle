@@ -3,23 +3,48 @@ import { Text, useInput } from 'ink';
 
 const MAX_VISIBLE_INPUT_CHARS = 96;
 
+export type PromptKeyInput = {
+  input: string;
+  key: {
+    return?: boolean;
+    backspace?: boolean;
+    delete?: boolean;
+    leftArrow?: boolean;
+    rightArrow?: boolean;
+    upArrow?: boolean;
+    downArrow?: boolean;
+    home?: boolean;
+    end?: boolean;
+    tab?: boolean;
+    escape?: boolean;
+    ctrl?: boolean;
+    meta?: boolean;
+  };
+};
+
 export function PromptInput({
   value,
   isDisabled,
   placeholder,
   onChange,
   onSubmit,
+  onSpecialKey,
 }: {
   value: string;
   isDisabled: boolean;
   placeholder: string;
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
+  onSpecialKey?: (event: PromptKeyInput) => boolean;
 }) {
   const [cursor, setCursor] = useState(value.length);
 
   useInput((input, key) => {
     if (isDisabled) {
+      return;
+    }
+
+    if (onSpecialKey?.({ input, key })) {
       return;
     }
 

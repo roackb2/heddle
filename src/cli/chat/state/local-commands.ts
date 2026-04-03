@@ -17,195 +17,199 @@ export type LocalCommandArgs = {
   listRecentSessionsMessage: string[];
 };
 
+type ExactCommandHandler = (args: LocalCommandArgs) => LocalCommandResult;
+type PrefixCommandHandler = (args: LocalCommandArgs, value: string) => LocalCommandResult;
+
+const MODEL_LIST_MESSAGE = ['Common OpenAI model choices', '', formatOpenAiModelGroups()].join('\n');
+const MODEL_SET_HELP_MESSAGE = 'Use /model set <query> to filter models, then use arrows and Enter to choose one.';
+const HELP_MESSAGE = [
+  'Local commands',
+  '',
+  '/model',
+  'Show the active model.',
+  '',
+  '/model <name>',
+  'Switch the current model.',
+  '',
+  '/model set [query]',
+  'Open the interactive model picker and filter it by query.',
+  '',
+  '/models',
+  'List common model choices. /model list also works.',
+  '',
+  '/continue',
+  'Resume the current session from its last interrupted or prior run.',
+  '',
+  '/clear',
+  'Reset the current session transcript.',
+  '',
+  '/session list',
+  'List recent saved sessions.',
+  '',
+  '/session choose [query]',
+  'Pick a recent session with filtering and arrow-key selection.',
+  '',
+  '/session new [name]',
+  'Create and switch to a new session.',
+  '',
+  '/session switch <id>',
+  'Switch to another saved session.',
+  '',
+  '/session continue <id>',
+  'Switch to another saved session and immediately resume it.',
+  '',
+  '/session rename <name>',
+  'Rename the current session.',
+  '',
+  '/session close <id>',
+  'Remove a saved session.',
+  '',
+  '!<command>',
+  'Run a shell command directly in chat using the current inspect or execute policy.',
+  '',
+  '/help',
+  'Show this message.',
+].join('\n');
+
+const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
+  ['/help', () => messageResult(HELP_MESSAGE)],
+  ['/models', () => messageResult(MODEL_LIST_MESSAGE)],
+  ['/model list', () => messageResult(MODEL_LIST_MESSAGE)],
+  ['/model', (args) => messageResult(`Current model: ${args.activeModel}`)],
+  ['/model set', () => messageResult(MODEL_SET_HELP_MESSAGE)],
+  ['/clear', (args) => {
+    args.clearConversation();
+    return messageResult('Cleared the current chat transcript.');
+  }],
+  ['/continue', () => ({ handled: true, kind: 'continue' })],
+  ['/session list', (args) =>
+    messageResult(args.sessions.length > 0 ? args.listRecentSessionsMessage.join('\n') : 'No sessions available.'),
+  ],
+  ['/session choose', () => messageResult('Use /session choose <query> to filter recent sessions, then use arrows and Enter to choose one.')],
+]);
+
+const PREFIX_COMMANDS: Array<{ prefix: string; handle: PrefixCommandHandler }> = [
+  { prefix: '/model ', handle: handleModelCommand },
+  { prefix: '/session new', handle: handleSessionNew },
+  { prefix: '/session switch ', handle: handleSessionSwitch },
+  { prefix: '/session continue ', handle: handleSessionContinue },
+  { prefix: '/session rename ', handle: handleSessionRename },
+  { prefix: '/session close ', handle: handleSessionClose },
+];
+
 export function runLocalCommand(args: LocalCommandArgs): LocalCommandResult {
   const trimmed = args.prompt.trim();
   if (!trimmed.startsWith('/')) {
     return { handled: false };
   }
 
-  if (trimmed === '/help') {
-    return {
-      handled: true,
-      kind: 'message',
-      message: [
-        'Local commands',
-        '',
-        '/model',
-        'Show the active model.',
-        '',
-        '/model <name>',
-        'Switch the current model.',
-        '',
-        '/models',
-        'List common model choices.',
-        '',
-        '/continue',
-        'Resume the current session from its last interrupted or prior run.',
-        '',
-        '/clear',
-        'Reset the current session transcript.',
-        '',
-        '/session list',
-        'List recent saved sessions.',
-        '',
-        '/session new [name]',
-        'Create and switch to a new session.',
-        '',
-        '/session switch <id>',
-        'Switch to another saved session.',
-        '',
-        '/session continue <id>',
-        'Switch to another saved session and immediately resume it.',
-        '',
-        '/session rename <name>',
-        'Rename the current session.',
-        '',
-        '/session close <id>',
-        'Remove a saved session.',
-        '',
-        '!<command>',
-        'Run a shell command directly in chat using the current inspect or execute policy.',
-        '',
-        '/help',
-        'Show this message.',
-      ].join('\n'),
-    };
+  const exact = EXACT_COMMANDS.get(trimmed);
+  if (exact) {
+    return exact(args);
   }
 
-  if (trimmed === '/models') {
-    return {
-      handled: true,
-      kind: 'message',
-      message: ['Common OpenAI model choices', '', formatOpenAiModelGroups()].join('\n'),
-    };
+  const matchedPrefix = PREFIX_COMMANDS.find((entry) => trimmed.startsWith(entry.prefix));
+  if (matchedPrefix) {
+    const value = trimmed.slice(matchedPrefix.prefix.length).trim();
+    return matchedPrefix.handle(args, value);
   }
 
-  if (trimmed === '/model') {
-    return {
-      handled: true,
-      kind: 'message',
-      message: `Current model: ${args.activeModel}`,
-    };
+  return messageResult(`Unknown command: ${trimmed}. Use /help for available commands.`);
+}
+
+function handleModelCommand(args: LocalCommandArgs, value: string): LocalCommandResult {
+  if (!value) {
+    return messageResult('Usage: /model <name>');
   }
 
-  if (trimmed.startsWith('/model ')) {
-    const nextModel = trimmed.slice('/model '.length).trim();
-    if (!nextModel) {
-      return { handled: true, kind: 'message', message: 'Usage: /model <name>' };
-    }
+  const modelCommandAliases = new Map<string, LocalCommandResult>([
+    ['list', messageResult(MODEL_LIST_MESSAGE)],
+    ['set', messageResult(MODEL_SET_HELP_MESSAGE)],
+  ]);
 
-    args.setActiveModel(nextModel);
-    return {
-      handled: true,
-      kind: 'message',
-      message:
-        COMMON_OPENAI_MODELS.includes(nextModel) ?
-          `Switched model to ${nextModel}`
-        : `Switched model to ${nextModel}. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.`,
-    };
+  const aliased = modelCommandAliases.get(value);
+  if (aliased) {
+    return aliased;
   }
 
-  if (trimmed === '/clear') {
-    args.clearConversation();
-    return {
-      handled: true,
-      kind: 'message',
-      message: 'Cleared the current chat transcript.',
-    };
+  args.setActiveModel(value);
+  return messageResult(
+    COMMON_OPENAI_MODELS.includes(value) ?
+      `Switched model to ${value}`
+    : `Switched model to ${value}. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.`,
+  );
+}
+
+function handleSessionNew(args: LocalCommandArgs, value: string): LocalCommandResult {
+  const session = args.createSession(value || undefined);
+  return messageResult(`Created and switched to ${session.id} (${session.name}).`);
+}
+
+function handleSessionSwitch(args: LocalCommandArgs, value: string): LocalCommandResult {
+  const session = resolveSessionReference(args, value);
+  if (!session) {
+    return messageResult(`Unknown session: ${value}. Use /session list to inspect available sessions.`);
   }
 
-  if (trimmed === '/continue') {
-    return { handled: true, kind: 'continue' };
-  }
+  args.switchSession(session.id);
+  return messageResult(`Switched to ${session.id} (${session.name}).\n${summarizeSession(session)}`);
+}
 
-  if (trimmed === '/session list') {
-    return {
-      handled: true,
-      kind: 'message',
-      message: args.sessions.length > 0 ? args.listRecentSessionsMessage.join('\n') : 'No sessions available.',
-    };
-  }
-
-  if (trimmed.startsWith('/session new')) {
-    const maybeName = trimmed.slice('/session new'.length).trim();
-    const session = args.createSession(maybeName || undefined);
-    return {
-      handled: true,
-      kind: 'message',
-      message: `Created and switched to ${session.id} (${session.name}).`,
-    };
-  }
-
-  if (trimmed.startsWith('/session switch ')) {
-    const id = trimmed.slice('/session switch '.length).trim();
-    const session = args.sessions.find((candidate) => candidate.id === id);
-    if (!session) {
-      return {
-        handled: true,
-        kind: 'message',
-        message: `Unknown session: ${id}. Use /session list to inspect available sessions.`,
-      };
-    }
-    args.switchSession(id);
-    return {
-      handled: true,
-      kind: 'message',
-      message: `Switched to ${session.id} (${session.name}).\n${summarizeSession(session)}`,
-    };
-  }
-
-  if (trimmed.startsWith('/session continue ')) {
-    const id = trimmed.slice('/session continue '.length).trim();
-    const session = args.sessions.find((candidate) => candidate.id === id);
-    if (!session) {
-      return {
-        handled: true,
-        kind: 'message',
-        message: `Unknown session: ${id}.\nUse /session list to inspect available sessions.`,
-      };
-    }
-    return {
-      handled: true,
-      kind: 'continue',
-      sessionId: id,
-      message: `Switched to ${session.id} (${session.name}).\nContinuing from that session transcript.`,
-    };
-  }
-
-  if (trimmed.startsWith('/session rename ')) {
-    const name = trimmed.slice('/session rename '.length).trim();
-    if (!name) {
-      return { handled: true, kind: 'message', message: 'Usage: /session rename <name>' };
-    }
-    args.renameSession(name);
-    return {
-      handled: true,
-      kind: 'message',
-      message: `Renamed current session to ${name}.`,
-    };
-  }
-
-  if (trimmed.startsWith('/session close ')) {
-    const id = trimmed.slice('/session close '.length).trim();
-    const session = args.sessions.find((candidate) => candidate.id === id);
-    if (!session) {
-      return {
-        handled: true,
-        kind: 'message',
-        message: `Unknown session: ${id}.\nUse /session list to inspect available sessions.`,
-      };
-    }
-    args.removeSession(id);
-    return {
-      handled: true,
-      kind: 'message',
-      message: `Closed ${session.id} (${session.name}).`,
-    };
+function handleSessionContinue(args: LocalCommandArgs, value: string): LocalCommandResult {
+  const session = resolveSessionReference(args, value);
+  if (!session) {
+    return messageResult(`Unknown session: ${value}.\nUse /session list to inspect available sessions.`);
   }
 
   return {
     handled: true,
+    kind: 'continue',
+    sessionId: session.id,
+    message: `Switched to ${session.id} (${session.name}).\nContinuing from that session transcript.`,
+  };
+}
+
+function handleSessionRename(args: LocalCommandArgs, value: string): LocalCommandResult {
+  if (!value) {
+    return messageResult('Usage: /session rename <name>');
+  }
+
+  args.renameSession(value);
+  return messageResult(`Renamed current session to ${value}.`);
+}
+
+function handleSessionClose(args: LocalCommandArgs, value: string): LocalCommandResult {
+  const session = resolveSessionReference(args, value);
+  if (!session) {
+    return messageResult(`Unknown session: ${value}.\nUse /session list to inspect available sessions.`);
+  }
+
+  args.removeSession(session.id);
+  return messageResult(`Closed ${session.id} (${session.name}).`);
+}
+
+function findSession(args: LocalCommandArgs, id: string): ChatSession | undefined {
+  return args.sessions.find((candidate) => candidate.id === id);
+}
+
+function resolveSessionReference(args: LocalCommandArgs, value: string): ChatSession | undefined {
+  const directMatch = findSession(args, value);
+  if (directMatch) {
+    return directMatch;
+  }
+
+  const numericIndex = Number.parseInt(value, 10);
+  if (!Number.isFinite(numericIndex) || numericIndex <= 0) {
+    return undefined;
+  }
+
+  return args.recentSessions[numericIndex - 1];
+}
+
+function messageResult(message: string): LocalCommandResult {
+  return {
+    handled: true,
     kind: 'message',
-    message: `Unknown command: ${trimmed}. Use /help for available commands.`,
+    message,
   };
 }

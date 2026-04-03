@@ -4,11 +4,14 @@ import {
   ApprovalComposer,
   CommandHintPanel,
   ConversationPanel,
+  ModelPickerPanel,
   PromptInput,
+  SessionPickerPanel,
   shouldShowCommandHint,
   shouldShowSlashHints,
   SlashHintPanel,
 } from './components/index.js';
+import { filterOpenAiModels } from '../../llm/openai-models.js';
 import { useApprovalFlow } from './hooks/useApprovalFlow.js';
 import { useAgentRun } from './hooks/useAgentRun.js';
 import { useChatSessions } from './hooks/useChatSessions.js';
@@ -22,7 +25,15 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   const nextIdRef = useRef(0);
   const [activeModel, setActiveModel] = useState(runtime.model);
   const [draft, setDraft] = useState('');
+  const [modelPickerIndex, setModelPickerIndex] = useState(0);
+  const [sessionPickerIndex, setSessionPickerIndex] = useState(0);
   const nextLocalId = () => `ui-${Date.now()}-${nextIdRef.current++}`;
+  const modelPickerQuery = getModelPickerQuery(draft);
+  const modelPickerVisible = modelPickerQuery !== undefined;
+  const filteredModels = modelPickerVisible ? filterOpenAiModels(modelPickerQuery) : [];
+  const safeModelPickerIndex =
+    filteredModels.length === 0 ? 0 : Math.min(modelPickerIndex, Math.max(0, filteredModels.length - 1));
+  const highlightedModel = filteredModels[safeModelPickerIndex];
 
   const {
     sessions,
@@ -41,6 +52,12 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     sessionsFile: runtime.sessionsFile,
     apiKeyPresent: Boolean(runtime.apiKey),
   });
+  const sessionPickerQuery = getSessionPickerQuery(draft);
+  const sessionPickerVisible = sessionPickerQuery !== undefined;
+  const filteredSessions = sessionPickerVisible ? filterSessionsForPicker(recentSessions, sessionPickerQuery) : [];
+  const safeSessionPickerIndex =
+    filteredSessions.length === 0 ? 0 : Math.min(sessionPickerIndex, Math.max(0, filteredSessions.length - 1));
+  const highlightedSession = filteredSessions[safeSessionPickerIndex];
   const {
     status,
     setStatus,
@@ -60,6 +77,11 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   } = useApprovalFlow(nextLocalId);
   const messages = activeSession?.messages ?? [];
   const activityText = currentActivityText(liveEvents, isRunning, elapsedSeconds, pendingApproval, interruptRequested);
+  const promptStatusLine = [
+    `model=${activeModel}`,
+    'context=unknown',
+    `session=${activeSession?.id ?? activeSessionId}${activeSession?.name ? ` (${activeSession.name})` : ''}`,
+  ].join(' • ');
   const activityLines = liveEvents
     .slice(-4)
     .filter((event, index, events) => events.findIndex((candidate) => candidate.text === event.text) === index)
@@ -110,6 +132,64 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   });
 
   const submitPrompt = async (value: string) => {
+    if (modelPickerVisible && highlightedModel) {
+      setDraft('');
+      setModelPickerIndex(0);
+      await submitChatPrompt({
+        value: `/model ${highlightedModel}`,
+        isRunning,
+        activeModel,
+        setActiveModel,
+        sessions,
+        recentSessions,
+        activeSessionId,
+        activeSession,
+        apiKeyPresent: Boolean(runtime.apiKey),
+        nextLocalId,
+        setStatus,
+        switchSession,
+        closeSession,
+        updateSessionById,
+        updateActiveSession,
+        createSession,
+        renameSession,
+        listRecentSessionsMessage,
+        executeTurn,
+        executeDirectShellCommand,
+      });
+      return;
+    }
+
+    if (sessionPickerVisible && highlightedSession) {
+      setDraft('');
+      setSessionPickerIndex(0);
+      await submitChatPrompt({
+        value: `/session switch ${highlightedSession.id}`,
+        isRunning,
+        activeModel,
+        setActiveModel,
+        sessions,
+        recentSessions,
+        activeSessionId,
+        activeSession,
+        apiKeyPresent: Boolean(runtime.apiKey),
+        nextLocalId,
+        setStatus,
+        switchSession,
+        closeSession,
+        updateSessionById,
+        updateActiveSession,
+        createSession,
+        renameSession,
+        listRecentSessionsMessage,
+        executeTurn,
+        executeDirectShellCommand,
+      });
+      return;
+    }
+
+    setModelPickerIndex(0);
+    setSessionPickerIndex(0);
     await submitChatPrompt({
       value,
       isRunning,
@@ -168,6 +248,22 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         {pendingApproval ?
           <ApprovalComposer pendingApproval={pendingApproval} approvalChoice={approvalChoice} />
         : <>
+            {modelPickerVisible ?
+              <ModelPickerPanel
+                query={modelPickerQuery}
+                models={filteredModels}
+                activeModel={activeModel}
+                highlightedIndex={safeModelPickerIndex}
+              />
+            : null}
+            {sessionPickerVisible ?
+              <SessionPickerPanel
+                query={sessionPickerQuery}
+                sessions={filteredSessions}
+                activeSessionId={activeSessionId}
+                highlightedIndex={safeSessionPickerIndex}
+              />
+            : null}
             {shouldShowSlashHints(draft) ?
               <SlashHintPanel draft={draft} activeSessionId={activeSession?.id ?? ''} sessions={sessions} />
             : shouldShowCommandHint(draft) ?
@@ -181,6 +277,31 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
                   isDisabled={isRunning}
                   placeholder="Ask Heddle about this project"
                   onChange={setDraft}
+                  onSpecialKey={({ key }) => {
+                    if (modelPickerVisible) {
+                      return handlePickerKeys({
+                        key,
+                        itemCount: filteredModels.length,
+                        resetDraft: () => setDraft(''),
+                        resetIndex: () => setModelPickerIndex(0),
+                        advance: () => setModelPickerIndex((current) => (current + 1) % filteredModels.length),
+                        retreat: () => setModelPickerIndex((current) => (current <= 0 ? filteredModels.length - 1 : current - 1)),
+                      });
+                    }
+
+                    if (sessionPickerVisible) {
+                      return handlePickerKeys({
+                        key,
+                        itemCount: filteredSessions.length,
+                        resetDraft: () => setDraft(''),
+                        resetIndex: () => setSessionPickerIndex(0),
+                        advance: () => setSessionPickerIndex((current) => (current + 1) % filteredSessions.length),
+                        retreat: () => setSessionPickerIndex((current) => (current <= 0 ? filteredSessions.length - 1 : current - 1)),
+                      });
+                    }
+
+                    return false;
+                  }}
                   onSubmit={(value) => {
                     setDraft('');
                     void submitPrompt(value);
@@ -194,6 +315,77 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
             </Box>
           </>}
       </Box>
+      <Text dimColor>{promptStatusLine}</Text>
     </Box>
   );
+}
+
+function getModelPickerQuery(draft: string): string | undefined {
+  const trimmedStart = draft.trimStart();
+  if (!trimmedStart.startsWith('/model set')) {
+    return undefined;
+  }
+
+  const remainder = trimmedStart.slice('/model set'.length);
+  return remainder.trim();
+}
+
+function getSessionPickerQuery(draft: string): string | undefined {
+  const trimmedStart = draft.trimStart();
+  if (!trimmedStart.startsWith('/session choose')) {
+    return undefined;
+  }
+
+  const remainder = trimmedStart.slice('/session choose'.length);
+  return remainder.trim();
+}
+
+function filterSessionsForPicker(
+  sessions: Array<{ id: string; name: string }>,
+  query: string,
+): Array<{ id: string; name: string }> {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return sessions;
+  }
+
+  return sessions.filter(
+    (session) =>
+      session.id.toLowerCase().includes(normalized) ||
+      session.name.toLowerCase().includes(normalized),
+  );
+}
+
+function handlePickerKeys(options: {
+  key: {
+    upArrow?: boolean;
+    downArrow?: boolean;
+    leftArrow?: boolean;
+    rightArrow?: boolean;
+    tab?: boolean;
+    escape?: boolean;
+  };
+  itemCount: number;
+  resetDraft: () => void;
+  resetIndex: () => void;
+  advance: () => void;
+  retreat: () => void;
+}): boolean {
+  if ((options.key.upArrow || options.key.leftArrow) && options.itemCount > 0) {
+    options.retreat();
+    return true;
+  }
+
+  if ((options.key.downArrow || options.key.rightArrow || options.key.tab) && options.itemCount > 0) {
+    options.advance();
+    return true;
+  }
+
+  if (options.key.escape) {
+    options.resetDraft();
+    options.resetIndex();
+    return true;
+  }
+
+  return false;
 }
