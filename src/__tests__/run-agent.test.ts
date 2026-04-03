@@ -209,6 +209,40 @@ describe('runAgent', () => {
     });
   });
 
+  it('delivers streamed assistant updates through the dedicated stream callback', async () => {
+    const streamUpdates: Array<{ step: number; text: string; done: boolean }> = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(_messages, _tools, _signal, onStreamEvent): Promise<LlmResponse> {
+        onStreamEvent?.({ type: 'content.delta', delta: 'Hello' });
+        onStreamEvent?.({ type: 'content.delta', delta: ' world' });
+        onStreamEvent?.({ type: 'content.done', content: 'Hello world' });
+        return {
+          content: 'Hello world',
+        };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Say hello.',
+      llm: fakeLlm,
+      tools: [],
+      maxSteps: 1,
+      logger: silentLogger,
+      onAssistantStream: (update) => {
+        streamUpdates.push(update);
+      },
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(streamUpdates.length).toBeGreaterThanOrEqual(2);
+    expect(streamUpdates.some((update) => update.done === false)).toBe(true);
+    expect(streamUpdates.at(-1)).toMatchObject({
+      step: 1,
+      text: 'Hello world',
+      done: true,
+    });
+  });
+
   it('allows one repeated identical tool call, then blocks excessive repetition', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {

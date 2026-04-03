@@ -8,6 +8,17 @@ import {
 import { isCompactedHistorySummary } from '../state/compaction.js';
 import type { ConversationLine, LiveEvent, PendingApproval } from '../state/types.js';
 
+export type ApprovalSummary = {
+  title: string;
+  command?: string;
+  scope?: string;
+  risk?: string;
+  capability?: string;
+  why: string;
+  effects: string[];
+  rememberLabel?: string;
+};
+
 const MAX_SHELL_OUTPUT_CHARS = 1400;
 const MAX_TOOL_CALL_SUMMARY_CHARS = 96;
 
@@ -133,29 +144,70 @@ export function currentActivityText(
 }
 
 export function formatApprovalPrompt(pendingApproval: PendingApproval): string {
-  const command = extractShellCommand(pendingApproval.call.input);
-  if (command) {
-    const policy = describePendingApprovalPolicy(pendingApproval);
-    if (policy) {
-      return `Allow ${policy.scope} mutation command (${policy.capability}, ${policy.risk} risk): ${truncate(command, 120)}`;
-    }
-
-    return `Allow mutation command: ${truncate(command, 120)}`;
-  }
-
-  const editPath = extractEditPath(pendingApproval.call.input);
-  if (pendingApproval.call.tool === 'edit_file' && editPath) {
-    return `Allow edit_file on ${truncate(editPath, 120)}`;
-  }
-
-  return `Allow ${pendingApproval.call.tool}`;
+  return summarizePendingApproval(pendingApproval).title;
 }
 
 export function formatApprovalHint(pendingApproval: PendingApproval): string {
+  const summary = summarizePendingApproval(pendingApproval);
+  const rememberLabel = summary.rememberLabel ? `A ${summary.rememberLabel}` : 'A remember for project';
+  return `Y approve once • ${rememberLabel} • N deny • Enter confirms selected choice`;
+}
+
+export function summarizePendingApproval(pendingApproval: PendingApproval): ApprovalSummary {
   const policy = describePendingApprovalPolicy(pendingApproval);
-  const policySummary = policy ? ` • ${policy.scope} • ${policy.capability} • ${policy.risk} risk` : '';
-  const rememberLabel = pendingApproval.rememberLabel ? `A ${pendingApproval.rememberLabel}` : 'A allow for project';
-  return `Tool: ${pendingApproval.call.tool}${policySummary} • Y approve • ${rememberLabel} • N deny`;
+  const command = extractShellCommand(pendingApproval.call.input);
+  const editPath = extractEditPath(pendingApproval.call.input);
+
+  if (command) {
+    const title =
+      policy?.capability === 'verification' ? 'Run verification command'
+      : policy?.scope === 'external' ? 'Run external command'
+      : 'Run mutation command';
+    const why =
+      policy ? `${policy.scope} scope • ${policy.capability} • ${policy.risk} risk`
+      : 'approval required before running this command';
+    const effects = buildApprovalEffects({
+      tool: pendingApproval.call.tool,
+      command,
+      scope: policy?.scope,
+      capability: policy?.capability,
+      risk: policy?.risk,
+    });
+
+    return {
+      title,
+      command,
+      scope: policy?.scope,
+      risk: policy?.risk,
+      capability: policy?.capability,
+      why,
+      effects,
+      rememberLabel: pendingApproval.rememberLabel,
+    };
+  }
+
+  if (pendingApproval.call.tool === 'edit_file') {
+    return {
+      title: 'Edit file',
+      command: editPath,
+      scope: 'workspace',
+      risk: 'medium',
+      capability: 'file_edit',
+      why: editPath ? `edit_file on ${editPath}` : 'approval required before editing a file',
+      effects: [
+        editPath ? `modifies ${editPath}` : 'modifies a workspace file',
+        'stays inside the current repository',
+      ],
+      rememberLabel: pendingApproval.rememberLabel,
+    };
+  }
+
+  return {
+    title: `Allow ${pendingApproval.call.tool}`,
+    why: 'approval required for this tool call',
+    effects: ['tool-specific side effects are not yet summarized'],
+    rememberLabel: pendingApproval.rememberLabel,
+  };
 }
 
 export function summarizeToolCall(tool: string, input: unknown): string {
@@ -356,6 +408,46 @@ function describePendingApprovalPolicy(pendingApproval: PendingApproval): RunShe
   });
 
   return 'error' in result ? undefined : result;
+}
+
+function buildApprovalEffects(options: {
+  tool: string;
+  command: string;
+  scope?: string;
+  capability?: string;
+  risk?: string;
+}): string[] {
+  const effects: string[] = [];
+
+  if (options.scope === 'workspace') {
+    effects.push('stays inside the current repository');
+  }
+
+  if (options.scope === 'external') {
+    effects.push('may affect an external system outside the repo');
+  }
+
+  if (options.capability === 'verification') {
+    effects.push('runs a verification command to check current changes');
+  }
+
+  if (options.capability === 'git_staging') {
+    effects.push('updates git staging state');
+  }
+
+  if (options.capability === 'project_script') {
+    effects.push('runs a project-defined script with repo-defined side effects');
+  }
+
+  if (options.risk === 'unknown') {
+    effects.push('command is not specifically classified, so review the exact command carefully');
+  }
+
+  if (effects.length === 0) {
+    effects.push(`runs: ${truncate(options.command, 96)}`);
+  }
+
+  return effects;
 }
 
 export function isGenericSessionName(name: string): boolean {

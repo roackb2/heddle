@@ -3,6 +3,7 @@ import { Box, Text, useInput } from 'ink';
 
 const DEFAULT_MAX_VISIBLE_INPUT_LINES = 8;
 const FALLBACK_WRAP_WIDTH = 80;
+const CURSOR_GLYPH = '▌';
 
 export type PromptKeyInput = {
   input: string;
@@ -157,7 +158,7 @@ export function PromptInput({
 }
 
 function buildPromptLines(value: string, cursor: number, maxVisibleLines: number): string[] {
-  const withCursor = `${value.slice(0, cursor)}|${value.slice(cursor)}`;
+  const withCursor = `${value.slice(0, cursor)}${CURSOR_GLYPH}${value.slice(cursor)}`;
   const rawLines = withCursor.split('\n');
   const wrapped = rawLines.flatMap((line) => wrapLine(line, FALLBACK_WRAP_WIDTH));
   if (wrapped.length <= maxVisibleLines) {

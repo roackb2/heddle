@@ -83,6 +83,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     pendingApproval,
     approvalChoice,
     interruptRequested,
+    currentAssistantText,
     currentPlan,
     setLiveEvents,
     resetRunState,
@@ -119,6 +120,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
           pendingApproval ? activityLines.filter((line) => line !== activityText)
           : activityLines,
         error,
+        currentAssistantText,
         currentPlan,
       }
     : undefined;

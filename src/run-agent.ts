@@ -31,6 +31,7 @@ const PLAN_ITEM_STATUSES = new Set<PlanItem['status']>(['pending', 'in_progress'
 
 const DEFAULT_MAX_STEPS = 20;
 const MAX_CONSECUTIVE_ERRORS = 3;
+const STREAM_UPDATE_INTERVAL_MS = 75;
 const INTERRUPTED_SUMMARY = 'Run interrupted by host request';
 
 export type RunAgentOptions = {
@@ -42,6 +43,7 @@ export type RunAgentOptions = {
   history?: ChatMessage[];
   systemContext?: string;
   onEvent?: (event: TraceEvent) => void;
+  onAssistantStream?: (update: { step: number; text: string; done: boolean }) => void;
   approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
   shouldStop?: () => boolean;
   abortSignal?: AbortSignal;
@@ -73,6 +75,7 @@ type RunContext = {
   seenToolCalls: Map<string, number>;
   mutation: ReturnType<typeof createMutationState>;
   progress: ReturnType<typeof createProgressReminderState>;
+  onAssistantStream?: RunAgentOptions['onAssistantStream'];
   approveToolCall?: RunAgentOptions['approveToolCall'];
   shouldStop?: RunAgentOptions['shouldStop'];
   abortSignal?: AbortSignal;
@@ -152,6 +155,7 @@ function createRunContext(options: RunAgentOptions): RunContext {
     seenToolCalls: new Map<string, number>(),
     mutation: createMutationState(),
     progress: createProgressReminderState(),
+    onAssistantStream: options.onAssistantStream,
     approveToolCall: options.approveToolCall,
     shouldStop: options.shouldStop,
     abortSignal: options.abortSignal,
@@ -190,32 +194,32 @@ async function requestModelTurn(context: RunContext): Promise<LlmResponse | RunR
 
   try {
     let streamedContent = '';
+    let pendingStreamDelta = '';
+    let lastStreamRecordAt = 0;
     const response = await context.llm.chat(
       context.messages,
       context.registry.list(),
       context.abortSignal,
       (event: LlmStreamEvent) => {
         if (event.type === 'content.delta') {
+          pendingStreamDelta += event.delta;
+          const nowMs = Date.now();
+          if (nowMs - lastStreamRecordAt < STREAM_UPDATE_INTERVAL_MS) {
+            streamedContent += event.delta;
+            context.onAssistantStream?.({ step: context.state.step, text: streamedContent, done: false });
+            return;
+          }
+          lastStreamRecordAt = nowMs;
           streamedContent += event.delta;
-          context.record({
-            type: 'assistant.stream',
-            content: streamedContent,
-            done: false,
-            step: context.state.step,
-            timestamp: context.now(),
-          });
+          context.onAssistantStream?.({ step: context.state.step, text: streamedContent, done: false });
+          pendingStreamDelta = '';
           return;
         }
 
         if (event.type === 'content.done') {
+          pendingStreamDelta = '';
           streamedContent = event.content;
-          context.record({
-            type: 'assistant.stream',
-            content: streamedContent,
-            done: true,
-            step: context.state.step,
-            timestamp: context.now(),
-          });
+          context.onAssistantStream?.({ step: context.state.step, text: streamedContent, done: true });
         }
       },
     );

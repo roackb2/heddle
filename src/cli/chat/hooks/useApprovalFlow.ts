@@ -20,6 +20,7 @@ export function useApprovalFlow(nextLocalId: () => string) {
   const [interruptRequested, setInterruptRequested] = useState(false);
   const [currentEditPreview, setCurrentEditPreview] = useState<EditFilePreview | undefined>();
   const [currentPlan, setCurrentPlan] = useState<{ explanation?: string; items: PlanItem[] } | undefined>();
+  const [currentAssistantText, setCurrentAssistantText] = useState<string | undefined>();
   const interruptRequestedRef = useRef(false);
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
 
@@ -117,6 +118,7 @@ export function useApprovalFlow(nextLocalId: () => string) {
     setInterruptRequested(false);
     setCurrentEditPreview(undefined);
     setCurrentPlan(undefined);
+    setCurrentAssistantText(undefined);
     interruptRequestedRef.current = false;
     abortControllerRef.current = undefined;
     setIsRunning(false);
@@ -135,6 +137,7 @@ export function useApprovalFlow(nextLocalId: () => string) {
       setApprovalChoice,
       setCurrentEditPreview,
       setCurrentPlan,
+      setCurrentAssistantText,
       interruptRequestedRef,
       abortControllerRef,
     }),
@@ -155,6 +158,7 @@ export function useApprovalFlow(nextLocalId: () => string) {
     interruptRequested,
     currentEditPreview,
     currentPlan,
+    currentAssistantText,
     setLiveEvents,
     resetRunState,
     actionState,

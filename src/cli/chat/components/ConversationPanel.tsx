@@ -12,6 +12,7 @@ export function ConversationPanel({
     title: string;
     lines: string[];
     error?: string;
+    currentAssistantText?: string;
     currentPlan?: {
       explanation?: string;
       items: PlanItem[];
@@ -24,15 +25,7 @@ export function ConversationPanel({
     <Box flexDirection="column" marginBottom={1}>
       <Text bold>Conversation</Text>
       {visibleMessages.map((message, index) => (
-        <Box key={message.id} flexDirection="column" marginBottom={1}>
-          <Text dimColor>{message.role === 'user' ? '┌ You' : '┌ Heddle'}</Text>
-          <Box paddingLeft={2}>
-            <MessageBody role={message.role} text={message.text} />
-          </Box>
-          <Text dimColor>
-            {index === visibleMessages.length - 1 ? '└' : '└────────────────────────────────────────────────────────'}
-          </Text>
-        </Box>
+        <ConversationEntry key={message.id} message={message} isLast={index === visibleMessages.length - 1} />
       ))}
       {activeTurn ?
         <Box flexDirection="column" marginBottom={1}>
@@ -42,6 +35,11 @@ export function ConversationPanel({
             {activeTurn.lines.map((line) => (
               <Text key={line} dimColor>{line}</Text>
             ))}
+            {activeTurn.currentAssistantText ?
+              <Box marginTop={1}>
+                <StreamingText text={activeTurn.currentAssistantText} />
+              </Box>
+            : null}
             {activeTurn.currentPlan ? <ActivePlanPanel plan={activeTurn.currentPlan} /> : null}
             {activeTurn.error ? <Text color="red">{activeTurn.error}</Text> : null}
           </Box>
@@ -51,6 +49,26 @@ export function ConversationPanel({
     </Box>
   );
 }
+
+const ConversationEntry = React.memo(function ConversationEntry({
+  message,
+  isLast,
+}: {
+  message: ConversationLine;
+  isLast: boolean;
+}) {
+  return (
+    <Box flexDirection="column" marginBottom={1}>
+      <Text dimColor>{message.role === 'user' ? '┌ You' : '┌ Heddle'}</Text>
+      <Box paddingLeft={2}>
+        <MessageBody role={message.role} text={message.text} />
+      </Box>
+      <Text dimColor>
+        {isLast ? '└' : '└────────────────────────────────────────────────────────'}
+      </Text>
+    </Box>
+  );
+});
 
 function ActivePlanPanel({ plan }: { plan: { explanation?: string; items: PlanItem[] } }) {
   return (
@@ -82,6 +100,17 @@ function MessageBody({
         <React.Fragment key={`${block.kind}-${index}-${block.text}`}>
           {renderBlock(block, role)}
         </React.Fragment>
+      ))}
+    </Box>
+  );
+}
+
+function StreamingText({ text }: { text: string }) {
+  const lines = text.split(/\r?\n/);
+  return (
+    <Box flexDirection="column">
+      {lines.map((line, index) => (
+        <Text key={`${index}-${line}`} color="white">{line || ' '}</Text>
       ))}
     </Box>
   );

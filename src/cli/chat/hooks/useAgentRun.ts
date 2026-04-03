@@ -60,6 +60,7 @@ export type ActionState = {
   setApprovalChoice: (value: ApprovalChoice) => void;
   setCurrentEditPreview: (value: EditFilePreview | undefined) => void;
   setCurrentPlan: (value: { explanation?: string; items: PlanItem[] } | undefined) => void;
+  setCurrentAssistantText: (value: string | undefined) => void;
   interruptRequestedRef: MutableRefObject<boolean>;
   abortControllerRef: MutableRefObject<AbortController | undefined>;
 };
@@ -256,11 +257,12 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   state.setLiveEvents([]);
   state.setCurrentEditPreview(undefined);
   state.setCurrentPlan(undefined);
+  state.setCurrentAssistantText(undefined);
   updateSessionById(sessionId, (session) => ({ ...session, lastContinuePrompt: prompt }));
   const appendedAssistantSteps = new Set<number>();
   const appendedEditPreviewIds = new Set<string>();
   const appendedPlanSteps = new Set<number>();
-  const streamingMessageIds = new Map<number, string>();
+  const streamingBuffers = new Map<number, string>();
 
   if (displayText) {
     updateSessionById(sessionId, (session) => ({
@@ -278,57 +280,27 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       logger,
       history: sessionHistory,
       systemContext: runtime.systemContext,
+      onAssistantStream: (update) => {
+        streamingBuffers.set(update.step, update.text);
+        state.setCurrentAssistantText(update.text || undefined);
+        if (update.done) {
+          streamingBuffers.delete(update.step);
+        }
+      },
       onEvent: (event) => {
-        if (event.type === 'assistant.stream') {
-          const existingId = streamingMessageIds.get(event.step);
-          const messageId = existingId ?? state.nextLocalId();
-          if (!existingId) {
-            streamingMessageIds.set(event.step, messageId);
-          }
-
+        if (event.type === 'assistant.turn' && event.content.trim() && !appendedAssistantSteps.has(event.step)) {
+          appendedAssistantSteps.add(event.step);
+          streamingBuffers.delete(event.step);
+          state.setCurrentAssistantText(undefined);
           updateSessionById(sessionId, (session) => {
-            const existingIndex = session.messages.findIndex((message) => message.id === messageId);
             const nextMessage = {
-              id: messageId,
+              id: state.nextLocalId(),
               role: 'assistant' as const,
               text: event.content,
-              isStreaming: !event.done,
             };
-
-            if (existingIndex >= 0) {
-              return {
-                ...session,
-                messages: session.messages.map((message, index) => (index === existingIndex ? nextMessage : message)),
-              };
-            }
-
             return {
               ...session,
               messages: [...session.messages, nextMessage],
-            };
-          });
-        }
-
-        if (event.type === 'assistant.turn' && event.content.trim() && !appendedAssistantSteps.has(event.step)) {
-          appendedAssistantSteps.add(event.step);
-          const streamingMessageId = streamingMessageIds.get(event.step);
-          updateSessionById(sessionId, (session) => {
-            const nextMessage = {
-              id: streamingMessageId ?? state.nextLocalId(),
-              role: 'assistant' as const,
-              text: event.content,
-            };
-
-            if (!streamingMessageId) {
-              return {
-                ...session,
-                messages: [...session.messages, nextMessage],
-              };
-            }
-
-            return {
-              ...session,
-              messages: session.messages.map((message) => (message.id === streamingMessageId ? nextMessage : message)),
             };
           });
         }
@@ -445,6 +417,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     }));
 
     if (result.outcome !== 'done') {
+      state.setCurrentAssistantText(undefined);
       updateSessionById(sessionId, (sessionToUpdate) => ({
         ...sessionToUpdate,
         messages: [

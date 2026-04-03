@@ -3,7 +3,13 @@
 // ---------------------------------------------------------------------------
 
 import OpenAI from 'openai';
-import type { ResponseInputItem, FunctionTool, ResponseFunctionToolCall, ResponseReasoningItem, Response } from 'openai/resources/responses/responses.js';
+import type {
+  ResponseInputItem,
+  FunctionTool,
+  ResponseReasoningItem,
+  Response,
+  ResponseStreamEvent,
+} from 'openai/resources/responses/responses.js';
 import type { LlmAdapter, ChatMessage, LlmResponse, LlmAdapterCapabilities, LlmUsage, LlmStreamEvent } from './types.js';
 import type { AssistantDiagnostics, ToolDefinition, ToolCall } from '../types.js';
 import { DEFAULT_OPENAI_MODEL } from '../config.js';
@@ -40,7 +46,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
       signal?: AbortSignal,
       onStreamEvent?: (event: LlmStreamEvent) => void,
     ): Promise<LlmResponse> {
-      const response = await client.responses.create({
+      const stream = await client.responses.stream({
         model,
         input: toResponseInput(messages),
         tools: tools.length > 0 ? tools.map(toResponseTool) : undefined,
@@ -49,17 +55,41 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
         },
       }, { signal });
 
-      const toolCalls = response.output
-        .filter((item): item is ResponseFunctionToolCall => item.type === 'function_call')
-        .map((item): ToolCall => ({
+      let streamedContent = '';
+      for await (const event of stream as AsyncIterable<ResponseStreamEvent>) {
+        if (event.type === 'response.output_text.delta' && event.delta) {
+          streamedContent += event.delta;
+          onStreamEvent?.({ type: 'content.delta', delta: event.delta });
+          continue;
+        }
+
+        if (event.type === 'response.output_text.done') {
+          streamedContent = event.text;
+          onStreamEvent?.({ type: 'content.done', content: event.text });
+        }
+      }
+
+      const response = await stream.finalResponse();
+      const toolCalls = response.output.flatMap((item): ToolCall[] => {
+        if (
+          item.type !== 'function_call'
+          || typeof (item as { call_id?: unknown }).call_id !== 'string'
+          || typeof (item as { name?: unknown }).name !== 'string'
+          || typeof (item as { arguments?: unknown }).arguments !== 'string'
+        ) {
+          return [];
+        }
+
+        return [{
           id: item.call_id,
           tool: item.name,
           input: JSON.parse(item.arguments),
-        }));
+        }];
+      });
       const diagnostics = extractAssistantDiagnostics(response, toolCalls.length > 0);
-      const content = diagnostics?.rationale ?? extractAssistantContent(response, toolCalls.length > 0);
+      const content = streamedContent || (diagnostics?.rationale ?? extractAssistantContent(response, toolCalls.length > 0));
 
-      if (content) {
+      if (!streamedContent && content) {
         onStreamEvent?.({ type: 'content.delta', delta: content });
         onStreamEvent?.({ type: 'content.done', content });
       }
