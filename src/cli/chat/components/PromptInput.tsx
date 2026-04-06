@@ -3,7 +3,6 @@ import { Box, Text, useInput } from 'ink';
 
 const DEFAULT_MAX_VISIBLE_INPUT_LINES = 8;
 const FALLBACK_WRAP_WIDTH = 80;
-const CURSOR_GLYPH = '|';
 
 export type PromptKeyInput = {
   input: string;
@@ -163,7 +162,7 @@ export function PromptInput({
     onCursorChange(cursor + input.length);
   }, { isActive: !isDisabled });
 
-  const lines = useMemo(() => buildPromptLines(value, cursor, maxVisibleLines), [value, cursor, maxVisibleLines]);
+  const lines = useMemo(() => buildPromptRenderLines(value, cursor, maxVisibleLines), [value, cursor, maxVisibleLines]);
 
   if (!value) {
     return <Text dimColor>{placeholder}</Text>;
@@ -172,21 +171,85 @@ export function PromptInput({
   return (
     <Box flexDirection="column">
       {lines.map((line, index) => (
-        <Text key={`${index}-${line}`}>{line || ' '}</Text>
+        <Text key={`${index}-${line.before}-${line.cursor}-${line.after}-${line.hasCursor}`}>
+          {line.hasCursor ?
+            <>
+              {line.before}
+              <Text inverse>{line.cursor}</Text>
+              {line.after}
+            </>
+          : (line.before || ' ')}
+        </Text>
       ))}
     </Box>
   );
 }
 
-function buildPromptLines(value: string, cursor: number, maxVisibleLines: number): string[] {
-  const withCursor = `${value.slice(0, cursor)}${CURSOR_GLYPH}${value.slice(cursor)}`;
-  const rawLines = withCursor.split('\n');
-  const wrapped = rawLines.flatMap((line) => wrapLine(line, FALLBACK_WRAP_WIDTH));
-  if (wrapped.length <= maxVisibleLines) {
-    return wrapped;
+export type PromptRenderLine = {
+  before: string;
+  cursor: string;
+  after: string;
+  hasCursor: boolean;
+};
+
+export function buildPromptRenderLines(
+  value: string,
+  cursor: number,
+  maxVisibleLines: number,
+  width = FALLBACK_WRAP_WIDTH,
+): PromptRenderLine[] {
+  const rawLines = value.split('\n');
+  const rendered: PromptRenderLine[] = [];
+  let logicalOffset = 0;
+
+  for (let lineIndex = 0; lineIndex < rawLines.length; lineIndex += 1) {
+    const line = rawLines[lineIndex] ?? '';
+    const wrapped = wrapLine(line, width);
+    const lineStart = logicalOffset;
+    const lineEnd = lineStart + line.length;
+    const isLastLogicalLine = lineIndex === rawLines.length - 1;
+    let segmentStart = lineStart;
+
+    for (let segmentIndex = 0; segmentIndex < wrapped.length; segmentIndex += 1) {
+      const segment = wrapped[segmentIndex] ?? '';
+      const segmentEnd = segmentStart + segment.length;
+      const isLastWrappedSegment = segmentIndex === wrapped.length - 1;
+      const hasCursor =
+        cursor >= segmentStart &&
+        (
+          cursor < segmentEnd ||
+          (segment.length === 0 && cursor === segmentStart) ||
+          (isLastWrappedSegment && isLastLogicalLine && cursor === lineEnd)
+        );
+
+      if (hasCursor) {
+        const cursorOffset = cursor - segmentStart;
+        rendered.push({
+          before: segment.slice(0, cursorOffset),
+          cursor: segment[cursorOffset] ?? ' ',
+          after: segment.slice(cursorOffset + 1),
+          hasCursor: true,
+        });
+      } else {
+        rendered.push({
+          before: segment,
+          cursor: '',
+          after: '',
+          hasCursor: false,
+        });
+      }
+
+      segmentStart = segmentEnd;
+    }
+
+    logicalOffset = lineEnd + 1;
   }
 
-  return wrapped.slice(wrapped.length - maxVisibleLines);
+  if (rendered.length <= maxVisibleLines) {
+    return rendered;
+  }
+
+  return rendered.slice(rendered.length - maxVisibleLines);
 }
 
 function wrapLine(line: string, width: number): string[] {
