@@ -2,6 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { isLikelyLocalCommand, runLocalCommand } from '../cli/chat/state/local-commands.js';
 
 describe('runLocalCommand', () => {
+  it('treats bare and partial slash command roots as local commands for hints', () => {
+    expect(isLikelyLocalCommand('/')).toBe(true);
+    expect(isLikelyLocalCommand('/h')).toBe(true);
+    expect(isLikelyLocalCommand('/mo')).toBe(true);
+    expect(isLikelyLocalCommand('/sess')).toBe(true);
+  });
+
   it('does not treat absolute unix paths as slash commands', () => {
     expect(isLikelyLocalCommand('/Users/roackb2/Desktop/screenshot.png')).toBe(false);
   });

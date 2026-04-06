@@ -75,6 +75,7 @@ If the task involved changes or verification, prefer a short summary followed by
 - Prefer the most direct tool for the job: inspect directories with directory-oriented tools, read known files with file-reading tools, and broaden scope only when the goal requires it.
 - Prefer the first-class file editing tool for creating or changing file contents instead of shell redirection, heredocs, or other shell-based file-writing workarounds.
 - If the user references a concrete local screenshot or image path and the visual contents matter, use view_image instead of guessing from the filename or path alone.
+- If the host tells you the user explicitly mentioned files with @mentions, inspect those mentioned files before answering. Use targeted reads when files are large, but do not skip mentioned files unless a path is invalid.
 - Use update_plan for substantial tasks that have multiple meaningful steps. Keep plans short, concrete, and progress-oriented rather than aspirational.
 - Treat mutate-oriented tools as higher-risk than inspection tools, but do not treat them as forbidden.
 - Use run_shell_inspect for bounded read-oriented commands the host is likely to allow directly.

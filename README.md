@@ -18,6 +18,7 @@ It is open source, provider-agnostic, and currently supports OpenAI and Anthropi
 - provider-agnostic model support across OpenAI and Anthropic
 - hosted web search through `web_search`
 - local image viewing from referenced file paths through `view_image`
+- inline `@file` mentions that tell the agent which workspace files to inspect first
 - multi-turn sessions with save, switch, continue, rename, and close flows
 - automatic conversation compaction for longer chats
 - lightweight working-plan tracking through `update_plan`
@@ -74,6 +75,7 @@ Heddle currently supports:
 - code and doc changes with `edit_file`
 - hosted web search through `web_search`
 - local screenshot and image inspection through `view_image`
+- inline `@file` mentions for file-priority context without pasting file contents into the prompt
 - shell execution with inspect vs approval-gated mutate behavior
 - multi-turn chat sessions with saved history under `.heddle/`
 - session management with create, switch, continue, rename, and close flows
@@ -83,6 +85,8 @@ Heddle currently supports:
 - interrupt and resume support for longer-running coding workflows
 
 The image workflow is intentionally simple for now: users can reference a local image path in chat, and the agent can decide whether to inspect it with `view_image`. Heddle does not require a full multimodal attachment model for this first version.
+
+The file-mention workflow is also intentionally lightweight: `@path/to/file` tells Heddle that the file is important context and should be inspected before answering, but it does not automatically inline the file contents into the prompt.
 
 The planning workflow is also intentionally lightweight: Heddle does not force a heavyweight planner or a separate "plan mode," but it can automatically record and update a short plan when a task is substantial enough to benefit from visible progress tracking.
 
@@ -124,6 +128,7 @@ Typical chat use cases:
 - keep a long coding conversation usable through saved sessions, `/continue`, and automatic history compaction
 - let the agent create and update a short working plan for a multi-step implementation
 - search official docs or other current external references with `web_search`
+- mention important repo files with `@path/to/file` so the agent treats them as first-pass context
 - reference a local screenshot path and have the agent inspect it with `view_image`
 - run direct shell commands from chat with `!<command>`
 - pause and later resume earlier sessions
@@ -207,40 +212,6 @@ Notes:
 - Gemini model names are recognized by provider inference, but a Google adapter is not wired yet
 - you can pass another model name with `--model`, but it only works if the corresponding provider adapter supports it
 
-## Current Functionality
-
-The current runtime exposes a small set of repo-oriented capabilities:
-
-- list files
-- read files
-- search files
-- search the public web through a host-side `web_search` tool
-- inspect local images through a host-side `view_image` tool
-- edit files
-- run shell commands in inspect or approval-gated mutate mode
-- report state
-- update a plan during a run
-
-Operator-facing behavior includes:
-
-- explicit approval flow for risky tool calls and mutate commands
-- project-level remembered command approvals
-- per-project state under `.heddle/`
-- saved chat sessions and resumable chat workflow
-- automatic chat-history compaction for longer-running conversations
-- short visible working-plan updates for substantial tasks
-- trace logs for runs and tool activity
-- project instruction injection from `AGENTS.md` by default
-
-Chat usage notes:
-
-- use `/continue` for built-in resume behavior
-- use `/model`, `/model list`, or `/model set` to inspect or switch models in chat
-- use `/session` commands to create, switch, continue, rename, and close saved sessions
-- use `!<command>` to run shell commands directly from the composer
-- during approval, `A` remembers the current mutate command for the project, while `Y` approves once and `N` denies
-- if a long-running turn appears stuck, `Esc` requests an interrupt
-
 ## Project Config
 
 You can store project defaults in `heddle.config.json`:
@@ -268,23 +239,7 @@ Field notes:
 - `searchIgnoreDirs`: directories excluded from `search_files`
 - `agentContextPaths`: project instruction files injected into the system prompt
 
-## Who It Is For
-
-Heddle is for people who want a coding agent that runs in a real repository with visible traces and explicit host-side control.
-
-It is a good fit if you want:
-
-- a CLI-first coding assistant
-- a minimal runtime you can inspect and extend
-- direct workspace execution instead of a hosted IDE product
-
-It is not trying to be:
-
-- a no-code agent builder
-- a multi-agent orchestration framework
-- a general prompt workflow library
-
-## Runtime And Library
+## Programmatic Use
 
 The npm package also exports the core runtime pieces for programmatic use, including:
 
@@ -303,7 +258,16 @@ The public API lives in [src/index.ts](/Users/roackb2/Studio/projects/ProjectHed
 
 ## Design Direction
 
-Heddle's long-term goal is broader than the current CLI: a credible general runtime for tool-using agents. The current implementation stays deliberately narrow and behavior-first so abstractions only get added after real runtime traces justify them.
+Heddle is currently optimized for coding and terminal workflows, but the long-term goal is broader: an open, provider-agnostic runtime for tool-using agents in real working environments.
+
+The current CLI is the proving ground, not the endpoint. The coding-agent workflow matters because it is a demanding, evidence-heavy environment with real files, shell tools, long-running context, and operator oversight. If the runtime holds up there, it can later support wider agentic workflows beyond software projects.
+
+The design direction stays intentionally behavior-first:
+
+- start from real agent loops, traces, approvals, and recovery behavior
+- keep the current surface small until abstractions are justified by actual usage
+- stay usable as a coding agent while growing toward a more general agent runtime
+- support richer workspace tasks, not just code editing, whenever the environment already provides the right tools
 
 More project context:
 

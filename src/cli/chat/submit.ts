@@ -28,6 +28,7 @@ type SubmitChatPromptArgs = {
   createSession: (name?: string) => ChatSession;
   renameSession: (name: string) => void;
   listRecentSessionsMessage: string[];
+  preparePrompt?: (prompt: string) => { prompt: string; displayText?: string };
   executeTurn: (prompt: string, displayText?: string, sessionIdOverride?: string) => Promise<void>;
   executeDirectShellCommand: (rawCommand: string) => Promise<void>;
 };
@@ -67,7 +68,8 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
   } satisfies LocalCommandDeps);
 
   if (!commandResult.handled) {
-    await args.executeTurn(prompt, prompt);
+    const prepared = args.preparePrompt ? args.preparePrompt(prompt) : { prompt, displayText: prompt };
+    await args.executeTurn(prepared.prompt, prepared.displayText ?? prompt);
     return;
   }
 

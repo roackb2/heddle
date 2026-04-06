@@ -5,6 +5,7 @@ import {
   ApprovalComposer,
   CommandHintPanel,
   ConversationPanel,
+  FileMentionPickerPanel,
   ModelPickerPanel,
   PromptInput,
   SessionPickerPanel,
@@ -18,6 +19,7 @@ import { useAgentRun } from './hooks/useAgentRun.js';
 import { useChatSessions } from './hooks/useChatSessions.js';
 import { submitChatPrompt } from './submit.js';
 import { currentActivityText } from './utils/format.js';
+import { buildPromptWithFileMentions, filterMentionableFiles, getMentionQuery, insertMentionSelection, listMentionableFiles } from './utils/file-mentions.js';
 import type { ChatRuntimeConfig } from './utils/runtime.js';
 
 const SESSION_TITLE_MODEL = 'gpt-5.1-codex-mini';
@@ -26,10 +28,19 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   const nextIdRef = useRef(0);
   const [activeModel, setActiveModel] = useState(runtime.model);
   const [draft, setDraft] = useState('');
+  const [draftCursor, setDraftCursor] = useState(0);
   const [pendingSubmittedPrompt, setPendingSubmittedPrompt] = useState<string | undefined>();
   const [modelPickerIndex, setModelPickerIndex] = useState(0);
   const [sessionPickerIndex, setSessionPickerIndex] = useState(0);
+  const [fileMentionPickerIndex, setFileMentionPickerIndex] = useState(0);
   const nextLocalId = () => `ui-${Date.now()}-${nextIdRef.current++}`;
+  const mentionableFiles = useState(() => listMentionableFiles(runtime.workspaceRoot, runtime.searchIgnoreDirs))[0];
+  const mentionQuery = getMentionQuery(draft);
+  const fileMentionPickerVisible = mentionQuery !== undefined;
+  const filteredMentionFiles = fileMentionPickerVisible ? filterMentionableFiles(mentionableFiles, mentionQuery) : [];
+  const safeFileMentionPickerIndex =
+    filteredMentionFiles.length === 0 ? 0 : Math.min(fileMentionPickerIndex, Math.max(0, filteredMentionFiles.length - 1));
+  const highlightedMentionFile = filteredMentionFiles[safeFileMentionPickerIndex];
   const modelPickerQuery = getModelPickerQuery(draft);
   const modelPickerVisible = modelPickerQuery !== undefined;
   const filteredModels = modelPickerVisible ? filterBuiltInModels(modelPickerQuery) : [];
@@ -62,6 +73,13 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   const safeSessionPickerIndex =
     filteredSessions.length === 0 ? 0 : Math.min(sessionPickerIndex, Math.max(0, filteredSessions.length - 1));
   const highlightedSession = filteredSessions[safeSessionPickerIndex];
+  const preparePromptWithMentions = (prompt: string) => {
+    const prepared = buildPromptWithFileMentions(prompt, runtime.workspaceRoot, mentionableFiles);
+    return {
+      prompt: prepared.runPrompt,
+      displayText: prompt,
+    };
+  };
 
   useEffect(() => {
     if (!activeSession) {
@@ -129,6 +147,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   const switchSession = (id: string) => {
     setActiveSessionId(id);
     setDraft('');
+    setDraftCursor(0);
     resetRunState({ abortInFlight: true });
   };
 
@@ -143,6 +162,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     const removedActive = removeSession(id);
     if (removedActive) {
       setDraft('');
+      setDraftCursor(0);
       setPendingSubmittedPrompt(undefined);
       resetRunState({ abortInFlight: true });
     }
@@ -203,6 +223,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
 
     if (modelPickerVisible && highlightedModel) {
       setDraft('');
+      setDraftCursor(0);
       setModelPickerIndex(0);
       await submitChatPrompt({
         value: `/model ${highlightedModel}`,
@@ -223,6 +244,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         createSession,
         renameSession,
         listRecentSessionsMessage,
+        preparePrompt: preparePromptWithMentions,
         executeTurn,
         executeDirectShellCommand,
       });
@@ -231,6 +253,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
 
     if (sessionPickerVisible && highlightedSession) {
       setDraft('');
+      setDraftCursor(0);
       setSessionPickerIndex(0);
       await submitChatPrompt({
         value: `/session switch ${highlightedSession.id}`,
@@ -251,14 +274,24 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         createSession,
         renameSession,
         listRecentSessionsMessage,
+        preparePrompt: preparePromptWithMentions,
         executeTurn,
         executeDirectShellCommand,
       });
       return;
     }
 
+    if (fileMentionPickerVisible && highlightedMentionFile) {
+      const nextDraft = insertMentionSelection(value, highlightedMentionFile);
+      setDraft(nextDraft);
+      setDraftCursor(nextDraft.length);
+      setFileMentionPickerIndex(0);
+      return;
+    }
+
     setModelPickerIndex(0);
     setSessionPickerIndex(0);
+    setFileMentionPickerIndex(0);
     await submitChatPrompt({
       value,
       isRunning: effectiveIsRunning,
@@ -278,6 +311,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
       createSession,
       renameSession,
       listRecentSessionsMessage,
+      preparePrompt: preparePromptWithMentions,
       executeTurn,
       executeDirectShellCommand,
     });
@@ -288,6 +322,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     highlightedModel,
     sessionPickerVisible,
     highlightedSession,
+    fileMentionPickerVisible,
+    highlightedMentionFile,
     activeModel,
     sessions,
     recentSessions,
@@ -303,6 +339,9 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     executeTurn,
     executeDirectShellCommand,
     appendPendingUserMessage,
+    mentionableFiles,
+    runtime.workspaceRoot,
+    preparePromptWithMentions,
   ]);
 
   useEffect(() => {
@@ -365,6 +404,13 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
                 highlightedIndex={safeSessionPickerIndex}
               />
             : null}
+            {fileMentionPickerVisible ?
+              <FileMentionPickerPanel
+                query={mentionQuery}
+                files={filteredMentionFiles}
+                highlightedIndex={safeFileMentionPickerIndex}
+              />
+            : null}
             {shouldShowSlashHints(draft) ?
               <SlashHintPanel draft={draft} activeSessionId={activeSession?.id ?? ''} sessions={sessions} />
             : shouldShowCommandHint(draft) ?
@@ -375,16 +421,21 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
               <Box flexGrow={1}>
                 <PromptInput
                   value={draft}
+                  cursor={draftCursor}
                   isDisabled={Boolean(pendingApproval)}
                   placeholder={isRunning ? "Keep typing while Heddle works" : "Ask Heddle about this project"}
                   maxVisibleLines={10}
                   onChange={setDraft}
+                  onCursorChange={setDraftCursor}
                   onSpecialKey={({ key }) => {
                     if (modelPickerVisible) {
                       return handlePickerKeys({
                         key,
                         itemCount: filteredModels.length,
-                        resetDraft: () => setDraft(''),
+                        resetDraft: () => {
+                          setDraft('');
+                          setDraftCursor(0);
+                        },
                         resetIndex: () => setModelPickerIndex(0),
                         advance: () => setModelPickerIndex((current) => (current + 1) % filteredModels.length),
                         retreat: () => setModelPickerIndex((current) => (current <= 0 ? filteredModels.length - 1 : current - 1)),
@@ -395,10 +446,27 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
                       return handlePickerKeys({
                         key,
                         itemCount: filteredSessions.length,
-                        resetDraft: () => setDraft(''),
+                        resetDraft: () => {
+                          setDraft('');
+                          setDraftCursor(0);
+                        },
                         resetIndex: () => setSessionPickerIndex(0),
                         advance: () => setSessionPickerIndex((current) => (current + 1) % filteredSessions.length),
                         retreat: () => setSessionPickerIndex((current) => (current <= 0 ? filteredSessions.length - 1 : current - 1)),
+                      });
+                    }
+
+                    if (fileMentionPickerVisible) {
+                      return handlePickerKeys({
+                        key,
+                        itemCount: filteredMentionFiles.length,
+                        resetDraft: () => {
+                          setDraft('');
+                          setDraftCursor(0);
+                        },
+                        resetIndex: () => setFileMentionPickerIndex(0),
+                        advance: () => setFileMentionPickerIndex((current) => (current + 1) % filteredMentionFiles.length),
+                        retreat: () => setFileMentionPickerIndex((current) => (current <= 0 ? filteredMentionFiles.length - 1 : current - 1)),
                       });
                     }
 
@@ -406,6 +474,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
                   }}
                   onSubmit={(value) => {
                     setDraft('');
+                    setDraftCursor(0);
                     void submitPrompt(value);
                   }}
                 />

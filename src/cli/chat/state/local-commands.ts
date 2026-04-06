@@ -22,6 +22,7 @@ type PrefixCommandHandler = (args: LocalCommandArgs, value: string) => LocalComm
 
 const MODEL_LIST_MESSAGE = ['Common built-in model choices', '', formatBuiltInModelGroups()].join('\n');
 const MODEL_SET_HELP_MESSAGE = 'Use /model set <query> to filter models, then use arrows and Enter to choose one.';
+const COMMAND_ROOTS = ['help', 'models', 'model', 'continue', 'clear', 'session'] as const;
 const HELP_MESSAGE = [
   'Local commands',
   '',
@@ -101,6 +102,19 @@ export function isLikelyLocalCommand(prompt: string): boolean {
   const trimmed = prompt.trim();
   if (!trimmed.startsWith('/')) {
     return false;
+  }
+
+  const firstToken = trimmed.slice(1).split(/\s+/, 1)[0] ?? '';
+  if (firstToken.includes('/')) {
+    return false;
+  }
+
+  if (firstToken.length === 0) {
+    return true;
+  }
+
+  if (COMMAND_ROOTS.some((root) => root.startsWith(firstToken))) {
+    return true;
   }
 
   if (EXACT_COMMANDS.has(trimmed)) {

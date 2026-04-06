@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 
 const DEFAULT_MAX_VISIBLE_INPUT_LINES = 8;
 const FALLBACK_WRAP_WIDTH = 80;
-const CURSOR_GLYPH = '▌';
+const CURSOR_GLYPH = '|';
 
 export type PromptKeyInput = {
   input: string;
@@ -30,7 +30,9 @@ export function PromptInput({
   isDisabled,
   placeholder,
   maxVisibleLines = DEFAULT_MAX_VISIBLE_INPUT_LINES,
+  cursor,
   onChange,
+  onCursorChange,
   onSubmit,
   onSpecialKey,
 }: {
@@ -38,12 +40,12 @@ export function PromptInput({
   isDisabled: boolean;
   placeholder: string;
   maxVisibleLines?: number;
+  cursor: number;
   onChange: (value: string) => void;
+  onCursorChange: (cursor: number) => void;
   onSubmit: (value: string) => void;
   onSpecialKey?: (event: PromptKeyInput) => boolean;
 }) {
-  const [cursor, setCursor] = useState(value.length);
-
   useInput((input, key) => {
     if (isDisabled) {
       return;
@@ -55,26 +57,25 @@ export function PromptInput({
 
     if (key.return && !key.shift) {
       onSubmit(value);
-      setCursor(0);
       return;
     }
 
     if (key.return && key.shift) {
       onChange(insertAtCursor(value, cursor, '\n'));
-      setCursor(cursor + 1);
+      onCursorChange(cursor + 1);
       return;
     }
 
     if (key.meta && key.backspace) {
       const nextCursor = findPreviousWordBoundary(value, cursor);
       onChange(removeRange(value, nextCursor, cursor));
-      setCursor(nextCursor);
+      onCursorChange(nextCursor);
       return;
     }
 
     if (key.ctrl && input === 'u') {
       onChange(value.slice(cursor));
-      setCursor(0);
+      onCursorChange(0);
       return;
     }
 
@@ -84,19 +85,29 @@ export function PromptInput({
     }
 
     if (key.ctrl && input === 'a') {
-      setCursor(0);
+      onCursorChange(0);
       return;
     }
 
     if (key.ctrl && input === 'e') {
-      setCursor(value.length);
+      onCursorChange(value.length);
       return;
     }
 
     if (key.ctrl && input === 'w') {
       const nextCursor = findPreviousWordBoundary(value, cursor);
       onChange(removeRange(value, nextCursor, cursor));
-      setCursor(nextCursor);
+      onCursorChange(nextCursor);
+      return;
+    }
+
+    if (key.meta && input === 'b') {
+      onCursorChange(findPreviousWordBoundary(value, cursor));
+      return;
+    }
+
+    if (key.meta && input === 'f') {
+      onCursorChange(findNextWordBoundary(value, cursor));
       return;
     }
 
@@ -106,27 +117,37 @@ export function PromptInput({
       }
 
       onChange(removeRange(value, cursor - 1, cursor));
-      setCursor(cursor - 1);
+      onCursorChange(cursor - 1);
+      return;
+    }
+
+    if (key.meta && key.leftArrow) {
+      onCursorChange(findPreviousWordBoundary(value, cursor));
+      return;
+    }
+
+    if (key.meta && key.rightArrow) {
+      onCursorChange(findNextWordBoundary(value, cursor));
       return;
     }
 
     if (key.leftArrow) {
-      setCursor(Math.max(0, cursor - 1));
+      onCursorChange(Math.max(0, cursor - 1));
       return;
     }
 
     if (key.rightArrow) {
-      setCursor(Math.min(value.length, cursor + 1));
+      onCursorChange(Math.min(value.length, cursor + 1));
       return;
     }
 
     if (key.home) {
-      setCursor(0);
+      onCursorChange(0);
       return;
     }
 
     if (key.end) {
-      setCursor(value.length);
+      onCursorChange(value.length);
       return;
     }
 
@@ -139,7 +160,7 @@ export function PromptInput({
     }
 
     onChange(insertAtCursor(value, cursor, input));
-    setCursor(cursor + input.length);
+    onCursorChange(cursor + input.length);
   }, { isActive: !isDisabled });
 
   const lines = useMemo(() => buildPromptLines(value, cursor, maxVisibleLines), [value, cursor, maxVisibleLines]);
@@ -197,6 +218,20 @@ function findPreviousWordBoundary(value: string, cursor: number): number {
 
   while (index > 0 && !isWordBoundary(value[index - 1])) {
     index--;
+  }
+
+  return index;
+}
+
+function findNextWordBoundary(value: string, cursor: number): number {
+  let index = cursor;
+
+  while (index < value.length && isWordBoundary(value[index])) {
+    index++;
+  }
+
+  while (index < value.length && !isWordBoundary(value[index])) {
+    index++;
   }
 
   return index;
