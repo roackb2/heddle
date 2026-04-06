@@ -1,10 +1,23 @@
 {
   "name": "@roackb2/heddle",
-  "version": "0.0.2",
-  "description": "A minimal TypeScript runtime for tool-using agents",
+  "version": "0.0.3",
+  "description": "An open-source terminal coding agent runtime and CLI with OpenAI and Anthropic support",
+  "author": "Jay / Fienna Liang <roackb2@gmail.com>",
+  "license": "MIT",
   "type": "module",
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roackb2/heddle.git"
+  },
+  "homepage": "https://github.com/roackb2/heddle#readme",
+  "bugs": {
+    "url": "https://github.com/roackb2/heddle/issues"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "bin": {
     "heddle": "dist/src/cli/main.js"
@@ -31,12 +44,21 @@
   },
   "keywords": [
     "agent",
+    "coding-agent",
+    "terminal-agent",
+    "cli-agent",
+    "ai-cli",
+    "developer-tools",
+    "workspace-agent",
+    "repository-tools",
     "llm",
-    "tools",
-    "runtime",
-    "trace"
+    "open-source",
+    "provider-agnostic",
+    "openai",
+    "anthropic",
+    "trace",
+    "chat"
   ],
-  "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
     "@inkjs/ui": "^2.0.0",

@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runLocalCommand } from '../cli/chat/state/local-commands.js';
+import { isLikelyLocalCommand, runLocalCommand } from '../cli/chat/state/local-commands.js';
 
 describe('runLocalCommand', () => {
+  it('does not treat absolute unix paths as slash commands', () => {
+    expect(isLikelyLocalCommand('/Users/roackb2/Desktop/screenshot.png')).toBe(false);
+  });
+
   it('lists grouped common built-in model choices with multi-line formatting', () => {
     const result = runLocalCommand({
       prompt: '/model list',
@@ -170,5 +174,24 @@ describe('runLocalCommand', () => {
       sessionId: 'session-b',
       message: 'Switched to session-b (B).\nContinuing from that session transcript.',
     });
+  });
+
+  it('passes through absolute unix paths as normal prompts', () => {
+    const result = runLocalCommand({
+      prompt: '/Users/roackb2/Desktop/screenshot.png can you describe this image',
+      activeModel: 'gpt-5.1-codex',
+      setActiveModel: vi.fn(),
+      sessions: [],
+      recentSessions: [],
+      activeSessionId: 'session-1',
+      switchSession: vi.fn(),
+      createSession: vi.fn(),
+      renameSession: vi.fn(),
+      removeSession: vi.fn(),
+      clearConversation: vi.fn(),
+      listRecentSessionsMessage: [],
+    });
+
+    expect(result).toEqual({ handled: false });
   });
 });

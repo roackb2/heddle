@@ -102,12 +102,6 @@ Current concrete next step:
 - guarantee that every non-successful run still leaves a visible terminal summary in the conversation, not only a status badge
 - use this as the main acceptance bar for asking Heddle to implement the next bounded product improvement itself
 
-Adjacent capability direction now documented:
-
-- hosted web search should land first as a normal host-side `web_search` tool backed by provider search rather than a new provider-native tool abstraction
-- image support should start with local path references plus a host-side `view_image` tool, not full multimodal attachments
-- rationale and rollout notes live in [Web Search And Image Viewing](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/web-search-and-image-viewing.md)
-
 Direction for shell evolution:
 
 - the current allowlist-based `run_shell_mutate` is a bootstrap, not the intended end state

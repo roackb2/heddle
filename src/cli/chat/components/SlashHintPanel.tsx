@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { ChatSession } from '../state/types.js';
+import { isLikelyLocalCommand } from '../state/local-commands.js';
 
 export function SlashHintPanel({
   draft,
@@ -26,7 +27,7 @@ export function SlashHintPanel({
 }
 
 export function shouldShowSlashHints(draft: string): boolean {
-  return draft.trimStart().startsWith('/');
+  return isLikelyLocalCommand(draft);
 }
 
 function getSlashHints(

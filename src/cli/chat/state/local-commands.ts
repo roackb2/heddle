@@ -97,9 +97,22 @@ const PREFIX_COMMANDS: Array<{ prefix: string; handle: PrefixCommandHandler }> =
   { prefix: '/session close ', handle: handleSessionClose },
 ];
 
+export function isLikelyLocalCommand(prompt: string): boolean {
+  const trimmed = prompt.trim();
+  if (!trimmed.startsWith('/')) {
+    return false;
+  }
+
+  if (EXACT_COMMANDS.has(trimmed)) {
+    return true;
+  }
+
+  return PREFIX_COMMANDS.some((entry) => trimmed === entry.prefix.trimEnd() || trimmed.startsWith(entry.prefix));
+}
+
 export function runLocalCommand(args: LocalCommandArgs): LocalCommandResult {
   const trimmed = args.prompt.trim();
-  if (!trimmed.startsWith('/')) {
+  if (!isLikelyLocalCommand(trimmed)) {
     return { handled: false };
   }
 

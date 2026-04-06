@@ -1,13 +1,28 @@
 # Heddle
 
-Heddle is a terminal coding agent runtime and CLI built mainly for interactive chat inside a real project directory, with tool calls, command approval, traces, and persistent chat state.
+Heddle is a terminal coding agent runtime and CLI.
 
-It is built for repository work such as:
+It is open source, provider-agnostic, and currently supports OpenAI and Anthropic models.
 
-- understanding an unfamiliar codebase
-- searching, reading, and editing files
-- running shell commands with explicit approval for risky actions
-- keeping a trace of what the agent did in `.heddle/`
+## How Heddle Helps
+
+- daily development work in real coding projects
+- understanding unfamiliar repositories and carrying fixes through inspection, edits, and verification
+- infrastructure and environment inspection through approval-gated shell commands
+- broader terminal-based agent workflows whenever the needed CLI tools already exist in the environment
+- tasks such as image, media, or document processing through existing command-line tools like `ffmpeg`, ImageMagick, or project-specific scripts
+- long-running multi-step work that benefits from chat continuity, short plans, and explicit operator control
+
+## Advanced Capabilities
+
+- provider-agnostic model support across OpenAI and Anthropic
+- hosted web search through `web_search`
+- local image viewing from referenced file paths through `view_image`
+- multi-turn sessions with save, switch, continue, rename, and close flows
+- automatic conversation compaction for longer chats
+- lightweight working-plan tracking through `update_plan`
+- approval-gated shell execution with remembered per-project approvals
+- trace logs, persistent chat state, and project instruction loading under `.heddle/`
 
 ## Install
 
@@ -51,6 +66,26 @@ Heddle uses the current directory as the workspace root unless you pass `--cwd`.
 
 The default workflow is interactive chat, not one-shot prompts. You keep a session open, inspect the repo, switch models, run direct shell commands when needed, and continue earlier sessions later.
 
+## Core Capabilities
+
+Heddle currently supports:
+
+- repository inspection with `list_files`, `read_file`, and `search_files`
+- code and doc changes with `edit_file`
+- hosted web search through `web_search`
+- local screenshot and image inspection through `view_image`
+- shell execution with inspect vs approval-gated mutate behavior
+- multi-turn chat sessions with saved history under `.heddle/`
+- session management with create, switch, continue, rename, and close flows
+- automatic conversation compaction so longer chats preserve context instead of growing unbounded
+- short working-plan support through `update_plan` for substantial multi-step tasks
+- remembered per-project approvals for repeated commands and edits
+- interrupt and resume support for longer-running coding workflows
+
+The image workflow is intentionally simple for now: users can reference a local image path in chat, and the agent can decide whether to inspect it with `view_image`. Heddle does not require a full multimodal attachment model for this first version.
+
+The planning workflow is also intentionally lightweight: Heddle does not force a heavyweight planner or a separate "plan mode," but it can automatically record and update a short plan when a task is substantial enough to benefit from visible progress tracking.
+
 ## What Heddle Does
 
 Heddle runs an agent loop against your workspace:
@@ -86,6 +121,10 @@ Typical chat use cases:
 - ask Heddle to explain architecture, code paths, tests, or build setup
 - iterate on a fix over multiple prompts instead of fitting everything into one request
 - inspect files, search the repo, and edit code inside one persistent session
+- keep a long coding conversation usable through saved sessions, `/continue`, and automatic history compaction
+- let the agent create and update a short working plan for a multi-step implementation
+- search official docs or other current external references with `web_search`
+- reference a local screenshot path and have the agent inspect it with `view_image`
 - run direct shell commands from chat with `!<command>`
 - pause and later resume earlier sessions
 
@@ -176,6 +215,7 @@ The current runtime exposes a small set of repo-oriented capabilities:
 - read files
 - search files
 - search the public web through a host-side `web_search` tool
+- inspect local images through a host-side `view_image` tool
 - edit files
 - run shell commands in inspect or approval-gated mutate mode
 - report state
@@ -187,6 +227,8 @@ Operator-facing behavior includes:
 - project-level remembered command approvals
 - per-project state under `.heddle/`
 - saved chat sessions and resumable chat workflow
+- automatic chat-history compaction for longer-running conversations
+- short visible working-plan updates for substantial tasks
 - trace logs for runs and tool activity
 - project instruction injection from `AGENTS.md` by default
 
@@ -198,11 +240,6 @@ Chat usage notes:
 - use `!<command>` to run shell commands directly from the composer
 - during approval, `A` remembers the current mutate command for the project, while `Y` approves once and `N` denies
 - if a long-running turn appears stuck, `Esc` requests an interrupt
-
-Current roadmap note:
-
-- web search is now landing as a normal host-side tool backed by hosted provider search
-- image support is planned to start with local path references plus a host-side `view_image` tool before any full multimodal attachment redesign
 
 ## Project Config
 
@@ -273,7 +310,6 @@ More project context:
 - [Framework Vision](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/framework-vision.md)
 - [Project Purpose](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/project-purpose.md)
 - [Coding Agent Roadmap](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/coding-agent-roadmap.md)
-- [Web Search And Image Viewing](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/web-search-and-image-viewing.md)
 
 ## License
 

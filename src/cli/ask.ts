@@ -11,6 +11,7 @@ import {
   editFileTool,
   createSearchFilesTool,
   createWebSearchTool,
+  createViewImageTool,
   reportStateTool,
   createRunShellInspectTool,
   createRunShellMutateTool,
@@ -51,12 +52,18 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
     provider,
     apiKey: options.apiKey ?? resolveProviderApiKey(provider),
   });
+  const viewImageTool = createViewImageTool({
+    model,
+    provider,
+    apiKey: options.apiKey ?? resolveProviderApiKey(provider),
+  });
   const tools = [
     listFilesTool,
     readFileTool,
     editFileTool,
     createSearchFilesTool({ excludedDirs: options.searchIgnoreDirs }),
     webSearchTool,
+    viewImageTool,
     reportStateTool,
     createRunShellInspectTool(),
     createRunShellMutateTool(),

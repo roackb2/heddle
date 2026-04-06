@@ -16,6 +16,7 @@ import {
 } from '../tools/run-shell.js';
 import { createSearchFilesTool, searchFilesTool } from '../tools/search-files.js';
 import { webSearchTool } from '../tools/web-search.js';
+import { viewImageTool } from '../tools/view-image.js';
 
 describe('tool input validation', () => {
   it('rejects unexpected fields for list_files', async () => {
@@ -72,6 +73,8 @@ describe('tool input validation', () => {
     expect(webSearchTool.description).toContain('Search the public web');
     expect(webSearchTool.description).toContain("active model provider's hosted web search");
     expect(webSearchTool.description).toContain('{ "query": "OpenAI Responses API web search tool" }');
+    expect(viewImageTool.description).toContain('Inspect a local image file');
+    expect(viewImageTool.description).toContain('{ "path": "/absolute/path/to/screenshot.png" }');
     expect(reportStateTool.description).toContain('Use this when you are blocked, uncertain');
     expect(reportStateTool.description).toContain('tell the library author what capability, input, or support was missing');
     expect(reportStateTool.description).toContain('Returns the same structured report back');
@@ -230,6 +233,45 @@ describe('webSearchTool', () => {
       expect(result).toEqual({
         ok: false,
         error: 'web_search requires OPENAI_API_KEY (or PERSONAL_OPENAI_API_KEY) when the active model provider is OpenAI.',
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
+describe('viewImageTool', () => {
+  it('rejects invalid input', async () => {
+    const result = await viewImageTool.execute({ prompt: 'describe it' });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Invalid input for view_image. Required field: path. Optional field: prompt.',
+    });
+  });
+
+  it('rejects unsupported file types before any provider call', async () => {
+    const result = await viewImageTool.execute({ path: 'notes.txt' });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'view_image supports .png, .jpg, .jpeg, .gif, and .webp files.',
+    });
+  });
+
+  it('fails clearly when no OpenAI key is available for the default provider', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-view-image-'));
+    const imagePath = join(root, 'screen.png');
+    await writeFile(imagePath, 'fake');
+    vi.stubEnv('OPENAI_API_KEY', '');
+    vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
+
+    try {
+      const result = await viewImageTool.execute({ path: imagePath });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'view_image requires OPENAI_API_KEY (or PERSONAL_OPENAI_API_KEY) when the active model provider is OpenAI.',
       });
     } finally {
       vi.unstubAllEnvs();

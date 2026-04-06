@@ -9,6 +9,7 @@ import {
   createRunShellMutateTool,
   createSearchFilesTool,
   createWebSearchTool,
+  createViewImageTool,
   editFileTool,
   listFilesTool,
   readFileTool,
@@ -127,6 +128,10 @@ export function useAgentRun(args: UseAgentRunArgs) {
         model: activeModel,
         apiKey: activeApiKey,
       });
+      const viewImageTool = createViewImageTool({
+        model: activeModel,
+        apiKey: activeApiKey,
+      });
 
       return [
         listFilesTool,
@@ -134,6 +139,7 @@ export function useAgentRun(args: UseAgentRunArgs) {
         editFileTool,
         createSearchFilesTool({ excludedDirs: runtime.searchIgnoreDirs }),
         webSearchTool,
+        viewImageTool,
         reportStateTool,
         updatePlanTool,
         createRunShellInspectTool(),
