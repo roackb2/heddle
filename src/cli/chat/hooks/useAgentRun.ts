@@ -8,6 +8,7 @@ import {
   createRunShellInspectTool,
   createRunShellMutateTool,
   createSearchFilesTool,
+  createWebSearchTool,
   editFileTool,
   listFilesTool,
   readFileTool,
@@ -121,17 +122,25 @@ export function useAgentRun(args: UseAgentRunArgs) {
     [sessionTitleModel, titleApiKey],
   );
   const tools = useMemo(
-    () => [
-      listFilesTool,
-      readFileTool,
-      editFileTool,
-      createSearchFilesTool({ excludedDirs: runtime.searchIgnoreDirs }),
-      reportStateTool,
-      updatePlanTool,
-      createRunShellInspectTool(),
-      createRunShellMutateTool(),
-    ],
-    [runtime.searchIgnoreDirs],
+    () => {
+      const webSearchTool = createWebSearchTool({
+        model: activeModel,
+        apiKey: activeApiKey,
+      });
+
+      return [
+        listFilesTool,
+        readFileTool,
+        editFileTool,
+        createSearchFilesTool({ excludedDirs: runtime.searchIgnoreDirs }),
+        webSearchTool,
+        reportStateTool,
+        updatePlanTool,
+        createRunShellInspectTool(),
+        createRunShellMutateTool(),
+      ];
+    },
+    [activeApiKey, activeModel, runtime.searchIgnoreDirs],
   );
   const logger = useMemo<Logger>(
     () =>

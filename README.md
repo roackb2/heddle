@@ -175,6 +175,7 @@ The current runtime exposes a small set of repo-oriented capabilities:
 - list files
 - read files
 - search files
+- search the public web through a host-side `web_search` tool
 - edit files
 - run shell commands in inspect or approval-gated mutate mode
 - report state
@@ -197,6 +198,11 @@ Chat usage notes:
 - use `!<command>` to run shell commands directly from the composer
 - during approval, `A` remembers the current mutate command for the project, while `Y` approves once and `N` denies
 - if a long-running turn appears stuck, `Esc` requests an interrupt
+
+Current roadmap note:
+
+- web search is now landing as a normal host-side tool backed by hosted provider search
+- image support is planned to start with local path references plus a host-side `view_image` tool before any full multimodal attachment redesign
 
 ## Project Config
 
@@ -267,6 +273,7 @@ More project context:
 - [Framework Vision](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/framework-vision.md)
 - [Project Purpose](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/project-purpose.md)
 - [Coding Agent Roadmap](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/coding-agent-roadmap.md)
+- [Web Search And Image Viewing](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/web-search-and-image-viewing.md)
 
 ## License
 

@@ -10,6 +10,7 @@ import {
   readFileTool,
   editFileTool,
   createSearchFilesTool,
+  createWebSearchTool,
   reportStateTool,
   createRunShellInspectTool,
   createRunShellMutateTool,
@@ -45,11 +46,17 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
     model,
     apiKey: options.apiKey ?? resolveProviderApiKey(provider),
   });
+  const webSearchTool = createWebSearchTool({
+    model,
+    provider,
+    apiKey: options.apiKey ?? resolveProviderApiKey(provider),
+  });
   const tools = [
     listFilesTool,
     readFileTool,
     editFileTool,
     createSearchFilesTool({ excludedDirs: options.searchIgnoreDirs }),
+    webSearchTool,
     reportStateTool,
     createRunShellInspectTool(),
     createRunShellMutateTool(),

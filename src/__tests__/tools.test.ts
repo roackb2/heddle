@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { listFilesTool } from '../tools/list-files.js';
 import { readFileTool } from '../tools/read-file.js';
 import { editFileTool, previewEditFileInput } from '../tools/edit-file.js';
@@ -15,6 +15,7 @@ import {
   DEFAULT_MUTATE_RULES,
 } from '../tools/run-shell.js';
 import { createSearchFilesTool, searchFilesTool } from '../tools/search-files.js';
+import { webSearchTool } from '../tools/web-search.js';
 
 describe('tool input validation', () => {
   it('rejects unexpected fields for list_files', async () => {
@@ -68,6 +69,9 @@ describe('tool input validation', () => {
     expect(searchFilesTool.description).toContain('grep-style path:line:content format');
     expect(searchFilesTool.description).toContain('{ "query": "createUser" }');
     expect(searchFilesTool.description).toContain('{ "query": "incident", "path": "../shared-notes" }');
+    expect(webSearchTool.description).toContain('Search the public web');
+    expect(webSearchTool.description).toContain("active model provider's hosted web search");
+    expect(webSearchTool.description).toContain('{ "query": "OpenAI Responses API web search tool" }');
     expect(reportStateTool.description).toContain('Use this when you are blocked, uncertain');
     expect(reportStateTool.description).toContain('tell the library author what capability, input, or support was missing');
     expect(reportStateTool.description).toContain('Returns the same structured report back');
@@ -203,6 +207,33 @@ describe('searchFilesTool', () => {
 
     expect(result.ok).toBe(true);
     expect(result.output).toContain('.heddle/traces/trace-1.json');
+  });
+});
+
+describe('webSearchTool', () => {
+  it('rejects invalid input', async () => {
+    const result = await webSearchTool.execute({ query: 'docs', mode: 'fast' });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Invalid input for web_search. Required field: query. Optional field: contextSize ("low", "medium", or "high").',
+    });
+  });
+
+  it('fails clearly when no OpenAI key is available', async () => {
+    vi.stubEnv('OPENAI_API_KEY', '');
+    vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
+
+    try {
+      const result = await webSearchTool.execute({ query: 'OpenAI Responses API web search tool' });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'web_search requires OPENAI_API_KEY (or PERSONAL_OPENAI_API_KEY) when the active model provider is OpenAI.',
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 

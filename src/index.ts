@@ -55,6 +55,8 @@ export { readFileTool } from './tools/read-file.js';
 export { editFileTool } from './tools/edit-file.js';
 export { searchFilesTool, createSearchFilesTool, DEFAULT_SEARCH_EXCLUDED_DIRS } from './tools/search-files.js';
 export type { SearchFilesOptions } from './tools/search-files.js';
+export { webSearchTool, createWebSearchTool } from './tools/web-search.js';
+export type { WebSearchToolOptions } from './tools/web-search.js';
 export { reportStateTool } from './tools/report-state.js';
 export { updatePlanTool } from './tools/update-plan.js';
 export type { PlanItem, PlanItemStatus } from './tools/update-plan.js';
