@@ -16,11 +16,12 @@ It is open source, provider-agnostic, and currently supports OpenAI and Anthropi
 ## Advanced Capabilities
 
 - provider-agnostic model support across OpenAI and Anthropic
-- hosted web search through `web_search`
+- provider-backed hosted web search through `web_search`
 - local image viewing from referenced file paths through `view_image`
 - inline `@file` mentions that tell the agent which workspace files to inspect first
 - multi-turn sessions with save, switch, continue, rename, and close flows
-- automatic conversation compaction for longer chats
+- automatic conversation compaction for longer chats, plus manual `/compact` when needed
+- persistent workspace knowledge through `.heddle/memory/`
 - lightweight working-plan tracking through `update_plan`
 - approval-gated shell execution with remembered per-project approvals
 - trace logs, persistent chat state, and project instruction loading under `.heddle/`
@@ -73,22 +74,49 @@ Heddle currently supports:
 
 - repository inspection with `list_files`, `read_file`, and `search_files`
 - code and doc changes with `edit_file`
-- hosted web search through `web_search`
+- provider-backed hosted web search through `web_search`
 - local screenshot and image inspection through `view_image`
 - inline `@file` mentions for file-priority context without pasting file contents into the prompt
 - shell execution with inspect vs approval-gated mutate behavior
 - multi-turn chat sessions with saved history under `.heddle/`
 - session management with create, switch, continue, rename, and close flows
 - automatic conversation compaction so longer chats preserve context instead of growing unbounded
+- manual `/compact` to shrink the current session transcript on demand
+- persistent workspace memory notes under `.heddle/memory/`
 - short working-plan support through `update_plan` for substantial multi-step tasks
 - remembered per-project approvals for repeated commands and edits
 - interrupt and resume support for longer-running coding workflows
+- request-size aware context tracking in chat so the footer reflects model input usage, not only raw history size
 
 The image workflow is intentionally simple for now: users can reference a local image path in chat, and the agent can decide whether to inspect it with `view_image`. Heddle does not require a full multimodal attachment model for this first version.
 
 The file-mention workflow is also intentionally lightweight: `@path/to/file` tells Heddle that the file is important context and should be inspected before answering, but it does not automatically inline the file contents into the prompt.
 
 The planning workflow is also intentionally lightweight: Heddle does not force a heavyweight planner or a separate "plan mode," but it can automatically record and update a short plan when a task is substantial enough to benefit from visible progress tracking.
+
+The web-search workflow is provider-backed rather than crawler-backed: OpenAI models use OpenAI-hosted web search, and Anthropic models use Anthropic-hosted web search when available through the selected model/tool path.
+
+## Knowledge Persistence
+
+Heddle can maintain durable workspace knowledge under `.heddle/memory/`.
+
+The goal is to help Heddle learn from real project work over time instead of rediscovering the same stable facts every session.
+
+Typical examples:
+
+- architecture notes that future sessions should reuse
+- recurring build, test, or environment quirks
+- important repo conventions and command patterns
+- durable findings from completed implementation work
+
+The memory model is intentionally simple:
+
+- memory is stored as readable markdown files in the project state directory
+- Heddle can list, read, search, and edit those notes
+- shell tools are still available when flexible retrieval or editing is needed
+- memory is meant for stable, reusable knowledge, not scratch notes or speculative plans
+
+This is one of Heddle's more distinctive host-side capabilities: the aim is not just to answer the current prompt, but to let the runtime accumulate project understanding from your operations and become more useful across sessions.
 
 ## What Heddle Does
 
@@ -125,9 +153,9 @@ Typical chat use cases:
 - ask Heddle to explain architecture, code paths, tests, or build setup
 - iterate on a fix over multiple prompts instead of fitting everything into one request
 - inspect files, search the repo, and edit code inside one persistent session
-- keep a long coding conversation usable through saved sessions, `/continue`, and automatic history compaction
+- keep a long coding conversation usable through saved sessions, `/continue`, automatic history compaction, and manual `/compact`
 - let the agent create and update a short working plan for a multi-step implementation
-- search official docs or other current external references with `web_search`
+- search official docs or other current external references with provider-backed `web_search`
 - mention important repo files with `@path/to/file` so the agent treats them as first-pass context
 - reference a local screenshot path and have the agent inspect it with `view_image`
 - run direct shell commands from chat with `!<command>`
@@ -149,6 +177,7 @@ Useful chat commands:
 - `/session rename <name>`: rename the current session
 - `/session close <id>`: remove a saved session
 - `/clear`: clear the current transcript
+- `/compact`: compact older session history immediately
 - `!<command>`: run a shell command directly in chat
 
 Direct shell in chat:
@@ -160,6 +189,8 @@ Direct shell in chat:
 ```
 
 Read-oriented commands stay in inspect mode when possible. Workspace-changing or unclassified commands fall back to approval-gated execution.
+
+Chat state is stored under `.heddle/`, including saved sessions, traces, approvals, and memory notes. The footer context indicator is an estimate of total request input against the active model's context window, not only the raw chat history length.
 
 ## CLI Usage
 
