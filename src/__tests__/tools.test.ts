@@ -17,6 +17,12 @@ import {
 import { createSearchFilesTool, searchFilesTool } from '../tools/search-files.js';
 import { webSearchTool } from '../tools/web-search.js';
 import { viewImageTool } from '../tools/view-image.js';
+import {
+  createListMemoryNotesTool,
+  createReadMemoryNoteTool,
+  createSearchMemoryNotesTool,
+  createEditMemoryNoteTool,
+} from '../tools/memory-notes.js';
 
 describe('tool input validation', () => {
   it('rejects unexpected fields for list_files', async () => {
@@ -75,6 +81,16 @@ describe('tool input validation', () => {
     expect(webSearchTool.description).toContain('{ "query": "OpenAI Responses API web search tool" }');
     expect(viewImageTool.description).toContain('Inspect a local image file');
     expect(viewImageTool.description).toContain('{ "path": "/absolute/path/to/screenshot.png" }');
+    const listMemoryTool = createListMemoryNotesTool();
+    const readMemoryTool = createReadMemoryNoteTool();
+    const searchMemoryTool = createSearchMemoryNotesTool();
+    const editMemoryTool = createEditMemoryNoteTool();
+    expect(listMemoryTool.description).toContain('List markdown notes inside Heddle persistent memory');
+    expect(readMemoryTool.description).toContain('Read a persistent memory note');
+    expect(searchMemoryTool.description).toContain('mature command-line search tools');
+    expect(editMemoryTool.description).toContain('Create or edit a persistent markdown note');
+    expect(editMemoryTool.description).toContain('does not require approval');
+    expect(editMemoryTool.requiresApproval).toBeUndefined();
     expect(reportStateTool.description).toContain('Use this when you are blocked, uncertain');
     expect(reportStateTool.description).toContain('tell the library author what capability, input, or support was missing');
     expect(reportStateTool.description).toContain('Returns the same structured report back');
@@ -276,6 +292,88 @@ describe('viewImageTool', () => {
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+});
+
+describe('memory note tools', () => {
+  it('lists markdown notes recursively inside the memory root', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-memory-list-'));
+    await mkdir(join(root, 'architecture'), { recursive: true });
+    await writeFile(join(root, 'project-summary.md'), '# Summary\n');
+    await writeFile(join(root, 'architecture', 'auth.md'), '# Auth\n');
+    await writeFile(join(root, 'architecture', 'notes.txt'), 'ignore\n');
+    const tool = createListMemoryNotesTool({ memoryRoot: root });
+
+    const result = await tool.execute({});
+
+    expect(result).toEqual({
+      ok: true,
+      output: ['architecture/auth.md', 'project-summary.md'].join('\n'),
+    });
+  });
+
+  it('reads memory notes with paging support', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-memory-read-'));
+    await writeFile(join(root, 'project-summary.md'), ['zero', 'one', 'two'].join('\n'));
+    const tool = createReadMemoryNoteTool({ memoryRoot: root });
+
+    const result = await tool.execute({ path: 'project-summary.md', offset: 1, maxLines: 1 });
+
+    expect(result).toEqual({
+      ok: true,
+      output: 'one',
+    });
+  });
+
+  it('searches memory notes with grep-style output', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-memory-search-'));
+    await writeFile(join(root, 'known-issues.md'), ['first line', 'test command is yarn test', 'another'].join('\n'));
+    const tool = createSearchMemoryNotesTool({ memoryRoot: root });
+
+    const result = await tool.execute({ query: 'test command' });
+
+    expect(result).toEqual({
+      ok: true,
+      output: 'known-issues.md:2:test command is yarn test',
+    });
+  });
+
+  it('edits memory notes inside the memory root without approval gating', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-memory-write-'));
+    await writeFile(join(root, 'project-summary.md'), '# Summary\nKnown fact');
+    const tool = createEditMemoryNoteTool({ memoryRoot: root });
+
+    const replaced = await tool.execute({
+      path: 'project-summary.md',
+      oldText: 'Known fact',
+      newText: 'Updated fact',
+    });
+
+    expect(replaced).toEqual({
+      ok: true,
+      output: {
+        path: 'project-summary.md',
+        action: 'replaced',
+        matchCount: 1,
+        bytesWritten: Buffer.byteLength('# Summary\nUpdated fact', 'utf8'),
+        diff: {
+          path: 'project-summary.md',
+          action: 'replaced',
+          diff: ['--- a/project-summary.md', '+++ b/project-summary.md', '@@ -1,2 +1,2 @@', ' # Summary', '-Known fact', '+Updated fact'].join('\n'),
+          truncated: false,
+        },
+      },
+    });
+  });
+
+  it('refuses to access paths outside the memory root', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-memory-scope-'));
+    const tool = createReadMemoryNoteTool({ memoryRoot: root });
+
+    const result = await tool.execute({ path: '../outside.md' });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Memory note paths must stay inside');
   });
 });
 

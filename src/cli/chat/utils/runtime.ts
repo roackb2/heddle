@@ -25,6 +25,7 @@ export type ChatRuntimeConfig = {
   sessionsFile: string;
   approvalsFile: string;
   traceDir: string;
+  memoryDir: string;
   workspaceRoot: string;
   directShellApproval: 'always' | 'never';
   searchIgnoreDirs: string[];
@@ -56,6 +57,7 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
     sessionsFile: join(stateRoot, 'chat-sessions.json'),
     approvalsFile: join(stateRoot, 'command-approvals.json'),
     traceDir: join(stateRoot, 'traces'),
+    memoryDir: join(stateRoot, 'memory'),
     directShellApproval: options.directShellApproval ?? 'never',
     searchIgnoreDirs: options.searchIgnoreDirs ?? [],
     systemContext: options.systemContext,

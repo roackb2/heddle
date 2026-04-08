@@ -59,6 +59,17 @@ export { webSearchTool, createWebSearchTool } from './tools/web-search.js';
 export type { WebSearchToolOptions } from './tools/web-search.js';
 export { viewImageTool, createViewImageTool } from './tools/view-image.js';
 export type { ViewImageToolOptions } from './tools/view-image.js';
+export {
+  listMemoryNotesTool,
+  readMemoryNoteTool,
+  searchMemoryNotesTool,
+  editMemoryNoteTool,
+  createListMemoryNotesTool,
+  createReadMemoryNoteTool,
+  createSearchMemoryNotesTool,
+  createEditMemoryNoteTool,
+} from './tools/memory-notes.js';
+export type { MemoryNotesToolOptions } from './tools/memory-notes.js';
 export { reportStateTool } from './tools/report-state.js';
 export { updatePlanTool } from './tools/update-plan.js';
 export type { PlanItem, PlanItemStatus } from './tools/update-plan.js';
