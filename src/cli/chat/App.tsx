@@ -112,7 +112,10 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   } = useApprovalFlow(nextLocalId);
   const messages = activeSession?.messages ?? [];
   const activityText = currentActivityText(liveEvents, isRunning, elapsedSeconds, pendingApproval, interruptRequested);
-  const contextStatus = formatContextStatus(activeModel, activeSession?.context?.estimatedHistoryTokens);
+  const contextStatus = formatContextStatus(
+    activeModel,
+    activeSession?.context?.lastRunInputTokens ?? activeSession?.context?.estimatedRequestTokens,
+  );
   const promptStatusLine = [
     `model=${activeModel}`,
     contextStatus,
@@ -569,17 +572,17 @@ function handlePickerKeys(options: {
   return false;
 }
 
-function formatContextStatus(model: string, estimatedHistoryTokens?: number): string {
-  if (estimatedHistoryTokens === undefined) {
+function formatContextStatus(model: string, estimatedRequestTokens?: number): string {
+  if (estimatedRequestTokens === undefined) {
     return 'context=unknown';
   }
 
   const contextWindow = estimateBuiltInContextWindow(model);
   if (!contextWindow) {
-    return `context≈${formatTokenCount(estimatedHistoryTokens)} used`;
+    return `context≈${formatTokenCount(estimatedRequestTokens)} used`;
   }
 
-  const remainingTokens = Math.max(contextWindow - estimatedHistoryTokens, 0);
+  const remainingTokens = Math.max(contextWindow - estimatedRequestTokens, 0);
   const remainingPercent = Math.max(Math.round((remainingTokens / contextWindow) * 100), 0);
   return `context≈${remainingPercent}% left`;
 }

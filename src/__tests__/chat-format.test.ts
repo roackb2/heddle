@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildConversationMessages, formatEditPreviewHistoryMessage, formatPlanHistoryMessage } from '../cli/chat/utils/format.js';
+import {
+  buildConversationMessages,
+  formatChatFailureMessage,
+  formatEditPreviewHistoryMessage,
+  formatPlanHistoryMessage,
+} from '../cli/chat/utils/format.js';
 import type { ChatMessage } from '../llm/types.js';
 
 describe('buildConversationMessages', () => {
@@ -133,5 +138,28 @@ describe('buildConversationMessages', () => {
     expect(rendered).toContain('- [x] Inspect runtime behavior');
     expect(rendered).toContain('- [-] Implement the fix');
     expect(rendered).toContain('- [ ] Verify with tests');
+  });
+});
+
+describe('formatChatFailureMessage', () => {
+  it('adds manual compaction guidance for likely input-size TPM failures', () => {
+    const formatted = formatChatFailureMessage(
+      `429 {"type":"error","error":{"type":"rate_limit_error","message":"This request would exceed your organization's rate limit of 30,000 input tokens per minute. Please reduce the prompt length or the maximum tokens requested."}}`,
+      { model: 'claude-sonnet-4-6', estimatedHistoryTokens: 18234 },
+    );
+
+    expect(formatted).toContain('input-token-per-minute limit');
+    expect(formatted).toContain('18,234 tokens');
+    expect(formatted).toContain('/compact, /clear, or /session new');
+  });
+
+  it('distinguishes OpenAI quota exhaustion from prompt-size issues', () => {
+    const formatted = formatChatFailureMessage(
+      'You exceeded your current quota, please check your plan and billing details.',
+      { model: 'gpt-5.4' },
+    );
+
+    expect(formatted).toContain('quota or billing limit');
+    expect(formatted).toContain('not a transient prompt-size issue');
   });
 });

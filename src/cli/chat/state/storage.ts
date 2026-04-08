@@ -169,6 +169,7 @@ function isChatContextStats(value: unknown): value is ChatContextStats {
   const candidate = value as Partial<ChatContextStats>;
   return (
     typeof candidate.estimatedHistoryTokens === 'number' &&
+    (candidate.estimatedRequestTokens === undefined || typeof candidate.estimatedRequestTokens === 'number') &&
     (candidate.lastRunInputTokens === undefined || typeof candidate.lastRunInputTokens === 'number') &&
     (candidate.lastRunOutputTokens === undefined || typeof candidate.lastRunOutputTokens === 'number') &&
     (candidate.lastRunTotalTokens === undefined || typeof candidate.lastRunTotalTokens === 'number') &&

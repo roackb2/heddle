@@ -29,6 +29,7 @@ import {
   appendDirectShellHistory,
   buildConversationMessages,
   countAssistantSteps,
+  formatChatFailureMessage,
   formatEditPreviewHistoryMessage,
   formatPlanHistoryMessage,
   formatDirectShellResponse,
@@ -40,7 +41,7 @@ import {
 import { saveTrace } from '../utils/runtime.js';
 import { resolveApiKeyForModel } from '../utils/runtime.js';
 import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../state/approval-rules.js';
-import { compactChatHistory } from '../state/compaction.js';
+import { compactChatHistory, estimateChatHistoryTokens } from '../state/compaction.js';
 import { isGenericSessionName } from '../state/storage.js';
 import { normalizeSessionTitle } from '../utils/format.js';
 import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval, TurnSummary } from '../state/types.js';
@@ -420,6 +421,9 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       history: result.transcript,
       model: llm.info?.model ?? runtime.model,
       usage: result.usage,
+      systemContext: runtime.systemContext,
+      toolNames: tools.map((tool) => tool.name),
+      goal: prompt,
     });
     updateSessionById(sessionId, (sessionToUpdate) => ({
       ...sessionToUpdate,
@@ -442,6 +446,14 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       turns: [...sessionToUpdate.turns, nextTurn].slice(-8),
     }));
 
+    const formattedSummary =
+      result.outcome === 'error' ?
+        formatChatFailureMessage(result.summary, {
+          model: llm.info?.model ?? runtime.model,
+          estimatedHistoryTokens: estimateChatHistoryTokens(sessionHistory),
+        })
+      : result.summary;
+
     if (result.outcome !== 'done') {
       state.setCurrentAssistantText(undefined);
       updateSessionById(sessionId, (sessionToUpdate) => ({
@@ -451,28 +463,32 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
           {
             id: state.nextLocalId(),
             role: 'assistant',
-            text: `Run stopped: ${result.summary}`,
+            text: `Run stopped: ${formattedSummary}`,
           },
         ],
       }));
     }
 
-    const assistantText = result.summary;
+    const assistantText = formattedSummary;
     maybeAutoNameSession(sessionId, prompt, assistantText);
     if (result.outcome === 'error') {
-      state.setError(result.summary);
+      state.setError(formattedSummary);
     }
     state.setStatus(result.outcome === 'done' ? 'Idle' : `Stopped: ${result.outcome}`);
     return result;
   } catch (runError) {
     const message = runError instanceof Error ? runError.message : String(runError);
-    state.setError(message);
+    const formattedMessage = formatChatFailureMessage(message, {
+      model: llm.info?.model ?? runtime.model,
+      estimatedHistoryTokens: estimateChatHistoryTokens(sessionHistory),
+    });
+    state.setError(formattedMessage);
     state.setStatus('Error');
     updateSessionById(sessionId, (sessionToUpdate) => ({
       ...sessionToUpdate,
       messages: [
         ...sessionToUpdate.messages,
-        { id: state.nextLocalId(), role: 'assistant', text: `Run failed before a final answer: ${message}` },
+        { id: state.nextLocalId(), role: 'assistant', text: `Run failed before a final answer: ${formattedMessage}` },
       ],
     }));
     return undefined;
@@ -633,6 +649,9 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
         const compacted = compactChatHistory({
           history: appendDirectShellHistory(session.history, shellDisplay, chosenCall.tool, chosenResult),
           model,
+          systemContext: runtime.systemContext,
+          toolNames: tools.map((tool) => tool.name),
+          goal: shellDisplay,
         });
 
         return {

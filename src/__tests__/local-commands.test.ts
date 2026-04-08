@@ -1,5 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
-import { isLikelyLocalCommand, runLocalCommand } from '../cli/chat/state/local-commands.js';
+import { getLocalCommandHints, isLikelyLocalCommand, runLocalCommand } from '../cli/chat/state/local-commands.js';
+
+function createCommandArgs(overrides: Partial<Parameters<typeof runLocalCommand>[0]> = {}): Parameters<typeof runLocalCommand>[0] {
+  return {
+    prompt: '/help',
+    activeModel: 'gpt-5.1-codex',
+    setActiveModel: vi.fn(),
+    sessions: [],
+    recentSessions: [],
+    activeSessionId: 'session-1',
+    switchSession: vi.fn(),
+    createSession: vi.fn(),
+    renameSession: vi.fn(),
+    removeSession: vi.fn(),
+    clearConversation: vi.fn(),
+    compactConversation: vi.fn(() => 'Compacted earlier session history to reduce context size.'),
+    listRecentSessionsMessage: [],
+    ...overrides,
+  };
+}
 
 describe('runLocalCommand', () => {
   it('treats bare and partial slash command roots as local commands for hints', () => {
@@ -7,6 +26,7 @@ describe('runLocalCommand', () => {
     expect(isLikelyLocalCommand('/h')).toBe(true);
     expect(isLikelyLocalCommand('/mo')).toBe(true);
     expect(isLikelyLocalCommand('/sess')).toBe(true);
+    expect(isLikelyLocalCommand('/comp')).toBe(true);
   });
 
   it('does not treat absolute unix paths as slash commands', () => {
@@ -14,20 +34,7 @@ describe('runLocalCommand', () => {
   });
 
   it('lists grouped common built-in model choices with multi-line formatting', () => {
-    const result = runLocalCommand({
-      prompt: '/model list',
-      activeModel: 'gpt-5.1-codex',
-      setActiveModel: vi.fn(),
-      sessions: [],
-      recentSessions: [],
-      activeSessionId: 'session-1',
-      switchSession: vi.fn(),
-      createSession: vi.fn(),
-      renameSession: vi.fn(),
-      removeSession: vi.fn(),
-      clearConversation: vi.fn(),
-      listRecentSessionsMessage: [],
-    });
+    const result = runLocalCommand(createCommandArgs({ prompt: '/model list' }));
 
     expect(result).toMatchObject({
       handled: true,
@@ -45,20 +52,7 @@ describe('runLocalCommand', () => {
   });
 
   it('keeps /models as a compatibility alias for /model list', () => {
-    const result = runLocalCommand({
-      prompt: '/models',
-      activeModel: 'gpt-5.1-codex',
-      setActiveModel: vi.fn(),
-      sessions: [],
-      recentSessions: [],
-      activeSessionId: 'session-1',
-      switchSession: vi.fn(),
-      createSession: vi.fn(),
-      renameSession: vi.fn(),
-      removeSession: vi.fn(),
-      clearConversation: vi.fn(),
-      listRecentSessionsMessage: [],
-    });
+    const result = runLocalCommand(createCommandArgs({ prompt: '/models' }));
 
     expect(result).toMatchObject({
       handled: true,
@@ -74,20 +68,10 @@ describe('runLocalCommand', () => {
 
   it('recognizes supported shortlist models when switching', () => {
     const setActiveModel = vi.fn();
-    const result = runLocalCommand({
+    const result = runLocalCommand(createCommandArgs({
       prompt: '/model gpt-5.4-mini',
-      activeModel: 'gpt-5.1-codex',
       setActiveModel,
-      sessions: [],
-      recentSessions: [],
-      activeSessionId: 'session-1',
-      switchSession: vi.fn(),
-      createSession: vi.fn(),
-      renameSession: vi.fn(),
-      removeSession: vi.fn(),
-      clearConversation: vi.fn(),
-      listRecentSessionsMessage: [],
-    });
+    }));
 
     expect(setActiveModel).toHaveBeenCalledWith('gpt-5.4-mini');
     expect(result).toEqual({
@@ -99,20 +83,10 @@ describe('runLocalCommand', () => {
 
   it('does not treat /model set as a literal model name', () => {
     const setActiveModel = vi.fn();
-    const result = runLocalCommand({
+    const result = runLocalCommand(createCommandArgs({
       prompt: '/model set',
-      activeModel: 'gpt-5.1-codex',
       setActiveModel,
-      sessions: [],
-      recentSessions: [],
-      activeSessionId: 'session-1',
-      switchSession: vi.fn(),
-      createSession: vi.fn(),
-      renameSession: vi.fn(),
-      removeSession: vi.fn(),
-      clearConversation: vi.fn(),
-      listRecentSessionsMessage: [],
-    });
+    }));
 
     expect(setActiveModel).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -124,26 +98,17 @@ describe('runLocalCommand', () => {
 
   it('allows switching sessions by recent-session index', () => {
     const switchSession = vi.fn();
-    const result = runLocalCommand({
+    const sessions = [
+      { id: 'session-a', name: 'A', history: [], messages: [], turns: [], createdAt: '2024-01-01', updatedAt: '2024-01-01' },
+      { id: 'session-b', name: 'B', history: [], messages: [], turns: [], createdAt: '2024-01-02', updatedAt: '2024-01-02' },
+    ];
+    const result = runLocalCommand(createCommandArgs({
       prompt: '/session switch 2',
-      activeModel: 'gpt-5.1-codex',
-      setActiveModel: vi.fn(),
-      sessions: [
-        { id: 'session-a', name: 'A', history: [], messages: [], turns: [], createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-        { id: 'session-b', name: 'B', history: [], messages: [], turns: [], createdAt: '2024-01-02', updatedAt: '2024-01-02' },
-      ],
-      recentSessions: [
-        { id: 'session-a', name: 'A', history: [], messages: [], turns: [], createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-        { id: 'session-b', name: 'B', history: [], messages: [], turns: [], createdAt: '2024-01-02', updatedAt: '2024-01-02' },
-      ],
+      sessions,
+      recentSessions: sessions,
       activeSessionId: 'session-a',
       switchSession,
-      createSession: vi.fn(),
-      renameSession: vi.fn(),
-      removeSession: vi.fn(),
-      clearConversation: vi.fn(),
-      listRecentSessionsMessage: [],
-    });
+    }));
 
     expect(switchSession).toHaveBeenCalledWith('session-b');
     expect(result).toEqual({
@@ -154,26 +119,16 @@ describe('runLocalCommand', () => {
   });
 
   it('allows continuing sessions by recent-session index', () => {
-    const result = runLocalCommand({
+    const sessions = [
+      { id: 'session-a', name: 'A', history: [], messages: [], turns: [], createdAt: '2024-01-01', updatedAt: '2024-01-01' },
+      { id: 'session-b', name: 'B', history: [], messages: [], turns: [], createdAt: '2024-01-02', updatedAt: '2024-01-02' },
+    ];
+    const result = runLocalCommand(createCommandArgs({
       prompt: '/session continue 2',
-      activeModel: 'gpt-5.1-codex',
-      setActiveModel: vi.fn(),
-      sessions: [
-        { id: 'session-a', name: 'A', history: [], messages: [], turns: [], createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-        { id: 'session-b', name: 'B', history: [], messages: [], turns: [], createdAt: '2024-01-02', updatedAt: '2024-01-02' },
-      ],
-      recentSessions: [
-        { id: 'session-a', name: 'A', history: [], messages: [], turns: [], createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-        { id: 'session-b', name: 'B', history: [], messages: [], turns: [], createdAt: '2024-01-02', updatedAt: '2024-01-02' },
-      ],
+      sessions,
+      recentSessions: sessions,
       activeSessionId: 'session-a',
-      switchSession: vi.fn(),
-      createSession: vi.fn(),
-      renameSession: vi.fn(),
-      removeSession: vi.fn(),
-      clearConversation: vi.fn(),
-      listRecentSessionsMessage: [],
-    });
+    }));
 
     expect(result).toEqual({
       handled: true,
@@ -184,21 +139,37 @@ describe('runLocalCommand', () => {
   });
 
   it('passes through absolute unix paths as normal prompts', () => {
-    const result = runLocalCommand({
+    const result = runLocalCommand(createCommandArgs({
       prompt: '/Users/roackb2/Desktop/screenshot.png can you describe this image',
-      activeModel: 'gpt-5.1-codex',
-      setActiveModel: vi.fn(),
-      sessions: [],
-      recentSessions: [],
-      activeSessionId: 'session-1',
-      switchSession: vi.fn(),
-      createSession: vi.fn(),
-      renameSession: vi.fn(),
-      removeSession: vi.fn(),
-      clearConversation: vi.fn(),
-      listRecentSessionsMessage: [],
-    });
+    }));
 
     expect(result).toEqual({ handled: false });
+  });
+
+  it('runs manual compaction when requested', () => {
+    const compactConversation = vi.fn(
+      () => 'Compacted earlier session history to reduce context size (24 messages summarized).',
+    );
+    const result = runLocalCommand(createCommandArgs({
+      prompt: '/compact',
+      activeModel: 'claude-sonnet-4-6',
+      compactConversation,
+    }));
+
+    expect(compactConversation).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'Compacted earlier session history to reduce context size (24 messages summarized).',
+    });
+  });
+
+  it('includes /compact in shared slash-command hints', () => {
+    const hints = getLocalCommandHints('/', 'session-1', []);
+
+    expect(hints).toContainEqual({
+      command: '/compact',
+      description: 'compact earlier session history for the next run',
+    });
   });
 });

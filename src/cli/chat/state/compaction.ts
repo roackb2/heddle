@@ -1,10 +1,12 @@
 import type { ChatMessage, LlmUsage } from '../../../index.js';
+import { buildSystemPrompt } from '../../../prompts/system-prompt.js';
 import { estimateBuiltInContextWindow } from '../../../llm/openai-models.js';
 import type { ChatContextStats } from './types.js';
 
 const DEFAULT_CONTEXT_WINDOW_ESTIMATE = 200_000;
 const MAX_HISTORY_RATIO = 0.6;
 const MIN_RECENT_MESSAGES = 16;
+const MIN_FORCED_RECENT_MESSAGES = 3;
 const MAX_SUMMARY_LINES = 12;
 const MAX_SUMMARY_CHARS = 4_000;
 const COMPACTED_HISTORY_MARKER = 'Heddle compacted earlier conversation history.';
@@ -13,17 +15,22 @@ export function compactChatHistory(options: {
   history: ChatMessage[];
   model: string;
   usage?: LlmUsage;
+  force?: boolean;
+  systemContext?: string;
+  toolNames?: string[];
+  goal?: string;
 }): { history: ChatMessage[]; context: ChatContextStats } {
   const estimatedWindow = estimateBuiltInContextWindow(options.model) ?? DEFAULT_CONTEXT_WINDOW_ESTIMATE;
   const maxHistoryTokens = Math.floor(estimatedWindow * MAX_HISTORY_RATIO);
+  const minRecentMessages = options.force ? MIN_FORCED_RECENT_MESSAGES : MIN_RECENT_MESSAGES;
   let nextHistory = options.history;
   let compactedMessages = 0;
 
   while (
-    estimateChatHistoryTokens(nextHistory) > maxHistoryTokens &&
-    countNonCompactedMessages(nextHistory) > MIN_RECENT_MESSAGES
+    (estimateChatHistoryTokens(nextHistory) > maxHistoryTokens || (options.force && compactedMessages === 0)) &&
+    countNonCompactedMessages(nextHistory) > minRecentMessages
   ) {
-    const splitIndex = findCompactionSplit(nextHistory);
+    const splitIndex = findCompactionSplit(nextHistory, minRecentMessages);
     if (splitIndex <= 0 || splitIndex >= nextHistory.length) {
       break;
     }
@@ -38,6 +45,12 @@ export function compactChatHistory(options: {
       history: nextHistory,
       usage: options.usage,
       compactedMessages,
+      estimatedRequestTokens: estimateRequestTokens({
+        history: nextHistory,
+        systemContext: options.systemContext,
+        toolNames: options.toolNames ?? [],
+        goal: options.goal,
+      }),
     }),
   };
 }
@@ -54,9 +67,11 @@ function buildContextStats(options: {
   history: ChatMessage[];
   usage?: LlmUsage;
   compactedMessages: number;
+  estimatedRequestTokens?: number;
 }): ChatContextStats {
   return {
     estimatedHistoryTokens: estimateChatHistoryTokens(options.history),
+    estimatedRequestTokens: options.estimatedRequestTokens,
     lastRunInputTokens: options.usage?.inputTokens,
     lastRunOutputTokens: options.usage?.outputTokens,
     lastRunTotalTokens: options.usage?.totalTokens,
@@ -141,8 +156,8 @@ function countNonCompactedMessages(history: ChatMessage[]): number {
   return history.filter((message) => !isCompactedHistorySummary(message)).length;
 }
 
-function findCompactionSplit(history: ChatMessage[]): number {
-  let splitIndex = Math.max(0, history.length - MIN_RECENT_MESSAGES);
+function findCompactionSplit(history: ChatMessage[], minRecentMessages: number): number {
+  let splitIndex = Math.max(0, history.length - minRecentMessages);
 
   while (splitIndex < history.length && history[splitIndex]?.role === 'tool') {
     splitIndex++;
@@ -179,6 +194,18 @@ function estimateMessageTokens(message: ChatMessage): number {
 
 function estimateTextTokens(text: string): number {
   return Math.ceil(text.length / 4);
+}
+
+function estimateRequestTokens(options: {
+  history: ChatMessage[];
+  systemContext?: string;
+  toolNames: string[];
+  goal?: string;
+}): number {
+  const syntheticGoal = options.goal ?? 'Continue from the current conversation.';
+  const systemPrompt = buildSystemPrompt(syntheticGoal, options.toolNames, options.systemContext);
+  const userPrompt = syntheticGoal;
+  return estimateTextTokens(systemPrompt) + estimateChatHistoryTokens(options.history) + estimateTextTokens(userPrompt) + 24;
 }
 
 function isAssistantToolCallMessage(

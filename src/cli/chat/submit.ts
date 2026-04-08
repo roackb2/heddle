@@ -1,7 +1,8 @@
 import { runLocalCommand } from './state/local-commands.js';
+import { compactChatHistory } from './state/compaction.js';
 import { createInitialMessages } from './state/storage.js';
 import type { ChatSession, ConversationLine } from './state/types.js';
-import { normalizeInlineText } from './utils/format.js';
+import { buildConversationMessages, normalizeInlineText } from './utils/format.js';
 
 type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
 
@@ -63,6 +64,36 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
         lastContinuePrompt: undefined,
         messages: createInitialMessages(args.apiKeyPresent),
       }));
+    },
+    compactConversation: () => {
+      const session = args.activeSession ?? args.sessions.find((candidate) => candidate.id === args.activeSessionId);
+      if (!session) {
+        return 'No active session is available to compact.';
+      }
+
+      const compacted = compactChatHistory({
+        history: session.history,
+        model: args.activeModel,
+        force: true,
+      });
+      const changed =
+        compacted.history.length !== session.history.length
+        || compacted.context.compactedMessages !== undefined;
+
+      if (!changed) {
+        return 'Current session history is already compact enough.';
+      }
+
+      args.updateActiveSession((currentSession) => ({
+        ...currentSession,
+        history: compacted.history,
+        context: compacted.context,
+        messages: buildConversationMessages(compacted.history),
+      }));
+
+      return compacted.context.compactedMessages ?
+          `Compacted earlier session history to reduce context size (${compacted.context.compactedMessages} messages summarized).`
+        : 'Compacted earlier session history to reduce context size.';
     },
     listRecentSessionsMessage: args.listRecentSessionsMessage,
   } satisfies LocalCommandDeps);

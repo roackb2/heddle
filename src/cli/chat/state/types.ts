@@ -26,6 +26,7 @@ export type LiveEvent = {
 
 export type ChatContextStats = {
   estimatedHistoryTokens: number;
+  estimatedRequestTokens?: number;
   lastRunInputTokens?: number;
   lastRunOutputTokens?: number;
   lastRunTotalTokens?: number;

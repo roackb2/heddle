@@ -2,6 +2,11 @@ import type { ChatSession, LocalCommandResult } from './types.js';
 import { summarizeSession } from './storage.js';
 import { COMMON_BUILT_IN_MODELS, formatBuiltInModelGroups } from '../../../llm/openai-models.js';
 
+export type LocalCommandHint = {
+  command: string;
+  description: string;
+};
+
 export type LocalCommandArgs = {
   prompt: string;
   activeModel: string;
@@ -14,6 +19,7 @@ export type LocalCommandArgs = {
   renameSession: (name: string) => void;
   removeSession: (id: string) => void;
   clearConversation: () => void;
+  compactConversation: () => string;
   listRecentSessionsMessage: string[];
 };
 
@@ -22,54 +28,35 @@ type PrefixCommandHandler = (args: LocalCommandArgs, value: string) => LocalComm
 
 const MODEL_LIST_MESSAGE = ['Common built-in model choices', '', formatBuiltInModelGroups()].join('\n');
 const MODEL_SET_HELP_MESSAGE = 'Use /model set <query> to filter models, then use arrows and Enter to choose one.';
-const COMMAND_ROOTS = ['help', 'models', 'model', 'continue', 'clear', 'session'] as const;
+const HELP_HINTS: LocalCommandHint[] = [
+  { command: '/help', description: 'show available local commands' },
+  { command: '/model', description: 'show the active model' },
+  { command: '/model <name>', description: 'switch the current model' },
+  { command: '/model set [query]', description: 'pick a model with filtering' },
+  { command: '/model list', description: 'list common built-in models' },
+  { command: '/continue', description: 'resume from the current transcript' },
+  { command: '/clear', description: 'reset the current session transcript' },
+  { command: '/compact', description: 'compact earlier session history for the next run' },
+  { command: '/session list', description: 'list local chat sessions' },
+  { command: '/session choose [query]', description: 'pick a recent session with filtering' },
+  { command: '/session new [name]', description: 'create and switch to a new session' },
+  { command: '/session switch <id>', description: 'switch to another session' },
+  { command: '/session continue <id>', description: 'switch to a session and resume it' },
+  { command: '/session rename <name>', description: 'rename the current session' },
+  { command: '/session close <id>', description: 'remove a saved session' },
+  { command: '!<command>', description: 'run a shell command directly in chat using the current policy' },
+];
+const COMMAND_ROOTS = Array.from(
+  new Set(
+    HELP_HINTS.filter((hint) => hint.command.startsWith('/'))
+      .map((hint) => hint.command.slice(1).split(/\s+/, 1)[0] ?? '')
+      .filter(Boolean),
+  ),
+) as ReadonlyArray<string>;
 const HELP_MESSAGE = [
   'Local commands',
   '',
-  '/model',
-  'Show the active model.',
-  '',
-  '/model <name>',
-  'Switch the current model.',
-  '',
-  '/model set [query]',
-  'Open the interactive model picker and filter it by query.',
-  '',
-  '/model list',
-  'List common model choices.',
-  '',
-  '/continue',
-  'Resume the current session from its last interrupted or prior run.',
-  '',
-  '/clear',
-  'Reset the current session transcript.',
-  '',
-  '/session list',
-  'List recent saved sessions.',
-  '',
-  '/session choose [query]',
-  'Pick a recent session with filtering and arrow-key selection.',
-  '',
-  '/session new [name]',
-  'Create and switch to a new session.',
-  '',
-  '/session switch <id>',
-  'Switch to another saved session.',
-  '',
-  '/session continue <id>',
-  'Switch to another saved session and immediately resume it.',
-  '',
-  '/session rename <name>',
-  'Rename the current session.',
-  '',
-  '/session close <id>',
-  'Remove a saved session.',
-  '',
-  '!<command>',
-  'Run a shell command directly in chat using the current inspect or execute policy.',
-  '',
-  '/help',
-  'Show this message.',
+  ...HELP_HINTS.flatMap((hint) => [hint.command, capitalizeFirst(hint.description), '']),
 ].join('\n');
 
 const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
@@ -82,6 +69,7 @@ const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
     args.clearConversation();
     return messageResult('Cleared the current chat transcript.');
   }],
+  ['/compact', (args) => messageResult(args.compactConversation())],
   ['/continue', () => ({ handled: true, kind: 'continue' })],
   ['/session list', (args) =>
     messageResult(args.sessions.length > 0 ? args.listRecentSessionsMessage.join('\n') : 'No sessions available.'),
@@ -122,6 +110,24 @@ export function isLikelyLocalCommand(prompt: string): boolean {
   }
 
   return PREFIX_COMMANDS.some((entry) => trimmed === entry.prefix.trimEnd() || trimmed.startsWith(entry.prefix));
+}
+
+export function getLocalCommandHints(
+  draft: string,
+  activeSessionId: string,
+  sessions: ChatSession[],
+): LocalCommandHint[] {
+  const trimmed = draft.trim();
+  if (trimmed.startsWith('/session switch ')) {
+    const sessionHints = sessions.map((session) => ({
+      command: `/session switch ${session.id}`,
+      description: `${session.id === activeSessionId ? '(current) ' : ''}${session.name}`,
+    }));
+    return sessionHints.filter((hint) => hint.command.startsWith(trimmed));
+  }
+
+  const filtered = HELP_HINTS.filter((hint) => hint.command.startsWith(trimmed) || trimmed === '/');
+  return filtered.length > 0 ? filtered : HELP_HINTS;
 }
 
 export function runLocalCommand(args: LocalCommandArgs): LocalCommandResult {
@@ -239,4 +245,8 @@ function messageResult(message: string): LocalCommandResult {
     kind: 'message',
     message,
   };
+}
+
+function capitalizeFirst(value: string): string {
+  return value.length > 0 ? `${value[0]!.toUpperCase()}${value.slice(1)}.` : value;
 }
