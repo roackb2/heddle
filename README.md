@@ -2,7 +2,9 @@
 
 Heddle is a terminal coding agent runtime and CLI.
 
-It is open source, provider-agnostic, and currently supports OpenAI and Anthropic models.
+It is built to feel like a terminal partner that understands your project, keeps continuity across real work, and becomes more useful over time.
+
+It is open source, provider-agnostic, supports OpenAI and Anthropic models, and can build memory across sessions.
 
 ## How Heddle Helps
 
