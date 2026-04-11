@@ -8,7 +8,7 @@ import type { RunAgentOptions } from '../run-agent.js';
 import type { RunResult, ToolCall, ToolDefinition, TraceEvent } from '../types.js';
 import { createLogger } from '../utils/logger.js';
 import { resolveApiKeyForModel } from './api-keys.js';
-import { createFinishedAgentLoopState, getHistoryFromAgentLoopCheckpoint, getHistoryFromAgentLoopState } from './events.js';
+import { createFinishedAgentLoopState, generateRunId, getHistoryFromAgentLoopCheckpoint, getHistoryFromAgentLoopState } from './events.js';
 import type { AgentLoopCheckpoint, AgentLoopEvent, AgentLoopState } from './events.js';
 
 export type { AgentLoopCheckpoint, AgentLoopEvent, AgentLoopState } from './events.js';
@@ -47,6 +47,7 @@ export type AgentLoopResult = RunResult & {
 };
 
 export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentLoopResult> {
+  const runId = generateRunId();
   const model = options.model ?? options.llm?.info?.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
   const provider = inferProviderFromModel(model);
   const workspaceRoot = resolve(options.workspaceRoot ?? process.cwd());
@@ -62,14 +63,28 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
   const now = () => new Date().toISOString();
   const startedAt = now();
 
+  const resumeMetadata = getResumeMetadata(options.resumeFrom);
+
   options.onEvent?.({
     type: 'loop.started',
+    runId,
     goal: options.goal,
     model,
     provider,
     workspaceRoot,
+    resumedFromCheckpoint: resumeMetadata?.checkpointRunId,
     timestamp: startedAt,
   });
+
+  if (resumeMetadata) {
+    options.onEvent?.({
+      type: 'loop.resumed',
+      runId,
+      fromCheckpoint: resumeMetadata.checkpointRunId,
+      priorTraceEvents: resumeMetadata.priorTraceEvents,
+      timestamp: now(),
+    });
+  }
 
   const result = await runAgent({
     goal: options.goal,
@@ -82,14 +97,39 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
     onAssistantStream: (update) => {
       options.onEvent?.({
         type: 'assistant.stream',
+        runId,
         ...update,
         timestamp: now(),
       });
       options.onAssistantStream?.(update);
     },
     onEvent: (event) => {
-      options.onEvent?.({ type: 'trace', event, timestamp: now() });
+      options.onEvent?.({ type: 'trace', runId, event, timestamp: now() });
       options.onTraceEvent?.(event);
+    },
+    onToolCalling: (call, step, toolDef) => {
+      options.onEvent?.({
+        type: 'tool.calling',
+        runId,
+        step,
+        tool: call.tool,
+        toolCallId: call.id,
+        input: call.input,
+        requiresApproval: toolDef.requiresApproval ?? false,
+        timestamp: now(),
+      });
+    },
+    onToolCompleted: (call, result, step, durationMs) => {
+      options.onEvent?.({
+        type: 'tool.completed',
+        runId,
+        step,
+        tool: call.tool,
+        toolCallId: call.id,
+        result: { ok: result.ok, output: result.output, error: result.error },
+        durationMs,
+        timestamp: now(),
+      });
     },
     approveToolCall: options.approveToolCall,
     shouldStop: options.shouldStop,
@@ -98,6 +138,7 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
 
   const finishedAt = now();
   const state = createFinishedAgentLoopState({
+    runId,
     goal: options.goal,
     model,
     provider,
@@ -109,6 +150,7 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
 
   options.onEvent?.({
     type: 'loop.finished',
+    runId,
     outcome: result.outcome,
     summary: result.summary,
     usage: result.usage,
@@ -139,6 +181,26 @@ function resolveHistory(options: Pick<RunAgentLoopOptions, 'history' | 'resumeFr
   }
 
   return getHistoryFromAgentLoopState(options.resumeFrom);
+}
+
+function getResumeMetadata(
+  resumeFrom: AgentLoopState | AgentLoopCheckpoint | undefined,
+): { checkpointRunId: string; priorTraceEvents: number } | undefined {
+  if (!resumeFrom) {
+    return undefined;
+  }
+
+  if ('version' in resumeFrom) {
+    return {
+      checkpointRunId: resumeFrom.runId,
+      priorTraceEvents: resumeFrom.state.trace.length,
+    };
+  }
+
+  return {
+    checkpointRunId: resumeFrom.runId,
+    priorTraceEvents: resumeFrom.trace.length,
+  };
 }
 
 async function createLoopLlmAdapter(options: { model: string; apiKey?: string }): Promise<LlmAdapter> {

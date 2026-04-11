@@ -44,6 +44,8 @@ export type RunAgentOptions = {
   systemContext?: string;
   onEvent?: (event: TraceEvent) => void;
   onAssistantStream?: (update: { step: number; text: string; done: boolean }) => void;
+  onToolCalling?: (call: ToolCall, step: number, toolDef: ToolDefinition) => void;
+  onToolCompleted?: (call: ToolCall, result: ToolResult, step: number, durationMs: number) => void;
   approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
   shouldStop?: () => boolean;
   abortSignal?: AbortSignal;
@@ -76,6 +78,8 @@ type RunContext = {
   mutation: ReturnType<typeof createMutationState>;
   progress: ReturnType<typeof createProgressReminderState>;
   onAssistantStream?: RunAgentOptions['onAssistantStream'];
+  onToolCalling?: RunAgentOptions['onToolCalling'];
+  onToolCompleted?: RunAgentOptions['onToolCompleted'];
   approveToolCall?: RunAgentOptions['approveToolCall'];
   shouldStop?: RunAgentOptions['shouldStop'];
   abortSignal?: AbortSignal;
@@ -156,6 +160,8 @@ function createRunContext(options: RunAgentOptions): RunContext {
     mutation: createMutationState(),
     progress: createProgressReminderState(),
     onAssistantStream: options.onAssistantStream,
+    onToolCalling: options.onToolCalling,
+    onToolCompleted: options.onToolCompleted,
     approveToolCall: options.approveToolCall,
     shouldStop: options.shouldStop,
     abortSignal: options.abortSignal,
@@ -271,6 +277,11 @@ async function executeToolTurn(context: RunContext, call: ToolCall): Promise<Run
   }
 
   const tool = context.registry.get(call.tool);
+  if (tool) {
+    context.onToolCalling?.(call, context.state.step, tool);
+  }
+  const toolStartTime = Date.now();
+
   const approvalDeniedResult = await maybeDenyToolCall({
     call,
     tool,
@@ -281,6 +292,8 @@ async function executeToolTurn(context: RunContext, call: ToolCall): Promise<Run
     log: context.log,
   });
   if (approvalDeniedResult) {
+    const durationMs = Date.now() - toolStartTime;
+    context.onToolCompleted?.(call, approvalDeniedResult, context.state.step, durationMs);
     return handleDeniedToolResult(context, call.id, approvalDeniedResult);
   }
 
@@ -294,6 +307,9 @@ async function executeToolTurn(context: RunContext, call: ToolCall): Promise<Run
     record: context.record,
     log: context.log,
   });
+
+  const durationMs = Date.now() - toolStartTime;
+  context.onToolCompleted?.(execution.effectiveCall, execution.result, context.state.step, durationMs);
 
   return handleExecutedToolResult(context, execution.effectiveCall, call.id, execution.result);
 }

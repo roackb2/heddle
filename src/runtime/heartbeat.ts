@@ -65,10 +65,44 @@ export async function runAgentHeartbeat(options: RunAgentHeartbeatOptions): Prom
     abortSignal: options.abortSignal,
   });
 
-  return {
-    decision: inferHeartbeatDecision(result.summary, result.outcome),
+  const decision = inferHeartbeatDecision(result.summary, result.outcome);
+  const runId = result.state.runId;
+  const checkpoint = createAgentLoopCheckpoint(result.state);
+  const now = () => new Date().toISOString();
+
+  options.onEvent?.({
+    type: 'heartbeat.decision',
+    runId,
+    decision,
+    outcome: result.outcome,
     summary: result.summary,
-    checkpoint: createAgentLoopCheckpoint(result.state),
+    timestamp: now(),
+  });
+
+  if (decision === 'escalate') {
+    options.onEvent?.({
+      type: 'escalation.required',
+      runId,
+      task: options.task,
+      outcome: result.outcome,
+      summary: result.summary,
+      step: result.trace.length,
+      timestamp: now(),
+    });
+  }
+
+  options.onEvent?.({
+    type: 'checkpoint.saved',
+    runId,
+    checkpoint,
+    step: result.trace.length,
+    timestamp: now(),
+  });
+
+  return {
+    decision,
+    summary: result.summary,
+    checkpoint,
     state: result.state,
   };
 }
@@ -114,4 +148,23 @@ function inferHeartbeatDecision(summary: string, outcome: string): HeartbeatDeci
   }
 
   return 'escalate';
+}
+
+function inferEscalationReason(
+  summary: string,
+  outcome: string,
+): 'human_input_required' | 'policy_violation' | 'max_steps_reached' | 'error' | 'risk_detected' {
+  if (outcome === 'max_steps') {
+    return 'max_steps_reached';
+  }
+  if (outcome === 'error') {
+    return 'error';
+  }
+  if (/blocked|risk|unapproved|policy/i.test(summary)) {
+    return 'policy_violation';
+  }
+  if (/input|user|human|question/i.test(summary)) {
+    return 'human_input_required';
+  }
+  return 'risk_detected';
 }

@@ -383,3 +383,275 @@ describe('runStoredHeartbeat', () => {
     expect(suggestNextHeartbeatDelayMs('pause')).toBe(15 * 60_000);
   });
 });
+
+describe('AgentLoopEvent contracts', () => {
+  it('emits tool.calling and tool.completed events with stable payloads', async () => {
+    const events: AgentLoopEvent[] = [];
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        return {
+          content: 'Using echo.',
+          toolCalls: [{ id: 'call-1', tool: 'echo_tool', input: { value: 'test' } }],
+        };
+      },
+    };
+    const echoTool: ToolDefinition = {
+      name: 'echo_tool',
+      description: 'Echoes a value.',
+      requiresApproval: false,
+      parameters: { type: 'object', properties: { value: { type: 'string' } } },
+      async execute(input) {
+        return { ok: true, output: input };
+      },
+    };
+
+    await runAgentLoop({
+      goal: 'Test tool events.',
+      llm: fakeLlm,
+      tools: [echoTool],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger: silentLogger,
+      onEvent: (event) => events.push(event),
+    });
+
+    const callingEvent = events.find((e) => e.type === 'tool.calling');
+    const completedEvent = events.find((e) => e.type === 'tool.completed');
+
+    expect(callingEvent).toMatchObject({
+      type: 'tool.calling',
+      runId: expect.stringMatching(/^run_/),
+      step: 1,
+      tool: 'echo_tool',
+      toolCallId: 'call-1',
+      input: { value: 'test' },
+      requiresApproval: false,
+      timestamp: expect.any(String),
+    });
+
+    expect(completedEvent).toMatchObject({
+      type: 'tool.completed',
+      runId: expect.stringMatching(/^run_/),
+      step: 1,
+      tool: 'echo_tool',
+      toolCallId: 'call-1',
+      result: { ok: true, output: { value: 'test' } },
+      durationMs: expect.any(Number),
+      timestamp: expect.any(String),
+    });
+
+    // Verify runId correlation across events
+    expect(callingEvent?.runId).toBe(completedEvent?.runId);
+  });
+
+  it('emits loop.resumed event when resuming from checkpoint', async () => {
+    const events: AgentLoopEvent[] = [];
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        return { content: 'Done.' };
+      },
+    };
+
+    const first = await runAgentLoop({
+      goal: 'First.',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger: silentLogger,
+    });
+
+    const checkpoint = createAgentLoopCheckpoint(first.state);
+
+    await runAgentLoop({
+      goal: 'Second.',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      resumeFrom: checkpoint,
+      maxSteps: 1,
+      logger: silentLogger,
+      onEvent: (event) => events.push(event),
+    });
+
+    const resumedEvent = events.find((e) => e.type === 'loop.resumed');
+    const startedEvent = events.find((e) => e.type === 'loop.started');
+
+    expect(resumedEvent).toMatchObject({
+      type: 'loop.resumed',
+      runId: expect.stringMatching(/^run_/),
+      fromCheckpoint: first.state.runId,
+      priorTraceEvents: expect.any(Number),
+      timestamp: expect.any(String),
+    });
+
+    expect(startedEvent).toMatchObject({
+      type: 'loop.started',
+      runId: resumedEvent?.runId,
+      resumedFromCheckpoint: first.state.runId,
+    });
+  });
+
+  it('emits heartbeat.decision and checkpoint.saved events', async () => {
+    const events: AgentLoopEvent[] = [];
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        return {
+          content: 'Task is progressing well.\n\nHEARTBEAT_DECISION: continue',
+        };
+      },
+    };
+
+    await runAgentHeartbeat({
+      task: 'Background work.',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger: silentLogger,
+      onEvent: (event) => events.push(event),
+    });
+
+    const decisionEvent = events.find((e) => e.type === 'heartbeat.decision');
+    const checkpointEvent = events.find((e) => e.type === 'checkpoint.saved');
+
+    expect(decisionEvent).toMatchObject({
+      type: 'heartbeat.decision',
+      runId: expect.stringMatching(/^run_/),
+      decision: 'continue',
+      outcome: 'done',
+      summary: expect.stringContaining('HEARTBEAT_DECISION: continue'),
+      timestamp: expect.any(String),
+    });
+
+    expect(checkpointEvent).toMatchObject({
+      type: 'checkpoint.saved',
+      runId: decisionEvent?.runId,
+      checkpoint: {
+        runId: expect.stringMatching(/^run_/),
+        version: 1,
+      },
+      step: expect.any(Number),
+      timestamp: expect.any(String),
+    });
+  });
+
+  it('emits escalation.required event when heartbeat decides to escalate', async () => {
+    const events: AgentLoopEvent[] = [];
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        return {
+          content: 'Blocked by policy.\n\nHEARTBEAT_DECISION: escalate',
+        };
+      },
+    };
+
+    await runAgentHeartbeat({
+      task: 'Risky work.',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger: silentLogger,
+      onEvent: (event) => events.push(event),
+    });
+
+    const decisionEvent = events.find((e) => e.type === 'heartbeat.decision');
+
+    expect(decisionEvent?.decision).toBe('escalate');
+
+    const escalationEvent = events.find((e) => e.type === 'escalation.required');
+
+    expect(escalationEvent).toMatchObject({
+      type: 'escalation.required',
+      runId: decisionEvent?.runId,
+      task: 'Risky work.',
+      outcome: 'done',
+      summary: expect.stringContaining('HEARTBEAT_DECISION: escalate'),
+      step: expect.any(Number),
+      timestamp: expect.any(String),
+    });
+  });
+
+  it('includes runId in all loop-level events for correlation', async () => {
+    const events: AgentLoopEvent[] = [];
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        return { content: 'Done.' };
+      },
+    };
+
+    await runAgentLoop({
+      goal: 'Test correlation.',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger: silentLogger,
+      onEvent: (event) => events.push(event),
+    });
+
+    const loopEvents = events.filter(
+      (e) => e.type === 'loop.started' || e.type === 'loop.finished' || e.type === 'assistant.stream' || e.type === 'trace'
+    );
+
+    expect(loopEvents.length).toBeGreaterThan(0);
+
+    const runId = loopEvents[0]?.runId;
+    expect(runId).toMatch(/^run_/);
+
+    for (const event of loopEvents) {
+      expect(event.runId).toBe(runId);
+    }
+  });
+});
