@@ -50,7 +50,7 @@ export function createLogger(options: CreateLoggerOptions = {}): pino.Logger {
   }
 
   if (streams.length === 0) {
-    return pino({ level }, pino.destination('/dev/null'));
+    return pino({ level, enabled: false });
   }
 
   return pino({ level }, pino.multistream(streams));
@@ -59,4 +59,4 @@ export function createLogger(options: CreateLoggerOptions = {}): pino.Logger {
 /**
  * Default logger instance.
  */
-export const logger = createLogger();
+export const logger = pino({ level: 'silent', enabled: false });

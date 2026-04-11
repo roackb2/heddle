@@ -2,25 +2,11 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   DEFAULT_OPENAI_MODEL,
-  runAgent,
-  createLlmAdapter,
   inferProviderFromModel,
-  type LlmProvider,
-  listFilesTool,
-  readFileTool,
-  editFileTool,
-  createSearchFilesTool,
-  createWebSearchTool,
-  createViewImageTool,
-  createListMemoryNotesTool,
-  createReadMemoryNoteTool,
-  createSearchMemoryNotesTool,
-  createEditMemoryNoteTool,
-  reportStateTool,
-  createRunShellInspectTool,
-  createRunShellMutateTool,
+  runAgentLoop,
   formatTraceForConsole,
   createLogger,
+  resolveProviderApiKey,
 } from '../index.js';
 
 export type AskCliOptions = {
@@ -47,37 +33,18 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
 
   logger.info({ goal, model, provider, maxSteps, cwd: workspaceRoot }, 'Heddle');
 
-  const llm = createLlmAdapter({
+  const result = await runAgentLoop({
+    goal,
     model,
     apiKey: options.apiKey ?? resolveProviderApiKey(provider),
+    maxSteps,
+    logger,
+    workspaceRoot,
+    stateDir: options.stateDir,
+    searchIgnoreDirs: options.searchIgnoreDirs,
+    systemContext: options.systemContext,
+    includePlanTool: false,
   });
-  const webSearchTool = createWebSearchTool({
-    model,
-    provider,
-    apiKey: options.apiKey ?? resolveProviderApiKey(provider),
-  });
-  const viewImageTool = createViewImageTool({
-    model,
-    provider,
-    apiKey: options.apiKey ?? resolveProviderApiKey(provider),
-  });
-  const tools = [
-    listFilesTool,
-    readFileTool,
-    editFileTool,
-    createSearchFilesTool({ excludedDirs: options.searchIgnoreDirs }),
-    webSearchTool,
-    viewImageTool,
-    createListMemoryNotesTool({ memoryRoot: join(stateRoot, 'memory') }),
-    createReadMemoryNoteTool({ memoryRoot: join(stateRoot, 'memory') }),
-    createSearchMemoryNotesTool({ memoryRoot: join(stateRoot, 'memory') }),
-    createEditMemoryNoteTool({ memoryRoot: join(stateRoot, 'memory') }),
-    reportStateTool,
-    createRunShellInspectTool(),
-    createRunShellMutateTool(),
-  ];
-
-  const result = await runAgent({ goal, llm, tools, maxSteps, logger, systemContext: options.systemContext });
   process.stdout.write(`${formatTraceForConsole(result.trace)}\n`);
 
   const traceDir = join(stateRoot, 'traces');
@@ -98,19 +65,4 @@ function parsePositiveInt(raw: string | undefined): number | undefined {
   }
 
   return value;
-}
-
-function resolveProviderApiKey(provider: LlmProvider): string | undefined {
-  switch (provider) {
-    case 'openai':
-      return firstDefinedNonEmpty(process.env.OPENAI_API_KEY, process.env.PERSONAL_OPENAI_API_KEY);
-    case 'anthropic':
-      return firstDefinedNonEmpty(process.env.ANTHROPIC_API_KEY, process.env.PERSONAL_ANTHROPIC_API_KEY);
-    case 'google':
-      return undefined;
-  }
-}
-
-function firstDefinedNonEmpty(...values: Array<string | undefined>): string | undefined {
-  return values.find((value) => typeof value === 'string' && value.trim().length > 0);
 }

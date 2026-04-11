@@ -4,7 +4,7 @@ Heddle is a terminal coding agent runtime and CLI.
 
 It is built to feel like a terminal partner that understands your project, keeps continuity across real work, and becomes more useful over time.
 
-It is open source, provider-agnostic, supports OpenAI and Anthropic models, and can build memory across sessions.
+It is open source, provider-agnostic, supports OpenAI and Anthropic models, and can build memory across sessions. For agentic-system builders, Heddle also exposes heartbeat primitives for autonomous wake cycles, checkpointing, and long-running background work.
 
 ## How Heddle Helps
 
@@ -18,6 +18,9 @@ It is open source, provider-agnostic, supports OpenAI and Anthropic models, and 
 ## Advanced Capabilities
 
 - provider-agnostic model support across OpenAI and Anthropic
+- embeddable `runAgentLoop` API for building non-CLI agent hosts
+- `runAgentHeartbeat` for scheduler-driven autonomous wake cycles without chat by default
+- serializable checkpoints for resume, background execution, and hosted workers
 - provider-backed hosted web search through `web_search`
 - local image viewing from referenced file paths through `view_image`
 - inline `@file` mentions that tell the agent which workspace files to inspect first
@@ -85,6 +88,8 @@ Heddle currently supports:
 - automatic conversation compaction so longer chats preserve context instead of growing unbounded
 - manual `/compact` to shrink the current session transcript on demand
 - persistent workspace memory notes under `.heddle/memory/`
+- autonomous heartbeat wake cycles through `runAgentHeartbeat`
+- serializable run checkpoints for programmatic hosts and later continuation
 - short working-plan support through `update_plan` for substantial multi-step tasks
 - remembered per-project approvals for repeated commands and edits
 - interrupt and resume support for longer-running coding workflows
@@ -97,6 +102,49 @@ The file-mention workflow is also intentionally lightweight: `@path/to/file` tel
 The planning workflow is also intentionally lightweight: Heddle does not force a heavyweight planner or a separate "plan mode," but it can automatically record and update a short plan when a task is substantial enough to benefit from visible progress tracking.
 
 The web-search workflow is provider-backed rather than crawler-backed: OpenAI models use OpenAI-hosted web search, and Anthropic models use Anthropic-hosted web search when available through the selected model/tool path.
+
+## Heartbeat
+
+Heddle exposes `runAgentHeartbeat` for autonomous, scheduler-driven agent work.
+
+Heartbeat is not an interactive chat mode. It is a host/runtime primitive for systems that want to wake an agent periodically, let it work within budget and approval limits, checkpoint the result, and decide what should happen next.
+
+A heartbeat wake cycle:
+
+- loads a durable task plus an optional checkpoint
+- resumes prior transcript state if available
+- lets the agent do bounded useful work without a human prompt
+- checkpoints the new state
+- returns a decision: `continue`, `pause`, `complete`, or `escalate`
+
+This is intended for hosted workers, local schedulers, long-running agents, and systems like agent social platforms where agents need to keep working over time without staying in a live chat session.
+
+Heartbeat uses a larger default step budget than ordinary short chat runs so a wake cycle has room to inspect, act, and checkpoint. Hosts can still pass `maxSteps` when they need stricter control.
+
+Try a small local heartbeat example:
+
+```bash
+export OPENAI_API_KEY=your_key_here
+yarn example:heartbeat
+```
+
+The example stores its checkpoint at `.heddle/examples/heartbeat-demo-checkpoint.json`, so running it again resumes from the previous wake cycle.
+
+For hosts that want storage handled by Heddle, use `runStoredHeartbeat` with a checkpoint store:
+
+```ts
+import { createFileHeartbeatCheckpointStore, runStoredHeartbeat } from '@roackb2/heddle'
+
+const result = await runStoredHeartbeat({
+  task: 'Keep this project moving when safe autonomous progress is available',
+  store: createFileHeartbeatCheckpointStore({
+    path: '.heddle/heartbeat/project-maintenance.json',
+  }),
+})
+
+// result.nextDelayMs is a scheduling hint. The host still owns the timer,
+// cron job, queue, worker, or hosted scheduler that wakes the agent again.
+```
 
 ## Knowledge Persistence
 
@@ -274,9 +322,65 @@ Field notes:
 
 ## Programmatic Use
 
-The npm package also exports the core runtime pieces for programmatic use, including:
+The npm package exports a programmatic execution loop for building other agent hosts on top of Heddle.
+
+Use `runAgentLoop` when you want Heddle to assemble the model adapter, default tool bundle, memory tools, and event stream:
+
+```ts
+import { runAgentLoop } from '@roackb2/heddle'
+
+const result = await runAgentLoop({
+  goal: 'Inspect this repo and summarize the main architecture',
+  model: 'gpt-5.1-codex',
+  workspaceRoot: process.cwd(),
+  onEvent(event) {
+    // Render progress, persist traces, feed middleware, or bridge into another app.
+    console.log(event.type)
+  },
+})
+```
+
+Persist `result.state` or wrap it with `createAgentLoopCheckpoint(result.state)` when another host needs to continue later:
+
+```ts
+import { createAgentLoopCheckpoint, runAgentLoop } from '@roackb2/heddle'
+
+const checkpoint = createAgentLoopCheckpoint(result.state)
+
+await runAgentLoop({
+  goal: 'Continue from the prior run and identify the next action',
+  resumeFrom: checkpoint,
+})
+```
+
+The loop emits structured events for:
+
+- loop start and finish
+- assistant streaming updates
+- trace events such as tool calls, tool results, approvals, and final outcome
+
+The returned result also includes a serializable `state` object with the model, provider, workspace root, outcome, transcript, trace, usage, and timestamps. This is the boundary future hosts can persist for background execution, dashboards, middleware, or heartbeat-style continuation.
+
+For autonomous background work, `runAgentHeartbeat` runs one wake cycle from a durable task and optional checkpoint:
+
+```ts
+import { runAgentHeartbeat } from '@roackb2/heddle'
+
+const heartbeat = await runAgentHeartbeat({
+  task: 'Check whether there is safe maintenance work to do for this project',
+  checkpoint,
+  maxSteps: 8,
+})
+
+// Persist heartbeat.checkpoint, then schedule the next wake based on heartbeat.decision.
+```
+
+Heartbeat is not chat by default. It is meant for scheduler-driven agents that wake up, reload state, do bounded autonomous work, checkpoint, and either continue, pause, complete, or escalate.
+
+Lower-level pieces are still exported for custom hosts, including:
 
 - `runAgent`
+- `createDefaultAgentTools`
 - LLM adapter helpers
 - built-in tools
 - trace utilities
@@ -285,6 +389,20 @@ Install as a dependency with:
 
 ```bash
 npm install @roackb2/heddle
+```
+
+For a small real-LLM example of embedding the loop with a custom host tool:
+
+```bash
+export OPENAI_API_KEY=your_key_here
+yarn example:programmatic
+```
+
+To try the same example with Claude:
+
+```bash
+export ANTHROPIC_API_KEY=your_key_here
+HEDDLE_EXAMPLE_MODEL=claude-3-5-haiku-latest yarn example:programmatic
 ```
 
 The public API lives in [src/index.ts](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/src/index.ts).

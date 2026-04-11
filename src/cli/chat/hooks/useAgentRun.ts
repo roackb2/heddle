@@ -5,21 +5,8 @@ import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition, Tool
 import {
   createLogger,
   createLlmAdapter,
-  createRunShellInspectTool,
-  createRunShellMutateTool,
-  createSearchFilesTool,
-  createWebSearchTool,
-  createViewImageTool,
-  createListMemoryNotesTool,
-  createReadMemoryNoteTool,
-  createSearchMemoryNotesTool,
-  createEditMemoryNoteTool,
-  editFileTool,
-  listFilesTool,
-  readFileTool,
-  reportStateTool,
-  updatePlanTool,
-  runAgent,
+  createDefaultAgentTools,
+  runAgentLoop,
 } from '../../../index.js';
 import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../tools/run-shell.js';
 import { previewEditFileInput } from '../../../tools/edit-file.js';
@@ -129,33 +116,16 @@ export function useAgentRun(args: UseAgentRunArgs) {
   );
   const tools = useMemo(
     () => {
-      const webSearchTool = createWebSearchTool({
+      return createDefaultAgentTools({
         model: activeModel,
         apiKey: activeApiKey,
+        workspaceRoot: runtime.workspaceRoot,
+        memoryDir: runtime.memoryDir,
+        searchIgnoreDirs: runtime.searchIgnoreDirs,
+        includePlanTool: true,
       });
-      const viewImageTool = createViewImageTool({
-        model: activeModel,
-        apiKey: activeApiKey,
-      });
-
-      return [
-        listFilesTool,
-        readFileTool,
-        editFileTool,
-        createSearchFilesTool({ excludedDirs: runtime.searchIgnoreDirs }),
-        webSearchTool,
-        viewImageTool,
-        createListMemoryNotesTool({ memoryRoot: runtime.memoryDir }),
-        createReadMemoryNoteTool({ memoryRoot: runtime.memoryDir }),
-        createSearchMemoryNotesTool({ memoryRoot: runtime.memoryDir }),
-        createEditMemoryNoteTool({ memoryRoot: runtime.memoryDir }),
-        reportStateTool,
-        updatePlanTool,
-        createRunShellInspectTool(),
-        createRunShellMutateTool(),
-      ];
     },
-    [activeApiKey, activeModel, runtime.searchIgnoreDirs],
+    [activeApiKey, activeModel, runtime.memoryDir, runtime.searchIgnoreDirs, runtime.workspaceRoot],
   );
   const logger = useMemo<Logger>(
     () =>
@@ -299,10 +269,15 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   }
 
   try {
-    const result = await runAgent({
+    const result = await runAgentLoop({
       goal: prompt,
+      model: llm.info?.model ?? runtime.model,
+      workspaceRoot: runtime.workspaceRoot,
+      memoryDir: runtime.memoryDir,
+      searchIgnoreDirs: runtime.searchIgnoreDirs,
       llm,
       tools,
+      includeDefaultTools: false,
       maxSteps: runtime.maxSteps,
       logger,
       history: sessionHistory,
@@ -314,7 +289,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
           streamingBuffers.delete(update.step);
         }
       },
-      onEvent: (event) => {
+      onTraceEvent: (event) => {
         if (event.type === 'assistant.turn' && event.content.trim() && !appendedAssistantSteps.has(event.step)) {
           appendedAssistantSteps.add(event.step);
           streamingBuffers.delete(event.step);

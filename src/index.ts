@@ -5,6 +5,31 @@
 // Core loop
 export { runAgent } from './run-agent.js';
 export type { RunAgentOptions } from './run-agent.js';
+export { runAgentLoop } from './runtime/agent-loop.js';
+export type { AgentLoopEvent, AgentLoopResult, RunAgentLoopOptions } from './runtime/agent-loop.js';
+export { runAgentHeartbeat } from './runtime/heartbeat.js';
+export type { AgentHeartbeatResult, HeartbeatDecision, RunAgentHeartbeatOptions } from './runtime/heartbeat.js';
+export {
+  createFileHeartbeatCheckpointStore,
+  runStoredHeartbeat,
+  suggestNextHeartbeatDelayMs,
+} from './runtime/heartbeat-store.js';
+export type {
+  FileHeartbeatCheckpointStoreOptions,
+  HeartbeatCheckpointStore,
+  RunStoredHeartbeatOptions,
+  StoredHeartbeatResult,
+} from './runtime/heartbeat-store.js';
+export {
+  createAgentLoopCheckpoint,
+  getHistoryFromAgentLoopCheckpoint,
+  getHistoryFromAgentLoopState,
+} from './runtime/events.js';
+export type { AgentLoopCheckpoint, AgentLoopState, AgentLoopStatus } from './runtime/events.js';
+export { resolveApiKeyForModel, resolveProviderApiKey } from './runtime/api-keys.js';
+export type { ApiKeyRuntime } from './runtime/api-keys.js';
+export { createDefaultAgentTools } from './runtime/default-tools.js';
+export type { DefaultAgentToolsOptions } from './runtime/default-tools.js';
 export { DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL } from './config.js';
 
 // Types

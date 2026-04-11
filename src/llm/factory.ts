@@ -7,6 +7,7 @@ import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_LLM_PROVIDER, DEFAULT_OPENAI_MODEL } f
 import { createAnthropicAdapter } from './anthropic.js';
 import { createOpenAiAdapter } from './openai.js';
 import type { LlmAdapter, LlmProvider } from './types.js';
+import { inferProviderFromModel } from './providers.js';
 
 export type CreateLlmAdapterOptions = {
   provider?: LlmProvider;
@@ -47,29 +48,4 @@ export function resolveLlmProvider(options: CreateLlmAdapterOptions = {}): LlmPr
   return DEFAULT_LLM_PROVIDER;
 }
 
-export function inferProviderFromModel(model: string): LlmProvider {
-  const normalized = model.trim().toLowerCase();
-
-  if (!normalized) {
-    return DEFAULT_LLM_PROVIDER;
-  }
-
-  if (
-    normalized.startsWith('gpt-') ||
-    normalized.startsWith('o1') ||
-    normalized.startsWith('o3') ||
-    normalized.startsWith('o4')
-  ) {
-    return 'openai';
-  }
-
-  if (normalized.startsWith('claude')) {
-    return 'anthropic';
-  }
-
-  if (normalized.startsWith('gemini')) {
-    return 'google';
-  }
-
-  return DEFAULT_LLM_PROVIDER;
-}
+export { inferProviderFromModel } from './providers.js';

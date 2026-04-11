@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import type { TraceEvent } from '../../../index.js';
 import { DEFAULT_OPENAI_MODEL, inferProviderFromModel } from '../../../index.js';
 import type { LlmProvider } from '../../../index.js';
+import { resolveApiKeyForModel as resolveRuntimeApiKeyForModel, resolveProviderApiKey as resolveRuntimeProviderApiKey } from '../../../runtime/api-keys.js';
 import { parsePositiveInt } from './format.js';
 
 export type ChatCliOptions = {
@@ -65,29 +66,9 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
 }
 
 export function resolveProviderApiKey(provider: LlmProvider): string | undefined {
-  switch (provider) {
-    case 'openai':
-      return firstDefinedNonEmpty(process.env.OPENAI_API_KEY, process.env.PERSONAL_OPENAI_API_KEY);
-    case 'anthropic':
-      return firstDefinedNonEmpty(process.env.ANTHROPIC_API_KEY, process.env.PERSONAL_ANTHROPIC_API_KEY);
-    case 'google':
-      return undefined;
-  }
+  return resolveRuntimeProviderApiKey(provider);
 }
 
 export function resolveApiKeyForModel(model: string, runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider'>): string | undefined {
-  if (runtime?.apiKey && runtime.apiKeyProvider === 'explicit') {
-    return runtime.apiKey;
-  }
-
-  const provider = inferProviderFromModel(model);
-  if (runtime?.apiKey && runtime.apiKeyProvider === provider) {
-    return runtime.apiKey;
-  }
-
-  return resolveProviderApiKey(provider);
-}
-
-function firstDefinedNonEmpty(...values: Array<string | undefined>): string | undefined {
-  return values.find((value) => typeof value === 'string' && value.trim().length > 0);
+  return resolveRuntimeApiKeyForModel(model, runtime);
 }
