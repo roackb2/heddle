@@ -40,6 +40,7 @@ export {
   formatRuntimeFrameForEmbedding,
   inferDriftLevel,
 } from './integrations/cyberloop.js';
+export { createCyberLoopKinematicsObserver } from './integrations/cyberloop-kinematics.js';
 export type {
   CyberLoopCompatibleMiddleware,
   CyberLoopCompatibleStateEmbedder,
@@ -54,6 +55,10 @@ export type {
   HeddleRuntimeFrameKind,
   RuntimeFrameEmbedText,
 } from './integrations/cyberloop.js';
+export type {
+  CreateCyberLoopKinematicsObserverOptions,
+  CyberLoopKinematicsObserver,
+} from './integrations/cyberloop-kinematics.js';
 
 // Types
 export type {

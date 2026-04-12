@@ -29,6 +29,8 @@ type SubmitChatPromptArgs = {
   createSession: (name?: string) => ChatSession;
   renameSession: (name: string) => void;
   listRecentSessionsMessage: string[];
+  driftEnabled: boolean;
+  setDriftEnabled: (enabled: boolean) => void;
   preparePrompt?: (prompt: string) => { prompt: string; displayText?: string };
   executeTurn: (prompt: string, displayText?: string, sessionIdOverride?: string) => Promise<void>;
   executeDirectShellCommand: (rawCommand: string) => Promise<void>;
@@ -95,6 +97,8 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
           `Compacted earlier session history to reduce context size (${compacted.context.compactedMessages} messages summarized).`
         : 'Compacted earlier session history to reduce context size.';
     },
+    driftEnabled: args.driftEnabled,
+    setDriftEnabled: args.setDriftEnabled,
     listRecentSessionsMessage: args.listRecentSessionsMessage,
   } satisfies LocalCommandDeps);
 

@@ -3,11 +3,13 @@ import type { MutableRefObject } from 'react';
 import type { Logger } from 'pino';
 import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition, ToolResult } from '../../../index.js';
 import {
+  createCyberLoopKinematicsObserver,
   createLogger,
   createLlmAdapter,
   createDefaultAgentTools,
   runAgentLoop,
 } from '../../../index.js';
+import type { CyberLoopKinematicsObserver, CyberLoopObserverAnnotation } from '../../../index.js';
 import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../tools/run-shell.js';
 import { previewEditFileInput } from '../../../tools/edit-file.js';
 import type { EditFilePreview } from '../../../tools/edit-file.js';
@@ -74,6 +76,7 @@ type ExecuteTurnArgs = {
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
   isProjectApproved: (call: ToolCall) => boolean;
   rememberProjectApproval: (call: ToolCall) => void;
+  drift?: ChatDriftObserverOptions;
 };
 
 type ExecuteDirectShellArgs = {
@@ -98,6 +101,14 @@ type UseAgentRunArgs = {
   state: ActionState;
   updateSessionById: SessionUpdater;
   updateActiveSession: ActiveSessionUpdater;
+  drift?: ChatDriftObserverOptions;
+};
+
+type ChatDriftObserverOptions = {
+  enabled: boolean;
+  onRunStart?: () => void;
+  onAnnotation?: (annotation: CyberLoopObserverAnnotation) => void;
+  onError?: (error: unknown) => void;
 };
 
 export function useAgentRun(args: UseAgentRunArgs) {
@@ -194,6 +205,7 @@ export function useAgentRun(args: UseAgentRunArgs) {
       maybeAutoNameSession,
       isProjectApproved: projectApprovals.isApproved,
       rememberProjectApproval: projectApprovals.rememberApproval,
+      drift: args.drift,
     });
   };
 
@@ -233,6 +245,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     maybeAutoNameSession,
     isProjectApproved,
     rememberProjectApproval,
+    drift,
   } = args;
 
   if (!prompt || state.isRunning) {
@@ -260,6 +273,8 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   const appendedEditPreviewIds = new Set<string>();
   const appendedPlanSteps = new Set<number>();
   const streamingBuffers = new Map<number, string>();
+  drift?.onRunStart?.();
+  const driftObserver = await createChatDriftObserver(prompt, llm, runtime, drift);
 
   if (displayText) {
     updateSessionById(sessionId, (session) => ({
@@ -366,6 +381,9 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
           return [...current, { id: state.nextLocalId(), text: next }].slice(-8);
         });
       },
+      onEvent: (event) => {
+        driftObserver?.observer.handleEvent(event);
+      },
       approveToolCall: async (call, tool) => {
         if (isProjectApproved(call)) {
           return {
@@ -391,6 +409,10 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       shouldStop: () => state.interruptRequestedRef.current,
       abortSignal: state.abortControllerRef.current.signal,
     });
+    await driftObserver?.observer.flush();
+    if (driftObserver?.annotations.length) {
+      result.trace.push(...driftObserver.annotations);
+    }
 
     const compacted = compactChatHistory({
       history: result.transcript,
@@ -452,6 +474,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     state.setStatus(result.outcome === 'done' ? 'Idle' : `Stopped: ${result.outcome}`);
     return result;
   } catch (runError) {
+    await driftObserver?.observer.flush();
     const message = runError instanceof Error ? runError.message : String(runError);
     const formattedMessage = formatChatFailureMessage(message, {
       model: llm.info?.model ?? runtime.model,
@@ -472,6 +495,29 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     state.interruptRequestedRef.current = false;
     state.setInterruptRequested(false);
     state.abortControllerRef.current = undefined;
+  }
+}
+
+async function createChatDriftObserver(
+  goal: string,
+  llm: LlmAdapter,
+  runtime: ChatRuntimeConfig,
+  options: ChatDriftObserverOptions | undefined,
+): Promise<CyberLoopKinematicsObserver | undefined> {
+  if (!options?.enabled) {
+    return undefined;
+  }
+
+  try {
+    return await createCyberLoopKinematicsObserver({
+      goal,
+      apiKey: llm.info?.provider === 'openai' ? resolveApiKeyForModel(llm.info.model, runtime) : undefined,
+      onAnnotation: options.onAnnotation,
+      onError: options.onError,
+    });
+  } catch (error) {
+    options.onError?.(error);
+    return undefined;
   }
 }
 

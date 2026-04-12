@@ -103,6 +103,20 @@ export function formatTraceForConsole(trace: TraceEvent[]): string {
         break;
       }
 
+      case 'cyberloop.annotation': {
+        const color =
+          event.driftLevel === 'high' ? COLORS.red
+          : event.driftLevel === 'medium' ? COLORS.yellow
+          : event.driftLevel === 'low' ? COLORS.green
+          : COLORS.dim;
+        lines.push(
+          `${color}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}CyberLoop:${COLORS.reset} drift=${event.driftLevel} frame=${event.frameKind}${event.requestedHalt ? ' halt-requested' : ''}`,
+          `  Metadata: ${truncate(JSON.stringify(event.metadata), 500)}`,
+          '',
+        );
+        break;
+      }
+
       case 'run.finished': {
         const outcomeColor =
           event.outcome === 'done' ? COLORS.green

@@ -21,7 +21,7 @@ It is open source, provider-agnostic, supports OpenAI and Anthropic models, and 
 - embeddable `runAgentLoop` API for building non-CLI agent hosts
 - `runAgentHeartbeat` for scheduler-driven autonomous wake cycles without chat by default
 - serializable checkpoints for resume, background execution, and hosted workers
-- experimental CyberLoop-compatible observer hooks for passive semantic-drift instrumentation
+- experimental CyberLoop-compatible observer hooks and optional chat drift telemetry
 - provider-backed hosted web search through `web_search`
 - local image viewing from referenced file paths through `view_image`
 - inline `@file` mentions that tell the agent which workspace files to inspect first
@@ -92,6 +92,7 @@ Heddle currently supports:
 - autonomous heartbeat wake cycles through `runAgentHeartbeat`
 - serializable run checkpoints for programmatic hosts and later continuation
 - passive CyberLoop-compatible observation through `createCyberLoopObserver`
+- optional chat-mode CyberLoop semantic drift telemetry with `/drift on`
 - short working-plan support through `update_plan` for substantial multi-step tasks
 - remembered per-project approvals for repeated commands and edits
 - interrupt and resume support for longer-running coding workflows
@@ -104,6 +105,8 @@ The file-mention workflow is also intentionally lightweight: `@path/to/file` tel
 The planning workflow is also intentionally lightweight: Heddle does not force a heavyweight planner or a separate "plan mode," but it can automatically record and update a short plan when a task is substantial enough to benefit from visible progress tracking.
 
 The web-search workflow is provider-backed rather than crawler-backed: OpenAI models use OpenAI-hosted web search, and Anthropic models use Anthropic-hosted web search when available through the selected model/tool path.
+
+The CyberLoop workflow is observe-only. When `/drift on` is enabled, Heddle loads real CyberLoop kinematics middleware, embeds runtime frames with OpenAI embeddings, shows `drift=unknown|low|medium|high` in the footer, and writes `cyberloop.annotation` events into saved traces. Heddle does not calculate semantic drift itself.
 
 ## Heartbeat
 
@@ -230,6 +233,9 @@ Useful chat commands:
 - `/session close <id>`: remove a saved session
 - `/clear`: clear the current transcript
 - `/compact`: compact older session history immediately
+- `/drift`: show CyberLoop semantic drift detection status
+- `/drift on`: enable observe-only CyberLoop kinematics telemetry for chat runs
+- `/drift off`: disable CyberLoop semantic drift detection
 - `!<command>`: run a shell command directly in chat
 
 Direct shell in chat:
@@ -243,6 +249,14 @@ Direct shell in chat:
 Read-oriented commands stay in inspect mode when possible. Workspace-changing or unclassified commands fall back to approval-gated execution.
 
 Chat state is stored under `.heddle/`, including saved sessions, traces, approvals, and memory notes. The footer context indicator is an estimate of total request input against the active model's context window, not only the raw chat history length.
+
+For local development against the sibling CyberLoop repo, run chat with the middleware module path:
+
+```bash
+HEDDLE_CYBERLOOP_ADVANCED_MODULE=/Users/roackb2/Studio/projects/CyberLoop/src/advanced/kinematics-middleware.ts yarn chat:dev:openai
+```
+
+Then use `/drift on` before asking Heddle to do real work. For installed usage, install or otherwise expose `cyberloop/advanced` so Heddle can dynamically import `kinematicsMiddleware`.
 
 ## CLI Usage
 

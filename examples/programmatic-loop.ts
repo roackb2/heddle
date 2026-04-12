@@ -116,6 +116,8 @@ function formatTraceEvent(event: TraceEvent): string {
       return `[trace] tool.call step=${event.step} tool=${event.call.tool} input=${JSON.stringify(event.call.input)}`;
     case 'tool.result':
       return `[trace] tool.result step=${event.step} tool=${event.tool} ok=${event.result.ok} output=${JSON.stringify(formatUnknown(event.result.output ?? event.result.error ?? ''))}`;
+    case 'cyberloop.annotation':
+      return `[trace] cyberloop.annotation step=${event.step} frame=${event.frameKind} drift=${event.driftLevel}`;
     case 'run.finished':
       return `[trace] run.finished step=${event.step} outcome=${event.outcome} summary=${JSON.stringify(shorten(event.summary))}`;
   }

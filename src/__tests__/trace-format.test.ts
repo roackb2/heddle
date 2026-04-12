@@ -158,4 +158,28 @@ describe('formatTraceForConsole', () => {
     expect(output).toContain('inspect policy rejected the command');
     expect(output).toContain('"command":"aws configure list"');
   });
+
+  it('renders CyberLoop annotation events readably', () => {
+    const output = formatTraceForConsole([
+      {
+        type: 'cyberloop.annotation',
+        step: 3,
+        frameKind: 'assistant',
+        driftLevel: 'medium',
+        requestedHalt: false,
+        metadata: {
+          kinematics: {
+            isStable: false,
+            coherenceAngleDeg: 90,
+            correctionMagnitude: 1,
+          },
+        },
+        timestamp: '2024-01-01T00:00:03Z',
+      },
+    ]);
+
+    expect(output).toContain('CyberLoop:');
+    expect(output).toContain('drift=medium');
+    expect(output).toContain('coherenceAngleDeg');
+  });
 });

@@ -90,6 +90,15 @@ export type TraceEvent =
     }
   | { type: 'tool.call'; call: ToolCall; step: number; timestamp: string }
   | { type: 'tool.result'; tool: string; result: ToolResult; step: number; timestamp: string }
+  | {
+      type: 'cyberloop.annotation';
+      step: number;
+      frameKind: string;
+      driftLevel: 'unknown' | 'low' | 'medium' | 'high';
+      requestedHalt: boolean;
+      metadata: Record<string, unknown>;
+      timestamp: string;
+    }
   | { type: 'run.finished'; outcome: StopReason; summary: string; step: number; timestamp: string };
 
 /**

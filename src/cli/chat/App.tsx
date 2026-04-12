@@ -14,6 +14,7 @@ import {
   SlashHintPanel,
 } from './components/index.js';
 import { estimateBuiltInContextWindow, filterBuiltInModels } from '../../llm/openai-models.js';
+import type { CyberLoopDriftLevel } from '../../index.js';
 import { useApprovalFlow } from './hooks/useApprovalFlow.js';
 import { useAgentRun } from './hooks/useAgentRun.js';
 import { useChatSessions } from './hooks/useChatSessions.js';
@@ -30,6 +31,9 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   const [draft, setDraft] = useState('');
   const [draftCursor, setDraftCursor] = useState(0);
   const [pendingSubmittedPrompt, setPendingSubmittedPrompt] = useState<string | undefined>();
+  const [driftEnabled, setDriftEnabled] = useState(false);
+  const [driftLevel, setDriftLevel] = useState<CyberLoopDriftLevel>('unknown');
+  const [driftError, setDriftError] = useState<string | undefined>();
   const [modelPickerIndex, setModelPickerIndex] = useState(0);
   const [sessionPickerIndex, setSessionPickerIndex] = useState(0);
   const [fileMentionPickerIndex, setFileMentionPickerIndex] = useState(0);
@@ -119,6 +123,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   const promptStatusLine = [
     `model=${activeModel}`,
     contextStatus,
+    `drift=${formatDriftFooter(driftEnabled, driftLevel, driftError)}`,
     `session=${activeSession?.id ?? activeSessionId}${activeSession?.name ? ` (${activeSession.name})` : ''}`,
   ].join(' • ');
   const activityLines = liveEvents
@@ -194,6 +199,15 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     state: actionState,
     updateSessionById,
     updateActiveSession,
+    drift: {
+      enabled: driftEnabled,
+      onRunStart: () => {
+        setDriftLevel('unknown');
+        setDriftError(undefined);
+      },
+      onAnnotation: (annotation) => setDriftLevel(annotation.driftLevel),
+      onError: (error) => setDriftError(error instanceof Error ? error.message : String(error)),
+    },
   });
 
   const submitPrompt = useCallback(async (value: string, options?: { allowWhileRunning?: boolean }) => {
@@ -247,6 +261,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         createSession,
         renameSession,
         listRecentSessionsMessage,
+        driftEnabled,
+        setDriftEnabled,
         preparePrompt: preparePromptWithMentions,
         executeTurn,
         executeDirectShellCommand,
@@ -277,6 +293,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         createSession,
         renameSession,
         listRecentSessionsMessage,
+        driftEnabled,
+        setDriftEnabled,
         preparePrompt: preparePromptWithMentions,
         executeTurn,
         executeDirectShellCommand,
@@ -314,6 +332,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
       createSession,
       renameSession,
       listRecentSessionsMessage,
+      driftEnabled,
+      setDriftEnabled,
       preparePrompt: preparePromptWithMentions,
       executeTurn,
       executeDirectShellCommand,
@@ -339,6 +359,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     createSession,
     renameSession,
     listRecentSessionsMessage,
+    driftEnabled,
+    setDriftEnabled,
     executeTurn,
     executeDirectShellCommand,
     appendPendingUserMessage,
@@ -500,6 +522,14 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
       <Text dimColor>{promptStatusLine}</Text>
     </Box>
   );
+}
+
+function formatDriftFooter(enabled: boolean, level: CyberLoopDriftLevel, error: string | undefined): string {
+  if (!enabled) {
+    return 'off';
+  }
+
+  return error ? 'unavailable' : level;
 }
 
 function getModelPickerQuery(draft: string): string | undefined {

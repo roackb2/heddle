@@ -20,6 +20,8 @@ export type LocalCommandArgs = {
   removeSession: (id: string) => void;
   clearConversation: () => void;
   compactConversation: () => string;
+  driftEnabled: boolean;
+  setDriftEnabled: (enabled: boolean) => void;
   listRecentSessionsMessage: string[];
 };
 
@@ -37,6 +39,9 @@ const HELP_HINTS: LocalCommandHint[] = [
   { command: '/continue', description: 'resume from the current transcript' },
   { command: '/clear', description: 'reset the current session transcript' },
   { command: '/compact', description: 'compact earlier session history for the next run' },
+  { command: '/drift', description: 'show CyberLoop semantic drift detection status' },
+  { command: '/drift on', description: 'enable CyberLoop semantic drift detection for chat runs' },
+  { command: '/drift off', description: 'disable CyberLoop semantic drift detection' },
   { command: '/session list', description: 'list local chat sessions' },
   { command: '/session choose [query]', description: 'pick a recent session with filtering' },
   { command: '/session new [name]', description: 'create and switch to a new session' },
@@ -70,6 +75,16 @@ const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
     return messageResult('Cleared the current chat transcript.');
   }],
   ['/compact', (args) => messageResult(args.compactConversation())],
+  ['/drift', (args) => messageResult(formatDriftStatus(args.driftEnabled))],
+  ['/drift status', (args) => messageResult(formatDriftStatus(args.driftEnabled))],
+  ['/drift on', (args) => {
+    args.setDriftEnabled(true);
+    return messageResult('Enabled CyberLoop semantic drift detection for chat runs. Heddle will load real CyberLoop kinematics middleware and write annotations into traces.');
+  }],
+  ['/drift off', (args) => {
+    args.setDriftEnabled(false);
+    return messageResult('Disabled CyberLoop semantic drift detection.');
+  }],
   ['/continue', () => ({ handled: true, kind: 'continue' })],
   ['/session list', (args) =>
     messageResult(args.sessions.length > 0 ? args.listRecentSessionsMessage.join('\n') : 'No sessions available.'),
@@ -245,6 +260,12 @@ function messageResult(message: string): LocalCommandResult {
     kind: 'message',
     message,
   };
+}
+
+function formatDriftStatus(enabled: boolean): string {
+  return enabled ?
+      'CyberLoop drift detection is enabled. The footer shows drift=unknown|low|medium|high, and traces include cyberloop.annotation events.'
+    : 'CyberLoop drift detection is disabled. Use /drift on to enable observe-only kinematics telemetry.';
 }
 
 function capitalizeFirst(value: string): string {

@@ -84,6 +84,10 @@ export function summarizeTrace(trace: TraceEvent[]): string[] {
         return [
           `tool result ${summarizeToolResult(event.tool, extractShellCommand(event.result.output), event.result.output)}: ${event.result.ok ? 'ok' : event.result.error ?? 'error'}`,
         ];
+      case 'cyberloop.annotation':
+        return [
+          `cyberloop ${event.frameKind} step ${event.step}: drift=${event.driftLevel}${event.requestedHalt ? ' halt-requested' : ''}`,
+        ];
       case 'run.finished':
         return [`run finished: ${event.outcome}`];
       default:
@@ -118,6 +122,8 @@ export function toLiveEvent(event: TraceEvent): string | undefined {
       return `running ${summarizeToolCall(event.call.tool, event.call.input)}`;
     case 'tool.result':
       return `${summarizeToolResult(event.tool, extractShellCommand(event.result.output), event.result.output)} ${event.result.ok ? 'completed' : `failed: ${event.result.error ?? 'error'}`}`;
+    case 'cyberloop.annotation':
+      return event.driftLevel === 'unknown' ? undefined : `cyberloop drift=${event.driftLevel}`;
     case 'run.finished':
       return event.outcome === 'done' ? undefined : `stopped: ${event.outcome}`;
     default:

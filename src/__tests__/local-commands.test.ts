@@ -15,6 +15,8 @@ function createCommandArgs(overrides: Partial<Parameters<typeof runLocalCommand>
     removeSession: vi.fn(),
     clearConversation: vi.fn(),
     compactConversation: vi.fn(() => 'Compacted earlier session history to reduce context size.'),
+    driftEnabled: false,
+    setDriftEnabled: vi.fn(),
     listRecentSessionsMessage: [],
     ...overrides,
   };
@@ -164,12 +166,43 @@ describe('runLocalCommand', () => {
     });
   });
 
-  it('includes /compact in shared slash-command hints', () => {
+  it('toggles drift detection commands', () => {
+    const setDriftEnabled = vi.fn();
+    const enabled = runLocalCommand(createCommandArgs({
+      prompt: '/drift on',
+      setDriftEnabled,
+    }));
+    const status = runLocalCommand(createCommandArgs({
+      prompt: '/drift',
+      driftEnabled: true,
+      setDriftEnabled,
+    }));
+    const disabled = runLocalCommand(createCommandArgs({
+      prompt: '/drift off',
+      driftEnabled: true,
+      setDriftEnabled,
+    }));
+
+    expect(setDriftEnabled).toHaveBeenNthCalledWith(1, true);
+    expect(setDriftEnabled).toHaveBeenNthCalledWith(2, false);
+    expect(enabled).toMatchObject({ handled: true, kind: 'message' });
+    expect(status).toMatchObject({ handled: true, kind: 'message' });
+    expect(disabled).toMatchObject({ handled: true, kind: 'message' });
+    if (status.handled && status.kind === 'message') {
+      expect(status.message).toContain('CyberLoop drift detection is enabled');
+    }
+  });
+
+  it('includes /compact and /drift in shared slash-command hints', () => {
     const hints = getLocalCommandHints('/', 'session-1', []);
 
     expect(hints).toContainEqual({
       command: '/compact',
       description: 'compact earlier session history for the next run',
+    });
+    expect(hints).toContainEqual({
+      command: '/drift',
+      description: 'show CyberLoop semantic drift detection status',
     });
   });
 });
