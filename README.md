@@ -21,6 +21,7 @@ It is open source, provider-agnostic, supports OpenAI and Anthropic models, and 
 - embeddable `runAgentLoop` API for building non-CLI agent hosts
 - `runAgentHeartbeat` for scheduler-driven autonomous wake cycles without chat by default
 - serializable checkpoints for resume, background execution, and hosted workers
+- experimental CyberLoop-compatible observer hooks for passive semantic-drift instrumentation
 - provider-backed hosted web search through `web_search`
 - local image viewing from referenced file paths through `view_image`
 - inline `@file` mentions that tell the agent which workspace files to inspect first
@@ -90,6 +91,7 @@ Heddle currently supports:
 - persistent workspace memory notes under `.heddle/memory/`
 - autonomous heartbeat wake cycles through `runAgentHeartbeat`
 - serializable run checkpoints for programmatic hosts and later continuation
+- passive CyberLoop-compatible observation through `createCyberLoopObserver`
 - short working-plan support through `update_plan` for substantial multi-step tasks
 - remembered per-project approvals for repeated commands and edits
 - interrupt and resume support for longer-running coding workflows
@@ -361,6 +363,27 @@ The loop emits structured events for:
 
 The returned result also includes a serializable `state` object with the model, provider, workspace root, outcome, transcript, trace, usage, and timestamps. This is the boundary future hosts can persist for background execution, dashboards, middleware, or heartbeat-style continuation.
 
+For passive semantic-drift experiments, `createCyberLoopObserver` can consume Heddle's event stream and run CyberLoop-compatible middleware over normalized runtime frames:
+
+```ts
+import { createCyberLoopObserver, runAgentLoop } from '@roackb2/heddle'
+
+const observer = createCyberLoopObserver({
+  middleware: [/* CyberLoop middleware or structurally compatible middleware */],
+  onAnnotation(annotation) {
+    console.log(annotation.driftLevel, annotation.frame.kind)
+  },
+})
+
+await runAgentLoop({
+  goal: 'Investigate this repo',
+  onEvent: observer.handleEvent,
+})
+await observer.flush()
+```
+
+This is intentionally observe-only. Heddle still owns execution, tools, approvals, and checkpoints; CyberLoop-style middleware can annotate the run without steering or halting it.
+
 For autonomous background work, `runAgentHeartbeat` runs one wake cycle from a durable task and optional checkpoint:
 
 ```ts
@@ -403,6 +426,12 @@ To try the same example with Claude:
 ```bash
 export ANTHROPIC_API_KEY=your_key_here
 HEDDLE_EXAMPLE_MODEL=claude-3-5-haiku-latest yarn example:programmatic
+```
+
+For a small no-network observer example:
+
+```bash
+yarn example:cyberloop-observer
 ```
 
 The public API lives in [src/index.ts](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/src/index.ts).

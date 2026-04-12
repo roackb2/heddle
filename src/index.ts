@@ -32,6 +32,24 @@ export { createDefaultAgentTools } from './runtime/default-tools.js';
 export type { DefaultAgentToolsOptions } from './runtime/default-tools.js';
 export { DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL } from './config.js';
 
+// Integrations
+export {
+  createCyberLoopObserver,
+  eventToRuntimeFrame,
+  inferDriftLevel,
+} from './integrations/cyberloop.js';
+export type {
+  CyberLoopCompatibleMiddleware,
+  CyberLoopDriftLevel,
+  CyberLoopMetadataChannels,
+  CyberLoopObserver,
+  CyberLoopObserverAnnotation,
+  CyberLoopStepContext,
+  CyberLoopStepResult,
+  HeddleRuntimeFrame,
+  HeddleRuntimeFrameKind,
+} from './integrations/cyberloop.js';
+
 // Types
 export type {
   RunInput,
