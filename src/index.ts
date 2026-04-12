@@ -35,19 +35,24 @@ export { DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL } from './config.js';
 // Integrations
 export {
   createCyberLoopObserver,
+  createRuntimeFrameEmbedder,
   eventToRuntimeFrame,
+  formatRuntimeFrameForEmbedding,
   inferDriftLevel,
 } from './integrations/cyberloop.js';
 export type {
   CyberLoopCompatibleMiddleware,
+  CyberLoopCompatibleStateEmbedder,
   CyberLoopDriftLevel,
   CyberLoopMetadataChannels,
   CyberLoopObserver,
   CyberLoopObserverAnnotation,
   CyberLoopStepContext,
   CyberLoopStepResult,
+  CreateRuntimeFrameEmbedderOptions,
   HeddleRuntimeFrame,
   HeddleRuntimeFrameKind,
+  RuntimeFrameEmbedText,
 } from './integrations/cyberloop.js';
 
 // Types

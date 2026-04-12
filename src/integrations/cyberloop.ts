@@ -31,6 +31,13 @@ export type CyberLoopCompatibleMiddleware<S = unknown> = {
   teardown?: (ctx: { reason: string }) => Promise<void>;
 };
 
+/**
+ * Structural subset of CyberLoop's StateEmbedder contract.
+ */
+export type CyberLoopCompatibleStateEmbedder<S = unknown> = {
+  embed: (state: S) => Promise<number[]>;
+};
+
 export type HeddleRuntimeFrameKind =
   | 'assistant'
   | 'tool'
@@ -69,10 +76,45 @@ export type CreateCyberLoopObserverOptions = {
   onError?: (error: unknown) => void;
 };
 
+export type RuntimeFrameEmbedText = (text: string, frame: HeddleRuntimeFrame) => Promise<number[]>;
+
+export type CreateRuntimeFrameEmbedderOptions = {
+  embedText: RuntimeFrameEmbedText;
+  includeGoal?: boolean;
+  maxTextLength?: number;
+};
+
 export type CyberLoopObserver = {
   handleEvent: (event: AgentLoopEvent) => void;
   flush: () => Promise<void>;
 };
+
+export function createRuntimeFrameEmbedder(
+  options: CreateRuntimeFrameEmbedderOptions,
+): CyberLoopCompatibleStateEmbedder<HeddleRuntimeFrame> {
+  return {
+    async embed(frame) {
+      return options.embedText(formatRuntimeFrameForEmbedding(frame, options), frame);
+    },
+  };
+}
+
+export function formatRuntimeFrameForEmbedding(
+  frame: HeddleRuntimeFrame,
+  options: Pick<CreateRuntimeFrameEmbedderOptions, 'includeGoal' | 'maxTextLength'> = {},
+): string {
+  const maxTextLength = options.maxTextLength ?? 4_000;
+  const sections = [
+    `kind: ${frame.kind}`,
+    frame.tool ? `tool: ${frame.tool}` : undefined,
+    typeof frame.ok === 'boolean' ? `ok: ${frame.ok}` : undefined,
+    options.includeGoal ? `goal: ${frame.goal}` : undefined,
+    '',
+    frame.text,
+  ].filter((section): section is string => section !== undefined);
+
+  return sections.join('\n').slice(0, maxTextLength);
+}
 
 export function createCyberLoopObserver(options: CreateCyberLoopObserverOptions): CyberLoopObserver {
   let queue = Promise.resolve();
@@ -222,6 +264,32 @@ export function eventToRuntimeFrame(
     };
   }
 
+  if (event.type === 'trace' && event.event.type === 'assistant.turn') {
+    return {
+      runId,
+      step: event.event.step,
+      kind: 'assistant',
+      goal,
+      text: event.event.content,
+      timestamp: event.timestamp,
+      rawEvent: event,
+    };
+  }
+
+  if (event.type === 'trace' && event.event.type === 'tool.result') {
+    return {
+      runId,
+      step: event.event.step,
+      kind: 'tool',
+      goal,
+      text: formatTraceToolResultText(event.event.tool, event.event.result),
+      timestamp: event.timestamp,
+      tool: event.event.tool,
+      ok: event.event.result.ok,
+      rawEvent: event,
+    };
+  }
+
   if (event.type === 'checkpoint.saved') {
     return {
       runId,
@@ -295,4 +363,16 @@ function formatToolCompletedText(event: Extract<AgentLoopEvent, { type: 'tool.co
   }
 
   return `Tool ${event.tool} completed: ${JSON.stringify(output).slice(0, 1_000)}`;
+}
+
+function formatTraceToolResultText(tool: string, result: { ok: boolean; output?: unknown; error?: string }): string {
+  if (!result.ok) {
+    return `Tool ${tool} failed: ${result.error ?? 'unknown error'}`;
+  }
+
+  if (typeof result.output === 'string') {
+    return `Tool ${tool} completed: ${result.output.slice(0, 1_000)}`;
+  }
+
+  return `Tool ${tool} completed: ${JSON.stringify(result.output).slice(0, 1_000)}`;
 }

@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createCyberLoopObserver,
+  createRuntimeFrameEmbedder,
   eventToRuntimeFrame,
+  formatRuntimeFrameForEmbedding,
   inferDriftLevel,
   type CyberLoopCompatibleMiddleware,
   type CyberLoopObserverAnnotation,
@@ -167,6 +169,73 @@ describe('CyberLoop observer integration', () => {
     expect(inferDriftLevel({ kinematics: { isStable: false } })).toBe('medium');
     expect(inferDriftLevel({ manifold: { isDrifting: true } })).toBe('high');
     expect(inferDriftLevel({ grassmannian: { isDrifting: true } })).toBe('high');
+  });
+
+  it('converts trace assistant turns into runtime frames for non-streaming adapters', () => {
+    const frame = eventToRuntimeFrame({
+      type: 'trace',
+      runId: 'run-1',
+      timestamp: '2026-04-12T00:00:01.000Z',
+      event: {
+        type: 'assistant.turn',
+        content: 'Inspect README and summarize repository architecture.',
+        requestedTools: false,
+        step: 1,
+        timestamp: '2026-04-12T00:00:01.000Z',
+      },
+    }, {
+      goal: 'Inspect the repo',
+    });
+
+    expect(frame).toMatchObject({
+      runId: 'run-1',
+      step: 1,
+      kind: 'assistant',
+      goal: 'Inspect the repo',
+      text: 'Inspect README and summarize repository architecture.',
+    });
+  });
+
+  it('formats and embeds runtime frames through a caller-provided embedding function', async () => {
+    const frame: HeddleRuntimeFrame = {
+      runId: 'run-1',
+      step: 2,
+      kind: 'tool',
+      goal: 'Inspect the repo',
+      text: 'README says this is a terminal coding agent runtime.',
+      timestamp: '2026-04-12T00:00:02.000Z',
+      tool: 'read_file',
+      ok: true,
+      rawEvent: createLoopStarted(),
+    };
+    const seen: string[] = [];
+    const embedder = createRuntimeFrameEmbedder({
+      maxTextLength: 200,
+      embedText: async (text) => {
+        seen.push(text);
+        return [1, 0, 0];
+      },
+    });
+
+    await expect(embedder.embed(frame)).resolves.toEqual([1, 0, 0]);
+    expect(seen[0]).toContain('kind: tool');
+    expect(seen[0]).toContain('tool: read_file');
+    expect(seen[0]).toContain('ok: true');
+    expect(seen[0]).not.toContain('goal: Inspect the repo');
+  });
+
+  it('can include the run goal in frame embeddings when the caller explicitly opts in', () => {
+    const frame: HeddleRuntimeFrame = {
+      runId: 'run-1',
+      step: 1,
+      kind: 'assistant',
+      goal: 'Inspect the repo',
+      text: 'I will inspect the project files.',
+      timestamp: '2026-04-12T00:00:01.000Z',
+      rawEvent: createLoopStarted(),
+    };
+
+    expect(formatRuntimeFrameForEmbedding(frame, { includeGoal: true })).toContain('goal: Inspect the repo');
   });
 });
 

@@ -366,10 +366,26 @@ The returned result also includes a serializable `state` object with the model, 
 For passive semantic-drift experiments, `createCyberLoopObserver` can consume Heddle's event stream and run CyberLoop-compatible middleware over normalized runtime frames:
 
 ```ts
-import { createCyberLoopObserver, runAgentLoop } from '@roackb2/heddle'
+import {
+  createCyberLoopObserver,
+  createRuntimeFrameEmbedder,
+  runAgentLoop,
+} from '@roackb2/heddle'
+import { kinematicsMiddleware } from 'cyberloop/advanced'
+
+const frameEmbedder = createRuntimeFrameEmbedder({
+  async embedText(text) {
+    return embedWithYourProvider(text)
+  },
+})
 
 const observer = createCyberLoopObserver({
-  middleware: [/* CyberLoop middleware or structurally compatible middleware */],
+  middleware: [
+    kinematicsMiddleware({
+      embedder: frameEmbedder,
+      goalEmbedding: await embedWithYourProvider('Investigate this repo'),
+    }),
+  ],
   onAnnotation(annotation) {
     console.log(annotation.driftLevel, annotation.frame.kind)
   },
@@ -382,7 +398,7 @@ await runAgentLoop({
 await observer.flush()
 ```
 
-This is intentionally observe-only. Heddle still owns execution, tools, approvals, and checkpoints; CyberLoop-style middleware can annotate the run without steering or halting it.
+This is intentionally observe-only. Heddle still owns execution, tools, approvals, and checkpoints; CyberLoop-style middleware can annotate the run without steering or halting it. Heddle does not calculate semantic drift itself; actual drift signals should come from CyberLoop metadata such as kinematics, manifold, or Grassmannian channels.
 
 For autonomous background work, `runAgentHeartbeat` runs one wake cycle from a durable task and optional checkpoint:
 
