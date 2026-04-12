@@ -39,6 +39,7 @@ export function createChatSession(options: {
     createdAt: now,
     updatedAt: now,
     model: options.model,
+    driftEnabled: false,
     lastContinuePrompt: undefined,
     context: undefined,
   };
@@ -125,6 +126,7 @@ function parseSavedSession(value: unknown, apiKeyPresent: boolean): ChatSession[
     createdAt,
     updatedAt,
     model: typeof candidate.model === 'string' ? candidate.model : undefined,
+    driftEnabled: typeof candidate.driftEnabled === 'boolean' ? candidate.driftEnabled : false,
     lastContinuePrompt: typeof candidate.lastContinuePrompt === 'string' ? candidate.lastContinuePrompt : undefined,
     context: isChatContextStats(candidate.context) ? candidate.context : undefined,
   }];

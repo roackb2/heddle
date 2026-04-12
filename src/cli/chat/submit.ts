@@ -30,6 +30,7 @@ type SubmitChatPromptArgs = {
   renameSession: (name: string) => void;
   listRecentSessionsMessage: string[];
   driftEnabled: boolean;
+  driftError?: string;
   setDriftEnabled: (enabled: boolean) => void;
   preparePrompt?: (prompt: string) => { prompt: string; displayText?: string };
   executeTurn: (prompt: string, displayText?: string, sessionIdOverride?: string) => Promise<void>;
@@ -98,6 +99,7 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
         : 'Compacted earlier session history to reduce context size.';
     },
     driftEnabled: args.driftEnabled,
+    driftError: args.driftError,
     setDriftEnabled: args.setDriftEnabled,
     listRecentSessionsMessage: args.listRecentSessionsMessage,
   } satisfies LocalCommandDeps);

@@ -21,6 +21,7 @@ export type LocalCommandArgs = {
   clearConversation: () => void;
   compactConversation: () => string;
   driftEnabled: boolean;
+  driftError?: string;
   setDriftEnabled: (enabled: boolean) => void;
   listRecentSessionsMessage: string[];
 };
@@ -75,8 +76,8 @@ const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
     return messageResult('Cleared the current chat transcript.');
   }],
   ['/compact', (args) => messageResult(args.compactConversation())],
-  ['/drift', (args) => messageResult(formatDriftStatus(args.driftEnabled))],
-  ['/drift status', (args) => messageResult(formatDriftStatus(args.driftEnabled))],
+  ['/drift', (args) => messageResult(formatDriftStatus(args.driftEnabled, args.driftError))],
+  ['/drift status', (args) => messageResult(formatDriftStatus(args.driftEnabled, args.driftError))],
   ['/drift on', (args) => {
     args.setDriftEnabled(true);
     return messageResult('Enabled CyberLoop semantic drift detection for chat runs. Heddle will load real CyberLoop kinematics middleware and write annotations into traces.');
@@ -262,10 +263,14 @@ function messageResult(message: string): LocalCommandResult {
   };
 }
 
-function formatDriftStatus(enabled: boolean): string {
-  return enabled ?
-      'CyberLoop drift detection is enabled. The footer shows drift=unknown|low|medium|high, and traces include cyberloop.annotation events.'
-    : 'CyberLoop drift detection is disabled. Use /drift on to enable observe-only kinematics telemetry.';
+function formatDriftStatus(enabled: boolean, error: string | undefined): string {
+  if (!enabled) {
+    return 'CyberLoop drift detection is disabled. Use /drift on to enable observe-only kinematics telemetry.';
+  }
+
+  return error ?
+      `CyberLoop drift detection is enabled but unavailable: ${error}`
+    : 'CyberLoop drift detection is enabled. The footer shows drift=unknown|low|medium|high, and traces include cyberloop.annotation events.';
 }
 
 function capitalizeFirst(value: string): string {

@@ -45,6 +45,7 @@ export type ChatSession = {
   createdAt: string;
   updatedAt: string;
   model?: string;
+  driftEnabled?: boolean;
   lastContinuePrompt?: string;
   context?: ChatContextStats;
 };

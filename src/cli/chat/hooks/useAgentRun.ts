@@ -274,7 +274,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   const appendedPlanSteps = new Set<number>();
   const streamingBuffers = new Map<number, string>();
   drift?.onRunStart?.();
-  const driftObserver = await createChatDriftObserver(prompt, llm, runtime, drift);
+  const driftObserver = await createChatDriftObserver(prompt, llm, runtime, logger, drift);
 
   if (displayText) {
     updateSessionById(sessionId, (session) => ({
@@ -502,6 +502,7 @@ async function createChatDriftObserver(
   goal: string,
   llm: LlmAdapter,
   runtime: ChatRuntimeConfig,
+  logger: Logger,
   options: ChatDriftObserverOptions | undefined,
 ): Promise<CyberLoopKinematicsObserver | undefined> {
   if (!options?.enabled) {
@@ -513,9 +514,19 @@ async function createChatDriftObserver(
       goal,
       apiKey: llm.info?.provider === 'openai' ? resolveApiKeyForModel(llm.info.model, runtime) : undefined,
       onAnnotation: options.onAnnotation,
-      onError: options.onError,
+      onError: (error) => {
+        logger.debug(
+          { error: error instanceof Error ? error.message : String(error) },
+          'CyberLoop drift observer failed',
+        );
+        options.onError?.(error);
+      },
     });
   } catch (error) {
+    logger.debug(
+      { error: error instanceof Error ? error.message : String(error) },
+      'CyberLoop drift observer unavailable',
+    );
     options.onError?.(error);
     return undefined;
   }

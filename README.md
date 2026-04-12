@@ -106,7 +106,7 @@ The planning workflow is also intentionally lightweight: Heddle does not force a
 
 The web-search workflow is provider-backed rather than crawler-backed: OpenAI models use OpenAI-hosted web search, and Anthropic models use Anthropic-hosted web search when available through the selected model/tool path.
 
-The CyberLoop workflow is observe-only. When `/drift on` is enabled, Heddle loads real CyberLoop kinematics middleware, embeds runtime frames with OpenAI embeddings, shows `drift=unknown|low|medium|high` in the footer, and writes `cyberloop.annotation` events into saved traces. Heddle does not calculate semantic drift itself.
+The CyberLoop workflow is observe-only. When `/drift on` is enabled, Heddle loads real CyberLoop kinematics middleware, embeds runtime frames with OpenAI embeddings, shows `drift=unknown|low|medium|high` in the footer, and writes `cyberloop.annotation` events into saved traces. The toggle is saved on the active chat session, and `/drift` reports the last unavailable reason if the middleware or embeddings fail. Heddle does not calculate semantic drift itself.
 
 ## Heartbeat
 

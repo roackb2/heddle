@@ -31,7 +31,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   const [draft, setDraft] = useState('');
   const [draftCursor, setDraftCursor] = useState(0);
   const [pendingSubmittedPrompt, setPendingSubmittedPrompt] = useState<string | undefined>();
-  const [driftEnabled, setDriftEnabled] = useState(false);
+  const [driftEnabled, setDriftEnabledState] = useState(false);
   const [driftLevel, setDriftLevel] = useState<CyberLoopDriftLevel>('unknown');
   const [driftError, setDriftError] = useState<string | undefined>();
   const [modelPickerIndex, setModelPickerIndex] = useState(0);
@@ -95,6 +95,17 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
       setActiveModel(sessionModel);
     }
   }, [activeModel, activeSession, runtime.model]);
+
+  useEffect(() => {
+    if (!activeSession) {
+      return;
+    }
+
+    const sessionDriftEnabled = activeSession.driftEnabled ?? false;
+    if (sessionDriftEnabled !== driftEnabled) {
+      setDriftEnabledState(sessionDriftEnabled);
+    }
+  }, [activeSession, driftEnabled]);
   const {
     status,
     setStatus,
@@ -165,6 +176,15 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
       setSessionModel(activeSession.id, model);
     }
   };
+
+  const applyDriftEnabled = useCallback((enabled: boolean) => {
+    setDriftEnabledState(enabled);
+    setDriftError(undefined);
+    updateActiveSession((session) => ({
+      ...session,
+      driftEnabled: enabled,
+    }));
+  }, [updateActiveSession]);
 
   const closeSession = (id: string) => {
     const removedActive = removeSession(id);
@@ -262,7 +282,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         renameSession,
         listRecentSessionsMessage,
         driftEnabled,
-        setDriftEnabled,
+        driftError,
+        setDriftEnabled: applyDriftEnabled,
         preparePrompt: preparePromptWithMentions,
         executeTurn,
         executeDirectShellCommand,
@@ -294,7 +315,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         renameSession,
         listRecentSessionsMessage,
         driftEnabled,
-        setDriftEnabled,
+        driftError,
+        setDriftEnabled: applyDriftEnabled,
         preparePrompt: preparePromptWithMentions,
         executeTurn,
         executeDirectShellCommand,
@@ -333,7 +355,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
       renameSession,
       listRecentSessionsMessage,
       driftEnabled,
-      setDriftEnabled,
+      driftError,
+      setDriftEnabled: applyDriftEnabled,
       preparePrompt: preparePromptWithMentions,
       executeTurn,
       executeDirectShellCommand,
@@ -360,7 +383,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     renameSession,
     listRecentSessionsMessage,
     driftEnabled,
-    setDriftEnabled,
+    driftError,
+    applyDriftEnabled,
     executeTurn,
     executeDirectShellCommand,
     appendPendingUserMessage,
