@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { runAgentHeartbeat } from './heartbeat.js';
 import type { AgentHeartbeatResult, HeartbeatDecision, RunAgentHeartbeatOptions } from './heartbeat.js';
 import type { AgentLoopCheckpoint, AgentLoopState } from './events.js';
+import type { LlmUsage } from '../llm/types.js';
 import { suggestNextHeartbeatDelayMs } from './heartbeat-store.js';
 
 export type HeartbeatTask = {
@@ -55,6 +56,10 @@ export type HeartbeatSchedulerEvent =
       type: 'heartbeat.task.finished';
       taskId: string;
       decision: HeartbeatDecision;
+      outcome: string;
+      summary: string;
+      runId: string;
+      usage?: LlmUsage;
       nextRunAt?: string;
       enabled: boolean;
       timestamp: string;
@@ -163,6 +168,10 @@ export async function runDueHeartbeatTasks(options: RunDueHeartbeatTasksOptions)
         type: 'heartbeat.task.finished',
         taskId: task.id,
         decision: result.decision,
+        outcome: result.state.outcome,
+        summary: result.summary,
+        runId: result.state.runId,
+        usage: result.state.usage,
         nextRunAt: nextTask.nextRunAt,
         enabled: nextTask.enabled,
         timestamp: now.toISOString(),

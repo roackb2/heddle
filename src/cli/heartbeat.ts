@@ -8,6 +8,8 @@ import {
   type AgentLoopEvent,
   type HeartbeatSchedulerEvent,
   type HeartbeatTask,
+  type ToolCall,
+  type ToolDefinition,
 } from '../index.js';
 
 export type HeartbeatCliOptions = {
@@ -119,6 +121,9 @@ async function runHeartbeatTaskCli(
     case 'disable':
       await setHeartbeatTaskEnabled(parsed, store, false);
       return;
+    case 'show':
+      await showHeartbeatTask(parsed, store);
+      return;
     default:
       throw new Error(`Unknown heartbeat task command: ${parsed.subcommand}`);
   }
@@ -199,6 +204,37 @@ async function setHeartbeatTaskEnabled(
   process.stdout.write(`${enabled ? 'Enabled' : 'Disabled'} heartbeat task ${id}\n`);
 }
 
+async function showHeartbeatTask(
+  parsed: ParsedHeartbeatArgs,
+  store: ReturnType<typeof createFileHeartbeatTaskStore>,
+) {
+  const id = stringFlag(parsed.flags, 'id') ?? parsed.rest[0];
+  if (!id) {
+    throw new Error('Usage: heddle heartbeat task show <id>');
+  }
+
+  const tasks = await store.listTasks();
+  const task = tasks.find((candidate) => candidate.id === id);
+  if (!task) {
+    throw new Error(`Heartbeat task not found: ${id}`);
+  }
+
+  process.stdout.write([
+    `${task.enabled ? 'enabled ' : 'disabled'} ${task.id}${task.name ? ` (${task.name})` : ''}`,
+    `every=${formatDurationMs(task.intervalMs)} next=${task.nextRunAt ?? 'none'} model=${task.model ?? 'default'}`,
+    '',
+    'Task:',
+    task.task,
+    '',
+    task.lastDecision ? `Last decision: ${task.lastDecision}` : 'Last decision: none',
+    task.lastOutcome ? `Last outcome: ${task.lastOutcome}` : undefined,
+    task.lastRunAt ? `Last run: ${task.lastRunAt}` : undefined,
+    task.lastError ? `Last error: ${task.lastError}` : undefined,
+    task.lastSummary ? ['', 'Last summary:', task.lastSummary].join('\n') : undefined,
+    '',
+  ].filter((line): line is string => Boolean(line)).join('\n'));
+}
+
 async function runHeartbeatWorkerCli(
   parsed: ParsedHeartbeatArgs,
   store: ReturnType<typeof createFileHeartbeatTaskStore>,
@@ -220,6 +256,7 @@ async function runHeartbeatWorkerCli(
     searchIgnoreDirs: options.searchIgnoreDirs,
     systemContext: options.systemContext,
     onEvent: printAgentLoopEvent,
+    approveToolCall: approveAutonomousHeartbeatToolCall,
   };
 
   if (booleanFlag(parsed.flags, 'once')) {
@@ -286,6 +323,19 @@ async function startHeartbeatCli(
   }, store, options);
 }
 
+async function approveAutonomousHeartbeatToolCall(
+  call: ToolCall,
+  _tool: ToolDefinition,
+): Promise<{ approved: boolean; reason?: string }> {
+  return {
+    approved: false,
+    reason:
+      call.tool === 'edit_file' || call.tool === 'run_shell_mutate' ?
+        'The heartbeat CLI has no live approval UI. Use read-only tools, memory notes, or run the task in chat for approved workspace changes.'
+      : 'The heartbeat CLI cannot approve this tool call interactively.',
+  };
+}
+
 function printAgentLoopEvent(event: AgentLoopEvent) {
   switch (event.type) {
     case 'loop.started':
@@ -337,7 +387,14 @@ function printSchedulerEvent(event: HeartbeatSchedulerEvent) {
       process.stdout.write(`[heartbeat] task started id=${event.taskId} loadedCheckpoint=${event.loadedCheckpoint}\n`);
       break;
     case 'heartbeat.task.finished':
-      process.stdout.write(`[heartbeat] task finished id=${event.taskId} decision=${event.decision} enabled=${event.enabled} next=${event.nextRunAt ?? 'none'}\n`);
+      process.stdout.write([
+        `[heartbeat] task finished id=${event.taskId} decision=${event.decision} outcome=${event.outcome} enabled=${event.enabled} next=${event.nextRunAt ?? 'none'}`,
+        event.usage ? `[heartbeat] usage input=${event.usage.inputTokens} output=${event.usage.outputTokens} total=${event.usage.totalTokens} requests=${event.usage.requests}` : undefined,
+        '',
+        'Heartbeat summary:',
+        stripHeartbeatDecisionLine(event.summary).trim() || event.summary.trim(),
+        '',
+      ].filter((line): line is string => line !== undefined).join('\n'));
       break;
     case 'heartbeat.task.failed':
       process.stdout.write(`[heartbeat] task failed id=${event.taskId} error=${event.error} next=${event.nextRunAt ?? 'none'}\n`);
@@ -352,6 +409,7 @@ function printHeartbeatHelp() {
     'Usage:',
     '  heddle heartbeat task add --id <id> --task "<durable task>" [--every 15m] [--model <name>] [--max-steps <n>]',
     '  heddle heartbeat task list',
+    '  heddle heartbeat task show <id>',
     '  heddle heartbeat task enable <id>',
     '  heddle heartbeat task disable <id>',
     '  heddle heartbeat start [--every 30m] [--task "<durable task>"] [--model <name>]',
@@ -362,6 +420,10 @@ function printHeartbeatHelp() {
     '  30s, 15m, 1h, 2d',
     '',
   ].join('\n'));
+}
+
+function stripHeartbeatDecisionLine(summary: string): string {
+  return summary.replace(/\n?\s*HEARTBEAT_DECISION:\s*(continue|pause|complete|escalate)\s*$/i, '');
 }
 
 function stringFlag(flags: Record<string, string | boolean>, name: string): string | undefined {

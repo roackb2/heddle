@@ -159,6 +159,7 @@ function printHelp() {
       '  heddle ask "<goal>" [--cwd <path>] [--model <name>] [--max-steps <n>]',
       '  heddle heartbeat task add --id <id> --task "<durable task>" [--every 15m]',
       '  heddle heartbeat task list',
+      '  heddle heartbeat task show <id>',
       '  heddle heartbeat task enable <id>',
       '  heddle heartbeat task disable <id>',
       '  heddle heartbeat start [--every 30m] [--task "<durable task>"] [--model <name>]',

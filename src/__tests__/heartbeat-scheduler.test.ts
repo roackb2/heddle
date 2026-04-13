@@ -131,6 +131,33 @@ describe('heartbeat scheduler', () => {
     });
   });
 
+  it('includes result details on finished task events', async () => {
+    const events: HeartbeatSchedulerEvent[] = [];
+
+    await runDueHeartbeatTasks({
+      store: createMemoryTaskStore({
+        tasks: [{
+          id: 'summary-task',
+          task: 'Summarize work.',
+          enabled: true,
+          intervalMs: 60_000,
+        }],
+      }),
+      now: () => NOW,
+      onEvent: (event) => events.push(event),
+      runner: async () => createHeartbeatResult('pause'),
+    });
+
+    expect(events.at(-1)).toMatchObject({
+      type: 'heartbeat.task.finished',
+      taskId: 'summary-task',
+      decision: 'pause',
+      outcome: 'done',
+      summary: expect.stringContaining('Heartbeat result.'),
+      runId: 'run-pause',
+    });
+  });
+
   it('stores tasks and checkpoints in a local heartbeat directory', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'heddle-heartbeat-scheduler-'));
     const store = createFileHeartbeatTaskStore({ dir });

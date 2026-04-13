@@ -152,6 +152,8 @@ This is intended for hosted workers, local schedulers, long-running agents, and 
 
 Heartbeat uses a larger default step budget than ordinary short chat runs so a wake cycle has room to inspect, act, and checkpoint. Hosts can still pass `maxSteps` when they need stricter control.
 
+The built-in CLI heartbeat runner is intentionally conservative: it has no live approval UI, so approval-gated file edits and mutation shell commands are denied with a clear blocker. It is useful today for recurring inspection, summaries, memory-note updates, and escalation reports. Hosts can provide their own `approveToolCall` policy when they want autonomous agents to perform broader actions.
+
 For repeated wake cycles, Heddle also exposes a local-first scheduler core:
 
 - `runDueHeartbeatTasks`: scan a task store once, run due tasks, save checkpoints, and update next-run state
@@ -184,11 +186,12 @@ The installed CLI also exposes the local heartbeat scheduler:
 heddle heartbeat start --every 30m
 heddle heartbeat task add --id repo-gardener --task "Check for safe maintenance work" --every 1h
 heddle heartbeat task list
+heddle heartbeat task show repo-gardener
 heddle heartbeat run --once
 heddle heartbeat run --poll 60s
 ```
 
-For an OpenClaw-like local experience, `heartbeat start` creates or enables a default periodic task and runs the foreground scheduler in one command. Stop it with `Ctrl+C`.
+For an OpenClaw-like local experience, `heartbeat start` creates or enables a default periodic task and runs the foreground scheduler in one command. It prints the agent's final summary and decision after each run. Stop it with `Ctrl+C`.
 
 Inside this repository, use the dev CLI entrypoint instead:
 
@@ -348,6 +351,7 @@ Supported commands:
 - `heddle heartbeat start [--every 30m] [--task "<durable task>"]`: create or enable the default heartbeat task and run the foreground scheduler
 - `heddle heartbeat task add --id <id> --task "<durable task>" [--every 15m]`: create or update a scheduled heartbeat task
 - `heddle heartbeat task list`: list local heartbeat tasks
+- `heddle heartbeat task show <id>`: show a task's schedule, last decision, and last run summary
 - `heddle heartbeat task enable <id>` / `heddle heartbeat task disable <id>`: toggle a heartbeat task
 - `heddle heartbeat run --once`: run due heartbeat tasks once
 - `heddle heartbeat run [--poll 60s]`: run the foreground heartbeat scheduler until interrupted; heartbeat runs print scheduler, agent, tool, decision, and checkpoint progress events
