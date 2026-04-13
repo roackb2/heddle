@@ -21,12 +21,10 @@ If you are interested in the underlying methodology, Heddle's drift telemetry is
 
 ## Advanced Capabilities
 
-- CyberLoop-powered semantic drift detection in chat and traces, enabled by default when available
 - provider-agnostic model support across OpenAI and Anthropic
 - embeddable `runAgentLoop` API for building non-CLI agent hosts
 - `runAgentHeartbeat` for scheduler-driven autonomous wake cycles without chat by default
 - serializable checkpoints for resume, background execution, and hosted workers
-- CyberLoop-compatible observer hooks for host-side runtime instrumentation
 - provider-backed hosted web search through `web_search`
 - local image viewing from referenced file paths through `view_image`
 - inline `@file` mentions that tell the agent which workspace files to inspect first
@@ -69,6 +67,8 @@ npx -p @roackb2/heddle -p cyberloop heddle
 
 If you are developing inside the Heddle repo itself, `yarn install` also installs `cyberloop` through `devDependencies`, so `yarn chat:dev` can use the published package path without extra setup.
 
+For local development against the full CLI entrypoint, use `yarn cli:dev`. The `chat:dev` scripts intentionally start chat mode directly and do not route subcommands such as `heartbeat`.
+
 ## Quick Start
 
 1. Set an API key for a supported provider.
@@ -110,10 +110,7 @@ Heddle currently supports:
 - automatic conversation compaction so longer chats preserve context instead of growing unbounded
 - manual `/compact` to shrink the current session transcript on demand
 - persistent workspace memory notes under `.heddle/memory/`
-- autonomous heartbeat wake cycles through `runAgentHeartbeat`
 - serializable run checkpoints for programmatic hosts and later continuation
-- passive CyberLoop-compatible observation through `createCyberLoopObserver`
-- chat-mode CyberLoop semantic drift telemetry, enabled by default when `cyberloop` is installed
 - short working-plan support through `update_plan` for substantial multi-step tasks
 - remembered per-project approvals for repeated commands and edits
 - interrupt and resume support for longer-running coding workflows
@@ -127,7 +124,15 @@ The planning workflow is also intentionally lightweight: Heddle does not force a
 
 The web-search workflow is provider-backed rather than crawler-backed: OpenAI models use OpenAI-hosted web search, and Anthropic models use Anthropic-hosted web search when available through the selected model/tool path.
 
-The CyberLoop workflow is observe-only. Drift telemetry is enabled by default for new chat sessions. When enabled, Heddle loads real [CyberLoop](https://www.npmjs.com/package/cyberloop) kinematics middleware, embeds agent output frames with OpenAI embeddings, compares the current response trajectory against the previous assistant response when available, shows `drift=unknown|low|medium|high` in the footer, highlights medium/high drift in the status bar, and writes `cyberloop.annotation` events into saved traces. Tool outputs are excluded from chat drift scoring so the signal focuses on where the agent's own responses are heading. Chat drift uses a more sensitive default stability threshold than CyberLoop's library default; set `HEDDLE_DRIFT_STABILITY_THRESHOLD` if you want to tune it. The toggle is saved on the active chat session, and `/drift` reports the last unavailable reason if the middleware or embeddings fail. Heddle does not calculate semantic drift itself. For the underlying methodology, see the [CyberLoop repository](https://github.com/roackb2/cyberloop) and [paper](https://zenodo.org/records/18138161).
+## Semantic Drift
+
+Heddle can show whether the agent's responses are drifting away from the recent semantic trajectory of the conversation.
+
+The CyberLoop workflow is observe-only. Drift telemetry is enabled by default for new chat sessions when `cyberloop` is available. Heddle loads real [CyberLoop](https://www.npmjs.com/package/cyberloop) kinematics middleware, embeds agent output frames with OpenAI embeddings, compares the current response trajectory against the previous assistant response when available, shows `drift=unknown|low|medium|high` in the footer, highlights medium/high drift in the status bar, and writes `cyberloop.annotation` events into saved traces.
+
+Tool outputs are excluded from chat drift scoring so the signal focuses on where the agent's own responses are heading. Chat drift uses a more sensitive default stability threshold than CyberLoop's library default; set `HEDDLE_DRIFT_STABILITY_THRESHOLD` if you want to tune it. The toggle is saved on the active chat session, and `/drift` reports the last unavailable reason if the middleware or embeddings fail.
+
+Heddle does not calculate semantic drift itself. For the underlying methodology, see the [CyberLoop repository](https://github.com/roackb2/cyberloop) and [paper](https://zenodo.org/records/18138161).
 
 ## Heartbeat
 
@@ -172,6 +177,30 @@ yarn example:heartbeat-scheduler
 ```
 
 The scheduler example writes task, checkpoint, and run records under `.heddle/examples/heartbeat-scheduler/`.
+
+The installed CLI also exposes the local heartbeat scheduler:
+
+```bash
+heddle heartbeat start --every 30m
+heddle heartbeat task add --id repo-gardener --task "Check for safe maintenance work" --every 1h
+heddle heartbeat task list
+heddle heartbeat run --once
+heddle heartbeat run --poll 60s
+```
+
+For an OpenClaw-like local experience, `heartbeat start` creates or enables a default periodic task and runs the foreground scheduler in one command. Stop it with `Ctrl+C`.
+
+Inside this repository, use the dev CLI entrypoint instead:
+
+```bash
+yarn cli:dev heartbeat start --every 30m
+```
+
+Adding a task only saves scheduler state; it does not start a background process. Stop a foreground scheduler with `Ctrl+C`, or pause a task with:
+
+```bash
+heddle heartbeat task disable repo-gardener
+```
 
 For hosts that want storage handled by Heddle, use `runStoredHeartbeat` with a checkpoint store:
 
@@ -316,6 +345,12 @@ Supported commands:
 
 - `heddle` or `heddle chat`: start interactive chat mode
 - `heddle ask "<goal>"`: run a single prompt and exit
+- `heddle heartbeat start [--every 30m] [--task "<durable task>"]`: create or enable the default heartbeat task and run the foreground scheduler
+- `heddle heartbeat task add --id <id> --task "<durable task>" [--every 15m]`: create or update a scheduled heartbeat task
+- `heddle heartbeat task list`: list local heartbeat tasks
+- `heddle heartbeat task enable <id>` / `heddle heartbeat task disable <id>`: toggle a heartbeat task
+- `heddle heartbeat run --once`: run due heartbeat tasks once
+- `heddle heartbeat run [--poll 60s]`: run the foreground heartbeat scheduler until interrupted; heartbeat runs print scheduler, agent, tool, decision, and checkpoint progress events
 - `heddle init`: create a `heddle.config.json` template in the current project
 
 Common flags:

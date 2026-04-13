@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { startChatCli } from './chat/index.js';
 import { runAskCli } from './ask.js';
+import { runHeartbeatCli } from './heartbeat.js';
 
 type CliFlags = {
   cwd?: string;
@@ -49,6 +50,11 @@ async function main() {
 
   if (parsed.command === 'init') {
     initializeProjectConfig(workspaceRoot);
+    return;
+  }
+
+  if (parsed.command === 'heartbeat') {
+    await runHeartbeatCli(parsed.rest, resolved);
     return;
   }
 
@@ -151,6 +157,13 @@ function printHelp() {
       '  heddle [--cwd <path>] [--model <name>] [--max-steps <n>]',
       '  heddle chat [--cwd <path>] [--model <name>] [--max-steps <n>]',
       '  heddle ask "<goal>" [--cwd <path>] [--model <name>] [--max-steps <n>]',
+      '  heddle heartbeat task add --id <id> --task "<durable task>" [--every 15m]',
+      '  heddle heartbeat task list',
+      '  heddle heartbeat task enable <id>',
+      '  heddle heartbeat task disable <id>',
+      '  heddle heartbeat start [--every 30m] [--task "<durable task>"] [--model <name>]',
+      '  heddle heartbeat run --once',
+      '  heddle heartbeat run [--poll 60s]',
       '  heddle init [--cwd <path>]',
       '',
       'Project config:',
