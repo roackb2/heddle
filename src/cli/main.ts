@@ -165,6 +165,8 @@ function printHelp() {
       '  heddle heartbeat start [--every 30m] [--task "<durable task>"] [--model <name>]',
       '  heddle heartbeat run --once',
       '  heddle heartbeat run [--poll 60s]',
+      '  heddle heartbeat runs list [--task <id>] [--limit 10]',
+      '  heddle heartbeat runs show <run-id|latest> [--task <id>]',
       '  heddle init [--cwd <path>]',
       '',
       'Project config:',

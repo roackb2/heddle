@@ -45,6 +45,23 @@ describe('heartbeat CLI helpers', () => {
     });
   });
 
+  it('parses heartbeat run history commands', () => {
+    expect(parseHeartbeatArgs([
+      'runs',
+      'show',
+      'latest',
+      '--task',
+      'repo-gardener',
+    ])).toEqual({
+      command: 'runs',
+      subcommand: 'show',
+      rest: ['latest'],
+      flags: {
+        task: 'repo-gardener',
+      },
+    });
+  });
+
   it('parses and formats scheduler durations', () => {
     expect(parseDurationMs('500ms')).toBe(500);
     expect(parseDurationMs('30s')).toBe(30_000);

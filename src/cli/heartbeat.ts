@@ -58,6 +58,11 @@ export async function runHeartbeatCli(args: string[], options: HeartbeatCliOptio
     return;
   }
 
+  if (parsed.command === 'runs') {
+    await runHeartbeatRunsCli(parsed, store);
+    return;
+  }
+
   if (parsed.command === 'start') {
     await startHeartbeatCli(parsed, store, options);
     return;
@@ -233,6 +238,86 @@ async function showHeartbeatTask(
     task.lastSummary ? ['', 'Last summary:', task.lastSummary].join('\n') : undefined,
     '',
   ].filter((line): line is string => Boolean(line)).join('\n'));
+}
+
+async function runHeartbeatRunsCli(
+  parsed: ParsedHeartbeatArgs,
+  store: ReturnType<typeof createFileHeartbeatTaskStore>,
+) {
+  switch (parsed.subcommand) {
+    case 'list':
+    case undefined:
+      await listHeartbeatRuns(parsed, store);
+      return;
+    case 'show':
+      await showHeartbeatRun(parsed, store);
+      return;
+    default:
+      throw new Error(`Unknown heartbeat runs command: ${parsed.subcommand}`);
+  }
+}
+
+async function listHeartbeatRuns(
+  parsed: ParsedHeartbeatArgs,
+  store: ReturnType<typeof createFileHeartbeatTaskStore>,
+) {
+  const taskId = stringFlag(parsed.flags, 'task') ?? parsed.rest[0];
+  const limit = parsePositiveInt(stringFlag(parsed.flags, 'limit')) ?? 10;
+  const runs = await store.listRunRecords?.({ taskId, limit });
+  if (!runs?.length) {
+    process.stdout.write(taskId ? `No heartbeat runs found for task ${taskId}.\n` : 'No heartbeat runs found.\n');
+    return;
+  }
+
+  for (const run of runs) {
+    const { result } = run.record;
+    process.stdout.write([
+      `${run.id}`,
+      `  task=${run.taskId} run=${run.runId} decision=${result.decision} outcome=${result.state.outcome} finished=${run.createdAt}`,
+      result.state.usage ? `  usage input=${result.state.usage.inputTokens} output=${result.state.usage.outputTokens} total=${result.state.usage.totalTokens} requests=${result.state.usage.requests}` : undefined,
+      `  summary=${firstLine(stripHeartbeatDecisionLine(result.summary))}`,
+    ].filter((line): line is string => Boolean(line)).join('\n') + '\n');
+  }
+}
+
+async function showHeartbeatRun(
+  parsed: ParsedHeartbeatArgs,
+  store: ReturnType<typeof createFileHeartbeatTaskStore>,
+) {
+  const id = parsed.rest[0] ?? stringFlag(parsed.flags, 'id') ?? 'latest';
+  const taskId = stringFlag(parsed.flags, 'task');
+  const run =
+    id === 'latest' ?
+      (await store.listRunRecords?.({ taskId, limit: 1 }))?.[0]
+    : await store.loadRunRecord?.(id);
+
+  if (!run || (taskId && run.taskId !== taskId)) {
+    throw new Error(taskId ? `Heartbeat run not found for task ${taskId}: ${id}` : `Heartbeat run not found: ${id}`);
+  }
+
+  const { result, loadedCheckpoint } = run.record;
+  process.stdout.write([
+    `Heartbeat run ${run.id}`,
+    `task=${run.taskId} run=${run.runId} loadedCheckpoint=${loadedCheckpoint}`,
+    `decision=${result.decision} outcome=${result.state.outcome} finished=${run.createdAt}`,
+    result.state.usage ? `usage input=${result.state.usage.inputTokens} output=${result.state.usage.outputTokens} total=${result.state.usage.totalTokens} requests=${result.state.usage.requests}` : undefined,
+    '',
+    'Task:',
+    run.record.task.task,
+    '',
+    'Summary:',
+    stripHeartbeatDecisionLine(result.summary).trim() || result.summary.trim(),
+    '',
+  ].filter((line): line is string => line !== undefined).join('\n'));
+}
+
+function firstLine(value: string): string {
+  const line = value.trim().split('\n').find((candidate) => candidate.trim());
+  return line ? truncate(line.trim(), 180) : '';
+}
+
+function truncate(value: string, maxLength: number): string {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
 }
 
 async function runHeartbeatWorkerCli(
@@ -415,6 +500,8 @@ function printHeartbeatHelp() {
     '  heddle heartbeat start [--every 30m] [--task "<durable task>"] [--model <name>]',
     '  heddle heartbeat run --once',
     '  heddle heartbeat run [--poll 60s]',
+    '  heddle heartbeat runs list [--task <id>] [--limit 10]',
+    '  heddle heartbeat runs show <run-id|latest> [--task <id>]',
     '',
     'Duration examples:',
     '  30s, 15m, 1h, 2d',

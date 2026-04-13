@@ -180,6 +180,36 @@ describe('heartbeat scheduler', () => {
     expect(readFileSync(join(dir, 'tasks', 'local-task.json'), 'utf8')).toContain('Local task.');
   });
 
+  it('lists stored heartbeat run records newest first', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'heddle-heartbeat-runs-'));
+    const store = createFileHeartbeatTaskStore({ dir });
+    const task: HeartbeatTask = {
+      id: 'local-task',
+      task: 'Local task.',
+      enabled: true,
+      intervalMs: 60_000,
+    };
+
+    await store.saveRunRecord?.({
+      task,
+      result: createHeartbeatResult('pause'),
+      loadedCheckpoint: false,
+    });
+
+    const runs = await store.listRunRecords?.({ taskId: 'local-task' });
+    expect(runs).toHaveLength(1);
+    expect(runs?.[0]).toMatchObject({
+      taskId: 'local-task',
+      runId: 'run-pause',
+      record: {
+        loadedCheckpoint: false,
+      },
+    });
+    await expect(store.loadRunRecord?.('run-pause')).resolves.toMatchObject({
+      runId: 'run-pause',
+    });
+  });
+
   it('runs the scheduler loop until aborted', async () => {
     const controller = new AbortController();
     const events: HeartbeatSchedulerEvent[] = [];

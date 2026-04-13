@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { runAgentHeartbeat } from './heartbeat.js';
 import type { AgentHeartbeatResult, HeartbeatDecision, RunAgentHeartbeatOptions } from './heartbeat.js';
 import type { AgentLoopCheckpoint, AgentLoopState } from './events.js';
@@ -35,12 +35,23 @@ export type HeartbeatTaskRunRecord = {
   loadedCheckpoint: boolean;
 };
 
+export type HeartbeatTaskRunRecordEntry = {
+  id: string;
+  path: string;
+  taskId: string;
+  runId: string;
+  createdAt: string;
+  record: HeartbeatTaskRunRecord;
+};
+
 export type HeartbeatTaskStore = {
   listTasks: () => Promise<HeartbeatTask[]>;
   saveTask: (task: HeartbeatTask) => Promise<void>;
   loadCheckpoint: (task: HeartbeatTask) => Promise<AgentLoopCheckpoint | undefined>;
   saveCheckpoint: (task: HeartbeatTask, checkpoint: AgentLoopCheckpoint) => Promise<void>;
   saveRunRecord?: (record: HeartbeatTaskRunRecord) => Promise<void>;
+  listRunRecords?: (options?: { taskId?: string; limit?: number }) => Promise<HeartbeatTaskRunRecordEntry[]>;
+  loadRunRecord?: (id: string) => Promise<HeartbeatTaskRunRecordEntry | undefined>;
 };
 
 export type FileHeartbeatTaskStoreOptions = {
@@ -134,6 +145,34 @@ export function createFileHeartbeatTaskStore(options: FileHeartbeatTaskStoreOpti
       const path = join(runsDir, `${timestamp}-${safeTaskFileName(record.task.id)}.json`);
       mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, JSON.stringify(record, null, 2));
+    },
+    async listRunRecords(options = {}) {
+      if (!existsSync(runsDir)) {
+        return [];
+      }
+
+      const entries = readdirSync(runsDir)
+        .filter((entry) => entry.endsWith('.json'))
+        .flatMap((entry) => {
+          const path = join(runsDir, entry);
+          try {
+            const record = JSON.parse(readFileSync(path, 'utf8')) as HeartbeatTaskRunRecord;
+            if (options.taskId && record.task.id !== options.taskId) {
+              return [];
+            }
+
+            return [runRecordEntryFromPath(path, record)];
+          } catch {
+            return [];
+          }
+        })
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+
+      return options.limit ? entries.slice(0, options.limit) : entries;
+    },
+    async loadRunRecord(id) {
+      const entries = await this.listRunRecords?.();
+      return entries?.find((entry) => entry.id === id || entry.runId === id);
     },
   };
 }
@@ -299,6 +338,18 @@ function safeTaskFileName(id: string): string {
     throw new Error(`Invalid heartbeat task id "${id}". Use only letters, numbers, dots, underscores, and hyphens.`);
   }
   return id;
+}
+
+function runRecordEntryFromPath(path: string, record: HeartbeatTaskRunRecord): HeartbeatTaskRunRecordEntry {
+  const id = basename(path, '.json');
+  return {
+    id,
+    path,
+    taskId: record.task.id,
+    runId: record.result.state.runId,
+    createdAt: record.result.state.finishedAt,
+    record,
+  };
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {

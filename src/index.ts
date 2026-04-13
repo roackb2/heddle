@@ -30,6 +30,7 @@ export type {
   HeartbeatSchedulerEvent,
   HeartbeatTask,
   HeartbeatTaskRunRecord,
+  HeartbeatTaskRunRecordEntry,
   HeartbeatTaskRunner,
   HeartbeatTaskStore,
   RunDueHeartbeatTasksOptions,

@@ -189,6 +189,8 @@ heddle heartbeat task list
 heddle heartbeat task show repo-gardener
 heddle heartbeat run --once
 heddle heartbeat run --poll 60s
+heddle heartbeat runs list --task repo-gardener
+heddle heartbeat runs show latest --task repo-gardener
 ```
 
 For an OpenClaw-like local experience, `heartbeat start` creates or enables a default periodic task and runs the foreground scheduler in one command. It prints the agent's final summary and decision after each run. Stop it with `Ctrl+C`.
@@ -355,6 +357,8 @@ Supported commands:
 - `heddle heartbeat task enable <id>` / `heddle heartbeat task disable <id>`: toggle a heartbeat task
 - `heddle heartbeat run --once`: run due heartbeat tasks once
 - `heddle heartbeat run [--poll 60s]`: run the foreground heartbeat scheduler until interrupted; heartbeat runs print scheduler, agent, tool, decision, and checkpoint progress events
+- `heddle heartbeat runs list [--task <id>] [--limit 10]`: list saved heartbeat run records
+- `heddle heartbeat runs show <run-id|latest> [--task <id>]`: show the final agent output for a saved heartbeat run
 - `heddle init`: create a `heddle.config.json` template in the current project
 
 Common flags:
