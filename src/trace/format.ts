@@ -110,7 +110,7 @@ export function formatTraceForConsole(trace: TraceEvent[]): string {
           : event.driftLevel === 'low' ? COLORS.green
           : COLORS.dim;
         lines.push(
-          `${color}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}CyberLoop:${COLORS.reset} drift=${event.driftLevel} frame=${event.frameKind}${event.requestedHalt ? ' halt-requested' : ''}`,
+          `${color}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}CyberLoop:${COLORS.reset} drift=${event.driftLevel} frame=${event.frameKind}${formatCyberLoopMetrics(event.metadata)}${event.requestedHalt ? ' halt-requested' : ''}`,
           `  Metadata: ${truncate(JSON.stringify(event.metadata), 500)}`,
           '',
         );
@@ -138,6 +138,41 @@ export function formatTraceForConsole(trace: TraceEvent[]): string {
 function truncate(str: string, maxLen: number): string {
   if (str.length <= maxLen) return str;
   return str.slice(0, maxLen) + '…';
+}
+
+function formatCyberLoopMetrics(metadata: Record<string, unknown>): string {
+  const kinematics = metadata.kinematics;
+  if (!kinematics || typeof kinematics !== 'object' || Array.isArray(kinematics)) {
+    return '';
+  }
+
+  const snapshot = kinematics as {
+    errorMagnitude?: unknown;
+    correctionMagnitude?: unknown;
+    isStable?: unknown;
+  };
+  const parts: string[] = [];
+  if (typeof snapshot.errorMagnitude === 'number') {
+    parts.push(`err=${formatMetric(snapshot.errorMagnitude)}`);
+  }
+  if (typeof snapshot.correctionMagnitude === 'number') {
+    parts.push(`corr=${formatMetric(snapshot.correctionMagnitude)}`);
+  }
+  if (typeof snapshot.isStable === 'boolean') {
+    parts.push(`stable=${snapshot.isStable}`);
+  }
+
+  return parts.length ? ` (${parts.join(' ')})` : '';
+}
+
+function formatMetric(value: number): string {
+  if (!Number.isFinite(value)) {
+    return String(value);
+  }
+  if (Math.abs(value) < 0.001 && value !== 0) {
+    return value.toExponential(2);
+  }
+  return value.toFixed(3);
 }
 
 function formatToolResultOutput(output: unknown): string {

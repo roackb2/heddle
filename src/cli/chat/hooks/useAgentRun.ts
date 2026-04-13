@@ -73,6 +73,7 @@ type ExecuteTurnArgs = {
   logger: Logger;
   state: ActionState;
   updateSessionById: SessionUpdater;
+  referenceAssistantText?: string;
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
   isProjectApproved: (call: ToolCall) => boolean;
   rememberProjectApproval: (call: ToolCall) => void;
@@ -196,6 +197,7 @@ export function useAgentRun(args: UseAgentRunArgs) {
       displayText,
       sessionId: sessionIdOverride,
       sessionHistory: session?.history ?? [],
+      referenceAssistantText: previousAssistantOutput(session),
       runtime,
       llm,
       tools,
@@ -242,6 +244,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     logger,
     state,
     updateSessionById,
+    referenceAssistantText,
     maybeAutoNameSession,
     isProjectApproved,
     rememberProjectApproval,
@@ -274,7 +277,14 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   const appendedPlanSteps = new Set<number>();
   const streamingBuffers = new Map<number, string>();
   drift?.onRunStart?.();
-  const driftObserver = await createChatDriftObserver(prompt, llm, runtime, logger, drift);
+  const driftObserver = await createChatDriftObserver({
+    prompt,
+    referenceAssistantText,
+    llm,
+    runtime,
+    logger,
+    options: drift,
+  });
 
   if (displayText) {
     updateSessionById(sessionId, (session) => ({
@@ -498,20 +508,23 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   }
 }
 
-async function createChatDriftObserver(
-  goal: string,
-  llm: LlmAdapter,
-  runtime: ChatRuntimeConfig,
-  logger: Logger,
-  options: ChatDriftObserverOptions | undefined,
-): Promise<CyberLoopKinematicsObserver | undefined> {
+async function createChatDriftObserver(args: {
+  prompt: string;
+  referenceAssistantText?: string;
+  llm: LlmAdapter;
+  runtime: ChatRuntimeConfig;
+  logger: Logger;
+  options: ChatDriftObserverOptions | undefined;
+}): Promise<CyberLoopKinematicsObserver | undefined> {
+  const { prompt, referenceAssistantText, llm, runtime, logger, options } = args;
   if (!options?.enabled) {
     return undefined;
   }
 
   try {
     return await createCyberLoopKinematicsObserver({
-      goal,
+      goal: prompt,
+      referenceText: referenceAssistantText,
       apiKey: llm.info?.provider === 'openai' ? resolveApiKeyForModel(llm.info.model, runtime) : undefined,
       onAnnotation: options.onAnnotation,
       onError: (error) => {
@@ -530,6 +543,38 @@ async function createChatDriftObserver(
     options.onError?.(error);
     return undefined;
   }
+}
+
+function previousAssistantOutput(session: ChatSession | undefined): string | undefined {
+  if (!session) {
+    return undefined;
+  }
+
+  for (let index = session.messages.length - 1; index >= 0; index--) {
+    const message = session.messages[index];
+    if (message?.role !== 'assistant') {
+      continue;
+    }
+
+    const text = message.text.trim();
+    if (!text || isNonResponseAssistantMessage(text)) {
+      continue;
+    }
+
+    return text;
+  }
+
+  return undefined;
+}
+
+function isNonResponseAssistantMessage(text: string): boolean {
+  return (
+    text.startsWith('Heddle conversational mode.') ||
+    text.startsWith('No provider API key detected.') ||
+    text.startsWith('Enabled CyberLoop semantic drift detection') ||
+    text.startsWith('Disabled CyberLoop semantic drift detection') ||
+    text.startsWith('CyberLoop drift detection is ')
+  );
 }
 
 function parsePlanStateFromToolResult(output: unknown): { explanation?: string; items: PlanItem[] } | undefined {

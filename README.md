@@ -1,12 +1,12 @@
 # Heddle
 
-Heddle is a terminal coding agent runtime and CLI with optional semantic drift detection.
+Heddle is a terminal coding agent runtime and CLI with semantic drift detection.
 
 It is built to feel like a terminal partner that understands your project, keeps continuity across real work, and becomes more useful over time.
 
 It is open source, provider-agnostic, supports OpenAI and Anthropic models, and can build memory across sessions. For agentic-system builders, Heddle also exposes heartbeat primitives for autonomous wake cycles, checkpointing, and long-running background work.
 
-Heddle is designed to make live agent runs more observable, not just easier to launch. With optional semantic drift detection, Heddle can show whether an agent appears to be going off track based on its recent trajectory, surface `drift=unknown|low|medium|high` in chat, and write drift annotations into saved traces instead of leaving you to infer that only from token usage and tool calls.
+Heddle is designed to make live agent runs more observable, not just easier to launch. With CyberLoop installed, Heddle can show whether the agent's outputs are moving away from the recent response trajectory, surface `drift=unknown|low|medium|high` in chat, and write drift annotations into saved traces instead of leaving you to infer that only from token usage and tool calls.
 
 If you are interested in the underlying methodology, Heddle's drift telemetry is powered by [CyberLoop on npm](https://www.npmjs.com/package/cyberloop). See the [CyberLoop repository](https://github.com/roackb2/cyberloop) and [paper](https://zenodo.org/records/18138161) for the geometric-control and trajectory-based details.
 
@@ -21,7 +21,7 @@ If you are interested in the underlying methodology, Heddle's drift telemetry is
 
 ## Advanced Capabilities
 
-- optional CyberLoop-powered semantic drift detection in chat and traces with `/drift on`
+- CyberLoop-powered semantic drift detection in chat and traces, enabled by default when available
 - provider-agnostic model support across OpenAI and Anthropic
 - embeddable `runAgentLoop` API for building non-CLI agent hosts
 - `runAgentHeartbeat` for scheduler-driven autonomous wake cycles without chat by default
@@ -53,7 +53,7 @@ npx @roackb2/heddle
 
 The installed CLI command remains `heddle`.
 
-If you want optional CyberLoop drift telemetry in chat with `/drift on`, or you want to import `cyberloop/advanced` in your own host, install `cyberloop` in the same environment as Heddle:
+If you want CyberLoop drift telemetry in chat, or you want to import `cyberloop/advanced` in your own host, install `cyberloop` in the same environment as Heddle:
 
 ```bash
 npm install -g cyberloop
@@ -113,7 +113,7 @@ Heddle currently supports:
 - autonomous heartbeat wake cycles through `runAgentHeartbeat`
 - serializable run checkpoints for programmatic hosts and later continuation
 - passive CyberLoop-compatible observation through `createCyberLoopObserver`
-- optional chat-mode CyberLoop semantic drift telemetry with `/drift on`
+- chat-mode CyberLoop semantic drift telemetry, enabled by default when `cyberloop` is installed
 - short working-plan support through `update_plan` for substantial multi-step tasks
 - remembered per-project approvals for repeated commands and edits
 - interrupt and resume support for longer-running coding workflows
@@ -127,7 +127,7 @@ The planning workflow is also intentionally lightweight: Heddle does not force a
 
 The web-search workflow is provider-backed rather than crawler-backed: OpenAI models use OpenAI-hosted web search, and Anthropic models use Anthropic-hosted web search when available through the selected model/tool path.
 
-The CyberLoop workflow is observe-only. When `/drift on` is enabled, Heddle loads real [CyberLoop](https://www.npmjs.com/package/cyberloop) kinematics middleware, embeds runtime frames with OpenAI embeddings, shows `drift=unknown|low|medium|high` in the footer, and writes `cyberloop.annotation` events into saved traces. The toggle is saved on the active chat session, and `/drift` reports the last unavailable reason if the middleware or embeddings fail. Heddle does not calculate semantic drift itself. For the underlying methodology, see the [CyberLoop repository](https://github.com/roackb2/cyberloop) and [paper](https://zenodo.org/records/18138161).
+The CyberLoop workflow is observe-only. Drift telemetry is enabled by default for new chat sessions. When enabled, Heddle loads real [CyberLoop](https://www.npmjs.com/package/cyberloop) kinematics middleware, embeds agent output frames with OpenAI embeddings, compares the current response trajectory against the previous assistant response when available, shows `drift=unknown|low|medium|high` in the footer, highlights medium/high drift in the status bar, and writes `cyberloop.annotation` events into saved traces. Tool outputs are excluded from chat drift scoring so the signal focuses on where the agent's own responses are heading. Chat drift uses a more sensitive default stability threshold than CyberLoop's library default; set `HEDDLE_DRIFT_STABILITY_THRESHOLD` if you want to tune it. The toggle is saved on the active chat session, and `/drift` reports the last unavailable reason if the middleware or embeddings fail. Heddle does not calculate semantic drift itself. For the underlying methodology, see the [CyberLoop repository](https://github.com/roackb2/cyberloop) and [paper](https://zenodo.org/records/18138161).
 
 ## Heartbeat
 
@@ -255,7 +255,7 @@ Useful chat commands:
 - `/clear`: clear the current transcript
 - `/compact`: compact older session history immediately
 - `/drift`: show CyberLoop semantic drift detection status
-- `/drift on`: enable observe-only CyberLoop kinematics telemetry for chat runs
+- `/drift on`: re-enable observe-only CyberLoop kinematics telemetry for chat runs
 - `/drift off`: disable CyberLoop semantic drift detection
 - `!<command>`: run a shell command directly in chat
 
@@ -277,7 +277,7 @@ For local development against the sibling CyberLoop repo, run chat with the midd
 HEDDLE_CYBERLOOP_ADVANCED_MODULE=/Users/roackb2/Studio/projects/CyberLoop/src/advanced/kinematics-middleware.ts yarn chat:dev:openai
 ```
 
-Then use `/drift on` before asking Heddle to do real work. For installed usage, install the optional `cyberloop` peer dependency in the same environment as Heddle so it can dynamically import `cyberloop/advanced`.
+Drift telemetry is enabled by default for new sessions. For installed usage, install the optional `cyberloop` peer dependency in the same environment as Heddle so it can dynamically import `cyberloop/advanced`.
 
 ## CLI Usage
 

@@ -19,6 +19,7 @@ import { useApprovalFlow } from './hooks/useApprovalFlow.js';
 import { useAgentRun } from './hooks/useAgentRun.js';
 import { useChatSessions } from './hooks/useChatSessions.js';
 import { submitChatPrompt } from './submit.js';
+import { driftFooterColor, formatDriftFooter } from './utils/drift-footer.js';
 import { currentActivityText } from './utils/format.js';
 import { buildPromptWithFileMentions, filterMentionableFiles, getMentionQuery, insertMentionSelection, listMentionableFiles } from './utils/file-mentions.js';
 import type { ChatRuntimeConfig } from './utils/runtime.js';
@@ -31,7 +32,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   const [draft, setDraft] = useState('');
   const [draftCursor, setDraftCursor] = useState(0);
   const [pendingSubmittedPrompt, setPendingSubmittedPrompt] = useState<string | undefined>();
-  const [driftEnabled, setDriftEnabledState] = useState(false);
+  const [driftEnabled, setDriftEnabledState] = useState(true);
   const [driftLevel, setDriftLevel] = useState<CyberLoopDriftLevel>('unknown');
   const [driftError, setDriftError] = useState<string | undefined>();
   const [modelPickerIndex, setModelPickerIndex] = useState(0);
@@ -101,7 +102,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
       return;
     }
 
-    const sessionDriftEnabled = activeSession.driftEnabled ?? false;
+    const sessionDriftEnabled = activeSession.driftEnabled ?? true;
     if (sessionDriftEnabled !== driftEnabled) {
       setDriftEnabledState(sessionDriftEnabled);
     }
@@ -131,12 +132,9 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     activeModel,
     activeSession?.context?.lastRunInputTokens ?? activeSession?.context?.estimatedRequestTokens,
   );
-  const promptStatusLine = [
-    `model=${activeModel}`,
-    contextStatus,
-    `drift=${formatDriftFooter(driftEnabled, driftLevel, driftError)}`,
-    `session=${activeSession?.id ?? activeSessionId}${activeSession?.name ? ` (${activeSession.name})` : ''}`,
-  ].join(' • ');
+  const driftFooter = formatDriftFooter(driftEnabled, driftLevel, driftError);
+  const driftColor = driftFooterColor(driftEnabled, driftLevel, driftError);
+  const sessionFooter = `session=${activeSession?.id ?? activeSessionId}${activeSession?.name ? ` (${activeSession.name})` : ''}`;
   const activityLines = liveEvents
     .slice(-4)
     .filter((event, index, events) => events.findIndex((candidate) => candidate.text === event.text) === index)
@@ -543,17 +541,13 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
             </Box>
           </>}
       </Box>
-      <Text dimColor>{promptStatusLine}</Text>
+      <Text>
+        <Text dimColor>{`model=${activeModel} • ${contextStatus} • `}</Text>
+        <Text color={driftColor} dimColor={!driftColor}>{`drift=${driftFooter}`}</Text>
+        <Text dimColor>{` • ${sessionFooter}`}</Text>
+      </Text>
     </Box>
   );
-}
-
-function formatDriftFooter(enabled: boolean, level: CyberLoopDriftLevel, error: string | undefined): string {
-  if (!enabled) {
-    return 'off';
-  }
-
-  return error ? 'unavailable' : level;
 }
 
 function getModelPickerQuery(draft: string): string | undefined {

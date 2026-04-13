@@ -18,11 +18,17 @@ export type CyberLoopKinematicsObserver = {
 
 export type CreateCyberLoopKinematicsObserverOptions = {
   goal: string;
+  referenceText?: string;
   apiKey?: string;
   embeddingModel?: string;
+  stabilityThreshold?: number;
   moduleSpecifier?: string;
   onAnnotation?: (annotation: CyberLoopObserverAnnotation) => void;
   onError?: (error: unknown) => void;
+  _testOverrides?: {
+    advancedModule?: CyberLoopAdvancedModule;
+    embedText?: (text: string) => Promise<number[]>;
+  };
 };
 
 type CyberLoopAdvancedModule = {
@@ -52,10 +58,10 @@ export async function createCyberLoopKinematicsObserver(
     throw new Error('CyberLoop drift detection requires OPENAI_API_KEY or PERSONAL_OPENAI_API_KEY for embeddings.');
   }
 
-  const cyberloop = await importCyberLoopAdvanced(options.moduleSpecifier ?? process.env.HEDDLE_CYBERLOOP_ADVANCED_MODULE);
+  const cyberloop = options._testOverrides?.advancedModule ?? await importCyberLoopAdvanced(options.moduleSpecifier ?? process.env.HEDDLE_CYBERLOOP_ADVANCED_MODULE);
   const client = new OpenAI({ apiKey });
   const embeddingModel = options.embeddingModel ?? process.env.HEDDLE_DRIFT_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL;
-  const embedText = async (text: string) => {
+  const embedText = options._testOverrides?.embedText ?? (async (text: string) => {
     const response = await client.embeddings.create({
       model: embeddingModel,
       input: text,
@@ -65,16 +71,32 @@ export async function createCyberLoopKinematicsObserver(
       throw new Error('OpenAI embeddings response did not include an embedding vector.');
     }
     return embedding;
-  };
+  });
   const frameEmbedder = createRuntimeFrameEmbedder({ embedText });
-  const goalEmbedding = await embedText(options.goal);
+  const referenceText = options.referenceText?.trim();
+  const goalEmbedding = await embedText(referenceText || options.goal);
   const annotations: TraceEvent[] = [];
 
   const observer = createCyberLoopObserver({
+    baselineFrame: referenceText ?
+      (event) => ({
+        runId: event.runId,
+        step: 0,
+        kind: 'assistant',
+        goal: event.goal,
+        text: referenceText,
+        timestamp: event.timestamp,
+        rawEvent: event,
+      })
+    : undefined,
+    shouldObserveFrame: (frame) => frame.kind === 'assistant' || frame.kind === 'final',
     middleware: [
       cyberloop.kinematicsMiddleware({
         embedder: frameEmbedder,
         goalEmbedding,
+        pid: {
+          stabilityThreshold: options.stabilityThreshold ?? readStabilityThreshold(),
+        },
       }),
     ],
     onAnnotation(annotation) {
@@ -85,6 +107,16 @@ export async function createCyberLoopKinematicsObserver(
   });
 
   return { observer, annotations };
+}
+
+function readStabilityThreshold(): number {
+  const raw = process.env.HEDDLE_DRIFT_STABILITY_THRESHOLD;
+  if (!raw) {
+    return 0.05;
+  }
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0.05;
 }
 
 function toCyberLoopTraceEvent(annotation: CyberLoopObserverAnnotation): TraceEvent {

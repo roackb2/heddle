@@ -9,6 +9,7 @@ import {
   type CyberLoopObserverAnnotation,
   type HeddleRuntimeFrame,
 } from '../integrations/cyberloop.js';
+import { createCyberLoopKinematicsObserver } from '../integrations/cyberloop-kinematics.js';
 import type { AgentLoopEvent } from '../runtime/events.js';
 
 describe('CyberLoop observer integration', () => {
@@ -87,6 +88,158 @@ describe('CyberLoop observer integration', () => {
     expect(annotations).toHaveLength(3);
     expect(annotations.map((annotation) => annotation.driftLevel)).toEqual(['medium', 'medium', 'medium']);
     expect(annotations[1]?.frame.kind).toBe('tool');
+  });
+
+  it('deduplicates equivalent stream and trace frames for the same assistant turn', async () => {
+    const annotations: CyberLoopObserverAnnotation[] = [];
+    const calls: string[] = [];
+    const middleware: CyberLoopCompatibleMiddleware<HeddleRuntimeFrame> = {
+      name: 'count-frames',
+      async beforeStep(ctx) {
+        calls.push(`${ctx.state.kind}:${ctx.step}:${ctx.state.text}`);
+        return {
+          ...ctx,
+          metadata: {
+            ...ctx.metadata,
+            kinematics: { isStable: true },
+          },
+        };
+      },
+    };
+
+    const observer = createCyberLoopObserver({
+      middleware: [middleware],
+      onAnnotation: (annotation) => annotations.push(annotation),
+    });
+
+    observer.handleEvent(createLoopStarted());
+    observer.handleEvent({
+      type: 'assistant.stream',
+      runId: 'run-1',
+      step: 1,
+      text: 'Same answer.',
+      done: true,
+      timestamp: '2026-04-12T00:00:01.000Z',
+    });
+    observer.handleEvent({
+      type: 'trace',
+      runId: 'run-1',
+      timestamp: '2026-04-12T00:00:01.100Z',
+      event: {
+        type: 'assistant.turn',
+        content: 'Same answer.',
+        requestedTools: false,
+        step: 1,
+        timestamp: '2026-04-12T00:00:01.000Z',
+      },
+    });
+    await observer.flush();
+
+    expect(calls).toEqual(['assistant:1:Same answer.']);
+    expect(annotations).toHaveLength(1);
+  });
+
+  it('can seed trajectory with an unannotated baseline frame before observing current output', async () => {
+    const annotations: CyberLoopObserverAnnotation[] = [];
+    const previousStates: Array<string | undefined> = [];
+    const observed: string[] = [];
+    const middleware: CyberLoopCompatibleMiddleware<HeddleRuntimeFrame> = {
+      name: 'trajectory',
+      async beforeStep(ctx) {
+        observed.push(ctx.state.text);
+        previousStates.push(ctx.prevState?.text);
+        return {
+          ...ctx,
+          metadata: {
+            ...ctx.metadata,
+            kinematics: { isStable: true },
+          },
+        };
+      },
+    };
+
+    const observer = createCyberLoopObserver({
+      middleware: [middleware],
+      baselineFrame: (event) => ({
+        runId: event.runId,
+        step: 0,
+        kind: 'assistant',
+        goal: event.goal,
+        text: 'Previous assistant response about Lucid integration.',
+        timestamp: event.timestamp,
+        rawEvent: event,
+      }),
+      shouldObserveFrame: (frame) => frame.kind === 'assistant' || frame.kind === 'final',
+      onAnnotation: (annotation) => annotations.push(annotation),
+    });
+
+    observer.handleEvent(createLoopStarted());
+    observer.handleEvent({
+      type: 'tool.completed',
+      runId: 'run-1',
+      step: 1,
+      tool: 'read_file',
+      toolCallId: 'call-1',
+      result: { ok: true, output: 'content' },
+      durationMs: 10,
+      timestamp: '2026-04-12T00:00:01.000Z',
+    });
+    observer.handleEvent({
+      type: 'assistant.stream',
+      runId: 'run-1',
+      step: 2,
+      text: 'Current assistant response about weather.',
+      done: true,
+      timestamp: '2026-04-12T00:00:02.000Z',
+    });
+    await observer.flush();
+
+    expect(observed).toEqual([
+      'Previous assistant response about Lucid integration.',
+      'Current assistant response about weather.',
+    ]);
+    expect(previousStates).toEqual([
+      undefined,
+      'Previous assistant response about Lucid integration.',
+    ]);
+    expect(annotations).toHaveLength(1);
+    expect(annotations[0]?.frame.text).toBe('Current assistant response about weather.');
+  });
+
+  it('uses a more sensitive default stability threshold for Heddle chat kinematics', async () => {
+    const captured: unknown[] = [];
+    const observer = await createCyberLoopKinematicsObserver({
+      goal: 'current prompt',
+      referenceText: 'previous assistant response',
+      apiKey: 'test-key',
+      moduleSpecifier: 'fake-module',
+      onError: () => undefined,
+      _testOverrides: {
+        embedText: async (text) => text.includes('current') ? [0.06, 0] : [0, 0],
+        advancedModule: {
+          kinematicsMiddleware(options) {
+            captured.push(options.pid);
+            return {
+              name: 'fake-kinematics',
+              async beforeStep(ctx) {
+                return {
+                  ...ctx,
+                  metadata: {
+                    ...ctx.metadata,
+                    kinematics: { isStable: true },
+                  },
+                };
+              },
+            };
+          },
+        },
+      },
+    });
+
+    observer.observer.handleEvent(createLoopStarted());
+    await observer.observer.flush();
+
+    expect(captured).toEqual([{ stabilityThreshold: 0.05 }]);
   });
 
   it('records requested halts as annotations instead of stopping Heddle execution', async () => {

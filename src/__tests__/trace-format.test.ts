@@ -180,6 +180,8 @@ describe('formatTraceForConsole', () => {
 
     expect(output).toContain('CyberLoop:');
     expect(output).toContain('drift=medium');
+    expect(output).toContain('corr=1.000');
+    expect(output).toContain('stable=false');
     expect(output).toContain('coherenceAngleDeg');
   });
 });

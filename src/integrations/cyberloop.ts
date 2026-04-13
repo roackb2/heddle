@@ -72,6 +72,8 @@ export type CyberLoopObserverAnnotation = {
 
 export type CreateCyberLoopObserverOptions = {
   middleware: CyberLoopCompatibleMiddleware<HeddleRuntimeFrame>[];
+  baselineFrame?: (event: Extract<AgentLoopEvent, { type: 'loop.started' }>) => HeddleRuntimeFrame | undefined;
+  shouldObserveFrame?: (frame: HeddleRuntimeFrame) => boolean;
   onAnnotation?: (annotation: CyberLoopObserverAnnotation) => void;
   onError?: (error: unknown) => void;
 };
@@ -122,6 +124,7 @@ export function createCyberLoopObserver(options: CreateCyberLoopObserverOptions)
   let goal = '';
   let initialized = false;
   let previousFrame: HeddleRuntimeFrame | undefined;
+  let observedFrameKeys = new Set<string>();
 
   const enqueue = (work: () => Promise<void>) => {
     queue = queue.then(work, work).catch((error: unknown) => {
@@ -133,9 +136,15 @@ export function createCyberLoopObserver(options: CreateCyberLoopObserverOptions)
     runId = event.runId;
     goal = event.goal;
     previousFrame = undefined;
+    observedFrameKeys = new Set();
     initialized = true;
     for (const middleware of options.middleware) {
       await middleware.setup?.({ input: event });
+    }
+
+    const baselineFrame = options.baselineFrame?.(event);
+    if (baselineFrame) {
+      await observeFrame(baselineFrame, { annotate: false });
     }
   };
 
@@ -149,7 +158,7 @@ export function createCyberLoopObserver(options: CreateCyberLoopObserverOptions)
     initialized = false;
   };
 
-  const observeFrame = async (frame: HeddleRuntimeFrame) => {
+  const observeFrame = async (frame: HeddleRuntimeFrame, observeOptions: { annotate?: boolean } = {}) => {
     if (!initialized) {
       initialized = true;
       runId = frame.runId;
@@ -158,6 +167,16 @@ export function createCyberLoopObserver(options: CreateCyberLoopObserverOptions)
         await middleware.setup?.({ input: frame.rawEvent });
       }
     }
+
+    if (options.shouldObserveFrame && !options.shouldObserveFrame(frame)) {
+      return;
+    }
+
+    const frameKey = runtimeFrameKey(frame);
+    if (observedFrameKeys.has(frameKey)) {
+      return;
+    }
+    observedFrameKeys.add(frameKey);
 
     let ctx: CyberLoopStepContext<HeddleRuntimeFrame> = {
       step: frame.step,
@@ -191,15 +210,17 @@ export function createCyberLoopObserver(options: CreateCyberLoopObserverOptions)
     }
 
     previousFrame = frame;
-    options.onAnnotation?.({
-      runId: frame.runId,
-      step: frame.step,
-      frame,
-      metadata: ctx.metadata,
-      driftLevel: inferDriftLevel(ctx.metadata),
-      requestedHalt,
-      timestamp: new Date().toISOString(),
-    });
+    if (observeOptions.annotate !== false) {
+      options.onAnnotation?.({
+        runId: frame.runId,
+        step: frame.step,
+        frame,
+        metadata: ctx.metadata,
+        driftLevel: inferDriftLevel(ctx.metadata),
+        requestedHalt,
+        timestamp: new Date().toISOString(),
+      });
+    }
   };
 
   return {
@@ -224,6 +245,17 @@ export function createCyberLoopObserver(options: CreateCyberLoopObserverOptions)
       return queue;
     },
   };
+}
+
+function runtimeFrameKey(frame: HeddleRuntimeFrame): string {
+  return [
+    frame.runId,
+    frame.step,
+    frame.kind,
+    frame.tool ?? '',
+    frame.ok === undefined ? '' : String(frame.ok),
+    frame.text,
+  ].join('\u001f');
 }
 
 export function eventToRuntimeFrame(
