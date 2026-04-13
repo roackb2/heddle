@@ -147,6 +147,14 @@ This is intended for hosted workers, local schedulers, long-running agents, and 
 
 Heartbeat uses a larger default step budget than ordinary short chat runs so a wake cycle has room to inspect, act, and checkpoint. Hosts can still pass `maxSteps` when they need stricter control.
 
+For repeated wake cycles, Heddle also exposes a local-first scheduler core:
+
+- `runDueHeartbeatTasks`: scan a task store once, run due tasks, save checkpoints, and update next-run state
+- `runHeartbeatScheduler`: run the same scan loop until an `AbortSignal` stops it
+- `createFileHeartbeatTaskStore`: store task definitions and checkpoints under `.heddle/heartbeat/`-style directories
+
+Cron, launchd, systemd, hosted queues, and Lucid-style services should be treated as hosts around this API, not as Heddle's internal scheduler model.
+
 Try a small local heartbeat example:
 
 ```bash
@@ -155,6 +163,15 @@ yarn example:heartbeat
 ```
 
 The example stores its checkpoint at `.heddle/examples/heartbeat-demo-checkpoint.json`, so running it again resumes from the previous wake cycle.
+
+Try the local scheduler API with a real LLM:
+
+```bash
+export OPENAI_API_KEY=your_key_here
+yarn example:heartbeat-scheduler
+```
+
+The scheduler example writes task, checkpoint, and run records under `.heddle/examples/heartbeat-scheduler/`.
 
 For hosts that want storage handled by Heddle, use `runStoredHeartbeat` with a checkpoint store:
 
@@ -170,6 +187,20 @@ const result = await runStoredHeartbeat({
 
 // result.nextDelayMs is a scheduling hint. The host still owns the timer,
 // cron job, queue, worker, or hosted scheduler that wakes the agent again.
+```
+
+For hosts that want task scheduling handled by Heddle, use the scheduler API:
+
+```ts
+import { createFileHeartbeatTaskStore, runHeartbeatScheduler } from '@roackb2/heddle'
+
+const controller = new AbortController()
+
+await runHeartbeatScheduler({
+  store: createFileHeartbeatTaskStore({ dir: '.heddle/heartbeat' }),
+  pollIntervalMs: 60_000,
+  signal: controller.signal,
+})
 ```
 
 ## Knowledge Persistence
@@ -451,9 +482,15 @@ const heartbeat = await runAgentHeartbeat({
 
 Heartbeat is not chat by default. It is meant for scheduler-driven agents that wake up, reload state, do bounded autonomous work, checkpoint, and either continue, pause, complete, or escalate.
 
+For repeated local or hosted wake cycles, `runDueHeartbeatTasks`, `runHeartbeatScheduler`, and `createFileHeartbeatTaskStore` provide the scheduler layer above one-shot heartbeat runs.
+
 Lower-level pieces are still exported for custom hosts, including:
 
 - `runAgent`
+- `runAgentLoop`
+- `runAgentHeartbeat`
+- `runHeartbeatScheduler`
+- `createFileHeartbeatTaskStore`
 - `createDefaultAgentTools`
 - LLM adapter helpers
 - built-in tools

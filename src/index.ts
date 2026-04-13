@@ -21,6 +21,22 @@ export type {
   StoredHeartbeatResult,
 } from './runtime/heartbeat-store.js';
 export {
+  createFileHeartbeatTaskStore,
+  runDueHeartbeatTasks,
+  runHeartbeatScheduler,
+} from './runtime/heartbeat-scheduler.js';
+export type {
+  FileHeartbeatTaskStoreOptions,
+  HeartbeatSchedulerEvent,
+  HeartbeatTask,
+  HeartbeatTaskRunRecord,
+  HeartbeatTaskRunner,
+  HeartbeatTaskStore,
+  RunDueHeartbeatTasksOptions,
+  RunDueHeartbeatTasksResult,
+  RunHeartbeatSchedulerOptions,
+} from './runtime/heartbeat-scheduler.js';
+export {
   createAgentLoopCheckpoint,
   getHistoryFromAgentLoopCheckpoint,
   getHistoryFromAgentLoopState,
