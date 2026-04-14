@@ -38,6 +38,31 @@ export type {
   RunHeartbeatSchedulerOptions,
 } from './runtime/heartbeat-scheduler.js';
 export {
+  listHeartbeatRunViews,
+  listHeartbeatTaskViews,
+  loadHeartbeatRunView,
+  projectHeartbeatRunView,
+  projectHeartbeatTaskView,
+} from './runtime/heartbeat-views.js';
+export type {
+  HeartbeatRunView,
+  HeartbeatTaskView,
+} from './runtime/heartbeat-views.js';
+export {
+  heartbeatSchedulerEventToLucidMessages,
+  heartbeatRunViewToLucidMessages,
+  heartbeatTaskStatusToLucidStatus,
+  heartbeatTaskViewToLucidMessages,
+} from './runtime/heartbeat-lucid.js';
+export type {
+  LucidAgentMessage,
+  LucidAgentProgressNotification,
+  LucidAgentResponseNotification,
+  LucidAgentStatus,
+  LucidAgentStatusNotification,
+  LucidAdapterOptions,
+} from './runtime/heartbeat-lucid.js';
+export {
   createAgentLoopCheckpoint,
   getHistoryFromAgentLoopCheckpoint,
   getHistoryFromAgentLoopState,

@@ -25,6 +25,7 @@ If you are interested in the underlying methodology, Heddle's drift telemetry is
 - embeddable `runAgentLoop` API for building non-CLI agent hosts
 - `runAgentHeartbeat` for scheduler-driven autonomous wake cycles without chat by default
 - serializable checkpoints for resume, background execution, and hosted workers
+- host-facing heartbeat task/run views plus websocket-friendly status/progress/response adapters
 - provider-backed hosted web search through `web_search`
 - local image viewing from referenced file paths through `view_image`
 - inline `@file` mentions that tell the agent which workspace files to inspect first
@@ -195,6 +196,8 @@ heddle heartbeat runs show latest --task repo-gardener
 
 For an OpenClaw-like local experience, `heartbeat start` creates or enables a default periodic task and runs the foreground scheduler in one command. It prints the agent's final summary and decision after each run. Stop it with `Ctrl+C`.
 
+For programmatic hosts, heartbeat now also exposes compact task/run views and a thin host-adapter layer, so external apps can consume stable status/progress/response payloads without parsing raw CLI output or full trace history.
+
 Inside this repository, use the dev CLI entrypoint instead:
 
 ```bash
@@ -236,6 +239,23 @@ await runHeartbeatScheduler({
   signal: controller.signal,
 })
 ```
+
+To read compact task/run state back out for dashboards or hosted controllers:
+
+```ts
+import {
+  createFileHeartbeatTaskStore,
+  listHeartbeatTaskViews,
+  listHeartbeatRunViews,
+} from '@roackb2/heddle'
+
+const store = createFileHeartbeatTaskStore({ dir: '.heddle/heartbeat' })
+
+const tasks = await listHeartbeatTaskViews(store)
+const runs = await listHeartbeatRunViews(store, { taskId: 'repo-gardener', limit: 5 })
+```
+
+Those views are intentionally smaller than full checkpoints or traces. They expose stable operator-facing fields such as task ID, status, progress, decision, outcome, resumability, usage, and latest summary.
 
 ## Knowledge Persistence
 
@@ -471,6 +491,36 @@ The loop emits structured events for:
 - trace events such as tool calls, tool results, approvals, and final outcome
 
 The returned result also includes a serializable `state` object with the model, provider, workspace root, outcome, transcript, trace, usage, and timestamps. This is the boundary future hosts can persist for background execution, dashboards, middleware, or heartbeat-style continuation.
+
+For host UIs or controllers that do not want to understand Heddle's full trace/event model, the package also exports compact heartbeat views plus a thin status/progress/response adapter layer:
+
+```ts
+import {
+  createFileHeartbeatTaskStore,
+  heartbeatSchedulerEventToLucidMessages,
+  heartbeatTaskViewToLucidMessages,
+  listHeartbeatTaskViews,
+} from '@roackb2/heddle'
+
+const store = createFileHeartbeatTaskStore({ dir: '.heddle/heartbeat' })
+const tasks = await listHeartbeatTaskViews(store)
+
+for (const task of tasks) {
+  const messages = heartbeatTaskViewToLucidMessages(task)
+  console.log(messages)
+}
+
+const schedulerMessages = heartbeatSchedulerEventToLucidMessages({
+  type: 'heartbeat.task.started',
+  taskId: 'repo-gardener',
+  loadedCheckpoint: true,
+  status: 'running',
+  progress: 'Resuming heartbeat wake from the last checkpoint.',
+  timestamp: new Date().toISOString(),
+})
+```
+
+The adapter names are Lucid-oriented because that is one target host, but the payload shape is generic: compact status, progress, and response messages that another app can publish over websockets, SSE, or logs.
 
 For passive semantic-drift experiments, `createCyberLoopObserver` can consume Heddle's event stream and run CyberLoop-compatible middleware over normalized runtime frames:
 
