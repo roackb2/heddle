@@ -55,6 +55,11 @@ describe('heartbeat scheduler', () => {
     expect(savedTask).toMatchObject({
       id: 'project-maintenance',
       enabled: true,
+      status: 'waiting',
+      lastProgress: 'Heartbeat wake finished. Waiting until the next scheduled run in 5s.',
+      lastRunId: 'run-continue',
+      lastLoadedCheckpoint: false,
+      resumable: true,
       nextRunAt: '2026-04-13T00:00:05.000Z',
       lastDecision: 'continue',
       lastOutcome: 'done',
@@ -88,6 +93,7 @@ describe('heartbeat scheduler', () => {
 
     expect(savedTask).toMatchObject({
       enabled: false,
+      status: 'complete',
       lastDecision: 'complete',
       nextRunAt: undefined,
     });
@@ -121,6 +127,8 @@ describe('heartbeat scheduler', () => {
     expect(result).toMatchObject({ checked: 1, ran: 0, failed: 1 });
     expect(savedTask).toMatchObject({
       enabled: true,
+      status: 'failed',
+      lastProgress: 'Heartbeat wake failed and will retry later.',
       nextRunAt: '2026-04-13T00:00:10.000Z',
       lastError: 'temporary failure',
     });
@@ -153,6 +161,8 @@ describe('heartbeat scheduler', () => {
       taskId: 'summary-task',
       decision: 'pause',
       outcome: 'done',
+      status: 'waiting',
+      progress: 'Heartbeat paused. Waiting 15m before the next wake.',
       summary: expect.stringContaining('Heartbeat result.'),
       runId: 'run-pause',
     });
@@ -165,6 +175,7 @@ describe('heartbeat scheduler', () => {
       id: 'local-task',
       task: 'Local task.',
       enabled: true,
+      status: 'waiting',
       intervalMs: 60_000,
     };
     const checkpoint = createHeartbeatResult('pause').checkpoint;
@@ -187,6 +198,7 @@ describe('heartbeat scheduler', () => {
       id: 'local-task',
       task: 'Local task.',
       enabled: true,
+      status: 'waiting',
       intervalMs: 60_000,
     };
 
@@ -202,6 +214,9 @@ describe('heartbeat scheduler', () => {
       taskId: 'local-task',
       runId: 'run-pause',
       record: {
+        task: {
+          status: 'waiting',
+        },
         loadedCheckpoint: false,
       },
     });

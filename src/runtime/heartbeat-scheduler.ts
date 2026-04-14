@@ -22,12 +22,26 @@ export type HeartbeatTask = {
   searchIgnoreDirs?: string[];
   systemContext?: string;
   lastRunAt?: string;
+  status?: HeartbeatTaskStatus;
+  lastProgress?: string;
+  lastRunId?: string;
+  lastLoadedCheckpoint?: boolean;
+  resumable?: boolean;
+  lastUsage?: LlmUsage;
   lastDecision?: HeartbeatDecision;
   lastOutcome?: string;
   lastSummary?: string;
   lastError?: string;
   updatedAt?: string;
 };
+
+export type HeartbeatTaskStatus =
+  | 'idle'
+  | 'running'
+  | 'waiting'
+  | 'blocked'
+  | 'complete'
+  | 'failed';
 
 export type HeartbeatTaskRunRecord = {
   task: HeartbeatTask;
@@ -62,12 +76,21 @@ export type HeartbeatSchedulerEvent =
   | { type: 'heartbeat.scheduler.started'; timestamp: string }
   | { type: 'heartbeat.scheduler.stopped'; reason: 'aborted' | 'completed' | 'error'; timestamp: string }
   | { type: 'heartbeat.task.due'; taskId: string; timestamp: string }
-  | { type: 'heartbeat.task.started'; taskId: string; loadedCheckpoint: boolean; timestamp: string }
+  | {
+      type: 'heartbeat.task.started';
+      taskId: string;
+      loadedCheckpoint: boolean;
+      status: HeartbeatTaskStatus;
+      progress: string;
+      timestamp: string;
+    }
   | {
       type: 'heartbeat.task.finished';
       taskId: string;
       decision: HeartbeatDecision;
       outcome: string;
+      status: HeartbeatTaskStatus;
+      progress: string;
       summary: string;
       runId: string;
       usage?: LlmUsage;
@@ -75,7 +98,15 @@ export type HeartbeatSchedulerEvent =
       enabled: boolean;
       timestamp: string;
     }
-  | { type: 'heartbeat.task.failed'; taskId: string; error: string; nextRunAt?: string; timestamp: string };
+  | {
+      type: 'heartbeat.task.failed';
+      taskId: string;
+      error: string;
+      status: HeartbeatTaskStatus;
+      progress: string;
+      nextRunAt?: string;
+      timestamp: string;
+    };
 
 export type HeartbeatTaskRunner = (
   task: HeartbeatTask,
@@ -188,26 +219,41 @@ export async function runDueHeartbeatTasks(options: RunDueHeartbeatTasksOptions)
     options.onEvent?.({ type: 'heartbeat.task.due', taskId: task.id, timestamp: now.toISOString() });
     try {
       const checkpoint = await options.store.loadCheckpoint(task);
+      const runningTask = normalizeTaskForSave({
+        ...task,
+        status: 'running',
+        lastProgress:
+          checkpoint ?
+            'Resuming heartbeat wake from the last checkpoint.'
+          : 'Starting a new heartbeat wake cycle.',
+        lastLoadedCheckpoint: Boolean(checkpoint),
+        lastError: undefined,
+        updatedAt: now.toISOString(),
+      });
+      await options.store.saveTask(runningTask);
       options.onEvent?.({
         type: 'heartbeat.task.started',
         taskId: task.id,
         loadedCheckpoint: Boolean(checkpoint),
+        status: runningTask.status ?? 'running',
+        progress: runningTask.lastProgress ?? '',
         timestamp: now.toISOString(),
       });
 
       const result = await runHeartbeatTask(task, checkpoint, options);
-      const record = { task, result, loadedCheckpoint: Boolean(checkpoint) };
       await options.store.saveCheckpoint(task, result.checkpoint);
+      const nextTask = updateTaskAfterResult(task, result, now, Boolean(checkpoint));
+      await options.store.saveTask(nextTask);
+      const record = { task: nextTask, result, loadedCheckpoint: Boolean(checkpoint) };
       await options.store.saveRunRecord?.(record);
       records.push(record);
-
-      const nextTask = updateTaskAfterResult(task, result, now);
-      await options.store.saveTask(nextTask);
       options.onEvent?.({
         type: 'heartbeat.task.finished',
         taskId: task.id,
         decision: result.decision,
         outcome: result.state.outcome,
+        status: nextTask.status ?? 'waiting',
+        progress: nextTask.lastProgress ?? '',
         summary: result.summary,
         runId: result.state.runId,
         usage: result.state.usage,
@@ -223,6 +269,8 @@ export async function runDueHeartbeatTasks(options: RunDueHeartbeatTasksOptions)
         type: 'heartbeat.task.failed',
         taskId: task.id,
         error: error instanceof Error ? error.message : String(error),
+        status: nextTask.status ?? 'failed',
+        progress: nextTask.lastProgress ?? '',
         nextRunAt: nextTask.nextRunAt,
         timestamp: now.toISOString(),
       });
@@ -292,18 +340,30 @@ async function runHeartbeatTask(
   });
 }
 
-function updateTaskAfterResult(task: HeartbeatTask, result: AgentHeartbeatResult, now: Date): HeartbeatTask {
+function updateTaskAfterResult(
+  task: HeartbeatTask,
+  result: AgentHeartbeatResult,
+  now: Date,
+  loadedCheckpoint: boolean,
+): HeartbeatTask {
   const terminal = result.decision === 'complete' || result.decision === 'escalate';
   const delayMs =
     terminal ? undefined
     : result.decision === 'continue' ? task.intervalMs
     : suggestNextHeartbeatDelayMs(result.decision) ?? task.intervalMs;
+  const projection = projectionForResult(result, delayMs);
 
   return normalizeTaskForSave({
     ...task,
     enabled: terminal ? false : task.enabled,
+    status: projection.status,
+    lastProgress: projection.progress,
     nextRunAt: delayMs === undefined ? undefined : new Date(now.getTime() + delayMs).toISOString(),
     lastRunAt: now.toISOString(),
+    lastRunId: result.state.runId,
+    lastLoadedCheckpoint: loadedCheckpoint,
+    resumable: result.decision !== 'complete',
+    lastUsage: result.state.usage,
     lastDecision: result.decision,
     lastOutcome: result.state.outcome,
     lastSummary: result.summary,
@@ -315,6 +375,8 @@ function updateTaskAfterResult(task: HeartbeatTask, result: AgentHeartbeatResult
 function updateTaskAfterFailure(task: HeartbeatTask, error: unknown, now: Date, retryMs: number): HeartbeatTask {
   return normalizeTaskForSave({
     ...task,
+    status: 'failed',
+    lastProgress: 'Heartbeat wake failed and will retry later.',
     nextRunAt: new Date(now.getTime() + retryMs).toISOString(),
     lastRunAt: now.toISOString(),
     lastError: error instanceof Error ? error.message : String(error),
@@ -326,6 +388,7 @@ function normalizeTaskForSave(task: HeartbeatTask): HeartbeatTask {
   return {
     ...task,
     intervalMs: Math.max(1, Math.trunc(task.intervalMs)),
+    status: task.status ?? 'idle',
   };
 }
 
@@ -338,6 +401,56 @@ function safeTaskFileName(id: string): string {
     throw new Error(`Invalid heartbeat task id "${id}". Use only letters, numbers, dots, underscores, and hyphens.`);
   }
   return id;
+}
+
+function projectionForResult(
+  result: AgentHeartbeatResult,
+  delayMs: number | undefined,
+): { status: HeartbeatTaskStatus; progress: string } {
+  switch (result.decision) {
+    case 'continue':
+      return {
+        status: 'waiting',
+        progress:
+          delayMs === undefined ?
+            'Heartbeat wake finished.'
+          : `Heartbeat wake finished. Waiting until the next scheduled run in ${formatDelay(delayMs)}.`,
+      };
+    case 'pause':
+      return {
+        status: 'waiting',
+        progress:
+          delayMs === undefined ?
+            'Heartbeat paused.'
+          : `Heartbeat paused. Waiting ${formatDelay(delayMs)} before the next wake.`,
+      };
+    case 'complete':
+      return {
+        status: 'complete',
+        progress: 'Heartbeat task completed and will not wake again.',
+      };
+    case 'escalate':
+      return {
+        status: 'blocked',
+        progress: 'Heartbeat escalated for user input and is waiting for follow-up.',
+      };
+  }
+}
+
+function formatDelay(ms: number): string {
+  if (ms % (24 * 60 * 60_000) === 0) {
+    return `${ms / (24 * 60 * 60_000)}d`;
+  }
+  if (ms % (60 * 60_000) === 0) {
+    return `${ms / (60 * 60_000)}h`;
+  }
+  if (ms % 60_000 === 0) {
+    return `${ms / 60_000}m`;
+  }
+  if (ms % 1_000 === 0) {
+    return `${ms / 1_000}s`;
+  }
+  return `${ms}ms`;
 }
 
 function runRecordEntryFromPath(path: string, record: HeartbeatTaskRunRecord): HeartbeatTaskRunRecordEntry {

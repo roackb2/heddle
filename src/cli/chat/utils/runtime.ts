@@ -22,6 +22,7 @@ export type ChatRuntimeConfig = {
   maxSteps: number;
   apiKey?: string;
   apiKeyProvider?: LlmProvider | 'explicit';
+  stateRoot: string;
   logFile: string;
   sessionsFile: string;
   approvalsFile: string;
@@ -54,6 +55,7 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
     apiKey,
     apiKeyProvider: options.apiKey ? 'explicit' : apiKey ? provider : undefined,
     workspaceRoot,
+    stateRoot,
     logFile: join(stateRoot, 'logs', `${sessionId}.log`),
     sessionsFile: join(stateRoot, 'chat-sessions.json'),
     approvalsFile: join(stateRoot, 'command-approvals.json'),

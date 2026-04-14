@@ -176,8 +176,11 @@ async function listHeartbeatTasks(store: ReturnType<typeof createFileHeartbeatTa
   for (const task of tasks) {
     process.stdout.write([
       `${task.enabled ? 'enabled ' : 'disabled'} ${task.id}${task.name ? ` (${task.name})` : ''}`,
-      `  every=${formatDurationMs(task.intervalMs)} next=${task.nextRunAt ?? 'now'} model=${task.model ?? 'default'}`,
+      `  status=${task.status ?? 'idle'} every=${formatDurationMs(task.intervalMs)} next=${task.nextRunAt ?? 'now'} model=${task.model ?? 'default'}`,
       `  task=${task.task}`,
+      task.lastProgress ? `  progress=${task.lastProgress}` : undefined,
+      task.lastRunId ? `  run=${task.lastRunId} resumable=${task.resumable === false ? 'no' : 'yes'} loadedCheckpoint=${task.lastLoadedCheckpoint ? 'yes' : 'no'}` : undefined,
+      task.lastUsage ? `  usage input=${task.lastUsage.inputTokens} output=${task.lastUsage.outputTokens} total=${task.lastUsage.totalTokens} requests=${task.lastUsage.requests}` : undefined,
       task.lastDecision ? `  last=${task.lastDecision} outcome=${task.lastOutcome ?? 'unknown'} runAt=${task.lastRunAt ?? 'unknown'}` : undefined,
       task.lastError ? `  error=${task.lastError}` : undefined,
     ].filter((line): line is string => Boolean(line)).join('\n') + '\n');
@@ -226,14 +229,19 @@ async function showHeartbeatTask(
 
   process.stdout.write([
     `${task.enabled ? 'enabled ' : 'disabled'} ${task.id}${task.name ? ` (${task.name})` : ''}`,
-    `every=${formatDurationMs(task.intervalMs)} next=${task.nextRunAt ?? 'none'} model=${task.model ?? 'default'}`,
+    `status=${task.status ?? 'idle'} every=${formatDurationMs(task.intervalMs)} next=${task.nextRunAt ?? 'none'} model=${task.model ?? 'default'}`,
     '',
     'Task:',
     task.task,
     '',
+    task.lastProgress ? `Progress: ${task.lastProgress}` : undefined,
     task.lastDecision ? `Last decision: ${task.lastDecision}` : 'Last decision: none',
     task.lastOutcome ? `Last outcome: ${task.lastOutcome}` : undefined,
     task.lastRunAt ? `Last run: ${task.lastRunAt}` : undefined,
+    task.lastRunId ? `Last run id: ${task.lastRunId}` : undefined,
+    task.lastRunId ? `Resumable: ${task.resumable === false ? 'no' : 'yes'}` : undefined,
+    task.lastRunId ? `Loaded checkpoint: ${task.lastLoadedCheckpoint ? 'yes' : 'no'}` : undefined,
+    task.lastUsage ? `Usage: input=${task.lastUsage.inputTokens} output=${task.lastUsage.outputTokens} total=${task.lastUsage.totalTokens} requests=${task.lastUsage.requests}` : undefined,
     task.lastError ? `Last error: ${task.lastError}` : undefined,
     task.lastSummary ? ['', 'Last summary:', task.lastSummary].join('\n') : undefined,
     '',
@@ -469,11 +477,12 @@ function printSchedulerEvent(event: HeartbeatSchedulerEvent) {
       process.stdout.write(`[heartbeat] task due id=${event.taskId}\n`);
       break;
     case 'heartbeat.task.started':
-      process.stdout.write(`[heartbeat] task started id=${event.taskId} loadedCheckpoint=${event.loadedCheckpoint}\n`);
+      process.stdout.write(`[heartbeat] task started id=${event.taskId} loadedCheckpoint=${event.loadedCheckpoint} status=${event.status} progress=${event.progress}\n`);
       break;
     case 'heartbeat.task.finished':
       process.stdout.write([
-        `[heartbeat] task finished id=${event.taskId} decision=${event.decision} outcome=${event.outcome} enabled=${event.enabled} next=${event.nextRunAt ?? 'none'}`,
+        `[heartbeat] task finished id=${event.taskId} decision=${event.decision} outcome=${event.outcome} status=${event.status} enabled=${event.enabled} next=${event.nextRunAt ?? 'none'}`,
+        `[heartbeat] progress ${event.progress}`,
         event.usage ? `[heartbeat] usage input=${event.usage.inputTokens} output=${event.usage.outputTokens} total=${event.usage.totalTokens} requests=${event.usage.requests}` : undefined,
         '',
         'Heartbeat summary:',
@@ -482,7 +491,7 @@ function printSchedulerEvent(event: HeartbeatSchedulerEvent) {
       ].filter((line): line is string => line !== undefined).join('\n'));
       break;
     case 'heartbeat.task.failed':
-      process.stdout.write(`[heartbeat] task failed id=${event.taskId} error=${event.error} next=${event.nextRunAt ?? 'none'}\n`);
+      process.stdout.write(`[heartbeat] task failed id=${event.taskId} status=${event.status} error=${event.error} next=${event.nextRunAt ?? 'none'}\n[heartbeat] progress ${event.progress}\n`);
       break;
   }
 }

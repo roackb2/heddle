@@ -32,6 +32,8 @@ type SubmitChatPromptArgs = {
   driftEnabled: boolean;
   driftError?: string;
   setDriftEnabled: (enabled: boolean) => void;
+  workspaceRoot: string;
+  stateRoot: string;
   preparePrompt?: (prompt: string) => { prompt: string; displayText?: string };
   executeTurn: (prompt: string, displayText?: string, sessionIdOverride?: string) => Promise<void>;
   executeDirectShellCommand: (rawCommand: string) => Promise<void>;
@@ -48,7 +50,7 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
     return;
   }
 
-  const commandResult = runLocalCommand({
+  const commandResult = await runLocalCommand({
     prompt,
     activeModel: args.activeModel,
     setActiveModel: args.setActiveModel,
@@ -102,6 +104,8 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
     driftError: args.driftError,
     setDriftEnabled: args.setDriftEnabled,
     listRecentSessionsMessage: args.listRecentSessionsMessage,
+    workspaceRoot: args.workspaceRoot,
+    stateRoot: args.stateRoot,
   } satisfies LocalCommandDeps);
 
   if (!commandResult.handled) {
@@ -113,6 +117,14 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
   if (commandResult.kind === 'message') {
     appendAssistantMessage(args.updateActiveSession, args.nextLocalId, commandResult.message);
     args.setStatus('Idle');
+    return;
+  }
+
+  if (commandResult.kind === 'execute') {
+    if (commandResult.message) {
+      appendAssistantMessage(args.updateActiveSession, args.nextLocalId, commandResult.message);
+    }
+    await args.executeTurn(commandResult.prompt, commandResult.displayText);
     return;
   }
 
