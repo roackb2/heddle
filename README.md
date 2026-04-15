@@ -669,7 +669,7 @@ You can store project defaults in `heddle.config.json`:
 ```json
 {
   "model": "gpt-5.1-codex",
-  "maxSteps": 40,
+  "maxSteps": 100,
   "stateDir": ".heddle",
   "directShellApproval": "never",
   "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"],

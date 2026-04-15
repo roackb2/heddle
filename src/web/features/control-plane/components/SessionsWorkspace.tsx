@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChatSessionDetail, ChatTurnReview, ControlPlaneState } from '../../../lib/api';
 import { formatDate, formatNumber, toneFor, className } from '../utils';
 import { CodeBlock, EmptyState, Pill, SideSection, WorkspaceSectionHeader } from './common';
@@ -20,6 +20,9 @@ export type SessionsWorkspaceProps = {
   turnReview: ChatTurnReview | null;
   turnReviewLoading: boolean;
   turnReviewError?: string;
+  sendingPrompt: boolean;
+  sendPromptError?: string;
+  onSendPrompt: (prompt: string) => Promise<void>;
   inspectorTab: 'summary' | 'review';
   onInspectorTabChange: (tab: 'summary' | 'review') => void;
 };
@@ -38,10 +41,14 @@ export function SessionsWorkspace({
   turnReview,
   turnReviewLoading,
   turnReviewError,
+  sendingPrompt,
+  sendPromptError,
+  onSendPrompt,
   inspectorTab,
   onInspectorTabChange,
 }: SessionsWorkspaceProps) {
   const conversationScrollRef = useRef<HTMLDivElement>(null);
+  const [draft, setDraft] = useState('');
 
   useEffect(() => {
     const element = conversationScrollRef.current;
@@ -106,10 +113,44 @@ export function SessionsWorkspace({
         </div>
 
         <div className="composer-shell">
-          <textarea disabled placeholder="Send-message wiring comes next. This shell is here to lock in the workstation layout first." />
+          <textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            disabled={!selectedSessionId || sendingPrompt}
+            placeholder={sendingPrompt ? 'Heddle is working…' : 'Ask Heddle about this workspace'}
+            onKeyDown={(event) => {
+              if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                event.preventDefault();
+                const prompt = draft.trim();
+                if (!prompt) {
+                  return;
+                }
+                setDraft('');
+                void onSendPrompt(prompt);
+              }
+            }}
+          />
           <div className="composer-footer">
-            <p className="muted">Read-only for now. The next API slice should wire send/continue into this exact shell.</p>
-            <button className="primary-button" type="button" disabled>Send</button>
+            <p className="muted">
+              {sendPromptError ? sendPromptError
+              : sendingPrompt ? 'Running selected session in the daemon. This should append to the same saved transcript as TUI.'
+              : 'Send on this session. Cmd/Ctrl+Enter also submits.'}
+            </p>
+            <button
+              className="primary-button"
+              type="button"
+              disabled={!selectedSessionId || sendingPrompt || !draft.trim()}
+              onClick={() => {
+                const prompt = draft.trim();
+                if (!prompt) {
+                  return;
+                }
+                setDraft('');
+                void onSendPrompt(prompt);
+              }}
+            >
+              {sendingPrompt ? 'Sending…' : 'Send'}
+            </button>
           </div>
         </div>
       </section>

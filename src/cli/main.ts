@@ -178,7 +178,7 @@ function printHelp() {
       '',
       'Project config:',
       '  heddle.config.json in the target workspace root',
-      '  { "model": "gpt-5.1-codex", "maxSteps": 40, "stateDir": ".heddle", "directShellApproval": "never", "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"], "agentContextPaths": ["AGENTS.md"] }',
+      '  { "model": "gpt-5.1-codex", "maxSteps": 100, "stateDir": ".heddle", "directShellApproval": "never", "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"], "agentContextPaths": ["AGENTS.md"] }',
       '',
       'Environment:',
       '  OPENAI_API_KEY or ANTHROPIC_API_KEY',
@@ -197,7 +197,7 @@ function initializeProjectConfig(workspaceRoot: string) {
 
   const template = {
     model: DEFAULT_MODEL_FOR_CONFIG,
-    maxSteps: 40,
+    maxSteps: 100,
     stateDir: '.heddle',
     directShellApproval: 'never',
     searchIgnoreDirs: ['.git', 'dist', 'node_modules', '.heddle'],

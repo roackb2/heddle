@@ -71,6 +71,9 @@ function renderActiveTab(
         turnReview={sessionWorkspace.turnReview}
         turnReviewLoading={sessionWorkspace.turnReviewLoading}
         turnReviewError={sessionWorkspace.turnReviewError}
+        sendingPrompt={sessionWorkspace.sendingPrompt}
+        sendPromptError={sessionWorkspace.sendPromptError}
+        onSendPrompt={sessionWorkspace.sendPrompt}
         inspectorTab={sessionWorkspace.inspectorTab}
         onInspectorTabChange={sessionWorkspace.setInspectorTab}
       />

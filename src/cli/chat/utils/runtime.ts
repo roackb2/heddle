@@ -1,7 +1,6 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import type { TraceEvent } from '../../../index.js';
 import { DEFAULT_OPENAI_MODEL, inferProviderFromModel } from '../../../index.js';
+import { saveTrace } from '../../../core/chat/trace.js';
 import type { LlmProvider } from '../../../index.js';
 import { resolveApiKeyForModel as resolveRuntimeApiKeyForModel, resolveProviderApiKey as resolveRuntimeProviderApiKey } from '../../../runtime/api-keys.js';
 import { parsePositiveInt } from './format.js';
@@ -34,12 +33,7 @@ export type ChatRuntimeConfig = {
   systemContext?: string;
 };
 
-export function saveTrace(traceDir: string, trace: TraceEvent[]): string {
-  mkdirSync(traceDir, { recursive: true });
-  const traceFile = join(traceDir, `trace-${Date.now()}.json`);
-  writeFileSync(traceFile, JSON.stringify(trace, null, 2));
-  return traceFile;
-}
+export { saveTrace };
 
 export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeConfig {
   const workspaceRoot = resolve(options.workspaceRoot ?? process.cwd());
@@ -51,7 +45,7 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
 
   return {
     model,
-    maxSteps: options.maxSteps ?? parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 40,
+    maxSteps: options.maxSteps ?? parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 100,
     apiKey,
     apiKeyProvider: options.apiKey ? 'explicit' : apiKey ? provider : undefined,
     workspaceRoot,

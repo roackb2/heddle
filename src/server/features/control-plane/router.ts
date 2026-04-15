@@ -1,12 +1,17 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { procedure, router } from '../../trpc.js';
-import { readChatSessionDetail, readChatSessionViews, readChatTurnReview } from './services/chat-sessions.js';
+import { readChatSessionDetail, readChatSessionViews, readChatTurnReview, submitChatPrompt } from './services/chat-sessions.js';
 import { loadControlPlaneState } from './services/control-plane-state.js';
 import { listControlPlaneHeartbeatRuns, listControlPlaneHeartbeatTasks } from './services/heartbeat.js';
 
 const sessionInputSchema = z.object({
   id: z.string().min(1),
+});
+
+const sessionMessageInputSchema = z.object({
+  sessionId: z.string().min(1),
+  prompt: z.string().min(1),
 });
 
 const turnReviewInputSchema = z.object({
@@ -33,6 +38,15 @@ export const controlPlaneRouter = router({
   }),
   sessionTurnReview: procedure.input(turnReviewInputSchema).query(({ ctx, input }) => {
     return readChatTurnReview(resolve(ctx.stateRoot, 'chat-sessions.json'), input.sessionId, input.turnId) ?? null;
+  }),
+  sessionSendPrompt: procedure.input(sessionMessageInputSchema).mutation(async ({ ctx, input }) => {
+    return await submitChatPrompt({
+      workspaceRoot: ctx.workspaceRoot,
+      stateRoot: ctx.stateRoot,
+      sessionsPath: resolve(ctx.stateRoot, 'chat-sessions.json'),
+      sessionId: input.sessionId,
+      prompt: input.prompt,
+    });
   }),
   heartbeatTasks: procedure.query(async ({ ctx }) => {
     return {

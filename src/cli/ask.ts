@@ -25,7 +25,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
   }
 
   const model = options.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
-  const maxSteps = options.maxSteps ?? parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 40;
+  const maxSteps = options.maxSteps ?? parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 100;
   const workspaceRoot = options.workspaceRoot ?? process.cwd();
   const stateRoot = join(workspaceRoot, options.stateDir ?? '.heddle');
   const logger = createLogger({ pretty: true, level: 'debug' });

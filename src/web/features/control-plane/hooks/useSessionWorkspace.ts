@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   fetchChatSessionDetail,
   fetchChatTurnReview,
+  sendChatSessionPrompt,
   type ChatSessionDetail,
   type ChatTurnReview,
   type ControlPlaneState,
@@ -18,6 +19,9 @@ export type SessionWorkspaceState = {
   sessionDetail: ChatSessionDetail | null;
   sessionDetailLoading: boolean;
   sessionDetailError?: string;
+  sendingPrompt: boolean;
+  sendPromptError?: string;
+  sendPrompt: (prompt: string) => Promise<void>;
   selectedTurnId?: string;
   setSelectedTurnId: (turnId: string) => void;
   selectedTurn?: SessionTurn;
@@ -35,6 +39,8 @@ export function useSessionWorkspace(sessions: ControlPlaneState['sessions'] | un
   const [sessionDetail, setSessionDetail] = useState<ChatSessionDetail | null>(null);
   const [sessionDetailLoading, setSessionDetailLoading] = useState(false);
   const [sessionDetailError, setSessionDetailError] = useState<string | undefined>();
+  const [sendingPrompt, setSendingPrompt] = useState(false);
+  const [sendPromptError, setSendPromptError] = useState<string | undefined>();
   const [turnReview, setTurnReview] = useState<ChatTurnReview | null>(null);
   const [turnReviewLoading, setTurnReviewLoading] = useState(false);
   const [turnReviewError, setTurnReviewError] = useState<string | undefined>();
@@ -146,6 +152,28 @@ export function useSessionWorkspace(sessions: ControlPlaneState['sessions'] | un
     [selectedTurnId, sessionDetail],
   );
 
+  const sendPrompt = useCallback(async (prompt: string) => {
+    const trimmed = prompt.trim();
+    if (!selectedSessionId || !trimmed || sendingPrompt) {
+      return;
+    }
+
+    setSendingPrompt(true);
+    setSendPromptError(undefined);
+    try {
+      const result = await sendChatSessionPrompt(selectedSessionId, trimmed);
+      setSessionDetail(result.session);
+      const latestTurnId = result.session?.turns.at(-1)?.id;
+      if (latestTurnId) {
+        setSelectedTurnId(latestTurnId);
+      }
+    } catch (error) {
+      setSendPromptError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSendingPrompt(false);
+    }
+  }, [selectedSessionId, sendingPrompt]);
+
   return {
     activeSession,
     selectedSessionId,
@@ -153,6 +181,9 @@ export function useSessionWorkspace(sessions: ControlPlaneState['sessions'] | un
     sessionDetail,
     sessionDetailLoading,
     sessionDetailError,
+    sendingPrompt,
+    sendPromptError,
+    sendPrompt,
     selectedTurnId,
     setSelectedTurnId,
     selectedTurn,

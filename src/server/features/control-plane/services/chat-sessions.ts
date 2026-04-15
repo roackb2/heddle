@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { submitChatSessionPrompt } from '../../../../core/chat/session-submit.js';
 import type {
   ApprovalEventView,
   ChatSessionDetail,
@@ -8,6 +9,22 @@ import type {
   ChatTurnView,
   CommandEvidenceView,
 } from '../types.js';
+
+type SubmitChatPromptArgs = {
+  workspaceRoot: string;
+  stateRoot: string;
+  sessionsPath: string;
+  sessionId: string;
+  prompt: string;
+};
+
+export async function submitChatPrompt(args: SubmitChatPromptArgs) {
+  const result = await submitChatSessionPrompt(args);
+  return {
+    ...result,
+    session: projectChatSessionDetail(result.session)[0] ?? null,
+  };
+}
 
 export function readChatSessionViews(sessionsPath: string): ChatSessionView[] {
   return readChatSessionRecords(sessionsPath).flatMap(projectChatSessionView).sort((left, right) => {

@@ -29,7 +29,7 @@ import type { PlanItem } from './tools/update-plan.js';
 
 const PLAN_ITEM_STATUSES = new Set<PlanItem['status']>(['pending', 'in_progress', 'completed']);
 
-const DEFAULT_MAX_STEPS = 20;
+const DEFAULT_MAX_STEPS = 100;
 const MAX_CONSECUTIVE_ERRORS = 3;
 const STREAM_UPDATE_INTERVAL_MS = 75;
 const INTERRUPTED_SUMMARY = 'Run interrupted by host request';
