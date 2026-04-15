@@ -10,6 +10,19 @@ Heddle is designed to make live agent runs more observable, not just easier to l
 
 If you are interested in the underlying methodology, Heddle's drift telemetry is powered by [CyberLoop on npm](https://www.npmjs.com/package/cyberloop). See the [CyberLoop repository](https://github.com/roackb2/cyberloop) and [paper](https://zenodo.org/records/18138161) for the geometric-control and trajectory-based details.
 
+## Agenda
+
+- [Chat And CLI Usage](#chat-and-cli-usage)
+- [Control Plane](#control-plane)
+- [Knowledge Persistence](#knowledge-persistence)
+- [Semantic Drift](#semantic-drift)
+- [Heartbeat](#heartbeat)
+- [Programmatic Use](#programmatic-use)
+- [Capability Details](#capability-details)
+- [Supported Providers And Models](#supported-providers-and-models)
+- [Project Config](#project-config)
+- [Design Direction](#design-direction)
+
 ## How Heddle Helps
 
 - daily development work in real coding projects
@@ -71,7 +84,9 @@ If you are developing inside the Heddle repo itself, `yarn install` also install
 
 For local development against the full CLI entrypoint, use `yarn cli:dev`. The `chat:dev` scripts intentionally start chat mode directly and do not route subcommands such as `heartbeat`.
 
-## Quick Start
+## Chat And CLI Usage
+
+### Quick Start
 
 1. Set an API key for a supported provider.
 
@@ -96,6 +111,95 @@ heddle
 Heddle uses the current directory as the workspace root unless you pass `--cwd`.
 
 The default workflow is interactive chat, not one-shot prompts. You keep a session open, inspect the repo, switch models, run direct shell commands when needed, and continue earlier sessions later.
+
+### Chat Workflow
+
+Start chat in the current repo:
+
+```bash
+heddle
+heddle chat
+heddle --cwd /path/to/project
+heddle chat --model gpt-5.4-mini --max-steps 20
+```
+
+Typical chat use cases:
+
+- ask Heddle to explain architecture, code paths, tests, or build setup
+- iterate on a fix over multiple prompts instead of fitting everything into one request
+- inspect files, search the repo, and edit code inside one persistent session
+- keep a long coding conversation usable through saved sessions, `/continue`, automatic history compaction, and manual `/compact`
+- let the agent create and update a short working plan for a multi-step implementation
+- search official docs or other current external references with provider-backed `web_search`
+- mention important repo files with `@path/to/file` so the agent treats them as first-pass context
+- reference a local screenshot path and have the agent inspect it with `view_image`
+- run direct shell commands from chat with `!<command>`
+- pause and later resume earlier sessions
+
+Useful chat commands:
+
+- `/help`: show local chat commands
+- `/continue`: resume the current session from its last interrupted or prior run
+- `/model`: show the active model
+- `/model list`: show the built-in shortlist
+- `/model set <query>`: open the interactive model picker
+- `/model <name>`: switch models directly
+- `/session list`: list recent saved sessions
+- `/session choose <query>`: choose a recent session interactively
+- `/session new [name]`: create a new session
+- `/session switch <id>`: switch to another session
+- `/session continue <id>`: switch and immediately continue that session
+- `/session rename <name>`: rename the current session
+- `/session close <id>`: remove a saved session
+- `/clear`: clear the current transcript
+- `/compact`: compact older session history immediately
+- `/drift`: show CyberLoop semantic drift detection status
+- `/drift on`: re-enable observe-only CyberLoop kinematics telemetry for chat runs
+- `/drift off`: disable CyberLoop semantic drift detection
+- `!<command>`: run a shell command directly in chat
+
+Direct shell in chat:
+
+```bash
+!pwd
+!git status
+!yarn test
+```
+
+Read-oriented commands stay in inspect mode when possible. Workspace-changing or unclassified commands fall back to approval-gated execution.
+
+Chat state is stored under `.heddle/`, including saved sessions, traces, approvals, and memory notes. The footer context indicator is an estimate of total request input against the active model's context window, not only the raw chat history length.
+
+For local development against the sibling CyberLoop repo, run chat with the middleware module path:
+
+```bash
+HEDDLE_CYBERLOOP_ADVANCED_MODULE=/Users/roackb2/Studio/projects/CyberLoop/src/advanced/kinematics-middleware.ts yarn chat:dev:openai
+```
+
+Drift telemetry is enabled by default for new sessions. For installed usage, install the optional `cyberloop` peer dependency in the same environment as Heddle so it can dynamically import `cyberloop/advanced`.
+
+### CLI Commands
+
+Supported commands:
+
+- `heddle` or `heddle chat`: start interactive chat mode
+- `heddle ask "<goal>"`: run a single prompt and exit
+- `heddle heartbeat start [--every 30m] [--task "<durable task>"]`: create or enable the default heartbeat task and run the foreground scheduler
+- `heddle heartbeat task add --id <id> --task "<durable task>" [--every 15m]`: create or update a scheduled heartbeat task
+- `heddle heartbeat task list`: list local heartbeat tasks
+- `heddle heartbeat task show <id>`: show a task's schedule, last decision, and last run summary
+- `heddle heartbeat task enable <id>` / `heddle heartbeat task disable <id>`: toggle a heartbeat task
+- `heddle heartbeat run --once`: run due heartbeat tasks once
+- `heddle heartbeat run [--poll 60s]`: run the foreground heartbeat scheduler until interrupted; heartbeat runs print scheduler, agent, tool, decision, and checkpoint progress events
+- `heddle heartbeat runs list [--task <id>] [--limit 10]`: list saved heartbeat run records
+- `heddle heartbeat runs show <run-id|latest> [--task <id>]`: show the final agent output for a saved heartbeat run
+- `heddle init`: create a `heddle.config.json` template in the current project
+
+Common flags:
+
+- `--cwd <path>`: run against another workspace root
+- `--model <name>`: choose the active model
+- `--max-steps <n>`: limit the agent loop length
 
 ## Control Plane
 
@@ -146,35 +250,27 @@ HEDDLE_SERVER_LOG_FILE=/path/to/server.log yarn server:dev
 
 This control plane is intentionally read-only at first. The next milestones are session detail views, chat continuation from the browser, heartbeat task actions, and live run updates.
 
-## Core Capabilities
+## Knowledge Persistence
 
-Heddle currently supports:
+Heddle can maintain durable workspace knowledge under `.heddle/memory/`.
 
-- repository inspection with `list_files`, `read_file`, and `search_files`
-- code and doc changes with `edit_file`
-- provider-backed hosted web search through `web_search`
-- local screenshot and image inspection through `view_image`
-- native browser control plane through `heddle daemon`
-- inline `@file` mentions for file-priority context without pasting file contents into the prompt
-- shell execution with inspect vs approval-gated mutate behavior
-- multi-turn chat sessions with saved history under `.heddle/`
-- session management with create, switch, continue, rename, and close flows
-- automatic conversation compaction so longer chats preserve context instead of growing unbounded
-- manual `/compact` to shrink the current session transcript on demand
-- persistent workspace memory notes under `.heddle/memory/`
-- serializable run checkpoints for programmatic hosts and later continuation
-- short working-plan support through `update_plan` for substantial multi-step tasks
-- remembered per-project approvals for repeated commands and edits
-- interrupt and resume support for longer-running coding workflows
-- request-size aware context tracking in chat so the footer reflects model input usage, not only raw history size
+The goal is to help Heddle learn from real project work over time instead of rediscovering the same stable facts every session.
 
-The image workflow is intentionally simple for now: users can reference a local image path in chat, and the agent can decide whether to inspect it with `view_image`. Heddle does not require a full multimodal attachment model for this first version.
+Typical examples:
 
-The file-mention workflow is also intentionally lightweight: `@path/to/file` tells Heddle that the file is important context and should be inspected before answering, but it does not automatically inline the file contents into the prompt.
+- architecture notes that future sessions should reuse
+- recurring build, test, or environment quirks
+- important repo conventions and command patterns
+- durable findings from completed implementation work
 
-The planning workflow is also intentionally lightweight: Heddle does not force a heavyweight planner or a separate "plan mode," but it can automatically record and update a short plan when a task is substantial enough to benefit from visible progress tracking.
+The memory model is intentionally simple:
 
-The web-search workflow is provider-backed rather than crawler-backed: OpenAI models use OpenAI-hosted web search, and Anthropic models use Anthropic-hosted web search when available through the selected model/tool path.
+- memory is stored as readable markdown files in the project state directory
+- Heddle can list, read, search, and edit those notes
+- shell tools are still available when flexible retrieval or editing is needed
+- memory is meant for stable, reusable knowledge, not scratch notes or speculative plans
+
+This is one of Heddle's more distinctive host-side capabilities: the aim is not just to answer the current prompt, but to let the runtime accumulate project understanding from your operations and become more useful across sessions.
 
 ## Semantic Drift
 
@@ -307,200 +403,6 @@ const runs = await listHeartbeatRunViews(store, { taskId: 'repo-gardener', limit
 ```
 
 Those views are intentionally smaller than full checkpoints or traces. They expose stable operator-facing fields such as task ID, status, progress, decision, outcome, resumability, usage, and latest summary.
-
-## Knowledge Persistence
-
-Heddle can maintain durable workspace knowledge under `.heddle/memory/`.
-
-The goal is to help Heddle learn from real project work over time instead of rediscovering the same stable facts every session.
-
-Typical examples:
-
-- architecture notes that future sessions should reuse
-- recurring build, test, or environment quirks
-- important repo conventions and command patterns
-- durable findings from completed implementation work
-
-The memory model is intentionally simple:
-
-- memory is stored as readable markdown files in the project state directory
-- Heddle can list, read, search, and edit those notes
-- shell tools are still available when flexible retrieval or editing is needed
-- memory is meant for stable, reusable knowledge, not scratch notes or speculative plans
-
-This is one of Heddle's more distinctive host-side capabilities: the aim is not just to answer the current prompt, but to let the runtime accumulate project understanding from your operations and become more useful across sessions.
-
-## What Heddle Does
-
-Heddle runs an agent loop against your workspace:
-
-```text
-goal
-  -> send transcript + tool definitions to the model
-  -> model answers or requests tool calls
-  -> execute tools in the workspace
-  -> append results to the transcript
-  -> continue until done / max steps / error
-```
-
-Current focus:
-
-- chat-first coding and repository workflows from the terminal
-- minimal runtime behavior instead of a large framework surface
-- traceability and operator control over hidden orchestration
-
-## Chat Workflow
-
-Start chat in the current repo:
-
-```bash
-heddle
-heddle chat
-heddle --cwd /path/to/project
-heddle chat --model gpt-5.4-mini --max-steps 20
-```
-
-Typical chat use cases:
-
-- ask Heddle to explain architecture, code paths, tests, or build setup
-- iterate on a fix over multiple prompts instead of fitting everything into one request
-- inspect files, search the repo, and edit code inside one persistent session
-- keep a long coding conversation usable through saved sessions, `/continue`, automatic history compaction, and manual `/compact`
-- let the agent create and update a short working plan for a multi-step implementation
-- search official docs or other current external references with provider-backed `web_search`
-- mention important repo files with `@path/to/file` so the agent treats them as first-pass context
-- reference a local screenshot path and have the agent inspect it with `view_image`
-- run direct shell commands from chat with `!<command>`
-- pause and later resume earlier sessions
-
-Useful chat commands:
-
-- `/help`: show local chat commands
-- `/continue`: resume the current session from its last interrupted or prior run
-- `/model`: show the active model
-- `/model list`: show the built-in shortlist
-- `/model set <query>`: open the interactive model picker
-- `/model <name>`: switch models directly
-- `/session list`: list recent saved sessions
-- `/session choose <query>`: choose a recent session interactively
-- `/session new [name]`: create a new session
-- `/session switch <id>`: switch to another session
-- `/session continue <id>`: switch and immediately continue that session
-- `/session rename <name>`: rename the current session
-- `/session close <id>`: remove a saved session
-- `/clear`: clear the current transcript
-- `/compact`: compact older session history immediately
-- `/drift`: show CyberLoop semantic drift detection status
-- `/drift on`: re-enable observe-only CyberLoop kinematics telemetry for chat runs
-- `/drift off`: disable CyberLoop semantic drift detection
-- `!<command>`: run a shell command directly in chat
-
-Direct shell in chat:
-
-```bash
-!pwd
-!git status
-!yarn test
-```
-
-Read-oriented commands stay in inspect mode when possible. Workspace-changing or unclassified commands fall back to approval-gated execution.
-
-Chat state is stored under `.heddle/`, including saved sessions, traces, approvals, and memory notes. The footer context indicator is an estimate of total request input against the active model's context window, not only the raw chat history length.
-
-For local development against the sibling CyberLoop repo, run chat with the middleware module path:
-
-```bash
-HEDDLE_CYBERLOOP_ADVANCED_MODULE=/Users/roackb2/Studio/projects/CyberLoop/src/advanced/kinematics-middleware.ts yarn chat:dev:openai
-```
-
-Drift telemetry is enabled by default for new sessions. For installed usage, install the optional `cyberloop` peer dependency in the same environment as Heddle so it can dynamically import `cyberloop/advanced`.
-
-## CLI Usage
-
-Supported commands:
-
-- `heddle` or `heddle chat`: start interactive chat mode
-- `heddle ask "<goal>"`: run a single prompt and exit
-- `heddle heartbeat start [--every 30m] [--task "<durable task>"]`: create or enable the default heartbeat task and run the foreground scheduler
-- `heddle heartbeat task add --id <id> --task "<durable task>" [--every 15m]`: create or update a scheduled heartbeat task
-- `heddle heartbeat task list`: list local heartbeat tasks
-- `heddle heartbeat task show <id>`: show a task's schedule, last decision, and last run summary
-- `heddle heartbeat task enable <id>` / `heddle heartbeat task disable <id>`: toggle a heartbeat task
-- `heddle heartbeat run --once`: run due heartbeat tasks once
-- `heddle heartbeat run [--poll 60s]`: run the foreground heartbeat scheduler until interrupted; heartbeat runs print scheduler, agent, tool, decision, and checkpoint progress events
-- `heddle heartbeat runs list [--task <id>] [--limit 10]`: list saved heartbeat run records
-- `heddle heartbeat runs show <run-id|latest> [--task <id>]`: show the final agent output for a saved heartbeat run
-- `heddle init`: create a `heddle.config.json` template in the current project
-
-Common flags:
-
-- `--cwd <path>`: run against another workspace root
-- `--model <name>`: choose the active model
-- `--max-steps <n>`: limit the agent loop length
-
-## Supported Providers And Models
-
-Heddle currently has working adapters for:
-
-- OpenAI
-- Anthropic
-
-Environment variables:
-
-- `OPENAI_API_KEY` for OpenAI models
-- `ANTHROPIC_API_KEY` for Anthropic models
-- dev fallback env vars are also accepted: `PERSONAL_OPENAI_API_KEY` and `PERSONAL_ANTHROPIC_API_KEY`
-
-Default models:
-
-- OpenAI: `gpt-5.1-codex`
-- Anthropic: `claude-sonnet-4-6`
-
-Built-in model shortlist exposed by the CLI UI:
-
-- OpenAI: `gpt-5.4`, `gpt-5.4-pro`, `gpt-5.4-mini`, `gpt-5.4-nano`
-- OpenAI: `gpt-5`, `gpt-5-pro`, `gpt-5-mini`, `gpt-5-nano`
-- OpenAI: `gpt-5.2`, `gpt-5.2-pro`, `gpt-5.1`
-- OpenAI: `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`
-- OpenAI: `o3-pro`, `o3`, `o3-mini`, `o4-mini`
-- OpenAI coding models: `gpt-5.1-codex`, `gpt-5.1-codex-max`, `gpt-5.1-codex-mini`
-- Anthropic: `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`
-- Anthropic: `claude-opus-4-1`, `claude-opus-4-0`, `claude-sonnet-4-0`
-- Anthropic: `claude-3-7-sonnet-latest`
-- Anthropic: `claude-3-5-sonnet-latest`, `claude-3-5-haiku-latest`
-
-Notes:
-
-- model selection is inferred from the model name prefix
-- Gemini model names are recognized by provider inference, but a Google adapter is not wired yet
-- you can pass another model name with `--model`, but it only works if the corresponding provider adapter supports it
-
-## Project Config
-
-You can store project defaults in `heddle.config.json`:
-
-```json
-{
-  "model": "gpt-5.1-codex",
-  "maxSteps": 40,
-  "stateDir": ".heddle",
-  "directShellApproval": "never",
-  "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"],
-  "agentContextPaths": ["AGENTS.md"]
-}
-```
-
-Precedence order:
-
-- CLI flags override `heddle.config.json`
-- `heddle.config.json` overrides environment-driven defaults
-
-Field notes:
-
-- `stateDir`: where traces, logs, approvals, and chat state are stored
-- `directShellApproval`: whether explicit `!command` input in chat still asks for approval
-- `searchIgnoreDirs`: directories excluded from `search_files`
-- `agentContextPaths`: project instruction files injected into the system prompt
 
 ## Programmatic Use
 
@@ -673,6 +575,119 @@ yarn example:cyberloop-observer
 ```
 
 The public API lives in [src/index.ts](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/src/index.ts).
+
+## Capability Details
+
+Heddle currently supports:
+
+- repository inspection with `list_files`, `read_file`, and `search_files`
+- code and doc changes with `edit_file`
+- provider-backed hosted web search through `web_search`
+- local screenshot and image inspection through `view_image`
+- native browser control plane through `heddle daemon`
+- inline `@file` mentions for file-priority context without pasting file contents into the prompt
+- shell execution with inspect vs approval-gated mutate behavior
+- multi-turn chat sessions with saved history under `.heddle/`
+- session management with create, switch, continue, rename, and close flows
+- automatic conversation compaction so longer chats preserve context instead of growing unbounded
+- manual `/compact` to shrink the current session transcript on demand
+- persistent workspace memory notes under `.heddle/memory/`
+- serializable run checkpoints for programmatic hosts and later continuation
+- short working-plan support through `update_plan` for substantial multi-step tasks
+- remembered per-project approvals for repeated commands and edits
+- interrupt and resume support for longer-running coding workflows
+- request-size aware context tracking in chat so the footer reflects model input usage, not only raw history size
+
+The image workflow is intentionally simple for now: users can reference a local image path in chat, and the agent can decide whether to inspect it with `view_image`. Heddle does not require a full multimodal attachment model for this first version.
+
+The file-mention workflow is also intentionally lightweight: `@path/to/file` tells Heddle that the file is important context and should be inspected before answering, but it does not automatically inline the file contents into the prompt.
+
+The planning workflow is also intentionally lightweight: Heddle does not force a heavyweight planner or a separate "plan mode," but it can automatically record and update a short plan when a task is substantial enough to benefit from visible progress tracking.
+
+The web-search workflow is provider-backed rather than crawler-backed: OpenAI models use OpenAI-hosted web search, and Anthropic models use Anthropic-hosted web search when available through the selected model/tool path.
+
+## What Heddle Does
+
+Heddle runs an agent loop against your workspace:
+
+```text
+goal
+  -> send transcript + tool definitions to the model
+  -> model answers or requests tool calls
+  -> execute tools in the workspace
+  -> append results to the transcript
+  -> continue until done / max steps / error
+```
+
+Current focus:
+
+- chat-first coding and repository workflows from the terminal
+- minimal runtime behavior instead of a large framework surface
+- traceability and operator control over hidden orchestration
+
+## Supported Providers And Models
+
+Heddle currently has working adapters for:
+
+- OpenAI
+- Anthropic
+
+Environment variables:
+
+- `OPENAI_API_KEY` for OpenAI models
+- `ANTHROPIC_API_KEY` for Anthropic models
+- dev fallback env vars are also accepted: `PERSONAL_OPENAI_API_KEY` and `PERSONAL_ANTHROPIC_API_KEY`
+
+Default models:
+
+- OpenAI: `gpt-5.1-codex`
+- Anthropic: `claude-sonnet-4-6`
+
+Built-in model shortlist exposed by the CLI UI:
+
+- OpenAI: `gpt-5.4`, `gpt-5.4-pro`, `gpt-5.4-mini`, `gpt-5.4-nano`
+- OpenAI: `gpt-5`, `gpt-5-pro`, `gpt-5-mini`, `gpt-5-nano`
+- OpenAI: `gpt-5.2`, `gpt-5.2-pro`, `gpt-5.1`
+- OpenAI: `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`
+- OpenAI: `o3-pro`, `o3`, `o3-mini`, `o4-mini`
+- OpenAI coding models: `gpt-5.1-codex`, `gpt-5.1-codex-max`, `gpt-5.1-codex-mini`
+- Anthropic: `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`
+- Anthropic: `claude-opus-4-1`, `claude-opus-4-0`, `claude-sonnet-4-0`
+- Anthropic: `claude-3-7-sonnet-latest`
+- Anthropic: `claude-3-5-sonnet-latest`, `claude-3-5-haiku-latest`
+
+Notes:
+
+- model selection is inferred from the model name prefix
+- Gemini model names are recognized by provider inference, but a Google adapter is not wired yet
+- you can pass another model name with `--model`, but it only works if the corresponding provider adapter supports it
+
+## Project Config
+
+You can store project defaults in `heddle.config.json`:
+
+```json
+{
+  "model": "gpt-5.1-codex",
+  "maxSteps": 40,
+  "stateDir": ".heddle",
+  "directShellApproval": "never",
+  "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"],
+  "agentContextPaths": ["AGENTS.md"]
+}
+```
+
+Precedence order:
+
+- CLI flags override `heddle.config.json`
+- `heddle.config.json` overrides environment-driven defaults
+
+Field notes:
+
+- `stateDir`: where traces, logs, approvals, and chat state are stored
+- `directShellApproval`: whether explicit `!command` input in chat still asks for approval
+- `searchIgnoreDirs`: directories excluded from `search_files`
+- `agentContextPaths`: project instruction files injected into the system prompt
 
 ## Design Direction
 
