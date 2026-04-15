@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "outDir": "../../dist/web-types",
+    "rootDir": "../..",
+    "types": ["vite/client"]
+  },
+  "include": ["**/*.ts", "**/*.tsx", "../server/**/*.ts", "../runtime/heartbeat-views.ts", "../llm/types.ts"],
+  "exclude": ["../../node_modules", "../../dist"]
+}

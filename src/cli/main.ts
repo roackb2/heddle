@@ -6,6 +6,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { startChatCli } from './chat/index.js';
 import { runAskCli } from './ask.js';
 import { runHeartbeatCli } from './heartbeat.js';
+import { runDaemonCli } from './daemon.js';
 
 type CliFlags = {
   cwd?: string;
@@ -55,6 +56,11 @@ async function main() {
 
   if (parsed.command === 'heartbeat') {
     await runHeartbeatCli(parsed.rest, resolved);
+    return;
+  }
+
+  if (parsed.command === 'daemon') {
+    await runDaemonCli(parsed.rest, resolved);
     return;
   }
 
@@ -167,6 +173,7 @@ function printHelp() {
       '  heddle heartbeat run [--poll 60s]',
       '  heddle heartbeat runs list [--task <id>] [--limit 10]',
       '  heddle heartbeat runs show <run-id|latest> [--task <id>]',
+      '  heddle daemon [--host 127.0.0.1] [--port 8765]',
       '  heddle init [--cwd <path>]',
       '',
       'Project config:',

@@ -24,6 +24,7 @@ If you are interested in the underlying methodology, Heddle's drift telemetry is
 - provider-agnostic model support across OpenAI and Anthropic
 - embeddable `runAgentLoop` API for building non-CLI agent hosts
 - `runAgentHeartbeat` for scheduler-driven autonomous wake cycles without chat by default
+- native React/Vite control plane served by `heddle daemon` for local browser-based oversight
 - serializable checkpoints for resume, background execution, and hosted workers
 - host-facing heartbeat task/run views plus websocket-friendly status/progress/response adapters
 - provider-backed hosted web search through `web_search`
@@ -96,6 +97,55 @@ Heddle uses the current directory as the workspace root unless you pass `--cwd`.
 
 The default workflow is interactive chat, not one-shot prompts. You keep a session open, inspect the repo, switch models, run direct shell commands when needed, and continue earlier sessions later.
 
+## Control Plane
+
+Heddle includes an early local browser control plane for users who want a native UI instead of only terminal chat or third-party messaging apps.
+
+This is still WIP. The current version is useful for read-only oversight, but it is not yet a full replacement for the TUI.
+
+Current stack:
+
+- `src/server`: Express-hosted tRPC server
+- `src/web`: React/Vite web client
+- `src/server/features/control-plane`: control-plane-specific server feature logic
+- pino logs written locally for debugging
+
+Start the daemon from a workspace:
+
+```bash
+heddle daemon
+```
+
+By default, the daemon binds to `127.0.0.1:8765` and serves the built web app plus the tRPC API. The first implementation surfaces:
+
+- workspace and `.heddle/` state location
+- saved chat session inventory
+- heartbeat task status
+- recent heartbeat run summaries and usage
+
+You can override host and port:
+
+```bash
+heddle daemon --host 127.0.0.1 --port 8765
+```
+
+For local development, run the server and client separately:
+
+```bash
+yarn server:dev
+yarn client:dev
+```
+
+`yarn server:dev` starts the tRPC server at `127.0.0.1:8765`. `yarn client:dev` starts the Vite client and proxies `/trpc` to the server.
+
+The server writes pino logs to `.heddle/logs/server.log` by default. Override the path with:
+
+```bash
+HEDDLE_SERVER_LOG_FILE=/path/to/server.log yarn server:dev
+```
+
+This control plane is intentionally read-only at first. The next milestones are session detail views, chat continuation from the browser, heartbeat task actions, and live run updates.
+
 ## Core Capabilities
 
 Heddle currently supports:
@@ -104,6 +154,7 @@ Heddle currently supports:
 - code and doc changes with `edit_file`
 - provider-backed hosted web search through `web_search`
 - local screenshot and image inspection through `view_image`
+- native browser control plane through `heddle daemon`
 - inline `@file` mentions for file-priority context without pasting file contents into the prompt
 - shell execution with inspect vs approval-gated mutate behavior
 - multi-turn chat sessions with saved history under `.heddle/`
