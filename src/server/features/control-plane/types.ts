@@ -21,6 +21,56 @@ export type ChatSessionView = {
   };
 };
 
+export type ChatSessionMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  isStreaming?: boolean;
+  isPending?: boolean;
+};
+
+export type ChatTurnView = {
+  id: string;
+  prompt: string;
+  outcome: string;
+  summary: string;
+  steps: number;
+  traceFile: string;
+  events: string[];
+};
+
+export type CommandEvidenceView = {
+  tool: string;
+  command: string;
+  exitCode?: number;
+  stdout?: string;
+  stderr?: string;
+};
+
+export type ApprovalEventView = {
+  tool: string;
+  command?: string;
+  approved: boolean;
+  reason?: string;
+  timestamp?: string;
+};
+
+export type ChatTurnReview = {
+  traceFile: string;
+  diffExcerpt?: string;
+  finalSummary?: string;
+  reviewCommands: CommandEvidenceView[];
+  verificationCommands: CommandEvidenceView[];
+  mutationCommands: CommandEvidenceView[];
+  approvals: ApprovalEventView[];
+};
+
+export type ChatSessionDetail = ChatSessionView & {
+  messages: ChatSessionMessage[];
+  turns: ChatTurnView[];
+  lastContinuePrompt?: string;
+};
+
 export type ControlPlaneState = {
   workspaceRoot: string;
   stateRoot: string;

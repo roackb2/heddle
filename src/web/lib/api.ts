@@ -12,7 +12,17 @@ export const trpc = createTRPCProxyClient<AppRouter>({
 
 export type RouterOutputs = inferRouterOutputs<AppRouter>;
 export type ControlPlaneState = RouterOutputs['controlPlane']['state'];
+export type ChatSessionDetail = RouterOutputs['controlPlane']['session'];
+export type ChatTurnReview = RouterOutputs['controlPlane']['sessionTurnReview'];
 
 export async function fetchControlPlaneState(): Promise<ControlPlaneState> {
   return await trpc.controlPlane.state.query();
+}
+
+export async function fetchChatSessionDetail(sessionId: string): Promise<ChatSessionDetail> {
+  return await trpc.controlPlane.session.query({ id: sessionId });
+}
+
+export async function fetchChatTurnReview(sessionId: string, turnId: string): Promise<ChatTurnReview> {
+  return await trpc.controlPlane.sessionTurnReview.query({ sessionId, turnId });
 }

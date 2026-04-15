@@ -85,6 +85,8 @@ Current progress:
 - approval prompts now surface scope/capability/risk metadata, and exact per-project approvals apply immediately after being remembered
 - project approval memory is now backward-compatible with older saved rules, supports low-risk workspace verification command families such as `yarn test ...`, and can remember `edit_file` at the project level
 - the chat view is now more stable for multi-turn use: conversation stays the anchor, active run state is rendered inline with that flow, and basic response formatting now makes lists/code easier to read
+- the local control plane now has a workstation-style browser shell instead of only a read-only dashboard: sessions render as sidebar + conversation + review inspector, heartbeat renders as task list + detail + run history, and the web client is modularized under `src/web/features/control-plane`
+- the control-plane server now exposes session detail and trace-derived turn review procedures over tRPC so the browser can inspect full saved session messages, turn summaries, and review evidence without loading only list projections
 
 Remaining priority:
 
@@ -93,6 +95,7 @@ Remaining priority:
 - begin evolving shell policy from a narrow command-prefix allowlist toward a real execution-policy model based on risk, scope, approval, and auditability
 - reduce reliance on shell-syntax blocking as a safety mechanism; serious workflows will need broader command expressiveness than the current heredoc/redirect restrictions allow
 - strengthen host-side follow-through so when the agent discovers a safe path for a bounded change, it executes it instead of stopping at explanation
+- wire the browser workstation shell into real `send message` and `continue` session mutations so the web control plane stops being read-only for chat sessions
 
 Current concrete next step:
 
