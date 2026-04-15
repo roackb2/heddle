@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { ChatSessionDetail, ChatTurnReview, ControlPlaneState } from '../../../lib/api';
 import { formatDate, formatNumber, toneFor, className } from '../utils';
 import { CodeBlock, EmptyState, Pill, SideSection, WorkspaceSectionHeader } from './common';
@@ -40,6 +41,23 @@ export function SessionsWorkspace({
   inspectorTab,
   onInspectorTabChange,
 }: SessionsWorkspaceProps) {
+  const conversationScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = conversationScrollRef.current;
+    if (!element) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      element.scrollTop = element.scrollHeight;
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [selectedSessionId, sessionDetail?.messages.length, sessionDetailLoading, sessionDetailError]);
+
   return (
     <section className="workspace-shell">
       <aside className="workspace-sidebar">
@@ -74,14 +92,17 @@ export function SessionsWorkspace({
           ) : undefined}
         />
 
-        <div className="conversation-scroll">
-          {sessionDetailLoading ?
-            <EmptyState title="Loading session" body="Fetching full conversation state from saved Heddle session storage." />
-          : sessionDetailError ?
-            <EmptyState title="Session load failed" body={sessionDetailError} />
-          : sessionDetail && sessionDetail.messages.length ?
-            sessionDetail.messages.map((message) => <ConversationMessage key={message.id} message={message} />)
-          : <EmptyState title="No conversation available" body="This session does not have any saved chat messages yet." />}
+        <div className="conversation-scroll" ref={conversationScrollRef}>
+          <div className="conversation-stack">
+            <div className="conversation-spacer" />
+            {sessionDetailLoading ?
+              <EmptyState title="Loading session" body="Fetching full conversation state from saved Heddle session storage." />
+            : sessionDetailError ?
+              <EmptyState title="Session load failed" body={sessionDetailError} />
+            : sessionDetail && sessionDetail.messages.length ?
+              sessionDetail.messages.map((message) => <ConversationMessage key={message.id} message={message} />)
+            : <EmptyState title="No conversation available" body="This session does not have any saved chat messages yet." />}
+          </div>
         </div>
 
         <div className="composer-shell">

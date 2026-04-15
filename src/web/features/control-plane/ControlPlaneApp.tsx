@@ -16,23 +16,25 @@ export function ControlPlaneApp() {
   const { state, error } = useControlPlaneState();
   const sessionWorkspace = useSessionWorkspace(state?.sessions);
   const heartbeatWorkspace = useHeartbeatWorkspace(state?.heartbeat.tasks, state?.heartbeat.runs);
+  const sectionTabs = (
+    <>
+      <TabButton active={tab === 'overview'} onClick={() => setTab('overview')}>Overview</TabButton>
+      <TabButton active={tab === 'sessions'} onClick={() => setTab('sessions')}>Sessions</TabButton>
+      <TabButton active={tab === 'heartbeat'} onClick={() => setTab('heartbeat')}>Tasks</TabButton>
+    </>
+  );
 
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <div>
+      <header className="toolbar">
+        <nav className="tabs toolbar-tabs" aria-label="Control plane sections">
+          {sectionTabs}
+        </nav>
+        <div className="toolbar-status">
           <p className="topbar-eyebrow">Heddle Control Plane</p>
-          <h1>Local agent workstation</h1>
-          <p className="topbar-copy">Sessions should feel like a coding workstation, not a dashboard. Tasks should feel like durable agents with real run history.</p>
+          <StatusBadge error={error} state={state} />
         </div>
-        <StatusBadge error={error} state={state} />
       </header>
-
-      <nav className="tabs" aria-label="Control plane sections">
-        <TabButton active={tab === 'overview'} onClick={() => setTab('overview')}>Overview</TabButton>
-        <TabButton active={tab === 'sessions'} onClick={() => setTab('sessions')}>Sessions</TabButton>
-        <TabButton active={tab === 'heartbeat'} onClick={() => setTab('heartbeat')}>Tasks</TabButton>
-      </nav>
 
       {!state ?
         <Panel title="Loading state">

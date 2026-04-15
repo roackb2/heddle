@@ -6,6 +6,9 @@ import { SessionListButton, RunListButton } from './lists';
 export function OverviewView({ state }: { state: ControlPlaneState }) {
   return (
     <section className="overview-grid">
+      <Panel title="Local agent workstation" wide>
+        <p className="topbar-copy">Sessions should feel like a coding workstation, not a dashboard. Tasks should feel like durable agents with real run history.</p>
+      </Panel>
       <Panel title="Workspace">
         <div className="kv-list">
           <div>
