@@ -14,8 +14,8 @@
 
 import { join } from 'node:path';
 import { inferProviderFromModel } from '../src/llm/providers.js';
-import { resolveProviderApiKey } from '../src/runtime/api-keys.js';
-import { createFileHeartbeatCheckpointStore, runStoredHeartbeat } from '../src/runtime/heartbeat-store.js';
+import { resolveProviderApiKey } from '../src/core/runtime/api-keys.js';
+import { createFileHeartbeatCheckpointStore, runStoredHeartbeat } from '../src/core/runtime/heartbeat-store.js';
 
 const DEFAULT_EXAMPLE_MODEL = 'gpt-5.1-codex-mini';
 const CHECKPOINT_PATH = join(process.cwd(), '.heddle', 'examples', 'heartbeat-demo-checkpoint.json');

@@ -1,5 +1,5 @@
 import type { ChatMessage, ToolCall, ToolDefinition } from '../../index.js';
-import type { EditFilePreview } from '../../tools/edit-file.js';
+import type { EditFilePreview } from '../tools/edit-file.js';
 
 export type TurnSummary = {
   id: string;

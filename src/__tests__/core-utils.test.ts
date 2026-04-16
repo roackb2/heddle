@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createToolRegistry } from '../tools/registry.js';
+import { createToolRegistry } from '../core/tools/registry.js';
 import { createBudget } from '../utils/budget.js';
 import { createTraceRecorder } from '../trace/recorder.js';
 import { isRepoReviewCommand } from '../run-agent/mutation-tracking.js';

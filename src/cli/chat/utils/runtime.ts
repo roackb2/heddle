@@ -2,7 +2,7 @@ import { join, resolve } from 'node:path';
 import { DEFAULT_OPENAI_MODEL, inferProviderFromModel } from '../../../index.js';
 import { saveTrace } from '../../../core/chat/trace.js';
 import type { LlmProvider } from '../../../index.js';
-import { resolveApiKeyForModel as resolveRuntimeApiKeyForModel, resolveProviderApiKey as resolveRuntimeProviderApiKey } from '../../../runtime/api-keys.js';
+import { resolveApiKeyForModel as resolveRuntimeApiKeyForModel, resolveProviderApiKey as resolveRuntimeProviderApiKey } from '../../../core/runtime/api-keys.js';
 import { parsePositiveInt } from './format.js';
 
 export type ChatCliOptions = {

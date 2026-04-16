@@ -1,11 +1,11 @@
 import { resolve } from 'node:path';
 import type { Logger } from 'pino';
-import { DEFAULT_OPENAI_MODEL } from '../config.js';
-import { inferProviderFromModel } from '../llm/providers.js';
-import type { ChatMessage, LlmAdapter, LlmProvider } from '../llm/types.js';
-import { runAgent } from '../run-agent.js';
-import type { RunAgentOptions } from '../run-agent.js';
-import type { RunResult, ToolCall, ToolDefinition, TraceEvent } from '../types.js';
+import { DEFAULT_OPENAI_MODEL } from '../../config.js';
+import { inferProviderFromModel } from '../../llm/providers.js';
+import type { ChatMessage, LlmAdapter, LlmProvider } from '../../llm/types.js';
+import { runAgent } from '../../run-agent.js';
+import type { RunAgentOptions } from '../../run-agent.js';
+import type { RunResult, ToolCall, ToolDefinition, TraceEvent } from '../../types.js';
 import { createLogger } from '../utils/logger.js';
 import { resolveApiKeyForModel } from './api-keys.js';
 import { createFinishedAgentLoopState, generateRunId, getHistoryFromAgentLoopCheckpoint, getHistoryFromAgentLoopState } from './events.js';
@@ -204,7 +204,7 @@ function getResumeMetadata(
 }
 
 async function createLoopLlmAdapter(options: { model: string; apiKey?: string }): Promise<LlmAdapter> {
-  const { createLlmAdapter } = await import('../llm/factory.js');
+  const { createLlmAdapter } = await import('../../llm/factory.js');
   return createLlmAdapter(options);
 }
 

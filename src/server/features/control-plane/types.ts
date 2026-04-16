@@ -1,4 +1,4 @@
-import type { HeartbeatRunView, HeartbeatTaskView } from '../../../runtime/heartbeat-views.js';
+import type { HeartbeatRunView, HeartbeatTaskView } from '../../../core/runtime/heartbeat-views.js';
 
 export type ChatSessionView = {
   id: string;

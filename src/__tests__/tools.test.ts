@@ -2,27 +2,27 @@ import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
-import { listFilesTool } from '../tools/list-files.js';
-import { readFileTool } from '../tools/read-file.js';
-import { editFileTool, previewEditFileInput } from '../tools/edit-file.js';
-import { reportStateTool } from '../tools/report-state.js';
-import { updatePlanTool } from '../tools/update-plan.js';
+import { listFilesTool } from '../core/tools/list-files.js';
+import { readFileTool } from '../core/tools/read-file.js';
+import { editFileTool, previewEditFileInput } from '../core/tools/edit-file.js';
+import { reportStateTool } from '../core/tools/report-state.js';
+import { updatePlanTool } from '../core/tools/update-plan.js';
 import {
   classifyShellCommandPolicy,
   DEFAULT_INSPECT_RULES,
   createRunShellInspectTool,
   createRunShellMutateTool,
   DEFAULT_MUTATE_RULES,
-} from '../tools/run-shell.js';
-import { createSearchFilesTool, searchFilesTool } from '../tools/search-files.js';
-import { webSearchTool } from '../tools/web-search.js';
-import { viewImageTool } from '../tools/view-image.js';
+} from '../core/tools/run-shell.js';
+import { createSearchFilesTool, searchFilesTool } from '../core/tools/search-files.js';
+import { webSearchTool } from '../core/tools/web-search.js';
+import { viewImageTool } from '../core/tools/view-image.js';
 import {
   createListMemoryNotesTool,
   createReadMemoryNoteTool,
   createSearchMemoryNotesTool,
   createEditMemoryNoteTool,
-} from '../tools/memory-notes.js';
+} from '../core/tools/memory-notes.js';
 
 describe('tool input validation', () => {
   it('rejects unexpected fields for list_files', async () => {

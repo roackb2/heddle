@@ -1,6 +1,6 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
-import type { ToolResult } from '../types.js';
+import type { ToolResult } from '../../types.js';
 
 export type ReplaceEditInput = {
   path: string;

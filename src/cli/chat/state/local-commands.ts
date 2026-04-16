@@ -1,7 +1,7 @@
 import type { ChatSession, LocalCommandResult } from './types.js';
 import { summarizeSession } from './storage.js';
 import { COMMON_BUILT_IN_MODELS, formatBuiltInModelGroups } from '../../../llm/openai-models.js';
-import { createFileHeartbeatTaskStore } from '../../../runtime/heartbeat-scheduler.js';
+import { createFileHeartbeatTaskStore } from '../../../core/runtime/heartbeat-scheduler.js';
 import { join } from 'node:path';
 
 export type LocalCommandHint = {

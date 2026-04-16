@@ -10,10 +10,10 @@ import {
   runAgentLoop,
 } from '../../../index.js';
 import type { CyberLoopKinematicsObserver, CyberLoopObserverAnnotation } from '../../../index.js';
-import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../tools/run-shell.js';
-import { previewEditFileInput } from '../../../tools/edit-file.js';
-import type { EditFilePreview } from '../../../tools/edit-file.js';
-import type { PlanItem } from '../../../tools/update-plan.js';
+import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../core/tools/run-shell.js';
+import { previewEditFileInput } from '../../../core/tools/edit-file.js';
+import type { EditFilePreview } from '../../../core/tools/edit-file.js';
+import type { PlanItem } from '../../../core/tools/update-plan.js';
 import {
   appendDirectShellHistory,
   buildConversationMessages,

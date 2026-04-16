@@ -1,10 +1,10 @@
 import type { ChatMessage, ToolCall, TraceEvent, ToolResult } from '../../../index.js';
-import type { EditFilePreview } from '../../../tools/edit-file.js';
+import type { EditFilePreview } from '../../../core/tools/edit-file.js';
 import {
   classifyShellCommandPolicy,
   DEFAULT_MUTATE_RULES,
   type RunShellPolicyDecision,
-} from '../../../tools/run-shell.js';
+} from '../../../core/tools/run-shell.js';
 import { truncate } from '../../../core/chat/format.js';
 export {
   buildConversationMessages,

@@ -5,7 +5,7 @@ import type {
   HeartbeatTaskStore,
 } from './heartbeat-scheduler.js';
 import type { HeartbeatDecision } from './heartbeat.js';
-import type { LlmUsage } from '../llm/types.js';
+import type { LlmUsage } from '../../llm/types.js';
 
 export type HeartbeatTaskView = {
   taskId: string;

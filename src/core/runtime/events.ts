@@ -1,5 +1,5 @@
-import type { ChatMessage, LlmProvider, LlmUsage } from '../llm/types.js';
-import type { RunResult, StopReason, TraceEvent } from '../types.js';
+import type { ChatMessage, LlmProvider, LlmUsage } from '../../llm/types.js';
+import type { RunResult, StopReason, TraceEvent } from '../../types.js';
 
 export type AgentLoopStatus = 'finished';
 

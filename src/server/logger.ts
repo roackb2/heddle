@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { createLogger } from '../utils/logger.js';
+import { createLogger } from '../core/utils/logger.js';
 
 export function createServerLogger(options: {
   stateRoot: string;

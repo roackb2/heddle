@@ -14,13 +14,13 @@
 
 import { join } from 'node:path';
 import { inferProviderFromModel } from '../src/llm/providers.js';
-import { resolveProviderApiKey } from '../src/runtime/api-keys.js';
+import { resolveProviderApiKey } from '../src/core/runtime/api-keys.js';
 import {
   createFileHeartbeatTaskStore,
   runDueHeartbeatTasks,
   type HeartbeatSchedulerEvent,
   type HeartbeatTask,
-} from '../src/runtime/heartbeat-scheduler.js';
+} from '../src/core/runtime/heartbeat-scheduler.js';
 
 const DEFAULT_EXAMPLE_MODEL = 'gpt-5.1-codex-mini';
 const STORE_DIR = join(process.cwd(), '.heddle', 'examples', 'heartbeat-scheduler');

@@ -3,7 +3,7 @@
 // Record current rationale, uncertainty, or missing needs in a structured way.
 // ---------------------------------------------------------------------------
 
-import type { ToolDefinition, ToolResult } from '../types.js';
+import type { ToolDefinition, ToolResult } from '../../types.js';
 
 type ReportStateInput = {
   rationale: string;

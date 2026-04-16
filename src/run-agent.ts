@@ -5,12 +5,12 @@
 
 import type { RunResult, ToolDefinition, StopReason, ToolCall, ToolResult, TraceEvent } from './types.js';
 import type { LlmAdapter, LlmResponse, LlmUsage, ChatMessage, LlmStreamEvent } from './llm/types.js';
-import { createToolRegistry } from './tools/registry.js';
-import type { ToolRegistry } from './tools/registry.js';
-import { createTraceRecorder } from './trace/recorder.js';
-import { createBudget } from './utils/budget.js';
+import { createToolRegistry } from './core/tools/registry.js';
+import type { ToolRegistry } from './core/tools/registry.js';
+import { createTraceRecorder } from './core/trace/recorder.js';
+import { createBudget } from './core/utils/budget.js';
 import { buildSystemPrompt } from './prompts/system-prompt.js';
-import { logger as defaultLogger } from './utils/logger.js';
+import { logger as defaultLogger } from './core/utils/logger.js';
 import type { Logger } from 'pino';
 
 import { sanitizeHistory } from './run-agent/history.js';
@@ -25,7 +25,7 @@ import {
   buildStructuredChangeSummaryRequirement,
 } from './run-agent/post-mutation.js';
 import { maybeDenyToolCall, executeToolCallWithFallback } from './run-agent/tool-dispatch.js';
-import type { PlanItem } from './tools/update-plan.js';
+import type { PlanItem } from './core/tools/update-plan.js';
 
 const PLAN_ITEM_STATUSES = new Set<PlanItem['status']>(['pending', 'in_progress', 'completed']);
 

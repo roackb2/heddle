@@ -2,7 +2,7 @@
 // Trace Formatter — human-readable console output
 // ---------------------------------------------------------------------------
 
-import type { TraceEvent } from '../types.js';
+import type { TraceEvent } from '../../types.js';
 
 const COLORS = {
   reset: '\x1b[0m',

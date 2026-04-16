@@ -1,4 +1,4 @@
-import type { AgentLoopEvent } from '../runtime/events.js';
+import type { AgentLoopEvent } from '../core/runtime/events.js';
 
 export type CyberLoopMetadataChannels = Record<string, unknown>;
 

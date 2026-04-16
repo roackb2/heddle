@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
-import { DEFAULT_SEARCH_EXCLUDED_DIRS } from '../../../tools/search-files.js';
+import { DEFAULT_SEARCH_EXCLUDED_DIRS } from '../../../core/tools/search-files.js';
 
 export type ResolvedFileMention = {
   token: string;

@@ -5,26 +5,26 @@
 // Core loop
 export { runAgent } from './run-agent.js';
 export type { RunAgentOptions } from './run-agent.js';
-export { runAgentLoop } from './runtime/agent-loop.js';
-export type { AgentLoopEvent, AgentLoopResult, RunAgentLoopOptions } from './runtime/agent-loop.js';
-export { runAgentHeartbeat } from './runtime/heartbeat.js';
-export type { AgentHeartbeatResult, HeartbeatDecision, RunAgentHeartbeatOptions } from './runtime/heartbeat.js';
+export { runAgentLoop } from './core/runtime/agent-loop.js';
+export type { AgentLoopEvent, AgentLoopResult, RunAgentLoopOptions } from './core/runtime/agent-loop.js';
+export { runAgentHeartbeat } from './core/runtime/heartbeat.js';
+export type { AgentHeartbeatResult, HeartbeatDecision, RunAgentHeartbeatOptions } from './core/runtime/heartbeat.js';
 export {
   createFileHeartbeatCheckpointStore,
   runStoredHeartbeat,
   suggestNextHeartbeatDelayMs,
-} from './runtime/heartbeat-store.js';
+} from './core/runtime/heartbeat-store.js';
 export type {
   FileHeartbeatCheckpointStoreOptions,
   HeartbeatCheckpointStore,
   RunStoredHeartbeatOptions,
   StoredHeartbeatResult,
-} from './runtime/heartbeat-store.js';
+} from './core/runtime/heartbeat-store.js';
 export {
   createFileHeartbeatTaskStore,
   runDueHeartbeatTasks,
   runHeartbeatScheduler,
-} from './runtime/heartbeat-scheduler.js';
+} from './core/runtime/heartbeat-scheduler.js';
 export type {
   FileHeartbeatTaskStoreOptions,
   HeartbeatSchedulerEvent,
@@ -36,24 +36,24 @@ export type {
   RunDueHeartbeatTasksOptions,
   RunDueHeartbeatTasksResult,
   RunHeartbeatSchedulerOptions,
-} from './runtime/heartbeat-scheduler.js';
+} from './core/runtime/heartbeat-scheduler.js';
 export {
   listHeartbeatRunViews,
   listHeartbeatTaskViews,
   loadHeartbeatRunView,
   projectHeartbeatRunView,
   projectHeartbeatTaskView,
-} from './runtime/heartbeat-views.js';
+} from './core/runtime/heartbeat-views.js';
 export type {
   HeartbeatRunView,
   HeartbeatTaskView,
-} from './runtime/heartbeat-views.js';
+} from './core/runtime/heartbeat-views.js';
 export {
   heartbeatSchedulerEventToLucidMessages,
   heartbeatRunViewToLucidMessages,
   heartbeatTaskStatusToLucidStatus,
   heartbeatTaskViewToLucidMessages,
-} from './runtime/heartbeat-lucid.js';
+} from './core/runtime/heartbeat-lucid.js';
 export type {
   LucidAgentMessage,
   LucidAgentProgressNotification,
@@ -61,17 +61,17 @@ export type {
   LucidAgentStatus,
   LucidAgentStatusNotification,
   LucidAdapterOptions,
-} from './runtime/heartbeat-lucid.js';
+} from './core/runtime/heartbeat-lucid.js';
 export {
   createAgentLoopCheckpoint,
   getHistoryFromAgentLoopCheckpoint,
   getHistoryFromAgentLoopState,
-} from './runtime/events.js';
-export type { AgentLoopCheckpoint, AgentLoopState, AgentLoopStatus } from './runtime/events.js';
-export { resolveApiKeyForModel, resolveProviderApiKey } from './runtime/api-keys.js';
-export type { ApiKeyRuntime } from './runtime/api-keys.js';
-export { createDefaultAgentTools } from './runtime/default-tools.js';
-export type { DefaultAgentToolsOptions } from './runtime/default-tools.js';
+} from './core/runtime/events.js';
+export type { AgentLoopCheckpoint, AgentLoopState, AgentLoopStatus } from './core/runtime/events.js';
+export { resolveApiKeyForModel, resolveProviderApiKey } from './core/runtime/api-keys.js';
+export type { ApiKeyRuntime } from './core/runtime/api-keys.js';
+export { createDefaultAgentTools } from './core/runtime/default-tools.js';
+export type { DefaultAgentToolsOptions } from './core/runtime/default-tools.js';
 export { DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL } from './config.js';
 
 // Integrations
@@ -142,18 +142,18 @@ export {
 export type { BuiltInModelGroup } from './llm/openai-models.js';
 
 // Tools
-export { createToolRegistry } from './tools/registry.js';
-export type { ToolRegistry } from './tools/registry.js';
-export { executeTool } from './tools/execute-tool.js';
-export { listFilesTool } from './tools/list-files.js';
-export { readFileTool } from './tools/read-file.js';
-export { editFileTool } from './tools/edit-file.js';
-export { searchFilesTool, createSearchFilesTool, DEFAULT_SEARCH_EXCLUDED_DIRS } from './tools/search-files.js';
-export type { SearchFilesOptions } from './tools/search-files.js';
-export { webSearchTool, createWebSearchTool } from './tools/web-search.js';
-export type { WebSearchToolOptions } from './tools/web-search.js';
-export { viewImageTool, createViewImageTool } from './tools/view-image.js';
-export type { ViewImageToolOptions } from './tools/view-image.js';
+export { createToolRegistry } from './core/tools/registry.js';
+export type { ToolRegistry } from './core/tools/registry.js';
+export { executeTool } from './core/tools/execute-tool.js';
+export { listFilesTool } from './core/tools/list-files.js';
+export { readFileTool } from './core/tools/read-file.js';
+export { editFileTool } from './core/tools/edit-file.js';
+export { searchFilesTool, createSearchFilesTool, DEFAULT_SEARCH_EXCLUDED_DIRS } from './core/tools/search-files.js';
+export type { SearchFilesOptions } from './core/tools/search-files.js';
+export { webSearchTool, createWebSearchTool } from './core/tools/web-search.js';
+export type { WebSearchToolOptions } from './core/tools/web-search.js';
+export { viewImageTool, createViewImageTool } from './core/tools/view-image.js';
+export type { ViewImageToolOptions } from './core/tools/view-image.js';
 export {
   listMemoryNotesTool,
   readMemoryNoteTool,
@@ -163,25 +163,25 @@ export {
   createReadMemoryNoteTool,
   createSearchMemoryNotesTool,
   createEditMemoryNoteTool,
-} from './tools/memory-notes.js';
-export type { MemoryNotesToolOptions } from './tools/memory-notes.js';
-export { reportStateTool } from './tools/report-state.js';
-export { updatePlanTool } from './tools/update-plan.js';
-export type { PlanItem, PlanItemStatus } from './tools/update-plan.js';
-export { createRunShellInspectTool, createRunShellMutateTool } from './tools/run-shell.js';
-export { createRunShellTool } from './tools/run-shell.js';
-export type { RunShellOptions } from './tools/run-shell.js';
+} from './core/tools/memory-notes.js';
+export type { MemoryNotesToolOptions } from './core/tools/memory-notes.js';
+export { reportStateTool } from './core/tools/report-state.js';
+export { updatePlanTool } from './core/tools/update-plan.js';
+export type { PlanItem, PlanItemStatus } from './core/tools/update-plan.js';
+export { createRunShellInspectTool, createRunShellMutateTool } from './core/tools/run-shell.js';
+export { createRunShellTool } from './core/tools/run-shell.js';
+export type { RunShellOptions } from './core/tools/run-shell.js';
 
 // Trace
-export { createTraceRecorder } from './trace/recorder.js';
-export type { TraceRecorder } from './trace/recorder.js';
-export { formatTraceForConsole } from './trace/format.js';
+export { createTraceRecorder } from './core/trace/recorder.js';
+export type { TraceRecorder } from './core/trace/recorder.js';
+export { formatTraceForConsole } from './core/trace/format.js';
 
 // Prompts
 export { buildSystemPrompt } from './prompts/system-prompt.js';
 
 // Utils
-export { createBudget } from './utils/budget.js';
-export type { Budget } from './utils/budget.js';
-export { HeddleError, ToolExecutionError, LlmError, BudgetExhaustedError } from './utils/errors.js';
-export { createLogger, logger } from './utils/logger.js';
+export { createBudget } from './core/utils/budget.js';
+export type { Budget } from './core/utils/budget.js';
+export { HeddleError, ToolExecutionError, LlmError, BudgetExhaustedError } from './core/utils/errors.js';
+export { createLogger, logger } from './core/utils/logger.js';

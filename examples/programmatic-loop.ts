@@ -14,11 +14,11 @@
 // For a no-key test of this API, see src/__tests__/agent-loop.test.ts.
 // ---------------------------------------------------------------------------
 
-import { runAgentLoop, type AgentLoopEvent } from '../src/runtime/agent-loop.js';
-import { createAgentLoopCheckpoint } from '../src/runtime/events.js';
+import { runAgentLoop, type AgentLoopEvent } from '../src/core/runtime/agent-loop.js';
+import { createAgentLoopCheckpoint } from '../src/core/runtime/events.js';
 import type { ToolDefinition } from '../src/types.js';
 import type { TraceEvent } from '../src/types.js';
-import { resolveProviderApiKey } from '../src/runtime/api-keys.js';
+import { resolveProviderApiKey } from '../src/core/runtime/api-keys.js';
 import { inferProviderFromModel } from '../src/llm/providers.js';
 
 const DEFAULT_EXAMPLE_MODEL = 'gpt-5.1-codex-mini';
