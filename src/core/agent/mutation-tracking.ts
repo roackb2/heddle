@@ -48,12 +48,15 @@ export function trackToolResult(
 
   if (effectiveCall.tool === 'run_shell_mutate' && command) {
     if (isWorkspaceChangeMutateCommand(command)) {
-      state.pendingVerification = true;
-      state.pendingChangeReview = true;
-      state.requiresStructuredChangeSummary = true;
-      state.needsImmediateReviewReminder = true;
-      state.needsImmediateVerificationReminder = true;
       state.executedMutationCommands.push(command);
+
+      if (!isRepoLifecycleMutationCommand(command)) {
+        state.pendingVerification = true;
+        state.pendingChangeReview = true;
+        state.requiresStructuredChangeSummary = true;
+        state.needsImmediateReviewReminder = true;
+        state.needsImmediateVerificationReminder = true;
+      }
     }
 
     if (isVerificationMutateCommand(command)) {
@@ -110,6 +113,14 @@ export function isVerificationMutateCommand(command: string): boolean {
     /^yarn vitest\b/.test(command) ||
     /^vitest\b/.test(command) ||
     /^tsc\b/.test(command)
+  );
+}
+
+function isRepoLifecycleMutationCommand(command: string): boolean {
+  return (
+    /^git add\b/.test(command) ||
+    /^git commit\b/.test(command) ||
+    /^git push\b/.test(command)
   );
 }
 

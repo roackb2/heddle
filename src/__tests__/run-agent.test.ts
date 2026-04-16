@@ -926,6 +926,86 @@ describe('runAgent', () => {
     );
   });
 
+  it('does not reopen post-mutation review and verification requirements for git add/commit/push after verification already ran', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    let stage = 0;
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        stage += 1;
+        seenMessages.push(structuredClone(messages));
+
+        if (stage === 1) {
+          return {
+            toolCalls: [{ id: 'call-1', tool: 'run_shell_mutate', input: { command: 'eslint --fix src/example.ts' } }],
+          };
+        }
+
+        if (stage === 2) {
+          return {
+            toolCalls: [{ id: 'call-2', tool: 'run_shell_inspect', input: { command: 'git diff --stat' } }],
+          };
+        }
+
+        if (stage === 3) {
+          return {
+            toolCalls: [{ id: 'call-3', tool: 'run_shell_mutate', input: { command: 'yarn test' } }],
+          };
+        }
+
+        if (stage === 4) {
+          return {
+            toolCalls: [{ id: 'call-4', tool: 'run_shell_mutate', input: { command: 'git add src/example.ts && git commit -m "fix example" && git push' } }],
+          };
+        }
+
+        return {
+          content:
+            'Applied the fix, verified it, and pushed it.\n- Changed: eslint --fix src/example.ts; git add src/example.ts && git commit -m "fix example" && git push\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output\n- Remaining uncertainty: none.',
+        };
+      },
+    };
+
+    const mutateTool: ToolDefinition = {
+      name: 'run_shell_mutate',
+      description: 'Runs a bounded workspace mutation or verification command',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const command = (input as { command: string }).command;
+        return { ok: true, output: { command, exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
+    const inspectTool: ToolDefinition = {
+      name: 'run_shell_inspect',
+      description: 'Runs a read-only shell inspection command',
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const command = (input as { command: string }).command;
+        return { ok: true, output: { command, exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Apply fix, verify it, commit, push, and summarize.',
+      llm: fakeLlm,
+      tools: [mutateTool, inspectTool],
+      maxSteps: 8,
+      logger: silentLogger,
+      approveToolCall: async () => ({ approved: true }),
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toContain('Applied the fix, verified it, and pushed it.');
+    expect(
+      seenMessages[4]?.filter(
+        (message) =>
+          message.role === 'system' &&
+          message.content.includes('Host requirement: before giving a final answer after a workspace-changing mutate command'),
+      ) ?? [],
+    ).toHaveLength(0);
+  });
+
   it('rejects a vague final answer after mutation follow-up until it includes changed, verified, and remaining uncertainty labels', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
