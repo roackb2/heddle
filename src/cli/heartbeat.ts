@@ -418,7 +418,7 @@ async function startHeartbeatCli(
 
 async function approveAutonomousHeartbeatToolCall(
   call: ToolCall,
-  _tool: ToolDefinition,
+  _toolDef: ToolDefinition,
 ): Promise<{ approved: boolean; reason?: string }> {
   return {
     approved: false,

@@ -1,6 +1,6 @@
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import { listFilesTool } from '../core/tools/list-files.js';
 import { readFileTool } from '../core/tools/read-file.js';
@@ -9,7 +9,6 @@ import { reportStateTool } from '../core/tools/report-state.js';
 import { updatePlanTool } from '../core/tools/update-plan.js';
 import {
   classifyShellCommandPolicy,
-  DEFAULT_INSPECT_RULES,
   createRunShellInspectTool,
   createRunShellMutateTool,
   DEFAULT_MUTATE_RULES,

@@ -200,7 +200,6 @@ async function requestModelTurn(context: RunContext): Promise<LlmResponse | RunR
 
   try {
     let streamedContent = '';
-    let pendingStreamDelta = '';
     let lastStreamRecordAt = 0;
     const response = await context.llm.chat(
       context.messages,
@@ -208,7 +207,6 @@ async function requestModelTurn(context: RunContext): Promise<LlmResponse | RunR
       context.abortSignal,
       (event: LlmStreamEvent) => {
         if (event.type === 'content.delta') {
-          pendingStreamDelta += event.delta;
           const nowMs = Date.now();
           if (nowMs - lastStreamRecordAt < STREAM_UPDATE_INTERVAL_MS) {
             streamedContent += event.delta;
@@ -218,12 +216,10 @@ async function requestModelTurn(context: RunContext): Promise<LlmResponse | RunR
           lastStreamRecordAt = nowMs;
           streamedContent += event.delta;
           context.onAssistantStream?.({ step: context.state.step, text: streamedContent, done: false });
-          pendingStreamDelta = '';
           return;
         }
 
         if (event.type === 'content.done') {
-          pendingStreamDelta = '';
           streamedContent = event.content;
           context.onAssistantStream?.({ step: context.state.step, text: streamedContent, done: true });
         }

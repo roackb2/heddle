@@ -143,6 +143,7 @@ async function importCyberLoopAdvanced(moduleSpecifier: string | undefined): Pro
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(
       `Unable to load CyberLoop kinematics middleware from ${specifier}. Install the optional peer dependency cyberloop in the same environment as Heddle, or set HEDDLE_CYBERLOOP_ADVANCED_MODULE to a local advanced middleware module. ${detail}`,
+      error instanceof Error ? { cause: error } : undefined,
     );
   }
 }

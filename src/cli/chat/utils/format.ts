@@ -1,4 +1,4 @@
-import type { ChatMessage, ToolCall, TraceEvent, ToolResult } from '../../../index.js';
+import type { ChatMessage, TraceEvent, ToolResult } from '../../../index.js';
 import type { EditFilePreview } from '../../../core/tools/edit-file.js';
 import {
   classifyShellCommandPolicy,
@@ -486,40 +486,6 @@ function summarizePlanInput(tool: string, input: unknown): string | undefined {
   return currentStep ? `${tool} (${truncate(currentStep, MAX_TOOL_CALL_SUMMARY_CHARS)})` : `${tool} (${plan.length} items)`;
 }
 
-function renderToolHistoryMessage(message: Extract<ChatMessage, { role: 'tool' }>, history: ChatMessage[], index: number): string | undefined {
-  const toolCall = findToolCallForResult(history, index, message.toolCallId);
-  if (!toolCall) {
-    return undefined;
-  }
-
-  const result = parseToolResultPayload(message.content);
-  if (!result?.ok) {
-    return undefined;
-  }
-
-  if (toolCall.tool === 'update_plan') {
-    return renderUpdatePlanHistoryMessage(result.output);
-  }
-
-  if (toolCall.tool !== 'edit_file') {
-    return undefined;
-  }
-
-  const editResult = parseEditFileResult(result.output);
-  if (!editResult) {
-    return undefined;
-  }
-
-  return formatEditHistoryMessage({
-    path: editResult.path,
-    action: editResult.action,
-    matchCount: editResult.matchCount,
-    bytesWritten: editResult.bytesWritten,
-    diff: editResult.diff?.diff,
-    truncated: editResult.diff?.truncated,
-  });
-}
-
 function renderUpdatePlanHistoryMessage(output: unknown): string | undefined {
   if (!output || typeof output !== 'object' || Array.isArray(output)) {
     return undefined;
@@ -609,86 +575,6 @@ function formatEditHistoryMessage(options: {
   }
 
   return lines.join('\n');
-}
-
-function findToolCallForResult(history: ChatMessage[], index: number, toolCallId: string): ToolCall | undefined {
-  for (let cursor = index - 1; cursor >= 0; cursor--) {
-    const message = history[cursor];
-    if (message?.role !== 'assistant' || !message.toolCalls?.length) {
-      continue;
-    }
-
-    const match = message.toolCalls.find((call) => call.id === toolCallId);
-    if (match) {
-      return match;
-    }
-  }
-
-  return undefined;
-}
-
-function parseToolResultPayload(content: string): ToolResult | undefined {
-  try {
-    const parsed = JSON.parse(content);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || typeof parsed.ok !== 'boolean') {
-      return undefined;
-    }
-
-    return parsed as ToolResult;
-  } catch {
-    return undefined;
-  }
-}
-
-type EditFileHistoryResult = {
-  path: string;
-  action: string;
-  bytesWritten: number;
-  matchCount?: number;
-  diff?: {
-    diff: string;
-    truncated: boolean;
-  };
-};
-
-function parseEditFileResult(output: unknown): EditFileHistoryResult | undefined {
-  if (!output || typeof output !== 'object' || Array.isArray(output)) {
-    return undefined;
-  }
-
-  const candidate = output as Record<string, unknown>;
-  if (typeof candidate.path !== 'string' || typeof candidate.action !== 'string' || typeof candidate.bytesWritten !== 'number') {
-    return undefined;
-  }
-
-  const diff =
-    candidate.diff && typeof candidate.diff === 'object' && !Array.isArray(candidate.diff) ?
-      parseEditDiff(candidate.diff)
-    : undefined;
-
-  return {
-    path: candidate.path,
-    action: candidate.action,
-    bytesWritten: candidate.bytesWritten,
-    matchCount: typeof candidate.matchCount === 'number' ? candidate.matchCount : undefined,
-    diff,
-  };
-}
-
-function parseEditDiff(value: unknown): { diff: string; truncated: boolean } | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  if (typeof candidate.diff !== 'string' || typeof candidate.truncated !== 'boolean') {
-    return undefined;
-  }
-
-  return {
-    diff: candidate.diff,
-    truncated: candidate.truncated,
-  };
 }
 
 export function appendDirectShellHistory(

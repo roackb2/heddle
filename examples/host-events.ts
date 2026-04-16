@@ -13,7 +13,7 @@
  */
 
 import { runAgentLoop, runAgentHeartbeat, type AgentLoopEvent, type ToolDefinition } from '../src/index.js';
-import type { ChatMessage, LlmAdapter, LlmResponse } from '../src/core/llm/types.js';
+import type { LlmAdapter, LlmResponse } from '../src/core/llm/types.js';
 
 // ---------------------------------------------------------------------------
 // Mock LLM for demo purposes (replace with real LLM in production)
@@ -31,7 +31,7 @@ const createMockLlm = (scenario: 'success' | 'tool-use' | 'escalate'): LlmAdapte
         parallelToolCalls: true,
       },
     },
-    async chat(messages: ChatMessage[]): Promise<LlmResponse> {
+    async chat(): Promise<LlmResponse> {
       turn++;
 
       if (scenario === 'success') {

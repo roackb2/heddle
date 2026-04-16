@@ -5,7 +5,7 @@ import type { LiveEvent, PendingApproval } from '../state/types.js';
 
 export function ActivityPanel({
   isRunning,
-  workingFrame,
+  workingFrame: _workingFrame,
   elapsedSeconds,
   liveEvents,
   pendingApproval,

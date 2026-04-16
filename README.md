@@ -37,6 +37,7 @@ If you are interested in the underlying methodology, Heddle's drift telemetry is
 - provider-agnostic model support across OpenAI and Anthropic
 - embeddable `runAgentLoop` API for building non-CLI agent hosts
 - `runAgentHeartbeat` for scheduler-driven autonomous wake cycles without chat by default
+- reorganized core runtime modules under `src/core` for agent, runtime, llm, tools, prompts, trace, and shared utilities
 - native React/Vite control plane served by `heddle daemon` for local browser-based oversight
 - serializable checkpoints for resume, background execution, and hosted workers
 - host-facing heartbeat task/run views plus websocket-friendly status/progress/response adapters
@@ -205,7 +206,7 @@ Common flags:
 
 Heddle includes a local browser control plane for workspace oversight when you want a native UI in addition to terminal chat.
 
-The current control plane is still early, but it is now a practical read-only dashboard for local runs instead of only a placeholder.
+The current control plane is still early, but it has moved beyond a placeholder dashboard into a workstation-style local UI for inspecting sessions, review evidence, heartbeat tasks, and run history.
 
 Current stack:
 
@@ -223,8 +224,8 @@ heddle daemon
 By default, the daemon binds to `127.0.0.1:8765` and serves the built web app plus the tRPC API. The current browser UI surfaces:
 
 - workspace and `.heddle/` state location
-- saved chat sessions projected into control-plane-friendly summaries
-- heartbeat task status and scheduling state
+- saved chat sessions with sidebar navigation, conversation view, and review-oriented detail inspection
+- heartbeat task status, scheduling state, selected task detail, and run history
 - recent heartbeat run summaries and usage data
 
 You can override host and port:
@@ -248,7 +249,7 @@ The server writes pino logs to `.heddle/logs/server.log` by default. Override th
 HEDDLE_SERVER_LOG_FILE=/path/to/server.log yarn server:dev
 ```
 
-This control plane remains read-only today. The next milestones are deeper session detail views, browser-side chat continuation, heartbeat task actions, and live run updates.
+The control plane is still early and not yet a full browser-native chat/operator surface. The next milestones are browser-side `send message` and `continue` actions for sessions, heartbeat task actions, and richer live run updates.
 
 ## Knowledge Persistence
 

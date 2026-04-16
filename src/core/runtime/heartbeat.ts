@@ -153,21 +153,3 @@ function inferHeartbeatDecision(summary: string, outcome: string): HeartbeatDeci
   return 'escalate';
 }
 
-function inferEscalationReason(
-  summary: string,
-  outcome: string,
-): 'human_input_required' | 'policy_violation' | 'max_steps_reached' | 'error' | 'risk_detected' {
-  if (outcome === 'max_steps') {
-    return 'max_steps_reached';
-  }
-  if (outcome === 'error') {
-    return 'error';
-  }
-  if (/blocked|risk|unapproved|policy/i.test(summary)) {
-    return 'policy_violation';
-  }
-  if (/input|user|human|question/i.test(summary)) {
-    return 'human_input_required';
-  }
-  return 'risk_detected';
-}
