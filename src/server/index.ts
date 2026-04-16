@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHeddleServerApp } from './app.js';
@@ -46,5 +47,18 @@ function resolveDefaultAssetsDir(): string {
   }
 
   const moduleDir = dirname(fileURLToPath(import.meta.url));
-  return resolve(moduleDir, '../web');
+  const candidates = [
+    resolve(moduleDir, '../web'),
+    resolve(moduleDir, '../../web'),
+    resolve(moduleDir, '../../../src/web'),
+  ];
+
+  for (const candidate of candidates) {
+    const indexPath = resolve(candidate, 'index.html');
+    if (existsSync(indexPath)) {
+      return candidate;
+    }
+  }
+
+  return candidates[0];
 }
