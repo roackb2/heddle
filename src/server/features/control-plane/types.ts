@@ -1,3 +1,4 @@
+import type { AgentLoopEvent } from '../../../core/runtime/agent-loop.js';
 import type { HeartbeatRunView, HeartbeatTaskView } from '../../../core/runtime/heartbeat-views.js';
 
 export type ChatSessionView = {
@@ -7,6 +8,7 @@ export type ChatSessionView = {
   updatedAt?: string;
   model?: string;
   driftEnabled?: boolean;
+  driftLevel?: 'unknown' | 'low' | 'medium' | 'high';
   messageCount: number;
   turnCount: number;
   lastPrompt?: string;
@@ -69,6 +71,19 @@ export type ChatSessionDetail = ChatSessionView & {
   messages: ChatSessionMessage[];
   turns: ChatTurnView[];
   lastContinuePrompt?: string;
+};
+
+export type ControlPlanePendingApproval = {
+  tool: string;
+  callId: string;
+  input: unknown;
+  requestedAt: string;
+};
+
+export type ControlPlaneSessionLiveEvent = {
+  sessionId: string;
+  timestamp: string;
+  event: AgentLoopEvent;
 };
 
 export type ControlPlaneState = {

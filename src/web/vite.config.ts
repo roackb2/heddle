@@ -12,6 +12,10 @@ export default defineConfig({
         target: process.env.HEDDLE_SERVER_URL ?? 'http://127.0.0.1:8765',
         changeOrigin: true,
       },
+      '/control-plane': {
+        target: process.env.HEDDLE_SERVER_URL ?? 'http://127.0.0.1:8765',
+        changeOrigin: true,
+      },
     },
   },
   build: {

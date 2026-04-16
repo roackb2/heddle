@@ -1,20 +1,25 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import './control-plane.css';
 import { type ControlPlaneState } from '../../lib/api';
 import { useControlPlaneState } from './hooks/useControlPlaneState';
 import { useHeartbeatWorkspace } from './hooks/useHeartbeatWorkspace';
 import { useSessionWorkspace } from './hooks/useSessionWorkspace';
-import { Panel, StatusBadge, TabButton } from './components/common';
+import { Panel, StatusBadge, TabButton, WorkspacePathLabel } from './components/common';
 import { HeartbeatWorkspace } from './components/HeartbeatWorkspace';
 import { OverviewView } from './components/OverviewView';
 import { SessionsWorkspace } from './components/SessionsWorkspace';
+import { ToastViewport, useToasts } from './components/toasts';
 
 type Tab = 'overview' | 'sessions' | 'heartbeat';
 
 export function ControlPlaneApp() {
   const [tab, setTab] = useState<Tab>('sessions');
-  const { state, error } = useControlPlaneState();
-  const sessionWorkspace = useSessionWorkspace(state?.sessions);
+  const { state, error, refresh } = useControlPlaneState();
+  const { toasts, addToast, removeToast } = useToasts();
+  const refreshControlPlaneState = useCallback(() => {
+    void refresh();
+  }, [refresh]);
+  const sessionWorkspace = useSessionWorkspace(state?.sessions, addToast, refreshControlPlaneState);
   const heartbeatWorkspace = useHeartbeatWorkspace(state?.heartbeat.tasks, state?.heartbeat.runs);
   const sectionTabs = (
     <>
@@ -31,7 +36,10 @@ export function ControlPlaneApp() {
           {sectionTabs}
         </nav>
         <div className="toolbar-status">
-          <p className="topbar-eyebrow">Heddle Control Plane</p>
+          <div className="topbar-title-row">
+            <p className="topbar-eyebrow">Heddle Control Plane</p>
+            <WorkspacePathLabel state={state} />
+          </div>
           <StatusBadge error={error} state={state} />
         </div>
       </header>
@@ -41,6 +49,7 @@ export function ControlPlaneApp() {
           <p className="muted">{error ?? 'Reading local Heddle state...'}</p>
         </Panel>
       : renderActiveTab(tab, state, sessionWorkspace, heartbeatWorkspace)}
+      <ToastViewport toasts={toasts} onDismiss={removeToast} />
     </main>
   );
 }
@@ -72,8 +81,17 @@ function renderActiveTab(
         turnReviewLoading={sessionWorkspace.turnReviewLoading}
         turnReviewError={sessionWorkspace.turnReviewError}
         sendingPrompt={sessionWorkspace.sendingPrompt}
+        runInFlight={sessionWorkspace.runInFlight}
         sendPromptError={sessionWorkspace.sendPromptError}
         onSendPrompt={sessionWorkspace.sendPrompt}
+        creatingSession={sessionWorkspace.creatingSession}
+        sessionNotice={sessionWorkspace.sessionNotice}
+        onCreateSession={sessionWorkspace.createSession}
+        onContinueSession={sessionWorkspace.continueSession}
+        onCancelSessionRun={sessionWorkspace.cancelSessionRun}
+        onUpdateSessionSettings={sessionWorkspace.updateSessionSettings}
+        pendingApproval={sessionWorkspace.pendingApproval}
+        onResolveApproval={sessionWorkspace.resolveApproval}
         inspectorTab={sessionWorkspace.inspectorTab}
         onInspectorTabChange={sessionWorkspace.setInspectorTab}
       />

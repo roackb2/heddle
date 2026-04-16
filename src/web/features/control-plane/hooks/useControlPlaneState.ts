@@ -1,40 +1,56 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchControlPlaneState, type ControlPlaneState } from '../../../lib/api';
 
 export function useControlPlaneState() {
   const [state, setState] = useState<ControlPlaneState | undefined>();
   const [error, setError] = useState<string | undefined>();
+  const lastSnapshotRef = useRef<string | undefined>(undefined);
+
+  const refresh = useCallback(async () => {
+    try {
+      const next = await fetchControlPlaneState();
+      const snapshot = JSON.stringify(next);
+      if (lastSnapshotRef.current !== snapshot) {
+        lastSnapshotRef.current = snapshot;
+        setState(next);
+      }
+      setError(undefined);
+    } catch (refreshError) {
+      setError(refreshError instanceof Error ? refreshError.message : String(refreshError));
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    let active = true;
 
-    async function refresh() {
+    async function refreshIfActive() {
+      if (!active) {
+        return;
+      }
+
       try {
-        const next = await fetchControlPlaneState();
-        if (!cancelled) {
-          setState(next);
-          setError(undefined);
-        }
-      } catch (refreshError) {
-        if (!cancelled) {
-          setError(refreshError instanceof Error ? refreshError.message : String(refreshError));
+        await refresh();
+      } catch {
+        if (!active) {
+          return;
         }
       }
     }
 
-    void refresh();
+    void refreshIfActive();
     const interval = window.setInterval(() => {
-      void refresh();
+      void refreshIfActive();
     }, 10_000);
 
     return () => {
-      cancelled = true;
+      active = false;
       window.clearInterval(interval);
     };
-  }, []);
+  }, [refresh]);
 
   return {
     state,
     error,
+    refresh,
   };
 }

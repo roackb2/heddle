@@ -27,7 +27,15 @@ export function StatusBadge({ error, state }: { error?: string; state?: ControlP
   if (!state) {
     return <aside className="status-badge">Connecting...</aside>;
   }
-  return <aside className="status-badge">{shortPath(state.workspaceRoot)} · {state.sessions.length} sessions · {state.heartbeat.tasks.length} tasks</aside>;
+  return <aside className="status-badge">{state.sessions.length} sessions · {state.heartbeat.tasks.length} tasks</aside>;
+}
+
+export function WorkspacePathLabel({ state }: { state?: ControlPlaneState }) {
+  if (!state) {
+    return null;
+  }
+
+  return <span className="workspace-path-label">{shortPath(state.workspaceRoot)}</span>;
 }
 
 export function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {

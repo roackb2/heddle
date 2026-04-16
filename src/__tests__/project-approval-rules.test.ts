@@ -15,8 +15,13 @@ import {
 } from '../cli/chat/state/approval-rules.js';
 
 describe('project approval rules', () => {
-  it('normalizes repeated whitespace in saved commands', () => {
+  it('normalizes repeated whitespace and canonicalizes common verification command aliases', () => {
     expect(normalizeApprovedCommand('  yarn   test   --watch  ')).toBe('yarn test --watch');
+    expect(normalizeApprovedCommand('npx tsc --noEmit')).toBe('tsc --noEmit');
+    expect(normalizeApprovedCommand('./node_modules/.bin/tsc --noEmit')).toBe('tsc --noEmit');
+    expect(normalizeApprovedCommand('node_modules/.bin/vitest run src/__tests__/tools.test.ts')).toBe(
+      'vitest run src/__tests__/tools.test.ts',
+    );
   });
 
   it('saves and reloads project approval rules', () => {
@@ -47,6 +52,26 @@ describe('project approval rules', () => {
     expect(findMatchingApprovalRule([rule], 'run_shell_mutate', { command: 'yarn test' })).toBeDefined();
     expect(findMatchingApprovalRule([rule], 'run_shell_mutate', { command: 'yarn test src/__tests__/run-agent.test.ts' })).toBeDefined();
     expect(findMatchingApprovalRule([rule], 'run_shell_mutate', { command: 'yarn build' })).toBeUndefined();
+  });
+
+  it('broadens canonicalized tsc verification approvals to a reusable family rule', () => {
+    const rule = createProjectApprovalRule('npx tsc --noEmit');
+
+    expect(rule.mode).toBe('prefix');
+    expect(rule.command).toBe('tsc');
+    expect(rule.capability).toBe('verification');
+    expect(findMatchingApprovalRule([rule], 'run_shell_mutate', { command: 'tsc -p tsconfig.build.json --noEmit' })).toBeDefined();
+    expect(findMatchingApprovalRule([rule], 'run_shell_mutate', { command: './node_modules/.bin/tsc --pretty false' })).toBeDefined();
+  });
+
+  it('broadens canonicalized vitest verification approvals to a reusable family rule', () => {
+    const rule = createProjectApprovalRule('./node_modules/.bin/vitest run src/__tests__/tools.test.ts');
+
+    expect(rule.mode).toBe('prefix');
+    expect(rule.command).toBe('vitest run');
+    expect(rule.capability).toBe('verification');
+    expect(findMatchingApprovalRule([rule], 'run_shell_mutate', { command: 'vitest run src/__tests__/run-agent.test.ts' })).toBeDefined();
+    expect(findMatchingApprovalRule([rule], 'run_shell_mutate', { command: 'node_modules/.bin/vitest run src/__tests__/chat-format.test.ts' })).toBeDefined();
   });
 
   it('creates a project-wide edit_file approval rule from a tool call', () => {

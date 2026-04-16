@@ -47,7 +47,7 @@ export function saveProjectApprovalRules(filePath: string, rules: ProjectApprova
 }
 
 export function normalizeApprovedCommand(command: string): string {
-  return command.trim().replace(/\s+/g, ' ');
+  return canonicalizeVerificationCommand(command.trim().replace(/\s+/g, ' '));
 }
 
 export function findMatchingApprovalRule(
@@ -191,13 +191,61 @@ function shouldUseVerificationPrefixApproval(
     return false;
   }
 
-  const argv = command.split(' ').filter(Boolean);
-  return argv[0] === 'yarn' && typeof argv[1] === 'string' && !argv[1].startsWith('-');
+  return buildVerificationPrefix(command) !== command;
 }
 
 function buildVerificationPrefix(command: string): string {
   const argv = command.split(' ').filter(Boolean);
-  return argv.length >= 2 ? `${argv[0]} ${argv[1]}` : command;
+  if (argv.length === 0) {
+    return command;
+  }
+
+  if (argv[0] === 'yarn' && typeof argv[1] === 'string' && !argv[1].startsWith('-')) {
+    return `${argv[0]} ${argv[1]}`;
+  }
+
+  if (argv[0] === 'vitest' && typeof argv[1] === 'string' && !argv[1].startsWith('-')) {
+    return `${argv[0]} ${argv[1]}`;
+  }
+
+  if (argv[0] === 'tsc') {
+    return 'tsc';
+  }
+
+  return command;
+}
+
+function canonicalizeVerificationCommand(command: string): string {
+  const argv = command.split(' ').filter(Boolean);
+  if (argv.length === 0) {
+    return command;
+  }
+
+  if (argv[0] === 'npx' && typeof argv[1] === 'string') {
+    if (argv[1] === 'tsc') {
+      return ['tsc', ...argv.slice(2)].join(' ');
+    }
+    if (argv[1] === 'vitest') {
+      return ['vitest', ...argv.slice(2)].join(' ');
+    }
+    if (argv[1] === 'eslint') {
+      return ['eslint', ...argv.slice(2)].join(' ');
+    }
+  }
+
+  if (argv[0] === './node_modules/.bin/tsc' || argv[0] === 'node_modules/.bin/tsc') {
+    return ['tsc', ...argv.slice(1)].join(' ');
+  }
+
+  if (argv[0] === './node_modules/.bin/vitest' || argv[0] === 'node_modules/.bin/vitest') {
+    return ['vitest', ...argv.slice(1)].join(' ');
+  }
+
+  if (argv[0] === './node_modules/.bin/eslint' || argv[0] === 'node_modules/.bin/eslint') {
+    return ['eslint', ...argv.slice(1)].join(' ');
+  }
+
+  return command;
 }
 
 function normalizeApprovalPath(path: string): string {
@@ -207,6 +255,20 @@ function normalizeApprovalPath(path: string): string {
   }
 
   return trimmed.replace(/\/+$/, '') || '.';
+}
+
+function buildLegacyVerificationPrefix(command: string): string | undefined {
+  const argv = command.split(' ').filter(Boolean);
+  if (argv[0] !== 'yarn') {
+    return undefined;
+  }
+
+  const subcommand = argv[1];
+  if (subcommand === 'test' || subcommand === 'build' || subcommand === 'lint' || subcommand === 'vitest') {
+    return `yarn ${subcommand}`;
+  }
+
+  return undefined;
 }
 
 function parseProjectApprovalRule(value: unknown): ProjectApprovalRule[] {
@@ -227,7 +289,20 @@ function parseProjectApprovalRule(value: unknown): ProjectApprovalRule[] {
       }];
     }
 
-    const migrated = createShellApprovalRule(candidate.command);
+    const normalizedCommand = normalizeApprovedCommand(candidate.command);
+    const legacyVerificationPrefix = buildLegacyVerificationPrefix(normalizedCommand);
+    if (legacyVerificationPrefix) {
+      return [{
+        tool: 'run_shell_mutate',
+        mode: 'prefix',
+        command: legacyVerificationPrefix,
+        scope: 'workspace',
+        capability: 'verification',
+        createdAt: candidate.createdAt,
+      }];
+    }
+
+    const migrated = createShellApprovalRule(normalizedCommand);
     return [{ ...migrated, createdAt: candidate.createdAt }];
   }
 

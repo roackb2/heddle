@@ -13,7 +13,7 @@ export async function loadControlPlaneState(context: HeddleServerContext): Promi
   return {
     workspaceRoot: context.workspaceRoot,
     stateRoot: context.stateRoot,
-    sessions: readChatSessionViews(resolve(context.stateRoot, 'chat-sessions.json')),
+    sessions: readChatSessionViews(resolve(context.stateRoot, 'chat-sessions.catalog.json')),
     heartbeat: {
       tasks,
       runs,

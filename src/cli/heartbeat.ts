@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { Command } from 'commander';
 import {
   createFileHeartbeatTaskStore,
   inferProviderFromModel,
@@ -72,39 +73,80 @@ export async function runHeartbeatCli(args: string[], options: HeartbeatCliOptio
 }
 
 export function parseHeartbeatArgs(args: string[]): ParsedHeartbeatArgs {
-  const positionals: string[] = [];
-  const flags: Record<string, string | boolean> = {};
+  const root = new Command();
+  root
+    .exitOverride()
+    .allowUnknownOption(true)
+    .allowExcessArguments(true)
+    .name('heddle heartbeat')
+    .addHelpText('after', ['','Duration examples:','  30s, 15m, 1h, 2d',''].join('\n'));
 
-  for (let index = 0; index < args.length; index++) {
-    const arg = args[index] ?? '';
-    if (!arg.startsWith('--')) {
-      positionals.push(arg);
-      continue;
-    }
+  let parsed: ParsedHeartbeatArgs = {
+    command: undefined,
+    subcommand: undefined,
+    rest: [],
+    flags: {},
+  };
 
-    const eqIndex = arg.indexOf('=');
-    if (eqIndex > 0) {
-      flags[arg.slice(2, eqIndex)] = arg.slice(eqIndex + 1);
-      continue;
-    }
+  root
+    .command('task [subcommand] [rest...]')
+    .allowUnknownOption(true)
+    .action((subcommand: string | undefined, rest: string[] = [], command: Command) => {
+      parsed = {
+        command: 'task',
+        subcommand,
+        rest,
+        flags: collectUnknownFlags(command),
+      };
+    });
 
-    const name = arg.slice(2);
-    const next = args[index + 1];
-    if (!next || next.startsWith('--')) {
-      flags[name] = true;
-      continue;
-    }
+  root
+    .command('run [rest...]')
+    .allowUnknownOption(true)
+    .action((rest: string[] = [], command: Command) => {
+      parsed = {
+        command: 'run',
+        subcommand: undefined,
+        rest,
+        flags: collectUnknownFlags(command),
+      };
+    });
 
-    flags[name] = next;
-    index++;
+  root
+    .command('runs [subcommand] [rest...]')
+    .allowUnknownOption(true)
+    .action((subcommand: string | undefined, rest: string[] = [], command: Command) => {
+      parsed = {
+        command: 'runs',
+        subcommand,
+        rest,
+        flags: collectUnknownFlags(command),
+      };
+    });
+
+  root
+    .command('start [rest...]')
+    .allowUnknownOption(true)
+    .action((rest: string[] = [], command: Command) => {
+      parsed = {
+        command: 'start',
+        subcommand: undefined,
+        rest,
+        flags: collectUnknownFlags(command),
+      };
+    });
+
+  try {
+    root.parse(['node', 'heddle-heartbeat', ...args], { from: 'node' });
+  } catch {
+    return fallbackParseHeartbeatArgs(args);
   }
 
-  return {
-    command: positionals[0],
-    subcommand: positionals[1],
-    rest: positionals.slice(2),
-    flags,
-  };
+  if (!parsed.command) {
+    return fallbackParseHeartbeatArgs(args);
+  }
+
+  return parsed;
 }
 
 async function runHeartbeatTaskCli(
@@ -497,25 +539,89 @@ function printSchedulerEvent(event: HeartbeatSchedulerEvent) {
 }
 
 function printHeartbeatHelp() {
-  process.stdout.write([
-    'Heddle heartbeat',
-    '',
-    'Usage:',
-    '  heddle heartbeat task add --id <id> --task "<durable task>" [--every 15m] [--model <name>] [--max-steps <n>]',
-    '  heddle heartbeat task list',
-    '  heddle heartbeat task show <id>',
-    '  heddle heartbeat task enable <id>',
-    '  heddle heartbeat task disable <id>',
-    '  heddle heartbeat start [--every 30m] [--task "<durable task>"] [--model <name>]',
-    '  heddle heartbeat run --once',
-    '  heddle heartbeat run [--poll 60s]',
-    '  heddle heartbeat runs list [--task <id>] [--limit 10]',
-    '  heddle heartbeat runs show <run-id|latest> [--task <id>]',
-    '',
-    'Duration examples:',
-    '  30s, 15m, 1h, 2d',
-    '',
-  ].join('\n'));
+  const root = new Command();
+  root
+    .name('heddle heartbeat')
+    .description('Manage and run heartbeat tasks')
+    .addHelpText('after', ['','Duration examples:','  30s, 15m, 1h, 2d',''].join('\n'));
+
+  root.command('task add').description('add a heartbeat task');
+  root.command('task list').description('list heartbeat tasks');
+  root.command('task show <id>').description('show a heartbeat task');
+  root.command('task enable <id>').description('enable a heartbeat task');
+  root.command('task disable <id>').description('disable a heartbeat task');
+  root.command('start').description('start the heartbeat scheduler convenience flow');
+  root.command('run').description('run due heartbeat tasks once or in a poll loop');
+  root.command('runs list').description('list heartbeat run records');
+  root.command('runs show <id>').description('show a heartbeat run record');
+
+  process.stdout.write(root.helpInformation());
+}
+
+function collectUnknownFlags(command: Command): Record<string, string | boolean> {
+  const flags: Record<string, string | boolean> = {};
+  const unknown = command.parseOptions(command.args).unknown;
+
+  for (let index = 0; index < unknown.length; index++) {
+    const arg = unknown[index] ?? '';
+    if (!arg.startsWith('--')) {
+      continue;
+    }
+
+    const eqIndex = arg.indexOf('=');
+    if (eqIndex > 0) {
+      flags[arg.slice(2, eqIndex)] = arg.slice(eqIndex + 1);
+      continue;
+    }
+
+    const name = arg.slice(2);
+    const next = unknown[index + 1];
+    if (!next || next.startsWith('--')) {
+      flags[name] = true;
+      continue;
+    }
+
+    flags[name] = next;
+    index++;
+  }
+
+  return flags;
+}
+
+function fallbackParseHeartbeatArgs(args: string[]): ParsedHeartbeatArgs {
+  const positionals: string[] = [];
+  const flags: Record<string, string | boolean> = {};
+
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index] ?? '';
+    if (!arg.startsWith('--')) {
+      positionals.push(arg);
+      continue;
+    }
+
+    const eqIndex = arg.indexOf('=');
+    if (eqIndex > 0) {
+      flags[arg.slice(2, eqIndex)] = arg.slice(eqIndex + 1);
+      continue;
+    }
+
+    const name = arg.slice(2);
+    const next = args[index + 1];
+    if (!next || next.startsWith('--')) {
+      flags[name] = true;
+      continue;
+    }
+
+    flags[name] = next;
+    index++;
+  }
+
+  return {
+    command: positionals[0],
+    subcommand: positionals[1],
+    rest: positionals.slice(2),
+    flags,
+  };
 }
 
 function stripHeartbeatDecisionLine(summary: string): string {

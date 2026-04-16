@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 
-import { chdir } from 'node:process';
-import { resolve } from 'node:path';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { startChatCli } from './chat/index.js';
+import { resolve } from 'node:path';
+import { chdir } from 'node:process';
+import { Command } from 'commander';
 import { runAskCli } from './ask.js';
-import { runHeartbeatCli } from './heartbeat.js';
+import { startChatCli } from './chat/index.js';
 import { runDaemonCli } from './daemon.js';
+import { runHeartbeatCli } from './heartbeat.js';
+import { runSessionCli } from './session.js';
 
-type CliFlags = {
+type RootCliOptions = {
   cwd?: string;
   model?: string;
-  maxSteps?: number;
+  maxSteps?: string;
 };
 
 type HeddleProjectConfig = {
@@ -23,97 +25,147 @@ type HeddleProjectConfig = {
   agentContextPaths?: string[];
 };
 
+type ResolvedCliOptions = {
+  workspaceRoot: string;
+  model?: string;
+  maxSteps?: number;
+  stateDir: string;
+  directShellApproval: 'always' | 'never';
+  searchIgnoreDirs: string[];
+  systemContext?: string;
+};
+
+const DEFAULT_MODEL_FOR_CONFIG = 'gpt-5.1-codex';
+const CLI_VERSION = readCliVersion();
+
 async function main() {
-  const parsed = parseCli(process.argv.slice(2));
-  const workspaceRoot = resolve(parsed.flags.cwd ?? process.cwd());
+  const program = new Command();
+  program
+    .name('heddle')
+    .description('Heddle CLI')
+    .version(CLI_VERSION, '--version', 'print the installed Heddle version')
+    .option('--cwd <path>', 'run against another workspace root')
+    .option('--model <name>', 'choose the active model')
+    .option('--max-steps <n>', 'limit the agent loop length');
+
+  program
+    .command('chat')
+    .description('start the interactive chat UI')
+    .action(async () => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      chdir(resolved.workspaceRoot);
+      startChatCli(resolved);
+    });
+
+  program
+    .command('ask [goal...]')
+    .description('run a one-shot ask against the workspace')
+    .action(async (goalParts: string[]) => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      chdir(resolved.workspaceRoot);
+      await runAskCli(goalParts.join(' ').trim(), resolved);
+    });
+
+  program
+    .command('init')
+    .description('create a heddle.config.json template in the workspace')
+    .action(() => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      initializeProjectConfig(resolved.workspaceRoot);
+    });
+
+  program
+    .command('heartbeat [args...]')
+    .description('manage and run heartbeat tasks')
+    .allowUnknownOption(true)
+    .action(async (args: string[]) => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      chdir(resolved.workspaceRoot);
+      await runHeartbeatCli(args ?? [], resolved);
+    });
+
+  program
+    .command('daemon [args...]')
+    .description('start the local Heddle daemon and control plane')
+    .allowUnknownOption(true)
+    .action(async (args: string[]) => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      chdir(resolved.workspaceRoot);
+      await runDaemonCli(args ?? [], resolved);
+    });
+
+  program
+    .command('session [args...]')
+    .description('manage local chat session storage')
+    .allowUnknownOption(true)
+    .action(async (args: string[]) => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      chdir(resolved.workspaceRoot);
+      await runSessionCli(args ?? [], resolved);
+    });
+
+  program
+    .action(async () => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      chdir(resolved.workspaceRoot);
+      startChatCli(resolved);
+    });
+
+  const argv = process.argv.slice(2);
+  const knownCommand = argv[0];
+  if (knownCommand && !isKnownCommand(knownCommand) && !knownCommand.startsWith('-')) {
+    const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+    chdir(resolved.workspaceRoot);
+    await runAskCli(argv.join(' ').trim(), resolved);
+    return;
+  }
+
+  await program.parseAsync(process.argv);
+}
+
+function isKnownCommand(command: string): boolean {
+  return ['chat', 'ask', 'init', 'heartbeat', 'daemon', 'session', 'help'].includes(command);
+}
+
+function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
+  const workspaceRoot = resolve(flags.cwd ?? process.cwd());
   const projectConfig = loadProjectConfig(workspaceRoot);
-  const resolved = {
+  return {
     workspaceRoot,
-    model: parsed.flags.model ?? projectConfig.model,
-    maxSteps: parsed.flags.maxSteps ?? projectConfig.maxSteps,
+    model: flags.model ?? projectConfig.model,
+    maxSteps: parsePositiveInt(flags.maxSteps) ?? projectConfig.maxSteps,
     stateDir: projectConfig.stateDir ?? '.heddle',
     directShellApproval: projectConfig.directShellApproval ?? 'never',
     searchIgnoreDirs: projectConfig.searchIgnoreDirs ?? [],
     systemContext: loadProjectAgentContext(workspaceRoot, projectConfig.agentContextPaths ?? ['AGENTS.md']),
   };
-
-  chdir(workspaceRoot);
-
-  if (!parsed.command || parsed.command === 'chat') {
-    startChatCli(resolved);
-    return;
-  }
-
-  if (parsed.command === 'ask') {
-    await runAskCli(parsed.rest.join(' ').trim(), resolved);
-    return;
-  }
-
-  if (parsed.command === 'init') {
-    initializeProjectConfig(workspaceRoot);
-    return;
-  }
-
-  if (parsed.command === 'heartbeat') {
-    await runHeartbeatCli(parsed.rest, resolved);
-    return;
-  }
-
-  if (parsed.command === 'daemon') {
-    await runDaemonCli(parsed.rest, resolved);
-    return;
-  }
-
-  if (parsed.command === '--help' || parsed.command === '-h' || parsed.command === 'help') {
-    printHelp();
-    return;
-  }
-
-  await runAskCli([parsed.command, ...parsed.rest].join(' ').trim(), resolved);
 }
 
-function parseCli(args: string[]): { command?: string; rest: string[]; flags: CliFlags } {
-  const flags: CliFlags = {};
-  const positionals: string[] = [];
-
-  for (let index = 0; index < args.length; index++) {
-    const arg = args[index] ?? '';
-    if (arg === '--cwd') {
-      flags.cwd = args[index + 1];
-      index++;
-      continue;
-    }
-    if (arg.startsWith('--cwd=')) {
-      flags.cwd = arg.slice('--cwd='.length);
-      continue;
-    }
-    if (arg === '--model') {
-      flags.model = args[index + 1];
-      index++;
-      continue;
-    }
-    if (arg.startsWith('--model=')) {
-      flags.model = arg.slice('--model='.length);
-      continue;
-    }
-    if (arg === '--max-steps') {
-      flags.maxSteps = parsePositiveInt(args[index + 1]);
-      index++;
-      continue;
-    }
-    if (arg.startsWith('--max-steps=')) {
-      flags.maxSteps = parsePositiveInt(arg.slice('--max-steps='.length));
+function readCliVersion(): string {
+  for (const candidatePath of resolvePackageJsonCandidates()) {
+    if (!existsSync(candidatePath)) {
       continue;
     }
 
-    positionals.push(arg);
+    try {
+      const raw = readFileSync(candidatePath, 'utf8');
+      const parsed = JSON.parse(raw) as { version?: unknown };
+      if (typeof parsed.version === 'string' && parsed.version.trim()) {
+        return parsed.version;
+      }
+    } catch {
+      continue;
+    }
   }
 
-  return {
-    command: positionals[0],
-    rest: positionals.slice(1),
-    flags,
-  };
+  return '0.0.0';
+}
+
+function resolvePackageJsonCandidates(): string[] {
+  return [
+    resolve(import.meta.dirname, '../../package.json'),
+    resolve(import.meta.dirname, '../../../package.json'),
+  ];
 }
 
 function loadProjectConfig(workspaceRoot: string): HeddleProjectConfig {
@@ -154,40 +206,6 @@ function loadProjectConfig(workspaceRoot: string): HeddleProjectConfig {
   }
 }
 
-function printHelp() {
-  process.stdout.write(
-    [
-      'Heddle',
-      '',
-      'Usage:',
-      '  heddle [--cwd <path>] [--model <name>] [--max-steps <n>]',
-      '  heddle chat [--cwd <path>] [--model <name>] [--max-steps <n>]',
-      '  heddle ask "<goal>" [--cwd <path>] [--model <name>] [--max-steps <n>]',
-      '  heddle heartbeat task add --id <id> --task "<durable task>" [--every 15m]',
-      '  heddle heartbeat task list',
-      '  heddle heartbeat task show <id>',
-      '  heddle heartbeat task enable <id>',
-      '  heddle heartbeat task disable <id>',
-      '  heddle heartbeat start [--every 30m] [--task "<durable task>"] [--model <name>]',
-      '  heddle heartbeat run --once',
-      '  heddle heartbeat run [--poll 60s]',
-      '  heddle heartbeat runs list [--task <id>] [--limit 10]',
-      '  heddle heartbeat runs show <run-id|latest> [--task <id>]',
-      '  heddle daemon [--host 127.0.0.1] [--port 8765]',
-      '  heddle init [--cwd <path>]',
-      '',
-      'Project config:',
-      '  heddle.config.json in the target workspace root',
-      '  { "model": "gpt-5.1-codex", "maxSteps": 100, "stateDir": ".heddle", "directShellApproval": "never", "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"], "agentContextPaths": ["AGENTS.md"] }',
-      '',
-      'Environment:',
-      '  OPENAI_API_KEY or ANTHROPIC_API_KEY',
-      '  Dev fallback conventions also supported: PERSONAL_OPENAI_API_KEY, PERSONAL_ANTHROPIC_API_KEY',
-      '',
-    ].join('\n'),
-  );
-}
-
 function initializeProjectConfig(workspaceRoot: string) {
   const configPath = resolve(workspaceRoot, 'heddle.config.json');
   if (existsSync(configPath)) {
@@ -206,8 +224,6 @@ function initializeProjectConfig(workspaceRoot: string) {
   writeFileSync(configPath, `${JSON.stringify(template, null, 2)}\n`);
   process.stdout.write(`Created ${configPath}\n`);
 }
-
-const DEFAULT_MODEL_FOR_CONFIG = 'gpt-5.1-codex';
 
 function loadProjectAgentContext(workspaceRoot: string, paths: string[]): string | undefined {
   const sections = paths.flatMap((relativePath) => {

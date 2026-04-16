@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createAnthropicAdapter } from '../llm/anthropic.js';
-import { createLlmAdapter, inferProviderFromModel, resolveLlmProvider } from '../llm/factory.js';
+import { createAnthropicAdapter } from '../core/llm/anthropic.js';
+import { createLlmAdapter, inferProviderFromModel, resolveLlmProvider } from '../core/llm/factory.js';
 
 describe('llm adapter factory', () => {
   it('infers provider from known model prefixes', () => {

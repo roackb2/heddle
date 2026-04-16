@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import {
-  listenHeddleServer,
+  listenHeddleDaemon,
   projectChatSessionView,
 } from '../server/index.js';
 import type { HeddleServerListenOptions } from '../server/index.js';
@@ -33,7 +33,7 @@ export async function runDaemonCli(args: string[], options: DaemonCliOptions = {
     assetsDir: parsed.assetsDir,
   };
 
-  await listenHeddleServer(listenOptions);
+  await listenHeddleDaemon(listenOptions);
 }
 
 export function parseDaemonArgs(args: string[]): DaemonArgs {

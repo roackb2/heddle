@@ -11,7 +11,7 @@ export { createHeddleServerApp } from './app.js';
 export { createServerLogger } from './logger.js';
 export { projectChatSessionView } from './features/control-plane/services/chat-sessions.js';
 
-export async function listenHeddleServer(options: HeddleServerListenOptions): Promise<void> {
+export async function listenHeddleDaemon(options: HeddleServerListenOptions): Promise<void> {
   const assetsDir = options.assetsDir ?? resolveDefaultAssetsDir();
   assertWebAssetsBuilt(assetsDir);
   const logger = options.logger ?? createServerLogger({ stateRoot: options.stateRoot });
@@ -37,6 +37,8 @@ export async function listenHeddleServer(options: HeddleServerListenOptions): Pr
     });
   });
 }
+
+export const listenHeddleServer = listenHeddleDaemon;
 
 function resolveDefaultAssetsDir(): string {
   if (process.env.HEDDLE_WEB_DIST) {

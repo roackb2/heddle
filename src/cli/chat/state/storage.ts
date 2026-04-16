@@ -5,5 +5,8 @@ export {
   summarizeSession,
   isGenericSessionName,
   loadChatSessions,
+  readChatSessionCatalog,
+  readChatSession,
+  migrateLegacyChatSessions,
   saveChatSessions,
 } from '../../../core/chat/storage.js';

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { runAgentLoop } from '../runtime/agent-loop.js';
-import { createAgentLoopCheckpoint, getHistoryFromAgentLoopCheckpoint, getHistoryFromAgentLoopState } from '../runtime/events.js';
-import { createDefaultAgentTools } from '../runtime/default-tools.js';
-import type { ChatMessage, LlmAdapter, LlmResponse } from '../llm/types.js';
+import { runAgentLoop } from '../core/runtime/agent-loop.js';
+import { createAgentLoopCheckpoint, getHistoryFromAgentLoopCheckpoint, getHistoryFromAgentLoopState } from '../core/runtime/events.js';
+import { createDefaultAgentTools } from '../core/runtime/default-tools.js';
+import type { ChatMessage, LlmAdapter, LlmResponse } from '../core/llm/types.js';
 import type { AgentLoopEvent, ToolDefinition } from '../index.js';
-import { createLogger } from '../utils/logger.js';
-import { runAgentHeartbeat } from '../runtime/heartbeat.js';
-import { runStoredHeartbeat, suggestNextHeartbeatDelayMs, type HeartbeatCheckpointStore } from '../runtime/heartbeat-store.js';
+import { createLogger } from '../core/utils/logger.js';
+import { runAgentHeartbeat } from '../core/runtime/heartbeat.js';
+import { runStoredHeartbeat, suggestNextHeartbeatDelayMs, type HeartbeatCheckpointStore } from '../core/runtime/heartbeat-store.js';
 
 const silentLogger = createLogger({ level: 'silent', console: false });
 

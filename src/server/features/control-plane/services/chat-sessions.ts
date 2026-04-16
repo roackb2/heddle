@@ -1,4 +1,10 @@
+import { EventEmitter } from 'node:events';
 import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../../core/chat/storage.js';
+import { DEFAULT_OPENAI_MODEL } from '../../../../core/config.js';
+import { resolveApiKeyForModel } from '../../../../core/runtime/api-keys.js';
+import type { ChatSession } from '../../../../core/chat/types.js';
 import { submitChatSessionPrompt } from '../../../../core/chat/session-submit.js';
 import type {
   ApprovalEventView,
@@ -8,38 +14,208 @@ import type {
   ChatTurnReview,
   ChatTurnView,
   CommandEvidenceView,
+  ControlPlanePendingApproval,
+  ControlPlaneSessionLiveEvent,
 } from '../types.js';
 
 type SubmitChatPromptArgs = {
   workspaceRoot: string;
   stateRoot: string;
-  sessionsPath: string;
+  sessionStoragePath: string;
   sessionId: string;
   prompt: string;
 };
 
-export async function submitChatPrompt(args: SubmitChatPromptArgs) {
-  const result = await submitChatSessionPrompt(args);
-  return {
-    ...result,
-    session: projectChatSessionDetail(result.session)[0] ?? null,
-  };
+const DEFAULT_CONTINUE_PROMPT = 'Continue from where you left off.';
+
+export function createControlPlaneChatSession(args: {
+  sessionStoragePath: string;
+  suggestedName?: string;
+}): ChatSessionDetail {
+  const existing = readChatSessionViews(args.sessionStoragePath);
+  const nextNumber = existing.length + 1;
+  const model = process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
+  const session = createChatSession({
+    id: `session-${Date.now()}`,
+    name: args.suggestedName?.trim() || `Session ${nextNumber}`,
+    apiKeyPresent: Boolean(resolveApiKeyForModel(model)),
+    model,
+  });
+
+  const currentSessions = readChatSessionCatalog(args.sessionStoragePath)
+    .map((entry) => readChatSession(args.sessionStoragePath, entry.id, Boolean(resolveApiKeyForModel(model))))
+    .filter((candidate): candidate is ChatSession => Boolean(candidate));
+  saveChatSessions(args.sessionStoragePath, [session, ...currentSessions]);
+  return projectChatSessionDetail(session)[0] as ChatSessionDetail;
 }
 
-export function readChatSessionViews(sessionsPath: string): ChatSessionView[] {
-  return readChatSessionRecords(sessionsPath).flatMap(projectChatSessionView).sort((left, right) => {
-    return (right.updatedAt ?? '').localeCompare(left.updatedAt ?? '');
+export function updateControlPlaneChatSessionSettings(args: {
+  sessionStoragePath: string;
+  sessionId: string;
+  model?: string;
+  driftEnabled?: boolean;
+}): ChatSessionDetail {
+  const currentSessions = readChatSessionCatalog(args.sessionStoragePath)
+    .map((entry) => readChatSession(args.sessionStoragePath, entry.id, true))
+    .filter((candidate): candidate is ChatSession => Boolean(candidate));
+  const nextSessions = currentSessions.map((session) => (
+    session.id === args.sessionId ?
+      {
+        ...session,
+        model: args.model ?? session.model,
+        driftEnabled: args.driftEnabled ?? session.driftEnabled,
+        updatedAt: new Date().toISOString(),
+      }
+    : session
+  ));
+  const updated = nextSessions.find((session) => session.id === args.sessionId);
+  if (!updated) {
+    throw new Error(`Chat session not found: ${args.sessionId}`);
+  }
+
+  saveChatSessions(args.sessionStoragePath, nextSessions);
+  return projectChatSessionDetail(updated)[0] as ChatSessionDetail;
+}
+
+const sessionEventBus = new EventEmitter();
+const pendingApprovals = new Map<string, {
+  approval: ControlPlanePendingApproval;
+  resolve: (decision: { approved: boolean; reason?: string }) => void;
+}>();
+const inFlightRuns = new Map<string, AbortController>();
+
+export async function submitChatPrompt(args: SubmitChatPromptArgs) {
+  if (inFlightRuns.has(args.sessionId)) {
+    throw new Error('A run is already in progress for this session.');
+  }
+
+  const controller = new AbortController();
+  inFlightRuns.set(args.sessionId, controller);
+
+  try {
+    const result = await submitChatSessionPrompt({
+      ...args,
+      abortSignal: controller.signal,
+      onEvent: (event) => {
+        sessionEventBus.emit(args.sessionId, {
+          sessionId: args.sessionId,
+          timestamp: new Date().toISOString(),
+          event,
+        } satisfies ControlPlaneSessionLiveEvent);
+      },
+      approveToolCall: async (call, tool) => {
+        const decision = await new Promise<{ approved: boolean; reason?: string }>((resolve) => {
+          pendingApprovals.set(args.sessionId, {
+            approval: {
+              tool: tool.name,
+              callId: call.id,
+              input: call.input,
+              requestedAt: new Date().toISOString(),
+            },
+            resolve,
+          });
+          sessionEventBus.emit(args.sessionId, {
+            sessionId: args.sessionId,
+            timestamp: new Date().toISOString(),
+            event: {
+              type: 'trace',
+              runId: 'pending-approval',
+              timestamp: new Date().toISOString(),
+              event: {
+                type: 'tool.approval_requested',
+                call,
+                step: 0,
+                timestamp: new Date().toISOString(),
+              },
+            },
+          } satisfies ControlPlaneSessionLiveEvent);
+        });
+        pendingApprovals.delete(args.sessionId);
+        return decision;
+      },
+    });
+    return {
+      ...result,
+      session: projectChatSessionDetail(result.session)[0] ?? null,
+    };
+  } finally {
+    pendingApprovals.delete(args.sessionId);
+    inFlightRuns.delete(args.sessionId);
+  }
+}
+
+export async function continueChatPrompt(args: Omit<SubmitChatPromptArgs, 'prompt'>) {
+  const session = readChatSession(args.sessionStoragePath, args.sessionId, true);
+  if (!session) {
+    throw new Error(`Chat session not found: ${args.sessionId}`);
+  }
+
+  if (!session.history.length || !session.lastContinuePrompt) {
+    throw new Error('There is no interrupted or prior run to continue yet.');
+  }
+
+  return await submitChatPrompt({
+    ...args,
+    prompt: DEFAULT_CONTINUE_PROMPT,
   });
 }
 
-export function readChatSessionDetail(sessionsPath: string, id: string): ChatSessionDetail | undefined {
-  return readChatSessionRecords(sessionsPath)
-    .flatMap(projectChatSessionDetail)
-    .find((session) => session.id === id);
+export function subscribeToControlPlaneSessionEvents(
+  sessionId: string,
+  listener: (event: ControlPlaneSessionLiveEvent) => void,
+): () => void {
+  sessionEventBus.on(sessionId, listener);
+  return () => {
+    sessionEventBus.off(sessionId, listener);
+  };
 }
 
-export function readChatTurnReview(sessionsPath: string, sessionId: string, turnId: string): ChatTurnReview | undefined {
-  const session = readChatSessionDetail(sessionsPath, sessionId);
+export function getPendingControlPlaneApproval(sessionId: string): ControlPlanePendingApproval | undefined {
+  return pendingApprovals.get(sessionId)?.approval;
+}
+
+export function isControlPlaneSessionRunning(sessionId: string): boolean {
+  return inFlightRuns.has(sessionId);
+}
+
+export function cancelControlPlaneSessionRun(sessionId: string): boolean {
+  const controller = inFlightRuns.get(sessionId);
+  if (!controller) {
+    return false;
+  }
+
+  controller.abort();
+  pendingApprovals.delete(sessionId);
+  return true;
+}
+
+export function resolvePendingControlPlaneApproval(
+  sessionId: string,
+  decision: { approved: boolean; reason?: string },
+): boolean {
+  const pending = pendingApprovals.get(sessionId);
+  if (!pending) {
+    return false;
+  }
+
+  pendingApprovals.delete(sessionId);
+  pending.resolve(decision);
+  return true;
+}
+
+export function readChatSessionViews(sessionStoragePath: string): ChatSessionView[] {
+  return readChatSessionCatalog(sessionStoragePath)
+    .flatMap(projectChatSessionView)
+    .sort((left, right) => (right.updatedAt ?? '').localeCompare(left.updatedAt ?? ''));
+}
+
+export function readChatSessionDetail(sessionStoragePath: string, id: string): ChatSessionDetail | undefined {
+  const session = readChatSession(sessionStoragePath, id, true);
+  return session ? projectChatSessionDetail(session)[0] : undefined;
+}
+
+export function readChatTurnReview(sessionStoragePath: string, sessionId: string, turnId: string): ChatTurnReview | undefined {
+  const session = readChatSessionDetail(sessionStoragePath, sessionId);
   const turn = session?.turns.find((candidate) => candidate.id === turnId);
   if (!turn) {
     return undefined;
@@ -48,7 +224,11 @@ export function readChatTurnReview(sessionsPath: string, sessionId: string, turn
   return loadChatTurnReview(turn.traceFile);
 }
 
-export function projectChatSessionView(raw: unknown): ChatSessionView[] {
+export function resolveChatSessionFilePath(stateRoot: string, sessionId: string): string {
+  return join(stateRoot, 'chat-sessions', `${sessionId}.json`);
+}
+
+export function projectChatSessionView(raw: unknown | ChatSession): ChatSessionView[] {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return [];
   }
@@ -72,6 +252,7 @@ export function projectChatSessionView(raw: unknown): ChatSessionView[] {
     updatedAt: readString(candidate.updatedAt),
     model: readString(candidate.model),
     driftEnabled: typeof candidate.driftEnabled === 'boolean' ? candidate.driftEnabled : undefined,
+    driftLevel: readLatestDriftLevel(turns),
     messageCount: messages.length,
     turnCount: turns.length,
     lastPrompt: readString(lastTurn?.prompt),
@@ -87,7 +268,49 @@ export function projectChatSessionView(raw: unknown): ChatSessionView[] {
   }];
 }
 
-export function projectChatSessionDetail(raw: unknown): ChatSessionDetail[] {
+function readLatestDriftLevel(turns: unknown[]): ChatSessionView['driftLevel'] {
+  for (let index = turns.length - 1; index >= 0; index--) {
+    const turn = readObject(turns[index]);
+    const traceFile = readString(turn?.traceFile);
+    const driftLevel = traceFile ? readLatestDriftLevelFromTrace(traceFile) : undefined;
+    if (driftLevel) {
+      return driftLevel;
+    }
+  }
+
+  return undefined;
+}
+
+function readLatestDriftLevelFromTrace(traceFile: string): ChatSessionView['driftLevel'] {
+  if (!traceFile || !existsSync(traceFile)) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(traceFile, 'utf8')) as unknown;
+    if (!Array.isArray(parsed)) {
+      return undefined;
+    }
+
+    for (let index = parsed.length - 1; index >= 0; index--) {
+      const event = readObject(parsed[index]);
+      if (event?.type !== 'cyberloop.annotation') {
+        continue;
+      }
+
+      const driftLevel = readString(event.driftLevel);
+      if (driftLevel === 'unknown' || driftLevel === 'low' || driftLevel === 'medium' || driftLevel === 'high') {
+        return driftLevel;
+      }
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
+export function projectChatSessionDetail(raw: unknown | ChatSession): ChatSessionDetail[] {
   const base = projectChatSessionView(raw)[0];
   if (!base || !raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return [];
@@ -103,19 +326,6 @@ export function projectChatSessionDetail(raw: unknown): ChatSessionDetail[] {
     turns,
     lastContinuePrompt: readString(candidate.lastContinuePrompt),
   }];
-}
-
-function readChatSessionRecords(sessionsPath: string): unknown[] {
-  if (!existsSync(sessionsPath)) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(readFileSync(sessionsPath, 'utf8')) as unknown;
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
 }
 
 function projectChatSessionMessage(raw: unknown): ChatSessionMessage[] {

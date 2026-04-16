@@ -1,6 +1,6 @@
 {
   "name": "@roackb2/heddle",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "description": "An open-source terminal coding agent runtime and CLI with OpenAI and Anthropic support",
   "author": "Jay / Fienna Liang <roackb2@gmail.com>",
   "license": "MIT",
@@ -102,6 +102,7 @@
     "@inkjs/ui": "^2.0.0",
     "@trpc/client": "^11.16.0",
     "@trpc/server": "^11.16.0",
+    "commander": "^14.0.1",
     "express": "^5.2.1",
     "ink": "^6.8.0",
     "openai": "^4.86.2",

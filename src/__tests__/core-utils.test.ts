@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { createToolRegistry } from '../core/tools/registry.js';
-import { createBudget } from '../utils/budget.js';
-import { createTraceRecorder } from '../trace/recorder.js';
-import { isRepoReviewCommand } from '../run-agent/mutation-tracking.js';
-import type { ToolDefinition, TraceEvent } from '../types.js';
+import { createBudget } from '../core/utils/budget.js';
+import { createTraceRecorder } from '../core/trace/recorder.js';
+import { isRepoReviewCommand } from '../core/agent/mutation-tracking.js';
+import type { ToolDefinition, TraceEvent } from '../core/types.js';
 
 describe('createToolRegistry', () => {
   const fakeTool: ToolDefinition = {

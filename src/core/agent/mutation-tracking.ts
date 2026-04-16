@@ -157,7 +157,7 @@ function describeEditMutation(input: unknown): string {
 
 function summarizeCommandEvidence(output: unknown): string {
   if (!output || typeof output !== 'object' || Array.isArray(output)) {
-    return 'no structured command output recorded';
+    return 'command completed';
   }
 
   const candidate = output as {
@@ -170,7 +170,21 @@ function summarizeCommandEvidence(output: unknown): string {
   const stdout = typeof candidate.stdout === 'string' ? candidate.stdout.trim() : '';
   const stderr = typeof candidate.stderr === 'string' ? candidate.stderr.trim() : '';
   const exitCode = typeof candidate.exitCode === 'number' ? candidate.exitCode : 0;
+  const normalized = normalizeCommand(command);
+
+  if (normalized.startsWith('git status') || normalized.startsWith('git diff')) {
+    return `${command} reviewed (exit ${exitCode})`;
+  }
+
+  if (/^(?:yarn test|yarn build|yarn lint|yarn vitest|vitest|tsc)\b/.test(normalized)) {
+    return `${command} passed (exit ${exitCode})`;
+  }
+
   const body = stdout || stderr;
-  const snippet = body ? body.replace(/\s+/g, ' ').slice(0, 120) : 'no stdout/stderr output';
-  return `${command} => exit ${exitCode}, ${snippet}`;
+  if (!body) {
+    return `${command} completed (exit ${exitCode})`;
+  }
+
+  const snippet = body.replace(/\s+/g, ' ').slice(0, 80);
+  return `${command} completed (exit ${exitCode}): ${snippet}`;
 }

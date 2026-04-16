@@ -10,15 +10,15 @@ import {
 } from '../state/storage.js';
 
 type UseChatSessionsArgs = {
-  sessionsFile: string;
+  sessionCatalogFile: string;
   apiKeyPresent: boolean;
   defaultModel: string;
 };
 
-export function useChatSessions({ sessionsFile, apiKeyPresent, defaultModel }: UseChatSessionsArgs) {
+export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultModel }: UseChatSessionsArgs) {
   const initialSessionsRef = useRef<ChatSession[] | undefined>(undefined);
   if (!initialSessionsRef.current) {
-    initialSessionsRef.current = loadChatSessions(sessionsFile, apiKeyPresent).map((session) => ({
+    initialSessionsRef.current = loadChatSessions(sessionCatalogFile, apiKeyPresent).map((session) => ({
       ...session,
       model: session.model ?? defaultModel,
     }));
@@ -29,8 +29,8 @@ export function useChatSessions({ sessionsFile, apiKeyPresent, defaultModel }: U
   const [activeSessionId, setActiveSessionId] = useState(initialSessionsRef.current[0]?.id ?? 'session-1');
 
   useEffect(() => {
-    saveChatSessions(sessionsFile, sessions);
-  }, [sessionsFile, sessions]);
+    saveChatSessions(sessionCatalogFile, sessions);
+  }, [sessionCatalogFile, sessions]);
 
   const setSessionModel = (sessionId: string, model: string) => {
     updateSessionById(sessionId, (session) => ({

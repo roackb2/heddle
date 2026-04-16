@@ -67,7 +67,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     renameSession,
     removeSession,
   } = useChatSessions({
-    sessionsFile: runtime.sessionsFile,
+    sessionCatalogFile: runtime.sessionCatalogFile,
     apiKeyPresent: Boolean(runtime.apiKey),
     defaultModel: runtime.model,
   });

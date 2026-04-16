@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSystemPrompt } from '../prompts/system-prompt.js';
+import { buildSystemPrompt } from '../core/prompts/system-prompt.js';
 
 describe('buildSystemPrompt', () => {
   it('frames Heddle as a coding and workspace agent rather than a generic chatbot', () => {

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { runAgent } from '../run-agent.js';
-import type { ChatMessage, LlmAdapter, LlmResponse } from '../llm/types.js';
-import type { ToolDefinition } from '../types.js';
-import { createLogger } from '../utils/logger.js';
+import { runAgent } from '../core/agent/run-agent.js';
+import type { ChatMessage, LlmAdapter, LlmResponse } from '../core/llm/types.js';
+import type { ToolDefinition } from '../core/types.js';
+import { createLogger } from '../core/utils/logger.js';
 
 const silentLogger = createLogger({ level: 'silent', console: false });
 
@@ -745,7 +745,7 @@ describe('runAgent', () => {
 
         return {
           content:
-            'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output.\n- Remaining uncertainty: none.',
+            'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.',
         };
       },
     };
@@ -782,7 +782,7 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe(
-      'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output.\n- Remaining uncertainty: none.',
+      'Applied the fix and verified the repo state.\n\n- Changed: eslint --fix src/example.ts\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0)\n- Remaining uncertainty: none',
     );
     expect(seenMessages[2]).toContainEqual({
       role: 'system',
@@ -960,7 +960,7 @@ describe('runAgent', () => {
 
         return {
           content:
-            'Applied the fix, verified it, and pushed it.\n- Changed: eslint --fix src/example.ts; git add src/example.ts && git commit -m "fix example" && git push\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output\n- Remaining uncertainty: none.',
+            'Applied the fix, verified it, and pushed it.\n- Changed: eslint --fix src/example.ts; git add src/example.ts && git commit -m "fix example" && git push\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0)\n- Remaining uncertainty: none.',
         };
       },
     };
@@ -1049,7 +1049,7 @@ describe('runAgent', () => {
 
         return {
           content:
-            'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output.\n- Remaining uncertainty: none.',
+            'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.',
         };
       },
     };
@@ -1086,7 +1086,7 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe(
-      'I made the change and it looks good.\n\n- Changed: eslint --fix src/example.ts\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output\n- Remaining uncertainty: none',
+      'I made the change and it looks good.\n\n- Changed: eslint --fix src/example.ts\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0)\n- Remaining uncertainty: none',
     );
   });
 
@@ -1131,7 +1131,7 @@ describe('runAgent', () => {
 
         return {
           content:
-            'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output.\n- Remaining uncertainty: none.',
+            'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.',
         };
       },
     };
@@ -1168,7 +1168,7 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe(
-      'Applied the fix and checked it.\n\n- Changed: eslint --fix src/example.ts\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output\n- Remaining uncertainty: none',
+      'Applied the fix and checked it.\n\n- Changed: eslint --fix src/example.ts\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0)\n- Remaining uncertainty: none',
     );
   });
 
@@ -1232,7 +1232,7 @@ describe('runAgent', () => {
 
         return {
           content:
-            'Moved the file and completed the required follow-up checks.\n- Changed: moved docs/old.md to docs/new.md.\n- Verified: reviewed git diff --stat and yarn test passed.\n- Remaining uncertainty: none.',
+            'Moved the file and completed the required follow-up checks.\n- Changed: moved docs/old.md to docs/new.md.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.',
         };
       },
     };

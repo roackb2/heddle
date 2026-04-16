@@ -1,8 +1,9 @@
+import { memo } from 'react';
 import type { ChatSessionDetail, ChatTurnReview, ControlPlaneState } from '../../../lib/api';
 import { formatShortDate, short, toneFor, className } from '../utils';
 import { CodeBlock, EmptyState, Pill } from './common';
 
-export function SessionListButton({
+export const SessionListButton = memo(function SessionListButton({
   session,
   active,
   onClick,
@@ -25,9 +26,9 @@ export function SessionListButton({
       {session.lastSummary ? <p className="button-copy muted-copy">{short(session.lastSummary, 120)}</p> : null}
     </button>
   );
-}
+});
 
-export function TaskListButton({
+export const TaskListButton = memo(function TaskListButton({
   task,
   active,
   onClick,
@@ -49,9 +50,9 @@ export function TaskListButton({
       <p className="button-copy">{short(task.task, 112)}</p>
     </button>
   );
-}
+});
 
-export function RunListButton({
+export const RunListButton = memo(function RunListButton({
   run,
   active,
   onClick,
@@ -73,9 +74,9 @@ export function RunListButton({
       <p className="button-copy muted-copy">{short(run.summary, 96)}</p>
     </button>
   );
-}
+});
 
-export function TurnListButton({
+export const TurnListButton = memo(function TurnListButton({
   turn,
   active,
   onClick,
@@ -96,9 +97,9 @@ export function TurnListButton({
       <p className="button-copy muted-copy">{short(turn.summary, 110)}</p>
     </button>
   );
-}
+});
 
-export function CommandList({ commands, empty }: { commands: Exclude<ChatTurnReview, null>['reviewCommands']; empty: string }) {
+export const CommandList = memo(function CommandList({ commands, empty }: { commands: Exclude<ChatTurnReview, null>['reviewCommands']; empty: string }) {
   return commands.length ? (
     <div className="stack-list compact">
       {commands.map((command) => (
@@ -116,4 +117,4 @@ export function CommandList({ commands, empty }: { commands: Exclude<ChatTurnRev
       ))}
     </div>
   ) : <EmptyState title="No evidence" body={empty} />;
-}
+});

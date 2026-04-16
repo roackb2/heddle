@@ -8,7 +8,23 @@ import {
 import type { ChatMessage } from '../llm/types.js';
 
 describe('buildConversationMessages', () => {
-  it('renders successful edit_file tool results into visible conversation history', () => {
+  it('renders successful edit_file tool results as tool-name plus raw tool payload history', () => {
+    const payload = JSON.stringify({
+      ok: true,
+      output: {
+        path: 'src/example.ts',
+        action: 'replaced',
+        matchCount: 1,
+        bytesWritten: 42,
+        diff: {
+          path: 'src/example.ts',
+          action: 'replaced',
+          diff: ['--- a/src/example.ts', '+++ b/src/example.ts', '@@ -1 +1 @@', '-const value = "old";', '+const value = "new";'].join('\n'),
+          truncated: false,
+        },
+      },
+    });
+
     const history: ChatMessage[] = [
       { role: 'user', content: 'Update the file.' },
       {
@@ -19,21 +35,7 @@ describe('buildConversationMessages', () => {
       {
         role: 'tool',
         toolCallId: 'call-1',
-        content: JSON.stringify({
-          ok: true,
-          output: {
-            path: 'src/example.ts',
-            action: 'replaced',
-            matchCount: 1,
-            bytesWritten: 42,
-            diff: {
-              path: 'src/example.ts',
-              action: 'replaced',
-              diff: ['--- a/src/example.ts', '+++ b/src/example.ts', '@@ -1 +1 @@', '-const value = "old";', '+const value = "new";'].join('\n'),
-              truncated: false,
-            },
-          },
-        }),
+        content: payload,
       },
       { role: 'assistant', content: 'Done.' },
     ];
@@ -43,15 +45,12 @@ describe('buildConversationMessages', () => {
     expect(messages).toHaveLength(4);
     expect(messages[2]).toMatchObject({
       role: 'assistant',
-      text: expect.stringContaining('## Edited `src/example.ts`'),
+      text: `edit_file: ${payload}`,
     });
-    expect(messages[2]?.text).toContain('Action: replaced');
-    expect(messages[2]?.text).toContain('Matches changed: 1');
-    expect(messages[2]?.text).toContain('```diff');
-    expect(messages[2]?.text).toContain('+const value = "new";');
   });
 
-  it('does not render non-edit tool results into conversation history', () => {
+  it('renders non-edit tool results into conversation history with the tool prefix', () => {
+    const payload = JSON.stringify({ ok: true, output: 'README.md\nsrc/' });
     const history: ChatMessage[] = [
       { role: 'user', content: 'Inspect the repo.' },
       {
@@ -62,7 +61,7 @@ describe('buildConversationMessages', () => {
       {
         role: 'tool',
         toolCallId: 'call-1',
-        content: JSON.stringify({ ok: true, output: 'README.md\nsrc/' }),
+        content: payload,
       },
     ];
 
@@ -71,10 +70,23 @@ describe('buildConversationMessages', () => {
     expect(messages).toEqual([
       { id: 'user-0-Inspect the repo.', role: 'user', text: 'Inspect the repo.' },
       { id: 'assistant-1-I will inspect.', role: 'assistant', text: 'I will inspect.' },
+      { id: `tool-2-list_files: ${payload}`, role: 'assistant', text: `list_files: ${payload}` },
     ]);
   });
 
-  it('renders update_plan tool results into visible checklist history', () => {
+  it('renders update_plan tool results as tool-name plus raw tool payload history', () => {
+    const payload = JSON.stringify({
+      ok: true,
+      output: {
+        explanation: 'Tracking the next implementation slice.',
+        plan: [
+          { step: 'Inspect roadmap and runtime state', status: 'completed' },
+          { step: 'Implement the next bounded capability', status: 'in_progress' },
+          { step: 'Verify with tests and build', status: 'pending' },
+        ],
+      },
+    });
+
     const history: ChatMessage[] = [
       { role: 'user', content: 'Move the project forward.' },
       {
@@ -85,28 +97,14 @@ describe('buildConversationMessages', () => {
       {
         role: 'tool',
         toolCallId: 'call-1',
-        content: JSON.stringify({
-          ok: true,
-          output: {
-            explanation: 'Tracking the next implementation slice.',
-            plan: [
-              { step: 'Inspect roadmap and runtime state', status: 'completed' },
-              { step: 'Implement the next bounded capability', status: 'in_progress' },
-              { step: 'Verify with tests and build', status: 'pending' },
-            ],
-          },
-        }),
+        content: payload,
       },
     ];
 
     const messages = buildConversationMessages(history);
 
     expect(messages).toHaveLength(3);
-    expect(messages[2]?.text).toContain('## Plan');
-    expect(messages[2]?.text).toContain('Tracking the next implementation slice.');
-    expect(messages[2]?.text).toContain('- [x] Inspect roadmap and runtime state');
-    expect(messages[2]?.text).toContain('- [-] Implement the next bounded capability');
-    expect(messages[2]?.text).toContain('- [ ] Verify with tests and build');
+    expect(messages[2]?.text).toBe(`update_plan: ${payload}`);
   });
 
   it('formats a live edit preview into the same visible diff block shape', () => {

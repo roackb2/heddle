@@ -1,8 +1,24 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type { ChatMessage } from '../../index.js';
 import type { ChatContextStats, ChatSession, ConversationLine, TurnSummary } from './types.js';
 import { truncate } from './format.js';
+
+type ChatSessionCatalogEntry = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  model?: string;
+  driftEnabled?: boolean;
+  lastContinuePrompt?: string;
+  context?: ChatContextStats;
+};
+
+type ChatSessionCatalog = {
+  version: 1;
+  sessions: ChatSessionCatalogEntry[];
+};
 
 export function createInitialMessages(apiKeyPresent: boolean): ConversationLine[] {
   return [
@@ -60,31 +76,14 @@ export function isGenericSessionName(name: string): boolean {
 }
 
 export function loadChatSessions(sessionsPath: string, apiKeyPresent: boolean): ChatSession[] {
-  try {
-    if (!existsSync(sessionsPath)) {
-      return [
-        createChatSession({
-          id: 'session-1',
-          name: 'Session 1',
-          apiKeyPresent,
-        }),
-      ];
-    }
+  const resolved = loadChatSessionsFromCurrentStorage(sessionsPath, apiKeyPresent);
+  if (resolved.length > 0) {
+    return resolved;
+  }
 
-    const raw = readFileSync(sessionsPath, 'utf8');
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) {
-      throw new Error('Expected session array');
-    }
-
-    const sessions = parsed.flatMap((value) => parseSavedSession(value, apiKeyPresent));
-    if (sessions.length > 0) {
-      return sessions.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-    }
-  } catch (error) {
-    process.stderr.write(
-      `Failed to load chat sessions from ${sessionsPath}: ${error instanceof Error ? error.message : String(error)}\n`,
-    );
+  const migrated = migrateLegacyChatSessions(sessionsPath, apiKeyPresent);
+  if (migrated.length > 0) {
+    return migrated;
   }
 
   return [
@@ -96,9 +95,312 @@ export function loadChatSessions(sessionsPath: string, apiKeyPresent: boolean): 
   ];
 }
 
+export function readChatSessionCatalog(sessionsPath: string): ChatSessionCatalogEntry[] {
+  const paths = deriveSessionStoragePaths(sessionsPath);
+  const catalog = readCatalog(paths.catalogPath);
+  return catalog?.sessions.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)) ?? [];
+}
+
+export function readChatSession(sessionsPath: string, sessionId: string, apiKeyPresent: boolean): ChatSession | undefined {
+  const paths = deriveSessionStoragePaths(sessionsPath);
+  const catalog = readCatalog(paths.catalogPath);
+  const entry = catalog?.sessions.find((candidate) => candidate.id === sessionId);
+  if (!entry) {
+    return undefined;
+  }
+
+  return readSessionFile(paths.sessionsDir, entry, apiKeyPresent)[0];
+}
+
+export function migrateLegacyChatSessions(sessionsPath: string, apiKeyPresent: boolean): ChatSession[] {
+  const legacySessions = loadLegacyChatSessions(sessionsPath, apiKeyPresent);
+  if (legacySessions.length === 0) {
+    return [];
+  }
+
+  saveChatSessions(sessionsPath, legacySessions);
+  return legacySessions.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
 export function saveChatSessions(sessionsPath: string, sessions: ChatSession[]) {
   mkdirSync(dirname(sessionsPath), { recursive: true });
-  writeFileSync(sessionsPath, JSON.stringify(sessions, null, 2));
+  const paths = deriveSessionStoragePaths(sessionsPath);
+  mkdirSync(paths.sessionsDir, { recursive: true });
+
+  const sorted = dedupeSessionsById(sessions).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  const previousCatalog = readCatalog(paths.catalogPath);
+  const previousSessionBodies = new Map<string, string>();
+  for (const entry of previousCatalog?.sessions ?? []) {
+    const body = readSessionFileContents(paths.sessionsDir, entry.id);
+    if (body !== undefined) {
+      previousSessionBodies.set(entry.id, body);
+    }
+  }
+
+  for (const session of sorted) {
+    writeSessionFileIfChanged(paths.sessionsDir, session, previousSessionBodies.get(session.id));
+  }
+
+  const catalog: ChatSessionCatalog = {
+    version: 1,
+    sessions: sorted.map((session) => projectCatalogEntry(session)),
+  };
+
+  writeCatalogIfChanged(paths.catalogPath, catalog, previousCatalog);
+  removeOrphanedSessionFiles(paths.sessionsDir, catalog.sessions.map((session) => session.id));
+}
+
+export function deriveSessionStoragePaths(storagePath: string) {
+  const stateDir = dirname(storagePath);
+  const legacyPath = storagePath.endsWith('chat-sessions.catalog.json') ? join(stateDir, 'chat-sessions.json') : storagePath;
+  return {
+    legacyPath,
+    catalogPath: join(stateDir, 'chat-sessions.catalog.json'),
+    sessionsDir: join(stateDir, 'chat-sessions'),
+  };
+}
+
+function loadChatSessionsFromCurrentStorage(sessionsPath: string, apiKeyPresent: boolean): ChatSession[] {
+  const paths = deriveSessionStoragePaths(sessionsPath);
+  return loadSessionsFromCatalog(paths, apiKeyPresent);
+}
+
+function loadSessionsFromCatalog(paths: ReturnType<typeof deriveSessionStoragePaths>, apiKeyPresent: boolean): ChatSession[] {
+  if (!existsSync(paths.catalogPath)) {
+    return [];
+  }
+
+  try {
+    const raw = JSON.parse(readFileSync(paths.catalogPath, 'utf8')) as unknown;
+    const catalog = parseCatalog(raw);
+    if (!catalog) {
+      return [];
+    }
+
+    const sessions = catalog.sessions.flatMap((entry) => readSessionFile(paths.sessionsDir, entry, apiKeyPresent));
+    return sessions.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  } catch (error) {
+    process.stderr.write(
+      `Failed to load chat session catalog from ${paths.catalogPath}: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    return [];
+  }
+}
+
+function loadLegacyChatSessions(sessionsPath: string, apiKeyPresent: boolean): ChatSession[] {
+  try {
+    if (!existsSync(sessionsPath)) {
+      return [];
+    }
+
+    const raw = readFileSync(sessionsPath, 'utf8');
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      throw new Error('Expected session array');
+    }
+
+    return parsed
+      .flatMap((value) => parseSavedSession(value, apiKeyPresent))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  } catch (error) {
+    process.stderr.write(
+      `Failed to load chat sessions from ${sessionsPath}: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    return [];
+  }
+}
+
+function parseCatalog(value: unknown): ChatSessionCatalog | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const candidate = value as Partial<ChatSessionCatalog> & { sessions?: unknown };
+  if (candidate.version !== 1 || !Array.isArray(candidate.sessions)) {
+    return undefined;
+  }
+
+  const sessions = candidate.sessions.flatMap(parseCatalogEntry);
+  return { version: 1, sessions };
+}
+
+function parseCatalogEntry(value: unknown): ChatSessionCatalogEntry[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return [];
+  }
+
+  const candidate = value as Partial<ChatSessionCatalogEntry>;
+  if (typeof candidate.id !== 'string' || typeof candidate.name !== 'string') {
+    return [];
+  }
+
+  const createdAt = typeof candidate.createdAt === 'string' ? candidate.createdAt : new Date().toISOString();
+  const updatedAt = typeof candidate.updatedAt === 'string' ? candidate.updatedAt : createdAt;
+
+  return [{
+    id: candidate.id,
+    name: candidate.name,
+    createdAt,
+    updatedAt,
+    model: typeof candidate.model === 'string' ? candidate.model : undefined,
+    driftEnabled: typeof candidate.driftEnabled === 'boolean' ? candidate.driftEnabled : true,
+    lastContinuePrompt: typeof candidate.lastContinuePrompt === 'string' ? candidate.lastContinuePrompt : undefined,
+    context: isChatContextStats(candidate.context) ? candidate.context : undefined,
+  }];
+}
+
+function projectCatalogEntry(session: ChatSession): ChatSessionCatalogEntry {
+  return {
+    id: session.id,
+    name: session.name,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    model: session.model,
+    driftEnabled: session.driftEnabled,
+    lastContinuePrompt: session.lastContinuePrompt,
+    context: session.context,
+  };
+}
+
+function readSessionFile(
+  sessionsDir: string,
+  entry: ChatSessionCatalogEntry,
+  apiKeyPresent: boolean,
+): ChatSession[] {
+  const path = sessionFilePath(sessionsDir, entry.id);
+  if (!existsSync(path)) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    const payload = readObjectRecord(parsed);
+    if (!payload) {
+      return [];
+    }
+
+    return [{
+      id: entry.id,
+      name: entry.name,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+      model: entry.model,
+      driftEnabled: entry.driftEnabled,
+      lastContinuePrompt: entry.lastContinuePrompt,
+      context: entry.context,
+      history: Array.isArray(payload.history) ? payload.history as ChatMessage[] : [],
+      messages:
+        Array.isArray(payload.messages) && payload.messages.length > 0 ?
+          payload.messages.filter(isConversationLine)
+        : createInitialMessages(apiKeyPresent),
+      turns: Array.isArray(payload.turns) ? payload.turns.filter(isTurnSummary) : [],
+    }];
+  } catch (error) {
+    process.stderr.write(
+      `Failed to load chat session file ${path}: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    return [];
+  }
+}
+
+function writeSessionFileIfChanged(sessionsDir: string, session: ChatSession, previousContent?: string) {
+  const path = sessionFilePath(sessionsDir, session.id);
+  const nextContent = serializeSessionBody(session);
+  if (previousContent === nextContent) {
+    return;
+  }
+
+  writeFileSync(path, nextContent);
+}
+
+function writeCatalogIfChanged(
+  catalogPath: string,
+  catalog: ChatSessionCatalog,
+  previousCatalog?: ChatSessionCatalog,
+) {
+  const nextContent = `${JSON.stringify(catalog, null, 2)}\n`;
+  const previousContent = previousCatalog ? `${JSON.stringify(previousCatalog, null, 2)}\n` : undefined;
+  if (previousContent === nextContent) {
+    return;
+  }
+
+  writeFileSync(catalogPath, nextContent);
+}
+
+function serializeSessionBody(session: ChatSession): string {
+  return `${JSON.stringify({
+    id: session.id,
+    history: session.history,
+    messages: session.messages,
+    turns: session.turns,
+  }, null, 2)}\n`;
+}
+
+function readSessionFileContents(sessionsDir: string, sessionId: string): string | undefined {
+  const path = sessionFilePath(sessionsDir, sessionId);
+  if (!existsSync(path)) {
+    return undefined;
+  }
+
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+function readCatalog(catalogPath: string): ChatSessionCatalog | undefined {
+  if (!existsSync(catalogPath)) {
+    return undefined;
+  }
+
+  try {
+    return parseCatalog(JSON.parse(readFileSync(catalogPath, 'utf8')) as unknown);
+  } catch {
+    return undefined;
+  }
+}
+
+function dedupeSessionsById(sessions: ChatSession[]): ChatSession[] {
+  const seen = new Set<string>();
+  const deduped: ChatSession[] = [];
+  for (const session of sessions) {
+    if (seen.has(session.id)) {
+      continue;
+    }
+
+    seen.add(session.id);
+    deduped.push(session);
+  }
+
+  return deduped;
+}
+
+function sessionFilePath(sessionsDir: string, sessionId: string): string {
+  return join(sessionsDir, `${sessionId}.json`);
+}
+
+function removeOrphanedSessionFiles(sessionsDir: string, activeSessionIds: string[]) {
+  if (!existsSync(sessionsDir)) {
+    return;
+  }
+
+  const allowed = new Set(activeSessionIds.map((id) => `${id}.json`));
+  for (const name of safeReadDirFiles(sessionsDir)) {
+    if (allowed.has(name) || !name.endsWith('.json')) {
+      continue;
+    }
+
+    unlinkSync(join(sessionsDir, name));
+  }
+}
+
+function safeReadDirFiles(path: string): string[] {
+  try {
+    return readdirSync(path);
+  } catch {
+    return [];
+  }
 }
 
 function parseSavedSession(value: unknown, apiKeyPresent: boolean): ChatSession[] {
@@ -180,4 +482,8 @@ function isChatContextStats(value: unknown): value is ChatContextStats {
     (candidate.compactedMessages === undefined || typeof candidate.compactedMessages === 'number') &&
     (candidate.compactedAt === undefined || typeof candidate.compactedAt === 'string')
   );
+}
+
+function readObjectRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
 }

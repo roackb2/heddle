@@ -224,7 +224,13 @@ heddle daemon
 By default, the daemon binds to `127.0.0.1:8765` and serves the built web app plus the tRPC API. The current browser UI surfaces:
 
 - workspace and `.heddle/` state location
-- saved chat sessions with sidebar navigation, conversation view, and review-oriented detail inspection
+- saved chat sessions with sidebar navigation, resizable desktop panels, conversation view, and review-oriented detail inspection
+- browser-side session actions for new session, send, continue, cancel, and pending approval resolution
+- live per-session updates over SSE for run status, tool progress, assistant streaming text, and saved-session changes
+- a model selector backed by the server-side built-in model catalog, plus a drift toggle and latest trace-derived drift level
+- debounced `@file` mention suggestions in the composer, backed by a capped workspace file search endpoint
+- compact tool-result cards for saved tool outputs such as `list_files: {...}`
+- lightweight toast notifications for session/action success and failure
 - heartbeat task status, scheduling state, selected task detail, and run history
 - recent heartbeat run summaries and usage data
 
@@ -241,7 +247,28 @@ yarn server:dev
 yarn client:dev
 ```
 
-`yarn server:dev` starts the tRPC server at `127.0.0.1:8765`. `yarn client:dev` starts the Vite client and proxies `/trpc` to the server.
+`yarn server:dev` starts the backend API server only at `127.0.0.1:8765`. It does not serve the web app shell at `/`.
+
+`yarn client:dev` starts the Vite web client at `127.0.0.1:5173` and proxies `/trpc` and `/control-plane` requests to the backend server.
+
+In other words:
+
+- development mode uses two services:
+  - backend API on `8765`
+  - Vite frontend on `5173`
+- built daemon mode uses one service:
+  - `heddle daemon` serves both the built web client and the backend API on the same port
+
+For built/local operator usage, run:
+
+```bash
+yarn build
+heddle daemon
+```
+
+That path serves the built control-plane frontend from `dist/src/web` and mounts the backend API and session-event endpoints from the same daemon process. If you open the backend dev server port directly while only `yarn server:dev` is running, you may see `Cannot GET /`, because that dev path is API-only.
+
+If you add or change control-plane tRPC routes, restart the daemon/server process. Vite hot reload updates the browser bundle only; a still-running daemon will not know about new procedures and may return `No procedure found on path ...`.
 
 The server writes pino logs to `.heddle/logs/server.log` by default. Override the path with:
 
@@ -249,7 +276,7 @@ The server writes pino logs to `.heddle/logs/server.log` by default. Override th
 HEDDLE_SERVER_LOG_FILE=/path/to/server.log yarn server:dev
 ```
 
-The control plane is still early and not yet a full browser-native chat/operator surface. The next milestones are browser-side `send message` and `continue` actions for sessions, heartbeat task actions, and richer live run updates.
+The control plane is still early and not yet a full IDE-like browser-native operator surface. The next milestones are manual validation of the browser session flows against real `.heddle` state, heartbeat task mutations, and structured file-level review payloads for a richer diff viewer.
 
 ## Knowledge Persistence
 
@@ -587,6 +614,7 @@ Heddle currently supports:
 - local screenshot and image inspection through `view_image`
 - native browser control plane through `heddle daemon`
 - inline `@file` mentions for file-priority context without pasting file contents into the prompt
+- browser composer `@file` suggestions in the control plane, backed by workspace file search
 - shell execution with inspect vs approval-gated mutate behavior
 - multi-turn chat sessions with saved history under `.heddle/`
 - session management with create, switch, continue, rename, and close flows

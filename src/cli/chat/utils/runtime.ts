@@ -23,7 +23,7 @@ export type ChatRuntimeConfig = {
   apiKeyProvider?: LlmProvider | 'explicit';
   stateRoot: string;
   logFile: string;
-  sessionsFile: string;
+  sessionCatalogFile: string;
   approvalsFile: string;
   traceDir: string;
   memoryDir: string;
@@ -51,7 +51,7 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
     workspaceRoot,
     stateRoot,
     logFile: join(stateRoot, 'logs', `${sessionId}.log`),
-    sessionsFile: join(stateRoot, 'chat-sessions.json'),
+    sessionCatalogFile: join(stateRoot, 'chat-sessions.catalog.json'),
     approvalsFile: join(stateRoot, 'command-approvals.json'),
     traceDir: join(stateRoot, 'traces'),
     memoryDir: join(stateRoot, 'memory'),

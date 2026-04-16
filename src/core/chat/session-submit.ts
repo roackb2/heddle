@@ -6,6 +6,7 @@ import {
   inferProviderFromModel,
   runAgentLoop,
 } from '../../index.js';
+import type { ToolCall, ToolDefinition } from '../../index.js';
 import { compactChatHistory, estimateChatHistoryTokens } from './compaction.js';
 import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
 import type { ChatSession } from './types.js';
@@ -13,16 +14,21 @@ import { buildConversationMessages, countAssistantSteps, formatChatFailureMessag
 import { saveTrace } from './trace.js';
 import { resolveApiKeyForModel } from '../../core/runtime/api-keys.js';
 
+import type { AgentLoopEvent } from '../../index.js';
+
 export type SubmitChatSessionPromptArgs = {
   workspaceRoot: string;
   stateRoot: string;
-  sessionsPath: string;
+  sessionStoragePath: string;
   sessionId: string;
   prompt: string;
+  onEvent?: (event: AgentLoopEvent) => void;
+  approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
+  abortSignal?: AbortSignal;
 };
 
 export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs) {
-  const sessions = loadChatSessions(args.sessionsPath, true);
+  const sessions = loadChatSessions(args.sessionStoragePath, true);
   const session = sessions.find((candidate) => candidate.id === args.sessionId);
   if (!session) {
     throw new Error(`Chat session not found: ${args.sessionId}`);
@@ -56,6 +62,9 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
     tools,
     includeDefaultTools: false,
     history: session.history,
+    onEvent: args.onEvent,
+    approveToolCall: args.approveToolCall,
+    abortSignal: args.abortSignal,
   });
 
   const compacted = compactChatHistory({
@@ -94,7 +103,7 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
   });
 
   const nextSessions = sessions.map((candidate) => candidate.id === session.id ? updatedSession : candidate);
-  saveChatSessions(args.sessionsPath, nextSessions);
+  saveChatSessions(args.sessionStoragePath, nextSessions);
 
   return {
     outcome: result.outcome,

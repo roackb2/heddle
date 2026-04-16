@@ -1261,6 +1261,11 @@ combined-stream@^1.0.8:
   dependencies:
     delayed-stream "~1.0.0"
 
+commander@^14.0.1:
+  version "14.0.3"
+  resolved "https://registry.yarnpkg.com/commander/-/commander-14.0.3.tgz#425d79b48f9af82fcd9e4fc1ea8af6c5ec07bbc2"
+  integrity sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==
+
 content-disposition@^1.0.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/content-disposition/-/content-disposition-1.1.0.tgz#f3db789c752d45564cc7e9e1e0b31790d4a38e17"

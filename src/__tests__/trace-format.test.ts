@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatTraceForConsole } from '../trace/format.js';
+import { formatTraceForConsole } from '../core/trace/format.js';
 
 describe('formatTraceForConsole', () => {
   it('renders assistant turns with text and requested tools', () => {
