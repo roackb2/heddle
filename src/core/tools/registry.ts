@@ -2,7 +2,7 @@
 // Tool Registry
 // ---------------------------------------------------------------------------
 
-import type { ToolDefinition } from '../../types.js';
+import type { ToolDefinition } from '../types.js';
 
 export type ToolRegistry = {
   get(name: string): ToolDefinition | undefined;

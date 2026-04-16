@@ -3,7 +3,7 @@ import { basename, dirname, join } from 'node:path';
 import { runAgentHeartbeat } from './heartbeat.js';
 import type { AgentHeartbeatResult, HeartbeatDecision, RunAgentHeartbeatOptions } from './heartbeat.js';
 import type { AgentLoopCheckpoint, AgentLoopState } from './events.js';
-import type { LlmUsage } from '../../llm/types.js';
+import type { LlmUsage } from '../llm/types.js';
 import { suggestNextHeartbeatDelayMs } from './heartbeat-store.js';
 
 export type HeartbeatTask = {

@@ -13,7 +13,7 @@ import {
   shouldShowSlashHints,
   SlashHintPanel,
 } from './components/index.js';
-import { estimateBuiltInContextWindow, filterBuiltInModels } from '../../llm/openai-models.js';
+import { estimateBuiltInContextWindow, filterBuiltInModels } from '../../core/llm/openai-models.js';
 import type { CyberLoopDriftLevel } from '../../index.js';
 import { useApprovalFlow } from './hooks/useApprovalFlow.js';
 import { useAgentRun } from './hooks/useAgentRun.js';

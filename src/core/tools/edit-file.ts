@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'node:path';
-import type { ToolDefinition, ToolResult } from '../../types.js';
+import type { ToolDefinition, ToolResult } from '../types.js';
 import {
   executeScopedEdit,
   isScopedEditInput,

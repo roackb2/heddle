@@ -72,7 +72,7 @@ export { resolveApiKeyForModel, resolveProviderApiKey } from './core/runtime/api
 export type { ApiKeyRuntime } from './core/runtime/api-keys.js';
 export { createDefaultAgentTools } from './core/runtime/default-tools.js';
 export type { DefaultAgentToolsOptions } from './core/runtime/default-tools.js';
-export { DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL } from './config.js';
+export { DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL } from './core/config.js';
 
 // Integrations
 export {
@@ -111,7 +111,7 @@ export type {
   ToolResult,
   TraceEvent,
   StopReason,
-} from './types.js';
+} from './core/types.js';
 
 // LLM
 export type {
@@ -122,13 +122,13 @@ export type {
   LlmAdapterCapabilities,
   LlmAdapterInfo,
   LlmUsage,
-} from './llm/types.js';
-export { createLlmAdapter, inferProviderFromModel, resolveLlmProvider } from './llm/factory.js';
-export type { CreateLlmAdapterOptions } from './llm/factory.js';
-export { createOpenAiAdapter } from './llm/openai.js';
-export type { OpenAiAdapterOptions } from './llm/openai.js';
-export { createAnthropicAdapter } from './llm/anthropic.js';
-export type { AnthropicAdapterOptions } from './llm/anthropic.js';
+} from './core/llm/types.js';
+export { createLlmAdapter, inferProviderFromModel, resolveLlmProvider } from './core/llm/factory.js';
+export type { CreateLlmAdapterOptions } from './core/llm/factory.js';
+export { createOpenAiAdapter } from './core/llm/openai.js';
+export type { OpenAiAdapterOptions } from './core/llm/openai.js';
+export { createAnthropicAdapter } from './core/llm/anthropic.js';
+export type { AnthropicAdapterOptions } from './core/llm/anthropic.js';
 export {
   OPENAI_MODEL_GROUPS,
   COMMON_OPENAI_MODELS,
@@ -138,8 +138,8 @@ export {
   estimateOpenAiContextWindow,
   estimateBuiltInContextWindow,
   filterBuiltInModels,
-} from './llm/openai-models.js';
-export type { BuiltInModelGroup } from './llm/openai-models.js';
+} from './core/llm/openai-models.js';
+export type { BuiltInModelGroup } from './core/llm/openai-models.js';
 
 // Tools
 export { createToolRegistry } from './core/tools/registry.js';
@@ -178,7 +178,7 @@ export type { TraceRecorder } from './core/trace/recorder.js';
 export { formatTraceForConsole } from './core/trace/format.js';
 
 // Prompts
-export { buildSystemPrompt } from './prompts/system-prompt.js';
+export { buildSystemPrompt } from './core/prompts/system-prompt.js';
 
 // Utils
 export { createBudget } from './core/utils/budget.js';

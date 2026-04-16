@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import OpenAI from 'openai';
-import type { TraceEvent } from '../types.js';
+import type { TraceEvent } from '../core/types.js';
 import {
   createCyberLoopObserver,
   createRuntimeFrameEmbedder,

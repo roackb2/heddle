@@ -1,6 +1,6 @@
 import type { Logger } from 'pino';
-import type { ChatMessage, LlmAdapter } from '../../llm/types.js';
-import type { ToolCall, ToolDefinition } from '../../types.js';
+import type { ChatMessage, LlmAdapter } from '../llm/types.js';
+import type { ToolCall, ToolDefinition } from '../types.js';
 import { runAgentLoop } from './agent-loop.js';
 import { createAgentLoopCheckpoint } from './events.js';
 import type { AgentLoopCheckpoint, AgentLoopEvent, AgentLoopState } from './events.js';

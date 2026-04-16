@@ -1,5 +1,5 @@
-import type { LlmProvider } from '../../llm/types.js';
-import { inferProviderFromModel } from '../../llm/providers.js';
+import type { LlmProvider } from '../llm/types.js';
+import { inferProviderFromModel } from '../llm/providers.js';
 
 export type ApiKeyRuntime = {
   apiKey?: string;

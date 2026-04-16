@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import type { ToolDefinition } from '../../types.js';
+import type { ToolDefinition } from '../types.js';
 import { editFileTool } from '../tools/edit-file.js';
 import { listFilesTool } from '../tools/list-files.js';
 import {

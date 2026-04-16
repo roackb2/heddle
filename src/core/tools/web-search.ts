@@ -12,10 +12,10 @@ import type {
 } from '@anthropic-ai/sdk/resources/messages/messages';
 import OpenAI from 'openai';
 import type { Response, ResponseOutputText, WebSearchTool } from 'openai/resources/responses/responses.js';
-import type { ToolDefinition, ToolResult } from '../../types.js';
-import { inferProviderFromModel } from '../../llm/factory.js';
-import type { LlmProvider } from '../../llm/types.js';
-import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../../config.js';
+import type { ToolDefinition, ToolResult } from '../types.js';
+import { inferProviderFromModel } from '../llm/factory.js';
+import type { LlmProvider } from '../llm/types.js';
+import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../config.js';
 
 type WebSearchInput = {
   query: string;

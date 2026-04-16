@@ -3,13 +3,13 @@
 // A minimal, executable agent loop.
 // ---------------------------------------------------------------------------
 
-import type { RunResult, ToolDefinition, StopReason, ToolCall, ToolResult, TraceEvent } from './types.js';
-import type { LlmAdapter, LlmResponse, LlmUsage, ChatMessage, LlmStreamEvent } from './llm/types.js';
+import type { RunResult, ToolDefinition, StopReason, ToolCall, ToolResult, TraceEvent } from './core/types.js';
+import type { LlmAdapter, LlmResponse, LlmUsage, ChatMessage, LlmStreamEvent } from './core/llm/types.js';
 import { createToolRegistry } from './core/tools/registry.js';
 import type { ToolRegistry } from './core/tools/registry.js';
 import { createTraceRecorder } from './core/trace/recorder.js';
 import { createBudget } from './core/utils/budget.js';
-import { buildSystemPrompt } from './prompts/system-prompt.js';
+import { buildSystemPrompt } from './core/prompts/system-prompt.js';
 import { logger as defaultLogger } from './core/utils/logger.js';
 import type { Logger } from 'pino';
 

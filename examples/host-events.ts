@@ -13,7 +13,7 @@
  */
 
 import { runAgentLoop, runAgentHeartbeat, type AgentLoopEvent, type ToolDefinition } from '../src/index.js';
-import type { ChatMessage, LlmAdapter, LlmResponse } from '../src/llm/types.js';
+import type { ChatMessage, LlmAdapter, LlmResponse } from '../src/core/llm/types.js';
 
 // ---------------------------------------------------------------------------
 // Mock LLM for demo purposes (replace with real LLM in production)

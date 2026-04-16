@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { spawn } from 'node:child_process';
-import type { ToolDefinition, ToolResult } from '../../types.js';
+import type { ToolDefinition, ToolResult } from '../types.js';
 
 type RunShellInput = {
   command: string;

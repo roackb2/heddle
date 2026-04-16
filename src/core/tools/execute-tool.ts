@@ -2,7 +2,7 @@
 // Tool Executor
 // ---------------------------------------------------------------------------
 
-import type { ToolCall, ToolResult } from '../../types.js';
+import type { ToolCall, ToolResult } from '../types.js';
 import type { ToolRegistry } from './registry.js';
 
 const DEFAULT_TIMEOUT_MS = 30_000;

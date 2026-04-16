@@ -4,7 +4,7 @@
 // post-mutation requirements.
 // ---------------------------------------------------------------------------
 
-import type { ToolCall } from '../types.js';
+import type { ToolCall } from '../core/types.js';
 import { extractShellCommand } from './util.js';
 
 export type MutationState = {

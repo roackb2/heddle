@@ -13,7 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import { join } from 'node:path';
-import { inferProviderFromModel } from '../src/llm/providers.js';
+import { inferProviderFromModel } from '../src/core/llm/providers.js';
 import { resolveProviderApiKey } from '../src/core/runtime/api-keys.js';
 import { createFileHeartbeatCheckpointStore, runStoredHeartbeat } from '../src/core/runtime/heartbeat-store.js';
 

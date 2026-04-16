@@ -4,7 +4,7 @@
 
 import { readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import type { ToolDefinition, ToolResult } from '../../types.js';
+import type { ToolDefinition, ToolResult } from '../types.js';
 
 type ListFilesInput = {
   path?: string;

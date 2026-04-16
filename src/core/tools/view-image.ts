@@ -9,10 +9,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { ImageBlockParam } from '@anthropic-ai/sdk/resources/messages/messages';
 import OpenAI from 'openai';
 import type { ResponseInputImage, ResponseInputText } from 'openai/resources/responses/responses.js';
-import type { ToolDefinition, ToolResult } from '../../types.js';
-import { inferProviderFromModel } from '../../llm/factory.js';
-import type { LlmProvider } from '../../llm/types.js';
-import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../../config.js';
+import type { ToolDefinition, ToolResult } from '../types.js';
+import { inferProviderFromModel } from '../llm/factory.js';
+import type { LlmProvider } from '../llm/types.js';
+import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../config.js';
 
 type ViewImageInput = {
   path: string;

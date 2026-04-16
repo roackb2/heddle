@@ -2,7 +2,7 @@
 // Trace Recorder
 // ---------------------------------------------------------------------------
 
-import type { TraceEvent } from '../../types.js';
+import type { TraceEvent } from '../types.js';
 
 export type TraceRecorder = {
   record(event: TraceEvent): void;

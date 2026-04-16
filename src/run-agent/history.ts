@@ -3,8 +3,8 @@
 // Ensures interrupted or incomplete tool-call history does not poison later turns.
 // ---------------------------------------------------------------------------
 
-import type { ChatMessage } from '../llm/types.js';
-import type { ToolCall } from '../types.js';
+import type { ChatMessage } from '../core/llm/types.js';
+import type { ToolCall } from '../core/types.js';
 
 type AssistantWithTools = { role: 'assistant'; content: string; toolCalls: ToolCall[] };
 type ToolMessage = { role: 'tool'; content: string; toolCallId: string };

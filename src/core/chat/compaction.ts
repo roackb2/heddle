@@ -1,6 +1,6 @@
 import type { ChatMessage, LlmUsage } from '../../index.js';
-import { buildSystemPrompt } from '../../prompts/system-prompt.js';
-import { estimateBuiltInContextWindow } from '../../llm/openai-models.js';
+import { buildSystemPrompt } from '../prompts/system-prompt.js';
+import { estimateBuiltInContextWindow } from '../llm/openai-models.js';
 import type { ChatContextStats } from './types.js';
 
 const DEFAULT_CONTEXT_WINDOW_ESTIMATE = 200_000;
