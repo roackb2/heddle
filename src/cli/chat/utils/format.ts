@@ -11,6 +11,7 @@ export {
   countAssistantSteps,
   formatChatFailureMessage,
   summarizeTrace,
+  truncate,
 } from '../../../core/chat/format.js';
 import type { LiveEvent, PendingApproval } from '../state/types.js';
 
