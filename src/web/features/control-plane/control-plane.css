@@ -222,7 +222,7 @@ h3 {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: var(--session-sidebar-width, 288px) 6px minmax(420px, 1fr) 6px var(--session-side-width, 344px);
+  grid-template-columns: minmax(260px, var(--session-sidebar-width, 288px)) 6px minmax(560px, 1fr) 6px minmax(320px, var(--session-side-width, 344px));
   border: 1px solid var(--line);
   border-radius: 18px;
   overflow: hidden;
@@ -459,7 +459,6 @@ h3 {
   padding: 14px 18px 28px;
   overflow: auto;
 }
-
 
 .conversation-stack {
   min-height: 100%;
@@ -932,7 +931,7 @@ h3 {
 
 @media (max-width: 1180px) {
   .workspace-shell {
-    grid-template-columns: var(--session-sidebar-width, 252px) 6px minmax(420px, 1fr) 6px var(--session-side-width, 312px);
+    grid-template-columns: minmax(232px, var(--session-sidebar-width, 252px)) 6px minmax(420px, 1fr) 6px minmax(280px, var(--session-side-width, 312px));
   }
 }
 
@@ -1014,7 +1013,12 @@ h3 {
 }
 
 .mobile-nav-button,
-.mobile-side-header {
+.mobile-side-header,
+.mobile-task-shell,
+.mobile-task-screen,
+.mobile-task-header,
+.mobile-task-segmented,
+.mobile-task-meta {
   display: none;
 }
 
@@ -1023,7 +1027,8 @@ h3 {
     display: none;
   }
 
-  .mobile-session-screen {
+  .mobile-session-screen,
+  .mobile-task-screen {
     display: flex;
     flex: 1 1 auto;
     min-height: 0;
@@ -1040,13 +1045,15 @@ h3 {
   }
 
   .mobile-session-list .mobile-pane,
-  .mobile-session-review .mobile-pane {
+  .mobile-session-review .mobile-pane,
+  .mobile-task-screen .mobile-pane {
     display: flex;
     flex-direction: column;
     background: var(--panel-muted);
   }
 
-  .mobile-session-chat {
+  .mobile-session-chat,
+  .mobile-task-screen {
     min-height: 0;
   }
 
@@ -1073,13 +1080,16 @@ h3 {
     font-weight: 600;
   }
 
-  .mobile-side-header {
+  .mobile-side-header,
+  .mobile-task-header {
     display: block;
     padding: 12px 12px 0;
     background: var(--panel-muted);
   }
 
-  .workspace-header {
+  .workspace-header,
+  .mobile-task-segmented,
+  .mobile-task-meta {
     padding: 12px;
   }
 
@@ -1189,6 +1199,36 @@ h3 {
   }
 }
 
+.mobile-task-segmented {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-muted);
+}
+
+.mobile-task-segmented button {
+  flex: 1 1 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.mobile-task-segmented button.active {
+  border-color: rgba(125, 211, 252, 0.34);
+  background: rgba(125, 211, 252, 0.12);
+  color: var(--text);
+}
+
+.mobile-task-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-muted);
+}
+
 @media (max-width: 500px) {
   .toolbar {
     flex-wrap: wrap;
@@ -1223,7 +1263,9 @@ h3 {
   .side-tabs,
   .sidebar-scroll,
   .side-scroll,
-  .task-detail-scroll {
+  .task-detail-scroll,
+  .mobile-task-segmented,
+  .mobile-task-meta {
     padding: 10px;
   }
 

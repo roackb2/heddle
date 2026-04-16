@@ -276,7 +276,9 @@ export function SessionsWorkspace({
     setMobileView('review');
   };
 
-  if (mobileView === 'list') {
+  const showMobileLayout = typeof window !== 'undefined' && window.innerWidth <= 760;
+
+  if (showMobileLayout && mobileView === 'list') {
     return (
       <section className="mobile-session-screen mobile-session-list">
         <aside className="workspace-sidebar mobile-pane">
@@ -304,7 +306,7 @@ export function SessionsWorkspace({
     );
   }
 
-  if (mobileView === 'chat') {
+  if (showMobileLayout && mobileView === 'chat') {
     return (
       <section className="mobile-session-screen mobile-session-chat">
         <section className="workspace-main mobile-pane mobile-chat-pane">
@@ -481,7 +483,7 @@ export function SessionsWorkspace({
     );
   }
 
-  if (mobileView === 'review') {
+  if (showMobileLayout && mobileView === 'review') {
     return (
       <section className="mobile-session-screen mobile-session-review">
         <aside className="workspace-side mobile-pane">
@@ -571,7 +573,7 @@ export function SessionsWorkspace({
   }
 
   return (
-    <section className={shellClassName} ref={shellRef} style={workspaceStyle}>
+    <section className={shellClassName} ref={shellRef} style={workspaceStyle} data-mobile-view={mobileView}>
       <aside className="workspace-sidebar">
         <WorkspaceSectionHeader
           title="Sessions"
