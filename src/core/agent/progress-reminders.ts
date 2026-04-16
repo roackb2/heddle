@@ -3,7 +3,7 @@
 // drifting into planning/meta loops instead of executing or concluding.
 // ---------------------------------------------------------------------------
 
-import type { ToolCall, ToolResult } from '../core/types.js';
+import type { ToolCall, ToolResult } from '../types.js';
 import { isWorkspaceChangeMutateCommand } from './mutation-tracking.js';
 import { extractShellCommand } from './util.js';
 

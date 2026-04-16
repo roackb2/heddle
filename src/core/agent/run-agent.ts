@@ -3,29 +3,29 @@
 // A minimal, executable agent loop.
 // ---------------------------------------------------------------------------
 
-import type { RunResult, ToolDefinition, StopReason, ToolCall, ToolResult, TraceEvent } from './core/types.js';
-import type { LlmAdapter, LlmResponse, LlmUsage, ChatMessage, LlmStreamEvent } from './core/llm/types.js';
-import { createToolRegistry } from './core/tools/registry.js';
-import type { ToolRegistry } from './core/tools/registry.js';
-import { createTraceRecorder } from './core/trace/recorder.js';
-import { createBudget } from './core/utils/budget.js';
-import { buildSystemPrompt } from './core/prompts/system-prompt.js';
-import { logger as defaultLogger } from './core/utils/logger.js';
+import type { RunResult, ToolDefinition, StopReason, ToolCall, ToolResult, TraceEvent } from '../types.js';
+import type { LlmAdapter, LlmResponse, LlmUsage, ChatMessage, LlmStreamEvent } from '../llm/types.js';
+import { createToolRegistry } from '../tools/registry.js';
+import type { ToolRegistry } from '../tools/registry.js';
+import { createTraceRecorder } from '../trace/recorder.js';
+import { createBudget } from '../utils/budget.js';
+import { buildSystemPrompt } from '../prompts/system-prompt.js';
+import { logger as defaultLogger } from '../utils/logger.js';
 import type { Logger } from 'pino';
 
-import { sanitizeHistory } from './run-agent/history.js';
-import { isAbortError, isRecoverableToolError } from './run-agent/util.js';
-import { createMutationState, trackToolResult } from './run-agent/mutation-tracking.js';
-import { createProgressReminderState, buildProgressReminders } from './run-agent/progress-reminders.js';
+import { sanitizeHistory } from './history.js';
+import { isAbortError, isRecoverableToolError } from './util.js';
+import { createMutationState, trackToolResult } from './mutation-tracking.js';
+import { createProgressReminderState, buildProgressReminders } from './progress-reminders.js';
 import {
   buildPostMutationRequirement,
   buildImmediateReviewReminder,
   buildImmediateVerificationReminder,
   hasStructuredChangeSummary,
   buildStructuredChangeSummaryRequirement,
-} from './run-agent/post-mutation.js';
-import { maybeDenyToolCall, executeToolCallWithFallback } from './run-agent/tool-dispatch.js';
-import type { PlanItem } from './core/tools/update-plan.js';
+} from './post-mutation.js';
+import { maybeDenyToolCall, executeToolCallWithFallback } from './tool-dispatch.js';
+import type { PlanItem } from '../tools/update-plan.js';
 
 const PLAN_ITEM_STATUSES = new Set<PlanItem['status']>(['pending', 'in_progress', 'completed']);
 

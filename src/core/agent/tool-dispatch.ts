@@ -3,10 +3,10 @@
 // for the agent loop.
 // ---------------------------------------------------------------------------
 
-import type { ToolDefinition, ToolCall, TraceEvent } from '../core/types.js';
-import type { RunAgentOptions } from '../run-agent.js';
-import { createToolRegistry } from '../core/tools/registry.js';
-import { executeTool } from '../core/tools/execute-tool.js';
+import type { ToolDefinition, ToolCall, TraceEvent } from '../types.js';
+import type { RunAgentOptions } from './run-agent.js';
+import { createToolRegistry } from '../tools/registry.js';
+import { executeTool } from '../tools/execute-tool.js';
 import { stableSerialize, normalizeToolInput, buildRepeatedToolCallResult } from './util.js';
 import type { Logger } from 'pino';
 

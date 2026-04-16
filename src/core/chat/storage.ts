@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { ChatMessage } from '../../index.js';
 import type { ChatContextStats, ChatSession, ConversationLine, TurnSummary } from './types.js';
-import { truncate } from '../../cli/chat/utils/format.js';
+import { truncate } from './format.js';
 
 export function createInitialMessages(apiKeyPresent: boolean): ConversationLine[] {
   return [

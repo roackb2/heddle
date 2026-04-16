@@ -12,6 +12,6 @@
     "rootDir": "../..",
     "types": ["vite/client"]
   },
-  "include": ["**/*.ts", "**/*.tsx", "../server/**/*.ts", "../runtime/heartbeat-views.ts", "../llm/types.ts"],
+  "include": ["**/*.ts", "**/*.tsx", "../server/**/*.ts", "../core/runtime/heartbeat-views.ts", "../core/llm/types.ts"],
   "exclude": ["../../node_modules", "../../dist"]
 }

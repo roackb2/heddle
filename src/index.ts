@@ -3,8 +3,8 @@
 // ---------------------------------------------------------------------------
 
 // Core loop
-export { runAgent } from './run-agent.js';
-export type { RunAgentOptions } from './run-agent.js';
+export { runAgent } from './core/agent/run-agent.js';
+export type { RunAgentOptions } from './core/agent/run-agent.js';
 export { runAgentLoop } from './core/runtime/agent-loop.js';
 export type { AgentLoopEvent, AgentLoopResult, RunAgentLoopOptions } from './core/runtime/agent-loop.js';
 export { runAgentHeartbeat } from './core/runtime/heartbeat.js';

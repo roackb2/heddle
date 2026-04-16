@@ -203,9 +203,9 @@ Common flags:
 
 ## Control Plane
 
-Heddle includes an early local browser control plane for users who want a native UI instead of only terminal chat or third-party messaging apps.
+Heddle includes a local browser control plane for workspace oversight when you want a native UI in addition to terminal chat.
 
-This is still WIP. The current version is useful for read-only oversight, but it is not yet a full replacement for the TUI.
+The current control plane is still early, but it is now a practical read-only dashboard for local runs instead of only a placeholder.
 
 Current stack:
 
@@ -220,12 +220,12 @@ Start the daemon from a workspace:
 heddle daemon
 ```
 
-By default, the daemon binds to `127.0.0.1:8765` and serves the built web app plus the tRPC API. The first implementation surfaces:
+By default, the daemon binds to `127.0.0.1:8765` and serves the built web app plus the tRPC API. The current browser UI surfaces:
 
 - workspace and `.heddle/` state location
-- saved chat session inventory
-- heartbeat task status
-- recent heartbeat run summaries and usage
+- saved chat sessions projected into control-plane-friendly summaries
+- heartbeat task status and scheduling state
+- recent heartbeat run summaries and usage data
 
 You can override host and port:
 
@@ -248,7 +248,7 @@ The server writes pino logs to `.heddle/logs/server.log` by default. Override th
 HEDDLE_SERVER_LOG_FILE=/path/to/server.log yarn server:dev
 ```
 
-This control plane is intentionally read-only at first. The next milestones are session detail views, chat continuation from the browser, heartbeat task actions, and live run updates.
+This control plane remains read-only today. The next milestones are deeper session detail views, browser-side chat continuation, heartbeat task actions, and live run updates.
 
 ## Knowledge Persistence
 
