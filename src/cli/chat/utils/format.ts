@@ -168,16 +168,17 @@ export function summarizePendingApproval(pendingApproval: PendingApproval): Appr
   }
 
   if (pendingApproval.call.tool === 'edit_file') {
+    const scope = editPath && (editPath.startsWith('../') || editPath.startsWith('/') || editPath.includes('..\\')) ? 'external' : 'workspace';
     return {
-      title: 'Edit file',
+      title: scope === 'external' ? 'Edit external file' : 'Edit file',
       command: editPath,
-      scope: 'workspace',
+      scope,
       risk: 'medium',
       capability: 'file_edit',
       why: editPath ? `edit_file on ${editPath}` : 'approval required before editing a file',
       effects: [
-        editPath ? `modifies ${editPath}` : 'modifies a workspace file',
-        'stays inside the current repository',
+        editPath ? `modifies ${editPath}` : `modifies a ${scope} file`,
+        scope === 'external' ? 'writes outside the current repository' : 'stays inside the current repository',
       ],
       rememberLabel: pendingApproval.rememberLabel,
     };

@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it, expect, vi } from 'vitest';
 import { runAgent } from '../core/agent/run-agent.js';
 import type { ChatMessage, LlmAdapter, LlmResponse } from '../core/llm/types.js';
 import type { ToolDefinition } from '../core/types.js';
@@ -630,6 +633,167 @@ describe('runAgent', () => {
     });
     expect(result.trace.map((event) => event.type)).toContain('tool.approval_requested');
     expect(result.trace.map((event) => event.type)).toContain('tool.approval_resolved');
+  });
+
+  it('requires approval before reading a file outside the workspace root', async () => {
+    const externalRoot = await mkdtemp(join(tmpdir(), 'heddle-read-outside-'));
+    const externalFile = join(externalRoot, 'secret.txt');
+    await writeFile(externalFile, 'outside\n', 'utf8');
+
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        if (messages.some((message) => message.role === 'tool')) {
+          return {
+            content: 'I could not read that file without approval.',
+          };
+        }
+
+        return {
+          toolCalls: [{ id: 'call-1', tool: 'read_file', input: { path: externalFile } }],
+        };
+      },
+    };
+
+    const readTool: ToolDefinition = {
+      name: 'read_file',
+      description: 'Reads a file',
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const path = (input as { path: string }).path;
+        return { ok: true, output: `read:${path}` };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Read the external file.',
+      llm: fakeLlm,
+      tools: [readTool],
+      maxSteps: 3,
+      logger: silentLogger,
+      approveToolCall: async () => ({ approved: false, reason: 'Outside workspace read denied in test' }),
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.trace.map((event) => event.type)).toContain('tool.approval_requested');
+    expect(result.trace.map((event) => event.type)).toContain('tool.approval_resolved');
+    expect(result.trace).toContainEqual({
+      type: 'tool.approval_resolved',
+      call: { id: 'call-1', tool: 'read_file', input: { path: externalFile } },
+      approved: false,
+      reason: 'Outside workspace read denied in test',
+      step: 1,
+      timestamp: expect.any(String),
+    });
+    expect(result.trace).toContainEqual({
+      type: 'tool.result',
+      tool: 'read_file',
+      result: {
+        ok: false,
+        error: 'Approval denied for read_file: Outside workspace read denied in test',
+      },
+      step: 1,
+      timestamp: expect.any(String),
+    });
+  });
+
+  it('does not require approval before reading a file inside the workspace root', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'heddle-read-inside-'));
+    const previousCwd = process.cwd();
+    process.chdir(workspaceRoot);
+    await writeFile(join(workspaceRoot, 'note.txt'), 'inside\n', 'utf8');
+
+    try {
+      const fakeLlm: LlmAdapter = {
+        async chat(messages): Promise<LlmResponse> {
+          if (messages.some((message) => message.role === 'tool')) {
+            return {
+              content: 'Read completed without approval.',
+            };
+          }
+
+          return {
+            toolCalls: [{ id: 'call-1', tool: 'read_file', input: { path: 'note.txt' } }],
+          };
+        },
+      };
+
+      const readTool: ToolDefinition = {
+        name: 'read_file',
+        description: 'Reads a file',
+        parameters: { type: 'object', properties: {} },
+        async execute(input) {
+          const path = (input as { path: string }).path;
+          return { ok: true, output: `read:${path}` };
+        },
+      };
+
+      const approveToolCall = vi.fn(async () => ({ approved: true }));
+      const result = await runAgent({
+        goal: 'Read the workspace file.',
+        llm: fakeLlm,
+        tools: [readTool],
+        maxSteps: 3,
+        logger: silentLogger,
+        approveToolCall,
+      });
+
+      expect(result.outcome).toBe('done');
+      expect(approveToolCall).not.toHaveBeenCalled();
+      expect(result.trace.map((event) => event.type)).not.toContain('tool.approval_requested');
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+
+  it('requires approval before editing a file outside the workspace root', async () => {
+    const externalRoot = await mkdtemp(join(tmpdir(), 'heddle-edit-outside-'));
+    const externalFile = join(externalRoot, 'outside.txt');
+
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        if (messages.some((message) => message.role === 'tool')) {
+          return {
+            content: 'The external edit was denied.',
+          };
+        }
+
+        return {
+          toolCalls: [{ id: 'call-1', tool: 'edit_file', input: { path: externalFile, content: 'hello\n', createIfMissing: true } }],
+        };
+      },
+    };
+
+    const editTool: ToolDefinition = {
+      name: 'edit_file',
+      description: 'Edits a file directly',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: { path: externalFile, action: 'created' } };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Edit an external file.',
+      llm: fakeLlm,
+      tools: [editTool],
+      maxSteps: 3,
+      logger: silentLogger,
+      approveToolCall: async () => ({ approved: false, reason: 'External edit denied in test' }),
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.trace.map((event) => event.type)).toContain('tool.approval_requested');
+    expect(result.trace).toContainEqual({
+      type: 'tool.result',
+      tool: 'edit_file',
+      result: {
+        ok: false,
+        error: 'Approval denied for edit_file: External edit denied in test',
+      },
+      step: 1,
+      timestamp: expect.any(String),
+    });
   });
 
   it('records an explicit fallback event when inspect retries through mutate', async () => {

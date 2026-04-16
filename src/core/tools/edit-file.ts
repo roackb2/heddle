@@ -16,7 +16,7 @@ import type { EditPreview } from './file-edit-core.js';
 export const editFileTool: ToolDefinition = {
   name: 'edit_file',
   description:
-    'Edit a file directly inside the current workspace without going through shell redirection or heredocs. Prefer this over shell commands when you need to create or change file contents. Use { "path", "oldText", "newText" } for an exact replacement, optionally with replaceAll, or use { "path", "content", "createIfMissing" } to overwrite an existing file or create a new one explicitly. This tool only writes inside the current workspace root and returns a structured edit summary.',
+    'Edit a file directly without going through shell redirection or heredocs. Prefer this over shell commands when you need to create or change file contents. Use { "path", "oldText", "newText" } for an exact replacement, optionally with replaceAll, or use { "path", "content", "createIfMissing" } to overwrite an existing file or create a new one explicitly. Relative paths are resolved from the current working directory and may also point to nearby parent or sibling folders. Writes may require approval depending on runtime policy, and the tool returns a structured edit summary.',
   requiresApproval: true,
   parameters: {
     type: 'object',

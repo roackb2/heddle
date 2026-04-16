@@ -76,13 +76,6 @@ export async function executeScopedEdit(raw: unknown, options: ScopedEditOptions
 
   const targetPath = resolve(options.rootPath, raw.path);
 
-  if (!isInsideRoot(options.rootPath, targetPath)) {
-    return {
-      ok: false,
-      error: `${options.toolName} only writes inside the ${options.rootLabel} (${options.rootPath}). Refusing to modify ${targetPath}.`,
-    };
-  }
-
   if ('content' in raw) {
     return writeScopedContent(raw, targetPath, options);
   }
@@ -96,10 +89,6 @@ export async function previewScopedEdit(raw: unknown, options: Omit<ScopedEditOp
   }
 
   const targetPath = resolve(options.rootPath, raw.path);
-  if (!isInsideRoot(options.rootPath, targetPath)) {
-    return undefined;
-  }
-
   const scopedPath = toScopedPath(options.rootPath, targetPath);
 
   if ('content' in raw) {
@@ -231,7 +220,15 @@ function replaceFirst(content: string, search: string, replacement: string): str
 
 function toScopedPath(rootPath: string, targetPath: string): string {
   const rel = relative(rootPath, targetPath);
-  return rel || '.';
+  if (rel === '') {
+    return '.';
+  }
+
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    return targetPath;
+  }
+
+  return rel;
 }
 
 async function pathExists(path: string): Promise<boolean> {

@@ -3,6 +3,7 @@
 // for the agent loop.
 // ---------------------------------------------------------------------------
 
+import { resolve } from 'node:path';
 import type { ToolDefinition, ToolCall, TraceEvent } from '../types.js';
 import type { RunAgentOptions } from './run-agent.js';
 import { createToolRegistry } from '../tools/registry.js';
@@ -22,7 +23,11 @@ export async function maybeDenyToolCall(args: {
   log: Logger;
 }): Promise<{ ok: false; error: string } | undefined> {
   const { call, tool, step, now, approveToolCall, record, log } = args;
-  if (!tool?.requiresApproval) {
+  if (!tool) {
+    return undefined;
+  }
+
+  if (!requiresApprovalForCall(call, tool)) {
     return undefined;
   }
 
@@ -147,6 +152,38 @@ async function resolveToolApproval(args: {
     timestamp: now(),
   });
   return approval;
+}
+
+function requiresApprovalForCall(call: ToolCall, tool: ToolDefinition): boolean {
+  if (tool.requiresApproval) {
+    return true;
+  }
+
+  return isOutsideWorkspaceInspectionCall(call);
+}
+
+function isOutsideWorkspaceInspectionCall(call: ToolCall): boolean {
+  if (call.tool !== 'read_file' && call.tool !== 'list_files' && call.tool !== 'search_files' && call.tool !== 'edit_file') {
+    return false;
+  }
+
+  const input = call.input;
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return false;
+  }
+
+  const record = input as Record<string, unknown>;
+  const rawPath = typeof record.path === 'string'
+    ? record.path
+    : call.tool === 'search_files' ? '.'
+    : undefined;
+  if (!rawPath) {
+    return false;
+  }
+
+  const resolvedTarget = resolve(rawPath);
+  const workspaceRoot = process.cwd();
+  return resolvedTarget !== workspaceRoot && !resolvedTarget.startsWith(`${workspaceRoot}/`);
 }
 
 function getInspectFallbackReason(

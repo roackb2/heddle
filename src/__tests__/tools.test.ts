@@ -61,7 +61,7 @@ describe('tool input validation', () => {
     expect(readFileTool.description).toContain('may also point to nearby parent or sibling folders');
     expect(readFileTool.description).toContain('Returns the file text directly');
     expect(readFileTool.description).toContain('0-based line offset');
-    expect(editFileTool.description).toContain('Edit a file directly inside the current workspace');
+    expect(editFileTool.description).toContain('Edit a file directly without going through shell redirection or heredocs');
     expect(editFileTool.description).toContain('Prefer this over shell commands');
     expect(editFileTool.description).toContain('exact replacement');
     expect(editFileTool.description).toContain('overwrite an existing file or create a new one explicitly');
@@ -464,21 +464,24 @@ describe('editFileTool', () => {
     }
   });
 
-  it('refuses to write outside the current workspace root', async () => {
+  it('allows writing outside the current workspace root when the runtime permits it', async () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-edit-scope-'));
+    const outsidePath = join(root, '..', `outside-${Date.now()}.txt`);
     const previousCwd = process.cwd();
     process.chdir(root);
 
     try {
       const result = await editFileTool.execute({
-        path: '../outside.txt',
-        content: 'nope\n',
+        path: outsidePath,
+        content: 'ok\n',
         createIfMissing: true,
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.error).toContain('edit_file only writes inside the current workspace root');
-      expect(result.error).toContain('outside.txt');
+      expect(result.ok).toBe(true);
+      expect(result.output).toMatchObject({
+        path: outsidePath,
+        action: 'created',
+      });
     } finally {
       process.chdir(previousCwd);
     }
