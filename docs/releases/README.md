@@ -114,8 +114,9 @@ Do not rely on commit prefixes alone to decide the release narrative.
 If a script exists to summarize the git range, treat it as source material only.
 The final release notes should still be written from the actual scope plus the intended release goal.
 
-Current example release note draft:
+Current example release note drafts:
 - [`v0.0.23.md`](./v0.0.23.md)
+- [`v0.0.24.md`](./v0.0.24.md)
 
 ## Agent Rule
 

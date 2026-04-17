@@ -448,21 +448,6 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
         })
       : result.summary;
 
-    if (result.outcome !== 'done') {
-      state.setCurrentAssistantText(undefined);
-      updateSessionById(sessionId, (sessionToUpdate) => ({
-        ...sessionToUpdate,
-        messages: [
-          ...sessionToUpdate.messages,
-          {
-            id: state.nextLocalId(),
-            role: 'assistant',
-            text: `Run stopped: ${formattedSummary}`,
-          },
-        ],
-      }));
-    }
-
     state.setCurrentAssistantText(undefined);
     updateSessionById(sessionId, (sessionToUpdate) => ({
       ...sessionToUpdate,
