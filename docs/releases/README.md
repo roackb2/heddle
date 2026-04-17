@@ -15,13 +15,13 @@ The source of truth for a release is:
 For a user-facing release:
 
 1. Choose the version to ship.
-
-2. Update the package version in `package.json`.
-3. Verify the release candidate on the intended commit.
-4. Review the actual scope from git.
-5. Write curated release notes from that real scope.
-6. Create an annotated git tag on the shipped commit.
-7. Push the commit and tag, then publish the GitHub release and npm package if intended.
+2. Check the latest published npm version and existing GitHub tags/releases so you do not reuse an already shipped version.
+3. Update the package version in `package.json`.
+4. Verify the release candidate on the intended commit.
+5. Review the actual scope from git.
+6. Write curated release notes from that real scope.
+7. Create an annotated git tag on the shipped commit.
+8. Push the commit and tag, then publish the GitHub release and npm package if intended.
 
 ## Verification Baseline
 
@@ -67,21 +67,24 @@ Do not infer release boundaries from version-bump commit messages alone when an 
 
 For the actual release pass:
 
-1. Confirm the intended version in `package.json`.
-2. Run the release verification baseline.
-3. Review the git range since the previous release tag.
-4. Update or draft the release note in `docs/releases/`.
-5. Commit the release-ready state if needed.
-6. Create the annotated tag on the shipped commit.
-7. Push the commit and tag.
-8. Publish the GitHub release body from the curated note.
-9. Publish the npm package if that release is intended to ship publicly.
+1. Confirm the latest already-published version on npm and the latest GitHub release/tag.
+2. Confirm the intended next version in `package.json`.
+3. Run the release verification baseline.
+4. Review the git range since the previous release tag.
+5. Update or draft the release note in `docs/releases/`.
+6. Commit the release-ready state if needed.
+7. Create the annotated tag on the shipped commit.
+8. Push the commit and tag.
+9. Publish the GitHub release body from the curated note.
+10. Publish the npm package if that release is intended to ship publicly.
 
 ## Command Sequence
 
 Typical release sequence:
 
 ```bash
+npm view @roackb2/heddle version
+gh release list --limit 5
 yarn build
 yarn test
 npm pack --dry-run --cache /tmp/heddle-npm-cache
@@ -110,6 +113,9 @@ Do not rely on commit prefixes alone to decide the release narrative.
 
 If a script exists to summarize the git range, treat it as source material only.
 The final release notes should still be written from the actual scope plus the intended release goal.
+
+Current example release note draft:
+- [`v0.0.23.md`](./v0.0.23.md)
 
 ## Agent Rule
 
