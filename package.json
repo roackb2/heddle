@@ -1,6 +1,6 @@
 {
   "name": "@roackb2/heddle",
-  "version": "0.0.19",
+  "version": "0.0.20",
   "description": "An open-source terminal coding agent runtime and CLI with OpenAI and Anthropic support",
   "author": "Jay / Fienna Liang <roackb2@gmail.com>",
   "license": "MIT",
