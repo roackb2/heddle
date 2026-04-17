@@ -272,7 +272,6 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   state.setCurrentPlan(undefined);
   state.setCurrentAssistantText(undefined);
   updateSessionById(sessionId, (session) => ({ ...session, lastContinuePrompt: prompt }));
-  const appendedAssistantSteps = new Set<number>();
   const appendedEditPreviewIds = new Set<string>();
   const appendedPlanSteps = new Set<number>();
   const streamingBuffers = new Map<number, string>();
@@ -315,21 +314,9 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
         }
       },
       onTraceEvent: (event) => {
-        if (event.type === 'assistant.turn' && event.content.trim() && !appendedAssistantSteps.has(event.step)) {
-          appendedAssistantSteps.add(event.step);
+        if (event.type === 'assistant.turn' && event.content.trim()) {
           streamingBuffers.delete(event.step);
-          state.setCurrentAssistantText(undefined);
-          updateSessionById(sessionId, (session) => {
-            const nextMessage = {
-              id: state.nextLocalId(),
-              role: 'assistant' as const,
-              text: event.content,
-            };
-            return {
-              ...session,
-              messages: [...session.messages, nextMessage],
-            };
-          });
+          state.setCurrentAssistantText(event.content);
         }
 
         if (event.type === 'tool.call' && event.call.tool === 'edit_file') {
@@ -475,6 +462,19 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
         ],
       }));
     }
+
+    state.setCurrentAssistantText(undefined);
+    updateSessionById(sessionId, (sessionToUpdate) => ({
+      ...sessionToUpdate,
+      messages: [
+        ...sessionToUpdate.messages,
+        {
+          id: state.nextLocalId(),
+          role: 'assistant',
+          text: result.outcome === 'done' ? formattedSummary : `Run stopped: ${formattedSummary}`,
+        },
+      ],
+    }));
 
     const assistantText = formattedSummary;
     maybeAutoNameSession(sessionId, prompt, assistantText);

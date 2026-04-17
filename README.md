@@ -6,6 +6,20 @@ It is designed for workflows where an agent needs to inspect a live repository, 
 
 In plain terms: Heddle is for people who want an agent that can work inside an actual project, not just answer isolated prompts.
 
+## Why Try Heddle
+
+Heddle is aimed at people who want more than a one-shot coding chat wrapper.
+
+It is a good fit if you want:
+
+- a terminal-first coding agent that works in a real repository
+- local state and durable project memory
+- explicit traces, approvals, and reviewable workflow artifacts
+- a browser control plane for local oversight
+- a path from interactive use to programmatic and scheduled agent workflows
+
+Heddle is probably not the right fit if you only want a very simple one-shot prompt runner and do not care about sessions, persistence, observability, or operator control.
+
 ## What Heddle Does
 
 At a high level, Heddle helps with:
@@ -17,6 +31,74 @@ At a high level, Heddle helps with:
 - exposing more operator visibility than a black-box chat tool
 
 If you want a terminal-first coding agent with local state, review traces, and a path toward longer-running workflows, that is the problem Heddle is trying to solve.
+
+## See Heddle
+
+### Terminal coding workflow
+
+Heddle working in the terminal with live progress, tool activity, plans, and review output:
+
+![Heddle terminal coding workflow](docs/images/terminal-active-run.png)
+
+Heddle can inspect files, explain code, make edits, run shell commands with the right approval model, and carry a task through multiple turns.
+
+### Terminal change review
+
+Terminal chat/dev workflow showing file edits, inline diff output, and verification-oriented follow-through:
+
+![Heddle terminal change review](docs/images/terminal-change-review.png)
+
+### Browser control plane overview
+
+The local control plane gives you a browser-based view of the current workspace, saved sessions, heartbeat tasks, and recent activity:
+
+![Heddle control plane overview](docs/images/control-plane-overview.png)
+
+### Browser session review
+
+Saved session review in the control plane, with conversation history in the center and review evidence on the right:
+
+![Heddle control plane session review](docs/images/control-plane-session-review.png)
+
+## 2-Minute Try-It Path
+
+1. Install Heddle:
+
+```bash
+npm install -g @roackb2/heddle
+```
+
+2. Set a provider API key:
+
+```bash
+export OPENAI_API_KEY=your_key_here
+# or
+export ANTHROPIC_API_KEY=your_key_here
+```
+
+3. Move into any repository you want to inspect:
+
+```bash
+cd /path/to/project
+```
+
+4. Start chat:
+
+```bash
+heddle
+```
+
+5. Try a prompt like:
+
+```text
+Summarize this repository, show me the main build/test commands, and point out the likely entrypoints.
+```
+
+6. If you want the browser oversight UI too:
+
+```bash
+heddle daemon
+```
 
 ## Major Features
 
@@ -122,18 +204,6 @@ This is for people building their own agent hosts, schedulers, or control surfac
 
 More: [Programmatic use](docs/guides/programmatic-use.md)
 
-## Why Someone Might Choose Heddle
-
-Heddle is a good fit if you want:
-
-- a terminal-first coding agent that works in a real repository
-- local state and durable project memory
-- explicit traces, approvals, and reviewable workflow artifacts
-- a browser control plane for local oversight
-- a path from interactive use to programmatic and scheduled agent workflows
-
-Heddle is probably not the right fit if you only want a very simple one-shot chat wrapper and do not care about sessions, persistence, observability, or operator control.
-
 ## Install
 
 Global install:
@@ -156,42 +226,6 @@ The installed CLI command is `heddle`.
 - an API key for at least one supported provider:
   - `OPENAI_API_KEY`
   - `ANTHROPIC_API_KEY`
-
-## Quick Start
-
-1. Set a provider API key.
-
-```bash
-export OPENAI_API_KEY=your_key_here
-# or
-export ANTHROPIC_API_KEY=your_key_here
-```
-
-2. Move into the project you want Heddle to operate on.
-
-```bash
-cd /path/to/project
-```
-
-3. Start interactive chat.
-
-```bash
-heddle
-```
-
-4. Ask for something concrete, for example:
-
-```text
-Summarize this repository and point out the main build and test commands.
-```
-
-5. If you want the browser oversight UI, run:
-
-```bash
-heddle daemon
-```
-
-By default, Heddle uses the current directory as the workspace root unless you pass `--cwd`.
 
 ## Optional CyberLoop Integration
 
@@ -228,6 +262,7 @@ npx -p @roackb2/heddle -p cyberloop heddle
 ### Contributors
 
 - [Development and contributing](docs/guides/development.md)
+- [Release convention](docs/releases/README.md)
 - [Framework Vision](docs/framework-vision.md)
 - [Coding Agent Roadmap](docs/coding-agent-roadmap.md)
 

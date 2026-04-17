@@ -139,6 +139,18 @@ yarn typecheck
 
 If your change affects the browser UI, also test the control plane manually.
 
+## Release Notes
+
+For user-facing releases, follow the release convention in [`docs/releases/README.md`](../releases/README.md).
+
+In short:
+
+- verify the intended release commit is green
+- review the real git range since the previous release tag
+- optionally use `yarn release:context <previous-tag> HEAD` to gather raw release scope
+- write curated release notes from the actual scope
+- create an annotated tag such as `vX.Y.Z` on the shipped commit
+
 ## Related Docs
 
 - [Chat and sessions](chat-and-sessions.md)

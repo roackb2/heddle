@@ -32,6 +32,8 @@ When additional project context is needed, read in this order:
 - Use `yarn`, not `npm`.
 - Use `yarn build` as the canonical type-check.
 - Use `yarn test` as the canonical test command.
+- For user-facing releases, use an annotated git tag such as `vX.Y.Z` on the actual release commit.
+- Write release notes from the real git range since the previous release tag, not from commit-prefix inference alone.
 - Keep changes aligned with the project's minimal-runtime, trace-first philosophy.
 
 ## Agent Memory Usage

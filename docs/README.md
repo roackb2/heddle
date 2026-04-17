@@ -22,6 +22,7 @@ Task-oriented guides:
 - [Heartbeat](guides/heartbeat.md)
 - [Programmatic use](guides/programmatic-use.md)
 - [Development and contributing](guides/development.md)
+- [Release convention](releases/README.md)
 
 ## Reference
 
@@ -67,3 +68,9 @@ Longer-term project context and design direction:
 1. [Development and contributing](guides/development.md)
 2. [CLI reference](reference/cli.md)
 3. [Framework Vision](framework-vision.md)
+
+### I want to prepare a release
+
+1. [Release convention](releases/README.md)
+2. [Development and contributing](guides/development.md)
+3. [CLI reference](reference/cli.md)
