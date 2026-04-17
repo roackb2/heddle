@@ -33,32 +33,6 @@ export function buildPostMutationRequirement(options: {
   return `Host requirement: before giving a final answer after a workspace-changing mutate command, you must ${requirements.join(' and ')}. After doing that, then provide the final answer.`;
 }
 
-export function buildImmediateReviewReminder(options: {
-  executedReviewCommands: string[];
-  pendingChangeReview: boolean;
-}): string {
-  const lastReview = options.executedReviewCommands.at(-1);
-  const baseline = 'Host reminder: you ran a workspace-changing command; inspect the resulting repo state now with git status --short or git diff --stat before continuing.';
-  if (!lastReview) {
-    return baseline;
-  }
-
-  return `${baseline} Last review command recorded: ${lastReview}.`;
-}
-
-export function buildImmediateVerificationReminder(options: {
-  executedVerificationCommands: string[];
-  pendingVerification: boolean;
-}): string {
-  const lastVerification = options.executedVerificationCommands.at(-1);
-  const baseline = 'Host reminder: you ran a workspace-changing command; run a verification command such as yarn test or yarn build before continuing.';
-  if (!lastVerification) {
-    return baseline;
-  }
-
-  return `${baseline} Last verification command recorded: ${lastVerification}.`;
-}
-
 export function hasStructuredChangeSummary(
   content: string,
   options: {

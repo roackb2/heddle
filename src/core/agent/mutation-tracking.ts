@@ -11,8 +11,6 @@ export type MutationState = {
   pendingVerification: boolean;
   pendingChangeReview: boolean;
   requiresStructuredChangeSummary: boolean;
-  needsImmediateReviewReminder: boolean;
-  needsImmediateVerificationReminder: boolean;
   executedMutationCommands: string[];
   executedReviewCommands: string[];
   executedVerificationCommands: string[];
@@ -25,8 +23,6 @@ export function createMutationState(): MutationState {
     pendingVerification: false,
     pendingChangeReview: false,
     requiresStructuredChangeSummary: false,
-    needsImmediateReviewReminder: false,
-    needsImmediateVerificationReminder: false,
     executedMutationCommands: [],
     executedReviewCommands: [],
     executedVerificationCommands: [],
@@ -54,14 +50,11 @@ export function trackToolResult(
         state.pendingVerification = true;
         state.pendingChangeReview = true;
         state.requiresStructuredChangeSummary = true;
-        state.needsImmediateReviewReminder = true;
-        state.needsImmediateVerificationReminder = true;
       }
     }
 
     if (isVerificationMutateCommand(command)) {
       state.pendingVerification = false;
-      state.needsImmediateVerificationReminder = false;
       state.executedVerificationCommands.push(command);
     }
   }
@@ -72,14 +65,12 @@ export function trackToolResult(
 
   if (effectiveCall.tool === 'run_shell_inspect' && command && isRepoReviewCommand(command)) {
     state.pendingChangeReview = false;
-    state.needsImmediateReviewReminder = false;
     state.executedReviewCommands.push(command);
     state.executedReviewEvidence.push(summarizeCommandEvidence(result.output));
   }
 
   if (effectiveCall.tool === 'run_shell_mutate' && command && isVerificationMutateCommand(command)) {
     state.pendingVerification = false;
-    state.needsImmediateVerificationReminder = false;
     state.executedVerificationEvidence.push(summarizeCommandEvidence(result.output));
   }
 }
