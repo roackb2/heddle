@@ -1,5 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { ConversationLine } from './state/types.js';
+import React, { useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import {
   ApprovalComposer,
@@ -13,45 +12,33 @@ import {
   shouldShowSlashHints,
   SlashHintPanel,
 } from './components/index.js';
-import { estimateBuiltInContextWindow, filterBuiltInModels } from '../../core/llm/openai-models.js';
-import type { CyberLoopDriftLevel } from '../../index.js';
+import { estimateBuiltInContextWindow } from '../../core/llm/openai-models.js';
 import { useApprovalFlow } from './hooks/useApprovalFlow.js';
 import { useAgentRun } from './hooks/useAgentRun.js';
+import { useChatDrift } from './hooks/useChatDrift.js';
+import { useChatPickers } from './hooks/useChatPickers.js';
 import { useChatSessions } from './hooks/useChatSessions.js';
-import { submitChatPrompt } from './submit.js';
-import { driftFooterColor, formatDriftFooter } from './utils/drift-footer.js';
+import { useLocalIds } from './hooks/useLocalIds.js';
+import { usePromptDraft } from './hooks/usePromptDraft.js';
+import { usePromptSubmission } from './hooks/usePromptSubmission.js';
 import { currentActivityText } from './utils/format.js';
-import { buildPromptWithFileMentions, filterMentionableFiles, getMentionQuery, insertMentionSelection, listMentionableFiles } from './utils/file-mentions.js';
+import { listMentionableFiles } from './utils/file-mentions.js';
 import type { ChatRuntimeConfig } from './utils/runtime.js';
 
 const SESSION_TITLE_MODEL = 'gpt-5.1-codex-mini';
 
 export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
-  const nextIdRef = useRef(0);
+  const nextLocalId = useLocalIds();
   const [activeModel, setActiveModel] = useState(runtime.model);
-  const [draft, setDraft] = useState('');
-  const [draftCursor, setDraftCursor] = useState(0);
-  const [pendingSubmittedPrompt, setPendingSubmittedPrompt] = useState<string | undefined>();
-  const [driftEnabled, setDriftEnabledState] = useState(true);
-  const [driftLevel, setDriftLevel] = useState<CyberLoopDriftLevel>('unknown');
-  const [driftError, setDriftError] = useState<string | undefined>();
-  const [modelPickerIndex, setModelPickerIndex] = useState(0);
-  const [sessionPickerIndex, setSessionPickerIndex] = useState(0);
-  const [fileMentionPickerIndex, setFileMentionPickerIndex] = useState(0);
-  const nextLocalId = () => `ui-${Date.now()}-${nextIdRef.current++}`;
+  const {
+    draft,
+    setDraft,
+    draftCursor,
+    setDraftCursor,
+    clearDraft,
+    replaceDraft,
+  } = usePromptDraft();
   const mentionableFiles = useState(() => listMentionableFiles(runtime.workspaceRoot, runtime.searchIgnoreDirs))[0];
-  const mentionQuery = getMentionQuery(draft);
-  const fileMentionPickerVisible = mentionQuery !== undefined;
-  const filteredMentionFiles = fileMentionPickerVisible ? filterMentionableFiles(mentionableFiles, mentionQuery) : [];
-  const safeFileMentionPickerIndex =
-    filteredMentionFiles.length === 0 ? 0 : Math.min(fileMentionPickerIndex, Math.max(0, filteredMentionFiles.length - 1));
-  const highlightedMentionFile = filteredMentionFiles[safeFileMentionPickerIndex];
-  const modelPickerQuery = getModelPickerQuery(draft);
-  const modelPickerVisible = modelPickerQuery !== undefined;
-  const filteredModels = modelPickerVisible ? filterBuiltInModels(modelPickerQuery) : [];
-  const safeModelPickerIndex =
-    filteredModels.length === 0 ? 0 : Math.min(modelPickerIndex, Math.max(0, filteredModels.length - 1));
-  const highlightedModel = filteredModels[safeModelPickerIndex];
 
   const {
     sessions,
@@ -71,19 +58,17 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     apiKeyPresent: Boolean(runtime.apiKey),
     defaultModel: runtime.model,
   });
-  const sessionPickerQuery = getSessionPickerQuery(draft);
-  const sessionPickerVisible = sessionPickerQuery !== undefined;
-  const filteredSessions = sessionPickerVisible ? filterSessionsForPicker(recentSessions, sessionPickerQuery) : [];
-  const safeSessionPickerIndex =
-    filteredSessions.length === 0 ? 0 : Math.min(sessionPickerIndex, Math.max(0, filteredSessions.length - 1));
-  const highlightedSession = filteredSessions[safeSessionPickerIndex];
-  const preparePromptWithMentions = (prompt: string) => {
-    const prepared = buildPromptWithFileMentions(prompt, runtime.workspaceRoot, mentionableFiles);
-    return {
-      prompt: prepared.runPrompt,
-      displayText: prompt,
-    };
-  };
+  const pickers = useChatPickers({
+    draft,
+    recentSessions,
+    mentionableFiles,
+    clearDraft,
+    replaceDraft,
+  });
+  const drift = useChatDrift({
+    activeSession,
+    updateActiveSession,
+  });
 
   useEffect(() => {
     if (!activeSession) {
@@ -96,16 +81,6 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     }
   }, [activeModel, activeSession, runtime.model]);
 
-  useEffect(() => {
-    if (!activeSession) {
-      return;
-    }
-
-    const sessionDriftEnabled = activeSession.driftEnabled ?? true;
-    if (sessionDriftEnabled !== driftEnabled) {
-      setDriftEnabledState(sessionDriftEnabled);
-    }
-  }, [activeSession, driftEnabled]);
   const {
     status,
     setStatus,
@@ -129,8 +104,6 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     activeModel,
     activeSession?.context?.lastRunInputTokens ?? activeSession?.context?.estimatedRequestTokens,
   );
-  const driftFooter = formatDriftFooter(driftEnabled, driftLevel, driftError);
-  const driftColor = driftFooterColor(driftEnabled, driftLevel, driftError);
   const sessionFooter = `session=${activeSession?.id ?? activeSessionId}${activeSession?.name ? ` (${activeSession.name})` : ''}`;
   const activityLines = liveEvents
     .slice(-4)
@@ -160,8 +133,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     : undefined;
   const switchSession = (id: string) => {
     setActiveSessionId(id);
-    setDraft('');
-    setDraftCursor(0);
+    clearDraft();
     resetRunState({ abortInFlight: true });
   };
 
@@ -172,38 +144,14 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     }
   };
 
-  const applyDriftEnabled = useCallback((enabled: boolean) => {
-    setDriftEnabledState(enabled);
-    setDriftError(undefined);
-    updateActiveSession((session) => ({
-      ...session,
-      driftEnabled: enabled,
-    }));
-  }, [updateActiveSession]);
-
   const closeSession = (id: string) => {
     const removedActive = removeSession(id);
     if (removedActive) {
-      setDraft('');
-      setDraftCursor(0);
-      setPendingSubmittedPrompt(undefined);
+      clearDraft();
+      clearPendingSubmittedPrompt();
       resetRunState({ abortInFlight: true });
     }
   };
-
-  const appendPendingUserMessage = useCallback((prompt: string) => {
-    const message: ConversationLine = {
-      id: nextLocalId(),
-      role: 'user',
-      text: prompt,
-      isPending: true,
-    };
-
-    updateActiveSession((session) => ({
-      ...session,
-      messages: [...session.messages, message],
-    }));
-  }, [updateActiveSession]);
 
   const { executeTurn, executeDirectShellCommand } = useAgentRun({
     runtime,
@@ -214,195 +162,40 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     state: actionState,
     updateSessionById,
     updateActiveSession,
-    drift: {
-      enabled: driftEnabled,
-      onRunStart: () => {
-        setDriftLevel('unknown');
-        setDriftError(undefined);
-      },
-      onAnnotation: (annotation) => setDriftLevel(annotation.driftLevel),
-      onError: (error) => setDriftError(error instanceof Error ? error.message : String(error)),
-    },
+    drift: drift.observer,
   });
 
-  const submitPrompt = useCallback(async (value: string, options?: { allowWhileRunning?: boolean }) => {
-    const effectiveIsRunning = options?.allowWhileRunning ? false : isRunning;
-
-    if (effectiveIsRunning && !pendingApproval) {
-      setPendingSubmittedPrompt(value);
-      appendPendingUserMessage(value);
-      return;
-    }
-
-    if (options?.allowWhileRunning && pendingSubmittedPrompt === value) {
-      updateActiveSession((session) => {
-        const pendingIndex = session.messages.findIndex(
-          (message) => message.role === 'user' && message.text === value && message.isPending,
-        );
-
-        if (pendingIndex < 0) {
-          return session;
-        }
-
-        return {
-          ...session,
-          messages: session.messages.map((message, index) =>
-            index === pendingIndex ? { ...message, isPending: false } : message,
-          ),
-        };
-      });
-    }
-
-    if (modelPickerVisible && highlightedModel) {
-      setDraft('');
-      setDraftCursor(0);
-      setModelPickerIndex(0);
-      await submitChatPrompt({
-        value: `/model ${highlightedModel}`,
-        isRunning: effectiveIsRunning,
-        activeModel,
-        setActiveModel: applyActiveModel,
-        sessions,
-        recentSessions,
-        activeSessionId,
-        activeSession,
-        apiKeyPresent: Boolean(runtime.apiKey),
-        nextLocalId,
-        setStatus,
-        switchSession,
-        closeSession,
-        updateSessionById,
-        updateActiveSession,
-        createSession,
-        renameSession,
-        listRecentSessionsMessage,
-        driftEnabled,
-        driftError,
-        setDriftEnabled: applyDriftEnabled,
-        workspaceRoot: runtime.workspaceRoot,
-        stateRoot: runtime.stateRoot,
-        preparePrompt: preparePromptWithMentions,
-        executeTurn,
-        executeDirectShellCommand,
-      });
-      return;
-    }
-
-    if (sessionPickerVisible && highlightedSession) {
-      setDraft('');
-      setDraftCursor(0);
-      setSessionPickerIndex(0);
-      await submitChatPrompt({
-        value: `/session switch ${highlightedSession.id}`,
-        isRunning: effectiveIsRunning,
-        activeModel,
-        setActiveModel: applyActiveModel,
-        sessions,
-        recentSessions,
-        activeSessionId,
-        activeSession,
-        apiKeyPresent: Boolean(runtime.apiKey),
-        nextLocalId,
-        setStatus,
-        switchSession,
-        closeSession,
-        updateSessionById,
-        updateActiveSession,
-        createSession,
-        renameSession,
-        listRecentSessionsMessage,
-        driftEnabled,
-        driftError,
-        setDriftEnabled: applyDriftEnabled,
-        workspaceRoot: runtime.workspaceRoot,
-        stateRoot: runtime.stateRoot,
-        preparePrompt: preparePromptWithMentions,
-        executeTurn,
-        executeDirectShellCommand,
-      });
-      return;
-    }
-
-    if (fileMentionPickerVisible && highlightedMentionFile) {
-      const nextDraft = insertMentionSelection(value, highlightedMentionFile);
-      setDraft(nextDraft);
-      setDraftCursor(nextDraft.length);
-      setFileMentionPickerIndex(0);
-      return;
-    }
-
-    setModelPickerIndex(0);
-    setSessionPickerIndex(0);
-    setFileMentionPickerIndex(0);
-    await submitChatPrompt({
-      value,
-      isRunning: effectiveIsRunning,
-      activeModel,
-      setActiveModel: applyActiveModel,
-      sessions,
-      recentSessions,
-      activeSessionId,
-      activeSession,
-      apiKeyPresent: Boolean(runtime.apiKey),
-      nextLocalId,
-      setStatus,
-      switchSession,
-      closeSession,
-      updateSessionById,
-      updateActiveSession,
-      createSession,
-      renameSession,
-      listRecentSessionsMessage,
-      driftEnabled,
-      driftError,
-      setDriftEnabled: applyDriftEnabled,
-      workspaceRoot: runtime.workspaceRoot,
-      stateRoot: runtime.stateRoot,
-      preparePrompt: preparePromptWithMentions,
-      executeTurn,
-      executeDirectShellCommand,
-    });
-  }, [
-    isRunning,
-    pendingApproval,
-    modelPickerVisible,
-    highlightedModel,
-    sessionPickerVisible,
-    highlightedSession,
-    fileMentionPickerVisible,
-    highlightedMentionFile,
+  const { pendingSubmittedPrompt, clearPendingSubmittedPrompt, submitPrompt } = usePromptSubmission({
+    runtime,
     activeModel,
+    setActiveModel: applyActiveModel,
     sessions,
     recentSessions,
     activeSessionId,
     activeSession,
-    runtime.apiKey,
+    apiKeyPresent: Boolean(runtime.apiKey),
+    nextLocalId,
     setStatus,
+    switchSession,
+    closeSession,
     updateSessionById,
     updateActiveSession,
     createSession,
     renameSession,
     listRecentSessionsMessage,
-    driftEnabled,
-    driftError,
-    applyDriftEnabled,
+    driftEnabled: drift.enabled,
+    driftError: drift.error,
+    setDriftEnabled: drift.setEnabled,
+    isRunning,
+    pendingApproval,
     executeTurn,
     executeDirectShellCommand,
-    appendPendingUserMessage,
     mentionableFiles,
-    runtime.workspaceRoot,
-    preparePromptWithMentions,
-  ]);
-
-  useEffect(() => {
-    if (isRunning || pendingApproval || !pendingSubmittedPrompt) {
-      return;
-    }
-
-    const queuedPrompt = pendingSubmittedPrompt;
-    setPendingSubmittedPrompt(undefined);
-    void submitPrompt(queuedPrompt, { allowWhileRunning: true });
-  }, [isRunning, pendingApproval, pendingSubmittedPrompt, submitPrompt]);
+    modelPicker: pickers.model,
+    sessionPicker: pickers.session,
+    fileMentionPicker: pickers.fileMention,
+    resetPickerIndexes: pickers.resetPickerIndexes,
+  });
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -438,27 +231,27 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         {pendingApproval ?
           <ApprovalComposer pendingApproval={pendingApproval} approvalChoice={approvalChoice} />
         : <>
-            {modelPickerVisible ?
+            {pickers.model.visible ?
               <ModelPickerPanel
-                query={modelPickerQuery}
-                models={filteredModels}
+                query={pickers.model.query ?? ''}
+                models={pickers.model.items}
                 activeModel={activeModel}
-                highlightedIndex={safeModelPickerIndex}
+                highlightedIndex={pickers.model.highlightedIndex}
               />
             : null}
-            {sessionPickerVisible ?
+            {pickers.session.visible ?
               <SessionPickerPanel
-                query={sessionPickerQuery}
-                sessions={filteredSessions}
+                query={pickers.session.query ?? ''}
+                sessions={pickers.session.items}
                 activeSessionId={activeSessionId}
-                highlightedIndex={safeSessionPickerIndex}
+                highlightedIndex={pickers.session.highlightedIndex}
               />
             : null}
-            {fileMentionPickerVisible ?
+            {pickers.fileMention.visible ?
               <FileMentionPickerPanel
-                query={mentionQuery}
-                files={filteredMentionFiles}
-                highlightedIndex={safeFileMentionPickerIndex}
+                query={pickers.fileMention.query ?? ''}
+                files={pickers.fileMention.items}
+                highlightedIndex={pickers.fileMention.highlightedIndex}
               />
             : null}
             {shouldShowSlashHints(draft) ?
@@ -477,54 +270,9 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
                   maxVisibleLines={10}
                   onChange={setDraft}
                   onCursorChange={setDraftCursor}
-                  onSpecialKey={({ key }) => {
-                    if (modelPickerVisible) {
-                      return handlePickerKeys({
-                        key,
-                        itemCount: filteredModels.length,
-                        resetDraft: () => {
-                          setDraft('');
-                          setDraftCursor(0);
-                        },
-                        resetIndex: () => setModelPickerIndex(0),
-                        advance: () => setModelPickerIndex((current) => (current + 1) % filteredModels.length),
-                        retreat: () => setModelPickerIndex((current) => (current <= 0 ? filteredModels.length - 1 : current - 1)),
-                      });
-                    }
-
-                    if (sessionPickerVisible) {
-                      return handlePickerKeys({
-                        key,
-                        itemCount: filteredSessions.length,
-                        resetDraft: () => {
-                          setDraft('');
-                          setDraftCursor(0);
-                        },
-                        resetIndex: () => setSessionPickerIndex(0),
-                        advance: () => setSessionPickerIndex((current) => (current + 1) % filteredSessions.length),
-                        retreat: () => setSessionPickerIndex((current) => (current <= 0 ? filteredSessions.length - 1 : current - 1)),
-                      });
-                    }
-
-                    if (fileMentionPickerVisible) {
-                      return handlePickerKeys({
-                        key,
-                        itemCount: filteredMentionFiles.length,
-                        resetDraft: () => {
-                          setDraft('');
-                          setDraftCursor(0);
-                        },
-                        resetIndex: () => setFileMentionPickerIndex(0),
-                        advance: () => setFileMentionPickerIndex((current) => (current + 1) % filteredMentionFiles.length),
-                        retreat: () => setFileMentionPickerIndex((current) => (current <= 0 ? filteredMentionFiles.length - 1 : current - 1)),
-                      });
-                    }
-
-                    return false;
-                  }}
+                  onSpecialKey={pickers.handleSpecialKey}
                   onSubmit={(value) => {
-                    setDraft('');
-                    setDraftCursor(0);
+                    clearDraft();
                     void submitPrompt(value);
                   }}
                 />
@@ -546,81 +294,11 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
       </Box>
       <Text>
         <Text dimColor>{`model=${activeModel} • ${contextStatus} • `}</Text>
-        <Text color={driftColor} dimColor={!driftColor}>{`drift=${driftFooter}`}</Text>
+        <Text color={drift.color} dimColor={!drift.color}>{`drift=${drift.footer}`}</Text>
         <Text dimColor>{` • ${sessionFooter}`}</Text>
       </Text>
     </Box>
   );
-}
-
-function getModelPickerQuery(draft: string): string | undefined {
-  const trimmedStart = draft.trimStart();
-  if (!trimmedStart.startsWith('/model set')) {
-    return undefined;
-  }
-
-  const remainder = trimmedStart.slice('/model set'.length);
-  return remainder.trim();
-}
-
-function getSessionPickerQuery(draft: string): string | undefined {
-  const trimmedStart = draft.trimStart();
-  if (!trimmedStart.startsWith('/session choose')) {
-    return undefined;
-  }
-
-  const remainder = trimmedStart.slice('/session choose'.length);
-  return remainder.trim();
-}
-
-function filterSessionsForPicker(
-  sessions: Array<{ id: string; name: string }>,
-  query: string,
-): Array<{ id: string; name: string }> {
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) {
-    return sessions;
-  }
-
-  return sessions.filter(
-    (session) =>
-      session.id.toLowerCase().includes(normalized) ||
-      session.name.toLowerCase().includes(normalized),
-  );
-}
-
-function handlePickerKeys(options: {
-  key: {
-    upArrow?: boolean;
-    downArrow?: boolean;
-    leftArrow?: boolean;
-    rightArrow?: boolean;
-    tab?: boolean;
-    escape?: boolean;
-  };
-  itemCount: number;
-  resetDraft: () => void;
-  resetIndex: () => void;
-  advance: () => void;
-  retreat: () => void;
-}): boolean {
-  if ((options.key.upArrow || options.key.leftArrow) && options.itemCount > 0) {
-    options.retreat();
-    return true;
-  }
-
-  if ((options.key.downArrow || options.key.rightArrow || options.key.tab) && options.itemCount > 0) {
-    options.advance();
-    return true;
-  }
-
-  if (options.key.escape) {
-    options.resetDraft();
-    options.resetIndex();
-    return true;
-  }
-
-  return false;
 }
 
 function formatContextStatus(model: string, estimatedRequestTokens?: number): string {
