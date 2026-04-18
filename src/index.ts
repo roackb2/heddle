@@ -22,17 +22,21 @@ export type {
 } from './core/runtime/heartbeat-store.js';
 export {
   createFileHeartbeatTaskStore,
+} from './core/runtime/heartbeat-task-store.js';
+export type {
+  FileHeartbeatTaskStoreOptions,
+  HeartbeatTask,
+  HeartbeatTaskRunRecord,
+  HeartbeatTaskRunRecordEntry,
+  HeartbeatTaskStore,
+} from './core/runtime/heartbeat-task-store.js';
+export {
   runDueHeartbeatTasks,
   runHeartbeatScheduler,
 } from './core/runtime/heartbeat-scheduler.js';
 export type {
-  FileHeartbeatTaskStoreOptions,
   HeartbeatSchedulerEvent,
-  HeartbeatTask,
-  HeartbeatTaskRunRecord,
-  HeartbeatTaskRunRecordEntry,
   HeartbeatTaskRunner,
-  HeartbeatTaskStore,
   RunDueHeartbeatTasksOptions,
   RunDueHeartbeatTasksResult,
   RunHeartbeatSchedulerOptions,

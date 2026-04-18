@@ -1,4 +1,5 @@
-import type { HeartbeatSchedulerEvent, HeartbeatTaskStatus } from './heartbeat-scheduler.js';
+import type { HeartbeatSchedulerEvent } from './heartbeat-scheduler.js';
+import type { HeartbeatTaskStatus } from './heartbeat-task-store.js';
 import type { HeartbeatRunView, HeartbeatTaskView } from './heartbeat-views.js';
 
 export type LucidAgentStatus = 'running' | 'paused' | 'asleep' | 'terminated' | 'blocked' | 'failed';

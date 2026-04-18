@@ -1,76 +1,26 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
 import { runAgentHeartbeat } from './heartbeat.js';
 import type { AgentHeartbeatResult, HeartbeatDecision, RunAgentHeartbeatOptions } from './heartbeat.js';
 import type { AgentLoopCheckpoint, AgentLoopState } from './events.js';
 import type { LlmUsage } from '../llm/types.js';
-import { suggestNextHeartbeatDelayMs } from './heartbeat-store.js';
+import { updateTaskAfterFailure, updateTaskAfterResult } from './heartbeat-task-state.js';
+import type {
+  HeartbeatTask,
+  HeartbeatTaskRunRecord,
+  HeartbeatTaskStore,
+  HeartbeatTaskStatus,
+} from './heartbeat-task-store.js';
 
-export type HeartbeatTask = {
-  id: string;
-  task: string;
-  name?: string;
-  enabled: boolean;
-  intervalMs: number;
-  nextRunAt?: string;
-  checkpointPath?: string;
-  model?: string;
-  maxSteps?: number;
-  workspaceRoot?: string;
-  stateDir?: string;
-  memoryDir?: string;
-  searchIgnoreDirs?: string[];
-  systemContext?: string;
-  lastRunAt?: string;
-  status?: HeartbeatTaskStatus;
-  lastProgress?: string;
-  lastRunId?: string;
-  lastLoadedCheckpoint?: boolean;
-  resumable?: boolean;
-  lastUsage?: LlmUsage;
-  lastDecision?: HeartbeatDecision;
-  lastOutcome?: string;
-  lastSummary?: string;
-  lastError?: string;
-  updatedAt?: string;
-};
-
-export type HeartbeatTaskStatus =
-  | 'idle'
-  | 'running'
-  | 'waiting'
-  | 'blocked'
-  | 'complete'
-  | 'failed';
-
-export type HeartbeatTaskRunRecord = {
-  task: HeartbeatTask;
-  result: AgentHeartbeatResult;
-  loadedCheckpoint: boolean;
-};
-
-export type HeartbeatTaskRunRecordEntry = {
-  id: string;
-  path: string;
-  taskId: string;
-  runId: string;
-  createdAt: string;
-  record: HeartbeatTaskRunRecord;
-};
-
-export type HeartbeatTaskStore = {
-  listTasks: () => Promise<HeartbeatTask[]>;
-  saveTask: (task: HeartbeatTask) => Promise<void>;
-  loadCheckpoint: (task: HeartbeatTask) => Promise<AgentLoopCheckpoint | undefined>;
-  saveCheckpoint: (task: HeartbeatTask, checkpoint: AgentLoopCheckpoint) => Promise<void>;
-  saveRunRecord?: (record: HeartbeatTaskRunRecord) => Promise<void>;
-  listRunRecords?: (options?: { taskId?: string; limit?: number }) => Promise<HeartbeatTaskRunRecordEntry[]>;
-  loadRunRecord?: (id: string) => Promise<HeartbeatTaskRunRecordEntry | undefined>;
-};
-
-export type FileHeartbeatTaskStoreOptions = {
-  dir: string;
-};
+export {
+  createFileHeartbeatTaskStore,
+} from './heartbeat-task-store.js';
+export type {
+  FileHeartbeatTaskStoreOptions,
+  HeartbeatTask,
+  HeartbeatTaskRunRecord,
+  HeartbeatTaskRunRecordEntry,
+  HeartbeatTaskStore,
+  HeartbeatTaskStatus,
+} from './heartbeat-task-store.js';
 
 export type HeartbeatSchedulerEvent =
   | { type: 'heartbeat.scheduler.started'; timestamp: string }
@@ -137,77 +87,6 @@ export type RunHeartbeatSchedulerOptions = RunDueHeartbeatTasksOptions & {
 
 const DEFAULT_FAILURE_RETRY_MS = 5 * 60_000;
 
-export function createFileHeartbeatTaskStore(options: FileHeartbeatTaskStoreOptions): HeartbeatTaskStore {
-  const tasksDir = join(options.dir, 'tasks');
-  const checkpointsDir = join(options.dir, 'checkpoints');
-  const runsDir = join(options.dir, 'runs');
-
-  return {
-    async listTasks() {
-      if (!existsSync(tasksDir)) {
-        return [];
-      }
-
-      return readdirSync(tasksDir)
-        .filter((entry) => entry.endsWith('.json'))
-        .map((entry) => JSON.parse(readFileSync(join(tasksDir, entry), 'utf8')) as HeartbeatTask)
-        .sort((left, right) => left.id.localeCompare(right.id));
-    },
-    async saveTask(task) {
-      const path = join(tasksDir, `${safeTaskFileName(task.id)}.json`);
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, JSON.stringify(normalizeTaskForSave(task), null, 2));
-    },
-    async loadCheckpoint(task) {
-      const path = checkpointPathForTask(task, checkpointsDir);
-      if (!existsSync(path)) {
-        return undefined;
-      }
-
-      return JSON.parse(readFileSync(path, 'utf8')) as AgentLoopCheckpoint;
-    },
-    async saveCheckpoint(task, checkpoint) {
-      const path = checkpointPathForTask(task, checkpointsDir);
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, JSON.stringify(checkpoint, null, 2));
-    },
-    async saveRunRecord(record) {
-      const timestamp = new Date().toISOString().replaceAll(':', '-');
-      const path = join(runsDir, `${timestamp}-${safeTaskFileName(record.task.id)}.json`);
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, JSON.stringify(record, null, 2));
-    },
-    async listRunRecords(options = {}) {
-      if (!existsSync(runsDir)) {
-        return [];
-      }
-
-      const entries = readdirSync(runsDir)
-        .filter((entry) => entry.endsWith('.json'))
-        .flatMap((entry) => {
-          const path = join(runsDir, entry);
-          try {
-            const record = JSON.parse(readFileSync(path, 'utf8')) as HeartbeatTaskRunRecord;
-            if (options.taskId && record.task.id !== options.taskId) {
-              return [];
-            }
-
-            return [runRecordEntryFromPath(path, record)];
-          } catch {
-            return [];
-          }
-        })
-        .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-
-      return options.limit ? entries.slice(0, options.limit) : entries;
-    },
-    async loadRunRecord(id) {
-      const entries = await this.listRunRecords?.();
-      return entries?.find((entry) => entry.id === id || entry.runId === id);
-    },
-  };
-}
-
 export async function runDueHeartbeatTasks(options: RunDueHeartbeatTasksOptions): Promise<RunDueHeartbeatTasksResult> {
   const now = options.now?.() ?? new Date();
   const tasks = await options.store.listTasks();
@@ -219,9 +98,9 @@ export async function runDueHeartbeatTasks(options: RunDueHeartbeatTasksOptions)
     options.onEvent?.({ type: 'heartbeat.task.due', taskId: task.id, timestamp: now.toISOString() });
     try {
       const checkpoint = await options.store.loadCheckpoint(task);
-      const runningTask = normalizeTaskForSave({
+      const runningTask = {
         ...task,
-        status: 'running',
+        status: 'running' as const,
         lastProgress:
           checkpoint ?
             'Resuming heartbeat wake from the last checkpoint.'
@@ -229,14 +108,14 @@ export async function runDueHeartbeatTasks(options: RunDueHeartbeatTasksOptions)
         lastLoadedCheckpoint: Boolean(checkpoint),
         lastError: undefined,
         updatedAt: now.toISOString(),
-      });
+      };
       await options.store.saveTask(runningTask);
       options.onEvent?.({
         type: 'heartbeat.task.started',
         taskId: task.id,
         loadedCheckpoint: Boolean(checkpoint),
-        status: runningTask.status ?? 'running',
-        progress: runningTask.lastProgress ?? '',
+        status: runningTask.status,
+        progress: runningTask.lastProgress,
         timestamp: now.toISOString(),
       });
 
@@ -338,131 +217,6 @@ async function runHeartbeatTask(
     searchIgnoreDirs: task.searchIgnoreDirs ?? options.heartbeat?.searchIgnoreDirs,
     systemContext: task.systemContext ?? options.heartbeat?.systemContext,
   });
-}
-
-function updateTaskAfterResult(
-  task: HeartbeatTask,
-  result: AgentHeartbeatResult,
-  now: Date,
-  loadedCheckpoint: boolean,
-): HeartbeatTask {
-  const terminal = result.decision === 'complete' || result.decision === 'escalate';
-  const delayMs =
-    terminal ? undefined
-    : result.decision === 'continue' ? task.intervalMs
-    : suggestNextHeartbeatDelayMs(result.decision) ?? task.intervalMs;
-  const projection = projectionForResult(result, delayMs);
-
-  return normalizeTaskForSave({
-    ...task,
-    enabled: terminal ? false : task.enabled,
-    status: projection.status,
-    lastProgress: projection.progress,
-    nextRunAt: delayMs === undefined ? undefined : new Date(now.getTime() + delayMs).toISOString(),
-    lastRunAt: now.toISOString(),
-    lastRunId: result.state.runId,
-    lastLoadedCheckpoint: loadedCheckpoint,
-    resumable: result.decision !== 'complete',
-    lastUsage: result.state.usage,
-    lastDecision: result.decision,
-    lastOutcome: result.state.outcome,
-    lastSummary: result.summary,
-    lastError: undefined,
-    updatedAt: now.toISOString(),
-  });
-}
-
-function updateTaskAfterFailure(task: HeartbeatTask, error: unknown, now: Date, retryMs: number): HeartbeatTask {
-  return normalizeTaskForSave({
-    ...task,
-    status: 'failed',
-    lastProgress: 'Heartbeat wake failed and will retry later.',
-    nextRunAt: new Date(now.getTime() + retryMs).toISOString(),
-    lastRunAt: now.toISOString(),
-    lastError: error instanceof Error ? error.message : String(error),
-    updatedAt: now.toISOString(),
-  });
-}
-
-function normalizeTaskForSave(task: HeartbeatTask): HeartbeatTask {
-  return {
-    ...task,
-    intervalMs: Math.max(1, Math.trunc(task.intervalMs)),
-    status: task.status ?? 'idle',
-  };
-}
-
-function checkpointPathForTask(task: HeartbeatTask, checkpointsDir: string): string {
-  return task.checkpointPath ?? join(checkpointsDir, `${safeTaskFileName(task.id)}.json`);
-}
-
-function safeTaskFileName(id: string): string {
-  if (!/^[a-zA-Z0-9._-]+$/.test(id)) {
-    throw new Error(`Invalid heartbeat task id "${id}". Use only letters, numbers, dots, underscores, and hyphens.`);
-  }
-  return id;
-}
-
-function projectionForResult(
-  result: AgentHeartbeatResult,
-  delayMs: number | undefined,
-): { status: HeartbeatTaskStatus; progress: string } {
-  switch (result.decision) {
-    case 'continue':
-      return {
-        status: 'waiting',
-        progress:
-          delayMs === undefined ?
-            'Heartbeat wake finished.'
-          : `Heartbeat wake finished. Waiting until the next scheduled run in ${formatDelay(delayMs)}.`,
-      };
-    case 'pause':
-      return {
-        status: 'waiting',
-        progress:
-          delayMs === undefined ?
-            'Heartbeat paused.'
-          : `Heartbeat paused. Waiting ${formatDelay(delayMs)} before the next wake.`,
-      };
-    case 'complete':
-      return {
-        status: 'complete',
-        progress: 'Heartbeat task completed and will not wake again.',
-      };
-    case 'escalate':
-      return {
-        status: 'blocked',
-        progress: 'Heartbeat escalated for user input and is waiting for follow-up.',
-      };
-  }
-}
-
-function formatDelay(ms: number): string {
-  if (ms % (24 * 60 * 60_000) === 0) {
-    return `${ms / (24 * 60 * 60_000)}d`;
-  }
-  if (ms % (60 * 60_000) === 0) {
-    return `${ms / (60 * 60_000)}h`;
-  }
-  if (ms % 60_000 === 0) {
-    return `${ms / 60_000}m`;
-  }
-  if (ms % 1_000 === 0) {
-    return `${ms / 1_000}s`;
-  }
-  return `${ms}ms`;
-}
-
-function runRecordEntryFromPath(path: string, record: HeartbeatTaskRunRecord): HeartbeatTaskRunRecordEntry {
-  const id = basename(path, '.json');
-  return {
-    id,
-    path,
-    taskId: record.task.id,
-    runId: record.result.state.runId,
-    createdAt: record.result.state.finishedAt,
-    record,
-  };
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {

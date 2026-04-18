@@ -8,6 +8,15 @@ export type ParsedHeartbeatArgs = {
 };
 
 export function parseHeartbeatArgs(args: string[]): ParsedHeartbeatArgs {
+  if (args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
+    return {
+      command: args[0],
+      subcommand: undefined,
+      rest: args.slice(1),
+      flags: {},
+    };
+  }
+
   const root = new Command();
   root
     .exitOverride()

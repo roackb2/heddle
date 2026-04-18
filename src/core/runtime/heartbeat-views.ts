@@ -3,7 +3,7 @@ import type {
   HeartbeatTaskRunRecordEntry,
   HeartbeatTaskStatus,
   HeartbeatTaskStore,
-} from './heartbeat-scheduler.js';
+} from './heartbeat-task-store.js';
 import type { HeartbeatDecision } from './heartbeat.js';
 import type { LlmUsage } from '../llm/types.js';
 

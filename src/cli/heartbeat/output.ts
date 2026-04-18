@@ -1,4 +1,3 @@
-import { Command } from 'commander';
 import type { AgentLoopEvent, HeartbeatSchedulerEvent } from '../../index.js';
 import { stripHeartbeatDecisionLine } from './summary.js';
 
@@ -70,21 +69,24 @@ export function printSchedulerEvent(event: HeartbeatSchedulerEvent) {
 }
 
 export function printHeartbeatHelp() {
-  const root = new Command();
-  root
-    .name('heddle heartbeat')
-    .description('Manage and run heartbeat tasks')
-    .addHelpText('after', ['', 'Duration examples:', '  30s, 15m, 1h, 2d', ''].join('\n'));
-
-  root.command('task add').description('add a heartbeat task');
-  root.command('task list').description('list heartbeat tasks');
-  root.command('task show <id>').description('show a heartbeat task');
-  root.command('task enable <id>').description('enable a heartbeat task');
-  root.command('task disable <id>').description('disable a heartbeat task');
-  root.command('start').description('start the heartbeat scheduler convenience flow');
-  root.command('run').description('run due heartbeat tasks once or in a poll loop');
-  root.command('runs list').description('list heartbeat run records');
-  root.command('runs show <id>').description('show a heartbeat run record');
-
-  process.stdout.write(root.helpInformation());
+  process.stdout.write([
+    'Usage: heddle heartbeat <command>',
+    '',
+    'Manage and run heartbeat tasks',
+    '',
+    'Commands:',
+    '  task add                 add a heartbeat task',
+    '  task list                list heartbeat tasks',
+    '  task show <id>           show a heartbeat task',
+    '  task enable <id>         enable a heartbeat task',
+    '  task disable <id>        disable a heartbeat task',
+    '  start                    start the heartbeat scheduler convenience flow',
+    '  run                      run due heartbeat tasks once or in a poll loop',
+    '  runs list                list heartbeat run records',
+    '  runs show <id>           show a heartbeat run record',
+    '',
+    'Duration examples:',
+    '  30s, 15m, 1h, 2d',
+    '',
+  ].join('\n'));
 }
