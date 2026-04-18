@@ -82,6 +82,7 @@ node dist/src/cli/main.js daemon --host 127.0.0.1 --port 8765
 The repository includes example programs for common host/runtime patterns:
 
 ```bash
+yarn example:repo-investigator
 yarn example:programmatic
 yarn example:heartbeat
 yarn example:heartbeat-scheduler

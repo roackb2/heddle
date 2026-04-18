@@ -75,6 +75,7 @@ npm install cyberloop
 The repository includes example programs you can study or run directly:
 
 ```bash
+yarn example:repo-investigator
 yarn example:programmatic
 yarn example:heartbeat
 yarn example:heartbeat-scheduler

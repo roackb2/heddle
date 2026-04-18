@@ -2,7 +2,7 @@
 // Example: Repo Investigator
 //
 // Usage:
-//   OPENAI_API_KEY=sk-... npx tsx examples/repo-investigator.ts "What does this project do?"
+//   OPENAI_API_KEY=sk-... yarn example:repo-investigator "What does this project do?"
 // ---------------------------------------------------------------------------
 
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -25,7 +25,7 @@ import {
 async function main() {
   const goal = process.argv[2];
   if (!goal) {
-    console.error('Usage: npx tsx examples/repo-investigator.ts "<goal>"');
+    console.error('Usage: yarn example:repo-investigator "<goal>"');
     process.exit(1);
   }
   const model = process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
