@@ -5,14 +5,14 @@ import {
   DEFAULT_MUTATE_RULES,
   type RunShellPolicyDecision,
 } from '../../../core/tools/run-shell.js';
-import { truncate } from '../../../core/chat/format.js';
+import { truncate } from '../../../core/utils/text.js';
+export { buildConversationMessages } from '../../../core/chat/conversation-lines.js';
+export { formatChatFailureMessage } from '../../../core/chat/failure-messages.js';
+export type { ChatFailureHintOptions } from '../../../core/chat/failure-messages.js';
+export { countAssistantSteps, summarizeTrace } from '../../../core/chat/trace-summary.js';
 export {
-  buildConversationMessages,
-  countAssistantSteps,
-  formatChatFailureMessage,
-  summarizeTrace,
   truncate,
-} from '../../../core/chat/format.js';
+} from '../../../core/utils/text.js';
 import type { LiveEvent, PendingApproval } from '../state/types.js';
 
 export type ApprovalSummary = {
@@ -24,11 +24,6 @@ export type ApprovalSummary = {
   why: string;
   effects: string[];
   rememberLabel?: string;
-};
-
-export type ChatFailureHintOptions = {
-  model: string;
-  estimatedHistoryTokens?: number;
 };
 
 const MAX_SHELL_OUTPUT_CHARS = 1400;

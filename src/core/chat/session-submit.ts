@@ -8,10 +8,12 @@ import {
 } from '../../index.js';
 import type { ToolCall, ToolDefinition } from '../../index.js';
 import { compactChatHistory, estimateChatHistoryTokens } from './compaction.js';
+import { buildConversationMessages } from './conversation-lines.js';
+import { formatChatFailureMessage } from './failure-messages.js';
 import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
 import type { ChatSession } from './types.js';
-import { buildConversationMessages, countAssistantSteps, formatChatFailureMessage, summarizeTrace } from './format.js';
 import { saveTrace } from './trace.js';
+import { countAssistantSteps, summarizeTrace } from './trace-summary.js';
 import { resolveApiKeyForModel } from '../../core/runtime/api-keys.js';
 
 import type { AgentLoopEvent } from '../../index.js';

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFile
 import { dirname, join } from 'node:path';
 import type { ChatMessage } from '../../index.js';
 import type { ChatContextStats, ChatSession, ConversationLine, TurnSummary } from './types.js';
-import { truncate } from './format.js';
+import { truncate } from '../utils/text.js';
 
 type ChatSessionCatalogEntry = {
   id: string;
