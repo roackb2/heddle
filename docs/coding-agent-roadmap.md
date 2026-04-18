@@ -88,7 +88,7 @@ Current progress:
 - the local control plane now has a workstation-style browser shell instead of only a read-only dashboard: sessions render as sidebar + conversation + review inspector, heartbeat renders as task list + detail + run history, and the web client is modularized under `src/web/features/control-plane`
 - the control-plane server now exposes session detail and trace-derived turn review procedures over tRPC so the browser can inspect full saved session messages, turn summaries, and review evidence without loading only list projections
 - core runtime modules have been reorganized under `src/core`, including agent loop, runtime heartbeat, llm, tools, prompts, trace, and shared utils, so the public surface can keep growing without the old flat `src/` layout
-- the heartbeat/control-plane path is now cleaner at the package surface: CLI heartbeat imports from the package entrypoint, package scripts consistently expose `web:*`, `server:dev`, `client:dev`, and `control-plane:*`, and example imports follow the new core layout
+- the heartbeat/control-plane path is now cleaner at the package surface: CLI heartbeat imports from the package entrypoint, package scripts expose `server:dev`, `client:dev`, and `client:build`, and example imports follow the new core layout
 
 Remaining priority:
 
