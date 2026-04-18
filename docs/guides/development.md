@@ -48,6 +48,8 @@ yarn cli:dev --help
 yarn chat:dev
 ```
 
+`yarn chat:dev` runs the same source CLI entry point as the packaged `heddle chat` command. The `examples/` directory is reserved for programmatic host/runtime examples rather than the main terminal chat UI.
+
 If you prefer provider-specific local shortcuts, the repository also includes convenience scripts such as:
 
 ```bash
