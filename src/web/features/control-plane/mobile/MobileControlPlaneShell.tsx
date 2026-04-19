@@ -52,7 +52,7 @@ export function MobileControlPlaneShell({
       </section>
 
       <nav
-        className="grid shrink-0 grid-cols-3 gap-1 border-t border-border bg-card/95 px-2 py-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
+        className="grid shrink-0 grid-cols-3 gap-1 border-t border-border bg-card/95 px-2 py-2 pb-[max(env(safe-area-inset-bottom),0.25rem)]"
         aria-label="Control plane sections"
       >
         {tabs.map((item) => (

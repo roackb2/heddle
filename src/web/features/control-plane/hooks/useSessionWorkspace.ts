@@ -17,7 +17,7 @@ import {
   type ControlPlaneState,
   type PendingSessionApproval,
 } from '../../../lib/api';
-import type { ToastInput } from '../components/toasts';
+import type { ToastInput } from '../../../components/ui/use-toast';
 
 export type InspectorTab = 'summary' | 'review';
 export type SessionDetailValue = Exclude<ChatSessionDetail, null>;
@@ -550,7 +550,7 @@ export function useSessionWorkspace(
     } finally {
       setSendingPrompt(false);
     }
-  }, [notify, removeLiveStatusMessage, runInFlight, selectedSessionId, sendingPrompt, upsertLiveAssistantMessage, upsertLiveStatusMessage]);
+  }, [notify, removeLiveStatusMessage, runInFlight, selectedSessionId, sendingPrompt, upsertLiveStatusMessage]);
 
   const cancelSessionRun = useCallback(async () => {
     if (!selectedSessionId || !runInFlight) {

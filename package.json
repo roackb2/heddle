@@ -101,6 +101,7 @@
     "@anthropic-ai/sdk": "^0.54.0",
     "@inkjs/ui": "^2.0.0",
     "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-toast": "^1.2.15",
     "@tailwindcss/vite": "^4.2.2",
     "@trpc/client": "^11.16.0",
     "@trpc/server": "^11.16.0",

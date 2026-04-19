@@ -961,61 +961,6 @@ h3 {
   padding-top: 8px;
 }
 
-.toast-viewport {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  z-index: 20;
-  width: min(380px, calc(100vw - 36px));
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  pointer-events: none;
-}
-
-.toast {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.96);
-  padding: 12px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.32);
-  pointer-events: auto;
-}
-
-.toast.success {
-  border-color: rgba(134, 239, 172, 0.36);
-}
-
-.toast.error {
-  border-color: rgba(253, 164, 175, 0.38);
-}
-
-.toast-title {
-  margin: 0;
-  font-weight: 700;
-}
-
-.toast-body {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
-
-.toast-dismiss {
-  width: 26px;
-  height: 26px;
-  flex: 0 0 auto;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(11, 18, 32, 0.72);
-  color: var(--muted);
-}
-
 @media (max-width: 1180px) {
   .workspace-shell {
     grid-template-columns: minmax(232px, var(--session-sidebar-width, 252px)) 6px minmax(420px, 1fr) 6px minmax(280px, var(--session-side-width, 312px));

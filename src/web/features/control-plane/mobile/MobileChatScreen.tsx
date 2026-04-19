@@ -180,7 +180,7 @@ function MobileComposer({
           ref={textareaRef}
           rows={1}
           value={draft}
-          className="max-h-24 min-h-10 resize-none rounded-md bg-background px-3 py-2 text-sm leading-5"
+          className="max-h-24 min-h-10 resize-none rounded-md bg-background px-3 py-2 text-base leading-6 md:text-sm md:leading-5"
           disabled={disabled}
           placeholder={runActive ? 'Heddle is working...' : 'Message Heddle'}
           onChange={(event) => onDraftChange(event.target.value, event.target.selectionStart)}
@@ -236,7 +236,7 @@ function RunStatus({ runActive }: { runActive: boolean }) {
   return (
     <div className="flex items-center gap-1">
       <Badge variant={runActive ? 'outline' : 'secondary'}>{runActive ? 'working' : 'idle'}</Badge>
-      <span className="text-xs text-muted-foreground">Enter sends</span>
+      <span className="text-xs text-muted-foreground">Tap Send to submit</span>
     </div>
   );
 }

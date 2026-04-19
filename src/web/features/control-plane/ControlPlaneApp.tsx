@@ -10,8 +10,9 @@ import { Panel, StatusBadge, TabButton, WorkspacePathLabel } from './components/
 import { HeartbeatWorkspace } from './components/HeartbeatWorkspace';
 import { OverviewView } from './components/OverviewView';
 import { SessionsWorkspace } from './components/SessionsWorkspace';
-import { ToastViewport, useToasts } from './components/toasts';
 import { MobileControlPlaneShell, type ControlPlaneTab } from './mobile/MobileControlPlaneShell';
+import { Toaster } from '../../components/ui/toaster';
+import { useToast } from '../../components/ui/use-toast';
 
 type Tab = ControlPlaneTab;
 
@@ -24,12 +25,12 @@ declare global {
 export function ControlPlaneApp() {
   const [tab, setTab] = useState<Tab>('sessions');
   const { state, error, refresh } = useControlPlaneState();
-  const { toasts, addToast, removeToast } = useToasts();
+  const { toasts, toast: notifyToast } = useToast();
   const isMobile = useIsMobile();
   const refreshControlPlaneState = useCallback(() => {
     void refresh();
   }, [refresh]);
-  const sessionWorkspace = useSessionWorkspace(state?.sessions, addToast, refreshControlPlaneState);
+  const sessionWorkspace = useSessionWorkspace(state?.sessions, notifyToast, refreshControlPlaneState);
   const heartbeatWorkspace = useHeartbeatWorkspace(state?.heartbeat.tasks, state?.heartbeat.runs);
   const captureDebugSnapshot = useCallback(async (screenshot: ScreenshotMode) => {
     let snapshot: Awaited<ReturnType<typeof captureControlPlaneLayoutSnapshot>> | undefined;
@@ -52,7 +53,7 @@ export function ControlPlaneApp() {
         },
       });
       const saved = await saveLayoutSnapshot(snapshot);
-      addToast({
+      notifyToast({
         title: 'Layout snapshot saved',
         body: saved.screenshotPath ? `${saved.jsonPath}\n${saved.screenshotPath}` : saved.jsonPath,
         tone: 'success',
@@ -62,13 +63,13 @@ export function ControlPlaneApp() {
       if (snapshot) {
         downloadLayoutSnapshot(snapshot);
       }
-      addToast({
+      notifyToast({
         title: snapshot ? 'Layout snapshot downloaded' : 'Layout snapshot failed',
         body: snapshot ? `Server save failed, downloaded locally. ${message}` : message,
         tone: snapshot ? 'info' : 'error',
       });
     }
-  }, [addToast, error, sessionWorkspace, tab, toasts]);
+  }, [error, notifyToast, sessionWorkspace, tab, toasts]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) {
@@ -139,7 +140,7 @@ export function ControlPlaneApp() {
         >
           {activeContent}
         </MobileControlPlaneShell>
-        <ToastViewport toasts={toasts} onDismiss={removeToast} />
+        <Toaster />
       </>
     );
   }
@@ -163,7 +164,7 @@ export function ControlPlaneApp() {
       </header>
 
       {activeContent}
-      <ToastViewport toasts={toasts} onDismiss={removeToast} />
+      <Toaster />
     </main>
   );
 }
