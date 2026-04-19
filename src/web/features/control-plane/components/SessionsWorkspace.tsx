@@ -13,6 +13,7 @@ import { formatDate, formatNumber, toneFor, className } from '../utils';
 import { CodeBlock, EmptyState, Pill, SideSection, WorkspaceSectionHeader } from './common';
 import { CommandList, SessionListButton, TurnListButton } from './lists';
 import { MobileChatScreen } from '../mobile/MobileChatScreen';
+import { MobileSessionNav } from '../mobile/MobileSessionNav';
 
 export type SessionTurn = Exclude<ChatSessionDetail, null>['turns'][number];
 
@@ -393,13 +394,15 @@ export function SessionsWorkspace({
     return (
       <section className="mobile-session-screen mobile-session-review">
         <aside className="workspace-side mobile-pane">
-          <div className="mobile-side-header">
-            <button className="mobile-nav-button" type="button" onClick={showChatView}>← Chat</button>
-          </div>
-          <div className="side-tabs" role="tablist" aria-label="Session inspector">
-            <button className={className(inspectorTab === 'summary' && 'active')} type="button" onClick={() => onInspectorTabChange('summary')}>Summary</button>
-            <button className={className(inspectorTab === 'review' && 'active')} type="button" onClick={() => onInspectorTabChange('review')}>Review</button>
-          </div>
+          <MobileSessionNav
+            activeView={inspectorTab === 'summary' ? 'info' : 'review'}
+            title={sessionDetail?.name ?? activeSession?.name ?? 'Session'}
+            subtitle={inspectorTab === 'summary' ? 'Session info' : 'Review evidence'}
+            onBackToSessions={showSessionList}
+            onOpenChat={showChatView}
+            onOpenInfo={() => onInspectorTabChange('summary')}
+            onOpenReview={() => onInspectorTabChange('review')}
+          />
 
           <div className="side-scroll">
             {inspectorTab === 'summary' ?

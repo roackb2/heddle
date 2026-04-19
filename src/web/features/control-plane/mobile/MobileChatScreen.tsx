@@ -4,6 +4,7 @@ import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Textarea } from '../../../components/ui/textarea';
 import { formatDate } from '../utils';
+import { MobileSessionNav } from './MobileSessionNav';
 
 type ChatMessage = Exclude<ChatSessionDetail, null>['messages'][number];
 
@@ -66,25 +67,15 @@ export function MobileChatScreen({
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-background">
-      <header className="shrink-0 border-b border-border bg-card px-3 py-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <Button type="button" variant="ghost" size="sm" className="h-8 shrink-0 px-2 text-xs" onClick={onBackToSessions}>
-            Sessions
-          </Button>
-          <div className="min-w-0 flex-1">
-            <h2 className="m-0 truncate text-sm font-semibold leading-5 tracking-normal">{title}</h2>
-            <p className="m-0 truncate text-xs leading-4 text-muted-foreground">
-              {activeSession ? `updated ${formatDate(activeSession.updatedAt)}` : 'Pick a session'}
-            </p>
-          </div>
-          <Button type="button" variant="ghost" size="sm" className="h-8 shrink-0 px-2 text-xs" onClick={onOpenSummary}>
-            Info
-          </Button>
-          <Button type="button" variant="ghost" size="sm" className="h-8 shrink-0 px-2 text-xs" onClick={onOpenReview}>
-            Review
-          </Button>
-        </div>
-      </header>
+      <MobileSessionNav
+        activeView="chat"
+        title={title}
+        subtitle={activeSession ? `updated ${formatDate(activeSession.updatedAt)}` : 'Pick a session'}
+        onBackToSessions={onBackToSessions}
+        onOpenChat={() => undefined}
+        onOpenInfo={onOpenSummary}
+        onOpenReview={onOpenReview}
+      />
 
       <div ref={conversationScrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         <div className="flex min-h-full flex-col justify-end gap-3">
