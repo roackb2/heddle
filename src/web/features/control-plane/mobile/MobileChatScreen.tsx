@@ -172,7 +172,7 @@ function MobileComposer({
   const status = sendPromptError ?? sessionNotice;
 
   return (
-    <footer className="relative shrink-0 border-t border-border bg-card px-2 py-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
+    <footer className="relative shrink-0 border-t border-border bg-card px-2 py-2">
       {pendingApproval ? <MobileApprovalBanner approval={pendingApproval} onOpen={onOpenApprovalSheet} /> : null}
       {mentionMenu}
       <div className="flex items-end gap-2">
@@ -192,7 +192,7 @@ function MobileComposer({
           Send
         </Button>
       </div>
-      <div className="mt-2 flex items-center justify-between gap-2">
+      <div className="mt-1 flex items-center justify-between gap-2">
         <div className="min-w-0">
           {status ? <p className="m-0 truncate text-xs text-muted-foreground">{status}</p> : <RunStatus runActive={runActive} />}
         </div>
@@ -234,10 +234,7 @@ function MobileApprovalBanner({
 
 function RunStatus({ runActive }: { runActive: boolean }) {
   return (
-    <div className="flex items-center gap-1">
-      <Badge variant={runActive ? 'outline' : 'secondary'}>{runActive ? 'working' : 'idle'}</Badge>
-      <span className="text-xs text-muted-foreground">Tap Send to submit</span>
-    </div>
+    <Badge variant={runActive ? 'outline' : 'secondary'}>{runActive ? 'working' : 'idle'}</Badge>
   );
 }
 
