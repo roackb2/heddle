@@ -1,5 +1,5 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import {
   fetchModelOptions,
   fetchWorkspaceFileSuggestions,
@@ -12,6 +12,7 @@ import {
 import { formatDate, formatNumber, toneFor, className } from '../utils';
 import { CodeBlock, EmptyState, Pill, SideSection, WorkspaceSectionHeader } from './common';
 import { CommandList, SessionListButton, TurnListButton } from './lists';
+import { MobileChatScreen } from '../mobile/MobileChatScreen';
 
 export type SessionTurn = Exclude<ChatSessionDetail, null>['turns'][number];
 
@@ -276,6 +277,57 @@ export function SessionsWorkspace({
     setMobileView('review');
   };
 
+  const submitDraft = () => {
+    const prompt = draft.trim();
+    if (!prompt) {
+      return;
+    }
+    setDraft('');
+    void onSendPrompt(prompt);
+  };
+
+  const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionQuery && (mentionSuggestions.length || mentionLoading)) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setActiveMentionIndex((index) => Math.min(index + 1, Math.max(mentionSuggestions.length - 1, 0)));
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setActiveMentionIndex((index) => Math.max(index - 1, 0));
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMentionQuery(null);
+        setMentionSuggestions([]);
+        return;
+      }
+      if ((event.key === 'Enter' || event.key === 'Tab') && mentionSuggestions[activeMentionIndex]) {
+        event.preventDefault();
+        insertMention(mentionSuggestions[activeMentionIndex]);
+        return;
+      }
+    }
+
+    if (event.key === 'Enter' && !event.shiftKey && !event.altKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      submitDraft();
+    }
+  };
+
+  const mentionMenu = mentionQuery ?
+    <FileMentionMenu
+      loading={mentionLoading}
+      suggestions={mentionSuggestions}
+      activeIndex={activeMentionIndex}
+      error={mentionError}
+      query={mentionQuery.query}
+      onPick={insertMention}
+    />
+  : null;
+
   const showMobileLayout = typeof window !== 'undefined' && window.innerWidth <= 760;
 
   if (showMobileLayout && mobileView === 'list') {
@@ -308,178 +360,32 @@ export function SessionsWorkspace({
 
   if (showMobileLayout && mobileView === 'chat') {
     return (
-      <section className="mobile-session-screen mobile-session-chat">
-        <section className="workspace-main mobile-pane mobile-chat-pane">
-          <WorkspaceSectionHeader
-            title={sessionDetail?.name ?? activeSession?.name ?? 'Chat session'}
-            subtitle={activeSession ? `${activeSession.id} · updated ${formatDate(activeSession.updatedAt)}` : 'Pick a session to inspect its conversation.'}
-            actions={activeSession ? (
-              <div className="session-controls">
-                <button className="mobile-nav-button" type="button" onClick={showSessionList}>← Sessions</button>
-                <button className="mobile-nav-button mobile-inspector-button" type="button" onClick={openSummaryInspector}>Summary</button>
-                <button className="mobile-nav-button mobile-inspector-button" type="button" onClick={openReviewInspector}>Review</button>
-                <label className="select-control">
-                  <span>model</span>
-                  <select
-                    value={sessionDetail?.model ?? activeSession.model ?? ''}
-                    disabled={runActive || !modelOptions}
-                    onChange={(event) => void onUpdateSessionSettings({ model: event.target.value })}
-                    title={modelOptionsError ? 'Model options unavailable. Restart the Heddle daemon if this route was just added.' : undefined}
-                  >
-                    {modelOptions?.groups.map((group) => (
-                      <optgroup key={group.label} label={group.label}>
-                        {group.models.map((model) => <option key={model} value={model}>{model}</option>)}
-                      </optgroup>
-                    ))}
-                    {!modelOptions ? <option value={sessionDetail?.model ?? activeSession.model ?? ''}>{modelOptionsError ? 'models unavailable' : sessionDetail?.model ?? activeSession.model ?? 'loading models'}</option> : null}
-                  </select>
-                </label>
-                <Pill>turns {activeSession.turnCount}</Pill>
-                <button
-                  className={className('drift-button', (sessionDetail?.driftEnabled ?? activeSession.driftEnabled) && 'active')}
-                  type="button"
-                  disabled={runActive}
-                  onClick={() => void onUpdateSessionSettings({ driftEnabled: !(sessionDetail?.driftEnabled ?? activeSession.driftEnabled ?? true) })}
-                >
-                  {formatDriftLabel(sessionDetail?.driftEnabled ?? activeSession.driftEnabled, sessionDetail?.driftLevel ?? activeSession.driftLevel)}
-                </button>
-                {runActive ? <Pill tone="warn">working</Pill> : null}
-              </div>
-            ) : undefined}
-          />
-
-          <div className="conversation-scroll" ref={conversationScrollRef}>
-            <div className="conversation-stack">
-              <div className="conversation-spacer" />
-              {sessionDetailLoading ?
-                <EmptyState title="Loading session" body="Fetching full conversation state from saved Heddle session storage." />
-              : sessionDetailError ?
-                <EmptyState title="Session load failed" body={sessionDetailError} />
-              : sessionDetail && sessionDetail.messages.length ?
-                sessionDetail.messages.map((message) => <ConversationMessage key={message.id} message={message} />)
-              : <EmptyState title="No conversation available" body="This session does not have any saved chat messages yet." />}
-            </div>
-          </div>
-
-          <div className="composer-shell">
-            {pendingApproval ?
-              <div className="detail-card error-card approval-card">
-                <p className="card-title">Approval required: {pendingApproval.tool}</p>
-                <p className="muted">Call ID: {pendingApproval.callId}</p>
-                <CodeBlock>{JSON.stringify(pendingApproval.input, null, 2)}</CodeBlock>
-                <div className="pills approval-actions">
-                  <button className="primary-button" type="button" onClick={() => void onResolveApproval(true)}>Approve</button>
-                  <button className="tab-button" type="button" onClick={() => void onResolveApproval(false)}>Deny</button>
-                </div>
-              </div>
-            : null}
-            <textarea
-              ref={textareaRef}
-              value={draft}
-              onChange={(event) => updateDraft(event.target.value, event.target.selectionStart)}
-              onClick={(event) => updateDraft(draft, event.currentTarget.selectionStart)}
-              onSelect={(event) => updateDraft(draft, event.currentTarget.selectionStart)}
-              disabled={!selectedSessionId || runActive}
-              placeholder={runActive ? 'Heddle is working…' : 'Ask Heddle about this workspace'}
-              onKeyDown={(event) => {
-                if (mentionQuery && (mentionSuggestions.length || mentionLoading)) {
-                  if (event.key === 'ArrowDown') {
-                    event.preventDefault();
-                    setActiveMentionIndex((index) => Math.min(index + 1, Math.max(mentionSuggestions.length - 1, 0)));
-                    return;
-                  }
-                  if (event.key === 'ArrowUp') {
-                    event.preventDefault();
-                    setActiveMentionIndex((index) => Math.max(index - 1, 0));
-                    return;
-                  }
-                  if (event.key === 'Escape') {
-                    event.preventDefault();
-                    setMentionQuery(null);
-                    setMentionSuggestions([]);
-                    return;
-                  }
-                  if ((event.key === 'Enter' || event.key === 'Tab') && mentionSuggestions[activeMentionIndex]) {
-                    event.preventDefault();
-                    insertMention(mentionSuggestions[activeMentionIndex]);
-                    return;
-                  }
-                }
-
-                if (event.key === 'Enter' && !event.shiftKey && !event.altKey && !event.nativeEvent.isComposing) {
-                  event.preventDefault();
-                  const prompt = draft.trim();
-                  if (!prompt) {
-                    return;
-                  }
-                  setDraft('');
-                  void onSendPrompt(prompt);
-                }
-              }}
-            />
-            {mentionQuery ?
-              <FileMentionMenu
-                loading={mentionLoading}
-                suggestions={mentionSuggestions}
-                activeIndex={activeMentionIndex}
-                error={mentionError}
-                query={mentionQuery.query}
-                onPick={insertMention}
-              />
-            : null}
-            <div className="composer-footer">
-              <div className="composer-status">
-                <p className="muted">
-                  {sendPromptError ? sendPromptError
-                  : sessionNotice ? sessionNotice
-                  : runActive ? 'Run in progress. Continue is disabled until this run settles; Cancel interrupts the active run.'
-                  : sessionDetail?.lastContinuePrompt ? 'Enter sends. Option+Enter or Shift+Enter adds a new line.'
-                  : 'Enter sends. Option+Enter or Shift+Enter adds a new line.'}
-                </p>
-                <div className="pills compact-pills">
-                  <Pill tone={creatingSession ? 'warn' : runActive ? 'warn' : 'good'}>{creatingSession ? 'creating session' : runActive ? 'run active' : 'idle'}</Pill>
-                  {sessionDetail?.lastContinuePrompt ? <Pill>continue available</Pill> : <Pill>no continue state yet</Pill>}
-                </div>
-              </div>
-              <div className="pills composer-actions">
-                <button
-                  className="tab-button"
-                  type="button"
-                  disabled={!selectedSessionId || runActive || !sessionDetail?.lastContinuePrompt}
-                  onClick={() => void onContinueSession()}
-                  title={sessionDetail?.lastContinuePrompt ? 'Resume the current transcript from the last saved continue point' : 'Continue is available after a prior runnable turn exists'}
-                >
-                  Continue
-                </button>
-                <button
-                  className="tab-button"
-                  type="button"
-                  disabled={!runInFlight}
-                  onClick={() => void onCancelSessionRun()}
-                  title="Interrupt the currently running session"
-                >
-                  Cancel
-                </button>
-                <button
-                  className="primary-button"
-                  type="button"
-                  disabled={!selectedSessionId || runActive || !draft.trim()}
-                  onClick={() => {
-                    const prompt = draft.trim();
-                    if (!prompt) {
-                      return;
-                    }
-                    setDraft('');
-                    void onSendPrompt(prompt);
-                  }}
-                >
-                  Send
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-      </section>
+      <MobileChatScreen
+        activeSession={activeSession}
+        sessionDetail={sessionDetail}
+        sessionDetailLoading={sessionDetailLoading}
+        sessionDetailError={sessionDetailError}
+        selectedSessionId={selectedSessionId}
+        runActive={runActive}
+        runInFlight={runInFlight}
+        sendPromptError={sendPromptError}
+        sessionNotice={sessionNotice}
+        draft={draft}
+        pendingApproval={pendingApproval}
+        conversationScrollRef={conversationScrollRef}
+        textareaRef={textareaRef}
+        mentionMenu={mentionMenu}
+        renderMessage={(message) => <ConversationMessage key={message.id} message={message} />}
+        onDraftChange={updateDraft}
+        onComposerKeyDown={handleComposerKeyDown}
+        onBackToSessions={showSessionList}
+        onOpenSummary={openSummaryInspector}
+        onOpenReview={openReviewInspector}
+        onSubmitPrompt={submitDraft}
+        onContinueSession={() => void onContinueSession()}
+        onCancelSessionRun={() => void onCancelSessionRun()}
+        onResolveApproval={(approved) => void onResolveApproval(approved)}
+      />
     );
   }
 
