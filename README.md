@@ -62,12 +62,13 @@ Saved session review in the control plane, with conversation history in the cent
 
 ### Mobile control plane
 
-The control plane also has a phone-oriented layout for checking sessions, reading the latest conversation, and reviewing evidence from another device:
+The control plane also has a phone-oriented layout for checking sessions, reading the latest conversation, and reviewing evidence (especially approvals and command traces) from another device:
 
 <p>
   <img src="docs/images/mobile-control-plane-sessions.png" alt="Heddle mobile session list" width="240">
   <img src="docs/images/mobile-control-plane-chat.png" alt="Heddle mobile chat view" width="240">
-  <img src="docs/images/mobile-control-plane-review.png" alt="Heddle mobile review evidence" width="240">
+  <img src="docs/images/mobile-control-plane-review-commands.png" alt="Heddle mobile review commands tab" width="240">
+  <img src="docs/images/mobile-control-plane-review-approvals.png" alt="Heddle mobile review approvals tab" width="240">
 </p>
 
 ## 2-Minute Try-It Path

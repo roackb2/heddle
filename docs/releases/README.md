@@ -117,6 +117,8 @@ The final release notes should still be written from the actual scope plus the i
 Current example release note drafts:
 - [`v0.0.23.md`](./v0.0.23.md)
 - [`v0.0.24.md`](./v0.0.24.md)
+- [`v0.0.25.md`](./v0.0.25.md)
+- [`v0.0.26.md`](./v0.0.26.md)
 
 ## Agent Rule
 
