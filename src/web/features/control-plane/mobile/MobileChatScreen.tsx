@@ -1,10 +1,11 @@
-import type { KeyboardEvent, ReactNode, RefObject } from 'react';
+import { useEffect, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import type { ChatSessionDetail, ControlPlaneState } from '../../../lib/api';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Textarea } from '../../../components/ui/textarea';
 import { formatDate } from '../utils';
 import { MobileSessionNav } from './MobileSessionNav';
+import { MobileApprovalSheet } from './MobileApprovalSheet';
 
 type ChatMessage = Exclude<ChatSessionDetail, null>['messages'][number];
 
@@ -64,6 +65,13 @@ export function MobileChatScreen({
   const canSend = Boolean(selectedSessionId && !runActive && draft.trim());
   const canContinue = Boolean(selectedSessionId && !runActive && sessionDetail?.lastContinuePrompt);
   const title = sessionDetail?.name ?? activeSession?.name ?? 'Chat session';
+  const [approvalSheetOpen, setApprovalSheetOpen] = useState(false);
+
+  useEffect(() => {
+    if (!pendingApproval) {
+      setApprovalSheetOpen(false);
+    }
+  }, [pendingApproval]);
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-background">
@@ -97,6 +105,7 @@ export function MobileChatScreen({
         canSend={canSend}
         canContinue={canContinue}
         pendingApproval={pendingApproval}
+        onOpenApprovalSheet={() => setApprovalSheetOpen(true)}
         sendPromptError={sendPromptError}
         sessionNotice={sessionNotice}
         textareaRef={textareaRef}
@@ -106,7 +115,16 @@ export function MobileChatScreen({
         onSubmitPrompt={onSubmitPrompt}
         onContinueSession={onContinueSession}
         onCancelSessionRun={onCancelSessionRun}
-        onResolveApproval={onResolveApproval}
+      />
+
+      <MobileApprovalSheet
+        approval={pendingApproval}
+        open={approvalSheetOpen}
+        onOpenChange={setApprovalSheetOpen}
+        onResolve={(approved) => {
+          onResolveApproval(approved);
+          setApprovalSheetOpen(false);
+        }}
       />
     </section>
   );
@@ -120,6 +138,7 @@ type MobileComposerProps = {
   canSend: boolean;
   canContinue: boolean;
   pendingApproval: MobileChatScreenProps['pendingApproval'];
+  onOpenApprovalSheet: () => void;
   sendPromptError?: string;
   sessionNotice?: string;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -129,7 +148,6 @@ type MobileComposerProps = {
   onSubmitPrompt: () => void;
   onContinueSession: () => void;
   onCancelSessionRun: () => void;
-  onResolveApproval: (approved: boolean) => void;
 };
 
 function MobileComposer({
@@ -140,6 +158,7 @@ function MobileComposer({
   canSend,
   canContinue,
   pendingApproval,
+  onOpenApprovalSheet,
   sendPromptError,
   sessionNotice,
   textareaRef,
@@ -149,13 +168,12 @@ function MobileComposer({
   onSubmitPrompt,
   onContinueSession,
   onCancelSessionRun,
-  onResolveApproval,
 }: MobileComposerProps) {
   const status = sendPromptError ?? sessionNotice;
 
   return (
     <footer className="relative shrink-0 border-t border-border bg-card px-2 py-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
-      {pendingApproval ? <MobileApprovalBanner approval={pendingApproval} onResolve={onResolveApproval} /> : null}
+      {pendingApproval ? <MobileApprovalBanner approval={pendingApproval} onOpen={onOpenApprovalSheet} /> : null}
       {mentionMenu}
       <div className="flex items-end gap-2">
         <Textarea
@@ -193,31 +211,24 @@ function MobileComposer({
 
 function MobileApprovalBanner({
   approval,
-  onResolve,
+  onOpen,
 }: {
   approval: NonNullable<MobileChatScreenProps['pendingApproval']>;
-  onResolve: (approved: boolean) => void;
+  onOpen: () => void;
 }) {
   return (
-    <section className="mb-2 overflow-hidden rounded-md border border-destructive/40 bg-destructive/10">
-      <div className="flex items-center justify-between gap-2 border-b border-destructive/20 px-3 py-2">
-        <div className="min-w-0">
-          <p className="m-0 truncate text-xs font-semibold text-foreground">Approval required: {approval.tool}</p>
-          <p className="m-0 truncate text-[11px] text-muted-foreground">Call ID: {approval.callId}</p>
-        </div>
-        <div className="flex shrink-0 gap-1">
-          <Button type="button" size="sm" className="h-8 px-2 text-xs" onClick={() => onResolve(true)}>
-            Approve
-          </Button>
-          <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => onResolve(false)}>
-            Deny
-          </Button>
-        </div>
+    <button
+      type="button"
+      className="mb-2 flex w-full items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-left"
+      onClick={onOpen}
+      aria-label={`Open pending approval for ${approval.tool}`}
+    >
+      <div className="min-w-0">
+        <p className="m-0 truncate text-xs font-semibold text-foreground">Approval required: {approval.tool}</p>
+        <p className="m-0 truncate text-[11px] text-muted-foreground">Tap for details and actions</p>
       </div>
-      <pre className="m-0 max-h-[24dvh] overflow-auto whitespace-pre-wrap break-words px-3 py-2 text-[11px] leading-4 text-muted-foreground">
-        {JSON.stringify(approval.input, null, 2)}
-      </pre>
-    </section>
+      <Badge variant="destructive" className="shrink-0">Pending</Badge>
+    </button>
   );
 }
 

@@ -9,11 +9,11 @@ import {
   type ModelOptions,
   type WorkspaceFileSuggestion,
 } from '../../../lib/api';
-import { formatDate, formatNumber, toneFor, className } from '../utils';
+import { formatDate, formatNumber, className } from '../utils';
 import { CodeBlock, EmptyState, Pill, SideSection, WorkspaceSectionHeader } from './common';
 import { CommandList, SessionListButton, TurnListButton } from './lists';
 import { MobileChatScreen } from '../mobile/MobileChatScreen';
-import { MobileSessionNav } from '../mobile/MobileSessionNav';
+import { MobileReviewScreen } from '../mobile/MobileReviewScreen';
 
 export type SessionTurn = Exclude<ChatSessionDetail, null>['turns'][number];
 
@@ -399,92 +399,20 @@ export function SessionsWorkspace({
 
   if (showMobileLayout && mobileView === 'review') {
     return (
-      <section className="mobile-session-screen mobile-session-review">
-        <aside className="workspace-side mobile-pane">
-          <MobileSessionNav
-            activeView={inspectorTab === 'summary' ? 'info' : 'review'}
-            title={sessionDetail?.name ?? activeSession?.name ?? 'Session'}
-            subtitle={inspectorTab === 'summary' ? 'Session info' : 'Review evidence'}
-            onBackToSessions={showSessionList}
-            onOpenChat={showChatView}
-            onOpenInfo={() => onInspectorTabChange('summary')}
-            onOpenReview={() => onInspectorTabChange('review')}
-          />
-
-          <div className="side-scroll">
-            {inspectorTab === 'summary' ?
-              <>
-                <SideSection title="Session context">
-                  {sessionDetail ?
-                    <div className="kv-list">
-                      <div><span className="kv-key">session</span><span className="kv-value">{sessionDetail.id}</span></div>
-                      <div><span className="kv-key">messages</span><span className="kv-value">{sessionDetail.messages.length}</span></div>
-                      <div><span className="kv-key">turns</span><span className="kv-value">{sessionDetail.turns.length}</span></div>
-                      <div><span className="kv-key">history tokens</span><span className="kv-value">{formatNumber(sessionDetail.context?.estimatedHistoryTokens)}</span></div>
-                      <div><span className="kv-key">last run total</span><span className="kv-value">{formatNumber(sessionDetail.context?.lastRunTotalTokens)}</span></div>
-                      <div><span className="kv-key">continue prompt</span><span className="kv-value">{sessionDetail.lastContinuePrompt ?? 'none'}</span></div>
-                    </div>
-                  : <EmptyState title="No session selected" body="Choose a session from the sidebar." />}
-                </SideSection>
-
-                <SideSection title="Turns">
-                  {sessionDetail?.turns.length ?
-                    <div className="stack-list compact">
-                      {[...sessionDetail.turns].reverse().map((turn) => (
-                        <TurnListButton
-                          key={turn.id}
-                          turn={turn}
-                          active={turn.id === selectedTurnId}
-                          onClick={() => selectTurn(turn.id)}
-                        />
-                      ))}
-                    </div>
-                  : <EmptyState title="No turns yet" body="Completed turns appear here with prompt, outcome, and trace summary." />}
-                </SideSection>
-              </>
-            : <>
-              <SideSection title="Diff / review excerpt">
-                {turnReviewLoading ?
-                  <EmptyState title="Loading review" body="Reading trace-backed review evidence for the selected turn." />
-                : turnReviewError ?
-                  <EmptyState title="Review load failed" body={turnReviewError} />
-                : turnReview?.diffExcerpt ?
-                  <CodeBlock>{turnReview.diffExcerpt}</CodeBlock>
-                : <EmptyState title="No diff excerpt" body="This turn did not save git diff evidence. Review commands still appear below when available." />}
-              </SideSection>
-
-              <SideSection title="Review commands">
-                <CommandList commands={turnReview?.reviewCommands ?? []} empty="No git review commands captured for this turn." />
-              </SideSection>
-
-              <SideSection title="Verification commands">
-                <CommandList commands={turnReview?.verificationCommands ?? []} empty="No verification commands captured for this turn." />
-              </SideSection>
-
-              <SideSection title="Approvals and events">
-                {turnReview?.approvals.length ?
-                  <div className="stack-list compact">
-                    {turnReview.approvals.map((approval, index) => (
-                      <div className="detail-card" key={`${approval.tool}-${approval.timestamp ?? index}`}>
-                        <p className="card-title">{approval.tool}</p>
-                        <p className="muted">{approval.command ?? 'no command details'}</p>
-                        <div className="pills">
-                          <Pill tone={approval.approved ? 'good' : 'warn'}>{approval.approved ? 'approved' : 'rejected'}</Pill>
-                        </div>
-                        {approval.reason ? <p className="summary">{approval.reason}</p> : null}
-                      </div>
-                    ))}
-                  </div>
-                : selectedTurn?.events.length ?
-                  <div className="event-list">
-                    {selectedTurn.events.map((event, index) => <p key={`${selectedTurn.id}-${index}`} className="event-line">{event}</p>)}
-                  </div>
-                : <EmptyState title="No approvals or events" body="Turn-level approvals, tool review, or summarized events will appear here." />}
-              </SideSection>
-            </>}
-          </div>
-        </aside>
-      </section>
+      <MobileReviewScreen
+        activeSession={activeSession}
+        sessionDetail={sessionDetail}
+        selectedTurnId={selectedTurnId}
+        selectedTurn={selectedTurn}
+        turnReview={turnReview}
+        turnReviewLoading={turnReviewLoading}
+        turnReviewError={turnReviewError}
+        inspectorTab={inspectorTab}
+        onInspectorTabChange={onInspectorTabChange}
+        onBackToSessions={showSessionList}
+        onOpenChat={showChatView}
+        onSelectTurn={selectTurn}
+      />
     );
   }
 
