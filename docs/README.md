@@ -22,6 +22,7 @@ Task-oriented guides:
 - [Heartbeat](guides/heartbeat.md)
 - [Programmatic use](guides/programmatic-use.md)
 - [Development and contributing](guides/development.md)
+- [Debugging](guides/debugging.md)
 - [Release convention](releases/README.md)
 
 ## Reference

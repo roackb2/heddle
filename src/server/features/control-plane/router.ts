@@ -17,6 +17,7 @@ import {
 } from './services/chat-sessions.js';
 import { loadControlPlaneState } from './services/control-plane-state.js';
 import { listControlPlaneHeartbeatRuns, listControlPlaneHeartbeatTasks } from './services/heartbeat.js';
+import { saveControlPlaneLayoutSnapshot } from './services/layout-snapshots.js';
 import { searchWorkspaceFiles } from './services/workspace-files.js';
 
 const sessionInputSchema = z.object({
@@ -58,6 +59,10 @@ const fileSearchInputSchema = z.object({
   query: z.string().max(200).optional(),
   limit: z.number().int().min(1).max(50).optional(),
 }).optional();
+
+const layoutSnapshotInputSchema = z.object({
+  snapshot: z.unknown(),
+});
 
 export const controlPlaneRouter = router({
   state: procedure.query(async ({ ctx }) => {
@@ -150,5 +155,8 @@ export const controlPlaneRouter = router({
         limit: input?.limit ?? 20,
       }),
     };
+  }),
+  layoutSnapshotSave: procedure.input(layoutSnapshotInputSchema).mutation(async ({ ctx, input }) => {
+    return await saveControlPlaneLayoutSnapshot(ctx.stateRoot, input.snapshot);
   }),
 });

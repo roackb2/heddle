@@ -104,6 +104,66 @@ h3 {
   min-width: 0;
 }
 
+.toolbar-debug {
+  display: none;
+}
+
+.debug-snapshot-menu {
+  position: relative;
+}
+
+.debug-button {
+  list-style: none;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.08);
+  padding: 6px 8px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.debug-button::-webkit-details-marker {
+  display: none;
+}
+
+.debug-button:hover {
+  border-color: rgba(125, 211, 252, 0.3);
+  color: var(--text);
+}
+
+.debug-snapshot-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: rgba(11, 18, 32, 0.98);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
+  padding: 6px;
+}
+
+.debug-snapshot-options button {
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 8px 9px;
+  color: var(--text);
+  text-align: left;
+}
+
+.debug-snapshot-options button:hover {
+  background: rgba(125, 211, 252, 0.12);
+}
+
 .topbar-title-row {
   display: flex;
   justify-content: flex-end;
@@ -813,6 +873,33 @@ h3 {
   border-color: rgba(253, 164, 175, 0.24);
 }
 
+.approval-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(520px, 58vh);
+  overflow: hidden;
+}
+
+.approval-card .muted {
+  overflow-wrap: anywhere;
+}
+
+.approval-card .code-block {
+  flex: 1 1 auto;
+  min-height: 84px;
+  max-height: min(360px, 36vh);
+  overflow: auto;
+  border-radius: 8px;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.approval-actions {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
 .card-title,
 .section-label {
   margin-bottom: 6px;
@@ -974,6 +1061,11 @@ h3 {
 
   .toolbar-tabs {
     flex: 0 0 auto;
+  }
+
+  .toolbar-debug {
+    display: block;
+    margin-left: auto;
   }
 
   .tab-button {
@@ -1152,12 +1244,28 @@ h3 {
     position: relative;
     flex: 0 0 auto;
     z-index: 1;
+    display: flex;
+    flex-direction: column;
+    max-height: 58dvh;
+    overflow: auto;
+    overscroll-behavior: contain;
     padding: 10px 12px env(safe-area-inset-bottom, 0px);
     background: rgba(8, 12, 20, 0.96);
     backdrop-filter: blur(10px);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .approval-card {
+    flex: 0 1 auto;
+    max-height: min(330px, 38dvh);
+  }
+
+  .approval-card .code-block {
+    max-height: min(190px, 22dvh);
   }
 
   .composer-shell textarea {
+    flex: 0 0 auto;
     min-height: 78px;
     border-radius: 8px;
   }
@@ -1250,6 +1358,11 @@ h3 {
     display: none;
   }
 
+  .toolbar-debug {
+    display: block;
+    margin-left: auto;
+  }
+
   .workspace-main {
     min-height: 0;
     height: auto;
@@ -1297,7 +1410,16 @@ h3 {
   }
 
   .composer-shell {
+    max-height: 62dvh;
     padding: 8px 10px env(safe-area-inset-bottom, 0px);
+  }
+
+  .approval-card {
+    max-height: min(300px, 40dvh);
+  }
+
+  .approval-card .code-block {
+    max-height: min(170px, 23dvh);
   }
 
   .composer-footer {

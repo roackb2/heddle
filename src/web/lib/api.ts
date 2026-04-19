@@ -21,6 +21,7 @@ export type PendingSessionApproval = RouterOutputs['controlPlane']['sessionPendi
 export type SessionRunningState = RouterOutputs['controlPlane']['sessionRunning'];
 export type WorkspaceFileSuggestion = RouterOutputs['controlPlane']['workspaceFileSearch']['files'][number];
 export type ModelOptions = RouterOutputs['controlPlane']['modelOptions'];
+export type SavedLayoutSnapshot = RouterOutputs['controlPlane']['layoutSnapshotSave'];
 
 export async function fetchControlPlaneState(): Promise<ControlPlaneState> {
   return await trpc.controlPlane.state.query();
@@ -80,6 +81,10 @@ export async function resolvePendingSessionApproval(
 export async function fetchWorkspaceFileSuggestions(query: string): Promise<WorkspaceFileSuggestion[]> {
   const result = await trpc.controlPlane.workspaceFileSearch.query({ query, limit: 20 });
   return result.files;
+}
+
+export async function saveLayoutSnapshot(snapshot: unknown): Promise<SavedLayoutSnapshot> {
+  return await trpc.controlPlane.layoutSnapshotSave.mutate({ snapshot });
 }
 
 type SessionEventEnvelope = {

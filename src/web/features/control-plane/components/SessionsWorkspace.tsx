@@ -363,11 +363,11 @@ export function SessionsWorkspace({
 
           <div className="composer-shell">
             {pendingApproval ?
-              <div className="detail-card error-card">
+              <div className="detail-card error-card approval-card">
                 <p className="card-title">Approval required: {pendingApproval.tool}</p>
                 <p className="muted">Call ID: {pendingApproval.callId}</p>
                 <CodeBlock>{JSON.stringify(pendingApproval.input, null, 2)}</CodeBlock>
-                <div className="pills">
+                <div className="pills approval-actions">
                   <button className="primary-button" type="button" onClick={() => void onResolveApproval(true)}>Approve</button>
                   <button className="tab-button" type="button" onClick={() => void onResolveApproval(false)}>Deny</button>
                 </div>
@@ -657,11 +657,11 @@ export function SessionsWorkspace({
 
         <div className="composer-shell">
           {pendingApproval ?
-            <div className="detail-card error-card">
+            <div className="detail-card error-card approval-card">
               <p className="card-title">Approval required: {pendingApproval.tool}</p>
               <p className="muted">Call ID: {pendingApproval.callId}</p>
               <CodeBlock>{JSON.stringify(pendingApproval.input, null, 2)}</CodeBlock>
-              <div className="pills">
+              <div className="pills approval-actions">
                 <button className="primary-button" type="button" onClick={() => void onResolveApproval(true)}>Approve</button>
                 <button className="tab-button" type="button" onClick={() => void onResolveApproval(false)}>Deny</button>
               </div>
