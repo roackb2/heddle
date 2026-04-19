@@ -26,6 +26,26 @@ The current browser UI surfaces:
 - heartbeat task status, scheduling state, selected task detail, and run history
 - recent heartbeat run summaries and usage data
 
+## Mobile Layout
+
+The control plane includes a mobile-native layout for phone and tablet access. It is designed around short navigation paths rather than shrinking the desktop workstation view into a narrow screen.
+
+On mobile, the UI uses:
+
+- bottom root navigation for Sessions, Tasks, and Overview
+- a dedicated session list for choosing saved conversations
+- native-style session navigation for Chat, Info, and Review
+- a compact composer that keeps the latest conversation visible
+- reachable session review and approval evidence without desktop sidebars
+
+Representative mobile views:
+
+<p>
+  <img src="../images/mobile-control-plane-sessions.png" alt="Heddle mobile session list" width="240">
+  <img src="../images/mobile-control-plane-chat.png" alt="Heddle mobile chat view" width="240">
+  <img src="../images/mobile-control-plane-review.png" alt="Heddle mobile review evidence" width="240">
+</p>
+
 ## Start The Daemon
 
 Start the daemon from a workspace:

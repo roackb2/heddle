@@ -60,6 +60,16 @@ Saved session review in the control plane, with conversation history in the cent
 
 ![Heddle control plane session review](docs/images/control-plane-session-review.png)
 
+### Mobile control plane
+
+The control plane also has a phone-oriented layout for checking sessions, reading the latest conversation, and reviewing evidence from another device:
+
+<p>
+  <img src="docs/images/mobile-control-plane-sessions.png" alt="Heddle mobile session list" width="240">
+  <img src="docs/images/mobile-control-plane-chat.png" alt="Heddle mobile chat view" width="240">
+  <img src="docs/images/mobile-control-plane-review.png" alt="Heddle mobile review evidence" width="240">
+</p>
+
 ## 2-Minute Try-It Path
 
 1. Install Heddle:
@@ -143,7 +153,7 @@ It gives you a browser-based view into sessions, run state, heartbeat tasks, and
 
 If terminal chat is the execution surface, the control plane is the oversight surface.
 
-This is useful if you want a more inspectable and operator-friendly workflow than a plain CLI transcript.
+This is useful if you want a more inspectable and operator-friendly workflow than a plain CLI transcript. The layout adapts for phone use as well, with mobile-native session navigation, bottom root navigation, a compact chat composer, and dedicated session info/review views.
 
 More: [Control plane guide](docs/guides/control-plane.md)
 

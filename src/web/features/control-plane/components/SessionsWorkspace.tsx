@@ -113,14 +113,21 @@ export function SessionsWorkspace({
       return;
     }
 
+    let timeout: number | undefined;
     const frame = window.requestAnimationFrame(() => {
       element.scrollTop = element.scrollHeight;
+      timeout = window.setTimeout(() => {
+        element.scrollTop = element.scrollHeight;
+      }, 0);
     });
 
     return () => {
       window.cancelAnimationFrame(frame);
+      if (timeout !== undefined) {
+        window.clearTimeout(timeout);
+      }
     };
-  }, [selectedSessionId, sessionDetail?.messages.length, sessionDetailLoading, sessionDetailError]);
+  }, [mobileView, selectedSessionId, sessionDetail?.messages.length, sessionDetailLoading, sessionDetailError]);
 
   useEffect(() => {
     let cancelled = false;
