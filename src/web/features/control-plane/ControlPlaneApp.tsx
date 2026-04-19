@@ -4,14 +4,16 @@ import { saveLayoutSnapshot, type ControlPlaneState } from '../../lib/api';
 import { captureControlPlaneLayoutSnapshot, type ScreenshotMode } from '../../lib/debug/layoutSnapshot';
 import { useControlPlaneState } from './hooks/useControlPlaneState';
 import { useHeartbeatWorkspace } from './hooks/useHeartbeatWorkspace';
+import { useIsMobile } from './hooks/useIsMobile';
 import { useSessionWorkspace } from './hooks/useSessionWorkspace';
 import { Panel, StatusBadge, TabButton, WorkspacePathLabel } from './components/common';
 import { HeartbeatWorkspace } from './components/HeartbeatWorkspace';
 import { OverviewView } from './components/OverviewView';
 import { SessionsWorkspace } from './components/SessionsWorkspace';
 import { ToastViewport, useToasts } from './components/toasts';
+import { MobileControlPlaneShell, type ControlPlaneTab } from './mobile/MobileControlPlaneShell';
 
-type Tab = 'overview' | 'sessions' | 'heartbeat';
+type Tab = ControlPlaneTab;
 
 declare global {
   interface Window {
@@ -23,6 +25,7 @@ export function ControlPlaneApp() {
   const [tab, setTab] = useState<Tab>('sessions');
   const { state, error, refresh } = useControlPlaneState();
   const { toasts, addToast, removeToast } = useToasts();
+  const isMobile = useIsMobile();
   const refreshControlPlaneState = useCallback(() => {
     void refresh();
   }, [refresh]);
@@ -118,6 +121,29 @@ export function ControlPlaneApp() {
     </details>
   : null;
 
+  const activeContent = !state ?
+    <Panel title="Loading state">
+      <p className="muted">{error ?? 'Reading local Heddle state...'}</p>
+    </Panel>
+  : renderActiveTab(tab, state, sessionWorkspace, heartbeatWorkspace);
+
+  if (isMobile) {
+    return (
+      <>
+        <MobileControlPlaneShell
+          tab={tab}
+          onTabChange={setTab}
+          state={state}
+          error={error}
+          onCaptureDebugSnapshot={import.meta.env.DEV ? (screenshot) => void captureDebugSnapshot(screenshot) : undefined}
+        >
+          {activeContent}
+        </MobileControlPlaneShell>
+        <ToastViewport toasts={toasts} onDismiss={removeToast} />
+      </>
+    );
+  }
+
   return (
     <main className="app-shell">
       <header className="toolbar">
@@ -136,11 +162,7 @@ export function ControlPlaneApp() {
         </div>
       </header>
 
-      {!state ?
-        <Panel title="Loading state">
-          <p className="muted">{error ?? 'Reading local Heddle state...'}</p>
-        </Panel>
-      : renderActiveTab(tab, state, sessionWorkspace, heartbeatWorkspace)}
+      {activeContent}
       <ToastViewport toasts={toasts} onDismiss={removeToast} />
     </main>
   );
