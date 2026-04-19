@@ -10,6 +10,10 @@
     "noEmit": true,
     "outDir": "../../dist/web-types",
     "rootDir": "../..",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    },
     "types": ["vite/client"]
   },
   "include": ["**/*.ts", "**/*.tsx", "../server/**/*.ts", "../core/runtime/heartbeat-views.ts", "../core/llm/types.ts"],

@@ -107,6 +107,18 @@ High-level areas:
 
 During local use, Heddle writes runtime state under `.heddle/`, including sessions, traces, approvals, logs, and memory notes.
 
+## Web UI Styling
+
+The existing desktop control plane still uses the legacy stylesheet in `src/web/features/control-plane/control-plane.css`.
+
+New mobile-first control-plane surfaces should use Tailwind CSS and shadcn-style source components under `src/web/components/ui/`. The project is wired for Tailwind v4 through `@tailwindcss/vite`, with shared utility merging in `src/web/lib/utils.ts`.
+
+Keep the styling boundary explicit:
+
+- use Tailwind/shadcn for new mobile components
+- leave existing desktop components on the legacy CSS until they are intentionally migrated
+- share data hooks, API types, and formatting helpers across both surfaces
+
 Build output goes to `dist/`.
 
 These directories are runtime artifacts, not the main source of truth for understanding the codebase.
