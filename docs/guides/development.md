@@ -64,11 +64,17 @@ These rely on the personal fallback environment variables described in [Provider
 For control-plane development, run the backend and frontend separately:
 
 ```bash
-yarn server:dev
+yarn daemon:dev
 yarn client:dev
 ```
 
-The backend API runs on `127.0.0.1:8765` and the Vite client runs on `127.0.0.1:5173`.
+The daemon-backed backend runs on `127.0.0.1:8765` and the Vite client runs on `127.0.0.1:5173`.
+
+`yarn daemon:dev` uses the real daemon path, including workspace ownership, daemon-registry heartbeats, and built control-plane static assets from `dist/src/web`. This is the closest development path to the shipped `heddle daemon` behavior.
+
+Because it serves built assets, run `yarn build` after frontend changes before relying on `yarn daemon:dev` for UI validation.
+
+`yarn server:dev` remains a lighter backend-only path for server work. It starts the Express/tRPC app directly and does not register daemon ownership, so the clients will read that path as a local control-plane session rather than a daemon-owned workspace.
 
 For a production-style local run of the built daemon:
 

@@ -15,9 +15,10 @@ describe('runtime host discovery', () => {
   it('returns none when no daemon owner exists for the workspace', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-runtime-host-none-'));
     const stateRoot = join(workspaceRoot, '.heddle');
+    const registryPath = resolveDaemonRegistryPath(mkdtempSync(join(tmpdir(), 'heddle-runtime-host-none-home-')));
 
     ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
-    const resolved = resolveWorkspaceRuntimeHost({ workspaceRoot, stateRoot });
+    const resolved = resolveWorkspaceRuntimeHost({ workspaceRoot, stateRoot, registryPath });
 
     expect(resolved).toMatchObject({
       kind: 'none',
@@ -52,6 +53,7 @@ describe('runtime host discovery', () => {
       stateRoot,
       registryPath,
       now: Date.parse('2026-04-21T00:00:45.000Z'),
+      isPidAlive: () => true,
     });
 
     expect(resolved).toMatchObject({
@@ -96,6 +98,7 @@ describe('runtime host discovery', () => {
       registryPath,
       now: Date.parse('2026-04-21T00:01:00.000Z'),
       staleAfterMs: 10_000,
+      isPidAlive: () => true,
     });
 
     expect(resolved).toMatchObject({
@@ -104,6 +107,43 @@ describe('runtime host discovery', () => {
     });
     expect(formatRuntimeHostNotice('ask', resolved)).toBeUndefined();
     expect(embeddedCommandConflictMessage('ask', resolved)).toBeUndefined();
+    expect(daemonStartConflictMessage(resolved)).toBeUndefined();
+  });
+
+  it('marks daemon ownership stale when the recorded daemon pid is gone', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-runtime-host-dead-pid-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const registryPath = resolveDaemonRegistryPath(mkdtempSync(join(tmpdir(), 'heddle-runtime-host-dead-pid-home-')));
+    const catalog = ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
+
+    upsertDaemonWorkspaceRegistration({
+      registryPath,
+      workspaces: catalog.workspaces,
+      owner: {
+        ownerId: 'daemon-1',
+        mode: 'daemon',
+        host: '127.0.0.1',
+        port: 8765,
+        pid: 4242,
+        startedAt: '2026-04-21T00:00:00.000Z',
+        lastSeenAt: '2026-04-21T00:00:30.000Z',
+        workspaceRoot,
+        stateRoot,
+      },
+    });
+
+    const resolved = resolveWorkspaceRuntimeHost({
+      workspaceRoot,
+      stateRoot,
+      registryPath,
+      now: Date.parse('2026-04-21T00:00:31.000Z'),
+      isPidAlive: () => false,
+    });
+
+    expect(resolved).toMatchObject({
+      kind: 'daemon',
+      stale: true,
+    });
     expect(daemonStartConflictMessage(resolved)).toBeUndefined();
   });
 });

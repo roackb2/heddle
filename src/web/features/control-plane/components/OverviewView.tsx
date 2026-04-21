@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import type { ControlPlaneState } from '../../../lib/api';
+import { projectRuntimeHostSurface } from '../host-surface';
 import { formatNumber, formatShortDate, short, shortPath, toneFor } from '../utils';
 
 export function OverviewView({
@@ -15,7 +16,7 @@ export function OverviewView({
 }) {
   const recentSessions = useMemo(() => state.sessions.slice(0, 3), [state.sessions]);
   const recentRuns = useMemo(() => state.heartbeat.runs.slice(0, 3), [state.heartbeat.runs]);
-  const runtimeAttached = Boolean(state.runtimeHost?.workspaceOwner);
+  const runtimeHost = projectRuntimeHostSurface(state);
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] sm:px-4 sm:pt-4 sm:pb-4">
@@ -46,17 +47,11 @@ export function OverviewView({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Runtime host</p>
-              <h2 className="text-xl font-semibold text-foreground">
-                {runtimeAttached ? 'Daemon attached' : 'No daemon registered'}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {runtimeAttached ?
-                  'The control plane can identify the workspace owner in the daemon registry.'
-                : 'Restart heddle daemon against the current build so it registers this workspace.'}
-              </p>
+              <h2 className="text-xl font-semibold text-foreground">{runtimeHost.label}</h2>
+              <p className="text-sm text-muted-foreground">{runtimeHost.detail}</p>
             </div>
-            <Badge variant={runtimeAttached ? 'secondary' : 'outline'} className="w-fit max-w-full truncate">
-              {runtimeAttached ? 'attached' : 'unregistered'}
+            <Badge variant={runtimeHost.tone} className="w-fit max-w-full truncate">
+              {runtimeHost.state}
             </Badge>
           </div>
 

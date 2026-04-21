@@ -6,6 +6,7 @@ describe('daemon CLI helpers', () => {
     expect(parseDaemonArgs([])).toEqual({
       host: '127.0.0.1',
       port: 8765,
+      serveAssets: true,
     });
   });
 
@@ -13,6 +14,15 @@ describe('daemon CLI helpers', () => {
     expect(parseDaemonArgs(['--host', '0.0.0.0', '--port=9010'])).toEqual({
       host: '0.0.0.0',
       port: 9010,
+      serveAssets: true,
+    });
+  });
+
+  it('parses daemon dev mode without static assets', () => {
+    expect(parseDaemonArgs(['--no-assets'])).toEqual({
+      host: '127.0.0.1',
+      port: 8765,
+      serveAssets: false,
     });
   });
 

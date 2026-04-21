@@ -14,6 +14,7 @@ export type DaemonArgs = {
   host: string;
   port: number;
   assetsDir?: string;
+  serveAssets: boolean;
 };
 
 const DEFAULT_HOST = '127.0.0.1';
@@ -31,6 +32,7 @@ export async function runDaemonCli(args: string[], options: DaemonCliOptions = {
     host: parsed.host,
     port: parsed.port,
     assetsDir: parsed.assetsDir,
+    serveAssets: parsed.serveAssets,
   };
 
   await listenHeddleDaemon(listenOptions);
@@ -41,7 +43,8 @@ export function parseDaemonArgs(args: string[]): DaemonArgs {
   return {
     host: stringFlag(flags, 'host') ?? DEFAULT_HOST,
     port: parsePort(stringFlag(flags, 'port')) ?? DEFAULT_PORT,
-    assetsDir: stringFlag(flags, 'assets-dir'),
+    assetsDir: stringFlag(flags, 'assets-dir') ? resolve(stringFlag(flags, 'assets-dir')!) : undefined,
+    serveAssets: !booleanFlag(flags, 'no-assets'),
   };
 }
 
@@ -75,6 +78,10 @@ function parseFlags(args: string[]): Record<string, string | boolean> {
 function stringFlag(flags: Record<string, string | boolean>, name: string): string | undefined {
   const value = flags[name];
   return typeof value === 'string' ? value : undefined;
+}
+
+function booleanFlag(flags: Record<string, string | boolean>, name: string): boolean {
+  return flags[name] === true;
 }
 
 function parsePort(raw: string | undefined): number | undefined {

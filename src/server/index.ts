@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import type { Server } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHeddleServerApp } from './app.js';
@@ -19,8 +20,11 @@ export { createServerLogger } from './logger.js';
 export { projectChatSessionView } from './features/control-plane/services/chat-sessions.js';
 
 export async function listenHeddleDaemon(options: HeddleServerListenOptions): Promise<void> {
-  const assetsDir = options.assetsDir ?? resolveDefaultAssetsDir();
-  assertWebAssetsBuilt(assetsDir);
+  const serveAssets = options.serveAssets !== false;
+  const assetsDir = serveAssets ? (options.assetsDir ?? resolveDefaultAssetsDir()) : undefined;
+  if (assetsDir) {
+    assertWebAssetsBuilt(assetsDir);
+  }
   const logger = options.logger ?? createServerLogger({ stateRoot: options.stateRoot });
   const registryPath = options.daemonRegistryPath ?? resolveDaemonRegistryPath();
   const ownerId = `daemon-${process.pid}-${Date.now()}`;
@@ -63,6 +67,7 @@ export async function listenHeddleDaemon(options: HeddleServerListenOptions): Pr
   const app = createHeddleServerApp({
     ...options,
     assetsDir,
+    serveAssets,
     logger,
     runtimeHost: {
       mode: 'daemon',
@@ -95,13 +100,38 @@ export async function listenHeddleDaemon(options: HeddleServerListenOptions): Pr
   }, 15000);
   heartbeat.unref?.();
 
-  process.once('SIGINT', cleanup);
-  process.once('SIGTERM', cleanup);
+  let server: Server | undefined;
+  let shuttingDown = false;
+  const shutdown = (signal: 'SIGINT' | 'SIGTERM') => {
+    if (shuttingDown) {
+      return;
+    }
+
+    shuttingDown = true;
+    clearInterval(heartbeat);
+    cleanup();
+
+    if (!server) {
+      process.exit(0);
+      return;
+    }
+
+    server.close((error) => {
+      if (error) {
+        logger.error({ error, signal }, 'Heddle server failed during shutdown');
+        process.exitCode = 1;
+      }
+      process.exit();
+    });
+  };
+
+  process.once('SIGINT', () => shutdown('SIGINT'));
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
 
   await new Promise<void>((resolveListen, rejectListen) => {
-    const server = app.listen(options.port, options.host, () => {
-      server.off('error', rejectListen);
-      server.once('close', () => {
+    const listeningServer = app.listen(options.port, options.host, () => {
+      listeningServer.off('error', rejectListen);
+      listeningServer.once('close', () => {
         clearInterval(heartbeat);
         cleanup();
       });
@@ -111,6 +141,7 @@ export async function listenHeddleDaemon(options: HeddleServerListenOptions): Pr
         workspaceRoot: options.workspaceRoot,
         stateRoot: options.stateRoot,
         assetsDir,
+        serveAssets,
         registryPath,
         ownerId,
       }, 'Heddle server started');
@@ -120,7 +151,8 @@ export async function listenHeddleDaemon(options: HeddleServerListenOptions): Pr
       process.stdout.write(`registry=${registryPath}\n`);
       resolveListen();
     });
-    server.once('error', (error) => {
+    server = listeningServer;
+    listeningServer.once('error', (error) => {
       clearInterval(heartbeat);
       cleanup();
       logger.error({ error }, 'Heddle server failed');

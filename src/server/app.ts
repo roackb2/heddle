@@ -14,7 +14,7 @@ export function createHeddleServerApp(
   options: Omit<HeddleServerContext, 'logger' | 'activeWorkspaceId' | 'activeWorkspace' | 'workspaces' | 'runtimeHost'>
     & Partial<Pick<HeddleServerContext, 'logger'>>
     & { runtimeHost?: HeddleRuntimeHostDescriptor | null }
-    & { assetsDir?: string },
+    & { assetsDir?: string; serveAssets?: boolean },
 ): express.Express {
   const logger = options.logger ?? createServerLogger({ stateRoot: options.stateRoot });
   const app = express();
@@ -109,7 +109,7 @@ export function createHeddleServerApp(
     });
   });
 
-  if (options.assetsDir) {
+  if (options.serveAssets !== false && options.assetsDir) {
     installWebStaticRoutes(app, options.assetsDir);
   }
 

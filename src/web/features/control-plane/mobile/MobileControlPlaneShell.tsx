@@ -4,6 +4,8 @@ import type { ScreenshotMode } from '../../../lib/debug/layoutSnapshot';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { shortPath } from '../utils';
+import { projectRuntimeHostSurface } from '../host-surface';
+import { RuntimeHostMobileInfo } from '../components/common';
 
 export type ControlPlaneTab = 'overview' | 'sessions' | 'heartbeat';
 
@@ -15,6 +17,7 @@ type MobileControlPlaneShellProps = {
   children: ReactNode;
   onCaptureDebugSnapshot?: (screenshot: ScreenshotMode) => void;
   onSetActiveWorkspace?: (workspaceId: string) => void;
+  onRefresh?: () => void;
 };
 
 const tabs: Array<{ value: ControlPlaneTab; label: string }> = [
@@ -31,15 +34,26 @@ export function MobileControlPlaneShell({
   children,
   onCaptureDebugSnapshot,
   onSetActiveWorkspace,
+  onRefresh,
 }: MobileControlPlaneShellProps) {
+  const host = error ?
+    {
+      state: 'stale' as const,
+      label: 'Error',
+      badgeLabel: 'Error',
+      detail: error,
+      tone: 'destructive' as const,
+      endpoint: undefined,
+    }
+  : projectRuntimeHostSurface(state);
   return (
     <main className="flex h-dvh flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] text-foreground">
       <header className="shrink-0 border-b border-border bg-card/95 px-4 py-3">
         <div className="flex min-w-0 items-center justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="m-0 text-base font-semibold leading-5 tracking-normal">Heddle</h1>
-              <MobileStatusBadge state={state} error={error} />
+              <Badge variant={host.tone}>{host.badgeLabel}</Badge>
+              <RuntimeHostMobileInfo state={state} />
             </div>
             <p className="m-0 truncate text-xs leading-5 text-muted-foreground">
               {state ? `${state.workspace.name} · ${shortPath(state.workspace.anchorRoot)}` : 'Reading workspace state'}
@@ -61,8 +75,17 @@ export function MobileControlPlaneShell({
               </label>
             : null}
           </div>
-          {onCaptureDebugSnapshot ? <MobileSnapshotMenu onCapture={onCaptureDebugSnapshot} /> : null}
+          <div className="flex items-center gap-2">
+            {onCaptureDebugSnapshot ? <MobileSnapshotMenu onCapture={onCaptureDebugSnapshot} /> : null}
+          </div>
         </div>
+        {(error || host.state === 'stale') ?
+          <div className="mt-2 flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            <span className="truncate">{host.detail}</span>
+            {host.endpoint ? <span className="shrink-0">endpoint={host.endpoint}</span> : null}
+            {onRefresh ? <button type="button" className="text-[11px] text-accent" onClick={onRefresh}>Refresh</button> : null}
+          </div>
+        : null}
       </header>
 
       <section className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-background">
@@ -89,18 +112,6 @@ export function MobileControlPlaneShell({
       </nav>
     </main>
   );
-}
-
-function MobileStatusBadge({ state, error }: { state?: ControlPlaneState; error?: string }) {
-  if (error) {
-    return <Badge variant="destructive">Error</Badge>;
-  }
-
-  if (!state) {
-    return <Badge variant="outline">Connecting</Badge>;
-  }
-
-  return <Badge variant="secondary">{state.sessions.length} sessions</Badge>;
 }
 
 function MobileSnapshotMenu({ onCapture }: { onCapture: (screenshot: ScreenshotMode) => void }) {

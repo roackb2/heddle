@@ -6,6 +6,7 @@ export type HeddleServerOptions = {
   workspaceRoot: string;
   stateRoot: string;
   assetsDir?: string;
+  serveAssets?: boolean;
   logger?: Logger;
   runtimeHost?: HeddleRuntimeHostDescriptor;
 };

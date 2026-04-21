@@ -40,6 +40,7 @@
     "client:build": "tsc -p src/web/tsconfig.json --noEmit && vite build --config src/web/vite.config.ts",
     "client:dev": "vite --config src/web/vite.config.ts",
     "server:dev": "tsx --no-cache src/server/dev.ts",
+    "daemon:dev": "tsx --no-cache src/cli/main.ts daemon --assets-dir dist/src/web",
     "cli:dev": "tsx --no-cache src/cli/main.ts",
     "chat:dev": "tsx --no-cache src/cli/main.ts chat",
     "chat:dev:openai": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" tsx --no-cache src/cli/main.ts chat",
@@ -100,8 +101,10 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
     "@inkjs/ui": "^2.0.0",
+    "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-toast": "^1.2.15",
+    "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/vite": "^4.2.2",
     "@trpc/client": "^11.16.0",
     "@trpc/server": "^11.16.0",

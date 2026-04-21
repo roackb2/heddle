@@ -2,6 +2,7 @@ import { join, resolve } from 'node:path';
 import { DEFAULT_OPENAI_MODEL, inferProviderFromModel } from '../../../index.js';
 import { saveTrace } from '../../../core/chat/trace.js';
 import type { LlmProvider } from '../../../index.js';
+import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
 import { resolveApiKeyForModel as resolveRuntimeApiKeyForModel, resolveProviderApiKey as resolveRuntimeProviderApiKey } from '../../../core/runtime/api-keys.js';
 import { parsePositiveInt } from './format.js';
 
@@ -14,6 +15,7 @@ export type ChatCliOptions = {
   directShellApproval?: 'always' | 'never';
   searchIgnoreDirs?: string[];
   systemContext?: string;
+  runtimeHost?: ResolvedRuntimeHost;
 };
 
 export type ChatRuntimeConfig = {
@@ -31,6 +33,7 @@ export type ChatRuntimeConfig = {
   directShellApproval: 'always' | 'never';
   searchIgnoreDirs: string[];
   systemContext?: string;
+  runtimeHost?: ResolvedRuntimeHost;
   saveTuiSnapshot?: (metadata?: { sessionId?: string; model?: string; status?: string; textSnapshot?: string }) => {
     capturedAt: string;
     txtPath: string;
@@ -64,6 +67,7 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
     directShellApproval: options.directShellApproval ?? 'never',
     searchIgnoreDirs: options.searchIgnoreDirs ?? [],
     systemContext: options.systemContext,
+    runtimeHost: options.runtimeHost,
   };
 }
 

@@ -77,6 +77,7 @@ Inside this repository, common development commands include:
 ```bash
 yarn cli:dev
 yarn chat:dev
+yarn daemon:dev
 yarn server:dev
 yarn client:dev
 yarn build

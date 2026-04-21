@@ -6,7 +6,8 @@ import { useControlPlaneState } from './hooks/useControlPlaneState';
 import { useHeartbeatWorkspace } from './hooks/useHeartbeatWorkspace';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useSessionWorkspace } from './hooks/useSessionWorkspace';
-import { Panel, StatusBadge, TabButton, WorkspacePathLabel, WorkspaceSwitcher } from './components/common';
+import { Panel, RuntimeHostBadge, RuntimeHostInfo, RuntimeHostStrip, StatusBadge, TabButton, WorkspacePathLabel, WorkspaceSwitcher } from './components/common';
+import { projectRuntimeHostSurface } from './host-surface';
 import { HeartbeatWorkspace } from './components/HeartbeatWorkspace';
 import { OverviewView } from './components/OverviewView';
 import { SessionsWorkspace } from './components/SessionsWorkspace';
@@ -27,6 +28,7 @@ export function ControlPlaneApp() {
   const { state, error, refresh, setActiveWorkspace, createWorkspace } = useControlPlaneState();
   const { toasts, toast: notifyToast } = useToast();
   const isMobile = useIsMobile();
+  const host = projectRuntimeHostSurface(state);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const refreshControlPlaneState = useCallback(() => {
     void refresh();
@@ -182,6 +184,7 @@ export function ControlPlaneApp() {
           error={error}
           onSetActiveWorkspace={(workspaceId) => void switchWorkspace(workspaceId)}
           onCaptureDebugSnapshot={(screenshot) => void captureDebugSnapshot(screenshot)}
+          onRefresh={() => void refresh()}
         >
           {activeContent}
         </MobileControlPlaneShell>
@@ -202,6 +205,8 @@ export function ControlPlaneApp() {
           </div>
           <div className="topbar-title-row">
             <p className="topbar-eyebrow">Heddle Control Plane</p>
+            <RuntimeHostBadge state={state} />
+            <RuntimeHostInfo state={state} />
             <WorkspaceSwitcher state={state} onSelect={(workspaceId) => void switchWorkspace(workspaceId)} />
             <WorkspacePathLabel state={state} />
           </div>
@@ -209,6 +214,7 @@ export function ControlPlaneApp() {
         </div>
       </header>
 
+      {(error || host.state === 'stale') ? <RuntimeHostStrip state={state} onRefresh={() => void refresh()} /> : null}
       {activeContent}
       <Toaster />
     </main>

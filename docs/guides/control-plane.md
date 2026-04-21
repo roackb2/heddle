@@ -73,21 +73,30 @@ HEDDLE_SERVER_LOG_FILE=/path/to/server.log heddle daemon
 For local development, run the server and client separately:
 
 ```bash
-yarn server:dev
+yarn daemon:dev
 yarn client:dev
 ```
 
-`yarn server:dev` starts the backend API server only at `127.0.0.1:8765`. It does not serve the web app shell at `/`.
+`yarn daemon:dev` starts the real daemon runtime at `127.0.0.1:8765`, including daemon ownership registration, registry heartbeats, and the built web app from `dist/src/web`.
 
 `yarn client:dev` starts the Vite web client at `127.0.0.1:5173` and proxies `/trpc` and `/control-plane` requests to the backend server.
 
 In other words:
 
 - development mode uses two services:
-  - backend API on `8765`
+  - daemon-backed app/API on `8765`
   - Vite frontend on `5173`
 - built daemon mode uses one service:
   - `heddle daemon` serves both the built web client and the backend API on the same port
+
+If you only want a lighter backend API process without daemon registration or built static serving, `yarn server:dev` still exists. That path is for server development, not for testing daemon ownership behavior.
+
+When using `yarn daemon:dev`, rebuild after frontend changes:
+
+```bash
+yarn build
+yarn daemon:dev
+```
 
 For built/local operator usage inside this repository, run:
 

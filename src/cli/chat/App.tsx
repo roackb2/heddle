@@ -8,6 +8,7 @@ import {
   ModelPickerPanel,
   PromptInput,
   SessionPickerPanel,
+  RuntimeHostInterstitial,
   shouldShowCommandHint,
   shouldShowSlashHints,
   SlashHintPanel,
@@ -30,6 +31,14 @@ import type { ChatRuntimeConfig } from './utils/runtime.js';
 const SESSION_TITLE_MODEL = 'gpt-5.1-codex-mini';
 
 export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
+  if (runtime.runtimeHost?.kind === 'daemon' && !runtime.runtimeHost.stale) {
+    return <RuntimeHostInterstitial runtimeHost={runtime.runtimeHost} />;
+  }
+
+  return <EmbeddedChatApp runtime={runtime} />;
+}
+
+function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const nextLocalId = useLocalIds();
   const [activeModel, setActiveModel] = useState(runtime.model);
   const {

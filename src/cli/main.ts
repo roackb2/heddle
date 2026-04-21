@@ -65,9 +65,11 @@ async function main() {
     .action(async () => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      enforceEmbeddedOwnership('chat', resolved.runtimeHost, resolved.forceOwnerConflict);
       writeRuntimeHostNotice('chat', resolved.runtimeHost);
-      startChatCli(resolved);
+      startChatCli({
+        ...resolved,
+        runtimeHost: resolved.forceOwnerConflict ? undefined : resolved.runtimeHost,
+      });
     });
 
   program
@@ -143,9 +145,11 @@ async function main() {
     .action(async () => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      enforceEmbeddedOwnership('chat', resolved.runtimeHost, resolved.forceOwnerConflict);
       writeRuntimeHostNotice('chat', resolved.runtimeHost);
-      startChatCli(resolved);
+      startChatCli({
+        ...resolved,
+        runtimeHost: resolved.forceOwnerConflict ? undefined : resolved.runtimeHost,
+      });
     });
 
   const argv = process.argv.slice(2);

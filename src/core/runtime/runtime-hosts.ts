@@ -30,6 +30,7 @@ export function resolveWorkspaceRuntimeHost(options: {
   registryPath?: string;
   now?: number;
   staleAfterMs?: number;
+  isPidAlive?: (pid: number) => boolean;
 }): ResolvedRuntimeHost {
   const workspace = resolveWorkspaceContext({
     workspaceRoot: options.workspaceRoot,
@@ -50,7 +51,9 @@ export function resolveWorkspaceRuntimeHost(options: {
   const now = options.now ?? Date.now();
   const lastSeenAt = Date.parse(owner.lastSeenAt);
   const ageMs = Number.isFinite(lastSeenAt) ? Math.max(0, now - lastSeenAt) : Number.POSITIVE_INFINITY;
-  const stale = ageMs > (options.staleAfterMs ?? DEFAULT_STALE_AFTER_MS);
+  const staleByAge = ageMs > (options.staleAfterMs ?? DEFAULT_STALE_AFTER_MS);
+  const pidAlive = owner.pid > 0 ? (options.isPidAlive ?? isPidAlive)(owner.pid) : true;
+  const stale = staleByAge || !pidAlive;
 
   return {
     kind: 'daemon',
@@ -66,6 +69,22 @@ export function resolveWorkspaceRuntimeHost(options: {
     stale,
     ageMs,
   };
+}
+
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'EPERM') {
+      return true;
+    }
+    return false;
+  }
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return typeof error === 'object' && error !== null && 'code' in error;
 }
 
 export function formatRuntimeHostNotice(command: string, host: ResolvedRuntimeHost): string | undefined {
