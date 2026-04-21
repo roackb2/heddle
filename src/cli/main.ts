@@ -7,13 +7,21 @@ import { Command } from 'commander';
 import { runAskCli } from './ask.js';
 import { startChatCli } from './chat/index.js';
 import { runDaemonCli } from './daemon.js';
-import { runHeartbeatCli } from './heartbeat.js';
+import { parseHeartbeatArgs, runHeartbeatCli } from './heartbeat.js';
 import { runSessionCli } from './session.js';
+import {
+  daemonStartConflictMessage,
+  embeddedCommandConflictMessage,
+  formatRuntimeHostNotice,
+  resolveWorkspaceRuntimeHost,
+  type ResolvedRuntimeHost,
+} from '../core/runtime/runtime-hosts.js';
 
 type RootCliOptions = {
   cwd?: string;
   model?: string;
   maxSteps?: string;
+  forceOwnerConflict?: boolean;
 };
 
 type HeddleProjectConfig = {
@@ -33,6 +41,8 @@ type ResolvedCliOptions = {
   directShellApproval: 'always' | 'never';
   searchIgnoreDirs: string[];
   systemContext?: string;
+  runtimeHost: ResolvedRuntimeHost;
+  forceOwnerConflict: boolean;
 };
 
 const DEFAULT_MODEL_FOR_CONFIG = 'gpt-5.1-codex';
@@ -46,7 +56,8 @@ async function main() {
     .version(CLI_VERSION, '--version', 'print the installed Heddle version')
     .option('--cwd <path>', 'run against another workspace root')
     .option('--model <name>', 'choose the active model')
-    .option('--max-steps <n>', 'limit the agent loop length');
+    .option('--max-steps <n>', 'limit the agent loop length')
+    .option('--force-owner-conflict', 'bypass live daemon ownership guards for this command');
 
   program
     .command('chat')
@@ -54,6 +65,8 @@ async function main() {
     .action(async () => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
+      enforceEmbeddedOwnership('chat', resolved.runtimeHost, resolved.forceOwnerConflict);
+      writeRuntimeHostNotice('chat', resolved.runtimeHost);
       startChatCli(resolved);
     });
 
@@ -66,8 +79,15 @@ async function main() {
     .action(async (goalParts: string[], askOptions: { session?: string; latest?: boolean; newSession?: string | boolean }) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
+      enforceEmbeddedOwnership('ask', resolved.runtimeHost, resolved.forceOwnerConflict);
+      writeRuntimeHostNotice('ask', resolved.runtimeHost);
       await runAskCli(goalParts.join(' ').trim(), {
-        ...resolved,
+        workspaceRoot: resolved.workspaceRoot,
+        model: resolved.model,
+        maxSteps: resolved.maxSteps,
+        stateDir: resolved.stateDir,
+        searchIgnoreDirs: resolved.searchIgnoreDirs,
+        systemContext: resolved.systemContext,
         sessionId: askOptions.session,
         latestSession: Boolean(askOptions.latest),
         createSessionName:
@@ -92,6 +112,8 @@ async function main() {
     .action(async (args: string[]) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
+      enforceHeartbeatOwnership(args ?? [], resolved.runtimeHost, resolved.forceOwnerConflict);
+      writeRuntimeHostNotice('heartbeat', resolved.runtimeHost);
       await runHeartbeatCli(args ?? [], resolved);
     });
 
@@ -102,6 +124,7 @@ async function main() {
     .action(async (args: string[]) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
+      enforceDaemonStartOwnership(resolved.runtimeHost, resolved.forceOwnerConflict);
       await runDaemonCli(args ?? [], resolved);
     });
 
@@ -112,6 +135,8 @@ async function main() {
     .action(async (args: string[]) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
+      enforceEmbeddedOwnership('session', resolved.runtimeHost, resolved.forceOwnerConflict);
+      writeRuntimeHostNotice('session', resolved.runtimeHost);
       await runSessionCli(args ?? [], resolved);
     });
 
@@ -119,6 +144,8 @@ async function main() {
     .action(async () => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
+      enforceEmbeddedOwnership('chat', resolved.runtimeHost, resolved.forceOwnerConflict);
+      writeRuntimeHostNotice('chat', resolved.runtimeHost);
       startChatCli(resolved);
     });
 
@@ -127,7 +154,16 @@ async function main() {
   if (knownCommand && !isKnownCommand(knownCommand) && !knownCommand.startsWith('-')) {
     const resolved = resolveCliOptions(program.opts<RootCliOptions>());
     chdir(resolved.workspaceRoot);
-    await runAskCli(argv.join(' ').trim(), resolved);
+    enforceEmbeddedOwnership('ask', resolved.runtimeHost, resolved.forceOwnerConflict);
+    writeRuntimeHostNotice('ask', resolved.runtimeHost);
+    await runAskCli(argv.join(' ').trim(), {
+      workspaceRoot: resolved.workspaceRoot,
+      model: resolved.model,
+      maxSteps: resolved.maxSteps,
+      stateDir: resolved.stateDir,
+      searchIgnoreDirs: resolved.searchIgnoreDirs,
+      systemContext: resolved.systemContext,
+    });
     return;
   }
 
@@ -149,7 +185,62 @@ function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
     directShellApproval: projectConfig.directShellApproval ?? 'never',
     searchIgnoreDirs: projectConfig.searchIgnoreDirs ?? [],
     systemContext: loadProjectAgentContext(workspaceRoot, projectConfig.agentContextPaths ?? ['AGENTS.md']),
+    runtimeHost: resolveWorkspaceRuntimeHost({
+      workspaceRoot,
+      stateRoot: resolve(workspaceRoot, projectConfig.stateDir ?? '.heddle'),
+    }),
+    forceOwnerConflict: Boolean(flags.forceOwnerConflict),
   };
+}
+
+function writeRuntimeHostNotice(command: string, runtimeHost: ResolvedRuntimeHost) {
+  const notice = formatRuntimeHostNotice(command, runtimeHost);
+  if (!notice) {
+    return;
+  }
+
+  process.stdout.write(`${notice}\n`);
+}
+
+function enforceEmbeddedOwnership(command: string, runtimeHost: ResolvedRuntimeHost, forceOwnerConflict: boolean) {
+  if (forceOwnerConflict) {
+    return;
+  }
+
+  const message = embeddedCommandConflictMessage(command, runtimeHost);
+  if (message) {
+    throw new Error(message);
+  }
+}
+
+function enforceDaemonStartOwnership(runtimeHost: ResolvedRuntimeHost, forceOwnerConflict: boolean) {
+  if (forceOwnerConflict) {
+    return;
+  }
+
+  const message = daemonStartConflictMessage(runtimeHost);
+  if (message) {
+    throw new Error(message);
+  }
+}
+
+function enforceHeartbeatOwnership(args: string[], runtimeHost: ResolvedRuntimeHost, forceOwnerConflict: boolean) {
+  if (forceOwnerConflict) {
+    return;
+  }
+
+  const parsed = parseHeartbeatArgs(args);
+  if (parsed.command === 'help' || parsed.command === 'runs') {
+    return;
+  }
+  if (parsed.command === 'task' && (parsed.subcommand === 'list' || parsed.subcommand === 'show')) {
+    return;
+  }
+
+  const message = embeddedCommandConflictMessage('heartbeat', runtimeHost);
+  if (message) {
+    throw new Error(message);
+  }
 }
 
 function readCliVersion(): string {
