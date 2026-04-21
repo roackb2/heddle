@@ -15,6 +15,7 @@ import {
   submitChatPrompt,
   updateControlPlaneChatSessionSettings,
 } from './services/chat-sessions.js';
+import { runControlPlaneAsk } from './services/ask.js';
 import { loadControlPlaneState } from './services/control-plane-state.js';
 import {
   listControlPlaneHeartbeatRuns,
@@ -28,15 +29,28 @@ import { createWorkspaceDescriptor, setActiveWorkspace } from '../../../core/run
 
 const sessionInputSchema = z.object({
   id: z.string().min(1),
+  apiKey: z.string().min(1).optional(),
 });
 
 const createSessionInputSchema = z.object({
   name: z.string().min(1).optional(),
+  model: z.string().min(1).optional(),
+  apiKeyPresent: z.boolean().optional(),
 }).optional();
 
 const sessionMessageInputSchema = z.object({
   sessionId: z.string().min(1),
   prompt: z.string().min(1),
+  apiKey: z.string().min(1).optional(),
+});
+
+const agentAskInputSchema = z.object({
+  goal: z.string().min(1),
+  model: z.string().min(1).optional(),
+  maxSteps: z.number().int().min(1).max(500).optional(),
+  apiKey: z.string().min(1).optional(),
+  searchIgnoreDirs: z.array(z.string().min(1)).optional(),
+  systemContext: z.string().min(1).optional(),
 });
 
 const turnReviewInputSchema = z.object({
@@ -91,7 +105,7 @@ export const controlPlaneRouter = router({
   }),
   sessions: procedure.query(({ ctx }) => {
     return {
-      sessions: readChatSessionViews(resolve(ctx.stateRoot, 'chat-sessions.catalog.json')),
+      sessions: readChatSessionViews(resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json')),
     };
   }),
   sessionCreate: procedure.input(createSessionInputSchema).mutation(({ ctx, input }) => {
@@ -99,6 +113,8 @@ export const controlPlaneRouter = router({
       sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
       suggestedName: input?.name,
       workspaceId: ctx.activeWorkspace.id,
+      model: input?.model,
+      apiKeyPresent: input?.apiKeyPresent,
     });
   }),
   session: procedure.input(sessionInputSchema).query(({ ctx, input }) => {
@@ -146,6 +162,7 @@ export const controlPlaneRouter = router({
       sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
       sessionId: input.sessionId,
       prompt: input.prompt,
+      apiKey: input.apiKey,
     });
   }),
   sessionContinue: procedure.input(sessionInputSchema).mutation(async ({ ctx, input }) => {
@@ -154,6 +171,19 @@ export const controlPlaneRouter = router({
       stateRoot: ctx.activeWorkspace.stateRoot,
       sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
       sessionId: input.id,
+      apiKey: input.apiKey,
+    });
+  }),
+  agentAsk: procedure.input(agentAskInputSchema).mutation(async ({ ctx, input }) => {
+    return await runControlPlaneAsk({
+      goal: input.goal,
+      workspaceRoot: ctx.activeWorkspace.anchorRoot,
+      stateRoot: ctx.activeWorkspace.stateRoot,
+      model: input.model,
+      maxSteps: input.maxSteps,
+      apiKey: input.apiKey,
+      searchIgnoreDirs: input.searchIgnoreDirs,
+      systemContext: input.systemContext,
     });
   }),
   heartbeatTasks: procedure.query(async ({ ctx }) => {

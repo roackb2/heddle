@@ -26,6 +26,7 @@ type SubmitChatPromptArgs = {
   sessionStoragePath: string;
   sessionId: string;
   prompt: string;
+  apiKey?: string;
 };
 
 const DEFAULT_CONTINUE_PROMPT = 'Continue from where you left off.';
@@ -34,14 +35,16 @@ export function createControlPlaneChatSession(args: {
   sessionStoragePath: string;
   suggestedName?: string;
   workspaceId?: string;
+  model?: string;
+  apiKeyPresent?: boolean;
 }): ChatSessionDetail {
   const existing = readChatSessionViews(args.sessionStoragePath);
   const nextNumber = existing.length + 1;
-  const model = process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
+  const model = args.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
   const session = createChatSession({
     id: `session-${Date.now()}`,
     name: args.suggestedName?.trim() || `Session ${nextNumber}`,
-    apiKeyPresent: Boolean(resolveApiKeyForModel(model)),
+    apiKeyPresent: args.apiKeyPresent ?? Boolean(resolveApiKeyForModel(model)),
     model,
     workspaceId: args.workspaceId,
   });
@@ -99,6 +102,7 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs) {
   try {
     const result = await submitChatSessionPrompt({
       ...args,
+      apiKey: args.apiKey,
       abortSignal: controller.signal,
       onEvent: (event) => {
         sessionEventBus.emit(args.sessionId, {

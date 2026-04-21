@@ -1,11 +1,14 @@
 import { existsSync, mkdtempSync } from 'node:fs';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { runAskCli } from '../cli/ask.js';
 import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../core/chat/storage.js';
 import type { ChatSession } from '../core/chat/types.js';
+import type { ResolvedRuntimeHost } from '../core/runtime/runtime-hosts.js';
 import type { RunResult } from '../index.js';
+import { createHeddleServerApp } from '../server/app.js';
 
 describe('runAskCli', () => {
   afterEach(() => {
@@ -255,4 +258,134 @@ describe('runAskCli', () => {
     expect(runAgentLoopSpy).toHaveBeenCalledTimes(1);
     expect(readChatSession(sessionStoragePath, existingSession.id, true)?.archives).toHaveLength(1);
   });
+
+  it('attaches stateless ask to a live daemon host', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-remote-stateless-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    const result: RunResult = {
+      outcome: 'done',
+      summary: 'Remote stateless answer.',
+      trace: [
+        {
+          type: 'assistant.turn',
+          content: 'Remote stateless answer.',
+          requestedTools: false,
+          step: 1,
+          timestamp: '2026-04-21T00:00:03.000Z',
+        },
+      ],
+      transcript: [
+        { role: 'user', content: 'daemon stateless ask' },
+        { role: 'assistant', content: 'Remote stateless answer.' },
+      ],
+    };
+    vi.spyOn(await import('../index.js'), 'runAgentLoop').mockResolvedValue(result as never);
+
+    const server = createHeddleServerApp({ workspaceRoot, stateRoot }).listen(0, '127.0.0.1');
+    await onceListening(server);
+    const address = server.address() as AddressInfo;
+    const runtimeHost: ResolvedRuntimeHost = {
+      kind: 'daemon',
+      registryPath: join(workspaceRoot, 'daemon-registry.json'),
+      workspaceId: 'default',
+      ownerId: 'daemon-owner',
+      endpoint: { host: '127.0.0.1', port: address.port },
+      startedAt: '2026-04-21T00:00:00.000Z',
+      lastSeenAt: '2026-04-21T00:00:00.000Z',
+      stale: false,
+      ageMs: 0,
+    };
+
+    try {
+      await runAskCli('daemon stateless ask', {
+        workspaceRoot,
+        model: 'gpt-5.1-codex-mini',
+        apiKey: 'test-key',
+        runtimeHost,
+      });
+    } finally {
+      await closeServer(server);
+    }
+
+    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('attaching ask to daemon'));
+    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('Trace:'));
+  });
+
+  it('attaches session-backed ask to a live daemon host', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-remote-session-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    const result: RunResult = {
+      outcome: 'done',
+      summary: 'Remote session answer.',
+      trace: [
+        {
+          type: 'assistant.turn',
+          content: 'Remote session answer.',
+          requestedTools: false,
+          step: 1,
+          timestamp: '2026-04-21T00:00:04.000Z',
+        },
+      ],
+      transcript: [
+        { role: 'user', content: 'remote session ask' },
+        { role: 'assistant', content: 'Remote session answer.' },
+      ],
+    };
+    vi.spyOn(await import('../index.js'), 'runAgentLoop').mockResolvedValue(result as never);
+
+    const server = createHeddleServerApp({ workspaceRoot, stateRoot }).listen(0, '127.0.0.1');
+    await onceListening(server);
+    const address = server.address() as AddressInfo;
+    const runtimeHost: ResolvedRuntimeHost = {
+      kind: 'daemon',
+      registryPath: join(workspaceRoot, 'daemon-registry.json'),
+      workspaceId: 'default',
+      ownerId: 'daemon-owner',
+      endpoint: { host: '127.0.0.1', port: address.port },
+      startedAt: '2026-04-21T00:00:00.000Z',
+      lastSeenAt: '2026-04-21T00:00:00.000Z',
+      stale: false,
+      ageMs: 0,
+    };
+
+    try {
+      await runAskCli('remote session ask', {
+        workspaceRoot,
+        model: 'gpt-5.1-codex-mini',
+        apiKey: 'test-key',
+        runtimeHost,
+        createSessionName: 'Remote ask session',
+      });
+    } finally {
+      await closeServer(server);
+    }
+
+    const catalog = readChatSessionCatalog(join(stateRoot, 'chat-sessions.catalog.json'));
+    expect(catalog).toHaveLength(1);
+    expect(catalog[0]?.name).toBe('Remote ask session');
+    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining(`Session: ${catalog[0]?.id}`));
+  });
 });
+
+async function onceListening(server: { once: (event: 'listening', listener: () => void) => void; listening?: boolean }) {
+  if (server.listening) {
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    server.once('listening', resolve);
+  });
+}
+
+async function closeServer(server: { close: (listener: (error?: Error) => void) => void }) {
+  await new Promise<void>((resolve, reject) => {
+    server.close((error?: Error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}

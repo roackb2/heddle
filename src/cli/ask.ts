@@ -10,10 +10,12 @@ import {
   resolveProviderApiKey,
   resolveApiKeyForModel,
 } from '../index.js';
+import type { ResolvedRuntimeHost } from '../core/runtime/runtime-hosts.js';
 import { submitChatSessionPrompt } from '../core/chat/session-submit.js';
 import type { ChatSession } from '../core/chat/types.js';
 import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../core/chat/storage.js';
 import { resolveWorkspaceContext } from '../core/runtime/workspaces.js';
+import { createDaemonControlPlaneClient } from './remote/control-plane-client.js';
 
 export type AskCliOptions = {
   model?: string;
@@ -26,6 +28,7 @@ export type AskCliOptions = {
   sessionId?: string;
   latestSession?: boolean;
   createSessionName?: string;
+  runtimeHost?: ResolvedRuntimeHost;
 };
 
 export async function runAskCli(goal: string, options: AskCliOptions = {}) {
@@ -46,6 +49,22 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
   const sessionModeCount = Number(Boolean(options.sessionId)) + Number(Boolean(options.latestSession)) + Number(options.createSessionName !== undefined);
   if (sessionModeCount > 1) {
     throw new Error('Choose only one of --session, --latest, or --new-session for heddle ask.');
+  }
+
+  if (options.runtimeHost?.kind === 'daemon' && !options.runtimeHost.stale) {
+    await runDaemonBackedAsk({
+      goal,
+      model,
+      maxSteps,
+      apiKey: options.apiKey,
+      searchIgnoreDirs: options.searchIgnoreDirs,
+      systemContext: options.systemContext,
+      targetSessionId: options.sessionId,
+      latestSession: options.latestSession,
+      createSessionName: options.createSessionName,
+      runtimeHost: options.runtimeHost,
+    });
+    return;
   }
 
   const targetSession = resolveAskSession({
@@ -104,6 +123,85 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
   const traceFile = join(traceDir, `trace-${Date.now()}.json`);
   writeFileSync(traceFile, JSON.stringify(result.trace, null, 2));
   logger.info({ traceFile }, 'Trace saved');
+}
+
+async function runDaemonBackedAsk(options: {
+  goal: string;
+  model: string;
+  maxSteps: number;
+  apiKey?: string;
+  searchIgnoreDirs?: string[];
+  systemContext?: string;
+  targetSessionId?: string;
+  latestSession?: boolean;
+  createSessionName?: string;
+  runtimeHost: Extract<ResolvedRuntimeHost, { kind: 'daemon' }>;
+}) {
+  const client = createDaemonControlPlaneClient(options.runtimeHost);
+  process.stdout.write(
+    `Heddle notice: attaching ask to daemon http://${options.runtimeHost.endpoint.host}:${options.runtimeHost.endpoint.port}\n`,
+  );
+
+  if (options.targetSessionId || options.latestSession || options.createSessionName !== undefined) {
+    const sessionId =
+      options.targetSessionId
+      ?? (options.latestSession ? await resolveLatestRemoteSessionId(client) : undefined)
+      ?? await createRemoteSession(client, {
+        name: options.createSessionName?.trim() || undefined,
+        model: options.model,
+        apiKeyPresent: Boolean(resolveApiKeyForModel(options.model, { apiKey: options.apiKey, apiKeyProvider: 'explicit' })),
+      });
+
+    const result = await client.controlPlane.sessionSendPrompt.mutate({
+      sessionId,
+      prompt: options.goal,
+      apiKey: options.apiKey,
+    });
+
+    process.stdout.write(
+      [
+        `Session: ${result.session?.id ?? sessionId}`,
+        `Outcome: ${result.outcome}`,
+        `Summary: ${result.summary}`,
+        result.session?.turns.at(-1)?.traceFile ? `Trace: ${result.session.turns.at(-1)?.traceFile}` : undefined,
+        result.session?.context?.lastArchivePath ? `Latest archive: ${result.session.context.lastArchivePath}` : undefined,
+      ].filter((line): line is string => Boolean(line)).join('\n') + '\n',
+    );
+    return;
+  }
+
+  const result = await client.controlPlane.agentAsk.mutate({
+    goal: options.goal,
+    model: options.model,
+    maxSteps: options.maxSteps,
+    apiKey: options.apiKey,
+    searchIgnoreDirs: options.searchIgnoreDirs,
+    systemContext: options.systemContext,
+  });
+
+  process.stdout.write(`${result.consoleOutput}\n`);
+  process.stdout.write(`Trace: ${result.traceFile}\n`);
+}
+
+async function resolveLatestRemoteSessionId(client: ReturnType<typeof createDaemonControlPlaneClient>): Promise<string> {
+  const result = await client.controlPlane.sessions.query();
+  const latest = result.sessions[0];
+  if (!latest) {
+    throw new Error('No saved chat sessions are available yet. Use --new-session to create one first.');
+  }
+  return latest.id;
+}
+
+async function createRemoteSession(
+  client: ReturnType<typeof createDaemonControlPlaneClient>,
+  input: { name?: string; model: string; apiKeyPresent: boolean },
+): Promise<string> {
+  const created = await client.controlPlane.sessionCreate.mutate({
+    name: input.name,
+    model: input.model,
+    apiKeyPresent: input.apiKeyPresent,
+  });
+  return created.id;
 }
 
 function resolveAskSession(options: {

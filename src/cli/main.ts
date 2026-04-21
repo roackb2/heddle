@@ -79,8 +79,6 @@ async function main() {
     .action(async (goalParts: string[], askOptions: { session?: string; latest?: boolean; newSession?: string | boolean }) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      enforceEmbeddedOwnership('ask', resolved.runtimeHost, resolved.forceOwnerConflict);
-      writeRuntimeHostNotice('ask', resolved.runtimeHost);
       await runAskCli(goalParts.join(' ').trim(), {
         workspaceRoot: resolved.workspaceRoot,
         model: resolved.model,
@@ -88,6 +86,7 @@ async function main() {
         stateDir: resolved.stateDir,
         searchIgnoreDirs: resolved.searchIgnoreDirs,
         systemContext: resolved.systemContext,
+        runtimeHost: resolved.forceOwnerConflict ? undefined : resolved.runtimeHost,
         sessionId: askOptions.session,
         latestSession: Boolean(askOptions.latest),
         createSessionName:
@@ -154,8 +153,6 @@ async function main() {
   if (knownCommand && !isKnownCommand(knownCommand) && !knownCommand.startsWith('-')) {
     const resolved = resolveCliOptions(program.opts<RootCliOptions>());
     chdir(resolved.workspaceRoot);
-    enforceEmbeddedOwnership('ask', resolved.runtimeHost, resolved.forceOwnerConflict);
-    writeRuntimeHostNotice('ask', resolved.runtimeHost);
     await runAskCli(argv.join(' ').trim(), {
       workspaceRoot: resolved.workspaceRoot,
       model: resolved.model,
@@ -163,6 +160,7 @@ async function main() {
       stateDir: resolved.stateDir,
       searchIgnoreDirs: resolved.searchIgnoreDirs,
       systemContext: resolved.systemContext,
+      runtimeHost: resolved.forceOwnerConflict ? undefined : resolved.runtimeHost,
     });
     return;
   }
