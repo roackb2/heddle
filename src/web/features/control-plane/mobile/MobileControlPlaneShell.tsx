@@ -1,11 +1,9 @@
 import type { ReactNode } from 'react';
 import type { ControlPlaneState } from '../../../lib/api';
 import type { ScreenshotMode } from '../../../lib/debug/layoutSnapshot';
-import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { shortPath } from '../utils';
 import { projectRuntimeHostSurface } from '../host-surface';
-import { RuntimeHostMobileInfo } from '../components/common';
 
 export type ControlPlaneTab = 'overview' | 'sessions' | 'heartbeat';
 
@@ -53,8 +51,6 @@ export function MobileControlPlaneShell({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold tracking-normal text-foreground">Heddle</span>
-              <Badge variant={host.tone}>{host.badgeLabel}</Badge>
-              <RuntimeHostMobileInfo state={state} />
             </div>
             <p className="m-0 truncate text-xs leading-5 text-muted-foreground">
               {state ? `${state.workspace.name} · ${shortPath(state.workspace.anchorRoot)}` : 'Reading workspace state'}

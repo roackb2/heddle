@@ -6,7 +6,7 @@ import { useControlPlaneState } from './hooks/useControlPlaneState';
 import { useHeartbeatWorkspace } from './hooks/useHeartbeatWorkspace';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useSessionWorkspace } from './hooks/useSessionWorkspace';
-import { Panel, RuntimeHostBadge, RuntimeHostInfo, RuntimeHostStrip, StatusBadge, TabButton, WorkspacePathLabel, WorkspaceSwitcher } from './components/common';
+import { Panel, RuntimeHostStrip, StatusBadge, TabButton, WorkspacePathLabel, WorkspaceSwitcher } from './components/common';
 import { projectRuntimeHostSurface } from './host-surface';
 import { HeartbeatWorkspace } from './components/HeartbeatWorkspace';
 import { OverviewView } from './components/OverviewView';
@@ -205,8 +205,6 @@ export function ControlPlaneApp() {
           </div>
           <div className="topbar-title-row">
             <p className="topbar-eyebrow">Heddle Control Plane</p>
-            <RuntimeHostBadge state={state} />
-            <RuntimeHostInfo state={state} />
             <WorkspaceSwitcher state={state} onSelect={(workspaceId) => void switchWorkspace(workspaceId)} />
             <WorkspacePathLabel state={state} />
           </div>
