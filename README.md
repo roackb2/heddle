@@ -158,6 +158,24 @@ This is useful if you want a more inspectable and operator-friendly workflow tha
 
 More: [Control plane guide](docs/guides/control-plane.md)
 
+### Runtime host model
+
+Heddle is local-first, but it still has a runtime ownership model.
+
+The short version is:
+
+- the workspace is the ownership unit
+- one workspace should have one live runtime owner at a time
+- that owner is either:
+  - the embedded CLI command you started
+  - or a background `heddle daemon`
+
+This is why Heddle stores state under the workspace’s `.heddle/`, why the browser control plane acts as a client of the daemon rather than a separate runtime, and why some commands refuse to start a second owner when a daemon already owns the same workspace.
+
+If you want to understand how `chat`, `ask`, the daemon, the control plane, and workspace-local state fit together, read:
+
+- [Runtime host model](docs/guides/runtime-host-model.md)
+
 ### Knowledge persistence
 
 Heddle can keep durable project knowledge in markdown notes under `.heddle/memory/`.
@@ -259,11 +277,13 @@ npx -p @roackb2/heddle -p cyberloop heddle
 ### Start here
 
 - [Documentation hub](docs/README.md)
+- [Runtime host model](docs/guides/runtime-host-model.md)
 - [Chat and sessions guide](docs/guides/chat-and-sessions.md)
 - [CLI reference](docs/reference/cli.md)
 
 ### Feature guides
 
+- [Runtime host model](docs/guides/runtime-host-model.md)
 - [Control plane](docs/guides/control-plane.md)
 - [Heartbeat](docs/guides/heartbeat.md)
 - [Knowledge persistence](docs/guides/knowledge-persistence.md)

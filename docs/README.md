@@ -7,6 +7,7 @@ Heddle is a terminal coding agent runtime and CLI for real project work. This do
 If you are new to Heddle, begin with:
 
 - [Root README](../README.md) for installation and product overview
+- [Runtime host model](guides/runtime-host-model.md) for how workspace ownership and daemon mode work
 - [Chat and sessions](guides/chat-and-sessions.md) for the core interactive workflow
 - [Control plane](guides/control-plane.md) for the browser UI and daemon
 - [CLI reference](reference/cli.md) for command lookup
@@ -16,6 +17,7 @@ If you are new to Heddle, begin with:
 Task-oriented guides:
 
 - [Chat and sessions](guides/chat-and-sessions.md)
+- [Runtime host model](guides/runtime-host-model.md)
 - [Control plane](guides/control-plane.md)
 - [Knowledge persistence](guides/knowledge-persistence.md)
 - [Semantic drift](guides/semantic-drift.md)
@@ -54,9 +56,10 @@ Longer-term project context and design direction:
 
 ### I want the browser UI and remote oversight
 
-1. [Control plane](guides/control-plane.md)
-2. [CLI reference](reference/cli.md)
-3. [Heartbeat](guides/heartbeat.md)
+1. [Runtime host model](guides/runtime-host-model.md)
+2. [Control plane](guides/control-plane.md)
+3. [CLI reference](reference/cli.md)
+4. [Heartbeat](guides/heartbeat.md)
 
 ### I want to build on Heddle programmatically
 
