@@ -34,6 +34,9 @@ When additional project context is needed, read in this order:
 - Use `yarn test` as the canonical test command.
 - For web/mobile UI work, default to shadcn UI primitives and Tailwind utility composition for standard interaction behavior and design language.
 - When touching an existing UI surface, prefer migrating the touched area toward shadcn primitives instead of extending custom one-off controls unless there is a concrete product reason not to.
+- Before building any non-trivial feature, state the user-facing problem, the expected user benefit, and why the feature is worth the added complexity. If that case is weak, stop and discuss before implementing.
+- Do not build safety, presence, ownership, or coordination mechanisms for corner cases unless the user has confirmed the pain is real enough to matter in actual usage.
+- Do not optimize for internal architectural consistency over user value. Product usefulness and real user workflow take precedence over neat mechanism design.
 - For user-facing releases, use an annotated git tag such as `vX.Y.Z` on the actual release commit.
 - Write release notes from the real git range since the previous release tag, not from commit-prefix inference alone.
 - Keep changes aligned with the project's minimal-runtime, trace-first philosophy.
