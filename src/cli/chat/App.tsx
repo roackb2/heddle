@@ -8,7 +8,6 @@ import {
   ModelPickerPanel,
   PromptInput,
   SessionPickerPanel,
-  RuntimeHostInterstitial,
   shouldShowCommandHint,
   shouldShowSlashHints,
   SlashHintPanel,
@@ -31,10 +30,6 @@ import type { ChatRuntimeConfig } from './utils/runtime.js';
 const SESSION_TITLE_MODEL = 'gpt-5.1-codex-mini';
 
 export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
-  if (runtime.runtimeHost?.kind === 'daemon' && !runtime.runtimeHost.stale) {
-    return <RuntimeHostInterstitial runtimeHost={runtime.runtimeHost} />;
-  }
-
   return <EmbeddedChatApp runtime={runtime} />;
 }
 
@@ -130,6 +125,10 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     : compacting ? 'Compacting archived history in the background • Ctrl+C exits'
     : isRunning ? 'Type freely • Enter queues prompt • Esc requests stop after the current step • Ctrl+C exits'
     : 'Enter sends • Tab completes slash commands • /help shows commands • !command runs shell • Ctrl+C exits';
+  const runtimeHostWarning =
+    runtime.runtimeHost?.kind === 'daemon' && !runtime.runtimeHost.stale ?
+      `Daemon is also attached to this workspace at http://${runtime.runtimeHost.endpoint.host}:${runtime.runtimeHost.endpoint.port}. Different sessions are fine; avoid writing to the same session from multiple clients.`
+    : undefined;
   const activityLines = liveEvents
     .slice(-4)
     .filter((event, index, events) => events.findIndex((candidate) => candidate.text === event.text) === index)
@@ -332,6 +331,11 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
         <Text dimColor>
           {statusHint}
         </Text>
+        {runtimeHostWarning ?
+          <Text color="yellow">
+            {runtimeHostWarning}
+          </Text>
+        : null}
       </Box>
 
       <ConversationPanel messages={messages} activeTurn={activeTurn} />

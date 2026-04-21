@@ -92,6 +92,15 @@ export function formatRuntimeHostNotice(command: string, host: ResolvedRuntimeHo
     return undefined;
   }
 
+  if (command === 'chat') {
+    return [
+      'Heddle notice: a live daemon is attached to this workspace.',
+      `daemon=http://${host.endpoint.host}:${host.endpoint.port}`,
+      `workspace=${host.workspaceId}`,
+      'Embedded chat still works here; avoid writing to the same session from multiple clients.',
+    ].join(' ');
+  }
+
   return [
     `Heddle notice: workspace is currently owned by a daemon for \`${command}\`.`,
     `daemon=http://${host.endpoint.host}:${host.endpoint.port}`,

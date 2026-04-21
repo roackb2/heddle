@@ -65,7 +65,7 @@ describe('runtime host discovery', () => {
       },
       stale: false,
     });
-    expect(formatRuntimeHostNotice('chat', resolved)).toContain('daemon=http://127.0.0.1:8765');
+    expect(formatRuntimeHostNotice('chat', resolved)).toContain('Embedded chat still works here');
     expect(embeddedCommandConflictMessage('chat', resolved)).toContain('Refusing embedded `chat`');
     expect(daemonStartConflictMessage(resolved)).toContain('Refusing to start a second daemon');
   });

@@ -209,15 +209,21 @@ It also means the runtime host model stays tied to the actual project rather tha
 
 ## Current Limitations
 
-The host model is implemented more strongly in runtime behavior than in product UX right now.
+The host model is mostly done as a runtime model.
 
 Important current limits:
 
 - `chat` does not yet attach to daemon-owned sessions
-- TUI host-state UX is still more conflict-oriented than native
-- browser and mobile surfaces know about host state, but are still evolving toward a more consistent host-first shell
+- if a daemon already owns the workspace, browser and mobile clients are just clients of that daemon; switching devices is normal and does not require takeover
+- browser/mobile do not currently expose host-action controls such as takeover or force-embed, because those actions are not yet useful enough without a stronger ownership policy behind them
 
-So the correct mental model already exists, but some client surfaces are still catching up to it.
+So the correct mental model is:
+
+- one workspace
+- one live owner
+- many clients can observe and operate through that owner
+
+What remains is mostly around special-case ownership transitions, not the normal desktop/mobile workflow.
 
 ## Practical Rules
 
@@ -228,6 +234,16 @@ If you want a simple operational checklist:
 3. Treat the workspace as having one live owner at a time.
 4. Use `heddle ask` as a lightweight client when a daemon already owns the workspace.
 5. Do not assume the web UI, TUI, and daemon are separate runtimes operating independently on the same workspace.
+
+## Current Product Boundary
+
+For normal use, the current host model should be understood this way:
+
+- start `heddle daemon` when you want browser access or multi-device access
+- use desktop web, mobile web, and `ask` as clients of that daemon
+- do not expect browser/mobile to take over or force embedded mode yet
+
+That means the absence of host-action controls in the browser is intentional for now. The useful path today is one stable daemon owner with multiple clients, not ownership switching from the UI.
 
 ## Related Guides
 
