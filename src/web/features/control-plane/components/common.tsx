@@ -141,6 +141,7 @@ function RuntimeHostInfoContent({ host }: { host: RuntimeHostSurface }) {
   );
 }
 
+
 export function WorkspacePathLabel({ state }: { state?: ControlPlaneState }) {
   if (!state) {
     return null;

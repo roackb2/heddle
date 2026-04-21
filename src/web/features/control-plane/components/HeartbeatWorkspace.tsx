@@ -233,6 +233,6 @@ export function HeartbeatWorkspace({
           </SideSection>
         </div>
       </aside>
-    </section>
+      </section>
   );
 }

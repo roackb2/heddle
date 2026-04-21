@@ -213,6 +213,7 @@ h3 {
   line-height: 1.45;
 }
 
+
 .topbar-eyebrow {
   margin: 0;
   color: var(--accent);
@@ -1479,6 +1480,7 @@ h3 {
   .mobile-task-meta {
     padding: 10px;
   }
+
 
   .workspace-header h2 {
     font-size: 15px;
