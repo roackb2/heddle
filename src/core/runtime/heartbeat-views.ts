@@ -9,6 +9,7 @@ import type { LlmUsage } from '../llm/types.js';
 
 export type HeartbeatTaskView = {
   taskId: string;
+  workspaceId?: string;
   name?: string;
   task: string;
   enabled: boolean;
@@ -31,6 +32,7 @@ export type HeartbeatTaskView = {
 export type HeartbeatRunView = {
   id: string;
   taskId: string;
+  workspaceId?: string;
   runId: string;
   createdAt: string;
   task: string;
@@ -78,6 +80,7 @@ export async function loadHeartbeatRunView(
 export function projectHeartbeatTaskView(task: HeartbeatTask): HeartbeatTaskView {
   return {
     taskId: task.id,
+    workspaceId: task.workspaceId,
     name: task.name,
     task: task.task,
     enabled: task.enabled,
@@ -102,6 +105,7 @@ export function projectHeartbeatRunView(run: HeartbeatTaskRunRecordEntry): Heart
   return {
     id: run.id,
     taskId: run.taskId,
+    workspaceId: run.workspaceId,
     runId: run.runId,
     createdAt: run.createdAt,
     task: run.record.task.task,

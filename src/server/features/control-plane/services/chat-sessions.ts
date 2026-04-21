@@ -33,6 +33,7 @@ const DEFAULT_CONTINUE_PROMPT = 'Continue from where you left off.';
 export function createControlPlaneChatSession(args: {
   sessionStoragePath: string;
   suggestedName?: string;
+  workspaceId?: string;
 }): ChatSessionDetail {
   const existing = readChatSessionViews(args.sessionStoragePath);
   const nextNumber = existing.length + 1;
@@ -42,6 +43,7 @@ export function createControlPlaneChatSession(args: {
     name: args.suggestedName?.trim() || `Session ${nextNumber}`,
     apiKeyPresent: Boolean(resolveApiKeyForModel(model)),
     model,
+    workspaceId: args.workspaceId,
   });
 
   const currentSessions = readChatSessionCatalog(args.sessionStoragePath)
@@ -306,6 +308,7 @@ export function projectChatSessionView(raw: unknown | ChatSession): ChatSessionV
   return [omitUndefined({
     id,
     name,
+    workspaceId: readString(candidate.workspaceId),
     createdAt: readString(candidate.createdAt),
     updatedAt: readString(candidate.updatedAt),
     model: readString(candidate.model),

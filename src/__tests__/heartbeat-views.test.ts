@@ -14,6 +14,7 @@ describe('heartbeat views', () => {
   it('projects heartbeat task state into a host-facing view', () => {
     const view = projectHeartbeatTaskView({
       id: 'repo-check',
+      workspaceId: 'workspace-1',
       task: 'Inspect repo state',
       enabled: true,
       status: 'waiting',
@@ -38,6 +39,7 @@ describe('heartbeat views', () => {
 
     expect(view).toEqual({
       taskId: 'repo-check',
+      workspaceId: 'workspace-1',
       task: 'Inspect repo state',
       enabled: true,
       status: 'waiting',
@@ -69,6 +71,7 @@ describe('heartbeat views', () => {
     expect(view).toEqual({
       id: '2026-04-14T00-00-00.000Z-repo-check',
       taskId: 'repo-check',
+      workspaceId: 'workspace-1',
       runId: 'run_1',
       createdAt: '2026-04-14T00:00:00.000Z',
       task: 'Inspect repo state',
@@ -135,6 +138,7 @@ describe('heartbeat views', () => {
 function createTask(): HeartbeatTask {
   return {
     id: 'repo-check',
+    workspaceId: 'workspace-1',
     task: 'Inspect repo state',
     enabled: true,
     status: 'waiting',
@@ -163,6 +167,7 @@ function createRunEntry(): HeartbeatTaskRunRecordEntry {
     id: '2026-04-14T00-00-00.000Z-repo-check',
     path: '/tmp/2026-04-14T00-00-00.000Z-repo-check.json',
     taskId: 'repo-check',
+    workspaceId: 'workspace-1',
     runId: 'run_1',
     createdAt: '2026-04-14T00:00:00.000Z',
     record: {

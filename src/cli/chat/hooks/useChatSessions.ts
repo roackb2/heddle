@@ -8,14 +8,18 @@ import {
   summarizeSession,
   touchSession,
 } from '../state/storage.js';
+import { resolveWorkspaceContext } from '../../../core/runtime/workspaces.js';
 
 type UseChatSessionsArgs = {
   sessionCatalogFile: string;
   apiKeyPresent: boolean;
   defaultModel: string;
+  workspaceRoot: string;
+  stateRoot: string;
 };
 
-export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultModel }: UseChatSessionsArgs) {
+export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultModel, workspaceRoot, stateRoot }: UseChatSessionsArgs) {
+  const workspaceId = resolveWorkspaceContext({ workspaceRoot, stateRoot }).activeWorkspace.id;
   const initialSessionsRef = useRef<ChatSession[] | undefined>(undefined);
   if (!initialSessionsRef.current) {
     initialSessionsRef.current = loadChatSessions(sessionCatalogFile, apiKeyPresent).map((session) => ({
@@ -55,10 +59,11 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
       name: 'Session 1',
       apiKeyPresent,
       model: defaultModel,
+      workspaceId,
     });
     setSessions([fallback]);
     setActiveSessionId(fallback.id);
-  }, [apiKeyPresent, defaultModel, sessions]);
+  }, [apiKeyPresent, defaultModel, sessions, workspaceId]);
 
   const activeSession = useMemo(
     () => sessions.find((session) => session.id === activeSessionId) ?? sessions[0],
@@ -99,6 +104,7 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
       name: name?.trim() || `Session ${nextSessionNumberRef.current++}`,
       apiKeyPresent,
       model: defaultModel,
+      workspaceId,
     });
     setSessions((current) => [touchSession(nextSession), ...current].slice(0, 24));
     setActiveSessionId(id);
@@ -125,6 +131,7 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
           name: 'Session 1',
           apiKeyPresent,
           model: defaultModel,
+          workspaceId,
         }),
       ];
     });

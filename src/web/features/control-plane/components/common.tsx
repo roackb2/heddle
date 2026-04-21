@@ -2,9 +2,19 @@ import type { ReactNode } from 'react';
 import type { ControlPlaneState } from '../../../lib/api';
 import { className, shortPath } from '../utils';
 
-export function Panel({ title, children, wide = false }: { title: string; children: ReactNode; wide?: boolean }) {
+export function Panel({
+  title,
+  children,
+  wide = false,
+  panelClassName,
+}: {
+  title: string;
+  children: ReactNode;
+  wide?: boolean;
+  panelClassName?: string;
+}) {
   return (
-    <section className={className('panel', wide && 'wide')}>
+    <section className={className('panel', wide && 'wide', panelClassName)}>
       <h2>{title}</h2>
       {children}
     </section>
@@ -35,7 +45,43 @@ export function WorkspacePathLabel({ state }: { state?: ControlPlaneState }) {
     return null;
   }
 
-  return <span className="workspace-path-label">{shortPath(state.workspaceRoot)}</span>;
+  return (
+    <span className="workspace-path-label">
+      {state.workspace.name}
+      <span className="muted"> · {shortPath(state.workspace.anchorRoot)}</span>
+    </span>
+  );
+}
+
+export function WorkspaceSwitcher({
+  state,
+  disabled,
+  onSelect,
+}: {
+  state?: ControlPlaneState;
+  disabled?: boolean;
+  onSelect: (workspaceId: string) => void;
+}) {
+  if (!state || state.workspaces.length <= 1) {
+    return null;
+  }
+
+  return (
+    <label className="workspace-switcher">
+      <span className="muted">Workspace</span>
+      <select
+        value={state.activeWorkspaceId}
+        disabled={disabled}
+        onChange={(event) => onSelect(event.target.value)}
+      >
+        {state.workspaces.map((workspace) => (
+          <option key={workspace.id} value={workspace.id}>
+            {workspace.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 }
 
 export function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {

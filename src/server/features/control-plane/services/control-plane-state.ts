@@ -5,15 +5,21 @@ import { readChatSessionViews } from './chat-sessions.js';
 import { listControlPlaneHeartbeatRuns, listControlPlaneHeartbeatTasks } from './heartbeat.js';
 
 export async function loadControlPlaneState(context: HeddleServerContext): Promise<ControlPlaneState> {
+  const workspaceRoot = context.activeWorkspace.anchorRoot;
+  const stateRoot = context.activeWorkspace.stateRoot;
   const [tasks, runs] = await Promise.all([
-    listControlPlaneHeartbeatTasks(context.stateRoot),
-    listControlPlaneHeartbeatRuns(context.stateRoot, { limit: 20 }),
+    listControlPlaneHeartbeatTasks(stateRoot),
+    listControlPlaneHeartbeatRuns(stateRoot, { limit: 20 }),
   ]);
 
   return {
-    workspaceRoot: context.workspaceRoot,
-    stateRoot: context.stateRoot,
-    sessions: readChatSessionViews(resolve(context.stateRoot, 'chat-sessions.catalog.json')),
+    workspaceRoot,
+    stateRoot,
+    activeWorkspaceId: context.activeWorkspaceId,
+    workspace: context.activeWorkspace,
+    workspaces: context.workspaces,
+    runtimeHost: context.runtimeHost,
+    sessions: readChatSessionViews(resolve(stateRoot, 'chat-sessions.catalog.json')),
     heartbeat: {
       tasks,
       runs,

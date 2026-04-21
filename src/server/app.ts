@@ -5,10 +5,17 @@ import { createServerLogger } from './logger.js';
 import { createRequestLoggingMiddleware } from './middleware/request-logging.js';
 import { appRouter } from './router.js';
 import { installWebStaticRoutes } from './static.js';
-import type { HeddleServerContext } from './types.js';
+import type { HeddleRuntimeHostDescriptor, HeddleServerContext } from './types.js';
 import { resolveChatSessionFilePath, subscribeToControlPlaneSessionEvents } from './features/control-plane/services/chat-sessions.js';
+import { readDaemonWorkspaceRegistration } from '../core/runtime/daemon-registry.js';
+import { resolveWorkspaceContext } from '../core/runtime/workspaces.js';
 
-export function createHeddleServerApp(options: Omit<HeddleServerContext, 'logger'> & Partial<Pick<HeddleServerContext, 'logger'>> & { assetsDir?: string }): express.Express {
+export function createHeddleServerApp(
+  options: Omit<HeddleServerContext, 'logger' | 'activeWorkspaceId' | 'activeWorkspace' | 'workspaces' | 'runtimeHost'>
+    & Partial<Pick<HeddleServerContext, 'logger'>>
+    & { runtimeHost?: HeddleRuntimeHostDescriptor | null }
+    & { assetsDir?: string },
+): express.Express {
   const logger = options.logger ?? createServerLogger({ stateRoot: options.stateRoot });
   const app = express();
   app.disable('x-powered-by');
@@ -16,11 +23,31 @@ export function createHeddleServerApp(options: Omit<HeddleServerContext, 'logger
 
   app.use('/trpc', createExpressMiddleware({
     router: appRouter,
-    createContext: () => ({
-      workspaceRoot: options.workspaceRoot,
-      stateRoot: options.stateRoot,
-      logger,
-    }),
+    createContext: () => {
+      const workspaceContext = resolveWorkspaceContext({
+        workspaceRoot: options.workspaceRoot,
+        stateRoot: options.stateRoot,
+      });
+      const workspaceOwner =
+        options.runtimeHost ?
+          readDaemonWorkspaceRegistration(options.runtimeHost.registryPath, workspaceContext.activeWorkspaceId)?.owner ?? null
+        : null;
+      return {
+        workspaceRoot: options.workspaceRoot,
+        stateRoot: options.stateRoot,
+        activeWorkspaceId: workspaceContext.activeWorkspaceId,
+        activeWorkspace: workspaceContext.activeWorkspace,
+        workspaces: workspaceContext.workspaces,
+        runtimeHost:
+          options.runtimeHost ?
+            {
+              ...options.runtimeHost,
+              workspaceOwner,
+            }
+          : null,
+        logger,
+      };
+    },
     onError: ({ error, path, type }) => {
       logger.error({
         error: {
@@ -41,7 +68,11 @@ export function createHeddleServerApp(options: Omit<HeddleServerContext, 'logger
       return;
     }
 
-    const sessionFilePath = resolveChatSessionFilePath(options.stateRoot, sessionId);
+    const workspaceContext = resolveWorkspaceContext({
+      workspaceRoot: options.workspaceRoot,
+      stateRoot: options.stateRoot,
+    });
+    const sessionFilePath = resolveChatSessionFilePath(workspaceContext.activeWorkspace.stateRoot, sessionId);
     response.setHeader('Content-Type', 'text/event-stream');
     response.setHeader('Cache-Control', 'no-cache, no-transform');
     response.setHeader('Connection', 'keep-alive');

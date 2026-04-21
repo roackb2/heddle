@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchControlPlaneState, type ControlPlaneState } from '../../../lib/api';
+import {
+  createWorkspace as createWorkspaceRequest,
+  fetchControlPlaneState,
+  setActiveWorkspace as setActiveWorkspaceRequest,
+  type ControlPlaneState,
+} from '../../../lib/api';
 
 export function useControlPlaneState() {
   const [state, setState] = useState<ControlPlaneState | undefined>();
@@ -19,6 +24,21 @@ export function useControlPlaneState() {
       setError(refreshError instanceof Error ? refreshError.message : String(refreshError));
     }
   }, []);
+
+  const setActiveWorkspace = useCallback(async (workspaceId: string) => {
+    await setActiveWorkspaceRequest(workspaceId);
+    await refresh();
+  }, [refresh]);
+
+  const createWorkspace = useCallback(async (input: {
+    name: string;
+    anchorRoot: string;
+    repoRoots?: string[];
+    setActive?: boolean;
+  }) => {
+    await createWorkspaceRequest(input);
+    await refresh();
+  }, [refresh]);
 
   useEffect(() => {
     let active = true;
@@ -52,5 +72,7 @@ export function useControlPlaneState() {
     state,
     error,
     refresh,
+    setActiveWorkspace,
+    createWorkspace,
   };
 }

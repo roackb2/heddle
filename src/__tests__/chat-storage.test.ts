@@ -55,6 +55,7 @@ describe('chat session storage layout', () => {
         id: 'session-1',
         name: 'Session 1',
         apiKeyPresent: true,
+        workspaceId: 'workspace-1',
       }),
       model: 'gpt-5.1-codex-mini',
       lastContinuePrompt: 'continue',
@@ -84,6 +85,7 @@ describe('chat session storage layout', () => {
     expect(storedCatalog[0]).toEqual(expect.objectContaining({
       id: 'session-1',
       name: 'Session 1',
+      workspaceId: 'workspace-1',
       model: 'gpt-5.1-codex-mini',
       lastContinuePrompt: 'continue',
       context: { estimatedHistoryTokens: 42 },
@@ -91,6 +93,7 @@ describe('chat session storage layout', () => {
     expect(catalog.sessions[0]?.messages).toBeUndefined();
     expect(storedSession).toEqual(expect.objectContaining({
       id: 'session-1',
+      workspaceId: 'workspace-1',
       history: [],
       messages: [{ id: 'm1', role: 'assistant', text: 'hello there' }],
       turns: [{
@@ -123,5 +126,25 @@ describe('chat session storage layout', () => {
     const secondMtime = statSync(sessionFile).mtimeMs;
 
     expect(secondMtime).toBe(firstMtime);
+  });
+
+  it('preserves workspaceId when migrating legacy sessions', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-workspace-'));
+    const sessionsFile = join(dir, 'chat-sessions.json');
+    writeFileSync(sessionsFile, JSON.stringify([
+      {
+        id: 'session-1',
+        name: 'Session 1',
+        workspaceId: 'workspace-1',
+        history: [],
+        messages: [],
+        turns: [],
+      },
+    ], null, 2));
+
+    const sessions = migrateLegacyChatSessions(sessionsFile, true);
+
+    expect(sessions[0]?.workspaceId).toBe('workspace-1');
+    expect(readChatSessionCatalog(sessionsFile)[0]?.workspaceId).toBe('workspace-1');
   });
 });

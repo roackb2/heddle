@@ -7,6 +7,7 @@ import { truncate } from '../utils/text.js';
 type ChatSessionCatalogEntry = {
   id: string;
   name: string;
+  workspaceId?: string;
   createdAt: string;
   updatedAt: string;
   model?: string;
@@ -45,11 +46,13 @@ export function createChatSession(options: {
   name: string;
   apiKeyPresent: boolean;
   model?: string;
+  workspaceId?: string;
 }): ChatSession {
   const now = new Date().toISOString();
   return {
     id: options.id,
     name: options.name,
+    workspaceId: options.workspaceId,
     history: [],
     messages: createInitialMessages(options.apiKeyPresent),
     turns: [],
@@ -242,6 +245,7 @@ function parseCatalogEntry(value: unknown): ChatSessionCatalogEntry[] {
   return [{
     id: candidate.id,
     name: candidate.name,
+    workspaceId: typeof candidate.workspaceId === 'string' ? candidate.workspaceId : undefined,
     createdAt,
     updatedAt,
     model: typeof candidate.model === 'string' ? candidate.model : undefined,
@@ -256,6 +260,7 @@ function projectCatalogEntry(session: ChatSession): ChatSessionCatalogEntry {
   return {
     id: session.id,
     name: session.name,
+    workspaceId: session.workspaceId,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     model: session.model,
@@ -286,6 +291,7 @@ function readSessionFile(
     return [{
       id: entry.id,
       name: entry.name,
+      workspaceId: entry.workspaceId,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
       model: entry.model,
@@ -335,6 +341,7 @@ function writeCatalogIfChanged(
 function serializeSessionBody(session: ChatSession): string {
   return `${JSON.stringify({
     id: session.id,
+    workspaceId: session.workspaceId,
     history: session.history,
     messages: session.messages,
     turns: session.turns,
@@ -425,6 +432,7 @@ function parseSavedSession(value: unknown, apiKeyPresent: boolean): ChatSession[
   return [{
     id: candidate.id,
     name: candidate.name,
+    workspaceId: typeof candidate.workspaceId === 'string' ? candidate.workspaceId : undefined,
     history: Array.isArray(candidate.history) ? candidate.history as ChatMessage[] : [],
     messages:
       Array.isArray(candidate.messages) && candidate.messages.length > 0 ?

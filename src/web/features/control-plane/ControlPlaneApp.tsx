@@ -6,7 +6,7 @@ import { useControlPlaneState } from './hooks/useControlPlaneState';
 import { useHeartbeatWorkspace } from './hooks/useHeartbeatWorkspace';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useSessionWorkspace } from './hooks/useSessionWorkspace';
-import { Panel, StatusBadge, TabButton, WorkspacePathLabel } from './components/common';
+import { Panel, StatusBadge, TabButton, WorkspacePathLabel, WorkspaceSwitcher } from './components/common';
 import { HeartbeatWorkspace } from './components/HeartbeatWorkspace';
 import { OverviewView } from './components/OverviewView';
 import { SessionsWorkspace } from './components/SessionsWorkspace';
@@ -24,9 +24,10 @@ declare global {
 
 export function ControlPlaneApp() {
   const [tab, setTab] = useState<Tab>('sessions');
-  const { state, error, refresh } = useControlPlaneState();
+  const { state, error, refresh, setActiveWorkspace, createWorkspace } = useControlPlaneState();
   const { toasts, toast: notifyToast } = useToast();
   const isMobile = useIsMobile();
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const refreshControlPlaneState = useCallback(() => {
     void refresh();
   }, [refresh]);
@@ -75,12 +76,47 @@ export function ControlPlaneApp() {
       });
     }
   }, [error, notifyToast, sessionWorkspace, tab, toasts]);
+  const switchWorkspace = useCallback(async (workspaceId: string) => {
+    try {
+      await setActiveWorkspace(workspaceId);
+      notifyToast({
+        title: 'Workspace switched',
+        body: state?.workspaces.find((workspace) => workspace.id === workspaceId)?.name ?? workspaceId,
+        tone: 'success',
+      });
+    } catch (switchError) {
+      notifyToast({
+        title: 'Workspace switch failed',
+        body: switchError instanceof Error ? switchError.message : String(switchError),
+        tone: 'error',
+      });
+    }
+  }, [notifyToast, setActiveWorkspace, state?.workspaces]);
+  const handleCreateWorkspace = useCallback(async (input: {
+    name: string;
+    anchorRoot: string;
+    setActive: boolean;
+  }) => {
+    setCreatingWorkspace(true);
+    try {
+      await createWorkspace(input);
+      notifyToast({
+        title: 'Workspace created',
+        body: input.name,
+        tone: 'success',
+      });
+    } catch (createError) {
+      notifyToast({
+        title: 'Workspace creation failed',
+        body: createError instanceof Error ? createError.message : String(createError),
+        tone: 'error',
+      });
+    } finally {
+      setCreatingWorkspace(false);
+    }
+  }, [createWorkspace, notifyToast]);
 
   useEffect(() => {
-    if (!import.meta.env.DEV) {
-      return undefined;
-    }
-
     window.__HEDDLE_CAPTURE_LAYOUT_SNAPSHOT = async (options) => {
       await captureDebugSnapshot(options?.screenshot ?? 'none');
     };
@@ -113,7 +149,7 @@ export function ControlPlaneApp() {
       <TabButton active={tab === 'heartbeat'} onClick={() => setTab('heartbeat')}>Tasks</TabButton>
     </>
   );
-  const debugSnapshotMenu = import.meta.env.DEV ?
+  const debugSnapshotMenu = (
     <details className="debug-snapshot-menu">
       <summary className="debug-button">Snapshot</summary>
       <div className="debug-snapshot-options" role="menu" aria-label="Debug layout snapshot options">
@@ -125,13 +161,16 @@ export function ControlPlaneApp() {
         </button>
       </div>
     </details>
-  : null;
+  );
 
   const activeContent = !state ?
     <Panel title="Loading state">
       <p className="muted">{error ?? 'Reading local Heddle state...'}</p>
     </Panel>
-  : renderActiveTab(tab, state, sessionWorkspace, heartbeatWorkspace);
+  : renderActiveTab(tab, state, sessionWorkspace, heartbeatWorkspace, {
+      creatingWorkspace,
+      onCreateWorkspace: handleCreateWorkspace,
+    });
 
   if (isMobile) {
     return (
@@ -141,7 +180,8 @@ export function ControlPlaneApp() {
           onTabChange={setTab}
           state={state}
           error={error}
-          onCaptureDebugSnapshot={import.meta.env.DEV ? (screenshot) => void captureDebugSnapshot(screenshot) : undefined}
+          onSetActiveWorkspace={(workspaceId) => void switchWorkspace(workspaceId)}
+          onCaptureDebugSnapshot={(screenshot) => void captureDebugSnapshot(screenshot)}
         >
           {activeContent}
         </MobileControlPlaneShell>
@@ -156,12 +196,13 @@ export function ControlPlaneApp() {
         <nav className="tabs toolbar-tabs" aria-label="Control plane sections">
           {sectionTabs}
         </nav>
-        <div className="toolbar-debug">
-          {debugSnapshotMenu}
-        </div>
         <div className="toolbar-status">
+          <div className="toolbar-actions">
+            {debugSnapshotMenu}
+          </div>
           <div className="topbar-title-row">
             <p className="topbar-eyebrow">Heddle Control Plane</p>
+            <WorkspaceSwitcher state={state} onSelect={(workspaceId) => void switchWorkspace(workspaceId)} />
             <WorkspacePathLabel state={state} />
           </div>
           <StatusBadge error={error} state={state} />
@@ -211,9 +252,19 @@ function renderActiveTab(
   state: ControlPlaneState,
   sessionWorkspace: ReturnType<typeof useSessionWorkspace>,
   heartbeatWorkspace: ReturnType<typeof useHeartbeatWorkspace>,
+  options: {
+    creatingWorkspace: boolean;
+    onCreateWorkspace: (input: { name: string; anchorRoot: string; setActive: boolean }) => Promise<void>;
+  },
 ) {
   if (tab === 'overview') {
-    return <OverviewView state={state} />;
+    return (
+      <OverviewView
+        state={state}
+        creatingWorkspace={options.creatingWorkspace}
+        onCreateWorkspace={options.onCreateWorkspace}
+      />
+    );
   }
 
   if (tab === 'sessions') {

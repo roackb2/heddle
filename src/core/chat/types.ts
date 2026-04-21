@@ -61,6 +61,7 @@ export type ChatArchiveManifest = {
 export type ChatSession = {
   id: string;
   name: string;
+  workspaceId?: string;
   history: ChatMessage[];
   messages: ConversationLine[];
   turns: TurnSummary[];

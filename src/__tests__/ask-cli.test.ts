@@ -84,6 +84,7 @@ describe('runAskCli', () => {
     expect(session?.history).toEqual(result.transcript);
     expect(session?.turns).toHaveLength(1);
     expect(session?.lastContinuePrompt).toBe('inspect the repository');
+    expect(session?.workspaceId).toBe('default');
     expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining(`Session: ${catalog[0]!.id}`));
   });
 

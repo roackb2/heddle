@@ -7,11 +7,13 @@ import {
   type ToolCall,
   type ToolDefinition,
 } from '../../index.js';
+import { resolve } from 'node:path';
 import type { ParsedHeartbeatArgs } from './args.js';
 import { booleanFlag, parsePositiveInt, stringFlag } from './args.js';
 import { formatDurationMs, parseDurationMs } from './duration.js';
 import { printAgentLoopEvent, printSchedulerEvent } from './output.js';
 import type { HeartbeatCliOptions, HeartbeatCliStore } from './types.js';
+import { resolveWorkspaceContext } from '../../core/runtime/workspaces.js';
 
 const DEFAULT_MODEL = 'gpt-5.1-codex-mini';
 const DEFAULT_HEARTBEAT_TASK_ID = 'default';
@@ -77,9 +79,15 @@ export async function startHeartbeatCli(
   const existing = (await store.listTasks()).find((task) => task.id === id);
   const now = new Date();
   const taskText = stringFlag(parsed.flags, 'task') ?? stringFlag(parsed.flags, 'goal') ?? existing?.task ?? DEFAULT_HEARTBEAT_TASK;
+  const workspaceRoot = options.workspaceRoot ?? process.cwd();
+  const workspace = resolveWorkspaceContext({
+    workspaceRoot,
+    stateRoot: resolve(workspaceRoot, options.stateDir ?? '.heddle'),
+  }).activeWorkspace;
   const task: HeartbeatTask = {
     ...existing,
     id,
+    workspaceId: existing?.workspaceId ?? workspace.id,
     name: stringFlag(parsed.flags, 'name') ?? existing?.name,
     task: taskText.trim(),
     enabled: true,
@@ -87,7 +95,7 @@ export async function startHeartbeatCli(
     nextRunAt: booleanFlag(parsed.flags, 'defer') ? new Date(now.getTime() + intervalMs).toISOString() : new Date(now.getTime() - 1_000).toISOString(),
     model: stringFlag(parsed.flags, 'model') ?? existing?.model ?? options.model,
     maxSteps: parsePositiveInt(stringFlag(parsed.flags, 'max-steps')) ?? existing?.maxSteps ?? options.maxSteps,
-    workspaceRoot: options.workspaceRoot ?? process.cwd(),
+    workspaceRoot,
     stateDir: options.stateDir,
     searchIgnoreDirs: options.searchIgnoreDirs,
     systemContext: options.systemContext,

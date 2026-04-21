@@ -24,6 +24,7 @@ import {
 } from './services/heartbeat.js';
 import { saveControlPlaneLayoutSnapshot } from './services/layout-snapshots.js';
 import { searchWorkspaceFiles } from './services/workspace-files.js';
+import { createWorkspaceDescriptor, setActiveWorkspace } from '../../../core/runtime/workspaces.js';
 
 const sessionInputSchema = z.object({
   id: z.string().min(1),
@@ -73,6 +74,17 @@ const layoutSnapshotInputSchema = z.object({
   snapshot: z.unknown(),
 });
 
+const workspaceSetActiveInputSchema = z.object({
+  workspaceId: z.string().min(1),
+});
+
+const workspaceCreateInputSchema = z.object({
+  name: z.string().min(1),
+  anchorRoot: z.string().min(1),
+  repoRoots: z.array(z.string().min(1)).optional(),
+  setActive: z.boolean().optional(),
+});
+
 export const controlPlaneRouter = router({
   state: procedure.query(async ({ ctx }) => {
     return await loadControlPlaneState(ctx);
@@ -84,12 +96,13 @@ export const controlPlaneRouter = router({
   }),
   sessionCreate: procedure.input(createSessionInputSchema).mutation(({ ctx, input }) => {
     return createControlPlaneChatSession({
-      sessionStoragePath: resolve(ctx.stateRoot, 'chat-sessions.catalog.json'),
+      sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
       suggestedName: input?.name,
+      workspaceId: ctx.activeWorkspace.id,
     });
   }),
   session: procedure.input(sessionInputSchema).query(({ ctx, input }) => {
-    return readChatSessionDetail(resolve(ctx.stateRoot, 'chat-sessions.catalog.json'), input.id) ?? null;
+    return readChatSessionDetail(resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'), input.id) ?? null;
   }),
   modelOptions: procedure.query(() => {
     return {
@@ -98,14 +111,14 @@ export const controlPlaneRouter = router({
   }),
   sessionSettingsUpdate: procedure.input(sessionSettingsInputSchema).mutation(({ ctx, input }) => {
     return updateControlPlaneChatSessionSettings({
-      sessionStoragePath: resolve(ctx.stateRoot, 'chat-sessions.catalog.json'),
+      sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
       sessionId: input.id,
       model: input.model,
       driftEnabled: input.driftEnabled,
     });
   }),
   sessionTurnReview: procedure.input(turnReviewInputSchema).query(({ ctx, input }) => {
-    return readChatTurnReview(resolve(ctx.stateRoot, 'chat-sessions.catalog.json'), input.sessionId, input.turnId) ?? null;
+    return readChatTurnReview(resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'), input.sessionId, input.turnId) ?? null;
   }),
   sessionPendingApproval: procedure.input(sessionInputSchema).query(({ input }) => {
     return getPendingControlPlaneApproval(input.id) ?? null;
@@ -128,29 +141,29 @@ export const controlPlaneRouter = router({
   }),
   sessionSendPrompt: procedure.input(sessionMessageInputSchema).mutation(async ({ ctx, input }) => {
     return await submitChatPrompt({
-      workspaceRoot: ctx.workspaceRoot,
-      stateRoot: ctx.stateRoot,
-      sessionStoragePath: resolve(ctx.stateRoot, 'chat-sessions.catalog.json'),
+      workspaceRoot: ctx.activeWorkspace.anchorRoot,
+      stateRoot: ctx.activeWorkspace.stateRoot,
+      sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
       sessionId: input.sessionId,
       prompt: input.prompt,
     });
   }),
   sessionContinue: procedure.input(sessionInputSchema).mutation(async ({ ctx, input }) => {
     return await continueChatPrompt({
-      workspaceRoot: ctx.workspaceRoot,
-      stateRoot: ctx.stateRoot,
-      sessionStoragePath: resolve(ctx.stateRoot, 'chat-sessions.catalog.json'),
+      workspaceRoot: ctx.activeWorkspace.anchorRoot,
+      stateRoot: ctx.activeWorkspace.stateRoot,
+      sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
       sessionId: input.id,
     });
   }),
   heartbeatTasks: procedure.query(async ({ ctx }) => {
     return {
-      tasks: await listControlPlaneHeartbeatTasks(ctx.stateRoot),
+      tasks: await listControlPlaneHeartbeatTasks(ctx.activeWorkspace.stateRoot),
     };
   }),
   heartbeatRuns: procedure.input(heartbeatRunsInputSchema).query(async ({ ctx, input }) => {
     return {
-      runs: await listControlPlaneHeartbeatRuns(ctx.stateRoot, {
+      runs: await listControlPlaneHeartbeatRuns(ctx.activeWorkspace.stateRoot, {
         taskId: input?.taskId,
         limit: input?.limit ?? 20,
       }),
@@ -158,29 +171,56 @@ export const controlPlaneRouter = router({
   }),
   heartbeatTaskEnable: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
     return {
-      task: await setControlPlaneHeartbeatTaskEnabled(ctx.stateRoot, input.taskId, true),
+      task: await setControlPlaneHeartbeatTaskEnabled(ctx.activeWorkspace.stateRoot, input.taskId, true),
     };
   }),
   heartbeatTaskDisable: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
     return {
-      task: await setControlPlaneHeartbeatTaskEnabled(ctx.stateRoot, input.taskId, false),
+      task: await setControlPlaneHeartbeatTaskEnabled(ctx.activeWorkspace.stateRoot, input.taskId, false),
     };
   }),
   heartbeatTaskTrigger: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
     return {
-      task: await triggerControlPlaneHeartbeatTaskRun(ctx.stateRoot, input.taskId),
+      task: await triggerControlPlaneHeartbeatTaskRun(ctx.activeWorkspace.stateRoot, input.taskId),
     };
   }),
   workspaceFileSearch: procedure.input(fileSearchInputSchema).query(async ({ ctx, input }) => {
     return {
       files: await searchWorkspaceFiles({
-        workspaceRoot: ctx.workspaceRoot,
+        workspaceRoot: ctx.activeWorkspace.anchorRoot,
         query: input?.query ?? '',
         limit: input?.limit ?? 20,
       }),
     };
   }),
+  workspaceSetActive: procedure.input(workspaceSetActiveInputSchema).mutation(({ ctx, input }) => {
+    const resolved = setActiveWorkspace({
+      workspaceRoot: ctx.workspaceRoot,
+      stateRoot: ctx.stateRoot,
+      workspaceId: input.workspaceId,
+    });
+    return {
+      activeWorkspaceId: resolved.activeWorkspaceId,
+      workspace: resolved.activeWorkspace,
+      workspaces: resolved.workspaces,
+    };
+  }),
+  workspaceCreate: procedure.input(workspaceCreateInputSchema).mutation(({ ctx, input }) => {
+    const resolved = createWorkspaceDescriptor({
+      workspaceRoot: ctx.workspaceRoot,
+      stateRoot: ctx.stateRoot,
+      name: input.name,
+      anchorRoot: input.anchorRoot,
+      repoRoots: input.repoRoots,
+      setActive: input.setActive,
+    });
+    return {
+      activeWorkspaceId: resolved.activeWorkspaceId,
+      workspace: resolved.activeWorkspace,
+      workspaces: resolved.workspaces,
+    };
+  }),
   layoutSnapshotSave: procedure.input(layoutSnapshotInputSchema).mutation(async ({ ctx, input }) => {
-    return await saveControlPlaneLayoutSnapshot(ctx.stateRoot, input.snapshot);
+    return await saveControlPlaneLayoutSnapshot(ctx.activeWorkspace.stateRoot, input.snapshot);
   }),
 });

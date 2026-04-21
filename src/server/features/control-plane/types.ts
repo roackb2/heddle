@@ -1,9 +1,12 @@
 import type { AgentLoopEvent } from '../../../core/runtime/agent-loop.js';
+import type { DaemonOwnerRecord } from '../../../core/runtime/daemon-registry.js';
 import type { HeartbeatRunView, HeartbeatTaskView } from '../../../core/runtime/heartbeat-views.js';
+import type { WorkspaceDescriptor } from '../../../core/runtime/workspaces.js';
 
 export type ChatSessionView = {
   id: string;
   name: string;
+  workspaceId?: string;
   createdAt?: string;
   updatedAt?: string;
   model?: string;
@@ -110,6 +113,20 @@ export type ControlPlaneSessionLiveEvent = {
 export type ControlPlaneState = {
   workspaceRoot: string;
   stateRoot: string;
+  activeWorkspaceId: string;
+  workspace: WorkspaceDescriptor;
+  workspaces: WorkspaceDescriptor[];
+  runtimeHost: {
+    mode: 'daemon';
+    ownerId: string;
+    registryPath: string;
+    endpoint: {
+      host: string;
+      port: number;
+    };
+    startedAt: string;
+    workspaceOwner: DaemonOwnerRecord | null;
+  } | null;
   sessions: ChatSessionView[];
   heartbeat: {
     tasks: HeartbeatTaskView[];

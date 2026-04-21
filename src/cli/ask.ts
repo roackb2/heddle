@@ -13,6 +13,7 @@ import {
 import { submitChatSessionPrompt } from '../core/chat/session-submit.js';
 import type { ChatSession } from '../core/chat/types.js';
 import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../core/chat/storage.js';
+import { resolveWorkspaceContext } from '../core/runtime/workspaces.js';
 
 export type AskCliOptions = {
   model?: string;
@@ -48,6 +49,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
   }
 
   const targetSession = resolveAskSession({
+    workspaceRoot,
     sessionId: options.sessionId,
     latestSession: options.latestSession,
     createSessionName: options.createSessionName,
@@ -105,6 +107,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
 }
 
 function resolveAskSession(options: {
+  workspaceRoot: string;
   sessionId?: string;
   latestSession?: boolean;
   createSessionName?: string;
@@ -116,11 +119,16 @@ function resolveAskSession(options: {
   if (options.createSessionName !== undefined) {
     const existing = readChatSessionCatalog(options.sessionStoragePath);
     const nextNumber = existing.length + 1;
+    const workspace = resolveWorkspaceContext({
+      workspaceRoot: options.workspaceRoot,
+      stateRoot: options.stateRoot,
+    }).activeWorkspace;
     const session = createChatSession({
       id: `session-${Date.now()}`,
       name: options.createSessionName.trim() || `Session ${nextNumber}`,
       apiKeyPresent: options.apiKeyPresent,
       model: options.model,
+      workspaceId: workspace.id,
     });
     const currentSessions = existing
       .map((entry) => readChatSession(options.sessionStoragePath, entry.id, options.apiKeyPresent))

@@ -6,6 +6,7 @@ import type { LlmUsage } from '../llm/types.js';
 
 export type HeartbeatTask = {
   id: string;
+  workspaceId?: string;
   task: string;
   name?: string;
   enabled: boolean;
@@ -51,6 +52,7 @@ export type HeartbeatTaskRunRecordEntry = {
   id: string;
   path: string;
   taskId: string;
+  workspaceId?: string;
   runId: string;
   createdAt: string;
   record: HeartbeatTaskRunRecord;
@@ -166,6 +168,7 @@ function runRecordEntryFromPath(path: string, record: HeartbeatTaskRunRecord): H
     id,
     path,
     taskId: record.task.id,
+    workspaceId: record.task.workspaceId,
     runId: record.result.state.runId,
     createdAt: record.result.state.finishedAt,
     record,

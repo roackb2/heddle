@@ -59,6 +59,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     sessionCatalogFile: runtime.sessionCatalogFile,
     apiKeyPresent: Boolean(runtime.apiKey),
     defaultModel: runtime.model,
+    workspaceRoot: runtime.workspaceRoot,
+    stateRoot: runtime.stateRoot,
   });
   const pickers = useChatPickers({
     draft,

@@ -8,6 +8,10 @@ export const appRouter = router({
       service: 'heddle-server',
       workspaceRoot: ctx.workspaceRoot,
       stateRoot: ctx.stateRoot,
+      activeWorkspaceId: ctx.activeWorkspaceId,
+      workspace: ctx.activeWorkspace,
+      workspaces: ctx.workspaces,
+      runtimeHost: ctx.runtimeHost,
     };
   }),
   controlPlane: controlPlaneRouter,
