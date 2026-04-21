@@ -29,9 +29,10 @@ import {
 } from '../utils/format.js';
 import { saveTrace } from '../utils/runtime.js';
 import { resolveApiKeyForModel } from '../utils/runtime.js';
+import { acquireSessionLease, getSessionLeaseConflict, releaseSessionLease } from '../../../core/chat/session-lease.js';
 import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../state/approval-rules.js';
 import { buildCompactionRunningContext, compactChatHistoryWithArchive, estimateChatHistoryTokens } from '../state/compaction.js';
-import { isGenericSessionName } from '../state/storage.js';
+import { isGenericSessionName, readChatSession, touchSession } from '../state/storage.js';
 import { normalizeSessionTitle } from '../utils/format.js';
 import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval, TurnSummary } from '../state/types.js';
 import type { ChatRuntimeConfig } from '../utils/runtime.js';
@@ -279,6 +280,30 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   const streamingBuffers = new Map<number, string>();
   drift?.onRunStart?.();
   let historyForRun = sessionHistory;
+  const leaseOwner = {
+    ownerKind: 'tui' as const,
+    ownerId: `tui-${process.pid}`,
+    clientLabel: 'terminal chat',
+  };
+  const persistedSession = readChatSession(runtime.sessionCatalogFile, sessionId, true);
+  const leaseConflict = persistedSession ? getSessionLeaseConflict(persistedSession, leaseOwner) : undefined;
+  if (leaseConflict) {
+    state.setError(leaseConflict);
+    state.setStatus('Blocked');
+    updateSessionById(sessionId, (sessionToUpdate) => ({
+      ...sessionToUpdate,
+      messages: [
+        ...sessionToUpdate.messages,
+        { id: state.nextLocalId(), role: 'assistant', text: leaseConflict },
+      ],
+    }));
+    return undefined;
+  }
+  if (persistedSession) {
+    const leasedSession = touchSession(acquireSessionLease(persistedSession, leaseOwner));
+    historyForRun = leasedSession.history;
+    updateSessionById(sessionId, () => leasedSession);
+  }
   const toolNames = tools.map((tool) => tool.name);
   const emitCompactionStatus = (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; error?: string }, sourceHistory: ChatMessage[]) => {
     if (event.status === 'running') {
@@ -538,6 +563,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     }));
     return undefined;
   } finally {
+    updateSessionById(sessionId, (sessionToUpdate) => releaseSessionLease(sessionToUpdate, leaseOwner));
     state.setIsRunning(false);
     state.interruptRequestedRef.current = false;
     state.setInterruptRequested(false);
@@ -669,6 +695,23 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
   }
 
   const shellDisplay = `!${command}`;
+  const leaseOwner = {
+    ownerKind: 'tui' as const,
+    ownerId: `tui-${process.pid}`,
+    clientLabel: 'terminal chat',
+  };
+  const persistedSession = readChatSession(runtime.sessionCatalogFile, activeSessionId, true) ?? activeSession;
+  const leaseConflict = getSessionLeaseConflict(persistedSession, leaseOwner);
+  if (leaseConflict) {
+    state.setError(leaseConflict);
+    state.setStatus('Blocked');
+    updateActiveSession((session) => ({
+      ...session,
+      messages: [...session.messages, { id: state.nextLocalId(), role: 'assistant', text: leaseConflict }],
+    }));
+    return;
+  }
+  updateActiveSession(() => touchSession(acquireSessionLease(persistedSession, leaseOwner)));
   state.setError(undefined);
   state.setIsRunning(true);
   state.setStatus('Running');
@@ -821,6 +864,7 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
       ],
     }));
   } finally {
+    updateActiveSession((session) => releaseSessionLease(session, leaseOwner));
     state.setPendingApproval(undefined);
     state.setApprovalChoice('approve');
     state.interruptRequestedRef.current = false;

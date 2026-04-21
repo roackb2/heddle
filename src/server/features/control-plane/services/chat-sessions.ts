@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../../core/chat/storage.js';
 import { DEFAULT_OPENAI_MODEL } from '../../../../core/config.js';
 import { resolveApiKeyForModel } from '../../../../core/runtime/api-keys.js';
+import type { ChatSessionLeaseOwner } from '../../../../core/chat/session-lease.js';
 import type { ChatSession } from '../../../../core/chat/types.js';
 import { submitChatSessionPrompt } from '../../../../core/chat/session-submit.js';
 import type {
@@ -27,6 +28,7 @@ type SubmitChatPromptArgs = {
   sessionId: string;
   prompt: string;
   apiKey?: string;
+  leaseOwner: ChatSessionLeaseOwner;
 };
 
 const DEFAULT_CONTINUE_PROMPT = 'Continue from where you left off.';

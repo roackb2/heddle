@@ -216,6 +216,7 @@ Important current limits:
 - `chat` does not yet attach to daemon-owned sessions
 - if a daemon already owns the workspace, browser and mobile clients are just clients of that daemon; switching devices is normal and does not require takeover
 - browser/mobile do not currently expose host-action controls such as takeover or force-embed, because those actions are not yet useful enough without a stronger ownership policy behind them
+- same-session conflict protection is now a soft session lease, not a full takeover system yet
 
 So the correct mental model is:
 
@@ -224,6 +225,23 @@ So the correct mental model is:
 - many clients can observe and operate through that owner
 
 What remains is mostly around special-case ownership transitions, not the normal desktop/mobile workflow.
+
+## Session Concurrency
+
+Chat safety is now centered on the session, not the whole workspace.
+
+That means:
+
+- different sessions in the same workspace can be used from different clients
+- desktop web, mobile web, `ask`, and embedded TUI can coexist
+- the risky case is multiple live writers touching the same session
+
+Heddle now records a lightweight session lease while a session is being mutated. If another client tries to continue that same session while the lease is still fresh, the run is blocked with a warning about concurrent mutation risk.
+
+This is intentionally a soft coordination mechanism:
+
+- it prevents the main same-session corruption case
+- it does not yet implement rich takeover, transfer, or presence UI
 
 ## Practical Rules
 

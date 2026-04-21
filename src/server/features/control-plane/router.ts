@@ -163,6 +163,11 @@ export const controlPlaneRouter = router({
       sessionId: input.sessionId,
       prompt: input.prompt,
       apiKey: input.apiKey,
+      leaseOwner: {
+        ownerKind: 'daemon',
+        ownerId: ctx.runtimeHost?.ownerId ?? `daemon-${process.pid}`,
+        clientLabel: 'control plane',
+      },
     });
   }),
   sessionContinue: procedure.input(sessionInputSchema).mutation(async ({ ctx, input }) => {
@@ -172,6 +177,11 @@ export const controlPlaneRouter = router({
       sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
       sessionId: input.id,
       apiKey: input.apiKey,
+      leaseOwner: {
+        ownerKind: 'daemon',
+        ownerId: ctx.runtimeHost?.ownerId ?? `daemon-${process.pid}`,
+        clientLabel: 'control plane',
+      },
     });
   }),
   agentAsk: procedure.input(agentAskInputSchema).mutation(async ({ ctx, input }) => {

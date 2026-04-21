@@ -86,6 +86,11 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
       sessionId: targetSession.id,
       prompt: goal,
       apiKey: options.apiKey,
+      leaseOwner: {
+        ownerKind: 'ask',
+        ownerId: `ask-${process.pid}`,
+        clientLabel: 'heddle ask',
+      },
     });
     const latestTraceFile = result.session.turns.at(-1)?.traceFile;
     const trace = latestTraceFile ? readTraceFile(latestTraceFile) : undefined;

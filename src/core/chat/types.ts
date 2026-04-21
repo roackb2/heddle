@@ -58,6 +58,14 @@ export type ChatArchiveManifest = {
   archives: ChatArchiveRecord[];
 };
 
+export type ChatSessionLease = {
+  ownerKind: 'tui' | 'daemon' | 'ask';
+  ownerId: string;
+  acquiredAt: string;
+  lastSeenAt: string;
+  clientLabel?: string;
+};
+
 export type ChatSession = {
   id: string;
   name: string;
@@ -72,6 +80,7 @@ export type ChatSession = {
   lastContinuePrompt?: string;
   context?: ChatContextStats;
   archives?: ChatArchiveRecord[];
+  lease?: ChatSessionLease;
 };
 
 export type PendingApproval = {

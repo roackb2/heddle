@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { ChatMessage } from '../../index.js';
-import type { ChatArchiveRecord, ChatContextStats, ChatSession, ConversationLine, TurnSummary } from './types.js';
+import type { ChatArchiveRecord, ChatContextStats, ChatSession, ChatSessionLease, ConversationLine, TurnSummary } from './types.js';
 import { truncate } from '../utils/text.js';
 
 type ChatSessionCatalogEntry = {
@@ -15,6 +15,7 @@ type ChatSessionCatalogEntry = {
   lastContinuePrompt?: string;
   context?: ChatContextStats;
   archives?: ChatArchiveRecord[];
+  lease?: ChatSessionLease;
 };
 
 type ChatSessionCatalog = {
@@ -63,6 +64,7 @@ export function createChatSession(options: {
     lastContinuePrompt: undefined,
     context: undefined,
     archives: [],
+    lease: undefined,
   };
 }
 
@@ -253,6 +255,7 @@ function parseCatalogEntry(value: unknown): ChatSessionCatalogEntry[] {
     lastContinuePrompt: typeof candidate.lastContinuePrompt === 'string' ? candidate.lastContinuePrompt : undefined,
     context: isChatContextStats(candidate.context) ? candidate.context : undefined,
     archives: Array.isArray(candidate.archives) ? candidate.archives.flatMap(parseArchiveRecord) : undefined,
+    lease: parseLease(candidate.lease),
   }];
 }
 
@@ -268,6 +271,7 @@ function projectCatalogEntry(session: ChatSession): ChatSessionCatalogEntry {
     lastContinuePrompt: session.lastContinuePrompt,
     context: session.context,
     archives: session.archives,
+    lease: session.lease,
   };
 }
 
@@ -299,6 +303,7 @@ function readSessionFile(
       lastContinuePrompt: entry.lastContinuePrompt,
       context: entry.context,
       archives: entry.archives,
+      lease: entry.lease,
       history: Array.isArray(payload.history) ? payload.history as ChatMessage[] : [],
       messages:
         Array.isArray(payload.messages) && payload.messages.length > 0 ?
@@ -346,6 +351,7 @@ function serializeSessionBody(session: ChatSession): string {
     messages: session.messages,
     turns: session.turns,
     archives: session.archives,
+    lease: session.lease,
   }, null, 2)}\n`;
 }
 
@@ -446,7 +452,32 @@ function parseSavedSession(value: unknown, apiKeyPresent: boolean): ChatSession[
     lastContinuePrompt: typeof candidate.lastContinuePrompt === 'string' ? candidate.lastContinuePrompt : undefined,
     context: isChatContextStats(candidate.context) ? candidate.context : undefined,
     archives: Array.isArray(candidate.archives) ? candidate.archives.flatMap(parseArchiveRecord) : undefined,
+    lease: parseLease(candidate.lease),
   }];
+}
+
+function parseLease(value: unknown): ChatSessionLease | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const candidate = value as Partial<ChatSessionLease>;
+  if (
+    (candidate.ownerKind !== 'tui' && candidate.ownerKind !== 'daemon' && candidate.ownerKind !== 'ask') ||
+    typeof candidate.ownerId !== 'string' ||
+    typeof candidate.acquiredAt !== 'string' ||
+    typeof candidate.lastSeenAt !== 'string'
+  ) {
+    return undefined;
+  }
+
+  return {
+    ownerKind: candidate.ownerKind,
+    ownerId: candidate.ownerId,
+    acquiredAt: candidate.acquiredAt,
+    lastSeenAt: candidate.lastSeenAt,
+    clientLabel: typeof candidate.clientLabel === 'string' ? candidate.clientLabel : undefined,
+  };
 }
 
 function isConversationLine(value: unknown): value is ConversationLine {
