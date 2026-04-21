@@ -21,7 +21,8 @@ export type LocalCommandArgs = {
   renameSession: (name: string) => void;
   removeSession: (id: string) => void;
   clearConversation: () => void;
-  compactConversation: () => string;
+  compactConversation: () => Promise<string> | string;
+  saveTuiSnapshot?: () => Promise<string> | string;
   driftEnabled: boolean;
   driftError?: string;
   setDriftEnabled: (enabled: boolean) => void;
@@ -44,6 +45,7 @@ const HELP_HINTS: LocalCommandHint[] = [
   { command: '/continue', description: 'resume from the current transcript' },
   { command: '/clear', description: 'reset the current session transcript' },
   { command: '/compact', description: 'compact earlier session history for the next run' },
+  { command: '/debug tui-snapshot', description: 'save the latest rendered TUI frame for inspection' },
   { command: '/drift', description: 'show CyberLoop semantic drift detection status' },
   { command: '/drift on', description: 'enable CyberLoop semantic drift detection for chat runs' },
   { command: '/drift off', description: 'disable CyberLoop semantic drift detection' },
@@ -84,7 +86,11 @@ const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
     args.clearConversation();
     return messageResult('Cleared the current chat transcript.');
   }],
-  ['/compact', (args) => messageResult(args.compactConversation())],
+  ['/compact', async (args) => messageResult(await args.compactConversation())],
+  ['/debug tui-snapshot', async (args) =>
+    messageResult(
+      args.saveTuiSnapshot ? await args.saveTuiSnapshot() : 'TUI snapshots are not available in this runtime.',
+    )],
   ['/drift', (args) => messageResult(formatDriftStatus(args.driftEnabled, args.driftError))],
   ['/drift status', (args) => messageResult(formatDriftStatus(args.driftEnabled, args.driftError))],
   ['/drift on', (args) => {
@@ -159,6 +165,42 @@ export function getLocalCommandHints(
 
   const filtered = HELP_HINTS.filter((hint) => hint.command.startsWith(trimmed) || trimmed === '/');
   return filtered.length > 0 ? filtered : HELP_HINTS;
+}
+
+export function autocompleteLocalCommand(
+  draft: string,
+  activeSessionId: string,
+  sessions: ChatSession[],
+): string | undefined {
+  const leadingWhitespace = draft.match(/^\s*/)?.[0] ?? '';
+  const trimmedStart = draft.trimStart();
+  if (!isLikelyLocalCommand(trimmedStart)) {
+    return undefined;
+  }
+
+  const completionCandidates = Array.from(
+    new Set(
+      getLocalCommandHints(trimmedStart, activeSessionId, sessions)
+        .map((hint) => hintCommandToCompletionCandidate(hint.command))
+        .filter((candidate) => candidate.startsWith(trimmedStart)),
+    ),
+  );
+  if (completionCandidates.length === 0) {
+    return undefined;
+  }
+
+  const sharedPrefix = longestSharedPrefix(completionCandidates);
+  const expandedPrefix =
+    completionCandidates.some((candidate) => candidate.startsWith(`${sharedPrefix} `)) ? `${sharedPrefix} ` : sharedPrefix;
+  if (expandedPrefix.length > trimmedStart.length) {
+    return `${leadingWhitespace}${expandedPrefix}`;
+  }
+
+  if (completionCandidates.length === 1 && completionCandidates[0] !== trimmedStart) {
+    return `${leadingWhitespace}${completionCandidates[0]}`;
+  }
+
+  return undefined;
 }
 
 export async function runLocalCommand(args: LocalCommandArgs): Promise<LocalCommandResult> {
@@ -460,6 +502,35 @@ function messageResult(message: string): LocalCommandResult {
     kind: 'message',
     message,
   };
+}
+
+function hintCommandToCompletionCandidate(command: string): string {
+  const placeholderMatch = command.match(/\s(?:<[^>]+>|\[[^\]]+\])/);
+  if (!placeholderMatch || placeholderMatch.index === undefined) {
+    return command;
+  }
+
+  return `${command.slice(0, placeholderMatch.index)} `;
+}
+
+function longestSharedPrefix(values: string[]): string {
+  if (values.length === 0) {
+    return '';
+  }
+
+  let prefix = values[0] ?? '';
+  for (const value of values.slice(1)) {
+    let index = 0;
+    while (index < prefix.length && index < value.length && prefix[index] === value[index]) {
+      index += 1;
+    }
+    prefix = prefix.slice(0, index);
+    if (!prefix) {
+      break;
+    }
+  }
+
+  return prefix;
 }
 
 function formatDriftStatus(enabled: boolean, error: string | undefined): string {

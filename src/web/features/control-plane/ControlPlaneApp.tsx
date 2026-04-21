@@ -31,7 +31,12 @@ export function ControlPlaneApp() {
     void refresh();
   }, [refresh]);
   const sessionWorkspace = useSessionWorkspace(state?.sessions, notifyToast, refreshControlPlaneState);
-  const heartbeatWorkspace = useHeartbeatWorkspace(state?.heartbeat.tasks, state?.heartbeat.runs);
+  const heartbeatWorkspace = useHeartbeatWorkspace(
+    state?.heartbeat.tasks,
+    state?.heartbeat.runs,
+    notifyToast,
+    refreshControlPlaneState,
+  );
   const captureDebugSnapshot = useCallback(async (screenshot: ScreenshotMode) => {
     let snapshot: Awaited<ReturnType<typeof captureControlPlaneLayoutSnapshot>> | undefined;
     try {
@@ -256,6 +261,10 @@ function renderActiveTab(
       selectedRunId={heartbeatWorkspace.selectedRunId}
       onSelectRun={heartbeatWorkspace.setSelectedRunId}
       selectedTaskRuns={heartbeatWorkspace.selectedTaskRuns}
+      pendingTaskAction={heartbeatWorkspace.pendingTaskAction}
+      onEnableTask={heartbeatWorkspace.enableTask}
+      onDisableTask={heartbeatWorkspace.disableTask}
+      onTriggerTask={heartbeatWorkspace.triggerTask}
     />
   );
 }

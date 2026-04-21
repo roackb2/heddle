@@ -30,7 +30,7 @@ import {
 import { saveTrace } from '../utils/runtime.js';
 import { resolveApiKeyForModel } from '../utils/runtime.js';
 import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../state/approval-rules.js';
-import { compactChatHistory, estimateChatHistoryTokens } from '../state/compaction.js';
+import { buildCompactionRunningContext, compactChatHistoryWithArchive, estimateChatHistoryTokens } from '../state/compaction.js';
 import { isGenericSessionName } from '../state/storage.js';
 import { normalizeSessionTitle } from '../utils/format.js';
 import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval, TurnSummary } from '../state/types.js';
@@ -84,6 +84,7 @@ type ExecuteDirectShellArgs = {
   rawCommand: string;
   model: string;
   activeSessionId: string;
+  activeSession?: ChatSession;
   runtime: ChatRuntimeConfig;
   tools: ToolDefinition[];
   state: ActionState;
@@ -216,6 +217,7 @@ export function useAgentRun(args: UseAgentRunArgs) {
       rawCommand,
       model: activeModel,
       activeSessionId,
+      activeSession: sessions.find((candidate) => candidate.id === activeSessionId),
       runtime,
       tools,
       state,
@@ -276,6 +278,52 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   const appendedPlanSteps = new Set<number>();
   const streamingBuffers = new Map<number, string>();
   drift?.onRunStart?.();
+  let historyForRun = sessionHistory;
+  const toolNames = tools.map((tool) => tool.name);
+  const emitCompactionStatus = (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; error?: string }, sourceHistory: ChatMessage[]) => {
+    if (event.status === 'running') {
+      state.setStatus('Compacting');
+      state.setLiveEvents((current) => [...current, { id: state.nextLocalId(), text: 'Compacting earlier conversation history…' }].slice(-8));
+      updateSessionById(sessionId, (sessionToUpdate) => ({
+        ...sessionToUpdate,
+        history: sourceHistory,
+        context: buildCompactionRunningContext({
+          history: sourceHistory,
+          previous: sessionToUpdate.context,
+          archiveCount: sessionToUpdate.archives?.length,
+          currentSummaryPath: sessionToUpdate.context?.currentSummaryPath,
+          lastArchivePath: event.archivePath,
+        }),
+      }));
+      return;
+    }
+
+    if (event.status === 'failed') {
+      state.setLiveEvents((current) => [...current, { id: state.nextLocalId(), text: `Compaction failed: ${event.error ?? 'unknown error'}` }].slice(-8));
+      return;
+    }
+
+    state.setLiveEvents((current) => [...current, { id: state.nextLocalId(), text: 'Compaction finished.' }].slice(-8));
+  };
+  const preflightCompacted = await compactChatHistoryWithArchive({
+    history: historyForRun,
+    model: llm.info?.model ?? runtime.model,
+    sessionId,
+    stateRoot: runtime.stateRoot,
+    systemContext: runtime.systemContext,
+    toolNames,
+    goal: prompt,
+    onStatusChange: (event) => emitCompactionStatus(event, historyForRun),
+  });
+  historyForRun = preflightCompacted.history;
+  updateSessionById(sessionId, (sessionToUpdate) => ({
+    ...sessionToUpdate,
+    history: preflightCompacted.history,
+    context: preflightCompacted.context,
+    archives: preflightCompacted.archives,
+    messages: buildConversationMessages(preflightCompacted.history),
+  }));
+  state.setStatus('Running');
   const driftObserver = await createChatDriftObserver({
     prompt,
     referenceAssistantText,
@@ -304,7 +352,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       includeDefaultTools: false,
       maxSteps: runtime.maxSteps,
       logger,
-      history: sessionHistory,
+      history: historyForRun,
       systemContext: runtime.systemContext,
       onAssistantStream: (update) => {
         streamingBuffers.set(update.step, update.text);
@@ -411,18 +459,22 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       result.trace.push(...driftObserver.annotations);
     }
 
-    const compacted = compactChatHistory({
+    const compacted = await compactChatHistoryWithArchive({
       history: result.transcript,
       model: llm.info?.model ?? runtime.model,
+      sessionId,
+      stateRoot: runtime.stateRoot,
       usage: result.usage,
       systemContext: runtime.systemContext,
-      toolNames: tools.map((tool) => tool.name),
+      toolNames,
       goal: prompt,
+      onStatusChange: (event) => emitCompactionStatus(event, result.transcript),
     });
     updateSessionById(sessionId, (sessionToUpdate) => ({
       ...sessionToUpdate,
       history: compacted.history,
       context: compacted.context,
+      archives: compacted.archives,
     }));
 
     const traceFile = saveTrace(runtime.traceDir, result.trace);
@@ -444,7 +496,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       result.outcome === 'error' ?
         formatChatFailureMessage(result.summary, {
           model: llm.info?.model ?? runtime.model,
-          estimatedHistoryTokens: estimateChatHistoryTokens(sessionHistory),
+          estimatedHistoryTokens: estimateChatHistoryTokens(historyForRun),
         })
       : result.summary;
 
@@ -473,7 +525,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     const message = runError instanceof Error ? runError.message : String(runError);
     const formattedMessage = formatChatFailureMessage(message, {
       model: llm.info?.model ?? runtime.model,
-      estimatedHistoryTokens: estimateChatHistoryTokens(sessionHistory),
+      estimatedHistoryTokens: estimateChatHistoryTokens(historyForRun),
     });
     state.setError(formattedMessage);
     state.setStatus('Error');
@@ -601,6 +653,7 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
     rawCommand,
     model,
     activeSessionId,
+    activeSession,
     runtime,
     tools,
     state,
@@ -611,7 +664,7 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
   } = args;
 
   const command = rawCommand.trim();
-  if (!command || state.isRunning) {
+  if (!command || state.isRunning || !activeSession) {
     return;
   }
 
@@ -705,23 +758,42 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
     }
 
     const responseText = formatDirectShellResponse(chosenCall.tool, command, chosenResult);
+    const directShellHistory = appendDirectShellHistory(activeSession.history, shellDisplay, chosenCall.tool, chosenResult);
+    const compacted = await compactChatHistoryWithArchive({
+      history: directShellHistory,
+      model,
+      sessionId: activeSessionId,
+      stateRoot: runtime.stateRoot,
+      systemContext: runtime.systemContext,
+      toolNames: tools.map((tool) => tool.name),
+      goal: shellDisplay,
+      onStatusChange: (event) => {
+        if (event.status === 'running') {
+          state.setStatus('Compacting');
+          state.setLiveEvents((current) => [...current, { id: state.nextLocalId(), text: 'Compacting earlier conversation history…' }].slice(-8));
+          updateActiveSession((session) => ({
+            ...session,
+            context: buildCompactionRunningContext({
+              history: directShellHistory,
+              previous: session.context,
+              archiveCount: session.archives?.length,
+              currentSummaryPath: session.context?.currentSummaryPath,
+              lastArchivePath: event.archivePath,
+            }),
+          }));
+        } else if (event.status === 'failed') {
+          state.setLiveEvents((current) => [...current, { id: state.nextLocalId(), text: `Compaction failed: ${event.error ?? 'unknown error'}` }].slice(-8));
+        } else {
+          state.setLiveEvents((current) => [...current, { id: state.nextLocalId(), text: 'Compaction finished.' }].slice(-8));
+        }
+      },
+    });
     updateActiveSession((session) => ({
       ...session,
-      ...(() => {
-        const compacted = compactChatHistory({
-          history: appendDirectShellHistory(session.history, shellDisplay, chosenCall.tool, chosenResult),
-          model,
-          systemContext: runtime.systemContext,
-          toolNames: tools.map((tool) => tool.name),
-          goal: shellDisplay,
-        });
-
-        return {
-          history: compacted.history,
-          context: compacted.context,
-          messages: buildConversationMessages(compacted.history),
-        };
-      })(),
+      history: compacted.history,
+      context: compacted.context,
+      archives: compacted.archives,
+      messages: buildConversationMessages(compacted.history),
     }));
     state.setLiveEvents([
       {

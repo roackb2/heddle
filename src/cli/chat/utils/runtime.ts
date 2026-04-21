@@ -31,6 +31,12 @@ export type ChatRuntimeConfig = {
   directShellApproval: 'always' | 'never';
   searchIgnoreDirs: string[];
   systemContext?: string;
+  saveTuiSnapshot?: (metadata?: { sessionId?: string; model?: string; status?: string; textSnapshot?: string }) => {
+    capturedAt: string;
+    txtPath: string;
+    ansiPath: string;
+    jsonPath: string;
+  };
 };
 
 export { saveTrace };

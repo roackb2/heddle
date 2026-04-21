@@ -11,6 +11,12 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    files: ['**/*.{js,mjs,cjs,ts,tsx}'],
+    rules: {
+      'max-lines': ['error', { max: 1000, skipBlankLines: false, skipComments: false }],
+    },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       parserOptions: {
@@ -46,6 +52,7 @@ export default tseslint.config(
   {
     files: ['src/__tests__/**/*.{ts,tsx}', 'examples/**/*.{ts,tsx}'],
     rules: {
+      'max-lines': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
     },
   },

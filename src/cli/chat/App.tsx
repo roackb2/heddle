@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Text } from 'ink';
 import {
   ApprovalComposer,
@@ -12,6 +12,7 @@ import {
   shouldShowSlashHints,
   SlashHintPanel,
 } from './components/index.js';
+import { buildTuiDebugSnapshot } from './debug/tui-debug-snapshot.js';
 import { estimateBuiltInContextWindow } from '../../core/llm/openai-models.js';
 import { useApprovalFlow } from './hooks/useApprovalFlow.js';
 import { useAgentRun } from './hooks/useAgentRun.js';
@@ -21,6 +22,7 @@ import { useChatSessions } from './hooks/useChatSessions.js';
 import { useLocalIds } from './hooks/useLocalIds.js';
 import { usePromptDraft } from './hooks/usePromptDraft.js';
 import { usePromptSubmission } from './hooks/usePromptSubmission.js';
+import { autocompleteLocalCommand } from './state/local-commands.js';
 import { currentActivityText } from './utils/format.js';
 import { listMentionableFiles } from './utils/file-mentions.js';
 import type { ChatRuntimeConfig } from './utils/runtime.js';
@@ -98,13 +100,25 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     actionState,
     workingFrames,
   } = useApprovalFlow(nextLocalId);
-  const messages = activeSession?.messages ?? [];
+  const messages = useMemo(() => activeSession?.messages ?? [], [activeSession?.messages]);
+  const compacting = activeSession?.context?.compactionStatus === 'running';
   const activityText = currentActivityText(liveEvents, isRunning, elapsedSeconds, pendingApproval, interruptRequested);
   const contextStatus = formatContextStatus(
     activeModel,
     activeSession?.context?.lastRunInputTokens ?? activeSession?.context?.estimatedRequestTokens,
   );
   const sessionFooter = `session=${activeSession?.id ?? activeSessionId}${activeSession?.name ? ` (${activeSession.name})` : ''}`;
+  const renderedStatus =
+    pendingApproval ? 'awaiting approval'
+    : compacting ? 'compacting'
+    : interruptRequested ? 'interrupt requested'
+    : isRunning ? 'running'
+    : status;
+  const statusHint =
+    pendingApproval ? '←/→ choose • Enter confirms • A remembers for this project • Esc denies • Ctrl+C exits'
+    : compacting ? 'Compacting archived history in the background • Ctrl+C exits'
+    : isRunning ? 'Type freely • Enter queues prompt • Esc requests stop after the current step • Ctrl+C exits'
+    : 'Enter sends • Tab completes slash commands • /help shows commands • !command runs shell • Ctrl+C exits';
   const activityLines = liveEvents
     .slice(-4)
     .filter((event, index, events) => events.findIndex((candidate) => candidate.text === event.text) === index)
@@ -115,22 +129,116 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
 
       return event.text;
     });
-  const activeTurn =
-    isRunning || pendingApproval || interruptRequested || error ?
-      {
-        title:
-          pendingApproval ? activityText
-          : error ? 'Recent activity before failure'
-        : isRunning ? 'Recent activity'
-        : activityText,
-        lines:
-          pendingApproval ? activityLines.filter((line) => line !== activityText)
-          : activityLines,
-        error,
-        currentAssistantText,
-        currentPlan,
-      }
-    : undefined;
+  const activeTurn = useMemo(
+    () =>
+      isRunning || pendingApproval || interruptRequested || error ?
+        {
+          title:
+            pendingApproval ? activityText
+            : error ? 'Recent activity before failure'
+            : isRunning ? 'Recent activity'
+            : activityText,
+          lines:
+            pendingApproval ? activityLines.filter((line) => line !== activityText)
+            : activityLines,
+          error,
+          currentAssistantText,
+          currentPlan,
+        }
+      : undefined,
+    [
+      isRunning,
+      pendingApproval,
+      interruptRequested,
+      error,
+      activityText,
+      activityLines,
+      currentAssistantText,
+      currentPlan,
+    ],
+  );
+  const saveTuiSnapshotMessage = useCallback(() => {
+    if (!runtime.saveTuiSnapshot) {
+      return 'TUI snapshots are not available in this runtime.';
+    }
+
+    const saved = runtime.saveTuiSnapshot({
+      sessionId: activeSessionId,
+      model: activeModel,
+      status:
+        pendingApproval ? 'awaiting-approval'
+        : isRunning ? 'running'
+        : compacting ? 'compacting'
+        : 'idle',
+      textSnapshot: buildTuiDebugSnapshot({
+        sessionName: activeSession?.name ?? 'unknown',
+        activeModel,
+        maxSteps: runtime.maxSteps,
+        status: renderedStatus,
+        hint: statusHint,
+        contextStatus,
+        sessionFooter,
+        activeSessionId,
+        sessions,
+        messages,
+        activeTurn,
+        pendingApproval,
+        approvalChoice,
+        draft,
+        draftCursor,
+        showSlashHints: shouldShowSlashHints(draft),
+        showCommandHint: shouldShowCommandHint(draft),
+        modelPicker: pickers.model,
+        sessionPicker: pickers.session,
+        fileMentionPicker: pickers.fileMention,
+      }),
+    });
+
+    return [
+      `Saved TUI snapshot at ${saved.capturedAt}.`,
+      `Text: ${saved.txtPath}`,
+      `ANSI: ${saved.ansiPath}`,
+      `Metadata: ${saved.jsonPath}`,
+    ].join('\n');
+  }, [
+    runtime,
+    activeSessionId,
+    activeModel,
+    pendingApproval,
+    isRunning,
+    compacting,
+    activeSession,
+    contextStatus,
+    sessionFooter,
+    sessions,
+    messages,
+    activeTurn,
+    approvalChoice,
+    draft,
+    draftCursor,
+    pickers.model,
+    pickers.session,
+    pickers.fileMention,
+    renderedStatus,
+    statusHint,
+  ]);
+  const handlePromptSpecialKey = useCallback((event: Parameters<typeof pickers.handleSpecialKey>[0]) => {
+    if (pickers.handleSpecialKey(event)) {
+      return true;
+    }
+
+    if (!event.key.tab || draftCursor !== draft.length) {
+      return false;
+    }
+
+    const completed = autocompleteLocalCommand(draft, activeSession?.id ?? activeSessionId, sessions);
+    if (!completed || completed === draft) {
+      return false;
+    }
+
+    replaceDraft(completed);
+    return true;
+  }, [pickers, draftCursor, draft, activeSession, activeSessionId, sessions, replaceDraft]);
   const switchSession = (id: string) => {
     setActiveSessionId(id);
     clearDraft();
@@ -186,6 +294,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
     driftEnabled: drift.enabled,
     driftError: drift.error,
     setDriftEnabled: drift.setEnabled,
+    saveTuiSnapshotMessage,
     isRunning,
     pendingApproval,
     executeTurn,
@@ -207,12 +316,10 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
           </Text>
         </Text>
         <Text color={error ? 'red' : isRunning ? 'yellow' : 'green'}>
-          status={pendingApproval ? 'awaiting approval' : interruptRequested ? 'interrupt requested' : isRunning ? 'running' : status}
+          status={renderedStatus}
         </Text>
         <Text dimColor>
-          {pendingApproval ? '←/→ choose • Enter confirms • A remembers for this project • Esc denies • Ctrl+C exits'
-          : isRunning ? 'Type freely • Enter queues prompt • Esc requests stop after the current step • Ctrl+C exits'
-          : 'Enter sends • /help shows commands • !command runs shell • Ctrl+C exits'}
+          {statusHint}
         </Text>
       </Box>
 
@@ -226,7 +333,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
         paddingY={0}
       >
         <Text bold color={pendingApproval ? 'yellow' : undefined}>
-          {pendingApproval ? 'Approval Required' : isRunning ? `Working${workingFrames[workingFrame]}` : 'Prompt'}
+          {pendingApproval ? 'Approval Required' : compacting ? 'Compacting…' : isRunning ? `Working${workingFrames[workingFrame]}` : 'Prompt'}
         </Text>
         {pendingApproval ?
           <ApprovalComposer pendingApproval={pendingApproval} approvalChoice={approvalChoice} />
@@ -270,7 +377,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
                   maxVisibleLines={10}
                   onChange={setDraft}
                   onCursorChange={setDraftCursor}
-                  onSpecialKey={pickers.handleSpecialKey}
+                  onSpecialKey={handlePromptSpecialKey}
                   onSubmit={(value) => {
                     clearDraft();
                     void submitPrompt(value);

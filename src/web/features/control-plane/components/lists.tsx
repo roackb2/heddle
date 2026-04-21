@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import type { ChatSessionDetail, ChatTurnReview, ControlPlaneState } from '../../../lib/api';
-import { formatShortDate, short, toneFor, className } from '../utils';
+import { formatShortDate, short, toneFor, className, describeHeartbeatExecution } from '../utils';
 import { CodeBlock, EmptyState, Pill } from './common';
 
 export const SessionListButton = memo(function SessionListButton({
@@ -37,6 +37,7 @@ export const TaskListButton = memo(function TaskListButton({
   active: boolean;
   onClick: () => void;
 }) {
+  const execution = describeHeartbeatExecution(task);
   return (
     <button className={className('list-button', active && 'active')} type="button" onClick={onClick}>
       <div className="list-button-header">
@@ -45,7 +46,7 @@ export const TaskListButton = memo(function TaskListButton({
       </div>
       <div className="pills compact-pills">
         <Pill tone={task.enabled ? 'good' : undefined}>{task.enabled ? 'enabled' : 'disabled'}</Pill>
-        <Pill tone={toneFor(task.status)}>{task.status}</Pill>
+        <Pill tone={execution.tone}>{execution.label}</Pill>
       </div>
       <p className="button-copy">{short(task.task, 112)}</p>
     </button>

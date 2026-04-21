@@ -65,6 +65,7 @@ export function MobileChatScreen({
   const canSend = Boolean(selectedSessionId && !runActive && draft.trim());
   const canContinue = Boolean(selectedSessionId && !runActive && sessionDetail?.lastContinuePrompt);
   const title = sessionDetail?.name ?? activeSession?.name ?? 'Chat session';
+  const compacting = (sessionDetail?.context?.compactionStatus ?? activeSession?.context?.compactionStatus) === 'running';
   const [approvalSheetOpen, setApprovalSheetOpen] = useState(false);
 
   useEffect(() => {
@@ -105,6 +106,7 @@ export function MobileChatScreen({
         canSend={canSend}
         canContinue={canContinue}
         pendingApproval={pendingApproval}
+        compacting={compacting}
         onOpenApprovalSheet={() => setApprovalSheetOpen(true)}
         sendPromptError={sendPromptError}
         sessionNotice={sessionNotice}
@@ -138,6 +140,7 @@ type MobileComposerProps = {
   canSend: boolean;
   canContinue: boolean;
   pendingApproval: MobileChatScreenProps['pendingApproval'];
+  compacting?: boolean;
   onOpenApprovalSheet: () => void;
   sendPromptError?: string;
   sessionNotice?: string;
@@ -158,6 +161,7 @@ function MobileComposer({
   canSend,
   canContinue,
   pendingApproval,
+  compacting,
   onOpenApprovalSheet,
   sendPromptError,
   sessionNotice,
@@ -169,7 +173,7 @@ function MobileComposer({
   onContinueSession,
   onCancelSessionRun,
 }: MobileComposerProps) {
-  const status = sendPromptError ?? sessionNotice;
+  const status = compacting ? 'Compacting earlier conversation history into an archive summary.' : sendPromptError ?? sessionNotice;
 
   return (
     <footer className="relative shrink-0 border-t border-border bg-card px-2 py-2">

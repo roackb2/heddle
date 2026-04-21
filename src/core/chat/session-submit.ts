@@ -7,7 +7,7 @@ import {
   runAgentLoop,
 } from '../../index.js';
 import type { ToolCall, ToolDefinition } from '../../index.js';
-import { compactChatHistory, estimateChatHistoryTokens } from './compaction.js';
+import { buildCompactionRunningContext, compactChatHistoryWithArchive, estimateChatHistoryTokens } from './compaction.js';
 import { buildConversationMessages } from './conversation-lines.js';
 import { formatChatFailureMessage } from './failure-messages.js';
 import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
@@ -24,7 +24,9 @@ export type SubmitChatSessionPromptArgs = {
   sessionStoragePath: string;
   sessionId: string;
   prompt: string;
+  apiKey?: string;
   onEvent?: (event: AgentLoopEvent) => void;
+  onCompactionStatus?: (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; summaryPath?: string; error?: string }) => void;
   approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
   abortSignal?: AbortSignal;
 };
@@ -38,7 +40,7 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
 
   const model = session.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
   const provider = inferProviderFromModel(model);
-  const apiKey = resolveApiKeyForModel(model);
+  const apiKey = args.apiKey ?? resolveApiKeyForModel(model);
   if (!apiKey) {
     throw new Error(`Missing provider API key for ${provider}`);
   }
@@ -53,6 +55,50 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
     includePlanTool: true,
   });
 
+  const preflightCompacted = await compactChatHistoryWithArchive({
+    history: session.history,
+    model,
+    sessionId: session.id,
+    stateRoot: args.stateRoot,
+    toolNames: tools.map((tool) => tool.name),
+    goal: args.prompt,
+    onStatusChange: (event) => {
+      args.onCompactionStatus?.(event);
+      if (event.status === 'running') {
+        const compactionSeed = touchSession({
+          ...session,
+          context: buildCompactionRunningContext({
+            history: session.history,
+            previous: session.context,
+            archiveCount: session.archives?.length,
+            currentSummaryPath: session.context?.currentSummaryPath,
+            lastArchivePath: event.archivePath,
+          }),
+        });
+        saveChatSessions(
+          args.sessionStoragePath,
+          sessions.map((candidate) => candidate.id === session.id ? compactionSeed : candidate),
+        );
+      }
+    },
+  });
+  const preflightSession =
+    preflightCompacted.history !== session.history || preflightCompacted.archives.length !== (session.archives?.length ?? 0) ?
+      touchSession({
+        ...session,
+        history: preflightCompacted.history,
+        context: preflightCompacted.context,
+        archives: preflightCompacted.archives,
+        messages: buildConversationMessages(preflightCompacted.history),
+      })
+    : session;
+  if (preflightSession !== session) {
+    saveChatSessions(
+      args.sessionStoragePath,
+      sessions.map((candidate) => candidate.id === session.id ? preflightSession : candidate),
+    );
+  }
+
   const result = await runAgentLoop({
     goal: args.prompt,
     model,
@@ -63,18 +109,40 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
     llm,
     tools,
     includeDefaultTools: false,
-    history: session.history,
+    history: preflightSession.history,
     onEvent: args.onEvent,
     approveToolCall: args.approveToolCall,
     abortSignal: args.abortSignal,
   });
 
-  const compacted = compactChatHistory({
+  const compacted = await compactChatHistoryWithArchive({
     history: result.transcript,
     model,
+    sessionId: session.id,
+    stateRoot: args.stateRoot,
     usage: result.usage,
     toolNames: tools.map((tool) => tool.name),
     goal: args.prompt,
+    onStatusChange: (event) => {
+      args.onCompactionStatus?.(event);
+      if (event.status === 'running') {
+        const compactionSeed = touchSession({
+          ...preflightSession,
+          history: result.transcript,
+          context: buildCompactionRunningContext({
+            history: result.transcript,
+            previous: preflightSession.context,
+            archiveCount: preflightSession.archives?.length,
+            currentSummaryPath: preflightSession.context?.currentSummaryPath,
+            lastArchivePath: event.archivePath,
+          }),
+        });
+        saveChatSessions(
+          args.sessionStoragePath,
+          sessions.map((candidate) => candidate.id === session.id ? compactionSeed : candidate),
+        );
+      }
+    },
   });
   const traceFile = saveTrace(join(args.stateRoot, 'traces'), result.trace);
   const nextTurn = {
@@ -96,12 +164,13 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
     : result.summary;
 
   const updatedSession: ChatSession = touchSession({
-    ...session,
+    ...preflightSession,
     lastContinuePrompt: args.prompt,
     history: compacted.history,
     context: compacted.context,
+    archives: compacted.archives,
     messages: buildConversationMessages(compacted.history),
-    turns: [...session.turns, nextTurn].slice(-8),
+    turns: [...preflightSession.turns, nextTurn].slice(-8),
   });
 
   const nextSessions = sessions.map((candidate) => candidate.id === session.id ? updatedSession : candidate);

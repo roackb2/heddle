@@ -1,5 +1,5 @@
 import type { ControlPlaneState } from '../../../lib/api';
-import { formatDate, formatInterval, formatUsage, toneFor } from '../utils';
+import { describeHeartbeatExecution, formatDate, formatInterval, formatUsage, toneFor } from '../utils';
 import { EmptyState, Pill, SideSection, WorkspaceSectionHeader } from './common';
 import { RunListButton, TaskListButton } from './lists';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -15,6 +15,13 @@ export type HeartbeatWorkspaceProps = {
   selectedRunId?: string;
   onSelectRun: (runId: string) => void;
   selectedTaskRuns: ControlPlaneState['heartbeat']['runs'];
+  pendingTaskAction?: {
+    taskId: string;
+    action: 'enable' | 'disable' | 'trigger';
+  };
+  onEnableTask: (taskId: string) => Promise<void>;
+  onDisableTask: (taskId: string) => Promise<void>;
+  onTriggerTask: (taskId: string) => Promise<void>;
 };
 
 export function HeartbeatWorkspace({
@@ -27,6 +34,10 @@ export function HeartbeatWorkspace({
   selectedRunId,
   onSelectRun,
   selectedTaskRuns,
+  pendingTaskAction,
+  onEnableTask,
+  onDisableTask,
+  onTriggerTask,
 }: HeartbeatWorkspaceProps) {
   const isMobile = useIsMobile();
 
@@ -41,9 +52,17 @@ export function HeartbeatWorkspace({
         selectedRunId={selectedRunId}
         onSelectRun={onSelectRun}
         selectedTaskRuns={selectedTaskRuns}
+        pendingTaskAction={pendingTaskAction}
+        onEnableTask={onEnableTask}
+        onDisableTask={onDisableTask}
+        onTriggerTask={onTriggerTask}
       />
     );
   }
+
+  const isTaskBusy =
+    Boolean(selectedTask && pendingTaskAction && pendingTaskAction.taskId === selectedTask.taskId);
+  const selectedTaskExecution = selectedTask ? describeHeartbeatExecution(selectedTask) : undefined;
 
   return (
     <section className="workspace-shell tasks-shell">
@@ -73,7 +92,7 @@ export function HeartbeatWorkspace({
           actions={selectedTask ? (
             <div className="pills">
               <Pill tone={selectedTask.enabled ? 'good' : undefined}>{selectedTask.enabled ? 'enabled' : 'disabled'}</Pill>
-              <Pill tone={toneFor(selectedTask.status)}>{selectedTask.status}</Pill>
+              <Pill tone={selectedTaskExecution?.tone}>{selectedTaskExecution?.label ?? selectedTask.status}</Pill>
               {selectedTask.decision ? <Pill tone={toneFor(selectedTask.decision)}>{selectedTask.decision}</Pill> : null}
             </div>
           ) : undefined}
@@ -85,11 +104,47 @@ export function HeartbeatWorkspace({
               <div className="detail-card">
                 <p className="section-label">Task prompt</p>
                 <p className="summary">{selectedTask.task}</p>
+                <div className="pills approval-actions">
+                  <button
+                    type="button"
+                    className="sidebar-action-button"
+                    disabled={isTaskBusy || !selectedTask.enabled}
+                    onClick={() => {
+                      void onTriggerTask(selectedTask.taskId);
+                    }}
+                  >
+                    {isTaskBusy && pendingTaskAction?.action === 'trigger' ? 'Triggering…' : 'Run now'}
+                  </button>
+                  {selectedTask.enabled ?
+                    <button
+                      type="button"
+                      className="sidebar-action-button"
+                      disabled={isTaskBusy}
+                      onClick={() => {
+                        void onDisableTask(selectedTask.taskId);
+                      }}
+                    >
+                      {isTaskBusy && pendingTaskAction?.action === 'disable' ? 'Pausing…' : 'Pause task'}
+                    </button>
+                  : <button
+                      type="button"
+                      className="sidebar-action-button"
+                      disabled={isTaskBusy}
+                      onClick={() => {
+                        void onEnableTask(selectedTask.taskId);
+                      }}
+                    >
+                      {isTaskBusy && pendingTaskAction?.action === 'enable' ? 'Resuming…' : 'Resume task'}
+                    </button>
+                  }
+                </div>
+                <p className="summary">{selectedTaskExecution?.detail}</p>
               </div>
 
               <div className="detail-card">
                 <p className="section-label">Runtime status</p>
                 <div className="kv-list">
+                  <div><span className="kv-key">execution</span><span className="kv-value">{selectedTaskExecution?.label ?? selectedTask.status}</span></div>
                   <div><span className="kv-key">model</span><span className="kv-value">{selectedTask.model ?? 'unset'}</span></div>
                   <div><span className="kv-key">interval</span><span className="kv-value">{formatInterval(selectedTask.intervalMs)}</span></div>
                   <div><span className="kv-key">last run</span><span className="kv-value">{formatDate(selectedTask.lastRunAt)}</span></div>

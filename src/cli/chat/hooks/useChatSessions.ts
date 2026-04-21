@@ -58,7 +58,7 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
     });
     setSessions([fallback]);
     setActiveSessionId(fallback.id);
-  }, [apiKeyPresent, sessions]);
+  }, [apiKeyPresent, defaultModel, sessions]);
 
   const activeSession = useMemo(
     () => sessions.find((session) => session.id === activeSessionId) ?? sessions[0],

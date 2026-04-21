@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { ControlPlaneState } from '../../../lib/api';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
-import { formatDate, formatInterval, formatUsage, toneFor } from '../utils';
+import { describeHeartbeatExecution, formatDate, formatInterval, formatUsage } from '../utils';
 
 type HeartbeatTask = ControlPlaneState['heartbeat']['tasks'][number];
 type HeartbeatRun = ControlPlaneState['heartbeat']['runs'][number];
@@ -17,6 +17,13 @@ type MobileTasksScreenProps = {
   selectedRunId?: string;
   onSelectRun: (runId: string) => void;
   selectedTaskRuns: HeartbeatRun[];
+  pendingTaskAction?: {
+    taskId: string;
+    action: 'enable' | 'disable' | 'trigger';
+  };
+  onEnableTask: (taskId: string) => Promise<void>;
+  onDisableTask: (taskId: string) => Promise<void>;
+  onTriggerTask: (taskId: string) => Promise<void>;
 };
 
 type MobileTaskView = 'list' | 'detail' | 'runs';
@@ -30,8 +37,14 @@ export function MobileTasksScreen({
   selectedRunId,
   onSelectRun,
   selectedTaskRuns,
+  pendingTaskAction,
+  onEnableTask,
+  onDisableTask,
+  onTriggerTask,
 }: MobileTasksScreenProps) {
   const [view, setView] = useState<MobileTaskView>(selectedTaskId ? 'detail' : 'list');
+  const isTaskBusy = Boolean(selectedTask && pendingTaskAction && pendingTaskAction.taskId === selectedTask.taskId);
+  const selectedTaskExecution = selectedTask ? describeHeartbeatExecution(selectedTask) : undefined;
 
   useEffect(() => {
     if (!selectedTaskId) {
@@ -52,7 +65,9 @@ export function MobileTasksScreen({
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
           {tasks.length ?
             <div className="space-y-2">
-              {tasks.map((task) => (
+              {tasks.map((task) => {
+                const execution = describeHeartbeatExecution(task);
+                return (
                 <button
                   key={task.taskId}
                   type="button"
@@ -68,12 +83,13 @@ export function MobileTasksScreen({
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1">
                     <Badge variant={task.enabled ? 'secondary' : 'outline'}>{task.enabled ? 'enabled' : 'disabled'}</Badge>
-                    <Badge variant="outline">{task.status}</Badge>
+                    <Badge variant="outline">{execution.label}</Badge>
                     {task.decision ? <Badge variant="outline">{task.decision}</Badge> : null}
                   </div>
                   <p className="m-0 mt-2 text-xs text-muted-foreground">{task.task}</p>
                 </button>
-              ))}
+                );
+              })}
             </div>
           : <MobileEmptyState title="No tasks" body="Add a heartbeat task in the CLI, then manage it from here." />}
         </div>
@@ -165,14 +181,53 @@ export function MobileTasksScreen({
             <MobileCard title={selectedTask.name || selectedTask.taskId}>
               <div className="flex flex-wrap gap-1">
                 <Badge variant={selectedTask.enabled ? 'secondary' : 'outline'}>{selectedTask.enabled ? 'enabled' : 'disabled'}</Badge>
-                <Badge variant={toneFor(selectedTask.status) === 'good' ? 'secondary' : 'outline'}>{selectedTask.status}</Badge>
+                <Badge variant={selectedTaskExecution?.tone === 'good' ? 'secondary' : 'outline'}>{selectedTaskExecution?.label ?? selectedTask.status}</Badge>
                 {selectedTask.decision ? <Badge variant="outline">{selectedTask.decision}</Badge> : null}
               </div>
               <p className="m-0 mt-2 text-xs text-muted-foreground">{selectedTask.taskId}</p>
               <p className="m-0 mt-2 text-sm text-foreground">{selectedTask.task}</p>
+              <p className="m-0 mt-2 text-xs text-muted-foreground">{selectedTaskExecution?.detail}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={isTaskBusy || !selectedTask.enabled}
+                  onClick={() => {
+                    void onTriggerTask(selectedTask.taskId);
+                  }}
+                >
+                  {isTaskBusy && pendingTaskAction?.action === 'trigger' ? 'Triggering…' : 'Run now'}
+                </Button>
+                {selectedTask.enabled ?
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isTaskBusy}
+                    onClick={() => {
+                      void onDisableTask(selectedTask.taskId);
+                    }}
+                  >
+                    {isTaskBusy && pendingTaskAction?.action === 'disable' ? 'Pausing…' : 'Pause task'}
+                  </Button>
+                : <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isTaskBusy}
+                    onClick={() => {
+                      void onEnableTask(selectedTask.taskId);
+                    }}
+                  >
+                    {isTaskBusy && pendingTaskAction?.action === 'enable' ? 'Resuming…' : 'Resume task'}
+                  </Button>
+                }
+              </div>
             </MobileCard>
 
             <MobileCard title="Runtime status">
+              <SummaryRow label="execution" value={selectedTaskExecution?.label ?? selectedTask.status} />
               <SummaryRow label="model" value={selectedTask.model ?? 'unset'} />
               <SummaryRow label="interval" value={formatInterval(selectedTask.intervalMs)} />
               <SummaryRow label="last run" value={formatDate(selectedTask.lastRunAt)} />

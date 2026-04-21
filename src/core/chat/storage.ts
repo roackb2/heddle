@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { ChatMessage } from '../../index.js';
-import type { ChatContextStats, ChatSession, ConversationLine, TurnSummary } from './types.js';
+import type { ChatArchiveRecord, ChatContextStats, ChatSession, ConversationLine, TurnSummary } from './types.js';
 import { truncate } from '../utils/text.js';
 
 type ChatSessionCatalogEntry = {
@@ -13,6 +13,7 @@ type ChatSessionCatalogEntry = {
   driftEnabled?: boolean;
   lastContinuePrompt?: string;
   context?: ChatContextStats;
+  archives?: ChatArchiveRecord[];
 };
 
 type ChatSessionCatalog = {
@@ -58,6 +59,7 @@ export function createChatSession(options: {
     driftEnabled: true,
     lastContinuePrompt: undefined,
     context: undefined,
+    archives: [],
   };
 }
 
@@ -246,6 +248,7 @@ function parseCatalogEntry(value: unknown): ChatSessionCatalogEntry[] {
     driftEnabled: typeof candidate.driftEnabled === 'boolean' ? candidate.driftEnabled : true,
     lastContinuePrompt: typeof candidate.lastContinuePrompt === 'string' ? candidate.lastContinuePrompt : undefined,
     context: isChatContextStats(candidate.context) ? candidate.context : undefined,
+    archives: Array.isArray(candidate.archives) ? candidate.archives.flatMap(parseArchiveRecord) : undefined,
   }];
 }
 
@@ -259,6 +262,7 @@ function projectCatalogEntry(session: ChatSession): ChatSessionCatalogEntry {
     driftEnabled: session.driftEnabled,
     lastContinuePrompt: session.lastContinuePrompt,
     context: session.context,
+    archives: session.archives,
   };
 }
 
@@ -288,6 +292,7 @@ function readSessionFile(
       driftEnabled: entry.driftEnabled,
       lastContinuePrompt: entry.lastContinuePrompt,
       context: entry.context,
+      archives: entry.archives,
       history: Array.isArray(payload.history) ? payload.history as ChatMessage[] : [],
       messages:
         Array.isArray(payload.messages) && payload.messages.length > 0 ?
@@ -333,6 +338,7 @@ function serializeSessionBody(session: ChatSession): string {
     history: session.history,
     messages: session.messages,
     turns: session.turns,
+    archives: session.archives,
   }, null, 2)}\n`;
 }
 
@@ -431,6 +437,7 @@ function parseSavedSession(value: unknown, apiKeyPresent: boolean): ChatSession[
     driftEnabled: typeof candidate.driftEnabled === 'boolean' ? candidate.driftEnabled : true,
     lastContinuePrompt: typeof candidate.lastContinuePrompt === 'string' ? candidate.lastContinuePrompt : undefined,
     context: isChatContextStats(candidate.context) ? candidate.context : undefined,
+    archives: Array.isArray(candidate.archives) ? candidate.archives.flatMap(parseArchiveRecord) : undefined,
   }];
 }
 
@@ -480,8 +487,40 @@ function isChatContextStats(value: unknown): value is ChatContextStats {
     (candidate.cachedInputTokens === undefined || typeof candidate.cachedInputTokens === 'number') &&
     (candidate.reasoningTokens === undefined || typeof candidate.reasoningTokens === 'number') &&
     (candidate.compactedMessages === undefined || typeof candidate.compactedMessages === 'number') &&
-    (candidate.compactedAt === undefined || typeof candidate.compactedAt === 'string')
+    (candidate.compactedAt === undefined || typeof candidate.compactedAt === 'string') &&
+    (candidate.compactionStatus === undefined || candidate.compactionStatus === 'idle' || candidate.compactionStatus === 'running' || candidate.compactionStatus === 'failed') &&
+    (candidate.compactionError === undefined || typeof candidate.compactionError === 'string') &&
+    (candidate.archiveCount === undefined || typeof candidate.archiveCount === 'number') &&
+    (candidate.currentSummaryPath === undefined || typeof candidate.currentSummaryPath === 'string') &&
+    (candidate.lastArchivePath === undefined || typeof candidate.lastArchivePath === 'string')
   );
+}
+
+function parseArchiveRecord(value: unknown): ChatArchiveRecord[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return [];
+  }
+
+  const candidate = value as Partial<ChatArchiveRecord>;
+  if (
+    typeof candidate.id !== 'string'
+    || typeof candidate.path !== 'string'
+    || typeof candidate.summaryPath !== 'string'
+    || typeof candidate.messageCount !== 'number'
+    || typeof candidate.createdAt !== 'string'
+  ) {
+    return [];
+  }
+
+  return [{
+    id: candidate.id,
+    path: candidate.path,
+    summaryPath: candidate.summaryPath,
+    shortDescription: typeof candidate.shortDescription === 'string' ? candidate.shortDescription : undefined,
+    messageCount: candidate.messageCount,
+    createdAt: candidate.createdAt,
+    summaryModel: typeof candidate.summaryModel === 'string' ? candidate.summaryModel : undefined,
+  }];
 }
 
 function readObjectRecord(value: unknown): Record<string, unknown> | undefined {

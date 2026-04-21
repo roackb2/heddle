@@ -22,6 +22,7 @@ export type SessionRunningState = RouterOutputs['controlPlane']['sessionRunning'
 export type WorkspaceFileSuggestion = RouterOutputs['controlPlane']['workspaceFileSearch']['files'][number];
 export type ModelOptions = RouterOutputs['controlPlane']['modelOptions'];
 export type SavedLayoutSnapshot = RouterOutputs['controlPlane']['layoutSnapshotSave'];
+export type HeartbeatTaskMutationResult = RouterOutputs['controlPlane']['heartbeatTaskEnable'];
 
 export async function fetchControlPlaneState(): Promise<ControlPlaneState> {
   return await trpc.controlPlane.state.query();
@@ -85,6 +86,18 @@ export async function fetchWorkspaceFileSuggestions(query: string): Promise<Work
 
 export async function saveLayoutSnapshot(snapshot: unknown): Promise<SavedLayoutSnapshot> {
   return await trpc.controlPlane.layoutSnapshotSave.mutate({ snapshot });
+}
+
+export async function enableHeartbeatTask(taskId: string): Promise<HeartbeatTaskMutationResult> {
+  return await trpc.controlPlane.heartbeatTaskEnable.mutate({ taskId });
+}
+
+export async function disableHeartbeatTask(taskId: string): Promise<HeartbeatTaskMutationResult> {
+  return await trpc.controlPlane.heartbeatTaskDisable.mutate({ taskId });
+}
+
+export async function triggerHeartbeatTask(taskId: string): Promise<HeartbeatTaskMutationResult> {
+  return await trpc.controlPlane.heartbeatTaskTrigger.mutate({ taskId });
 }
 
 type SessionEventEnvelope = {

@@ -5,10 +5,14 @@ import type { ConversationLine } from './types.js';
 export function buildConversationMessages(history: ChatMessage[]): ConversationLine[] {
   return history.flatMap((message, index) => {
     if (isCompactedHistorySummary(message)) {
+      const archiveRootMatch = message.content.match(/Archive root:\s*(.+)/);
       return [{
         id: `compacted-${index}`,
         role: 'assistant',
-        text: 'Earlier conversation history was compacted to preserve context for longer chats.',
+        text:
+          archiveRootMatch ?
+            `Earlier conversation history was summarized and archived. Raw transcript remains available in ${archiveRootMatch[1]}.`
+          : 'Earlier conversation history was summarized and archived for longer chats.',
       }];
     }
 

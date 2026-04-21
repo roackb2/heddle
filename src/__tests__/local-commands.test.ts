@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { getLocalCommandHints, isLikelyLocalCommand, runLocalCommand } from '../cli/chat/state/local-commands.js';
+import { autocompleteLocalCommand, getLocalCommandHints, isLikelyLocalCommand, runLocalCommand } from '../cli/chat/state/local-commands.js';
 
 function createCommandArgs(overrides: Partial<Parameters<typeof runLocalCommand>[0]> = {}): Parameters<typeof runLocalCommand>[0] {
   return {
@@ -171,6 +171,32 @@ describe('runLocalCommand', () => {
     });
   });
 
+  it('saves a TUI snapshot when requested', async () => {
+    const saveTuiSnapshot = vi.fn(
+      () =>
+        'Saved TUI snapshot at 2026-04-21T00:00:00.000Z.\n'
+        + 'Text: /tmp/snapshot.txt\n'
+        + 'ANSI: /tmp/snapshot.ansi\n'
+        + 'Metadata: /tmp/snapshot.json',
+    );
+
+    const result = await runLocalCommand(createCommandArgs({
+      prompt: '/debug tui-snapshot',
+      saveTuiSnapshot,
+    }));
+
+    expect(saveTuiSnapshot).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      handled: true,
+      kind: 'message',
+      message:
+        'Saved TUI snapshot at 2026-04-21T00:00:00.000Z.\n'
+        + 'Text: /tmp/snapshot.txt\n'
+        + 'ANSI: /tmp/snapshot.ansi\n'
+        + 'Metadata: /tmp/snapshot.json',
+    });
+  });
+
   it('toggles drift detection commands', async () => {
     const setDriftEnabled = vi.fn();
     const enabled = await runLocalCommand(createCommandArgs({
@@ -209,10 +235,37 @@ describe('runLocalCommand', () => {
       command: '/drift',
       description: 'show CyberLoop semantic drift detection status',
     });
+    expect(hints).toContainEqual({
+      command: '/debug tui-snapshot',
+      description: 'save the latest rendered TUI frame for inspection',
+    });
+  });
+
+  it('autocompletes command roots and subcommands with tab-friendly spacing', () => {
+    expect(autocompleteLocalCommand('/m', 'session-1', [])).toBe('/model ');
+    expect(autocompleteLocalCommand('/model s', 'session-1', [])).toBe('/model set ');
+    expect(autocompleteLocalCommand('/session sw', 'session-1', [])).toBe('/session switch ');
+  });
+
+  it('autocompletes concrete session switch targets from matching session ids', () => {
+    const sessions = [
+      { id: 'session-a', name: 'A', history: [], messages: [], turns: [], createdAt: '2024-01-01', updatedAt: '2024-01-01' },
+      { id: 'session-b', name: 'B', history: [], messages: [], turns: [], createdAt: '2024-01-02', updatedAt: '2024-01-02' },
+    ];
+
+    expect(autocompleteLocalCommand('/session switch session-a', 'session-a', sessions)).toBeUndefined();
+    expect(autocompleteLocalCommand('/session switch s', 'session-a', sessions)).toBe('/session switch session-');
+    expect(autocompleteLocalCommand('/session switch session-a', 'session-b', sessions)).toBeUndefined();
+  });
+
+  it('does not autocomplete non-commands or already-maximal ambiguous prefixes', () => {
+    expect(autocompleteLocalCommand('hello', 'session-1', [])).toBeUndefined();
+    expect(autocompleteLocalCommand('/heartbeat ', 'session-1', [])).toBeUndefined();
   });
 
   it('lists heartbeat tasks and can continue from the latest run', async () => {
-    const workspaceRoot = mkdirSync(join(tmpdir(), `heddle-chat-heartbeat-${Date.now()}`), { recursive: true });
+    const workspaceRoot = join(tmpdir(), `heddle-chat-heartbeat-${Date.now()}`);
+    mkdirSync(workspaceRoot, { recursive: true });
     const stateRoot = join(workspaceRoot, '.heddle');
     const heartbeatRoot = join(stateRoot, 'heartbeat');
     mkdirSync(join(heartbeatRoot, 'tasks'), { recursive: true });

@@ -34,6 +34,28 @@ export type ChatContextStats = {
   reasoningTokens?: number;
   compactedMessages?: number;
   compactedAt?: string;
+  compactionStatus?: 'idle' | 'running' | 'failed';
+  compactionError?: string;
+  archiveCount?: number;
+  currentSummaryPath?: string;
+  lastArchivePath?: string;
+};
+
+export type ChatArchiveRecord = {
+  id: string;
+  path: string;
+  summaryPath: string;
+  shortDescription?: string;
+  messageCount: number;
+  createdAt: string;
+  summaryModel?: string;
+};
+
+export type ChatArchiveManifest = {
+  version: 1;
+  sessionId: string;
+  currentSummaryPath?: string;
+  archives: ChatArchiveRecord[];
 };
 
 export type ChatSession = {
@@ -48,6 +70,7 @@ export type ChatSession = {
   driftEnabled?: boolean;
   lastContinuePrompt?: string;
   context?: ChatContextStats;
+  archives?: ChatArchiveRecord[];
 };
 
 export type PendingApproval = {

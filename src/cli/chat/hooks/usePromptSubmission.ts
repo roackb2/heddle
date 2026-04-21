@@ -30,6 +30,7 @@ export function usePromptSubmission({
   setDriftEnabled,
   executeTurn,
   executeDirectShellCommand,
+  saveTuiSnapshotMessage,
   isRunning,
   pendingApproval,
   mentionableFiles,
@@ -60,6 +61,7 @@ export function usePromptSubmission({
   setDriftEnabled: (enabled: boolean) => void;
   executeTurn: (prompt: string, displayText?: string, sessionIdOverride?: string) => Promise<void>;
   executeDirectShellCommand: (rawCommand: string) => Promise<void>;
+  saveTuiSnapshotMessage?: () => string;
   isRunning: boolean;
   pendingApproval: unknown;
   mentionableFiles: string[];
@@ -103,6 +105,16 @@ export function usePromptSubmission({
       messages: [...session.messages, message],
     }));
   }, [nextLocalId, updateActiveSession]);
+
+  const saveTuiSnapshot = useCallback(() => {
+    if (saveTuiSnapshotMessage) {
+      return saveTuiSnapshotMessage();
+    }
+
+    return 'TUI snapshots are not available in this runtime.';
+  }, [
+    saveTuiSnapshotMessage,
+  ]);
 
   const submitPrompt = useCallback(async (value: string, options?: { allowWhileRunning?: boolean }) => {
     const effectiveIsRunning = options?.allowWhileRunning ? false : isRunning;
@@ -158,6 +170,7 @@ export function usePromptSubmission({
       preparePrompt: preparePromptWithMentions,
       executeTurn,
       executeDirectShellCommand,
+      saveTuiSnapshot,
     };
 
     if (modelPicker.visible && modelPicker.highlighted) {
@@ -216,6 +229,7 @@ export function usePromptSubmission({
     preparePromptWithMentions,
     executeTurn,
     executeDirectShellCommand,
+    saveTuiSnapshot,
     modelPicker,
     sessionPicker,
     fileMentionPicker,

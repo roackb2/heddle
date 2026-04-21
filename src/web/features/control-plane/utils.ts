@@ -70,6 +70,75 @@ export function formatUsage(value: unknown): string | undefined {
   return parts.length ? parts.join(' • ') : undefined;
 }
 
+export function describeHeartbeatExecution(task: {
+  status?: string;
+  enabled: boolean;
+  nextRunAt?: string;
+}): { label: string; tone: 'good' | 'warn' | 'bad' | undefined; detail: string } {
+  if (task.status === 'running') {
+    return {
+      label: 'running now',
+      tone: 'good',
+      detail: 'The task is actively executing a heartbeat wake cycle.',
+    };
+  }
+
+  if (!task.enabled) {
+    return {
+      label: 'paused',
+      tone: 'warn',
+      detail: 'The task is disabled and will not run until resumed.',
+    };
+  }
+
+  if (task.status === 'complete') {
+    return {
+      label: 'finished',
+      tone: 'good',
+      detail: 'The task reached a terminal complete decision and stopped scheduling.',
+    };
+  }
+
+  if (task.status === 'blocked') {
+    return {
+      label: 'blocked',
+      tone: 'warn',
+      detail: 'The task escalated and is waiting for human follow-up.',
+    };
+  }
+
+  if (task.status === 'failed') {
+    return {
+      label: 'failed',
+      tone: 'bad',
+      detail: 'The last wake failed. It will retry according to the next run schedule.',
+    };
+  }
+
+  if (task.status === 'waiting') {
+    const nextRunAt = task.nextRunAt ? Date.parse(task.nextRunAt) : Number.NaN;
+    if (Number.isFinite(nextRunAt) && nextRunAt <= Date.now() + 1_000) {
+      return {
+        label: 'queued',
+        tone: 'warn',
+        detail: 'The task is queued and will start on the next worker poll.',
+      };
+    }
+
+    return {
+      label: 'scheduled',
+      tone: 'good',
+      detail: 'The task is waiting for its next scheduled wake time.',
+    };
+  }
+
+  return {
+    label: task.status ?? 'idle',
+    tone: toneFor(task.status),
+    detail: 'The task is currently idle.',
+  };
+}
+
 function readNumericField(record: Record<string, unknown>, keys: string[]): number | undefined {
   for (const key of keys) {
     const value = record[key];

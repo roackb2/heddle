@@ -99,6 +99,7 @@ export function SessionsWorkspace({
   const [activeMentionIndex, setActiveMentionIndex] = useState(0);
   const [mobileView, setMobileView] = useState<MobileView>('list');
   const runActive = sendingPrompt || runInFlight;
+  const compactionStatus = sessionDetail?.context?.compactionStatus ?? activeSession?.context?.compactionStatus;
   const workspaceStyle = {
     '--session-sidebar-width': `${panelWidths.left}px`,
     '--session-side-width': `${panelWidths.right}px`,
@@ -486,6 +487,7 @@ export function SessionsWorkspace({
                 </select>
               </label>
               <Pill>turns {activeSession.turnCount}</Pill>
+              {compactionStatus === 'running' ? <Pill tone="warn">compacting</Pill> : null}
               <button
                 className={className('drift-button', (sessionDetail?.driftEnabled ?? activeSession.driftEnabled) && 'active')}
                 type="button"
@@ -581,7 +583,8 @@ export function SessionsWorkspace({
           <div className="composer-footer">
             <div className="composer-status">
               <p className="muted">
-                {sendPromptError ? sendPromptError
+                {compactionStatus === 'running' ? 'Compacting earlier conversation history into an archive summary.'
+                : sendPromptError ? sendPromptError
                 : sessionNotice ? sessionNotice
                 : runActive ? 'Run in progress. Continue is disabled until this run settles; Cancel interrupts the active run.'
                 : sessionDetail?.lastContinuePrompt ? 'Enter sends. Option+Enter or Shift+Enter adds a new line.'

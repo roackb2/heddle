@@ -270,7 +270,38 @@ export function useSessionWorkspace(
         outcome?: string;
         summary?: string;
         event?: TraceEvent;
+        status?: 'running' | 'finished' | 'failed';
+        archivePath?: string;
+        summaryPath?: string;
+        error?: string;
       };
+
+      if (liveEvent.status === 'running') {
+        upsertLiveStatusMessage(
+          'live-run-status',
+          liveEvent.archivePath ? `Compacting earlier history… ${liveEvent.archivePath}` : 'Compacting earlier history…',
+          { pending: true, streaming: false },
+        );
+        return;
+      }
+
+      if (liveEvent.status === 'failed') {
+        upsertLiveStatusMessage(
+          'live-run-status',
+          liveEvent.error ? `Compaction failed: ${liveEvent.error}` : 'Compaction failed.',
+          { pending: false, streaming: false },
+        );
+        return;
+      }
+
+      if (liveEvent.status === 'finished') {
+        upsertLiveStatusMessage(
+          'live-run-status',
+          liveEvent.summaryPath ? `Compaction finished. Summary: ${liveEvent.summaryPath}` : 'Compaction finished.',
+          { pending: false, streaming: false },
+        );
+        return;
+      }
 
       if (liveEvent.type === 'loop.started') {
         setRunInFlight(true);

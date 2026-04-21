@@ -60,10 +60,21 @@ async function main() {
   program
     .command('ask [goal...]')
     .description('run a one-shot ask against the workspace')
-    .action(async (goalParts: string[]) => {
+    .option('--session <id>', 'continue a saved chat session by id')
+    .option('--latest', 'continue the most recently updated chat session')
+    .option('--new-session [name]', 'create a fresh chat session and run this ask inside it')
+    .action(async (goalParts: string[], askOptions: { session?: string; latest?: boolean; newSession?: string | boolean }) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      await runAskCli(goalParts.join(' ').trim(), resolved);
+      await runAskCli(goalParts.join(' ').trim(), {
+        ...resolved,
+        sessionId: askOptions.session,
+        latestSession: Boolean(askOptions.latest),
+        createSessionName:
+          askOptions.newSession === undefined || askOptions.newSession === false ? undefined
+          : askOptions.newSession === true ? ''
+          : askOptions.newSession,
+      });
     });
 
   program

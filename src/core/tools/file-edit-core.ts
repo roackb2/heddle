@@ -187,11 +187,6 @@ async function replaceScopedContent(input: ReplaceEditInput, targetPath: string,
   };
 }
 
-function isInsideRoot(rootPath: string, targetPath: string): boolean {
-  const rel = relative(rootPath, targetPath);
-  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
-}
-
 function countOccurrences(content: string, search: string): number {
   if (!search) {
     return 0;

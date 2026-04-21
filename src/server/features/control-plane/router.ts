@@ -16,7 +16,12 @@ import {
   updateControlPlaneChatSessionSettings,
 } from './services/chat-sessions.js';
 import { loadControlPlaneState } from './services/control-plane-state.js';
-import { listControlPlaneHeartbeatRuns, listControlPlaneHeartbeatTasks } from './services/heartbeat.js';
+import {
+  listControlPlaneHeartbeatRuns,
+  listControlPlaneHeartbeatTasks,
+  setControlPlaneHeartbeatTaskEnabled,
+  triggerControlPlaneHeartbeatTaskRun,
+} from './services/heartbeat.js';
 import { saveControlPlaneLayoutSnapshot } from './services/layout-snapshots.js';
 import { searchWorkspaceFiles } from './services/workspace-files.js';
 
@@ -54,6 +59,10 @@ const heartbeatRunsInputSchema = z.object({
   taskId: z.string().min(1).optional(),
   limit: z.number().int().min(1).max(100).optional(),
 }).optional();
+
+const heartbeatTaskInputSchema = z.object({
+  taskId: z.string().min(1),
+});
 
 const fileSearchInputSchema = z.object({
   query: z.string().max(200).optional(),
@@ -145,6 +154,21 @@ export const controlPlaneRouter = router({
         taskId: input?.taskId,
         limit: input?.limit ?? 20,
       }),
+    };
+  }),
+  heartbeatTaskEnable: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
+    return {
+      task: await setControlPlaneHeartbeatTaskEnabled(ctx.stateRoot, input.taskId, true),
+    };
+  }),
+  heartbeatTaskDisable: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
+    return {
+      task: await setControlPlaneHeartbeatTaskEnabled(ctx.stateRoot, input.taskId, false),
+    };
+  }),
+  heartbeatTaskTrigger: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
+    return {
+      task: await triggerControlPlaneHeartbeatTaskRun(ctx.stateRoot, input.taskId),
     };
   }),
   workspaceFileSearch: procedure.input(fileSearchInputSchema).query(async ({ ctx, input }) => {

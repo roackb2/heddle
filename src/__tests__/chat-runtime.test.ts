@@ -6,7 +6,7 @@ import { executeAgentTurn } from '../cli/chat/hooks/useAgentRun.js';
 import type { ChatSession } from '../cli/chat/state/types.js';
 import { resolveApiKeyForModel, resolveChatRuntimeConfig } from '../cli/chat/utils/runtime.js';
 import { createLogger } from '../core/utils/logger.js';
-import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../index.js';
+import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../index.js';
 
 describe('resolveChatRuntimeConfig', () => {
   afterEach(() => {

@@ -1,6 +1,10 @@
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ChatMessage } from '../llm/types.js';
-import { compactChatHistory, isCompactedHistorySummary } from '../cli/chat/state/compaction.js';
+import type { LlmAdapter } from '../llm/types.js';
+import { compactChatHistory, compactChatHistoryWithArchive, isCompactedHistorySummary } from '../cli/chat/state/compaction.js';
 import { buildConversationMessages } from '../cli/chat/utils/format.js';
 
 describe('chat history compaction', () => {
@@ -23,7 +27,7 @@ describe('chat history compaction', () => {
     expect(compacted.context.compactedMessages).toBeGreaterThan(0);
 
     const visibleMessages = buildConversationMessages(compacted.history);
-    expect(visibleMessages[0]?.text).toContain('Earlier conversation history was compacted');
+    expect(visibleMessages[0]?.text).toContain('Earlier conversation history was summarized and archived');
   });
 
   it('can force a single manual compaction pass even before the auto threshold is exceeded', () => {
@@ -69,5 +73,117 @@ describe('chat history compaction', () => {
     expect(compacted.history.length).toBeLessThan(history.length);
     expect(isCompactedHistorySummary(compacted.history[0]!)).toBe(true);
     expect(compacted.context.compactedMessages).toBeGreaterThan(0);
+  });
+
+  it('archives compacted messages and writes a rolling summary', async () => {
+    const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-chat-compaction-archive-'));
+    const history: ChatMessage[] = Array.from({ length: 24 }).flatMap((_, index) => [
+      { role: 'user' as const, content: `User prompt ${index}: ${'u'.repeat(1_000)}` },
+      { role: 'assistant' as const, content: `Assistant reply ${index}: ${'a'.repeat(1_000)}` },
+    ]);
+    const llm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-5.1-codex-mini',
+        capabilities: {
+          toolCalls: false,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: false,
+        },
+      },
+      async chat() {
+        return {
+          content: [
+            '# Compacted Conversation Rolling Summary',
+            '## Work Completed',
+            '- Added archive-backed compaction.',
+            '## High-Fidelity Details Worth Retrieving',
+            '- Read the raw archive if exact tool output matters.',
+          ].join('\n'),
+        };
+      },
+    };
+
+    const compacted = await compactChatHistoryWithArchive({
+      history,
+      model: 'gpt-5.1',
+      sessionId: 'session-archive',
+      stateRoot,
+      force: true,
+      summarizer: { llm },
+    });
+
+    expect(compacted.archives).toHaveLength(1);
+    expect(compacted.history[0]?.role).toBe('system');
+    expect(compacted.history[0]?.content).toContain('.heddle/chat-sessions/session-archive/archives');
+    expect(compacted.context.compactionStatus).toBe('idle');
+    expect(compacted.context.archiveCount).toBe(1);
+    expect(compacted.context.currentSummaryPath).toBe(compacted.archives[0]?.summaryPath);
+
+    const archivePath = join(stateRoot, 'chat-sessions', 'session-archive', 'archives');
+    expect(existsSync(join(archivePath, 'manifest.json'))).toBe(true);
+    expect(readFileSync(join(archivePath, 'manifest.json'), 'utf8')).toContain('"sessionId": "session-archive"');
+    expect(readFileSync(join(archivePath, 'manifest.json'), 'utf8')).toContain(compacted.archives[0]!.id);
+    expect(readFileSync(join(archivePath, `${compacted.archives[0]!.id}.summary.md`), 'utf8')).toContain(
+      '# Compacted Conversation Rolling Summary',
+    );
+  });
+
+  it('carries forward the rolling summary across repeated compactions', async () => {
+    const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-chat-compaction-repeat-'));
+    const firstHistory: ChatMessage[] = Array.from({ length: 18 }).flatMap((_, index) => [
+      { role: 'user' as const, content: `First user ${index}: ${'u'.repeat(1_000)}` },
+      { role: 'assistant' as const, content: `First assistant ${index}: ${'a'.repeat(1_000)}` },
+    ]);
+    const secondHistory: ChatMessage[] = Array.from({ length: 18 }).flatMap((_, index) => [
+      { role: 'user' as const, content: `Second user ${index}: ${'u'.repeat(1_000)}` },
+      { role: 'assistant' as const, content: `Second assistant ${index}: ${'a'.repeat(1_000)}` },
+    ]);
+    const llmCalls: string[] = [];
+    const llm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-5.1-codex-mini',
+        capabilities: {
+          toolCalls: false,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: false,
+        },
+      },
+      async chat(messages) {
+        llmCalls.push(messages[1]?.content ?? '');
+        return {
+          content: [
+            '# Compacted Conversation Rolling Summary',
+            `## Work Completed`,
+            `- Summary call ${llmCalls.length}.`,
+          ].join('\n'),
+        };
+      },
+    };
+
+    await compactChatHistoryWithArchive({
+      history: firstHistory,
+      model: 'gpt-5.1',
+      sessionId: 'session-repeat',
+      stateRoot,
+      force: true,
+      summarizer: { llm },
+    });
+    const compactedAgain = await compactChatHistoryWithArchive({
+      history: secondHistory,
+      model: 'gpt-5.1',
+      sessionId: 'session-repeat',
+      stateRoot,
+      force: true,
+      summarizer: { llm },
+    });
+
+    expect(compactedAgain.archives).toHaveLength(2);
+    expect(llmCalls).toHaveLength(2);
+    expect(llmCalls[1]).toContain('Summary call 1.');
+    expect(compactedAgain.history[0]?.content).toContain('Archive index:');
   });
 });

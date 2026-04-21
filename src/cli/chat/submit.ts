@@ -1,5 +1,5 @@
 import { runLocalCommand } from './state/local-commands.js';
-import { compactChatHistory } from './state/compaction.js';
+import { buildCompactionRunningContext, compactChatHistoryWithArchive } from './state/compaction.js';
 import { createInitialMessages } from './state/storage.js';
 import type { ChatSession, ConversationLine } from './state/types.js';
 import { buildConversationMessages, normalizeInlineText } from './utils/format.js';
@@ -37,6 +37,7 @@ type SubmitChatPromptArgs = {
   preparePrompt?: (prompt: string) => { prompt: string; displayText?: string };
   executeTurn: (prompt: string, displayText?: string, sessionIdOverride?: string) => Promise<void>;
   executeDirectShellCommand: (rawCommand: string) => Promise<void>;
+  saveTuiSnapshot?: () => Promise<string> | string;
 };
 
 export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void> {
@@ -76,30 +77,54 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
         return 'No active session is available to compact.';
       }
 
-      const compacted = compactChatHistory({
-        history: session.history,
-        model: args.activeModel,
-        force: true,
-      });
-      const changed =
-        compacted.history.length !== session.history.length
-        || compacted.context.compactedMessages !== undefined;
-
-      if (!changed) {
-        return 'Current session history is already compact enough.';
-      }
-
+      args.setStatus('Compacting');
       args.updateActiveSession((currentSession) => ({
         ...currentSession,
-        history: compacted.history,
-        context: compacted.context,
-        messages: buildConversationMessages(compacted.history),
+        context: buildCompactionRunningContext({
+          history: currentSession.history,
+          previous: currentSession.context,
+          archiveCount: currentSession.archives?.length,
+          currentSummaryPath: currentSession.context?.currentSummaryPath,
+        }),
       }));
 
-      return compacted.context.compactedMessages ?
-          `Compacted earlier session history to reduce context size (${compacted.context.compactedMessages} messages summarized).`
-        : 'Compacted earlier session history to reduce context size.';
+      return compactChatHistoryWithArchive({
+        history: session.history,
+        model: args.activeModel,
+        sessionId: session.id,
+        stateRoot: args.stateRoot,
+        force: true,
+      }).then((compacted) => {
+        const changed =
+          compacted.history.length !== session.history.length
+          || compacted.context.compactedMessages !== undefined
+          || compacted.archives.length !== (session.archives?.length ?? 0);
+
+        if (!changed) {
+          args.setStatus('Idle');
+          return 'Current session history is already compact enough.';
+        }
+
+        args.updateActiveSession((currentSession) => ({
+          ...currentSession,
+          history: compacted.history,
+          context: compacted.context,
+          archives: compacted.archives,
+          messages: buildConversationMessages(compacted.history),
+        }));
+        args.setStatus('Idle');
+
+        return compacted.context.compactedMessages && compacted.context.lastArchivePath ?
+            `Compacted earlier session history into a rolling summary and archived ${compacted.context.compactedMessages} messages.\nArchive: ${compacted.context.lastArchivePath}`
+          : compacted.context.compactionError ?
+            `Compaction skipped. ${compacted.context.compactionError}`
+          : 'Current session history is already compact enough.';
+      }).catch((error) => {
+        args.setStatus('Idle');
+        return error instanceof Error ? `Compaction failed. ${error.message}` : `Compaction failed. ${String(error)}`;
+      });
     },
+    saveTuiSnapshot: args.saveTuiSnapshot,
     driftEnabled: args.driftEnabled,
     driftError: args.driftError,
     setDriftEnabled: args.setDriftEnabled,

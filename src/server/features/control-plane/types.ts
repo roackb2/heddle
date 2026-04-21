@@ -20,7 +20,23 @@ export type ChatSessionView = {
     lastRunInputTokens?: number;
     lastRunOutputTokens?: number;
     lastRunTotalTokens?: number;
+    compactedMessages?: number;
+    compactedAt?: string;
+    compactionStatus?: 'idle' | 'running' | 'failed';
+    compactionError?: string;
+    archiveCount?: number;
+    currentSummaryPath?: string;
+    lastArchivePath?: string;
   };
+  archives?: Array<{
+    id: string;
+    path: string;
+    summaryPath: string;
+    shortDescription?: string;
+    messageCount: number;
+    createdAt: string;
+    summaryModel?: string;
+  }>;
 };
 
 export type ChatSessionMessage = {
@@ -83,7 +99,12 @@ export type ControlPlanePendingApproval = {
 export type ControlPlaneSessionLiveEvent = {
   sessionId: string;
   timestamp: string;
-  event: AgentLoopEvent;
+  event: AgentLoopEvent | {
+    status: 'running' | 'finished' | 'failed';
+    archivePath?: string;
+    summaryPath?: string;
+    error?: string;
+  };
 };
 
 export type ControlPlaneState = {

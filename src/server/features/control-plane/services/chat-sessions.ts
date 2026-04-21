@@ -18,6 +18,8 @@ import type {
   ControlPlaneSessionLiveEvent,
 } from '../types.js';
 
+type ChatSessionContextView = NonNullable<ChatSessionView['context']>;
+
 type SubmitChatPromptArgs = {
   workspaceRoot: string;
   stateRoot: string;
@@ -133,6 +135,13 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs) {
         pendingApprovals.delete(args.sessionId);
         return decision;
       },
+      onCompactionStatus: (event) => {
+        sessionEventBus.emit(args.sessionId, {
+          sessionId: args.sessionId,
+          timestamp: new Date().toISOString(),
+          event,
+        } satisfies ControlPlaneSessionLiveEvent);
+      },
     });
     return {
       ...result,
@@ -244,8 +253,57 @@ export function projectChatSessionView(raw: unknown | ChatSession): ChatSessionV
   const messages = Array.isArray(candidate.messages) ? candidate.messages : [];
   const lastTurn = readObject(turns.at(-1));
   const context = readObject(candidate.context);
+  const archives = Array.isArray(candidate.archives) ? candidate.archives.map(readObject).filter(Boolean) : [];
+  const rawCompactionStatus = readString(context?.compactionStatus);
+  const compactionStatus: ChatSessionContextView['compactionStatus'] =
+    rawCompactionStatus === 'idle' || rawCompactionStatus === 'running' || rawCompactionStatus === 'failed' ?
+      rawCompactionStatus
+    : undefined;
 
-  return [{
+  const contextView =
+    context ?
+      omitUndefined({
+        estimatedHistoryTokens: readNumber(context.estimatedHistoryTokens),
+        estimatedRequestTokens: readNumber(context.estimatedRequestTokens),
+        lastRunInputTokens: readNumber(context.lastRunInputTokens),
+        lastRunOutputTokens: readNumber(context.lastRunOutputTokens),
+        lastRunTotalTokens: readNumber(context.lastRunTotalTokens),
+        compactedMessages: readNumber(context.compactedMessages),
+        compactedAt: readString(context.compactedAt),
+        compactionStatus,
+        compactionError: readString(context.compactionError),
+        archiveCount: readNumber(context.archiveCount),
+        currentSummaryPath: readString(context.currentSummaryPath),
+        lastArchivePath: readString(context.lastArchivePath),
+      })
+    : undefined;
+  const archiveViews = archives.flatMap((archive) => {
+    const archiveObject = readObject(archive);
+    if (!archiveObject) {
+      return [];
+    }
+
+    const id = readString(archiveObject.id);
+    const path = readString(archiveObject.path);
+    const summaryPath = readString(archiveObject.summaryPath);
+    const messageCount = readNumber(archiveObject.messageCount);
+    const createdAt = readString(archiveObject.createdAt);
+    if (!id || !path || !summaryPath || messageCount === undefined || !createdAt) {
+      return [];
+    }
+
+    return [omitUndefined({
+      id,
+      path,
+      summaryPath,
+      shortDescription: readString(archiveObject.shortDescription),
+      messageCount,
+      createdAt,
+      summaryModel: readString(archiveObject.summaryModel),
+    })];
+  });
+
+  return [omitUndefined({
     id,
     name,
     createdAt: readString(candidate.createdAt),
@@ -258,14 +316,9 @@ export function projectChatSessionView(raw: unknown | ChatSession): ChatSessionV
     lastPrompt: readString(lastTurn?.prompt),
     lastOutcome: readString(lastTurn?.outcome),
     lastSummary: readString(lastTurn?.summary),
-    context: context ? {
-      estimatedHistoryTokens: readNumber(context.estimatedHistoryTokens),
-      estimatedRequestTokens: readNumber(context.estimatedRequestTokens),
-      lastRunInputTokens: readNumber(context.lastRunInputTokens),
-      lastRunOutputTokens: readNumber(context.lastRunOutputTokens),
-      lastRunTotalTokens: readNumber(context.lastRunTotalTokens),
-    } : undefined,
-  }];
+    context: contextView && Object.keys(contextView).length > 0 ? contextView : undefined,
+    archives: archiveViews.length > 0 ? archiveViews : undefined,
+  })];
 }
 
 function readLatestDriftLevel(turns: unknown[]): ChatSessionView['driftLevel'] {
@@ -279,6 +332,10 @@ function readLatestDriftLevel(turns: unknown[]): ChatSessionView['driftLevel'] {
   }
 
   return undefined;
+}
+
+function omitUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as T;
 }
 
 function readLatestDriftLevelFromTrace(traceFile: string): ChatSessionView['driftLevel'] {
