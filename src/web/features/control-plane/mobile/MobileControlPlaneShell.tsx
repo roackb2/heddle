@@ -52,6 +52,7 @@ export function MobileControlPlaneShell({
         <div className="flex min-w-0 items-center justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold tracking-normal text-foreground">Heddle</span>
               <Badge variant={host.tone}>{host.badgeLabel}</Badge>
               <RuntimeHostMobileInfo state={state} />
             </div>
