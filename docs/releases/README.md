@@ -98,6 +98,28 @@ gh release create vX.Y.Z --title "Heddle vX.Y.Z" --notes-file docs/releases/vX.Y
 
 If the repo does not have a previous tag yet, run `yarn release:context <base-ref> HEAD` with the intended release boundary instead.
 
+## GitHub CLI Auth Notes
+
+If `gh release create` fails with a scope or account error, check the active GitHub CLI account before starting a new auth flow:
+
+```bash
+gh auth status
+```
+
+This machine may have multiple authenticated GitHub accounts. If the account with the needed scope is already present but inactive, switch to it:
+
+```bash
+gh auth switch -u <username>
+```
+
+For release creation, the active account needs enough repository access and may need `workflow` scope. If the correct account exists but lacks scope, refresh that same account:
+
+```bash
+gh auth refresh -h github.com -s workflow
+```
+
+During device login, make sure the browser authorizes the same account that `gh auth refresh` is trying to update. If `gh` expects one account but the browser grants another, the refresh will fail with an account mismatch. In that case, either switch to the already-authorized account with the right scope or rerun the refresh while logged into the intended GitHub account in the browser.
+
 ## Writing Rule
 
 Final release notes should be curated, short, and user-facing.
