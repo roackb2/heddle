@@ -61,6 +61,9 @@ export function trackToolResult(
 
   if (effectiveCall.tool === 'edit_file') {
     state.executedMutationCommands.push(describeEditMutation(effectiveCall.input));
+    state.pendingVerification = true;
+    state.pendingChangeReview = true;
+    state.requiresStructuredChangeSummary = true;
   }
 
   if (effectiveCall.tool === 'run_shell_inspect' && command && isRepoReviewCommand(command)) {

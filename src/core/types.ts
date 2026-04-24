@@ -91,6 +91,44 @@ export type TraceEvent =
   | { type: 'tool.call'; call: ToolCall; step: number; timestamp: string }
   | { type: 'tool.result'; tool: string; result: ToolResult; step: number; timestamp: string }
   | {
+      type: 'memory.candidate_recorded';
+      candidateId: string;
+      path: string;
+      step: number;
+      timestamp: string;
+    }
+  | {
+      type: 'memory.checkpoint_skipped';
+      rationale: string;
+      step: number;
+      timestamp: string;
+    }
+  | {
+      type: 'memory.maintenance_started';
+      runId: string;
+      candidateIds: string[];
+      step: number;
+      timestamp: string;
+    }
+  | {
+      type: 'memory.maintenance_finished';
+      runId: string;
+      outcome: StopReason | 'skipped';
+      summary: string;
+      processedCandidateIds: string[];
+      failedCandidateIds: string[];
+      step: number;
+      timestamp: string;
+    }
+  | {
+      type: 'memory.maintenance_failed';
+      runId: string;
+      error: string;
+      candidateIds: string[];
+      step: number;
+      timestamp: string;
+    }
+  | {
       type: 'cyberloop.annotation';
       step: number;
       frameKind: string;

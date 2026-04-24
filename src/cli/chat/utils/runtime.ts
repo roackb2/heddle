@@ -1,5 +1,5 @@
 import { join, resolve } from 'node:path';
-import { DEFAULT_OPENAI_MODEL, inferProviderFromModel } from '../../../index.js';
+import { appendMemoryCatalogSystemContext, DEFAULT_OPENAI_MODEL, inferProviderFromModel } from '../../../index.js';
 import { saveTrace } from '../../../core/chat/trace.js';
 import type { LlmProvider } from '../../../index.js';
 import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
@@ -48,6 +48,7 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
   const workspaceRoot = resolve(options.workspaceRoot ?? process.cwd());
   const sessionId = `chat-${Date.now()}`;
   const stateRoot = resolve(workspaceRoot, options.stateDir ?? '.heddle');
+  const memoryDir = join(stateRoot, 'memory');
   const model = options.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
   const provider = inferProviderFromModel(model);
   const apiKey = options.apiKey ?? resolveProviderApiKey(provider);
@@ -63,10 +64,13 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
     sessionCatalogFile: join(stateRoot, 'chat-sessions.catalog.json'),
     approvalsFile: join(stateRoot, 'command-approvals.json'),
     traceDir: join(stateRoot, 'traces'),
-    memoryDir: join(stateRoot, 'memory'),
+    memoryDir,
     directShellApproval: options.directShellApproval ?? 'never',
     searchIgnoreDirs: options.searchIgnoreDirs ?? [],
-    systemContext: options.systemContext,
+    systemContext: appendMemoryCatalogSystemContext({
+      systemContext: options.systemContext,
+      memoryRoot: memoryDir,
+    }),
     runtimeHost: options.runtimeHost,
   };
 }

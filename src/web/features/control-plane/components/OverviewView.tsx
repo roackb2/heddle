@@ -16,6 +16,7 @@ export function OverviewView({
 }) {
   const recentSessions = useMemo(() => state.sessions.slice(0, 3), [state.sessions]);
   const recentRuns = useMemo(() => state.heartbeat.runs.slice(0, 3), [state.heartbeat.runs]);
+  const recentMemoryRuns = useMemo(() => state.memory.runs.latest.slice(0, 3), [state.memory.runs.latest]);
   const runtimeHost = projectRuntimeHostSurface(state);
 
   return (
@@ -70,7 +71,7 @@ export function OverviewView({
         <WorkspaceCreateCard creatingWorkspace={creatingWorkspace} onCreateWorkspace={onCreateWorkspace} />
       </div>
 
-      <div className="min-w-0 grid gap-4 xl:grid-cols-2">
+      <div className="min-w-0 grid gap-4 xl:grid-cols-3">
         <OverviewCard className="min-h-0">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
@@ -113,6 +114,38 @@ export function OverviewView({
           {state.heartbeat.runs.length > recentRuns.length ?
             <p className="mt-4 text-sm text-muted-foreground">Open Tasks to inspect the full run history.</p>
           : null}
+        </OverviewCard>
+
+        <OverviewCard className="min-h-0">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Workspace memory</p>
+              <h2 className="text-xl font-semibold text-foreground">Catalog health</h2>
+            </div>
+            <Badge variant={state.memory.catalog.ok ? 'secondary' : 'destructive'}>
+              {state.memory.catalog.ok ? 'ok' : 'attention'}
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <OverviewStat label="Notes" value={formatNumber(state.memory.notes.count)} />
+            <OverviewStat label="Pending" value={formatNumber(state.memory.candidates.pending)} />
+          </div>
+
+          {state.memory.catalog.missing.length ?
+            <div className="mt-4 rounded-xl border border-border bg-background/60 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Missing catalogs</p>
+              <p className="mt-2 text-sm text-muted-foreground">{state.memory.catalog.missing.slice(0, 4).join(', ')}</p>
+            </div>
+          : null}
+
+          {recentMemoryRuns.length ?
+            <div className="mt-4 space-y-3">
+              {recentMemoryRuns.map((run) => (
+                <OverviewMemoryRunItem key={run.id} run={run} />
+              ))}
+            </div>
+          : <p className="mt-4 text-sm text-muted-foreground">No memory maintenance runs recorded yet.</p>}
         </OverviewCard>
       </div>
     </section>
@@ -266,6 +299,25 @@ function OverviewRunItem({
           <ToneBadge value={run.status} />
           <ToneBadge value={run.decision} />
         </div>
+      </div>
+      <p className="mt-3 text-sm text-muted-foreground">{short(run.summary, 132)}</p>
+    </article>
+  );
+}
+
+function OverviewMemoryRunItem({
+  run,
+}: {
+  run: ControlPlaneState['memory']['runs']['latest'][number];
+}) {
+  return (
+    <article className="rounded-xl border border-border bg-background/60 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-semibold text-foreground">{run.id}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{formatShortDate(run.finishedAt)}</p>
+        </div>
+        <ToneBadge value={run.outcome} />
       </div>
       <p className="mt-3 text-sm text-muted-foreground">{short(run.summary, 132)}</p>
     </article>

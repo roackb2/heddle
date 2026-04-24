@@ -4,6 +4,23 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { chdir } from 'node:process';
 import { Command } from 'commander';
+import { createLlmAdapter, DEFAULT_OPENAI_MODEL } from '../index.js';
+import { bootstrapMemoryWorkspace } from '../core/memory/catalog.js';
+import {
+  readPendingKnowledgeCandidates,
+  runKnowledgeMaintenanceForBacklog,
+} from '../core/memory/maintainer.js';
+import {
+  listMemoryNotePaths,
+  loadMemoryStatus,
+  readMemoryNote,
+  searchMemoryNotes,
+} from '../core/memory/visibility.js';
+import {
+  repairMissingMemoryCatalogs,
+  validateMemoryWorkspace,
+} from '../core/memory/validation.js';
+import { resolveApiKeyForModel } from '../core/runtime/api-keys.js';
 import { runAskCli } from './ask.js';
 import { startChatCli } from './chat/index.js';
 import { runDaemonCli } from './daemon.js';
@@ -106,6 +123,88 @@ async function main() {
       initializeProjectConfig(resolved.workspaceRoot);
     });
 
+  const memoryCommand = program
+    .command('memory')
+    .description('manage workspace memory catalogs')
+    .action(async () => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      await runMemoryCli('status', resolved);
+    });
+
+  memoryCommand
+    .command('status')
+    .description('show workspace memory catalog status')
+    .action(async () => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      await runMemoryCli('status', resolved);
+    });
+
+  memoryCommand
+    .command('init')
+    .description('create the default workspace memory catalogs')
+    .action(async () => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      await runMemoryCli('init', resolved);
+    });
+
+  memoryCommand
+    .command('list [path]')
+    .description('list markdown notes under workspace memory')
+    .action(async (path?: string) => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      await runMemoryCli('list', resolved, { path });
+    });
+
+  memoryCommand
+    .command('read [path]')
+    .description('read a memory note')
+    .option('--offset <n>', '0-based line offset')
+    .option('--max-lines <n>', 'maximum lines to print')
+    .action(async (path: string | undefined, flags: { offset?: string; maxLines?: string }) => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      await runMemoryCli('read', resolved, {
+        path,
+        offset: parsePositiveInt(flags.offset),
+        maxLines: parsePositiveInt(flags.maxLines),
+      });
+    });
+
+  memoryCommand
+    .command('search [query]')
+    .description('search memory notes')
+    .option('--path <path>', 'memory-relative path to search under')
+    .option('--max-results <n>', 'maximum matching lines to print')
+    .action(async (query: string | undefined, flags: { path?: string; maxResults?: string }) => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      await runMemoryCli('search', resolved, {
+        query,
+        path: flags.path,
+        maxResults: parsePositiveInt(flags.maxResults),
+      });
+    });
+
+  memoryCommand
+    .command('validate')
+    .description('validate memory catalog quality')
+    .option('--repair', 'repair safe missing catalog issues')
+    .action(async (flags: { repair?: boolean }) => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      await runMemoryValidateCli(resolved, { repair: Boolean(flags.repair) });
+    });
+
+  memoryCommand
+    .command('maintain')
+    .description('process pending memory candidates into cataloged notes')
+    .option('--dry-run', 'show pending candidates without running the maintainer')
+    .option('--reconcile', 'repair safe catalog issues before maintenance and report validation after')
+    .action(async (options: { dryRun?: boolean; reconcile?: boolean }) => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      await runMemoryMaintainCli(resolved, {
+        dryRun: Boolean(options.dryRun),
+        reconcile: Boolean(options.reconcile),
+      });
+    });
+
   program
     .command('heartbeat [args...]')
     .description('manage and run heartbeat tasks')
@@ -173,7 +272,176 @@ async function main() {
 }
 
 function isKnownCommand(command: string): boolean {
-  return ['chat', 'ask', 'init', 'heartbeat', 'daemon', 'session', 'help'].includes(command);
+  return ['chat', 'ask', 'init', 'memory', 'heartbeat', 'daemon', 'session', 'help'].includes(command);
+}
+
+async function runMemoryCli(
+  command: 'status' | 'init' | 'list' | 'read' | 'search',
+  options: ResolvedCliOptions,
+  flags: {
+    path?: string;
+    query?: string;
+    offset?: number;
+    maxLines?: number;
+    maxResults?: number;
+  } = {},
+) {
+  const memoryRoot = resolve(options.workspaceRoot, options.stateDir, 'memory');
+
+  if (command === 'init') {
+    const result = bootstrapMemoryWorkspace({ memoryRoot });
+    process.stdout.write(`Memory root: ${result.memoryRoot}\n`);
+    process.stdout.write(
+      result.createdPaths.length > 0 ?
+        `Created:\n${result.createdPaths.map((path) => `- ${path}`).join('\n')}\n`
+      : 'Memory workspace already initialized.\n',
+    );
+    return;
+  }
+
+  if (command === 'status') {
+    const result = await loadMemoryStatus({ memoryRoot });
+    process.stdout.write(`Memory root: ${result.memoryRoot}\n`);
+    process.stdout.write(`Catalog shape: ${result.catalog.ok ? 'ok' : 'missing required catalogs'}\n`);
+    process.stdout.write(`Notes: ${result.notes.count}\n`);
+    process.stdout.write(`Pending candidates: ${result.candidates.pending}\n`);
+    if (result.runs.latest.length > 0) {
+      process.stdout.write('Recent runs:\n');
+      for (const run of result.runs.latest) {
+        process.stdout.write(`- ${run.id}: ${run.outcome}, ${run.processedCandidateIds.length}/${run.candidateIds.length} processed\n`);
+      }
+    }
+    if (result.catalog.missing.length > 0) {
+      process.stdout.write(`Missing:\n${result.catalog.missing.map((path) => `- ${path}`).join('\n')}\n`);
+    }
+    return;
+  }
+
+  if (command === 'list') {
+    const notes = await listMemoryNotePaths({ memoryRoot, path: flags.path });
+    process.stdout.write(`Memory root: ${memoryRoot}\n`);
+    process.stdout.write(notes.length > 0 ? `${notes.join('\n')}\n` : 'No memory notes found.\n');
+    return;
+  }
+
+  if (command === 'read') {
+    if (!flags.path) {
+      throw new Error('Usage: heddle memory read <path>');
+    }
+    process.stdout.write(await readMemoryNote({
+      memoryRoot,
+      path: flags.path,
+      offset: flags.offset,
+      maxLines: flags.maxLines,
+    }));
+    process.stdout.write('\n');
+    return;
+  }
+
+  if (command === 'search') {
+    if (!flags.query) {
+      throw new Error('Usage: heddle memory search <query>');
+    }
+    process.stdout.write(await searchMemoryNotes({
+      memoryRoot,
+      query: flags.query,
+      path: flags.path,
+      maxResults: flags.maxResults,
+    }));
+    process.stdout.write('\n');
+    return;
+  }
+
+  const exhaustive: never = command;
+  throw new Error(`Unsupported memory command: ${exhaustive}`);
+}
+
+async function runMemoryValidateCli(options: ResolvedCliOptions, flags: { repair: boolean }) {
+  const memoryRoot = resolve(options.workspaceRoot, options.stateDir, 'memory');
+  if (flags.repair) {
+    const repair = await repairMissingMemoryCatalogs({ memoryRoot });
+    process.stdout.write(`Memory root: ${repair.memoryRoot}\n`);
+    process.stdout.write(
+      repair.createdPaths.length > 0 ?
+        `Repaired missing catalogs:\n${repair.createdPaths.map((path) => `- ${path}`).join('\n')}\n`
+      : 'No missing catalogs repaired.\n',
+    );
+  }
+
+  const validation = await validateMemoryWorkspace({ memoryRoot });
+  writeMemoryValidation(validation);
+}
+
+async function runMemoryMaintainCli(options: ResolvedCliOptions, flags: { dryRun: boolean; reconcile: boolean }) {
+  const memoryRoot = resolve(options.workspaceRoot, options.stateDir, 'memory');
+  if (flags.reconcile) {
+    const repair = await repairMissingMemoryCatalogs({ memoryRoot });
+    if (repair.createdPaths.length > 0) {
+      process.stdout.write(`Repaired missing catalogs:\n${repair.createdPaths.map((path) => `- ${path}`).join('\n')}\n`);
+    }
+  }
+  const pending = await readPendingKnowledgeCandidates({ memoryRoot });
+
+  if (flags.dryRun) {
+    process.stdout.write(`Memory root: ${memoryRoot}\n`);
+    process.stdout.write(`Pending candidates: ${pending.length}\n`);
+    for (const candidate of pending) {
+      process.stdout.write(`- ${candidate.id}: ${candidate.summary}\n`);
+    }
+    if (flags.reconcile) {
+      writeMemoryValidation(await validateMemoryWorkspace({ memoryRoot }));
+    }
+    return;
+  }
+
+  if (pending.length === 0) {
+    process.stdout.write(`Memory root: ${memoryRoot}\n`);
+    process.stdout.write('No pending memory candidates.\n');
+    if (flags.reconcile) {
+      writeMemoryValidation(await validateMemoryWorkspace({ memoryRoot }));
+    }
+    return;
+  }
+
+  const model = options.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
+  const apiKey = resolveApiKeyForModel(model);
+  if (!apiKey) {
+    throw new Error(`Missing provider API key for memory maintainer model: ${model}`);
+  }
+
+  const result = await runKnowledgeMaintenanceForBacklog({
+    memoryRoot,
+    llm: createLlmAdapter({ model, apiKey }),
+    source: 'heddle memory maintain',
+  });
+
+  process.stdout.write(`Memory root: ${memoryRoot}\n`);
+  process.stdout.write(`Run: ${result.run.id}\n`);
+  process.stdout.write(`Outcome: ${result.run.outcome}\n`);
+  process.stdout.write(`Summary: ${result.run.summary}\n`);
+  process.stdout.write(`Candidates: ${result.run.processedCandidateIds.length}/${result.run.candidateIds.length} processed\n`);
+  process.stdout.write(`Catalog shape: ${result.run.catalogValid ? 'ok' : 'missing required catalogs'}\n`);
+  if (result.run.catalogMissing.length > 0) {
+    process.stdout.write(`Missing:\n${result.run.catalogMissing.map((path) => `- ${path}`).join('\n')}\n`);
+  }
+  if (flags.reconcile) {
+    writeMemoryValidation(await validateMemoryWorkspace({ memoryRoot }));
+  }
+}
+
+function writeMemoryValidation(result: Awaited<ReturnType<typeof validateMemoryWorkspace>>) {
+  const hasErrors = result.issues.some((issue) => issue.severity === 'error');
+  const hasWarnings = result.issues.some((issue) => issue.severity === 'warning');
+  const label =
+    hasErrors ? 'issues found'
+    : hasWarnings ? 'warnings'
+    : 'ok';
+  process.stdout.write(`Memory root: ${result.memoryRoot}\n`);
+  process.stdout.write(`Validation: ${label}\n`);
+  process.stdout.write(`Issues: ${result.issueCount}\n`);
+  for (const issue of result.issues) {
+    process.stdout.write(`- [${issue.severity}] ${issue.type}: ${issue.message}\n`);
+  }
 }
 
 function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
@@ -373,6 +641,10 @@ function truncate(value: string, maxLength: number): string {
 
 main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
+  if (message.startsWith('Usage: ')) {
+    process.stderr.write(`${message}\n`);
+    process.exit(1);
+  }
   process.stderr.write(`Fatal error: ${message}\n`);
   process.exit(1);
 });

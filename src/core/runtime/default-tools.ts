@@ -9,6 +9,8 @@ import {
   createSearchMemoryNotesTool,
 } from '../tools/memory-notes.js';
 import { readFileTool } from '../tools/read-file.js';
+import { createMemoryCheckpointTool } from '../tools/memory-checkpoint.js';
+import { createRecordKnowledgeTool } from '../tools/record-knowledge.js';
 import { reportStateTool } from '../tools/report-state.js';
 import { createRunShellInspectTool, createRunShellMutateTool } from '../tools/run-shell.js';
 import { createSearchFilesTool } from '../tools/search-files.js';
@@ -22,6 +24,7 @@ export type DefaultAgentToolsOptions = {
   workspaceRoot?: string;
   stateDir?: string;
   memoryDir?: string;
+  memoryMode?: 'none' | 'read-and-record' | 'maintainer' | 'legacy-full';
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
 };
@@ -30,6 +33,7 @@ export function createDefaultAgentTools(options: DefaultAgentToolsOptions): Tool
   const memoryRoot =
     options.memoryDir ??
     join(options.workspaceRoot ?? process.cwd(), options.stateDir ?? '.heddle', 'memory');
+  const memoryMode = options.memoryMode ?? 'read-and-record';
   const tools: ToolDefinition[] = [
     listFilesTool,
     readFileTool,
@@ -43,12 +47,10 @@ export function createDefaultAgentTools(options: DefaultAgentToolsOptions): Tool
       model: options.model,
       apiKey: options.apiKey,
     }),
-    createListMemoryNotesTool({ memoryRoot }),
-    createReadMemoryNoteTool({ memoryRoot }),
-    createSearchMemoryNotesTool({ memoryRoot }),
-    createEditMemoryNoteTool({ memoryRoot }),
     reportStateTool,
   ];
+
+  tools.push(...createMemoryTools(memoryRoot, memoryMode));
 
   if (options.includePlanTool ?? true) {
     tools.push(updatePlanTool);
@@ -56,4 +58,27 @@ export function createDefaultAgentTools(options: DefaultAgentToolsOptions): Tool
 
   tools.push(createRunShellInspectTool(), createRunShellMutateTool());
   return tools;
+}
+
+function createMemoryTools(memoryRoot: string, mode: NonNullable<DefaultAgentToolsOptions['memoryMode']>): ToolDefinition[] {
+  if (mode === 'none') {
+    return [];
+  }
+
+  const readTools = [
+    createListMemoryNotesTool({ memoryRoot }),
+    createReadMemoryNoteTool({ memoryRoot }),
+    createSearchMemoryNotesTool({ memoryRoot }),
+  ];
+
+  if (mode === 'read-and-record') {
+    return [...readTools, createMemoryCheckpointTool({ memoryRoot }), createRecordKnowledgeTool({ memoryRoot })];
+  }
+
+  if (mode === 'maintainer' || mode === 'legacy-full') {
+    return [...readTools, createEditMemoryNoteTool({ memoryRoot })];
+  }
+
+  const exhaustive: never = mode;
+  throw new Error(`Unsupported memory mode: ${exhaustive}`);
 }

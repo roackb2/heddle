@@ -42,6 +42,7 @@ export type SessionsWorkspaceProps = {
   turnReviewError?: string;
   sendingPrompt: boolean;
   runInFlight: boolean;
+  memoryUpdating: boolean;
   sendPromptError?: string;
   onSendPrompt: (prompt: string) => Promise<void>;
   creatingSession: boolean;
@@ -72,6 +73,7 @@ export function SessionsWorkspace({
   turnReviewError,
   sendingPrompt,
   runInFlight,
+  memoryUpdating,
   sendPromptError,
   onSendPrompt,
   creatingSession,
@@ -390,6 +392,7 @@ export function SessionsWorkspace({
         selectedSessionId={selectedSessionId}
         runActive={runActive}
         runInFlight={runInFlight}
+        memoryUpdating={memoryUpdating}
         sendPromptError={sendPromptError}
         sessionNotice={sessionNotice}
         draft={draft}
@@ -587,11 +590,13 @@ export function SessionsWorkspace({
                 : sendPromptError ? sendPromptError
                 : sessionNotice ? sessionNotice
                 : runActive ? 'Run in progress. Continue is disabled until this run settles; Cancel interrupts the active run.'
+                : memoryUpdating ? 'Memory maintenance is updating the workspace catalog in the background.'
                 : sessionDetail?.lastContinuePrompt ? 'Enter sends. Option+Enter or Shift+Enter adds a new line.'
                 : 'Enter sends. Option+Enter or Shift+Enter adds a new line.'}
               </p>
               <div className="pills compact-pills">
                 <Pill tone={creatingSession ? 'warn' : runActive ? 'warn' : 'good'}>{creatingSession ? 'creating session' : runActive ? 'run active' : 'idle'}</Pill>
+                {memoryUpdating ? <Pill tone="warn">memory updating</Pill> : null}
                 {sessionDetail?.lastContinuePrompt ? <Pill>continue available</Pill> : <Pill>no continue state yet</Pill>}
               </div>
             </div>

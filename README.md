@@ -1,19 +1,19 @@
 # Heddle
 
-Heddle is an open-source terminal coding agent runtime and CLI for real project work.
+Heddle is an open-source AI coding agent runtime and terminal CLI for real project work.
 
-It is designed for workflows where an agent needs to inspect a live repository, make bounded changes, verify results, keep continuity across sessions, and stay observable to the operator. Heddle supports OpenAI and Anthropic models, stores local workspace state under `.heddle/`, and includes both a terminal chat experience and a browser control plane.
+It is designed for workflows where an agent needs to inspect a live repository, make bounded changes, verify results, keep continuity across sessions, and stay observable to the operator. Heddle supports OpenAI and Anthropic models, stores local workspace state under `.heddle/`, includes both a terminal chat experience and a browser control plane, and learns durable workspace knowledge while it works.
 
-In plain terms: Heddle is for people who want an agent that can work inside an actual project, not just answer isolated prompts.
+In plain terms: Heddle is for people who want an AI coding assistant that can work inside an actual project, learn the project's operating knowledge over time, and remain inspectable instead of acting like a black box.
 
 ## Why Try Heddle
 
-Heddle is aimed at people who want more than a one-shot coding chat wrapper.
+Heddle is aimed at people who want more than a one-shot coding chat wrapper or stateless AI code assistant.
 
 It is a good fit if you want:
 
 - a terminal-first coding agent that works in a real repository
-- local state and durable project memory
+- an agent that learns durable project knowledge while working with you, using inspectable local memory
 - explicit traces, approvals, and reviewable workflow artifacts
 - a browser control plane for local oversight
 - a path from interactive use to programmatic and scheduled agent workflows
@@ -28,6 +28,7 @@ At a high level, Heddle helps with:
 - making code or doc changes inside a real workspace
 - running bounded verification like builds, tests, and repo review
 - keeping multi-step work going across sessions instead of starting from scratch each time
+- learning durable facts, preferences, and workflows from real usage
 - exposing more operator visibility than a black-box chat tool
 
 If you want a terminal-first coding agent with local state, review traces, and a path toward longer-running workflows, that is the problem Heddle is trying to solve.
@@ -111,6 +112,28 @@ Summarize this repository, show me the main build/test commands, and point out t
 heddle daemon
 ```
 
+### Try The Learning Loop
+
+Heddle gets more useful when it learns a reusable preference and applies it later. In chat, teach it a ticket format:
+
+```text
+Whenever I ask you to create a ticket, use these sections: problem statement, proposed approach, considered alternatives, conclusion.
+```
+
+Then start a fresh session and ask:
+
+```text
+Create a ticket for maintaining doc consistency after feature updates.
+```
+
+Heddle should recover the preference from its local memory catalog and produce the ticket in that structure. You can inspect what it learned with:
+
+```bash
+heddle memory status
+heddle memory list
+heddle memory search ticket
+```
+
 ## Major Features
 
 ### Terminal chat for real coding work
@@ -141,6 +164,28 @@ Typical session commands include:
 - `/compact`
 
 More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
+
+### Knowledge Persistence: Heddle Learns While It Works
+
+Heddle can learn durable project knowledge while it works with you.
+
+When the agent notices reusable information — a preferred ticket format, a canonical verification command, an operational convention, a recurring repo quirk, or a stable workflow pattern — it can record a memory candidate and let a dedicated maintainer path fold that knowledge into cataloged markdown notes under `.heddle/memory/`.
+
+The goal is practical recall: future sessions should know where to look instead of rediscovering the same context from scratch. Heddle does this through explicit catalogs, readable local notes, maintenance logs, and memory visibility commands rather than opaque retrieval.
+
+The learning loop is intentionally concrete:
+
+- notices durable facts and preferences during normal work
+- records memory candidates without interrupting the user
+- folds candidates into cataloged markdown through a maintainer path
+- lets future sessions recover context through explicit discovery paths
+- lets users audit memory with `heddle memory status/list/read/search/validate`
+
+Try it on a real project: tell Heddle a durable preference or let it discover a stable workflow detail, then start a fresh session and watch it recover that context through the memory catalog.
+
+For example, tell Heddle your preferred ticket template once, then ask for a ticket in a new session. The point is not just storing a note; it is making future work start from the operating knowledge you already taught the agent.
+
+More: [Knowledge persistence](docs/guides/knowledge-persistence.md)
 
 ### Control plane
 
@@ -175,18 +220,6 @@ This is why Heddle stores state under the workspace’s `.heddle/`, why the brow
 If you want to understand how `chat`, `ask`, the daemon, the control plane, and workspace-local state fit together, read:
 
 - [Runtime host model](docs/guides/runtime-host-model.md)
-
-### Knowledge persistence
-
-Heddle can keep durable project knowledge in markdown notes under `.heddle/memory/`.
-
-The idea is simple: if the agent learns a stable fact about your repo — architecture notes, command quirks, recurring build issues, conventions — it can save that knowledge so future sessions do not have to rediscover it.
-
-This is not meant to be a hidden vector database or magical long-term memory. It is readable, local, workspace-scoped memory that both the agent and the human can inspect.
-
-This matters if you want the agent to become more useful over time in a specific project.
-
-More: [Knowledge persistence](docs/guides/knowledge-persistence.md)
 
 ### Heartbeat
 
@@ -304,6 +337,7 @@ Heddle is already useful for real coding-agent workflows, but it is still evolvi
 Current strengths include:
 
 - terminal-first coding and repository workflows
+- autonomous, catalog-backed workspace memory that helps the agent learn from normal usage
 - explicit traces, approvals, and local workspace state
 - browser-based oversight through the control plane
 - local-first heartbeat primitives for scheduled agent work

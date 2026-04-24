@@ -1,7 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  appendMemoryCatalogSystemContext,
   DEFAULT_OPENAI_MODEL,
+  createLlmAdapter,
   createLogger,
   formatTraceForConsole,
   inferProviderFromModel,
@@ -9,6 +11,7 @@ import {
   runAgentLoop,
   type RunResult,
 } from '../../../../index.js';
+import { runMaintenanceForRecordedCandidates } from '../../../../core/memory/maintenance-integration.js';
 
 export type RunControlPlaneAskArgs = {
   goal: string;
@@ -31,29 +34,46 @@ export async function runControlPlaneAsk(args: RunControlPlaneAskArgs): Promise<
   const maxSteps = args.maxSteps ?? parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 100;
   const provider = inferProviderFromModel(model);
   const logger = createLogger({ pretty: true, level: 'debug' });
+  const memoryDir = join(args.stateRoot, 'memory');
+  const apiKey = args.apiKey ?? resolveProviderApiKey(provider);
+  const llm = createLlmAdapter({ model, apiKey });
 
   const result = await runAgentLoop({
     goal: args.goal,
     model,
-    apiKey: args.apiKey ?? resolveProviderApiKey(provider),
+    apiKey,
     maxSteps,
     logger,
     workspaceRoot: args.workspaceRoot,
     stateDir: relativeStateDir(args.workspaceRoot, args.stateRoot),
     searchIgnoreDirs: args.searchIgnoreDirs,
-    systemContext: args.systemContext,
+    memoryDir,
+    systemContext: appendMemoryCatalogSystemContext({
+      systemContext: args.systemContext,
+      memoryRoot: memoryDir,
+    }),
     includePlanTool: false,
+    llm,
   });
+  const maintenance = await runMaintenanceForRecordedCandidates({
+    memoryRoot: memoryDir,
+    llm,
+    source: 'control plane ask',
+    trace: result.trace,
+    maxSteps: 20,
+  });
+  const trace = maintenance.events.length > 0 ? [...result.trace, ...maintenance.events] : result.trace;
 
   const traceDir = join(args.stateRoot, 'traces');
   mkdirSync(traceDir, { recursive: true });
   const traceFile = join(traceDir, `trace-${Date.now()}.json`);
-  writeFileSync(traceFile, JSON.stringify(result.trace, null, 2));
+  writeFileSync(traceFile, JSON.stringify(trace, null, 2));
 
   return {
     ...result,
+    trace,
     traceFile,
-    consoleOutput: formatTraceForConsole(result.trace),
+    consoleOutput: formatTraceForConsole(trace),
   };
 }
 

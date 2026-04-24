@@ -8,7 +8,7 @@ import {
 import type { ChatMessage } from '../llm/types.js';
 
 describe('buildConversationMessages', () => {
-  it('renders successful edit_file tool results as tool-name plus raw tool payload history', () => {
+  it('does not render raw edit_file tool payloads into conversation history', () => {
     const payload = JSON.stringify({
       ok: true,
       output: {
@@ -42,14 +42,14 @@ describe('buildConversationMessages', () => {
 
     const messages = buildConversationMessages(history);
 
-    expect(messages).toHaveLength(4);
-    expect(messages[2]).toMatchObject({
-      role: 'assistant',
-      text: `edit_file: ${payload}`,
-    });
+    expect(messages).toEqual([
+      { id: 'user-0-Update the file.', role: 'user', text: 'Update the file.' },
+      { id: 'assistant-1-I will update the file.', role: 'assistant', text: 'I will update the file.' },
+      { id: 'assistant-3-Done.', role: 'assistant', text: 'Done.' },
+    ]);
   });
 
-  it('renders non-edit tool results into conversation history with the tool prefix', () => {
+  it('does not render raw non-edit tool payloads into conversation history', () => {
     const payload = JSON.stringify({ ok: true, output: 'README.md\nsrc/' });
     const history: ChatMessage[] = [
       { role: 'user', content: 'Inspect the repo.' },
@@ -70,11 +70,10 @@ describe('buildConversationMessages', () => {
     expect(messages).toEqual([
       { id: 'user-0-Inspect the repo.', role: 'user', text: 'Inspect the repo.' },
       { id: 'assistant-1-I will inspect.', role: 'assistant', text: 'I will inspect.' },
-      { id: `tool-2-list_files: ${payload}`, role: 'assistant', text: `list_files: ${payload}` },
     ]);
   });
 
-  it('renders update_plan tool results as tool-name plus raw tool payload history', () => {
+  it('does not render raw update_plan payloads into conversation history', () => {
     const payload = JSON.stringify({
       ok: true,
       output: {
@@ -103,8 +102,10 @@ describe('buildConversationMessages', () => {
 
     const messages = buildConversationMessages(history);
 
-    expect(messages).toHaveLength(3);
-    expect(messages[2]?.text).toBe(`update_plan: ${payload}`);
+    expect(messages).toEqual([
+      { id: 'user-0-Move the project forward.', role: 'user', text: 'Move the project forward.' },
+      { id: 'assistant-1-I will plan the work first.', role: 'assistant', text: 'I will plan the work first.' },
+    ]);
   });
 
   it('formats a live edit preview into the same visible diff block shape', () => {

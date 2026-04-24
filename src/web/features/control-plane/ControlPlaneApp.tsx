@@ -289,6 +289,7 @@ function renderActiveTab(
         turnReviewError={sessionWorkspace.turnReviewError}
         sendingPrompt={sessionWorkspace.sendingPrompt}
         runInFlight={sessionWorkspace.runInFlight}
+        memoryUpdating={sessionWorkspace.memoryUpdating}
         sendPromptError={sessionWorkspace.sendPromptError}
         onSendPrompt={sessionWorkspace.sendPrompt}
         creatingSession={sessionWorkspace.creatingSession}

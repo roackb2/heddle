@@ -55,6 +55,15 @@ type RunState = {
   outcome: StopReason;
   summary: string;
   usage?: LlmUsage;
+  memoryCheckpoint: {
+    required: boolean;
+    completed: boolean;
+  };
+  reminders: {
+    postMutationFollowUpSent: boolean;
+    memoryCheckpointSent: boolean;
+    structuredSummarySent: boolean;
+  };
   activePlan?: {
     explanation?: string;
     items: PlanItem[];
@@ -168,6 +177,15 @@ function createRunContext(options: RunAgentOptions): RunContext {
       consecutiveErrors: 0,
       outcome: 'max_steps',
       summary: '',
+      memoryCheckpoint: {
+        required: shouldRequireMemoryCheckpoint(options.goal, registry.names()),
+        completed: false,
+      },
+      reminders: {
+        postMutationFollowUpSent: false,
+        memoryCheckpointSent: false,
+        structuredSummarySent: false,
+      },
     },
   };
 }
@@ -344,6 +362,9 @@ function handleExecutedToolResult(
   } else {
     context.state.consecutiveErrors = 0;
     trackToolResult(context.mutation, effectiveCall, result);
+    trackMemoryCheckpointNeed(context, effectiveCall);
+    recordMemoryCandidateEvent(context, effectiveCall, result);
+    recordMemoryCheckpointSkippedEvent(context, effectiveCall, result);
     if (effectiveCall.tool === 'update_plan') {
       context.state.activePlan = parsePlanState(result.output);
     }
@@ -354,8 +375,74 @@ function handleExecutedToolResult(
     content: JSON.stringify(result),
     toolCallId,
   });
+  pushHostRequirementReminders(context);
   pushProgressReminders(context, effectiveCall, result);
   return undefined;
+}
+
+function recordMemoryCandidateEvent(context: RunContext, effectiveCall: ToolCall, result: ToolResult) {
+  if (effectiveCall.tool !== 'record_knowledge' && effectiveCall.tool !== 'memory_checkpoint') {
+    return;
+  }
+  if (effectiveCall.tool === 'memory_checkpoint') {
+    context.state.memoryCheckpoint.completed = true;
+  }
+
+  const output = result.output;
+  if (!output || typeof output !== 'object' || Array.isArray(output)) {
+    return;
+  }
+
+  const candidateId = (output as Record<string, unknown>).id;
+  const path = (output as Record<string, unknown>).path;
+  if (typeof candidateId !== 'string' || typeof path !== 'string') {
+    return;
+  }
+
+  context.record({
+    type: 'memory.candidate_recorded',
+    candidateId,
+    path,
+    step: context.state.step,
+    timestamp: context.now(),
+  });
+}
+
+function recordMemoryCheckpointSkippedEvent(context: RunContext, effectiveCall: ToolCall, result: ToolResult) {
+  if (effectiveCall.tool !== 'memory_checkpoint') {
+    return;
+  }
+
+  context.state.memoryCheckpoint.completed = true;
+  const output = result.output;
+  if (!output || typeof output !== 'object' || Array.isArray(output)) {
+    return;
+  }
+
+  const decision = (output as Record<string, unknown>).decision;
+  const rationale = (output as Record<string, unknown>).rationale;
+  if (decision !== 'skip' || typeof rationale !== 'string') {
+    return;
+  }
+
+  context.record({
+    type: 'memory.checkpoint_skipped',
+    rationale,
+    step: context.state.step,
+    timestamp: context.now(),
+  });
+}
+
+function trackMemoryCheckpointNeed(context: RunContext, effectiveCall: ToolCall) {
+  if (effectiveCall.tool === 'memory_checkpoint') {
+    return;
+  }
+  if (isMemoryOnlyTool(effectiveCall.tool)) {
+    return;
+  }
+  if (context.registry.get('memory_checkpoint')) {
+    context.state.memoryCheckpoint.required = true;
+  }
 }
 
 function handleFailedToolExecution(context: RunContext, result: ToolResult): RunResult | undefined {
@@ -392,27 +479,21 @@ function finalizeAssistantResponse(context: RunContext, response: LlmResponse): 
     return finishRun(context, 'error', 'Model returned an empty response');
   }
 
-  const completionBlocker = getCompletionBlocker(context, response.content);
-  if (completionBlocker) {
-    const forcedSummary = buildForcedStructuredChangeSummary(context, response.content);
-    if (forcedSummary) {
-      context.record({
-        type: 'assistant.turn',
-        content: forcedSummary,
-        diagnostics: response.diagnostics,
-        requestedTools: false,
-        step: context.state.step,
-        timestamp: context.now(),
-      });
-      context.messages.push({ role: 'assistant', content: forcedSummary });
-      return finishRun(context, 'done', forcedSummary, {
-        logLevel: 'info',
-        logMessage: 'Agent run finished with host-enforced structured change summary',
-      });
-    }
-
-    context.messages.push({ role: 'system', content: completionBlocker });
-    return 'continue';
+  const forcedSummary = buildForcedStructuredChangeSummary(context, response.content);
+  if (forcedSummary) {
+    context.record({
+      type: 'assistant.turn',
+      content: forcedSummary,
+      diagnostics: response.diagnostics,
+      requestedTools: false,
+      step: context.state.step,
+      timestamp: context.now(),
+    });
+    context.messages.push({ role: 'assistant', content: forcedSummary });
+    return finishRun(context, 'done', forcedSummary, {
+      logLevel: 'info',
+      logMessage: 'Agent run finished with host-enforced structured change summary',
+    });
   }
 
   context.record({
@@ -431,7 +512,27 @@ function finalizeAssistantResponse(context: RunContext, response: LlmResponse): 
   });
 }
 
-function getCompletionBlocker(context: RunContext, responseContent: string): string | undefined {
+function pushHostRequirementReminders(context: RunContext) {
+  const postMutationReminder = getPostMutationFollowUpReminder(context);
+  if (postMutationReminder && !context.state.reminders.postMutationFollowUpSent) {
+    context.state.reminders.postMutationFollowUpSent = true;
+    context.messages.push({ role: 'system', content: postMutationReminder });
+  }
+
+  const memoryReminder = getMemoryCheckpointReminder(context);
+  if (memoryReminder && !context.state.reminders.memoryCheckpointSent) {
+    context.state.reminders.memoryCheckpointSent = true;
+    context.messages.push({ role: 'system', content: memoryReminder });
+  }
+
+  const structuredReminder = getStructuredSummaryReminder(context);
+  if (structuredReminder && !context.state.reminders.structuredSummarySent) {
+    context.state.reminders.structuredSummarySent = true;
+    context.messages.push({ role: 'system', content: structuredReminder });
+  }
+}
+
+function getPostMutationFollowUpReminder(context: RunContext): string | undefined {
   if (context.mutation.pendingVerification || context.mutation.pendingChangeReview) {
     context.log.info(
       {
@@ -439,7 +540,7 @@ function getCompletionBlocker(context: RunContext, responseContent: string): str
         pendingVerification: context.mutation.pendingVerification,
         pendingChangeReview: context.mutation.pendingChangeReview,
       },
-      'Blocking premature final answer until mutation follow-up is complete',
+      'Reminding agent to complete mutation follow-up before final answer',
     );
     return buildPostMutationRequirement({
       pendingVerification: context.mutation.pendingVerification,
@@ -450,23 +551,53 @@ function getCompletionBlocker(context: RunContext, responseContent: string): str
     });
   }
 
+  return undefined;
+}
+
+function getStructuredSummaryReminder(context: RunContext): string | undefined {
   if (
     context.mutation.requiresStructuredChangeSummary &&
-    !hasStructuredChangeSummary(responseContent, {
-      mutationCommands: context.mutation.executedMutationCommands,
-      reviewCommands: context.mutation.executedReviewCommands,
-      verificationCommands: context.mutation.executedVerificationCommands,
-    })
+    !context.mutation.pendingVerification &&
+    !context.mutation.pendingChangeReview
   ) {
-    context.log.info({ step: context.state.step }, 'Blocking vague final answer until structured change summary is provided');
+    context.log.info({ step: context.state.step }, 'Reminding agent to provide structured change summary');
     return buildStructuredChangeSummaryRequirement(context.mutation);
   }
 
   return undefined;
 }
 
+function getMemoryCheckpointReminder(context: RunContext): string | undefined {
+  if (context.state.memoryCheckpoint.required && !context.state.memoryCheckpoint.completed) {
+    context.log.info({ step: context.state.step }, 'Reminding agent to run memory checkpoint');
+    return 'Before your final answer, call memory_checkpoint exactly once. Use decision "record" if the user asked you to remember a durable preference/workflow/fact or this turn discovered stable reusable workspace knowledge. Use decision "skip" if there is nothing durable to preserve, the fact is speculative/temporary/duplicate, or it should not be stored.';
+  }
+
+  return undefined;
+}
+
+function shouldRequireMemoryCheckpoint(goal: string, toolNames: string[]): boolean {
+  return toolNames.includes('memory_checkpoint') && hasExplicitMemoryIntent(goal);
+}
+
+function hasExplicitMemoryIntent(goal: string): boolean {
+  return /\b(?:remember|note down|keep in memory|use this going forward|going forward|preferred format|preference|don't forget|do not forget|preserve this|save this)\b/i.test(goal);
+}
+
+function isMemoryOnlyTool(tool: string): boolean {
+  return tool === 'list_memory_notes'
+    || tool === 'read_memory_note'
+    || tool === 'search_memory_notes'
+    || tool === 'record_knowledge'
+    || tool === 'memory_checkpoint';
+}
+
 function buildForcedStructuredChangeSummary(context: RunContext, responseContent: string): string | undefined {
   if (context.mutation.pendingVerification || context.mutation.pendingChangeReview) {
+    return undefined;
+  }
+
+  if (context.state.memoryCheckpoint.required && !context.state.memoryCheckpoint.completed) {
     return undefined;
   }
 

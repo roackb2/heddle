@@ -77,6 +77,45 @@ export type { ApiKeyRuntime } from './core/runtime/api-keys.js';
 export { createDefaultAgentTools } from './core/runtime/default-tools.js';
 export type { DefaultAgentToolsOptions } from './core/runtime/default-tools.js';
 export { DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL } from './core/config.js';
+export {
+  buildMemoryDomainSystemContext,
+} from './core/memory/domain-prompt.js';
+export {
+  DEFAULT_MEMORY_CATEGORIES,
+  DEFAULT_MEMORY_FOLDER_CATALOG_MAX_BYTES,
+  DEFAULT_MEMORY_FOLDER_CATALOG_TARGET_BYTES,
+  DEFAULT_MEMORY_ROOT_CATALOG_MAX_BYTES,
+  DEFAULT_MEMORY_ROOT_CATALOG_TARGET_BYTES,
+  appendMemoryCatalogSystemContext,
+  bootstrapMemoryWorkspace,
+  formatMemoryCatalogSystemContext,
+  loadMemoryRootCatalog,
+  validateMemoryCatalogShape,
+} from './core/memory/catalog.js';
+export type {
+  BootstrapMemoryWorkspaceResult,
+  MemoryCatalogLoadResult,
+  MemoryCatalogShapeValidation,
+  MemoryCategory,
+} from './core/memory/catalog.js';
+export {
+  readPendingKnowledgeCandidates,
+  runKnowledgeMaintenance,
+  runKnowledgeMaintenanceForBacklog,
+} from './core/memory/maintainer.js';
+export type {
+  KnowledgeCandidate,
+  KnowledgeMaintenanceRunRecord,
+  RunKnowledgeMaintenanceOptions,
+  RunKnowledgeMaintenanceResult,
+} from './core/memory/maintainer.js';
+export { createMemoryMaintainerTools } from './core/memory/maintainer-tools.js';
+export { createMemoryNoteTemplate, slugifyMemoryTitle } from './core/memory/templates.js';
+export { runMaintenanceForRecordedCandidates } from './core/memory/maintenance-integration.js';
+export type {
+  RunMaintenanceForRecordedCandidatesOptions,
+  RunMaintenanceForRecordedCandidatesResult,
+} from './core/memory/maintenance-integration.js';
 
 // Integrations
 export {
@@ -169,6 +208,10 @@ export {
   createEditMemoryNoteTool,
 } from './core/tools/memory-notes.js';
 export type { MemoryNotesToolOptions } from './core/tools/memory-notes.js';
+export { createMemoryCheckpointTool } from './core/tools/memory-checkpoint.js';
+export type { MemoryCheckpointToolOptions } from './core/tools/memory-checkpoint.js';
+export { createRecordKnowledgeTool, recordKnowledgeTool } from './core/tools/record-knowledge.js';
+export type { RecordKnowledgeToolOptions } from './core/tools/record-knowledge.js';
 export { reportStateTool } from './core/tools/report-state.js';
 export { updatePlanTool } from './core/tools/update-plan.js';
 export type { PlanItem, PlanItemStatus } from './core/tools/update-plan.js';

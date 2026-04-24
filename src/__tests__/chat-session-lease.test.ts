@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { acquireSessionLease, getSessionLeaseConflict, isSessionLeaseFresh, releaseSessionLease } from '../core/chat/session-lease.js';
+import {
+  acquireSessionLease,
+  getSessionLeaseConflict,
+  isSessionLeaseFresh,
+  isSessionLeaseOwnedByDeadLocalProcess,
+  releaseSessionLease,
+} from '../core/chat/session-lease.js';
 import type { ChatSession } from '../core/chat/types.js';
 
 function createSession(): ChatSession {
@@ -70,5 +76,44 @@ describe('chat session leases', () => {
     }, {
       now: Date.parse('2026-04-21T01:20:00.000Z'),
     })).toBeUndefined();
+  });
+
+  it('ignores fresh leases owned by dead local Heddle processes', () => {
+    const leased = acquireSessionLease(createSession(), {
+      ownerKind: 'tui',
+      ownerId: 'tui-4686',
+      clientLabel: 'terminal chat',
+    }, {
+      now: Date.parse('2026-04-21T01:00:00.000Z'),
+    });
+
+    expect(isSessionLeaseOwnedByDeadLocalProcess(leased.lease, { isProcessAlive: () => false })).toBe(true);
+    expect(getSessionLeaseConflict(leased, {
+      ownerKind: 'tui',
+      ownerId: 'tui-123',
+      clientLabel: 'terminal chat',
+    }, {
+      now: Date.parse('2026-04-21T01:01:00.000Z'),
+      isProcessAlive: () => false,
+    })).toBeUndefined();
+  });
+
+  it('still reports fresh local process leases when the owner is alive', () => {
+    const leased = acquireSessionLease(createSession(), {
+      ownerKind: 'tui',
+      ownerId: 'tui-4686',
+      clientLabel: 'terminal chat',
+    }, {
+      now: Date.parse('2026-04-21T01:00:00.000Z'),
+    });
+
+    expect(getSessionLeaseConflict(leased, {
+      ownerKind: 'tui',
+      ownerId: 'tui-123',
+      clientLabel: 'terminal chat',
+    }, {
+      now: Date.parse('2026-04-21T01:01:00.000Z'),
+      isProcessAlive: () => true,
+    })).toContain('already active in terminal chat');
   });
 });

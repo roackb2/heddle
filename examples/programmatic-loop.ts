@@ -97,6 +97,8 @@ function formatExampleEvent(event: AgentLoopEvent): string | undefined {
       return `[event] loop.finished outcome=${event.outcome} transcript=${event.state.transcript.length} trace=${event.state.trace.length} input=${event.usage?.inputTokens ?? 0} output=${event.usage?.outputTokens ?? 0} total=${event.usage?.totalTokens ?? 0}`;
     case 'trace':
       return formatTraceEvent(event.event);
+    default:
+      return undefined;
   }
 }
 
@@ -116,6 +118,16 @@ function formatTraceEvent(event: TraceEvent): string {
       return `[trace] tool.call step=${event.step} tool=${event.call.tool} input=${JSON.stringify(event.call.input)}`;
     case 'tool.result':
       return `[trace] tool.result step=${event.step} tool=${event.tool} ok=${event.result.ok} output=${JSON.stringify(formatUnknown(event.result.output ?? event.result.error ?? ''))}`;
+    case 'memory.candidate_recorded':
+      return `[trace] memory.candidate_recorded step=${event.step} candidate=${event.candidateId}`;
+    case 'memory.checkpoint_skipped':
+      return `[trace] memory.checkpoint_skipped step=${event.step} rationale=${JSON.stringify(shorten(event.rationale))}`;
+    case 'memory.maintenance_started':
+      return `[trace] memory.maintenance_started step=${event.step} run=${event.runId} candidates=${event.candidateIds.join(',')}`;
+    case 'memory.maintenance_finished':
+      return `[trace] memory.maintenance_finished step=${event.step} run=${event.runId} outcome=${event.outcome}`;
+    case 'memory.maintenance_failed':
+      return `[trace] memory.maintenance_failed step=${event.step} run=${event.runId} error=${JSON.stringify(shorten(event.error))}`;
     case 'cyberloop.annotation':
       return `[trace] cyberloop.annotation step=${event.step} frame=${event.frameKind} drift=${event.driftLevel}`;
     case 'run.finished':

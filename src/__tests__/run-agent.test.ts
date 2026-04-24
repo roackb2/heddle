@@ -872,7 +872,7 @@ describe('runAgent', () => {
     ]);
   });
 
-  it('requires repo review and verification before finalizing after a workspace-changing mutate command', async () => {
+  it('reminds about repo review and verification after a workspace-changing action without blocking final answer', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
@@ -946,20 +946,25 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe(
-      'Applied the fix and verified the repo state.\n\n- Changed: eslint --fix src/example.ts\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0)\n- Remaining uncertainty: none',
+      'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.',
     );
-    expect(seenMessages[2]).toContainEqual({
+    expect(seenMessages[1]).toContainEqual({
       role: 'system',
       content:
-        'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
+        'Host requirement: before giving a final answer after a workspace-changing action, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
     });
   });
 
-  it('allows a small edit_file change to finish without forced review and verification follow-up', async () => {
+  it('reminds about post-edit review and verification after edit_file without blocking final answer', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
         seenMessages.push(structuredClone(messages));
+        const hostReminder = [...messages].reverse().find(
+          (message: ChatMessage) =>
+            message.role === 'system' &&
+            message.content.includes('Host requirement: before giving a final answer'),
+        );
 
         if (seenMessages.length === 1) {
           return {
@@ -967,8 +972,27 @@ describe('runAgent', () => {
           };
         }
 
+        if (!hostReminder) {
+          return {
+            content: 'I updated the file.',
+          };
+        }
+
+        if (seenMessages.length === 3) {
+          return {
+            toolCalls: [{ id: 'call-2', tool: 'run_shell_inspect', input: { command: 'git diff --stat' } }],
+          };
+        }
+
+        if (seenMessages.length === 4) {
+          return {
+            toolCalls: [{ id: 'call-3', tool: 'run_shell_mutate', input: { command: 'yarn test' } }],
+          };
+        }
+
         return {
-          content: 'I updated the file.',
+          content:
+            'Updated the README and verified the repo state.\n- Changed: edited README.md via edit_file README.md.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.',
         };
       },
     };
@@ -983,27 +1007,48 @@ describe('runAgent', () => {
       },
     };
 
+    const inspectTool: ToolDefinition = {
+      name: 'run_shell_inspect',
+      description: 'Runs a read-only shell inspection command',
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const command = (input as { command: string }).command;
+        return { ok: true, output: { command, exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
+    const mutateTool: ToolDefinition = {
+      name: 'run_shell_mutate',
+      description: 'Runs a bounded workspace mutation or verification command',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: {} },
+      async execute(input) {
+        const command = (input as { command: string }).command;
+        return { ok: true, output: { command, exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
     const result = await runAgent({
       goal: 'Update the README and tell me it worked.',
       llm: fakeLlm,
-      tools: [editTool],
-      maxSteps: 3,
+      tools: [editTool, inspectTool, mutateTool],
+      maxSteps: 6,
       logger: silentLogger,
       approveToolCall: async () => ({ approved: true }),
     });
 
     expect(result.outcome).toBe('done');
-    expect(result.summary).toBe('I updated the file.');
-    expect(
-      seenMessages.flat().some(
-        (message) =>
-          message.role === 'system' &&
-          message.content.includes('Host requirement: before giving a final answer after a workspace-changing mutate command'),
-      ),
-    ).toBe(false);
+    expect(result.summary).toBe(
+      'Updated the README and verified the repo state.\n- Changed: edited README.md via edit_file README.md.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.',
+    );
+    expect(seenMessages[1]).toContainEqual({
+      role: 'system',
+      content:
+        'Host requirement: before giving a final answer after a workspace-changing action, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
+    });
   });
 
-  it('requires post-mutation review, verification, and structured summary before finishing', async () => {
+  it('does not loop when post-mutation review and verification reminders are ignored', async () => {
     const seenMessages: ChatMessage[][] = [];
     let stage = 0;
     const fakeLlm: LlmAdapter = {
@@ -1073,20 +1118,18 @@ describe('runAgent', () => {
     });
 
     expect(result.outcome).toBe('done');
-    expect(result.summary).toBe(
-      'Applied the lint fix and checked the repo and test state.\n- Changed: eslint --fix src/example.ts applied to src/example.ts.\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output.\n- Remaining uncertainty: none.',
-    );
+    expect(result.summary).toBe('The change is ready to be reported.');
 
     const hostRequirement = seenMessages
       .flat()
       .find(
         (message) =>
           message.role === 'system' &&
-          message.content.includes('Host requirement: before giving a final answer after a workspace-changing mutate command'),
+          message.content.includes('Host requirement: before giving a final answer after a workspace-changing action'),
       );
     expect(hostRequirement).toBeDefined();
     expect(hostRequirement?.content).toContain(
-      'Host requirement: before giving a final answer after a workspace-changing mutate command',
+      'Host requirement: before giving a final answer after a workspace-changing action',
     );
   });
 
@@ -1161,16 +1204,10 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toContain('Applied the fix, verified it, and pushed it.');
-    expect(
-      seenMessages[4]?.filter(
-        (message) =>
-          message.role === 'system' &&
-          message.content.includes('Host requirement: before giving a final answer after a workspace-changing mutate command'),
-      ) ?? [],
-    ).toHaveLength(0);
+    expect(seenMessages.at(-1)?.some((message) => message.role === 'assistant')).toBe(true);
   });
 
-  it('rejects a vague final answer after mutation follow-up until it includes changed, verified, and remaining uncertainty labels', async () => {
+  it('allows a vague final answer after mutation reminder instead of looping', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
@@ -1249,12 +1286,10 @@ describe('runAgent', () => {
     });
 
     expect(result.outcome).toBe('done');
-    expect(result.summary).toBe(
-      'I made the change and it looks good.\n\n- Changed: eslint --fix src/example.ts\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0)\n- Remaining uncertainty: none',
-    );
+    expect(result.summary).toBe('The workspace-changing command is complete.');
   });
 
-  it('rejects a structured summary that omits the actual review and verification commands', async () => {
+  it('allows a structured summary that omits actual review and verification commands instead of looping', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
@@ -1331,9 +1366,7 @@ describe('runAgent', () => {
     });
 
     expect(result.outcome).toBe('done');
-    expect(result.summary).toBe(
-      'Applied the fix and checked it.\n\n- Changed: eslint --fix src/example.ts\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0)\n- Remaining uncertainty: none',
-    );
+    expect(result.summary).toBe('The workspace-changing command is complete.');
   });
 
   it('returns an interrupted outcome when the host requests a stop between steps', async () => {
@@ -1421,11 +1454,12 @@ describe('runAgent', () => {
       approveToolCall: async () => ({ approved: true }),
     });
 
-    expect(result.outcome).toBe('max_steps');
-    expect(seenMessages[2]).toContainEqual({
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('Moved the file and completed the required follow-up checks.\n- Changed: moved docs/old.md to docs/new.md.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.');
+    expect(seenMessages[1]).toContainEqual({
       role: 'system',
       content:
-        'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
+        'Host requirement: before giving a final answer after a workspace-changing action, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
     });
   });
 
@@ -1475,13 +1509,14 @@ describe('runAgent', () => {
       approveToolCall: async () => ({ approved: true }),
     });
 
-    expect(result.outcome).toBe('max_steps');
-    expect(seenMessages[3]).toEqual(
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('The change is done and verified.');
+    expect(seenMessages[1]).toEqual(
       expect.arrayContaining([
         {
           role: 'system',
           content: expect.stringContaining(
-            'Host requirement: before giving a final answer after a workspace-changing mutate command, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and note: verification already captured: yarn test. Additional verification is not required unless the repo state changed again.',
+            'Host requirement: before giving a final answer after a workspace-changing action, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command',
           ),
         },
       ]),

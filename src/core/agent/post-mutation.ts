@@ -30,7 +30,7 @@ export function buildPostMutationRequirement(options: {
     requirements.push(`note: verification already captured: ${options.verificationCommands.join('; ')}. Additional verification is not required unless the repo state changed again.`);
   }
 
-  return `Host requirement: before giving a final answer after a workspace-changing mutate command, you must ${requirements.join(' and ')}. After doing that, then provide the final answer.`;
+  return `Host requirement: before giving a final answer after a workspace-changing action, you must ${requirements.join(' and ')}. After doing that, then provide the final answer.`;
 }
 
 export function hasStructuredChangeSummary(
@@ -96,7 +96,7 @@ export function buildStructuredChangeSummaryRequirement(state: MutationState): s
     ? state.executedVerificationEvidence.join('; ')
     : 'no verification evidence captured';
 
-  return `Host requirement: after a workspace-changing mutate command, your final answer must start with a short summary sentence or short paragraph, then include bullet points labeled "Changed:", "Verified:", and "Remaining uncertainty:". In "Changed:", mention the concrete change work and name the exact command(s) or edit action used (${mutationSummary}). In "Verified:", name the exact repo review command(s) (${reviewSummary}) and exact verification command(s) (${verificationSummary}), and ground them in concrete evidence from the command results (${reviewEvidenceSummary}; ${verificationEvidenceSummary}). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".`;
+  return `Host requirement: after a workspace-changing action, your final answer must start with a short summary sentence or short paragraph, then include bullet points labeled "Changed:", "Verified:", and "Remaining uncertainty:". In "Changed:", mention the concrete change work and name the exact command(s) or edit action used (${mutationSummary}). In "Verified:", name the exact repo review command(s) (${reviewSummary}) and exact verification command(s) (${verificationSummary}), and ground them in concrete evidence from the command results (${reviewEvidenceSummary}; ${verificationEvidenceSummary}). If nothing remains uncertain, explicitly write "Remaining uncertainty: none".`;
 }
 
 function extractStructuredSummaryLine(

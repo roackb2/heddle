@@ -11,6 +11,7 @@ const APPROVAL_CHOICES: ApprovalChoice[] = ['approve', 'allow_project', 'deny'];
 export function useApprovalFlow(nextLocalId: () => string) {
   const [status, setStatus] = useState('Idle');
   const [isRunning, setIsRunning] = useState(false);
+  const [isMemoryUpdating, setIsMemoryUpdating] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [workingFrame, setWorkingFrame] = useState(0);
@@ -131,6 +132,7 @@ export function useApprovalFlow(nextLocalId: () => string) {
       setError,
       setStatus,
       setIsRunning,
+      setIsMemoryUpdating,
       setInterruptRequested,
       setLiveEvents,
       setPendingApproval,
@@ -148,6 +150,7 @@ export function useApprovalFlow(nextLocalId: () => string) {
     status,
     setStatus,
     isRunning,
+    isMemoryUpdating,
     error,
     setError,
     liveEvents,

@@ -52,6 +52,14 @@ export function toLiveEvent(event: TraceEvent): string | undefined {
       return `running ${summarizeToolCall(event.call.tool, event.call.input)}`;
     case 'tool.result':
       return `${summarizeToolResult(event.tool, extractShellCommand(event.result.output), event.result.output)} ${event.result.ok ? 'completed' : `failed: ${event.result.error ?? 'error'}`}`;
+    case 'memory.candidate_recorded':
+      return `memory candidate recorded: ${event.candidateId}`;
+    case 'memory.maintenance_started':
+      return `memory maintenance started for ${event.candidateIds.length} candidate${event.candidateIds.length === 1 ? '' : 's'}`;
+    case 'memory.maintenance_finished':
+      return `memory maintenance ${event.outcome}`;
+    case 'memory.maintenance_failed':
+      return `memory maintenance failed: ${truncate(event.error, 80)}`;
     case 'cyberloop.annotation':
       return event.driftLevel === 'unknown' ? undefined : `cyberloop drift=${event.driftLevel}${formatCyberLoopMetrics(event.metadata)}`;
     case 'run.finished':

@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,6 +18,9 @@ describe('runAskCli', () => {
 
   it('runs a stateless ask and writes a trace file', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-'));
+    const memoryRoot = join(workspaceRoot, '.heddle', 'memory');
+    mkdirSync(memoryRoot, { recursive: true });
+    writeFileSync(join(memoryRoot, 'README.md'), '# Workspace Memory\n\n- Ask uses memory context.\n', 'utf8');
     const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
     const result: RunResult = {
       outcome: 'done',
@@ -45,6 +48,9 @@ describe('runAskCli', () => {
     });
 
     expect(runAgentLoopSpy).toHaveBeenCalledTimes(1);
+    expect(runAgentLoopSpy).toHaveBeenCalledWith(expect.objectContaining({
+      systemContext: expect.stringContaining('- Ask uses memory context.'),
+    }));
     expect(existsSync(join(workspaceRoot, '.heddle', 'traces'))).toBe(true);
     expect(stdoutSpy).toHaveBeenCalled();
   });

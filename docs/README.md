@@ -9,6 +9,7 @@ If you are new to Heddle, begin with:
 - [Root README](../README.md) for installation and product overview
 - [Runtime host model](guides/runtime-host-model.md) for how workspace ownership and daemon mode work
 - [Chat and sessions](guides/chat-and-sessions.md) for the core interactive workflow
+- [Knowledge persistence](guides/knowledge-persistence.md) for how Heddle learns durable workspace knowledge while it works
 - [Control plane](guides/control-plane.md) for the browser UI and daemon
 - [CLI reference](reference/cli.md) for command lookup
 
@@ -51,8 +52,9 @@ Longer-term project context and design direction:
 
 1. [README](../README.md)
 2. [Chat and sessions](guides/chat-and-sessions.md)
-3. [Providers and models](reference/providers-and-models.md)
-4. [Project config](reference/config.md)
+3. [Knowledge persistence](guides/knowledge-persistence.md)
+4. [Providers and models](reference/providers-and-models.md)
+5. [Project config](reference/config.md)
 
 ### I want the browser UI and remote oversight
 

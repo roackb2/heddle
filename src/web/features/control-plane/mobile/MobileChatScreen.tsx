@@ -17,6 +17,7 @@ type MobileChatScreenProps = {
   selectedSessionId?: string;
   runActive: boolean;
   runInFlight: boolean;
+  memoryUpdating: boolean;
   sendPromptError?: string;
   sessionNotice?: string;
   draft: string;
@@ -44,6 +45,7 @@ export function MobileChatScreen({
   selectedSessionId,
   runActive,
   runInFlight,
+  memoryUpdating,
   sendPromptError,
   sessionNotice,
   draft,
@@ -103,6 +105,7 @@ export function MobileChatScreen({
         disabled={!selectedSessionId || runActive}
         runActive={runActive}
         runInFlight={runInFlight}
+        memoryUpdating={memoryUpdating}
         canSend={canSend}
         canContinue={canContinue}
         pendingApproval={pendingApproval}
@@ -137,6 +140,7 @@ type MobileComposerProps = {
   disabled: boolean;
   runActive: boolean;
   runInFlight: boolean;
+  memoryUpdating: boolean;
   canSend: boolean;
   canContinue: boolean;
   pendingApproval: MobileChatScreenProps['pendingApproval'];
@@ -158,6 +162,7 @@ function MobileComposer({
   disabled,
   runActive,
   runInFlight,
+  memoryUpdating,
   canSend,
   canContinue,
   pendingApproval,
@@ -173,7 +178,9 @@ function MobileComposer({
   onContinueSession,
   onCancelSessionRun,
 }: MobileComposerProps) {
-  const status = compacting ? 'Compacting earlier conversation history into an archive summary.' : sendPromptError ?? sessionNotice;
+  const status =
+    compacting ? 'Compacting earlier conversation history into an archive summary.'
+    : sendPromptError ?? sessionNotice ?? (memoryUpdating ? 'Memory updating in the background.' : undefined);
 
   return (
     <footer className="relative shrink-0 border-t border-border bg-card px-2 py-2">

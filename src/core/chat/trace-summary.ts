@@ -29,6 +29,16 @@ export function summarizeTrace(trace: TraceEvent[]): string[] {
         return [
           `tool result ${event.tool}: ${event.result.ok ? 'ok' : event.result.error ?? 'error'}`,
         ];
+      case 'memory.candidate_recorded':
+        return [`memory candidate recorded: ${event.candidateId}`];
+      case 'memory.checkpoint_skipped':
+        return [`memory checkpoint skipped: ${truncate(event.rationale, 100)}`];
+      case 'memory.maintenance_started':
+        return [`memory maintenance started: ${event.candidateIds.join(', ')}`];
+      case 'memory.maintenance_finished':
+        return [`memory maintenance finished: ${event.outcome}`];
+      case 'memory.maintenance_failed':
+        return [`memory maintenance failed: ${event.error}`];
       case 'run.finished':
         return [`run finished: ${event.outcome}`];
       default:

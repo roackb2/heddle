@@ -30,6 +30,7 @@ type ScopedEditOptions = {
   rootLabel: string;
   subjectLabel: string;
   creationHint: string;
+  enforceRoot?: boolean;
 };
 
 const DIFF_CONTEXT_LINES = 2;
@@ -75,6 +76,12 @@ export async function executeScopedEdit(raw: unknown, options: ScopedEditOptions
   }
 
   const targetPath = resolve(options.rootPath, raw.path);
+  if (options.enforceRoot && isOutsideRoot(options.rootPath, targetPath)) {
+    return {
+      ok: false,
+      error: `${options.subjectLabel} paths must stay inside ${options.rootLabel}: ${options.rootPath}. Refusing to access ${targetPath}.`,
+    };
+  }
 
   if ('content' in raw) {
     return writeScopedContent(raw, targetPath, options);
@@ -224,6 +231,11 @@ function toScopedPath(rootPath: string, targetPath: string): string {
   }
 
   return rel;
+}
+
+function isOutsideRoot(rootPath: string, targetPath: string): boolean {
+  const rel = relative(rootPath, targetPath);
+  return rel.startsWith('..') || isAbsolute(rel);
 }
 
 async function pathExists(path: string): Promise<boolean> {

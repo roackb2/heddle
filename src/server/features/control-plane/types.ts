@@ -2,6 +2,7 @@ import type { AgentLoopEvent } from '../../../core/runtime/agent-loop.js';
 import type { DaemonOwnerRecord } from '../../../core/runtime/daemon-registry.js';
 import type { HeartbeatRunView, HeartbeatTaskView } from '../../../core/runtime/heartbeat-views.js';
 import type { WorkspaceDescriptor } from '../../../core/runtime/workspaces.js';
+import type { MemoryStatusView } from '../../../core/memory/visibility.js';
 
 export type ChatSessionView = {
   id: string;
@@ -132,4 +133,5 @@ export type ControlPlaneState = {
     tasks: HeartbeatTaskView[];
     runs: HeartbeatRunView[];
   };
+  memory: MemoryStatusView;
 };

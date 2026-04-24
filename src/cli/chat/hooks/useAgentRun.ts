@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { readFileSync, writeFileSync } from 'node:fs';
 import type { MutableRefObject } from 'react';
 import type { Logger } from 'pino';
 import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition, ToolResult } from '../../../index.js';
@@ -9,6 +10,7 @@ import {
   createDefaultAgentTools,
   runAgentLoop,
 } from '../../../index.js';
+import { runMaintenanceForRecordedCandidates } from '../../../core/memory/maintenance-integration.js';
 import type { CyberLoopKinematicsObserver, CyberLoopObserverAnnotation } from '../../../index.js';
 import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../core/tools/run-shell.js';
 import { previewEditFileInput } from '../../../core/tools/edit-file.js';
@@ -52,6 +54,7 @@ export type ActionState = {
   setError: (value: string | undefined) => void;
   setStatus: (value: string) => void;
   setIsRunning: (value: boolean) => void;
+  setIsMemoryUpdating: (value: boolean) => void;
   setInterruptRequested: (value: boolean) => void;
   setLiveEvents: StateSetter<LiveEvent[]>;
   setPendingApproval: (value: PendingApproval | undefined) => void;
@@ -290,8 +293,13 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   if (leaseConflict) {
     state.setError(leaseConflict);
     state.setStatus('Blocked');
+    state.setIsRunning(false);
+    state.interruptRequestedRef.current = false;
+    state.setInterruptRequested(false);
+    state.abortControllerRef.current = undefined;
     updateSessionById(sessionId, (sessionToUpdate) => ({
       ...sessionToUpdate,
+      lastContinuePrompt: undefined,
       messages: [
         ...sessionToUpdate.messages,
         { id: state.nextLocalId(), role: 'assistant', text: leaseConflict },
@@ -544,6 +552,17 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       state.setError(formattedSummary);
     }
     state.setStatus(result.outcome === 'done' ? 'Idle' : `Stopped: ${result.outcome}`);
+    scheduleBackgroundMemoryMaintenance({
+      runtime,
+      llm,
+      sessionId,
+      trace: result.trace,
+      traceFile,
+      updateSessionById,
+      nextLocalId: state.nextLocalId,
+      setLiveEvents: state.setLiveEvents,
+      setIsMemoryUpdating: state.setIsMemoryUpdating,
+    });
     return result;
   } catch (runError) {
     await driftObserver?.observer.flush();
@@ -871,5 +890,74 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
     state.setInterruptRequested(false);
     state.abortControllerRef.current = undefined;
     state.setIsRunning(false);
+  }
+}
+
+function scheduleBackgroundMemoryMaintenance(args: {
+  runtime: ChatRuntimeConfig;
+  llm: LlmAdapter;
+  sessionId: string;
+  trace: RunResult['trace'];
+  traceFile: string;
+  updateSessionById: SessionUpdater;
+  nextLocalId: () => string;
+  setLiveEvents: ActionState['setLiveEvents'];
+  setIsMemoryUpdating: ActionState['setIsMemoryUpdating'];
+}) {
+  void (async () => {
+    const maintenance = await runMaintenanceForRecordedCandidates({
+      memoryRoot: args.runtime.memoryDir,
+      llm: args.llm,
+      source: `terminal chat session ${args.sessionId}`,
+      trace: args.trace,
+      maxSteps: 20,
+      onTraceEvent: (event) => {
+        if (event.type === 'memory.maintenance_started') {
+          args.setIsMemoryUpdating(true);
+        }
+        const next = toLiveEvent(event);
+        if (!next) {
+          return;
+        }
+        args.setLiveEvents((current) => [...current, { id: args.nextLocalId(), text: next }].slice(-8));
+      },
+    });
+    if (maintenance.events.length === 0) {
+      return;
+    }
+
+    const currentTrace = readTraceEvents(args.traceFile);
+    const nextTrace = [...currentTrace, ...maintenance.events];
+    writeFileSync(args.traceFile, `${JSON.stringify(nextTrace, null, 2)}\n`, 'utf8');
+    args.updateSessionById(args.sessionId, (session) => touchSession({
+      ...session,
+      turns: session.turns.map((turn, index) => (
+        index === session.turns.length - 1 ?
+          {
+            ...turn,
+            events: summarizeTrace(nextTrace),
+          }
+        : turn
+      )),
+    }));
+    args.setIsMemoryUpdating(false);
+  })().catch((error) => {
+    args.setIsMemoryUpdating(false);
+    args.setLiveEvents((current) => [
+      ...current,
+      {
+        id: args.nextLocalId(),
+        text: `Memory maintenance failed: ${error instanceof Error ? error.message : String(error)}`,
+      },
+    ].slice(-8));
+  });
+}
+
+function readTraceEvents(path: string): RunResult['trace'] {
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    return Array.isArray(parsed) ? parsed as RunResult['trace'] : [];
+  } catch {
+    return [];
   }
 }

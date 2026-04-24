@@ -32,6 +32,7 @@ export type SessionWorkspaceState = {
   sessionDetailError?: string;
   sendingPrompt: boolean;
   runInFlight: boolean;
+  memoryUpdating: boolean;
   sendPromptError?: string;
   sendPrompt: (prompt: string) => Promise<void>;
   creatingSession: boolean;
@@ -70,6 +71,7 @@ export function useSessionWorkspace(
   const [turnReviewError, setTurnReviewError] = useState<string | undefined>();
   const [pendingApproval, setPendingApproval] = useState<PendingSessionApproval>(null);
   const [runInFlight, setRunInFlight] = useState(false);
+  const [memoryUpdating, setMemoryUpdating] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
   const [sessionNotice, setSessionNotice] = useState<string | undefined>();
 
@@ -329,6 +331,37 @@ export function useSessionWorkspace(
 
       if (liveEvent.type === 'trace' && liveEvent.event) {
         const traceEvent = liveEvent.event;
+        if (traceEvent.type === 'memory.maintenance_started') {
+          setMemoryUpdating(true);
+          upsertLiveStatusMessage(
+            'live-run-status',
+            `Memory updating… ${traceEvent.candidateIds.length} candidate${traceEvent.candidateIds.length === 1 ? '' : 's'}`,
+            { pending: true, streaming: false },
+          );
+          return;
+        }
+
+        if (traceEvent.type === 'memory.maintenance_finished') {
+          setMemoryUpdating(false);
+          upsertLiveStatusMessage(
+            'live-run-status',
+            traceEvent.summary ? `Memory updated. ${traceEvent.summary}` : 'Memory updated.',
+            { pending: false, streaming: false },
+          );
+          void refresh({ silent: true });
+          return;
+        }
+
+        if (traceEvent.type === 'memory.maintenance_failed') {
+          setMemoryUpdating(false);
+          upsertLiveStatusMessage(
+            'live-run-status',
+            traceEvent.error ? `Memory update failed: ${traceEvent.error}` : 'Memory update failed.',
+            { pending: false, streaming: false },
+          );
+          return;
+        }
+
         if (traceEvent.type === 'tool.approval_requested') {
           void fetchPendingSessionApproval(sessionId).then((approval) => setPendingApproval(approval));
           upsertLiveStatusMessage(
@@ -651,6 +684,7 @@ export function useSessionWorkspace(
     sessionDetailError,
     sendingPrompt,
     runInFlight,
+    memoryUpdating,
     sendPromptError,
     sendPrompt,
     creatingSession,

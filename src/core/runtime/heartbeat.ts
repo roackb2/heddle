@@ -1,4 +1,6 @@
+import { resolve } from 'node:path';
 import type { Logger } from 'pino';
+import { appendMemoryCatalogSystemContext } from '../memory/catalog.js';
 import type { ChatMessage, LlmAdapter } from '../llm/types.js';
 import type { ToolCall, ToolDefinition } from '../types.js';
 import { runAgentLoop } from './agent-loop.js';
@@ -41,6 +43,12 @@ export type AgentHeartbeatResult = {
 };
 
 export async function runAgentHeartbeat(options: RunAgentHeartbeatOptions): Promise<AgentHeartbeatResult> {
+  const memoryDir = options.memoryDir ?? resolve(options.workspaceRoot ?? process.cwd(), options.stateDir ?? '.heddle', 'memory');
+  const systemContext = appendHeartbeatSystemContext(appendMemoryCatalogSystemContext({
+    systemContext: options.systemContext,
+    memoryRoot: memoryDir,
+  }));
+
   const result = await runAgentLoop({
     goal: buildHeartbeatGoal(options.task),
     model: options.model,
@@ -48,9 +56,9 @@ export async function runAgentHeartbeat(options: RunAgentHeartbeatOptions): Prom
     maxSteps: options.maxSteps ?? DEFAULT_HEARTBEAT_MAX_STEPS,
     workspaceRoot: options.workspaceRoot,
     stateDir: options.stateDir,
-    memoryDir: options.memoryDir,
+    memoryDir,
     searchIgnoreDirs: options.searchIgnoreDirs,
-    systemContext: appendHeartbeatSystemContext(options.systemContext),
+    systemContext,
     history: options.history,
     resumeFrom: options.checkpoint,
     llm: options.llm,
@@ -152,4 +160,3 @@ function inferHeartbeatDecision(summary: string, outcome: string): HeartbeatDeci
 
   return 'escalate';
 }
-

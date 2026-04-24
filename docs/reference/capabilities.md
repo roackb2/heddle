@@ -10,7 +10,7 @@ Heddle is built to help with real workspace tasks such as:
 - editing code and docs inside the active workspace
 - verifying changes with tests, builds, and repo review evidence
 - carrying work across multi-turn sessions instead of treating every prompt as stateless
-- keeping durable project knowledge in workspace-local memory notes
+- learning durable workspace knowledge from normal usage through catalog-backed memory
 - exposing local browser oversight through the control plane
 - supporting bounded autonomous work through heartbeat scheduling
 
@@ -43,7 +43,9 @@ Current runtime features include:
 - inline `@file` mentions so important files are inspected first
 - direct shell commands in chat with `!<command>`
 - short visible work plans through `update_plan` for substantial multi-step tasks
-- durable workspace memory notes under `.heddle/memory/`
+- automatic durable memory candidate recording and maintainer-backed catalog updates under `.heddle/memory/`
+- read-only memory visibility through `heddle memory status/list/read/search`
+- memory validation through `heddle memory validate`
 - remembered per-project approvals for repeated commands and edits
 - interrupt and resume support for longer-running workflows
 - serializable checkpoints for programmatic continuation
@@ -62,6 +64,7 @@ Beyond terminal chat, Heddle includes:
 ## Notes And Limits
 
 - Heddle is a coding/workspace agent runtime, not a general-purpose autonomous system.
+- Knowledge persistence uses explicit local catalogs and maintainer runs, so users can audit what Heddle learned instead of relying on opaque retrieval.
 - The control plane is already useful, but still early compared with a full IDE-like experience.
 - The image workflow is intentionally lightweight: users provide a local image path and Heddle decides whether inspection is needed.
 - `@path/to/file` mentions prioritize file inspection; they do not blindly paste file contents into the prompt.

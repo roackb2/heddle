@@ -1,8 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  appendMemoryCatalogSystemContext,
   DEFAULT_OPENAI_MODEL,
   type TraceEvent,
+  createLlmAdapter,
   inferProviderFromModel,
   runAgentLoop,
   formatTraceForConsole,
@@ -10,6 +12,7 @@ import {
   resolveProviderApiKey,
   resolveApiKeyForModel,
 } from '../index.js';
+import { runMaintenanceForRecordedCandidates } from '../core/memory/maintenance-integration.js';
 import type { ResolvedRuntimeHost } from '../core/runtime/runtime-hosts.js';
 import { submitChatSessionPrompt } from '../core/chat/session-submit.js';
 import type { ChatSession } from '../core/chat/types.js';
@@ -40,6 +43,10 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
   const maxSteps = options.maxSteps ?? parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 100;
   const workspaceRoot = options.workspaceRoot ?? process.cwd();
   const stateRoot = join(workspaceRoot, options.stateDir ?? '.heddle');
+  const systemContext = appendMemoryCatalogSystemContext({
+    systemContext: options.systemContext,
+    memoryRoot: join(stateRoot, 'memory'),
+  });
   const logger = createLogger({ pretty: true, level: 'debug' });
   const provider = inferProviderFromModel(model);
   const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
@@ -86,6 +93,8 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
       sessionId: targetSession.id,
       prompt: goal,
       apiKey: options.apiKey,
+      systemContext,
+      memoryMaintenanceMode: 'inline',
       leaseOwner: {
         ownerKind: 'ask',
         ownerId: `ask-${process.pid}`,
@@ -109,24 +118,37 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
     return;
   }
 
+  const apiKey = options.apiKey ?? resolveProviderApiKey(provider);
+  const llm = createLlmAdapter({ model, apiKey });
+  const memoryDir = join(stateRoot, 'memory');
   const result = await runAgentLoop({
     goal,
     model,
-    apiKey: options.apiKey ?? resolveProviderApiKey(provider),
+    apiKey,
     maxSteps,
     logger,
     workspaceRoot,
     stateDir: options.stateDir,
+    memoryDir,
     searchIgnoreDirs: options.searchIgnoreDirs,
-    systemContext: options.systemContext,
+    systemContext,
     includePlanTool: false,
+    llm,
   });
-  process.stdout.write(`${formatTraceForConsole(result.trace)}\n`);
+  const maintenance = await runMaintenanceForRecordedCandidates({
+    memoryRoot: memoryDir,
+    llm,
+    source: 'heddle ask',
+    trace: result.trace,
+    maxSteps: 20,
+  });
+  const trace = maintenance.events.length > 0 ? [...result.trace, ...maintenance.events] : result.trace;
+  process.stdout.write(`${formatTraceForConsole(trace)}\n`);
 
   const traceDir = join(stateRoot, 'traces');
   mkdirSync(traceDir, { recursive: true });
   const traceFile = join(traceDir, `trace-${Date.now()}.json`);
-  writeFileSync(traceFile, JSON.stringify(result.trace, null, 2));
+  writeFileSync(traceFile, JSON.stringify(trace, null, 2));
   logger.info({ traceFile }, 'Trace saved');
 }
 
@@ -161,6 +183,8 @@ async function runDaemonBackedAsk(options: {
       sessionId,
       prompt: options.goal,
       apiKey: options.apiKey,
+      systemContext: options.systemContext,
+      memoryMaintenanceMode: 'inline',
     });
 
     process.stdout.write(

@@ -1,12 +1,15 @@
 import { join } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
 import {
+  appendMemoryCatalogSystemContext,
   createDefaultAgentTools,
   createLlmAdapter,
   DEFAULT_OPENAI_MODEL,
   inferProviderFromModel,
   runAgentLoop,
 } from '../../index.js';
-import type { ToolCall, ToolDefinition } from '../../index.js';
+import type { AgentLoopResult, ToolCall, ToolDefinition } from '../../index.js';
+import { runMaintenanceForRecordedCandidates } from '../memory/maintenance-integration.js';
 import { buildCompactionRunningContext, compactChatHistoryWithArchive, estimateChatHistoryTokens } from './compaction.js';
 import { buildConversationMessages } from './conversation-lines.js';
 import { formatChatFailureMessage } from './failure-messages.js';
@@ -26,6 +29,8 @@ export type SubmitChatSessionPromptArgs = {
   sessionId: string;
   prompt: string;
   apiKey?: string;
+  systemContext?: string;
+  memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   onEvent?: (event: AgentLoopEvent) => void;
   onCompactionStatus?: (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; summaryPath?: string; error?: string }) => void;
   approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
@@ -62,11 +67,16 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
   );
 
   const llm = createLlmAdapter({ model, apiKey });
+  const memoryDir = join(args.stateRoot, 'memory');
+  const systemContext = appendMemoryCatalogSystemContext({
+    systemContext: args.systemContext,
+    memoryRoot: memoryDir,
+  });
   const tools = createDefaultAgentTools({
     model,
     apiKey,
     workspaceRoot: args.workspaceRoot,
-    memoryDir: join(args.stateRoot, 'memory'),
+    memoryDir,
     searchIgnoreDirs: [],
     includePlanTool: true,
   });
@@ -79,6 +89,7 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
       stateRoot: args.stateRoot,
       toolNames: tools.map((tool) => tool.name),
       goal: args.prompt,
+      systemContext,
       onStatusChange: (event) => {
         args.onCompactionStatus?.(event);
         if (event.status === 'running') {
@@ -122,24 +133,50 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
       apiKey,
       workspaceRoot: args.workspaceRoot,
       stateDir: args.stateRoot,
-      memoryDir: join(args.stateRoot, 'memory'),
+      memoryDir,
       llm,
       tools,
       includeDefaultTools: false,
       history: preflightSession.history,
+      systemContext,
       onEvent: args.onEvent,
       approveToolCall: args.approveToolCall,
       abortSignal: args.abortSignal,
     });
+    const maintenanceMode = args.memoryMaintenanceMode ?? 'background';
+    const inlineMaintenance =
+      maintenanceMode === 'inline' ?
+        await runMaintenanceForRecordedCandidates({
+          memoryRoot: memoryDir,
+          llm,
+          source: `chat session ${session.id}`,
+          trace: result.trace,
+          maxSteps: 20,
+          onTraceEvent: (event) => args.onEvent?.({ type: 'trace', runId: result.state.runId, event, timestamp: new Date().toISOString() }),
+        })
+      : undefined;
+    const resultTrace =
+      inlineMaintenance && inlineMaintenance.events.length > 0 ?
+        [...result.trace, ...inlineMaintenance.events]
+      : result.trace;
+    const resultForPersistence = {
+      ...result,
+      trace: resultTrace,
+      state: {
+        ...result.state,
+        trace: resultTrace,
+      },
+    };
 
     const compacted = await compactChatHistoryWithArchive({
-      history: result.transcript,
+      history: resultForPersistence.transcript,
       model,
       sessionId: session.id,
       stateRoot: args.stateRoot,
-      usage: result.usage,
+      usage: resultForPersistence.usage,
       toolNames: tools.map((tool) => tool.name),
       goal: args.prompt,
+      systemContext,
       onStatusChange: (event) => {
         args.onCompactionStatus?.(event);
         if (event.status === 'running') {
@@ -147,7 +184,7 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
             ...preflightSession,
             history: result.transcript,
             context: buildCompactionRunningContext({
-              history: result.transcript,
+              history: resultForPersistence.transcript,
               previous: preflightSession.context,
               archiveCount: preflightSession.archives?.length,
               currentSummaryPath: preflightSession.context?.currentSummaryPath,
@@ -161,24 +198,24 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
         }
       },
     });
-    const traceFile = saveTrace(join(args.stateRoot, 'traces'), result.trace);
+    const traceFile = saveTrace(join(args.stateRoot, 'traces'), resultForPersistence.trace);
     const nextTurn = {
       id: `server-turn-${Date.now()}`,
       prompt: args.prompt,
-      outcome: result.outcome,
-      summary: result.summary,
-      steps: countAssistantSteps(result.trace),
+      outcome: resultForPersistence.outcome,
+      summary: resultForPersistence.summary,
+      steps: countAssistantSteps(resultForPersistence.trace),
       traceFile,
-      events: summarizeTrace(result.trace),
+      events: summarizeTrace(resultForPersistence.trace),
     };
 
     const formattedSummary =
-      result.outcome === 'error' ?
-        formatChatFailureMessage(result.summary, {
+      resultForPersistence.outcome === 'error' ?
+        formatChatFailureMessage(resultForPersistence.summary, {
           model,
           estimatedHistoryTokens: estimateChatHistoryTokens(session.history),
         })
-      : result.summary;
+      : resultForPersistence.summary;
 
     const updatedSession: ChatSession = touchSession({
       ...preflightSession,
@@ -193,15 +230,105 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
 
     const nextSessions = sessions.map((candidate) => candidate.id === session.id ? updatedSession : candidate);
     saveChatSessions(args.sessionStoragePath, nextSessions);
+    if (maintenanceMode === 'background') {
+      scheduleBackgroundMemoryMaintenance({
+        memoryRoot: memoryDir,
+        llm,
+        source: `chat session ${session.id}`,
+        trace: result.trace,
+        traceFile,
+        sessionStoragePath: args.sessionStoragePath,
+        sessionId: session.id,
+        runId: result.state?.runId ?? `session-${session.id}`,
+        onEvent: args.onEvent,
+      });
+    }
 
     return {
-      outcome: result.outcome,
+      outcome: resultForPersistence.outcome,
       summary: formattedSummary,
       session: updatedSession,
     };
   } finally {
     clearChatSessionLease(args.sessionStoragePath, session.id, leaseOwner);
   }
+}
+
+function scheduleBackgroundMemoryMaintenance(args: {
+  memoryRoot: string;
+  llm: ReturnType<typeof createLlmAdapter>;
+  source: string;
+  trace: AgentLoopResult['trace'];
+  traceFile: string;
+  sessionStoragePath: string;
+  sessionId: string;
+  runId: string;
+  onEvent?: (event: AgentLoopEvent) => void;
+}) {
+  void (async () => {
+    const maintenance = await runMaintenanceForRecordedCandidates({
+      memoryRoot: args.memoryRoot,
+      llm: args.llm,
+      source: args.source,
+      trace: args.trace,
+      maxSteps: 20,
+      onTraceEvent: (event) => args.onEvent?.({ type: 'trace', runId: args.runId, event, timestamp: new Date().toISOString() }),
+    });
+    if (maintenance.events.length === 0) {
+      return;
+    }
+
+    const currentTrace = readTraceEvents(args.traceFile);
+    const nextTrace = [...currentTrace, ...maintenance.events];
+    writeFileSync(args.traceFile, `${JSON.stringify(nextTrace, null, 2)}\n`, 'utf8');
+
+    const sessions = loadChatSessions(args.sessionStoragePath, true);
+    const nextSessions = sessions.map((session) => {
+      if (session.id !== args.sessionId) {
+        return session;
+      }
+
+      return touchSession({
+        ...session,
+        turns: session.turns.map((turn, index) => (
+          index === session.turns.length - 1 ?
+            {
+              ...turn,
+              events: summarizeTrace(nextTrace),
+            }
+          : turn
+        )),
+      });
+    });
+    saveChatSessions(args.sessionStoragePath, nextSessions);
+  })().catch((error) => {
+    args.onEvent?.({
+      type: 'trace',
+      runId: args.runId,
+      event: {
+        type: 'memory.maintenance_failed',
+        runId: `memory-run-${Date.now()}`,
+        error: error instanceof Error ? error.message : String(error),
+        candidateIds: [],
+        step: nextTraceStep(args.trace),
+        timestamp: new Date().toISOString(),
+      },
+      timestamp: new Date().toISOString(),
+    });
+  });
+}
+
+function readTraceEvents(path: string): AgentLoopResult['trace'] {
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    return Array.isArray(parsed) ? parsed as AgentLoopResult['trace'] : [];
+  } catch {
+    return [];
+  }
+}
+
+function nextTraceStep(trace: AgentLoopResult['trace']): number {
+  return trace.reduce((max, event) => 'step' in event ? Math.max(max, event.step) : max, 0) + 1;
 }
 
 export function clearChatSessionLease(sessionStoragePath: string, sessionId: string, owner: ChatSessionLeaseOwner) {

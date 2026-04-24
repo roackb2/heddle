@@ -15,10 +15,12 @@ When additional project context is needed, read in this order:
 
 1. `../heddle-workspace-notes/agent-memory/README.md`
 2. `../heddle-workspace-notes/agent-memory/current-state/project-summary.md`
-3. This repo's docs and code
+3. This repo's live docs and code for the relevant capability area
 4. the relevant focused file under `../heddle-workspace-notes/agent-memory/current-state/`
 5. `../heddle-workspace-notes/agent-memory/project-context.md` only when broader long-form context is needed
 6. `../heddle-workspace-notes/analysis/` and `../heddle-workspace-notes/task-plans/` as supporting historical context only
+
+For first-run situation awareness, do not stop after reading high-level memory summaries. Before answering capability-depth questions such as "what is this project?", "how does Heddle work?", or "what can it really do?", inspect the implementation path named by `agent-memory/README.md` and `current-state/project-summary.md`. The sibling notes explain intent and current state; the live code is the source of truth for actual capability depth.
 
 ## Authority Rules
 

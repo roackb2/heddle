@@ -31,7 +31,7 @@ export function createListMemoryNotesTool(options: MemoryNotesToolOptions = {}):
   return {
     name: 'list_memory_notes',
     description:
-      'List markdown notes inside Heddle persistent memory under .heddle/memory. Use this when you want to inspect what durable project knowledge already exists before updating memory. Optional field: path, relative to the memory root, to limit listing to a subdirectory. Returns relative note paths. Example inputs: {}, { "path": "." }, { "path": "architecture" }.',
+      'List markdown notes inside Heddle-managed persistent memory under .heddle/memory. Use this to follow the catalog discovery path for durable preferences, workflows, current-state handoff, operational conventions, relationships, history, and other reusable agent context. Optional field: path, relative to the memory root, to limit listing to a subdirectory. Returns relative note paths. Example inputs: {}, { "path": "." }, { "path": "preferences" }.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -86,7 +86,7 @@ export function createReadMemoryNoteTool(options: MemoryNotesToolOptions = {}): 
   return {
     name: 'read_memory_note',
     description:
-      'Read a persistent memory note from .heddle/memory. Use this for durable project notes such as architecture, known issues, or common commands. Optional fields: maxLines and offset for paging long notes. The path must stay inside the memory root. Example inputs: { "path": "project-summary.md" }, { "path": "architecture.md", "offset": 40, "maxLines": 80 }.',
+      'Read a Heddle-managed persistent memory note from .heddle/memory. Prefer reading README.md catalogs first, then focused notes linked from those catalogs. Use this for durable agent context such as user/team preferences, task formats, workflows, current-state handoff, operational knowledge, relationships, history, known issues, or common commands. Optional fields: maxLines and offset for paging long notes. The path must stay inside the memory root. Example inputs: { "path": "README.md" }, { "path": "preferences/README.md" }, { "path": "preferences/ticket-format.md" }.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -144,7 +144,7 @@ export function createSearchMemoryNotesTool(options: MemoryNotesToolOptions = {}
   return {
     name: 'search_memory_notes',
     description:
-      'Search markdown notes under .heddle/memory using mature command-line search tools. Use this when you want durable project knowledge but do not yet know which note contains it. Input example: { "query": "test command" }. Optional fields: path to limit the search to a subdirectory or note, and maxResults to cap returned lines. Returns grep-style path:line:content output or "No matches found.".',
+      'Search Heddle-managed markdown memory under .heddle/memory. Use this before broad repo search when the user asks about durable preferences, ticket/response formats, workflows, recurring operational patterns, current-state handoff, relationships, or history and you do not yet know the right catalog path. Input example: { "query": "ticket" }. Optional fields: path to limit the search to a subdirectory or note, and maxResults to cap returned lines. Returns grep-style path:line:content output or "No matches found.".',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -229,6 +229,7 @@ export function createEditMemoryNoteTool(options: MemoryNotesToolOptions = {}): 
         rootLabel: 'memory root',
         subjectLabel: 'memory note',
         creationHint: 'Set createIfMissing to true if you want edit_memory_note to create it.',
+        enforceRoot: true,
       });
     },
   };

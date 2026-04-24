@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -51,6 +51,23 @@ describe('resolveChatRuntimeConfig', () => {
     expect(runtime.apiKey).toBe('openai-key');
     expect(runtime.apiKeyProvider).toBe('openai');
     expect(resolveApiKeyForModel('claude-sonnet-4-6', runtime)).toBe('anthropic-key');
+  });
+
+  it('loads the workspace memory root catalog into startup context', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-chat-memory-context-'));
+    const memoryRoot = join(workspaceRoot, '.heddle', 'memory');
+    mkdirSync(memoryRoot, { recursive: true });
+    writeFileSync(join(memoryRoot, 'README.md'), '# Workspace Memory\n\n- Read current-state first.\n', 'utf8');
+
+    const runtime = resolveChatRuntimeConfig({
+      workspaceRoot,
+      model: 'gpt-test',
+      systemContext: 'Source: AGENTS.md\nRead docs first.',
+    });
+
+    expect(runtime.systemContext).toContain('Source: AGENTS.md');
+    expect(runtime.systemContext).toContain('## Workspace Memory Catalog');
+    expect(runtime.systemContext).toContain('- Read current-state first.');
   });
 });
 

@@ -23,6 +23,12 @@ import {
   setControlPlaneHeartbeatTaskEnabled,
   triggerControlPlaneHeartbeatTaskRun,
 } from './services/heartbeat.js';
+import {
+  listControlPlaneMemoryNotes,
+  readControlPlaneMemoryNote,
+  readControlPlaneMemoryStatus,
+  searchControlPlaneMemoryNotes,
+} from './services/memory.js';
 import { saveControlPlaneLayoutSnapshot } from './services/layout-snapshots.js';
 import { searchWorkspaceFiles } from './services/workspace-files.js';
 import { createWorkspaceDescriptor, setActiveWorkspace } from '../../../core/runtime/workspaces.js';
@@ -42,6 +48,8 @@ const sessionMessageInputSchema = z.object({
   sessionId: z.string().min(1),
   prompt: z.string().min(1),
   apiKey: z.string().min(1).optional(),
+  systemContext: z.string().min(1).optional(),
+  memoryMaintenanceMode: z.enum(['background', 'inline', 'none']).optional(),
 });
 
 const agentAskInputSchema = z.object({
@@ -83,6 +91,22 @@ const fileSearchInputSchema = z.object({
   query: z.string().max(200).optional(),
   limit: z.number().int().min(1).max(50).optional(),
 }).optional();
+
+const memoryListInputSchema = z.object({
+  path: z.string().min(1).optional(),
+}).optional();
+
+const memoryReadInputSchema = z.object({
+  path: z.string().min(1),
+  offset: z.number().int().min(0).optional(),
+  maxLines: z.number().int().min(1).max(1000).optional(),
+});
+
+const memorySearchInputSchema = z.object({
+  query: z.string().min(1).max(200),
+  path: z.string().min(1).optional(),
+  maxResults: z.number().int().min(1).max(200).optional(),
+});
 
 const layoutSnapshotInputSchema = z.object({
   snapshot: z.unknown(),
@@ -163,6 +187,8 @@ export const controlPlaneRouter = router({
       sessionId: input.sessionId,
       prompt: input.prompt,
       apiKey: input.apiKey,
+      systemContext: input.systemContext,
+      memoryMaintenanceMode: input.memoryMaintenanceMode,
       leaseOwner: {
         ownerKind: 'daemon',
         ownerId: ctx.runtimeHost?.ownerId ?? `daemon-${process.pid}`,
@@ -208,6 +234,24 @@ export const controlPlaneRouter = router({
         limit: input?.limit ?? 20,
       }),
     };
+  }),
+  memoryStatus: procedure.query(async ({ ctx }) => {
+    return await readControlPlaneMemoryStatus(ctx.activeWorkspace.stateRoot);
+  }),
+  memoryList: procedure.input(memoryListInputSchema).query(async ({ ctx, input }) => {
+    return await listControlPlaneMemoryNotes(ctx.activeWorkspace.stateRoot, input?.path);
+  }),
+  memoryRead: procedure.input(memoryReadInputSchema).query(async ({ ctx, input }) => {
+    return await readControlPlaneMemoryNote(ctx.activeWorkspace.stateRoot, input.path, {
+      offset: input.offset,
+      maxLines: input.maxLines,
+    });
+  }),
+  memorySearch: procedure.input(memorySearchInputSchema).query(async ({ ctx, input }) => {
+    return await searchControlPlaneMemoryNotes(ctx.activeWorkspace.stateRoot, input.query, {
+      path: input.path,
+      maxResults: input.maxResults,
+    });
   }),
   heartbeatTaskEnable: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
     return {

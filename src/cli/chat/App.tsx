@@ -93,6 +93,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     status,
     setStatus,
     isRunning,
+    isMemoryUpdating,
     error,
     liveEvents,
     workingFrame,
@@ -119,11 +120,13 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     : compacting ? 'compacting'
     : interruptRequested ? 'interrupt requested'
     : isRunning ? 'running'
+    : isMemoryUpdating ? 'memory updating'
     : status;
   const statusHint =
     pendingApproval ? '←/→ choose • Enter confirms • A remembers for this project • Esc denies • Ctrl+C exits'
     : compacting ? 'Compacting archived history in the background • Ctrl+C exits'
     : isRunning ? 'Type freely • Enter queues prompt • Esc requests stop after the current step • Ctrl+C exits'
+    : isMemoryUpdating ? 'Memory maintenance is running in the background • Enter sends • Ctrl+C exits'
     : 'Enter sends • Tab completes slash commands • /help shows commands • !command runs shell • Ctrl+C exits';
   const runtimeHostWarning =
     runtime.runtimeHost?.kind === 'daemon' && !runtime.runtimeHost.stale ?

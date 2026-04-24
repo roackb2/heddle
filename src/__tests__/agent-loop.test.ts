@@ -229,10 +229,41 @@ describe('createDefaultAgentTools', () => {
       'list_memory_notes',
       'read_memory_note',
       'search_memory_notes',
-      'edit_memory_note',
+      'memory_checkpoint',
+      'record_knowledge',
       'run_shell_inspect',
       'run_shell_mutate',
     ]));
+    expect(withoutPlan.map((tool) => tool.name)).not.toContain('edit_memory_note');
+  });
+
+  it('supports explicit memory tool modes', () => {
+    const none = createDefaultAgentTools({
+      model: 'gpt-test',
+      memoryDir: '/tmp/heddle-memory',
+      memoryMode: 'none',
+    }).map((tool) => tool.name);
+    const maintainer = createDefaultAgentTools({
+      model: 'gpt-test',
+      memoryDir: '/tmp/heddle-memory',
+      memoryMode: 'maintainer',
+    }).map((tool) => tool.name);
+    const legacy = createDefaultAgentTools({
+      model: 'gpt-test',
+      memoryDir: '/tmp/heddle-memory',
+      memoryMode: 'legacy-full',
+    }).map((tool) => tool.name);
+
+    expect(none).not.toContain('list_memory_notes');
+    expect(none).not.toContain('record_knowledge');
+    expect(maintainer).toEqual(expect.arrayContaining([
+      'list_memory_notes',
+      'read_memory_note',
+      'search_memory_notes',
+      'edit_memory_note',
+    ]));
+    expect(maintainer).not.toContain('record_knowledge');
+    expect(legacy).toContain('edit_memory_note');
   });
 });
 

@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
@@ -22,6 +22,8 @@ import {
   createSearchMemoryNotesTool,
   createEditMemoryNoteTool,
 } from '../core/tools/memory-notes.js';
+import { createMemoryCheckpointTool } from '../core/tools/memory-checkpoint.js';
+import { createRecordKnowledgeTool } from '../core/tools/record-knowledge.js';
 
 describe('tool input validation', () => {
   it('rejects unexpected fields for list_files', async () => {
@@ -84,12 +86,22 @@ describe('tool input validation', () => {
     const readMemoryTool = createReadMemoryNoteTool();
     const searchMemoryTool = createSearchMemoryNotesTool();
     const editMemoryTool = createEditMemoryNoteTool();
-    expect(listMemoryTool.description).toContain('List markdown notes inside Heddle persistent memory');
-    expect(readMemoryTool.description).toContain('Read a persistent memory note');
-    expect(searchMemoryTool.description).toContain('mature command-line search tools');
+    const recordKnowledgeTool = createRecordKnowledgeTool();
+    expect(listMemoryTool.description).toContain('List markdown notes inside Heddle-managed persistent memory');
+    expect(listMemoryTool.description).toContain('follow the catalog discovery path');
+    expect(readMemoryTool.description).toContain('Read a Heddle-managed persistent memory note');
+    expect(readMemoryTool.description).toContain('Prefer reading README.md catalogs first');
+    expect(searchMemoryTool.description).toContain('Search Heddle-managed markdown memory');
+    expect(searchMemoryTool.description).toContain('Use this before broad repo search');
     expect(editMemoryTool.description).toContain('Create or edit a persistent markdown note');
     expect(editMemoryTool.description).toContain('does not require approval');
     expect(editMemoryTool.requiresApproval).toBeUndefined();
+    expect(recordKnowledgeTool.description).toContain('Submit a durable memory candidate');
+    expect(recordKnowledgeTool.description).toContain('Prefer memory_checkpoint before final answers');
+    expect(recordKnowledgeTool.description).toContain('canonical verification commands');
+    expect(recordKnowledgeTool.description).toContain('repeated session patterns');
+    expect(recordKnowledgeTool.description).toContain('does not directly edit memory notes');
+    expect(recordKnowledgeTool.requiresApproval).toBeUndefined();
     expect(reportStateTool.description).toContain('Use this when you are blocked, uncertain');
     expect(reportStateTool.description).toContain('tell the library author what capability, input, or support was missing');
     expect(reportStateTool.description).toContain('Returns the same structured report back');
@@ -367,12 +379,131 @@ describe('memory note tools', () => {
 
   it('refuses to access paths outside the memory root', async () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-memory-scope-'));
-    const tool = createReadMemoryNoteTool({ memoryRoot: root });
+    const readTool = createReadMemoryNoteTool({ memoryRoot: root });
+    const editTool = createEditMemoryNoteTool({ memoryRoot: root });
 
-    const result = await tool.execute({ path: '../outside.md' });
+    const readResult = await readTool.execute({ path: '../outside.md' });
+    const editResult = await editTool.execute({
+      path: '../outside.md',
+      content: 'bad',
+      createIfMissing: true,
+    });
 
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain('Memory note paths must stay inside');
+    expect(readResult.ok).toBe(false);
+    expect(readResult.error).toContain('Memory note paths must stay inside');
+    expect(editResult.ok).toBe(false);
+    expect(editResult.error).toContain('memory note paths must stay inside');
+  });
+
+  it('records knowledge candidates under memory maintenance', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-record-knowledge-'));
+    const tool = createRecordKnowledgeTool({
+      memoryRoot: root,
+      now: () => new Date('2026-04-24T00:00:00.000Z'),
+      nextId: () => 'candidate-test',
+    });
+
+    const result = await tool.execute({
+      summary: 'The canonical verification command is yarn build.',
+      evidence: ['Verified during implementation.'],
+      categoryHint: 'operations',
+      importance: 'high',
+      confidence: 'tool-verified',
+      sourceRefs: ['package.json', 'command:yarn build'],
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      output: {
+        id: 'candidate-test',
+        path: '_maintenance/candidates.jsonl',
+        status: 'pending',
+        message: 'Knowledge candidate recorded for memory maintenance.',
+      },
+    });
+    const raw = await readFile(join(root, '_maintenance', 'candidates.jsonl'), 'utf8');
+    expect(JSON.parse(raw.trim())).toEqual({
+      id: 'candidate-test',
+      recordedAt: '2026-04-24T00:00:00.000Z',
+      status: 'pending',
+      summary: 'The canonical verification command is yarn build.',
+      evidence: ['Verified during implementation.'],
+      categoryHint: 'operations',
+      importance: 'high',
+      confidence: 'tool-verified',
+      sourceRefs: ['package.json', 'command:yarn build'],
+    });
+  });
+
+  it('uses memory checkpoint to either skip or record a durable candidate', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-memory-checkpoint-'));
+    const tool = createMemoryCheckpointTool({
+      memoryRoot: root,
+      now: () => new Date('2026-04-24T00:00:00.000Z'),
+      nextId: () => 'candidate-checkpoint',
+    });
+
+    await expect(tool.execute({
+      decision: 'skip',
+      rationale: 'The turn only answered a one-off question.',
+      candidate: null,
+    })).resolves.toMatchObject({
+      ok: true,
+      output: {
+        decision: 'skip',
+        rationale: 'The turn only answered a one-off question.',
+      },
+    });
+
+    await expect(tool.execute({
+      decision: 'record',
+      rationale: 'The user stated a durable preference.',
+      candidate: {
+        summary: 'Use the short ticket format for future tickets.',
+        categoryHint: 'workflows',
+        importance: 'high',
+        confidence: 'user-stated',
+        sourceRefs: ['conversation'],
+      },
+    })).resolves.toMatchObject({
+      ok: true,
+      output: {
+        decision: 'record',
+        id: 'candidate-checkpoint',
+        path: '_maintenance/candidates.jsonl',
+      },
+    });
+
+    await expect(readFile(join(root, '_maintenance', 'candidates.jsonl'), 'utf8')).resolves.toContain('Use the short ticket format');
+  });
+
+  it('rejects invalid record_knowledge input and unsafe source refs', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-record-invalid-'));
+    const tool = createRecordKnowledgeTool({ memoryRoot: root });
+
+    await expect(tool.execute({ summary: 'ok', unexpected: true })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Invalid input for record_knowledge'),
+    });
+    await expect(tool.execute({ summary: 'ok', sourceRefs: ['../outside.md'] })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('unsafe sourceRef'),
+    });
+  });
+
+  it('refuses secret-like record_knowledge content', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-record-secret-'));
+    const tool = createRecordKnowledgeTool({ memoryRoot: root });
+
+    const result = await tool.execute({
+      summary: 'The API key is sk-test-secret',
+      confidence: 'user-stated',
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('secret-like content'),
+    });
   });
 });
 
