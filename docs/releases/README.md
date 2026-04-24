@@ -21,7 +21,8 @@ For a user-facing release:
 5. Review the actual scope from git.
 6. Write curated release notes from that real scope.
 7. Create an annotated git tag on the shipped commit.
-8. Push the commit and tag, then publish the GitHub release and npm package if intended.
+8. Push the commit and tag, then create the GitHub release from the curated release note.
+9. Leave npm publishing as the final manual operator step unless the operator explicitly asks the agent to publish to npm.
 
 ## Verification Baseline
 
@@ -75,8 +76,8 @@ For the actual release pass:
 6. Commit the release-ready state if needed.
 7. Create the annotated tag on the shipped commit.
 8. Push the commit and tag.
-9. Publish the GitHub release body from the curated note.
-10. Publish the npm package if that release is intended to ship publicly.
+9. Create the GitHub release body from the curated note.
+10. Stop and hand off to the operator for `npm publish`, unless the operator explicitly asks the agent to publish.
 
 ## Command Sequence
 
@@ -92,6 +93,7 @@ yarn release:context <previous-tag> HEAD
 git tag -a vX.Y.Z -m "Heddle vX.Y.Z"
 git push origin main
 git push origin vX.Y.Z
+gh release create vX.Y.Z --title "Heddle vX.Y.Z" --notes-file docs/releases/vX.Y.Z.md
 ```
 
 If the repo does not have a previous tag yet, run `yarn release:context <base-ref> HEAD` with the intended release boundary instead.
@@ -121,6 +123,7 @@ Current example release note drafts:
 - [`v0.0.26.md`](./v0.0.26.md)
 - [`v0.0.27.md`](./v0.0.27.md)
 - [`v0.0.28.md`](./v0.0.28.md)
+- [`v0.0.29.md`](./v0.0.29.md)
 
 ## Agent Rule
 
@@ -131,4 +134,7 @@ When a coding agent is asked to do a release, it should:
 - verify the release candidate is green
 - propose or apply the version bump
 - create the annotated tag only for the actual release commit
+- push the release commit and tag
+- create the GitHub release from the curated release note
+- leave `npm publish` as the final operator action unless explicitly delegated
 - avoid inventing release scope from commit naming style alone

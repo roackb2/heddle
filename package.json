@@ -1,6 +1,6 @@
 {
   "name": "@roackb2/heddle",
-  "version": "0.0.28",
+  "version": "0.0.29",
   "description": "An open-source AI coding agent runtime and terminal CLI for real repositories, with persistent memory, sessions, approvals, heartbeat, and a browser control plane",
   "author": "Jay / Fienna Liang <roackb2@gmail.com>",
   "license": "MIT",
