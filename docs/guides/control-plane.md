@@ -77,9 +77,10 @@ On mobile, the UI uses:
 Representative mobile views:
 
 <p>
-  <img src="../images/mobile-control-plane-sessions.png" alt="Heddle mobile session list" width="240">
-  <img src="../images/mobile-control-plane-chat.png" alt="Heddle mobile chat view" width="240">
-  <img src="../images/mobile-control-plane-review.png" alt="Heddle mobile review evidence" width="240">
+  <img src="../images/mobile-control-plane-overview-current.png" alt="Heddle mobile overview" width="240">
+  <img src="../images/mobile-control-plane-session-chat.png" alt="Heddle mobile chat view" width="240">
+  <img src="../images/mobile-control-plane-session-review-current-diff.png" alt="Heddle mobile current diff review" width="240">
+  <img src="../images/mobile-control-plane-workspaces-current.png" alt="Heddle mobile workspace management" width="240">
 </p>
 
 ## Start The Daemon

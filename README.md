@@ -52,25 +52,35 @@ Terminal chat/dev workflow showing file edits, inline diff output, and verificat
 
 ### Browser control plane overview
 
-The local control plane gives you a browser-based view of the current workspace, saved sessions, heartbeat tasks, workspace memory, and recent activity:
+The local control plane gives you a browser-based view of the current workspace, saved sessions, heartbeat tasks, workspace memory, and recent activity. It also shows which workspace is active, so browser sessions follow the selected project instead of the daemon launch directory:
 
-![Heddle control plane overview](docs/images/control-plane-overview.png)
+![Heddle control plane overview with workspace memory](docs/images/control-plane-overview-workspace-memory.png)
 
 ### Browser session review
 
-Saved session review in the control plane, with conversation history in the center and review on the right. Review starts from the current Git working tree, then separates historical turn diffs and command/approval evidence so you can focus on the change you need to inspect now:
+Saved session review in the control plane, with conversation history in the center and current change review on the right. Review starts from the current Git working tree, then separates historical turn diffs and command/approval evidence so you can focus on the change you need to inspect now:
 
-![Heddle control plane session review](docs/images/control-plane-session-review.png)
+![Heddle control plane current diff review](docs/images/control-plane-session-current-diff.png)
+
+### Workspace and task management
+
+The Workspaces view lets you switch between local projects, register additional workspace roots, rename attached workspaces, and keep sessions tied to the workspace state under `.heddle/`:
+
+![Heddle control plane workspace management](docs/images/control-plane-workspace-management.png)
+
+Heartbeat tasks expose scheduled/background maintenance runs with durable run history and operator escalation state:
+
+![Heddle control plane heartbeat tasks](docs/images/control-plane-heartbeat-tasks.png)
 
 ### Mobile control plane
 
-The control plane also has a phone-oriented layout for checking sessions, reading the latest conversation, switching between workspace sections, and reviewing evidence from another device:
+The control plane also has a phone-oriented layout for checking sessions, reading the latest conversation, switching between workspace sections, and reviewing current diffs from another device:
 
 <p>
-  <img src="docs/images/mobile-control-plane-sessions.png" alt="Heddle mobile session list" width="240">
-  <img src="docs/images/mobile-control-plane-chat.png" alt="Heddle mobile chat view" width="240">
-  <img src="docs/images/mobile-control-plane-review-commands.png" alt="Heddle mobile review commands tab" width="240">
-  <img src="docs/images/mobile-control-plane-review-approvals.png" alt="Heddle mobile review approvals tab" width="240">
+  <img src="docs/images/mobile-control-plane-overview-current.png" alt="Heddle mobile overview" width="240">
+  <img src="docs/images/mobile-control-plane-session-chat.png" alt="Heddle mobile chat view" width="240">
+  <img src="docs/images/mobile-control-plane-session-review-current-diff.png" alt="Heddle mobile current diff review" width="240">
+  <img src="docs/images/mobile-control-plane-workspaces-current.png" alt="Heddle mobile workspace management" width="240">
 </p>
 
 ## 2-Minute Try-It Path
