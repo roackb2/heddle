@@ -153,7 +153,7 @@ async function acquireMemoryMaintenanceLock(options: {
       }
 
       if (Date.now() - startedAt >= timeoutMs) {
-        throw new Error(`Memory maintenance lock is busy: ${lockPath}`);
+        throw new Error(`Memory maintenance lock is busy: ${lockPath}`, { cause: error });
       }
       await sleep(DEFAULT_LOCK_POLL_MS);
     }

@@ -6,7 +6,7 @@ import { formatDate } from '../utils';
 import { MobileSessionNav } from './MobileSessionNav';
 import { Button } from '../../../components/ui/button';
 import { DiffViewer } from '../components/DiffViewer';
-import type { ExpandedDiff } from '../screens/SessionsScreen';
+import type { ExpandedDiff } from '../screens/SessionReviewPanel';
 
 type SessionTurn = Exclude<ChatSessionDetail, null>['turns'][number];
 
@@ -23,6 +23,7 @@ type MobileReviewScreenProps = {
   workspaceChangesError?: string;
   selectedWorkspaceFile?: WorkspaceChanges['files'][number];
   workspaceFileDiff: WorkspaceFileDiff | null;
+  workspaceFileDiffsByPath: Record<string, WorkspaceFileDiff>;
   workspaceFileDiffLoading: boolean;
   workspaceFileDiffError?: string;
   onSelectWorkspaceFile: (path: string) => void;
@@ -66,10 +67,11 @@ export function MobileReviewScreen({
   const subtitle = 'Review evidence';
   const selectedFile =
     turnReview?.files.find((file) => file.path === selectedFilePath) ?? turnReview?.files[0];
+  const firstReviewFilePath = turnReview?.files[0]?.path;
 
   useEffect(() => {
-    setSelectedFilePath(turnReview?.files[0]?.path);
-  }, [selectedTurnId, turnReview?.traceFile]);
+    setSelectedFilePath(firstReviewFilePath);
+  }, [firstReviewFilePath, selectedTurnId, turnReview?.traceFile]);
 
   const commandGroups = useMemo(() => {
     if (!turnReview) {

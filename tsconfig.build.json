@@ -1,4 +1,4 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "dist", "src/__tests__/**/*", "src/web/**/*"]
+  "exclude": ["node_modules", "dist", "src/__tests__/**/*", "src/web/**/*", "e2e/**/*", "playwright.config.ts"]
 }

@@ -35,7 +35,7 @@ export function DiffViewer({
             <table key={`${hunk.header}-${hunkIndex}`} className="w-full border-collapse">
               <tbody>
                 <tr>
-                  <td colSpan={3} className="border-y border-border bg-muted/40 px-3 py-1 font-mono text-[11px] text-muted-foreground">
+                  <td colSpan={2} className="border-y border-border bg-muted/40 px-3 py-1 font-mono text-[11px] text-muted-foreground">
                     {hunk.header}
                   </td>
                 </tr>
@@ -47,11 +47,8 @@ export function DiffViewer({
                       line.type === 'deleted' && 'bg-rose-500/10',
                     )}
                   >
-                    <td className="w-12 select-none border-r border-border px-2 py-0.5 text-right text-muted-foreground/70">
-                      {line.oldLineNumber ?? ''}
-                    </td>
-                    <td className="w-12 select-none border-r border-border px-2 py-0.5 text-right text-muted-foreground/70">
-                      {line.newLineNumber ?? ''}
+                    <td className="w-14 select-none border-r border-border px-2 py-0.5 text-right text-muted-foreground/70">
+                      {line.type === 'added' ? line.newLineNumber : line.oldLineNumber ?? line.newLineNumber ?? ''}
                     </td>
                     <td className="whitespace-pre px-3 py-0.5 text-foreground">
                       {line.content}

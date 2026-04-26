@@ -19,6 +19,6 @@
       "@/*": ["src/web/*"]
     }
   },
-  "include": ["src/**/*", "examples/**/*"],
+  "include": ["src/**/*", "examples/**/*", "e2e/**/*", "playwright.config.ts"],
   "exclude": ["node_modules", "dist"]
 }

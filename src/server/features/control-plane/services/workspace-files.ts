@@ -89,7 +89,7 @@ export async function browseWorkspaceDirectories(args: {
 }): Promise<WorkspaceDirectoryListing> {
   const root = resolve(args.path?.trim() || defaultBrowseRoot());
   const limit = Math.max(1, Math.min(args.limit ?? 100, 300));
-  let entries: WorkspaceDirent[] = [];
+  let entries: WorkspaceDirent[];
 
   try {
     entries = await readdir(root, { withFileTypes: true });

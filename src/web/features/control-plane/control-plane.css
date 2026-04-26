@@ -616,6 +616,34 @@ h3 {
   padding: 10px;
 }
 
+.changed-file-review-card {
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.08);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.54);
+  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.changed-file-review-card.active {
+  border-color: rgba(125, 211, 252, 0.34);
+  background: linear-gradient(180deg, rgba(125, 211, 252, 0.12), rgba(15, 23, 42, 0.62));
+  box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.08);
+}
+
+.changed-file-review-header {
+  width: 100%;
+  padding: 10px;
+  text-align: left;
+}
+
+.changed-file-review-header:hover {
+  background: rgba(30, 41, 59, 0.52);
+}
+
+.changed-file-review-body {
+  padding: 0 10px 10px;
+}
+
 .button-copy {
   margin: 6px 0 0;
   color: var(--text);
@@ -997,9 +1025,13 @@ h3 {
   position: sticky;
   top: 0;
   z-index: 2;
-  margin: -12px -12px 12px;
+  margin: -12px -12px 18px;
   padding: 12px;
   background: var(--panel-alt);
+}
+
+.review-mode-tabs + .side-section {
+  padding-top: 2px;
 }
 
 .review-section-actions {

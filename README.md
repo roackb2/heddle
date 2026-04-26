@@ -60,7 +60,7 @@ The local control plane gives you a browser-based view of the current workspace,
 
 Saved session review in the control plane, with conversation history in the center and current change review on the right. Review starts from the current Git working tree, then separates historical turn diffs and command/approval evidence so you can focus on the change you need to inspect now:
 
-![Heddle control plane current diff review](docs/images/control-plane-session-current-diff.png)
+![Heddle control plane expanded diff review](docs/images/control-plane-expanded-diff-review.png)
 
 ### Workspace and task management
 
