@@ -1,6 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import * as gitDiffParser from 'gitdiff-parser';
+import type { File as ParsedGitDiffFile } from 'gitdiff-parser';
 import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../../core/chat/storage.js';
 import { DEFAULT_OPENAI_MODEL } from '../../../../core/config.js';
 import { resolveApiKeyForModel } from '../../../../core/runtime/api-keys.js';
@@ -14,6 +16,7 @@ import type {
   ChatSessionView,
   ChatTurnReview,
   ChatTurnView,
+  ChangedFileReviewView,
   CommandEvidenceView,
   ControlPlanePendingApproval,
   ControlPlaneSessionLiveEvent,
@@ -32,8 +35,16 @@ type SubmitChatPromptArgs = {
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   leaseOwner: ChatSessionLeaseOwner;
 };
+type GitDiffParserModule = {
+  default?: {
+    parse?: (source: string) => ParsedGitDiffFile[];
+  };
+  parse?: (source: string) => ParsedGitDiffFile[];
+};
 
 const DEFAULT_CONTINUE_PROMPT = 'Continue from where you left off.';
+const gitDiffParserModule = gitDiffParser as unknown as GitDiffParserModule;
+const parseGitDiff = gitDiffParserModule.default?.parse ?? gitDiffParserModule.parse;
 
 export function createControlPlaneChatSession(args: {
   sessionStoragePath: string;
@@ -462,6 +473,7 @@ function loadChatTurnReview(traceFile: string): ChatTurnReview | undefined {
     const verificationCommands: CommandEvidenceView[] = [];
     const mutationCommands: CommandEvidenceView[] = [];
     const approvals: ApprovalEventView[] = [];
+    const files = new Map<string, ChangedFileReviewView>();
     let diffExcerpt: string | undefined;
     let finalSummary: string | undefined;
 
@@ -475,6 +487,14 @@ function loadChatTurnReview(traceFile: string): ChatTurnReview | undefined {
       if (type === 'tool.result') {
         const tool = readString(event.tool) ?? 'unknown';
         const result = readObject(event.result);
+        if (tool === 'edit_file' && readBoolean(result?.ok) === true) {
+          const output = readObject(result?.output);
+          const file = projectEditFileReview(output);
+          if (file) {
+            addChangedFile(files, file);
+          }
+        }
+
         const output = readObject(result?.output);
         const evidence = output ? projectCommandEvidence(tool, output) : undefined;
         if (!evidence) {
@@ -485,6 +505,11 @@ function loadChatTurnReview(traceFile: string): ChatTurnReview | undefined {
           reviewCommands.push(evidence);
           if (!diffExcerpt && /^git diff(?:\s|$)/.test(evidence.command) && evidence.stdout) {
             diffExcerpt = evidence.stdout;
+          }
+          if (/^git diff(?:\s|$)/.test(evidence.command) && evidence.stdout) {
+            for (const file of parseGitDiffFiles(evidence.stdout)) {
+              addChangedFile(files, file);
+            }
           }
           continue;
         }
@@ -543,6 +568,7 @@ function loadChatTurnReview(traceFile: string): ChatTurnReview | undefined {
       traceFile,
       diffExcerpt,
       finalSummary,
+      files: [...files.values()],
       reviewCommands: dedupeEvidence(reviewCommands),
       verificationCommands: dedupeEvidence(verificationCommands),
       mutationCommands: dedupeEvidence(mutationCommands),
@@ -586,6 +612,143 @@ function isReviewCommand(command: string): boolean {
 
 function isVerificationCommand(command: string): boolean {
   return /^(?:yarn|npm|pnpm|bun|vitest|jest|tsx|tsc|go test|cargo test|pytest|ruff|eslint)\b/.test(command);
+}
+
+function projectEditFileReview(output: Record<string, unknown> | undefined): ChangedFileReviewView | undefined {
+  if (!output) {
+    return undefined;
+  }
+
+  const path = readString(output.path);
+  const diff = readObject(output.diff);
+  const patch = normalizeCommandText(readString(diff?.diff));
+  if (!path) {
+    return undefined;
+  }
+
+  return {
+    path,
+    status: statusFromEditAction(readString(output.action)),
+    source: 'edit_file',
+    patch,
+    truncated: readBoolean(diff?.truncated),
+  };
+}
+
+function statusFromEditAction(action: string | undefined): ChangedFileReviewView['status'] {
+  switch (action) {
+    case 'created':
+      return 'added';
+    case 'overwritten':
+    case 'replaced':
+      return 'modified';
+    default:
+      return 'unknown';
+  }
+}
+
+function parseGitDiffFiles(diff: string): ChangedFileReviewView[] {
+  const normalized = diff.trim();
+  if (!normalized || !normalized.includes('diff --git ')) {
+    return [];
+  }
+
+  let parsed: ParsedGitDiffFile[];
+  try {
+    parsed = parseGitDiff ? parseGitDiff(normalized) : [];
+  } catch {
+    return [];
+  }
+
+  const chunks = splitGitDiffChunks(normalized);
+  return parsed.map((file) => {
+    const patch = findGitDiffChunkForFile(chunks, file) ?? renderParsedGitDiffFile(file);
+    return {
+      path: pathForParsedGitDiffFile(file),
+      status: statusFromParsedGitDiffFile(file),
+      source: 'git_diff' as const,
+      patch: normalizeCommandText(patch),
+      truncated: patch.endsWith('…') || file.isBinary === true,
+    };
+  });
+}
+
+function splitGitDiffChunks(diff: string): string[] {
+  return diff
+    .split(/\n(?=diff --git )/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean);
+}
+
+function findGitDiffChunkForFile(chunks: string[], file: ParsedGitDiffFile): string | undefined {
+  const candidates = [
+    `diff --git a/${file.oldPath} b/${file.newPath}`,
+    `rename from ${file.oldPath}`,
+    `rename to ${file.newPath}`,
+    `--- a/${file.oldPath}`,
+    `+++ b/${file.newPath}`,
+  ];
+
+  return chunks.find((chunk) => candidates.some((candidate) => chunk.includes(candidate)));
+}
+
+function renderParsedGitDiffFile(file: ParsedGitDiffFile): string {
+  const oldPath = file.type === 'add' ? '/dev/null' : `a/${file.oldPath}`;
+  const newPath = file.type === 'delete' ? '/dev/null' : `b/${file.newPath}`;
+  const lines = [
+    `diff --git a/${file.oldPath} b/${file.newPath}`,
+    `--- ${oldPath}`,
+    `+++ ${newPath}`,
+  ];
+
+  for (const hunk of file.hunks) {
+    lines.push(hunk.content);
+    for (const change of hunk.changes) {
+      lines.push(change.content);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function pathForParsedGitDiffFile(file: ParsedGitDiffFile): string {
+  return file.type === 'delete' ? file.oldPath : file.newPath;
+}
+
+function statusFromParsedGitDiffFile(file: ParsedGitDiffFile): ChangedFileReviewView['status'] {
+  if (file.oldPath !== file.newPath && file.type === 'modify') {
+    return 'renamed';
+  }
+
+  switch (file.type) {
+    case 'add':
+      return 'added';
+    case 'delete':
+      return 'deleted';
+    case 'rename':
+      return 'renamed';
+    case 'copy':
+    case 'modify':
+      return 'modified';
+    default:
+      return 'unknown';
+  }
+}
+
+function addChangedFile(files: Map<string, ChangedFileReviewView>, file: ChangedFileReviewView) {
+  const existing = files.get(file.path);
+  if (!existing) {
+    files.set(file.path, file);
+    return;
+  }
+
+  if (existing.source === 'edit_file') {
+    return;
+  }
+
+  if (file.source === 'edit_file' || (!existing.patch && file.patch)) {
+    files.set(file.path, file);
+  }
 }
 
 function normalizeCommandText(value: string | undefined): string | undefined {

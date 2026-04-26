@@ -77,10 +77,19 @@ export type ApprovalEventView = {
   timestamp?: string;
 };
 
+export type ChangedFileReviewView = {
+  path: string;
+  status: 'added' | 'modified' | 'deleted' | 'renamed' | 'unknown';
+  source: 'edit_file' | 'git_diff';
+  patch?: string;
+  truncated?: boolean;
+};
+
 export type ChatTurnReview = {
   traceFile: string;
   diffExcerpt?: string;
   finalSummary?: string;
+  files: ChangedFileReviewView[];
   reviewCommands: CommandEvidenceView[];
   verificationCommands: CommandEvidenceView[];
   mutationCommands: CommandEvidenceView[];

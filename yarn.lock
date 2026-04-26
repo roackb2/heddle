@@ -2279,6 +2279,11 @@ get-tsconfig@^4.7.5:
   dependencies:
     resolve-pkg-maps "^1.0.0"
 
+gitdiff-parser@^0.3.1:
+  version "0.3.1"
+  resolved "https://registry.yarnpkg.com/gitdiff-parser/-/gitdiff-parser-0.3.1.tgz#5eb3e66eb7862810ba962fab762134071601baa5"
+  integrity sha512-YQJnY8aew65id8okGxKCksH3efDCJ9HzV7M9rsvd65habf39Pkh4cgYJ27AaoDMqo1X98pgNJhNMrm/kpV7UVQ==
+
 glob-parent@^6.0.2:
   version "6.0.2"
   resolved "https://registry.yarnpkg.com/glob-parent/-/glob-parent-6.0.2.tgz#6d237d99083950c79290f24c7642a3de9a28f9e3"

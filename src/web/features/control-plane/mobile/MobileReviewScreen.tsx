@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import type { ChatSessionDetail, ChatTurnReview, ControlPlaneState } from '../../../lib/api';
 import { Badge } from '../../../components/ui/badge';
@@ -38,10 +38,17 @@ export function MobileReviewScreen({
   onOpenChat,
   onSelectTurn,
 }: MobileReviewScreenProps) {
-  const [reviewTab, setReviewTab] = useState<ReviewTab>('summary');
+  const [reviewTab, setReviewTab] = useState<ReviewTab>('diff');
+  const [selectedFilePath, setSelectedFilePath] = useState<string | undefined>();
 
   const title = sessionDetail?.name ?? activeSession?.name ?? 'Session';
   const subtitle = inspectorTab === 'summary' ? 'Session info' : 'Review evidence';
+  const selectedFile =
+    turnReview?.files.find((file) => file.path === selectedFilePath) ?? turnReview?.files[0];
+
+  useEffect(() => {
+    setSelectedFilePath(turnReview?.files[0]?.path);
+  }, [selectedTurnId, turnReview?.traceFile]);
 
   const commandGroups = useMemo(() => {
     if (!turnReview) {
@@ -126,6 +133,7 @@ export function MobileReviewScreen({
                     <SummaryRow label="review commands" value={String(turnReview.reviewCommands.length)} />
                     <SummaryRow label="verification commands" value={String(turnReview.verificationCommands.length)} />
                     <SummaryRow label="mutation commands" value={String(turnReview.mutationCommands.length)} />
+                    <SummaryRow label="changed files" value={String(turnReview.files.length)} />
                     <SummaryRow label="approvals" value={String(turnReview.approvals.length)} />
                     <SummaryRow label="trace" value={turnReview.traceFile.split('/').at(-1) ?? turnReview.traceFile} />
                   </dl>
@@ -156,10 +164,29 @@ export function MobileReviewScreen({
                 : <MobileEmptyState title="No commands" body="No review, verification, or mutation commands were captured for this turn." />}
               </div>
             : reviewTab === 'diff' ?
-              <MobileCard title="Diff excerpt">
-                {turnReview?.diffExcerpt ?
+              <MobileCard title="Changed files">
+                {turnReview?.files.length ?
+                  <div className="space-y-2">
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {turnReview.files.map((file) => (
+                        <button
+                          key={`${file.source}-${file.path}`}
+                          type="button"
+                          className={`shrink-0 rounded-md border px-2 py-1 text-left text-[11px] ${selectedFile?.path === file.path ? 'border-primary bg-primary/5 text-foreground' : 'border-border bg-background text-muted-foreground'}`}
+                          onClick={() => setSelectedFilePath(file.path)}
+                        >
+                          <span className="block max-w-44 truncate font-medium">{file.path}</span>
+                          <span className="block">{file.status} · {file.source}{file.truncated ? ' · truncated' : ''}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {selectedFile?.patch ?
+                      <pre className="max-h-[52dvh] overflow-auto rounded-md border border-border bg-background p-2 text-[11px] leading-4 text-muted-foreground">{selectedFile.patch}</pre>
+                    : <MobileEmptyState title="No patch captured" body="This file was changed, but the turn did not capture patch text for it." />}
+                  </div>
+                : turnReview?.diffExcerpt ?
                   <pre className="max-h-[52dvh] overflow-auto rounded-md border border-border bg-background p-2 text-[11px] leading-4 text-muted-foreground">{turnReview.diffExcerpt}</pre>
-                : <MobileEmptyState title="No diff excerpt" body="This turn did not save git diff evidence." />}
+                : <MobileEmptyState title="No changed files" body="This turn did not capture structured file review data." />}
               </MobileCard>
             : <MobileCard title="Approvals and events">
                 {turnReview?.approvals.length ?

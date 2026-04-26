@@ -100,8 +100,11 @@ export function SessionsWorkspace({
   const [modelOptionsError, setModelOptionsError] = useState<string | undefined>();
   const [activeMentionIndex, setActiveMentionIndex] = useState(0);
   const [mobileView, setMobileView] = useState<MobileView>('list');
+  const [selectedReviewFilePath, setSelectedReviewFilePath] = useState<string | undefined>();
   const runActive = sendingPrompt || runInFlight;
   const compactionStatus = sessionDetail?.context?.compactionStatus ?? activeSession?.context?.compactionStatus;
+  const selectedReviewFile =
+    turnReview?.files.find((file) => file.path === selectedReviewFilePath) ?? turnReview?.files[0];
   const workspaceStyle = {
     '--session-sidebar-width': `${panelWidths.left}px`,
     '--session-side-width': `${panelWidths.right}px`,
@@ -151,6 +154,10 @@ export function SessionsWorkspace({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    setSelectedReviewFilePath(turnReview?.files[0]?.path);
+  }, [selectedTurnId, turnReview?.traceFile]);
 
   useEffect(() => {
     if (!mentionQuery) {
@@ -692,6 +699,31 @@ export function SessionsWorkspace({
                 <EmptyState title="Loading review" body="Reading trace-backed review evidence for the selected turn." />
               : turnReviewError ?
                 <EmptyState title="Review load failed" body={turnReviewError} />
+              : turnReview?.files.length ?
+                <div className="detail-stack compact-stack">
+                  <div className="stack-list compact">
+                    {turnReview.files.map((file) => (
+                      <button
+                        key={`${file.source}-${file.path}`}
+                        type="button"
+                        className={className('list-button compact-button', selectedReviewFile?.path === file.path && 'active')}
+                        onClick={() => setSelectedReviewFilePath(file.path)}
+                      >
+                        <div className="list-button-header">
+                          <strong>{file.path}</strong>
+                          <span>{file.status}</span>
+                        </div>
+                        <div className="pills compact-pills">
+                          <Pill>{file.source}</Pill>
+                          {file.truncated ? <Pill tone="warn">truncated</Pill> : null}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  {selectedReviewFile?.patch ?
+                    <CodeBlock>{selectedReviewFile.patch}</CodeBlock>
+                  : <EmptyState title="No patch captured" body="This file was changed, but the turn did not capture patch text for it." />}
+                </div>
               : turnReview?.diffExcerpt ?
                 <CodeBlock>{turnReview.diffExcerpt}</CodeBlock>
               : <EmptyState title="No diff excerpt" body="This turn did not save git diff evidence. Review commands still appear below when available." />}
