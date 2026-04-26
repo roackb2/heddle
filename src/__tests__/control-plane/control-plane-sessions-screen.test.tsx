@@ -118,17 +118,24 @@ describe('SessionsScreen review UI', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Current workspace changes')).toBeTruthy();
-      expect(screen.getAllByText('src/example.ts')).toHaveLength(2);
-      expect(screen.getAllByText(/diff --git a\/src\/example.ts/)).toHaveLength(2);
+      expect(screen.getByText('src/example.ts')).toBeTruthy();
+      expect(screen.getByText(/diff --git a\/src\/example.ts/)).toBeTruthy();
       expect(screen.getByText('Current workspace differs from captured turn')).toBeTruthy();
     });
-    expect(screen.getByText('Diff / review excerpt')).toBeTruthy();
+    expect(screen.getByText('Turn history')).toBeTruthy();
+    expect(screen.getByText('Evidence')).toBeTruthy();
     expect(fetchWorkspaceChanges).toHaveBeenCalledTimes(1);
     expect(fetchWorkspaceFileDiff).toHaveBeenCalledWith('src/example.ts');
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     await waitFor(() => {
       expect(fetchWorkspaceChanges).toHaveBeenCalledTimes(2);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Turn history' }));
+    await waitFor(() => {
+      expect(screen.getByText('Captured turn diff')).toBeTruthy();
+      expect(screen.getByText('Raw turn patch')).toBeTruthy();
     });
   });
 });

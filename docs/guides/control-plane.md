@@ -23,8 +23,8 @@ The current browser UI surfaces:
 - a model selector backed by the server-side built-in model catalog, plus a drift toggle and latest trace-derived drift level
 - debounced `@file` mention suggestions in the composer, backed by a capped workspace file search endpoint
 - compact tool-result cards for saved tool outputs such as `list_files: {...}`
-- changed-file review with structured diff excerpts when the trace contains file edits or git diff evidence
-- review and verification command evidence grouped separately from approvals and events
+- current workspace review backed by Git status and file patches, so generated or shell-made changes are visible even when they did not come from the edit tool
+- historical turn review for trace-backed file diffs, review commands, verification commands, approvals, and events
 - lightweight toast notifications for session/action success and failure
 - heartbeat task status, scheduling state, selected task detail, and run history
 - recent heartbeat run summaries and usage data
@@ -45,20 +45,21 @@ The folder picker is meant for choosing project roots without restarting the dae
 
 Heddle also maintains a small user-level registry of workspaces it has seen. This is why a project opened from the CLI can later appear as a known workspace in the browser UI. The registry is discovery metadata only; the authoritative project state remains in that workspace's `.heddle/` directory.
 
-## Review Evidence
+## Review Experience
 
-The `Review` view is designed to answer: "What changed, what did the agent run, and what evidence do I have before trusting this turn?"
+The `Review` view is designed to help you review the task in front of you, not to dump every trace artifact into one feed.
 
-When available, Heddle shows:
+It has three review modes:
 
-- changed files for the selected turn
-- file-level status such as modified, added, or deleted
-- diff excerpts from edit tools or git diff evidence
-- review commands such as `git status --short` or `git diff --stat`
-- verification commands such as tests, builds, or typechecks
-- approval and trace events that explain what the agent requested or executed
+- `Current`: the live Git working tree for the active workspace. This is the default because it answers what you need to review before committing or reverting.
+- `Turn history`: the selected turn's captured file diffs from traces. This is historical evidence and may differ from the current workspace if later edits happened.
+- `Evidence`: review commands, verification commands, approvals, and trace events for the selected turn.
 
-This is not a full IDE file-review engine yet. It is trace-backed review evidence focused on the agent turn, so it works best when Heddle uses its built-in edit tools or runs explicit git review commands after a change.
+Current review uses Git as the source of truth for changed files. It reads workspace status and selected file patches, filters out `.heddle/` runtime state, renders structured hunks when available, and falls back to raw patch text for unsupported patches.
+
+Turn history remains trace-backed. It is useful for answering what the agent did at that moment, what commands it ran, and what it believed it verified. If the current workspace patch no longer matches the captured turn patch, Heddle labels that stale relationship instead of pretending the historical trace is the live state.
+
+This is still intentionally short of a full IDE file-review engine: Heddle does not edit patches in the browser and does not rely on OS file watching as the review truth. The practical review model is: Git shows what changed now; traces explain how the selected turn got there.
 
 ## Mobile Layout
 
@@ -70,7 +71,7 @@ On mobile, the UI uses:
 - a dedicated session list for choosing saved conversations
 - native-style session navigation for Chat, Info, and Review
 - a compact composer that keeps the latest conversation visible
-- reachable session review and approval evidence without desktop sidebars
+- current workspace diff review plus historical turn/evidence tabs without desktop sidebars
 
 Representative mobile views:
 
@@ -194,7 +195,7 @@ Then open the reported `https://<machine-name>.<tailnet>.ts.net` URL.
 
 ## Current Status
 
-The control plane is useful today as a local workstation surface for sessions, workspace switching, review evidence, heartbeat visibility, and mobile oversight. The main product boundary is that file review is trace-backed rather than a full IDE-grade live file watcher. That keeps review evidence inspectable and reliable for the current agent turn while leaving room for deeper future file-review workflows.
+The control plane is useful today as a local workstation surface for sessions, workspace switching, Git-backed current review, trace-backed turn evidence, heartbeat visibility, and mobile oversight. The main product boundary is that file review is read-only and Git-backed rather than an editable IDE diff surface or live file watcher.
 
 ## See Also
 

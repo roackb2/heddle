@@ -59,8 +59,9 @@ Beyond terminal chat, Heddle includes:
 - a local browser control plane via `heddle daemon`
 - live session updates and review-oriented run inspection
 - workspace management for registering, renaming, choosing, and switching local project workspaces
-- trace-backed changed-file review with diff excerpts when edit or git evidence is available
-- separate review evidence for commands, verification, approvals, and trace events
+- Git-backed current workspace review with changed files and selected-file patches
+- trace-backed historical turn review for captured file diffs
+- separate evidence tabs for commands, verification, approvals, and trace events
 - heartbeat task and run visibility
 - workspace memory health visibility
 - browser-side model selection and drift toggling
@@ -70,7 +71,7 @@ Beyond terminal chat, Heddle includes:
 
 - Heddle is a coding/workspace agent runtime, not a general-purpose autonomous system.
 - Knowledge persistence uses explicit local catalogs and maintainer runs, so users can audit what Heddle learned instead of relying on opaque retrieval.
-- The control plane review view is trace-backed. It is useful for agent-turn review, but it is not yet a full IDE-grade live file watcher.
+- The control plane review view is read-only. Current changes are Git-backed, while historical turn evidence is trace-backed; it is not yet an editable IDE-grade diff surface or live file watcher.
 - The image workflow is intentionally lightweight: users provide a local image path and Heddle decides whether inspection is needed.
 - `@path/to/file` mentions prioritize file inspection; they do not blindly paste file contents into the prompt.
 - Web search is provider-backed rather than a general crawler maintained inside this repository.

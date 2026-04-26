@@ -1,14 +1,16 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useEffect, useState } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatSessionDetail, ChatTurnReview, ControlPlaneState } from '../../web/lib/api.js';
 import { useSessionsScreenState } from '../../web/features/control-plane/hooks/useSessionsScreenState.js';
 import {
   fetchChatSessionDetail,
   fetchChatTurnReview,
   fetchSessionRunningState,
+  sendChatSessionPrompt,
+  subscribeToChatSessionEvents,
 } from '../../web/lib/api.js';
 
 vi.mock('../../web/lib/api.js', () => ({
@@ -77,6 +79,10 @@ describe('useSessionsScreenState', () => {
     vi.mocked(fetchChatTurnReview).mockResolvedValue(turnReview);
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   it('does not refetch session detail on every state render when parent callbacks are recreated', async () => {
     render(<SessionsStateHarness />);
 
@@ -88,6 +94,45 @@ describe('useSessionsScreenState', () => {
     expect(fetchChatSessionDetail).toHaveBeenCalledTimes(1);
     expect(fetchSessionRunningState).toHaveBeenCalledTimes(1);
     expect(fetchChatTurnReview).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the optimistic user prompt visible while assistant text streams', async () => {
+    let eventHandler: Parameters<typeof subscribeToChatSessionEvents>[1] | undefined;
+    vi.mocked(subscribeToChatSessionEvents).mockImplementation((_sessionId, onUpdate) => {
+      eventHandler = onUpdate;
+      return () => undefined;
+    });
+    vi.mocked(sendChatSessionPrompt).mockReturnValue(new Promise(() => undefined) as ReturnType<typeof sendChatSessionPrompt>);
+
+    render(<SessionsSendHarness />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('messages').textContent).toContain('Loaded.');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'send' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('messages').textContent).toContain('What changed?');
+    });
+
+    act(() => {
+      eventHandler?.({
+        type: 'session.event',
+        sessionId: 'session-1',
+        event: {
+          type: 'assistant.stream',
+          text: 'Inspecting the repo…',
+          done: false,
+        },
+      });
+    });
+
+    await waitFor(() => {
+      const text = screen.getByTestId('messages').textContent ?? '';
+      expect(text).toContain('What changed?');
+      expect(text).toContain('Inspecting the repo…');
+    });
   });
 });
 
@@ -115,5 +160,26 @@ function SessionsStateHarness() {
     <output data-testid="messages">
       {state.sessionDetail?.messages.length ?? 0}
     </output>
+  );
+}
+
+function SessionsSendHarness() {
+  const state = useSessionsScreenState(
+    [sessionSummary],
+    undefined,
+    () => undefined,
+    {
+      selectedSessionId: 'session-1',
+      onSelectedSessionIdChange: () => undefined,
+    },
+  );
+
+  return (
+    <>
+      <output data-testid="messages">
+        {state.sessionDetail?.messages.map((message) => message.text).join('\n') ?? ''}
+      </output>
+      <button type="button" onClick={() => void state.sendPrompt('What changed?')}>send</button>
+    </>
   );
 }

@@ -115,6 +115,7 @@ export function SessionsScreen({
   const [workspaceFileDiffLoading, setWorkspaceFileDiffLoading] = useState(false);
   const [workspaceFileDiffError, setWorkspaceFileDiffError] = useState<string | undefined>();
   const [workspaceReviewRefreshKey, setWorkspaceReviewRefreshKey] = useState(0);
+  const [reviewMode, setReviewMode] = useState<ReviewMode>('current');
   const runActive = sendingPrompt || runInFlight;
   const compactionStatus = sessionDetail?.context?.compactionStatus ?? activeSession?.context?.compactionStatus;
   const selectedReviewFile =
@@ -524,6 +525,15 @@ export function SessionsScreen({
         turnReview={turnReview}
         turnReviewLoading={turnReviewLoading}
         turnReviewError={turnReviewError}
+        workspaceChanges={workspaceChanges}
+        workspaceChangesLoading={workspaceChangesLoading}
+        workspaceChangesError={workspaceChangesError}
+        selectedWorkspaceFile={selectedWorkspaceFile}
+        workspaceFileDiff={workspaceFileDiff}
+        workspaceFileDiffLoading={workspaceFileDiffLoading}
+        workspaceFileDiffError={workspaceFileDiffError}
+        onSelectWorkspaceFile={setSelectedWorkspaceFilePath}
+        onRefreshWorkspaceReview={() => setWorkspaceReviewRefreshKey((current) => current + 1)}
         inspectorTab={inspectorTab}
         onInspectorTabChange={onInspectorTabChange}
         onBackToSessions={showSessionList}
@@ -787,134 +797,34 @@ export function SessionsScreen({
               </SideSection>
             </>
           : <>
-            <SideSection
-              title="Current workspace changes"
-              actions={
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setWorkspaceReviewRefreshKey((current) => current + 1)}
-                  disabled={workspaceChangesLoading || workspaceFileDiffLoading}
-                >
-                  Refresh
-                </Button>
-              }
-            >
-              {workspaceChangesLoading ?
-                <EmptyState title="Loading workspace diff" body="Reading current Git changes from the active workspace." />
-              : workspaceChangesError ?
-                <EmptyState title="Workspace diff failed" body={workspaceChangesError} />
-              : workspaceChanges?.vcs === 'none' ?
-                <EmptyState title="Not a git workspace" body={workspaceChanges.error ?? 'Current workspace changes require a Git-backed project.'} />
-              : workspaceChanges?.files.length ?
-                <div className="detail-stack compact-stack">
-                  <div className="stack-list compact">
-                    {workspaceChanges.files.map((file) => (
-                      <button
-                        key={`workspace-${file.path}`}
-                        type="button"
-                        className={className('list-button compact-button', selectedWorkspaceFile?.path === file.path && 'active')}
-                        onClick={() => setSelectedWorkspaceFilePath(file.path)}
-                      >
-                        <div className="list-button-header">
-                          <strong>{file.path}</strong>
-                          <span>{file.status}</span>
-                        </div>
-                        <div className="pills compact-pills">
-                          <Pill>current git</Pill>
-                          {file.additions !== undefined || file.deletions !== undefined ?
-                            <Pill tone="good">+{file.additions ?? 0} / -{file.deletions ?? 0}</Pill>
-                          : null}
-                          {file.binary ? <Pill tone="warn">binary</Pill> : null}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  {workspaceFileDiffLoading ?
-                    <EmptyState title="Loading file diff" body="Reading the selected file patch." />
-                  : workspaceFileDiffError ?
-                    <EmptyState title="File diff failed" body={workspaceFileDiffError} />
-                  : workspaceFileDiff?.error ?
-                    <EmptyState title="File diff unavailable" body={workspaceFileDiff.error} />
-                  : workspaceFileDiff?.patch ?
-                    <>
-                      {selectedTurnPatchIsStale ?
-                        <div className="detail-card">
-                          <p className="card-title">Current workspace differs from captured turn</p>
-                          <p className="muted">The selected file also has trace-backed turn evidence, but the current Git patch is different. Review this section as live workspace state, not historical turn evidence.</p>
-                        </div>
-                      : null}
-                      <DiffViewer diff={workspaceFileDiff.diff} patch={workspaceFileDiff.patch} fallbackTitle="Raw workspace patch" />
-                    </>
-                  : <EmptyState title="No patch available" body="Git reports this file as changed, but no patch text is available for it." />}
-                </div>
-              : <EmptyState title="Clean workspace" body="Git does not report current project file changes." />}
-            </SideSection>
+            <nav className="side-tabs review-mode-tabs" role="tablist" aria-label="Review mode">
+              <button className={className(reviewMode === 'current' && 'active')} type="button" onClick={() => setReviewMode('current')}>Current</button>
+              <button className={className(reviewMode === 'turn' && 'active')} type="button" onClick={() => setReviewMode('turn')}>Turn history</button>
+              <button className={className(reviewMode === 'evidence' && 'active')} type="button" onClick={() => setReviewMode('evidence')}>Evidence</button>
+            </nav>
 
-            <SideSection title="Diff / review excerpt">
-              {turnReviewLoading ?
-                <EmptyState title="Loading review" body="Reading trace-backed review evidence for the selected turn." />
-              : turnReviewError ?
-                <EmptyState title="Review load failed" body={turnReviewError} />
-              : turnReview?.files.length ?
-                <div className="detail-stack compact-stack">
-                  <div className="stack-list compact">
-                    {turnReview.files.map((file) => (
-                      <button
-                        key={`${file.source}-${file.path}`}
-                        type="button"
-                        className={className('list-button compact-button', selectedReviewFile?.path === file.path && 'active')}
-                        onClick={() => setSelectedReviewFilePath(file.path)}
-                      >
-                        <div className="list-button-header">
-                          <strong>{file.path}</strong>
-                          <span>{file.status}</span>
-                        </div>
-                        <div className="pills compact-pills">
-                          <Pill>{file.source}</Pill>
-                          {file.truncated ? <Pill tone="warn">truncated</Pill> : null}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  {selectedReviewFile?.patch ?
-                    <DiffViewer diff={selectedReviewFile.diff} patch={selectedReviewFile.patch} fallbackTitle="Raw turn patch" />
-                  : <EmptyState title="No patch captured" body="This file was changed, but the turn did not capture patch text for it." />}
-                </div>
-              : turnReview?.diffExcerpt ?
-                <CodeBlock>{turnReview.diffExcerpt}</CodeBlock>
-              : <EmptyState title="No diff excerpt" body="This turn did not save git diff evidence. Review commands still appear below when available." />}
-            </SideSection>
-
-            <SideSection title="Review commands">
-              <CommandList commands={turnReview?.reviewCommands ?? []} empty="No git review commands captured for this turn." />
-            </SideSection>
-
-            <SideSection title="Verification commands">
-              <CommandList commands={turnReview?.verificationCommands ?? []} empty="No verification commands captured for this turn." />
-            </SideSection>
-
-            <SideSection title="Approvals and events">
-              {turnReview?.approvals.length ?
-                <div className="stack-list compact">
-                  {turnReview.approvals.map((approval, index) => (
-                    <div className="detail-card" key={`${approval.tool}-${approval.timestamp ?? index}`}>
-                      <p className="card-title">{approval.tool}</p>
-                      <p className="muted">{approval.command ?? 'no command details'}</p>
-                      <div className="pills">
-                        <Pill tone={approval.approved ? 'good' : 'warn'}>{approval.approved ? 'approved' : 'rejected'}</Pill>
-                      </div>
-                      {approval.reason ? <p className="summary">{approval.reason}</p> : null}
-                    </div>
-                  ))}
-                </div>
-              : selectedTurn?.events.length ?
-                <div className="event-list">
-                  {selectedTurn.events.map((event, index) => <p key={`${selectedTurn.id}-${index}`} className="event-line">{event}</p>)}
-                </div>
-              : <EmptyState title="No approvals or events" body="Turn-level approvals, tool review, or summarized events will appear here." />}
-            </SideSection>
+            {reviewMode === 'current' ?
+              <CurrentWorkspaceReviewSection
+                workspaceChanges={workspaceChanges}
+                workspaceChangesLoading={workspaceChangesLoading}
+                workspaceChangesError={workspaceChangesError}
+                selectedWorkspaceFile={selectedWorkspaceFile}
+                workspaceFileDiff={workspaceFileDiff}
+                workspaceFileDiffLoading={workspaceFileDiffLoading}
+                workspaceFileDiffError={workspaceFileDiffError}
+                selectedTurnPatchIsStale={selectedTurnPatchIsStale}
+                onSelectWorkspaceFile={setSelectedWorkspaceFilePath}
+                onRefresh={() => setWorkspaceReviewRefreshKey((current) => current + 1)}
+              />
+            : reviewMode === 'turn' ?
+              <HistoricalTurnReviewSection
+                turnReview={turnReview}
+                turnReviewLoading={turnReviewLoading}
+                turnReviewError={turnReviewError}
+                selectedReviewFile={selectedReviewFile}
+                onSelectReviewFile={setSelectedReviewFilePath}
+              />
+            : <ReviewEvidenceSection turnReview={turnReview} selectedTurn={selectedTurn} />}
           </>}
         </div>
       </aside>
@@ -938,6 +848,194 @@ type PanelWidths = {
 };
 
 type MobileView = 'list' | 'chat' | 'review';
+type ReviewMode = 'current' | 'turn' | 'evidence';
+
+type WorkspaceChangedFileValue = WorkspaceChanges['files'][number];
+
+function CurrentWorkspaceReviewSection({
+  workspaceChanges,
+  workspaceChangesLoading,
+  workspaceChangesError,
+  selectedWorkspaceFile,
+  workspaceFileDiff,
+  workspaceFileDiffLoading,
+  workspaceFileDiffError,
+  selectedTurnPatchIsStale,
+  onSelectWorkspaceFile,
+  onRefresh,
+}: {
+  workspaceChanges: WorkspaceChanges | null;
+  workspaceChangesLoading: boolean;
+  workspaceChangesError?: string;
+  selectedWorkspaceFile?: WorkspaceChangedFileValue;
+  workspaceFileDiff: WorkspaceFileDiff | null;
+  workspaceFileDiffLoading: boolean;
+  workspaceFileDiffError?: string;
+  selectedTurnPatchIsStale: boolean;
+  onSelectWorkspaceFile: (path: string) => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <SideSection
+      title="Current workspace changes"
+      actions={
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onRefresh}
+          disabled={workspaceChangesLoading || workspaceFileDiffLoading}
+        >
+          Refresh
+        </Button>
+      }
+    >
+      {workspaceChangesLoading ?
+        <EmptyState title="Loading workspace diff" body="Reading current Git changes from the active workspace." />
+      : workspaceChangesError ?
+        <EmptyState title="Workspace diff failed" body={workspaceChangesError} />
+      : workspaceChanges?.vcs === 'none' ?
+        <EmptyState title="Not a git workspace" body={workspaceChanges.error ?? 'Current workspace changes require a Git-backed project.'} />
+      : workspaceChanges?.files.length ?
+        <div className="detail-stack compact-stack">
+          <ChangedFilePicker
+            files={workspaceChanges.files}
+            selectedPath={selectedWorkspaceFile?.path}
+            sourceLabel="current git"
+            onSelect={onSelectWorkspaceFile}
+          />
+          {workspaceFileDiffLoading ?
+            <EmptyState title="Loading file diff" body="Reading the selected file patch." />
+          : workspaceFileDiffError ?
+            <EmptyState title="File diff failed" body={workspaceFileDiffError} />
+          : workspaceFileDiff?.error ?
+            <EmptyState title="File diff unavailable" body={workspaceFileDiff.error} />
+          : workspaceFileDiff?.patch ?
+            <>
+              {selectedTurnPatchIsStale ?
+                <div className="detail-card">
+                  <p className="card-title">Current workspace differs from captured turn</p>
+                  <p className="muted">The selected file also has trace-backed turn evidence, but the current Git patch is different. Review this section as live workspace state, not historical turn evidence.</p>
+                </div>
+              : null}
+              <DiffViewer diff={workspaceFileDiff.diff} patch={workspaceFileDiff.patch} fallbackTitle="Raw workspace patch" />
+            </>
+          : <EmptyState title="No patch available" body="Git reports this file as changed, but no patch text is available for it." />}
+        </div>
+      : <EmptyState title="Clean workspace" body="Git does not report current project file changes." />}
+    </SideSection>
+  );
+}
+
+function HistoricalTurnReviewSection({
+  turnReview,
+  turnReviewLoading,
+  turnReviewError,
+  selectedReviewFile,
+  onSelectReviewFile,
+}: {
+  turnReview: ChatTurnReview | null;
+  turnReviewLoading: boolean;
+  turnReviewError?: string;
+  selectedReviewFile?: NonNullable<ChatTurnReview>['files'][number];
+  onSelectReviewFile: (path: string) => void;
+}) {
+  return (
+    <SideSection title="Captured turn diff">
+      {turnReviewLoading ?
+        <EmptyState title="Loading review" body="Reading trace-backed review evidence for the selected turn." />
+      : turnReviewError ?
+        <EmptyState title="Review load failed" body={turnReviewError} />
+      : turnReview?.files.length ?
+        <div className="detail-stack compact-stack">
+          <ChangedFilePicker
+            files={turnReview.files}
+            selectedPath={selectedReviewFile?.path}
+            onSelect={onSelectReviewFile}
+          />
+          {selectedReviewFile?.patch ?
+            <DiffViewer diff={selectedReviewFile.diff} patch={selectedReviewFile.patch} fallbackTitle="Raw turn patch" />
+          : <EmptyState title="No patch captured" body="This file was changed, but the turn did not capture patch text for it." />}
+        </div>
+      : turnReview?.diffExcerpt ?
+        <CodeBlock>{turnReview.diffExcerpt}</CodeBlock>
+      : <EmptyState title="No captured diff" body="This selected turn did not save file-level diff evidence. Check Evidence for commands and approvals." />}
+    </SideSection>
+  );
+}
+
+function ReviewEvidenceSection({ turnReview, selectedTurn }: { turnReview: ChatTurnReview | null; selectedTurn?: SessionTurn }) {
+  return (
+    <>
+      <SideSection title="Review commands">
+        <CommandList commands={turnReview?.reviewCommands ?? []} empty="No git review commands captured for this turn." />
+      </SideSection>
+
+      <SideSection title="Verification commands">
+        <CommandList commands={turnReview?.verificationCommands ?? []} empty="No verification commands captured for this turn." />
+      </SideSection>
+
+      <SideSection title="Approvals and events">
+        {turnReview?.approvals.length ?
+          <div className="stack-list compact">
+            {turnReview.approvals.map((approval, index) => (
+              <div className="detail-card" key={`${approval.tool}-${approval.timestamp ?? index}`}>
+                <p className="card-title">{approval.tool}</p>
+                <p className="muted">{approval.command ?? 'no command details'}</p>
+                <div className="pills">
+                  <Pill tone={approval.approved ? 'good' : 'warn'}>{approval.approved ? 'approved' : 'rejected'}</Pill>
+                </div>
+                {approval.reason ? <p className="summary">{approval.reason}</p> : null}
+              </div>
+            ))}
+          </div>
+        : selectedTurn?.events.length ?
+          <div className="event-list">
+            {selectedTurn.events.map((event, index) => <p key={`${selectedTurn.id}-${index}`} className="event-line">{event}</p>)}
+          </div>
+        : <EmptyState title="No approvals or events" body="Turn-level approvals, tool review, or summarized events will appear here." />}
+      </SideSection>
+    </>
+  );
+}
+
+function ChangedFilePicker({
+  files,
+  selectedPath,
+  sourceLabel,
+  onSelect,
+}: {
+  files: Array<WorkspaceChangedFileValue | NonNullable<ChatTurnReview>['files'][number]>;
+  selectedPath?: string;
+  sourceLabel?: string;
+  onSelect: (path: string) => void;
+}) {
+  return (
+    <div className="stack-list compact">
+      {files.map((file) => (
+        <button
+          key={`${'source' in file ? file.source : 'workspace'}-${file.path}`}
+          type="button"
+          className={className('list-button compact-button', selectedPath === file.path && 'active')}
+          onClick={() => onSelect(file.path)}
+        >
+          <div className="list-button-header">
+            <strong>{file.path}</strong>
+            <span>{file.status}</span>
+          </div>
+          <div className="pills compact-pills">
+            {'source' in file ? <Pill>{file.source}</Pill> : <Pill>{sourceLabel ?? 'current git'}</Pill>}
+            {'additions' in file && (file.additions !== undefined || file.deletions !== undefined) ?
+              <Pill tone="good">+{file.additions ?? 0} / -{file.deletions ?? 0}</Pill>
+            : null}
+            {'binary' in file && file.binary ? <Pill tone="warn">binary</Pill> : null}
+            {'truncated' in file && file.truncated ? <Pill tone="warn">truncated</Pill> : null}
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function readStoredPanelWidths(): PanelWidths {
   try {

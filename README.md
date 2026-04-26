@@ -58,7 +58,7 @@ The local control plane gives you a browser-based view of the current workspace,
 
 ### Browser session review
 
-Saved session review in the control plane, with conversation history in the center and review evidence on the right. Review evidence includes changed files, diff excerpts, verification commands, and approvals when they are available from the trace:
+Saved session review in the control plane, with conversation history in the center and review on the right. Review starts from the current Git working tree, then separates historical turn diffs and command/approval evidence so you can focus on the change you need to inspect now:
 
 ![Heddle control plane session review](docs/images/control-plane-session-review.png)
 
@@ -204,7 +204,7 @@ If terminal chat is the execution surface, the control plane is the oversight su
 
 The `Workspaces` section lets you register local projects, switch the control plane between them, rename workspace entries, and pick a project folder from the browser UI. Heddle also keeps a user-level workspace registry so projects you have opened from the CLI or daemon can be rediscovered later.
 
-The `Sessions` section supports a coding-review flow: changed files, diff excerpts, review commands, verification commands, approvals, and trace events are grouped so you can inspect what happened in a turn without reading the entire transcript.
+The `Sessions` section supports a coding-review flow built around current work first. Review starts from the live Git working tree for the active workspace, with changed files and structured read-only diffs. Historical turn diffs, review commands, verification commands, approvals, and trace events are still available, but they are separated from current review so old evidence does not distract from the task at hand.
 
 This is useful if you want a more inspectable and operator-friendly workflow than a plain CLI transcript. The layout adapts for phone use as well, with mobile-native navigation for Overview, Sessions, Tasks, and Workspaces, plus dedicated session info/review views.
 
@@ -352,7 +352,7 @@ Current strengths include:
 
 Current limitations include:
 
-- the browser control plane is not yet a full IDE-like file review environment
+- the browser control plane is read-only for file review; it is not yet an editable IDE-like diff environment
 - some advanced workflows remain better documented in source and examples than in polished product UX
 - the project surface is still changing as the runtime matures
 

@@ -172,7 +172,7 @@ export function useSessionsScreenState(
         return current;
       }
 
-      const nextMessages = current.messages.filter((message) => message.id !== 'live-user' && message.id !== 'live-run-status');
+      const nextMessages = current.messages.filter((message) => message.id !== 'live-run-status');
       const lastMessage = nextMessages.at(-1);
       if (lastMessage?.id === 'live-assistant' && lastMessage.role === 'assistant') {
         nextMessages[nextMessages.length - 1] = {

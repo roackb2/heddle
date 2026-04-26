@@ -64,7 +64,7 @@ Start the control plane:
 heddle daemon
 ```
 
-After the daemon starts, open the browser control plane to inspect sessions, review diff/command evidence, and use the `Workspaces` section to switch between local projects. For one-off CLI usage against another project, keep using `--cwd`.
+After the daemon starts, open the browser control plane to inspect sessions, review current Git workspace changes, inspect historical turn evidence, and use the `Workspaces` section to switch between local projects. For one-off CLI usage against another project, keep using `--cwd`.
 
 Start the foreground heartbeat scheduler:
 
