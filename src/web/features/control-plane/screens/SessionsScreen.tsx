@@ -454,7 +454,7 @@ export function SessionsScreen({
           <WorkspaceSectionHeader
             title="Sessions"
             subtitle={`${sessions.length} saved conversation${sessions.length === 1 ? '' : 's'}`}
-            actions={<button className="sidebar-action-button" type="button" disabled={creatingSession} onClick={() => void onCreateSession()}>{creatingSession ? 'Creating…' : '+ New session'}</button>}
+            actions={<button className="sidebar-action-button" type="button" data-testid="new-session-button" disabled={creatingSession} onClick={() => void onCreateSession()}>{creatingSession ? 'Creating…' : '+ New session'}</button>}
           />
           <div className="sidebar-scroll">
             {sessions.length ?
@@ -543,7 +543,7 @@ export function SessionsScreen({
         <WorkspaceSectionHeader
           title="Sessions"
           subtitle={`${sessions.length} saved conversation${sessions.length === 1 ? '' : 's'}`}
-          actions={<button className="sidebar-action-button" type="button" disabled={creatingSession} onClick={() => void onCreateSession()}>{creatingSession ? 'Creating…' : '+ New session'}</button>}
+          actions={<button className="sidebar-action-button" type="button" data-testid="new-session-button" disabled={creatingSession} onClick={() => void onCreateSession()}>{creatingSession ? 'Creating…' : '+ New session'}</button>}
         />
         <div className="sidebar-scroll">
           {sessions.length ?
@@ -850,6 +850,7 @@ function CurrentWorkspaceReviewSection({
   return (
     <SideSection
       title="Current workspace changes"
+      testId="review-current-workspace"
       actions={
         <div className="review-section-actions">
           {selectedTurnPatchIsStale ? <StalePatchIndicator /> : null}
@@ -877,6 +878,7 @@ function CurrentWorkspaceReviewSection({
             files={workspaceChanges.files}
             selectedPath={selectedWorkspaceFile?.path}
             sourceLabel="current git"
+            testId="review-current-file-list"
             onSelect={onSelectWorkspaceFile}
           />
           {workspaceFileDiffLoading ?
@@ -953,11 +955,12 @@ function HistoricalTurnReviewSection({
         <EmptyState title="Review load failed" body={turnReviewError} />
       : turnReview?.files.length ?
         <div className="detail-stack compact-stack">
-          <ChangedFilePicker
-            files={turnReview.files}
-            selectedPath={selectedReviewFile?.path}
-            onSelect={onSelectReviewFile}
-          />
+            <ChangedFilePicker
+              files={turnReview.files}
+              selectedPath={selectedReviewFile?.path}
+              testId="review-turn-file-list"
+              onSelect={onSelectReviewFile}
+            />
           {selectedReviewFile?.patch ?
             <>
               <Button
@@ -1072,18 +1075,21 @@ function ChangedFilePicker({
   files,
   selectedPath,
   sourceLabel,
+  testId,
   onSelect,
 }: {
   files: Array<WorkspaceChangedFileValue | NonNullable<ChatTurnReview>['files'][number]>;
   selectedPath?: string;
   sourceLabel?: string;
+  testId?: string;
   onSelect: (path: string) => void;
 }) {
   return (
-    <div className="stack-list compact">
+    <div className="stack-list compact" data-testid={testId}>
       {files.map((file) => (
         <button
           key={`${'source' in file ? file.source : 'workspace'}-${file.path}`}
+          data-testid={`changed-file-${file.path}`}
           type="button"
           className={className('list-button compact-button', selectedPath === file.path && 'active')}
           onClick={() => onSelect(file.path)}

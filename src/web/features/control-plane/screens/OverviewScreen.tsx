@@ -17,7 +17,7 @@ export function OverviewScreen({
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] sm:px-4 sm:pt-4 sm:pb-4">
       <div className="min-w-0 grid gap-4 lg:grid-cols-2">
-        <OverviewCard className="lg:col-span-1">
+        <OverviewCard className="lg:col-span-1" data-testid="overview-active-workspace">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Active workspace</p>
@@ -65,7 +65,7 @@ export function OverviewScreen({
       </div>
 
       <div className="min-w-0 grid gap-4 xl:grid-cols-3">
-        <OverviewCard className="min-h-0">
+        <OverviewCard className="min-h-0" data-testid="overview-memory-health">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Recent sessions</p>
@@ -145,9 +145,9 @@ export function OverviewScreen({
   );
 }
 
-function OverviewCard({ children, className = '' }: { children: ReactNode; className?: string }) {
+function OverviewCard({ children, className = '', ...props }: { children: ReactNode; className?: string } & React.HTMLAttributes<HTMLElement>) {
   return (
-    <section className={`min-w-0 rounded-2xl border border-border bg-card/95 p-4 shadow-sm sm:p-5 ${className}`}>
+    <section className={`min-w-0 rounded-2xl border border-border bg-card/95 p-4 shadow-sm sm:p-5 ${className}`} {...props}>
       {children}
     </section>
   );

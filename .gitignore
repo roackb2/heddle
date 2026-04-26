@@ -8,6 +8,9 @@ dist/
 local/
 .heddle/
 coverage/
+.e2e/
+playwright-report/
+test-results/
 
 # Environment
 .env

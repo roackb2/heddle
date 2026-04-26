@@ -41,6 +41,10 @@
     "client:dev": "vite --config src/web/vite.config.ts",
     "server:dev": "tsx --no-cache src/server/dev.ts",
     "daemon:dev": "tsx --no-cache src/cli/main.ts daemon --assets-dir dist/src/web",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:headed": "playwright test --headed",
+    "e2e:install": "playwright install chromium",
     "cli:dev": "tsx --no-cache src/cli/main.ts",
     "chat:dev": "tsx --no-cache src/cli/main.ts chat",
     "chat:dev:openai": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" tsx --no-cache src/cli/main.ts chat",
@@ -136,6 +140,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.59.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/express": "^5.0.6",

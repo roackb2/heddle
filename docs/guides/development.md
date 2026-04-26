@@ -30,6 +30,20 @@ Run tests:
 yarn test
 ```
 
+Run browser workflow tests:
+
+```bash
+yarn e2e:install
+yarn e2e
+yarn e2e:headed
+```
+
+`yarn e2e` runs Playwright against an isolated fixture daemon on `127.0.0.1:9876` and a Vite client on `127.0.0.1:5174`. It does not call live LLM providers. The first suite covers control-plane loading, route persistence, workspace switching, current Git diff review, and mobile navigation.
+
+Use `yarn e2e:headed` when you want to watch the browser execute the workflow live.
+
+Use `yarn e2e:ui` when you want Playwright's timeline, trace, and selector tooling. If the preview pane shows `about:blank` after a completed run, select a specific test action in the left/timeline panels or rerun the selected test from the UI; the deterministic pass/fail result is still authoritative.
+
 Run lint and type checking when you are making code changes:
 
 ```bash

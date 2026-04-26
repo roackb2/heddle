@@ -39,10 +39,11 @@ export function WorkspacesScreen({
             <Badge variant="outline">{formatNumber(state.workspaces.length)} local</Badge>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3" data-testid="workspace-list">
             {state.workspaces.map((workspace) => (
               <article
                 key={workspace.id}
+                data-testid={`workspace-card-${workspace.id}`}
                 className="rounded-xl border border-border bg-background/60 p-4"
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -169,6 +170,7 @@ export function AddWorkspaceCard({
       </div>
 
       <form
+        data-testid="workspace-create-form"
         className="mt-4 space-y-4"
         onSubmit={(event) => {
           event.preventDefault();
@@ -195,6 +197,7 @@ export function AddWorkspaceCard({
             onChange={(event) => setName(event.target.value)}
             placeholder="Workspace name"
             disabled={creatingWorkspace}
+            data-testid="workspace-create-name"
           />
         </label>
 
@@ -207,6 +210,7 @@ export function AddWorkspaceCard({
               onChange={(event) => setAnchorRoot(event.target.value)}
               placeholder="/absolute/path/to/workspace"
               disabled={creatingWorkspace}
+              data-testid="workspace-create-path"
             />
             <Button
               type="button"
@@ -235,6 +239,7 @@ export function AddWorkspaceCard({
           variant="secondary"
           className="w-full"
           disabled={creatingWorkspace || !name.trim() || !anchorRoot.trim()}
+          data-testid="workspace-create-submit"
         >
           {creatingWorkspace ? 'Creating…' : 'Create workspace'}
         </Button>
@@ -277,7 +282,7 @@ function RecentWorkspacesCard({
       </div>
 
       {recentWorkspaces.length ?
-        <div className="mt-4 space-y-2">
+        <div className="mt-4 space-y-2" data-testid="recent-workspace-list">
           {recentWorkspaces.slice(0, 8).map((workspace) => {
             const active = workspace.id === state.activeWorkspaceId;
             const attached = workspace.relation === 'attached';

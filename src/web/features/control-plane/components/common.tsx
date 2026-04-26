@@ -176,6 +176,7 @@ export function WorkspaceSwitcher({
         value={state.activeWorkspaceId}
         disabled={disabled}
         onChange={(event) => onSelect(event.target.value)}
+        data-testid="workspace-switcher"
       >
         {state.workspaces.map((workspace) => (
           <option key={workspace.id} value={workspace.id}>
@@ -215,9 +216,19 @@ export function WorkspaceSectionHeader({ title, subtitle, actions }: { title: st
   );
 }
 
-export function SideSection({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) {
+export function SideSection({
+  title,
+  actions,
+  children,
+  testId,
+}: {
+  title: string;
+  actions?: ReactNode;
+  children: ReactNode;
+  testId?: string;
+}) {
   return (
-    <section className="side-section">
+    <section className="side-section" data-testid={testId}>
       <div className="flex items-center justify-between gap-3">
         <h3>{title}</h3>
         {actions}

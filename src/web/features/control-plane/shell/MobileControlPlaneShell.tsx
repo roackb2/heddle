@@ -102,6 +102,7 @@ export function MobileControlPlaneShell({
             className="h-9 rounded-md px-2 text-xs"
             onClick={() => onSectionChange(item.value)}
             aria-current={section === item.value ? 'page' : undefined}
+            data-testid={`mobile-nav-${item.value}`}
           >
             {item.label}
           </Button>

@@ -57,7 +57,12 @@ export function DesktopControlPlaneShell({
 
 function RouteTabLink({ active, to, children }: { active: boolean; to: string; children: string }) {
   return (
-    <NavLink className={`tab-button ${active ? 'active' : ''}`} to={to} aria-current={active ? 'page' : undefined}>
+    <NavLink
+      className={`tab-button ${active ? 'active' : ''}`}
+      to={to}
+      aria-current={active ? 'page' : undefined}
+      data-testid={`nav-${children.toLowerCase()}`}
+    >
       {children}
     </NavLink>
   );
