@@ -2,11 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent } from 'react';
 import {
   fetchModelOptions,
+  fetchWorkspaceChanges,
+  fetchWorkspaceFileDiff,
   fetchWorkspaceFileSuggestions,
   type ChatSessionDetail,
   type ChatTurnReview,
   type ControlPlaneState,
   type ModelOptions,
+  type WorkspaceChanges,
+  type WorkspaceFileDiff,
   type WorkspaceFileSuggestion,
 } from '../../../lib/api';
 import { formatDate, formatNumber, className } from '../utils';
@@ -101,10 +105,19 @@ export function SessionsScreen({
   const [activeMentionIndex, setActiveMentionIndex] = useState(0);
   const [mobileView, setMobileView] = useState<MobileView>('list');
   const [selectedReviewFilePath, setSelectedReviewFilePath] = useState<string | undefined>();
+  const [workspaceChanges, setWorkspaceChanges] = useState<WorkspaceChanges | null>(null);
+  const [workspaceChangesLoading, setWorkspaceChangesLoading] = useState(false);
+  const [workspaceChangesError, setWorkspaceChangesError] = useState<string | undefined>();
+  const [selectedWorkspaceFilePath, setSelectedWorkspaceFilePath] = useState<string | undefined>();
+  const [workspaceFileDiff, setWorkspaceFileDiff] = useState<WorkspaceFileDiff | null>(null);
+  const [workspaceFileDiffLoading, setWorkspaceFileDiffLoading] = useState(false);
+  const [workspaceFileDiffError, setWorkspaceFileDiffError] = useState<string | undefined>();
   const runActive = sendingPrompt || runInFlight;
   const compactionStatus = sessionDetail?.context?.compactionStatus ?? activeSession?.context?.compactionStatus;
   const selectedReviewFile =
     turnReview?.files.find((file) => file.path === selectedReviewFilePath) ?? turnReview?.files[0];
+  const selectedWorkspaceFile =
+    workspaceChanges?.files.find((file) => file.path === selectedWorkspaceFilePath) ?? workspaceChanges?.files[0];
   const workspaceStyle = {
     '--session-sidebar-width': `${panelWidths.left}px`,
     '--session-side-width': `${panelWidths.right}px`,
@@ -158,6 +171,76 @@ export function SessionsScreen({
   useEffect(() => {
     setSelectedReviewFilePath(turnReview?.files[0]?.path);
   }, [selectedTurnId, turnReview?.traceFile]);
+
+  useEffect(() => {
+    if (inspectorTab !== 'review') {
+      return;
+    }
+
+    let cancelled = false;
+    setWorkspaceChangesLoading(true);
+    async function refreshWorkspaceChanges() {
+      try {
+        const next = await fetchWorkspaceChanges();
+        if (!cancelled) {
+          setWorkspaceChanges(next);
+          setWorkspaceChangesError(undefined);
+          setSelectedWorkspaceFilePath((current) => (
+            current && next.files.some((file) => file.path === current) ? current : next.files[0]?.path
+          ));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setWorkspaceChangesError(error instanceof Error ? error.message : String(error));
+        }
+      } finally {
+        if (!cancelled) {
+          setWorkspaceChangesLoading(false);
+        }
+      }
+    }
+
+    void refreshWorkspaceChanges();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [inspectorTab, runActive, sessionDetail?.updatedAt]);
+
+  useEffect(() => {
+    if (!selectedWorkspaceFile?.path) {
+      setWorkspaceFileDiff(null);
+      setWorkspaceFileDiffError(undefined);
+      return;
+    }
+
+    const filePath = selectedWorkspaceFile.path;
+    let cancelled = false;
+    setWorkspaceFileDiffLoading(true);
+    async function refreshWorkspaceFileDiff() {
+      try {
+        const next = await fetchWorkspaceFileDiff(filePath);
+        if (!cancelled) {
+          setWorkspaceFileDiff(next);
+          setWorkspaceFileDiffError(undefined);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setWorkspaceFileDiffError(error instanceof Error ? error.message : String(error));
+        }
+      } finally {
+        if (!cancelled) {
+          setWorkspaceFileDiffLoading(false);
+        }
+      }
+    }
+
+    void refreshWorkspaceFileDiff();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedWorkspaceFile?.path]);
 
   useEffect(() => {
     if (!mentionQuery) {
@@ -694,6 +777,50 @@ export function SessionsScreen({
               </SideSection>
             </>
           : <>
+            <SideSection title="Current workspace changes">
+              {workspaceChangesLoading ?
+                <EmptyState title="Loading workspace diff" body="Reading current Git changes from the active workspace." />
+              : workspaceChangesError ?
+                <EmptyState title="Workspace diff failed" body={workspaceChangesError} />
+              : workspaceChanges?.vcs === 'none' ?
+                <EmptyState title="Not a git workspace" body={workspaceChanges.error ?? 'Current workspace changes require a Git-backed project.'} />
+              : workspaceChanges?.files.length ?
+                <div className="detail-stack compact-stack">
+                  <div className="stack-list compact">
+                    {workspaceChanges.files.map((file) => (
+                      <button
+                        key={`workspace-${file.path}`}
+                        type="button"
+                        className={className('list-button compact-button', selectedWorkspaceFile?.path === file.path && 'active')}
+                        onClick={() => setSelectedWorkspaceFilePath(file.path)}
+                      >
+                        <div className="list-button-header">
+                          <strong>{file.path}</strong>
+                          <span>{file.status}</span>
+                        </div>
+                        <div className="pills compact-pills">
+                          <Pill>current git</Pill>
+                          {file.additions !== undefined || file.deletions !== undefined ?
+                            <Pill tone="good">+{file.additions ?? 0} / -{file.deletions ?? 0}</Pill>
+                          : null}
+                          {file.binary ? <Pill tone="warn">binary</Pill> : null}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  {workspaceFileDiffLoading ?
+                    <EmptyState title="Loading file diff" body="Reading the selected file patch." />
+                  : workspaceFileDiffError ?
+                    <EmptyState title="File diff failed" body={workspaceFileDiffError} />
+                  : workspaceFileDiff?.error ?
+                    <EmptyState title="File diff unavailable" body={workspaceFileDiff.error} />
+                  : workspaceFileDiff?.patch ?
+                    <CodeBlock>{workspaceFileDiff.patch}</CodeBlock>
+                  : <EmptyState title="No patch available" body="Git reports this file as changed, but no patch text is available for it." />}
+                </div>
+              : <EmptyState title="Clean workspace" body="Git does not report current project file changes." />}
+            </SideSection>
+
             <SideSection title="Diff / review excerpt">
               {turnReviewLoading ?
                 <EmptyState title="Loading review" body="Reading trace-backed review evidence for the selected turn." />
