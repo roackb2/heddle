@@ -118,6 +118,13 @@ export function SessionsScreen({
     turnReview?.files.find((file) => file.path === selectedReviewFilePath) ?? turnReview?.files[0];
   const selectedWorkspaceFile =
     workspaceChanges?.files.find((file) => file.path === selectedWorkspaceFilePath) ?? workspaceChanges?.files[0];
+  const selectedTurnPatchIsStale = Boolean(
+    selectedReviewFile?.path
+    && selectedWorkspaceFile?.path === selectedReviewFile.path
+    && selectedReviewFile.patch
+    && workspaceFileDiff?.patch
+    && normalizePatchForComparison(selectedReviewFile.patch) !== normalizePatchForComparison(workspaceFileDiff.patch),
+  );
   const workspaceStyle = {
     '--session-sidebar-width': `${panelWidths.left}px`,
     '--session-side-width': `${panelWidths.right}px`,
@@ -815,7 +822,15 @@ export function SessionsScreen({
                   : workspaceFileDiff?.error ?
                     <EmptyState title="File diff unavailable" body={workspaceFileDiff.error} />
                   : workspaceFileDiff?.patch ?
-                    <CodeBlock>{workspaceFileDiff.patch}</CodeBlock>
+                    <>
+                      {selectedTurnPatchIsStale ?
+                        <div className="detail-card">
+                          <p className="card-title">Current workspace differs from captured turn</p>
+                          <p className="muted">The selected file also has trace-backed turn evidence, but the current Git patch is different. Review this section as live workspace state, not historical turn evidence.</p>
+                        </div>
+                      : null}
+                      <CodeBlock>{workspaceFileDiff.patch}</CodeBlock>
+                    </>
                   : <EmptyState title="No patch available" body="Git reports this file as changed, but no patch text is available for it." />}
                 </div>
               : <EmptyState title="Clean workspace" body="Git does not report current project file changes." />}
@@ -889,6 +904,10 @@ export function SessionsScreen({
       </aside>
     </section>
   );
+}
+
+function normalizePatchForComparison(patch: string): string {
+  return patch.trim().replace(/\r\n/g, '\n');
 }
 
 type FileMentionQuery = {

@@ -49,7 +49,13 @@ const sessionDetail: ChatSessionDetail = {
 
 const turnReview: ChatTurnReview = {
   traceFile: '/tmp/trace.json',
-  files: [],
+  files: [{
+    path: 'src/example.ts',
+    status: 'modified',
+    source: 'edit_file',
+    patch: 'diff --git a/src/example.ts b/src/example.ts\n-old\n+turn',
+    truncated: false,
+  }],
   reviewCommands: [],
   verificationCommands: [],
   mutationCommands: [],
@@ -112,8 +118,9 @@ describe('SessionsScreen review UI', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Current workspace changes')).toBeTruthy();
-      expect(screen.getByText('src/example.ts')).toBeTruthy();
-      expect(screen.getByText(/diff --git a\/src\/example.ts/)).toBeTruthy();
+      expect(screen.getAllByText('src/example.ts')).toHaveLength(2);
+      expect(screen.getAllByText(/diff --git a\/src\/example.ts/)).toHaveLength(2);
+      expect(screen.getByText('Current workspace differs from captured turn')).toBeTruthy();
     });
     expect(screen.getByText('Diff / review excerpt')).toBeTruthy();
     expect(fetchWorkspaceChanges).toHaveBeenCalledTimes(1);
