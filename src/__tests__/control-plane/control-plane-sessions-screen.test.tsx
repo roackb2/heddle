@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatSessionDetail, ChatTurnReview, ControlPlaneState } from '../../web/lib/api.js';
 import { SessionsScreen } from '../../web/features/control-plane/screens/SessionsScreen.js';
@@ -125,5 +125,10 @@ describe('SessionsScreen review UI', () => {
     expect(screen.getByText('Diff / review excerpt')).toBeTruthy();
     expect(fetchWorkspaceChanges).toHaveBeenCalledTimes(1);
     expect(fetchWorkspaceFileDiff).toHaveBeenCalledWith('src/example.ts');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => {
+      expect(fetchWorkspaceChanges).toHaveBeenCalledTimes(2);
+    });
   });
 });

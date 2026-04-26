@@ -215,10 +215,13 @@ export function WorkspaceSectionHeader({ title, subtitle, actions }: { title: st
   );
 }
 
-export function SideSection({ title, children }: { title: string; children: ReactNode }) {
+export function SideSection({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) {
   return (
     <section className="side-section">
-      <h3>{title}</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3>{title}</h3>
+        {actions}
+      </div>
       {children}
     </section>
   );

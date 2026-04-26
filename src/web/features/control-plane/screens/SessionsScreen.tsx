@@ -20,6 +20,7 @@ import { CommandList, SessionListButton, TurnListButton } from '../components/li
 import { ConversationMessage } from '../components/ConversationMessage';
 import { MobileChatScreen } from '../mobile/MobileChatScreen';
 import { MobileReviewScreen } from '../mobile/MobileReviewScreen';
+import { Button } from '../../../components/ui/button';
 
 export type SessionTurn = Exclude<ChatSessionDetail, null>['turns'][number];
 
@@ -113,6 +114,7 @@ export function SessionsScreen({
   const [workspaceFileDiff, setWorkspaceFileDiff] = useState<WorkspaceFileDiff | null>(null);
   const [workspaceFileDiffLoading, setWorkspaceFileDiffLoading] = useState(false);
   const [workspaceFileDiffError, setWorkspaceFileDiffError] = useState<string | undefined>();
+  const [workspaceReviewRefreshKey, setWorkspaceReviewRefreshKey] = useState(0);
   const runActive = sendingPrompt || runInFlight;
   const compactionStatus = sessionDetail?.context?.compactionStatus ?? activeSession?.context?.compactionStatus;
   const selectedReviewFile =
@@ -213,7 +215,7 @@ export function SessionsScreen({
     return () => {
       cancelled = true;
     };
-  }, [inspectorTab, runActive, sessionDetail?.updatedAt]);
+  }, [inspectorTab, runActive, sessionDetail?.updatedAt, workspaceReviewRefreshKey]);
 
   useEffect(() => {
     if (!selectedWorkspaceFile?.path) {
@@ -248,7 +250,7 @@ export function SessionsScreen({
     return () => {
       cancelled = true;
     };
-  }, [selectedWorkspaceFile?.path]);
+  }, [selectedWorkspaceFile?.path, workspaceReviewRefreshKey]);
 
   useEffect(() => {
     if (!mentionQuery) {
@@ -785,7 +787,20 @@ export function SessionsScreen({
               </SideSection>
             </>
           : <>
-            <SideSection title="Current workspace changes">
+            <SideSection
+              title="Current workspace changes"
+              actions={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setWorkspaceReviewRefreshKey((current) => current + 1)}
+                  disabled={workspaceChangesLoading || workspaceFileDiffLoading}
+                >
+                  Refresh
+                </Button>
+              }
+            >
               {workspaceChangesLoading ?
                 <EmptyState title="Loading workspace diff" body="Reading current Git changes from the active workspace." />
               : workspaceChangesError ?
