@@ -204,9 +204,9 @@ If terminal chat is the execution surface, the control plane is the oversight su
 
 The `Workspaces` section lets you register local projects, switch the control plane between them, rename workspace entries, and pick a project folder from the browser UI. Heddle also keeps a user-level workspace registry so projects you have opened from the CLI or daemon can be rediscovered later.
 
-The `Sessions` section supports a coding-review flow built around current work first. Review starts from the live Git working tree for the active workspace, with changed files and structured read-only diffs. Historical turn diffs, review commands, verification commands, approvals, and trace events are still available, but they are separated from current review so old evidence does not distract from the task at hand.
+The `Sessions` section supports a coding-review flow built around current work first. Review starts from the live Git working tree for the active workspace, with changed files, structured read-only diffs, and a larger full-diff viewer when the side panel is too tight. Historical turn diffs, review commands, verification commands, approvals, and trace events are still available, but they are separated from current review so old evidence does not distract from the task at hand.
 
-This is useful if you want a more inspectable and operator-friendly workflow than a plain CLI transcript. The layout adapts for phone use as well, with mobile-native navigation for Overview, Sessions, Tasks, and Workspaces, plus dedicated session info/review views.
+This is useful if you want a more inspectable and operator-friendly workflow than a plain CLI transcript. The layout adapts for phone use as well, with mobile-native navigation for Overview, Sessions, Tasks, and Workspaces, plus a focused Chat/Review session workflow.
 
 More: [Control plane guide](docs/guides/control-plane.md)
 

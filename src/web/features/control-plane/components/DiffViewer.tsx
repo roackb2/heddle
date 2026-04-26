@@ -69,9 +69,9 @@ export function DiffViewer({
   if (patch) {
     return (
       <div className="space-y-2">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Pill tone="warn">{fallbackTitle}</Pill>
-          <span className="text-xs text-muted-foreground">Structured hunks are unavailable for this patch.</span>
+          <span className="min-w-0 text-xs text-muted-foreground">Structured hunks are unavailable for this patch.</span>
         </div>
         <CodeBlock>{patch}</CodeBlock>
       </div>

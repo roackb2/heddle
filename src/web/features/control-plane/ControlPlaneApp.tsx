@@ -19,7 +19,6 @@ import { TasksScreen } from './screens/TasksScreen';
 import { WorkspacesScreen } from './screens/WorkspacesScreen';
 import { Toaster } from '../../components/ui/toaster';
 import { useToast } from '../../components/ui/use-toast';
-import { useControlPlaneUiStore } from './state/controlPlaneUiStore';
 
 declare global {
   interface Window {
@@ -31,8 +30,6 @@ export function ControlPlaneApp() {
   const navigation = useControlPlaneNavigation();
   const { state, error, refresh, setActiveWorkspace, createWorkspace, renameWorkspace } = useControlPlaneState();
   const { toasts, toast: notifyToast } = useToast();
-  const inspectorTab = useControlPlaneUiStore((store) => store.inspectorTab);
-  const setInspectorTab = useControlPlaneUiStore((store) => store.setInspectorTab);
   const isMobile = useIsMobile();
   const refreshControlPlaneState = useCallback(() => {
     void refresh();
@@ -40,8 +37,6 @@ export function ControlPlaneApp() {
   const sessionsState = useSessionsScreenState(state?.sessions, notifyToast, refreshControlPlaneState, {
     selectedSessionId: navigation.routeSessionId,
     onSelectedSessionIdChange: navigation.setRouteSessionId,
-    inspectorTab,
-    onInspectorTabChange: setInspectorTab,
     autoSelectSession: navigation.section === 'sessions',
   });
   const tasksState = useTasksScreenState(
@@ -222,8 +217,6 @@ function SessionsRoute({
       onUpdateSessionSettings={sessionsState.updateSessionSettings}
       pendingApproval={sessionsState.pendingApproval}
       onResolveApproval={sessionsState.resolveApproval}
-      inspectorTab={sessionsState.inspectorTab}
-      onInspectorTabChange={sessionsState.setInspectorTab}
     />
   );
 }

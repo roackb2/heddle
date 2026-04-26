@@ -29,7 +29,6 @@ type MobileChatScreenProps = {
   onDraftChange: (value: string, cursor: number | null) => void;
   onComposerKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onBackToSessions: () => void;
-  onOpenSummary: () => void;
   onOpenReview: () => void;
   onSubmitPrompt: () => void;
   onContinueSession: () => void;
@@ -57,7 +56,6 @@ export function MobileChatScreen({
   onDraftChange,
   onComposerKeyDown,
   onBackToSessions,
-  onOpenSummary,
   onOpenReview,
   onSubmitPrompt,
   onContinueSession,
@@ -84,7 +82,6 @@ export function MobileChatScreen({
         subtitle={activeSession ? `updated ${formatDate(activeSession.updatedAt)}` : 'Pick a session'}
         onBackToSessions={onBackToSessions}
         onOpenChat={() => undefined}
-        onOpenInfo={onOpenSummary}
         onOpenReview={onOpenReview}
       />
 

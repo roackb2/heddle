@@ -1,7 +1,7 @@
 import { Button } from '../../../components/ui/button';
 import { cn } from '../../../lib/utils';
 
-export type MobileSessionView = 'chat' | 'info' | 'review';
+export type MobileSessionView = 'chat' | 'review';
 
 type MobileSessionNavProps = {
   activeView: MobileSessionView;
@@ -9,7 +9,6 @@ type MobileSessionNavProps = {
   subtitle?: string;
   onBackToSessions: () => void;
   onOpenChat: () => void;
-  onOpenInfo: () => void;
   onOpenReview: () => void;
 };
 
@@ -19,7 +18,6 @@ export function MobileSessionNav({
   subtitle,
   onBackToSessions,
   onOpenChat,
-  onOpenInfo,
   onOpenReview,
 }: MobileSessionNavProps) {
   return (
@@ -35,9 +33,8 @@ export function MobileSessionNav({
         <div className="w-[76px]" aria-hidden="true" />
       </div>
 
-      <nav className="mt-2 grid grid-cols-3 rounded-md bg-muted p-1" aria-label="Session views">
+      <nav className="mt-2 grid grid-cols-2 rounded-md bg-muted p-1" aria-label="Session views">
         <SessionNavButton active={activeView === 'chat'} onClick={onOpenChat}>Chat</SessionNavButton>
-        <SessionNavButton active={activeView === 'info'} onClick={onOpenInfo}>Info</SessionNavButton>
         <SessionNavButton active={activeView === 'review'} onClick={onOpenReview}>Review</SessionNavButton>
       </nav>
     </header>

@@ -111,8 +111,6 @@ describe('SessionsScreen review UI', () => {
         onUpdateSessionSettings={async () => undefined}
         pendingApproval={null}
         onResolveApproval={async () => undefined}
-        inspectorTab="review"
-        onInspectorTabChange={() => undefined}
       />,
     );
 
@@ -120,12 +118,17 @@ describe('SessionsScreen review UI', () => {
       expect(screen.getByText('Current workspace changes')).toBeTruthy();
       expect(screen.getByText('src/example.ts')).toBeTruthy();
       expect(screen.getByText(/diff --git a\/src\/example.ts/)).toBeTruthy();
-      expect(screen.getByText('Current workspace differs from captured turn')).toBeTruthy();
+      expect(screen.getByLabelText('Current workspace differs from captured turn')).toBeTruthy();
     });
     expect(screen.getByText('Turn history')).toBeTruthy();
     expect(screen.getByText('Evidence')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Summary' })).toBeNull();
     expect(fetchWorkspaceChanges).toHaveBeenCalledTimes(1);
     expect(fetchWorkspaceFileDiff).toHaveBeenCalledWith('src/example.ts');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open full diff' }));
+    expect(screen.getByRole('dialog', { name: /Current workspace diff/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     await waitFor(() => {

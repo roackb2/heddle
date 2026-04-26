@@ -13,7 +13,7 @@ import {
   type WorkspaceFileDiff,
   type WorkspaceFileSuggestion,
 } from '../../../lib/api';
-import { formatDate, formatNumber, className } from '../utils';
+import { formatDate, className } from '../utils';
 import { CodeBlock, EmptyState, Pill, SideSection, WorkspaceSectionHeader } from '../components/common';
 import { DiffViewer } from '../components/DiffViewer';
 import { CommandList, SessionListButton, TurnListButton } from '../components/lists';
@@ -21,6 +21,12 @@ import { ConversationMessage } from '../components/ConversationMessage';
 import { MobileChatScreen } from '../mobile/MobileChatScreen';
 import { MobileReviewScreen } from '../mobile/MobileReviewScreen';
 import { Button } from '../../../components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../../../components/ui/tooltip';
 
 export type SessionTurn = Exclude<ChatSessionDetail, null>['turns'][number];
 
@@ -59,8 +65,6 @@ export type SessionsScreenProps = {
   onUpdateSessionSettings: (settings: { model?: string; driftEnabled?: boolean }) => Promise<void>;
   pendingApproval: { tool: string; callId: string; input?: unknown; requestedAt: string } | null;
   onResolveApproval: (approved: boolean) => Promise<void>;
-  inspectorTab: 'summary' | 'review';
-  onInspectorTabChange: (tab: 'summary' | 'review') => void;
 };
 
 export function SessionsScreen({
@@ -90,8 +94,6 @@ export function SessionsScreen({
   onUpdateSessionSettings,
   pendingApproval,
   onResolveApproval,
-  inspectorTab,
-  onInspectorTabChange,
 }: SessionsScreenProps) {
   const shellRef = useRef<HTMLElement>(null);
   const conversationScrollRef = useRef<HTMLDivElement>(null);
@@ -116,6 +118,7 @@ export function SessionsScreen({
   const [workspaceFileDiffError, setWorkspaceFileDiffError] = useState<string | undefined>();
   const [workspaceReviewRefreshKey, setWorkspaceReviewRefreshKey] = useState(0);
   const [reviewMode, setReviewMode] = useState<ReviewMode>('current');
+  const [expandedDiff, setExpandedDiff] = useState<ExpandedDiff | null>(null);
   const runActive = sendingPrompt || runInFlight;
   const compactionStatus = sessionDetail?.context?.compactionStatus ?? activeSession?.context?.compactionStatus;
   const selectedReviewFile =
@@ -184,10 +187,6 @@ export function SessionsScreen({
   }, [selectedTurnId, turnReview?.traceFile]);
 
   useEffect(() => {
-    if (inspectorTab !== 'review') {
-      return;
-    }
-
     let cancelled = false;
     setWorkspaceChangesLoading(true);
     async function refreshWorkspaceChanges() {
@@ -216,7 +215,7 @@ export function SessionsScreen({
     return () => {
       cancelled = true;
     };
-  }, [inspectorTab, runActive, sessionDetail?.updatedAt, workspaceReviewRefreshKey]);
+  }, [runActive, sessionDetail?.updatedAt, workspaceReviewRefreshKey]);
 
   useEffect(() => {
     if (!selectedWorkspaceFile?.path) {
@@ -369,7 +368,6 @@ export function SessionsScreen({
   const selectTurn = (turnId: string) => {
     onSelectTurn(turnId);
     setMobileView('review');
-    onInspectorTabChange('review');
   };
 
   const showSessionList = () => {
@@ -380,13 +378,7 @@ export function SessionsScreen({
     setMobileView('chat');
   };
 
-  const openSummaryInspector = () => {
-    onInspectorTabChange('summary');
-    setMobileView('review');
-  };
-
   const openReviewInspector = () => {
-    onInspectorTabChange('review');
     setMobileView('review');
   };
 
@@ -505,7 +497,6 @@ export function SessionsScreen({
         onDraftChange={updateDraft}
         onComposerKeyDown={handleComposerKeyDown}
         onBackToSessions={showSessionList}
-        onOpenSummary={openSummaryInspector}
         onOpenReview={openReviewInspector}
         onSubmitPrompt={submitDraft}
         onContinueSession={() => void onContinueSession()}
@@ -517,29 +508,32 @@ export function SessionsScreen({
 
   if (showMobileLayout && mobileView === 'review') {
     return (
-      <MobileReviewScreen
-        activeSession={activeSession}
-        sessionDetail={sessionDetail}
-        selectedTurnId={selectedTurnId}
-        selectedTurn={selectedTurn}
-        turnReview={turnReview}
-        turnReviewLoading={turnReviewLoading}
-        turnReviewError={turnReviewError}
-        workspaceChanges={workspaceChanges}
-        workspaceChangesLoading={workspaceChangesLoading}
-        workspaceChangesError={workspaceChangesError}
-        selectedWorkspaceFile={selectedWorkspaceFile}
-        workspaceFileDiff={workspaceFileDiff}
-        workspaceFileDiffLoading={workspaceFileDiffLoading}
-        workspaceFileDiffError={workspaceFileDiffError}
-        onSelectWorkspaceFile={setSelectedWorkspaceFilePath}
-        onRefreshWorkspaceReview={() => setWorkspaceReviewRefreshKey((current) => current + 1)}
-        inspectorTab={inspectorTab}
-        onInspectorTabChange={onInspectorTabChange}
-        onBackToSessions={showSessionList}
-        onOpenChat={showChatView}
-        onSelectTurn={selectTurn}
-      />
+      <>
+        <MobileReviewScreen
+          activeSession={activeSession}
+          sessionDetail={sessionDetail}
+          selectedTurnId={selectedTurnId}
+          selectedTurn={selectedTurn}
+          turnReview={turnReview}
+          turnReviewLoading={turnReviewLoading}
+          turnReviewError={turnReviewError}
+          workspaceChanges={workspaceChanges}
+          workspaceChangesLoading={workspaceChangesLoading}
+          workspaceChangesError={workspaceChangesError}
+          selectedWorkspaceFile={selectedWorkspaceFile}
+          workspaceFileDiff={workspaceFileDiff}
+          workspaceFileDiffLoading={workspaceFileDiffLoading}
+          workspaceFileDiffError={workspaceFileDiffError}
+          onSelectWorkspaceFile={setSelectedWorkspaceFilePath}
+          onRefreshWorkspaceReview={() => setWorkspaceReviewRefreshKey((current) => current + 1)}
+          selectedTurnPatchIsStale={selectedTurnPatchIsStale}
+          onOpenDiff={setExpandedDiff}
+          onBackToSessions={showSessionList}
+          onOpenChat={showChatView}
+          onSelectTurn={selectTurn}
+        />
+        <FullDiffDialog diff={expandedDiff} onClose={() => setExpandedDiff(null)} />
+      </>
     );
   }
 
@@ -581,7 +575,6 @@ export function SessionsScreen({
           actions={activeSession ? (
             <div className="session-controls">
               <button className="mobile-nav-button" type="button" onClick={showSessionList}>← Sessions</button>
-              <button className="mobile-nav-button mobile-inspector-button" type="button" onClick={openSummaryInspector}>Summary</button>
               <button className="mobile-nav-button mobile-inspector-button" type="button" onClick={openReviewInspector}>Review</button>
               <label className="select-control">
                 <span>model</span>
@@ -760,74 +753,43 @@ export function SessionsScreen({
         <div className="mobile-side-header">
           <button className="mobile-nav-button" type="button" onClick={showChatView}>← Chat</button>
         </div>
-        <div className="side-tabs" role="tablist" aria-label="Session inspector">
-          <button className={className(inspectorTab === 'summary' && 'active')} type="button" onClick={() => onInspectorTabChange('summary')}>Summary</button>
-          <button className={className(inspectorTab === 'review' && 'active')} type="button" onClick={() => onInspectorTabChange('review')}>Review</button>
-        </div>
-
         <div className="side-scroll">
-          {inspectorTab === 'summary' ?
-            <>
-              <SideSection title="Session context">
-                {sessionDetail ?
-                  <div className="kv-list">
-                    <div><span className="kv-key">session</span><span className="kv-value">{sessionDetail.id}</span></div>
-                    <div><span className="kv-key">messages</span><span className="kv-value">{sessionDetail.messages.length}</span></div>
-                    <div><span className="kv-key">turns</span><span className="kv-value">{sessionDetail.turns.length}</span></div>
-                    <div><span className="kv-key">history tokens</span><span className="kv-value">{formatNumber(sessionDetail.context?.estimatedHistoryTokens)}</span></div>
-                    <div><span className="kv-key">last run total</span><span className="kv-value">{formatNumber(sessionDetail.context?.lastRunTotalTokens)}</span></div>
-                    <div><span className="kv-key">continue prompt</span><span className="kv-value">{sessionDetail.lastContinuePrompt ?? 'none'}</span></div>
-                  </div>
-                : <EmptyState title="No session selected" body="Choose a session from the sidebar." />}
-              </SideSection>
+          <nav className="side-tabs review-mode-tabs" role="tablist" aria-label="Review mode">
+            <button className={className(reviewMode === 'current' && 'active')} type="button" onClick={() => setReviewMode('current')}>Current</button>
+            <button className={className(reviewMode === 'turn' && 'active')} type="button" onClick={() => setReviewMode('turn')}>Turn history</button>
+            <button className={className(reviewMode === 'evidence' && 'active')} type="button" onClick={() => setReviewMode('evidence')}>Evidence</button>
+          </nav>
 
-              <SideSection title="Turns">
-                {sessionDetail?.turns.length ?
-                  <div className="stack-list compact">
-                    {[...sessionDetail.turns].reverse().map((turn) => (
-                      <TurnListButton
-                        key={turn.id}
-                        turn={turn}
-                        active={turn.id === selectedTurnId}
-                        onClick={() => selectTurn(turn.id)}
-                      />
-                    ))}
-                  </div>
-                : <EmptyState title="No turns yet" body="Completed turns appear here with prompt, outcome, and trace summary." />}
-              </SideSection>
-            </>
-          : <>
-            <nav className="side-tabs review-mode-tabs" role="tablist" aria-label="Review mode">
-              <button className={className(reviewMode === 'current' && 'active')} type="button" onClick={() => setReviewMode('current')}>Current</button>
-              <button className={className(reviewMode === 'turn' && 'active')} type="button" onClick={() => setReviewMode('turn')}>Turn history</button>
-              <button className={className(reviewMode === 'evidence' && 'active')} type="button" onClick={() => setReviewMode('evidence')}>Evidence</button>
-            </nav>
-
-            {reviewMode === 'current' ?
-              <CurrentWorkspaceReviewSection
-                workspaceChanges={workspaceChanges}
-                workspaceChangesLoading={workspaceChangesLoading}
-                workspaceChangesError={workspaceChangesError}
-                selectedWorkspaceFile={selectedWorkspaceFile}
-                workspaceFileDiff={workspaceFileDiff}
-                workspaceFileDiffLoading={workspaceFileDiffLoading}
-                workspaceFileDiffError={workspaceFileDiffError}
-                selectedTurnPatchIsStale={selectedTurnPatchIsStale}
-                onSelectWorkspaceFile={setSelectedWorkspaceFilePath}
-                onRefresh={() => setWorkspaceReviewRefreshKey((current) => current + 1)}
-              />
-            : reviewMode === 'turn' ?
-              <HistoricalTurnReviewSection
-                turnReview={turnReview}
-                turnReviewLoading={turnReviewLoading}
-                turnReviewError={turnReviewError}
-                selectedReviewFile={selectedReviewFile}
-                onSelectReviewFile={setSelectedReviewFilePath}
-              />
-            : <ReviewEvidenceSection turnReview={turnReview} selectedTurn={selectedTurn} />}
-          </>}
+          {reviewMode === 'current' ?
+            <CurrentWorkspaceReviewSection
+              workspaceChanges={workspaceChanges}
+              workspaceChangesLoading={workspaceChangesLoading}
+              workspaceChangesError={workspaceChangesError}
+              selectedWorkspaceFile={selectedWorkspaceFile}
+              workspaceFileDiff={workspaceFileDiff}
+              workspaceFileDiffLoading={workspaceFileDiffLoading}
+              workspaceFileDiffError={workspaceFileDiffError}
+              selectedTurnPatchIsStale={selectedTurnPatchIsStale}
+              onSelectWorkspaceFile={setSelectedWorkspaceFilePath}
+              onRefresh={() => setWorkspaceReviewRefreshKey((current) => current + 1)}
+              onOpenDiff={setExpandedDiff}
+            />
+          : reviewMode === 'turn' ?
+            <HistoricalTurnReviewSection
+              sessionDetail={sessionDetail}
+              selectedTurnId={selectedTurnId}
+              onSelectTurn={selectTurn}
+              turnReview={turnReview}
+              turnReviewLoading={turnReviewLoading}
+              turnReviewError={turnReviewError}
+              selectedReviewFile={selectedReviewFile}
+              onSelectReviewFile={setSelectedReviewFilePath}
+              onOpenDiff={setExpandedDiff}
+            />
+          : <ReviewEvidenceSection turnReview={turnReview} selectedTurn={selectedTurn} />}
         </div>
       </aside>
+      <FullDiffDialog diff={expandedDiff} onClose={() => setExpandedDiff(null)} />
     </section>
   );
 }
@@ -849,6 +811,13 @@ type PanelWidths = {
 
 type MobileView = 'list' | 'chat' | 'review';
 type ReviewMode = 'current' | 'turn' | 'evidence';
+export type ExpandedDiff = {
+  title: string;
+  subtitle: string;
+  diff?: WorkspaceFileDiff['diff'];
+  patch?: string;
+  fallbackTitle: string;
+};
 
 type WorkspaceChangedFileValue = WorkspaceChanges['files'][number];
 
@@ -863,6 +832,7 @@ function CurrentWorkspaceReviewSection({
   selectedTurnPatchIsStale,
   onSelectWorkspaceFile,
   onRefresh,
+  onOpenDiff,
 }: {
   workspaceChanges: WorkspaceChanges | null;
   workspaceChangesLoading: boolean;
@@ -874,20 +844,25 @@ function CurrentWorkspaceReviewSection({
   selectedTurnPatchIsStale: boolean;
   onSelectWorkspaceFile: (path: string) => void;
   onRefresh: () => void;
+  onOpenDiff: (diff: ExpandedDiff) => void;
 }) {
+  const diffTitle = selectedWorkspaceFile?.path ?? workspaceFileDiff?.path ?? 'Workspace diff';
   return (
     <SideSection
       title="Current workspace changes"
       actions={
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onRefresh}
-          disabled={workspaceChangesLoading || workspaceFileDiffLoading}
-        >
-          Refresh
-        </Button>
+        <div className="review-section-actions">
+          {selectedTurnPatchIsStale ? <StalePatchIndicator /> : null}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRefresh}
+            disabled={workspaceChangesLoading || workspaceFileDiffLoading}
+          >
+            Refresh
+          </Button>
+        </div>
       }
     >
       {workspaceChangesLoading ?
@@ -912,12 +887,21 @@ function CurrentWorkspaceReviewSection({
             <EmptyState title="File diff unavailable" body={workspaceFileDiff.error} />
           : workspaceFileDiff?.patch ?
             <>
-              {selectedTurnPatchIsStale ?
-                <div className="detail-card">
-                  <p className="card-title">Current workspace differs from captured turn</p>
-                  <p className="muted">The selected file also has trace-backed turn evidence, but the current Git patch is different. Review this section as live workspace state, not historical turn evidence.</p>
-                </div>
-              : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="self-start"
+                onClick={() => onOpenDiff({
+                  title: diffTitle,
+                  subtitle: 'Current workspace diff',
+                  diff: workspaceFileDiff.diff,
+                  patch: workspaceFileDiff.patch,
+                  fallbackTitle: 'Raw workspace patch',
+                })}
+              >
+                Open full diff
+              </Button>
               <DiffViewer diff={workspaceFileDiff.diff} patch={workspaceFileDiff.patch} fallbackTitle="Raw workspace patch" />
             </>
           : <EmptyState title="No patch available" body="Git reports this file as changed, but no patch text is available for it." />}
@@ -928,20 +912,41 @@ function CurrentWorkspaceReviewSection({
 }
 
 function HistoricalTurnReviewSection({
+  sessionDetail,
+  selectedTurnId,
+  onSelectTurn,
   turnReview,
   turnReviewLoading,
   turnReviewError,
   selectedReviewFile,
   onSelectReviewFile,
+  onOpenDiff,
 }: {
+  sessionDetail: ChatSessionDetail | null;
+  selectedTurnId?: string;
+  onSelectTurn: (turnId: string) => void;
   turnReview: ChatTurnReview | null;
   turnReviewLoading: boolean;
   turnReviewError?: string;
   selectedReviewFile?: NonNullable<ChatTurnReview>['files'][number];
   onSelectReviewFile: (path: string) => void;
+  onOpenDiff: (diff: ExpandedDiff) => void;
 }) {
   return (
     <SideSection title="Captured turn diff">
+      {sessionDetail?.turns.length ?
+        <div className="stack-list compact review-turn-picker">
+          {[...sessionDetail.turns].reverse().map((turn) => (
+            <TurnListButton
+              key={turn.id}
+              turn={turn}
+              active={turn.id === selectedTurnId}
+              onClick={() => onSelectTurn(turn.id)}
+            />
+          ))}
+        </div>
+      : null}
+
       {turnReviewLoading ?
         <EmptyState title="Loading review" body="Reading trace-backed review evidence for the selected turn." />
       : turnReviewError ?
@@ -954,13 +959,77 @@ function HistoricalTurnReviewSection({
             onSelect={onSelectReviewFile}
           />
           {selectedReviewFile?.patch ?
-            <DiffViewer diff={selectedReviewFile.diff} patch={selectedReviewFile.patch} fallbackTitle="Raw turn patch" />
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="self-start"
+                onClick={() => onOpenDiff({
+                  title: selectedReviewFile.path,
+                  subtitle: 'Captured turn diff',
+                  diff: selectedReviewFile.diff,
+                  patch: selectedReviewFile.patch,
+                  fallbackTitle: 'Raw turn patch',
+                })}
+              >
+                Open full diff
+              </Button>
+              <DiffViewer diff={selectedReviewFile.diff} patch={selectedReviewFile.patch} fallbackTitle="Raw turn patch" />
+            </>
           : <EmptyState title="No patch captured" body="This file was changed, but the turn did not capture patch text for it." />}
         </div>
       : turnReview?.diffExcerpt ?
         <CodeBlock>{turnReview.diffExcerpt}</CodeBlock>
       : <EmptyState title="No captured diff" body="This selected turn did not save file-level diff evidence. Check Evidence for commands and approvals." />}
     </SideSection>
+  );
+}
+
+function StalePatchIndicator() {
+  return (
+    <TooltipProvider delayDuration={120}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button className="stale-diff-button" type="button" aria-label="Current workspace differs from captured turn">
+            i
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="left" className="max-w-64">
+          The selected file also has trace-backed turn evidence, but the current Git patch is different. Treat Current as live workspace state.
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+function FullDiffDialog({ diff, onClose }: { diff: ExpandedDiff | null; onClose: () => void }) {
+  if (!diff) {
+    return null;
+  }
+
+  return (
+    <div className="diff-dialog-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="diff-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${diff.subtitle}: ${diff.title}`}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="diff-dialog-header">
+          <div className="min-w-0">
+            <p className="topbar-eyebrow">Diff review</p>
+            <h2>{diff.title}</h2>
+            <p className="muted">{diff.subtitle}</p>
+          </div>
+          <Button type="button" variant="outline" onClick={onClose}>Close</Button>
+        </header>
+        <div className="diff-dialog-body">
+          <DiffViewer diff={diff.diff} patch={diff.patch} fallbackTitle={diff.fallbackTitle} />
+        </div>
+      </section>
+    </div>
   );
 }
 

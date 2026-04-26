@@ -19,7 +19,6 @@ import {
 } from '../../../lib/api';
 import type { ToastInput } from '../../../components/ui/use-toast';
 
-export type InspectorTab = 'summary' | 'review';
 export type SessionDetailValue = Exclude<ChatSessionDetail, null>;
 export type SessionTurn = SessionDetailValue['turns'][number];
 
@@ -49,8 +48,6 @@ export type SessionsScreenState = {
   turnReview: ChatTurnReview | null;
   turnReviewLoading: boolean;
   turnReviewError?: string;
-  inspectorTab: InspectorTab;
-  setInspectorTab: (tab: InspectorTab) => void;
 };
 
 export function useSessionsScreenState(
@@ -60,14 +57,11 @@ export function useSessionsScreenState(
   options?: {
     selectedSessionId?: string;
     onSelectedSessionIdChange?: (sessionId?: string) => void;
-    inspectorTab?: InspectorTab;
-    onInspectorTabChange?: (tab: InspectorTab) => void;
     autoSelectSession?: boolean;
   },
 ): SessionsScreenState {
   const [internalSelectedSessionId, setInternalSelectedSessionId] = useState<string | undefined>();
   const [selectedTurnId, setSelectedTurnId] = useState<string | undefined>();
-  const [internalInspectorTab, setInternalInspectorTab] = useState<InspectorTab>('review');
   const [sessionDetail, setSessionDetail] = useState<ChatSessionDetail | null>(null);
   const [sessionDetailLoading, setSessionDetailLoading] = useState(false);
   const [sessionDetailError, setSessionDetailError] = useState<string | undefined>();
@@ -83,8 +77,6 @@ export function useSessionsScreenState(
   const [sessionNotice, setSessionNotice] = useState<string | undefined>();
   const selectedSessionId = options?.selectedSessionId ?? internalSelectedSessionId;
   const setSelectedSessionId = options?.onSelectedSessionIdChange ?? setInternalSelectedSessionId;
-  const inspectorTab = options?.inspectorTab ?? internalInspectorTab;
-  const setInspectorTab = options?.onInspectorTabChange ?? setInternalInspectorTab;
   const autoSelectSession = options?.autoSelectSession ?? true;
   const onSessionsChangedRef = useRef(onSessionsChanged);
 
@@ -720,7 +712,5 @@ export function useSessionsScreenState(
     turnReview,
     turnReviewLoading,
     turnReviewError,
-    inspectorTab,
-    setInspectorTab,
   };
 }

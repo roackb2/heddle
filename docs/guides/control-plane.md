@@ -55,9 +55,9 @@ It has three review modes:
 - `Turn history`: the selected turn's captured file diffs from traces. This is historical evidence and may differ from the current workspace if later edits happened.
 - `Evidence`: review commands, verification commands, approvals, and trace events for the selected turn.
 
-Current review uses Git as the source of truth for changed files. It reads workspace status and selected file patches, filters out `.heddle/` runtime state, renders structured hunks when available, and falls back to raw patch text for unsupported patches.
+Current review uses Git as the source of truth for changed files. It reads workspace status and selected file patches, filters out `.heddle/` runtime state, renders structured hunks when available, and falls back to raw patch text for unsupported patches. The side panel stays focused on the selected file, and `Open full diff` expands the same diff into a larger review surface when the side panel is too constrained.
 
-Turn history remains trace-backed. It is useful for answering what the agent did at that moment, what commands it ran, and what it believed it verified. If the current workspace patch no longer matches the captured turn patch, Heddle labels that stale relationship instead of pretending the historical trace is the live state.
+Turn history remains trace-backed. It is useful for answering what the agent did at that moment, what commands it ran, and what it believed it verified. If the current workspace patch no longer matches the captured turn patch, Heddle marks that stale relationship with a compact info indicator instead of spending review space on a warning card.
 
 This is still intentionally short of a full IDE file-review engine: Heddle does not edit patches in the browser and does not rely on OS file watching as the review truth. The practical review model is: Git shows what changed now; traces explain how the selected turn got there.
 
@@ -69,9 +69,10 @@ On mobile, the UI uses:
 
 - bottom root navigation for Overview, Sessions, Tasks, and Workspaces
 - a dedicated session list for choosing saved conversations
-- native-style session navigation for Chat, Info, and Review
+- native-style session navigation for Chat and Review
 - a compact composer that keeps the latest conversation visible
 - current workspace diff review plus historical turn/evidence tabs without desktop sidebars
+- full-diff expansion for reviewing larger patches on small screens
 
 Representative mobile views:
 

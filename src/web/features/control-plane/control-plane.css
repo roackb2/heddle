@@ -993,6 +993,94 @@ h3 {
   color: var(--muted);
 }
 
+.review-mode-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -12px -12px 12px;
+  padding: 12px;
+  background: var(--panel-alt);
+}
+
+.review-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stale-diff-button {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.08);
+  color: #fde68a;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.review-turn-picker {
+  max-height: 210px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.diff-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.diff-dialog {
+  display: flex;
+  width: min(1180px, 96vw);
+  max-height: min(860px, 92vh);
+  min-height: min(620px, 82vh);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(125, 211, 252, 0.26);
+  border-radius: 18px;
+  background: #07101d;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55);
+}
+
+.diff-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(15, 23, 42, 0.82);
+}
+
+.diff-dialog-header h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 18px;
+}
+
+.diff-dialog-body {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 18px 20px 20px;
+}
+
+.diff-dialog-body .diff-viewer {
+  min-width: min(900px, 100%);
+}
+
 .side-section {
   display: flex;
   flex-direction: column;
@@ -1381,6 +1469,26 @@ h3 {
 
   .composer-actions .primary-button {
     margin-left: auto;
+  }
+
+  .diff-dialog-backdrop {
+    align-items: stretch;
+    padding: 10px;
+  }
+
+  .diff-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+    min-height: calc(100dvh - 20px);
+    border-radius: 14px;
+  }
+
+  .diff-dialog-header {
+    padding: 14px;
+  }
+
+  .diff-dialog-body {
+    padding: 12px;
   }
 }
 
