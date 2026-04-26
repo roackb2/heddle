@@ -19,6 +19,7 @@ export async function maybeDenyToolCall(args: {
   step: number;
   now: () => string;
   approveToolCall: RunAgentOptions['approveToolCall'];
+  workspaceRoot?: string;
   record: (event: TraceEvent) => void;
   log: Logger;
 }): Promise<{ ok: false; error: string } | undefined> {
@@ -27,7 +28,7 @@ export async function maybeDenyToolCall(args: {
     return undefined;
   }
 
-  if (!requiresApprovalForCall(call, tool)) {
+  if (!requiresApprovalForCall(call, tool, args.workspaceRoot)) {
     return undefined;
   }
 
@@ -54,6 +55,7 @@ export async function executeToolCallWithFallback(args: {
   registry: ReturnType<typeof createToolRegistry>;
   seenToolCalls: Map<string, number>;
   approveToolCall: RunAgentOptions['approveToolCall'];
+  workspaceRoot?: string;
   record: (event: TraceEvent) => void;
   log: Logger;
 }): Promise<{ effectiveCall: ToolCall; result: Awaited<ReturnType<typeof executeTool>> }> {
@@ -87,6 +89,7 @@ export async function executeToolCallWithFallback(args: {
     step: args.step,
     now: args.now,
     approveToolCall: args.approveToolCall,
+    workspaceRoot: args.workspaceRoot,
     record: args.record,
     log: args.log,
   });
@@ -154,15 +157,15 @@ async function resolveToolApproval(args: {
   return approval;
 }
 
-function requiresApprovalForCall(call: ToolCall, tool: ToolDefinition): boolean {
+function requiresApprovalForCall(call: ToolCall, tool: ToolDefinition, workspaceRoot?: string): boolean {
   if (tool.requiresApproval) {
     return true;
   }
 
-  return isOutsideWorkspaceInspectionCall(call);
+  return isOutsideWorkspaceInspectionCall(call, workspaceRoot);
 }
 
-function isOutsideWorkspaceInspectionCall(call: ToolCall): boolean {
+function isOutsideWorkspaceInspectionCall(call: ToolCall, workspaceRoot = process.cwd()): boolean {
   if (call.tool !== 'read_file' && call.tool !== 'list_files' && call.tool !== 'search_files' && call.tool !== 'edit_file') {
     return false;
   }
@@ -181,9 +184,9 @@ function isOutsideWorkspaceInspectionCall(call: ToolCall): boolean {
     return false;
   }
 
-  const resolvedTarget = resolve(rawPath);
-  const workspaceRoot = process.cwd();
-  return resolvedTarget !== workspaceRoot && !resolvedTarget.startsWith(`${workspaceRoot}/`);
+  const resolvedWorkspaceRoot = resolve(workspaceRoot);
+  const resolvedTarget = resolve(resolvedWorkspaceRoot, rawPath);
+  return resolvedTarget !== resolvedWorkspaceRoot && !resolvedTarget.startsWith(`${resolvedWorkspaceRoot}/`);
 }
 
 function getInspectFallbackReason(

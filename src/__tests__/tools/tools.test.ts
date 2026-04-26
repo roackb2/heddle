@@ -1,10 +1,10 @@
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
-import { listFilesTool } from '../../core/tools/list-files.js';
-import { readFileTool } from '../../core/tools/read-file.js';
-import { editFileTool, previewEditFileInput } from '../../core/tools/edit-file.js';
+import { createListFilesTool, listFilesTool } from '../../core/tools/list-files.js';
+import { createReadFileTool, readFileTool } from '../../core/tools/read-file.js';
+import { createEditFileTool, editFileTool, previewEditFileInput } from '../../core/tools/edit-file.js';
 import { reportStateTool } from '../../core/tools/report-state.js';
 import { updatePlanTool } from '../../core/tools/update-plan.js';
 import {
@@ -24,6 +24,7 @@ import {
 } from '../../core/tools/memory-notes.js';
 import { createMemoryCheckpointTool } from '../../core/tools/memory-checkpoint.js';
 import { createRecordKnowledgeTool } from '../../core/tools/record-knowledge.js';
+import { createDefaultAgentTools } from '../../core/runtime/default-tools.js';
 
 describe('tool input validation', () => {
   it('rejects unexpected fields for list_files', async () => {
@@ -146,6 +147,92 @@ describe('tool input validation', () => {
       error:
         'Invalid input for update_plan. Required field: plan. Optional field: explanation. Each plan item must have step and status (pending, in_progress, completed), with at most one in_progress item.',
     });
+  });
+});
+
+describe('workspace-bound default tools', () => {
+  it('resolves relative file tools from the configured workspace root instead of process cwd', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'heddle-tools-workspace-'));
+    const processRoot = await mkdtemp(join(tmpdir(), 'heddle-tools-process-'));
+    await writeFile(join(workspaceRoot, 'README.md'), 'workspace readme\n');
+    await writeFile(join(processRoot, 'README.md'), 'process readme\n');
+
+    const previousCwd = process.cwd();
+    try {
+      process.chdir(processRoot);
+
+      const listResult = await createListFilesTool({ workspaceRoot }).execute({ path: '.' });
+      expect(listResult).toEqual({ ok: true, output: 'README.md' });
+
+      const readResult = await createReadFileTool({ workspaceRoot }).execute({ path: 'README.md' });
+      expect(readResult).toEqual({ ok: true, output: 'workspace readme\n' });
+
+      const editResult = await createEditFileTool({ workspaceRoot }).execute({
+        path: 'README.md',
+        oldText: 'workspace',
+        newText: 'selected workspace',
+      });
+      expect(editResult.ok).toBe(true);
+      await expect(readFile(join(workspaceRoot, 'README.md'), 'utf8')).resolves.toBe('selected workspace readme\n');
+      await expect(readFile(join(processRoot, 'README.md'), 'utf8')).resolves.toBe('process readme\n');
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+
+  it('runs shell commands in the configured workspace root instead of process cwd', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'heddle-shell-workspace-'));
+    const processRoot = await mkdtemp(join(tmpdir(), 'heddle-shell-process-'));
+
+    const previousCwd = process.cwd();
+    try {
+      process.chdir(processRoot);
+
+      const result = await createRunShellInspectTool({ cwd: workspaceRoot }).execute({ command: 'pwd' });
+      const resolvedWorkspaceRoot = await realpath(workspaceRoot);
+
+      expect(result.ok).toBe(true);
+      expect(result.output).toMatchObject({
+        command: 'pwd',
+        exitCode: 0,
+        stdout: resolvedWorkspaceRoot,
+      });
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+
+  it('binds generated default tools to the selected workspace root', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'heddle-default-tools-workspace-'));
+    const processRoot = await mkdtemp(join(tmpdir(), 'heddle-default-tools-process-'));
+    await writeFile(join(workspaceRoot, 'package.json'), '{"name":"selected"}\n');
+    await writeFile(join(processRoot, 'package.json'), '{"name":"process"}\n');
+
+    const previousCwd = process.cwd();
+    try {
+      process.chdir(processRoot);
+      const tools = createDefaultAgentTools({
+        model: 'gpt-5.1-codex-mini',
+        workspaceRoot,
+        memoryMode: 'none',
+      });
+      const readTool = tools.find((tool) => tool.name === 'read_file');
+      const shellTool = tools.find((tool) => tool.name === 'run_shell_inspect');
+
+      expect(readTool).toBeDefined();
+      expect(shellTool).toBeDefined();
+      await expect(readTool?.execute({ path: 'package.json' })).resolves.toEqual({
+        ok: true,
+        output: '{"name":"selected"}\n',
+      });
+
+      const shellResult = await shellTool?.execute({ command: 'pwd' });
+      const resolvedWorkspaceRoot = await realpath(workspaceRoot);
+      expect(shellResult?.ok).toBe(true);
+      expect(shellResult?.output).toMatchObject({ stdout: resolvedWorkspaceRoot });
+    } finally {
+      process.chdir(previousCwd);
+    }
   });
 });
 

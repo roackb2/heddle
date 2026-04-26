@@ -1,14 +1,14 @@
 import { join } from 'node:path';
 import type { ToolDefinition } from '../types.js';
-import { editFileTool } from '../tools/edit-file.js';
-import { listFilesTool } from '../tools/list-files.js';
+import { createEditFileTool } from '../tools/edit-file.js';
+import { createListFilesTool } from '../tools/list-files.js';
 import {
   createEditMemoryNoteTool,
   createListMemoryNotesTool,
   createReadMemoryNoteTool,
   createSearchMemoryNotesTool,
 } from '../tools/memory-notes.js';
-import { readFileTool } from '../tools/read-file.js';
+import { createReadFileTool } from '../tools/read-file.js';
 import { createMemoryCheckpointTool } from '../tools/memory-checkpoint.js';
 import { createRecordKnowledgeTool } from '../tools/record-knowledge.js';
 import { reportStateTool } from '../tools/report-state.js';
@@ -30,15 +30,16 @@ export type DefaultAgentToolsOptions = {
 };
 
 export function createDefaultAgentTools(options: DefaultAgentToolsOptions): ToolDefinition[] {
+  const workspaceRoot = options.workspaceRoot ?? process.cwd();
   const memoryRoot =
     options.memoryDir ??
-    join(options.workspaceRoot ?? process.cwd(), options.stateDir ?? '.heddle', 'memory');
+    join(workspaceRoot, options.stateDir ?? '.heddle', 'memory');
   const memoryMode = options.memoryMode ?? 'read-and-record';
   const tools: ToolDefinition[] = [
-    listFilesTool,
-    readFileTool,
-    editFileTool,
-    createSearchFilesTool({ excludedDirs: options.searchIgnoreDirs }),
+    createListFilesTool({ workspaceRoot }),
+    createReadFileTool({ workspaceRoot }),
+    createEditFileTool({ workspaceRoot }),
+    createSearchFilesTool({ excludedDirs: options.searchIgnoreDirs, workspaceRoot }),
     createWebSearchTool({
       model: options.model,
       apiKey: options.apiKey,
@@ -46,6 +47,7 @@ export function createDefaultAgentTools(options: DefaultAgentToolsOptions): Tool
     createViewImageTool({
       model: options.model,
       apiKey: options.apiKey,
+      workspaceRoot,
     }),
     reportStateTool,
   ];
@@ -56,7 +58,7 @@ export function createDefaultAgentTools(options: DefaultAgentToolsOptions): Tool
     tools.push(updatePlanTool);
   }
 
-  tools.push(createRunShellInspectTool(), createRunShellMutateTool());
+  tools.push(createRunShellInspectTool({ cwd: workspaceRoot }), createRunShellMutateTool({ cwd: workspaceRoot }));
   return tools;
 }
 

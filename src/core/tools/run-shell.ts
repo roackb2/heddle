@@ -54,6 +54,7 @@ type RunShellOutput = {
 
 export type RunShellOptions = {
   rules?: RunShellRule[];
+  cwd?: string;
 };
 
 export const DEFAULT_INSPECT_RULES: RunShellRule[] = [
@@ -127,6 +128,7 @@ export function createRunShellInspectTool(options: RunShellOptions = {}): ToolDe
       toolName: 'run_shell_inspect',
       rules,
       allowUnknown: false,
+      cwd: options.cwd,
     }),
   };
 }
@@ -144,6 +146,7 @@ export function createRunShellMutateTool(options: RunShellOptions = {}): ToolDef
       toolName: 'run_shell_mutate',
       rules,
       allowUnknown: true,
+      cwd: options.cwd,
     }),
   };
 }
@@ -172,6 +175,7 @@ export function runShellCommand(
     toolName: string;
     rules: RunShellRule[];
     allowUnknown: boolean;
+    cwd?: string;
   },
   signal?: AbortSignal,
 ): Promise<ToolResult> {
@@ -227,6 +231,7 @@ export function runShellCommand(
     let aborted = false;
 
     const child = spawn(cmd, {
+      cwd: options.cwd,
       shell: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });

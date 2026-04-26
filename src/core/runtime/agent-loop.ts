@@ -90,6 +90,7 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
     goal: options.goal,
     llm,
     tools,
+    workspaceRoot,
     maxSteps: options.maxSteps,
     logger,
     history: resolveHistory(options),

@@ -23,6 +23,7 @@ export type ViewImageToolOptions = {
   model?: string;
   provider?: LlmProvider;
   apiKey?: string;
+  workspaceRoot?: string;
 };
 
 const DEFAULT_IMAGE_PROMPT =
@@ -59,7 +60,8 @@ export function createViewImageTool(options: ViewImageToolOptions = {}): ToolDef
       }
 
       const input = raw as ViewImageInput;
-      const filePath = resolve(input.path);
+      const workspaceRoot = options.workspaceRoot ?? process.cwd();
+      const filePath = resolve(workspaceRoot, input.path);
       const mediaType = detectMediaType(filePath);
       if (!mediaType) {
         return {

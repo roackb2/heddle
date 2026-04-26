@@ -3,6 +3,7 @@
 // A minimal, executable agent loop.
 // ---------------------------------------------------------------------------
 
+import { resolve } from 'node:path';
 import type { RunResult, ToolDefinition, StopReason, ToolCall, ToolResult, TraceEvent } from '../types.js';
 import type { LlmAdapter, LlmResponse, LlmUsage, ChatMessage, LlmStreamEvent } from '../llm/types.js';
 import { createToolRegistry } from '../tools/registry.js';
@@ -37,6 +38,7 @@ export type RunAgentOptions = {
   llm: LlmAdapter;
   tools: ToolDefinition[];
   maxSteps?: number;
+  workspaceRoot?: string;
   logger?: Logger;
   history?: ChatMessage[];
   systemContext?: string;
@@ -75,6 +77,7 @@ type RunContext = {
   maxSteps: number;
   llm: LlmAdapter;
   registry: ToolRegistry;
+  workspaceRoot: string;
   log: Logger;
   messages: ChatMessage[];
   trace: ReturnType<typeof createTraceRecorder>;
@@ -154,6 +157,7 @@ function createRunContext(options: RunAgentOptions): RunContext {
     maxSteps,
     llm: options.llm,
     registry,
+    workspaceRoot: resolve(options.workspaceRoot ?? process.cwd()),
     log: options.logger ?? defaultLogger,
     messages: buildInitialMessages(options.goal, registry.names(), options.systemContext, options.history),
     trace,
@@ -300,6 +304,7 @@ async function executeToolTurn(context: RunContext, call: ToolCall): Promise<Run
     step: context.state.step,
     now: context.now,
     approveToolCall: context.approveToolCall,
+    workspaceRoot: context.workspaceRoot,
     record: context.record,
     log: context.log,
   });
@@ -316,6 +321,7 @@ async function executeToolTurn(context: RunContext, call: ToolCall): Promise<Run
     registry: context.registry,
     seenToolCalls: context.seenToolCalls,
     approveToolCall: context.approveToolCall,
+    workspaceRoot: context.workspaceRoot,
     record: context.record,
     log: context.log,
   });
