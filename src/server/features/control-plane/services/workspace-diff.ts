@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
+import { parseUnifiedDiffFiles } from '../../../../core/review/diff-domain.js';
 import type {
   WorkspaceChangedFileView,
   WorkspaceChangesView,
@@ -110,12 +111,14 @@ export async function readWorkspaceFileDiff(workspaceRoot: string, path: string)
 
   const patch = patches.join('\n').trim();
   const truncated = patch ? truncatePatch(patch) : undefined;
+  const parsedFiles = patch ? parseUnifiedDiffFiles(patch) : [];
+  const parsedFile = parsedFiles.find((file) => file.path === scopedPath.path || file.oldPath === scopedPath.path);
   return {
     vcs: 'git',
     path: scopedPath.path,
     patch: truncated?.patch,
     truncated: truncated?.truncated,
-    binary: /Binary files .* differ/.test(patch),
+    binary: parsedFile?.binary ?? /Binary files .* differ/.test(patch),
   };
 }
 

@@ -1,10 +1,9 @@
 import { EventEmitter } from 'node:events';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import * as gitDiffParser from 'gitdiff-parser';
-import type { File as ParsedGitDiffFile } from 'gitdiff-parser';
 import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../../core/chat/storage.js';
 import { DEFAULT_OPENAI_MODEL } from '../../../../core/config.js';
+import { parseUnifiedDiffFiles } from '../../../../core/review/diff-domain.js';
 import { resolveApiKeyForModel } from '../../../../core/runtime/api-keys.js';
 import type { ChatSessionLeaseOwner } from '../../../../core/chat/session-lease.js';
 import type { ChatSession } from '../../../../core/chat/types.js';
@@ -35,16 +34,8 @@ type SubmitChatPromptArgs = {
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   leaseOwner: ChatSessionLeaseOwner;
 };
-type GitDiffParserModule = {
-  default?: {
-    parse?: (source: string) => ParsedGitDiffFile[];
-  };
-  parse?: (source: string) => ParsedGitDiffFile[];
-};
 
 const DEFAULT_CONTINUE_PROMPT = 'Continue from where you left off.';
-const gitDiffParserModule = gitDiffParser as unknown as GitDiffParserModule;
-const parseGitDiff = gitDiffParserModule.default?.parse ?? gitDiffParserModule.parse;
 
 export function createControlPlaneChatSession(args: {
   sessionStoragePath: string;
@@ -648,91 +639,13 @@ function statusFromEditAction(action: string | undefined): ChangedFileReviewView
 }
 
 function parseGitDiffFiles(diff: string): ChangedFileReviewView[] {
-  const normalized = diff.trim();
-  if (!normalized || !normalized.includes('diff --git ')) {
-    return [];
-  }
-
-  let parsed: ParsedGitDiffFile[];
-  try {
-    parsed = parseGitDiff ? parseGitDiff(normalized) : [];
-  } catch {
-    return [];
-  }
-
-  const chunks = splitGitDiffChunks(normalized);
-  return parsed.map((file) => {
-    const patch = findGitDiffChunkForFile(chunks, file) ?? renderParsedGitDiffFile(file);
-    return {
-      path: pathForParsedGitDiffFile(file),
-      status: statusFromParsedGitDiffFile(file),
-      source: 'git_diff' as const,
-      patch: normalizeCommandText(patch),
-      truncated: patch.endsWith('…') || file.isBinary === true,
-    };
-  });
-}
-
-function splitGitDiffChunks(diff: string): string[] {
-  return diff
-    .split(/\n(?=diff --git )/)
-    .map((chunk) => chunk.trim())
-    .filter(Boolean);
-}
-
-function findGitDiffChunkForFile(chunks: string[], file: ParsedGitDiffFile): string | undefined {
-  const candidates = [
-    `diff --git a/${file.oldPath} b/${file.newPath}`,
-    `rename from ${file.oldPath}`,
-    `rename to ${file.newPath}`,
-    `--- a/${file.oldPath}`,
-    `+++ b/${file.newPath}`,
-  ];
-
-  return chunks.find((chunk) => candidates.some((candidate) => chunk.includes(candidate)));
-}
-
-function renderParsedGitDiffFile(file: ParsedGitDiffFile): string {
-  const oldPath = file.type === 'add' ? '/dev/null' : `a/${file.oldPath}`;
-  const newPath = file.type === 'delete' ? '/dev/null' : `b/${file.newPath}`;
-  const lines = [
-    `diff --git a/${file.oldPath} b/${file.newPath}`,
-    `--- ${oldPath}`,
-    `+++ ${newPath}`,
-  ];
-
-  for (const hunk of file.hunks) {
-    lines.push(hunk.content);
-    for (const change of hunk.changes) {
-      lines.push(change.content);
-    }
-  }
-
-  return lines.join('\n');
-}
-
-function pathForParsedGitDiffFile(file: ParsedGitDiffFile): string {
-  return file.type === 'delete' ? file.oldPath : file.newPath;
-}
-
-function statusFromParsedGitDiffFile(file: ParsedGitDiffFile): ChangedFileReviewView['status'] {
-  if (file.oldPath !== file.newPath && file.type === 'modify') {
-    return 'renamed';
-  }
-
-  switch (file.type) {
-    case 'add':
-      return 'added';
-    case 'delete':
-      return 'deleted';
-    case 'rename':
-      return 'renamed';
-    case 'copy':
-    case 'modify':
-      return 'modified';
-    default:
-      return 'unknown';
-  }
+  return parseUnifiedDiffFiles(diff).map((file) => ({
+    path: file.path,
+    status: file.status === 'copied' ? 'modified' : file.status,
+    source: 'git_diff' as const,
+    patch: normalizeCommandText(file.patch),
+    truncated: file.binary === true,
+  }));
 }
 
 function addChangedFile(files: Map<string, ChangedFileReviewView>, file: ChangedFileReviewView) {
