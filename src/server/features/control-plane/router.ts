@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { BUILT_IN_MODEL_GROUPS } from '../../../core/llm/openai-models.js';
 import { procedure, router } from '../../trpc.js';
+import type { HeddleServerContext } from '../../types.js';
 import {
   cancelControlPlaneSessionRun,
   continueChatPrompt,
@@ -32,6 +33,7 @@ import {
 import { saveControlPlaneLayoutSnapshot } from './services/layout-snapshots.js';
 import { browseWorkspaceDirectories, searchWorkspaceFiles } from './services/workspace-files.js';
 import { createWorkspaceDescriptor, renameWorkspaceDescriptor, setActiveWorkspace } from '../../../core/runtime/workspaces.js';
+import { registerKnownWorkspaces, resolveDaemonRegistryPath } from '../../../core/runtime/daemon-registry.js';
 
 const sessionInputSchema = z.object({
   id: z.string().min(1),
@@ -301,6 +303,7 @@ export const controlPlaneRouter = router({
       stateRoot: ctx.stateRoot,
       workspaceId: input.workspaceId,
     });
+    registerControlPlaneWorkspaces(ctx, resolved.workspaces);
     return {
       activeWorkspaceId: resolved.activeWorkspaceId,
       workspace: resolved.activeWorkspace,
@@ -316,6 +319,7 @@ export const controlPlaneRouter = router({
       repoRoots: input.repoRoots,
       setActive: input.setActive,
     });
+    registerControlPlaneWorkspaces(ctx, resolved.workspaces);
     return {
       activeWorkspaceId: resolved.activeWorkspaceId,
       workspace: resolved.activeWorkspace,
@@ -329,6 +333,7 @@ export const controlPlaneRouter = router({
       workspaceId: input.workspaceId,
       name: input.name,
     });
+    registerControlPlaneWorkspaces(ctx, resolved.workspaces);
     return {
       activeWorkspaceId: resolved.activeWorkspaceId,
       workspace: resolved.activeWorkspace,
@@ -339,3 +344,13 @@ export const controlPlaneRouter = router({
     return await saveControlPlaneLayoutSnapshot(ctx.activeWorkspace.stateRoot, input.snapshot);
   }),
 });
+
+function registerControlPlaneWorkspaces(
+  ctx: HeddleServerContext,
+  workspaces: Parameters<typeof registerKnownWorkspaces>[0]['workspaces'],
+) {
+  registerKnownWorkspaces({
+    registryPath: ctx.runtimeHost?.registryPath ?? resolveDaemonRegistryPath(),
+    workspaces,
+  });
+}

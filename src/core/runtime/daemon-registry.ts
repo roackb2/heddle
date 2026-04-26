@@ -57,7 +57,7 @@ export function upsertDaemonWorkspaceRegistration(options: {
   );
 
   for (const workspace of options.workspaces) {
-    nextRecords.set(workspace.id, {
+    nextRecords.set(workspaceRecordKey(workspace), {
       workspace,
       owner: {
         ...options.owner,

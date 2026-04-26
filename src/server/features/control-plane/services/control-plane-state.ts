@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import type { HeddleServerContext } from '../../../types.js';
 import type { ControlPlaneState } from '../types.js';
-import { readDaemonRegistry, resolveDaemonRegistryPath } from '../../../../core/runtime/daemon-registry.js';
+import { readDaemonRegistry, registerKnownWorkspaces, resolveDaemonRegistryPath } from '../../../../core/runtime/daemon-registry.js';
 import { readChatSessionViews } from './chat-sessions.js';
 import { listControlPlaneHeartbeatRuns, listControlPlaneHeartbeatTasks } from './heartbeat.js';
 import { readControlPlaneMemoryStatus } from './memory.js';
@@ -34,6 +34,10 @@ export async function loadControlPlaneState(context: HeddleServerContext): Promi
 
 function readKnownWorkspaces(context: HeddleServerContext): ControlPlaneState['knownWorkspaces'] {
   const registryPath = context.runtimeHost?.registryPath ?? resolveDaemonRegistryPath();
+  registerKnownWorkspaces({
+    registryPath,
+    workspaces: context.workspaces,
+  });
   const current = new Set(context.workspaces.map((workspace) => resolve(workspace.stateRoot)));
   const known = new Map<string, ControlPlaneState['knownWorkspaces'][number]>();
   for (const record of readDaemonRegistry(registryPath).workspaces) {

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { InspectorTab } from '../hooks/useSessionWorkspace';
+import type { InspectorTab } from '../hooks/useSessionsScreenState';
 
 type ControlPlaneUiState = {
   inspectorTab: InspectorTab;

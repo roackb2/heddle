@@ -1,14 +1,13 @@
 import { matchPath } from 'react-router';
-import type { ControlPlaneTab } from './mobile/MobileControlPlaneShell';
 
-export type ControlPlaneRouteTab = ControlPlaneTab;
+export type ControlPlaneSection = 'overview' | 'sessions' | 'tasks' | 'workspaces';
 
-export function tabFromPath(pathname: string): ControlPlaneRouteTab {
+export function sectionFromPath(pathname: string): ControlPlaneSection {
   if (isPathInSection(pathname, '/overview')) {
     return 'overview';
   }
   if (isPathInSection(pathname, '/tasks')) {
-    return 'heartbeat';
+    return 'tasks';
   }
   if (isPathInSection(pathname, '/workspaces')) {
     return 'workspaces';
@@ -16,14 +15,14 @@ export function tabFromPath(pathname: string): ControlPlaneRouteTab {
   return 'sessions';
 }
 
-export function pathForTab(tab: ControlPlaneRouteTab): string {
-  if (tab === 'overview') {
+export function pathForSection(section: ControlPlaneSection): string {
+  if (section === 'overview') {
     return '/overview';
   }
-  if (tab === 'heartbeat') {
+  if (section === 'tasks') {
     return '/tasks';
   }
-  if (tab === 'workspaces') {
+  if (section === 'workspaces') {
     return '/workspaces';
   }
   return '/sessions';

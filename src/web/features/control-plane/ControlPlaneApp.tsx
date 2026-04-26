@@ -1,22 +1,22 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 import './control-plane.css';
 import type { ControlPlaneState } from '../../lib/api';
 import type { ScreenshotMode } from '../../lib/debug/layoutSnapshot';
 import { useControlPlaneState } from './hooks/useControlPlaneState';
-import { useControlPlaneRouting } from './hooks/useControlPlaneRouting';
-import { useDebugSnapshot } from './hooks/useDebugSnapshot';
-import { useHeartbeatWorkspace } from './hooks/useHeartbeatWorkspace';
+import { useControlPlaneNavigation } from './hooks/useControlPlaneNavigation';
+import { useLayoutSnapshot } from './hooks/useLayoutSnapshot';
 import { useIsMobile } from './hooks/useIsMobile';
-import { useSessionWorkspace } from './hooks/useSessionWorkspace';
-import { useWorkspaceActions } from './hooks/useWorkspaceActions';
+import { useSessionsScreenState } from './hooks/useSessionsScreenState';
+import { useTasksScreenState } from './hooks/useTasksScreenState';
+import { useWorkspaceMutations } from './hooks/useWorkspaceMutations';
 import { Panel } from './components/common';
-import { ControlPlaneDesktopShell } from './components/ControlPlaneDesktopShell';
-import { HeartbeatWorkspace } from './components/HeartbeatWorkspace';
-import { OverviewView } from './components/OverviewView';
-import { SessionsWorkspace } from './components/SessionsWorkspace';
-import { WorkspaceManagementView } from './components/WorkspaceManagementView';
-import { MobileControlPlaneShell } from './mobile/MobileControlPlaneShell';
+import { DesktopControlPlaneShell } from './shell/DesktopControlPlaneShell';
+import { MobileControlPlaneShell } from './shell/MobileControlPlaneShell';
+import { OverviewScreen } from './screens/OverviewScreen';
+import { SessionsScreen } from './screens/SessionsScreen';
+import { TasksScreen } from './screens/TasksScreen';
+import { WorkspacesScreen } from './screens/WorkspacesScreen';
 import { Toaster } from '../../components/ui/toaster';
 import { useToast } from '../../components/ui/use-toast';
 import { useControlPlaneUiStore } from './state/controlPlaneUiStore';
@@ -28,50 +28,50 @@ declare global {
 }
 
 export function ControlPlaneApp() {
-  const routing = useControlPlaneRouting();
+  const navigation = useControlPlaneNavigation();
   const { state, error, refresh, setActiveWorkspace, createWorkspace, renameWorkspace } = useControlPlaneState();
   const { toasts, toast: notifyToast } = useToast();
   const inspectorTab = useControlPlaneUiStore((store) => store.inspectorTab);
   const setInspectorTab = useControlPlaneUiStore((store) => store.setInspectorTab);
   const isMobile = useIsMobile();
-  const refreshControlPlaneState = () => {
+  const refreshControlPlaneState = useCallback(() => {
     void refresh();
-  };
-  const sessionWorkspace = useSessionWorkspace(state?.sessions, notifyToast, refreshControlPlaneState, {
-    selectedSessionId: routing.routeSessionId,
-    onSelectedSessionIdChange: routing.setRouteSessionId,
+  }, [refresh]);
+  const sessionsState = useSessionsScreenState(state?.sessions, notifyToast, refreshControlPlaneState, {
+    selectedSessionId: navigation.routeSessionId,
+    onSelectedSessionIdChange: navigation.setRouteSessionId,
     inspectorTab,
     onInspectorTabChange: setInspectorTab,
-    autoSelectSession: routing.tab === 'sessions',
+    autoSelectSession: navigation.section === 'sessions',
   });
-  const heartbeatWorkspace = useHeartbeatWorkspace(
+  const tasksState = useTasksScreenState(
     state?.heartbeat.tasks,
     state?.heartbeat.runs,
     notifyToast,
     refreshControlPlaneState,
   );
-  const workspaceActions = useWorkspaceActions({
+  const workspaceMutations = useWorkspaceMutations({
     state,
     setActiveWorkspace,
     createWorkspace,
     renameWorkspace,
     notify: notifyToast,
   });
-  const captureDebugSnapshot = useDebugSnapshot({
-    tab: routing.tab,
-    sessionWorkspace,
+  const captureLayoutSnapshot = useLayoutSnapshot({
+    section: navigation.section,
+    sessionsState,
     error,
     toasts,
     notify: notifyToast,
   });
 
   useEffect(() => {
-    routing.normalizeRoute();
-  }, [routing]);
+    navigation.normalizeRoute();
+  }, [navigation]);
 
   useEffect(() => {
     window.__HEDDLE_CAPTURE_LAYOUT_SNAPSHOT = async (options) => {
-      await captureDebugSnapshot(options?.screenshot ?? 'none');
+      await captureLayoutSnapshot(options?.screenshot ?? 'none');
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -83,7 +83,7 @@ export function ControlPlaneApp() {
         return;
       }
       event.preventDefault();
-      void captureDebugSnapshot('none');
+      void captureLayoutSnapshot('none');
     };
 
     window.addEventListener('keydown', onKeyDown);
@@ -93,24 +93,24 @@ export function ControlPlaneApp() {
       }
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [captureDebugSnapshot]);
+  }, [captureLayoutSnapshot]);
 
   const activeContent = !state ?
     <Panel title="Loading state">
       <p className="muted">{error ?? 'Reading local Heddle state...'}</p>
     </Panel>
-  : renderActiveTab(state, sessionWorkspace, heartbeatWorkspace, workspaceActions);
+  : renderActiveSection(state, sessionsState, tasksState, workspaceMutations);
 
   if (isMobile) {
     return (
       <>
         <MobileControlPlaneShell
-          tab={routing.tab}
-          onTabChange={routing.setTab}
+          section={navigation.section}
+          onSectionChange={navigation.setSection}
           state={state}
           error={error}
-          onSetActiveWorkspace={(workspaceId) => void workspaceActions.switchWorkspace(workspaceId)}
-          onCaptureDebugSnapshot={(screenshot) => void captureDebugSnapshot(screenshot)}
+          onSetActiveWorkspace={(workspaceId) => void workspaceMutations.switchWorkspace(workspaceId)}
+          onCaptureDebugSnapshot={(screenshot) => void captureLayoutSnapshot(screenshot)}
           onRefresh={() => void refresh()}
         >
           {activeContent}
@@ -122,63 +122,63 @@ export function ControlPlaneApp() {
 
   return (
     <>
-      <ControlPlaneDesktopShell
-        activeTab={routing.tab}
-        sessionPath={routing.routeSessionId ? `/sessions/${encodeURIComponent(routing.routeSessionId)}` : '/sessions'}
+      <DesktopControlPlaneShell
+        activeSection={navigation.section}
+        sessionPath={navigation.routeSessionId ? `/sessions/${encodeURIComponent(navigation.routeSessionId)}` : '/sessions'}
         state={state}
         error={error}
-        onSetActiveWorkspace={(workspaceId) => void workspaceActions.switchWorkspace(workspaceId)}
-        onCaptureDebugSnapshot={(screenshot) => void captureDebugSnapshot(screenshot)}
+        onSetActiveWorkspace={(workspaceId) => void workspaceMutations.switchWorkspace(workspaceId)}
+        onCaptureDebugSnapshot={(screenshot) => void captureLayoutSnapshot(screenshot)}
         onRefresh={() => void refresh()}
       >
         {activeContent}
-      </ControlPlaneDesktopShell>
+      </DesktopControlPlaneShell>
       <Toaster />
     </>
   );
 }
 
-function renderActiveTab(
+function renderActiveSection(
   state: ControlPlaneState,
-  sessionWorkspace: ReturnType<typeof useSessionWorkspace>,
-  heartbeatWorkspace: ReturnType<typeof useHeartbeatWorkspace>,
-  workspaceActions: ReturnType<typeof useWorkspaceActions>,
+  sessionsState: ReturnType<typeof useSessionsScreenState>,
+  tasksState: ReturnType<typeof useTasksScreenState>,
+  workspaceMutations: ReturnType<typeof useWorkspaceMutations>,
 ) {
   return (
     <Routes>
-      <Route path="/overview" element={<OverviewView state={state} />} />
-      <Route path="/sessions" element={<SessionsRoute state={state} sessionWorkspace={sessionWorkspace} />} />
-      <Route path="/sessions/:sessionId/*" element={<SessionsRoute state={state} sessionWorkspace={sessionWorkspace} />} />
+      <Route path="/overview" element={<OverviewScreen state={state} />} />
+      <Route path="/sessions" element={<SessionsRoute state={state} sessionsState={sessionsState} />} />
+      <Route path="/sessions/:sessionId/*" element={<SessionsRoute state={state} sessionsState={sessionsState} />} />
       <Route
         path="/tasks"
         element={(
-          <HeartbeatWorkspace
+          <TasksScreen
             tasks={state.heartbeat.tasks}
             runs={state.heartbeat.runs}
-            selectedTask={heartbeatWorkspace.selectedTask}
-            selectedTaskId={heartbeatWorkspace.selectedTaskId}
-            onSelectTask={heartbeatWorkspace.setSelectedTaskId}
-            selectedRun={heartbeatWorkspace.selectedRun}
-            selectedRunId={heartbeatWorkspace.selectedRunId}
-            onSelectRun={heartbeatWorkspace.setSelectedRunId}
-            selectedTaskRuns={heartbeatWorkspace.selectedTaskRuns}
-            pendingTaskAction={heartbeatWorkspace.pendingTaskAction}
-            onEnableTask={heartbeatWorkspace.enableTask}
-            onDisableTask={heartbeatWorkspace.disableTask}
-            onTriggerTask={heartbeatWorkspace.triggerTask}
+            selectedTask={tasksState.selectedTask}
+            selectedTaskId={tasksState.selectedTaskId}
+            onSelectTask={tasksState.setSelectedTaskId}
+            selectedRun={tasksState.selectedRun}
+            selectedRunId={tasksState.selectedRunId}
+            onSelectRun={tasksState.setSelectedRunId}
+            selectedTaskRuns={tasksState.selectedTaskRuns}
+            pendingTaskAction={tasksState.pendingTaskAction}
+            onEnableTask={tasksState.enableTask}
+            onDisableTask={tasksState.disableTask}
+            onTriggerTask={tasksState.triggerTask}
           />
         )}
       />
       <Route
         path="/workspaces"
         element={(
-          <WorkspaceManagementView
+          <WorkspacesScreen
             state={state}
-            creatingWorkspace={workspaceActions.creatingWorkspace}
-            renamingWorkspaceId={workspaceActions.renamingWorkspaceId}
-            onCreateWorkspace={workspaceActions.createWorkspace}
-            onRenameWorkspace={workspaceActions.renameWorkspace}
-            onSetActiveWorkspace={(workspaceId) => void workspaceActions.switchWorkspace(workspaceId)}
+            creatingWorkspace={workspaceMutations.creatingWorkspace}
+            renamingWorkspaceId={workspaceMutations.renamingWorkspaceId}
+            onCreateWorkspace={workspaceMutations.createWorkspace}
+            onRenameWorkspace={workspaceMutations.renameWorkspace}
+            onSetActiveWorkspace={(workspaceId) => void workspaceMutations.switchWorkspace(workspaceId)}
           />
         )}
       />
@@ -189,41 +189,41 @@ function renderActiveTab(
 
 function SessionsRoute({
   state,
-  sessionWorkspace,
+  sessionsState,
 }: {
   state: ControlPlaneState;
-  sessionWorkspace: ReturnType<typeof useSessionWorkspace>;
+  sessionsState: ReturnType<typeof useSessionsScreenState>;
 }) {
   return (
-    <SessionsWorkspace
+    <SessionsScreen
       sessions={state.sessions}
-      activeSession={sessionWorkspace.activeSession}
-      sessionDetail={sessionWorkspace.sessionDetail}
-      sessionDetailLoading={sessionWorkspace.sessionDetailLoading}
-      sessionDetailError={sessionWorkspace.sessionDetailError}
-      selectedSessionId={sessionWorkspace.selectedSessionId}
-      onSelectSession={sessionWorkspace.setSelectedSessionId}
-      selectedTurnId={sessionWorkspace.selectedTurnId}
-      onSelectTurn={sessionWorkspace.setSelectedTurnId}
-      selectedTurn={sessionWorkspace.selectedTurn}
-      turnReview={sessionWorkspace.turnReview}
-      turnReviewLoading={sessionWorkspace.turnReviewLoading}
-      turnReviewError={sessionWorkspace.turnReviewError}
-      sendingPrompt={sessionWorkspace.sendingPrompt}
-      runInFlight={sessionWorkspace.runInFlight}
-      memoryUpdating={sessionWorkspace.memoryUpdating}
-      sendPromptError={sessionWorkspace.sendPromptError}
-      onSendPrompt={sessionWorkspace.sendPrompt}
-      creatingSession={sessionWorkspace.creatingSession}
-      sessionNotice={sessionWorkspace.sessionNotice}
-      onCreateSession={sessionWorkspace.createSession}
-      onContinueSession={sessionWorkspace.continueSession}
-      onCancelSessionRun={sessionWorkspace.cancelSessionRun}
-      onUpdateSessionSettings={sessionWorkspace.updateSessionSettings}
-      pendingApproval={sessionWorkspace.pendingApproval}
-      onResolveApproval={sessionWorkspace.resolveApproval}
-      inspectorTab={sessionWorkspace.inspectorTab}
-      onInspectorTabChange={sessionWorkspace.setInspectorTab}
+      activeSession={sessionsState.activeSession}
+      sessionDetail={sessionsState.sessionDetail}
+      sessionDetailLoading={sessionsState.sessionDetailLoading}
+      sessionDetailError={sessionsState.sessionDetailError}
+      selectedSessionId={sessionsState.selectedSessionId}
+      onSelectSession={sessionsState.setSelectedSessionId}
+      selectedTurnId={sessionsState.selectedTurnId}
+      onSelectTurn={sessionsState.setSelectedTurnId}
+      selectedTurn={sessionsState.selectedTurn}
+      turnReview={sessionsState.turnReview}
+      turnReviewLoading={sessionsState.turnReviewLoading}
+      turnReviewError={sessionsState.turnReviewError}
+      sendingPrompt={sessionsState.sendingPrompt}
+      runInFlight={sessionsState.runInFlight}
+      memoryUpdating={sessionsState.memoryUpdating}
+      sendPromptError={sessionsState.sendPromptError}
+      onSendPrompt={sessionsState.sendPrompt}
+      creatingSession={sessionsState.creatingSession}
+      sessionNotice={sessionsState.sessionNotice}
+      onCreateSession={sessionsState.createSession}
+      onContinueSession={sessionsState.continueSession}
+      onCancelSessionRun={sessionsState.cancelSessionRun}
+      onUpdateSessionSettings={sessionsState.updateSessionSettings}
+      pendingApproval={sessionsState.pendingApproval}
+      onResolveApproval={sessionsState.resolveApproval}
+      inspectorTab={sessionsState.inspectorTab}
+      onInspectorTabChange={sessionsState.setInspectorTab}
     />
   );
 }
