@@ -237,7 +237,7 @@ export function useSessionsScreenState(
       try {
         const next = await fetchChatSessionDetail(sessionId);
         if (!cancelled) {
-          setSessionDetail(next);
+          setSessionDetail((current) => options.silent ? mergeTransientMessages(current, next) : next);
           setSessionDetailError(undefined);
         }
       } catch (refreshError) {
@@ -712,5 +712,25 @@ export function useSessionsScreenState(
     turnReview,
     turnReviewLoading,
     turnReviewError,
+  };
+}
+
+function mergeTransientMessages(current: ChatSessionDetail | null, next: ChatSessionDetail | null): ChatSessionDetail | null {
+  if (!current || !next || current.id !== next.id) {
+    return next;
+  }
+
+  const transientMessages = current.messages.filter((message) => message.id.startsWith('live-'));
+  if (!transientMessages.length) {
+    return next;
+  }
+
+  const nextMessageIds = new Set(next.messages.map((message) => message.id));
+  return {
+    ...next,
+    messages: [
+      ...next.messages,
+      ...transientMessages.filter((message) => !nextMessageIds.has(message.id)),
+    ],
   };
 }

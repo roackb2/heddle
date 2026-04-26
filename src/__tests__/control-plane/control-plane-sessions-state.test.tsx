@@ -134,6 +134,44 @@ describe('useSessionsScreenState', () => {
       expect(text).toContain('Inspecting the repo…');
     });
   });
+
+  it('keeps the optimistic user prompt visible across silent session refreshes', async () => {
+    let eventHandler: Parameters<typeof subscribeToChatSessionEvents>[1] | undefined;
+    vi.mocked(subscribeToChatSessionEvents).mockImplementation((_sessionId, onUpdate) => {
+      eventHandler = onUpdate;
+      return () => undefined;
+    });
+    vi.mocked(sendChatSessionPrompt).mockReturnValue(new Promise(() => undefined) as ReturnType<typeof sendChatSessionPrompt>);
+
+    render(<SessionsSendHarness />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('messages').textContent).toContain('Loaded.');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'send' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('messages').textContent).toContain('What changed?');
+    });
+
+    act(() => {
+      eventHandler?.({
+        type: 'session.updated',
+        sessionId: 'session-1',
+      });
+    });
+
+    await waitFor(() => {
+      expect(fetchChatSessionDetail).toHaveBeenCalledTimes(2);
+    });
+    await waitFor(() => {
+      const text = screen.getByTestId('messages').textContent ?? '';
+      expect(text).toContain('Loaded.');
+      expect(text).toContain('What changed?');
+      expect(text).toContain('Heddle is working…');
+    });
+  });
 });
 
 function SessionsStateHarness() {
