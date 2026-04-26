@@ -85,6 +85,33 @@ export type ChangedFileReviewView = {
   truncated?: boolean;
 };
 
+export type WorkspaceChangedFileView = {
+  path: string;
+  oldPath?: string;
+  status: 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'untracked' | 'unknown';
+  indexStatus?: string;
+  workingTreeStatus?: string;
+  additions?: number;
+  deletions?: number;
+  binary?: boolean;
+};
+
+export type WorkspaceChangesView = {
+  vcs: 'git' | 'none';
+  clean: boolean;
+  files: WorkspaceChangedFileView[];
+  error?: string;
+};
+
+export type WorkspaceFileDiffView = {
+  vcs: 'git' | 'none';
+  path: string;
+  patch?: string;
+  binary?: boolean;
+  truncated?: boolean;
+  error?: string;
+};
+
 export type ChatTurnReview = {
   traceFile: string;
   diffExcerpt?: string;

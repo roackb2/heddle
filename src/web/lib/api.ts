@@ -21,6 +21,8 @@ export type PendingSessionApproval = RouterOutputs['controlPlane']['sessionPendi
 export type SessionRunningState = RouterOutputs['controlPlane']['sessionRunning'];
 export type WorkspaceFileSuggestion = RouterOutputs['controlPlane']['workspaceFileSearch']['files'][number];
 export type WorkspaceDirectoryListing = RouterOutputs['controlPlane']['workspaceBrowse'];
+export type WorkspaceChanges = RouterOutputs['controlPlane']['workspaceChanges'];
+export type WorkspaceFileDiff = RouterOutputs['controlPlane']['workspaceFileDiff'];
 export type ModelOptions = RouterOutputs['controlPlane']['modelOptions'];
 export type SavedLayoutSnapshot = RouterOutputs['controlPlane']['layoutSnapshotSave'];
 export type HeartbeatTaskMutationResult = RouterOutputs['controlPlane']['heartbeatTaskEnable'];
@@ -88,6 +90,14 @@ export async function fetchWorkspaceFileSuggestions(query: string): Promise<Work
 
 export async function browseWorkspaceDirectories(path?: string, includeHidden = false): Promise<WorkspaceDirectoryListing> {
   return await trpc.controlPlane.workspaceBrowse.query(path ? { path, limit: 100, includeHidden } : { limit: 100, includeHidden });
+}
+
+export async function fetchWorkspaceChanges(): Promise<WorkspaceChanges> {
+  return await trpc.controlPlane.workspaceChanges.query();
+}
+
+export async function fetchWorkspaceFileDiff(path: string): Promise<WorkspaceFileDiff> {
+  return await trpc.controlPlane.workspaceFileDiff.query({ path });
 }
 
 export async function saveLayoutSnapshot(snapshot: unknown): Promise<SavedLayoutSnapshot> {

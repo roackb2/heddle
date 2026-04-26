@@ -32,6 +32,7 @@ import {
 } from './services/memory.js';
 import { saveControlPlaneLayoutSnapshot } from './services/layout-snapshots.js';
 import { browseWorkspaceDirectories, searchWorkspaceFiles } from './services/workspace-files.js';
+import { readWorkspaceChanges, readWorkspaceFileDiff } from './services/workspace-diff.js';
 import { createWorkspaceDescriptor, renameWorkspaceDescriptor, setActiveWorkspace } from '../../../core/runtime/workspaces.js';
 import { registerKnownWorkspaces, resolveDaemonRegistryPath } from '../../../core/runtime/daemon-registry.js';
 
@@ -99,6 +100,10 @@ const workspaceBrowseInputSchema = z.object({
   limit: z.number().int().min(1).max(300).optional(),
   includeHidden: z.boolean().optional(),
 }).optional();
+
+const workspaceFileDiffInputSchema = z.object({
+  path: z.string().min(1),
+});
 
 const memoryListInputSchema = z.object({
   path: z.string().min(1).optional(),
@@ -296,6 +301,12 @@ export const controlPlaneRouter = router({
       limit: input?.limit ?? 100,
       includeHidden: input?.includeHidden ?? false,
     });
+  }),
+  workspaceChanges: procedure.query(async ({ ctx }) => {
+    return await readWorkspaceChanges(ctx.activeWorkspace.anchorRoot);
+  }),
+  workspaceFileDiff: procedure.input(workspaceFileDiffInputSchema).query(async ({ ctx, input }) => {
+    return await readWorkspaceFileDiff(ctx.activeWorkspace.anchorRoot, input.path);
   }),
   workspaceSetActive: procedure.input(workspaceSetActiveInputSchema).mutation(({ ctx, input }) => {
     const resolved = setActiveWorkspace({
