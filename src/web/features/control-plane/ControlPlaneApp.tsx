@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Navigate, Route, Routes } from 'react-router';
 import './control-plane.css';
 import type { ControlPlaneState } from '../../lib/api';
 import type { ScreenshotMode } from '../../lib/debug/layoutSnapshot';
@@ -15,12 +16,10 @@ import { HeartbeatWorkspace } from './components/HeartbeatWorkspace';
 import { OverviewView } from './components/OverviewView';
 import { SessionsWorkspace } from './components/SessionsWorkspace';
 import { WorkspaceManagementView } from './components/WorkspaceManagementView';
-import { MobileControlPlaneShell, type ControlPlaneTab } from './mobile/MobileControlPlaneShell';
+import { MobileControlPlaneShell } from './mobile/MobileControlPlaneShell';
 import { Toaster } from '../../components/ui/toaster';
 import { useToast } from '../../components/ui/use-toast';
 import { useControlPlaneUiStore } from './state/controlPlaneUiStore';
-
-type Tab = ControlPlaneTab;
 
 declare global {
   interface Window {
@@ -100,7 +99,7 @@ export function ControlPlaneApp() {
     <Panel title="Loading state">
       <p className="muted">{error ?? 'Reading local Heddle state...'}</p>
     </Panel>
-  : renderActiveTab(routing.tab, state, sessionWorkspace, heartbeatWorkspace, workspaceActions);
+  : renderActiveTab(state, sessionWorkspace, heartbeatWorkspace, workspaceActions);
 
   if (isMobile) {
     return (
@@ -140,79 +139,91 @@ export function ControlPlaneApp() {
 }
 
 function renderActiveTab(
-  tab: Tab,
   state: ControlPlaneState,
   sessionWorkspace: ReturnType<typeof useSessionWorkspace>,
   heartbeatWorkspace: ReturnType<typeof useHeartbeatWorkspace>,
   workspaceActions: ReturnType<typeof useWorkspaceActions>,
 ) {
-  if (tab === 'overview') {
-    return <OverviewView state={state} />;
-  }
-
-  if (tab === 'sessions') {
-    return (
-      <SessionsWorkspace
-        sessions={state.sessions}
-        activeSession={sessionWorkspace.activeSession}
-        sessionDetail={sessionWorkspace.sessionDetail}
-        sessionDetailLoading={sessionWorkspace.sessionDetailLoading}
-        sessionDetailError={sessionWorkspace.sessionDetailError}
-        selectedSessionId={sessionWorkspace.selectedSessionId}
-        onSelectSession={sessionWorkspace.setSelectedSessionId}
-        selectedTurnId={sessionWorkspace.selectedTurnId}
-        onSelectTurn={sessionWorkspace.setSelectedTurnId}
-        selectedTurn={sessionWorkspace.selectedTurn}
-        turnReview={sessionWorkspace.turnReview}
-        turnReviewLoading={sessionWorkspace.turnReviewLoading}
-        turnReviewError={sessionWorkspace.turnReviewError}
-        sendingPrompt={sessionWorkspace.sendingPrompt}
-        runInFlight={sessionWorkspace.runInFlight}
-        memoryUpdating={sessionWorkspace.memoryUpdating}
-        sendPromptError={sessionWorkspace.sendPromptError}
-        onSendPrompt={sessionWorkspace.sendPrompt}
-        creatingSession={sessionWorkspace.creatingSession}
-        sessionNotice={sessionWorkspace.sessionNotice}
-        onCreateSession={sessionWorkspace.createSession}
-        onContinueSession={sessionWorkspace.continueSession}
-        onCancelSessionRun={sessionWorkspace.cancelSessionRun}
-        onUpdateSessionSettings={sessionWorkspace.updateSessionSettings}
-        pendingApproval={sessionWorkspace.pendingApproval}
-        onResolveApproval={sessionWorkspace.resolveApproval}
-        inspectorTab={sessionWorkspace.inspectorTab}
-        onInspectorTabChange={sessionWorkspace.setInspectorTab}
-      />
-    );
-  }
-
-  if (tab === 'workspaces') {
-    return (
-      <WorkspaceManagementView
-        state={state}
-        creatingWorkspace={workspaceActions.creatingWorkspace}
-        renamingWorkspaceId={workspaceActions.renamingWorkspaceId}
-        onCreateWorkspace={workspaceActions.createWorkspace}
-        onRenameWorkspace={workspaceActions.renameWorkspace}
-        onSetActiveWorkspace={(workspaceId) => void workspaceActions.switchWorkspace(workspaceId)}
-      />
-    );
-  }
-
   return (
-    <HeartbeatWorkspace
-      tasks={state.heartbeat.tasks}
-      runs={state.heartbeat.runs}
-      selectedTask={heartbeatWorkspace.selectedTask}
-      selectedTaskId={heartbeatWorkspace.selectedTaskId}
-      onSelectTask={heartbeatWorkspace.setSelectedTaskId}
-      selectedRun={heartbeatWorkspace.selectedRun}
-      selectedRunId={heartbeatWorkspace.selectedRunId}
-      onSelectRun={heartbeatWorkspace.setSelectedRunId}
-      selectedTaskRuns={heartbeatWorkspace.selectedTaskRuns}
-      pendingTaskAction={heartbeatWorkspace.pendingTaskAction}
-      onEnableTask={heartbeatWorkspace.enableTask}
-      onDisableTask={heartbeatWorkspace.disableTask}
-      onTriggerTask={heartbeatWorkspace.triggerTask}
+    <Routes>
+      <Route path="/overview" element={<OverviewView state={state} />} />
+      <Route path="/sessions" element={<SessionsRoute state={state} sessionWorkspace={sessionWorkspace} />} />
+      <Route path="/sessions/:sessionId/*" element={<SessionsRoute state={state} sessionWorkspace={sessionWorkspace} />} />
+      <Route
+        path="/tasks"
+        element={(
+          <HeartbeatWorkspace
+            tasks={state.heartbeat.tasks}
+            runs={state.heartbeat.runs}
+            selectedTask={heartbeatWorkspace.selectedTask}
+            selectedTaskId={heartbeatWorkspace.selectedTaskId}
+            onSelectTask={heartbeatWorkspace.setSelectedTaskId}
+            selectedRun={heartbeatWorkspace.selectedRun}
+            selectedRunId={heartbeatWorkspace.selectedRunId}
+            onSelectRun={heartbeatWorkspace.setSelectedRunId}
+            selectedTaskRuns={heartbeatWorkspace.selectedTaskRuns}
+            pendingTaskAction={heartbeatWorkspace.pendingTaskAction}
+            onEnableTask={heartbeatWorkspace.enableTask}
+            onDisableTask={heartbeatWorkspace.disableTask}
+            onTriggerTask={heartbeatWorkspace.triggerTask}
+          />
+        )}
+      />
+      <Route
+        path="/workspaces"
+        element={(
+          <WorkspaceManagementView
+            state={state}
+            creatingWorkspace={workspaceActions.creatingWorkspace}
+            renamingWorkspaceId={workspaceActions.renamingWorkspaceId}
+            onCreateWorkspace={workspaceActions.createWorkspace}
+            onRenameWorkspace={workspaceActions.renameWorkspace}
+            onSetActiveWorkspace={(workspaceId) => void workspaceActions.switchWorkspace(workspaceId)}
+          />
+        )}
+      />
+      <Route path="*" element={<Navigate to="/overview" replace />} />
+    </Routes>
+  );
+}
+
+function SessionsRoute({
+  state,
+  sessionWorkspace,
+}: {
+  state: ControlPlaneState;
+  sessionWorkspace: ReturnType<typeof useSessionWorkspace>;
+}) {
+  return (
+    <SessionsWorkspace
+      sessions={state.sessions}
+      activeSession={sessionWorkspace.activeSession}
+      sessionDetail={sessionWorkspace.sessionDetail}
+      sessionDetailLoading={sessionWorkspace.sessionDetailLoading}
+      sessionDetailError={sessionWorkspace.sessionDetailError}
+      selectedSessionId={sessionWorkspace.selectedSessionId}
+      onSelectSession={sessionWorkspace.setSelectedSessionId}
+      selectedTurnId={sessionWorkspace.selectedTurnId}
+      onSelectTurn={sessionWorkspace.setSelectedTurnId}
+      selectedTurn={sessionWorkspace.selectedTurn}
+      turnReview={sessionWorkspace.turnReview}
+      turnReviewLoading={sessionWorkspace.turnReviewLoading}
+      turnReviewError={sessionWorkspace.turnReviewError}
+      sendingPrompt={sessionWorkspace.sendingPrompt}
+      runInFlight={sessionWorkspace.runInFlight}
+      memoryUpdating={sessionWorkspace.memoryUpdating}
+      sendPromptError={sessionWorkspace.sendPromptError}
+      onSendPrompt={sessionWorkspace.sendPrompt}
+      creatingSession={sessionWorkspace.creatingSession}
+      sessionNotice={sessionWorkspace.sessionNotice}
+      onCreateSession={sessionWorkspace.createSession}
+      onContinueSession={sessionWorkspace.continueSession}
+      onCancelSessionRun={sessionWorkspace.cancelSessionRun}
+      onUpdateSessionSettings={sessionWorkspace.updateSessionSettings}
+      pendingApproval={sessionWorkspace.pendingApproval}
+      onResolveApproval={sessionWorkspace.resolveApproval}
+      inspectorTab={sessionWorkspace.inspectorTab}
+      onInspectorTabChange={sessionWorkspace.setInspectorTab}
     />
   );
 }

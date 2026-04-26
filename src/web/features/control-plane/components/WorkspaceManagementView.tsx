@@ -78,7 +78,11 @@ export function WorkspaceManagementView({
         </WorkspaceCard>
 
         <div className="grid min-w-0 gap-4">
-          <WorkspaceCreateCard creatingWorkspace={creatingWorkspace} onCreateWorkspace={onCreateWorkspace} />
+          <WorkspaceCreateCard
+            creatingWorkspace={creatingWorkspace}
+            knownWorkspaces={state.knownWorkspaces}
+            onCreateWorkspace={onCreateWorkspace}
+          />
           <KnownWorkspacesCard state={state} creatingWorkspace={creatingWorkspace} onCreateWorkspace={onCreateWorkspace} />
         </div>
       </div>
@@ -134,9 +138,11 @@ function WorkspaceRenameForm({
 export function WorkspaceCreateCard({
   creatingWorkspace,
   onCreateWorkspace,
+  knownWorkspaces = [],
 }: {
   creatingWorkspace: boolean;
   onCreateWorkspace?: (input: WorkspaceMutationInput) => Promise<void>;
+  knownWorkspaces?: ControlPlaneState['knownWorkspaces'];
 }) {
   const [name, setName] = useState('');
   const [anchorRoot, setAnchorRoot] = useState('');
@@ -225,6 +231,7 @@ export function WorkspaceCreateCard({
       <WorkspacePickerDialog
         open={pickerOpen}
         selectedPath={anchorRoot}
+        knownWorkspaces={knownWorkspaces}
         onOpenChange={setPickerOpen}
         onSelectPath={(path) => {
           setAnchorRoot(path);
@@ -286,11 +293,13 @@ function KnownWorkspacesCard({
 function WorkspacePickerDialog({
   open,
   selectedPath,
+  knownWorkspaces,
   onOpenChange,
   onSelectPath,
 }: {
   open: boolean;
   selectedPath: string;
+  knownWorkspaces: ControlPlaneState['knownWorkspaces'];
   onOpenChange: (open: boolean) => void;
   onSelectPath: (path: string) => void;
 }) {
@@ -415,6 +424,34 @@ function WorkspacePickerDialog({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+          {knownWorkspaces.length ?
+            <div className="mb-4 rounded-xl border border-border bg-background/50 p-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Recent workspaces</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Choose from Heddle workspaces registered on this machine.</p>
+                </div>
+                <Badge variant="outline">{knownWorkspaces.length}</Badge>
+              </div>
+              <div className="grid gap-2 md:grid-cols-2">
+                {knownWorkspaces.slice(0, 6).map((workspace) => (
+                  <button
+                    key={workspace.stateRoot}
+                    type="button"
+                    className="rounded-lg border border-border bg-card px-3 py-2 text-left hover:border-primary"
+                    onClick={() => {
+                      onSelectPath(workspace.anchorRoot);
+                      onOpenChange(false);
+                    }}
+                  >
+                    <span className="block truncate text-sm font-semibold text-foreground">{workspace.name}</span>
+                    <span className="mt-1 block truncate text-xs text-muted-foreground">{workspace.anchorRoot}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          : null}
+
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge variant="outline" className="max-w-full truncate">{currentPath || 'Home'}</Badge>
             {listing?.parentPath ?
