@@ -139,6 +139,7 @@ If a script exists to summarize the git range, treat it as source material only.
 The final release notes should still be written from the actual scope plus the intended release goal.
 
 Current example release note drafts:
+
 - [`v0.0.23.md`](./v0.0.23.md)
 - [`v0.0.24.md`](./v0.0.24.md)
 - [`v0.0.25.md`](./v0.0.25.md)
@@ -146,6 +147,7 @@ Current example release note drafts:
 - [`v0.0.27.md`](./v0.0.27.md)
 - [`v0.0.28.md`](./v0.0.28.md)
 - [`v0.0.29.md`](./v0.0.29.md)
+- [`v0.0.30.md`](./v0.0.30.md)
 
 ## Agent Rule
 
