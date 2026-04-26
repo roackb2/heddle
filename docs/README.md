@@ -10,7 +10,7 @@ If you are new to Heddle, begin with:
 - [Runtime host model](guides/runtime-host-model.md) for how workspace ownership and daemon mode work
 - [Chat and sessions](guides/chat-and-sessions.md) for the core interactive workflow
 - [Knowledge persistence](guides/knowledge-persistence.md) for how Heddle learns durable workspace knowledge while it works
-- [Control plane](guides/control-plane.md) for the browser UI and daemon
+- [Control plane](guides/control-plane.md) for the browser UI, workspace switching, and session review
 - [CLI reference](reference/cli.md) for command lookup
 
 ## Guides
@@ -62,6 +62,12 @@ Longer-term project context and design direction:
 2. [Control plane](guides/control-plane.md)
 3. [CLI reference](reference/cli.md)
 4. [Heartbeat](guides/heartbeat.md)
+
+### I want to switch between local projects
+
+1. [Control plane](guides/control-plane.md)
+2. [Runtime host model](guides/runtime-host-model.md)
+3. [CLI reference](reference/cli.md)
 
 ### I want to build on Heddle programmatically
 

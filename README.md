@@ -1,10 +1,10 @@
 # Heddle
 
-Heddle is an open-source AI coding agent runtime and terminal CLI for real project work.
+Heddle is an open-source AI coding agent runtime and terminal-first workspace for real project work.
 
-It is designed for workflows where an agent needs to inspect a live repository, make bounded changes, verify results, keep continuity across sessions, and stay observable to the operator. Heddle supports OpenAI and Anthropic models, stores local workspace state under `.heddle/`, includes both a terminal chat experience and a browser control plane, and learns durable workspace knowledge while it works.
+It is designed for workflows where an agent needs to inspect a live repository, make bounded changes, verify results, keep continuity across sessions, and stay observable to the operator. Heddle supports OpenAI and Anthropic models, stores local workspace state under `.heddle/`, includes both a terminal chat experience and a browser control plane, learns durable workspace knowledge while it works, and gives users a review path for file diffs, commands, approvals, and traces.
 
-In plain terms: Heddle is for people who want an AI coding assistant that can work inside an actual project, learn the project's operating knowledge over time, and remain inspectable instead of acting like a black box.
+In plain terms: Heddle is for people who want an AI coding assistant that can work inside actual projects, learn each project's operating knowledge over time, switch between local workspaces, and remain inspectable instead of acting like a black box.
 
 ## Why Try Heddle
 
@@ -15,7 +15,7 @@ It is a good fit if you want:
 - a terminal-first coding agent that works in a real repository
 - an agent that learns durable project knowledge while working with you, using inspectable local memory
 - explicit traces, approvals, and reviewable workflow artifacts
-- a browser control plane for local oversight
+- a browser control plane for local oversight, workspace switching, and session review
 - a path from interactive use to programmatic and scheduled agent workflows
 
 Heddle is probably not the right fit if you only want a very simple one-shot prompt runner and do not care about sessions, persistence, observability, or operator control.
@@ -28,10 +28,11 @@ At a high level, Heddle helps with:
 - making code or doc changes inside a real workspace
 - running bounded verification like builds, tests, and repo review
 - keeping multi-step work going across sessions instead of starting from scratch each time
+- switching between local workspaces from the browser control plane
 - learning durable facts, preferences, and workflows from real usage
 - exposing more operator visibility than a black-box chat tool
 
-If you want a terminal-first coding agent with local state, review traces, and a path toward longer-running workflows, that is the problem Heddle is trying to solve.
+If you want a terminal-first coding agent with local state, review traces, workspace memory, and a path toward longer-running workflows, that is the problem Heddle is trying to solve.
 
 ## See Heddle
 
@@ -51,19 +52,19 @@ Terminal chat/dev workflow showing file edits, inline diff output, and verificat
 
 ### Browser control plane overview
 
-The local control plane gives you a browser-based view of the current workspace, saved sessions, heartbeat tasks, and recent activity:
+The local control plane gives you a browser-based view of the current workspace, saved sessions, heartbeat tasks, workspace memory, and recent activity:
 
 ![Heddle control plane overview](docs/images/control-plane-overview.png)
 
 ### Browser session review
 
-Saved session review in the control plane, with conversation history in the center and review evidence on the right:
+Saved session review in the control plane, with conversation history in the center and review evidence on the right. Review evidence includes changed files, diff excerpts, verification commands, and approvals when they are available from the trace:
 
 ![Heddle control plane session review](docs/images/control-plane-session-review.png)
 
 ### Mobile control plane
 
-The control plane also has a phone-oriented layout for checking sessions, reading the latest conversation, and reviewing evidence (especially approvals and command traces) from another device:
+The control plane also has a phone-oriented layout for checking sessions, reading the latest conversation, switching between workspace sections, and reviewing evidence from another device:
 
 <p>
   <img src="docs/images/mobile-control-plane-sessions.png" alt="Heddle mobile session list" width="240">
@@ -111,6 +112,8 @@ Summarize this repository, show me the main build/test commands, and point out t
 ```bash
 heddle daemon
 ```
+
+Open the browser control plane from the daemon output. From there you can use `Overview`, `Sessions`, `Tasks`, and `Workspaces` to inspect the active workspace, continue saved sessions, review changes, and switch to another local project.
 
 ### Try The Learning Loop
 
@@ -187,7 +190,7 @@ For example, tell Heddle your preferred ticket template once, then ask for a tic
 
 More: [Knowledge persistence](docs/guides/knowledge-persistence.md)
 
-### Control plane
+### Control plane and workspaces
 
 The control plane is Heddle's local browser UI:
 
@@ -195,11 +198,15 @@ The control plane is Heddle's local browser UI:
 heddle daemon
 ```
 
-It gives you a browser-based view into sessions, run state, heartbeat tasks, and review-oriented details. The purpose is operator oversight: seeing what the agent is doing, reviewing history more comfortably, and managing local runs from a UI instead of only from the terminal.
+It gives you a browser-based view into workspaces, sessions, run state, heartbeat tasks, memory health, and review-oriented details. The purpose is operator oversight: seeing what the agent is doing, reviewing history more comfortably, and managing local runs from a UI instead of only from the terminal.
 
 If terminal chat is the execution surface, the control plane is the oversight surface.
 
-This is useful if you want a more inspectable and operator-friendly workflow than a plain CLI transcript. The layout adapts for phone use as well, with mobile-native session navigation, bottom root navigation, a compact chat composer, and dedicated session info/review views.
+The `Workspaces` section lets you register local projects, switch the control plane between them, rename workspace entries, and pick a project folder from the browser UI. Heddle also keeps a user-level workspace registry so projects you have opened from the CLI or daemon can be rediscovered later.
+
+The `Sessions` section supports a coding-review flow: changed files, diff excerpts, review commands, verification commands, approvals, and trace events are grouped so you can inspect what happened in a turn without reading the entire transcript.
+
+This is useful if you want a more inspectable and operator-friendly workflow than a plain CLI transcript. The layout adapts for phone use as well, with mobile-native navigation for Overview, Sessions, Tasks, and Workspaces, plus dedicated session info/review views.
 
 More: [Control plane guide](docs/guides/control-plane.md)
 
@@ -209,13 +216,13 @@ Heddle is local-first, but it still has a runtime ownership model.
 
 The short version is:
 
-- the workspace is the ownership unit
+- the workspace is the project-level state and ownership unit
 - one workspace should have one live runtime owner at a time
 - that owner is either:
   - the embedded CLI command you started
   - or a background `heddle daemon`
 
-This is why Heddle stores state under the workspace’s `.heddle/`, why the browser control plane acts as a client of the daemon rather than a separate runtime, and why some commands refuse to start a second owner when a daemon already owns the same workspace.
+This is why Heddle stores state under the workspace’s `.heddle/`, why the browser control plane acts as a client of the daemon rather than a separate runtime, and why the UI treats workspace switching as choosing which local `.heddle/` state to inspect and operate.
 
 If you want to understand how `chat`, `ask`, the daemon, the control plane, and workspace-local state fit together, read:
 
@@ -338,14 +345,14 @@ Current strengths include:
 
 - terminal-first coding and repository workflows
 - autonomous, catalog-backed workspace memory that helps the agent learn from normal usage
-- explicit traces, approvals, and local workspace state
-- browser-based oversight through the control plane
+- explicit traces, approvals, diff review, and local workspace state
+- browser-based oversight and workspace switching through the control plane
 - local-first heartbeat primitives for scheduled agent work
 - practical programmatic hooks for custom hosts
 
 Current limitations include:
 
-- the browser control plane is still early compared with a full IDE-like environment
+- the browser control plane is not yet a full IDE-like file review environment
 - some advanced workflows remain better documented in source and examples than in polished product UX
 - the project surface is still changing as the runtime matures
 

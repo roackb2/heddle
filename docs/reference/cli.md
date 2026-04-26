@@ -34,7 +34,7 @@ This page is a command lookup for the current Heddle CLI surface.
 
 These flags show up across multiple commands:
 
-- `--cwd <path>`: run against another workspace root
+- `--cwd <path>`: run against another workspace path
 - `--model <name>`: choose the active model
 - `--max-steps <n>`: limit the agent loop length
 
@@ -64,6 +64,8 @@ Start the control plane:
 heddle daemon
 ```
 
+After the daemon starts, open the browser control plane to inspect sessions, review diff/command evidence, and use the `Workspaces` section to switch between local projects. For one-off CLI usage against another project, keep using `--cwd`.
+
 Start the foreground heartbeat scheduler:
 
 ```bash
@@ -90,6 +92,7 @@ yarn typecheck
 
 - The installed command is `heddle`.
 - By default, commands operate on the current working directory unless `--cwd` is provided.
+- Workspace state is local to the project under `.heddle/`. The browser control plane can register and switch between local workspaces, but each workspace keeps its own sessions, traces, memory, and tasks.
 - Heartbeat scheduler commands are local-first; adding a task does not create a background OS service by itself.
 
 ## See Also

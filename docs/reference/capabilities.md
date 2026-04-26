@@ -10,6 +10,7 @@ Heddle is built to help with real workspace tasks such as:
 - editing code and docs inside the active workspace
 - verifying changes with tests, builds, and repo review evidence
 - carrying work across multi-turn sessions instead of treating every prompt as stateless
+- switching between local project workspaces through the browser control plane
 - learning durable workspace knowledge from normal usage through catalog-backed memory
 - exposing local browser oversight through the control plane
 - supporting bounded autonomous work through heartbeat scheduling
@@ -57,7 +58,11 @@ Beyond terminal chat, Heddle includes:
 
 - a local browser control plane via `heddle daemon`
 - live session updates and review-oriented run inspection
+- workspace management for registering, renaming, choosing, and switching local project workspaces
+- trace-backed changed-file review with diff excerpts when edit or git evidence is available
+- separate review evidence for commands, verification, approvals, and trace events
 - heartbeat task and run visibility
+- workspace memory health visibility
 - browser-side model selection and drift toggling
 - file mention suggestions in the browser composer
 
@@ -65,7 +70,7 @@ Beyond terminal chat, Heddle includes:
 
 - Heddle is a coding/workspace agent runtime, not a general-purpose autonomous system.
 - Knowledge persistence uses explicit local catalogs and maintainer runs, so users can audit what Heddle learned instead of relying on opaque retrieval.
-- The control plane is already useful, but still early compared with a full IDE-like experience.
+- The control plane review view is trace-backed. It is useful for agent-turn review, but it is not yet a full IDE-grade live file watcher.
 - The image workflow is intentionally lightweight: users provide a local image path and Heddle decides whether inspection is needed.
 - `@path/to/file` mentions prioritize file inspection; they do not blindly paste file contents into the prompt.
 - Web search is provider-backed rather than a general crawler maintained inside this repository.

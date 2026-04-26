@@ -29,12 +29,7 @@ A Heddle workspace is the local project scope Heddle is operating on.
 
 In the simplest case, it is just the directory you started Heddle from.
 
-A workspace has:
-
-- an `anchor root`
-- a `state root`
-- a stable `workspace id`
-- optional multiple `repo roots`
+For users, a workspace is the project folder plus its `.heddle/` state. Internally, Heddle also tracks lower-level fields such as the workspace path, state path, workspace id, and optional repo roots, but the user-facing concept should stay simple: choose a workspace, and Heddle reads that workspace's state.
 
 By default, Heddle stores workspace-local state under:
 
@@ -153,7 +148,7 @@ This is different from `chat`, which still remains an embedded interactive surfa
 
 ## The Daemon Registry
 
-Heddle keeps a small user-level daemon registry so commands can discover active workspace ownership.
+Heddle keeps a small user-level registry so commands and the control plane can discover active workspace ownership and recently seen workspaces.
 
 Conceptually, that registry tracks:
 
@@ -161,7 +156,7 @@ Conceptually, that registry tracks:
 - active daemon owner metadata
 - endpoint and last-seen timestamps
 
-Its job is coordination and discovery.
+Its job is coordination and discovery. It lets the browser control plane offer a workspace switcher and reopen projects that were previously opened from the CLI or daemon.
 
 It is not the main source of truth for workspace history.
 
@@ -182,6 +177,7 @@ When deciding how to run Heddle, use this rule of thumb:
 - you want the browser control plane
 - you want a stable background owner for that workspace
 - you want to inspect or operate Heddle from another device
+- you want to switch the browser control plane between local workspaces
 
 ### Do not think of daemon mode as “extra UI”
 
@@ -217,6 +213,7 @@ Important current limits:
 - if a daemon already owns the workspace, browser and mobile clients are just clients of that daemon; switching devices is normal and does not require takeover
 - browser/mobile do not currently expose host-action controls such as takeover or force-embed, because those actions are not yet useful enough without a stronger ownership policy behind them
 - same-session conflict protection is now a soft session lease, not a full takeover system yet
+- workspace switching changes which workspace state the control plane is showing; it does not merge or centralize the `.heddle/` state from multiple projects
 
 So the correct mental model is:
 
@@ -249,9 +246,10 @@ If you want a simple operational checklist:
 
 1. Start `heddle` or `heddle chat` when you want direct terminal interaction and no daemon owns that workspace.
 2. Start `heddle daemon` when you want the browser control plane or a stable background owner.
-3. Treat the workspace as having one live owner at a time.
-4. Use `heddle ask` as a lightweight client when a daemon already owns the workspace.
-5. Do not assume the web UI, TUI, and daemon are separate runtimes operating independently on the same workspace.
+3. Use the control plane `Workspaces` section to register, rename, and switch between local project workspaces.
+4. Treat the workspace as having one live owner at a time.
+5. Use `heddle ask` as a lightweight client when a daemon already owns the workspace.
+6. Do not assume the web UI, TUI, and daemon are separate runtimes operating independently on the same workspace.
 
 ## Current Product Boundary
 

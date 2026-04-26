@@ -1,8 +1,8 @@
 # Control Plane
 
-Heddle includes a local browser control plane for workspace oversight when you want a native UI in addition to terminal chat.
+Heddle includes a local browser control plane for workspace oversight when you want a browser UI in addition to terminal chat.
 
-The current control plane is still early, but it has moved beyond a placeholder dashboard into a workstation-style local UI for inspecting sessions, review evidence, heartbeat tasks, and run history.
+The control plane is the main place to inspect saved sessions, review evidence, workspace memory health, heartbeat tasks, run history, and local workspace switching.
 
 ## What The Control Plane Includes
 
@@ -15,16 +15,50 @@ Current stack:
 
 The current browser UI surfaces:
 
-- workspace and `.heddle/` state location
+- active workspace and `.heddle/` state location
+- workspace management with registered workspaces, recent known workspaces, folder picking, switching, and renaming
 - saved chat sessions with sidebar navigation, resizable desktop panels, conversation view, and review-oriented detail inspection
 - browser-side session actions for new session, send, continue, cancel, and pending approval resolution
 - live per-session updates over SSE for run status, tool progress, assistant streaming text, and saved-session changes
 - a model selector backed by the server-side built-in model catalog, plus a drift toggle and latest trace-derived drift level
 - debounced `@file` mention suggestions in the composer, backed by a capped workspace file search endpoint
 - compact tool-result cards for saved tool outputs such as `list_files: {...}`
+- changed-file review with structured diff excerpts when the trace contains file edits or git diff evidence
+- review and verification command evidence grouped separately from approvals and events
 - lightweight toast notifications for session/action success and failure
 - heartbeat task status, scheduling state, selected task detail, and run history
 - recent heartbeat run summaries and usage data
+
+## Workspaces
+
+A workspace is the project state Heddle is currently operating on. For users, the important rule is simple: a workspace is the local project plus its `.heddle/` state.
+
+The control plane exposes this as a top-level `Workspaces` section. From there you can:
+
+- see workspaces attached to the current control-plane catalog
+- switch the UI to another workspace
+- rename a workspace entry
+- add a workspace by typing a path or choosing a folder
+- reopen recently known workspaces discovered through the user-level registry
+
+The folder picker is meant for choosing project roots without restarting the daemon by hand. It lets you navigate up and down the local folder tree, hides dot-prefixed folders by default, and can select a folder as the workspace path.
+
+Heddle also maintains a small user-level registry of workspaces it has seen. This is why a project opened from the CLI can later appear as a known workspace in the browser UI. The registry is discovery metadata only; the authoritative project state remains in that workspace's `.heddle/` directory.
+
+## Review Evidence
+
+The `Review` view is designed to answer: "What changed, what did the agent run, and what evidence do I have before trusting this turn?"
+
+When available, Heddle shows:
+
+- changed files for the selected turn
+- file-level status such as modified, added, or deleted
+- diff excerpts from edit tools or git diff evidence
+- review commands such as `git status --short` or `git diff --stat`
+- verification commands such as tests, builds, or typechecks
+- approval and trace events that explain what the agent requested or executed
+
+This is not a full IDE file-review engine yet. It is trace-backed review evidence focused on the agent turn, so it works best when Heddle uses its built-in edit tools or runs explicit git review commands after a change.
 
 ## Mobile Layout
 
@@ -32,7 +66,7 @@ The control plane includes a mobile-native layout for phone and tablet access. I
 
 On mobile, the UI uses:
 
-- bottom root navigation for Sessions, Tasks, and Overview
+- bottom root navigation for Overview, Sessions, Tasks, and Workspaces
 - a dedicated session list for choosing saved conversations
 - native-style session navigation for Chat, Info, and Review
 - a compact composer that keeps the latest conversation visible
@@ -160,7 +194,7 @@ Then open the reported `https://<machine-name>.<tailnet>.ts.net` URL.
 
 ## Current Status
 
-The control plane is still early and not yet a full IDE-like browser-native operator surface. Current strengths are browser-based session control, session review, and heartbeat visibility. Current limitations are richer diff/file review, broader heartbeat mutations, and general UI polish.
+The control plane is useful today as a local workstation surface for sessions, workspace switching, review evidence, heartbeat visibility, and mobile oversight. The main product boundary is that file review is trace-backed rather than a full IDE-grade live file watcher. That keeps review evidence inspectable and reliable for the current agent turn while leaving room for deeper future file-review workflows.
 
 ## See Also
 
