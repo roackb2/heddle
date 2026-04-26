@@ -33,6 +33,8 @@ import {
   resolveWorkspaceRuntimeHost,
   type ResolvedRuntimeHost,
 } from '../core/runtime/runtime-hosts.js';
+import { registerKnownWorkspaces, resolveDaemonRegistryPath } from '../core/runtime/daemon-registry.js';
+import { resolveWorkspaceContext } from '../core/runtime/workspaces.js';
 
 type RootCliOptions = {
   cwd?: string;
@@ -447,6 +449,15 @@ function writeMemoryValidation(result: Awaited<ReturnType<typeof validateMemoryW
 function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
   const workspaceRoot = resolve(flags.cwd ?? process.cwd());
   const projectConfig = loadProjectConfig(workspaceRoot);
+  const stateRoot = resolve(workspaceRoot, projectConfig.stateDir ?? '.heddle');
+  const workspaceContext = resolveWorkspaceContext({
+    workspaceRoot,
+    stateRoot,
+  });
+  registerKnownWorkspaces({
+    registryPath: resolveDaemonRegistryPath(),
+    workspaces: workspaceContext.workspaces,
+  });
   return {
     workspaceRoot,
     model: flags.model ?? projectConfig.model,
@@ -457,7 +468,7 @@ function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
     systemContext: loadProjectAgentContext(workspaceRoot, projectConfig.agentContextPaths ?? ['AGENTS.md']),
     runtimeHost: resolveWorkspaceRuntimeHost({
       workspaceRoot,
-      stateRoot: resolve(workspaceRoot, projectConfig.stateDir ?? '.heddle'),
+      stateRoot,
     }),
     forceOwnerConflict: Boolean(flags.forceOwnerConflict),
   };

@@ -30,7 +30,7 @@ import {
   searchControlPlaneMemoryNotes,
 } from './services/memory.js';
 import { saveControlPlaneLayoutSnapshot } from './services/layout-snapshots.js';
-import { searchWorkspaceFiles } from './services/workspace-files.js';
+import { browseWorkspaceDirectories, searchWorkspaceFiles } from './services/workspace-files.js';
 import { createWorkspaceDescriptor, setActiveWorkspace } from '../../../core/runtime/workspaces.js';
 
 const sessionInputSchema = z.object({
@@ -90,6 +90,12 @@ const heartbeatTaskInputSchema = z.object({
 const fileSearchInputSchema = z.object({
   query: z.string().max(200).optional(),
   limit: z.number().int().min(1).max(50).optional(),
+}).optional();
+
+const workspaceBrowseInputSchema = z.object({
+  path: z.string().min(1).optional(),
+  limit: z.number().int().min(1).max(300).optional(),
+  includeHidden: z.boolean().optional(),
 }).optional();
 
 const memoryListInputSchema = z.object({
@@ -276,6 +282,13 @@ export const controlPlaneRouter = router({
         limit: input?.limit ?? 20,
       }),
     };
+  }),
+  workspaceBrowse: procedure.input(workspaceBrowseInputSchema).query(async ({ input }) => {
+    return await browseWorkspaceDirectories({
+      path: input?.path,
+      limit: input?.limit ?? 100,
+      includeHidden: input?.includeHidden ?? false,
+    });
   }),
   workspaceSetActive: procedure.input(workspaceSetActiveInputSchema).mutation(({ ctx, input }) => {
     const resolved = setActiveWorkspace({

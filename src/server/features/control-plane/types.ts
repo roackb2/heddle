@@ -126,6 +126,7 @@ export type ControlPlaneState = {
   activeWorkspaceId: string;
   workspace: WorkspaceDescriptor;
   workspaces: WorkspaceDescriptor[];
+  knownWorkspaces: WorkspaceDescriptor[];
   runtimeHost: {
     mode: 'daemon';
     ownerId: string;

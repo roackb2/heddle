@@ -37,7 +37,7 @@ export function resolveWorkspaceRuntimeHost(options: {
     stateRoot: options.stateRoot,
   }).activeWorkspace;
   const registryPath = options.registryPath ?? resolveDaemonRegistryPath();
-  const registration = readDaemonWorkspaceRegistration(registryPath, workspace.id);
+  const registration = readDaemonWorkspaceRegistration(registryPath, workspace.id, workspace.stateRoot);
   const owner = registration?.owner;
 
   if (!owner) {

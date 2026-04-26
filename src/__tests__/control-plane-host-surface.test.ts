@@ -92,6 +92,7 @@ function baseState(overrides: Partial<ControlPlaneState> = {}): ControlPlaneStat
       updatedAt: '2026-04-21T00:00:00.000Z',
     },
     workspaces: [],
+    knownWorkspaces: [],
     runtimeHost: null,
     sessions: [],
     heartbeat: {

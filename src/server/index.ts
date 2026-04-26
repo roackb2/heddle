@@ -58,6 +58,7 @@ export async function listenHeddleDaemon(options: HeddleServerListenOptions): Pr
     clearDaemonWorkspaceRegistration({
       registryPath,
       workspaceIds: workspaceContext.workspaces.map((workspace) => workspace.id),
+      stateRoots: workspaceContext.workspaces.map((workspace) => workspace.stateRoot),
       ownerId,
     });
   };

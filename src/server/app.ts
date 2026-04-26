@@ -30,7 +30,11 @@ export function createHeddleServerApp(
       });
       const workspaceOwner =
         options.runtimeHost ?
-          readDaemonWorkspaceRegistration(options.runtimeHost.registryPath, workspaceContext.activeWorkspaceId)?.owner ?? null
+          readDaemonWorkspaceRegistration(
+            options.runtimeHost.registryPath,
+            workspaceContext.activeWorkspaceId,
+            workspaceContext.activeWorkspace.stateRoot,
+          )?.owner ?? null
         : null;
       return {
         workspaceRoot: options.workspaceRoot,

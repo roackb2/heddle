@@ -100,10 +100,25 @@ export function createWorkspaceDescriptor(options: {
   repoRoots?: string[];
   nextId?: string;
   setActive?: boolean;
+  workspaceStateRoot?: string;
 }): ResolvedWorkspaceContext {
   const resolved = resolveWorkspaceContext(options);
   const now = new Date().toISOString();
   const anchorRoot = resolve(options.anchorRoot);
+  const workspaceStateRoot = resolve(options.workspaceStateRoot ?? join(anchorRoot, basename(options.stateRoot)));
+  const existing = resolved.workspaces.find((workspace) => (
+    resolve(workspace.stateRoot) === workspaceStateRoot || resolve(workspace.anchorRoot) === anchorRoot
+  ));
+  if (existing) {
+    const nextCatalog: WorkspaceCatalog = {
+      ...resolved.catalog,
+      activeWorkspaceId: options.setActive === false ? resolved.activeWorkspaceId : existing.id,
+      workspaces: resolved.workspaces,
+    };
+    saveWorkspaceCatalog(resolved.catalogPath, nextCatalog);
+    return resolveWorkspaceContext(options);
+  }
+
   const repoRoots =
     options.repoRoots && options.repoRoots.length > 0 ?
       options.repoRoots.map((root) => resolve(root))
@@ -113,7 +128,7 @@ export function createWorkspaceDescriptor(options: {
     name: options.name.trim() || deriveDefaultWorkspaceName(anchorRoot),
     anchorRoot,
     repoRoots,
-    stateRoot: resolve(options.stateRoot),
+    stateRoot: workspaceStateRoot,
     createdAt: now,
     updatedAt: now,
   };
@@ -191,6 +206,7 @@ function normalizeWorkspaceDescriptor(
 ): WorkspaceDescriptor {
   const now = new Date().toISOString();
   const anchorRoot = resolve(workspace.anchorRoot ?? options.workspaceRoot);
+  const stateRoot = resolve(workspace.stateRoot ?? join(anchorRoot, basename(options.stateRoot)));
   const repoRoots =
     Array.isArray(workspace.repoRoots) && workspace.repoRoots.length > 0 ?
       workspace.repoRoots.map((root) => resolve(root))
@@ -204,7 +220,7 @@ function normalizeWorkspaceDescriptor(
       : deriveDefaultWorkspaceName(anchorRoot),
     anchorRoot,
     repoRoots,
-    stateRoot: resolve(workspace.stateRoot ?? options.stateRoot),
+    stateRoot,
     createdAt: workspace.createdAt ?? now,
     updatedAt: workspace.updatedAt ?? now,
   };

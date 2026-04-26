@@ -53,7 +53,7 @@ export function upsertDaemonWorkspaceRegistration(options: {
   const registry = readDaemonRegistry(options.registryPath);
   const now = options.owner.lastSeenAt ?? new Date().toISOString();
   const nextRecords = new Map(
-    registry.workspaces.map((record) => [record.workspace.id, record] as const),
+    registry.workspaces.map((record) => [workspaceRecordKey(record.workspace), record] as const),
   );
 
   for (const workspace of options.workspaces) {
@@ -79,16 +79,19 @@ export function upsertDaemonWorkspaceRegistration(options: {
 export function clearDaemonWorkspaceRegistration(options: {
   registryPath: string;
   workspaceIds: string[];
+  stateRoots?: string[];
   ownerId: string;
 }): DaemonRegistry {
   const registry = readDaemonRegistry(options.registryPath);
   const targetIds = new Set(options.workspaceIds);
+  const targetStateRoots = new Set((options.stateRoots ?? []).map((stateRoot) => resolve(stateRoot)));
   const now = new Date().toISOString();
   const nextRegistry: DaemonRegistry = {
     version: 1,
     updatedAt: now,
     workspaces: registry.workspaces.map((record) => {
-      if (!targetIds.has(record.workspace.id) || record.owner?.ownerId !== options.ownerId) {
+      const matchesWorkspace = targetIds.has(record.workspace.id) || targetStateRoots.has(resolve(record.workspace.stateRoot));
+      if (!matchesWorkspace || record.owner?.ownerId !== options.ownerId) {
         return record;
       }
 
@@ -106,9 +109,42 @@ export function clearDaemonWorkspaceRegistration(options: {
 export function readDaemonWorkspaceRegistration(
   registryPath: string,
   workspaceId: string,
+  stateRoot?: string,
 ): RegisteredWorkspaceRecord | null {
   const registry = readDaemonRegistry(registryPath);
-  return registry.workspaces.find((record) => record.workspace.id === workspaceId) ?? null;
+  const normalizedStateRoot = stateRoot ? resolve(stateRoot) : undefined;
+  return registry.workspaces.find((record) => (
+    normalizedStateRoot ? resolve(record.workspace.stateRoot) === normalizedStateRoot : record.workspace.id === workspaceId
+  )) ?? null;
+}
+
+export function registerKnownWorkspaces(options: {
+  registryPath?: string;
+  workspaces: WorkspaceDescriptor[];
+}): DaemonRegistry {
+  const registryPath = options.registryPath ?? resolveDaemonRegistryPath();
+  const registry = readDaemonRegistry(registryPath);
+  const now = new Date().toISOString();
+  const nextRecords = new Map(
+    registry.workspaces.map((record) => [workspaceRecordKey(record.workspace), record] as const),
+  );
+
+  for (const workspace of options.workspaces) {
+    const existing = nextRecords.get(workspaceRecordKey(workspace));
+    nextRecords.set(workspaceRecordKey(workspace), {
+      workspace,
+      owner: existing?.owner,
+      updatedAt: now,
+    });
+  }
+
+  const nextRegistry: DaemonRegistry = {
+    version: 1,
+    updatedAt: now,
+    workspaces: Array.from(nextRecords.values()),
+  };
+  saveDaemonRegistry(registryPath, nextRegistry);
+  return nextRegistry;
 }
 
 function createEmptyDaemonRegistry(): DaemonRegistry {
@@ -144,6 +180,10 @@ function normalizeWorkspaceRecord(record: Partial<RegisteredWorkspaceRecord>): R
         record.updatedAt
       : new Date().toISOString(),
   }];
+}
+
+function workspaceRecordKey(workspace: WorkspaceDescriptor): string {
+  return resolve(workspace.stateRoot);
 }
 
 function normalizeOwnerRecord(owner: unknown): DaemonOwnerRecord | undefined {

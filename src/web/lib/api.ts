@@ -20,6 +20,7 @@ export type SessionContinueResult = RouterOutputs['controlPlane']['sessionContin
 export type PendingSessionApproval = RouterOutputs['controlPlane']['sessionPendingApproval'];
 export type SessionRunningState = RouterOutputs['controlPlane']['sessionRunning'];
 export type WorkspaceFileSuggestion = RouterOutputs['controlPlane']['workspaceFileSearch']['files'][number];
+export type WorkspaceDirectoryListing = RouterOutputs['controlPlane']['workspaceBrowse'];
 export type ModelOptions = RouterOutputs['controlPlane']['modelOptions'];
 export type SavedLayoutSnapshot = RouterOutputs['controlPlane']['layoutSnapshotSave'];
 export type HeartbeatTaskMutationResult = RouterOutputs['controlPlane']['heartbeatTaskEnable'];
@@ -83,6 +84,10 @@ export async function resolvePendingSessionApproval(
 export async function fetchWorkspaceFileSuggestions(query: string): Promise<WorkspaceFileSuggestion[]> {
   const result = await trpc.controlPlane.workspaceFileSearch.query({ query, limit: 20 });
   return result.files;
+}
+
+export async function browseWorkspaceDirectories(path?: string, includeHidden = false): Promise<WorkspaceDirectoryListing> {
+  return await trpc.controlPlane.workspaceBrowse.query(path ? { path, limit: 100, includeHidden } : { limit: 100, includeHidden });
 }
 
 export async function saveLayoutSnapshot(snapshot: unknown): Promise<SavedLayoutSnapshot> {

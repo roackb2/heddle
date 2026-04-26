@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   clearDaemonWorkspaceRegistration,
   readDaemonWorkspaceRegistration,
+  registerKnownWorkspaces,
   resolveDaemonRegistryPath,
   upsertDaemonWorkspaceRegistration,
 } from '../core/runtime/daemon-registry.js';
@@ -84,5 +85,20 @@ describe('daemon registry', () => {
       ownerId: 'daemon-1',
     });
     expect(readDaemonWorkspaceRegistration(registryPath, 'default')?.owner).toBeUndefined();
+  });
+
+  it('keeps default-id workspaces distinct by state root', () => {
+    const firstRoot = mkdtempSync(join(tmpdir(), 'heddle-daemon-registry-first-'));
+    const secondRoot = mkdtempSync(join(tmpdir(), 'heddle-daemon-registry-second-'));
+    const registryPath = resolveDaemonRegistryPath(mkdtempSync(join(tmpdir(), 'heddle-daemon-registry-global-home-')));
+    const firstCatalog = ensureWorkspaceCatalog({ workspaceRoot: firstRoot, stateRoot: join(firstRoot, '.heddle') });
+    const secondCatalog = ensureWorkspaceCatalog({ workspaceRoot: secondRoot, stateRoot: join(secondRoot, '.heddle') });
+
+    registerKnownWorkspaces({ registryPath, workspaces: firstCatalog.workspaces });
+    const registry = registerKnownWorkspaces({ registryPath, workspaces: secondCatalog.workspaces });
+
+    expect(registry.workspaces).toHaveLength(2);
+    expect(readDaemonWorkspaceRegistration(registryPath, 'default', join(firstRoot, '.heddle'))?.workspace.anchorRoot).toBe(firstRoot);
+    expect(readDaemonWorkspaceRegistration(registryPath, 'default', join(secondRoot, '.heddle'))?.workspace.anchorRoot).toBe(secondRoot);
   });
 });
