@@ -15,6 +15,7 @@ import {
 } from '../../../lib/api';
 import { formatDate, formatNumber, className } from '../utils';
 import { CodeBlock, EmptyState, Pill, SideSection, WorkspaceSectionHeader } from '../components/common';
+import { DiffViewer } from '../components/DiffViewer';
 import { CommandList, SessionListButton, TurnListButton } from '../components/lists';
 import { ConversationMessage } from '../components/ConversationMessage';
 import { MobileChatScreen } from '../mobile/MobileChatScreen';
@@ -829,7 +830,7 @@ export function SessionsScreen({
                           <p className="muted">The selected file also has trace-backed turn evidence, but the current Git patch is different. Review this section as live workspace state, not historical turn evidence.</p>
                         </div>
                       : null}
-                      <CodeBlock>{workspaceFileDiff.patch}</CodeBlock>
+                      <DiffViewer diff={workspaceFileDiff.diff} patch={workspaceFileDiff.patch} fallbackTitle="Raw workspace patch" />
                     </>
                   : <EmptyState title="No patch available" body="Git reports this file as changed, but no patch text is available for it." />}
                 </div>
@@ -863,7 +864,7 @@ export function SessionsScreen({
                     ))}
                   </div>
                   {selectedReviewFile?.patch ?
-                    <CodeBlock>{selectedReviewFile.patch}</CodeBlock>
+                    <DiffViewer diff={selectedReviewFile.diff} patch={selectedReviewFile.patch} fallbackTitle="Raw turn patch" />
                   : <EmptyState title="No patch captured" body="This file was changed, but the turn did not capture patch text for it." />}
                 </div>
               : turnReview?.diffExcerpt ?

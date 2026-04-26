@@ -3,6 +3,7 @@ import type { DaemonOwnerRecord } from '../../../core/runtime/daemon-registry.js
 import type { HeartbeatRunView, HeartbeatTaskView } from '../../../core/runtime/heartbeat-views.js';
 import type { WorkspaceDescriptor } from '../../../core/runtime/workspaces.js';
 import type { MemoryStatusView } from '../../../core/memory/visibility.js';
+import type { ReviewDiffFile } from '../../../core/review/diff-domain.js';
 
 export type ChatSessionView = {
   id: string;
@@ -82,6 +83,7 @@ export type ChangedFileReviewView = {
   status: 'added' | 'modified' | 'deleted' | 'renamed' | 'unknown';
   source: 'edit_file' | 'git_diff';
   patch?: string;
+  diff?: ReviewDiffFile;
   truncated?: boolean;
 };
 
@@ -107,6 +109,7 @@ export type WorkspaceFileDiffView = {
   vcs: 'git' | 'none';
   path: string;
   patch?: string;
+  diff?: ReviewDiffFile;
   binary?: boolean;
   truncated?: boolean;
   error?: string;

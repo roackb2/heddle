@@ -622,6 +622,7 @@ function projectEditFileReview(output: Record<string, unknown> | undefined): Cha
     status: statusFromEditAction(readString(output.action)),
     source: 'edit_file',
     patch,
+    diff: patch ? parseUnifiedDiffFiles(patch).find((file) => file.path === path || file.oldPath === path) : undefined,
     truncated: readBoolean(diff?.truncated),
   };
 }
@@ -644,6 +645,7 @@ function parseGitDiffFiles(diff: string): ChangedFileReviewView[] {
     status: file.status === 'copied' ? 'modified' : file.status,
     source: 'git_diff' as const,
     patch: normalizeCommandText(file.patch),
+    diff: file,
     truncated: file.binary === true,
   }));
 }

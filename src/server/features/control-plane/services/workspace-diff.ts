@@ -117,6 +117,7 @@ export async function readWorkspaceFileDiff(workspaceRoot: string, path: string)
     vcs: 'git',
     path: scopedPath.path,
     patch: truncated?.patch,
+    diff: truncated?.truncated ? undefined : parsedFile,
     truncated: truncated?.truncated,
     binary: parsedFile?.binary ?? /Binary files .* differ/.test(patch),
   };
