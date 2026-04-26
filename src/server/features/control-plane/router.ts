@@ -31,7 +31,7 @@ import {
 } from './services/memory.js';
 import { saveControlPlaneLayoutSnapshot } from './services/layout-snapshots.js';
 import { browseWorkspaceDirectories, searchWorkspaceFiles } from './services/workspace-files.js';
-import { createWorkspaceDescriptor, setActiveWorkspace } from '../../../core/runtime/workspaces.js';
+import { createWorkspaceDescriptor, renameWorkspaceDescriptor, setActiveWorkspace } from '../../../core/runtime/workspaces.js';
 
 const sessionInputSchema = z.object({
   id: z.string().min(1),
@@ -127,6 +127,11 @@ const workspaceCreateInputSchema = z.object({
   anchorRoot: z.string().min(1),
   repoRoots: z.array(z.string().min(1)).optional(),
   setActive: z.boolean().optional(),
+});
+
+const workspaceRenameInputSchema = z.object({
+  workspaceId: z.string().min(1),
+  name: z.string().min(1),
 });
 
 export const controlPlaneRouter = router({
@@ -310,6 +315,19 @@ export const controlPlaneRouter = router({
       anchorRoot: input.anchorRoot,
       repoRoots: input.repoRoots,
       setActive: input.setActive,
+    });
+    return {
+      activeWorkspaceId: resolved.activeWorkspaceId,
+      workspace: resolved.activeWorkspace,
+      workspaces: resolved.workspaces,
+    };
+  }),
+  workspaceRename: procedure.input(workspaceRenameInputSchema).mutation(({ ctx, input }) => {
+    const resolved = renameWorkspaceDescriptor({
+      workspaceRoot: ctx.workspaceRoot,
+      stateRoot: ctx.stateRoot,
+      workspaceId: input.workspaceId,
+      name: input.name,
     });
     return {
       activeWorkspaceId: resolved.activeWorkspaceId,

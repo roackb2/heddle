@@ -119,6 +119,10 @@ export async function createWorkspace(input: {
   return await trpc.controlPlane.workspaceCreate.mutate(input);
 }
 
+export async function renameWorkspace(workspaceId: string, name: string): Promise<WorkspaceMutationResult> {
+  return await trpc.controlPlane.workspaceRename.mutate({ workspaceId, name });
+}
+
 type SessionEventEnvelope = {
   type: string;
   sessionId: string;

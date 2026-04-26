@@ -1,19 +1,24 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import './control-plane.css';
-import { saveLayoutSnapshot, type ControlPlaneState } from '../../lib/api';
-import { captureControlPlaneLayoutSnapshot, type ScreenshotMode } from '../../lib/debug/layoutSnapshot';
+import type { ControlPlaneState } from '../../lib/api';
+import type { ScreenshotMode } from '../../lib/debug/layoutSnapshot';
 import { useControlPlaneState } from './hooks/useControlPlaneState';
+import { useControlPlaneRouting } from './hooks/useControlPlaneRouting';
+import { useDebugSnapshot } from './hooks/useDebugSnapshot';
 import { useHeartbeatWorkspace } from './hooks/useHeartbeatWorkspace';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useSessionWorkspace } from './hooks/useSessionWorkspace';
-import { Panel, RuntimeHostStrip, StatusBadge, TabButton, WorkspacePathLabel, WorkspaceSwitcher } from './components/common';
-import { projectRuntimeHostSurface } from './host-surface';
+import { useWorkspaceActions } from './hooks/useWorkspaceActions';
+import { Panel } from './components/common';
+import { ControlPlaneDesktopShell } from './components/ControlPlaneDesktopShell';
 import { HeartbeatWorkspace } from './components/HeartbeatWorkspace';
 import { OverviewView } from './components/OverviewView';
 import { SessionsWorkspace } from './components/SessionsWorkspace';
+import { WorkspaceManagementView } from './components/WorkspaceManagementView';
 import { MobileControlPlaneShell, type ControlPlaneTab } from './mobile/MobileControlPlaneShell';
 import { Toaster } from '../../components/ui/toaster';
 import { useToast } from '../../components/ui/use-toast';
+import { useControlPlaneUiStore } from './state/controlPlaneUiStore';
 
 type Tab = ControlPlaneTab;
 
@@ -24,99 +29,46 @@ declare global {
 }
 
 export function ControlPlaneApp() {
-  const [tab, setTab] = useState<Tab>('sessions');
-  const { state, error, refresh, setActiveWorkspace, createWorkspace } = useControlPlaneState();
+  const routing = useControlPlaneRouting();
+  const { state, error, refresh, setActiveWorkspace, createWorkspace, renameWorkspace } = useControlPlaneState();
   const { toasts, toast: notifyToast } = useToast();
+  const inspectorTab = useControlPlaneUiStore((store) => store.inspectorTab);
+  const setInspectorTab = useControlPlaneUiStore((store) => store.setInspectorTab);
   const isMobile = useIsMobile();
-  const host = projectRuntimeHostSurface(state);
-  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
-  const refreshControlPlaneState = useCallback(() => {
+  const refreshControlPlaneState = () => {
     void refresh();
-  }, [refresh]);
-  const sessionWorkspace = useSessionWorkspace(state?.sessions, notifyToast, refreshControlPlaneState);
+  };
+  const sessionWorkspace = useSessionWorkspace(state?.sessions, notifyToast, refreshControlPlaneState, {
+    selectedSessionId: routing.routeSessionId,
+    onSelectedSessionIdChange: routing.setRouteSessionId,
+    inspectorTab,
+    onInspectorTabChange: setInspectorTab,
+    autoSelectSession: routing.tab === 'sessions',
+  });
   const heartbeatWorkspace = useHeartbeatWorkspace(
     state?.heartbeat.tasks,
     state?.heartbeat.runs,
     notifyToast,
     refreshControlPlaneState,
   );
-  const captureDebugSnapshot = useCallback(async (screenshot: ScreenshotMode) => {
-    let snapshot: Awaited<ReturnType<typeof captureControlPlaneLayoutSnapshot>> | undefined;
-    try {
-      snapshot = await captureControlPlaneLayoutSnapshot({
-        screenshot,
-        context: {
-          activeTab: tab,
-          selectedSessionId: sessionWorkspace.selectedSessionId,
-          selectedTurnId: sessionWorkspace.selectedTurnId,
-          runActive: sessionWorkspace.sendingPrompt || sessionWorkspace.runInFlight,
-          pendingApproval: sessionWorkspace.pendingApproval,
-          selectedModel: sessionWorkspace.sessionDetail?.model ?? sessionWorkspace.activeSession?.model,
-          driftEnabled: sessionWorkspace.sessionDetail?.driftEnabled ?? sessionWorkspace.activeSession?.driftEnabled,
-          driftLevel: sessionWorkspace.sessionDetail?.driftLevel ?? sessionWorkspace.activeSession?.driftLevel,
-          toastCount: toasts.length,
-          latestToasts: toasts.map((toast) => ({ title: toast.title, tone: toast.tone })),
-          errors: [error, sessionWorkspace.sessionDetailError, sessionWorkspace.sendPromptError, sessionWorkspace.turnReviewError]
-            .filter((candidate): candidate is string => Boolean(candidate)),
-        },
-      });
-      const saved = await saveLayoutSnapshot(snapshot);
-      notifyToast({
-        title: 'Layout snapshot saved',
-        body: saved.screenshotPath ? `${saved.jsonPath}\n${saved.screenshotPath}` : saved.jsonPath,
-        tone: 'success',
-      });
-    } catch (snapshotError) {
-      const message = snapshotError instanceof Error ? snapshotError.message : String(snapshotError);
-      if (snapshot) {
-        downloadLayoutSnapshot(snapshot);
-      }
-      notifyToast({
-        title: snapshot ? 'Layout snapshot downloaded' : 'Layout snapshot failed',
-        body: snapshot ? `Server save failed, downloaded locally. ${message}` : message,
-        tone: snapshot ? 'info' : 'error',
-      });
-    }
-  }, [error, notifyToast, sessionWorkspace, tab, toasts]);
-  const switchWorkspace = useCallback(async (workspaceId: string) => {
-    try {
-      await setActiveWorkspace(workspaceId);
-      notifyToast({
-        title: 'Workspace switched',
-        body: state?.workspaces.find((workspace) => workspace.id === workspaceId)?.name ?? workspaceId,
-        tone: 'success',
-      });
-    } catch (switchError) {
-      notifyToast({
-        title: 'Workspace switch failed',
-        body: switchError instanceof Error ? switchError.message : String(switchError),
-        tone: 'error',
-      });
-    }
-  }, [notifyToast, setActiveWorkspace, state?.workspaces]);
-  const handleCreateWorkspace = useCallback(async (input: {
-    name: string;
-    anchorRoot: string;
-    setActive: boolean;
-  }) => {
-    setCreatingWorkspace(true);
-    try {
-      await createWorkspace(input);
-      notifyToast({
-        title: 'Workspace created',
-        body: input.name,
-        tone: 'success',
-      });
-    } catch (createError) {
-      notifyToast({
-        title: 'Workspace creation failed',
-        body: createError instanceof Error ? createError.message : String(createError),
-        tone: 'error',
-      });
-    } finally {
-      setCreatingWorkspace(false);
-    }
-  }, [createWorkspace, notifyToast]);
+  const workspaceActions = useWorkspaceActions({
+    state,
+    setActiveWorkspace,
+    createWorkspace,
+    renameWorkspace,
+    notify: notifyToast,
+  });
+  const captureDebugSnapshot = useDebugSnapshot({
+    tab: routing.tab,
+    sessionWorkspace,
+    error,
+    toasts,
+    notify: notifyToast,
+  });
+
+  useEffect(() => {
+    routing.normalizeRoute();
+  }, [routing]);
 
   useEffect(() => {
     window.__HEDDLE_CAPTURE_LAYOUT_SNAPSHOT = async (options) => {
@@ -144,45 +96,21 @@ export function ControlPlaneApp() {
     };
   }, [captureDebugSnapshot]);
 
-  const sectionTabs = (
-    <>
-      <TabButton active={tab === 'overview'} onClick={() => setTab('overview')}>Overview</TabButton>
-      <TabButton active={tab === 'sessions'} onClick={() => setTab('sessions')}>Sessions</TabButton>
-      <TabButton active={tab === 'heartbeat'} onClick={() => setTab('heartbeat')}>Tasks</TabButton>
-    </>
-  );
-  const debugSnapshotMenu = (
-    <details className="debug-snapshot-menu">
-      <summary className="debug-button">Snapshot</summary>
-      <div className="debug-snapshot-options" role="menu" aria-label="Debug layout snapshot options">
-        <button type="button" role="menuitem" onClick={() => void captureDebugSnapshot('none')}>
-          DOM + layout only
-        </button>
-        <button type="button" role="menuitem" onClick={() => void captureDebugSnapshot('auto')}>
-          Include screenshot
-        </button>
-      </div>
-    </details>
-  );
-
   const activeContent = !state ?
     <Panel title="Loading state">
       <p className="muted">{error ?? 'Reading local Heddle state...'}</p>
     </Panel>
-  : renderActiveTab(tab, state, sessionWorkspace, heartbeatWorkspace, {
-      creatingWorkspace,
-      onCreateWorkspace: handleCreateWorkspace,
-    });
+  : renderActiveTab(routing.tab, state, sessionWorkspace, heartbeatWorkspace, workspaceActions);
 
   if (isMobile) {
     return (
       <>
         <MobileControlPlaneShell
-          tab={tab}
-          onTabChange={setTab}
+          tab={routing.tab}
+          onTabChange={routing.setTab}
           state={state}
           error={error}
-          onSetActiveWorkspace={(workspaceId) => void switchWorkspace(workspaceId)}
+          onSetActiveWorkspace={(workspaceId) => void workspaceActions.switchWorkspace(workspaceId)}
           onCaptureDebugSnapshot={(screenshot) => void captureDebugSnapshot(screenshot)}
           onRefresh={() => void refresh()}
         >
@@ -194,61 +122,21 @@ export function ControlPlaneApp() {
   }
 
   return (
-    <main className="app-shell">
-      <header className="toolbar">
-        <nav className="tabs toolbar-tabs" aria-label="Control plane sections">
-          {sectionTabs}
-        </nav>
-        <div className="toolbar-status">
-          <div className="toolbar-actions">
-            {debugSnapshotMenu}
-          </div>
-          <div className="topbar-title-row">
-            <p className="topbar-eyebrow">Heddle Control Plane</p>
-            <WorkspaceSwitcher state={state} onSelect={(workspaceId) => void switchWorkspace(workspaceId)} />
-            <WorkspacePathLabel state={state} />
-          </div>
-          <StatusBadge error={error} state={state} />
-        </div>
-      </header>
-
-      {(error || host.state === 'stale') ? <RuntimeHostStrip state={state} onRefresh={() => void refresh()} /> : null}
-      {activeContent}
+    <>
+      <ControlPlaneDesktopShell
+        activeTab={routing.tab}
+        sessionPath={routing.routeSessionId ? `/sessions/${encodeURIComponent(routing.routeSessionId)}` : '/sessions'}
+        state={state}
+        error={error}
+        onSetActiveWorkspace={(workspaceId) => void workspaceActions.switchWorkspace(workspaceId)}
+        onCaptureDebugSnapshot={(screenshot) => void captureDebugSnapshot(screenshot)}
+        onRefresh={() => void refresh()}
+      >
+        {activeContent}
+      </ControlPlaneDesktopShell>
       <Toaster />
-    </main>
+    </>
   );
-}
-
-function downloadLayoutSnapshot(snapshot: Awaited<ReturnType<typeof captureControlPlaneLayoutSnapshot>>) {
-  const timestamp = snapshot.capturedAt.replaceAll(':', '-');
-  const prefix = `${timestamp}-${snapshot.appState.activeTab}`;
-  downloadTextFile(`${prefix}.json`, `${JSON.stringify(snapshot, null, 2)}\n`, 'application/json');
-  if (snapshot.screenshot.status === 'captured') {
-    downloadDataUrl(`${prefix}.png`, snapshot.screenshot.dataUrl);
-  }
-}
-
-function downloadTextFile(filename: string, content: string, type: string) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  try {
-    downloadUrl(filename, url);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-function downloadDataUrl(filename: string, dataUrl: string) {
-  downloadUrl(filename, dataUrl);
-}
-
-function downloadUrl(filename: string, url: string) {
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.append(link);
-  link.click();
-  link.remove();
 }
 
 function renderActiveTab(
@@ -256,19 +144,10 @@ function renderActiveTab(
   state: ControlPlaneState,
   sessionWorkspace: ReturnType<typeof useSessionWorkspace>,
   heartbeatWorkspace: ReturnType<typeof useHeartbeatWorkspace>,
-  options: {
-    creatingWorkspace: boolean;
-    onCreateWorkspace: (input: { name: string; anchorRoot: string; setActive: boolean }) => Promise<void>;
-  },
+  workspaceActions: ReturnType<typeof useWorkspaceActions>,
 ) {
   if (tab === 'overview') {
-    return (
-      <OverviewView
-        state={state}
-        creatingWorkspace={options.creatingWorkspace}
-        onCreateWorkspace={options.onCreateWorkspace}
-      />
-    );
+    return <OverviewView state={state} />;
   }
 
   if (tab === 'sessions') {
@@ -302,6 +181,19 @@ function renderActiveTab(
         onResolveApproval={sessionWorkspace.resolveApproval}
         inspectorTab={sessionWorkspace.inspectorTab}
         onInspectorTabChange={sessionWorkspace.setInspectorTab}
+      />
+    );
+  }
+
+  if (tab === 'workspaces') {
+    return (
+      <WorkspaceManagementView
+        state={state}
+        creatingWorkspace={workspaceActions.creatingWorkspace}
+        renamingWorkspaceId={workspaceActions.renamingWorkspaceId}
+        onCreateWorkspace={workspaceActions.createWorkspace}
+        onRenameWorkspace={workspaceActions.renameWorkspace}
+        onSetActiveWorkspace={(workspaceId) => void workspaceActions.switchWorkspace(workspaceId)}
       />
     );
   }

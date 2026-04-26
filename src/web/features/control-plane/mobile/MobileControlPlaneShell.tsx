@@ -5,7 +5,7 @@ import { Button } from '../../../components/ui/button';
 import { shortPath } from '../utils';
 import { projectRuntimeHostSurface } from '../host-surface';
 
-export type ControlPlaneTab = 'overview' | 'sessions' | 'heartbeat';
+export type ControlPlaneTab = 'overview' | 'sessions' | 'heartbeat' | 'workspaces';
 
 type MobileControlPlaneShellProps = {
   tab: ControlPlaneTab;
@@ -21,6 +21,7 @@ type MobileControlPlaneShellProps = {
 const tabs: Array<{ value: ControlPlaneTab; label: string }> = [
   { value: 'sessions', label: 'Sessions' },
   { value: 'heartbeat', label: 'Tasks' },
+  { value: 'workspaces', label: 'Workspaces' },
   { value: 'overview', label: 'Overview' },
 ];
 
@@ -90,7 +91,7 @@ export function MobileControlPlaneShell({
       </section>
 
       <nav
-        className="grid shrink-0 grid-cols-3 gap-1 border-t border-border bg-card/95 px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
+        className="grid shrink-0 grid-cols-4 gap-1 border-t border-border bg-card/95 px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
         aria-label="Control plane sections"
       >
         {tabs.map((item) => (

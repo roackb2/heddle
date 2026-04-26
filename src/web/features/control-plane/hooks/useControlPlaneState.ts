@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createWorkspace as createWorkspaceRequest,
   fetchControlPlaneState,
+  renameWorkspace as renameWorkspaceRequest,
   setActiveWorkspace as setActiveWorkspaceRequest,
   type ControlPlaneState,
 } from '../../../lib/api';
@@ -40,6 +41,11 @@ export function useControlPlaneState() {
     await refresh();
   }, [refresh]);
 
+  const renameWorkspace = useCallback(async (workspaceId: string, name: string) => {
+    await renameWorkspaceRequest(workspaceId, name);
+    await refresh();
+  }, [refresh]);
+
   useEffect(() => {
     let active = true;
 
@@ -74,5 +80,6 @@ export function useControlPlaneState() {
     refresh,
     setActiveWorkspace,
     createWorkspace,
+    renameWorkspace,
   };
 }

@@ -92,6 +92,32 @@ export function setActiveWorkspace(options: {
   return resolveWorkspaceContext(options);
 }
 
+export function renameWorkspaceDescriptor(options: {
+  workspaceRoot: string;
+  stateRoot: string;
+  workspaceId: string;
+  name: string;
+}): ResolvedWorkspaceContext {
+  const resolved = resolveWorkspaceContext(options);
+  const name = options.name.trim();
+  if (!name) {
+    throw new Error('Workspace name is required.');
+  }
+  if (!resolved.workspaces.some((workspace) => workspace.id === options.workspaceId)) {
+    throw new Error(`Workspace not found: ${options.workspaceId}`);
+  }
+
+  const now = new Date().toISOString();
+  const nextCatalog: WorkspaceCatalog = {
+    ...resolved.catalog,
+    workspaces: resolved.workspaces.map((workspace) => (
+      workspace.id === options.workspaceId ? { ...workspace, name, updatedAt: now } : workspace
+    )),
+  };
+  saveWorkspaceCatalog(resolved.catalogPath, nextCatalog);
+  return resolveWorkspaceContext(options);
+}
+
 export function createWorkspaceDescriptor(options: {
   workspaceRoot: string;
   stateRoot: string;

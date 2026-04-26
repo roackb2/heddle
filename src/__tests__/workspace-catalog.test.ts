@@ -7,6 +7,7 @@ import {
   createWorkspaceDescriptor,
   DEFAULT_WORKSPACE_ID,
   ensureWorkspaceCatalog,
+  renameWorkspaceDescriptor,
   resolveWorkspaceCatalogPath,
   setActiveWorkspace,
 } from '../core/runtime/workspaces.js';
@@ -113,6 +114,22 @@ describe('workspace catalog', () => {
     });
   });
 
+  it('can rename a workspace', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-rename-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
+
+    const renamed = renameWorkspaceDescriptor({
+      workspaceRoot,
+      stateRoot,
+      workspaceId: DEFAULT_WORKSPACE_ID,
+      name: 'Primary workspace',
+    });
+
+    expect(renamed.activeWorkspace.name).toBe('Primary workspace');
+    expect(renamed.workspaces[0]?.name).toBe('Primary workspace');
+  });
+
   it('exposes router mutations for workspace create and switch', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-router-mutations-'));
     const stateRoot = join(workspaceRoot, '.heddle');
@@ -147,6 +164,9 @@ describe('workspace catalog', () => {
     const switched = await caller.workspaceSetActive({ workspaceId: DEFAULT_WORKSPACE_ID });
     expect(switched.activeWorkspaceId).toBe(DEFAULT_WORKSPACE_ID);
     expect(switched.workspace.id).toBe(DEFAULT_WORKSPACE_ID);
+
+    const renamed = await caller.workspaceRename({ workspaceId: DEFAULT_WORKSPACE_ID, name: 'Renamed default' });
+    expect(renamed.workspace.name).toBe('Renamed default');
   });
 
   it('exposes known workspaces from the user-level registry', async () => {

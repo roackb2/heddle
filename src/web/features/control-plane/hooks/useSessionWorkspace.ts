@@ -57,10 +57,17 @@ export function useSessionWorkspace(
   sessions: ControlPlaneState['sessions'] | undefined,
   notify?: (toast: ToastInput) => void,
   onSessionsChanged?: () => void,
+  options?: {
+    selectedSessionId?: string;
+    onSelectedSessionIdChange?: (sessionId?: string) => void;
+    inspectorTab?: InspectorTab;
+    onInspectorTabChange?: (tab: InspectorTab) => void;
+    autoSelectSession?: boolean;
+  },
 ): SessionWorkspaceState {
-  const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>();
+  const [internalSelectedSessionId, setInternalSelectedSessionId] = useState<string | undefined>();
   const [selectedTurnId, setSelectedTurnId] = useState<string | undefined>();
-  const [inspectorTab, setInspectorTab] = useState<InspectorTab>('review');
+  const [internalInspectorTab, setInternalInspectorTab] = useState<InspectorTab>('review');
   const [sessionDetail, setSessionDetail] = useState<ChatSessionDetail | null>(null);
   const [sessionDetailLoading, setSessionDetailLoading] = useState(false);
   const [sessionDetailError, setSessionDetailError] = useState<string | undefined>();
@@ -74,6 +81,11 @@ export function useSessionWorkspace(
   const [memoryUpdating, setMemoryUpdating] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
   const [sessionNotice, setSessionNotice] = useState<string | undefined>();
+  const selectedSessionId = options?.selectedSessionId ?? internalSelectedSessionId;
+  const setSelectedSessionId = options?.onSelectedSessionIdChange ?? setInternalSelectedSessionId;
+  const inspectorTab = options?.inspectorTab ?? internalInspectorTab;
+  const setInspectorTab = options?.onInspectorTabChange ?? setInternalInspectorTab;
+  const autoSelectSession = options?.autoSelectSession ?? true;
 
   const appendPendingUserTurn = useCallback((prompt: string) => {
     setSessionDetail((current) => {
@@ -182,6 +194,10 @@ export function useSessionWorkspace(
   }, []);
 
   useEffect(() => {
+    if (!autoSelectSession) {
+      return;
+    }
+
     if (!sessions?.length) {
       if (selectedSessionId && sessionDetail?.id === selectedSessionId) {
         return;
@@ -197,15 +213,14 @@ export function useSessionWorkspace(
     if (!selectedSessionId || !sessions.some((session) => session.id === selectedSessionId)) {
       setSelectedSessionId(sessions[0].id);
     }
-  }, [selectedSessionId, sessionDetail?.id, sessions]);
+  }, [autoSelectSession, selectedSessionId, sessionDetail?.id, sessions, setSelectedSessionId]);
 
   const selectSession = useCallback((sessionId: string) => {
     setSelectedSessionId(sessionId);
     setSelectedTurnId(undefined);
-    setInspectorTab('summary');
     setSessionNotice(undefined);
     setSendPromptError(undefined);
-  }, []);
+  }, [setSelectedSessionId]);
 
   useEffect(() => {
     if (!selectedSessionId) {
@@ -539,7 +554,7 @@ export function useSessionWorkspace(
     } finally {
       setCreatingSession(false);
     }
-  }, [notify]);
+  }, [notify, setSelectedSessionId]);
 
   const sendPrompt = useCallback(async (prompt: string) => {
     const trimmed = prompt.trim();
