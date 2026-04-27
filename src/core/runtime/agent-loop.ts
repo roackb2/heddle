@@ -7,7 +7,11 @@ import { runAgent } from '../agent/run-agent.js';
 import type { RunAgentOptions } from '../agent/run-agent.js';
 import type { RunResult, ToolCall, ToolDefinition, TraceEvent } from '../types.js';
 import { createLogger } from '../utils/logger.js';
-import { resolveApiKeyForModel } from './api-keys.js';
+import {
+  resolveApiKeyForModel,
+  resolveProviderCredentialSourceForModel,
+  type ProviderCredentialSource,
+} from './api-keys.js';
 import { createFinishedAgentLoopState, generateRunId, getHistoryFromAgentLoopCheckpoint, getHistoryFromAgentLoopState } from './events.js';
 import type { AgentLoopCheckpoint, AgentLoopEvent, AgentLoopState } from './events.js';
 
@@ -52,12 +56,17 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
   const provider = inferProviderFromModel(model);
   const workspaceRoot = resolve(options.workspaceRoot ?? process.cwd());
   const apiKey = options.apiKey ?? resolveApiKeyForModel(model);
+  const providerCredentialSource = resolveProviderCredentialSourceForModel(model, {
+    apiKey,
+    apiKeyProvider: options.apiKey ? 'explicit' : apiKey ? provider : undefined,
+  });
   const llm = options.llm ?? await createLoopLlmAdapter({ model, apiKey });
   const logger = options.logger ?? createLogger({ pretty: false, level: 'info', console: false });
   const tools = await resolveTools({
     ...options,
     model,
     apiKey,
+    providerCredentialSource,
     workspaceRoot,
   });
   const now = () => new Date().toISOString();
@@ -213,6 +222,7 @@ async function resolveTools(
   options: RunAgentLoopOptions & {
     model: string;
     apiKey?: string;
+    providerCredentialSource?: ProviderCredentialSource;
     workspaceRoot: string;
   },
 ): Promise<ToolDefinition[]> {
@@ -227,6 +237,7 @@ async function resolveTools(
     ...createDefaultAgentTools({
       model: options.model,
       apiKey: options.apiKey,
+      providerCredentialSource: options.providerCredentialSource,
       workspaceRoot: options.workspaceRoot,
       stateDir: options.stateDir,
       memoryDir: options.memoryDir,

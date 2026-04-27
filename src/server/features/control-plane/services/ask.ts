@@ -6,8 +6,7 @@ import {
   createLlmAdapter,
   createLogger,
   formatTraceForConsole,
-  inferProviderFromModel,
-  resolveProviderApiKey,
+  resolveApiKeyForModel,
   runAgentLoop,
   type RunResult,
 } from '../../../../index.js';
@@ -32,10 +31,12 @@ export type ControlPlaneAskResult = Pick<RunResult, 'outcome' | 'summary' | 'tra
 export async function runControlPlaneAsk(args: RunControlPlaneAskArgs): Promise<ControlPlaneAskResult> {
   const model = args.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
   const maxSteps = args.maxSteps ?? parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 100;
-  const provider = inferProviderFromModel(model);
   const logger = createLogger({ pretty: true, level: 'debug' });
   const memoryDir = join(args.stateRoot, 'memory');
-  const apiKey = args.apiKey ?? resolveProviderApiKey(provider);
+  const apiKey = resolveApiKeyForModel(model, {
+    apiKey: args.apiKey,
+    apiKeyProvider: args.apiKey ? 'explicit' : undefined,
+  });
   const llm = createLlmAdapter({ model, apiKey });
 
   const result = await runAgentLoop({

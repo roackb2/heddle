@@ -13,6 +13,15 @@ This page is a command lookup for the current Heddle CLI surface.
 
 - `heddle daemon`: start the browser control-plane daemon
 
+### Provider auth
+
+- `heddle auth status`: show stored provider credentials
+- `heddle auth login openai`: sign in with an OpenAI ChatGPT/Codex account
+- `heddle auth login openai --no-browser`: print the authorization URL without opening a browser
+- `heddle auth logout openai`: remove the stored OpenAI credential
+
+OpenAI account sign-in is experimental and user-selected. It is not official OpenAI support, and Heddle is not affiliated with, endorsed by, or sponsored by OpenAI. Anthropic currently uses API-key auth; Heddle does not support Anthropic consumer subscription OAuth.
+
 ### Heartbeat and scheduling
 
 - `heddle heartbeat start [--every 30m] [--task "<durable task>"]`: create or enable the default heartbeat task and run the foreground scheduler

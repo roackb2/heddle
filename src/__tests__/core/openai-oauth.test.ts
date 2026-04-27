@@ -14,7 +14,7 @@ import {
   refreshOpenAiOAuthToken,
   type OpenAiOAuthTokenResponse,
 } from '../../core/auth/openai-oauth.js';
-import { createOpenAiOAuthFetch } from '../../core/llm/openai.js';
+import { createOpenAiAdapter, createOpenAiOAuthFetch } from '../../core/llm/openai.js';
 
 describe('OpenAI OAuth helpers', () => {
   it('generates PKCE verifier and challenge values', () => {
@@ -136,6 +136,26 @@ describe('OpenAI OAuth helpers', () => {
     expect(requests[1]?.url).toBe(OPENAI_CODEX_RESPONSES_ENDPOINT);
     expect(requests[1]?.headers.get('authorization')).toBe('Bearer new-access-token');
     expect(requests[1]?.headers.get('ChatGPT-Account-Id')).toBe('account-123');
+  });
+
+  it('fails clearly for account sign-in with a model outside the known Codex set', async () => {
+    const adapter = createOpenAiAdapter({
+      model: 'o3',
+      credential: {
+        type: 'oauth',
+        provider: 'openai',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresAt: Date.now() + 60_000,
+        accountId: 'account-123',
+        createdAt: '2026-04-27T00:00:00.000Z',
+        updatedAt: '2026-04-27T00:00:00.000Z',
+      },
+    });
+
+    await expect(adapter.chat([{ role: 'user', content: 'hello' }], [])).rejects.toThrow(
+      'OpenAI account sign-in is not enabled for model o3.',
+    );
   });
 });
 

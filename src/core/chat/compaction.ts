@@ -1,6 +1,6 @@
 import type { ChatMessage, LlmAdapter, LlmUsage } from '../../index.js';
 import { createLlmAdapter, inferProviderFromModel } from '../../index.js';
-import { resolveApiKeyForModel } from '../runtime/api-keys.js';
+import { hasProviderCredentialForModel, resolveApiKeyForModel } from '../runtime/api-keys.js';
 import { estimateBuiltInContextWindow } from '../llm/openai-models.js';
 import type { ChatArchiveManifest, ChatArchiveRecord, ChatContextStats } from './types.js';
 import {
@@ -441,7 +441,10 @@ function resolveSummarizer(options: CompactChatHistoryWithArchiveOptions): { llm
       DEFAULT_ANTHROPIC_COMPACTION_MODEL
     : DEFAULT_OPENAI_COMPACTION_MODEL);
   const apiKey = options.summarizer?.apiKey ?? resolveApiKeyForModel(model);
-  if (!apiKey) {
+  if (!hasProviderCredentialForModel(model, {
+    apiKey,
+    apiKeyProvider: options.summarizer?.apiKey ? 'explicit' : apiKey ? provider : undefined,
+  })) {
     return { model };
   }
 

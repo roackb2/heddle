@@ -16,6 +16,7 @@ import type { ToolDefinition, ToolResult } from '../types.js';
 import { inferProviderFromModel } from '../llm/factory.js';
 import type { LlmProvider } from '../llm/types.js';
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../config.js';
+import type { ProviderCredentialSource } from '../runtime/api-keys.js';
 
 type WebSearchInput = {
   query: string;
@@ -26,6 +27,7 @@ export type WebSearchToolOptions = {
   model?: string;
   provider?: LlmProvider;
   apiKey?: string;
+  providerCredentialSource?: ProviderCredentialSource;
 };
 
 export const webSearchTool: ToolDefinition = createWebSearchTool();
@@ -85,6 +87,13 @@ export function createWebSearchTool(options: WebSearchToolOptions = {}): ToolDef
 }
 
 async function executeOpenAiWebSearch(input: WebSearchInput, options: WebSearchToolOptions): Promise<ToolResult> {
+  if (options.providerCredentialSource?.type === 'oauth') {
+    return {
+      ok: false,
+      error: 'web_search currently requires OpenAI Platform API-key mode. The active OpenAI credential is account sign-in; set OPENAI_API_KEY or pass an explicit API key to use hosted web search.',
+    };
+  }
+
   const apiKey = firstDefinedNonEmpty(options.apiKey, process.env.OPENAI_API_KEY, process.env.PERSONAL_OPENAI_API_KEY);
   if (!apiKey) {
     return {

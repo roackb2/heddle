@@ -72,8 +72,15 @@ export {
   getHistoryFromAgentLoopState,
 } from './core/runtime/events.js';
 export type { AgentLoopCheckpoint, AgentLoopState, AgentLoopStatus } from './core/runtime/events.js';
-export { hasProviderCredentialForModel, resolveApiKeyForModel, resolveOAuthCredentialForModel, resolveProviderApiKey } from './core/runtime/api-keys.js';
-export type { ApiKeyRuntime } from './core/runtime/api-keys.js';
+export {
+  formatMissingProviderCredentialMessage,
+  hasProviderCredentialForModel,
+  resolveApiKeyForModel,
+  resolveOAuthCredentialForModel,
+  resolveProviderApiKey,
+  resolveProviderCredentialSourceForModel,
+} from './core/runtime/api-keys.js';
+export type { ApiKeyRuntime, ProviderCredentialSource } from './core/runtime/api-keys.js';
 export { createDefaultAgentTools } from './core/runtime/default-tools.js';
 export type { DefaultAgentToolsOptions } from './core/runtime/default-tools.js';
 export { DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL } from './core/config.js';

@@ -61,6 +61,16 @@ export const OPENAI_MODEL_GROUPS: BuiltInModelGroup[] = BUILT_IN_MODEL_GROUPS.fi
 
 export const COMMON_BUILT_IN_MODELS = BUILT_IN_MODEL_GROUPS.flatMap((group) => group.models);
 export const COMMON_OPENAI_MODELS = OPENAI_MODEL_GROUPS.flatMap((group) => group.models);
+export const OPENAI_ACCOUNT_SIGN_IN_MODELS = [
+  'gpt-5.1-codex',
+  'gpt-5.1-codex-max',
+  'gpt-5.1-codex-mini',
+  'gpt-5.2',
+  'gpt-5.2-codex',
+  'gpt-5.3-codex',
+  'gpt-5.4',
+  'gpt-5.4-mini',
+];
 
 const BUILT_IN_CONTEXT_WINDOW_ESTIMATES = new Map<string, number>(
   COMMON_BUILT_IN_MODELS.map((model) => [model, inferContextWindowEstimate(model)]),
@@ -91,6 +101,10 @@ export function filterOpenAiModels(query: string): string[] {
   }
 
   return COMMON_OPENAI_MODELS.filter((model) => model.toLowerCase().includes(normalized));
+}
+
+export function isOpenAiAccountSignInModel(model: string): boolean {
+  return OPENAI_ACCOUNT_SIGN_IN_MODELS.includes(model.trim());
 }
 
 export function filterBuiltInModels(query: string): string[] {

@@ -5,9 +5,37 @@ Heddle currently has working provider adapters for:
 - OpenAI
 - Anthropic
 
-## Required Environment Variables
+## Provider Access
 
-Set at least one provider API key before running chat, one-shot tasks, or most examples:
+Configure access to at least one provider before running chat, one-shot tasks, or most examples.
+
+For OpenAI, Heddle supports two user-selected paths:
+
+- OpenAI account sign-in:
+
+```bash
+heddle auth login openai
+```
+
+- Platform API key:
+
+```bash
+export OPENAI_API_KEY=your_key_here
+```
+
+OpenAI account sign-in is experimental and uses the user's own ChatGPT/Codex account. It is not official OpenAI support, and Heddle is not affiliated with, endorsed by, or sponsored by OpenAI. API-key auth remains the stable OpenAI path.
+
+For Anthropic, use an API key:
+
+```bash
+export ANTHROPIC_API_KEY=your_key_here
+```
+
+Heddle does not support Anthropic consumer subscription OAuth. That path is intentionally deferred unless Anthropic documents or approves a third-party auth route.
+
+## Environment Variables
+
+Supported provider API-key environment variables:
 
 - `OPENAI_API_KEY` for OpenAI models
 - `ANTHROPIC_API_KEY` for Anthropic models
@@ -59,12 +87,46 @@ In chat, you can also use:
 - `/model set <query>`
 - `/model <name>`
 
+## Auth Commands
+
+Provider credential commands:
+
+```bash
+heddle auth status
+heddle auth login openai
+heddle auth logout openai
+```
+
+Inside terminal chat, the same auth surface is available as slash commands:
+
+- `/auth`
+- `/auth status`
+- `/auth login openai`
+- `/auth logout openai`
+
+The chat footer shows the active credential source for the selected model, such as `auth=openai-oauth`, `auth=openai-key`, or `auth=missing-openai`.
+
+## OpenAI Account Sign-In Model Support
+
+OpenAI account sign-in is routed through the ChatGPT/Codex transport path and is limited to models Heddle has explicitly allowed for that path:
+
+- `gpt-5.1-codex`
+- `gpt-5.1-codex-max`
+- `gpt-5.1-codex-mini`
+- `gpt-5.2`
+- `gpt-5.2-codex`
+- `gpt-5.3-codex`
+- `gpt-5.4`
+- `gpt-5.4-mini`
+
+Use `OPENAI_API_KEY` for other OpenAI Platform models or features that require Platform API-key mode.
+
 ## Notes
 
 - Provider selection is inferred from the model name prefix.
 - Gemini model names are recognized by provider inference, but a Google adapter is not wired yet.
 - You can pass another supported model name with `--model` if the relevant provider adapter can handle it.
-- Hosted web search availability depends on the selected provider/model path.
+- Hosted web search and image viewing currently require Platform API-key mode for OpenAI.
 
 ## See Also
 

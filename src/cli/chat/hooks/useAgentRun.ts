@@ -30,7 +30,12 @@ import {
   toLiveEvent,
 } from '../utils/format.js';
 import { saveTrace } from '../utils/runtime.js';
-import { hasProviderCredentialForModel, resolveApiKeyForModel } from '../utils/runtime.js';
+import {
+  formatMissingProviderCredentialMessage,
+  hasProviderCredentialForModel,
+  resolveApiKeyForModel,
+  resolveProviderCredentialSourceForModel,
+} from '../../../core/runtime/api-keys.js';
 import { acquireSessionLease, getSessionLeaseConflict, releaseSessionLease } from '../../../core/chat/session-lease.js';
 import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../state/approval-rules.js';
 import { buildCompactionRunningContext, compactChatHistoryWithArchive, estimateChatHistoryTokens } from '../state/compaction.js';
@@ -122,6 +127,10 @@ export function useAgentRun(args: UseAgentRunArgs) {
   const projectApprovals = useProjectApprovals(runtime.approvalsFile);
   const activeApiKey = resolveApiKeyForModel(activeModel, runtime);
   const titleApiKey = resolveApiKeyForModel(sessionTitleModel, runtime);
+  const activeCredentialSource = useMemo(
+    () => resolveProviderCredentialSourceForModel(activeModel, runtime),
+    [activeModel, runtime],
+  );
 
   const llm = useMemo(
     () => createLlmAdapter({ model: activeModel, apiKey: activeApiKey, credentialStorePath: runtime.credentialStorePath }),
@@ -136,13 +145,14 @@ export function useAgentRun(args: UseAgentRunArgs) {
       return createDefaultAgentTools({
         model: activeModel,
         apiKey: activeApiKey,
+        providerCredentialSource: activeCredentialSource,
         workspaceRoot: runtime.workspaceRoot,
         memoryDir: runtime.memoryDir,
         searchIgnoreDirs: runtime.searchIgnoreDirs,
         includePlanTool: true,
       });
     },
-    [activeApiKey, activeModel, runtime.memoryDir, runtime.searchIgnoreDirs, runtime.workspaceRoot],
+    [activeApiKey, activeCredentialSource, activeModel, runtime.memoryDir, runtime.searchIgnoreDirs, runtime.workspaceRoot],
   );
   const logger = useMemo<Logger>(
     () =>
@@ -262,7 +272,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   }
 
   if (!hasProviderCredentialForModel(llm.info?.model ?? runtime.model, runtime)) {
-    state.setError('Missing provider credential');
+    state.setError(formatMissingProviderCredentialMessage(llm.info?.model ?? runtime.model));
     state.setStatus('Error');
     return undefined;
   }
@@ -652,6 +662,7 @@ function previousAssistantOutput(session: ChatSession | undefined): string | und
 function isNonResponseAssistantMessage(text: string): boolean {
   return (
     text.startsWith('Heddle conversational mode.') ||
+    text.startsWith('No provider credential detected.') ||
     text.startsWith('No provider API key detected.') ||
     text.startsWith('Enabled CyberLoop semantic drift detection') ||
     text.startsWith('Disabled CyberLoop semantic drift detection') ||

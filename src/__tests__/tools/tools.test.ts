@@ -14,8 +14,8 @@ import {
   DEFAULT_MUTATE_RULES,
 } from '../../core/tools/run-shell.js';
 import { createSearchFilesTool, searchFilesTool } from '../../core/tools/search-files.js';
-import { webSearchTool } from '../../core/tools/web-search.js';
-import { viewImageTool } from '../../core/tools/view-image.js';
+import { createWebSearchTool, webSearchTool } from '../../core/tools/web-search.js';
+import { createViewImageTool, viewImageTool } from '../../core/tools/view-image.js';
 import {
   createListMemoryNotesTool,
   createReadMemoryNoteTool,
@@ -352,6 +352,29 @@ describe('webSearchTool', () => {
       vi.unstubAllEnvs();
     }
   });
+
+  it('does not silently fall back to an OpenAI env key when OAuth is the active credential', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'openai-key');
+
+    try {
+      const result = await createWebSearchTool({
+        model: 'gpt-5.1-codex',
+        providerCredentialSource: {
+          type: 'oauth',
+          provider: 'openai',
+          accountId: 'account-123',
+          expiresAt: Date.now() + 60_000,
+        },
+      }).execute({ query: 'OpenAI Responses API web search tool' });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'web_search currently requires OpenAI Platform API-key mode. The active OpenAI credential is account sign-in; set OPENAI_API_KEY or pass an explicit API key to use hosted web search.',
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 describe('viewImageTool', () => {
@@ -386,6 +409,31 @@ describe('viewImageTool', () => {
       expect(result).toEqual({
         ok: false,
         error: 'view_image requires OPENAI_API_KEY (or PERSONAL_OPENAI_API_KEY) when the active model provider is OpenAI.',
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('does not silently fall back to an OpenAI env key for image viewing when OAuth is active', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-view-image-oauth-'));
+    const imagePath = join(root, 'screen.png');
+    await writeFile(imagePath, 'fake');
+    vi.stubEnv('OPENAI_API_KEY', 'openai-key');
+
+    try {
+      const result = await createViewImageTool({
+        providerCredentialSource: {
+          type: 'oauth',
+          provider: 'openai',
+          accountId: 'account-123',
+          expiresAt: Date.now() + 60_000,
+        },
+      }).execute({ path: imagePath });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'view_image currently requires OpenAI Platform API-key mode. The active OpenAI credential is account sign-in; set OPENAI_API_KEY or pass an explicit API key to inspect images.',
       });
     } finally {
       vi.unstubAllEnvs();

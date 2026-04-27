@@ -5,8 +5,10 @@ import type { LlmProvider } from '../../../index.js';
 import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
 import {
   hasProviderCredentialForModel as hasRuntimeProviderCredentialForModel,
+  type ProviderCredentialSource,
   resolveOAuthCredentialForModel,
   resolveApiKeyForModel as resolveRuntimeApiKeyForModel,
+  resolveProviderCredentialSourceForModel as resolveRuntimeProviderCredentialSourceForModel,
   resolveProviderApiKey as resolveRuntimeProviderApiKey,
 } from '../../../core/runtime/api-keys.js';
 import { parsePositiveInt } from './format.js';
@@ -53,11 +55,7 @@ export type ChatRuntimeConfig = {
 
 export { saveTrace };
 
-export type ProviderCredentialSource =
-  | { type: 'explicit-api-key' }
-  | { type: 'env-api-key'; provider: LlmProvider }
-  | { type: 'oauth'; provider: LlmProvider; accountId?: string; expiresAt?: number }
-  | { type: 'missing'; provider: LlmProvider };
+export type { ProviderCredentialSource };
 
 export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeConfig {
   const workspaceRoot = resolve(options.workspaceRoot ?? process.cwd());
@@ -105,30 +103,7 @@ export function resolveProviderCredentialSourceForModel(
   model: string,
   runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider'> & { credentialStorePath?: string },
 ): ProviderCredentialSource {
-  const provider = inferProviderFromModel(model);
-  if (runtime?.apiKey && runtime.apiKeyProvider === 'explicit') {
-    return { type: 'explicit-api-key' };
-  }
-
-  const oauthCredential = resolveOAuthCredentialForModel(model, { storePath: runtime?.credentialStorePath });
-  if (oauthCredential) {
-    return {
-      type: 'oauth',
-      provider: oauthCredential.provider,
-      accountId: oauthCredential.accountId,
-      expiresAt: oauthCredential.expiresAt,
-    };
-  }
-
-  if (runtime?.apiKey && runtime.apiKeyProvider === provider) {
-    return { type: 'env-api-key', provider };
-  }
-
-  const apiKey = resolveProviderApiKey(provider);
-  if (apiKey) {
-    return { type: 'env-api-key', provider };
-  }
-  return { type: 'missing', provider };
+  return resolveRuntimeProviderCredentialSourceForModel(model, runtime);
 }
 
 export function resolveProviderApiKey(provider: LlmProvider): string | undefined {

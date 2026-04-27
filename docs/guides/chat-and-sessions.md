@@ -4,13 +4,27 @@ Use Heddle chat when you want an interactive coding-agent workflow inside a real
 
 ## Quick Start
 
-Set a provider API key:
+Configure provider access.
+
+For OpenAI, you can sign in with your own ChatGPT/Codex account:
+
+```bash
+heddle auth login openai
+```
+
+Or use a Platform API key:
 
 ```bash
 export OPENAI_API_KEY=your_key_here
-# or
+```
+
+For Anthropic, use an API key:
+
+```bash
 export ANTHROPIC_API_KEY=your_key_here
 ```
+
+OpenAI account sign-in is experimental and optional. It is not official OpenAI support, and Heddle is not affiliated with, endorsed by, or sponsored by OpenAI.
 
 Move into the project you want Heddle to work on:
 
@@ -53,6 +67,10 @@ Useful chat commands:
 - `/model list`: show the built-in shortlist
 - `/model set <query>`: open the interactive model picker
 - `/model <name>`: switch models directly
+- `/auth`: show stored provider credentials
+- `/auth status`: show stored provider credentials
+- `/auth login openai`: sign in with OpenAI account auth
+- `/auth logout openai`: remove the stored OpenAI credential
 - `/session list`: list recent saved sessions
 - `/session choose <query>`: choose a recent session interactively
 - `/session new [name]`: create a new session

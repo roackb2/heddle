@@ -13,6 +13,7 @@ import type { ToolDefinition, ToolResult } from '../types.js';
 import { inferProviderFromModel } from '../llm/factory.js';
 import type { LlmProvider } from '../llm/types.js';
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../config.js';
+import type { ProviderCredentialSource } from '../runtime/api-keys.js';
 
 type ViewImageInput = {
   path: string;
@@ -23,6 +24,7 @@ export type ViewImageToolOptions = {
   model?: string;
   provider?: LlmProvider;
   apiKey?: string;
+  providerCredentialSource?: ProviderCredentialSource;
   workspaceRoot?: string;
 };
 
@@ -104,6 +106,13 @@ async function executeOpenAiImageView(args: {
   prompt: string;
   options: ViewImageToolOptions;
 }): Promise<ToolResult> {
+  if (args.options.providerCredentialSource?.type === 'oauth') {
+    return {
+      ok: false,
+      error: 'view_image currently requires OpenAI Platform API-key mode. The active OpenAI credential is account sign-in; set OPENAI_API_KEY or pass an explicit API key to inspect images.',
+    };
+  }
+
   const apiKey = firstDefinedNonEmpty(args.options.apiKey, process.env.OPENAI_API_KEY, process.env.PERSONAL_OPENAI_API_KEY);
   if (!apiKey) {
     return {

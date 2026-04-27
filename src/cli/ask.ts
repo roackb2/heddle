@@ -10,7 +10,6 @@ import {
   formatTraceForConsole,
   createLogger,
   hasProviderCredentialForModel,
-  resolveProviderApiKey,
   resolveApiKeyForModel,
 } from '../index.js';
 import { runMaintenanceForRecordedCandidates } from '../core/memory/maintenance-integration.js';
@@ -119,7 +118,10 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
     return;
   }
 
-  const apiKey = options.apiKey ?? resolveProviderApiKey(provider);
+  const apiKey = resolveApiKeyForModel(model, {
+    apiKey: options.apiKey,
+    apiKeyProvider: options.apiKey ? 'explicit' : undefined,
+  });
   const llm = createLlmAdapter({ model, apiKey });
   const memoryDir = join(stateRoot, 'memory');
   const result = await runAgentLoop({

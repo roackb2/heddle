@@ -6,7 +6,7 @@ This repository is already usable as an OSS coding-agent runtime, but it is stil
 
 - Node.js 20 or newer
 - Yarn
-- An API key for at least one supported provider if you want to run live chat or examples
+- Provider access if you want to run live chat or examples: `heddle auth login openai`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`
 
 ## Setup
 

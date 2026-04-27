@@ -91,13 +91,27 @@ The control plane also has a phone-oriented layout for checking sessions, readin
 npm install -g @roackb2/heddle
 ```
 
-2. Set a provider API key:
+2. Configure provider access.
+
+For OpenAI, you can either sign in with your own ChatGPT/Codex account:
+
+```bash
+heddle auth login openai
+```
+
+Or use a Platform API key:
 
 ```bash
 export OPENAI_API_KEY=your_key_here
-# or
+```
+
+For Anthropic, use an API key:
+
+```bash
 export ANTHROPIC_API_KEY=your_key_here
 ```
+
+OpenAI account sign-in is an experimental, user-selected transport for Heddle. It is not official OpenAI support, and Heddle is not affiliated with, endorsed by, or sponsored by OpenAI. Use of OpenAI services remains subject to OpenAI's terms and policies.
 
 3. Move into any repository you want to inspect:
 
@@ -302,9 +316,11 @@ The installed CLI command is `heddle`.
 ## Requirements
 
 - Node.js 20+
-- an API key for at least one supported provider:
-  - `OPENAI_API_KEY`
-  - `ANTHROPIC_API_KEY`
+- access to at least one supported provider:
+  - OpenAI account sign-in with `heddle auth login openai`, or `OPENAI_API_KEY`
+  - `ANTHROPIC_API_KEY` for Anthropic models
+
+Heddle intentionally does not support Anthropic consumer subscription OAuth. Use Anthropic API-key access unless Anthropic provides an approved third-party auth route.
 
 ## Optional CyberLoop Integration
 

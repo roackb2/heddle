@@ -17,10 +17,12 @@ import { createSearchFilesTool } from '../tools/search-files.js';
 import { updatePlanTool } from '../tools/update-plan.js';
 import { createViewImageTool } from '../tools/view-image.js';
 import { createWebSearchTool } from '../tools/web-search.js';
+import type { ProviderCredentialSource } from './api-keys.js';
 
 export type DefaultAgentToolsOptions = {
   model: string;
   apiKey?: string;
+  providerCredentialSource?: ProviderCredentialSource;
   workspaceRoot?: string;
   stateDir?: string;
   memoryDir?: string;
@@ -43,10 +45,12 @@ export function createDefaultAgentTools(options: DefaultAgentToolsOptions): Tool
     createWebSearchTool({
       model: options.model,
       apiKey: options.apiKey,
+      providerCredentialSource: options.providerCredentialSource,
     }),
     createViewImageTool({
       model: options.model,
       apiKey: options.apiKey,
+      providerCredentialSource: options.providerCredentialSource,
       workspaceRoot,
     }),
     reportStateTool,

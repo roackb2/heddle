@@ -18,7 +18,12 @@ import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
 import type { ChatSession } from './types.js';
 import { saveTrace } from './trace.js';
 import { countAssistantSteps, summarizeTrace } from './trace-summary.js';
-import { hasProviderCredentialForModel, resolveApiKeyForModel } from '../../core/runtime/api-keys.js';
+import {
+  formatMissingProviderCredentialMessage,
+  hasProviderCredentialForModel,
+  resolveApiKeyForModel,
+  resolveProviderCredentialSourceForModel,
+} from '../../core/runtime/api-keys.js';
 
 import type { AgentLoopEvent } from '../../index.js';
 
@@ -48,8 +53,12 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
   const model = session.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
   const provider = inferProviderFromModel(model);
   const apiKey = args.apiKey ?? resolveApiKeyForModel(model);
+  const providerCredentialSource = resolveProviderCredentialSourceForModel(model, {
+    apiKey,
+    apiKeyProvider: args.apiKey ? 'explicit' : apiKey ? provider : undefined,
+  });
   if (!hasProviderCredentialForModel(model, { apiKey: args.apiKey, apiKeyProvider: args.apiKey ? 'explicit' : undefined })) {
-    throw new Error(`Missing provider credential for ${provider}`);
+    throw new Error(formatMissingProviderCredentialMessage(model));
   }
   const leaseOwner = args.leaseOwner ?? {
     ownerKind: 'ask',
@@ -75,6 +84,7 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
   const tools = createDefaultAgentTools({
     model,
     apiKey,
+    providerCredentialSource,
     workspaceRoot: args.workspaceRoot,
     memoryDir,
     searchIgnoreDirs: [],

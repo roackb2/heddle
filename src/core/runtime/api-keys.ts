@@ -11,6 +11,12 @@ export type ApiKeyRuntime = {
   credentialStorePath?: string;
 };
 
+export type ProviderCredentialSource =
+  | { type: 'explicit-api-key' }
+  | { type: 'env-api-key'; provider: LlmProvider }
+  | { type: 'oauth'; provider: LlmProvider; accountId?: string; expiresAt?: number }
+  | { type: 'missing'; provider: LlmProvider };
+
 export function resolveProviderApiKey(provider: LlmProvider): string | undefined {
   switch (provider) {
     case 'openai':
@@ -23,20 +29,19 @@ export function resolveProviderApiKey(provider: LlmProvider): string | undefined
 }
 
 export function resolveApiKeyForModel(model: string, runtime?: ApiKeyRuntime): string | undefined {
-  if (runtime?.apiKey && runtime.apiKeyProvider === 'explicit') {
-    return runtime.apiKey;
+  const source = resolveProviderCredentialSourceForModel(model, runtime);
+
+  if (source.type === 'explicit-api-key') {
+    return runtime?.apiKey;
   }
 
-  const provider = inferProviderFromModel(model);
-  if (resolveOAuthCredentialForModel(model, { storePath: runtime?.credentialStorePath })) {
-    return undefined;
+  if (source.type === 'env-api-key') {
+    return runtime?.apiKey && runtime.apiKeyProvider === source.provider ?
+        runtime.apiKey
+      : resolveProviderApiKey(source.provider);
   }
 
-  if (runtime?.apiKey && runtime.apiKeyProvider === provider) {
-    return runtime.apiKey;
-  }
-
-  return resolveProviderApiKey(provider);
+  return undefined;
 }
 
 export function resolveOAuthCredentialForModel(
@@ -52,9 +57,51 @@ export function hasProviderCredentialForModel(
   model: string,
   runtime?: ApiKeyRuntime & { credentialStorePath?: string },
 ): boolean {
-  return Boolean(resolveApiKeyForModel(model, runtime) ?? resolveOAuthCredentialForModel(model, {
-    storePath: runtime?.credentialStorePath,
-  }));
+  return resolveProviderCredentialSourceForModel(model, runtime).type !== 'missing';
+}
+
+export function resolveProviderCredentialSourceForModel(
+  model: string,
+  runtime?: ApiKeyRuntime,
+): ProviderCredentialSource {
+  const provider = inferProviderFromModel(model);
+  if (runtime?.apiKey && runtime.apiKeyProvider === 'explicit') {
+    return { type: 'explicit-api-key' };
+  }
+
+  const oauthCredential = resolveOAuthCredentialForModel(model, { storePath: runtime?.credentialStorePath });
+  if (oauthCredential) {
+    return {
+      type: 'oauth',
+      provider: oauthCredential.provider,
+      accountId: oauthCredential.accountId,
+      expiresAt: oauthCredential.expiresAt,
+    };
+  }
+
+  if (runtime?.apiKey && runtime.apiKeyProvider === provider) {
+    return { type: 'env-api-key', provider };
+  }
+
+  const apiKey = resolveProviderApiKey(provider);
+  if (apiKey) {
+    return { type: 'env-api-key', provider };
+  }
+
+  return { type: 'missing', provider };
+}
+
+export function formatMissingProviderCredentialMessage(model: string): string {
+  const provider = inferProviderFromModel(model);
+  if (provider === 'openai') {
+    return 'Missing OpenAI credential. Run `heddle auth login openai` to use OpenAI account sign-in, or set OPENAI_API_KEY for Platform API-key mode.';
+  }
+
+  if (provider === 'anthropic') {
+    return 'Missing Anthropic credential. Set ANTHROPIC_API_KEY for Anthropic models.';
+  }
+
+  return `Missing provider credential for ${provider}.`;
 }
 
 function firstDefinedNonEmpty(...values: Array<string | undefined>): string | undefined {

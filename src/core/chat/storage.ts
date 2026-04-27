@@ -36,7 +36,7 @@ export function createInitialMessages(apiKeyPresent: boolean): ConversationLine[
         id: 'missing-key',
         role: 'assistant' as const,
         text:
-          'No provider API key detected. Set OPENAI_API_KEY for OpenAI models or ANTHROPIC_API_KEY for Claude models. Dev fallback conventions also work: PERSONAL_OPENAI_API_KEY and PERSONAL_ANTHROPIC_API_KEY.',
+          'No provider credential detected. For OpenAI, run `heddle auth login openai` or set OPENAI_API_KEY. For Anthropic, set ANTHROPIC_API_KEY. Dev fallback conventions also work: PERSONAL_OPENAI_API_KEY and PERSONAL_ANTHROPIC_API_KEY.',
       }]
     : []),
   ];
