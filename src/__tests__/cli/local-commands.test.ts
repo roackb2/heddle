@@ -51,6 +51,7 @@ describe('runLocalCommand', () => {
       throw new Error('expected /model list to return a message result');
     }
     expect(result.message).toContain('Common built-in model choices');
+    expect(result.message).toContain('OpenAI · GPT-5.5\n  - gpt-5.5\n  - gpt-5.5-pro');
     expect(result.message).toContain('OpenAI · GPT-5.4\n  - gpt-5.4\n  - gpt-5.4-pro\n  - gpt-5.4-mini\n  - gpt-5.4-nano');
     expect(result.message).toContain('OpenAI · GPT-4.1\n  - gpt-4.1\n  - gpt-4.1-mini\n  - gpt-4.1-nano');
     expect(result.message).toContain('Anthropic · Claude 4\n  - claude-opus-4-6\n  - claude-sonnet-4-6\n  - claude-haiku-4-5');
@@ -69,6 +70,7 @@ describe('runLocalCommand', () => {
       throw new Error('expected /models to return a message result');
     }
     expect(result.message).toContain('Common built-in model choices');
+    expect(result.message).toContain('OpenAI · GPT-5.5\n  - gpt-5.5');
     expect(result.message).toContain('OpenAI · GPT-5.4\n  - gpt-5.4');
     expect(result.message).toContain('Anthropic · Claude 4\n  - claude-opus-4-6');
   });

@@ -10,6 +10,10 @@ export type BuiltInModelGroup = {
 
 export const BUILT_IN_MODEL_GROUPS: BuiltInModelGroup[] = [
   {
+    label: 'OpenAI · GPT-5.5',
+    models: ['gpt-5.5', 'gpt-5.5-pro'],
+  },
+  {
     label: 'OpenAI · GPT-5.4',
     models: ['gpt-5.4', 'gpt-5.4-pro', 'gpt-5.4-mini', 'gpt-5.4-nano'],
   },
@@ -112,6 +116,18 @@ export function estimateBuiltInContextWindow(model: string): number | undefined 
 }
 
 function inferContextWindowEstimate(model: string): number {
+  if (model.startsWith('gpt-5.5')) {
+    return 1_050_000;
+  }
+
+  if (model === 'gpt-5.4' || model === 'gpt-5.4-pro') {
+    return 1_050_000;
+  }
+
+  if (model === 'gpt-5.4-mini') {
+    return 400_000;
+  }
+
   if (model.startsWith('gpt-4.1')) {
     return 128_000;
   }
