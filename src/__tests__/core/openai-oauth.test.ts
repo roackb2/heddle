@@ -146,7 +146,7 @@ describe('OpenAI OAuth helpers', () => {
         provider: 'openai',
         accessToken: 'access-token',
         refreshToken: 'refresh-token',
-        expiresAt: Date.now() + 60_000,
+        expiresAt: Date.now() + 120_000,
         accountId: 'account-123',
         createdAt: '2026-04-27T00:00:00.000Z',
         updatedAt: '2026-04-27T00:00:00.000Z',
@@ -156,6 +156,39 @@ describe('OpenAI OAuth helpers', () => {
     await expect(adapter.chat([{ role: 'user', content: 'hello' }], [])).rejects.toThrow(
       'OpenAI account sign-in is not enabled for model o3.',
     );
+  });
+
+  it('uses the Codex-compatible Responses payload shape for account sign-in models', async () => {
+    const requests: Array<{ url: string; body: string }> = [];
+    const adapter = createOpenAiAdapter({
+      model: 'gpt-5.4',
+      credential: {
+        type: 'oauth',
+        provider: 'openai',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresAt: Date.now() + 120_000,
+        accountId: 'account-123',
+        createdAt: '2026-04-27T00:00:00.000Z',
+        updatedAt: '2026-04-27T00:00:00.000Z',
+      },
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), body: String((init as RequestInit | undefined)?.body ?? '') });
+        return new Response('bad request', { status: 400 });
+      }) as typeof fetch,
+    });
+
+    await expect(adapter.chat([{ role: 'user', content: 'hello' }], [])).rejects.toThrow();
+
+    expect(requests[0]?.url).toBe(OPENAI_CODEX_RESPONSES_ENDPOINT);
+    const body = JSON.parse(requests[0]?.body ?? '{}') as {
+      model?: string;
+      store?: boolean;
+      reasoning?: { summary?: string };
+    };
+    expect(body.model).toBe('gpt-5.4');
+    expect(body.store).toBe(false);
+    expect(body.reasoning?.summary).toBe('auto');
   });
 });
 

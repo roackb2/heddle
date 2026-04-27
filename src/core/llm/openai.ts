@@ -77,8 +77,9 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
         model,
         input: toResponseInput(messages),
         tools: tools.length > 0 ? tools.map(toResponseTool) : undefined,
+        store: false,
         reasoning: {
-          summary: 'detailed',
+          summary: oauthCredential ? 'auto' : 'detailed',
         },
       }, { signal });
 

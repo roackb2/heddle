@@ -35,7 +35,7 @@ export const BUILT_IN_MODEL_GROUPS: BuiltInModelGroup[] = [
   },
   {
     label: 'OpenAI · Coding-optimized',
-    models: ['gpt-5.1-codex', 'gpt-5.1-codex-max', 'gpt-5.1-codex-mini'],
+    models: ['gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2-codex', 'gpt-5.1-codex', 'gpt-5.1-codex-max', 'gpt-5.1-codex-mini'],
   },
   {
     label: 'Anthropic · Claude 4',
@@ -62,14 +62,16 @@ export const OPENAI_MODEL_GROUPS: BuiltInModelGroup[] = BUILT_IN_MODEL_GROUPS.fi
 export const COMMON_BUILT_IN_MODELS = BUILT_IN_MODEL_GROUPS.flatMap((group) => group.models);
 export const COMMON_OPENAI_MODELS = OPENAI_MODEL_GROUPS.flatMap((group) => group.models);
 export const OPENAI_ACCOUNT_SIGN_IN_MODELS = [
+  'gpt-5.5',
+  'gpt-5.4',
+  'gpt-5.4-mini',
   'gpt-5.1-codex',
   'gpt-5.1-codex-max',
   'gpt-5.1-codex-mini',
   'gpt-5.2',
   'gpt-5.2-codex',
   'gpt-5.3-codex',
-  'gpt-5.4',
-  'gpt-5.4-mini',
+  'gpt-5.3-codex-spark',
 ];
 
 const BUILT_IN_CONTEXT_WINDOW_ESTIMATES = new Map<string, number>(
