@@ -9,6 +9,7 @@ import {
   runAgentLoop,
   formatTraceForConsole,
   createLogger,
+  hasProviderCredentialForModel,
   resolveProviderApiKey,
   resolveApiKeyForModel,
 } from '../index.js';
@@ -82,7 +83,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
     sessionStoragePath,
     stateRoot,
     model,
-    apiKeyPresent: Boolean(resolveApiKeyForModel(model, { apiKey: options.apiKey, apiKeyProvider: 'explicit' })),
+    apiKeyPresent: hasProviderCredentialForModel(model, { apiKey: options.apiKey, apiKeyProvider: 'explicit' }),
   });
 
   if (targetSession) {
@@ -176,7 +177,7 @@ async function runDaemonBackedAsk(options: {
       ?? await createRemoteSession(client, {
         name: options.createSessionName?.trim() || undefined,
         model: options.model,
-        apiKeyPresent: Boolean(resolveApiKeyForModel(options.model, { apiKey: options.apiKey, apiKeyProvider: 'explicit' })),
+        apiKeyPresent: hasProviderCredentialForModel(options.model, { apiKey: options.apiKey, apiKeyProvider: 'explicit' }),
       });
 
     const result = await client.controlPlane.sessionSendPrompt.mutate({

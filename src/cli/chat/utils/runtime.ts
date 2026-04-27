@@ -3,7 +3,11 @@ import { appendMemoryCatalogSystemContext, DEFAULT_OPENAI_MODEL, inferProviderFr
 import { saveTrace } from '../../../core/chat/trace.js';
 import type { LlmProvider } from '../../../index.js';
 import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
-import { resolveApiKeyForModel as resolveRuntimeApiKeyForModel, resolveProviderApiKey as resolveRuntimeProviderApiKey } from '../../../core/runtime/api-keys.js';
+import {
+  hasProviderCredentialForModel as hasRuntimeProviderCredentialForModel,
+  resolveApiKeyForModel as resolveRuntimeApiKeyForModel,
+  resolveProviderApiKey as resolveRuntimeProviderApiKey,
+} from '../../../core/runtime/api-keys.js';
 import { parsePositiveInt } from './format.js';
 
 export type ChatCliOptions = {
@@ -23,6 +27,7 @@ export type ChatRuntimeConfig = {
   maxSteps: number;
   apiKey?: string;
   apiKeyProvider?: LlmProvider | 'explicit';
+  providerCredentialPresent: boolean;
   stateRoot: string;
   logFile: string;
   sessionCatalogFile: string;
@@ -52,12 +57,14 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
   const model = options.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
   const provider = inferProviderFromModel(model);
   const apiKey = options.apiKey ?? resolveProviderApiKey(provider);
+  const providerCredentialPresent = Boolean(apiKey) || hasRuntimeProviderCredentialForModel(model);
 
   return {
     model,
     maxSteps: options.maxSteps ?? parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 100,
     apiKey,
     apiKeyProvider: options.apiKey ? 'explicit' : apiKey ? provider : undefined,
+    providerCredentialPresent,
     workspaceRoot,
     stateRoot,
     logFile: join(stateRoot, 'logs', `${sessionId}.log`),
@@ -81,4 +88,11 @@ export function resolveProviderApiKey(provider: LlmProvider): string | undefined
 
 export function resolveApiKeyForModel(model: string, runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider'>): string | undefined {
   return resolveRuntimeApiKeyForModel(model, runtime);
+}
+
+export function hasProviderCredentialForModel(
+  model: string,
+  runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider'>,
+): boolean {
+  return hasRuntimeProviderCredentialForModel(model, runtime);
 }

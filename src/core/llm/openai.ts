@@ -7,24 +7,46 @@ import type {
   ResponseInputItem,
   FunctionTool,
   ResponseReasoningItem,
-  Response,
+  Response as OpenAiResponse,
   ResponseStreamEvent,
 } from 'openai/resources/responses/responses.js';
+import type { Fetch as OpenAiFetch } from 'openai/core.js';
 import type { LlmAdapter, ChatMessage, LlmResponse, LlmAdapterCapabilities, LlmUsage, LlmStreamEvent } from './types.js';
 import type { AssistantDiagnostics, ToolDefinition, ToolCall } from '../types.js';
 import { DEFAULT_OPENAI_MODEL } from '../config.js';
+import {
+  OPENAI_CODEX_RESPONSES_ENDPOINT,
+  refreshOpenAiOAuthCredential,
+  type OpenAiOAuthCredential,
+} from '../auth/openai-oauth.js';
+import {
+  setStoredProviderCredential,
+  type StoredProviderCredential,
+} from '../auth/provider-credentials.js';
 
 export type OpenAiAdapterOptions = {
   apiKey?: string;
   model?: string;
+  credential?: StoredProviderCredential;
+  credentialStorePath?: string;
+  fetchImpl?: CompatibleFetch;
 };
+
+type CompatibleFetch = (url: unknown, init?: unknown) => Promise<globalThis.Response>;
 
 /**
  * Create an LLM adapter backed by the OpenAI chat completions API.
  */
 export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdapter {
+  const oauthCredential = options.credential?.type === 'oauth' ? options.credential : undefined;
   const client = new OpenAI({
-    apiKey: firstDefinedNonEmpty(options.apiKey, process.env.OPENAI_API_KEY, process.env.PERSONAL_OPENAI_API_KEY),
+    apiKey:
+      oauthCredential ? 'heddle-oauth-placeholder'
+      : firstDefinedNonEmpty(options.apiKey, process.env.OPENAI_API_KEY, process.env.PERSONAL_OPENAI_API_KEY),
+    fetch: oauthCredential ? createOpenAiOAuthFetch(oauthCredential, {
+      storePath: options.credentialStorePath,
+      fetchImpl: options.fetchImpl,
+    }) : options.fetchImpl as OpenAiFetch | undefined,
   });
   const model = options.model ?? DEFAULT_OPENAI_MODEL;
   const capabilities: LlmAdapterCapabilities = {
@@ -108,11 +130,65 @@ function firstDefinedNonEmpty(...values: Array<string | undefined>): string | un
   return values.find((value) => typeof value === 'string' && value.trim().length > 0);
 }
 
+export function createOpenAiOAuthFetch(
+  initialCredential: OpenAiOAuthCredential,
+  options: {
+    storePath?: string;
+    fetchImpl?: CompatibleFetch;
+    refreshBeforeMs?: number;
+  } = {},
+): OpenAiFetch {
+  let credential = initialCredential;
+  const fetcher = options.fetchImpl ?? fetch;
+  const refreshBeforeMs = options.refreshBeforeMs ?? 60_000;
+
+  const oauthFetch: CompatibleFetch = async (requestInput, init) => {
+    if (credential.expiresAt <= Date.now() + refreshBeforeMs) {
+      credential = await refreshOpenAiOAuthCredential(credential, { fetchImpl: fetcher as typeof fetch });
+      setStoredProviderCredential(credential, options.storePath);
+    }
+
+    const request = requestInput instanceof Request ? requestInput : undefined;
+    const requestInit = init as RequestInit | undefined;
+    const headers = new Headers(requestInit?.headers ?? request?.headers);
+    headers.delete('authorization');
+    headers.delete('Authorization');
+    headers.set('authorization', `Bearer ${credential.accessToken}`);
+    if (credential.accountId) {
+      headers.set('ChatGPT-Account-Id', credential.accountId);
+    }
+
+    const url = normalizeRequestUrl(requestInput);
+    const rewrittenUrl = shouldRouteToCodexResponses(url) ? OPENAI_CODEX_RESPONSES_ENDPOINT : url.toString();
+    return await fetcher(rewrittenUrl, {
+      ...requestInit,
+      method: requestInit?.method ?? request?.method,
+      body: requestInit?.body ?? request?.body ?? undefined,
+      headers,
+    });
+  };
+  return oauthFetch as unknown as OpenAiFetch;
+}
+
+function normalizeRequestUrl(requestInput: unknown): URL {
+  if (requestInput instanceof URL) {
+    return requestInput;
+  }
+  if (requestInput instanceof Request) {
+    return new URL(requestInput.url);
+  }
+  return new URL(String(requestInput));
+}
+
+function shouldRouteToCodexResponses(url: URL): boolean {
+  return url.pathname.endsWith('/responses') || url.pathname.endsWith('/chat/completions');
+}
+
 // ---------------------------------------------------------------------------
 // Internal converters
 // ---------------------------------------------------------------------------
 
-function extractAssistantContent(response: Response, hasToolCalls: boolean): string | undefined {
+function extractAssistantContent(response: OpenAiResponse, hasToolCalls: boolean): string | undefined {
   if (response.output_text) {
     return response.output_text;
   }
@@ -131,7 +207,7 @@ function extractAssistantContent(response: Response, hasToolCalls: boolean): str
   return reasoningSummary || undefined;
 }
 
-function extractAssistantDiagnostics(response: Response, hasToolCalls: boolean): AssistantDiagnostics | undefined {
+function extractAssistantDiagnostics(response: OpenAiResponse, hasToolCalls: boolean): AssistantDiagnostics | undefined {
   if (!hasToolCalls) {
     return undefined;
   }
@@ -150,7 +226,7 @@ function extractAssistantDiagnostics(response: Response, hasToolCalls: boolean):
   return { rationale };
 }
 
-function extractUsage(response: Response): LlmUsage | undefined {
+function extractUsage(response: OpenAiResponse): LlmUsage | undefined {
   if (!response.usage) {
     return undefined;
   }

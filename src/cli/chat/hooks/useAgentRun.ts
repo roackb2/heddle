@@ -30,7 +30,7 @@ import {
   toLiveEvent,
 } from '../utils/format.js';
 import { saveTrace } from '../utils/runtime.js';
-import { resolveApiKeyForModel } from '../utils/runtime.js';
+import { hasProviderCredentialForModel, resolveApiKeyForModel } from '../utils/runtime.js';
 import { acquireSessionLease, getSessionLeaseConflict, releaseSessionLease } from '../../../core/chat/session-lease.js';
 import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../state/approval-rules.js';
 import { buildCompactionRunningContext, compactChatHistoryWithArchive, estimateChatHistoryTokens } from '../state/compaction.js';
@@ -261,8 +261,8 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     return undefined;
   }
 
-  if (!resolveApiKeyForModel(llm.info?.model ?? runtime.model, runtime)) {
-    state.setError('Missing provider API key');
+  if (!hasProviderCredentialForModel(llm.info?.model ?? runtime.model, runtime)) {
+    state.setError('Missing provider credential');
     state.setStatus('Error');
     return undefined;
   }

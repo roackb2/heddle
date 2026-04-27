@@ -8,26 +8,40 @@ import { createAnthropicAdapter } from './anthropic.js';
 import { createOpenAiAdapter } from './openai.js';
 import type { LlmAdapter, LlmProvider } from './types.js';
 import { inferProviderFromModel } from './providers.js';
+import type { StoredProviderCredential } from '../auth/provider-credentials.js';
+import { resolveOAuthCredentialForModel } from '../runtime/api-keys.js';
 
 export type CreateLlmAdapterOptions = {
   provider?: LlmProvider;
   model?: string;
   apiKey?: string;
+  credential?: StoredProviderCredential;
+  credentialStorePath?: string;
 };
 
 export function createLlmAdapter(options: CreateLlmAdapterOptions = {}): LlmAdapter {
   const provider = resolveLlmProvider(options);
+  const model =
+    options.model
+    ?? (provider === 'anthropic' ? DEFAULT_ANTHROPIC_MODEL : DEFAULT_OPENAI_MODEL);
+  const credential =
+    options.credential
+    ?? (!options.apiKey && provider === 'openai' ? resolveOAuthCredentialForModel(model, {
+      storePath: options.credentialStorePath,
+    }) : undefined);
 
   switch (provider) {
     case 'openai':
       return createOpenAiAdapter({
         apiKey: options.apiKey,
-        model: options.model ?? DEFAULT_OPENAI_MODEL,
+        model,
+        credential,
+        credentialStorePath: options.credentialStorePath,
       });
     case 'anthropic':
       return createAnthropicAdapter({
         apiKey: options.apiKey,
-        model: options.model ?? DEFAULT_ANTHROPIC_MODEL,
+        model,
       });
     case 'google':
       throw new Error(

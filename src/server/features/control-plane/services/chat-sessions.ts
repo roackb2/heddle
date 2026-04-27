@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../../core/chat/storage.js';
 import { DEFAULT_OPENAI_MODEL } from '../../../../core/config.js';
 import { parseUnifiedDiffFiles } from '../../../../core/review/diff-domain.js';
-import { resolveApiKeyForModel } from '../../../../core/runtime/api-keys.js';
+import { hasProviderCredentialForModel } from '../../../../core/runtime/api-keys.js';
 import type { ChatSessionLeaseOwner } from '../../../../core/chat/session-lease.js';
 import type { ChatSession } from '../../../../core/chat/types.js';
 import { submitChatSessionPrompt } from '../../../../core/chat/session-submit.js';
@@ -50,13 +50,13 @@ export function createControlPlaneChatSession(args: {
   const session = createChatSession({
     id: `session-${Date.now()}`,
     name: args.suggestedName?.trim() || `Session ${nextNumber}`,
-    apiKeyPresent: args.apiKeyPresent ?? Boolean(resolveApiKeyForModel(model)),
+    apiKeyPresent: args.apiKeyPresent ?? hasProviderCredentialForModel(model),
     model,
     workspaceId: args.workspaceId,
   });
 
   const currentSessions = readChatSessionCatalog(args.sessionStoragePath)
-    .map((entry) => readChatSession(args.sessionStoragePath, entry.id, Boolean(resolveApiKeyForModel(model))))
+    .map((entry) => readChatSession(args.sessionStoragePath, entry.id, hasProviderCredentialForModel(model)))
     .filter((candidate): candidate is ChatSession => Boolean(candidate));
   saveChatSessions(args.sessionStoragePath, [session, ...currentSessions]);
   return projectChatSessionDetail(session)[0] as ChatSessionDetail;

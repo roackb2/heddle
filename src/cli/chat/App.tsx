@@ -61,7 +61,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     removeSession,
   } = useChatSessions({
     sessionCatalogFile: runtime.sessionCatalogFile,
-    apiKeyPresent: Boolean(runtime.apiKey),
+    apiKeyPresent: runtime.providerCredentialPresent,
     defaultModel: runtime.model,
     workspaceRoot: runtime.workspaceRoot,
     stateRoot: runtime.stateRoot,
@@ -294,7 +294,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     recentSessions,
     activeSessionId,
     activeSession,
-    apiKeyPresent: Boolean(runtime.apiKey),
+    apiKeyPresent: runtime.providerCredentialPresent,
     nextLocalId,
     setStatus,
     switchSession,

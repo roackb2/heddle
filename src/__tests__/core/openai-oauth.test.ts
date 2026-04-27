@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   OPENAI_AUTH_ISSUER,
+  OPENAI_CODEX_RESPONSES_ENDPOINT,
   OPENAI_CODEX_CLIENT_ID,
   buildOpenAiAuthorizeUrl,
   createOpenAiOAuthCredential,
@@ -10,6 +14,7 @@ import {
   refreshOpenAiOAuthToken,
   type OpenAiOAuthTokenResponse,
 } from '../../core/auth/openai-oauth.js';
+import { createOpenAiOAuthFetch } from '../../core/llm/openai.js';
 
 describe('OpenAI OAuth helpers', () => {
   it('generates PKCE verifier and challenge values', () => {
@@ -86,6 +91,51 @@ describe('OpenAI OAuth helpers', () => {
     expect(new URLSearchParams(requests[0]?.body).get('code_verifier')).toBe('verifier');
     expect(new URLSearchParams(requests[1]?.body).get('grant_type')).toBe('refresh_token');
     expect(new URLSearchParams(requests[1]?.body).get('refresh_token')).toBe('refresh-token');
+  });
+
+  it('rewrites Responses calls to the Codex endpoint with refreshed OAuth headers', async () => {
+    const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-oauth-fetch-')), 'auth.json');
+    const requests: Array<{ url: string; headers: Headers; body: string }> = [];
+    const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({
+        url: String(url),
+        headers: new Headers(init?.headers),
+        body: String(init?.body ?? ''),
+      });
+      if (String(url).endsWith('/oauth/token')) {
+        return Response.json({
+          access_token: 'new-access-token',
+          refresh_token: 'new-refresh-token',
+          expires_in: 3600,
+        });
+      }
+      return new Response('ok');
+    }) as typeof fetch;
+    const oauthFetch = createOpenAiOAuthFetch({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'expired-access-token',
+      refreshToken: 'old-refresh-token',
+      expiresAt: Date.now() - 1000,
+      accountId: 'account-123',
+      createdAt: '2026-04-27T00:00:00.000Z',
+      updatedAt: '2026-04-27T00:00:00.000Z',
+    }, {
+      storePath,
+      fetchImpl,
+    });
+
+    await oauthFetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { authorization: 'Bearer placeholder' },
+      body: JSON.stringify({ model: 'gpt-5.1-codex' }),
+    });
+
+    expect(requests).toHaveLength(2);
+    expect(requests[0]?.url).toBe(`${OPENAI_AUTH_ISSUER}/oauth/token`);
+    expect(requests[1]?.url).toBe(OPENAI_CODEX_RESPONSES_ENDPOINT);
+    expect(requests[1]?.headers.get('authorization')).toBe('Bearer new-access-token');
+    expect(requests[1]?.headers.get('ChatGPT-Account-Id')).toBe('account-123');
   });
 });
 

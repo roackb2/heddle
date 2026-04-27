@@ -25,6 +25,7 @@ describe('resolveChatRuntimeConfig', () => {
     });
 
     expect(runtime.apiKey).toBeUndefined();
+    expect(runtime.providerCredentialPresent).toBe(false);
   });
 
   it('uses Anthropic keys for Anthropic models', () => {
@@ -37,6 +38,7 @@ describe('resolveChatRuntimeConfig', () => {
     });
 
     expect(runtime.apiKey).toBe('anthropic-key');
+    expect(runtime.providerCredentialPresent).toBe(true);
   });
 
   it('resolves the correct provider key for a session model even if startup used another provider', () => {
@@ -85,6 +87,7 @@ describe('executeAgentTurn final message persistence', () => {
       maxSteps: 4,
       apiKey: 'test-key',
       apiKeyProvider: 'explicit' as const,
+      providerCredentialPresent: true,
       stateRoot,
       logFile: join(stateRoot, 'logs', 'test.log'),
       sessionCatalogFile: join(stateRoot, 'chat-sessions.catalog.json'),

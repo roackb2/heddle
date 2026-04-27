@@ -1,5 +1,9 @@
 import type { LlmProvider } from '../llm/types.js';
 import { inferProviderFromModel } from '../llm/providers.js';
+import {
+  getStoredProviderCredential,
+  type StoredProviderCredential,
+} from '../auth/provider-credentials.js';
 
 export type ApiKeyRuntime = {
   apiKey?: string;
@@ -28,6 +32,24 @@ export function resolveApiKeyForModel(model: string, runtime?: ApiKeyRuntime): s
   }
 
   return resolveProviderApiKey(provider);
+}
+
+export function resolveOAuthCredentialForModel(
+  model: string,
+  options: { storePath?: string } = {},
+): Extract<StoredProviderCredential, { type: 'oauth' }> | undefined {
+  const provider = inferProviderFromModel(model);
+  const credential = getStoredProviderCredential(provider, options.storePath);
+  return credential?.type === 'oauth' ? credential : undefined;
+}
+
+export function hasProviderCredentialForModel(
+  model: string,
+  runtime?: ApiKeyRuntime & { credentialStorePath?: string },
+): boolean {
+  return Boolean(resolveApiKeyForModel(model, runtime) ?? resolveOAuthCredentialForModel(model, {
+    storePath: runtime?.credentialStorePath,
+  }));
 }
 
 function firstDefinedNonEmpty(...values: Array<string | undefined>): string | undefined {

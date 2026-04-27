@@ -72,7 +72,7 @@ export {
   getHistoryFromAgentLoopState,
 } from './core/runtime/events.js';
 export type { AgentLoopCheckpoint, AgentLoopState, AgentLoopStatus } from './core/runtime/events.js';
-export { resolveApiKeyForModel, resolveProviderApiKey } from './core/runtime/api-keys.js';
+export { hasProviderCredentialForModel, resolveApiKeyForModel, resolveOAuthCredentialForModel, resolveProviderApiKey } from './core/runtime/api-keys.js';
 export type { ApiKeyRuntime } from './core/runtime/api-keys.js';
 export { createDefaultAgentTools } from './core/runtime/default-tools.js';
 export type { DefaultAgentToolsOptions } from './core/runtime/default-tools.js';

@@ -6,6 +6,7 @@ import type { StoredProviderCredential } from './provider-credentials.js';
 
 export const OPENAI_CODEX_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 export const OPENAI_AUTH_ISSUER = 'https://auth.openai.com';
+export const OPENAI_CODEX_RESPONSES_ENDPOINT = 'https://chatgpt.com/backend-api/codex/responses';
 export const OPENAI_OAUTH_CALLBACK_PATH = '/auth/callback';
 export const DEFAULT_OPENAI_OAUTH_PORT = 1455;
 
