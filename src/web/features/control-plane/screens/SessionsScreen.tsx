@@ -607,7 +607,6 @@ export function SessionsScreen({
               >
                 {formatDriftLabel(sessionDetail?.driftEnabled ?? activeSession.driftEnabled, sessionDetail?.driftLevel ?? activeSession.driftLevel)}
               </button>
-              {authStatus ? <Pill>{authStatus}</Pill> : null}
               {runActive ? <Pill tone="warn">working</Pill> : null}
             </div>
           ) : undefined}
@@ -706,6 +705,7 @@ export function SessionsScreen({
               <div className="pills compact-pills">
                 <Pill tone={creatingSession ? 'warn' : runActive ? 'warn' : 'good'}>{creatingSession ? 'creating session' : runActive ? 'run active' : 'idle'}</Pill>
                 {memoryUpdating ? <Pill tone="warn">memory updating</Pill> : null}
+                {authStatus ? <Pill>{authStatus}</Pill> : null}
                 {sessionDetail?.lastContinuePrompt ? <Pill>continue available</Pill> : <Pill>no continue state yet</Pill>}
               </div>
             </div>

@@ -21,6 +21,7 @@ The current browser UI surfaces:
 - browser-side session actions for new session, send, continue, cancel, and pending approval resolution
 - live per-session updates over SSE for run status, tool progress, assistant streaming text, and saved-session changes
 - a model selector backed by the server-side built-in model catalog, plus a drift toggle and latest trace-derived drift level
+- an auth status indicator in the session composer footer so you can see whether the selected model is using OAuth or API-key mode without spending header space
 - debounced `@file` mention suggestions in the composer, backed by a capped workspace file search endpoint
 - compact tool-result cards for saved tool outputs such as `list_files: {...}`
 - current workspace review backed by Git status and file patches, so generated or shell-made changes are visible even when they did not come from the edit tool
@@ -97,6 +98,12 @@ You can override host and port:
 
 ```bash
 heddle daemon --host 127.0.0.1 --port 8765
+```
+
+If you have both a stored OpenAI OAuth credential and an API key, and you want the control plane to use API-key mode for that daemon session, start it with:
+
+```bash
+heddle --prefer-api-key daemon
 ```
 
 The server writes pino logs to `.heddle/logs/server.log` by default. Override the path with:

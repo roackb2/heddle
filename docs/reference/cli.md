@@ -46,6 +46,7 @@ These flags show up across multiple commands:
 - `--cwd <path>`: run against another workspace path
 - `--model <name>`: choose the active model
 - `--max-steps <n>`: limit the agent loop length
+- `--prefer-api-key`: prefer an available provider API key over a stored OAuth credential for that run
 
 ## Common Usage Examples
 
@@ -65,6 +66,14 @@ Run against another workspace:
 
 ```bash
 heddle --cwd /path/to/project
+```
+
+Force OpenAI Platform API-key mode when both OAuth and API-key credentials exist:
+
+```bash
+heddle --prefer-api-key chat --model gpt-5.4-mini
+heddle --prefer-api-key ask "List the top-level build commands"
+heddle --prefer-api-key daemon
 ```
 
 Start the control plane:

@@ -45,6 +45,14 @@ For local development inside this repository, fallback env vars are also accepte
 - `PERSONAL_OPENAI_API_KEY`
 - `PERSONAL_ANTHROPIC_API_KEY`
 
+If both a stored OpenAI OAuth credential and an OpenAI API key are available, Heddle prefers OAuth by default. Use `--prefer-api-key` when you want to force Platform API-key mode for a run:
+
+```bash
+heddle --prefer-api-key
+heddle --prefer-api-key ask "Summarize this repository"
+heddle --prefer-api-key daemon
+```
+
 ## Default Models
 
 Current defaults:
@@ -62,7 +70,7 @@ OpenAI models currently included in the built-in shortlist:
 - `gpt-5.2`, `gpt-5.2-pro`, `gpt-5.1`
 - `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`
 - `o3-pro`, `o3`, `o3-mini`, `o4-mini`
-- coding-oriented models: `gpt-5.1-codex`, `gpt-5.1-codex-max`, `gpt-5.1-codex-mini`
+- coding-oriented models: `gpt-5.3-codex`, `gpt-5.3-codex-spark`, `gpt-5.2-codex`, `gpt-5.1-codex`, `gpt-5.1-codex-max`, `gpt-5.1-codex-mini`
 
 Anthropic models currently included in the built-in shortlist:
 
@@ -105,6 +113,8 @@ Inside terminal chat, the same auth surface is available as slash commands:
 - `/auth logout openai`
 
 The chat footer shows the active credential source for the selected model, such as `auth=openai-oauth`, `auth=openai-key`, or `auth=missing-openai`.
+
+In the browser control plane, the same auth indicator appears in the session composer footer so it stays visible without taking space away from the conversation header.
 
 ## OpenAI Account Sign-In Model Support
 

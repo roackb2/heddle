@@ -105,6 +105,14 @@ Or use a Platform API key:
 export OPENAI_API_KEY=your_key_here
 ```
 
+If you keep both a stored OpenAI OAuth credential and an API key around for testing, you can explicitly prefer the API key for a run:
+
+```bash
+heddle --prefer-api-key
+heddle --prefer-api-key ask "Summarize this repository"
+heddle --prefer-api-key daemon
+```
+
 For Anthropic, use an API key:
 
 ```bash
@@ -138,6 +146,8 @@ heddle daemon
 ```
 
 Open the browser control plane from the daemon output. From there you can use `Overview`, `Sessions`, `Tasks`, and `Workspaces` to inspect the active workspace, continue saved sessions, review changes, and switch to another local project.
+
+The terminal chat footer and the control-plane session composer both show the active auth source for the selected model, so you can tell whether a session is using OpenAI account sign-in, API-key mode, or missing credentials.
 
 ### Try The Learning Loop
 

@@ -43,6 +43,13 @@ heddle chat --model gpt-5.4-mini --max-steps 20
 
 Heddle uses the current directory as the workspace root unless you pass `--cwd`.
 
+If you keep both OpenAI OAuth and an API key configured, Heddle prefers OAuth by default. For explicit API-key testing, start a run with:
+
+```bash
+heddle --prefer-api-key chat --model gpt-5.4-mini
+heddle --prefer-api-key ask "Reply with OK"
+```
+
 ## Typical Chat Workflow
 
 Common use cases:
@@ -98,6 +105,8 @@ Read-oriented commands stay in inspect mode when possible. Workspace-changing or
 ## State And Continuity
 
 Chat state is stored under `.heddle/`, including saved sessions, traces, approvals, and memory notes. The footer context indicator is an estimate of total request input against the active model's context window, not only raw chat history length.
+
+The footer also shows the active auth source for the selected model, so you can tell whether the session is using OpenAI account sign-in or API-key mode.
 
 For local development against the sibling CyberLoop repo, run chat with the middleware module path:
 
