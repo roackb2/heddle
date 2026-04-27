@@ -216,6 +216,14 @@ async function main() {
     });
 
   authCommand
+    .command('login <provider>')
+    .description('log in to a provider')
+    .option('--no-browser', 'print the authorization URL without opening a browser')
+    .action(async (provider: string, flags: { browser?: boolean }) => {
+      await runAuthCli('login', provider, { openBrowser: flags.browser });
+    });
+
+  authCommand
     .command('status')
     .description('show stored provider credentials')
     .action(async () => {

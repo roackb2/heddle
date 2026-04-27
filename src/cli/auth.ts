@@ -1,14 +1,18 @@
 import type { LlmProvider } from '../core/llm/types.js';
+import { runOpenAiBrowserOAuthLogin, type OpenAiOAuthCredential } from '../core/auth/openai-oauth.js';
 import {
   listStoredProviderCredentialSummaries,
   removeStoredProviderCredential,
   resolveProviderCredentialStorePath,
+  setStoredProviderCredential,
 } from '../core/auth/provider-credentials.js';
 
-export type AuthCliCommand = 'status' | 'logout';
+export type AuthCliCommand = 'status' | 'logout' | 'login';
 
 export type AuthCliOptions = {
   storePath?: string;
+  openBrowser?: boolean;
+  openAiLogin?: () => Promise<OpenAiOAuthCredential>;
 };
 
 const SUPPORTED_PROVIDERS = new Set<LlmProvider>(['openai', 'anthropic', 'google']);
@@ -22,6 +26,27 @@ export async function runAuthCli(command: AuthCliCommand, provider?: string, opt
   }
 
   const normalizedProvider = parseProvider(provider);
+  if (command === 'login') {
+    if (normalizedProvider !== 'openai') {
+      throw new Error(`OAuth login is not available for ${normalizedProvider}. Use API keys or supported provider credentials.`);
+    }
+
+    process.stdout.write('Starting OpenAI ChatGPT/Codex OAuth login...\n');
+    const credential = await (options.openAiLogin ?? (() => runOpenAiBrowserOAuthLogin({
+      openBrowser: options.openBrowser,
+      onAuthorizeUrl: (url) => {
+        process.stdout.write(`Open this URL to authorize Heddle:\n${url}\n`);
+      },
+    })))();
+    setStoredProviderCredential(credential, storePath);
+    process.stdout.write('Stored OpenAI OAuth credential.\n');
+    if (credential.accountId) {
+      process.stdout.write(`Account: ${credential.accountId}\n`);
+    }
+    process.stdout.write(`Expires: ${new Date(credential.expiresAt).toISOString()}\n`);
+    return;
+  }
+
   const removed = removeStoredProviderCredential(normalizedProvider, storePath);
   process.stdout.write(
     removed ?
