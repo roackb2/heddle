@@ -21,6 +21,7 @@ import {
   validateMemoryWorkspace,
 } from '../core/memory/validation.js';
 import { resolveApiKeyForModel } from '../core/runtime/api-keys.js';
+import { runAuthCli } from './auth.js';
 import { runAskCli } from './ask.js';
 import { startChatCli } from './chat/index.js';
 import { runDaemonCli } from './daemon.js';
@@ -207,6 +208,27 @@ async function main() {
       });
     });
 
+  const authCommand = program
+    .command('auth')
+    .description('manage provider credentials')
+    .action(async () => {
+      await runAuthCli('status');
+    });
+
+  authCommand
+    .command('status')
+    .description('show stored provider credentials')
+    .action(async () => {
+      await runAuthCli('status');
+    });
+
+  authCommand
+    .command('logout <provider>')
+    .description('remove a stored provider credential')
+    .action(async (provider: string) => {
+      await runAuthCli('logout', provider);
+    });
+
   program
     .command('heartbeat [args...]')
     .description('manage and run heartbeat tasks')
@@ -274,7 +296,7 @@ async function main() {
 }
 
 function isKnownCommand(command: string): boolean {
-  return ['chat', 'ask', 'init', 'memory', 'heartbeat', 'daemon', 'session', 'help'].includes(command);
+  return ['chat', 'ask', 'init', 'memory', 'auth', 'heartbeat', 'daemon', 'session', 'help'].includes(command);
 }
 
 async function runMemoryCli(
