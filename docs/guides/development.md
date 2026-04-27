@@ -51,6 +51,19 @@ yarn eslint
 yarn typecheck
 ```
 
+## Auth-Sensitive Commands
+
+Some development and release commands need access to user-level credentials, keychains, or external network services. Examples include:
+
+- `gh auth status`
+- `gh release list`
+- `gh release create`
+- `npm publish`
+
+When an agent runs in a sandboxed shell, those commands may report stale credentials, missing keyring access, or network failures even when the operator's normal terminal is authenticated correctly. Treat that as an execution-environment issue, not proof that the operator is unauthenticated.
+
+For auth-sensitive operations, especially GitHub release commands, run them in the normal authenticated shell context or explicitly request an unsandboxed/escalated execution path. Do not abandon the release flow solely because sandboxed `gh auth status` disagrees with the operator's terminal.
+
 ## Local Development Workflows
 
 ### CLI and chat

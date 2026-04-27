@@ -100,6 +100,10 @@ If the repo does not have a previous tag yet, run `yarn release:context <base-re
 
 ## GitHub CLI Auth Notes
 
+Release commands that use GitHub or npm credentials should be treated as auth-sensitive. In agent environments, sandboxed shell commands may not have the same keyring, credential helper, or network access as the operator's normal terminal.
+
+If sandboxed `gh auth status`, `gh release list`, or `gh release create` reports invalid credentials while the operator's terminal shows a valid active account, rerun the GitHub command through the normal authenticated shell context or request an unsandboxed/escalated execution path. Do not stop the release solely because sandboxed `gh` cannot see the keyring-backed token.
+
 If `gh release create` fails with a scope or account error, check the active GitHub CLI account before starting a new auth flow:
 
 ```bash
