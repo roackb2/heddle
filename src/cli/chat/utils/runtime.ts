@@ -5,6 +5,7 @@ import type { LlmProvider } from '../../../index.js';
 import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
 import {
   hasProviderCredentialForModel as hasRuntimeProviderCredentialForModel,
+  resolveOAuthCredentialForModel,
   resolveApiKeyForModel as resolveRuntimeApiKeyForModel,
   resolveProviderApiKey as resolveRuntimeProviderApiKey,
 } from '../../../core/runtime/api-keys.js';
@@ -20,6 +21,7 @@ export type ChatCliOptions = {
   searchIgnoreDirs?: string[];
   systemContext?: string;
   runtimeHost?: ResolvedRuntimeHost;
+  credentialStorePath?: string;
 };
 
 export type ChatRuntimeConfig = {
@@ -28,6 +30,7 @@ export type ChatRuntimeConfig = {
   apiKey?: string;
   apiKeyProvider?: LlmProvider | 'explicit';
   providerCredentialPresent: boolean;
+  providerCredentialSource: ProviderCredentialSource;
   stateRoot: string;
   logFile: string;
   sessionCatalogFile: string;
@@ -49,6 +52,12 @@ export type ChatRuntimeConfig = {
 
 export { saveTrace };
 
+export type ProviderCredentialSource =
+  | { type: 'explicit-api-key' }
+  | { type: 'env-api-key'; provider: LlmProvider }
+  | { type: 'oauth'; provider: LlmProvider; accountId?: string; expiresAt?: number }
+  | { type: 'missing'; provider: LlmProvider };
+
 export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeConfig {
   const workspaceRoot = resolve(options.workspaceRoot ?? process.cwd());
   const sessionId = `chat-${Date.now()}`;
@@ -57,14 +66,21 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
   const model = options.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
   const provider = inferProviderFromModel(model);
   const apiKey = options.apiKey ?? resolveProviderApiKey(provider);
-  const providerCredentialPresent = Boolean(apiKey) || hasRuntimeProviderCredentialForModel(model);
+  const apiKeyProvider = options.apiKey ? 'explicit' : apiKey ? provider : undefined;
+  const providerCredentialSource = resolveProviderCredentialSourceForModel(model, {
+    apiKey,
+    apiKeyProvider,
+    credentialStorePath: options.credentialStorePath,
+  });
+  const providerCredentialPresent = providerCredentialSource.type !== 'missing';
 
   return {
     model,
     maxSteps: options.maxSteps ?? parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 100,
     apiKey,
-    apiKeyProvider: options.apiKey ? 'explicit' : apiKey ? provider : undefined,
+    apiKeyProvider,
     providerCredentialPresent,
+    providerCredentialSource,
     workspaceRoot,
     stateRoot,
     logFile: join(stateRoot, 'logs', `${sessionId}.log`),
@@ -80,6 +96,36 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
     }),
     runtimeHost: options.runtimeHost,
   };
+}
+
+export function resolveProviderCredentialSourceForModel(
+  model: string,
+  runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider'> & { credentialStorePath?: string },
+): ProviderCredentialSource {
+  const provider = inferProviderFromModel(model);
+  if (runtime?.apiKey && runtime.apiKeyProvider === 'explicit') {
+    return { type: 'explicit-api-key' };
+  }
+
+  if (runtime?.apiKey && runtime.apiKeyProvider === provider) {
+    return { type: 'env-api-key', provider };
+  }
+
+  const apiKey = resolveProviderApiKey(provider);
+  if (apiKey) {
+    return { type: 'env-api-key', provider };
+  }
+
+  const oauthCredential = resolveOAuthCredentialForModel(model, { storePath: runtime?.credentialStorePath });
+  if (oauthCredential) {
+    return {
+      type: 'oauth',
+      provider: oauthCredential.provider,
+      accountId: oauthCredential.accountId,
+      expiresAt: oauthCredential.expiresAt,
+    };
+  }
+  return { type: 'missing', provider };
 }
 
 export function resolveProviderApiKey(provider: LlmProvider): string | undefined {

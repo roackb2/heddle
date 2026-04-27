@@ -25,7 +25,7 @@ import { usePromptSubmission } from './hooks/usePromptSubmission.js';
 import { autocompleteLocalCommand } from './state/local-commands.js';
 import { currentActivityText } from './utils/format.js';
 import { listMentionableFiles } from './utils/file-mentions.js';
-import type { ChatRuntimeConfig } from './utils/runtime.js';
+import { resolveProviderCredentialSourceForModel, type ChatRuntimeConfig, type ProviderCredentialSource } from './utils/runtime.js';
 
 const SESSION_TITLE_MODEL = 'gpt-5.1-codex-mini';
 
@@ -114,6 +114,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     activeModel,
     activeSession?.context?.lastRunInputTokens ?? activeSession?.context?.estimatedRequestTokens,
   );
+  const authStatus = formatAuthStatus(resolveProviderCredentialSourceForModel(activeModel, runtime));
   const sessionFooter = `session=${activeSession?.id ?? activeSessionId}${activeSession?.name ? ` (${activeSession.name})` : ''}`;
   const renderedStatus =
     pendingApproval ? 'awaiting approval'
@@ -418,12 +419,25 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
           </>}
       </Box>
       <Text>
-        <Text dimColor>{`model=${activeModel} • ${contextStatus} • `}</Text>
+        <Text dimColor>{`model=${activeModel} • ${authStatus} • ${contextStatus} • `}</Text>
         <Text color={drift.color} dimColor={!drift.color}>{`drift=${drift.footer}`}</Text>
         <Text dimColor>{` • ${sessionFooter}`}</Text>
       </Text>
     </Box>
   );
+}
+
+function formatAuthStatus(source: ProviderCredentialSource): string {
+  switch (source.type) {
+    case 'explicit-api-key':
+      return 'auth=explicit-key';
+    case 'env-api-key':
+      return `auth=${source.provider}-key`;
+    case 'oauth':
+      return source.accountId ? `auth=${source.provider}-oauth:${source.accountId.slice(0, 8)}` : `auth=${source.provider}-oauth`;
+    case 'missing':
+      return `auth=missing-${source.provider}`;
+  }
 }
 
 function formatContextStatus(model: string, estimatedRequestTokens?: number): string {

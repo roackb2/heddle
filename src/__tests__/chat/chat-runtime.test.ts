@@ -4,9 +4,10 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { executeAgentTurn } from '../../cli/chat/hooks/useAgentRun.js';
 import type { ChatSession } from '../../cli/chat/state/types.js';
-import { resolveApiKeyForModel, resolveChatRuntimeConfig } from '../../cli/chat/utils/runtime.js';
+import { resolveApiKeyForModel, resolveChatRuntimeConfig, resolveProviderCredentialSourceForModel } from '../../cli/chat/utils/runtime.js';
 import { createLogger } from '../../core/utils/logger.js';
 import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../index.js';
+import { setStoredProviderCredential } from '../../core/auth/provider-credentials.js';
 
 describe('resolveChatRuntimeConfig', () => {
   afterEach(() => {
@@ -26,6 +27,7 @@ describe('resolveChatRuntimeConfig', () => {
 
     expect(runtime.apiKey).toBeUndefined();
     expect(runtime.providerCredentialPresent).toBe(false);
+    expect(runtime.providerCredentialSource).toEqual({ type: 'missing', provider: 'anthropic' });
   });
 
   it('uses Anthropic keys for Anthropic models', () => {
@@ -39,6 +41,7 @@ describe('resolveChatRuntimeConfig', () => {
 
     expect(runtime.apiKey).toBe('anthropic-key');
     expect(runtime.providerCredentialPresent).toBe(true);
+    expect(runtime.providerCredentialSource).toEqual({ type: 'env-api-key', provider: 'anthropic' });
   });
 
   it('resolves the correct provider key for a session model even if startup used another provider', () => {
@@ -52,7 +55,46 @@ describe('resolveChatRuntimeConfig', () => {
 
     expect(runtime.apiKey).toBe('openai-key');
     expect(runtime.apiKeyProvider).toBe('openai');
+    expect(runtime.providerCredentialSource).toEqual({ type: 'env-api-key', provider: 'openai' });
     expect(resolveApiKeyForModel('claude-sonnet-4-6', runtime)).toBe('anthropic-key');
+  });
+
+  it('reports stored OpenAI OAuth when no API key is configured', () => {
+    vi.stubEnv('OPENAI_API_KEY', '');
+    vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
+    const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-chat-oauth-')), 'auth.json');
+    const now = '2026-04-27T00:00:00.000Z';
+    setStoredProviderCredential({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAt: Date.parse('2026-04-27T01:00:00.000Z'),
+      accountId: 'account-1234567890',
+      createdAt: now,
+      updatedAt: now,
+    }, storePath);
+
+    const runtime = resolveChatRuntimeConfig({
+      workspaceRoot: '/tmp/heddle-test',
+      model: 'gpt-5.1-codex',
+      credentialStorePath: storePath,
+    });
+
+    expect(runtime.apiKey).toBeUndefined();
+    expect(runtime.providerCredentialPresent).toBe(true);
+    expect(runtime.providerCredentialSource).toEqual({
+      type: 'oauth',
+      provider: 'openai',
+      accountId: 'account-1234567890',
+      expiresAt: Date.parse('2026-04-27T01:00:00.000Z'),
+    });
+    expect(resolveProviderCredentialSourceForModel('gpt-5.1-codex-mini', { credentialStorePath: storePath })).toEqual({
+      type: 'oauth',
+      provider: 'openai',
+      accountId: 'account-1234567890',
+      expiresAt: Date.parse('2026-04-27T01:00:00.000Z'),
+    });
   });
 
   it('loads the workspace memory root catalog into startup context', () => {
@@ -88,6 +130,7 @@ describe('executeAgentTurn final message persistence', () => {
       apiKey: 'test-key',
       apiKeyProvider: 'explicit' as const,
       providerCredentialPresent: true,
+      providerCredentialSource: { type: 'explicit-api-key' as const },
       stateRoot,
       logFile: join(stateRoot, 'logs', 'test.log'),
       sessionCatalogFile: join(stateRoot, 'chat-sessions.catalog.json'),
