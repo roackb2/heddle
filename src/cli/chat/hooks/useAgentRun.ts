@@ -613,6 +613,17 @@ async function createChatDriftObserver(args: {
     return undefined;
   }
 
+  const llmInfo = llm.info;
+  const credentialSource = llmInfo?.provider === 'openai' ?
+    resolveProviderCredentialSourceForModel(llmInfo.model, runtime)
+  : undefined;
+  if (credentialSource?.type === 'oauth') {
+    const message = 'CyberLoop drift detection requires OpenAI Platform API-key mode for embeddings; active auth is OpenAI account sign-in.';
+    logger.debug({ model: llmInfo?.model, credentialSource: credentialSource.type }, message);
+    options.onError?.(new Error(message));
+    return undefined;
+  }
+
   try {
     return await createCyberLoopKinematicsObserver({
       goal: prompt,

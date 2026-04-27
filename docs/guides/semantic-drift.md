@@ -2,7 +2,7 @@
 
 Heddle can show whether the agent's responses are drifting away from the recent semantic trajectory of the conversation.
 
-The CyberLoop workflow is observe-only. Drift telemetry is enabled by default for new chat sessions when `cyberloop` is available.
+The CyberLoop workflow is observe-only. Drift telemetry is opt-in for chat sessions because it uses OpenAI Platform embeddings when enabled.
 
 ## What Heddle Does
 
@@ -22,6 +22,7 @@ Tool outputs are excluded from chat drift scoring so the signal focuses on where
 - Chat drift uses a more sensitive default stability threshold than CyberLoop's library default.
 - Set `HEDDLE_DRIFT_STABILITY_THRESHOLD` if you want to tune it.
 - The toggle is saved on the active chat session.
+- OpenAI account sign-in is not used for drift embeddings; enable drift only when you intend to use OpenAI Platform API-key mode for this telemetry.
 - `/drift` reports the last unavailable reason if the middleware or embeddings fail.
 
 Heddle does not calculate semantic drift itself. For the underlying methodology, see the [CyberLoop repository](https://github.com/roackb2/cyberloop) and [paper](https://zenodo.org/records/18138161).

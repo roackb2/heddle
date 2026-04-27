@@ -6,17 +6,17 @@ import { createChatSession, loadChatSessions } from '../../cli/chat/state/storag
 import { driftFooterColor, formatDriftFooter } from '../../cli/chat/utils/drift-footer.js';
 
 describe('chat drift defaults and footer formatting', () => {
-  it('enables CyberLoop drift detection by default for new sessions', () => {
+  it('leaves CyberLoop drift detection disabled by default for new sessions', () => {
     const session = createChatSession({
       id: 'session-1',
       name: 'Session 1',
       apiKeyPresent: true,
     });
 
-    expect(session.driftEnabled).toBe(true);
+    expect(session.driftEnabled).toBe(false);
   });
 
-  it('defaults old saved sessions without drift preference to enabled', () => {
+  it('defaults old saved sessions without drift preference to disabled', () => {
     const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-drift-'));
     const sessionsFile = join(dir, 'sessions.json');
     writeFileSync(sessionsFile, JSON.stringify([{
@@ -31,7 +31,7 @@ describe('chat drift defaults and footer formatting', () => {
 
     const [session] = loadChatSessions(sessionsFile, true);
 
-    expect(session?.driftEnabled).toBe(true);
+    expect(session?.driftEnabled).toBe(false);
   });
 
   it('keeps explicit drift opt-out from saved sessions', () => {

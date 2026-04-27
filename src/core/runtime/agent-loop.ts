@@ -72,6 +72,13 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
   const now = () => new Date().toISOString();
   const startedAt = now();
 
+  logger.info({
+    model,
+    provider,
+    credentialSource: providerCredentialSource.type,
+    credentialProvider: 'provider' in providerCredentialSource ? providerCredentialSource.provider : undefined,
+  }, 'Agent runtime configured');
+
   const resumeMetadata = getResumeMetadata(options.resumeFrom);
 
   options.onEvent?.({
