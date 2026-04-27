@@ -24,6 +24,7 @@ export type AskCliOptions = {
   model?: string;
   maxSteps?: number;
   apiKey?: string;
+  preferApiKey?: boolean;
   workspaceRoot?: string;
   stateDir?: string;
   searchIgnoreDirs?: string[];
@@ -64,6 +65,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
       model,
       maxSteps,
       apiKey: options.apiKey,
+      preferApiKey: options.preferApiKey,
       searchIgnoreDirs: options.searchIgnoreDirs,
       systemContext: options.systemContext,
       targetSessionId: options.sessionId,
@@ -82,7 +84,11 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
     sessionStoragePath,
     stateRoot,
     model,
-    apiKeyPresent: hasProviderCredentialForModel(model, { apiKey: options.apiKey, apiKeyProvider: 'explicit' }),
+    apiKeyPresent: hasProviderCredentialForModel(model, {
+      apiKey: options.apiKey,
+      apiKeyProvider: 'explicit',
+      preferApiKey: options.preferApiKey,
+    }),
   });
 
   if (targetSession) {
@@ -93,6 +99,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
       sessionId: targetSession.id,
       prompt: goal,
       apiKey: options.apiKey,
+      preferApiKey: options.preferApiKey,
       systemContext,
       memoryMaintenanceMode: 'inline',
       leaseOwner: {
@@ -121,6 +128,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
   const apiKey = resolveApiKeyForModel(model, {
     apiKey: options.apiKey,
     apiKeyProvider: options.apiKey ? 'explicit' : undefined,
+    preferApiKey: options.preferApiKey,
   });
   const llm = createLlmAdapter({ model, apiKey });
   const memoryDir = join(stateRoot, 'memory');
@@ -160,6 +168,7 @@ async function runDaemonBackedAsk(options: {
   model: string;
   maxSteps: number;
   apiKey?: string;
+  preferApiKey?: boolean;
   searchIgnoreDirs?: string[];
   systemContext?: string;
   targetSessionId?: string;
@@ -179,13 +188,18 @@ async function runDaemonBackedAsk(options: {
       ?? await createRemoteSession(client, {
         name: options.createSessionName?.trim() || undefined,
         model: options.model,
-        apiKeyPresent: hasProviderCredentialForModel(options.model, { apiKey: options.apiKey, apiKeyProvider: 'explicit' }),
+        apiKeyPresent: hasProviderCredentialForModel(options.model, {
+          apiKey: options.apiKey,
+          apiKeyProvider: 'explicit',
+          preferApiKey: options.preferApiKey,
+        }),
       });
 
     const result = await client.controlPlane.sessionSendPrompt.mutate({
       sessionId,
       prompt: options.goal,
       apiKey: options.apiKey,
+      preferApiKey: options.preferApiKey,
       systemContext: options.systemContext,
       memoryMaintenanceMode: 'inline',
     });
@@ -207,6 +221,7 @@ async function runDaemonBackedAsk(options: {
     model: options.model,
     maxSteps: options.maxSteps,
     apiKey: options.apiKey,
+    preferApiKey: options.preferApiKey,
     searchIgnoreDirs: options.searchIgnoreDirs,
     systemContext: options.systemContext,
   });

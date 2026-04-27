@@ -18,6 +18,7 @@ type MobileChatScreenProps = {
   runActive: boolean;
   runInFlight: boolean;
   memoryUpdating: boolean;
+  authStatus?: string;
   sendPromptError?: string;
   sessionNotice?: string;
   draft: string;
@@ -45,6 +46,7 @@ export function MobileChatScreen({
   runActive,
   runInFlight,
   memoryUpdating,
+  authStatus,
   sendPromptError,
   sessionNotice,
   draft,
@@ -103,6 +105,7 @@ export function MobileChatScreen({
         runActive={runActive}
         runInFlight={runInFlight}
         memoryUpdating={memoryUpdating}
+        authStatus={authStatus}
         canSend={canSend}
         canContinue={canContinue}
         pendingApproval={pendingApproval}
@@ -138,6 +141,7 @@ type MobileComposerProps = {
   runActive: boolean;
   runInFlight: boolean;
   memoryUpdating: boolean;
+  authStatus?: string;
   canSend: boolean;
   canContinue: boolean;
   pendingApproval: MobileChatScreenProps['pendingApproval'];
@@ -160,6 +164,7 @@ function MobileComposer({
   runActive,
   runInFlight,
   memoryUpdating,
+  authStatus,
   canSend,
   canContinue,
   pendingApproval,
@@ -205,6 +210,7 @@ function MobileComposer({
           {status ? <p className="m-0 truncate text-xs text-muted-foreground">{status}</p> : <RunStatus runActive={runActive} />}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {authStatus ? <Badge variant="secondary">{authStatus}</Badge> : null}
           <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" disabled={!canContinue} onClick={onContinueSession}>
             Continue
           </Button>

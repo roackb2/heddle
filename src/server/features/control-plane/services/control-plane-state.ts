@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import type { HeddleServerContext } from '../../../types.js';
 import type { ControlPlaneState } from '../types.js';
 import { readDaemonRegistry, registerKnownWorkspaces, resolveDaemonRegistryPath } from '../../../../core/runtime/daemon-registry.js';
+import { resolveProviderCredentialSourceForModel } from '../../../../core/runtime/api-keys.js';
 import { readChatSessionViews } from './chat-sessions.js';
 import { listControlPlaneHeartbeatRuns, listControlPlaneHeartbeatTasks } from './heartbeat.js';
 import { readControlPlaneMemoryStatus } from './memory.js';
@@ -18,6 +19,11 @@ export async function loadControlPlaneState(context: HeddleServerContext): Promi
   return {
     workspaceRoot,
     stateRoot,
+    auth: {
+      preferApiKey: context.preferApiKey,
+      openai: resolveProviderCredentialSourceForModel('gpt-5.4', { preferApiKey: context.preferApiKey }),
+      anthropic: resolveProviderCredentialSourceForModel('claude-sonnet-4-6', { preferApiKey: context.preferApiKey }),
+    },
     activeWorkspaceId: context.activeWorkspaceId,
     workspace: context.activeWorkspace,
     workspaces: context.workspaces,

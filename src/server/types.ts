@@ -5,6 +5,7 @@ import type { WorkspaceDescriptor } from '../core/runtime/workspaces.js';
 export type HeddleServerOptions = {
   workspaceRoot: string;
   stateRoot: string;
+  preferApiKey?: boolean;
   assetsDir?: string;
   serveAssets?: boolean;
   logger?: Logger;
@@ -35,6 +36,7 @@ export type HeddleRuntimeHostInfo = HeddleRuntimeHostDescriptor & {
 export type HeddleServerContext = {
   workspaceRoot: string;
   stateRoot: string;
+  preferApiKey: boolean;
   activeWorkspaceId: string;
   activeWorkspace: WorkspaceDescriptor;
   workspaces: WorkspaceDescriptor[];

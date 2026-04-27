@@ -34,6 +34,7 @@ export type SubmitChatSessionPromptArgs = {
   sessionId: string;
   prompt: string;
   apiKey?: string;
+  preferApiKey?: boolean;
   systemContext?: string;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   onEvent?: (event: AgentLoopEvent) => void;
@@ -52,12 +53,17 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
 
   const model = session.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
   const provider = inferProviderFromModel(model);
-  const apiKey = args.apiKey ?? resolveApiKeyForModel(model);
+  const apiKey = args.apiKey ?? resolveApiKeyForModel(model, { preferApiKey: args.preferApiKey });
   const providerCredentialSource = resolveProviderCredentialSourceForModel(model, {
     apiKey,
     apiKeyProvider: args.apiKey ? 'explicit' : apiKey ? provider : undefined,
+    preferApiKey: args.preferApiKey,
   });
-  if (!hasProviderCredentialForModel(model, { apiKey: args.apiKey, apiKeyProvider: args.apiKey ? 'explicit' : undefined })) {
+  if (!hasProviderCredentialForModel(model, {
+    apiKey: args.apiKey,
+    apiKeyProvider: args.apiKey ? 'explicit' : undefined,
+    preferApiKey: args.preferApiKey,
+  })) {
     throw new Error(formatMissingProviderCredentialMessage(model));
   }
   const leaseOwner = args.leaseOwner ?? {

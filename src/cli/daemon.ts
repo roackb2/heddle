@@ -8,6 +8,7 @@ import type { HeddleServerListenOptions } from '../server/index.js';
 export type DaemonCliOptions = {
   workspaceRoot?: string;
   stateDir?: string;
+  preferApiKey?: boolean;
 };
 
 export type DaemonArgs = {
@@ -29,6 +30,7 @@ export async function runDaemonCli(args: string[], options: DaemonCliOptions = {
   const listenOptions: HeddleServerListenOptions = {
     workspaceRoot,
     stateRoot: resolve(workspaceRoot, stateDir),
+    preferApiKey: Boolean(options.preferApiKey),
     host: parsed.host,
     port: parsed.port,
     assetsDir: parsed.assetsDir,

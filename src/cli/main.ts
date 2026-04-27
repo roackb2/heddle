@@ -41,6 +41,7 @@ type RootCliOptions = {
   cwd?: string;
   model?: string;
   maxSteps?: string;
+  preferApiKey?: boolean;
   forceOwnerConflict?: boolean;
 };
 
@@ -57,6 +58,7 @@ type ResolvedCliOptions = {
   workspaceRoot: string;
   model?: string;
   maxSteps?: number;
+  preferApiKey: boolean;
   stateDir: string;
   directShellApproval: 'always' | 'never';
   searchIgnoreDirs: string[];
@@ -77,6 +79,7 @@ async function main() {
     .option('--cwd <path>', 'run against another workspace root')
     .option('--model <name>', 'choose the active model')
     .option('--max-steps <n>', 'limit the agent loop length')
+    .option('--prefer-api-key', 'prefer environment API keys over stored OAuth credentials when both are available')
     .option('--force-owner-conflict', 'bypass live daemon ownership guards for this command');
 
   program
@@ -105,6 +108,7 @@ async function main() {
         workspaceRoot: resolved.workspaceRoot,
         model: resolved.model,
         maxSteps: resolved.maxSteps,
+        preferApiKey: resolved.preferApiKey,
         stateDir: resolved.stateDir,
         searchIgnoreDirs: resolved.searchIgnoreDirs,
         systemContext: resolved.systemContext,
@@ -296,6 +300,7 @@ async function main() {
       searchIgnoreDirs: resolved.searchIgnoreDirs,
       systemContext: resolved.systemContext,
       runtimeHost: resolved.forceOwnerConflict ? undefined : resolved.runtimeHost,
+      preferApiKey: resolved.preferApiKey,
     });
     return;
   }
@@ -492,6 +497,7 @@ function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
     workspaceRoot,
     model: flags.model ?? projectConfig.model,
     maxSteps: parsePositiveInt(flags.maxSteps) ?? projectConfig.maxSteps,
+    preferApiKey: Boolean(flags.preferApiKey),
     stateDir: projectConfig.stateDir ?? '.heddle',
     directShellApproval: projectConfig.directShellApproval ?? 'never',
     searchIgnoreDirs: projectConfig.searchIgnoreDirs ?? [],

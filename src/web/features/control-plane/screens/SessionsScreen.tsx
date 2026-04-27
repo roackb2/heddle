@@ -13,6 +13,7 @@ import {
   type WorkspaceFileDiff,
   type WorkspaceFileSuggestion,
 } from '../../../lib/api';
+import { formatControlPlaneAuthStatus } from '../auth-status';
 import { formatDate, className } from '../utils';
 import { CodeBlock, EmptyState, Pill, WorkspaceSectionHeader } from '../components/common';
 import { SessionListButton } from '../components/lists';
@@ -48,6 +49,7 @@ export type SessionsScreenProps = {
   sendingPrompt: boolean;
   runInFlight: boolean;
   memoryUpdating: boolean;
+  auth: ControlPlaneState['auth'];
   sendPromptError?: string;
   onSendPrompt: (prompt: string) => Promise<void>;
   creatingSession: boolean;
@@ -77,6 +79,7 @@ export function SessionsScreen({
   sendingPrompt,
   runInFlight,
   memoryUpdating,
+  auth,
   sendPromptError,
   onSendPrompt,
   creatingSession,
@@ -113,6 +116,7 @@ export function SessionsScreen({
   const [reviewMode, setReviewMode] = useState<ReviewMode>('current');
   const [expandedDiff, setExpandedDiff] = useState<ExpandedDiff | null>(null);
   const runActive = sendingPrompt || runInFlight;
+  const authStatus = formatControlPlaneAuthStatus(sessionDetail?.model ?? activeSession?.model, auth);
   const compactionStatus = sessionDetail?.context?.compactionStatus ?? activeSession?.context?.compactionStatus;
   const selectedReviewFile =
     turnReview?.files.find((file) => file.path === selectedReviewFilePath) ?? turnReview?.files[0];
@@ -486,6 +490,7 @@ export function SessionsScreen({
         runActive={runActive}
         runInFlight={runInFlight}
         memoryUpdating={memoryUpdating}
+        authStatus={authStatus}
         sendPromptError={sendPromptError}
         sessionNotice={sessionNotice}
         draft={draft}
@@ -602,6 +607,7 @@ export function SessionsScreen({
               >
                 {formatDriftLabel(sessionDetail?.driftEnabled ?? activeSession.driftEnabled, sessionDetail?.driftLevel ?? activeSession.driftLevel)}
               </button>
+              {authStatus ? <Pill>{authStatus}</Pill> : null}
               {runActive ? <Pill tone="warn">working</Pill> : null}
             </div>
           ) : undefined}

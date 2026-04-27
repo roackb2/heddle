@@ -113,6 +113,38 @@ describe('resolveChatRuntimeConfig', () => {
     expect(explicitRuntime.providerCredentialSource).toEqual({ type: 'explicit-api-key' });
   });
 
+  it('uses environment API keys ahead of stored OAuth when preferApiKey is enabled', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'openai-key');
+    vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
+    const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-chat-prefer-key-')), 'auth.json');
+    const now = '2026-04-27T00:00:00.000Z';
+    setStoredProviderCredential({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAt: Date.parse('2026-04-27T01:00:00.000Z'),
+      accountId: 'account-1234567890',
+      createdAt: now,
+      updatedAt: now,
+    }, storePath);
+
+    const runtime = resolveChatRuntimeConfig({
+      workspaceRoot: '/tmp/heddle-test',
+      model: 'gpt-5.4',
+      credentialStorePath: storePath,
+      preferApiKey: true,
+    });
+
+    expect(runtime.apiKey).toBe('openai-key');
+    expect(runtime.preferApiKey).toBe(true);
+    expect(runtime.providerCredentialSource).toEqual({ type: 'env-api-key', provider: 'openai' });
+    expect(resolveProviderCredentialSourceForModel('gpt-5.4', {
+      credentialStorePath: storePath,
+      preferApiKey: true,
+    })).toEqual({ type: 'env-api-key', provider: 'openai' });
+  });
+
   it('loads the workspace memory root catalog into startup context', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-chat-memory-context-'));
     const memoryRoot = join(workspaceRoot, '.heddle', 'memory');
@@ -145,6 +177,7 @@ describe('executeAgentTurn final message persistence', () => {
       maxSteps: 4,
       apiKey: 'test-key',
       apiKeyProvider: 'explicit' as const,
+      preferApiKey: false,
       providerCredentialPresent: true,
       providerCredentialSource: { type: 'explicit-api-key' as const },
       stateRoot,

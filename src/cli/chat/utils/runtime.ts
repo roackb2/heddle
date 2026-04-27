@@ -17,6 +17,7 @@ export type ChatCliOptions = {
   model?: string;
   maxSteps?: number;
   apiKey?: string;
+  preferApiKey?: boolean;
   workspaceRoot?: string;
   stateDir?: string;
   directShellApproval?: 'always' | 'never';
@@ -31,6 +32,7 @@ export type ChatRuntimeConfig = {
   maxSteps: number;
   apiKey?: string;
   apiKeyProvider?: LlmProvider | 'explicit';
+  preferApiKey: boolean;
   providerCredentialPresent: boolean;
   providerCredentialSource: ProviderCredentialSource;
   stateRoot: string;
@@ -64,13 +66,17 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
   const memoryDir = join(stateRoot, 'memory');
   const model = options.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
   const provider = inferProviderFromModel(model);
-  const oauthCredential = options.apiKey ? undefined : resolveOAuthCredentialForModel(model, { storePath: options.credentialStorePath });
+  const preferApiKey = Boolean(options.preferApiKey);
+  const oauthCredential =
+    options.apiKey || preferApiKey ? undefined
+    : resolveOAuthCredentialForModel(model, { storePath: options.credentialStorePath });
   const apiKey = options.apiKey ?? (oauthCredential ? undefined : resolveProviderApiKey(provider));
   const apiKeyProvider = options.apiKey ? 'explicit' : apiKey ? provider : undefined;
   const providerCredentialSource = resolveProviderCredentialSourceForModel(model, {
     apiKey,
     apiKeyProvider,
     credentialStorePath: options.credentialStorePath,
+    preferApiKey,
   });
   const providerCredentialPresent = providerCredentialSource.type !== 'missing';
 
@@ -79,6 +85,7 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
     maxSteps: options.maxSteps ?? parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 100,
     apiKey,
     apiKeyProvider,
+    preferApiKey,
     providerCredentialPresent,
     providerCredentialSource,
     workspaceRoot,
@@ -101,7 +108,7 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
 
 export function resolveProviderCredentialSourceForModel(
   model: string,
-  runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider'> & { credentialStorePath?: string },
+  runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider' | 'preferApiKey'> & { credentialStorePath?: string },
 ): ProviderCredentialSource {
   return resolveRuntimeProviderCredentialSourceForModel(model, runtime);
 }
@@ -112,14 +119,14 @@ export function resolveProviderApiKey(provider: LlmProvider): string | undefined
 
 export function resolveApiKeyForModel(
   model: string,
-  runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider' | 'credentialStorePath'>,
+  runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider' | 'credentialStorePath' | 'preferApiKey'>,
 ): string | undefined {
   return resolveRuntimeApiKeyForModel(model, runtime);
 }
 
 export function hasProviderCredentialForModel(
   model: string,
-  runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider' | 'credentialStorePath'>,
+  runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider' | 'credentialStorePath' | 'preferApiKey'>,
 ): boolean {
   return hasRuntimeProviderCredentialForModel(model, runtime);
 }

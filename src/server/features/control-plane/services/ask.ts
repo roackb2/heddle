@@ -19,6 +19,7 @@ export type RunControlPlaneAskArgs = {
   model?: string;
   maxSteps?: number;
   apiKey?: string;
+  preferApiKey?: boolean;
   searchIgnoreDirs?: string[];
   systemContext?: string;
 };
@@ -36,6 +37,7 @@ export async function runControlPlaneAsk(args: RunControlPlaneAskArgs): Promise<
   const apiKey = resolveApiKeyForModel(model, {
     apiKey: args.apiKey,
     apiKeyProvider: args.apiKey ? 'explicit' : undefined,
+    preferApiKey: args.preferApiKey,
   });
   const llm = createLlmAdapter({ model, apiKey });
 

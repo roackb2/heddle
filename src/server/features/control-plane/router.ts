@@ -39,6 +39,7 @@ import { registerKnownWorkspaces, resolveDaemonRegistryPath } from '../../../cor
 const sessionInputSchema = z.object({
   id: z.string().min(1),
   apiKey: z.string().min(1).optional(),
+  preferApiKey: z.boolean().optional(),
 });
 
 const createSessionInputSchema = z.object({
@@ -51,6 +52,7 @@ const sessionMessageInputSchema = z.object({
   sessionId: z.string().min(1),
   prompt: z.string().min(1),
   apiKey: z.string().min(1).optional(),
+  preferApiKey: z.boolean().optional(),
   systemContext: z.string().min(1).optional(),
   memoryMaintenanceMode: z.enum(['background', 'inline', 'none']).optional(),
 });
@@ -60,6 +62,7 @@ const agentAskInputSchema = z.object({
   model: z.string().min(1).optional(),
   maxSteps: z.number().int().min(1).max(500).optional(),
   apiKey: z.string().min(1).optional(),
+  preferApiKey: z.boolean().optional(),
   searchIgnoreDirs: z.array(z.string().min(1)).optional(),
   systemContext: z.string().min(1).optional(),
 });
@@ -205,6 +208,7 @@ export const controlPlaneRouter = router({
       sessionId: input.sessionId,
       prompt: input.prompt,
       apiKey: input.apiKey,
+      preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
       systemContext: input.systemContext,
       memoryMaintenanceMode: input.memoryMaintenanceMode,
       leaseOwner: {
@@ -221,6 +225,7 @@ export const controlPlaneRouter = router({
       sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
       sessionId: input.id,
       apiKey: input.apiKey,
+      preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
       leaseOwner: {
         ownerKind: 'daemon',
         ownerId: ctx.runtimeHost?.ownerId ?? `daemon-${process.pid}`,
@@ -236,6 +241,7 @@ export const controlPlaneRouter = router({
       model: input.model,
       maxSteps: input.maxSteps,
       apiKey: input.apiKey,
+      preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
       searchIgnoreDirs: input.searchIgnoreDirs,
       systemContext: input.systemContext,
     });

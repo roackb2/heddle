@@ -4,6 +4,7 @@ import type { HeartbeatRunView, HeartbeatTaskView } from '../../../core/runtime/
 import type { WorkspaceDescriptor } from '../../../core/runtime/workspaces.js';
 import type { MemoryStatusView } from '../../../core/memory/visibility.js';
 import type { ReviewDiffFile } from '../../../core/review/diff-domain.js';
+import type { ProviderCredentialSource } from '../../../core/runtime/api-keys.js';
 
 export type ChatSessionView = {
   id: string;
@@ -153,6 +154,11 @@ export type ControlPlaneSessionLiveEvent = {
 export type ControlPlaneState = {
   workspaceRoot: string;
   stateRoot: string;
+  auth: {
+    preferApiKey: boolean;
+    openai: ProviderCredentialSource;
+    anthropic: ProviderCredentialSource;
+  };
   activeWorkspaceId: string;
   workspace: WorkspaceDescriptor;
   workspaces: WorkspaceDescriptor[];

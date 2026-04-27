@@ -30,6 +30,7 @@ type SubmitChatPromptArgs = {
   sessionId: string;
   prompt: string;
   apiKey?: string;
+  preferApiKey?: boolean;
   systemContext?: string;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   leaseOwner: ChatSessionLeaseOwner;
@@ -109,6 +110,7 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs) {
     const result = await submitChatSessionPrompt({
       ...args,
       apiKey: args.apiKey,
+      preferApiKey: args.preferApiKey,
       memoryMaintenanceMode: args.memoryMaintenanceMode,
       abortSignal: controller.signal,
       onEvent: (event) => {

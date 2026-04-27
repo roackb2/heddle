@@ -207,6 +207,7 @@ function SessionsRoute({
       sendingPrompt={sessionsState.sendingPrompt}
       runInFlight={sessionsState.runInFlight}
       memoryUpdating={sessionsState.memoryUpdating}
+      auth={state.auth}
       sendPromptError={sessionsState.sendPromptError}
       onSendPrompt={sessionsState.sendPrompt}
       creatingSession={sessionsState.creatingSession}

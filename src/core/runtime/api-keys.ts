@@ -9,6 +9,7 @@ export type ApiKeyRuntime = {
   apiKey?: string;
   apiKeyProvider?: LlmProvider | 'explicit';
   credentialStorePath?: string;
+  preferApiKey?: boolean;
 };
 
 export type ProviderCredentialSource =
@@ -67,6 +68,17 @@ export function resolveProviderCredentialSourceForModel(
   const provider = inferProviderFromModel(model);
   if (runtime?.apiKey && runtime.apiKeyProvider === 'explicit') {
     return { type: 'explicit-api-key' };
+  }
+
+  if (runtime?.preferApiKey) {
+    if (runtime.apiKey && runtime.apiKeyProvider === provider) {
+      return { type: 'env-api-key', provider };
+    }
+
+    const preferredApiKey = resolveProviderApiKey(provider);
+    if (preferredApiKey) {
+      return { type: 'env-api-key', provider };
+    }
   }
 
   const oauthCredential = resolveOAuthCredentialForModel(model, { storePath: runtime?.credentialStorePath });

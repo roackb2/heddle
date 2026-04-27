@@ -11,7 +11,8 @@ import { readDaemonWorkspaceRegistration } from '../core/runtime/daemon-registry
 import { resolveWorkspaceContext } from '../core/runtime/workspaces.js';
 
 export function createHeddleServerApp(
-  options: Omit<HeddleServerContext, 'logger' | 'activeWorkspaceId' | 'activeWorkspace' | 'workspaces' | 'runtimeHost'>
+  options: Pick<HeddleServerContext, 'workspaceRoot' | 'stateRoot'>
+    & { preferApiKey?: boolean }
     & Partial<Pick<HeddleServerContext, 'logger'>>
     & { runtimeHost?: HeddleRuntimeHostDescriptor | null }
     & { assetsDir?: string; serveAssets?: boolean },
@@ -39,6 +40,7 @@ export function createHeddleServerApp(
       return {
         workspaceRoot: options.workspaceRoot,
         stateRoot: options.stateRoot,
+        preferApiKey: Boolean(options.preferApiKey),
         activeWorkspaceId: workspaceContext.activeWorkspaceId,
         activeWorkspace: workspaceContext.activeWorkspace,
         workspaces: workspaceContext.workspaces,
