@@ -178,17 +178,26 @@ describe('OpenAI OAuth helpers', () => {
       }) as typeof fetch,
     });
 
-    await expect(adapter.chat([{ role: 'user', content: 'hello' }], [])).rejects.toThrow();
+    await expect(adapter.chat([
+      { role: 'system', content: 'You are Heddle. Reply with OK only.' },
+      { role: 'user', content: 'hello' },
+    ], [])).rejects.toThrow();
 
     expect(requests[0]?.url).toBe(OPENAI_CODEX_RESPONSES_ENDPOINT);
     const body = JSON.parse(requests[0]?.body ?? '{}') as {
       model?: string;
       store?: boolean;
       reasoning?: { summary?: string };
+      instructions?: string;
+      input?: Array<{ type?: string; role?: string; content?: string }>;
     };
     expect(body.model).toBe('gpt-5.4');
     expect(body.store).toBe(false);
     expect(body.reasoning?.summary).toBe('auto');
+    expect(body.instructions).toBe('You are Heddle. Reply with OK only.');
+    expect(body.input).toEqual([
+      { type: 'message', role: 'user', content: 'hello' },
+    ]);
   });
 });
 

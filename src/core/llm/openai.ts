@@ -73,14 +73,13 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
         throw new Error(`OpenAI account sign-in is not enabled for model ${model}. Use one of ${formatOpenAiAccountSignInModels()}, or set OPENAI_API_KEY to use Platform API-key mode.`);
       }
 
-      const stream = await client.responses.stream({
+      const request = buildOpenAiResponsesRequest(messages, {
         model,
-        input: toResponseInput(messages),
-        tools: tools.length > 0 ? tools.map(toResponseTool) : undefined,
-        store: false,
-        reasoning: {
-          summary: oauthCredential ? 'auto' : 'detailed',
-        },
+        tools,
+        oauthMode: Boolean(oauthCredential),
+      });
+      const stream = await client.responses.stream({
+        ...request,
       }, { signal });
 
       let streamedContent = '';
@@ -253,6 +252,40 @@ function extractUsage(response: OpenAiResponse): LlmUsage | undefined {
 
 function toResponseInput(messages: ChatMessage[]): ResponseInputItem[] {
   return messages.flatMap((message) => toResponseInputItems(message));
+}
+
+function buildOpenAiResponsesRequest(
+  messages: ChatMessage[],
+  options: {
+    model: string;
+    tools: ToolDefinition[];
+    oauthMode: boolean;
+  },
+): {
+  model: string;
+  input: ResponseInputItem[];
+  tools?: FunctionTool[];
+  store: boolean;
+  reasoning: { summary: 'auto' | 'detailed' };
+  instructions?: string;
+} {
+  const systemMessages = options.oauthMode ? messages.filter((message): message is Extract<ChatMessage, { role: 'system' }> => message.role === 'system') : [];
+  const inputMessages = options.oauthMode ? messages.filter((message) => message.role !== 'system') : messages;
+  const instructions =
+    options.oauthMode ?
+      systemMessages.map((message) => message.content.trim()).filter(Boolean).join('\n\n')
+    : undefined;
+
+  return {
+    model: options.model,
+    input: toResponseInput(inputMessages),
+    tools: options.tools.length > 0 ? options.tools.map(toResponseTool) : undefined,
+    store: false,
+    reasoning: {
+      summary: options.oauthMode ? 'auto' : 'detailed',
+    },
+    ...(instructions ? { instructions } : {}),
+  };
 }
 
 function toResponseInputItems(msg: ChatMessage): ResponseInputItem[] {
