@@ -38,6 +38,7 @@ export type ChatRuntimeConfig = {
   traceDir: string;
   memoryDir: string;
   workspaceRoot: string;
+  credentialStorePath?: string;
   directShellApproval: 'always' | 'never';
   searchIgnoreDirs: string[];
   systemContext?: string;
@@ -83,6 +84,7 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
     providerCredentialPresent,
     providerCredentialSource,
     workspaceRoot,
+    credentialStorePath: options.credentialStorePath,
     stateRoot,
     logFile: join(stateRoot, 'logs', `${sessionId}.log`),
     sessionCatalogFile: join(stateRoot, 'chat-sessions.catalog.json'),
@@ -108,10 +110,6 @@ export function resolveProviderCredentialSourceForModel(
     return { type: 'explicit-api-key' };
   }
 
-  if (runtime?.apiKey && runtime.apiKeyProvider === provider) {
-    return { type: 'env-api-key', provider };
-  }
-
   const oauthCredential = resolveOAuthCredentialForModel(model, { storePath: runtime?.credentialStorePath });
   if (oauthCredential) {
     return {
@@ -120,6 +118,10 @@ export function resolveProviderCredentialSourceForModel(
       accountId: oauthCredential.accountId,
       expiresAt: oauthCredential.expiresAt,
     };
+  }
+
+  if (runtime?.apiKey && runtime.apiKeyProvider === provider) {
+    return { type: 'env-api-key', provider };
   }
 
   const apiKey = resolveProviderApiKey(provider);
@@ -133,13 +135,16 @@ export function resolveProviderApiKey(provider: LlmProvider): string | undefined
   return resolveRuntimeProviderApiKey(provider);
 }
 
-export function resolveApiKeyForModel(model: string, runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider'>): string | undefined {
+export function resolveApiKeyForModel(
+  model: string,
+  runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider' | 'credentialStorePath'>,
+): string | undefined {
   return resolveRuntimeApiKeyForModel(model, runtime);
 }
 
 export function hasProviderCredentialForModel(
   model: string,
-  runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider'>,
+  runtime?: Pick<ChatRuntimeConfig, 'apiKey' | 'apiKeyProvider' | 'credentialStorePath'>,
 ): boolean {
   return hasRuntimeProviderCredentialForModel(model, runtime);
 }

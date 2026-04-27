@@ -8,6 +8,7 @@ import {
 export type ApiKeyRuntime = {
   apiKey?: string;
   apiKeyProvider?: LlmProvider | 'explicit';
+  credentialStorePath?: string;
 };
 
 export function resolveProviderApiKey(provider: LlmProvider): string | undefined {
@@ -27,6 +28,10 @@ export function resolveApiKeyForModel(model: string, runtime?: ApiKeyRuntime): s
   }
 
   const provider = inferProviderFromModel(model);
+  if (resolveOAuthCredentialForModel(model, { storePath: runtime?.credentialStorePath })) {
+    return undefined;
+  }
+
   if (runtime?.apiKey && runtime.apiKeyProvider === provider) {
     return runtime.apiKey;
   }

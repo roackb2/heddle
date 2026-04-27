@@ -1,6 +1,9 @@
 import type { ChatSession, LocalCommandResult } from './types.js';
 import { summarizeSession } from './storage.js';
+import { formatAuthStatusMessage, loginProviderWithOAuth, logoutProvider } from '../../auth.js';
+import type { OpenAiOAuthCredential } from '../../../core/auth/openai-oauth.js';
 import { COMMON_BUILT_IN_MODELS, formatBuiltInModelGroups } from '../../../core/llm/openai-models.js';
+import type { LlmProvider } from '../../../core/llm/types.js';
 import { createFileHeartbeatTaskStore } from '../../../core/runtime/heartbeat-task-store.js';
 import { join } from 'node:path';
 
@@ -29,6 +32,8 @@ export type LocalCommandArgs = {
   listRecentSessionsMessage: string[];
   workspaceRoot: string;
   stateRoot: string;
+  credentialStorePath?: string;
+  openAiLogin?: () => Promise<OpenAiOAuthCredential>;
 };
 
 type ExactCommandHandler = (args: LocalCommandArgs) => Promise<LocalCommandResult> | LocalCommandResult;
@@ -42,6 +47,10 @@ const HELP_HINTS: LocalCommandHint[] = [
   { command: '/model <name>', description: 'switch the current model' },
   { command: '/model set [query]', description: 'pick a model with filtering' },
   { command: '/model list', description: 'list common built-in models' },
+  { command: '/auth', description: 'show stored provider credentials' },
+  { command: '/auth status', description: 'show stored provider credentials' },
+  { command: '/auth login openai', description: 'sign in with OpenAI ChatGPT/Codex OAuth' },
+  { command: '/auth logout <provider>', description: 'remove a stored provider credential' },
   { command: '/continue', description: 'resume from the current transcript' },
   { command: '/clear', description: 'reset the current session transcript' },
   { command: '/compact', description: 'compact earlier session history for the next run' },
@@ -82,6 +91,8 @@ const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
   ['/model list', () => messageResult(MODEL_LIST_MESSAGE)],
   ['/model', (args) => messageResult(`Current model: ${args.activeModel}`)],
   ['/model set', () => messageResult(MODEL_SET_HELP_MESSAGE)],
+  ['/auth', (args) => messageResult(formatAuthStatusMessage(args.credentialStorePath))],
+  ['/auth status', (args) => messageResult(formatAuthStatusMessage(args.credentialStorePath))],
   ['/clear', (args) => {
     args.clearConversation();
     return messageResult('Cleared the current chat transcript.');
@@ -112,6 +123,8 @@ const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
 
 const PREFIX_COMMANDS: Array<{ prefix: string; handle: PrefixCommandHandler }> = [
   { prefix: '/model ', handle: handleModelCommand },
+  { prefix: '/auth login ', handle: handleAuthLogin },
+  { prefix: '/auth logout ', handle: handleAuthLogout },
   { prefix: '/heartbeat task ', handle: handleHeartbeatTask },
   { prefix: '/heartbeat runs ', handle: handleHeartbeatRuns },
   { prefix: '/heartbeat run ', handle: handleHeartbeatRun },
@@ -244,6 +257,36 @@ function handleModelCommand(args: LocalCommandArgs, value: string): LocalCommand
       `Switched model to ${value}`
     : `Switched model to ${value}. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.`,
   );
+}
+
+async function handleAuthLogin(args: LocalCommandArgs, value: string): Promise<LocalCommandResult> {
+  const provider = parseAuthProvider(value);
+  if (!provider) {
+    return messageResult('Usage: /auth login <provider>');
+  }
+
+  try {
+    const message = await loginProviderWithOAuth(provider, {
+      storePath: args.credentialStorePath,
+      openAiLogin: args.openAiLogin,
+    });
+    return messageResult(message);
+  } catch (error) {
+    return messageResult(`Auth login failed. ${formatErrorMessage(error)}`);
+  }
+}
+
+function handleAuthLogout(args: LocalCommandArgs, value: string): LocalCommandResult {
+  const provider = parseAuthProvider(value);
+  if (!provider) {
+    return messageResult('Usage: /auth logout <provider>');
+  }
+
+  try {
+    return messageResult(logoutProvider(provider, args.credentialStorePath));
+  } catch (error) {
+    return messageResult(`Auth logout failed. ${formatErrorMessage(error)}`);
+  }
 }
 
 async function handleHeartbeatTask(args: LocalCommandArgs, value: string): Promise<LocalCommandResult> {
@@ -494,6 +537,18 @@ function resolveSessionReference(args: LocalCommandArgs, value: string): ChatSes
   }
 
   return args.recentSessions[numericIndex - 1];
+}
+
+function parseAuthProvider(value: string): LlmProvider | undefined {
+  const provider = value.trim().split(/\s+/, 1)[0]?.toLowerCase();
+  if (provider === 'openai' || provider === 'anthropic' || provider === 'google') {
+    return provider;
+  }
+  return undefined;
+}
+
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function messageResult(message: string): LocalCommandResult {

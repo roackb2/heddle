@@ -97,6 +97,11 @@ describe('resolveChatRuntimeConfig', () => {
       accountId: 'account-1234567890',
       expiresAt: Date.parse('2026-04-27T01:00:00.000Z'),
     });
+    expect(resolveApiKeyForModel('gpt-5.1-codex-mini', {
+      apiKey: 'openai-key',
+      apiKeyProvider: 'openai',
+      credentialStorePath: storePath,
+    })).toBeUndefined();
 
     const explicitRuntime = resolveChatRuntimeConfig({
       workspaceRoot: '/tmp/heddle-test',

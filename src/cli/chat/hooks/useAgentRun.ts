@@ -124,12 +124,12 @@ export function useAgentRun(args: UseAgentRunArgs) {
   const titleApiKey = resolveApiKeyForModel(sessionTitleModel, runtime);
 
   const llm = useMemo(
-    () => createLlmAdapter({ model: activeModel, apiKey: activeApiKey }),
-    [activeApiKey, activeModel],
+    () => createLlmAdapter({ model: activeModel, apiKey: activeApiKey, credentialStorePath: runtime.credentialStorePath }),
+    [activeApiKey, activeModel, runtime.credentialStorePath],
   );
   const titleLlm = useMemo(
-    () => createLlmAdapter({ model: sessionTitleModel, apiKey: titleApiKey }),
-    [sessionTitleModel, titleApiKey],
+    () => createLlmAdapter({ model: sessionTitleModel, apiKey: titleApiKey, credentialStorePath: runtime.credentialStorePath }),
+    [runtime.credentialStorePath, sessionTitleModel, titleApiKey],
   );
   const tools = useMemo(
     () => {

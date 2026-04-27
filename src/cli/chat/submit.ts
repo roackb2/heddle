@@ -34,6 +34,7 @@ type SubmitChatPromptArgs = {
   setDriftEnabled: (enabled: boolean) => void;
   workspaceRoot: string;
   stateRoot: string;
+  credentialStorePath?: string;
   preparePrompt?: (prompt: string) => { prompt: string; displayText?: string };
   executeTurn: (prompt: string, displayText?: string, sessionIdOverride?: string) => Promise<void>;
   executeDirectShellCommand: (rawCommand: string) => Promise<void>;
@@ -131,6 +132,7 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
     listRecentSessionsMessage: args.listRecentSessionsMessage,
     workspaceRoot: args.workspaceRoot,
     stateRoot: args.stateRoot,
+    credentialStorePath: args.credentialStorePath,
   } satisfies LocalCommandDeps);
 
   if (!commandResult.handled) {

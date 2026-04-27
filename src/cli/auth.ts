@@ -21,50 +21,38 @@ export async function runAuthCli(command: AuthCliCommand, provider?: string, opt
   const storePath = options.storePath ?? resolveProviderCredentialStorePath();
 
   if (command === 'status') {
-    writeAuthStatus(storePath);
+    process.stdout.write(formatAuthStatusMessage(storePath));
+    process.stdout.write('\n');
     return;
   }
 
   const normalizedProvider = parseProvider(provider);
   if (command === 'login') {
-    if (normalizedProvider !== 'openai') {
-      throw new Error(`OAuth login is not available for ${normalizedProvider}. Use API keys or supported provider credentials.`);
-    }
-
     process.stdout.write('Starting OpenAI ChatGPT/Codex OAuth login...\n');
-    const credential = await (options.openAiLogin ?? (() => runOpenAiBrowserOAuthLogin({
-      openBrowser: options.openBrowser,
+    process.stdout.write(await loginProviderWithOAuth(normalizedProvider, {
+      ...options,
+      storePath,
       onAuthorizeUrl: (url) => {
         process.stdout.write(`Open this URL to authorize Heddle:\n${url}\n`);
       },
-    })))();
-    setStoredProviderCredential(credential, storePath);
-    process.stdout.write('Stored OpenAI OAuth credential.\n');
-    if (credential.accountId) {
-      process.stdout.write(`Account: ${credential.accountId}\n`);
-    }
-    process.stdout.write(`Expires: ${new Date(credential.expiresAt).toISOString()}\n`);
+    }));
+    process.stdout.write('\n');
     return;
   }
 
-  const removed = removeStoredProviderCredential(normalizedProvider, storePath);
-  process.stdout.write(
-    removed ?
-      `Removed stored ${normalizedProvider} credential.\n`
-    : `No stored ${normalizedProvider} credential found.\n`,
-  );
+  process.stdout.write(logoutProvider(normalizedProvider, storePath));
+  process.stdout.write('\n');
 }
 
-function writeAuthStatus(storePath: string) {
+export function formatAuthStatusMessage(storePath = resolveProviderCredentialStorePath()): string {
   const summaries = listStoredProviderCredentialSummaries(storePath);
-  process.stdout.write(`Auth store: ${storePath}\n`);
+  const lines = [`Auth store: ${storePath}`];
 
   if (summaries.length === 0) {
-    process.stdout.write('Stored credentials: none\n');
-    return;
+    return [...lines, 'Stored credentials: none'].join('\n');
   }
 
-  process.stdout.write('Stored credentials:\n');
+  lines.push('Stored credentials:');
   for (const summary of summaries) {
     const details = [
       `type=${summary.type}`,
@@ -74,8 +62,38 @@ function writeAuthStatus(storePath: string) {
       summary.expired === true ? 'expired=true' : undefined,
       `updated=${summary.updatedAt}`,
     ].filter(Boolean);
-    process.stdout.write(`- ${summary.provider}: ${details.join(' ')}\n`);
+    lines.push(`- ${summary.provider}: ${details.join(' ')}`);
   }
+  return lines.join('\n');
+}
+
+export async function loginProviderWithOAuth(
+  provider: LlmProvider,
+  options: AuthCliOptions & { onAuthorizeUrl?: (url: string) => void } = {},
+): Promise<string> {
+  const storePath = options.storePath ?? resolveProviderCredentialStorePath();
+  if (provider !== 'openai') {
+    throw new Error(`OAuth login is not available for ${provider}. Use API keys or supported provider credentials.`);
+  }
+
+  const credential = await (options.openAiLogin ?? (() => runOpenAiBrowserOAuthLogin({
+    openBrowser: options.openBrowser,
+    onAuthorizeUrl: options.onAuthorizeUrl,
+  })))();
+  setStoredProviderCredential(credential, storePath);
+
+  return [
+    'Stored OpenAI OAuth credential.',
+    credential.accountId ? `Account: ${credential.accountId}` : undefined,
+    `Expires: ${new Date(credential.expiresAt).toISOString()}`,
+  ].filter((line): line is string => Boolean(line)).join('\n');
+}
+
+export function logoutProvider(provider: LlmProvider, storePath = resolveProviderCredentialStorePath()): string {
+  const removed = removeStoredProviderCredential(provider, storePath);
+  return removed ?
+      `Removed stored ${provider} credential.`
+    : `No stored ${provider} credential found.`;
 }
 
 function parseProvider(provider: string | undefined): LlmProvider {

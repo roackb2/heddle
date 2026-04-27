@@ -1,8 +1,9 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { autocompleteLocalCommand, getLocalCommandHints, isLikelyLocalCommand, runLocalCommand } from '../../cli/chat/state/local-commands.js';
+import { getStoredProviderCredential, setStoredProviderCredential } from '../../core/auth/provider-credentials.js';
 
 function createCommandArgs(overrides: Partial<Parameters<typeof runLocalCommand>[0]> = {}): Parameters<typeof runLocalCommand>[0] {
   return {
@@ -226,6 +227,80 @@ describe('runLocalCommand', () => {
     }
   });
 
+  it('shows auth status and supports OpenAI OAuth login from chat', async () => {
+    const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-chat-auth-')), 'auth.json');
+
+    const emptyStatus = await runLocalCommand(createCommandArgs({
+      prompt: '/auth status',
+      credentialStorePath: storePath,
+    }));
+    expect(emptyStatus).toMatchObject({
+      handled: true,
+      kind: 'message',
+    });
+    if (!emptyStatus.handled || emptyStatus.kind !== 'message') {
+      throw new Error('expected /auth status to return a message result');
+    }
+    expect(emptyStatus.message).toContain('Stored credentials: none');
+
+    const login = await runLocalCommand(createCommandArgs({
+      prompt: '/auth login openai',
+      credentialStorePath: storePath,
+      openAiLogin: async () => ({
+        type: 'oauth',
+        provider: 'openai',
+        accessToken: 'access-secret',
+        refreshToken: 'refresh-secret',
+        expiresAt: Date.parse('2026-04-27T01:00:00.000Z'),
+        accountId: 'account-123',
+        createdAt: '2026-04-27T00:00:00.000Z',
+        updatedAt: '2026-04-27T00:00:00.000Z',
+        label: 'ChatGPT/Codex OAuth',
+      }),
+    }));
+    expect(login).toMatchObject({
+      handled: true,
+      kind: 'message',
+    });
+    if (!login.handled || login.kind !== 'message') {
+      throw new Error('expected /auth login openai to return a message result');
+    }
+    expect(login.message).toContain('Stored OpenAI OAuth credential.');
+    expect(login.message).toContain('Account: account-123');
+    expect(login.message).not.toContain('access-secret');
+    expect(getStoredProviderCredential('openai', storePath)).toMatchObject({
+      type: 'oauth',
+      provider: 'openai',
+      accountId: 'account-123',
+    });
+  });
+
+  it('supports provider credential logout from chat', async () => {
+    const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-chat-auth-')), 'auth.json');
+    setStoredProviderCredential({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'access-secret',
+      refreshToken: 'refresh-secret',
+      expiresAt: Date.parse('2026-04-27T01:00:00.000Z'),
+      accountId: 'account-123',
+      createdAt: '2026-04-27T00:00:00.000Z',
+      updatedAt: '2026-04-27T00:00:00.000Z',
+    }, storePath);
+
+    const logout = await runLocalCommand(createCommandArgs({
+      prompt: '/auth logout openai',
+      credentialStorePath: storePath,
+    }));
+
+    expect(logout).toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'Removed stored openai credential.',
+    });
+    expect(getStoredProviderCredential('openai', storePath)).toBeUndefined();
+  });
+
   it('includes /compact and /drift in shared slash-command hints', () => {
     const hints = getLocalCommandHints('/', 'session-1', []);
 
@@ -240,6 +315,10 @@ describe('runLocalCommand', () => {
     expect(hints).toContainEqual({
       command: '/debug tui-snapshot',
       description: 'save the latest rendered TUI frame for inspection',
+    });
+    expect(hints).toContainEqual({
+      command: '/auth login openai',
+      description: 'sign in with OpenAI ChatGPT/Codex OAuth',
     });
   });
 
