@@ -65,7 +65,8 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
   const memoryDir = join(stateRoot, 'memory');
   const model = options.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
   const provider = inferProviderFromModel(model);
-  const apiKey = options.apiKey ?? resolveProviderApiKey(provider);
+  const oauthCredential = options.apiKey ? undefined : resolveOAuthCredentialForModel(model, { storePath: options.credentialStorePath });
+  const apiKey = options.apiKey ?? (oauthCredential ? undefined : resolveProviderApiKey(provider));
   const apiKeyProvider = options.apiKey ? 'explicit' : apiKey ? provider : undefined;
   const providerCredentialSource = resolveProviderCredentialSourceForModel(model, {
     apiKey,
@@ -111,11 +112,6 @@ export function resolveProviderCredentialSourceForModel(
     return { type: 'env-api-key', provider };
   }
 
-  const apiKey = resolveProviderApiKey(provider);
-  if (apiKey) {
-    return { type: 'env-api-key', provider };
-  }
-
   const oauthCredential = resolveOAuthCredentialForModel(model, { storePath: runtime?.credentialStorePath });
   if (oauthCredential) {
     return {
@@ -124,6 +120,11 @@ export function resolveProviderCredentialSourceForModel(
       accountId: oauthCredential.accountId,
       expiresAt: oauthCredential.expiresAt,
     };
+  }
+
+  const apiKey = resolveProviderApiKey(provider);
+  if (apiKey) {
+    return { type: 'env-api-key', provider };
   }
   return { type: 'missing', provider };
 }

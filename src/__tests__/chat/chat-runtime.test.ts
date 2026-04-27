@@ -47,10 +47,12 @@ describe('resolveChatRuntimeConfig', () => {
   it('resolves the correct provider key for a session model even if startup used another provider', () => {
     vi.stubEnv('OPENAI_API_KEY', 'openai-key');
     vi.stubEnv('ANTHROPIC_API_KEY', 'anthropic-key');
+    const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-chat-no-oauth-')), 'auth.json');
 
     const runtime = resolveChatRuntimeConfig({
       workspaceRoot: '/tmp/heddle-test',
       model: 'gpt-5.4',
+      credentialStorePath: storePath,
     });
 
     expect(runtime.apiKey).toBe('openai-key');
@@ -59,8 +61,8 @@ describe('resolveChatRuntimeConfig', () => {
     expect(resolveApiKeyForModel('claude-sonnet-4-6', runtime)).toBe('anthropic-key');
   });
 
-  it('reports stored OpenAI OAuth when no API key is configured', () => {
-    vi.stubEnv('OPENAI_API_KEY', '');
+  it('prefers stored OpenAI OAuth over environment API keys unless a key is explicit', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'openai-key');
     vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-chat-oauth-')), 'auth.json');
     const now = '2026-04-27T00:00:00.000Z';
@@ -95,6 +97,15 @@ describe('resolveChatRuntimeConfig', () => {
       accountId: 'account-1234567890',
       expiresAt: Date.parse('2026-04-27T01:00:00.000Z'),
     });
+
+    const explicitRuntime = resolveChatRuntimeConfig({
+      workspaceRoot: '/tmp/heddle-test',
+      model: 'gpt-5.1-codex',
+      apiKey: 'explicit-key',
+      credentialStorePath: storePath,
+    });
+    expect(explicitRuntime.apiKey).toBe('explicit-key');
+    expect(explicitRuntime.providerCredentialSource).toEqual({ type: 'explicit-api-key' });
   });
 
   it('loads the workspace memory root catalog into startup context', () => {
