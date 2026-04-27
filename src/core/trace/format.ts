@@ -61,6 +61,14 @@ export function formatTraceForConsole(trace: TraceEvent[]): string {
         break;
       }
 
+      case 'host.warning':
+        lines.push(
+          `${COLORS.red}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}Host Warning:${COLORS.reset} ${event.message}`,
+          event.details ? `  Details: ${truncate(JSON.stringify(event.details), 500)}` : '',
+          '',
+        );
+        break;
+
       case 'tool.call':
         lines.push(
           `${COLORS.yellow}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}Tool Call:${COLORS.reset} ${event.call.tool}`,

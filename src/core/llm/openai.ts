@@ -83,6 +83,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
       }, { signal });
 
       let streamedContent = '';
+      const streamedToolCalls = new Map<string, { id: string; tool: string; argumentsText: string }>();
       for await (const event of stream as AsyncIterable<ResponseStreamEvent>) {
         if (event.type === 'response.output_text.delta' && event.delta) {
           streamedContent += event.delta;
@@ -93,11 +94,47 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
         if (event.type === 'response.output_text.done') {
           streamedContent = event.text;
           onStreamEvent?.({ type: 'content.done', content: event.text });
+          continue;
+        }
+
+        if (event.type === 'response.output_item.added' || event.type === 'response.output_item.done') {
+          const item = event.item;
+          if (
+            item.type === 'function_call'
+            && typeof item.id === 'string'
+            && typeof item.call_id === 'string'
+            && typeof item.name === 'string'
+          ) {
+            const existing = streamedToolCalls.get(item.id);
+            streamedToolCalls.set(item.id, {
+              id: item.call_id,
+              tool: item.name,
+              argumentsText:
+                typeof item.arguments === 'string' && item.arguments.length > 0 ? item.arguments
+                : existing?.argumentsText ?? '',
+            });
+          }
+          continue;
+        }
+
+        if (event.type === 'response.function_call_arguments.delta') {
+          const existing = streamedToolCalls.get(event.item_id);
+          if (existing) {
+            existing.argumentsText += event.delta;
+          }
+          continue;
+        }
+
+        if (event.type === 'response.function_call_arguments.done') {
+          const existing = streamedToolCalls.get(event.item_id);
+          if (existing) {
+            existing.argumentsText = event.arguments;
+          }
         }
       }
 
       const response = await stream.finalResponse();
-      const toolCalls = response.output.flatMap((item): ToolCall[] => {
+      const finalResponseToolCalls = response.output.flatMap((item): ToolCall[] => {
         if (
           item.type !== 'function_call'
           || typeof (item as { call_id?: unknown }).call_id !== 'string'
@@ -113,6 +150,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
           input: JSON.parse(item.arguments),
         }];
       });
+      const toolCalls = finalResponseToolCalls.length > 0 ? finalResponseToolCalls : parseStreamedToolCalls(streamedToolCalls);
       const diagnostics = extractAssistantDiagnostics(response, toolCalls.length > 0);
       const content = streamedContent || (diagnostics?.rationale ?? extractAssistantContent(response, toolCalls.length > 0));
 
@@ -129,6 +167,26 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
       };
     },
   };
+}
+
+function parseStreamedToolCalls(
+  streamedToolCalls: Map<string, { id: string; tool: string; argumentsText: string }>,
+): ToolCall[] {
+  const toolCalls: ToolCall[] = [];
+
+  for (const entry of streamedToolCalls.values()) {
+    if (!entry.argumentsText.trim()) {
+      continue;
+    }
+
+    toolCalls.push({
+      id: entry.id,
+      tool: entry.tool,
+      input: JSON.parse(entry.argumentsText),
+    });
+  }
+
+  return toolCalls;
 }
 
 function formatOpenAiAccountSignInModels(): string {

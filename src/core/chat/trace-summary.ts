@@ -13,6 +13,8 @@ export function summarizeTrace(trace: TraceEvent[]): string[] {
             `assistant requested ${event.toolCalls?.map((call) => summarizeToolCall(call.tool, call.input)).join(', ')}`
           : 'assistant answered',
         ];
+      case 'host.warning':
+        return [`host warning ${event.code}: ${truncate(event.message, 140)}`];
       case 'tool.approval_requested':
         return [`approval requested for ${summarizeToolCall(event.call.tool, event.call.input)}`];
       case 'tool.approval_resolved':

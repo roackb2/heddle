@@ -108,6 +108,8 @@ function formatTraceEvent(event: TraceEvent): string {
       return `[trace] run.started goal=${JSON.stringify(shorten(event.goal))}`;
     case 'assistant.turn':
       return `[trace] assistant.turn step=${event.step} tools=${event.requestedTools ? event.toolCalls?.map((call) => call.tool).join(',') || 'yes' : 'none'} content=${JSON.stringify(shorten(event.content))}`;
+    case 'host.warning':
+      return `[trace] host.warning step=${event.step} code=${event.code} message=${JSON.stringify(shorten(event.message))}`;
     case 'tool.approval_requested':
       return `[trace] tool.approval_requested step=${event.step} tool=${event.call.tool}`;
     case 'tool.approval_resolved':

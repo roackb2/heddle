@@ -155,6 +155,41 @@ describe('runAgent', () => {
     });
   });
 
+  it('records a host warning when an action-oriented prompt ends with an intent-only answer and no tool activity', async () => {
+    const fakeLlm: LlmAdapter = {
+      async chat(): Promise<LlmResponse> {
+        return {
+          content: 'I will continue in the isolated worktree, inspect the existing E2E harness files and run the Playwright-focused checks to reach a clean handoff point.',
+        };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'yep, continue on the work',
+      llm: fakeLlm,
+      tools: [],
+      maxSteps: 1,
+      logger: silentLogger,
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.trace.map((event) => event.type)).toEqual([
+      'run.started',
+      'host.warning',
+      'assistant.turn',
+      'run.finished',
+    ]);
+    expect(result.trace[1]).toMatchObject({
+      type: 'host.warning',
+      code: 'actionless_completion',
+      message: expect.stringContaining('no tool activity'),
+      details: expect.objectContaining({
+        goal: 'yep, continue on the work',
+        executedToolCalls: 0,
+      }),
+    });
+  });
+
   it('aggregates token usage across model calls', async () => {
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {

@@ -54,6 +54,7 @@ export type RunAgentOptions = {
 type RunState = {
   step: number;
   consecutiveErrors: number;
+  executedToolCalls: number;
   outcome: StopReason;
   summary: string;
   usage?: LlmUsage;
@@ -179,6 +180,7 @@ function createRunContext(options: RunAgentOptions): RunContext {
     state: {
       step: 0,
       consecutiveErrors: 0,
+      executedToolCalls: 0,
       outcome: 'max_steps',
       summary: '',
       memoryCheckpoint: {
@@ -327,6 +329,7 @@ async function executeToolTurn(context: RunContext, call: ToolCall): Promise<Run
   });
 
   const durationMs = Date.now() - toolStartTime;
+  context.state.executedToolCalls++;
   context.onToolCompleted?.(execution.effectiveCall, execution.result, context.state.step, durationMs);
 
   return handleExecutedToolResult(context, execution.effectiveCall, call.id, execution.result);
@@ -483,6 +486,19 @@ function pushProgressReminders(context: RunContext, effectiveCall: ToolCall, res
 function finalizeAssistantResponse(context: RunContext, response: LlmResponse): RunResult | 'continue' {
   if (!response.content) {
     return finishRun(context, 'error', 'Model returned an empty response');
+  }
+
+  const hostWarning = detectActionlessCompletion(context, response.content);
+  if (hostWarning) {
+    context.record({
+      type: 'host.warning',
+      code: 'actionless_completion',
+      message: hostWarning.message,
+      details: hostWarning.details,
+      step: context.state.step,
+      timestamp: context.now(),
+    });
+    context.log.warn({ step: context.state.step, ...hostWarning.details }, hostWarning.message);
   }
 
   const forcedSummary = buildForcedStructuredChangeSummary(context, response.content);
@@ -672,6 +688,55 @@ function maybeFinishAfterConsecutiveErrors(context: RunContext, summary: string)
   }
 
   return finishRun(context, 'error', summary);
+}
+
+function detectActionlessCompletion(
+  context: RunContext,
+  content: string,
+): { message: string; details: Record<string, unknown> } | undefined {
+  if (context.state.executedToolCalls > 0) {
+    return undefined;
+  }
+
+  if (!isActionOrientedGoal(context.goal)) {
+    return undefined;
+  }
+
+  if (!looksLikeIntentOnlyResponse(content)) {
+    return undefined;
+  }
+
+  return {
+    message: 'Action-oriented prompt finished with no tool activity; assistant replied with an intent statement instead of taking the next action.',
+    details: {
+      goal: context.goal,
+      responseLead: extractSummaryLead(content) ?? content.trim().slice(0, 160),
+      executedToolCalls: context.state.executedToolCalls,
+      activePlanItems: context.state.activePlan?.items.length ?? 0,
+    },
+  };
+}
+
+function isActionOrientedGoal(goal: string): boolean {
+  return /\b(?:continue|go on|keep working|work on|inspect|investigate|check|verify|run|open|list|read|search|look into|implement|fix|update|edit|change|create|write|polish)\b/i.test(goal);
+}
+
+function looksLikeIntentOnlyResponse(content: string): boolean {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  const firstLine = trimmed.split('\n').map((line) => line.trim()).find(Boolean) ?? trimmed;
+  if (!/^(?:i(?:'|’)ll|i will|let me)\b/i.test(firstLine)) {
+    return false;
+  }
+
+  if (/\b(?:completed|done|finished|updated|changed|implemented|fixed|checked|inspected|ran|verified|listed|found|created|wrote)\b/i.test(trimmed)) {
+    return false;
+  }
+
+  return /\b(?:continue|inspect|verify|implement|polish|check|review|look|open|run|read|search|work on|take a look)\b/i.test(trimmed);
 }
 
 function finishRun(

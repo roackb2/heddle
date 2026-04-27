@@ -199,6 +199,78 @@ describe('OpenAI OAuth helpers', () => {
       { type: 'message', role: 'user', content: 'hello' },
     ]);
   });
+
+  it('reconstructs tool calls from streamed Codex OAuth events when final response output is empty', async () => {
+    const adapter = createOpenAiAdapter({
+      model: 'gpt-5.4',
+      credential: {
+        type: 'oauth',
+        provider: 'openai',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresAt: Date.now() + 120_000,
+        accountId: 'account-123',
+        createdAt: '2026-04-27T00:00:00.000Z',
+        updatedAt: '2026-04-27T00:00:00.000Z',
+      },
+      fetchImpl: (async () => {
+        const body = [
+          'event: response.created',
+          'data: {"type":"response.created","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"in_progress","model":"gpt-5.4","output":[]}}',
+          '',
+          'event: response.output_item.added',
+          'data: {"type":"response.output_item.added","item":{"id":"fc_item_1","type":"function_call","status":"in_progress","arguments":"","call_id":"call_123","name":"list_files"},"output_index":0,"sequence_number":2}',
+          '',
+          'event: response.function_call_arguments.delta',
+          'data: {"type":"response.function_call_arguments.delta","delta":"{\\"","item_id":"fc_item_1","output_index":0,"sequence_number":3}',
+          '',
+          'event: response.function_call_arguments.delta',
+          'data: {"type":"response.function_call_arguments.delta","delta":"path\\":\\".\\"}","item_id":"fc_item_1","output_index":0,"sequence_number":4}',
+          '',
+          'event: response.function_call_arguments.done',
+          'data: {"type":"response.function_call_arguments.done","arguments":"{\\"path\\":\\".\\"}","item_id":"fc_item_1","output_index":0,"sequence_number":5}',
+          '',
+          'event: response.output_item.done',
+          'data: {"type":"response.output_item.done","item":{"id":"fc_item_1","type":"function_call","status":"completed","arguments":"{\\"path\\":\\".\\"}","call_id":"call_123","name":"list_files"},"output_index":0,"sequence_number":6}',
+          '',
+          'event: response.completed',
+          'data: {"type":"response.completed","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"completed","completed_at":1777301835,"model":"gpt-5.4","output":[],"usage":{"input_tokens":10,"input_tokens_details":{"cached_tokens":0},"output_tokens":5,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":15}}}',
+          '',
+        ].join('\n');
+
+        return new Response(body, {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        });
+      }) as typeof fetch,
+    });
+
+    const result = await adapter.chat([
+      { role: 'system', content: 'Use tools immediately when needed.' },
+      { role: 'user', content: 'List files in the current directory.' },
+    ], [
+      {
+        name: 'list_files',
+        description: 'Lists files in a directory',
+        parameters: {
+          type: 'object',
+          properties: { path: { type: 'string' } },
+          required: ['path'],
+        },
+        async execute() {
+          return { ok: true, output: '' };
+        },
+      },
+    ]);
+
+    expect(result.toolCalls).toEqual([
+      {
+        id: 'call_123',
+        tool: 'list_files',
+        input: { path: '.' },
+      },
+    ]);
+  });
 });
 
 function createJwt(payload: unknown): string {

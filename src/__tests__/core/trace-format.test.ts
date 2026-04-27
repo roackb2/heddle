@@ -76,6 +76,26 @@ describe('formatTraceForConsole', () => {
     expect(output).not.toContain('Requested Tools:');
   });
 
+  it('renders host warnings readably', () => {
+    const output = formatTraceForConsole([
+      {
+        type: 'host.warning',
+        code: 'actionless_completion',
+        message: 'Action-oriented prompt finished with no tool activity; assistant replied with an intent statement instead of taking the next action.',
+        details: {
+          goal: 'continue on the work',
+          responseLead: 'I will continue in the isolated worktree.',
+        },
+        step: 3,
+        timestamp: '2024-01-01T00:00:02Z',
+      },
+    ]);
+
+    expect(output).toContain('Host Warning:');
+    expect(output).toContain('Action-oriented prompt finished with no tool activity');
+    expect(output).toContain('"goal":"continue on the work"');
+  });
+
   it('renders structured tool outputs readably instead of object coercions', () => {
     const output = formatTraceForConsole([
       {

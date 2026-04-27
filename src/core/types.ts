@@ -71,6 +71,14 @@ export type TraceEvent =
       step: number;
       timestamp: string;
     }
+  | {
+      type: 'host.warning';
+      code: 'actionless_completion';
+      message: string;
+      details?: Record<string, unknown>;
+      step: number;
+      timestamp: string;
+    }
   | { type: 'tool.approval_requested'; call: ToolCall; step: number; timestamp: string }
   | {
       type: 'tool.approval_resolved';
