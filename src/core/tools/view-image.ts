@@ -212,7 +212,7 @@ async function executeOpenAiOAuthImageStream(args: {
     throw new Error('Missing OAuth fetch implementation for OpenAI image inspection.');
   }
 
-  const headers = new Headers({ 'content-type': 'application/json' });
+  const headers = { 'content-type': 'application/json' };
   const body = JSON.stringify({
     model: args.model,
     store: false,
