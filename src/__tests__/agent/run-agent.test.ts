@@ -943,8 +943,7 @@ describe('runAgent', () => {
         }
 
         return {
-          content:
-            'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.',
+          content: 'Applied the fix and verified the repo state.',
         };
       },
     };
@@ -980,9 +979,7 @@ describe('runAgent', () => {
     });
 
     expect(result.outcome).toBe('done');
-    expect(result.summary).toBe(
-      'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.',
-    );
+    expect(result.summary).toBe('Applied the fix and verified the repo state.');
     expect(seenMessages[1]).toContainEqual({
       role: 'system',
       content:
@@ -1026,8 +1023,7 @@ describe('runAgent', () => {
         }
 
         return {
-          content:
-            'Updated the README and verified the repo state.\n- Changed: edited README.md via edit_file README.md.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.',
+          content: 'Updated the README and verified the repo state.',
         };
       },
     };
@@ -1073,9 +1069,7 @@ describe('runAgent', () => {
     });
 
     expect(result.outcome).toBe('done');
-    expect(result.summary).toBe(
-      'Updated the README and verified the repo state.\n- Changed: edited README.md via edit_file README.md.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.',
-    );
+    expect(result.summary).toBe('Updated the README and verified the repo state.');
     expect(seenMessages[1]).toContainEqual({
       role: 'system',
       content:
@@ -1116,8 +1110,7 @@ describe('runAgent', () => {
         }
 
         return {
-          content:
-            'Applied the lint fix and checked the repo and test state.\n- Changed: eslint --fix src/example.ts applied to src/example.ts.\n- Verified: git diff --stat => exit 0, no stdout/stderr output; yarn test => exit 0, no stdout/stderr output.\n- Remaining uncertainty: none.',
+          content: 'Applied the lint fix and checked the repo and test state.',
         };
       },
     };
@@ -1201,8 +1194,7 @@ describe('runAgent', () => {
         }
 
         return {
-          content:
-            'Applied the fix, verified it, and pushed it.\n- Changed: eslint --fix src/example.ts; git add src/example.ts && git commit -m "fix example" && git push\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0)\n- Remaining uncertainty: none.',
+          content: 'Applied the fix, verified it, and pushed it.',
         };
       },
     };
@@ -1247,11 +1239,7 @@ describe('runAgent', () => {
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
         seenMessages.push(structuredClone(messages));
-        const structuredReminder = [...messages].reverse().find(
-          (message: ChatMessage) =>
-            message.role === 'system' &&
-            message.content.includes('your final answer must start with a short summary sentence or short paragraph'),
-        );
+        const structuredReminder = undefined;
 
         if (seenMessages.length === 1) {
           return {
@@ -1284,8 +1272,7 @@ describe('runAgent', () => {
         }
 
         return {
-          content:
-            'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.',
+          content: 'Applied the fix and verified the repo state.',
         };
       },
     };
@@ -1329,11 +1316,7 @@ describe('runAgent', () => {
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
         seenMessages.push(structuredClone(messages));
-        const structuredReminder = [...messages].reverse().find(
-          (message: ChatMessage) =>
-            message.role === 'system' &&
-            message.content.includes('your final answer must start with a short summary sentence or short paragraph'),
-        );
+        const structuredReminder = undefined;
 
         if (seenMessages.length === 1) {
           return {
@@ -1364,8 +1347,7 @@ describe('runAgent', () => {
         }
 
         return {
-          content:
-            'Applied the fix and verified the repo state.\n- Changed: fixed src/example.ts via eslint --fix src/example.ts.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.',
+          content: 'Applied the fix and verified the repo state.',
         };
       },
     };

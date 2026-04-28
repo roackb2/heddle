@@ -20,8 +20,6 @@ import { createMutationState, trackToolResult } from './mutation-tracking.js';
 import { createProgressReminderState, buildProgressReminders } from './progress-reminders.js';
 import {
   buildPostMutationRequirement,
-  hasStructuredChangeSummary,
-  buildStructuredChangeSummaryRequirement,
 } from './post-mutation.js';
 import { maybeDenyToolCall, executeToolCallWithFallback } from './tool-dispatch.js';
 import type { PlanItem } from '../tools/update-plan.js';
@@ -501,23 +499,6 @@ function finalizeAssistantResponse(context: RunContext, response: LlmResponse): 
     context.log.warn({ step: context.state.step, ...hostWarning.details }, hostWarning.message);
   }
 
-  const forcedSummary = buildForcedStructuredChangeSummary(context, response.content);
-  if (forcedSummary) {
-    context.record({
-      type: 'assistant.turn',
-      content: forcedSummary,
-      diagnostics: response.diagnostics,
-      requestedTools: false,
-      step: context.state.step,
-      timestamp: context.now(),
-    });
-    context.messages.push({ role: 'assistant', content: forcedSummary });
-    return finishRun(context, 'done', forcedSummary, {
-      logLevel: 'info',
-      logMessage: 'Agent run finished with host-enforced structured change summary',
-    });
-  }
-
   context.record({
     type: 'assistant.turn',
     content: response.content,
@@ -547,11 +528,6 @@ function pushHostRequirementReminders(context: RunContext) {
     context.messages.push({ role: 'system', content: memoryReminder });
   }
 
-  const structuredReminder = getStructuredSummaryReminder(context);
-  if (structuredReminder && !context.state.reminders.structuredSummarySent) {
-    context.state.reminders.structuredSummarySent = true;
-    context.messages.push({ role: 'system', content: structuredReminder });
-  }
 }
 
 function getPostMutationFollowUpReminder(context: RunContext): string | undefined {
@@ -576,18 +552,6 @@ function getPostMutationFollowUpReminder(context: RunContext): string | undefine
   return undefined;
 }
 
-function getStructuredSummaryReminder(context: RunContext): string | undefined {
-  if (
-    context.mutation.requiresStructuredChangeSummary &&
-    !context.mutation.pendingVerification &&
-    !context.mutation.pendingChangeReview
-  ) {
-    context.log.info({ step: context.state.step }, 'Reminding agent to provide structured change summary');
-    return buildStructuredChangeSummaryRequirement(context.mutation);
-  }
-
-  return undefined;
-}
 
 function getMemoryCheckpointReminder(context: RunContext): string | undefined {
   if (context.state.memoryCheckpoint.required && !context.state.memoryCheckpoint.completed) {
@@ -614,40 +578,6 @@ function isMemoryOnlyTool(tool: string): boolean {
     || tool === 'memory_checkpoint';
 }
 
-function buildForcedStructuredChangeSummary(context: RunContext, responseContent: string): string | undefined {
-  if (context.mutation.pendingVerification || context.mutation.pendingChangeReview) {
-    return undefined;
-  }
-
-  if (context.state.memoryCheckpoint.required && !context.state.memoryCheckpoint.completed) {
-    return undefined;
-  }
-
-  if (!context.mutation.requiresStructuredChangeSummary) {
-    return undefined;
-  }
-
-  if (hasStructuredChangeSummary(responseContent, {
-    mutationCommands: context.mutation.executedMutationCommands,
-    reviewCommands: context.mutation.executedReviewCommands,
-    verificationCommands: context.mutation.executedVerificationCommands,
-  })) {
-    return undefined;
-  }
-
-  const lead = extractSummaryLead(responseContent) ?? 'Completed the requested change.';
-  const changed = context.mutation.executedMutationCommands.length > 0 ?
-    context.mutation.executedMutationCommands.join('; ')
-  : 'workspace-changing command(s) already executed';
-  const review = context.mutation.executedReviewEvidence.length > 0 ?
-    context.mutation.executedReviewEvidence.join('; ')
-  : context.mutation.executedReviewCommands.join('; ') || 'no repo review evidence captured';
-  const verification = context.mutation.executedVerificationEvidence.length > 0 ?
-    context.mutation.executedVerificationEvidence.join('; ')
-  : context.mutation.executedVerificationCommands.join('; ') || 'no verification evidence captured';
-
-  return `${lead}\n\n- Changed: ${changed}\n- Verified: ${review}; ${verification}\n- Remaining uncertainty: none`;
-}
 
 function extractSummaryLead(content: string): string | undefined {
   const lines = content
@@ -655,16 +585,7 @@ function extractSummaryLead(content: string): string | undefined {
     .map((line) => line.trim())
     .filter(Boolean);
 
-  const first = lines[0];
-  if (!first) {
-    return undefined;
-  }
-
-  if (/^(?:[-*]\s+)?(?:changed|verified|remaining uncertainty|uncertainty|remaining risks?)\s*:/i.test(first)) {
-    return undefined;
-  }
-
-  return first;
+  return lines[0] || undefined;
 }
 
 function maybeFinishInterrupted(context: RunContext, logMessage: string): RunResult | undefined {
