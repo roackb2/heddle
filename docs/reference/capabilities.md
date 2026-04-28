@@ -23,6 +23,8 @@ Current workspace-facing tool support includes:
 - file reading with `read_file`
 - text search with `search_files`
 - direct file editing with `edit_file`
+- direct file deletion with `delete_file`
+- direct file/directory move or rename with `move_file`
 - read-oriented shell inspection with `run_shell_inspect`
 - approval-gated shell mutation with `run_shell_mutate`
 
@@ -73,6 +75,7 @@ Beyond terminal chat, Heddle includes:
 - Knowledge persistence uses explicit local catalogs and maintainer runs, so users can audit what Heddle learned instead of relying on opaque retrieval.
 - The control plane review view is read-only. Current changes are Git-backed, while historical turn evidence is trace-backed; it is not yet an editable IDE-grade diff surface or live file watcher.
 - The image workflow is intentionally lightweight: users provide a local image path and Heddle decides whether inspection is needed.
+- OpenAI account sign-in can now drive `view_image` through the Codex OAuth transport. Hosted `web_search` and drift embeddings still require OpenAI Platform API-key mode today.
 - `@path/to/file` mentions prioritize file inspection; they do not blindly paste file contents into the prompt.
 - Web search is provider-backed rather than a general crawler maintained inside this repository.
 

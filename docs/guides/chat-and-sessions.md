@@ -50,6 +50,8 @@ heddle --prefer-api-key chat --model gpt-5.4-mini
 heddle --prefer-api-key ask "Reply with OK"
 ```
 
+OpenAI account sign-in now supports `view_image` through the Codex OAuth transport. OpenAI hosted `web_search` and drift embeddings still require Platform API-key mode.
+
 ## Typical Chat Workflow
 
 Common use cases:
@@ -62,6 +64,7 @@ Common use cases:
 - search official docs or current external references with provider-backed `web_search`
 - mention important repo files with `@path/to/file`
 - reference a local screenshot path and have the agent inspect it with `view_image`
+- clean up or rename workspace files directly with `delete_file` and `move_file`
 - run direct shell commands from chat with `!<command>`
 
 ## Session Management
