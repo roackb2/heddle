@@ -1,7 +1,9 @@
 import { join } from 'node:path';
 import type { ToolDefinition } from '../types.js';
+import { createDeleteFileTool } from '../tools/delete-file.js';
 import { createEditFileTool } from '../tools/edit-file.js';
 import { createListFilesTool } from '../tools/list-files.js';
+import { createMoveFileTool } from '../tools/move-file.js';
 import {
   createEditMemoryNoteTool,
   createListMemoryNotesTool,
@@ -42,6 +44,8 @@ export function createDefaultAgentTools(options: DefaultAgentToolsOptions): Tool
     createListFilesTool({ workspaceRoot }),
     createReadFileTool({ workspaceRoot }),
     createEditFileTool({ workspaceRoot }),
+    createDeleteFileTool({ workspaceRoot }),
+    createMoveFileTool({ workspaceRoot }),
     createSearchFilesTool({ excludedDirs: options.searchIgnoreDirs, workspaceRoot }),
     createWebSearchTool({
       model: options.model,

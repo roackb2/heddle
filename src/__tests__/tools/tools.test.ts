@@ -6,6 +6,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createListFilesTool, listFilesTool } from '../../core/tools/list-files.js';
 import { createReadFileTool, readFileTool } from '../../core/tools/read-file.js';
 import { createEditFileTool, editFileTool, previewEditFileInput } from '../../core/tools/edit-file.js';
+import { createDeleteFileTool, deleteFileTool } from '../../core/tools/delete-file.js';
+import { createMoveFileTool, moveFileTool } from '../../core/tools/move-file.js';
 import { reportStateTool } from '../../core/tools/report-state.js';
 import { updatePlanTool } from '../../core/tools/update-plan.js';
 import {
@@ -57,6 +59,24 @@ describe('tool input validation', () => {
     });
   });
 
+  it('rejects invalid delete_file input', async () => {
+    const result = await deleteFileTool.execute({ recursive: true });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Invalid input for delete_file. Required field: path. Optional field: recursive.',
+    });
+  });
+
+  it('rejects invalid move_file input', async () => {
+    const result = await moveFileTool.execute({ from: 'a' });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Invalid input for move_file. Required fields: from, to. Optional field: createParentDirs.',
+    });
+  });
+
   it('tool descriptions distinguish directories from files', () => {
     expect(listFilesTool.description).toContain('Use this to inspect folders, not to read file contents');
     expect(listFilesTool.description).toContain('explore an obvious nearby folder');
@@ -70,6 +90,10 @@ describe('tool input validation', () => {
     expect(editFileTool.description).toContain('Prefer this over shell commands');
     expect(editFileTool.description).toContain('exact replacement');
     expect(editFileTool.description).toContain('overwrite an existing file or create a new one explicitly');
+    expect(deleteFileTool.description).toContain('Delete a file or remove a directory');
+    expect(deleteFileTool.description).toContain('set recursive to true');
+    expect(moveFileTool.description).toContain('Move or rename a file or directory');
+    expect(moveFileTool.description).toContain('createParentDirs');
     expect(listFilesTool.description).toContain('{ "path": "." }');
     expect(listFilesTool.description).toContain('{ "path": ".." }');
     expect(readFileTool.description).toContain('{ "path": "path/to/file.txt" }');
@@ -803,7 +827,61 @@ describe('memory note tools', () => {
   });
 });
 
-describe('editFileTool', () => {
+describe('file mutation tools', () => {
+  it('deletes a file through delete_file', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-delete-file-'));
+    const filePath = join(root, 'obsolete.txt');
+    await writeFile(filePath, 'remove me');
+    const tool = createDeleteFileTool({ workspaceRoot: root });
+
+    const result = await tool.execute({ path: 'obsolete.txt' });
+
+    expect(result).toEqual({
+      ok: true,
+      output: {
+        path: filePath,
+        deleted: true,
+        kind: 'file',
+        recursive: false,
+      },
+    });
+    await expect(readFile(filePath, 'utf8')).rejects.toThrow();
+  });
+
+  it('refuses to delete a directory without recursive true', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-delete-dir-'));
+    await mkdir(join(root, 'old-dir'));
+    const tool = createDeleteFileTool({ workspaceRoot: root });
+
+    const result = await tool.execute({ path: 'old-dir' });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Refusing to delete directory');
+  });
+
+  it('moves a file through move_file and can create parent directories', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-move-file-'));
+    const fromPath = join(root, 'draft.txt');
+    const toPath = join(root, 'docs', 'draft.txt');
+    await writeFile(fromPath, 'move me');
+    const tool = createMoveFileTool({ workspaceRoot: root });
+
+    const result = await tool.execute({ from: 'draft.txt', to: 'docs/draft.txt', createParentDirs: true });
+
+    expect(result).toEqual({
+      ok: true,
+      output: {
+        from: fromPath,
+        to: toPath,
+        moved: true,
+        kind: 'file',
+        createdParentDirs: true,
+      },
+    });
+    await expect(readFile(toPath, 'utf8')).resolves.toBe('move me');
+    await expect(readFile(fromPath, 'utf8')).rejects.toThrow();
+  });
+
   it('creates a new file when explicitly allowed', async () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-edit-create-'));
     const previousCwd = process.cwd();
