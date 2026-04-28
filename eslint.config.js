@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'local/**'],
+    ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'local/**', 'test-results/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -59,11 +59,6 @@ export default tseslint.config(
   {
     files: ['e2e/**/*.{ts,tsx}', 'playwright.config.ts'],
     languageOptions: {
-      parserOptions: {
-        projectService: {
-          allowDefaultProject: ['playwright.config.ts', 'e2e/*.ts'],
-        },
-      },
       globals: {
         ...globals.browser,
         ...globals.node,
