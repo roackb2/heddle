@@ -31,6 +31,8 @@ test('shows current git diff in the review surface', async ({ page }) => {
   await expect(page.getByTestId('review-current-workspace')).toBeVisible();
   await expect(page.getByTestId('review-current-file-list')).toContainText('README.md');
   await expect(page.getByTestId('review-current-file-list')).toContainText('+2 / -0');
+  await expect(page.getByTestId('monaco-diff-viewer').first()).toBeVisible();
+  await expect(page.getByTestId('monaco-diff-viewer').first()).toContainText('markdown');
 });
 
 test('registers and switches to another workspace from the browser', async ({ page }) => {

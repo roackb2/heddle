@@ -129,6 +129,7 @@
     "express": "^5.2.1",
     "gitdiff-parser": "^0.3.1",
     "ink": "^6.8.0",
+    "monaco-editor": "^0.55.1",
     "openai": "^4.86.2",
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.3",

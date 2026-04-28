@@ -234,7 +234,6 @@ async function startOpenAiOAuthCallbackServer(args: {
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
 }): Promise<CallbackServer> {
-  let server: Server | undefined;
   let settled = false;
   let resolveTokens: (tokens: OpenAiOAuthTokenResponse) => void;
   let rejectTokens: (error: Error) => void;
@@ -249,7 +248,7 @@ async function startOpenAiOAuthCallbackServer(args: {
     }
   }, args.timeoutMs ?? 5 * 60 * 1000);
 
-  server = createServer((req, res) => {
+  const server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', `http://localhost:${args.port}`);
     if (url.pathname !== OPENAI_OAUTH_CALLBACK_PATH) {
       res.writeHead(404);
@@ -285,7 +284,7 @@ async function startOpenAiOAuthCallbackServer(args: {
     }
 
     settled = true;
-    const redirectUri = `http://localhost:${getServerPort(server!) ?? args.port}${OPENAI_OAUTH_CALLBACK_PATH}`;
+    const redirectUri = `http://localhost:${getServerPort(server) ?? args.port}${OPENAI_OAUTH_CALLBACK_PATH}`;
     void exchangeOpenAiOAuthCode({
       code,
       redirectUri,
@@ -298,9 +297,9 @@ async function startOpenAiOAuthCallbackServer(args: {
   });
 
   await new Promise<void>((resolve, reject) => {
-    server!.once('error', reject);
-    server!.listen(args.port, '127.0.0.1', () => {
-      server!.off('error', reject);
+    server.once('error', reject);
+    server.listen(args.port, '127.0.0.1', () => {
+      server.off('error', reject);
       resolve();
     });
   });
@@ -314,7 +313,7 @@ async function startOpenAiOAuthCallbackServer(args: {
     close: async () => {
       clearTimeout(timeout);
       await new Promise<void>((resolve) => {
-        if (!server?.listening) {
+        if (!server.listening) {
           resolve();
           return;
         }

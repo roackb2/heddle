@@ -1113,6 +1113,33 @@ h3 {
   min-width: min(900px, 100%);
 }
 
+.monaco-diff-viewer {
+  overflow: hidden;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  background: #0b1220;
+}
+
+.monaco-diff-viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  padding: 6px 10px;
+  color: var(--muted);
+  font-family: var(--font-sans, Inter, system-ui, sans-serif);
+  font-size: 11px;
+}
+
+.monaco-diff-viewer-editor {
+  min-height: 220px;
+}
+
+.monaco-diff-viewer .monaco-editor,
+.monaco-diff-viewer .monaco-diff-editor {
+  --vscode-editor-background: #070b10;
+}
+
 .side-section {
   display: flex;
   flex-direction: column;
