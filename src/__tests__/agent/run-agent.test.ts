@@ -496,7 +496,7 @@ describe('runAgent', () => {
     expect(seenMessages[1]).toContainEqual({
       role: 'system',
       content:
-        'Host reminder: report_state is only a checkpoint. On the next turn, either do the concrete nextNeed you identified (read_file on src/run-agent.ts with offset 200 and maxLines 80) or finish with the best grounded blocker. Do not repeat the same planning state.',
+        'Host reminder: report_state recorded a blocker. If that blocker is still real, do the concrete nextNeed you identified (read_file on src/run-agent.ts with offset 200 and maxLines 80) or finish with the best grounded blocker. If you already have enough evidence to proceed, continue instead of repeating the same planning state.',
     });
   });
 
@@ -538,7 +538,7 @@ describe('runAgent', () => {
     expect(seenMessages[3]).toContainEqual({
       role: 'system',
       content:
-        'Host reminder: only 1 step(s) remain. Do not spend another turn rephrasing the plan. Either execute the single next concrete action needed to finish, or answer with the best grounded blocker.',
+        'Host reminder: only 1 step(s) remain. Do not spend another turn rephrasing the plan. Either execute the single next concrete action needed to finish the current slice, or answer with the best grounded blocker.',
     });
   });
 

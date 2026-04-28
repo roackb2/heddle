@@ -14,7 +14,7 @@ type ReportStateInput = {
 export const reportStateTool: ToolDefinition = {
   name: 'report_state',
   description:
-    'Report your current reasoning state in a structured way. Use this when you are blocked, uncertain, missing information, recovering from repeated low-value exploration, or about to take a speculative path. This does not inspect or change the environment. It records what is missing and the single most important next thing you need. Use it to tell the library author what capability, input, or support was missing so future agents are less likely to get stuck on the same problem. Returns the same structured report back. Example input: { "rationale": "I need to inspect the top-level directory first.", "missing": ["Top-level directory contents"], "nextNeed": "list_files on ." }',
+    'Report a genuine blocker or missing requirement in a structured way. Use this when progress is actually blocked by missing information, missing tool support, missing inputs, or a runtime limitation that prevents the next concrete action. Do not use it for ordinary progress updates or to restate a plan you can already execute. This tool does not inspect or change the environment. It records what is missing and the single most important next thing you need so future maintainers can understand the blocker. Returns the same structured report back. Example input: { "rationale": "I need to inspect the top-level directory first.", "missing": ["Top-level directory contents"], "nextNeed": "list_files on ." }',
   parameters: {
     type: 'object',
     additionalProperties: false,

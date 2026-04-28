@@ -129,8 +129,8 @@ describe('tool input validation', () => {
     expect(recordKnowledgeTool.description).toContain('repeated session patterns');
     expect(recordKnowledgeTool.description).toContain('does not directly edit memory notes');
     expect(recordKnowledgeTool.requiresApproval).toBeUndefined();
-    expect(reportStateTool.description).toContain('Use this when you are blocked, uncertain');
-    expect(reportStateTool.description).toContain('tell the library author what capability, input, or support was missing');
+    expect(reportStateTool.description).toContain('Use this when progress is actually blocked');
+    expect(reportStateTool.description).toContain('Do not use it for ordinary progress updates');
     expect(reportStateTool.description).toContain('Returns the same structured report back');
     expect(reportStateTool.description).toContain('"nextNeed": "list_files on ."');
     expect(updatePlanTool.description).toContain('Record or revise a short working plan');

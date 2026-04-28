@@ -50,7 +50,7 @@ export function buildProgressReminders(
   if (!state.sentDriftReminder && state.successfulNonMutationToolCalls >= DRIFT_REMINDER_THRESHOLD) {
     state.sentDriftReminder = true;
     reminders.push(
-      'Host reminder: you have already spent several successful tool calls gathering context. Stop restating the plan. Either answer directly from the evidence you have or execute one bounded next action now.',
+      'Host reminder: you already have substantial evidence. Do not spend another turn rephrasing the plan. Either execute the single next bounded action that would move the task forward, or answer directly from the evidence you already have.',
     );
   }
 
@@ -61,7 +61,7 @@ export function buildProgressReminders(
   ) {
     state.sentLowStepReminder = true;
     reminders.push(
-      `Host reminder: only ${options.remainingSteps} step(s) remain. Do not spend another turn rephrasing the plan. Either execute the single next concrete action needed to finish, or answer with the best grounded blocker.`,
+      `Host reminder: only ${options.remainingSteps} step(s) remain. Do not spend another turn rephrasing the plan. Either execute the single next concrete action needed to finish the current slice, or answer with the best grounded blocker.`,
     );
   }
 
@@ -84,8 +84,8 @@ function isWorkspaceChangingCall(call: ToolCall): boolean {
 function buildReportStateReminder(output: unknown): string {
   const nextNeed = extractNextNeed(output);
   return nextNeed ?
-      `Host reminder: report_state is only a checkpoint. On the next turn, either do the concrete nextNeed you identified (${nextNeed}) or finish with the best grounded blocker. Do not repeat the same planning state.`
-    : 'Host reminder: report_state is only a checkpoint. On the next turn, either do the concrete next action you identified or finish with the best grounded blocker. Do not repeat the same planning state.';
+      `Host reminder: report_state recorded a blocker. If that blocker is still real, do the concrete nextNeed you identified (${nextNeed}) or finish with the best grounded blocker. If you already have enough evidence to proceed, continue instead of repeating the same planning state.`
+    : 'Host reminder: report_state recorded a blocker. If the blocker is still real, take the concrete next action needed to unblock progress or finish with the best grounded blocker. If progress is already available, continue instead of repeating the same planning state.';
 }
 
 function extractNextNeed(output: unknown): string | undefined {

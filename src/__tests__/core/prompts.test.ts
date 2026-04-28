@@ -17,7 +17,9 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('If the user asks how to use Heddle');
     expect(prompt).toContain('direct shell commands');
     expect(prompt).toContain('distinguish observed facts from inference');
-    expect(prompt).toContain('You MUST call report_state before continuing');
+    expect(prompt).toContain('Use report_state only when you are genuinely blocked');
+    expect(prompt).toContain('When you have enough evidence to continue, continue.');
+    expect(prompt).toContain('For bounded implementation work, carry the current slice through until it is actually complete or honestly blocked');
     expect(prompt).toContain('Do not lead with internal tool names or implementation details');
     expect(prompt).toContain('prefer plain-language descriptions over enumerating internal tool names');
     expect(prompt).toContain('prefer carrying the task through implementation and verification instead of stopping at analysis or a plan unless you are blocked');
