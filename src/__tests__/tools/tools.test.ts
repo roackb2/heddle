@@ -1,7 +1,8 @@
 import { mkdtemp, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createListFilesTool, listFilesTool } from '../../core/tools/list-files.js';
 import { createReadFileTool, readFileTool } from '../../core/tools/read-file.js';
 import { createEditFileTool, editFileTool, previewEditFileInput } from '../../core/tools/edit-file.js';
@@ -25,6 +26,7 @@ import {
 import { createMemoryCheckpointTool } from '../../core/tools/memory-checkpoint.js';
 import { createRecordKnowledgeTool } from '../../core/tools/record-knowledge.js';
 import { createDefaultAgentTools } from '../../core/runtime/default-tools.js';
+import { setStoredProviderCredential } from '../../core/auth/provider-credentials.js';
 
 describe('tool input validation', () => {
   it('rejects unexpected fields for list_files', async () => {
@@ -378,6 +380,15 @@ describe('webSearchTool', () => {
 });
 
 describe('viewImageTool', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
   it('rejects invalid input', async () => {
     const result = await viewImageTool.execute({ prompt: 'describe it' });
 
@@ -415,29 +426,179 @@ describe('viewImageTool', () => {
     }
   });
 
-  it('does not silently fall back to an OpenAI env key for image viewing when OAuth is active', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'heddle-view-image-oauth-'));
+  it('fails clearly when OAuth is active but no stored OpenAI credential can be loaded', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-view-image-oauth-missing-'));
     const imagePath = join(root, 'screen.png');
+    const credentialStorePath = join(root, 'auth.json');
     await writeFile(imagePath, 'fake');
     vi.stubEnv('OPENAI_API_KEY', 'openai-key');
 
-    try {
-      const result = await createViewImageTool({
-        providerCredentialSource: {
-          type: 'oauth',
-          provider: 'openai',
-          accountId: 'account-123',
-          expiresAt: Date.now() + 60_000,
-        },
-      }).execute({ path: imagePath });
+    const result = await createViewImageTool({
+      model: 'gpt-5.4',
+      providerCredentialSource: {
+        type: 'oauth',
+        provider: 'openai',
+        accountId: 'account-123',
+        expiresAt: Date.now() + 60_000,
+      },
+      credentialStorePath,
+    }).execute({ path: imagePath });
 
-      expect(result).toEqual({
-        ok: false,
-        error: 'view_image currently requires OpenAI Platform API-key mode. The active OpenAI credential is account sign-in; set OPENAI_API_KEY or pass an explicit API key to inspect images.',
+    expect(result).toEqual({
+      ok: false,
+      error: 'view_image could not load the stored OpenAI account sign-in credential for this workspace. Sign in again with `heddle auth login openai`, or set OPENAI_API_KEY to use Platform API-key mode.',
+    });
+  });
+
+  it('fails clearly for OAuth when the selected model is not account-sign-in compatible', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-view-image-oauth-model-'));
+    const imagePath = join(root, 'screen.png');
+    const credentialStorePath = join(root, 'auth.json');
+    await writeFile(imagePath, 'fake');
+    writeFileSync(credentialStorePath, '{}\n');
+    setStoredProviderCredential({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAt: Date.now() + 120_000,
+      accountId: 'account-123',
+      createdAt: '2026-04-27T00:00:00.000Z',
+      updatedAt: '2026-04-27T00:00:00.000Z',
+    }, credentialStorePath);
+
+    const result = await createViewImageTool({
+      model: 'o3',
+      providerCredentialSource: {
+        type: 'oauth',
+        provider: 'openai',
+        accountId: 'account-123',
+        expiresAt: Date.now() + 60_000,
+      },
+      credentialStorePath,
+    }).execute({ path: imagePath });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'OpenAI account sign-in is not enabled for model o3. Set OPENAI_API_KEY to use Platform API-key mode for image inspection.',
+    });
+  });
+
+  it('uses the OAuth-backed OpenAI transport for image inspection when a stored credential is available', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-view-image-oauth-success-'));
+    const imagePath = join(root, 'screen.png');
+    const credentialStorePath = join(root, 'auth.json');
+    await writeFile(imagePath, 'fake-image-data');
+    writeFileSync(credentialStorePath, '{}\n');
+    setStoredProviderCredential({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAt: Date.now() + 120_000,
+      accountId: 'account-123',
+      createdAt: '2026-04-27T00:00:00.000Z',
+      updatedAt: '2026-04-27T00:00:00.000Z',
+    }, credentialStorePath);
+
+    const requests: Array<{ url: string; headers: Headers; body: string }> = [];
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({
+        url: String(url),
+        headers: new Headers(init?.headers),
+        body: String(init?.body ?? ''),
       });
-    } finally {
-      vi.unstubAllEnvs();
-    }
+      const body = [
+        'event: response.created',
+        'data: {"type":"response.created","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"in_progress","model":"gpt-5.4","output":[]}}',
+        '',
+        'event: response.output_text.delta',
+        'data: {"type":"response.output_text.delta","delta":"UI screenshot ","content_index":0,"item_id":"msg_1","output_index":0,"sequence_number":1}',
+        '',
+        'event: response.output_text.done',
+        'data: {"type":"response.output_text.done","text":"UI screenshot summary","content_index":0,"item_id":"msg_1","output_index":0,"sequence_number":2}',
+        '',
+        'event: response.completed',
+        'data: {"type":"response.completed","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"completed","completed_at":1777301835,"model":"gpt-5.4","output_text":"UI screenshot summary","output":[],"usage":{"input_tokens":10,"input_tokens_details":{"cached_tokens":0},"output_tokens":5,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":15}}}',
+        '',
+      ].join('\n');
+      return new Response(body, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchImpl);
+
+    const result = await createViewImageTool({
+      model: 'gpt-5.4',
+      providerCredentialSource: {
+        type: 'oauth',
+        provider: 'openai',
+        accountId: 'account-123',
+        expiresAt: Date.now() + 60_000,
+      },
+      credentialStorePath,
+    }).execute({ path: imagePath, prompt: 'Summarize the screenshot.' });
+
+    expect(result).toEqual({
+      ok: true,
+      output: {
+        provider: 'openai',
+        model: 'gpt-5.4',
+        path: imagePath,
+        summary: 'UI screenshot summary',
+      },
+    });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.headers.get('authorization')).toBe('Bearer access-token');
+    expect(requests[0]?.headers.get('ChatGPT-Account-Id')).toBe('account-123');
+    const body = JSON.parse(requests[0]?.body ?? '{}') as {
+      input?: Array<{ content?: Array<{ type?: string; text?: string; image_url?: string }> }>;
+    };
+    expect(body.input?.[0]?.content?.[0]).toEqual({ type: 'input_text', text: 'Summarize the screenshot.' });
+    expect(body.input?.[0]?.content?.[1]?.type).toBe('input_image');
+    expect(body.input?.[0]?.content?.[1]?.image_url).toContain('data:image/png;base64,');
+  });
+
+  it('returns richer OAuth failure diagnostics including attempted models', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-view-image-oauth-failure-details-'));
+    const imagePath = join(root, 'screen.png');
+    const credentialStorePath = join(root, 'auth.json');
+    await writeFile(imagePath, 'fake-image-data');
+    writeFileSync(credentialStorePath, '{}\n');
+    setStoredProviderCredential({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAt: Date.now() + 120_000,
+      accountId: 'account-123',
+      createdAt: '2026-04-27T00:00:00.000Z',
+      updatedAt: '2026-04-27T00:00:00.000Z',
+    }, credentialStorePath);
+
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      return new Response('', { status: 400 });
+    }));
+
+    const result = await createViewImageTool({
+      model: 'gpt-5.4',
+      providerCredentialSource: {
+        type: 'oauth',
+        provider: 'openai',
+        accountId: 'account-123',
+        expiresAt: Date.now() + 60_000,
+      },
+      credentialStorePath,
+    }).execute({ path: imagePath, prompt: 'Summarize the screenshot.' });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Image view failed: OpenAI image inspection failed for model');
+    expect(result.error).toContain('OpenAI account sign-in mode');
+    expect(result.error).toContain('status 400');
+    expect(result.error).toContain('Attempted models:');
+    expect(result.error).toContain('gpt-5.4');
+    expect(result.error).toContain('gpt-5.4-mini');
   });
 });
 

@@ -8,12 +8,15 @@ import { extname, resolve } from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
 import type { ImageBlockParam } from '@anthropic-ai/sdk/resources/messages/messages';
 import OpenAI from 'openai';
-import type { ResponseInputImage, ResponseInputText } from 'openai/resources/responses/responses.js';
+import type { ResponseInputImage, ResponseInputText, ResponseStreamEvent } from 'openai/resources/responses/responses.js';
 import type { ToolDefinition, ToolResult } from '../types.js';
+import { OPENAI_CODEX_RESPONSES_ENDPOINT } from '../auth/openai-oauth.js';
 import { inferProviderFromModel } from '../llm/factory.js';
+import { createOpenAiOAuthFetch } from '../llm/openai.js';
+import { isOpenAiAccountSignInModel, OPENAI_ACCOUNT_SIGN_IN_MODELS } from '../llm/openai-models.js';
 import type { LlmProvider } from '../llm/types.js';
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../config.js';
-import type { ProviderCredentialSource } from '../runtime/api-keys.js';
+import { resolveOAuthCredentialForModel, type ProviderCredentialSource } from '../runtime/api-keys.js';
 
 type ViewImageInput = {
   path: string;
@@ -25,11 +28,13 @@ export type ViewImageToolOptions = {
   provider?: LlmProvider;
   apiKey?: string;
   providerCredentialSource?: ProviderCredentialSource;
+  credentialStorePath?: string;
   workspaceRoot?: string;
 };
 
 const DEFAULT_IMAGE_PROMPT =
   'Describe the image for a coding assistant. Focus on UI text, error messages, filenames, commands, code, diagrams, and any details relevant to software work.';
+const OPENAI_OAUTH_IMAGE_MODEL_CANDIDATES = ['gpt-5.4', 'gpt-5.4-mini', ...OPENAI_ACCOUNT_SIGN_IN_MODELS];
 
 export const viewImageTool: ToolDefinition = createViewImageTool();
 
@@ -92,7 +97,7 @@ export function createViewImageTool(options: ViewImageToolOptions = {}): ToolDef
       } catch (error) {
         return {
           ok: false,
-          error: `Image view failed: ${error instanceof Error ? error.message : String(error)}`,
+          error: formatImageViewFailure(error),
         };
       }
     },
@@ -106,47 +111,146 @@ async function executeOpenAiImageView(args: {
   prompt: string;
   options: ViewImageToolOptions;
 }): Promise<ToolResult> {
-  if (args.options.providerCredentialSource?.type === 'oauth') {
+  const model = args.options.model ?? DEFAULT_OPENAI_MODEL;
+  const oauthCredential =
+    args.options.providerCredentialSource?.type === 'oauth' ?
+      resolveOAuthCredentialForModel(model, { storePath: args.options.credentialStorePath })
+    : undefined;
+
+  if (args.options.providerCredentialSource?.type === 'oauth' && !oauthCredential) {
     return {
       ok: false,
-      error: 'view_image currently requires OpenAI Platform API-key mode. The active OpenAI credential is account sign-in; set OPENAI_API_KEY or pass an explicit API key to inspect images.',
+      error: 'view_image could not load the stored OpenAI account sign-in credential for this workspace. Sign in again with `heddle auth login openai`, or set OPENAI_API_KEY to use Platform API-key mode.',
+    };
+  }
+
+  if (oauthCredential && !isOpenAiAccountSignInModel(model)) {
+    return {
+      ok: false,
+      error: `OpenAI account sign-in is not enabled for model ${model}. Set OPENAI_API_KEY to use Platform API-key mode for image inspection.`,
     };
   }
 
   const apiKey = firstDefinedNonEmpty(args.options.apiKey, process.env.OPENAI_API_KEY, process.env.PERSONAL_OPENAI_API_KEY);
-  if (!apiKey) {
+  if (!oauthCredential && !apiKey) {
     return {
       ok: false,
       error: 'view_image requires OPENAI_API_KEY (or PERSONAL_OPENAI_API_KEY) when the active model provider is OpenAI.',
     };
   }
 
-  const client = new OpenAI({ apiKey });
-  const model = args.options.model ?? DEFAULT_OPENAI_MODEL;
+  const oauthFetch =
+    oauthCredential ? createOpenAiOAuthFetch(oauthCredential, { storePath: args.options.credentialStorePath })
+    : undefined;
+  const client = new OpenAI({
+    apiKey: oauthCredential ? 'heddle-oauth-placeholder' : apiKey,
+    fetch: oauthFetch,
+  });
   const imageBase64 = args.data.toString('base64');
-  const response = await client.responses.create({
-    model,
+  const candidateModels = oauthCredential ? uniqueModels([model, ...OPENAI_OAUTH_IMAGE_MODEL_CANDIDATES]) : [model];
+  let lastError: unknown;
+
+  for (const candidateModel of candidateModels) {
+    try {
+      const response = oauthCredential ?
+        await executeOpenAiOAuthImageStream({
+          oauthFetch,
+          accountId: oauthCredential.accountId,
+          model: candidateModel,
+          prompt: args.prompt,
+          imageUrl: `data:${args.mediaType};base64,${imageBase64}`,
+        })
+      : await client.responses.create({
+          model: candidateModel,
+          input: [{
+            role: 'user',
+            content: [
+              { type: 'input_text', text: args.prompt } satisfies ResponseInputText,
+              {
+                type: 'input_image',
+                detail: 'auto',
+                image_url: `data:${args.mediaType};base64,${imageBase64}`,
+              } satisfies ResponseInputImage,
+            ],
+          }],
+        });
+
+      return {
+        ok: true,
+        output: {
+          provider: 'openai',
+          model: response.model,
+          path: args.filePath,
+          summary: response.output_text?.trim() || 'No image description returned.',
+        },
+      };
+    } catch (error) {
+      lastError = error;
+      if (!oauthCredential || !shouldRetryOpenAiOAuthImageModel(error)) {
+        throw enrichOpenAiImageError(error, candidateModel, oauthCredential ? 'oauth' : 'api-key', {
+          attemptedModels: candidateModels,
+          currentModel: candidateModel,
+        });
+      }
+    }
+  }
+
+  throw enrichOpenAiImageError(lastError, candidateModels[candidateModels.length - 1] ?? model, 'oauth', {
+    attemptedModels: candidateModels,
+    currentModel: candidateModels[candidateModels.length - 1] ?? model,
+  });
+}
+
+async function executeOpenAiOAuthImageStream(args: {
+  oauthFetch: ReturnType<typeof createOpenAiOAuthFetch> | undefined;
+  accountId?: string;
+  model: string;
+  prompt: string;
+  imageUrl: string;
+}): Promise<{ model: string; output_text?: string }> {
+  if (!args.oauthFetch) {
+    throw new Error('Missing OAuth fetch implementation for OpenAI image inspection.');
+  }
+
+  const headers = new Headers({ 'content-type': 'application/json' });
+  const body = JSON.stringify({
+    model: args.model,
+    store: false,
+    stream: true,
+    reasoning: { summary: 'auto' },
+    instructions: 'You are a helpful vision assistant. Describe the provided screenshot briefly and focus on visible UI text, structure, and notable details.',
     input: [{
+      type: 'message',
       role: 'user',
       content: [
         { type: 'input_text', text: args.prompt } satisfies ResponseInputText,
         {
           type: 'input_image',
           detail: 'auto',
-          image_url: `data:${args.mediaType};base64,${imageBase64}`,
+          image_url: args.imageUrl,
         } satisfies ResponseInputImage,
       ],
     }],
   });
 
+  const response = await args.oauthFetch(OPENAI_CODEX_RESPONSES_ENDPOINT, {
+    method: 'POST',
+    headers,
+    body,
+  });
+
+  if (!response.ok) {
+    const failureBody = await response.text();
+    const failure = new Error(failureBody || `${response.status} status code (no body)`);
+    (failure as Error & { status?: number }).status = response.status;
+    throw failure;
+  }
+
+  const text = await response.text();
+  const outputText = extractOutputTextFromSse(text);
   return {
-    ok: true,
-    output: {
-      provider: 'openai',
-      model: response.model,
-      path: args.filePath,
-      summary: response.output_text?.trim() || 'No image description returned.',
-    },
+    model: args.model,
+    output_text: outputText || undefined,
   };
 }
 
@@ -257,6 +361,122 @@ function toAnthropicMediaType(mediaType: string): 'image/jpeg' | 'image/png' | '
   }
 
   return undefined;
+}
+
+function uniqueModels(models: string[]): string[] {
+  return [...new Set(models.map((model) => model.trim()).filter(Boolean))];
+}
+
+function shouldRetryOpenAiOAuthImageModel(error: unknown): boolean {
+  const status = readOpenAiErrorStatus(error);
+  return status === 400 || status === 404;
+}
+
+function enrichOpenAiImageError(
+  error: unknown,
+  model: string,
+  authMode: 'oauth' | 'api-key',
+  options: { attemptedModels?: string[]; currentModel?: string } = {},
+): Error {
+  const status = readOpenAiErrorStatus(error);
+  const details = readOpenAiErrorDetails(error);
+  const modeDetail = authMode === 'oauth' ? 'OpenAI account sign-in mode' : 'OpenAI API-key mode';
+  const statusDetail = status ? `status ${status}` : 'unknown status';
+  const attemptedModels = options.attemptedModels?.length ? uniqueModels(options.attemptedModels) : [model];
+  const attemptSuffix = attemptedModels.length > 1 ? ` Attempted models: ${attemptedModels.join(', ')}.` : '';
+  const currentModelSuffix = options.currentModel && options.currentModel !== model ? ` Last attempted model: ${options.currentModel}.` : '';
+  const detailSuffix = details ? ` ${details}` : '';
+  return new Error(
+    `OpenAI image inspection failed for model ${model} in ${modeDetail}: ${statusDetail}.${detailSuffix}${attemptSuffix}${currentModelSuffix}`.trim(),
+  );
+}
+
+function readOpenAiErrorStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+
+  const candidate = error as { status?: unknown; response?: { status?: unknown } };
+  return typeof candidate.status === 'number' ? candidate.status
+    : typeof candidate.response?.status === 'number' ? candidate.response.status
+    : undefined;
+}
+
+function formatImageViewFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return `Image view failed: ${message}`;
+}
+
+function extractOutputTextFromSse(text: string): string {
+  const chunks = text.split('\n\n');
+  let output = '';
+
+  for (const chunk of chunks) {
+    const lines = chunk.split('\n');
+    const dataLine = lines.find((line) => line.startsWith('data: '));
+    if (!dataLine) {
+      continue;
+    }
+
+    try {
+      const payload = JSON.parse(dataLine.slice(6)) as ResponseStreamEvent;
+      if (payload.type === 'response.output_text.delta' && payload.delta) {
+        output += payload.delta;
+      }
+      if (payload.type === 'response.output_text.done' && payload.text) {
+        output = payload.text;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return output.trim();
+}
+
+function readOpenAiErrorDetails(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') {
+    return error instanceof Error ? error.message : undefined;
+  }
+
+  const candidate = error as {
+    message?: unknown;
+    error?: { message?: unknown; type?: unknown; code?: unknown; param?: unknown };
+    response?: { data?: unknown; body?: unknown };
+  };
+
+  const directMessage = typeof candidate.message === 'string' ? candidate.message.trim() : '';
+  if (directMessage && directMessage !== '400 status code (no body)' && directMessage !== '404 status code (no body)') {
+    return directMessage;
+  }
+
+  const nested = candidate.error;
+  if (nested && typeof nested === 'object') {
+    const parts = [nested.message, nested.type, nested.code, nested.param]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+    if (parts.length > 0) {
+      return parts.join(' | ');
+    }
+  }
+
+  const responsePayload = candidate.response?.data ?? candidate.response?.body;
+  if (typeof responsePayload === 'string' && responsePayload.trim()) {
+    return responsePayload.trim();
+  }
+
+  if (responsePayload && typeof responsePayload === 'object') {
+    try {
+      return JSON.stringify(responsePayload);
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (directMessage) {
+    return directMessage;
+  }
+
+  return error instanceof Error ? error.message : undefined;
 }
 
 function firstDefinedNonEmpty(...values: Array<string | undefined>): string | undefined {

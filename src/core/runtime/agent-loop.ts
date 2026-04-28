@@ -59,8 +59,13 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
   const providerCredentialSource = resolveProviderCredentialSourceForModel(model, {
     apiKey,
     apiKeyProvider: options.apiKey ? 'explicit' : apiKey ? provider : undefined,
+    credentialStorePath: options.stateDir ? resolve(workspaceRoot, options.stateDir) : undefined,
   });
-  const llm = options.llm ?? await createLoopLlmAdapter({ model, apiKey });
+  const llm = options.llm ?? await createLoopLlmAdapter({
+    model,
+    apiKey,
+    credentialStorePath: options.stateDir ? resolve(workspaceRoot, options.stateDir) : undefined,
+  });
   const logger = options.logger ?? createLogger({ pretty: false, level: 'info', console: false });
   const tools = await resolveTools({
     ...options,
@@ -220,7 +225,7 @@ function getResumeMetadata(
   };
 }
 
-async function createLoopLlmAdapter(options: { model: string; apiKey?: string }): Promise<LlmAdapter> {
+async function createLoopLlmAdapter(options: { model: string; apiKey?: string; credentialStorePath?: string }): Promise<LlmAdapter> {
   const { createLlmAdapter } = await import('../llm/factory.js');
   return createLlmAdapter(options);
 }
@@ -245,6 +250,7 @@ async function resolveTools(
       model: options.model,
       apiKey: options.apiKey,
       providerCredentialSource: options.providerCredentialSource,
+      credentialStorePath: options.stateDir ? resolve(options.workspaceRoot, options.stateDir) : undefined,
       workspaceRoot: options.workspaceRoot,
       stateDir: options.stateDir,
       memoryDir: options.memoryDir,

@@ -23,6 +23,7 @@ export type DefaultAgentToolsOptions = {
   model: string;
   apiKey?: string;
   providerCredentialSource?: ProviderCredentialSource;
+  credentialStorePath?: string;
   workspaceRoot?: string;
   stateDir?: string;
   memoryDir?: string;
@@ -51,6 +52,7 @@ export function createDefaultAgentTools(options: DefaultAgentToolsOptions): Tool
       model: options.model,
       apiKey: options.apiKey,
       providerCredentialSource: options.providerCredentialSource,
+      credentialStorePath: options.credentialStorePath,
       workspaceRoot,
     }),
     reportStateTool,

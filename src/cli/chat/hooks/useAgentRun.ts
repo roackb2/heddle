@@ -146,6 +146,7 @@ export function useAgentRun(args: UseAgentRunArgs) {
         model: activeModel,
         apiKey: activeApiKey,
         providerCredentialSource: activeCredentialSource,
+        credentialStorePath: runtime.credentialStorePath,
         workspaceRoot: runtime.workspaceRoot,
         memoryDir: runtime.memoryDir,
         searchIgnoreDirs: runtime.searchIgnoreDirs,
