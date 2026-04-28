@@ -6,7 +6,8 @@ import { DEFAULT_OPENAI_MODEL } from '../../../../core/config.js';
 import { parseUnifiedDiffFiles } from '../../../../core/review/diff-domain.js';
 import { hasProviderCredentialForModel } from '../../../../core/runtime/api-keys.js';
 import type { ChatSessionLeaseOwner } from '../../../../core/chat/session-lease.js';
-import type { ChatSession } from '../../../../core/chat/types.js';
+import type { ChatSession, TurnSummary } from '../../../../core/chat/types.js';
+import { buildConversationMessages } from '../../../../core/chat/conversation-lines.js';
 import { submitChatSessionPrompt } from '../../../../core/chat/session-submit.js';
 import type {
   ApprovalEventView,
@@ -103,6 +104,10 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs) {
     throw new Error('A run is already in progress for this session.');
   }
 
+  if (process.env.HEDDLE_E2E_FAKE_AGENT === '1') {
+    return runFakeE2eSessionPrompt(args);
+  }
+
   const controller = new AbortController();
   inFlightRuns.set(args.sessionId, controller);
 
@@ -182,6 +187,70 @@ export async function continueChatPrompt(args: Omit<SubmitChatPromptArgs, 'promp
     ...args,
     prompt: DEFAULT_CONTINUE_PROMPT,
   });
+}
+
+async function runFakeE2eSessionPrompt(args: SubmitChatPromptArgs) {
+  const session = readChatSession(args.sessionStoragePath, args.sessionId, true);
+  if (!session) {
+    throw new Error(`Chat session not found: ${args.sessionId}`);
+  }
+
+  const timestamp = new Date().toISOString();
+  const assistantText = `Mocked E2E agent response: ${args.prompt}`;
+  const nextHistory = [
+    ...session.history,
+    { role: 'user' as const, content: args.prompt },
+    { role: 'assistant' as const, content: assistantText },
+  ];
+  const nextTurn: TurnSummary = {
+    id: `e2e-turn-${Date.now()}`,
+    prompt: args.prompt,
+    outcome: 'done',
+    summary: assistantText,
+    steps: 1,
+    traceFile: 'e2e-fake-trace.jsonl',
+    events: ['Mocked E2E session run completed.'],
+  };
+  const updatedSession: ChatSession = {
+    ...session,
+    history: nextHistory,
+    messages: buildConversationMessages(nextHistory),
+    turns: [...session.turns, nextTurn].slice(-8),
+    updatedAt: timestamp,
+    lastContinuePrompt: args.prompt,
+    lease: undefined,
+  };
+
+  saveChatSessions(
+    args.sessionStoragePath,
+    readChatSessionCatalog(args.sessionStoragePath)
+      .map((entry) => readChatSession(args.sessionStoragePath, entry.id, true))
+      .filter((candidate): candidate is ChatSession => Boolean(candidate))
+      .map((candidate) => candidate.id === session.id ? updatedSession : candidate),
+  );
+
+  sessionEventBus.emit(args.sessionId, {
+    sessionId: args.sessionId,
+    timestamp,
+    event: {
+      type: 'trace',
+      runId: `e2e-${args.sessionId}`,
+      timestamp,
+      event: {
+        type: 'run.finished',
+        outcome: 'done',
+        summary: assistantText,
+        step: 1,
+        timestamp,
+      },
+    },
+  } satisfies ControlPlaneSessionLiveEvent);
+
+  return {
+    outcome: 'done',
+    summary: assistantText,
+    session: projectChatSessionDetail(updatedSession)[0] ?? null,
+  };
 }
 
 export function subscribeToControlPlaneSessionEvents(

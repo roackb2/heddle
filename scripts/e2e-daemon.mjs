@@ -42,6 +42,7 @@ const child = spawn(
       HOME: homeRoot,
       HEDDLE_E2E_PRIMARY_WORKSPACE: primaryWorkspace,
       HEDDLE_E2E_SECONDARY_WORKSPACE: secondaryWorkspace,
+      HEDDLE_E2E_FAKE_AGENT: '1',
     },
     stdio: 'inherit',
   },

@@ -49,6 +49,38 @@ test('registers and switches to another workspace from the browser', async ({ pa
   await expect(page.getByTestId('overview-active-workspace')).toContainText('secondary');
 });
 
+test('creates a session and sends a mocked prompt through the browser flow', async ({ page }) => {
+  await page.goto('/sessions');
+
+  await page.getByTestId('new-session-button').click();
+  await expect(page.locator('textarea')).toBeVisible();
+
+  await page.locator('textarea').fill('Explain this mocked E2E run');
+  await page.getByRole('button', { name: 'Send' }).click();
+
+  await expect(page.getByText('Explain this mocked E2E run')).toBeVisible();
+  await expect(page.getByText('Mocked E2E agent response: Explain this mocked E2E run')).toBeVisible();
+});
+
+test('continues a mocked browser session after an initial prompt', async ({ page }) => {
+  await page.goto('/sessions');
+
+  await page.getByTestId('new-session-button').click();
+  await expect(page.locator('textarea')).toBeVisible();
+
+  await page.locator('textarea').fill('Start a mocked continuation flow');
+  await page.getByRole('button', { name: 'Send' }).click();
+
+  await expect(page.getByText('Mocked E2E agent response: Start a mocked continuation flow')).toBeVisible();
+
+  const continueButton = page.getByRole('button', { name: 'Continue' });
+  await expect(continueButton).toBeEnabled();
+  await continueButton.click();
+
+  await expect(page.getByText('Continue from where you left off.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Mocked E2E agent response: Continue from where you left off.', { exact: true })).toBeVisible();
+});
+
 test('mobile navigation exposes the primary sections', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/overview');
@@ -61,5 +93,6 @@ test('mobile navigation exposes the primary sections', async ({ page }) => {
 
   await page.getByTestId('mobile-nav-sessions').click();
   await expect(page).toHaveURL(/\/sessions$/);
-  await expect(page.getByTestId('new-session-button')).toBeVisible();
+  await expect(page.locator('textarea')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Send' })).toBeVisible();
 });
