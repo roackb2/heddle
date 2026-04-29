@@ -299,11 +299,13 @@ describe('runAgent', () => {
       },
     };
 
+    let executions = 0;
     const listFilesTool: ToolDefinition = {
       name: 'list_files',
       description: 'Lists files in a directory',
       parameters: { type: 'object', properties: {} },
       async execute() {
+        executions += 1;
         return { ok: true, output: 'README.md\nsrc/' };
       },
     };
@@ -318,12 +320,12 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe('I should stop repeating the same directory listing.');
+    expect(executions).toBe(3);
     expect(seenMessages[3]).toContainEqual({
       role: 'tool',
       content: JSON.stringify({
-        ok: false,
-        error:
-          'Repeated tool call blocked: list_files was already called 2 times with the same input earlier in this run. Try a different tool or different input.',
+        ok: true,
+        output: 'README.md\nsrc/',
       }),
       toolCallId: 'call-3',
     });
@@ -331,15 +333,15 @@ describe('runAgent', () => {
       type: 'tool.result',
       tool: 'list_files',
       result: {
-        ok: false,
-        error:
-          'Repeated tool call blocked: list_files was already called 2 times with the same input earlier in this run. Try a different tool or different input.',
+        ok: true,
+        output: 'README.md\nsrc/',
       },
     });
   });
 
-  it('normalizes equivalent path spellings and only blocks them after repeated retries', async () => {
+  it('normalizes equivalent path spellings but still allows repeated equivalent tool calls', async () => {
     const seenMessages: ChatMessage[][] = [];
+    let executions = 0;
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
         seenMessages.push(structuredClone(messages));
@@ -373,6 +375,7 @@ describe('runAgent', () => {
       description: 'Lists files in a directory',
       parameters: { type: 'object', properties: {} },
       async execute() {
+        executions += 1;
         return { ok: true, output: 'README.md\nsrc/' };
       },
     };
@@ -386,12 +389,12 @@ describe('runAgent', () => {
     });
 
     expect(result.outcome).toBe('done');
+    expect(executions).toBe(3);
     expect(seenMessages[3]).toContainEqual({
       role: 'tool',
       content: JSON.stringify({
-        ok: false,
-        error:
-          'Repeated tool call blocked: list_files was already called 2 times with the same input earlier in this run. Try a different tool or different input.',
+        ok: true,
+        output: 'README.md\nsrc/',
       }),
       toolCallId: 'call-3',
     });

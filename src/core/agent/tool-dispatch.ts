@@ -8,10 +8,8 @@ import type { ToolDefinition, ToolCall, TraceEvent } from '../types.js';
 import type { RunAgentOptions } from './run-agent.js';
 import { createToolRegistry } from '../tools/registry.js';
 import { executeTool } from '../tools/execute-tool.js';
-import { stableSerialize, normalizeToolInput, buildRepeatedToolCallResult } from './util.js';
+import { stableSerialize, normalizeToolInput } from './util.js';
 import type { Logger } from 'pino';
-
-const MAX_IDENTICAL_TOOL_CALLS = 2;
 
 export async function maybeDenyToolCall(args: {
   call: ToolCall;
@@ -121,9 +119,14 @@ async function executeRecordedToolCall(
 
   const signature = `${call.tool}:${stableSerialize(normalizeToolInput(call.tool, call.input))}`;
   const seenCount = seenToolCalls.get(signature) ?? 0;
-  const result = seenCount >= MAX_IDENTICAL_TOOL_CALLS
-    ? buildRepeatedToolCallResult(call.tool)
-    : await executeTool(registry, call);
+  if (seenCount >= 2) {
+    log.warn(
+      { step, tool: call.tool, repeatCount: seenCount + 1 },
+      'Executing repeated identical tool call; warning only',
+    );
+  }
+
+  const result = await executeTool(registry, call);
   seenToolCalls.set(signature, seenCount + 1);
   log.debug({ step, tool: call.tool, ok: result.ok }, 'Tool result');
   record({ type: 'tool.result', tool: call.tool, result, step, timestamp: now() });
