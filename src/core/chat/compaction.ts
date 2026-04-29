@@ -524,29 +524,6 @@ function summarizeMessageForLegacyCompaction(message: ChatMessage): string[] {
   return [];
 }
 
-function renderArchivedMessage(message: ChatMessage): string {
-  if (message.role === 'assistant') {
-    return [
-      'Role: assistant',
-      message.content ? `Content:\n${message.content}` : 'Content: (empty)',
-      message.toolCalls?.length ? `Tool calls:\n${JSON.stringify(message.toolCalls, null, 2)}` : undefined,
-    ].filter((part): part is string => Boolean(part)).join('\n\n');
-  }
-
-  if (message.role === 'tool') {
-    return [
-      'Role: tool',
-      `Tool call id: ${message.toolCallId}`,
-      `Content:\n${message.content}`,
-    ].join('\n\n');
-  }
-
-  return [
-    `Role: ${message.role}`,
-    `Content:\n${message.content}`,
-  ].join('\n\n');
-}
-
 function buildSummarizerTranscript(messages: ChatMessage[], summaryModel: string): string {
   if (messages.length === 0) {
     return '(no archived messages)';

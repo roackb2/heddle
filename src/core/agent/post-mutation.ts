@@ -3,8 +3,6 @@
 // the agent has reviewed and verified workspace-changing mutations.
 // ---------------------------------------------------------------------------
 
-import type { MutationState } from './mutation-tracking.js';
-
 export function buildPostMutationRequirement(options: {
   pendingVerification: boolean;
   pendingChangeReview: boolean;
@@ -32,4 +30,3 @@ export function buildPostMutationRequirement(options: {
 
   return `Host requirement: before giving a final answer after a workspace-changing action, you must ${requirements.join(' and ')}. After doing that, then provide the final answer.`;
 }
-
