@@ -12,10 +12,14 @@ import type {
 } from '@anthropic-ai/sdk/resources/messages/messages';
 import OpenAI from 'openai';
 import type { Response, ResponseOutputText, WebSearchTool } from 'openai/resources/responses/responses.js';
-import { OPENAI_CODEX_RESPONSES_ENDPOINT } from '../auth/openai-oauth.js';
 import type { ToolDefinition, ToolResult } from '../types.js';
 import { inferProviderFromModel } from '../llm/factory.js';
-import { createOpenAiOAuthFetch } from '../llm/openai.js';
+import {
+  createOpenAiOAuthFetch,
+  executeOpenAiOAuthCodexSse,
+  extractOpenAiCodexOutputTextFromSse,
+  extractOpenAiCodexSseItems,
+} from '../llm/openai.js';
 import { validateModelCredentialCompatibility } from '../llm/model-policy.js';
 import type { LlmProvider } from '../llm/types.js';
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../config.js';
@@ -154,10 +158,9 @@ async function executeOpenAiOAuthWebSearch(
   oauthCredential: NonNullable<ReturnType<typeof resolveOAuthCredentialForModel>>,
 ): Promise<ToolResult> {
   const oauthFetch = createOpenAiOAuthFetch(oauthCredential, { storePath: options.credentialStorePath });
-  const response = await oauthFetch(OPENAI_CODEX_RESPONSES_ENDPOINT, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
+  const sseText = await executeOpenAiOAuthCodexSse({
+    oauthFetch,
+    body: {
       model: options.model,
       store: false,
       stream: true,
@@ -169,17 +172,8 @@ async function executeOpenAiOAuthWebSearch(
         type: 'web_search',
         search_context_size: input.contextSize ?? 'medium',
       }],
-    }),
+    },
   });
-
-  if (!response.ok) {
-    const failureBody = await response.text();
-    const failure = new Error(failureBody || `${response.status} status code (no body)`);
-    (failure as Error & { status?: number }).status = response.status;
-    throw failure;
-  }
-
-  const sseText = await response.text();
   return {
     ok: true,
     output: formatOpenAiOAuthWebSearchSseResult(sseText, options.model),
@@ -303,71 +297,37 @@ function formatOpenAiOAuthWebSearchSseResult(sseText: string, model: string): {
   return {
     provider: 'openai',
     model,
-    summary: extractSseOutputText(sseText)?.trim() || 'No summary returned.',
+    summary: extractOpenAiCodexOutputTextFromSse(sseText).trim() || 'No summary returned.',
     citations: extractSseWebSearchSources(sseText),
   };
-}
-
-function extractSseOutputText(sseText: string): string | undefined {
-  const matches = [...sseText.matchAll(/^data: (\{.*"type":"response\.output_text\.done".*\})$/gm)];
-  for (let index = matches.length - 1; index >= 0; index -= 1) {
-    const raw = matches[index]?.[1];
-    if (!raw) {
-      continue;
-    }
-
-    try {
-      const parsed = JSON.parse(raw) as { text?: unknown };
-      if (typeof parsed.text === 'string' && parsed.text.trim()) {
-        return parsed.text;
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  return undefined;
 }
 
 function extractSseWebSearchSources(sseText: string): Array<{ title: string; url: string }> {
   const citations: Array<{ title: string; url: string }> = [];
   const seen = new Set<string>();
-  const matches = [...sseText.matchAll(/^data: (\{.*"type":"response\.output_item\.done".*\})$/gm)];
 
-  for (const match of matches) {
-    const raw = match[1];
-    if (!raw) {
-      continue;
-    }
+  const items = extractOpenAiCodexSseItems<{
+    type: 'web_search_call';
+    action?: { sources?: Array<{ type?: string; url?: string }> };
+  }>(
+    sseText,
+    (item): item is { type: 'web_search_call'; action?: { sources?: Array<{ type?: string; url?: string }> } } =>
+      Boolean(item && typeof item === 'object' && (item as { type?: unknown }).type === 'web_search_call'),
+  );
 
-    try {
-      const parsed = JSON.parse(raw) as {
-        item?: {
-          type?: string;
-          action?: {
-            sources?: Array<{ type?: string; url?: string }>;
-          };
-        };
-      };
-      if (parsed.item?.type !== 'web_search_call') {
+  for (const item of items) {
+    for (const source of item.action?.sources ?? []) {
+      if (source.type !== 'url' || !source.url) {
         continue;
       }
-
-      for (const source of parsed.item.action?.sources ?? []) {
-        if (source.type !== 'url' || !source.url) {
-          continue;
-        }
-        if (seen.has(source.url)) {
-          continue;
-        }
-        seen.add(source.url);
-        citations.push({
-          title: source.url,
-          url: source.url,
-        });
+      if (seen.has(source.url)) {
+        continue;
       }
-    } catch {
-      continue;
+      seen.add(source.url);
+      citations.push({
+        title: source.url,
+        url: source.url,
+      });
     }
   }
 
