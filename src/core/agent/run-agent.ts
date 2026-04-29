@@ -339,13 +339,7 @@ function handleDeniedToolResult(
   result: ToolResult,
 ): RunResult | undefined {
   context.state.consecutiveErrors++;
-  const maybeFailure = maybeFinishAfterConsecutiveErrors(
-    context,
-    `Stopped after ${MAX_CONSECUTIVE_ERRORS} consecutive tool errors. Last error: ${result.error}`,
-  );
-  if (maybeFailure) {
-    return maybeFailure;
-  }
+  pushConsecutiveErrorWarning(context, result.error);
 
   context.messages.push({
     role: 'tool',
@@ -461,12 +455,10 @@ function handleFailedToolExecution(context: RunContext, result: ToolResult): Run
     });
   } else {
     context.state.consecutiveErrors++;
+    pushConsecutiveErrorWarning(context, result.error);
   }
 
-  return maybeFinishAfterConsecutiveErrors(
-    context,
-    `Stopped after ${MAX_CONSECUTIVE_ERRORS} consecutive tool errors. Last error: ${result.error}`,
-  );
+  return undefined;
 }
 
 function pushProgressReminders(context: RunContext, effectiveCall: ToolCall, result: ToolResult) {
@@ -603,12 +595,16 @@ function finishInterrupted(context: RunContext, logMessage: string): RunResult {
   });
 }
 
-function maybeFinishAfterConsecutiveErrors(context: RunContext, summary: string): RunResult | undefined {
+function pushConsecutiveErrorWarning(context: RunContext, error: string | undefined) {
   if (context.state.consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
-    return undefined;
+    return;
   }
 
-  return finishRun(context, 'error', summary);
+  context.messages.push({
+    role: 'system',
+    content:
+      `Host warning: there have been ${context.state.consecutiveErrors} consecutive tool errors${error ? `; latest error: ${error}` : ''}. Try a different approach, different tool, narrower scope, or use report_state if you are genuinely blocked. Do not stop solely because of this warning.`,
+  });
 }
 
 function detectActionlessCompletion(

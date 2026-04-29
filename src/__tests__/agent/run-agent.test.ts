@@ -453,6 +453,50 @@ describe('runAgent', () => {
     });
   });
 
+  it('warns after 3 consecutive tool errors but still lets the agent continue', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+
+        if (seenMessages.length <= 3) {
+          return {
+            toolCalls: [{ id: `call-${seenMessages.length}`, tool: 'list_files', input: { path: '.' } }],
+          };
+        }
+
+        return {
+          content: 'I saw the warning and changed approach instead of being stopped.',
+        };
+      },
+    };
+
+    const listFilesTool: ToolDefinition = {
+      name: 'list_files',
+      description: 'Lists files in a directory',
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: false, error: 'Transient tool failure while listing files.' };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Inspect this repo.',
+      llm: fakeLlm,
+      tools: [listFilesTool],
+      maxSteps: 5,
+      logger: silentLogger,
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('I saw the warning and changed approach instead of being stopped.');
+    expect(seenMessages[3]).toContainEqual({
+      role: 'system',
+      content:
+        'Host warning: there have been 3 consecutive tool errors; latest error: Transient tool failure while listing files.. Try a different approach, different tool, narrower scope, or use report_state if you are genuinely blocked. Do not stop solely because of this warning.',
+    });
+  });
+
   it('adds a follow-through reminder after report_state so the next turn acts on the named blocker', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
