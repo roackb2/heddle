@@ -168,6 +168,7 @@ export function usePromptSubmission({
       workspaceRoot: runtime.workspaceRoot,
       stateRoot: runtime.stateRoot,
       credentialStorePath: runtime.credentialStorePath,
+      providerCredentialSource: runtime.providerCredentialSource,
       preparePrompt: preparePromptWithMentions,
       executeTurn,
       executeDirectShellCommand,

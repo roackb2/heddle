@@ -23,7 +23,7 @@ import {
   setStoredProviderCredential,
   type StoredProviderCredential,
 } from '../auth/provider-credentials.js';
-import { isOpenAiAccountSignInModel, OPENAI_ACCOUNT_SIGN_IN_MODELS } from './openai-models.js';
+import { assertModelCredentialCompatibility } from './model-policy.js';
 
 export type OpenAiAdapterOptions = {
   apiKey?: string;
@@ -69,8 +69,12 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
       signal?: AbortSignal,
       onStreamEvent?: (event: LlmStreamEvent) => void,
     ): Promise<LlmResponse> {
-      if (oauthCredential && !isOpenAiAccountSignInModel(model)) {
-        throw new Error(`OpenAI account sign-in is not enabled for model ${model}. Use one of ${formatOpenAiAccountSignInModels()}, or set OPENAI_API_KEY to use Platform API-key mode.`);
+      if (oauthCredential) {
+        assertModelCredentialCompatibility({
+          model,
+          provider: 'openai',
+          credentialMode: 'oauth',
+        });
       }
 
       const request = buildOpenAiResponsesRequest(messages, {
@@ -187,10 +191,6 @@ function parseStreamedToolCalls(
   }
 
   return toolCalls;
-}
-
-function formatOpenAiAccountSignInModels(): string {
-  return OPENAI_ACCOUNT_SIGN_IN_MODELS.join(', ');
 }
 
 function firstDefinedNonEmpty(...values: Array<string | undefined>): string | undefined {

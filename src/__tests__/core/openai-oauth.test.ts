@@ -158,6 +158,29 @@ describe('OpenAI OAuth helpers', () => {
     );
   });
 
+  it('fails clearly before routing gpt-5.1-codex-mini through account sign-in', async () => {
+    const adapter = createOpenAiAdapter({
+      model: 'gpt-5.1-codex-mini',
+      credential: {
+        type: 'oauth',
+        provider: 'openai',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresAt: Date.now() + 120_000,
+        accountId: 'account-123',
+        createdAt: '2026-04-27T00:00:00.000Z',
+        updatedAt: '2026-04-27T00:00:00.000Z',
+      },
+      fetchImpl: (async () => {
+        throw new Error('fetch should not be called');
+      }) as typeof fetch,
+    });
+
+    await expect(adapter.chat([{ role: 'user', content: 'hello' }], [])).rejects.toThrow(
+      'OpenAI account sign-in is not enabled for model gpt-5.1-codex-mini.',
+    );
+  });
+
   it('uses the Codex-compatible Responses payload shape for account sign-in models', async () => {
     const requests: Array<{ url: string; body: string }> = [];
     const adapter = createOpenAiAdapter({

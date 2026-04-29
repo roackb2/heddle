@@ -201,7 +201,7 @@ function buildInitialMessages(
   history: ChatMessage[] | undefined,
 ): ChatMessage[] {
   return [
-    { role: 'system', content: buildSystemPrompt(goal, toolNames, systemContext) },
+    { role: 'system', content: buildSystemPrompt(toolNames, systemContext) },
     ...sanitizeHistory(history ?? []),
     { role: 'user', content: goal },
   ];

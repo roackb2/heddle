@@ -127,6 +127,10 @@ export function useAgentRun(args: UseAgentRunArgs) {
   const projectApprovals = useProjectApprovals(runtime.approvalsFile);
   const activeApiKey = resolveApiKeyForModel(activeModel, runtime);
   const titleApiKey = resolveApiKeyForModel(sessionTitleModel, runtime);
+  const titleCredentialSource = useMemo(
+    () => resolveProviderCredentialSourceForModel(sessionTitleModel, runtime),
+    [runtime, sessionTitleModel],
+  );
   const activeCredentialSource = useMemo(
     () => resolveProviderCredentialSourceForModel(activeModel, runtime),
     [activeModel, runtime],
@@ -168,7 +172,7 @@ export function useAgentRun(args: UseAgentRunArgs) {
 
   const maybeAutoNameSession = (sessionId: string, prompt: string, responseText: string) => {
     const session = sessions.find((candidate) => candidate.id === sessionId);
-    if (!session || !isGenericSessionName(session.name) || !titleApiKey) {
+    if (!session || !isGenericSessionName(session.name) || titleCredentialSource.type === 'missing') {
       return;
     }
 
@@ -357,6 +361,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     systemContext: runtime.systemContext,
     toolNames,
     goal: prompt,
+    summarizer: { credentialSource: runtime.providerCredentialSource },
     onStatusChange: (event) => emitCompactionStatus(event, historyForRun),
   });
   historyForRun = preflightCompacted.history;
@@ -512,6 +517,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       systemContext: runtime.systemContext,
       toolNames,
       goal: prompt,
+      summarizer: { credentialSource: runtime.providerCredentialSource },
       onStatusChange: (event) => emitCompactionStatus(event, result.transcript),
     });
     updateSessionById(sessionId, (sessionToUpdate) => ({
@@ -852,6 +858,7 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
       systemContext: runtime.systemContext,
       toolNames: tools.map((tool) => tool.name),
       goal: shellDisplay,
+      summarizer: { credentialSource: runtime.providerCredentialSource },
       onStatusChange: (event) => {
         if (event.status === 'running') {
           state.setStatus('Compacting');

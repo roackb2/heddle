@@ -3,6 +3,7 @@ import { buildCompactionRunningContext, compactChatHistoryWithArchive } from './
 import { createInitialMessages } from './state/storage.js';
 import type { ChatSession, ConversationLine } from './state/types.js';
 import { buildConversationMessages, normalizeInlineText } from './utils/format.js';
+import type { ProviderCredentialSource } from './utils/runtime.js';
 
 type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
 
@@ -35,6 +36,7 @@ type SubmitChatPromptArgs = {
   workspaceRoot: string;
   stateRoot: string;
   credentialStorePath?: string;
+  providerCredentialSource?: ProviderCredentialSource;
   preparePrompt?: (prompt: string) => { prompt: string; displayText?: string };
   executeTurn: (prompt: string, displayText?: string, sessionIdOverride?: string) => Promise<void>;
   executeDirectShellCommand: (rawCommand: string) => Promise<void>;
@@ -95,6 +97,7 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
         sessionId: session.id,
         stateRoot: args.stateRoot,
         force: true,
+        summarizer: { credentialSource: args.providerCredentialSource },
       }).then((compacted) => {
         const changed =
           compacted.history.length !== session.history.length

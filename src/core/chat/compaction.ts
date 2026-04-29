@@ -1,7 +1,12 @@
 import type { ChatMessage, LlmAdapter, LlmUsage } from '../../index.js';
 import { createLlmAdapter, inferProviderFromModel } from '../../index.js';
-import { hasProviderCredentialForModel, resolveApiKeyForModel } from '../runtime/api-keys.js';
+import { hasProviderCredentialForModel, resolveApiKeyForModel, resolveProviderCredentialSourceForModel, type ProviderCredentialSource } from '../runtime/api-keys.js';
 import { estimateBuiltInContextWindow } from '../llm/openai-models.js';
+import {
+  credentialModeFromSource,
+  resolveSystemSelectedModel,
+  type ModelCredentialMode,
+} from '../llm/model-policy.js';
 import type { ChatArchiveManifest, ChatArchiveRecord, ChatContextStats } from './types.js';
 import {
   createArchiveId,
@@ -16,18 +21,25 @@ import {
 
 const DEFAULT_CONTEXT_WINDOW_ESTIMATE = 200_000;
 const MAX_HISTORY_RATIO = 0.6;
-const MIN_RECENT_MESSAGES = 16;
-const MIN_FORCED_RECENT_MESSAGES = 3;
+const MAX_RECENT_HISTORY_RATIO = 0.18;
+const MIN_RECENT_HISTORY_TOKEN_BUDGET = 8_000;
+const MAX_RECENT_HISTORY_TOKEN_BUDGET = 120_000;
+const PREFERRED_RECENT_MESSAGES = 12;
+const PREFERRED_FORCED_RECENT_MESSAGES = 3;
 const MAX_ROLLING_SUMMARY_CHARS = 12_000;
+const MAX_SUMMARIZER_CONTEXT_RATIO = 0.12;
+const MAX_SUMMARIZER_TRANSCRIPT_TOKENS = 32_000;
+const MAX_SUMMARIZER_TRANSCRIPT_CHARS = 96_000;
+const MAX_SUMMARIZER_MESSAGE_CHARS = 2_000;
+const MIN_SUMMARIZER_MESSAGE_CHARS = 80;
 const COMPACTED_HISTORY_MARKER = 'Heddle compacted earlier conversation history.';
-const DEFAULT_OPENAI_COMPACTION_MODEL = 'gpt-5.1-codex-mini';
-const DEFAULT_ANTHROPIC_COMPACTION_MODEL = 'claude-haiku-4-5';
 
 export type CompactionSummarizerOptions = {
   provider?: 'openai' | 'anthropic' | 'active';
   model?: string;
   apiKey?: string;
   llm?: LlmAdapter;
+  credentialSource?: ProviderCredentialSource;
 };
 
 export type CompactChatHistoryWithArchiveOptions = {
@@ -55,7 +67,8 @@ export async function compactChatHistoryWithArchive(
 ): Promise<CompactChatHistoryResult> {
   const estimatedWindow = estimateBuiltInContextWindow(options.model) ?? DEFAULT_CONTEXT_WINDOW_ESTIMATE;
   const maxHistoryTokens = Math.floor(estimatedWindow * MAX_HISTORY_RATIO);
-  const minRecentMessages = options.force ? MIN_FORCED_RECENT_MESSAGES : MIN_RECENT_MESSAGES;
+  const recentTokenBudget = resolveRecentHistoryTokenBudget(estimatedWindow);
+  const preferredRecentMessages = options.force ? PREFERRED_FORCED_RECENT_MESSAGES : PREFERRED_RECENT_MESSAGES;
   const needsCompaction =
     estimateChatHistoryTokens(options.history) > maxHistoryTokens
     || (Boolean(options.force) && countNonCompactedMessages(options.history) > 0);
@@ -80,7 +93,11 @@ export async function compactChatHistoryWithArchive(
     };
   }
 
-  const splitIndex = findCompactionSplit(options.history, minRecentMessages);
+  const splitIndex = findCompactionSplit(options.history, {
+    recentTokenBudget,
+    preferredRecentMessages,
+    stopAtPreferredMessages: Boolean(options.force),
+  });
   if (splitIndex <= 0 || splitIndex >= options.history.length) {
     const manifest = loadChatArchiveManifest(options.stateRoot, options.sessionId);
     return {
@@ -210,15 +227,20 @@ export function compactChatHistory(options: {
 }): { history: ChatMessage[]; context: ChatContextStats } {
   const estimatedWindow = estimateBuiltInContextWindow(options.model) ?? DEFAULT_CONTEXT_WINDOW_ESTIMATE;
   const maxHistoryTokens = Math.floor(estimatedWindow * MAX_HISTORY_RATIO);
-  const minRecentMessages = options.force ? MIN_FORCED_RECENT_MESSAGES : MIN_RECENT_MESSAGES;
+  const recentTokenBudget = resolveRecentHistoryTokenBudget(estimatedWindow);
+  const preferredRecentMessages = options.force ? PREFERRED_FORCED_RECENT_MESSAGES : PREFERRED_RECENT_MESSAGES;
   let nextHistory = options.history;
   let compactedMessages = 0;
 
   while (
     (estimateChatHistoryTokens(nextHistory) > maxHistoryTokens || (options.force && compactedMessages === 0)) &&
-    countNonCompactedMessages(nextHistory) > minRecentMessages
+    countNonCompactedMessages(nextHistory) > 1
   ) {
-    const splitIndex = findCompactionSplit(nextHistory, minRecentMessages);
+    const splitIndex = findCompactionSplit(nextHistory, {
+      recentTokenBudget,
+      preferredRecentMessages,
+      stopAtPreferredMessages: Boolean(options.force),
+    });
     if (splitIndex <= 0 || splitIndex >= nextHistory.length) {
       break;
     }
@@ -370,9 +392,7 @@ async function summarizeChatArchive(options: {
     createdAt: archive.createdAt,
   }));
 
-  const transcript = options.archivedMessages
-    .map((message, index) => `## Message ${index + 1}\n${renderArchivedMessage(message)}`)
-    .join('\n\n');
+  const transcript = buildSummarizerTranscript(options.archivedMessages, options.summaryModel);
 
   const response = await options.llm.chat([
     {
@@ -437,9 +457,16 @@ function resolveSummarizer(options: CompactChatHistoryWithArchiveOptions): { llm
     : options.summarizer.provider;
   const model =
     options.summarizer?.model
-    ?? (provider === 'anthropic' ?
-      DEFAULT_ANTHROPIC_COMPACTION_MODEL
-    : DEFAULT_OPENAI_COMPACTION_MODEL);
+    ?? resolveSystemSelectedModel({
+      purpose: 'chat-compaction',
+      provider,
+      activeModel: options.model,
+      credentialMode: resolveCompactionCredentialMode({
+        activeModel: options.model,
+        explicitApiKey: options.summarizer?.apiKey,
+        credentialSource: options.summarizer?.credentialSource,
+      }),
+    });
   const apiKey = options.summarizer?.apiKey ?? resolveApiKeyForModel(model);
   if (!hasProviderCredentialForModel(model, {
     apiKey,
@@ -452,6 +479,19 @@ function resolveSummarizer(options: CompactChatHistoryWithArchiveOptions): { llm
     model,
     llm: createLlmAdapter({ model, apiKey }),
   };
+}
+
+function resolveCompactionCredentialMode(args: {
+  activeModel: string;
+  explicitApiKey?: string;
+  credentialSource?: ProviderCredentialSource;
+  credentialStorePath?: string;
+}): ModelCredentialMode {
+  return credentialModeFromSource(args.credentialSource ?? resolveProviderCredentialSourceForModel(args.activeModel, {
+    apiKey: args.explicitApiKey,
+    apiKeyProvider: args.explicitApiKey ? 'explicit' : undefined,
+    credentialStorePath: args.credentialStorePath,
+  }));
 }
 
 function extractPriorSummary(history: ChatMessage[]): string | undefined {
@@ -507,6 +547,71 @@ function renderArchivedMessage(message: ChatMessage): string {
   ].join('\n\n');
 }
 
+function buildSummarizerTranscript(messages: ChatMessage[], summaryModel: string): string {
+  if (messages.length === 0) {
+    return '(no archived messages)';
+  }
+
+  const transcriptCharBudget = resolveSummarizerTranscriptCharBudget(summaryModel);
+  const perMessageBudget = Math.max(
+    MIN_SUMMARIZER_MESSAGE_CHARS,
+    Math.min(MAX_SUMMARIZER_MESSAGE_CHARS, Math.floor(transcriptCharBudget / messages.length) - 80),
+  );
+  const lines: string[] = [
+    `Summarizer transcript note: raw archive contains ${messages.length} complete messages.`,
+    `Each message below is condensed to fit the summarizer request. Read the archive file when exact wording or full tool output matters.`,
+    `Summarizer input budget: about ${Math.floor(transcriptCharBudget / 4).toLocaleString()} estimated text tokens.`,
+  ];
+  let totalChars = lines.join('\n').length;
+
+  for (const [index, message] of messages.entries()) {
+    const rendered = `## Message ${index + 1}\n${renderArchivedMessageForSummary(message, perMessageBudget)}`;
+    const separator = lines.length > 0 ? '\n\n' : '';
+    if (totalChars + separator.length + rendered.length > transcriptCharBudget) {
+      lines.push(`\n\nOmitted ${messages.length - index} additional archived messages from summarizer input to stay within request budget. Inspect the raw archive for full detail.`);
+      break;
+    }
+
+    lines.push(rendered);
+    totalChars += separator.length + rendered.length;
+  }
+
+  return lines.join('\n\n');
+}
+
+function resolveSummarizerTranscriptCharBudget(summaryModel: string): number {
+  const contextWindow = estimateBuiltInContextWindow(summaryModel) ?? DEFAULT_CONTEXT_WINDOW_ESTIMATE;
+  const budgetByContext = Math.floor(contextWindow * MAX_SUMMARIZER_CONTEXT_RATIO);
+  const tokenBudget = Math.min(MAX_SUMMARIZER_TRANSCRIPT_TOKENS, budgetByContext);
+  return Math.min(MAX_SUMMARIZER_TRANSCRIPT_CHARS, tokenBudget * 4);
+}
+
+function renderArchivedMessageForSummary(message: ChatMessage, maxChars: number): string {
+  if (message.role === 'assistant') {
+    const parts = [
+      'Role: assistant',
+      message.content ? `Content excerpt:\n${truncateForSummary(message.content, maxChars)}` : 'Content: (empty)',
+      message.toolCalls?.length ?
+        `Tool calls:\n${truncateForSummary(JSON.stringify(message.toolCalls, null, 2), maxChars)}`
+      : undefined,
+    ].filter((part): part is string => Boolean(part));
+    return parts.join('\n\n');
+  }
+
+  if (message.role === 'tool') {
+    return [
+      'Role: tool',
+      `Tool call id: ${message.toolCallId}`,
+      `Content excerpt:\n${truncateForSummary(message.content, maxChars)}`,
+    ].join('\n\n');
+  }
+
+  return [
+    `Role: ${message.role}`,
+    `Content excerpt:\n${truncateForSummary(message.content, maxChars)}`,
+  ].join('\n\n');
+}
+
 function deriveShortDescription(summary: string): string | undefined {
   const lines = summary
     .split('\n')
@@ -524,6 +629,14 @@ function truncateSummary(value: string): string {
   return `${value.slice(0, MAX_ROLLING_SUMMARY_CHARS - 1).trimEnd()}…`;
 }
 
+function truncateForSummary(value: string, maxChars: number): string {
+  if (value.length <= maxChars) {
+    return value;
+  }
+
+  return `${value.slice(0, Math.max(0, maxChars - 80)).trimEnd()}\n\n[truncated ${value.length - maxChars} chars; full content is in the raw archive]`;
+}
+
 function truncateLine(value: string, maxChars: number): string {
   const compact = value.replace(/\s+/g, ' ').trim();
   if (compact.length <= maxChars) {
@@ -537,22 +650,59 @@ function countNonCompactedMessages(history: ChatMessage[]): number {
   return history.filter((message) => !isCompactedHistorySummary(message)).length;
 }
 
-function findCompactionSplit(history: ChatMessage[], minRecentMessages: number): number {
-  let splitIndex = Math.max(0, history.length - minRecentMessages);
+function resolveRecentHistoryTokenBudget(contextWindow: number): number {
+  return Math.max(
+    MIN_RECENT_HISTORY_TOKEN_BUDGET,
+    Math.min(MAX_RECENT_HISTORY_TOKEN_BUDGET, Math.floor(contextWindow * MAX_RECENT_HISTORY_RATIO)),
+  );
+}
 
-  while (splitIndex < history.length && history[splitIndex]?.role === 'tool') {
-    splitIndex++;
+function findCompactionSplit(history: ChatMessage[], options: {
+  recentTokenBudget: number;
+  preferredRecentMessages: number;
+  stopAtPreferredMessages?: boolean;
+}): number {
+  let splitIndex = history.length;
+  let recentTokens = 0;
+  let recentMessages = 0;
+
+  while (splitIndex > 0) {
+    if (options.stopAtPreferredMessages && recentMessages >= options.preferredRecentMessages) {
+      break;
+    }
+
+    const nextMessage = history[splitIndex - 1];
+    if (!nextMessage) {
+      break;
+    }
+
+    const nextTokens = estimateMessageTokens(nextMessage);
+    const exceedsBudget = recentTokens + nextTokens > options.recentTokenBudget;
+    const reachedPreferredCount = recentMessages >= options.preferredRecentMessages;
+    if (recentMessages > 0 && exceedsBudget && reachedPreferredCount) {
+      break;
+    }
+    if (recentMessages > 0 && exceedsBudget && nextTokens > options.recentTokenBudget) {
+      break;
+    }
+
+    splitIndex--;
+    recentTokens += nextTokens;
+    if (!isCompactedHistorySummary(nextMessage)) {
+      recentMessages++;
+    }
+
+    if (recentMessages >= options.preferredRecentMessages && recentTokens >= options.recentTokenBudget) {
+      break;
+    }
   }
 
-  while (
-    splitIndex < history.length &&
-    splitIndex > 0 &&
-    isAssistantToolCallMessage(history[splitIndex - 1])
-  ) {
-    splitIndex++;
-    while (splitIndex < history.length && history[splitIndex]?.role === 'tool') {
-      splitIndex++;
-    }
+  while (splitIndex > 0 && history[splitIndex]?.role === 'tool') {
+    splitIndex--;
+  }
+
+  if (splitIndex > 0 && isAssistantToolCallMessage(history[splitIndex - 1])) {
+    splitIndex--;
   }
 
   return splitIndex;

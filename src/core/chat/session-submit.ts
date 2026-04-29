@@ -107,6 +107,7 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
       toolNames: tools.map((tool) => tool.name),
       goal: args.prompt,
       systemContext,
+      summarizer: { credentialSource: providerCredentialSource },
       onStatusChange: (event) => {
         args.onCompactionStatus?.(event);
         if (event.status === 'running') {
@@ -194,6 +195,7 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
       toolNames: tools.map((tool) => tool.name),
       goal: args.prompt,
       systemContext,
+      summarizer: { credentialSource: providerCredentialSource },
       onStatusChange: (event) => {
         args.onCompactionStatus?.(event);
         if (event.status === 'running') {

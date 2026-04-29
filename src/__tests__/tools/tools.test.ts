@@ -504,8 +504,10 @@ describe('viewImageTool', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: 'OpenAI account sign-in is not enabled for model o3. Set OPENAI_API_KEY to use Platform API-key mode for image inspection.',
+      error: expect.stringContaining('OpenAI account sign-in is not enabled for model o3.'),
     });
+    expect(result.error).toContain('set OPENAI_API_KEY');
+    expect(result.error).toContain('image inspection');
   });
 
   it('uses the OAuth-backed OpenAI transport for image inspection when a stored credential is available', async () => {
