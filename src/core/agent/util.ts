@@ -60,7 +60,7 @@ export function isRecoverableToolError(error: string | undefined): boolean {
     return false;
   }
 
-  return error.startsWith('Invalid input for ') || error.startsWith('Repeated tool call blocked:');
+  return error.startsWith('Invalid input for ');
 }
 
 export function isAbortError(err: unknown): boolean {
@@ -75,9 +75,3 @@ export function isAbortError(err: unknown): boolean {
   );
 }
 
-export function buildRepeatedToolCallResult(tool: string): { ok: false; error: string } {
-  return {
-    ok: false,
-    error: `Repeated tool call blocked: ${tool} was already called ${2} times with the same input earlier in this run. Try a different tool or different input.`,
-  };
-}

@@ -299,11 +299,13 @@ describe('runAgent', () => {
       },
     };
 
+    let executions = 0;
     const listFilesTool: ToolDefinition = {
       name: 'list_files',
       description: 'Lists files in a directory',
       parameters: { type: 'object', properties: {} },
       async execute() {
+        executions += 1;
         return { ok: true, output: 'README.md\nsrc/' };
       },
     };
@@ -318,12 +320,12 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe('I should stop repeating the same directory listing.');
+    expect(executions).toBe(3);
     expect(seenMessages[3]).toContainEqual({
       role: 'tool',
       content: JSON.stringify({
-        ok: false,
-        error:
-          'Repeated tool call blocked: list_files was already called 2 times with the same input earlier in this run. Try a different tool or different input.',
+        ok: true,
+        output: 'README.md\nsrc/',
       }),
       toolCallId: 'call-3',
     });
@@ -331,15 +333,15 @@ describe('runAgent', () => {
       type: 'tool.result',
       tool: 'list_files',
       result: {
-        ok: false,
-        error:
-          'Repeated tool call blocked: list_files was already called 2 times with the same input earlier in this run. Try a different tool or different input.',
+        ok: true,
+        output: 'README.md\nsrc/',
       },
     });
   });
 
-  it('normalizes equivalent path spellings and only blocks them after repeated retries', async () => {
+  it('normalizes equivalent path spellings but still allows repeated equivalent tool calls', async () => {
     const seenMessages: ChatMessage[][] = [];
+    let executions = 0;
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
         seenMessages.push(structuredClone(messages));
@@ -373,6 +375,7 @@ describe('runAgent', () => {
       description: 'Lists files in a directory',
       parameters: { type: 'object', properties: {} },
       async execute() {
+        executions += 1;
         return { ok: true, output: 'README.md\nsrc/' };
       },
     };
@@ -386,12 +389,12 @@ describe('runAgent', () => {
     });
 
     expect(result.outcome).toBe('done');
+    expect(executions).toBe(3);
     expect(seenMessages[3]).toContainEqual({
       role: 'tool',
       content: JSON.stringify({
-        ok: false,
-        error:
-          'Repeated tool call blocked: list_files was already called 2 times with the same input earlier in this run. Try a different tool or different input.',
+        ok: true,
+        output: 'README.md\nsrc/',
       }),
       toolCallId: 'call-3',
     });
@@ -447,6 +450,50 @@ describe('runAgent', () => {
       role: 'system',
       content:
         'Host reminder: the last tool call failed due to invalid or repeated tool use: Invalid input for list_files. Allowed fields: path. Example: { "path": "." }. Correct the call immediately, switch tools, or use report_state if you are blocked. Do not keep retrying the same failing pattern.',
+    });
+  });
+
+  it('warns after 3 consecutive tool errors but still lets the agent continue', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(structuredClone(messages));
+
+        if (seenMessages.length <= 3) {
+          return {
+            toolCalls: [{ id: `call-${seenMessages.length}`, tool: 'list_files', input: { path: '.' } }],
+          };
+        }
+
+        return {
+          content: 'I saw the warning and changed approach instead of being stopped.',
+        };
+      },
+    };
+
+    const listFilesTool: ToolDefinition = {
+      name: 'list_files',
+      description: 'Lists files in a directory',
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: false, error: 'Transient tool failure while listing files.' };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Inspect this repo.',
+      llm: fakeLlm,
+      tools: [listFilesTool],
+      maxSteps: 5,
+      logger: silentLogger,
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('I saw the warning and changed approach instead of being stopped.');
+    expect(seenMessages[3]).toContainEqual({
+      role: 'system',
+      content:
+        'Host warning: there have been 3 consecutive tool errors; latest error: Transient tool failure while listing files.. Try a different approach, different tool, narrower scope, or use report_state if you are genuinely blocked. Do not stop solely because of this warning.',
     });
   });
 
