@@ -354,16 +354,27 @@ function getServerPort(server: Server): number | undefined {
 }
 
 async function openUrlInBrowser(url: string): Promise<void> {
-  const command =
-    process.platform === 'darwin' ? 'open'
-    : process.platform === 'win32' ? 'cmd'
-    : 'xdg-open';
-  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
+  const { command, args } = buildOpenUrlCommand(url, process.platform);
   const child = spawn(command, args, {
     detached: true,
     stdio: 'ignore',
   });
   child.unref();
+}
+
+export function buildOpenUrlCommand(url: string, platform: NodeJS.Platform = process.platform): { command: string; args: string[] } {
+  if (platform === 'darwin') {
+    return { command: 'open', args: [url] };
+  }
+
+  if (platform === 'win32') {
+    return {
+      command: 'powershell.exe',
+      args: ['-NoProfile', '-NonInteractive', '-Command', 'Start-Process -FilePath $args[0]', url],
+    };
+  }
+
+  return { command: 'xdg-open', args: [url] };
 }
 
 function renderCallbackHtml(title: string, message: string): string {
