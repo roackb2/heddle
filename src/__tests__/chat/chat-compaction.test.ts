@@ -186,4 +186,50 @@ describe('chat history compaction', () => {
     expect(llmCalls[1]).toContain('Summary call 1.');
     expect(compactedAgain.history[0]?.content).toContain('Archive index:');
   });
+
+  it('condenses large raw archive content before sending it to the summarizer', async () => {
+    const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-chat-compaction-large-summary-'));
+    const history: ChatMessage[] = Array.from({ length: 40 }).flatMap((_, index) => [
+      { role: 'user' as const, content: `User ${index}: ${'u'.repeat(20_000)}` },
+      { role: 'assistant' as const, content: `Assistant ${index}: ${'a'.repeat(20_000)}` },
+      { role: 'tool' as const, toolCallId: `call-${index}`, content: `Tool ${index}: ${'t'.repeat(20_000)}` },
+    ]);
+    let summarizerInput = '';
+    const llm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-5.1-codex-mini',
+        capabilities: {
+          toolCalls: false,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: false,
+        },
+      },
+      async chat(messages) {
+        summarizerInput = messages[1]?.content ?? '';
+        return {
+          content: [
+            '# Compacted Conversation Rolling Summary',
+            '## Work Completed',
+            '- Large archive summarized.',
+          ].join('\n'),
+        };
+      },
+    };
+
+    const compacted = await compactChatHistoryWithArchive({
+      history,
+      model: 'gpt-5.1',
+      sessionId: 'session-large-summary',
+      stateRoot,
+      force: true,
+      summarizer: { llm },
+    });
+
+    expect(compacted.archives).toHaveLength(1);
+    expect(summarizerInput.length).toBeLessThan(300_000);
+    expect(summarizerInput).toContain('Summarizer transcript note');
+    expect(summarizerInput).toContain('full content is in the raw archive');
+  });
 });

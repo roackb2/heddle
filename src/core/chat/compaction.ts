@@ -19,6 +19,9 @@ const MAX_HISTORY_RATIO = 0.6;
 const MIN_RECENT_MESSAGES = 16;
 const MIN_FORCED_RECENT_MESSAGES = 3;
 const MAX_ROLLING_SUMMARY_CHARS = 12_000;
+const MAX_SUMMARIZER_TRANSCRIPT_CHARS = 240_000;
+const MAX_SUMMARIZER_MESSAGE_CHARS = 4_000;
+const MIN_SUMMARIZER_MESSAGE_CHARS = 240;
 const COMPACTED_HISTORY_MARKER = 'Heddle compacted earlier conversation history.';
 const DEFAULT_OPENAI_COMPACTION_MODEL = 'gpt-5.1-codex-mini';
 const DEFAULT_ANTHROPIC_COMPACTION_MODEL = 'claude-haiku-4-5';
@@ -370,9 +373,7 @@ async function summarizeChatArchive(options: {
     createdAt: archive.createdAt,
   }));
 
-  const transcript = options.archivedMessages
-    .map((message, index) => `## Message ${index + 1}\n${renderArchivedMessage(message)}`)
-    .join('\n\n');
+  const transcript = buildSummarizerTranscript(options.archivedMessages);
 
   const response = await options.llm.chat([
     {
@@ -507,6 +508,62 @@ function renderArchivedMessage(message: ChatMessage): string {
   ].join('\n\n');
 }
 
+function buildSummarizerTranscript(messages: ChatMessage[]): string {
+  if (messages.length === 0) {
+    return '(no archived messages)';
+  }
+
+  const perMessageBudget = Math.max(
+    MIN_SUMMARIZER_MESSAGE_CHARS,
+    Math.min(MAX_SUMMARIZER_MESSAGE_CHARS, Math.floor(MAX_SUMMARIZER_TRANSCRIPT_CHARS / messages.length) - 80),
+  );
+  const lines: string[] = [
+    `Summarizer transcript note: raw archive contains ${messages.length} complete messages.`,
+    `Each message below is condensed to fit the summarizer request. Read the archive file when exact wording or full tool output matters.`,
+  ];
+  let totalChars = lines.join('\n').length;
+
+  for (const [index, message] of messages.entries()) {
+    const rendered = `## Message ${index + 1}\n${renderArchivedMessageForSummary(message, perMessageBudget)}`;
+    const separator = lines.length > 0 ? '\n\n' : '';
+    if (totalChars + separator.length + rendered.length > MAX_SUMMARIZER_TRANSCRIPT_CHARS) {
+      lines.push(`\n\nOmitted ${messages.length - index} additional archived messages from summarizer input to stay within request budget. Inspect the raw archive for full detail.`);
+      break;
+    }
+
+    lines.push(rendered);
+    totalChars += separator.length + rendered.length;
+  }
+
+  return lines.join('\n\n');
+}
+
+function renderArchivedMessageForSummary(message: ChatMessage, maxChars: number): string {
+  if (message.role === 'assistant') {
+    const parts = [
+      'Role: assistant',
+      message.content ? `Content excerpt:\n${truncateForSummary(message.content, maxChars)}` : 'Content: (empty)',
+      message.toolCalls?.length ?
+        `Tool calls:\n${truncateForSummary(JSON.stringify(message.toolCalls, null, 2), maxChars)}`
+      : undefined,
+    ].filter((part): part is string => Boolean(part));
+    return parts.join('\n\n');
+  }
+
+  if (message.role === 'tool') {
+    return [
+      'Role: tool',
+      `Tool call id: ${message.toolCallId}`,
+      `Content excerpt:\n${truncateForSummary(message.content, maxChars)}`,
+    ].join('\n\n');
+  }
+
+  return [
+    `Role: ${message.role}`,
+    `Content excerpt:\n${truncateForSummary(message.content, maxChars)}`,
+  ].join('\n\n');
+}
+
 function deriveShortDescription(summary: string): string | undefined {
   const lines = summary
     .split('\n')
@@ -522,6 +579,14 @@ function truncateSummary(value: string): string {
   }
 
   return `${value.slice(0, MAX_ROLLING_SUMMARY_CHARS - 1).trimEnd()}…`;
+}
+
+function truncateForSummary(value: string, maxChars: number): string {
+  if (value.length <= maxChars) {
+    return value;
+  }
+
+  return `${value.slice(0, Math.max(0, maxChars - 80)).trimEnd()}\n\n[truncated ${value.length - maxChars} chars; full content is in the raw archive]`;
 }
 
 function truncateLine(value: string, maxChars: number): string {
