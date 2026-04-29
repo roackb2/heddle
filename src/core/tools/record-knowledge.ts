@@ -200,20 +200,20 @@ function isSafeSourceRef(value: string, memoryRoot: string): boolean {
     return false;
   }
 
-  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
+  if (value.startsWith('trace-') || value.startsWith('session-') || value.startsWith('command:')) {
     return true;
   }
 
-  if (value.startsWith('trace-') || value.startsWith('session-') || value.startsWith('command:')) {
-    return true;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
+    return false;
   }
 
   if (isAbsolute(value)) {
     return false;
   }
 
-  const resolved = resolve(memoryRoot, '..', '..', value);
   const workspaceRoot = resolve(memoryRoot, '..', '..');
+  const resolved = resolve(workspaceRoot, value);
   const rel = relative(workspaceRoot, resolved);
   return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
 }
