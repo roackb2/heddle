@@ -133,14 +133,18 @@ export function estimateBuiltInContextWindow(model: string): number | undefined 
 
 function inferContextWindowEstimate(model: string): number {
   if (model.startsWith('gpt-5.5')) {
-    return 1_050_000;
+    return 400_000;
   }
 
   if (model === 'gpt-5.4' || model === 'gpt-5.4-pro') {
-    return 1_050_000;
+    return 400_000;
   }
 
   if (model === 'gpt-5.4-mini') {
+    return 400_000;
+  }
+
+  if (model.startsWith('gpt-5.1') || model.startsWith('gpt-5.2') || model.startsWith('gpt-5.3') || model.startsWith('gpt-5-') || model === 'gpt-5') {
     return 400_000;
   }
 

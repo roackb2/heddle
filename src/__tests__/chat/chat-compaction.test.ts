@@ -4,10 +4,20 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ChatMessage } from '../../core/llm/types.js';
 import type { LlmAdapter } from '../../core/llm/types.js';
+import { estimateBuiltInContextWindow } from '../../core/llm/openai-models.js';
 import { compactChatHistory, compactChatHistoryWithArchive, isCompactedHistorySummary } from '../../cli/chat/state/compaction.js';
 import { buildConversationMessages } from '../../cli/chat/utils/format.js';
 
 describe('chat history compaction', () => {
+  it('uses the documented context window for the default OpenAI compaction model', () => {
+    expect(estimateBuiltInContextWindow('gpt-5.1-codex-mini')).toBe(400_000);
+  });
+
+  it('uses a conservative context window for GPT-5.4 chat sessions', () => {
+    expect(estimateBuiltInContextWindow('gpt-5.4')).toBe(400_000);
+    expect(estimateBuiltInContextWindow('gpt-5.4-pro')).toBe(400_000);
+  });
+
   it('compacts older transcript messages into a summary and keeps recent messages', () => {
     const history: ChatMessage[] = Array.from({ length: 50 }).flatMap((_, index) => [
       { role: 'user' as const, content: `User prompt ${index}: ${'u'.repeat(4000)}` },
@@ -50,6 +60,31 @@ describe('chat history compaction', () => {
     expect(isCompactedHistorySummary(manuallyCompacted.history[0]!)).toBe(true);
     expect(manuallyCompacted.history.length).toBeLessThan(history.length);
     expect(manuallyCompacted.context.compactedMessages).toBeGreaterThan(0);
+  });
+
+  it('keeps recent history by token budget rather than a fixed message count', () => {
+    const history: ChatMessage[] = [
+      ...Array.from({ length: 10 }).flatMap((_, index) => [
+        { role: 'user' as const, content: `Older user ${index}: ${'u'.repeat(2_000)}` },
+        { role: 'assistant' as const, content: `Older assistant ${index}: ${'a'.repeat(2_000)}` },
+      ]),
+      { role: 'user' as const, content: `recent small request` },
+      { role: 'assistant' as const, content: `recent giant tool analysis: ${'a'.repeat(80_000)}` },
+      { role: 'tool' as const, toolCallId: 'huge-tool-1', content: `{"ok":true,"output":"${'t'.repeat(80_000)}"}` },
+      { role: 'assistant' as const, content: `recent giant follow-up: ${'b'.repeat(80_000)}` },
+      { role: 'user' as const, content: 'what was our task?' },
+    ];
+
+    const compacted = compactChatHistory({
+      history,
+      model: 'gpt-4.1',
+      force: true,
+    });
+
+    expect(isCompactedHistorySummary(compacted.history[0]!)).toBe(true);
+    expect(compacted.history.length).toBeLessThan(16);
+    expect(compacted.history.at(-1)).toEqual(history.at(-1));
+    expect(compacted.context.estimatedHistoryTokens).toBeLessThan(90_000);
   });
 
   it('can re-compact an already compacted short session when forced manually', () => {
@@ -185,5 +220,51 @@ describe('chat history compaction', () => {
     expect(llmCalls).toHaveLength(2);
     expect(llmCalls[1]).toContain('Summary call 1.');
     expect(compactedAgain.history[0]?.content).toContain('Archive index:');
+  });
+
+  it('condenses large raw archive content before sending it to the summarizer', async () => {
+    const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-chat-compaction-large-summary-'));
+    const history: ChatMessage[] = Array.from({ length: 40 }).flatMap((_, index) => [
+      { role: 'user' as const, content: `User ${index}: ${'u'.repeat(20_000)}` },
+      { role: 'assistant' as const, content: `Assistant ${index}: ${'a'.repeat(20_000)}` },
+      { role: 'tool' as const, toolCallId: `call-${index}`, content: `Tool ${index}: ${'t'.repeat(20_000)}` },
+    ]);
+    let summarizerInput = '';
+    const llm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-5.1-codex-mini',
+        capabilities: {
+          toolCalls: false,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: false,
+        },
+      },
+      async chat(messages) {
+        summarizerInput = messages[1]?.content ?? '';
+        return {
+          content: [
+            '# Compacted Conversation Rolling Summary',
+            '## Work Completed',
+            '- Large archive summarized.',
+          ].join('\n'),
+        };
+      },
+    };
+
+    const compacted = await compactChatHistoryWithArchive({
+      history,
+      model: 'gpt-5.1',
+      sessionId: 'session-large-summary',
+      stateRoot,
+      force: true,
+      summarizer: { llm },
+    });
+
+    expect(compacted.archives).toHaveLength(1);
+    expect(summarizerInput.length).toBeLessThan(300_000);
+    expect(summarizerInput).toContain('Summarizer transcript note');
+    expect(summarizerInput).toContain('full content is in the raw archive');
   });
 });
