@@ -6,6 +6,7 @@ import {
   OPENAI_AUTH_ISSUER,
   OPENAI_CODEX_RESPONSES_ENDPOINT,
   OPENAI_CODEX_CLIENT_ID,
+  buildOpenUrlCommand,
   buildOpenAiAuthorizeUrl,
   createOpenAiOAuthCredential,
   exchangeOpenAiOAuthCode,
@@ -40,6 +41,15 @@ describe('OpenAI OAuth helpers', () => {
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
     expect(url.searchParams.get('codex_cli_simplified_flow')).toBe('true');
     expect(url.searchParams.get('originator')).toBe('heddle');
+  });
+
+  it('opens OAuth URLs on Windows without routing query separators through cmd.exe', () => {
+    const authorizeUrl = 'https://auth.openai.com/oauth/authorize?response_type=code&client_id=client&redirect_uri=http%3A%2F%2Flocalhost%3A1455%2Fauth%2Fcallback';
+    const command = buildOpenUrlCommand(authorizeUrl, 'win32');
+
+    expect(command.command).toBe('powershell.exe');
+    expect(command.args).toContain(authorizeUrl);
+    expect(command.args.join(' ')).not.toContain('cmd /c start');
   });
 
   it('extracts account id from id token claims', () => {
