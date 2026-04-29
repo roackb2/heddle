@@ -1,5 +1,5 @@
-import type { ChatMessage, LlmAdapter, LlmUsage } from '../../index.js';
-import { createLlmAdapter, inferProviderFromModel } from '../../index.js';
+import type { ChatMessage, LlmAdapter, LlmUsage } from '../llm/types.js';
+import { createLlmAdapter, inferProviderFromModel } from '../llm/factory.js';
 import { hasProviderCredentialForModel, resolveApiKeyForModel, resolveProviderCredentialSourceForModel, type ProviderCredentialSource } from '../runtime/api-keys.js';
 import { estimateBuiltInContextWindow } from '../llm/openai-models.js';
 import {
