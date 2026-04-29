@@ -8,7 +8,7 @@ import { extname, resolve } from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
 import type { ImageBlockParam } from '@anthropic-ai/sdk/resources/messages/messages';
 import OpenAI from 'openai';
-import type { ResponseInputImage, ResponseInputText, ResponseStreamEvent } from 'openai/resources/responses/responses.js';
+import type { ResponseInputImage, ResponseInputText } from 'openai/resources/responses/responses.js';
 import type { ToolDefinition, ToolResult } from '../types.js';
 import { inferProviderFromModel } from '../llm/factory.js';
 import {
