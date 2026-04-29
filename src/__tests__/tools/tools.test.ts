@@ -423,25 +423,15 @@ describe('webSearchTool', () => {
         headers: new Headers(init?.headers),
         body: String(init?.body ?? ''),
       });
-      return Response.json({
-        id: 'resp_1',
-        object: 'response',
-        model: 'gpt-5.4',
-        output_text: 'Hosted search summary',
-        output: [{
-          type: 'message',
-          id: 'msg_1',
-          role: 'assistant',
-          content: [{
-            type: 'output_text',
-            text: 'Hosted search summary',
-            annotations: [{
-              type: 'url_citation',
-              title: 'OpenAI Docs',
-              url: 'https://platform.openai.com/docs',
-            }],
-          }],
-        }],
+      return new Response([
+        'event: response.output_item.done',
+        'data: {"type":"response.output_item.done","item":{"id":"ws_1","type":"web_search_call","status":"completed","action":{"type":"search","sources":[{"type":"url","url":"https://platform.openai.com/docs"}]}}}',
+        '',
+        'event: response.output_text.done',
+        'data: {"type":"response.output_text.done","text":"Hosted search summary"}',
+        '',
+      ].join('\n'), {
+        headers: { 'content-type': 'text/event-stream' },
       });
     });
     vi.stubGlobal('fetch', fetchImpl);
@@ -463,7 +453,7 @@ describe('webSearchTool', () => {
         provider: 'openai',
         model: 'gpt-5.4',
         summary: 'Hosted search summary',
-        citations: [{ title: 'OpenAI Docs', url: 'https://platform.openai.com/docs' }],
+        citations: [{ title: 'https://platform.openai.com/docs', url: 'https://platform.openai.com/docs' }],
       },
     });
     expect(requests).toHaveLength(1);
@@ -471,12 +461,20 @@ describe('webSearchTool', () => {
     expect(requests[0]?.headers.get('ChatGPT-Account-Id')).toBe('account-123');
     const body = JSON.parse(requests[0]?.body ?? '{}') as {
       model?: string;
-      input?: string;
+      store?: boolean;
+      stream?: boolean;
+      instructions?: string;
+      include?: string[];
+      input?: Array<{ type?: string; role?: string; content?: string }>;
       tools?: Array<{ type?: string; search_context_size?: string }>;
     };
     expect(body.model).toBe('gpt-5.4');
-    expect(body.input).toBe('OpenAI Responses API web search tool');
-    expect(body.tools).toEqual([{ type: 'web_search_preview', search_context_size: 'high' }]);
+    expect(body.store).toBe(false);
+    expect(body.stream).toBe(true);
+    expect(body.instructions).toContain('Search the web and answer concisely');
+    expect(body.include).toEqual(['web_search_call.action.sources']);
+    expect(body.input).toEqual([{ type: 'message', role: 'user', content: 'OpenAI Responses API web search tool' }]);
+    expect(body.tools).toEqual([{ type: 'web_search', search_context_size: 'high' }]);
   });
 });
 

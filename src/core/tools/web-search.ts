@@ -12,6 +12,7 @@ import type {
 } from '@anthropic-ai/sdk/resources/messages/messages';
 import OpenAI from 'openai';
 import type { Response, ResponseOutputText, WebSearchTool } from 'openai/resources/responses/responses.js';
+import { OPENAI_CODEX_RESPONSES_ENDPOINT } from '../auth/openai-oauth.js';
 import type { ToolDefinition, ToolResult } from '../types.js';
 import { inferProviderFromModel } from '../llm/factory.js';
 import { createOpenAiOAuthFetch } from '../llm/openai.js';
@@ -119,18 +120,19 @@ async function executeOpenAiWebSearch(input: WebSearchInput, options: WebSearchT
     };
   }
 
+  if (oauthCredential) {
+    return await executeOpenAiOAuthWebSearch(input, { ...options, model }, oauthCredential);
+  }
+
   const apiKey = firstDefinedNonEmpty(options.apiKey, process.env.OPENAI_API_KEY, process.env.PERSONAL_OPENAI_API_KEY);
-  if (!oauthCredential && !apiKey) {
+  if (!apiKey) {
     return {
       ok: false,
       error: 'web_search requires OPENAI_API_KEY (or PERSONAL_OPENAI_API_KEY) when the active model provider is OpenAI.',
     };
   }
 
-  const client = new OpenAI({
-    apiKey: oauthCredential ? 'heddle-oauth-placeholder' : apiKey,
-    fetch: oauthCredential ? createOpenAiOAuthFetch(oauthCredential, { storePath: options.credentialStorePath }) : undefined,
-  });
+  const client = new OpenAI({ apiKey });
   const response = await client.responses.create({
     model,
     input: input.query,
@@ -143,6 +145,44 @@ async function executeOpenAiWebSearch(input: WebSearchInput, options: WebSearchT
   return {
     ok: true,
     output: formatOpenAiWebSearchResult(response),
+  };
+}
+
+async function executeOpenAiOAuthWebSearch(
+  input: WebSearchInput,
+  options: WebSearchToolOptions & { model: string },
+  oauthCredential: NonNullable<ReturnType<typeof resolveOAuthCredentialForModel>>,
+): Promise<ToolResult> {
+  const oauthFetch = createOpenAiOAuthFetch(oauthCredential, { storePath: options.credentialStorePath });
+  const response = await oauthFetch(OPENAI_CODEX_RESPONSES_ENDPOINT, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model: options.model,
+      store: false,
+      stream: true,
+      reasoning: { summary: 'auto' },
+      instructions: 'Search the web and answer concisely with citations when available.',
+      include: ['web_search_call.action.sources'],
+      input: [{ type: 'message', role: 'user', content: input.query }],
+      tools: [{
+        type: 'web_search',
+        search_context_size: input.contextSize ?? 'medium',
+      }],
+    }),
+  });
+
+  if (!response.ok) {
+    const failureBody = await response.text();
+    const failure = new Error(failureBody || `${response.status} status code (no body)`);
+    (failure as Error & { status?: number }).status = response.status;
+    throw failure;
+  }
+
+  const sseText = await response.text();
+  return {
+    ok: true,
+    output: formatOpenAiOAuthWebSearchSseResult(sseText, options.model),
   };
 }
 
@@ -248,6 +288,86 @@ function extractOpenAiUrlCitations(response: Response): Array<{ title: string; u
           url: annotation.url,
         });
       }
+    }
+  }
+
+  return citations;
+}
+
+function formatOpenAiOAuthWebSearchSseResult(sseText: string, model: string): {
+  provider: 'openai';
+  model: string;
+  summary: string;
+  citations: Array<{ title: string; url: string }>;
+} {
+  return {
+    provider: 'openai',
+    model,
+    summary: extractSseOutputText(sseText)?.trim() || 'No summary returned.',
+    citations: extractSseWebSearchSources(sseText),
+  };
+}
+
+function extractSseOutputText(sseText: string): string | undefined {
+  const matches = [...sseText.matchAll(/^data: (\{.*"type":"response\.output_text\.done".*\})$/gm)];
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const raw = matches[index]?.[1];
+    if (!raw) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as { text?: unknown };
+      if (typeof parsed.text === 'string' && parsed.text.trim()) {
+        return parsed.text;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return undefined;
+}
+
+function extractSseWebSearchSources(sseText: string): Array<{ title: string; url: string }> {
+  const citations: Array<{ title: string; url: string }> = [];
+  const seen = new Set<string>();
+  const matches = [...sseText.matchAll(/^data: (\{.*"type":"response\.output_item\.done".*\})$/gm)];
+
+  for (const match of matches) {
+    const raw = match[1];
+    if (!raw) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as {
+        item?: {
+          type?: string;
+          action?: {
+            sources?: Array<{ type?: string; url?: string }>;
+          };
+        };
+      };
+      if (parsed.item?.type !== 'web_search_call') {
+        continue;
+      }
+
+      for (const source of parsed.item.action?.sources ?? []) {
+        if (source.type !== 'url' || !source.url) {
+          continue;
+        }
+        if (seen.has(source.url)) {
+          continue;
+        }
+        seen.add(source.url);
+        citations.push({
+          title: source.url,
+          url: source.url,
+        });
+      }
+    } catch {
+      continue;
     }
   }
 
