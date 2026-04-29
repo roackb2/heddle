@@ -14,9 +14,14 @@ import OpenAI from 'openai';
 import type { Response, ResponseOutputText, WebSearchTool } from 'openai/resources/responses/responses.js';
 import type { ToolDefinition, ToolResult } from '../types.js';
 import { inferProviderFromModel } from '../llm/factory.js';
+import { createOpenAiOAuthFetch } from '../llm/openai.js';
+import { validateModelCredentialCompatibility } from '../llm/model-policy.js';
 import type { LlmProvider } from '../llm/types.js';
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../config.js';
-import type { ProviderCredentialSource } from '../runtime/api-keys.js';
+import {
+  resolveOAuthCredentialForModel,
+  type ProviderCredentialSource,
+} from '../runtime/api-keys.js';
 
 type WebSearchInput = {
   query: string;
@@ -28,6 +33,7 @@ export type WebSearchToolOptions = {
   provider?: LlmProvider;
   apiKey?: string;
   providerCredentialSource?: ProviderCredentialSource;
+  credentialStorePath?: string;
 };
 
 export const webSearchTool: ToolDefinition = createWebSearchTool();
@@ -87,23 +93,44 @@ export function createWebSearchTool(options: WebSearchToolOptions = {}): ToolDef
 }
 
 async function executeOpenAiWebSearch(input: WebSearchInput, options: WebSearchToolOptions): Promise<ToolResult> {
-  if (options.providerCredentialSource?.type === 'oauth') {
+  const model = options.model ?? process.env.OPENAI_WEB_SEARCH_MODEL ?? DEFAULT_OPENAI_MODEL;
+  const oauthCredential =
+    options.providerCredentialSource?.type === 'oauth' ?
+      resolveOAuthCredentialForModel(model, { storePath: options.credentialStorePath })
+    : undefined;
+
+  if (options.providerCredentialSource?.type === 'oauth' && !oauthCredential) {
     return {
       ok: false,
-      error: 'web_search currently requires OpenAI Platform API-key mode. The active OpenAI credential is account sign-in; set OPENAI_API_KEY or pass an explicit API key to use hosted web search.',
+      error: 'web_search could not load the stored OpenAI account sign-in credential for this workspace. Sign in again with `heddle auth login openai`, or set OPENAI_API_KEY to use Platform API-key mode.',
+    };
+  }
+
+  const compatibility = validateModelCredentialCompatibility({
+    model,
+    provider: 'openai',
+    credentialMode: oauthCredential ? 'oauth' : undefined,
+    usageLabel: 'web search',
+  });
+  if (!compatibility.ok) {
+    return {
+      ok: false,
+      error: compatibility.error,
     };
   }
 
   const apiKey = firstDefinedNonEmpty(options.apiKey, process.env.OPENAI_API_KEY, process.env.PERSONAL_OPENAI_API_KEY);
-  if (!apiKey) {
+  if (!oauthCredential && !apiKey) {
     return {
       ok: false,
       error: 'web_search requires OPENAI_API_KEY (or PERSONAL_OPENAI_API_KEY) when the active model provider is OpenAI.',
     };
   }
 
-  const client = new OpenAI({ apiKey });
-  const model = options.model ?? process.env.OPENAI_WEB_SEARCH_MODEL ?? DEFAULT_OPENAI_MODEL;
+  const client = new OpenAI({
+    apiKey: oauthCredential ? 'heddle-oauth-placeholder' : apiKey,
+    fetch: oauthCredential ? createOpenAiOAuthFetch(oauthCredential, { storePath: options.credentialStorePath }) : undefined,
+  });
   const response = await client.responses.create({
     model,
     input: input.query,

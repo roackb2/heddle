@@ -379,27 +379,104 @@ describe('webSearchTool', () => {
     }
   });
 
-  it('does not silently fall back to an OpenAI env key when OAuth is the active credential', async () => {
+  it('fails clearly when OAuth is active but no stored OpenAI credential can be loaded', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-web-search-oauth-missing-'));
+    const credentialStorePath = join(root, 'auth.json');
     vi.stubEnv('OPENAI_API_KEY', 'openai-key');
 
-    try {
-      const result = await createWebSearchTool({
-        model: 'gpt-5.1-codex',
-        providerCredentialSource: {
-          type: 'oauth',
-          provider: 'openai',
-          accountId: 'account-123',
-          expiresAt: Date.now() + 60_000,
-        },
-      }).execute({ query: 'OpenAI Responses API web search tool' });
+    const result = await createWebSearchTool({
+      model: 'gpt-5.4',
+      providerCredentialSource: {
+        type: 'oauth',
+        provider: 'openai',
+        accountId: 'account-123',
+        expiresAt: Date.now() + 60_000,
+      },
+      credentialStorePath,
+    }).execute({ query: 'OpenAI Responses API web search tool' });
 
-      expect(result).toEqual({
-        ok: false,
-        error: 'web_search currently requires OpenAI Platform API-key mode. The active OpenAI credential is account sign-in; set OPENAI_API_KEY or pass an explicit API key to use hosted web search.',
+    expect(result).toEqual({
+      ok: false,
+      error: 'web_search could not load the stored OpenAI account sign-in credential for this workspace. Sign in again with `heddle auth login openai`, or set OPENAI_API_KEY to use Platform API-key mode.',
+    });
+  });
+
+  it('uses the OAuth-backed OpenAI transport for web search when a stored credential is available', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-web-search-oauth-success-'));
+    const credentialStorePath = join(root, 'auth.json');
+    writeFileSync(credentialStorePath, '{}\n');
+    setStoredProviderCredential({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAt: Date.now() + 120_000,
+      accountId: 'account-123',
+      createdAt: '2026-04-27T00:00:00.000Z',
+      updatedAt: '2026-04-27T00:00:00.000Z',
+    }, credentialStorePath);
+
+    const requests: Array<{ url: string; headers: Headers; body: string }> = [];
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({
+        url: String(url),
+        headers: new Headers(init?.headers),
+        body: String(init?.body ?? ''),
       });
-    } finally {
-      vi.unstubAllEnvs();
-    }
+      return Response.json({
+        id: 'resp_1',
+        object: 'response',
+        model: 'gpt-5.4',
+        output_text: 'Hosted search summary',
+        output: [{
+          type: 'message',
+          id: 'msg_1',
+          role: 'assistant',
+          content: [{
+            type: 'output_text',
+            text: 'Hosted search summary',
+            annotations: [{
+              type: 'url_citation',
+              title: 'OpenAI Docs',
+              url: 'https://platform.openai.com/docs',
+            }],
+          }],
+        }],
+      });
+    });
+    vi.stubGlobal('fetch', fetchImpl);
+
+    const result = await createWebSearchTool({
+      model: 'gpt-5.4',
+      providerCredentialSource: {
+        type: 'oauth',
+        provider: 'openai',
+        accountId: 'account-123',
+        expiresAt: Date.now() + 60_000,
+      },
+      credentialStorePath,
+    }).execute({ query: 'OpenAI Responses API web search tool', contextSize: 'high' });
+
+    expect(result).toEqual({
+      ok: true,
+      output: {
+        provider: 'openai',
+        model: 'gpt-5.4',
+        summary: 'Hosted search summary',
+        citations: [{ title: 'OpenAI Docs', url: 'https://platform.openai.com/docs' }],
+      },
+    });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.headers.get('authorization')).toBe('Bearer access-token');
+    expect(requests[0]?.headers.get('ChatGPT-Account-Id')).toBe('account-123');
+    const body = JSON.parse(requests[0]?.body ?? '{}') as {
+      model?: string;
+      input?: string;
+      tools?: Array<{ type?: string; search_context_size?: string }>;
+    };
+    expect(body.model).toBe('gpt-5.4');
+    expect(body.input).toBe('OpenAI Responses API web search tool');
+    expect(body.tools).toEqual([{ type: 'web_search_preview', search_context_size: 'high' }]);
   });
 });
 
