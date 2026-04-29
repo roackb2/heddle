@@ -212,6 +212,11 @@ function isSafeSourceRef(value: string, memoryRoot: string): boolean {
     return false;
   }
 
+  const normalizedSegments = value.replace(/\\/g, '/').split('/');
+  if (normalizedSegments.includes('..')) {
+    return false;
+  }
+
   const workspaceRoot = resolve(memoryRoot, '..', '..');
   const resolved = resolve(workspaceRoot, value);
   const rel = relative(workspaceRoot, resolved);
