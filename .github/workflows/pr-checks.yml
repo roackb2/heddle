@@ -6,8 +6,8 @@ on:
       - main
 
 jobs:
-  eslint:
-    name: eslint
+  setup:
+    name: setup
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -23,6 +23,34 @@ jobs:
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
+
+      - name: Upload prepared workspace
+        uses: actions/upload-artifact@v4
+        with:
+          name: prepared-workspace
+          path: |
+            package.json
+            yarn.lock
+            tsconfig.json
+            tsconfig.build.json
+            eslint.config.js
+            scripts/
+            src/
+            .github/
+            node_modules/
+          if-no-files-found: error
+
+  eslint:
+    name: eslint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: setup
+
+    steps:
+      - name: Download prepared workspace
+        uses: actions/download-artifact@v4
+        with:
+          name: prepared-workspace
 
       - name: Run eslint
         run: yarn eslint
@@ -31,19 +59,13 @@ jobs:
     name: typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: setup
 
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Download prepared workspace
+        uses: actions/download-artifact@v4
         with:
-          node-version: 20
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
+          name: prepared-workspace
 
       - name: Run typecheck
         run: yarn typecheck
@@ -52,19 +74,13 @@ jobs:
     name: test
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: setup
 
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Download prepared workspace
+        uses: actions/download-artifact@v4
         with:
-          node-version: 20
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
+          name: prepared-workspace
 
       - name: Run tests
         run: yarn test
