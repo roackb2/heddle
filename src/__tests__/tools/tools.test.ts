@@ -886,6 +886,17 @@ describe('memory note tools', () => {
       ok: false,
       error: expect.stringContaining('unsafe sourceRef'),
     });
+    await expect(tool.execute({ summary: 'ok', sourceRefs: ['/tmp/outside.md'] })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('unsafe sourceRef'),
+    });
+    await expect(tool.execute({ summary: 'ok', sourceRefs: ['https://example.com/file.md'] })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('unsafe sourceRef'),
+    });
+    await expect(tool.execute({ summary: 'ok', sourceRefs: ['trace-123', 'session-456', 'command:git status'] })).resolves.toMatchObject({
+      ok: true,
+    });
   });
 
   it('refuses secret-like record_knowledge content', async () => {
