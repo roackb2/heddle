@@ -3,10 +3,12 @@ import { buildSystemPrompt } from '../../core/prompts/system-prompt.js';
 
 describe('buildSystemPrompt', () => {
   it('frames Heddle as a coding and workspace agent rather than a generic chatbot', () => {
-    const prompt = buildSystemPrompt('Explain this project.', ['list_files', 'read_file', 'run_shell_inspect']);
+    const prompt = buildSystemPrompt(['list_files', 'read_file', 'run_shell_inspect']);
 
     expect(prompt).toContain('You are Heddle, a conversational coding and workspace agent.');
     expect(prompt).toContain('You are not a generic chatbot.');
+    expect(prompt).toContain('help the user complete their requested task');
+    expect(prompt).not.toContain('Explain this project.');
     expect(prompt).toContain('## Default Workflow');
     expect(prompt).toContain('1. Clarify the real task.');
     expect(prompt).toContain('2. Gather the minimum relevant evidence first.');
@@ -40,7 +42,7 @@ describe('buildSystemPrompt', () => {
   });
 
   it('includes project-specific context when provided', () => {
-    const prompt = buildSystemPrompt('Help in this repo.', ['list_files'], 'Source: AGENTS.md\nUse yarn and keep answers concise.');
+    const prompt = buildSystemPrompt(['list_files'], 'Source: AGENTS.md\nUse yarn and keep answers concise.');
 
     expect(prompt).toContain('## Project Context');
     expect(prompt).toContain('Source: AGENTS.md');

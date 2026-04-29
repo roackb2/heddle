@@ -13,7 +13,10 @@ import type { ToolDefinition, ToolResult } from '../types.js';
 import { OPENAI_CODEX_RESPONSES_ENDPOINT } from '../auth/openai-oauth.js';
 import { inferProviderFromModel } from '../llm/factory.js';
 import { createOpenAiOAuthFetch } from '../llm/openai.js';
-import { isOpenAiAccountSignInModel, OPENAI_ACCOUNT_SIGN_IN_MODELS } from '../llm/openai-models.js';
+import {
+  resolveOpenAiOAuthImageCandidateModels,
+  validateModelCredentialCompatibility,
+} from '../llm/model-policy.js';
 import type { LlmProvider } from '../llm/types.js';
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../config.js';
 import { resolveOAuthCredentialForModel, type ProviderCredentialSource } from '../runtime/api-keys.js';
@@ -34,7 +37,6 @@ export type ViewImageToolOptions = {
 
 const DEFAULT_IMAGE_PROMPT =
   'Describe the image for a coding assistant. Focus on UI text, error messages, filenames, commands, code, diagrams, and any details relevant to software work.';
-const OPENAI_OAUTH_IMAGE_MODEL_CANDIDATES = ['gpt-5.4', 'gpt-5.4-mini', ...OPENAI_ACCOUNT_SIGN_IN_MODELS];
 
 export const viewImageTool: ToolDefinition = createViewImageTool();
 
@@ -124,10 +126,16 @@ async function executeOpenAiImageView(args: {
     };
   }
 
-  if (oauthCredential && !isOpenAiAccountSignInModel(model)) {
+  const compatibility = validateModelCredentialCompatibility({
+    model,
+    provider: 'openai',
+    credentialMode: oauthCredential ? 'oauth' : undefined,
+    usageLabel: 'image inspection',
+  });
+  if (!compatibility.ok) {
     return {
       ok: false,
-      error: `OpenAI account sign-in is not enabled for model ${model}. Set OPENAI_API_KEY to use Platform API-key mode for image inspection.`,
+      error: compatibility.error,
     };
   }
 
@@ -147,7 +155,7 @@ async function executeOpenAiImageView(args: {
     fetch: oauthFetch,
   });
   const imageBase64 = args.data.toString('base64');
-  const candidateModels = oauthCredential ? uniqueModels([model, ...OPENAI_OAUTH_IMAGE_MODEL_CANDIDATES]) : [model];
+  const candidateModels = oauthCredential ? resolveOpenAiOAuthImageCandidateModels(model) : [model];
   let lastError: unknown;
 
   for (const candidateModel of candidateModels) {

@@ -14,6 +14,7 @@ import {
 } from './components/index.js';
 import { buildTuiDebugSnapshot } from './debug/tui-debug-snapshot.js';
 import { estimateBuiltInContextWindow } from '../../core/llm/openai-models.js';
+import { credentialModeFromSource, resolveSystemSelectedModel } from '../../core/llm/model-policy.js';
 import { useApprovalFlow } from './hooks/useApprovalFlow.js';
 import { useAgentRun } from './hooks/useAgentRun.js';
 import { useChatDrift } from './hooks/useChatDrift.js';
@@ -26,8 +27,6 @@ import { autocompleteLocalCommand } from './state/local-commands.js';
 import { currentActivityText } from './utils/format.js';
 import { listMentionableFiles } from './utils/file-mentions.js';
 import { resolveProviderCredentialSourceForModel, type ChatRuntimeConfig, type ProviderCredentialSource } from './utils/runtime.js';
-
-const SESSION_TITLE_MODEL = 'gpt-5.1-codex-mini';
 
 export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   return <EmbeddedChatApp runtime={runtime} />;
@@ -115,6 +114,12 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     activeSession?.context?.lastRunInputTokens ?? activeSession?.context?.estimatedRequestTokens,
   );
   const authStatus = formatAuthStatus(resolveProviderCredentialSourceForModel(activeModel, runtime));
+  const sessionTitleModel = resolveSystemSelectedModel({
+    purpose: 'session-title',
+    provider: 'openai',
+    activeModel,
+    credentialMode: credentialModeFromSource(runtime.providerCredentialSource),
+  });
   const sessionFooter = `session=${activeSession?.id ?? activeSessionId}${activeSession?.name ? ` (${activeSession.name})` : ''}`;
   const renderedStatus =
     pendingApproval ? 'awaiting approval'
@@ -278,7 +283,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const { executeTurn, executeDirectShellCommand } = useAgentRun({
     runtime,
     activeModel,
-    sessionTitleModel: SESSION_TITLE_MODEL,
+    sessionTitleModel,
     activeSessionId,
     sessions,
     state: actionState,
