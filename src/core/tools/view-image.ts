@@ -10,9 +10,12 @@ import type { ImageBlockParam } from '@anthropic-ai/sdk/resources/messages/messa
 import OpenAI from 'openai';
 import type { ResponseInputImage, ResponseInputText, ResponseStreamEvent } from 'openai/resources/responses/responses.js';
 import type { ToolDefinition, ToolResult } from '../types.js';
-import { OPENAI_CODEX_RESPONSES_ENDPOINT } from '../auth/openai-oauth.js';
 import { inferProviderFromModel } from '../llm/factory.js';
-import { createOpenAiOAuthFetch } from '../llm/openai.js';
+import {
+  createOpenAiOAuthFetch,
+  executeOpenAiOAuthCodexSse,
+  extractOpenAiCodexOutputTextFromSse,
+} from '../llm/openai.js';
 import {
   resolveOpenAiOAuthImageCandidateModels,
   validateModelCredentialCompatibility,
@@ -220,42 +223,30 @@ async function executeOpenAiOAuthImageStream(args: {
     throw new Error('Missing OAuth fetch implementation for OpenAI image inspection.');
   }
 
-  const headers = { 'content-type': 'application/json' };
-  const body = JSON.stringify({
-    model: args.model,
-    store: false,
-    stream: true,
-    reasoning: { summary: 'auto' },
-    instructions: 'You are a helpful vision assistant. Describe the provided screenshot briefly and focus on visible UI text, structure, and notable details.',
-    input: [{
-      type: 'message',
-      role: 'user',
-      content: [
-        { type: 'input_text', text: args.prompt } satisfies ResponseInputText,
-        {
-          type: 'input_image',
-          detail: 'auto',
-          image_url: args.imageUrl,
-        } satisfies ResponseInputImage,
-      ],
-    }],
+  const text = await executeOpenAiOAuthCodexSse({
+    oauthFetch: args.oauthFetch,
+    body: {
+      model: args.model,
+      store: false,
+      stream: true,
+      reasoning: { summary: 'auto' },
+      instructions: 'You are a helpful vision assistant. Describe the provided screenshot briefly and focus on visible UI text, structure, and notable details.',
+      input: [{
+        type: 'message',
+        role: 'user',
+        content: [
+          { type: 'input_text', text: args.prompt } satisfies ResponseInputText,
+          {
+            type: 'input_image',
+            detail: 'auto',
+            image_url: args.imageUrl,
+          } satisfies ResponseInputImage,
+        ],
+      }],
+    },
   });
 
-  const response = await args.oauthFetch(OPENAI_CODEX_RESPONSES_ENDPOINT, {
-    method: 'POST',
-    headers,
-    body,
-  });
-
-  if (!response.ok) {
-    const failureBody = await response.text();
-    const failure = new Error(failureBody || `${response.status} status code (no body)`);
-    (failure as Error & { status?: number }).status = response.status;
-    throw failure;
-  }
-
-  const text = await response.text();
-  const outputText = extractOutputTextFromSse(text);
+  const outputText = extractOpenAiCodexOutputTextFromSse(text);
   return {
     model: args.model,
     output_text: outputText || undefined,
@@ -413,33 +404,6 @@ function readOpenAiErrorStatus(error: unknown): number | undefined {
 function formatImageViewFailure(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return `Image view failed: ${message}`;
-}
-
-function extractOutputTextFromSse(text: string): string {
-  const chunks = text.split('\n\n');
-  let output = '';
-
-  for (const chunk of chunks) {
-    const lines = chunk.split('\n');
-    const dataLine = lines.find((line) => line.startsWith('data: '));
-    if (!dataLine) {
-      continue;
-    }
-
-    try {
-      const payload = JSON.parse(dataLine.slice(6)) as ResponseStreamEvent;
-      if (payload.type === 'response.output_text.delta' && payload.delta) {
-        output += payload.delta;
-      }
-      if (payload.type === 'response.output_text.done' && payload.text) {
-        output = payload.text;
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  return output.trim();
 }
 
 function readOpenAiErrorDetails(error: unknown): string | undefined {

@@ -251,6 +251,78 @@ function shouldRouteToCodexResponses(url: URL): boolean {
   return url.pathname.endsWith('/responses') || url.pathname.endsWith('/chat/completions');
 }
 
+export async function executeOpenAiOAuthCodexSse(args: {
+  oauthFetch: ReturnType<typeof createOpenAiOAuthFetch> | undefined;
+  body: unknown;
+  endpoint?: string;
+}): Promise<string> {
+  if (!args.oauthFetch) {
+    throw new Error('Missing OAuth fetch implementation for OpenAI Codex request.');
+  }
+
+  const response = await args.oauthFetch(args.endpoint ?? OPENAI_CODEX_RESPONSES_ENDPOINT, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(args.body),
+  });
+
+  if (!response.ok) {
+    const failureBody = await response.text();
+    const failure = new Error(failureBody || `${response.status} status code (no body)`);
+    (failure as Error & { status?: number }).status = response.status;
+    throw failure;
+  }
+
+  return await response.text();
+}
+
+export function extractOpenAiCodexOutputTextFromSse(text: string): string {
+  const matches = [...text.matchAll(/^data: (\{.*"type":"response\.output_text\.done".*\})$/gm)];
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const raw = matches[index]?.[1];
+    if (!raw) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as { text?: unknown };
+      if (typeof parsed.text === 'string' && parsed.text.trim()) {
+        return parsed.text;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return '';
+}
+
+export function extractOpenAiCodexSseItems<T>(
+  text: string,
+  predicate: (item: unknown) => item is T,
+): T[] {
+  const items: T[] = [];
+  const matches = [...text.matchAll(/^data: (\{.*"type":"response\.output_item\.done".*\})$/gm)];
+
+  for (const match of matches) {
+    const raw = match[1];
+    if (!raw) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as { item?: unknown };
+      if (predicate(parsed.item)) {
+        items.push(parsed.item);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return items;
+}
+
 // ---------------------------------------------------------------------------
 // Internal converters
 // ---------------------------------------------------------------------------

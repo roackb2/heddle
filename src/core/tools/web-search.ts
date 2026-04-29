@@ -14,9 +14,19 @@ import OpenAI from 'openai';
 import type { Response, ResponseOutputText, WebSearchTool } from 'openai/resources/responses/responses.js';
 import type { ToolDefinition, ToolResult } from '../types.js';
 import { inferProviderFromModel } from '../llm/factory.js';
+import {
+  createOpenAiOAuthFetch,
+  executeOpenAiOAuthCodexSse,
+  extractOpenAiCodexOutputTextFromSse,
+  extractOpenAiCodexSseItems,
+} from '../llm/openai.js';
+import { validateModelCredentialCompatibility } from '../llm/model-policy.js';
 import type { LlmProvider } from '../llm/types.js';
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../config.js';
-import type { ProviderCredentialSource } from '../runtime/api-keys.js';
+import {
+  resolveOAuthCredentialForModel,
+  type ProviderCredentialSource,
+} from '../runtime/api-keys.js';
 
 type WebSearchInput = {
   query: string;
@@ -28,6 +38,7 @@ export type WebSearchToolOptions = {
   provider?: LlmProvider;
   apiKey?: string;
   providerCredentialSource?: ProviderCredentialSource;
+  credentialStorePath?: string;
 };
 
 export const webSearchTool: ToolDefinition = createWebSearchTool();
@@ -87,11 +98,34 @@ export function createWebSearchTool(options: WebSearchToolOptions = {}): ToolDef
 }
 
 async function executeOpenAiWebSearch(input: WebSearchInput, options: WebSearchToolOptions): Promise<ToolResult> {
-  if (options.providerCredentialSource?.type === 'oauth') {
+  const model = options.model ?? process.env.OPENAI_WEB_SEARCH_MODEL ?? DEFAULT_OPENAI_MODEL;
+  const oauthCredential =
+    options.providerCredentialSource?.type === 'oauth' ?
+      resolveOAuthCredentialForModel(model, { storePath: options.credentialStorePath })
+    : undefined;
+
+  if (options.providerCredentialSource?.type === 'oauth' && !oauthCredential) {
     return {
       ok: false,
-      error: 'web_search currently requires OpenAI Platform API-key mode. The active OpenAI credential is account sign-in; set OPENAI_API_KEY or pass an explicit API key to use hosted web search.',
+      error: 'web_search could not load the stored OpenAI account sign-in credential for this workspace. Sign in again with `heddle auth login openai`, or set OPENAI_API_KEY to use Platform API-key mode.',
     };
+  }
+
+  const compatibility = validateModelCredentialCompatibility({
+    model,
+    provider: 'openai',
+    credentialMode: oauthCredential ? 'oauth' : undefined,
+    usageLabel: 'web search',
+  });
+  if (!compatibility.ok) {
+    return {
+      ok: false,
+      error: compatibility.error,
+    };
+  }
+
+  if (oauthCredential) {
+    return await executeOpenAiOAuthWebSearch(input, { ...options, model }, oauthCredential);
   }
 
   const apiKey = firstDefinedNonEmpty(options.apiKey, process.env.OPENAI_API_KEY, process.env.PERSONAL_OPENAI_API_KEY);
@@ -103,7 +137,6 @@ async function executeOpenAiWebSearch(input: WebSearchInput, options: WebSearchT
   }
 
   const client = new OpenAI({ apiKey });
-  const model = options.model ?? process.env.OPENAI_WEB_SEARCH_MODEL ?? DEFAULT_OPENAI_MODEL;
   const response = await client.responses.create({
     model,
     input: input.query,
@@ -116,6 +149,34 @@ async function executeOpenAiWebSearch(input: WebSearchInput, options: WebSearchT
   return {
     ok: true,
     output: formatOpenAiWebSearchResult(response),
+  };
+}
+
+async function executeOpenAiOAuthWebSearch(
+  input: WebSearchInput,
+  options: WebSearchToolOptions & { model: string },
+  oauthCredential: NonNullable<ReturnType<typeof resolveOAuthCredentialForModel>>,
+): Promise<ToolResult> {
+  const oauthFetch = createOpenAiOAuthFetch(oauthCredential, { storePath: options.credentialStorePath });
+  const sseText = await executeOpenAiOAuthCodexSse({
+    oauthFetch,
+    body: {
+      model: options.model,
+      store: false,
+      stream: true,
+      reasoning: { summary: 'auto' },
+      instructions: 'Search the web and answer concisely with citations when available.',
+      include: ['web_search_call.action.sources'],
+      input: [{ type: 'message', role: 'user', content: input.query }],
+      tools: [{
+        type: 'web_search',
+        search_context_size: input.contextSize ?? 'medium',
+      }],
+    },
+  });
+  return {
+    ok: true,
+    output: formatOpenAiOAuthWebSearchSseResult(sseText, options.model),
   };
 }
 
@@ -221,6 +282,52 @@ function extractOpenAiUrlCitations(response: Response): Array<{ title: string; u
           url: annotation.url,
         });
       }
+    }
+  }
+
+  return citations;
+}
+
+function formatOpenAiOAuthWebSearchSseResult(sseText: string, model: string): {
+  provider: 'openai';
+  model: string;
+  summary: string;
+  citations: Array<{ title: string; url: string }>;
+} {
+  return {
+    provider: 'openai',
+    model,
+    summary: extractOpenAiCodexOutputTextFromSse(sseText).trim() || 'No summary returned.',
+    citations: extractSseWebSearchSources(sseText),
+  };
+}
+
+function extractSseWebSearchSources(sseText: string): Array<{ title: string; url: string }> {
+  const citations: Array<{ title: string; url: string }> = [];
+  const seen = new Set<string>();
+
+  const items = extractOpenAiCodexSseItems<{
+    type: 'web_search_call';
+    action?: { sources?: Array<{ type?: string; url?: string }> };
+  }>(
+    sseText,
+    (item): item is { type: 'web_search_call'; action?: { sources?: Array<{ type?: string; url?: string }> } } =>
+      Boolean(item && typeof item === 'object' && (item as { type?: unknown }).type === 'web_search_call'),
+  );
+
+  for (const item of items) {
+    for (const source of item.action?.sources ?? []) {
+      if (source.type !== 'url' || !source.url) {
+        continue;
+      }
+      if (seen.has(source.url)) {
+        continue;
+      }
+      seen.add(source.url);
+      citations.push({
+        title: source.url,
+        url: source.url,
+      });
     }
   }
 
