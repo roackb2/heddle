@@ -13,6 +13,11 @@ describe('chat history compaction', () => {
     expect(estimateBuiltInContextWindow('gpt-5.1-codex-mini')).toBe(400_000);
   });
 
+  it('uses a conservative context window for GPT-5.4 chat sessions', () => {
+    expect(estimateBuiltInContextWindow('gpt-5.4')).toBe(400_000);
+    expect(estimateBuiltInContextWindow('gpt-5.4-pro')).toBe(400_000);
+  });
+
   it('compacts older transcript messages into a summary and keeps recent messages', () => {
     const history: ChatMessage[] = Array.from({ length: 50 }).flatMap((_, index) => [
       { role: 'user' as const, content: `User prompt ${index}: ${'u'.repeat(4000)}` },
