@@ -144,6 +144,10 @@ function inferContextWindowEstimate(model: string): number {
     return 400_000;
   }
 
+  if (model.startsWith('gpt-5.1') || model.startsWith('gpt-5.2') || model.startsWith('gpt-5.3') || model.startsWith('gpt-5-') || model === 'gpt-5') {
+    return 400_000;
+  }
+
   if (model.startsWith('gpt-4.1')) {
     return 128_000;
   }

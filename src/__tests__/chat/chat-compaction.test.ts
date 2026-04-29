@@ -4,10 +4,15 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ChatMessage } from '../../core/llm/types.js';
 import type { LlmAdapter } from '../../core/llm/types.js';
+import { estimateBuiltInContextWindow } from '../../core/llm/openai-models.js';
 import { compactChatHistory, compactChatHistoryWithArchive, isCompactedHistorySummary } from '../../cli/chat/state/compaction.js';
 import { buildConversationMessages } from '../../cli/chat/utils/format.js';
 
 describe('chat history compaction', () => {
+  it('uses the documented context window for the default OpenAI compaction model', () => {
+    expect(estimateBuiltInContextWindow('gpt-5.1-codex-mini')).toBe(400_000);
+  });
+
   it('compacts older transcript messages into a summary and keeps recent messages', () => {
     const history: ChatMessage[] = Array.from({ length: 50 }).flatMap((_, index) => [
       { role: 'user' as const, content: `User prompt ${index}: ${'u'.repeat(4000)}` },
@@ -50,6 +55,31 @@ describe('chat history compaction', () => {
     expect(isCompactedHistorySummary(manuallyCompacted.history[0]!)).toBe(true);
     expect(manuallyCompacted.history.length).toBeLessThan(history.length);
     expect(manuallyCompacted.context.compactedMessages).toBeGreaterThan(0);
+  });
+
+  it('keeps recent history by token budget rather than a fixed message count', () => {
+    const history: ChatMessage[] = [
+      ...Array.from({ length: 10 }).flatMap((_, index) => [
+        { role: 'user' as const, content: `Older user ${index}: ${'u'.repeat(2_000)}` },
+        { role: 'assistant' as const, content: `Older assistant ${index}: ${'a'.repeat(2_000)}` },
+      ]),
+      { role: 'user' as const, content: `recent small request` },
+      { role: 'assistant' as const, content: `recent giant tool analysis: ${'a'.repeat(80_000)}` },
+      { role: 'tool' as const, toolCallId: 'huge-tool-1', content: `{"ok":true,"output":"${'t'.repeat(80_000)}"}` },
+      { role: 'assistant' as const, content: `recent giant follow-up: ${'b'.repeat(80_000)}` },
+      { role: 'user' as const, content: 'what was our task?' },
+    ];
+
+    const compacted = compactChatHistory({
+      history,
+      model: 'gpt-4.1',
+      force: true,
+    });
+
+    expect(isCompactedHistorySummary(compacted.history[0]!)).toBe(true);
+    expect(compacted.history.length).toBeLessThan(16);
+    expect(compacted.history.at(-1)).toEqual(history.at(-1));
+    expect(compacted.context.estimatedHistoryTokens).toBeLessThan(90_000);
   });
 
   it('can re-compact an already compacted short session when forced manually', () => {
