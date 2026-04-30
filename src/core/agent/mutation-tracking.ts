@@ -1,33 +1,19 @@
 // ---------------------------------------------------------------------------
-// Mutation tracking — classifies shell commands and tool calls by their
-// workspace effect (change, verify, review) so the main loop can enforce
-// post-mutation requirements.
+// Mutation tracking — lightweight classification for workspace-changing
+// commands and edits. The richer review/verification follow-up state is
+// intentionally dormant for now.
 // ---------------------------------------------------------------------------
 
 import type { ToolCall } from '../types.js';
 import { extractShellCommand } from './util.js';
 
 export type MutationState = {
-  pendingVerification: boolean;
-  pendingChangeReview: boolean;
-  requiresStructuredChangeSummary: boolean;
   executedMutationCommands: string[];
-  executedReviewCommands: string[];
-  executedVerificationCommands: string[];
-  executedReviewEvidence: string[];
-  executedVerificationEvidence: string[];
 };
 
 export function createMutationState(): MutationState {
   return {
-    pendingVerification: false,
-    pendingChangeReview: false,
-    requiresStructuredChangeSummary: false,
     executedMutationCommands: [],
-    executedReviewCommands: [],
-    executedVerificationCommands: [],
-    executedReviewEvidence: [],
-    executedVerificationEvidence: [],
   };
 }
 
@@ -42,39 +28,12 @@ export function trackToolResult(
 
   const command = extractShellCommand(effectiveCall.input);
 
-  if (effectiveCall.tool === 'run_shell_mutate' && command) {
-    if (isWorkspaceChangeMutateCommand(command)) {
-      state.executedMutationCommands.push(command);
-
-      if (!isRepoLifecycleMutationCommand(command)) {
-        state.pendingVerification = true;
-        state.pendingChangeReview = true;
-        state.requiresStructuredChangeSummary = true;
-      }
-    }
-
-    if (isVerificationMutateCommand(command)) {
-      state.pendingVerification = false;
-      state.executedVerificationCommands.push(command);
-    }
+  if (effectiveCall.tool === 'run_shell_mutate' && command && isWorkspaceChangeMutateCommand(command)) {
+    state.executedMutationCommands.push(command);
   }
 
   if (effectiveCall.tool === 'edit_file') {
     state.executedMutationCommands.push(describeEditMutation(effectiveCall.input));
-    state.pendingVerification = true;
-    state.pendingChangeReview = true;
-    state.requiresStructuredChangeSummary = true;
-  }
-
-  if (effectiveCall.tool === 'run_shell_inspect' && command && isRepoReviewCommand(command)) {
-    state.pendingChangeReview = false;
-    state.executedReviewCommands.push(command);
-    state.executedReviewEvidence.push(summarizeCommandEvidence(result.output));
-  }
-
-  if (effectiveCall.tool === 'run_shell_mutate' && command && isVerificationMutateCommand(command)) {
-    state.pendingVerification = false;
-    state.executedVerificationEvidence.push(summarizeCommandEvidence(result.output));
   }
 }
 
@@ -110,14 +69,6 @@ export function isVerificationMutateCommand(command: string): boolean {
   );
 }
 
-function isRepoLifecycleMutationCommand(command: string): boolean {
-  return (
-    /^git add\b/.test(command) ||
-    /^git commit\b/.test(command) ||
-    /^git push\b/.test(command)
-  );
-}
-
 export function isRepoReviewCommand(command: string): boolean {
   const normalized = normalizeCommand(command);
   return (
@@ -147,38 +98,4 @@ function describeEditMutation(input: unknown): string {
 
   const path = (input as { path?: unknown }).path;
   return typeof path === 'string' && path.trim() ? `edit_file ${path.trim()}` : 'edit_file';
-}
-
-function summarizeCommandEvidence(output: unknown): string {
-  if (!output || typeof output !== 'object' || Array.isArray(output)) {
-    return 'command completed';
-  }
-
-  const candidate = output as {
-    command?: unknown;
-    stdout?: unknown;
-    stderr?: unknown;
-    exitCode?: unknown;
-  };
-  const command = typeof candidate.command === 'string' && candidate.command.trim() ? candidate.command.trim() : 'command';
-  const stdout = typeof candidate.stdout === 'string' ? candidate.stdout.trim() : '';
-  const stderr = typeof candidate.stderr === 'string' ? candidate.stderr.trim() : '';
-  const exitCode = typeof candidate.exitCode === 'number' ? candidate.exitCode : 0;
-  const normalized = normalizeCommand(command);
-
-  if (normalized.startsWith('git status') || normalized.startsWith('git diff')) {
-    return `${command} reviewed (exit ${exitCode})`;
-  }
-
-  if (/^(?:yarn test|yarn build|yarn lint|yarn vitest|vitest|tsc)\b/.test(normalized)) {
-    return `${command} passed (exit ${exitCode})`;
-  }
-
-  const body = stdout || stderr;
-  if (!body) {
-    return `${command} completed (exit ${exitCode})`;
-  }
-
-  const snippet = body.replace(/\s+/g, ' ').slice(0, 80);
-  return `${command} completed (exit ${exitCode}): ${snippet}`;
 }
