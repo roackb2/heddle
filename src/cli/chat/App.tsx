@@ -80,10 +80,17 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   });
 
   const previousActiveModelRef = useRef(activeModel);
+  const previousSessionIdRef = useRef<string | undefined>(activeSession?.id);
 
   useEffect(() => {
     if (!activeSession) {
       return;
+    }
+
+    const sessionChanged = previousSessionIdRef.current !== activeSession.id;
+    previousSessionIdRef.current = activeSession.id;
+    if (sessionChanged) {
+      previousActiveModelRef.current = activeSession.model ?? runtime.model;
     }
 
     const sessionModel = activeSession.model ?? runtime.model;
@@ -113,6 +120,14 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   useEffect(() => {
     if (!activeSession) {
       previousActiveModelRef.current = activeModel;
+      previousSessionIdRef.current = undefined;
+      return;
+    }
+
+    const sessionChanged = previousSessionIdRef.current !== activeSession.id;
+    previousSessionIdRef.current = activeSession.id;
+    if (sessionChanged) {
+      previousActiveModelRef.current = activeSession.model ?? activeModel;
       return;
     }
 
