@@ -1104,6 +1104,31 @@ describe('file mutation tools', () => {
       process.chdir(previousCwd);
     }
   });
+
+  it('does not throw while previewing an edit_file write to a directory', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-edit-preview-dir-'));
+    await mkdir(join(root, 'src'));
+
+    await expect(previewEditFileInput({
+      path: 'src',
+      content: 'not a directory\n',
+    }, root)).resolves.toBeUndefined();
+  });
+
+  it('returns a normal edit_file error when writing to a directory path', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-edit-dir-'));
+    await mkdir(join(root, 'src'));
+    const tool = createEditFileTool({ workspaceRoot: root });
+
+    const result = await tool.execute({
+      path: 'src',
+      content: 'not a directory\n',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Failed to read');
+    expect(result.error).toContain('EISDIR');
+  });
 });
 
 describe('runShell tools', () => {

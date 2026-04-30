@@ -9,6 +9,11 @@ import type { ChatSessionLeaseOwner } from '../../../../core/chat/session-lease.
 import type { ChatSession, TurnSummary } from '../../../../core/chat/types.js';
 import { buildConversationMessages } from '../../../../core/chat/conversation-lines.js';
 import { submitChatSessionPrompt } from '../../../../core/chat/session-submit.js';
+import { requestToolApproval } from '../../../../core/chat/tool-approval-host.js';
+import {
+  createControlPlanePendingApprovalView,
+  createControlPlaneSessionEventPublisher,
+} from './chat-session-events.js';
 import type {
   ApprovalEventView,
   ChatSessionDetail,
@@ -110,6 +115,10 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs) {
 
   const controller = new AbortController();
   inFlightRuns.set(args.sessionId, controller);
+  const events = createControlPlaneSessionEventPublisher({
+    eventBus: sessionEventBus,
+    sessionId: args.sessionId,
+  });
 
   try {
     const result = await submitChatSessionPrompt({
@@ -118,50 +127,26 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs) {
       preferApiKey: args.preferApiKey,
       memoryMaintenanceMode: args.memoryMaintenanceMode,
       abortSignal: controller.signal,
-      onEvent: (event) => {
-        sessionEventBus.emit(args.sessionId, {
-          sessionId: args.sessionId,
-          timestamp: new Date().toISOString(),
-          event,
-        } satisfies ControlPlaneSessionLiveEvent);
-      },
+      onEvent: events.hostPort.events?.onAgentLoopEvent,
       approveToolCall: async (call, tool) => {
-        const decision = await new Promise<{ approved: boolean; reason?: string }>((resolve) => {
-          pendingApprovals.set(args.sessionId, {
-            approval: {
-              tool: tool.name,
-              callId: call.id,
-              input: call.input,
-              requestedAt: new Date().toISOString(),
-            },
-            resolve,
-          });
-          sessionEventBus.emit(args.sessionId, {
-            sessionId: args.sessionId,
-            timestamp: new Date().toISOString(),
-            event: {
-              type: 'trace',
-              runId: 'pending-approval',
-              timestamp: new Date().toISOString(),
-              event: {
-                type: 'tool.approval_requested',
-                call,
-                step: 0,
-                timestamp: new Date().toISOString(),
-              },
-            },
-          } satisfies ControlPlaneSessionLiveEvent);
+        const decision = await requestToolApproval({
+          call,
+          tool,
+          createView: createControlPlanePendingApprovalView,
+          storePending: ({ view, resolve }) => {
+            pendingApprovals.set(args.sessionId, {
+              approval: view,
+              resolve,
+            });
+          },
+          publish: (_view, callForEvent) => {
+            events.publishApprovalRequested(callForEvent);
+          },
         });
         pendingApprovals.delete(args.sessionId);
         return decision;
       },
-      onCompactionStatus: (event) => {
-        sessionEventBus.emit(args.sessionId, {
-          sessionId: args.sessionId,
-          timestamp: new Date().toISOString(),
-          event,
-        } satisfies ControlPlaneSessionLiveEvent);
-      },
+      onCompactionStatus: events.hostPort.compaction?.onFinalCompactionStatus,
     });
     return {
       ...result,

@@ -104,7 +104,14 @@ export async function previewScopedEdit(raw: unknown, options: Omit<ScopedEditOp
       return undefined;
     }
 
-    const previousContent = existed ? await readFile(targetPath, 'utf8') : '';
+    let previousContent = '';
+    if (existed) {
+      try {
+        previousContent = await readFile(targetPath, 'utf8');
+      } catch {
+        return undefined;
+      }
+    }
     return buildDiffPreview(previousContent, raw.content, scopedPath, existed ? 'overwritten' : 'created');
   }
 
@@ -128,7 +135,17 @@ export async function previewScopedEdit(raw: unknown, options: Omit<ScopedEditOp
 
 async function writeScopedContent(input: WriteEditInput, targetPath: string, options: ScopedEditOptions): Promise<ToolResult> {
   const existed = await pathExists(targetPath);
-  const previousContent = existed ? await readFile(targetPath, 'utf8') : '';
+  let previousContent = '';
+  if (existed) {
+    try {
+      previousContent = await readFile(targetPath, 'utf8');
+    } catch (error) {
+      return {
+        ok: false,
+        error: `Failed to read ${targetPath}: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
 
   if (!existed && !input.createIfMissing) {
     return {

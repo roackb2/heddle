@@ -3,6 +3,7 @@ import { appendMemoryCatalogSystemContext, DEFAULT_OPENAI_MODEL, inferProviderFr
 import { saveTrace } from '../../../core/chat/trace.js';
 import type { LlmProvider } from '../../../index.js';
 import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
+import { resolveProviderCredentialStorePath } from '../../../core/auth/provider-credentials.js';
 import {
   hasProviderCredentialForModel as hasRuntimeProviderCredentialForModel,
   type ProviderCredentialSource,
@@ -64,18 +65,19 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
   const sessionId = `chat-${Date.now()}`;
   const stateRoot = resolve(workspaceRoot, options.stateDir ?? '.heddle');
   const memoryDir = join(stateRoot, 'memory');
+  const credentialStorePath = options.credentialStorePath ?? resolveProviderCredentialStorePath();
   const model = options.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
   const provider = inferProviderFromModel(model);
   const preferApiKey = Boolean(options.preferApiKey);
   const oauthCredential =
     options.apiKey || preferApiKey ? undefined
-    : resolveOAuthCredentialForModel(model, { storePath: options.credentialStorePath });
+    : resolveOAuthCredentialForModel(model, { storePath: credentialStorePath });
   const apiKey = options.apiKey ?? (oauthCredential ? undefined : resolveProviderApiKey(provider));
   const apiKeyProvider = options.apiKey ? 'explicit' : apiKey ? provider : undefined;
   const providerCredentialSource = resolveProviderCredentialSourceForModel(model, {
     apiKey,
     apiKeyProvider,
-    credentialStorePath: options.credentialStorePath,
+    credentialStorePath,
     preferApiKey,
   });
   const providerCredentialPresent = providerCredentialSource.type !== 'missing';
@@ -89,7 +91,7 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
     providerCredentialPresent,
     providerCredentialSource,
     workspaceRoot,
-    credentialStorePath: options.credentialStorePath,
+    credentialStorePath,
     stateRoot,
     logFile: join(stateRoot, 'logs', `${sessionId}.log`),
     sessionCatalogFile: join(stateRoot, 'chat-sessions.catalog.json'),
