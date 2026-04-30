@@ -547,7 +547,7 @@ describe('runAgent', () => {
     });
   });
 
-  it('adds a low-step reminder after extended evidence gathering so the run converges instead of drifting', async () => {
+  it('does not inject a low-step enforcement reminder after extended evidence gathering', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
@@ -582,10 +582,9 @@ describe('runAgent', () => {
       logger: silentLogger,
     });
 
-    expect(seenMessages[3]).toContainEqual({
+    expect(seenMessages[3]).not.toContainEqual({
       role: 'system',
-      content:
-        'Host reminder: only 1 step(s) remain. Do not spend another turn rephrasing the plan. Either execute the single next concrete action needed to finish the current slice, or answer with the best grounded blocker.',
+      content: expect.stringContaining('Do not spend another turn rephrasing the plan'),
     });
   });
 

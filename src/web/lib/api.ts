@@ -55,12 +55,38 @@ export async function fetchChatTurnReview(sessionId: string, turnId: string): Pr
   return await trpc.controlPlane.sessionTurnReview.query({ sessionId, turnId });
 }
 
-export async function sendChatSessionPrompt(sessionId: string, prompt: string): Promise<SessionSendPromptResult> {
-  return await trpc.controlPlane.sessionSendPrompt.mutate({ sessionId, prompt });
+export async function sendChatSessionPrompt(
+  sessionId: string,
+  prompt: string,
+  options?: {
+    apiKey?: string;
+    preferApiKey?: boolean;
+    systemContext?: string;
+    memoryMaintenanceMode?: 'background' | 'inline' | 'none';
+  },
+): Promise<SessionSendPromptResult> {
+  return await trpc.controlPlane.sessionSendPrompt.mutate({
+    sessionId,
+    prompt,
+    apiKey: options?.apiKey,
+    preferApiKey: options?.preferApiKey,
+    systemContext: options?.systemContext,
+    memoryMaintenanceMode: options?.memoryMaintenanceMode,
+  });
 }
 
-export async function continueChatSession(sessionId: string): Promise<SessionContinueResult> {
-  return await trpc.controlPlane.sessionContinue.mutate({ id: sessionId });
+export async function continueChatSession(
+  sessionId: string,
+  options?: {
+    apiKey?: string;
+    preferApiKey?: boolean;
+  },
+): Promise<SessionContinueResult> {
+  return await trpc.controlPlane.sessionContinue.mutate({
+    id: sessionId,
+    apiKey: options?.apiKey,
+    preferApiKey: options?.preferApiKey,
+  });
 }
 
 export async function fetchPendingSessionApproval(sessionId: string): Promise<PendingSessionApproval> {

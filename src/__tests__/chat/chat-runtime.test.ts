@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { executeAgentTurn } from '../../cli/chat/hooks/useAgentRun.js';
 import type { ChatSession } from '../../cli/chat/state/types.js';
@@ -8,6 +8,7 @@ import { resolveApiKeyForModel, resolveChatRuntimeConfig, resolveProviderCredent
 import { createLogger } from '../../core/utils/logger.js';
 import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../index.js';
 import { setStoredProviderCredential } from '../../core/auth/provider-credentials.js';
+import { continueChatPrompt, createControlPlaneChatSession, readChatSessionDetail, submitChatPrompt } from '../../server/features/control-plane/services/chat-sessions.js';
 
 describe('resolveChatRuntimeConfig', () => {
   afterEach(() => {
@@ -174,6 +175,10 @@ describe('resolveChatRuntimeConfig', () => {
 });
 
 describe('executeAgentTurn final message persistence', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   function createRuntime() {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-chat-runtime-'));
     const stateRoot = join(workspaceRoot, '.heddle');
@@ -343,6 +348,7 @@ describe('executeAgentTurn final message persistence', () => {
     expect(session.lastContinuePrompt).toBe('inspect file with expanded mention contents');
   });
 
+
   it('resets visible run state at TUI turn start and releases it after completion', async () => {
     const { state } = await runTurn('done', 'All set.');
 
@@ -354,5 +360,115 @@ describe('executeAgentTurn final message persistence', () => {
     expect(state.setCurrentPlan).toHaveBeenCalledWith(undefined);
     expect(state.setCurrentAssistantText).toHaveBeenCalledWith(undefined);
     expect(state.setIsRunning).toHaveBeenLastCalledWith(false);
+  });
+});
+
+describe('control-plane shared chat runtime integration', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('continues with the stored prompt while preserving continue-style transcript text', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-control-plane-runtime-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const sessionStoragePath = resolve(stateRoot, 'chat-sessions.catalog.json');
+    const traceDir = resolve(stateRoot, 'traces');
+    mkdirSync(traceDir, { recursive: true });
+    vi.stubEnv('OPENAI_API_KEY', 'test-openai-key');
+
+    const session = createControlPlaneChatSession({
+      sessionStoragePath,
+      suggestedName: 'Phase C test',
+      model: 'gpt-5.1-codex-mini',
+      apiKeyPresent: true,
+    });
+
+    const loopSpy = vi.spyOn(await import('../../index.js'), 'runAgentLoop')
+      .mockResolvedValueOnce({
+        outcome: 'done',
+        summary: 'First turn done.',
+        trace: [
+          {
+            type: 'run.finished',
+            outcome: 'done',
+            summary: 'First turn done.',
+            step: 1,
+            timestamp: '2026-04-30T00:00:01.000Z',
+          },
+        ],
+        transcript: [
+          { role: 'user', content: 'inspect file with expanded mention contents' },
+          { role: 'assistant', content: 'First turn done.' },
+        ],
+        state: {
+          stepCount: 1,
+          trace: [],
+          toolCallHistory: [],
+          runId: 'run-first',
+        },
+      } as never)
+      .mockResolvedValueOnce({
+        outcome: 'done',
+        summary: 'Continue turn done.',
+        trace: [
+          {
+            type: 'run.finished',
+            outcome: 'done',
+            summary: 'Continue turn done.',
+            step: 1,
+            timestamp: '2026-04-30T00:00:02.000Z',
+          },
+        ],
+        transcript: [
+          { role: 'user', content: 'inspect file with expanded mention contents' },
+          { role: 'assistant', content: 'First turn done.' },
+          { role: 'user', content: 'inspect file with expanded mention contents' },
+          { role: 'assistant', content: 'Continue turn done.' },
+        ],
+        state: {
+          stepCount: 1,
+          trace: [],
+          toolCallHistory: [],
+          runId: 'run-continue',
+        },
+      } as never);
+
+    await submitChatPrompt({
+      workspaceRoot,
+      stateRoot,
+      sessionStoragePath,
+      sessionId: session.id,
+      prompt: 'inspect file with expanded mention contents',
+      leaseOwner: {
+        ownerKind: 'daemon',
+        ownerId: 'daemon-test',
+        clientLabel: 'control plane',
+      },
+    });
+
+    const continueResult = await continueChatPrompt({
+      workspaceRoot,
+      stateRoot,
+      sessionStoragePath,
+      sessionId: session.id,
+      leaseOwner: {
+        ownerKind: 'daemon',
+        ownerId: 'daemon-test',
+        clientLabel: 'control plane',
+      },
+    });
+
+    const continueCall = loopSpy.mock.calls.at(-1)?.[0];
+    expect(continueCall?.goal).toBe('inspect file with expanded mention contents');
+
+    const detail = readChatSessionDetail(sessionStoragePath, session.id);
+    expect(detail?.messages.map((message) => message.text)).toEqual([
+      'inspect file with expanded mention contents',
+      'First turn done.',
+      'inspect file with expanded mention contents',
+      'Continue turn done.',
+    ]);
+    expect(detail?.lastContinuePrompt).toBe('inspect file with expanded mention contents');
+    expect(continueResult.session?.lastContinuePrompt).toBe('inspect file with expanded mention contents');
   });
 });

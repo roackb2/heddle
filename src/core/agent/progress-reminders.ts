@@ -7,20 +7,13 @@ import type { ToolCall, ToolResult } from '../types.js';
 import { isWorkspaceChangeMutateCommand } from './mutation-tracking.js';
 import { extractShellCommand } from './util.js';
 
-const DRIFT_REMINDER_THRESHOLD = 6;
-const LOW_STEP_REMINDER_THRESHOLD = 2;
-
 export type ProgressReminderState = {
   successfulNonMutationToolCalls: number;
-  sentDriftReminder: boolean;
-  sentLowStepReminder: boolean;
 };
 
 export function createProgressReminderState(): ProgressReminderState {
   return {
     successfulNonMutationToolCalls: 0,
-    sentDriftReminder: false,
-    sentLowStepReminder: false,
   };
 }
 
@@ -29,40 +22,22 @@ export function buildProgressReminders(
   options: {
     effectiveCall: ToolCall;
     result: ToolResult;
-    remainingSteps: number;
   },
 ): string[] {
   const reminders: string[] = [];
 
-  if (options.result.ok) {
-    if (isWorkspaceChangingCall(options.effectiveCall)) {
-      state.successfulNonMutationToolCalls = 0;
-      state.sentDriftReminder = false;
-    } else {
-      state.successfulNonMutationToolCalls += 1;
-    }
-
-    if (options.effectiveCall.tool === 'report_state') {
-      reminders.push(buildReportStateReminder(options.result.output));
-    }
+  if (!options.result.ok) {
+    return reminders;
   }
 
-  if (!state.sentDriftReminder && state.successfulNonMutationToolCalls >= DRIFT_REMINDER_THRESHOLD) {
-    state.sentDriftReminder = true;
-    reminders.push(
-      'Host reminder: you already have substantial evidence. Do not spend another turn rephrasing the plan. Either execute the single next bounded action that would move the task forward, or answer directly from the evidence you already have.',
-    );
+  if (isWorkspaceChangingCall(options.effectiveCall)) {
+    state.successfulNonMutationToolCalls = 0;
+  } else {
+    state.successfulNonMutationToolCalls += 1;
   }
 
-  if (
-    !state.sentLowStepReminder &&
-    state.successfulNonMutationToolCalls >= 3 &&
-    options.remainingSteps <= LOW_STEP_REMINDER_THRESHOLD
-  ) {
-    state.sentLowStepReminder = true;
-    reminders.push(
-      `Host reminder: only ${options.remainingSteps} step(s) remain. Do not spend another turn rephrasing the plan. Either execute the single next concrete action needed to finish the current slice, or answer with the best grounded blocker.`,
-    );
+  if (options.effectiveCall.tool === 'report_state') {
+    reminders.push(buildReportStateReminder(options.result.output));
   }
 
   return reminders;

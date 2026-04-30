@@ -465,7 +465,6 @@ function pushProgressReminders(context: RunContext, effectiveCall: ToolCall, res
   const reminders = buildProgressReminders(context.progress, {
     effectiveCall,
     result,
-    remainingSteps: context.budget.remaining(),
   });
 
   for (const reminder of reminders) {
