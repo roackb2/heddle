@@ -76,6 +76,11 @@ describe('memory catalog', () => {
     expect(context).toContain('Repository docs such as README files, AGENTS.md, or docs/ are project-authored evidence.');
     expect(context).toContain('For preference-shaped, workflow-shaped, planning-style, ticket/format');
     expect(context).toContain('Follow the catalog path: read the root memory catalog, then the relevant folder README catalog, then focused notes listed there.');
+    expect(context).toContain('### Memory Judgment Internal Reasoning');
+    expect(context).toContain('Ask whether the same pattern is likely to recur in the next round of work or in future sessions.');
+    expect(context).toContain('future-you would accomplish similar tasks better if this were recorded');
+    expect(context).toContain('Treat task-embedded clarifications as potentially durable when they define a reusable operating rule.');
+    expect(context).toContain('Use examples as reasoning anchors, not phrase templates');
     expect(context).toContain('Every durable memory note must be discoverable from the root README.md or a folder README.md.');
     expect(context).toContain('## Workspace Memory Catalog');
     expect(context).toContain(`Source: ${join(memoryRoot, 'README.md')}`);
