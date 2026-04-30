@@ -42,8 +42,6 @@ type SubmitChatPromptArgs = {
   leaseOwner: ChatSessionLeaseOwner;
 };
 
-const DEFAULT_CONTINUE_PROMPT = 'Continue from where you left off.';
-
 export function createControlPlaneChatSession(args: {
   sessionStoragePath: string;
   suggestedName?: string;
@@ -170,7 +168,7 @@ export async function continueChatPrompt(args: Omit<SubmitChatPromptArgs, 'promp
 
   return await submitChatPrompt({
     ...args,
-    prompt: DEFAULT_CONTINUE_PROMPT,
+    prompt: session.lastContinuePrompt,
   });
 }
 

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatSessionDetail, ChatTurnReview, ControlPlaneState } from '../../web/lib/api.js';
 import { useSessionsScreenState } from '../../web/features/control-plane/hooks/useSessionsScreenState.js';
 import {
+  continueChatSession,
   fetchChatSessionDetail,
   fetchChatTurnReview,
   fetchSessionRunningState,
@@ -77,6 +78,11 @@ describe('useSessionsScreenState', () => {
     vi.mocked(fetchChatSessionDetail).mockResolvedValue(sessionDetail);
     vi.mocked(fetchSessionRunningState).mockResolvedValue({ running: false });
     vi.mocked(fetchChatTurnReview).mockResolvedValue(turnReview);
+    vi.mocked(continueChatSession).mockResolvedValue({
+      outcome: 'done',
+      summary: 'Continued.',
+      session: sessionDetail,
+    });
   });
 
   afterEach(() => {
@@ -172,6 +178,20 @@ describe('useSessionsScreenState', () => {
       expect(text).toContain('Heddle is working…');
     });
   });
+
+  it('continues the selected session through the shared continue mutation', async () => {
+    render(<SessionsContinueHarness />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('messages').textContent).toContain('Loaded.');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'continue' }));
+
+    await waitFor(() => {
+      expect(continueChatSession).toHaveBeenCalledWith('session-1');
+    });
+  });
 });
 
 function SessionsStateHarness() {
@@ -218,6 +238,27 @@ function SessionsSendHarness() {
         {state.sessionDetail?.messages.map((message) => message.text).join('\n') ?? ''}
       </output>
       <button type="button" onClick={() => void state.sendPrompt('What changed?')}>send</button>
+    </>
+  );
+}
+
+function SessionsContinueHarness() {
+  const state = useSessionsScreenState(
+    [sessionSummary],
+    undefined,
+    () => undefined,
+    {
+      selectedSessionId: 'session-1',
+      onSelectedSessionIdChange: () => undefined,
+    },
+  );
+
+  return (
+    <>
+      <output data-testid="messages">
+        {state.sessionDetail?.messages.map((message) => message.text).join('\n') ?? ''}
+      </output>
+      <button type="button" onClick={() => void state.continueSession()}>continue</button>
     </>
   );
 }
