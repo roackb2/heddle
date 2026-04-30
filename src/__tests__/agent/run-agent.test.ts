@@ -155,7 +155,7 @@ describe('runAgent', () => {
     });
   });
 
-  it('records a host warning when an action-oriented prompt ends with an intent-only answer and no tool activity', async () => {
+  it('does not record an actionless-completion host warning for an intent-only answer', async () => {
     const fakeLlm: LlmAdapter = {
       async chat(): Promise<LlmResponse> {
         return {
@@ -175,19 +175,9 @@ describe('runAgent', () => {
     expect(result.outcome).toBe('done');
     expect(result.trace.map((event) => event.type)).toEqual([
       'run.started',
-      'host.warning',
       'assistant.turn',
       'run.finished',
     ]);
-    expect(result.trace[1]).toMatchObject({
-      type: 'host.warning',
-      code: 'actionless_completion',
-      message: expect.stringContaining('no tool activity'),
-      details: expect.objectContaining({
-        goal: 'yep, continue on the work',
-        executedToolCalls: 0,
-      }),
-    });
   });
 
   it('aggregates token usage across model calls', async () => {
@@ -446,14 +436,13 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe('I corrected course instead of dying on invalid list_files parameters.');
-    expect(seenMessages[1]).toContainEqual({
+    expect(seenMessages[1]).not.toContainEqual({
       role: 'system',
-      content:
-        'Host reminder: the last tool call failed due to invalid or repeated tool use: Invalid input for list_files. Allowed fields: path. Example: { "path": "." }. Correct the call immediately, switch tools, or use report_state if you are blocked. Do not keep retrying the same failing pattern.',
+      content: expect.stringContaining('the last tool call failed due to invalid or repeated tool use'),
     });
   });
 
-  it('warns after 3 consecutive tool errors but still lets the agent continue', async () => {
+  it('continues after 3 consecutive tool errors without injecting a warning', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
@@ -490,14 +479,13 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe('I saw the warning and changed approach instead of being stopped.');
-    expect(seenMessages[3]).toContainEqual({
+    expect(seenMessages[3]).not.toContainEqual({
       role: 'system',
-      content:
-        'Host warning: there have been 3 consecutive tool errors; latest error: Transient tool failure while listing files.. Try a different approach, different tool, narrower scope, or use report_state if you are genuinely blocked. Do not stop solely because of this warning.',
+      content: expect.stringContaining('there have been 3 consecutive tool errors'),
     });
   });
 
-  it('adds a follow-through reminder after report_state so the next turn acts on the named blocker', async () => {
+  it('does not add a follow-through reminder after report_state', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
@@ -540,10 +528,9 @@ describe('runAgent', () => {
       logger: silentLogger,
     });
 
-    expect(seenMessages[1]).toContainEqual({
+    expect(seenMessages[1]).not.toContainEqual({
       role: 'system',
-      content:
-        'Host reminder: report_state recorded a blocker. If that blocker is still real, do the concrete nextNeed you identified (read_file on src/run-agent.ts with offset 200 and maxLines 80) or finish with the best grounded blocker. If you already have enough evidence to proceed, continue instead of repeating the same planning state.',
+      content: expect.stringContaining('report_state recorded a blocker'),
     });
   });
 
@@ -1025,11 +1012,10 @@ describe('runAgent', () => {
     });
 
     expect(result.outcome).toBe('done');
-    expect(result.summary).toBe('Applied the fix and verified the repo state.');
-    expect(seenMessages[1]).toContainEqual({
+    expect(result.summary).toBe('The workspace-changing command is complete.');
+    expect(seenMessages[1]).not.toContainEqual({
       role: 'system',
-      content:
-        'Host requirement: before giving a final answer after a workspace-changing action, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
+      content: expect.stringContaining('before giving a final answer after a workspace-changing action'),
     });
   });
 
@@ -1038,11 +1024,6 @@ describe('runAgent', () => {
     const fakeLlm: LlmAdapter = {
       async chat(messages): Promise<LlmResponse> {
         seenMessages.push(structuredClone(messages));
-        const hostReminder = [...messages].reverse().find(
-          (message: ChatMessage) =>
-            message.role === 'system' &&
-            message.content.includes('Host requirement: before giving a final answer'),
-        );
 
         if (seenMessages.length === 1) {
           return {
@@ -1050,26 +1031,8 @@ describe('runAgent', () => {
           };
         }
 
-        if (!hostReminder) {
-          return {
-            content: 'I updated the file.',
-          };
-        }
-
-        if (seenMessages.length === 3) {
-          return {
-            toolCalls: [{ id: 'call-2', tool: 'run_shell_inspect', input: { command: 'git diff --stat' } }],
-          };
-        }
-
-        if (seenMessages.length === 4) {
-          return {
-            toolCalls: [{ id: 'call-3', tool: 'run_shell_mutate', input: { command: 'yarn test' } }],
-          };
-        }
-
         return {
-          content: 'Updated the README and verified the repo state.',
+          content: 'I updated the file.',
         };
       },
     };
@@ -1115,11 +1078,10 @@ describe('runAgent', () => {
     });
 
     expect(result.outcome).toBe('done');
-    expect(result.summary).toBe('Updated the README and verified the repo state.');
-    expect(seenMessages[1]).toContainEqual({
+    expect(result.summary).toBe('I updated the file.');
+    expect(seenMessages[1]).not.toContainEqual({
       role: 'system',
-      content:
-        'Host requirement: before giving a final answer after a workspace-changing action, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
+      content: expect.stringContaining('before giving a final answer after a workspace-changing action'),
     });
   });
 
@@ -1201,10 +1163,7 @@ describe('runAgent', () => {
           message.role === 'system' &&
           message.content.includes('Host requirement: before giving a final answer after a workspace-changing action'),
       );
-    expect(hostRequirement).toBeDefined();
-    expect(hostRequirement?.content).toContain(
-      'Host requirement: before giving a final answer after a workspace-changing action',
-    );
+    expect(hostRequirement).toBeUndefined();
   });
 
   it('does not reopen post-mutation review and verification requirements for git add/commit/push after verification already ran', async () => {
@@ -1518,11 +1477,10 @@ describe('runAgent', () => {
     });
 
     expect(result.outcome).toBe('done');
-    expect(result.summary).toBe('Moved the file and completed the required follow-up checks.\n- Changed: moved docs/old.md to docs/new.md.\n- Verified: git diff --stat reviewed (exit 0); yarn test passed (exit 0).\n- Remaining uncertainty: none.');
-    expect(seenMessages[1]).toContainEqual({
+    expect(result.summary).toBe('I moved the file.');
+    expect(seenMessages[1]).not.toContainEqual({
       role: 'system',
-      content:
-        'Host requirement: before giving a final answer after a workspace-changing action, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command such as yarn test, yarn build, yarn lint, vitest, or tsc. After doing that, then provide the final answer.',
+      content: expect.stringContaining('before giving a final answer after a workspace-changing action'),
     });
   });
 
@@ -1574,12 +1532,12 @@ describe('runAgent', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.summary).toBe('The change is done and verified.');
-    expect(seenMessages[1]).toEqual(
+    expect(seenMessages[1]).not.toEqual(
       expect.arrayContaining([
         {
           role: 'system',
           content: expect.stringContaining(
-            'Host requirement: before giving a final answer after a workspace-changing action, you must inspect the resulting repo state with concrete git review evidence such as git status --short or git diff --stat and run a verification command',
+            'Host requirement: before giving a final answer after a workspace-changing action',
           ),
         },
       ]),
