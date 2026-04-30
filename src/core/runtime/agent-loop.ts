@@ -59,12 +59,10 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
   const providerCredentialSource = resolveProviderCredentialSourceForModel(model, {
     apiKey,
     apiKeyProvider: options.apiKey ? 'explicit' : apiKey ? provider : undefined,
-    credentialStorePath: options.stateDir ? resolve(workspaceRoot, options.stateDir) : undefined,
   });
   const llm = options.llm ?? await createLoopLlmAdapter({
     model,
     apiKey,
-    credentialStorePath: options.stateDir ? resolve(workspaceRoot, options.stateDir) : undefined,
   });
   const logger = options.logger ?? createLogger({ pretty: false, level: 'info', console: false });
   const tools = await resolveTools({
@@ -250,7 +248,6 @@ async function resolveTools(
       model: options.model,
       apiKey: options.apiKey,
       providerCredentialSource: options.providerCredentialSource,
-      credentialStorePath: options.stateDir ? resolve(options.workspaceRoot, options.stateDir) : undefined,
       workspaceRoot: options.workspaceRoot,
       stateDir: options.stateDir,
       memoryDir: options.memoryDir,

@@ -81,7 +81,7 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
     sessions.map((candidate) => candidate.id === session.id ? leasedSession : candidate),
   );
 
-  const llm = createLlmAdapter({ model, apiKey, credentialStorePath: args.stateRoot });
+  const llm = createLlmAdapter({ model, apiKey });
   const memoryDir = join(args.stateRoot, 'memory');
   const systemContext = appendMemoryCatalogSystemContext({
     systemContext: args.systemContext,
@@ -91,7 +91,6 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
     model,
     apiKey,
     providerCredentialSource,
-    credentialStorePath: args.stateRoot,
     workspaceRoot: args.workspaceRoot,
     memoryDir,
     searchIgnoreDirs: [],
