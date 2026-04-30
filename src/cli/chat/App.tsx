@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Text } from 'ink';
 import {
   ApprovalComposer,
@@ -13,6 +13,9 @@ import {
   SlashHintPanel,
 } from './components/index.js';
 import { buildTuiDebugSnapshot } from './debug/tui-debug-snapshot.js';
+import { buildConversationMessages } from './utils/format.js';
+import { buildCompactionRunningContext, compactChatHistoryWithArchive } from './state/compaction.js';
+import { estimateBuiltInContextWindow } from '../../core/llm/openai-models.js';
 import { credentialModeFromSource, resolveSystemSelectedModel } from '../../core/llm/model-policy.js';
 import { useApprovalFlow } from './hooks/useApprovalFlow.js';
 import { useAgentRun } from './hooks/useAgentRun.js';
@@ -76,9 +79,18 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     updateActiveSession,
   });
 
+  const previousActiveModelRef = useRef(activeModel);
+  const previousSessionIdRef = useRef<string | undefined>(activeSession?.id);
+
   useEffect(() => {
     if (!activeSession) {
       return;
+    }
+
+    const sessionChanged = previousSessionIdRef.current !== activeSession.id;
+    previousSessionIdRef.current = activeSession.id;
+    if (sessionChanged) {
+      previousActiveModelRef.current = activeSession.model ?? runtime.model;
     }
 
     const sessionModel = activeSession.model ?? runtime.model;
@@ -105,6 +117,82 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     actionState,
     workingFrames,
   } = useApprovalFlow(nextLocalId);
+  useEffect(() => {
+    if (!activeSession) {
+      previousActiveModelRef.current = activeModel;
+      previousSessionIdRef.current = undefined;
+      return;
+    }
+
+    const sessionChanged = previousSessionIdRef.current !== activeSession.id;
+    previousSessionIdRef.current = activeSession.id;
+    if (sessionChanged) {
+      previousActiveModelRef.current = activeSession.model ?? activeModel;
+      return;
+    }
+
+    if (activeSession.model !== activeModel) {
+      setSessionModel(activeSession.id, activeModel);
+    }
+
+    const previousModel = previousActiveModelRef.current;
+    previousActiveModelRef.current = activeModel;
+    if (previousModel === activeModel) {
+      return;
+    }
+
+    const previousWindow = estimateBuiltInContextWindow(previousModel);
+    const nextWindow = estimateBuiltInContextWindow(activeModel);
+    if (!nextWindow || (previousWindow !== undefined && nextWindow >= previousWindow)) {
+      return;
+    }
+
+    const sessionId = activeSession.id;
+    const sessionHistory = activeSession.history;
+    const previousContext = activeSession.context;
+    const previousArchives = activeSession.archives;
+
+    setStatus('Compacting');
+    updateSessionById(sessionId, (session) => ({
+      ...session,
+      model: activeModel,
+      context: buildCompactionRunningContext({
+        history: session.history,
+        previous: session.context,
+        archiveCount: session.archives?.length,
+        currentSummaryPath: session.context?.currentSummaryPath,
+      }),
+    }));
+
+    void compactChatHistoryWithArchive({
+      history: sessionHistory,
+      model: activeModel,
+      sessionId,
+      stateRoot: runtime.stateRoot,
+      systemContext: runtime.systemContext,
+      goal: `Model switched from ${previousModel} to ${activeModel}`,
+      summarizer: { credentialSource: runtime.providerCredentialSource },
+    }).then((compacted) => {
+      updateSessionById(sessionId, (session) => ({
+        ...session,
+        model: activeModel,
+        history: compacted.history,
+        context: compacted.context,
+        archives: compacted.archives,
+        messages: buildConversationMessages(compacted.history),
+      }));
+      setStatus('Idle');
+    }).catch(() => {
+      updateSessionById(sessionId, (session) => ({
+        ...session,
+        model: activeModel,
+        context: previousContext,
+        archives: previousArchives,
+      }));
+      setStatus('Idle');
+    });
+  }, [activeModel, activeSession, runtime.providerCredentialSource, runtime.stateRoot, runtime.systemContext, setStatus, setSessionModel, updateSessionById]);
+
   const messages = useMemo(() => activeSession?.messages ?? [], [activeSession?.messages]);
   const sessionTitleModel = resolveSystemSelectedModel({
     purpose: 'session-title',
