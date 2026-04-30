@@ -41,7 +41,6 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
         requestToolApproval: ({ call, tool }) => args.approveToolCall?.(call, tool) ?? Promise.resolve({ approved: false, reason: 'Missing approval handler.' }),
       } : undefined,
     },
-    onCompactionStatus: args.onCompactionStatus,
     abortSignal: args.abortSignal,
     leaseOwner: args.leaseOwner,
   });

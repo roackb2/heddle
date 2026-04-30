@@ -89,7 +89,6 @@ export async function executeTuiOrdinaryTurn(args: {
       compaction: compactionPort,
       approvals: approvalPort,
     },
-    onCompactionStatus: (event) => compactionPort.onFinalCompactionStatus?.(event),
     onAssistantStream: runLoopEvents.onAssistantStream,
     onTraceEvent: runLoopEvents.onTraceEvent,
     shouldStop: () => state.interruptRequestedRef.current,
