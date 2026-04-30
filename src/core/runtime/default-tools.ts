@@ -51,6 +51,7 @@ export function createDefaultAgentTools(options: DefaultAgentToolsOptions): Tool
       model: options.model,
       apiKey: options.apiKey,
       providerCredentialSource: options.providerCredentialSource,
+      credentialStorePath: options.credentialStorePath,
     }),
     createViewImageTool({
       model: options.model,

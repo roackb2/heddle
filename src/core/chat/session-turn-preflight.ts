@@ -1,0 +1,83 @@
+import type { ChatMessage } from '../llm/types.js';
+import { buildConversationMessages } from './conversation-lines.js';
+import { compactChatHistoryWithArchive } from './compaction.js';
+import { acquireSessionLease, getSessionLeaseConflict, type ChatSessionLeaseOwner } from './session-lease.js';
+import { readChatSession, touchSession } from './storage.js';
+import type { ChatArchiveRecord, ChatContextStats, ChatSession } from './types.js';
+
+export type ChatTurnPreflightCompactionStatus = {
+  status: 'running' | 'finished' | 'failed';
+  archivePath?: string;
+  summaryPath?: string;
+  error?: string;
+};
+
+export type PrepareChatSessionTurnArgs = {
+  sessionStoragePath: string;
+  sessionId: string;
+  fallbackHistory: ChatMessage[];
+  prompt: string;
+  model: string;
+  stateRoot: string;
+  systemContext?: string;
+  toolNames: string[];
+  summarizer: Parameters<typeof compactChatHistoryWithArchive>[0]['summarizer'];
+  leaseOwner: ChatSessionLeaseOwner;
+  onCompactionStatus?: (event: ChatTurnPreflightCompactionStatus, sourceHistory: ChatMessage[], leasedSession?: ChatSession) => void;
+};
+
+export type PrepareChatSessionTurnResult =
+  | {
+      ok: true;
+      session?: ChatSession;
+      historyForRun: ChatMessage[];
+      preflightHistory: ChatMessage[];
+      context: ChatContextStats;
+      archives: ChatArchiveRecord[];
+    }
+  | {
+      ok: false;
+      reason: 'lease_conflict';
+      message: string;
+    };
+
+export async function prepareChatSessionTurn(args: PrepareChatSessionTurnArgs): Promise<PrepareChatSessionTurnResult> {
+  const persistedSession = readChatSession(args.sessionStoragePath, args.sessionId, true);
+  const leaseConflict = persistedSession ? getSessionLeaseConflict(persistedSession, args.leaseOwner) : undefined;
+  if (leaseConflict) {
+    return {
+      ok: false,
+      reason: 'lease_conflict',
+      message: leaseConflict,
+    };
+  }
+
+  const leasedSession = persistedSession ? touchSession(acquireSessionLease(persistedSession, args.leaseOwner)) : undefined;
+  const initialHistory = leasedSession?.history ?? args.fallbackHistory;
+  const preflightCompacted = await compactChatHistoryWithArchive({
+    history: initialHistory,
+    model: args.model,
+    sessionId: args.sessionId,
+    stateRoot: args.stateRoot,
+    systemContext: args.systemContext,
+    toolNames: args.toolNames,
+    goal: args.prompt,
+    summarizer: args.summarizer,
+    onStatusChange: (event) => args.onCompactionStatus?.(event, initialHistory, leasedSession),
+  });
+
+  return {
+    ok: true,
+    session: leasedSession ? {
+      ...leasedSession,
+      history: preflightCompacted.history,
+      context: preflightCompacted.context,
+      archives: preflightCompacted.archives,
+      messages: buildConversationMessages(preflightCompacted.history),
+    } : undefined,
+    historyForRun: preflightCompacted.history,
+    preflightHistory: preflightCompacted.history,
+    context: preflightCompacted.context,
+    archives: preflightCompacted.archives,
+  };
+}

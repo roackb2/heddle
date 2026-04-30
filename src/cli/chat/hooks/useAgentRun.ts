@@ -1,49 +1,36 @@
 import { useMemo } from 'react';
-import { readFileSync, writeFileSync } from 'node:fs';
 import type { MutableRefObject } from 'react';
 import type { Logger } from 'pino';
-import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition, ToolResult } from '../../../index.js';
+import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../index.js';
 import {
-  createCyberLoopKinematicsObserver,
   createLogger,
   createLlmAdapter,
   createDefaultAgentTools,
-  runAgentLoop,
 } from '../../../index.js';
-import { runMaintenanceForRecordedCandidates } from '../../../core/memory/maintenance-integration.js';
-import type { CyberLoopKinematicsObserver, CyberLoopObserverAnnotation } from '../../../index.js';
-import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../core/tools/run-shell.js';
-import { previewEditFileInput } from '../../../core/tools/edit-file.js';
+import type { CyberLoopObserverAnnotation } from '../../../index.js';
 import type { EditFilePreview } from '../../../core/tools/edit-file.js';
 import type { PlanItem } from '../../../core/tools/update-plan.js';
-import {
-  appendDirectShellHistory,
-  buildConversationMessages,
-  countAssistantSteps,
-  formatChatFailureMessage,
-  formatEditPreviewHistoryMessage,
-  formatPlanHistoryMessage,
-  formatDirectShellResponse,
-  shouldFallbackToMutate,
-  summarizeTrace,
-  summarizeToolCall,
-  toLiveEvent,
-} from '../utils/format.js';
-import { saveTrace } from '../utils/runtime.js';
 import {
   formatMissingProviderCredentialMessage,
   hasProviderCredentialForModel,
   resolveApiKeyForModel,
   resolveProviderCredentialSourceForModel,
 } from '../../../core/runtime/api-keys.js';
-import { acquireSessionLease, getSessionLeaseConflict, releaseSessionLease } from '../../../core/chat/session-lease.js';
-import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../state/approval-rules.js';
-import { buildCompactionRunningContext, compactChatHistoryWithArchive, estimateChatHistoryTokens } from '../state/compaction.js';
-import { isGenericSessionName, readChatSession, touchSession } from '../state/storage.js';
+import { releaseSessionLease } from '../../../core/chat/session-lease.js';
+import { generateSessionTitle } from '../../../core/chat/session-title.js';
+import { isGenericSessionName } from '../state/storage.js';
 import { normalizeSessionTitle } from '../utils/format.js';
-import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval, TurnSummary } from '../state/types.js';
+import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval } from '../state/types.js';
 import type { ChatRuntimeConfig } from '../utils/runtime.js';
 import { useProjectApprovals } from './useProjectApprovals.js';
+import {
+  beginTuiAgentTurn,
+  finishTuiAgentTurn,
+} from './tui-agent-turn-lifecycle.js';
+import { createTuiChatDriftObserver } from './tui-drift-observer.js';
+import { executeTuiDirectShell } from './tui-direct-shell.js';
+import { applyTuiAgentTurnFailure } from './tui-agent-turn-result.js';
+import { executeTuiOrdinaryTurn } from './tui-ordinary-turn.js';
 
 const PLAN_ITEM_STATUSES = new Set<PlanItem['status']>(['pending', 'in_progress', 'completed']);
 
@@ -115,7 +102,7 @@ type UseAgentRunArgs = {
   drift?: ChatDriftObserverOptions;
 };
 
-type ChatDriftObserverOptions = {
+export type ChatDriftObserverOptions = {
   enabled: boolean;
   onRunStart?: () => void;
   onAnnotation?: (annotation: CyberLoopObserverAnnotation) => void;
@@ -157,7 +144,15 @@ export function useAgentRun(args: UseAgentRunArgs) {
         includePlanTool: true,
       });
     },
-    [activeApiKey, activeCredentialSource, activeModel, runtime.memoryDir, runtime.searchIgnoreDirs, runtime.workspaceRoot],
+    [
+      activeApiKey,
+      activeCredentialSource,
+      activeModel,
+      runtime.credentialStorePath,
+      runtime.memoryDir,
+      runtime.searchIgnoreDirs,
+      runtime.workspaceRoot,
+    ],
   );
   const logger = useMemo<Logger>(
     () =>
@@ -178,22 +173,12 @@ export function useAgentRun(args: UseAgentRunArgs) {
 
     void (async () => {
       try {
-        const result = await titleLlm.chat(
-          [
-            {
-              role: 'system',
-              content:
-                'You name terminal chat sessions. Return only a short 3 to 6 word title in plain text. No quotes, no punctuation, no prefix.',
-            },
-            {
-              role: 'user',
-              content: `User prompt:\n${prompt}\n\nAssistant or tool summary:\n${responseText}\n\nCreate a concise session title.`,
-            },
-          ],
-          [],
-        );
-
-        const title = normalizeSessionTitle(result.content);
+        const title = await generateSessionTitle({
+          llm: titleLlm,
+          prompt,
+          responseText,
+          normalize: normalizeSessionTitle,
+        });
         if (!title) {
           return;
         }
@@ -261,7 +246,6 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     sessionHistory,
     runtime,
     llm,
-    tools,
     logger,
     state,
     updateSessionById,
@@ -282,98 +266,16 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     return undefined;
   }
 
-  state.setError(undefined);
-  state.setIsRunning(true);
-  state.setStatus('Running');
-  state.interruptRequestedRef.current = false;
-  state.setInterruptRequested(false);
-  state.abortControllerRef.current = new AbortController();
-  state.setLiveEvents([]);
-  state.setCurrentEditPreview(undefined);
-  state.setCurrentPlan(undefined);
-  state.setCurrentAssistantText(undefined);
+  const turnAbortController = beginTuiAgentTurn(state);
   updateSessionById(sessionId, (session) => ({ ...session, lastContinuePrompt: prompt }));
-  const appendedEditPreviewIds = new Set<string>();
-  const appendedPlanSteps = new Set<number>();
-  const streamingBuffers = new Map<number, string>();
   drift?.onRunStart?.();
-  let historyForRun = sessionHistory;
   const leaseOwner = {
     ownerKind: 'tui' as const,
     ownerId: `tui-${process.pid}`,
     clientLabel: 'terminal chat',
   };
-  const persistedSession = readChatSession(runtime.sessionCatalogFile, sessionId, true);
-  const leaseConflict = persistedSession ? getSessionLeaseConflict(persistedSession, leaseOwner) : undefined;
-  if (leaseConflict) {
-    state.setError(leaseConflict);
-    state.setStatus('Blocked');
-    state.setIsRunning(false);
-    state.interruptRequestedRef.current = false;
-    state.setInterruptRequested(false);
-    state.abortControllerRef.current = undefined;
-    updateSessionById(sessionId, (sessionToUpdate) => ({
-      ...sessionToUpdate,
-      lastContinuePrompt: undefined,
-      messages: [
-        ...sessionToUpdate.messages,
-        { id: state.nextLocalId(), role: 'assistant', text: leaseConflict },
-      ],
-    }));
-    return undefined;
-  }
-  if (persistedSession) {
-    const leasedSession = touchSession(acquireSessionLease(persistedSession, leaseOwner));
-    historyForRun = leasedSession.history;
-    updateSessionById(sessionId, () => leasedSession);
-  }
-  const toolNames = tools.map((tool) => tool.name);
-  const emitCompactionStatus = (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; error?: string }, sourceHistory: ChatMessage[]) => {
-    if (event.status === 'running') {
-      state.setStatus('Compacting');
-      state.setLiveEvents((current) => [...current, { id: state.nextLocalId(), text: 'Compacting earlier conversation history…' }].slice(-8));
-      updateSessionById(sessionId, (sessionToUpdate) => ({
-        ...sessionToUpdate,
-        history: sourceHistory,
-        context: buildCompactionRunningContext({
-          history: sourceHistory,
-          previous: sessionToUpdate.context,
-          archiveCount: sessionToUpdate.archives?.length,
-          currentSummaryPath: sessionToUpdate.context?.currentSummaryPath,
-          lastArchivePath: event.archivePath,
-        }),
-      }));
-      return;
-    }
-
-    if (event.status === 'failed') {
-      state.setLiveEvents((current) => [...current, { id: state.nextLocalId(), text: `Compaction failed: ${event.error ?? 'unknown error'}` }].slice(-8));
-      return;
-    }
-
-    state.setLiveEvents((current) => [...current, { id: state.nextLocalId(), text: 'Compaction finished.' }].slice(-8));
-  };
-  const preflightCompacted = await compactChatHistoryWithArchive({
-    history: historyForRun,
-    model: llm.info?.model ?? runtime.model,
-    sessionId,
-    stateRoot: runtime.stateRoot,
-    systemContext: runtime.systemContext,
-    toolNames,
-    goal: prompt,
-    summarizer: { credentialSource: runtime.providerCredentialSource },
-    onStatusChange: (event) => emitCompactionStatus(event, historyForRun),
-  });
-  historyForRun = preflightCompacted.history;
-  updateSessionById(sessionId, (sessionToUpdate) => ({
-    ...sessionToUpdate,
-    history: preflightCompacted.history,
-    context: preflightCompacted.context,
-    archives: preflightCompacted.archives,
-    messages: buildConversationMessages(preflightCompacted.history),
-  }));
   state.setStatus('Running');
-  const driftObserver = await createChatDriftObserver({
+  const driftObserver = await createTuiChatDriftObserver({
     prompt,
     referenceAssistantText,
     llm,
@@ -382,276 +284,38 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     options: drift,
   });
 
-  if (displayText) {
-    updateSessionById(sessionId, (session) => ({
-      ...session,
-      messages: [...session.messages, { id: state.nextLocalId(), role: 'user', text: displayText }],
-    }));
-  }
-
   try {
-    const result = await runAgentLoop({
-      goal: prompt,
-      model: llm.info?.model ?? runtime.model,
-      workspaceRoot: runtime.workspaceRoot,
-      memoryDir: runtime.memoryDir,
-      searchIgnoreDirs: runtime.searchIgnoreDirs,
-      llm,
-      tools,
-      includeDefaultTools: false,
-      maxSteps: runtime.maxSteps,
-      logger,
-      history: historyForRun,
-      systemContext: runtime.systemContext,
-      onAssistantStream: (update) => {
-        streamingBuffers.set(update.step, update.text);
-        state.setCurrentAssistantText(update.text || undefined);
-        if (update.done) {
-          streamingBuffers.delete(update.step);
-        }
-      },
-      onTraceEvent: (event) => {
-        if (event.type === 'assistant.turn' && event.content.trim()) {
-          streamingBuffers.delete(event.step);
-          state.setCurrentAssistantText(event.content);
-        }
-
-        if (event.type === 'tool.call' && event.call.tool === 'edit_file') {
-          void previewEditFileInput(event.call.input).then((preview) => {
-            if (!preview || appendedEditPreviewIds.has(event.call.id)) {
-              return;
-            }
-
-            appendedEditPreviewIds.add(event.call.id);
-            updateSessionById(sessionId, (session) => ({
-              ...session,
-              messages: [
-                ...session.messages,
-                {
-                  id: state.nextLocalId(),
-                  role: 'assistant',
-                  text: formatEditPreviewHistoryMessage(preview),
-                },
-              ],
-            }));
-          });
-        }
-
-        if (event.type === 'tool.result') {
-          if (event.tool === 'update_plan') {
-            state.setCurrentPlan(parsePlanStateFromToolResult(event.result.output));
-
-            if (!appendedPlanSteps.has(event.step)) {
-              const renderedPlan = formatPlanHistoryMessage(event.result.output);
-              if (renderedPlan) {
-                appendedPlanSteps.add(event.step);
-                updateSessionById(sessionId, (session) => ({
-                  ...session,
-                  messages: [
-                    ...session.messages,
-                    {
-                      id: state.nextLocalId(),
-                      role: 'assistant',
-                      text: renderedPlan,
-                    },
-                  ],
-                }));
-              }
-            }
-          }
-        }
-
-        const next = toLiveEvent(event);
-        if (!next) {
-          return;
-        }
-
-        state.setLiveEvents((current) => {
-          const previous = current[current.length - 1];
-          if (previous?.text === next) {
-            return current;
-          }
-
-          return [...current, { id: state.nextLocalId(), text: next }].slice(-8);
-        });
-      },
-      onEvent: (event) => {
-        driftObserver?.observer.handleEvent(event);
-      },
-      approveToolCall: async (call, tool) => {
-        if (isProjectApproved(call)) {
-          return {
-            approved: true,
-            reason: 'Approved by saved project rule',
-          };
-        }
-
-        const editPreview = call.tool === 'edit_file' ? await previewEditFileInput(call.input) : undefined;
-
-        return new Promise((resolve) => {
-          const rememberedRule = createProjectApprovalRuleForCall(call);
-          state.setPendingApproval({
-            call,
-            tool,
-            editPreview,
-            rememberForProject: () => rememberProjectApproval(call),
-            rememberLabel: rememberedRule ? describeProjectApprovalRule(rememberedRule) : undefined,
-            resolve,
-          });
-        });
-      },
-      shouldStop: () => state.interruptRequestedRef.current,
-      abortSignal: state.abortControllerRef.current.signal,
+    const result = await executeTuiOrdinaryTurn({
+      prompt,
+      displayText,
+      sessionId,
+      runtime,
+      state,
+      updateSessionById,
+      parsePlanState: parsePlanStateFromToolResult,
+      maybeAutoNameSession,
+      isProjectApproved,
+      rememberProjectApproval,
+      driftObserver,
+      turnAbortSignal: turnAbortController.signal,
+      leaseOwner,
     });
     await driftObserver?.observer.flush();
-    if (driftObserver?.annotations.length) {
-      result.trace.push(...driftObserver.annotations);
-    }
-
-    const compacted = await compactChatHistoryWithArchive({
-      history: result.transcript,
-      model: llm.info?.model ?? runtime.model,
-      sessionId,
-      stateRoot: runtime.stateRoot,
-      usage: result.usage,
-      systemContext: runtime.systemContext,
-      toolNames,
-      goal: prompt,
-      summarizer: { credentialSource: runtime.providerCredentialSource },
-      onStatusChange: (event) => emitCompactionStatus(event, result.transcript),
-    });
-    updateSessionById(sessionId, (sessionToUpdate) => ({
-      ...sessionToUpdate,
-      history: compacted.history,
-      context: compacted.context,
-      archives: compacted.archives,
-    }));
-
-    const traceFile = saveTrace(runtime.traceDir, result.trace);
-    const nextTurn: TurnSummary = {
-      id: state.nextLocalId(),
-      prompt,
-      outcome: result.outcome,
-      summary: result.summary,
-      steps: countAssistantSteps(result.trace),
-      traceFile,
-      events: summarizeTrace(result.trace),
-    };
-    updateSessionById(sessionId, (sessionToUpdate) => ({
-      ...sessionToUpdate,
-      turns: [...sessionToUpdate.turns, nextTurn].slice(-8),
-    }));
-
-    const formattedSummary =
-      result.outcome === 'error' ?
-        formatChatFailureMessage(result.summary, {
-          model: llm.info?.model ?? runtime.model,
-          estimatedHistoryTokens: estimateChatHistoryTokens(historyForRun),
-        })
-      : result.summary;
-
-    state.setCurrentAssistantText(undefined);
-    updateSessionById(sessionId, (sessionToUpdate) => ({
-      ...sessionToUpdate,
-      messages: [
-        ...sessionToUpdate.messages,
-        {
-          id: state.nextLocalId(),
-          role: 'assistant',
-          text: result.outcome === 'done' ? formattedSummary : `Run stopped: ${formattedSummary}`,
-        },
-      ],
-    }));
-
-    const assistantText = formattedSummary;
-    maybeAutoNameSession(sessionId, prompt, assistantText);
-    if (result.outcome === 'error') {
-      state.setError(formattedSummary);
-    }
-    state.setStatus(result.outcome === 'done' ? 'Idle' : `Stopped: ${result.outcome}`);
-    scheduleBackgroundMemoryMaintenance({
-      runtime,
-      llm,
-      sessionId,
-      trace: result.trace,
-      traceFile,
-      updateSessionById,
-      nextLocalId: state.nextLocalId,
-      setLiveEvents: state.setLiveEvents,
-      setIsMemoryUpdating: state.setIsMemoryUpdating,
-    });
     return result;
   } catch (runError) {
     await driftObserver?.observer.flush();
-    const message = runError instanceof Error ? runError.message : String(runError);
-    const formattedMessage = formatChatFailureMessage(message, {
+    await applyTuiAgentTurnFailure({
+      error: runError,
+      promptHistory: sessionHistory,
       model: llm.info?.model ?? runtime.model,
-      estimatedHistoryTokens: estimateChatHistoryTokens(historyForRun),
+      state,
+      sessionId,
+      updateSessionById,
     });
-    state.setError(formattedMessage);
-    state.setStatus('Error');
-    updateSessionById(sessionId, (sessionToUpdate) => ({
-      ...sessionToUpdate,
-      messages: [
-        ...sessionToUpdate.messages,
-        { id: state.nextLocalId(), role: 'assistant', text: `Run failed before a final answer: ${formattedMessage}` },
-      ],
-    }));
     return undefined;
   } finally {
     updateSessionById(sessionId, (sessionToUpdate) => releaseSessionLease(sessionToUpdate, leaseOwner));
-    state.setIsRunning(false);
-    state.interruptRequestedRef.current = false;
-    state.setInterruptRequested(false);
-    state.abortControllerRef.current = undefined;
-  }
-}
-
-async function createChatDriftObserver(args: {
-  prompt: string;
-  referenceAssistantText?: string;
-  llm: LlmAdapter;
-  runtime: ChatRuntimeConfig;
-  logger: Logger;
-  options: ChatDriftObserverOptions | undefined;
-}): Promise<CyberLoopKinematicsObserver | undefined> {
-  const { prompt, referenceAssistantText, llm, runtime, logger, options } = args;
-  if (!options?.enabled) {
-    return undefined;
-  }
-
-  const llmInfo = llm.info;
-  const credentialSource = llmInfo?.provider === 'openai' ?
-    resolveProviderCredentialSourceForModel(llmInfo.model, runtime)
-  : undefined;
-  if (credentialSource?.type === 'oauth') {
-    const message = 'CyberLoop drift detection requires OpenAI Platform API-key mode for embeddings; active auth is OpenAI account sign-in.';
-    logger.debug({ model: llmInfo?.model, credentialSource: credentialSource.type }, message);
-    options.onError?.(new Error(message));
-    return undefined;
-  }
-
-  try {
-    return await createCyberLoopKinematicsObserver({
-      goal: prompt,
-      referenceText: referenceAssistantText,
-      apiKey: llm.info?.provider === 'openai' ? resolveApiKeyForModel(llm.info.model, runtime) : undefined,
-      onAnnotation: options.onAnnotation,
-      onError: (error) => {
-        logger.debug(
-          { error: error instanceof Error ? error.message : String(error) },
-          'CyberLoop drift observer failed',
-        );
-        options.onError?.(error);
-      },
-    });
-  } catch (error) {
-    logger.debug(
-      { error: error instanceof Error ? error.message : String(error) },
-      'CyberLoop drift observer unavailable',
-    );
-    options.onError?.(error);
-    return undefined;
+    finishTuiAgentTurn(state);
   }
 }
 
@@ -742,252 +406,18 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
     return;
   }
 
-  const shellDisplay = `!${command}`;
-  const leaseOwner = {
-    ownerKind: 'tui' as const,
-    ownerId: `tui-${process.pid}`,
-    clientLabel: 'terminal chat',
-  };
-  const persistedSession = readChatSession(runtime.sessionCatalogFile, activeSessionId, true) ?? activeSession;
-  const leaseConflict = getSessionLeaseConflict(persistedSession, leaseOwner);
-  if (leaseConflict) {
-    state.setError(leaseConflict);
-    state.setStatus('Blocked');
-    updateActiveSession((session) => ({
-      ...session,
-      messages: [...session.messages, { id: state.nextLocalId(), role: 'assistant', text: leaseConflict }],
-    }));
-    return;
-  }
-  updateActiveSession(() => touchSession(acquireSessionLease(persistedSession, leaseOwner)));
-  state.setError(undefined);
-  state.setIsRunning(true);
-  state.setStatus('Running');
-  state.interruptRequestedRef.current = false;
-  state.setInterruptRequested(false);
-  state.abortControllerRef.current = new AbortController();
-  state.setLiveEvents([{ id: state.nextLocalId(), text: `running direct shell (${command})` }]);
-  updateActiveSession((session) => ({
-    ...session,
-    messages: [...session.messages, { id: state.nextLocalId(), role: 'user', text: shellDisplay }],
-    lastContinuePrompt: undefined,
-  }));
-
-  try {
-    const inspectCall: ToolCall = {
-      id: `direct-shell-${Date.now()}-inspect`,
-      tool: 'run_shell_inspect',
-      input: { command },
-    };
-    const inspectResult = await runShellCommand(
-      inspectCall.input,
-      {
-        toolName: inspectCall.tool,
-        rules: DEFAULT_INSPECT_RULES,
-        allowUnknown: false,
-      },
-      state.abortControllerRef.current.signal,
-    );
-
-    let chosenCall = inspectCall;
-    let chosenResult: ToolResult = inspectResult;
-
-    if (shouldFallbackToMutate(inspectResult.error)) {
-      const mutateCall: ToolCall = {
-        id: `direct-shell-${Date.now()}-mutate`,
-        tool: 'run_shell_mutate',
-        input: { command },
-      };
-
-      if (runtime.directShellApproval === 'always') {
-        const directShellTool = tools.find((tool) => tool.name === 'run_shell_mutate');
-        if (!directShellTool) {
-          throw new Error('run_shell_mutate tool is not registered');
-        }
-
-        const approval =
-          isProjectApproved(mutateCall) ?
-            { approved: true, reason: 'Approved by saved project rule' }
-          : await new Promise<{ approved: boolean; reason?: string }>((resolve) => {
-              const rememberedRule = createProjectApprovalRuleForCall(mutateCall);
-              state.setPendingApproval({
-                call: mutateCall,
-                tool: directShellTool,
-                rememberForProject: () => rememberProjectApproval(mutateCall),
-                rememberLabel: rememberedRule ? describeProjectApprovalRule(rememberedRule) : undefined,
-                resolve,
-              });
-            });
-
-        if (!approval.approved) {
-          const denialMessage = approval.reason ? `Command denied.\n${approval.reason}` : 'Command denied.';
-          updateActiveSession((session) => ({
-            ...session,
-            messages: [...session.messages, { id: state.nextLocalId(), role: 'assistant', text: denialMessage }],
-          }));
-          state.setLiveEvents([
-            {
-              id: state.nextLocalId(),
-              text: `approval denied for ${summarizeToolCall(mutateCall.tool, mutateCall.input)}`,
-            },
-          ]);
-          state.setStatus('Idle');
-          return;
-        }
-      }
-
-      chosenCall = mutateCall;
-      chosenResult = await runShellCommand(
-        mutateCall.input,
-        {
-          toolName: mutateCall.tool,
-          rules: DEFAULT_MUTATE_RULES,
-          allowUnknown: true,
-        },
-        state.abortControllerRef.current.signal,
-      );
-    }
-
-    const responseText = formatDirectShellResponse(chosenCall.tool, command, chosenResult);
-    const directShellHistory = appendDirectShellHistory(activeSession.history, shellDisplay, chosenCall.tool, chosenResult);
-    const compacted = await compactChatHistoryWithArchive({
-      history: directShellHistory,
-      model,
-      sessionId: activeSessionId,
-      stateRoot: runtime.stateRoot,
-      systemContext: runtime.systemContext,
-      toolNames: tools.map((tool) => tool.name),
-      goal: shellDisplay,
-      summarizer: { credentialSource: runtime.providerCredentialSource },
-      onStatusChange: (event) => {
-        if (event.status === 'running') {
-          state.setStatus('Compacting');
-          state.setLiveEvents((current) => [...current, { id: state.nextLocalId(), text: 'Compacting earlier conversation history…' }].slice(-8));
-          updateActiveSession((session) => ({
-            ...session,
-            context: buildCompactionRunningContext({
-              history: directShellHistory,
-              previous: session.context,
-              archiveCount: session.archives?.length,
-              currentSummaryPath: session.context?.currentSummaryPath,
-              lastArchivePath: event.archivePath,
-            }),
-          }));
-        } else if (event.status === 'failed') {
-          state.setLiveEvents((current) => [...current, { id: state.nextLocalId(), text: `Compaction failed: ${event.error ?? 'unknown error'}` }].slice(-8));
-        } else {
-          state.setLiveEvents((current) => [...current, { id: state.nextLocalId(), text: 'Compaction finished.' }].slice(-8));
-        }
-      },
-    });
-    updateActiveSession((session) => ({
-      ...session,
-      history: compacted.history,
-      context: compacted.context,
-      archives: compacted.archives,
-      messages: buildConversationMessages(compacted.history),
-    }));
-    state.setLiveEvents([
-      {
-        id: state.nextLocalId(),
-        text:
-          chosenResult.ok ?
-            `${summarizeToolCall(chosenCall.tool, chosenCall.input)} completed`
-          : `${summarizeToolCall(chosenCall.tool, chosenCall.input)} failed`,
-      },
-    ]);
-    state.setStatus(chosenResult.ok ? 'Idle' : 'Stopped: error');
-    if (!chosenResult.ok && chosenResult.error) {
-      state.setError(chosenResult.error);
-    }
-    maybeAutoNameSession(activeSessionId, shellDisplay, responseText);
-  } catch (shellError) {
-    const message = shellError instanceof Error ? shellError.message : String(shellError);
-    state.setError(message);
-    state.setStatus('Error');
-    updateActiveSession((session) => ({
-      ...session,
-      messages: [
-        ...session.messages,
-        { id: state.nextLocalId(), role: 'assistant', text: `Direct shell execution failed:\n${message}` },
-      ],
-    }));
-  } finally {
-    updateActiveSession((session) => releaseSessionLease(session, leaseOwner));
-    state.setPendingApproval(undefined);
-    state.setApprovalChoice('approve');
-    state.interruptRequestedRef.current = false;
-    state.setInterruptRequested(false);
-    state.abortControllerRef.current = undefined;
-    state.setIsRunning(false);
-  }
-}
-
-function scheduleBackgroundMemoryMaintenance(args: {
-  runtime: ChatRuntimeConfig;
-  llm: LlmAdapter;
-  sessionId: string;
-  trace: RunResult['trace'];
-  traceFile: string;
-  updateSessionById: SessionUpdater;
-  nextLocalId: () => string;
-  setLiveEvents: ActionState['setLiveEvents'];
-  setIsMemoryUpdating: ActionState['setIsMemoryUpdating'];
-}) {
-  void (async () => {
-    const maintenance = await runMaintenanceForRecordedCandidates({
-      memoryRoot: args.runtime.memoryDir,
-      llm: args.llm,
-      source: `terminal chat session ${args.sessionId}`,
-      trace: args.trace,
-      maxSteps: 20,
-      onTraceEvent: (event) => {
-        if (event.type === 'memory.maintenance_started') {
-          args.setIsMemoryUpdating(true);
-        }
-        const next = toLiveEvent(event);
-        if (!next) {
-          return;
-        }
-        args.setLiveEvents((current) => [...current, { id: args.nextLocalId(), text: next }].slice(-8));
-      },
-    });
-    if (maintenance.events.length === 0) {
-      return;
-    }
-
-    const currentTrace = readTraceEvents(args.traceFile);
-    const nextTrace = [...currentTrace, ...maintenance.events];
-    writeFileSync(args.traceFile, `${JSON.stringify(nextTrace, null, 2)}\n`, 'utf8');
-    args.updateSessionById(args.sessionId, (session) => touchSession({
-      ...session,
-      turns: session.turns.map((turn, index) => (
-        index === session.turns.length - 1 ?
-          {
-            ...turn,
-            events: summarizeTrace(nextTrace),
-          }
-        : turn
-      )),
-    }));
-    args.setIsMemoryUpdating(false);
-  })().catch((error) => {
-    args.setIsMemoryUpdating(false);
-    args.setLiveEvents((current) => [
-      ...current,
-      {
-        id: args.nextLocalId(),
-        text: `Memory maintenance failed: ${error instanceof Error ? error.message : String(error)}`,
-      },
-    ].slice(-8));
+  await executeTuiDirectShell({
+    command,
+    shellDisplay: `!${command}`,
+    model,
+    activeSessionId,
+    activeSession,
+    runtime,
+    tools,
+    state,
+    updateActiveSession,
+    maybeAutoNameSession,
+    isProjectApproved,
+    rememberProjectApproval,
   });
-}
-
-function readTraceEvents(path: string): RunResult['trace'] {
-  try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
-    return Array.isArray(parsed) ? parsed as RunResult['trace'] : [];
-  } catch {
-    return [];
-  }
 }

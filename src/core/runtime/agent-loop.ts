@@ -12,6 +12,7 @@ import {
   resolveProviderCredentialSourceForModel,
   type ProviderCredentialSource,
 } from './api-keys.js';
+import { resolveProviderCredentialStorePath } from '../auth/provider-credentials.js';
 import { createFinishedAgentLoopState, generateRunId, getHistoryFromAgentLoopCheckpoint, getHistoryFromAgentLoopState } from './events.js';
 import type { AgentLoopCheckpoint, AgentLoopEvent, AgentLoopState } from './events.js';
 
@@ -56,13 +57,18 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
   const provider = inferProviderFromModel(model);
   const workspaceRoot = resolve(options.workspaceRoot ?? process.cwd());
   const apiKey = options.apiKey ?? resolveApiKeyForModel(model);
+  const credentialStorePath = options.stateDir
+    ? resolveProviderCredentialStorePath(resolve(workspaceRoot, options.stateDir))
+    : undefined;
   const providerCredentialSource = resolveProviderCredentialSourceForModel(model, {
     apiKey,
     apiKeyProvider: options.apiKey ? 'explicit' : apiKey ? provider : undefined,
+    credentialStorePath,
   });
   const llm = options.llm ?? await createLoopLlmAdapter({
     model,
     apiKey,
+    credentialStorePath,
   });
   const logger = options.logger ?? createLogger({ pretty: false, level: 'info', console: false });
   const tools = await resolveTools({
@@ -248,6 +254,9 @@ async function resolveTools(
       model: options.model,
       apiKey: options.apiKey,
       providerCredentialSource: options.providerCredentialSource,
+      credentialStorePath: options.stateDir
+        ? resolveProviderCredentialStorePath(resolve(options.workspaceRoot, options.stateDir))
+        : undefined,
       workspaceRoot: options.workspaceRoot,
       stateDir: options.stateDir,
       memoryDir: options.memoryDir,

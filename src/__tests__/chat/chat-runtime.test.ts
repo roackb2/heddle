@@ -161,6 +161,16 @@ describe('resolveChatRuntimeConfig', () => {
     expect(runtime.systemContext).toContain('## Workspace Memory Catalog');
     expect(runtime.systemContext).toContain('- Read current-state first.');
   });
+
+  it('resolves the default credential store to an auth file path', () => {
+    const runtime = resolveChatRuntimeConfig({
+      workspaceRoot: mkdtempSync(join(tmpdir(), 'heddle-chat-credential-store-')),
+      model: 'gpt-5.4',
+    });
+
+    expect(runtime.credentialStorePath).toMatch(/auth\.json$/);
+    expect(runtime.credentialStorePath).not.toMatch(/\.heddle$/);
+  });
 });
 
 describe('executeAgentTurn final message persistence', () => {
@@ -225,10 +235,16 @@ describe('executeAgentTurn final message persistence', () => {
     };
   }
 
-  async function runTurn(outcome: RunResult['outcome'], summary: string) {
+  async function runTurn(
+    outcome: RunResult['outcome'],
+    summary: string,
+    options?: { prompt?: string; displayText?: string },
+  ) {
     const runtime = createRuntime();
     const state = createState();
     let session = createSession();
+    const prompt = options?.prompt ?? 'test prompt';
+    const displayText = options?.displayText ?? 'test prompt';
 
     const llm: LlmAdapter = {
       info: {
@@ -271,7 +287,7 @@ describe('executeAgentTurn final message persistence', () => {
         },
       ],
       transcript: [
-        { role: 'user', content: 'test prompt' },
+        { role: 'user', content: prompt },
         { role: 'assistant', content: summary },
       ],
     };
@@ -279,8 +295,8 @@ describe('executeAgentTurn final message persistence', () => {
     const runAgentLoopSpy = vi.spyOn(await import('../../index.js'), 'runAgentLoop').mockResolvedValue(result as never);
 
     await executeAgentTurn({
-      prompt: 'test prompt',
-      displayText: 'test prompt',
+      prompt,
+      displayText,
       sessionId: session.id,
       sessionHistory: session.history,
       runtime,
@@ -294,8 +310,9 @@ describe('executeAgentTurn final message persistence', () => {
       rememberProjectApproval: vi.fn(),
     });
 
+    const runAgentLoopCall = runAgentLoopSpy.mock.calls.at(-1)?.[0];
     runAgentLoopSpy.mockRestore();
-    return { session, state };
+    return { session, state, runAgentLoopCall };
   }
 
   it('persists one final assistant summary for done runs', async () => {
@@ -313,5 +330,29 @@ describe('executeAgentTurn final message persistence', () => {
       'Run stopped: Stopped after approval denied.',
     ]);
     expect(session.messages.filter((message) => message.text === 'Run stopped: Stopped after approval denied.')).toHaveLength(1);
+  });
+
+  it('uses the prepared prompt for execution but preserves display text in TUI messages', async () => {
+    const { session, runAgentLoopCall } = await runTurn('done', 'Done.', {
+      prompt: 'inspect file with expanded mention contents',
+      displayText: 'inspect @README.md',
+    });
+
+    expect(runAgentLoopCall?.goal).toBe('inspect file with expanded mention contents');
+    expect(session.messages.map((message) => message.text)).toEqual(['inspect @README.md', 'Done.']);
+    expect(session.lastContinuePrompt).toBe('inspect file with expanded mention contents');
+  });
+
+  it('resets visible run state at TUI turn start and releases it after completion', async () => {
+    const { state } = await runTurn('done', 'All set.');
+
+    expect(state.setError).toHaveBeenCalledWith(undefined);
+    expect(state.setIsRunning).toHaveBeenNthCalledWith(1, true);
+    expect(state.setStatus).toHaveBeenCalledWith('Running');
+    expect(state.setLiveEvents).toHaveBeenCalledWith([]);
+    expect(state.setCurrentEditPreview).toHaveBeenCalledWith(undefined);
+    expect(state.setCurrentPlan).toHaveBeenCalledWith(undefined);
+    expect(state.setCurrentAssistantText).toHaveBeenCalledWith(undefined);
+    expect(state.setIsRunning).toHaveBeenLastCalledWith(false);
   });
 });

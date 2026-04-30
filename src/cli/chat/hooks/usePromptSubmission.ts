@@ -229,6 +229,7 @@ export function usePromptSubmission({
     runtime.workspaceRoot,
     runtime.stateRoot,
     runtime.credentialStorePath,
+    runtime.providerCredentialSource,
     preparePromptWithMentions,
     executeTurn,
     executeDirectShellCommand,
