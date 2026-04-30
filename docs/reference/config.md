@@ -6,7 +6,7 @@ Heddle can store project defaults in `heddle.config.json` so you do not have to 
 
 ```json
 {
-  "model": "gpt-5.1-codex",
+  "model": "gpt-5.4",
   "maxSteps": 100,
   "stateDir": ".heddle",
   "directShellApproval": "never",

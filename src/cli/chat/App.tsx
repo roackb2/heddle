@@ -84,25 +84,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   });
 
   const previousActiveModelRef = useRef(activeModel);
-  const previousModelSyncSessionIdRef = useRef<string | undefined>(activeSession?.id);
   const previousModelWriteSessionIdRef = useRef<string | undefined>(activeSession?.id);
-
-  useEffect(() => {
-    if (!activeSession) {
-      return;
-    }
-
-    const sessionChanged = previousModelSyncSessionIdRef.current !== activeSession.id;
-    previousModelSyncSessionIdRef.current = activeSession.id;
-    if (sessionChanged) {
-      previousActiveModelRef.current = activeSession.model ?? runtime.model;
-    }
-
-    const sessionModel = activeSession.model ?? runtime.model;
-    if (sessionModel !== activeModel) {
-      setActiveModel(sessionModel);
-    }
-  }, [activeModel, activeSession, runtime.model]);
 
   const {
     status,
@@ -125,7 +107,6 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   useEffect(() => {
     if (!activeSession) {
       previousActiveModelRef.current = activeModel;
-      previousModelSyncSessionIdRef.current = undefined;
       previousModelWriteSessionIdRef.current = undefined;
       return;
     }
@@ -133,7 +114,10 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     const sessionChanged = previousModelWriteSessionIdRef.current !== activeSession.id;
     previousModelWriteSessionIdRef.current = activeSession.id;
     if (sessionChanged) {
-      previousActiveModelRef.current = activeSession.model ?? activeModel;
+      previousActiveModelRef.current = activeModel;
+      if (activeSession.model !== activeModel) {
+        setSessionModel(activeSession.id, activeModel);
+      }
       return;
     }
 

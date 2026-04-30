@@ -67,7 +67,7 @@ type ResolvedCliOptions = {
   forceOwnerConflict: boolean;
 };
 
-const DEFAULT_MODEL_FOR_CONFIG = 'gpt-5.1-codex';
+const DEFAULT_MODEL_FOR_CONFIG = 'gpt-5.4';
 const CLI_VERSION = readCliVersion();
 
 async function main() {
