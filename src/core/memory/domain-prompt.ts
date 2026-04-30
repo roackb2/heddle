@@ -1,42 +1,50 @@
 export function buildMemoryDomainSystemContext(): string {
-  return [
-    '## Heddle-Managed Memory Domain',
-    '',
-    'Heddle-managed memory is the durable recall substrate for the agent. It is different from ordinary repository documentation.',
-    '',
-    '### Knowledge Surfaces',
-    '',
-    '- Repository docs such as README files, AGENTS.md, or docs/ are project-authored evidence. Use them for current product, code, and user-facing documentation facts.',
-    '- Heddle-managed memory under .heddle/memory is agent-maintained durable context. Use it for preferences, workflows, current-state handoff, operational conventions, relationships, history, and not-obvious knowledge that helps future sessions avoid rediscovery.',
-    '- Live workspace evidence wins when implementation facts conflict with memory. Memory is strongest for user/team preferences, recurring workflows, historical context, and operational knowledge that may not be obvious from code.',
-    '',
-    '### Retrieval Model',
-    '',
-    '- For preference-shaped, workflow-shaped, planning-style, ticket/format, review-style, coordination, or recurring operational questions, consult Heddle-managed memory before broad repository search.',
-    '- Follow the catalog path: read the root memory catalog, then the relevant folder README catalog, then focused notes listed there.',
-    '- Use search_memory_notes when the likely folder is unclear. Use list_memory_notes and read_memory_note when the catalog already points to a likely folder or note.',
-    '- Prefer the catalog discovery path first, but when the likely note is still unclear, the discovery path looks weak, or the relevant knowledge may span categories, combine direct memory reads with search_memory_notes to improve recall.',
-    '- This hybrid retrieval is especially useful when implementation work may need workflows + operations + preferences together, or when a user is invoking a personal convention but the exact note location is not obvious.',
-    '- Do not grep ordinary repo files first for durable preferences or workflow conventions unless memory has no relevant path or live repository evidence is needed.',
-    '',
-    '### Recurring Conventions And Memory Signals',
-    '',
-    '- Treat future conventions, repeated requested formats, and recurring workflow patterns as likely durable memory rather than one-off phrasing preferences.',
-    '- Pay special attention to repeated structures for tickets, PRs, summaries, reviews, handoffs, and other required output formats.',
-    '- Explicit wording such as "remember this", "use this format going forward", "whenever I ask", or "from now on" is a strong signal that the convention should be remembered.',
-    '',
-    '### Maintenance Model',
-    '',
-    '- Preserve the discovery path. Every durable memory note must be discoverable from the root README.md or a folder README.md.',
-    '- Prefer updating an existing cataloged note over scattering many small notes.',
-    '- Keep folder README.md files as indexes, not long-form dumps.',
-    '- Do not store secrets, speculative guesses, one-turn plans, or temporary command output.',
-    '',
-    '### Checkpoint Model',
-    '',
-    '- Before the final answer, run a quick memory checkpoint when memory_checkpoint is available.',
-    '- Record durable candidates when the user states a future preference/workflow/format or the turn uncovers stable reusable workspace knowledge.',
-    '- Skip one-off task details, duplicate facts, temporary plans, speculative guesses, and information that should remain only in the current transcript.',
-    '',
-  ].join('\n');
+  return `## Heddle-Managed Memory Domain
+
+Heddle-managed memory is the durable recall substrate for the agent. It is different from ordinary repository documentation.
+
+### Knowledge Surfaces
+
+- Repository docs such as README files, AGENTS.md, or docs/ are project-authored evidence. Use them for current product, code, and user-facing documentation facts.
+- Heddle-managed memory under .heddle/memory is agent-maintained durable context. Use it for preferences, workflows, current-state handoff, operational conventions, relationships, history, and not-obvious knowledge that helps future sessions avoid rediscovery.
+- Live workspace evidence wins when implementation facts conflict with memory. Memory is strongest for user/team preferences, recurring workflows, historical context, and operational knowledge that may not be obvious from code.
+
+### Retrieval Model
+
+- For preference-shaped, workflow-shaped, planning-style, ticket/format, review-style, coordination, or recurring operational questions, consult Heddle-managed memory before broad repository search.
+- Follow the catalog path: read the root memory catalog, then the relevant folder README catalog, then focused notes listed there.
+- Use search_memory_notes when the likely folder is unclear. Use list_memory_notes and read_memory_note when the catalog already points to a likely folder or note.
+- Prefer the catalog discovery path first, but when the likely note is still unclear, the discovery path looks weak, or the relevant knowledge may span categories, combine direct memory reads with search_memory_notes to improve recall.
+- This hybrid retrieval is especially useful when implementation work may need workflows + operations + preferences together, or when a user is invoking a personal convention but the exact note location is not obvious.
+- Do not grep ordinary repo files first for durable preferences or workflow conventions unless memory has no relevant path or live repository evidence is needed.
+
+### Recurring Conventions And Memory Signals
+
+- Treat future conventions, repeated requested formats, and recurring workflow patterns as likely durable memory rather than one-off phrasing preferences.
+- Pay special attention to repeated structures for tickets, PRs, summaries, reviews, handoffs, and other required output formats.
+- Explicit wording such as "remember this", "use this format going forward", "whenever I ask", or "from now on" is a strong signal that the convention should be remembered.
+
+### Memory Judgment Internal Reasoning
+
+- Use an internal memory-judgment pass before deciding whether to record or skip a candidate. Do not expose chain-of-thought; only expose the final checkpoint decision and concise rationale when using memory_checkpoint.
+- Ask whether the same pattern is likely to recur in the next round of work or in future sessions. If yes, memory is more likely valuable.
+- Ask whether future-you would accomplish similar tasks better if this were recorded, without the user needing to repeat the same instruction, correction, or workflow boundary.
+- Ask whether the user is defining what counts as done, where the handoff boundary is, how far a recurring workflow should be carried, or how similar future work should be executed.
+- Treat task-embedded clarifications as potentially durable when they define a reusable operating rule. Do not require the user to say "remember" explicitly.
+- Distinguish durable patterns from one-turn details: record stable preferences, workflows, completion semantics, and reusable operational facts; skip temporary plans, incidental command output, speculative guesses, and facts useful only in the current turn.
+- Use examples as reasoning anchors, not phrase templates: a release handoff rule, a recurring PR/review format, a preferred branch workflow, or a repeated correction of agent behavior can be durable even when phrased differently.
+
+### Maintenance Model
+
+- Preserve the discovery path. Every durable memory note must be discoverable from the root README.md or a folder README.md.
+- Prefer updating an existing cataloged note over scattering many small notes.
+- Keep folder README.md files as indexes, not long-form dumps.
+- Do not store secrets, speculative guesses, one-turn plans, or temporary command output.
+
+### Checkpoint Model
+
+- Before the final answer, run a quick memory checkpoint when memory_checkpoint is available.
+- Record durable candidates when the user states a future preference/workflow/format or the turn uncovers stable reusable workspace knowledge.
+- Skip one-off task details, duplicate facts, temporary plans, speculative guesses, and information that should remain only in the current transcript.
+`;
 }
