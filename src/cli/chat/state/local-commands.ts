@@ -345,7 +345,7 @@ async function handleHeartbeatContinue(args: LocalCommandArgs, value: string): P
 
 function handleSessionNew(args: LocalCommandArgs, value: string): LocalCommandResult {
   const session = args.createSession(value || undefined);
-  return messageResult(`Created and switched to ${session.id} (${session.name}).`);
+  return messageResult(`Created and switched to ${session.id} (${session.name}).`, session.id);
 }
 
 async function listHeartbeatTasksMessage(args: LocalCommandArgs): Promise<LocalCommandResult> {
@@ -485,7 +485,7 @@ function handleSessionSwitch(args: LocalCommandArgs, value: string): LocalComman
   }
 
   args.switchSession(session.id);
-  return messageResult(`Switched to ${session.id} (${session.name}).\n${summarizeSession(session)}`);
+  return messageResult(`Switched to ${session.id} (${session.name}).\n${summarizeSession(session)}`, session.id);
 }
 
 function handleSessionContinue(args: LocalCommandArgs, value: string): LocalCommandResult {
@@ -551,11 +551,12 @@ function formatErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function messageResult(message: string): LocalCommandResult {
+function messageResult(message: string, sessionId?: string): LocalCommandResult {
   return {
     handled: true,
     kind: 'message',
     message,
+    sessionId,
   };
 }
 

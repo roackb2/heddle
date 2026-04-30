@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChatSession } from '../state/types.js';
 import {
   createChatSession,
@@ -19,7 +19,10 @@ type UseChatSessionsArgs = {
 };
 
 export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultModel, workspaceRoot, stateRoot }: UseChatSessionsArgs) {
-  const workspaceId = resolveWorkspaceContext({ workspaceRoot, stateRoot }).activeWorkspace.id;
+  const workspaceId = useMemo(
+    () => resolveWorkspaceContext({ workspaceRoot, stateRoot }).activeWorkspace.id,
+    [workspaceRoot, stateRoot],
+  );
   const initialSessionsRef = useRef<ChatSession[] | undefined>(undefined);
   if (!initialSessionsRef.current) {
     initialSessionsRef.current = loadChatSessions(sessionCatalogFile, apiKeyPresent).map((session) => ({
@@ -35,13 +38,6 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
   useEffect(() => {
     saveChatSessions(sessionCatalogFile, sessions);
   }, [sessionCatalogFile, sessions]);
-
-  const setSessionModel = (sessionId: string, model: string) => {
-    updateSessionById(sessionId, (session) => ({
-      ...session,
-      model,
-    }));
-  };
 
   useEffect(() => {
     if (!sessions.some((session) => session.id === activeSessionId) && sessions[0]) {
@@ -89,33 +85,46 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
       ]
     : ['No saved sessions yet.'];
 
-  const updateSessionById = (sessionId: string, updater: (session: ChatSession) => ChatSession) => {
-    setSessions((current) => current.map((session) => (session.id === sessionId ? touchSession(updater(session)) : session)));
-  };
+  const updateSessionById = useCallback((sessionId: string, updater: (session: ChatSession) => ChatSession) => {
+    setSessions((current) => current.map((session) => {
+      if (session.id !== sessionId) {
+        return session;
+      }
 
-  const updateActiveSession = (updater: (session: ChatSession) => ChatSession) => {
+      const nextSession = updater(session);
+      return nextSession === session ? session : touchSession(nextSession);
+    }));
+  }, []);
+
+  const updateActiveSession = useCallback((updater: (session: ChatSession) => ChatSession) => {
     updateSessionById(activeSessionId, updater);
-  };
+  }, [activeSessionId, updateSessionById]);
 
-  const createSession = (name?: string) => {
+  const setSessionModel = useCallback((sessionId: string, model: string) => {
+    updateSessionById(sessionId, (session) => (
+      session.model === model ? session : { ...session, model }
+    ));
+  }, [updateSessionById]);
+
+  const createSession = useCallback((name?: string, model = defaultModel) => {
     const id = `session-${Date.now()}`;
     const nextSession = createChatSession({
       id,
       name: name?.trim() || `Session ${nextSessionNumberRef.current++}`,
       apiKeyPresent,
-      model: defaultModel,
+      model,
       workspaceId,
     });
     setSessions((current) => [touchSession(nextSession), ...current].slice(0, 24));
     setActiveSessionId(id);
     return nextSession;
-  };
+  }, [apiKeyPresent, defaultModel, workspaceId]);
 
-  const renameSession = (name: string) => {
+  const renameSession = useCallback((name: string) => {
     updateActiveSession((session) => ({ ...session, name }));
-  };
+  }, [updateActiveSession]);
 
-  const removeSession = (id: string) => {
+  const removeSession = useCallback((id: string) => {
     const removedActive = id === activeSessionId;
     const nextActiveSessionId = sessions.find((session) => session.id !== id)?.id ?? 'session-1';
 
@@ -141,7 +150,7 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
     }
 
     return removedActive;
-  };
+  }, [activeSessionId, apiKeyPresent, defaultModel, sessions, workspaceId]);
 
   return {
     sessions,

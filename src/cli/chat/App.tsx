@@ -57,7 +57,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     updateSessionById,
     updateActiveSession,
     setSessionModel,
-    createSession,
+    createSession: createSessionWithDefaultModel,
     renameSession,
     removeSession,
   } = useChatSessions({
@@ -67,6 +67,10 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     workspaceRoot: runtime.workspaceRoot,
     stateRoot: runtime.stateRoot,
   });
+  const createSession = useCallback((name?: string) => createSessionWithDefaultModel(name, activeModel), [
+    activeModel,
+    createSessionWithDefaultModel,
+  ]);
   const pickers = useChatPickers({
     draft,
     recentSessions,
@@ -80,15 +84,16 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   });
 
   const previousActiveModelRef = useRef(activeModel);
-  const previousSessionIdRef = useRef<string | undefined>(activeSession?.id);
+  const previousModelSyncSessionIdRef = useRef<string | undefined>(activeSession?.id);
+  const previousModelWriteSessionIdRef = useRef<string | undefined>(activeSession?.id);
 
   useEffect(() => {
     if (!activeSession) {
       return;
     }
 
-    const sessionChanged = previousSessionIdRef.current !== activeSession.id;
-    previousSessionIdRef.current = activeSession.id;
+    const sessionChanged = previousModelSyncSessionIdRef.current !== activeSession.id;
+    previousModelSyncSessionIdRef.current = activeSession.id;
     if (sessionChanged) {
       previousActiveModelRef.current = activeSession.model ?? runtime.model;
     }
@@ -120,12 +125,13 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   useEffect(() => {
     if (!activeSession) {
       previousActiveModelRef.current = activeModel;
-      previousSessionIdRef.current = undefined;
+      previousModelSyncSessionIdRef.current = undefined;
+      previousModelWriteSessionIdRef.current = undefined;
       return;
     }
 
-    const sessionChanged = previousSessionIdRef.current !== activeSession.id;
-    previousSessionIdRef.current = activeSession.id;
+    const sessionChanged = previousModelWriteSessionIdRef.current !== activeSession.id;
+    previousModelWriteSessionIdRef.current = activeSession.id;
     if (sessionChanged) {
       previousActiveModelRef.current = activeSession.model ?? activeModel;
       return;
@@ -311,18 +317,18 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     replaceDraft(completed);
     return true;
   }, [pickers, draftCursor, draft, activeSession, activeSessionId, sessions, replaceDraft]);
-  const switchSession = (id: string) => {
+  const switchSession = useCallback((id: string) => {
     setActiveSessionId(id);
     clearDraft();
     resetRunState({ abortInFlight: true });
-  };
+  }, [clearDraft, resetRunState, setActiveSessionId]);
 
-  const applyActiveModel = (model: string) => {
+  const applyActiveModel = useCallback((model: string) => {
     setActiveModel(model);
     if (activeSession && activeSession.model !== model) {
       setSessionModel(activeSession.id, model);
     }
-  };
+  }, [activeSession, setSessionModel]);
 
   const closeSession = (id: string) => {
     const removedActive = removeSession(id);

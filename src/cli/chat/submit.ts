@@ -145,7 +145,11 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
   }
 
   if (commandResult.kind === 'message') {
-    appendAssistantMessage(args.updateActiveSession, args.nextLocalId, commandResult.message);
+    if (commandResult.sessionId) {
+      appendAssistantMessageToSession(args.updateSessionById, commandResult.sessionId, args.nextLocalId, commandResult.message);
+    } else {
+      appendAssistantMessage(args.updateActiveSession, args.nextLocalId, commandResult.message);
+    }
     args.setStatus('Idle');
     return;
   }
@@ -203,6 +207,18 @@ function appendAssistantMessage(
   text: string,
 ) {
   updateSession((session) => ({
+    ...session,
+    messages: [...session.messages, createAssistantMessage(nextLocalId, text)],
+  }));
+}
+
+function appendAssistantMessageToSession(
+  updateSessionById: SessionUpdater,
+  sessionId: string,
+  nextLocalId: () => string,
+  text: string,
+) {
+  updateSessionById(sessionId, (session) => ({
     ...session,
     messages: [...session.messages, createAssistantMessage(nextLocalId, text)],
   }));

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useInput } from 'ink';
 import type { ActionState } from './useAgentRun.js';
 import type { ApprovalChoice, LiveEvent, PendingApproval } from '../state/types.js';
@@ -104,7 +104,7 @@ export function useApprovalFlow(nextLocalId: () => string) {
     return () => clearInterval(timer);
   }, [isRunning]);
 
-  const resetRunState = (options?: { abortInFlight?: boolean; clearError?: boolean }) => {
+  const resetRunState = useCallback((options?: { abortInFlight?: boolean; clearError?: boolean }) => {
     if (options?.abortInFlight) {
       abortControllerRef.current?.abort();
     }
@@ -123,7 +123,7 @@ export function useApprovalFlow(nextLocalId: () => string) {
     interruptRequestedRef.current = false;
     abortControllerRef.current = undefined;
     setIsRunning(false);
-  };
+  }, []);
 
   const actionState = useMemo<ActionState>(
     () => ({

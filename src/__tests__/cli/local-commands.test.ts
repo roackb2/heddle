@@ -124,7 +124,25 @@ describe('runLocalCommand', () => {
     expect(result).toEqual({
       handled: true,
       kind: 'message',
+      sessionId: 'session-b',
       message: 'Switched to session-b (B).\n0 turns • no turns yet',
+    });
+  });
+
+  it('returns the created session id for /session new messages', async () => {
+    const session = { id: 'session-new', name: 'New Session', history: [], messages: [], turns: [], createdAt: '2024-01-03', updatedAt: '2024-01-03' };
+    const createSession = vi.fn(() => session);
+    const result = await runLocalCommand(createCommandArgs({
+      prompt: '/session new New Session',
+      createSession,
+    }));
+
+    expect(createSession).toHaveBeenCalledWith('New Session');
+    expect(result).toEqual({
+      handled: true,
+      kind: 'message',
+      sessionId: 'session-new',
+      message: 'Created and switched to session-new (New Session).',
     });
   });
 

@@ -96,6 +96,6 @@ export type ApprovalChoice = 'approve' | 'allow_project' | 'deny';
 
 export type LocalCommandResult =
   | { handled: false }
-  | { handled: true; kind: 'message'; message: string }
+  | { handled: true; kind: 'message'; message: string; sessionId?: string }
   | { handled: true; kind: 'continue'; sessionId?: string; message?: string }
   | { handled: true; kind: 'execute'; prompt: string; displayText: string; message?: string };
