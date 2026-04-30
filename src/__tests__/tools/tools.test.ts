@@ -8,7 +8,6 @@ import { createReadFileTool, readFileTool } from '../../core/tools/read-file.js'
 import { createEditFileTool, editFileTool, previewEditFileInput } from '../../core/tools/edit-file.js';
 import { createDeleteFileTool, deleteFileTool } from '../../core/tools/delete-file.js';
 import { createMoveFileTool, moveFileTool } from '../../core/tools/move-file.js';
-import { reportStateTool } from '../../core/tools/report-state.js';
 import { updatePlanTool } from '../../core/tools/update-plan.js';
 import {
   classifyShellCommandPolicy,
@@ -129,10 +128,6 @@ describe('tool input validation', () => {
     expect(recordKnowledgeTool.description).toContain('repeated session patterns');
     expect(recordKnowledgeTool.description).toContain('does not directly edit memory notes');
     expect(recordKnowledgeTool.requiresApproval).toBeUndefined();
-    expect(reportStateTool.description).toContain('Use this when progress is actually blocked');
-    expect(reportStateTool.description).toContain('Do not use it for ordinary progress updates');
-    expect(reportStateTool.description).toContain('Returns the same structured report back');
-    expect(reportStateTool.description).toContain('"nextNeed": "list_files on ."');
     expect(updatePlanTool.description).toContain('Record or revise a short working plan');
     expect(updatePlanTool.description).toContain('At most one item may be in_progress');
   });
@@ -1401,33 +1396,3 @@ describe('runShell tools', () => {
   });
 });
 
-describe('reportStateTool', () => {
-  it('accepts structured missing-gap reports and echoes them back', async () => {
-    const result = await reportStateTool.execute({
-      rationale: 'I need to inspect the top-level directory first.',
-      missing: ['Top-level directory contents'],
-      nextNeed: 'list_files on .',
-    });
-
-    expect(result).toEqual({
-      ok: true,
-      output: {
-        rationale: 'I need to inspect the top-level directory first.',
-        missing: ['Top-level directory contents'],
-        nextNeed: 'list_files on .',
-      },
-    });
-  });
-
-  it('rejects invalid report_state input', async () => {
-    const result = await reportStateTool.execute({
-      missing: ['Need more context'],
-    });
-
-    expect(result).toEqual({
-      ok: false,
-      error:
-        'Invalid input for report_state. Required field: rationale. Optional fields: missing, nextNeed.',
-    });
-  });
-});

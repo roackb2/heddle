@@ -485,55 +485,6 @@ describe('runAgent', () => {
     });
   });
 
-  it('does not add a follow-through reminder after report_state', async () => {
-    const seenMessages: ChatMessage[][] = [];
-    const fakeLlm: LlmAdapter = {
-      async chat(messages): Promise<LlmResponse> {
-        seenMessages.push(structuredClone(messages));
-
-        if (seenMessages.length === 1) {
-          return {
-            toolCalls: [{
-              id: 'call-1',
-              tool: 'report_state',
-              input: {
-                rationale: 'Need a more precise file slice before editing.',
-                missing: ['A specific line range from src/run-agent.ts'],
-                nextNeed: 'read_file on src/run-agent.ts with offset 200 and maxLines 80',
-              },
-            }],
-          };
-        }
-
-        return {
-          content: 'I will act on the concrete blocker next.',
-        };
-      },
-    };
-
-    const reportStateTool: ToolDefinition = {
-      name: 'report_state',
-      description: 'Records the current blocker',
-      parameters: { type: 'object', properties: {} },
-      async execute(input) {
-        return { ok: true, output: input };
-      },
-    };
-
-    await runAgent({
-      goal: 'Investigate the next implementation step.',
-      llm: fakeLlm,
-      tools: [reportStateTool],
-      maxSteps: 2,
-      logger: silentLogger,
-    });
-
-    expect(seenMessages[1]).not.toContainEqual({
-      role: 'system',
-      content: expect.stringContaining('report_state recorded a blocker'),
-    });
-  });
-
   it('does not inject a low-step enforcement reminder after extended evidence gathering', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
