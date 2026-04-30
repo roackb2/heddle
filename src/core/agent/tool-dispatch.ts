@@ -3,7 +3,7 @@
 // for the agent loop.
 // ---------------------------------------------------------------------------
 
-import { resolve } from 'node:path';
+import { isAbsolute, relative, resolve } from 'node:path';
 import type { ToolDefinition, ToolCall, TraceEvent } from '../types.js';
 import type { RunAgentOptions } from './run-agent.js';
 import { createToolRegistry } from '../tools/registry.js';
@@ -189,7 +189,8 @@ function isOutsideWorkspaceInspectionCall(call: ToolCall, workspaceRoot = proces
 
   const resolvedWorkspaceRoot = resolve(workspaceRoot);
   const resolvedTarget = resolve(resolvedWorkspaceRoot, rawPath);
-  return resolvedTarget !== resolvedWorkspaceRoot && !resolvedTarget.startsWith(`${resolvedWorkspaceRoot}/`);
+  const relativeTarget = relative(resolvedWorkspaceRoot, resolvedTarget);
+  return relativeTarget.startsWith('..') || isAbsolute(relativeTarget);
 }
 
 function getInspectFallbackReason(

@@ -1,3 +1,6 @@
+import { mkdir, mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { runAgentLoop } from '../../core/runtime/agent-loop.js';
 import { createAgentLoopCheckpoint, getHistoryFromAgentLoopCheckpoint, getHistoryFromAgentLoopState } from '../../core/runtime/events.js';
@@ -12,6 +15,7 @@ const silentLogger = createLogger({ level: 'silent', console: false });
 
 describe('runAgentLoop', () => {
   it('runs through the public execution loop and emits loop events around trace events', async () => {
+    const workspaceRoot = resolve('/tmp/heddle-loop-test');
     const seenMessages: ChatMessage[][] = [];
     const events: AgentLoopEvent[] = [];
     const fakeLlm: LlmAdapter = {
@@ -62,7 +66,7 @@ describe('runAgentLoop', () => {
       includeDefaultTools: false,
       maxSteps: 3,
       logger: silentLogger,
-      workspaceRoot: '/tmp/heddle-loop-test',
+      workspaceRoot,
       onEvent: (event) => events.push(event),
     });
 
@@ -75,7 +79,7 @@ describe('runAgentLoop', () => {
       goal: 'Use the echo tool.',
       model: 'gpt-test',
       provider: 'openai',
-      workspaceRoot: '/tmp/heddle-loop-test',
+      workspaceRoot,
       outcome: 'done',
       summary: 'Done.',
     });
@@ -86,7 +90,7 @@ describe('runAgentLoop', () => {
       goal: 'Use the echo tool.',
       model: 'gpt-test',
       provider: 'openai',
-      workspaceRoot: '/tmp/heddle-loop-test',
+      workspaceRoot,
     });
     expect(events.some((event) => event.type === 'trace' && event.event.type === 'tool.call')).toBe(true);
     expect(events.at(-1)).toMatchObject({
@@ -144,6 +148,42 @@ describe('runAgentLoop', () => {
       text: 'Hello',
       done: true,
     }));
+  });
+
+  it('does not treat the workspace state directory as the OAuth credential store', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'heddle-loop-state-dir-'));
+    await mkdir(join(workspaceRoot, '.heddle'));
+
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-5.5',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        return { content: 'Done.' };
+      },
+    };
+
+    await expect(runAgentLoop({
+      goal: 'Use the fake LLM.',
+      model: 'gpt-5.5',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger: silentLogger,
+      workspaceRoot,
+      stateDir: '.heddle',
+    })).resolves.toMatchObject({
+      outcome: 'done',
+      summary: 'Done.',
+    });
   });
 
   it('can resume a later run from a prior serializable checkpoint', async () => {
