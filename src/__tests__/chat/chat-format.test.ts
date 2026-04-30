@@ -4,8 +4,10 @@ import {
   formatChatFailureMessage,
   formatEditPreviewHistoryMessage,
   formatPlanHistoryMessage,
+  summarizePendingApproval,
 } from '../../cli/chat/utils/format.js';
 import type { ChatMessage } from '../../core/llm/types.js';
+import type { PendingApproval } from '../../core/chat/types.js';
 
 describe('buildConversationMessages', () => {
   it('does not render raw edit_file tool payloads into conversation history', () => {
@@ -137,6 +139,23 @@ describe('buildConversationMessages', () => {
     expect(rendered).toContain('- [x] Inspect runtime behavior');
     expect(rendered).toContain('- [-] Implement the fix');
     expect(rendered).toContain('- [ ] Verify with tests');
+  });
+});
+
+describe('summarizePendingApproval', () => {
+  it('shows the target path for path-aware tool approvals', () => {
+    const pendingApproval: PendingApproval = {
+      call: { id: 'call-1', tool: 'list_files', input: { path: 'src/cli/chat' } },
+      tool: { name: 'list_files', description: 'List files', parameters: { type: 'object', properties: {} } },
+      resolve: () => undefined,
+    };
+
+    const summary = summarizePendingApproval(pendingApproval);
+
+    expect(summary.title).toBe('Allow list_files');
+    expect(summary.command).toBe('src/cli/chat');
+    expect(summary.why).toBe('list_files on src/cli/chat');
+    expect(summary.effects).toContain('lists entries under src/cli/chat');
   });
 });
 

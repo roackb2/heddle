@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Box, Text, useInput } from 'ink';
 
 const DEFAULT_MAX_VISIBLE_INPUT_LINES = 8;
@@ -45,121 +45,52 @@ export function PromptInput({
   onSubmit: (value: string) => void;
   onSpecialKey?: (event: PromptKeyInput) => boolean;
 }) {
+  const valueRef = useRef(value);
+  const cursorRef = useRef(cursor);
+
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
+  useEffect(() => {
+    cursorRef.current = cursor;
+  }, [cursor]);
+
+  const applyDraft = (nextValue: string, nextCursor: number) => {
+    valueRef.current = nextValue;
+    cursorRef.current = nextCursor;
+    onChange(nextValue);
+    onCursorChange(nextCursor);
+  };
+
   useInput((input, key) => {
     if (isDisabled) {
       return;
     }
 
+    const state = {
+      value: valueRef.current,
+      cursor: Math.min(cursorRef.current, valueRef.current.length),
+    };
+    const actions: PromptInputActions = {
+      applyDraft,
+      moveCursor: (nextCursor) => {
+        cursorRef.current = nextCursor;
+        onCursorChange(nextCursor);
+      },
+      onSubmit,
+    };
+
     if (onSpecialKey?.({ input, key })) {
       return;
     }
 
-    if (key.return && !key.shift) {
-      onSubmit(value);
+    const command = resolvePromptInputCommand(input, key);
+    if (!command) {
       return;
     }
 
-    if (key.return && key.shift) {
-      onChange(insertAtCursor(value, cursor, '\n'));
-      onCursorChange(cursor + 1);
-      return;
-    }
-
-    if (key.meta && key.backspace) {
-      const nextCursor = findPreviousWordBoundary(value, cursor);
-      onChange(removeRange(value, nextCursor, cursor));
-      onCursorChange(nextCursor);
-      return;
-    }
-
-    if (key.ctrl && input === 'u') {
-      onChange(value.slice(cursor));
-      onCursorChange(0);
-      return;
-    }
-
-    if (key.ctrl && input === 'k') {
-      onChange(value.slice(0, cursor));
-      return;
-    }
-
-    if (key.ctrl && input === 'a') {
-      onCursorChange(0);
-      return;
-    }
-
-    if (key.ctrl && input === 'e') {
-      onCursorChange(value.length);
-      return;
-    }
-
-    if (key.ctrl && input === 'w') {
-      const nextCursor = findPreviousWordBoundary(value, cursor);
-      onChange(removeRange(value, nextCursor, cursor));
-      onCursorChange(nextCursor);
-      return;
-    }
-
-    if (key.meta && input === 'b') {
-      onCursorChange(findPreviousWordBoundary(value, cursor));
-      return;
-    }
-
-    if (key.meta && input === 'f') {
-      onCursorChange(findNextWordBoundary(value, cursor));
-      return;
-    }
-
-    if (key.backspace || key.delete) {
-      if (cursor === 0) {
-        return;
-      }
-
-      onChange(removeRange(value, cursor - 1, cursor));
-      onCursorChange(cursor - 1);
-      return;
-    }
-
-    if (key.meta && key.leftArrow) {
-      onCursorChange(findPreviousWordBoundary(value, cursor));
-      return;
-    }
-
-    if (key.meta && key.rightArrow) {
-      onCursorChange(findNextWordBoundary(value, cursor));
-      return;
-    }
-
-    if (key.leftArrow) {
-      onCursorChange(Math.max(0, cursor - 1));
-      return;
-    }
-
-    if (key.rightArrow) {
-      onCursorChange(Math.min(value.length, cursor + 1));
-      return;
-    }
-
-    if (key.home) {
-      onCursorChange(0);
-      return;
-    }
-
-    if (key.end) {
-      onCursorChange(value.length);
-      return;
-    }
-
-    if (key.ctrl || key.meta || key.escape || key.tab) {
-      return;
-    }
-
-    if (!input) {
-      return;
-    }
-
-    onChange(insertAtCursor(value, cursor, input));
-    onCursorChange(cursor + input.length);
+    handlePromptInputCommand(command, state, actions);
   }, { isActive: !isDisabled });
 
   const lines = useMemo(() => buildPromptRenderLines(value, cursor, maxVisibleLines), [value, cursor, maxVisibleLines]);
@@ -183,6 +114,150 @@ export function PromptInput({
       ))}
     </Box>
   );
+}
+
+export type PromptDraftState = {
+  value: string;
+  cursor: number;
+};
+
+type PromptInputCommand =
+  | { kind: 'submit' }
+  | { kind: 'insert'; input: string }
+  | { kind: 'deletePreviousChar' }
+  | { kind: 'deletePreviousWord' }
+  | { kind: 'deleteBeforeCursor' }
+  | { kind: 'deleteAfterCursor' }
+  | { kind: 'move'; direction: 'start' | 'end' | 'previousChar' | 'nextChar' | 'previousWord' | 'nextWord' };
+
+type PromptInputActions = {
+  applyDraft: (value: string, cursor: number) => void;
+  moveCursor: (cursor: number) => void;
+  onSubmit: (value: string) => void;
+};
+
+const CTRL_COMMANDS = new Map<string, PromptInputCommand>([
+  ['a', { kind: 'move', direction: 'start' }],
+  ['e', { kind: 'move', direction: 'end' }],
+  ['k', { kind: 'deleteAfterCursor' }],
+  ['u', { kind: 'deleteBeforeCursor' }],
+  ['w', { kind: 'deletePreviousWord' }],
+]);
+
+const META_TEXT_COMMANDS = new Map<string, PromptInputCommand>([
+  ['b', { kind: 'move', direction: 'previousWord' }],
+  ['f', { kind: 'move', direction: 'nextWord' }],
+]);
+
+export function insertPromptText(state: PromptDraftState, input: string): PromptDraftState {
+  return {
+    value: insertAtCursor(state.value, state.cursor, input),
+    cursor: state.cursor + input.length,
+  };
+}
+
+function resolvePromptInputCommand(input: string, key: PromptKeyInput['key']): PromptInputCommand | undefined {
+  if (key.return) {
+    return key.shift ? { kind: 'insert', input: '\n' } : { kind: 'submit' };
+  }
+
+  if (key.ctrl && input) {
+    return CTRL_COMMANDS.get(input);
+  }
+
+  if (key.meta && input) {
+    return META_TEXT_COMMANDS.get(input);
+  }
+
+  if (key.meta && key.backspace) {
+    return { kind: 'deletePreviousWord' };
+  }
+
+  if (key.backspace || key.delete) {
+    return { kind: 'deletePreviousChar' };
+  }
+
+  if (key.meta && key.leftArrow) {
+    return { kind: 'move', direction: 'previousWord' };
+  }
+
+  if (key.meta && key.rightArrow) {
+    return { kind: 'move', direction: 'nextWord' };
+  }
+
+  if (key.leftArrow) {
+    return { kind: 'move', direction: 'previousChar' };
+  }
+
+  if (key.rightArrow) {
+    return { kind: 'move', direction: 'nextChar' };
+  }
+
+  if (key.home) {
+    return { kind: 'move', direction: 'start' };
+  }
+
+  if (key.end) {
+    return { kind: 'move', direction: 'end' };
+  }
+
+  if (key.ctrl || key.meta || key.escape || key.tab || !input) {
+    return undefined;
+  }
+
+  return { kind: 'insert', input };
+}
+
+function handlePromptInputCommand(
+  command: PromptInputCommand,
+  state: PromptDraftState,
+  actions: PromptInputActions,
+): void {
+  const applyState = (next: PromptDraftState) => actions.applyDraft(next.value, next.cursor);
+
+  switch (command.kind) {
+    case 'submit':
+      actions.onSubmit(state.value);
+      return;
+    case 'insert':
+      applyState(insertPromptText(state, command.input));
+      return;
+    case 'deletePreviousChar':
+      if (state.cursor > 0) {
+        applyState({ value: removeRange(state.value, state.cursor - 1, state.cursor), cursor: state.cursor - 1 });
+      }
+      return;
+    case 'deletePreviousWord': {
+      const nextCursor = findPreviousWordBoundary(state.value, state.cursor);
+      applyState({ value: removeRange(state.value, nextCursor, state.cursor), cursor: nextCursor });
+      return;
+    }
+    case 'deleteBeforeCursor':
+      applyState({ value: state.value.slice(state.cursor), cursor: 0 });
+      return;
+    case 'deleteAfterCursor':
+      applyState({ value: state.value.slice(0, state.cursor), cursor: state.cursor });
+      return;
+    case 'move':
+      actions.moveCursor(resolvePromptCursorMove(state, command.direction));
+  }
+}
+
+function resolvePromptCursorMove(state: PromptDraftState, direction: Extract<PromptInputCommand, { kind: 'move' }>['direction']): number {
+  switch (direction) {
+    case 'start':
+      return 0;
+    case 'end':
+      return state.value.length;
+    case 'previousChar':
+      return Math.max(0, state.cursor - 1);
+    case 'nextChar':
+      return Math.min(state.value.length, state.cursor + 1);
+    case 'previousWord':
+      return findPreviousWordBoundary(state.value, state.cursor);
+    case 'nextWord':
+      return findNextWordBoundary(state.value, state.cursor);
+  }
 }
 
 export type PromptRenderLine = {
