@@ -187,6 +187,18 @@ export function summarizePendingApproval(pendingApproval: PendingApproval): Appr
     };
   }
 
+  const path = extractPathField(pendingApproval.call.input);
+  if (isPathAwareTool(pendingApproval.call.tool) && path) {
+    return {
+      title: `Allow ${pendingApproval.call.tool}`,
+      command: path,
+      scope: path.startsWith('../') || path.startsWith('/') || path.includes('..\\') ? 'external' : 'workspace',
+      why: `${pendingApproval.call.tool} on ${path}`,
+      effects: [describePathAwareToolEffect(pendingApproval.call.tool, path)],
+      rememberLabel: pendingApproval.rememberLabel,
+    };
+  }
+
   return {
     title: `Allow ${pendingApproval.call.tool}`,
     why: 'approval required for this tool call',
@@ -450,6 +462,17 @@ export function normalizeSessionTitle(value: string | undefined): string | undef
 
 function isPathAwareTool(tool: string): boolean {
   return tool === 'edit_file' || tool === 'read_file' || tool === 'list_files';
+}
+
+function describePathAwareToolEffect(tool: string, path: string): string {
+  switch (tool) {
+    case 'list_files':
+      return `lists entries under ${path}`;
+    case 'read_file':
+      return `reads ${path}`;
+    default:
+      return `uses ${tool} on ${path}`;
+  }
 }
 
 function summarizeSearchInput(tool: string, input: unknown): string | undefined {

@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { insertMentionSelection } from '../../cli/chat/utils/file-mentions.js';
-import { buildPromptRenderLines } from '../../cli/chat/components/PromptInput.js';
+import { buildPromptRenderLines, insertPromptText } from '../../cli/chat/components/PromptInput.js';
 
 describe('prompt input related helpers', () => {
   it('places the inserted mention at the end of the current trailing mention token', () => {
     const nextDraft = insertMentionSelection('take a look at @REA', 'README.md');
     expect(nextDraft).toBe('take a look at @README.md');
     expect(nextDraft.length).toBe('take a look at @README.md'.length);
+  });
+
+  it('preserves rapid sequential input when applying draft transitions immediately', () => {
+    const afterA = insertPromptText({ value: '', cursor: 0 }, 'a');
+    const afterB = insertPromptText(afterA, 'b');
+    const afterC = insertPromptText(afterB, 'c');
+
+    expect(afterC).toEqual({ value: 'abc', cursor: 3 });
   });
 
   it('renders the cursor at the end of the line after the last typed character', () => {
