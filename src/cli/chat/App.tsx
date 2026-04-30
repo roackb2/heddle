@@ -13,20 +13,19 @@ import {
   SlashHintPanel,
 } from './components/index.js';
 import { buildTuiDebugSnapshot } from './debug/tui-debug-snapshot.js';
-import { estimateBuiltInContextWindow } from '../../core/llm/openai-models.js';
 import { credentialModeFromSource, resolveSystemSelectedModel } from '../../core/llm/model-policy.js';
 import { useApprovalFlow } from './hooks/useApprovalFlow.js';
 import { useAgentRun } from './hooks/useAgentRun.js';
 import { useChatDrift } from './hooks/useChatDrift.js';
 import { useChatPickers } from './hooks/useChatPickers.js';
 import { useChatSessions } from './hooks/useChatSessions.js';
+import { useChatStatusSummary } from './hooks/useChatStatusSummary.js';
 import { useLocalIds } from './hooks/useLocalIds.js';
 import { usePromptDraft } from './hooks/usePromptDraft.js';
 import { usePromptSubmission } from './hooks/usePromptSubmission.js';
 import { autocompleteLocalCommand } from './state/local-commands.js';
-import { currentActivityText } from './utils/format.js';
 import { listMentionableFiles } from './utils/file-mentions.js';
-import { resolveProviderCredentialSourceForModel, type ChatRuntimeConfig, type ProviderCredentialSource } from './utils/runtime.js';
+import { resolveProviderCredentialSourceForModel, type ChatRuntimeConfig } from './utils/runtime.js';
 
 export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   return <EmbeddedChatApp runtime={runtime} />;
@@ -107,75 +106,41 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     workingFrames,
   } = useApprovalFlow(nextLocalId);
   const messages = useMemo(() => activeSession?.messages ?? [], [activeSession?.messages]);
-  const compacting = activeSession?.context?.compactionStatus === 'running';
-  const activityText = currentActivityText(liveEvents, isRunning, elapsedSeconds, pendingApproval, interruptRequested);
-  const contextStatus = formatContextStatus(
-    activeModel,
-    activeSession?.context?.lastRunInputTokens ?? activeSession?.context?.estimatedRequestTokens,
-  );
-  const authStatus = formatAuthStatus(resolveProviderCredentialSourceForModel(activeModel, runtime));
   const sessionTitleModel = resolveSystemSelectedModel({
     purpose: 'session-title',
     provider: 'openai',
     activeModel,
     credentialMode: credentialModeFromSource(runtime.providerCredentialSource),
   });
-  const sessionFooter = `session=${activeSession?.id ?? activeSessionId}${activeSession?.name ? ` (${activeSession.name})` : ''}`;
-  const renderedStatus =
-    pendingApproval ? 'awaiting approval'
-    : compacting ? 'compacting'
-    : interruptRequested ? 'interrupt requested'
-    : isRunning ? 'running'
-    : isMemoryUpdating ? 'memory updating'
-    : status;
-  const statusHint =
-    pendingApproval ? '←/→ choose • Enter confirms • A remembers for this project • Esc denies • Ctrl+C exits'
-    : compacting ? 'Compacting archived history in the background • Ctrl+C exits'
-    : isRunning ? 'Type freely • Enter queues prompt • Esc requests stop after the current step • Ctrl+C exits'
-    : isMemoryUpdating ? 'Memory maintenance is running in the background • Enter sends • Ctrl+C exits'
-    : 'Enter sends • Tab completes slash commands • /help shows commands • !command runs shell • Ctrl+C exits';
-  const runtimeHostWarning =
-    runtime.runtimeHost?.kind === 'daemon' && !runtime.runtimeHost.stale ?
-      `Daemon is also attached to this workspace at http://${runtime.runtimeHost.endpoint.host}:${runtime.runtimeHost.endpoint.port}. Different sessions are fine; avoid writing to the same session from multiple clients.`
-    : undefined;
-  const activityLines = liveEvents
-    .slice(-4)
-    .filter((event, index, events) => events.findIndex((candidate) => candidate.text === event.text) === index)
-    .map((event, index, events) => {
-      if (isRunning && index === events.length - 1) {
-        return `${event.text} · ${elapsedSeconds}s`;
-      }
-
-      return event.text;
-    });
-  const activeTurn = useMemo(
-    () =>
-      isRunning || pendingApproval || interruptRequested || error ?
-        {
-          title:
-            pendingApproval ? activityText
-            : error ? 'Recent activity before failure'
-            : isRunning ? 'Recent activity'
-            : activityText,
-          lines:
-            pendingApproval ? activityLines.filter((line) => line !== activityText)
-            : activityLines,
-          error,
-          currentAssistantText,
-          currentPlan,
-        }
-      : undefined,
-    [
-      isRunning,
-      pendingApproval,
-      interruptRequested,
-      error,
-      activityText,
-      activityLines,
-      currentAssistantText,
-      currentPlan,
-    ],
-  );
+  const {
+    compacting,
+    contextStatus,
+    authStatus,
+    sessionFooter,
+    renderedStatus,
+    statusHint,
+    runtimeHostWarning,
+    activeTurn,
+  } = useChatStatusSummary({
+    activeModel,
+    activeSessionId,
+    activeSession,
+    runtimeHostWarningSource: runtime.runtimeHost,
+    status,
+    isRunning,
+    isMemoryUpdating,
+    error,
+    liveEvents,
+    elapsedSeconds,
+    pendingApproval,
+    approvalChoice,
+    interruptRequested,
+    currentAssistantText,
+    currentPlan,
+    workingFrame,
+    workingFrames,
+    credentialSource: resolveProviderCredentialSourceForModel(activeModel, runtime),
+  });
   const saveTuiSnapshotMessage = useCallback(() => {
     if (!runtime.saveTuiSnapshot) {
       return 'TUI snapshots are not available in this runtime.';
@@ -430,44 +395,4 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
       </Text>
     </Box>
   );
-}
-
-function formatAuthStatus(source: ProviderCredentialSource): string {
-  switch (source.type) {
-    case 'explicit-api-key':
-      return 'auth=explicit-key';
-    case 'env-api-key':
-      return `auth=${source.provider}-key`;
-    case 'oauth':
-      return source.accountId ? `auth=${source.provider}-oauth:${source.accountId.slice(0, 8)}` : `auth=${source.provider}-oauth`;
-    case 'missing':
-      return `auth=missing-${source.provider}`;
-  }
-}
-
-function formatContextStatus(model: string, estimatedRequestTokens?: number): string {
-  if (estimatedRequestTokens === undefined) {
-    return 'context=unknown';
-  }
-
-  const contextWindow = estimateBuiltInContextWindow(model);
-  if (!contextWindow) {
-    return `context≈${formatTokenCount(estimatedRequestTokens)} used`;
-  }
-
-  const remainingTokens = Math.max(contextWindow - estimatedRequestTokens, 0);
-  const remainingPercent = Math.max(Math.round((remainingTokens / contextWindow) * 100), 0);
-  return `context≈${remainingPercent}% left`;
-}
-
-function formatTokenCount(value: number): string {
-  if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
-  }
-
-  if (value >= 1_000) {
-    return `${Math.round(value / 1_000)}k`;
-  }
-
-  return `${value}`;
 }
