@@ -511,16 +511,6 @@ function isMemoryOnlyTool(tool: string): boolean {
     || tool === 'memory_checkpoint';
 }
 
-
-function extractSummaryLead(content: string): string | undefined {
-  const lines = content
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  return lines[0] || undefined;
-}
-
 function maybeFinishInterrupted(context: RunContext, logMessage: string): RunResult | undefined {
   if (!context.shouldStop?.()) {
     return undefined;
