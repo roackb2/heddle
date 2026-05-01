@@ -28,9 +28,10 @@ describe('formatEvalSuiteMarkdown', () => {
           timedOut: false,
         },
         artifacts: {
-          gitStatusPath: '/out/git-status.txt',
-          gitDiffPath: '/out/diff.patch',
-          traceFiles: ['/tmp/workspace/.heddle/traces/trace.json'],
+          gitStatusPath: '/repo/evals/results/run/current/fix-failing-test/git-status.txt',
+          gitDiffPath: '/repo/evals/results/run/current/fix-failing-test/diff.patch',
+          sessionCatalogPath: '/repo/evals/results/run/current/fix-failing-test/session-catalog.json',
+          traceFiles: ['/repo/evals/results/run/current/fix-failing-test/traces/trace.json'],
         },
         checks: [{
           name: 'unit test',
@@ -56,13 +57,22 @@ describe('formatEvalSuiteMarkdown', () => {
           toolsByName: {},
           readOrSearchBeforeMutation: [],
         },
+        model: 'gpt-5.4',
+        maxSteps: 60,
       }],
     };
 
     const markdown = formatEvalSuiteMarkdown(report);
 
     expect(markdown).toContain('Results: 1/1 passed');
-    expect(markdown).toContain('| fix-failing-test | passed | 1/1 | done | 3 | 1 | 1 |');
+    expect(markdown).toContain('| fix-failing-test | passed | gpt-5.4 | 1/1 | done | 3 | 1 | 1 |');
+    expect(markdown).toContain('| Model | gpt-5.4 |');
+    expect(markdown).toContain('| Max steps | 60 |');
+    expect(markdown).toContain('| Output | `current/fix-failing-test` |');
+    expect(markdown).toContain('| Diff | `current/fix-failing-test/diff.patch` |');
+    expect(markdown).toContain('| Trace files | `current/fix-failing-test/traces/trace.json` |');
+    expect(markdown).toContain('### Metrics');
+    expect(markdown).toContain('| Assistant turns | 3 |');
     expect(markdown).toContain('- PASS unit test: `yarn test`');
   });
 });

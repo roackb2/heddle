@@ -36,15 +36,25 @@ describe('analyzeTrace', () => {
           { id: 'test-1', tool: 'run_shell_mutate', input: { command: 'yarn test' } },
         ],
       },
+      {
+        type: 'assistant.turn',
+        content: '',
+        requestedTools: true,
+        step: 4,
+        timestamp: '2026-05-01T00:00:04.000Z',
+        toolCalls: [
+          { id: 'test-2', tool: 'run_shell_inspect', input: { command: 'npm test -- --runInBand' } },
+        ],
+      },
       { type: 'tool.result', tool: 'run_shell_mutate', result: { ok: true, output: { exitCode: 0 } }, step: 3, timestamp: '2026-05-01T00:00:04.000Z' },
       { type: 'run.finished', outcome: 'done', summary: 'Fixed and verified.', step: 4, timestamp: '2026-05-01T00:00:05.000Z' },
     ];
 
     expect(analyzeTrace(trace)).toMatchObject({
-      assistantTurns: 3,
-      toolCalls: 3,
+      assistantTurns: 4,
+      toolCalls: 4,
       mutations: 2,
-      verificationCommandsAfterMutation: 1,
+      verificationCommandsAfterMutation: 2,
       firstMutationStep: 2,
       outcome: 'done',
       summary: 'Fixed and verified.',
@@ -52,6 +62,7 @@ describe('analyzeTrace', () => {
         read_file: 1,
         edit_file: 1,
         run_shell_mutate: 1,
+        run_shell_inspect: 1,
       },
       readOrSearchBeforeMutation: ['read_file:src/app.ts'],
     });

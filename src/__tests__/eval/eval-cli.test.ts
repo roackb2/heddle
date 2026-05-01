@@ -32,4 +32,10 @@ describe('parseEvalArgs', () => {
   it('returns help for unknown eval subcommands', () => {
     expect(parseEvalArgs(['other']).command).toBe('help');
   });
+
+  it('uses a readable repo-local default output path', () => {
+    const parsed = parseEvalArgs(['agent', '--cases-dir', 'evals/cases/coding']);
+
+    expect(parsed.outputDir).toMatch(/evals\/results\/agent-\d{4}-\d{2}-\d{2}-\d{6}$/);
+  });
 });

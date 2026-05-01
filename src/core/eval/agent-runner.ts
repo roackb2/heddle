@@ -61,7 +61,10 @@ export async function runAgentEvalCase(args: RunAgentEvalCaseArgs): Promise<Eval
         command: command[0] ?? 'yarn',
         args: command.slice(1),
         cwd: args.repoRoot,
-        env: process.env,
+        env: {
+          ...process.env,
+          HEDDLE_EVAL_AUTO_APPROVE: '1',
+        },
         timeoutMs: args.timeoutMs ?? 15 * 60_000,
       });
   writeTextArtifact(stdoutPath, agentResult.stdout);

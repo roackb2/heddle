@@ -40,7 +40,11 @@ export function analyzeTrace(trace: TraceEvent[]): EvalTraceMetrics {
           firstMutationStep ??= event.step;
         }
 
-        if (firstMutationStep !== undefined && call.tool === 'run_shell_mutate' && isVerificationCommand(call.input)) {
+        if (
+          firstMutationStep !== undefined
+          && (call.tool === 'run_shell_mutate' || call.tool === 'run_shell_inspect')
+          && isVerificationCommand(call.input)
+        ) {
           verificationCommandsAfterMutation++;
         }
       }

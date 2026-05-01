@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runCommand, runShellCommand } from './process.js';
@@ -17,6 +17,7 @@ export async function prepareEvalWorkspace(args: {
   const parent = args.workRoot ? resolve(args.workRoot) : mkdtempSync(join(tmpdir(), 'heddle-eval-'));
   mkdirSync(parent, { recursive: true });
   const workspaceRoot = join(parent, args.testCase.id);
+  rmSync(workspaceRoot, { recursive: true, force: true });
   mkdirSync(workspaceRoot, { recursive: true });
 
   for (const [relativePath, content] of Object.entries(args.testCase.setup.files ?? {})) {

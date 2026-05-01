@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { loadEvalCases } from '../../core/eval/case-loader.js';
 import { runAgentEvalCase } from '../../core/eval/agent-runner.js';
 import { writeEvalSuiteReport } from '../../core/eval/report-writer.js';
@@ -40,9 +40,8 @@ export async function runEvalCli(rawArgs: string[], options: EvalCliOptions) {
   }
 
   mkdirSync(args.outputDir, { recursive: true });
-  if (args.workRoot) {
-    mkdirSync(args.workRoot, { recursive: true });
-  }
+  const workRoot = args.workRoot ?? join(args.outputDir, 'workspaces');
+  mkdirSync(workRoot, { recursive: true });
 
   const results = [];
   for (const testCase of cases) {
@@ -51,7 +50,7 @@ export async function runEvalCli(rawArgs: string[], options: EvalCliOptions) {
       testCase,
       repoRoot: options.repoRoot,
       resultsRoot: args.outputDir,
-      workRoot: args.workRoot,
+      workRoot,
       target: args.target,
       model: options.model,
       maxSteps: options.maxSteps,
@@ -84,7 +83,7 @@ export function parseEvalArgs(rawArgs: string[]): EvalArgs {
       command: 'help',
       casesDir: resolve('evals/cases/coding'),
       caseIds: [],
-      outputDir: resolve('evals/results', timestampForPath()),
+      outputDir: resolve('evals/results', defaultRunDirName('agent')),
       target: 'current',
       dryRun: false,
     };
@@ -94,7 +93,7 @@ export function parseEvalArgs(rawArgs: string[]): EvalArgs {
     command,
     casesDir: resolve('evals/cases/coding'),
     caseIds: [],
-    outputDir: resolve('evals/results', timestampForPath()),
+    outputDir: resolve('evals/results', defaultRunDirName('agent')),
     target: 'current',
     dryRun: false,
   };
@@ -141,8 +140,8 @@ function writeEvalHelp() {
     'Options:',
     '  --cases-dir <path>   Directory containing JSON eval cases',
     '  --case <id>          Run one case id; repeat to select multiple',
-    '  --output <path>      Results directory',
-    '  --work-root <path>   Parent directory for disposable workspaces',
+    '  --output <path>      Results directory; defaults to evals/results/agent-YYYY-MM-DD-HHMMSS',
+    '  --work-root <path>   Parent directory for disposable workspaces; defaults to <output>/workspaces',
     '  --target <name>      Label for this run, default current',
     '  --timeout-ms <n>     Agent subprocess timeout',
     '  --dry-run            Prepare workspaces and reports without calling the model',
@@ -166,6 +165,10 @@ function parsePositiveInt(raw: string, flag: string): number {
   return value;
 }
 
-function timestampForPath(): string {
-  return new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
+function defaultRunDirName(prefix: string): string {
+  const timestamp = new Date().toISOString()
+    .replace('T', '-')
+    .replace(/\.\d{3}Z$/, '')
+    .replaceAll(':', '');
+  return `${prefix}-${timestamp}`;
 }

@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { runCommand } from './process.js';
 
 export type GitArtifacts = {
@@ -34,8 +34,11 @@ export async function collectEvalArtifacts(args: {
 
   const stateRoot = join(args.workspaceRoot, args.stateDir ?? '.heddle');
   const sessionCatalog = join(stateRoot, 'chat-sessions.catalog.json');
-  const sessionCatalogPath = existsSync(sessionCatalog) ? sessionCatalog : undefined;
-  const traceFiles = listTraceFiles(join(stateRoot, 'traces'));
+  const sessionCatalogPath = copyOptionalArtifact(sessionCatalog, join(args.outputDir, 'session-catalog.json'));
+  const traceFiles = copyTraceFiles({
+    sourceTraceDir: join(stateRoot, 'traces'),
+    outputTraceDir: join(args.outputDir, 'traces'),
+  });
 
   return {
     gitStatusPath,
@@ -58,4 +61,22 @@ function listTraceFiles(traceDir: string): string[] {
     .filter((file) => file.endsWith('.json'))
     .map((file) => join(traceDir, file))
     .sort();
+}
+
+function copyOptionalArtifact(sourcePath: string, targetPath: string): string | undefined {
+  if (!existsSync(sourcePath)) {
+    return undefined;
+  }
+  mkdirSync(dirname(targetPath), { recursive: true });
+  copyFileSync(sourcePath, targetPath);
+  return targetPath;
+}
+
+function copyTraceFiles(args: { sourceTraceDir: string; outputTraceDir: string }): string[] {
+  return listTraceFiles(args.sourceTraceDir).map((sourcePath) => {
+    const targetPath = join(args.outputTraceDir, basename(sourcePath));
+    mkdirSync(dirname(targetPath), { recursive: true });
+    copyFileSync(sourcePath, targetPath);
+    return targetPath;
+  });
 }

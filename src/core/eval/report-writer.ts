@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { relative, join } from 'node:path';
 import type { EvalRunResult, EvalSuiteReport } from './schema.js';
 
 export function writeEvalSuiteReport(report: EvalSuiteReport): { jsonPath: string; markdownPath: string } {
@@ -21,14 +21,14 @@ export function formatEvalSuiteMarkdown(report: EvalSuiteReport): string {
     `Finished: ${report.finishedAt}`,
     `Results: ${passed}/${report.results.length} passed`,
     '',
-    '| Case | Status | Checks | Outcome | Turns | Mutations | Verification After Mutation |',
-    '| --- | --- | ---: | --- | ---: | ---: | ---: |',
+    '| Case | Status | Model | Checks | Outcome | Turns | Mutations | Verification After Mutation |',
+    '| --- | --- | --- | ---: | --- | ---: | ---: | ---: |',
     ...report.results.map(formatSummaryRow),
     '',
   ];
 
   for (const result of report.results) {
-    lines.push(...formatRunDetail(result), '');
+    lines.push(...formatRunDetail(result, report.resultsDir), '');
   }
 
   return `${lines.join('\n').trimEnd()}\n`;
@@ -39,6 +39,7 @@ function formatSummaryRow(result: EvalRunResult): string {
   return [
     result.caseId,
     result.status,
+    result.model ?? 'default',
     `${passedChecks}/${result.checks.length}`,
     result.metrics.outcome ?? `exit ${result.agent.exitCode ?? 'unknown'}`,
     String(result.metrics.assistantTurns),
@@ -47,19 +48,26 @@ function formatSummaryRow(result: EvalRunResult): string {
   ].map(escapeCell).join(' | ').replace(/^/, '| ').replace(/$/, ' |');
 }
 
-function formatRunDetail(result: EvalRunResult): string[] {
+function formatRunDetail(result: EvalRunResult, resultsDir: string): string[] {
+  const traceFiles = result.artifacts.traceFiles.map((path) => formatPath(path, resultsDir));
   const lines = [
     `## ${result.caseId}`,
     '',
-    `Status: ${result.status}`,
-    `Workspace: ${result.workspaceRoot}`,
-    `Output: ${result.outputDir}`,
-    `Agent exit: ${result.agent.exitCode ?? 'unknown'}${result.agent.timedOut ? ' (timed out)' : ''}`,
-    `Diff: ${result.artifacts.gitDiffPath}`,
-    `Status file: ${result.artifacts.gitStatusPath}`,
-    `Trace files: ${result.artifacts.traceFiles.length ? result.artifacts.traceFiles.join(', ') : 'none'}`,
+    '| Field | Value |',
+    '| --- | --- |',
+    `| Status | ${escapeCell(result.status)} |`,
+    `| Model | ${escapeCell(result.model ?? 'default')} |`,
+    `| Max steps | ${escapeCell(String(result.maxSteps ?? 'default'))} |`,
+    `| Agent exit | ${escapeCell(`${result.agent.exitCode ?? 'unknown'}${result.agent.timedOut ? ' (timed out)' : ''}`)} |`,
+    `| Workspace | \`${escapeCell(formatPath(result.workspaceRoot, resultsDir))}\` |`,
+    `| Output | \`${escapeCell(formatPath(result.outputDir, resultsDir))}\` |`,
+    `| Diff | \`${escapeCell(formatPath(result.artifacts.gitDiffPath, resultsDir))}\` |`,
+    `| Git status | \`${escapeCell(formatPath(result.artifacts.gitStatusPath, resultsDir))}\` |`,
+    `| Session catalog | ${result.artifacts.sessionCatalogPath ? `\`${escapeCell(formatPath(result.artifacts.sessionCatalogPath, resultsDir))}\`` : 'none'} |`,
+    `| Trace files | ${traceFiles.length ? traceFiles.map((path) => `\`${escapeCell(path)}\``).join('<br>') : 'none'} |`,
     '',
-    'Checks:',
+    '### Checks',
+    '',
   ];
 
   if (result.checks.length === 0) {
@@ -72,17 +80,21 @@ function formatRunDetail(result: EvalRunResult): string[] {
 
   lines.push(
     '',
-    'Metrics:',
-    `- assistant turns: ${result.metrics.assistantTurns}`,
-    `- tool calls: ${result.metrics.toolCalls}`,
-    `- mutations: ${result.metrics.mutations}`,
-    `- verification commands after mutation: ${result.metrics.verificationCommandsAfterMutation}`,
-    `- approvals: ${result.metrics.approvalsRequested} requested, ${result.metrics.approvalsResolved} resolved`,
-    `- tool errors: ${result.metrics.toolErrors}`,
+    '### Metrics',
+    '',
+    '| Metric | Value |',
+    '| --- | ---: |',
+    `| Assistant turns | ${result.metrics.assistantTurns} |`,
+    `| Tool calls | ${result.metrics.toolCalls} |`,
+    `| Mutations | ${result.metrics.mutations} |`,
+    `| Verification after mutation | ${result.metrics.verificationCommandsAfterMutation} |`,
+    `| Approvals requested | ${result.metrics.approvalsRequested} |`,
+    `| Approvals resolved | ${result.metrics.approvalsResolved} |`,
+    `| Tool errors | ${result.metrics.toolErrors} |`,
   );
 
   if (result.metrics.summary) {
-    lines.push(`- summary: ${result.metrics.summary}`);
+    lines.push('', '### Final Summary', '', result.metrics.summary);
   }
 
   return lines;
@@ -90,4 +102,13 @@ function formatRunDetail(result: EvalRunResult): string[] {
 
 function escapeCell(value: string): string {
   return value.replaceAll('|', '\\|').replaceAll('\n', ' ');
+}
+
+function formatPath(path: string, basePath: string): string {
+  if (path === basePath) {
+    return '.';
+  }
+
+  const relativePath = relative(basePath, path);
+  return relativePath && !relativePath.startsWith('..') ? relativePath : path;
 }
