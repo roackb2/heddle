@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { cleanupEvalResults } from '../../core/eval/cleanup.js';
 import { loadEvalCases } from '../../core/eval/case-loader.js';
 import { runAgentEvalCase } from '../../core/eval/agent-runner.js';
 import { writeEvalSuiteReport } from '../../core/eval/report-writer.js';
@@ -13,23 +14,40 @@ export type EvalCliOptions = {
 };
 
 type EvalArgs = {
-  command: 'agent' | 'help';
+  command: 'agent' | 'clean' | 'help';
   casesDir: string;
   caseIds: string[];
   outputDir: string;
+  resultsDir: string;
   workRoot?: string;
   target: string;
   timeoutMs?: number;
+  before?: Date;
+  yes: boolean;
   dryRun: boolean;
+};
+
+type EvalCommand = EvalArgs['command'];
+type EvalCommandParser = (rawArgs: string[]) => EvalArgs;
+type EvalCommandRunner = (args: EvalArgs, options: EvalCliOptions) => Promise<void> | void;
+
+const evalCommandParsers: Partial<Record<EvalCommand, EvalCommandParser>> = {
+  agent: parseAgentEvalArgs,
+  clean: parseCleanEvalArgs,
+};
+
+const evalCommandRunners: Partial<Record<EvalCommand, EvalCommandRunner>> = {
+  agent: runAgentEval,
+  clean: runCleanEval,
+  help: () => writeEvalHelp(),
 };
 
 export async function runEvalCli(rawArgs: string[], options: EvalCliOptions) {
   const args = parseEvalArgs(rawArgs);
-  if (args.command === 'help') {
-    writeEvalHelp();
-    return;
-  }
+  await evalCommandRunners[args.command]?.(args, options);
+}
 
+async function runAgentEval(args: EvalArgs, options: EvalCliOptions) {
   const startedAt = new Date().toISOString();
   const cases = loadEvalCases({
     casesDir: args.casesDir,
@@ -76,48 +94,43 @@ export async function runEvalCli(rawArgs: string[], options: EvalCliOptions) {
   process.stdout.write(`Eval JSON: ${saved.jsonPath}\n`);
 }
 
+function runCleanEval(args: EvalArgs) {
+  const result = cleanupEvalResults({
+    resultsDir: args.resultsDir,
+    before: args.before,
+    dryRun: !args.yes,
+  });
+  writeCleanupResult(result);
+}
+
 export function parseEvalArgs(rawArgs: string[]): EvalArgs {
   const [command = 'help', ...rest] = rawArgs;
-  if (command !== 'agent') {
-    return {
-      command: 'help',
-      casesDir: resolve('evals/cases/coding'),
-      caseIds: [],
-      outputDir: resolve('evals/results', defaultRunDirName('agent')),
-      target: 'current',
-      dryRun: false,
-    };
-  }
+  return evalCommandParsers[command as EvalCommand]?.(rest) ?? defaultEvalArgs('help');
+}
 
-  const args: EvalArgs = {
-    command,
-    casesDir: resolve('evals/cases/coding'),
-    caseIds: [],
-    outputDir: resolve('evals/results', defaultRunDirName('agent')),
-    target: 'current',
-    dryRun: false,
-  };
+function parseAgentEvalArgs(rawArgs: string[]): EvalArgs {
+  const args = defaultEvalArgs('agent');
 
-  for (let index = 0; index < rest.length; index++) {
-    const token = rest[index];
+  for (let index = 0; index < rawArgs.length; index++) {
+    const token = rawArgs[index];
     switch (token) {
       case '--cases-dir':
-        args.casesDir = resolve(requireValue(rest, ++index, token));
+        args.casesDir = resolve(requireValue(rawArgs, ++index, token));
         break;
       case '--case':
-        args.caseIds.push(requireValue(rest, ++index, token));
+        args.caseIds.push(requireValue(rawArgs, ++index, token));
         break;
       case '--output':
-        args.outputDir = resolve(requireValue(rest, ++index, token));
+        args.outputDir = resolve(requireValue(rawArgs, ++index, token));
         break;
       case '--work-root':
-        args.workRoot = resolve(requireValue(rest, ++index, token));
+        args.workRoot = resolve(requireValue(rawArgs, ++index, token));
         break;
       case '--target':
-        args.target = requireValue(rest, ++index, token);
+        args.target = requireValue(rawArgs, ++index, token);
         break;
       case '--timeout-ms':
-        args.timeoutMs = parsePositiveInt(requireValue(rest, ++index, token), token);
+        args.timeoutMs = parsePositiveInt(requireValue(rawArgs, ++index, token), token);
         break;
       case '--dry-run':
         args.dryRun = true;
@@ -133,11 +146,52 @@ export function parseEvalArgs(rawArgs: string[]): EvalArgs {
   return args;
 }
 
+function parseCleanEvalArgs(rawArgs: string[]): EvalArgs {
+  const args = defaultEvalArgs('clean');
+
+  for (let index = 0; index < rawArgs.length; index++) {
+    const token = rawArgs[index];
+    switch (token) {
+      case '--results-dir':
+        args.resultsDir = resolve(requireValue(rawArgs, ++index, token));
+        break;
+      case '--before':
+        args.before = parseDate(requireValue(rawArgs, ++index, token), token);
+        break;
+      case '--yes':
+        args.yes = true;
+        break;
+      case '--dry-run':
+        args.yes = false;
+        break;
+      default:
+        throw new Error(`Unknown eval clean option: ${token}`);
+    }
+  }
+
+  return args;
+}
+
+function defaultEvalArgs(command: EvalCommand): EvalArgs {
+  return {
+    command,
+    casesDir: resolve('evals/cases/coding'),
+    caseIds: [],
+    outputDir: resolve('evals/results', defaultRunDirName('agent')),
+    resultsDir: resolve('evals/results'),
+    target: 'current',
+    yes: false,
+    dryRun: false,
+  };
+}
+
 function writeEvalHelp() {
   process.stdout.write([
-    'Usage: heddle eval agent [options]',
+    'Usage:',
+    '  heddle eval agent [options]',
+    '  heddle eval clean [options]',
     '',
-    'Options:',
+    'Agent options:',
     '  --cases-dir <path>   Directory containing JSON eval cases',
     '  --case <id>          Run one case id; repeat to select multiple',
     '  --output <path>      Results directory; defaults to evals/results/agent-YYYY-MM-DD-HHMMSS',
@@ -146,7 +200,32 @@ function writeEvalHelp() {
     '  --timeout-ms <n>     Agent subprocess timeout',
     '  --dry-run            Prepare workspaces and reports without calling the model',
     '',
+    'Clean options:',
+    '  --results-dir <path> Results directory; defaults to evals/results',
+    '  --before <datetime>  Only clean result directories modified before this datetime',
+    '  --yes                Actually delete matching result directories',
+    '  --dry-run            Preview matching result directories without deleting; default behavior',
+    '',
   ].join('\n'));
+}
+
+function writeCleanupResult(result: ReturnType<typeof cleanupEvalResults>) {
+  process.stdout.write(`Eval results dir: ${result.resultsDir}\n`);
+  process.stdout.write(`Mode: ${result.dryRun ? 'dry-run' : 'delete'}\n`);
+  if (result.before) {
+    process.stdout.write(`Before: ${result.before}\n`);
+  }
+  process.stdout.write(`Matched: ${result.candidates.length}\n`);
+  if (result.candidates.length > 0) {
+    for (const candidate of result.candidates) {
+      process.stdout.write(`- ${candidate.name} (${candidate.modifiedAt})\n`);
+    }
+  }
+  if (result.dryRun) {
+    process.stdout.write('No files deleted. Pass --yes to delete matched result directories.\n');
+    return;
+  }
+  process.stdout.write(`Deleted: ${result.removed.length}\n`);
 }
 
 function requireValue(values: string[], index: number, flag: string): string {
@@ -163,6 +242,14 @@ function parsePositiveInt(raw: string, flag: string): number {
     throw new Error(`Invalid positive integer for ${flag}: ${raw}`);
   }
   return value;
+}
+
+function parseDate(raw: string, flag: string): Date {
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid datetime for ${flag}: ${raw}`);
+  }
+  return date;
 }
 
 function defaultRunDirName(prefix: string): string {

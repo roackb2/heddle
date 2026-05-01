@@ -33,6 +33,24 @@ describe('parseEvalArgs', () => {
     expect(parseEvalArgs(['other']).command).toBe('help');
   });
 
+  it('parses clean eval options', () => {
+    const parsed = parseEvalArgs([
+      'clean',
+      '--results-dir',
+      'evals/results',
+      '--before',
+      '2026-05-01T00:00:00Z',
+      '--yes',
+    ]);
+
+    expect(parsed).toMatchObject({
+      command: 'clean',
+      yes: true,
+    });
+    expect(parsed.resultsDir).toContain('evals/results');
+    expect(parsed.before?.toISOString()).toBe('2026-05-01T00:00:00.000Z');
+  });
+
   it('uses a readable repo-local default output path', () => {
     const parsed = parseEvalArgs(['agent', '--cases-dir', 'evals/cases/coding']);
 
