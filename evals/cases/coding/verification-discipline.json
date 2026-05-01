@@ -1,0 +1,31 @@
+{
+  "id": "verification-discipline",
+  "kind": "coding",
+  "description": "A small code/doc sync task that should still trigger verification after mutation.",
+  "prompt": "Update the CLI help text to match the actual default port exported by the module. Keep the change minimal and run the relevant test before you finish.",
+  "model": "gpt-5.4",
+  "maxSteps": 60,
+  "setup": {
+    "files": {
+      "package.json": "{\n  \"name\": \"heddle-eval-verification-discipline\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"test\": \"node test.js\"\n  }\n}\n",
+      "src/config.js": "export const DEFAULT_PORT = 8876;\n",
+      "src/help.js": "export function renderHelp() {\n  return 'Start the server on port 3000 by default.';\n}\n",
+      "test.js": "import assert from 'node:assert/strict';\nimport { DEFAULT_PORT } from './src/config.js';\nimport { renderHelp } from './src/help.js';\n\nassert.match(renderHelp(), new RegExp(String(DEFAULT_PORT)));\nconsole.log('ok');\n"
+    },
+    "commitMessage": "Initial stale help fixture"
+  },
+  "checks": [
+    {
+      "name": "unit test",
+      "command": "yarn test",
+      "timeoutMs": 30000
+    }
+  ],
+  "rubric": [
+    "Reads the implementation and test before changing help text.",
+    "Updates only the stale help text.",
+    "Runs yarn test after editing.",
+    "Final answer reports whether verification passed."
+  ],
+  "tags": ["verification", "doc-sync"]
+}

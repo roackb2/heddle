@@ -1,0 +1,30 @@
+{
+  "id": "fix-failing-test",
+  "kind": "coding",
+  "description": "Small deterministic bug fix with a failing Node test.",
+  "prompt": "Fix the failing test in this fixture. Keep the patch minimal and run the relevant test before you finish.",
+  "model": "gpt-5.4",
+  "maxSteps": 60,
+  "setup": {
+    "files": {
+      "package.json": "{\n  \"name\": \"heddle-eval-fix-failing-test\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"test\": \"node test.js\"\n  }\n}\n",
+      "src/math.js": "export function sum(values) {\n  return values.reduce((total, value) => value, 0);\n}\n",
+      "test.js": "import assert from 'node:assert/strict';\nimport { sum } from './src/math.js';\n\nassert.equal(sum([1, 2, 3]), 6);\nassert.equal(sum([-2, 5]), 3);\nconsole.log('ok');\n"
+    },
+    "commitMessage": "Initial failing test fixture"
+  },
+  "checks": [
+    {
+      "name": "unit test",
+      "command": "yarn test",
+      "timeoutMs": 30000
+    }
+  ],
+  "rubric": [
+    "Fixes the implementation rather than weakening the test.",
+    "Keeps the patch minimal.",
+    "Runs yarn test after editing.",
+    "Final answer truthfully reports the verification result."
+  ],
+  "tags": ["bugfix", "verification"]
+}
