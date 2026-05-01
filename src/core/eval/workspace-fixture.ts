@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runCommand, runShellCommand } from './process.js';
@@ -40,7 +40,7 @@ export async function prepareEvalWorkspace(args: {
         progress: args.progress,
       });
 
-  copyAuthState({
+  await copyAuthState({
     repoRoot: args.repoRoot,
     workspaceRoot,
   });
@@ -185,16 +185,36 @@ async function applyEvalSetup(args: {
   return setupResults;
 }
 
-function copyAuthState(args: {
+async function copyAuthState(args: {
   repoRoot: string;
   workspaceRoot: string;
 }) {
   const memorySource = join(args.repoRoot, '.heddle', 'auth.json');
   const memoryTarget = join(args.workspaceRoot, '.heddle', 'auth.json');
   if (existsSync(memorySource) && !existsSync(memoryTarget)) {
+    await excludeAuthStateFromGit(args.workspaceRoot);
     mkdirSync(dirname(memoryTarget), { recursive: true });
     cpSync(memorySource, memoryTarget);
   }
+}
+
+async function excludeAuthStateFromGit(workspaceRoot: string) {
+  const result = await runCommand({
+    command: 'git',
+    args: ['rev-parse', '--git-path', 'info/exclude'],
+    cwd: workspaceRoot,
+    timeoutMs: 10_000,
+  });
+  if (result.exitCode !== 0 || result.timedOut) {
+    throw new Error(`git rev-parse --git-path info/exclude failed: ${result.stderr || result.stdout}`);
+  }
+
+  const excludePath = resolve(workspaceRoot, result.stdout.trim());
+  if (!excludePath) {
+    return;
+  }
+  mkdirSync(dirname(excludePath), { recursive: true });
+  appendFileSync(excludePath, '\n/.heddle/auth.json\n', 'utf8');
 }
 
 async function trackProgress<T>(

@@ -91,6 +91,38 @@ describe('prepareEvalWorkspace', () => {
     expect(prepared.fixture.baselineCommit).not.toBe(targetCommit);
     expect(git(prepared.workspaceRoot, ['status', '--porcelain'])).toBe('');
   });
+
+  it('copies eval auth state without contaminating the measured workspace diff', async () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), 'heddle-eval-auth-source-'));
+    mkdirSync(join(repoRoot, '.heddle'), { recursive: true });
+    writeFileSync(join(repoRoot, '.heddle/auth.json'), '{"provider":"openai"}\n');
+    const workRoot = mkdtempSync(join(tmpdir(), 'heddle-inline-auth-fixture-'));
+    const testCase: AgentEvalCase = {
+      id: 'auth-inline',
+      kind: 'coding',
+      prompt: 'Inspect the repo.',
+      fixture: { type: 'inline' },
+      setup: {},
+      review: {
+        requiredOutcomes: [],
+        allowedScope: [],
+        outOfScope: [],
+        humanQuestions: [],
+      },
+      checks: [],
+      rubric: [],
+      tags: [],
+    };
+
+    const prepared = await prepareEvalWorkspace({
+      testCase,
+      repoRoot,
+      workRoot,
+    });
+
+    expect(readFileSync(join(prepared.workspaceRoot, '.heddle/auth.json'), 'utf8')).toBe('{"provider":"openai"}\n');
+    expect(git(prepared.workspaceRoot, ['status', '--porcelain'])).toBe('');
+  });
 });
 
 function createSourceRepo(): string {

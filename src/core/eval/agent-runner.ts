@@ -154,7 +154,7 @@ export async function runAgentEvalCase(args: RunAgentEvalCaseArgs): Promise<Eval
   }
 }
 
-function buildHeddleAskCommand(args: {
+export function buildHeddleAskCommand(args: {
   workspaceRoot: string;
   model?: string;
   maxSteps?: number;
@@ -164,7 +164,6 @@ function buildHeddleAskCommand(args: {
 }): string[] {
   return [
     'yarn',
-    '-s',
     'cli:dev',
     '--cwd',
     args.workspaceRoot,
