@@ -4,7 +4,7 @@ import { cleanupEvalResults } from '../../core/eval/cleanup.js';
 import { loadEvalCases } from '../../core/eval/case-loader.js';
 import { runAgentEvalCase } from '../../core/eval/agent-runner.js';
 import { writeEvalSuiteReport } from '../../core/eval/report-writer.js';
-import type { EvalSuiteReport } from '../../core/eval/schema.js';
+import type { EvalCase, EvalSuiteReport } from '../../core/eval/schema.js';
 
 export type EvalCliOptions = {
   repoRoot: string;
@@ -21,6 +21,7 @@ type EvalArgs = {
   resultsDir: string;
   workRoot?: string;
   target: string;
+  fixtureRef?: string;
   timeoutMs?: number;
   before?: Date;
   yes: boolean;
@@ -51,10 +52,11 @@ export async function runEvalCli(rawArgs: string[], options: EvalCliOptions) {
 
 async function runAgentEval(args: EvalArgs, options: EvalCliOptions) {
   const startedAt = new Date().toISOString();
-  const cases = loadEvalCases({
+  const loadedCases = loadEvalCases({
     casesDir: args.casesDir,
     ids: args.caseIds.length ? args.caseIds : undefined,
   });
+  const cases = loadedCases.map((testCase) => overrideFixtureRef(testCase, args.fixtureRef));
   if (cases.length === 0) {
     throw new Error(`No eval cases found under ${args.casesDir}`);
   }
@@ -131,6 +133,9 @@ function parseAgentEvalArgs(rawArgs: string[]): EvalArgs {
       case '--target':
         args.target = requireValue(rawArgs, ++index, token);
         break;
+      case '--fixture-ref':
+        args.fixtureRef = requireValue(rawArgs, ++index, token);
+        break;
       case '--timeout-ms':
         args.timeoutMs = parsePositiveInt(requireValue(rawArgs, ++index, token), token);
         break;
@@ -199,6 +204,7 @@ function writeEvalHelp() {
     '  --output <path>      Results directory; defaults to evals/results/agent-YYYY-MM-DD-HHMMSS',
     '  --work-root <path>   Parent directory for disposable workspaces; defaults to <output>/workspaces',
     '  --target <name>      Label for this run, default current',
+    '  --fixture-ref <ref>  Override git-worktree fixture ref for target workspace code',
     '  --timeout-ms <n>     Agent subprocess timeout',
     '  --dry-run            Prepare workspaces and reports without calling the model',
     '',
@@ -209,6 +215,22 @@ function writeEvalHelp() {
     '  --dry-run            Preview matching result directories without deleting; default behavior',
     '',
   ].join('\n'));
+}
+
+function overrideFixtureRef(
+  testCase: EvalCase,
+  fixtureRef: string | undefined,
+): EvalCase {
+  if (!fixtureRef || testCase.fixture.type !== 'git-worktree') {
+    return testCase;
+  }
+  return {
+    ...testCase,
+    fixture: {
+      ...testCase.fixture,
+      ref: fixtureRef,
+    },
+  };
 }
 
 function writeCleanupResult(result: ReturnType<typeof cleanupEvalResults>) {

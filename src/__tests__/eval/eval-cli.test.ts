@@ -13,6 +13,8 @@ describe('parseEvalArgs', () => {
       'evals/results/test',
       '--target',
       'current',
+      '--fixture-ref',
+      'v0.0.37',
       '--timeout-ms',
       '1000',
       '--dry-run',
@@ -22,6 +24,7 @@ describe('parseEvalArgs', () => {
       command: 'agent',
       caseIds: ['fix-failing-test'],
       target: 'current',
+      fixtureRef: 'v0.0.37',
       timeoutMs: 1000,
       dryRun: true,
     });

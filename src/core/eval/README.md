@@ -59,10 +59,10 @@ Run the broader Phase B TUI-adapter dogfood case:
 yarn eval:agent --cases-dir evals/cases/coding --case heddle-phase-b-tui-adapter-milestone --model gpt-5.4
 ```
 
-Run the same Phase B scenario against the moving `HEAD` target:
+Run the same case but override the target workspace code ref:
 
 ```bash
-yarn eval:agent --cases-dir evals/cases/coding --case heddle-phase-b-tui-adapter-milestone-head --model gpt-5.4
+yarn eval:agent --cases-dir evals/cases/coding --case heddle-phase-b-tui-adapter-milestone --fixture-ref v0.0.37 --target runtime-current --model gpt-5.4
 ```
 
 Write results to a specific folder:
@@ -112,6 +112,29 @@ For smoke cases, the report mostly proves the harness is working.
 
 For dogfood and milestone cases, treat `passed` as "deterministic post-run checks passed", not "the work was definitely high quality." Use the report's milestone review section, changed files, diff, trace metrics, final summary, and human review questions to decide whether the agent completed the intended task or stopped after a substep.
 
+## Runner Versus Fixture Ref
+
+Dogfood evals have two different code versions in play:
+
+- **Runner code**: the Heddle checkout that executes `yarn eval:agent`. This is
+  the runtime behavior being evaluated.
+- **Fixture code**: the disposable workspace Heddle edits. For git-worktree
+  fixtures, this is the case's `fixture.ref`, optionally overridden by
+  `--fixture-ref`.
+
+For behavior comparisons, keep fixture code fixed and vary only the runner
+checkout. For example, run the same case from two different Heddle checkouts or
+commits, but keep `--fixture-ref v0.0.37` both times:
+
+```bash
+yarn eval:agent --cases-dir evals/cases/coding --case heddle-phase-b-tui-adapter-milestone --fixture-ref v0.0.37 --target runtime-v0.0.37 --model gpt-5.4
+yarn eval:agent --cases-dir evals/cases/coding --case heddle-phase-b-tui-adapter-milestone --fixture-ref v0.0.37 --target runtime-head --model gpt-5.4
+```
+
+`--target` is only a report/result label. It does not change which source code
+the agent edits. Use `--fixture-ref` or the case JSON fixture to control the
+target workspace code.
+
 ## Case Types
 
 ### Smoke Cases
@@ -129,9 +152,9 @@ They are not a serious benchmark for Heddle's product quality.
 
 ### Dogfood Cases
 
-Dogfood cases run against a real Heddle worktree pinned to a fixed ref.
+Dogfood cases run against a real Heddle worktree pinned to a fixed fixture ref.
 
-Pinned target refs are important. The evaluated Heddle runtime can change between baseline and candidate runs, but the target workspace should stay fixed. Avoid using moving `HEAD` for comparable evals.
+Pinned fixture refs are important. The evaluated Heddle runtime can change between baseline and candidate runs, but the target workspace should stay fixed. Avoid using moving `HEAD` as the fixture ref for comparable evals.
 
 Dogfood cases should be self-contained. If the task depends on a roadmap or
 design plan, keep a public fixture copy under `evals/fixtures/` and copy it into
@@ -155,10 +178,10 @@ Example fixture:
 }
 ```
 
-Moving-target `HEAD` cases are useful for exploratory dogfooding against the
-latest code, but do not use them as the primary baseline for A/B comparison.
-For comparable behavior measurement, keep the target fixture pinned and compare
-candidate Heddle runtimes against the same case and ref.
+Moving-target fixture refs such as `HEAD` are useful for exploratory dogfooding
+against the latest code, but do not use them as the primary baseline for A/B
+comparison. For comparable behavior measurement, keep the fixture pinned and
+compare candidate Heddle runtimes against the same case and ref.
 
 ## Progress Output
 
