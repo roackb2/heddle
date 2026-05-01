@@ -41,6 +41,8 @@
     "client:dev": "vite --config src/web/vite.config.ts",
     "server:dev": "tsx --no-cache src/server/dev.ts",
     "daemon:dev": "tsx --no-cache src/cli/main.ts daemon --assets-dir dist/src/web",
+    "eval:agent": "tsx --no-cache src/cli/main.ts eval agent",
+    "eval:clean": "tsx --no-cache src/cli/main.ts eval clean",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:headed": "playwright test --headed",
@@ -55,7 +57,10 @@
     "example:heartbeat-scheduler": "tsx --no-cache examples/heartbeat-scheduler.ts",
     "example:host-events": "tsx --no-cache examples/host-events.ts",
     "example:cyberloop-observer": "tsx --no-cache examples/cyberloop-observer.ts",
-    "test": "vitest run src/__tests__",
+    "test": "yarn test:unit && yarn test:integration",
+    "test:unit": "vitest run src/__tests__/unit",
+    "test:integration": "vitest run src/__tests__/integration",
+    "test:e2e": "playwright test",
     "prepare": "yarn build"
   },
   "keywords": [

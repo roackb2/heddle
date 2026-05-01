@@ -24,18 +24,28 @@ Build the project:
 yarn build
 ```
 
-Run tests:
+Run the default fast test suites:
 
 ```bash
 yarn test
 ```
 
-Run browser workflow tests:
+That runs unit and integration suites, but excludes browser e2e by default.
+
+Run focused suites by test layer:
+
+```bash
+yarn test:unit
+yarn test:integration
+```
+
+Run browser workflow tests explicitly:
 
 ```bash
 yarn e2e:install
 yarn e2e
 yarn e2e:headed
+yarn test:e2e
 ```
 
 `yarn e2e` runs Playwright against an isolated fixture daemon on `127.0.0.1:9876` and a Vite client on `127.0.0.1:5174`. It does not call live LLM providers. The first suite covers control-plane loading, route persistence, workspace switching, current Git diff review, and mobile navigation.
@@ -132,7 +142,9 @@ High-level areas:
 - `src/cli/`: CLI entrypoints and interactive chat flows
 - `src/server/`: daemon server and control-plane backend
 - `src/web/`: control-plane frontend
-- `src/__tests__/`: automated tests
+- `src/__tests__/unit/`: fast unit suites organized by product surface
+- `src/__tests__/integration/`: higher-level integration suites organized by product surface
+- `src/__tests__/e2e/`: Playwright/browser end-to-end suites excluded from default `yarn test`
 - `examples/`: programmatic and workflow examples
 - `docs/`: user, operator, and project documentation
 

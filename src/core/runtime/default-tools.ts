@@ -13,7 +13,6 @@ import {
 import { createReadFileTool } from '../tools/read-file.js';
 import { createMemoryCheckpointTool } from '../tools/memory-checkpoint.js';
 import { createRecordKnowledgeTool } from '../tools/record-knowledge.js';
-import { reportStateTool } from '../tools/report-state.js';
 import { createRunShellInspectTool, createRunShellMutateTool } from '../tools/run-shell.js';
 import { createSearchFilesTool } from '../tools/search-files.js';
 import { updatePlanTool } from '../tools/update-plan.js';
@@ -60,7 +59,6 @@ export function createDefaultAgentTools(options: DefaultAgentToolsOptions): Tool
       credentialStorePath: options.credentialStorePath,
       workspaceRoot,
     }),
-    reportStateTool,
   ];
 
   tools.push(...createMemoryTools(memoryRoot, memoryMode));

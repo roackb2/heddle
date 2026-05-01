@@ -6,7 +6,7 @@ const serverPort = process.env.HEDDLE_E2E_SERVER_PORT ?? '9876';
 const serverUrl = `http://127.0.0.1:${serverPort}`;
 
 export default defineConfig({
-  testDir: './e2e',
+  testDir: './src/__tests__/e2e',
   timeout: 30_000,
   expect: {
     timeout: 10_000,

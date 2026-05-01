@@ -1,0 +1,67 @@
+{
+  "id": "heddle-post-mutation-empty-requirement",
+  "kind": "coding",
+  "description": "Pinned Heddle dogfood case: fix a seeded post-mutation host requirement edge case in real Heddle source.",
+  "fixture": {
+    "type": "git-worktree",
+    "repo": ".",
+    "ref": "v0.0.37"
+  },
+  "setup": {
+    "files": {
+      "src/__tests__/core/post-mutation.test.ts": "import { describe, expect, it } from 'vitest';\nimport { buildPostMutationRequirement } from '../../core/agent/post-mutation.js';\n\ndescribe('buildPostMutationRequirement', () => {\n  it('returns an empty string when no post-mutation work is pending', () => {\n    expect(buildPostMutationRequirement({\n      pendingVerification: false,\n      pendingChangeReview: false,\n    })).toBe('');\n  });\n\n  it('can still note existing verification when requested', () => {\n    const message = buildPostMutationRequirement({\n      pendingVerification: false,\n      pendingChangeReview: false,\n      verificationCommands: ['yarn test'],\n      noteExistingVerification: true,\n    });\n\n    expect(message).toContain('verification already captured: yarn test');\n  });\n});\n"
+    },
+    "commands": [
+      {
+        "name": "install dependencies",
+        "command": "yarn install --ignore-scripts --silent --network-timeout 600000",
+        "timeoutMs": 300000
+      }
+    ],
+    "commitMessage": "Seed post-mutation edge case eval"
+  },
+  "prompt": "A focused regression test has been added for the post-mutation host requirement message. Make the smallest appropriate production-code change so the focused test passes. Preserve the existing behavior that can mention already captured verification when requested. Run the focused test before finishing and summarize the changed file and verification result.",
+  "maxSteps": 80,
+  "review": {
+    "milestone": "Post-mutation edge-case bugfix",
+    "intent": "Evaluate whether Heddle can make a small production fix in real Heddle code, verify it, and stop with an accurate summary.",
+    "requiredOutcomes": [
+      "The seeded post-mutation regression test passes",
+      "The production change preserves the existing verification-note behavior",
+      "The final diff is focused on post-mutation behavior rather than unrelated refactors"
+    ],
+    "allowedScope": [
+      "src/core/agent/post-mutation.ts",
+      "src/__tests__/core/post-mutation.test.ts"
+    ],
+    "outOfScope": [
+      "prompt rewrites",
+      "tool policy changes",
+      "control-plane or TUI code"
+    ],
+    "humanQuestions": [
+      "Did the agent inspect the failing test and production implementation before editing?",
+      "Did the final answer truthfully report the focused verification result?"
+    ]
+  },
+  "checks": [
+    {
+      "name": "focused post-mutation test",
+      "command": "yarn vitest run src/__tests__/core/post-mutation.test.ts",
+      "timeoutMs": 120000
+    }
+  ],
+  "rubric": [
+    "inspected the seeded failing test and post-mutation implementation before editing",
+    "fixed the empty-requirement edge case without removing the existing verification-note behavior",
+    "kept the patch focused to post-mutation behavior and its test",
+    "ran the focused Vitest command and reported the result truthfully"
+  ],
+  "tags": [
+    "dogfood",
+    "pinned-target",
+    "heddle",
+    "bugfix",
+    "verification"
+  ]
+}

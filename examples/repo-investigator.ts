@@ -15,7 +15,6 @@ import {
   readFileTool,
   editFileTool,
   searchFilesTool,
-  reportStateTool,
   createRunShellInspectTool,
   createRunShellMutateTool,
   formatTraceForConsole,
@@ -44,7 +43,6 @@ async function main() {
     readFileTool,
     editFileTool,
     searchFilesTool,
-    reportStateTool,
     createRunShellInspectTool(),
     createRunShellMutateTool(),
   ];

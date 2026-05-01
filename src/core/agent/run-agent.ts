@@ -15,19 +15,15 @@ import { logger as defaultLogger } from '../utils/logger.js';
 import type { Logger } from 'pino';
 
 import { sanitizeHistory } from './history.js';
-import { isAbortError, isRecoverableToolError } from './util.js';
+import { isAbortError } from './util.js';
 import { createMutationState, trackToolResult } from './mutation-tracking.js';
 import { createProgressReminderState, buildProgressReminders } from './progress-reminders.js';
-import {
-  buildPostMutationRequirement,
-} from './post-mutation.js';
 import { maybeDenyToolCall, executeToolCallWithFallback } from './tool-dispatch.js';
 import type { PlanItem } from '../tools/update-plan.js';
 
 const PLAN_ITEM_STATUSES = new Set<PlanItem['status']>(['pending', 'in_progress', 'completed']);
 
 const DEFAULT_MAX_STEPS = 100;
-const MAX_CONSECUTIVE_ERRORS = 3;
 const STREAM_UPDATE_INTERVAL_MS = 75;
 const INTERRUPTED_SUMMARY = 'Run interrupted by host request';
 
@@ -339,7 +335,6 @@ function handleDeniedToolResult(
   result: ToolResult,
 ): RunResult | undefined {
   context.state.consecutiveErrors++;
-  pushConsecutiveErrorWarning(context, result.error);
 
   context.messages.push({
     role: 'tool',
@@ -446,18 +441,8 @@ function trackMemoryCheckpointNeed(context: RunContext, effectiveCall: ToolCall)
   }
 }
 
-function handleFailedToolExecution(context: RunContext, result: ToolResult): RunResult | undefined {
-  if (isRecoverableToolError(result.error)) {
-    context.messages.push({
-      role: 'system',
-      content:
-        `Host reminder: the last tool call failed due to invalid or repeated tool use: ${result.error}. Correct the call immediately, switch tools, or use report_state if you are blocked. Do not keep retrying the same failing pattern.`,
-    });
-  } else {
-    context.state.consecutiveErrors++;
-    pushConsecutiveErrorWarning(context, result.error);
-  }
-
+function handleFailedToolExecution(context: RunContext, _result: ToolResult): RunResult | undefined {
+  context.state.consecutiveErrors++;
   return undefined;
 }
 
@@ -465,7 +450,6 @@ function pushProgressReminders(context: RunContext, effectiveCall: ToolCall, res
   const reminders = buildProgressReminders(context.progress, {
     effectiveCall,
     result,
-    remainingSteps: context.budget.remaining(),
   });
 
   for (const reminder of reminders) {
@@ -476,19 +460,6 @@ function pushProgressReminders(context: RunContext, effectiveCall: ToolCall, res
 function finalizeAssistantResponse(context: RunContext, response: LlmResponse): RunResult | 'continue' {
   if (!response.content) {
     return finishRun(context, 'error', 'Model returned an empty response');
-  }
-
-  const hostWarning = detectActionlessCompletion(context, response.content);
-  if (hostWarning) {
-    context.record({
-      type: 'host.warning',
-      code: 'actionless_completion',
-      message: hostWarning.message,
-      details: hostWarning.details,
-      step: context.state.step,
-      timestamp: context.now(),
-    });
-    context.log.warn({ step: context.state.step, ...hostWarning.details }, hostWarning.message);
   }
 
   context.record({
@@ -508,42 +479,12 @@ function finalizeAssistantResponse(context: RunContext, response: LlmResponse): 
 }
 
 function pushHostRequirementReminders(context: RunContext) {
-  const postMutationReminder = getPostMutationFollowUpReminder(context);
-  if (postMutationReminder && !context.state.reminders.postMutationFollowUpSent) {
-    context.state.reminders.postMutationFollowUpSent = true;
-    context.messages.push({ role: 'system', content: postMutationReminder });
-  }
-
   const memoryReminder = getMemoryCheckpointReminder(context);
   if (memoryReminder && !context.state.reminders.memoryCheckpointSent) {
     context.state.reminders.memoryCheckpointSent = true;
     context.messages.push({ role: 'system', content: memoryReminder });
   }
-
 }
-
-function getPostMutationFollowUpReminder(context: RunContext): string | undefined {
-  if (context.mutation.pendingVerification || context.mutation.pendingChangeReview) {
-    context.log.info(
-      {
-        step: context.state.step,
-        pendingVerification: context.mutation.pendingVerification,
-        pendingChangeReview: context.mutation.pendingChangeReview,
-      },
-      'Reminding agent to complete mutation follow-up before final answer',
-    );
-    return buildPostMutationRequirement({
-      pendingVerification: context.mutation.pendingVerification,
-      pendingChangeReview: context.mutation.pendingChangeReview,
-      reviewCommands: context.mutation.executedReviewCommands,
-      verificationCommands: context.mutation.executedVerificationCommands,
-      noteExistingVerification: !context.mutation.pendingVerification,
-    });
-  }
-
-  return undefined;
-}
-
 
 function getMemoryCheckpointReminder(context: RunContext): string | undefined {
   if (context.state.memoryCheckpoint.required && !context.state.memoryCheckpoint.completed) {
@@ -570,16 +511,6 @@ function isMemoryOnlyTool(tool: string): boolean {
     || tool === 'memory_checkpoint';
 }
 
-
-function extractSummaryLead(content: string): string | undefined {
-  const lines = content
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  return lines[0] || undefined;
-}
-
 function maybeFinishInterrupted(context: RunContext, logMessage: string): RunResult | undefined {
   if (!context.shouldStop?.()) {
     return undefined;
@@ -593,67 +524,6 @@ function finishInterrupted(context: RunContext, logMessage: string): RunResult {
     logLevel: 'info',
     logMessage,
   });
-}
-
-function pushConsecutiveErrorWarning(context: RunContext, error: string | undefined) {
-  if (context.state.consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
-    return;
-  }
-
-  context.messages.push({
-    role: 'system',
-    content:
-      `Host warning: there have been ${context.state.consecutiveErrors} consecutive tool errors${error ? `; latest error: ${error}` : ''}. Try a different approach, different tool, narrower scope, or use report_state if you are genuinely blocked. Do not stop solely because of this warning.`,
-  });
-}
-
-function detectActionlessCompletion(
-  context: RunContext,
-  content: string,
-): { message: string; details: Record<string, unknown> } | undefined {
-  if (context.state.executedToolCalls > 0) {
-    return undefined;
-  }
-
-  if (!isActionOrientedGoal(context.goal)) {
-    return undefined;
-  }
-
-  if (!looksLikeIntentOnlyResponse(content)) {
-    return undefined;
-  }
-
-  return {
-    message: 'Action-oriented prompt finished with no tool activity; assistant replied with an intent statement instead of taking the next action.',
-    details: {
-      goal: context.goal,
-      responseLead: extractSummaryLead(content) ?? content.trim().slice(0, 160),
-      executedToolCalls: context.state.executedToolCalls,
-      activePlanItems: context.state.activePlan?.items.length ?? 0,
-    },
-  };
-}
-
-function isActionOrientedGoal(goal: string): boolean {
-  return /\b(?:continue|go on|keep working|work on|inspect|investigate|check|verify|run|open|list|read|search|look into|implement|fix|update|edit|change|create|write|polish)\b/i.test(goal);
-}
-
-function looksLikeIntentOnlyResponse(content: string): boolean {
-  const trimmed = content.trim();
-  if (!trimmed) {
-    return false;
-  }
-
-  const firstLine = trimmed.split('\n').map((line) => line.trim()).find(Boolean) ?? trimmed;
-  if (!/^(?:i(?:'|’)ll|i will|let me)\b/i.test(firstLine)) {
-    return false;
-  }
-
-  if (/\b(?:completed|done|finished|updated|changed|implemented|fixed|checked|inspected|ran|verified|listed|found|created|wrote)\b/i.test(trimmed)) {
-    return false;
-  }
-
-  return /\b(?:continue|inspect|verify|implement|polish|check|review|look|open|run|read|search|work on|take a look)\b/i.test(trimmed);
 }
 
 function finishRun(

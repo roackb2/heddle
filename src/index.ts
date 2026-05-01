@@ -223,7 +223,6 @@ export { createMemoryCheckpointTool } from './core/tools/memory-checkpoint.js';
 export type { MemoryCheckpointToolOptions } from './core/tools/memory-checkpoint.js';
 export { createRecordKnowledgeTool, recordKnowledgeTool } from './core/tools/record-knowledge.js';
 export type { RecordKnowledgeToolOptions } from './core/tools/record-knowledge.js';
-export { reportStateTool } from './core/tools/report-state.js';
 export { updatePlanTool } from './core/tools/update-plan.js';
 export type { PlanItem, PlanItemStatus } from './core/tools/update-plan.js';
 export { createRunShellInspectTool, createRunShellMutateTool } from './core/tools/run-shell.js';

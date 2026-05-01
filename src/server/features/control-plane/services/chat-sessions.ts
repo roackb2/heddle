@@ -39,6 +39,7 @@ type SubmitChatPromptArgs = {
   preferApiKey?: boolean;
   systemContext?: string;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
+  continuePrompt?: string;
   leaseOwner: ChatSessionLeaseOwner;
 };
 
@@ -120,11 +121,17 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs) {
 
   try {
     const result = await submitChatSessionPrompt({
-      ...args,
+      workspaceRoot: args.workspaceRoot,
+      stateRoot: args.stateRoot,
+      sessionStoragePath: args.sessionStoragePath,
+      sessionId: args.sessionId,
+      prompt: args.continuePrompt ?? args.prompt,
       apiKey: args.apiKey,
       preferApiKey: args.preferApiKey,
+      systemContext: args.systemContext,
       memoryMaintenanceMode: args.memoryMaintenanceMode,
       abortSignal: controller.signal,
+      leaseOwner: args.leaseOwner,
       onEvent: events.hostPort.events?.onAgentLoopEvent,
       approveToolCall: async (call, tool) => {
         const decision = await requestToolApproval({
@@ -156,7 +163,7 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs) {
   }
 }
 
-export async function continueChatPrompt(args: Omit<SubmitChatPromptArgs, 'prompt'>) {
+export async function continueChatPrompt(args: Omit<SubmitChatPromptArgs, 'prompt' | 'continuePrompt'>) {
   const session = readChatSession(args.sessionStoragePath, args.sessionId, true);
   if (!session) {
     throw new Error(`Chat session not found: ${args.sessionId}`);
@@ -168,7 +175,8 @@ export async function continueChatPrompt(args: Omit<SubmitChatPromptArgs, 'promp
 
   return await submitChatPrompt({
     ...args,
-    prompt: session.lastContinuePrompt,
+    prompt: 'Continue from where you left off.',
+    continuePrompt: session.lastContinuePrompt,
   });
 }
 
