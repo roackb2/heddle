@@ -144,6 +144,7 @@ export type EvalRunResult = {
   artifacts: {
     gitStatusPath: string;
     gitDiffPath: string;
+    progressPath?: string;
     sessionCatalogPath?: string;
     traceFiles: string[];
   };

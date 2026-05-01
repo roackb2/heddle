@@ -64,6 +64,7 @@ function formatRunDetail(result: EvalRunResult, resultsDir: string): string[] {
     `| Output | \`${escapeCell(formatPath(result.outputDir, resultsDir))}\` |`,
     `| Diff | \`${escapeCell(formatPath(result.artifacts.gitDiffPath, resultsDir))}\` |`,
     `| Git status | \`${escapeCell(formatPath(result.artifacts.gitStatusPath, resultsDir))}\` |`,
+    `| Progress | ${result.artifacts.progressPath ? `\`${escapeCell(formatPath(result.artifacts.progressPath, resultsDir))}\`` : 'none'} |`,
     `| Session catalog | ${result.artifacts.sessionCatalogPath ? `\`${escapeCell(formatPath(result.artifacts.sessionCatalogPath, resultsDir))}\`` : 'none'} |`,
     `| Trace files | ${traceFiles.length ? traceFiles.map((path) => `\`${escapeCell(path)}\``).join('<br>') : 'none'} |`,
     '',

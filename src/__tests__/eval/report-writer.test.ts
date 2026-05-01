@@ -34,6 +34,7 @@ describe('formatEvalSuiteMarkdown', () => {
         artifacts: {
           gitStatusPath: '/repo/evals/results/run/current/fix-failing-test/git-status.txt',
           gitDiffPath: '/repo/evals/results/run/current/fix-failing-test/diff.patch',
+          progressPath: '/repo/evals/results/run/current/fix-failing-test/progress.jsonl',
           sessionCatalogPath: '/repo/evals/results/run/current/fix-failing-test/session-catalog.json',
           traceFiles: ['/repo/evals/results/run/current/fix-failing-test/traces/trace.json'],
         },
@@ -75,6 +76,7 @@ describe('formatEvalSuiteMarkdown', () => {
     expect(markdown).toContain('| Fixture | inline, baseline 1234567890ab |');
     expect(markdown).toContain('| Output | `current/fix-failing-test` |');
     expect(markdown).toContain('| Diff | `current/fix-failing-test/diff.patch` |');
+    expect(markdown).toContain('| Progress | `current/fix-failing-test/progress.jsonl` |');
     expect(markdown).toContain('| Trace files | `current/fix-failing-test/traces/trace.json` |');
     expect(markdown).toContain('### Metrics');
     expect(markdown).toContain('| Assistant turns | 3 |');

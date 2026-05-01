@@ -2,6 +2,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } fro
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runCommand, runShellCommand } from './process.js';
+import type { EvalProgressReporter } from './progress.js';
 import type { AgentEvalCase, EvalCheckResult, EvalRunResult } from './schema.js';
 
 export type PreparedEvalWorkspace = {
@@ -14,15 +15,14 @@ export async function prepareEvalWorkspace(args: {
   testCase: AgentEvalCase;
   repoRoot: string;
   workRoot?: string;
+  progress?: EvalProgressReporter;
 }): Promise<PreparedEvalWorkspace> {
   const parent = args.workRoot ? resolve(args.workRoot) : mkdtempSync(join(tmpdir(), 'heddle-eval-'));
   mkdirSync(parent, { recursive: true });
   const workspaceRoot = join(parent, args.testCase.id);
 
   const fixture = args.testCase.fixture;
-  if (fixture.type === 'git-worktree') {
-    await removeGitWorktree(resolve(args.repoRoot, fixture.repo), workspaceRoot);
-  } else {
+  if (fixture.type === 'inline') {
     rmSync(workspaceRoot, { recursive: true, force: true });
   }
   const prepared =
@@ -31,10 +31,12 @@ export async function prepareEvalWorkspace(args: {
         repoRoot: args.repoRoot,
         workspaceRoot,
         testCase: args.testCase,
+        progress: args.progress,
       })
     : await prepareInlineFixture({
         workspaceRoot,
         testCase: args.testCase,
+        progress: args.progress,
       });
 
   copyAuthState({
@@ -48,16 +50,22 @@ export async function prepareEvalWorkspace(args: {
 async function prepareInlineFixture(args: {
   workspaceRoot: string;
   testCase: AgentEvalCase;
+  progress?: EvalProgressReporter;
 }): Promise<PreparedEvalWorkspace> {
   mkdirSync(args.workspaceRoot, { recursive: true });
   const setupResults = await applyEvalSetup({
     workspaceRoot: args.workspaceRoot,
     testCase: args.testCase,
+    progress: args.progress,
   });
-  const baselineCommit = await initializeGitBaseline(
-    args.workspaceRoot,
-    args.testCase.setup.commitMessage ?? `Initial eval fixture for ${args.testCase.id}`,
-  );
+  const baselineCommit = await trackProgress(args.progress, {
+    phase: 'workspace.baseline',
+    message: 'commit inline fixture baseline',
+    run: () => initializeGitBaseline(
+      args.workspaceRoot,
+      args.testCase.setup.commitMessage ?? `Initial eval fixture for ${args.testCase.id}`,
+    ),
+  });
 
   return {
     workspaceRoot: args.workspaceRoot,
@@ -73,6 +81,7 @@ async function prepareGitWorktreeFixture(args: {
   repoRoot: string;
   workspaceRoot: string;
   testCase: AgentEvalCase;
+  progress?: EvalProgressReporter;
 }): Promise<PreparedEvalWorkspace> {
   const fixture = args.testCase.fixture;
   if (fixture.type !== 'git-worktree') {
@@ -80,17 +89,34 @@ async function prepareGitWorktreeFixture(args: {
   }
 
   const sourceRepo = resolve(args.repoRoot, fixture.repo);
-  const resolvedRef = await resolveGitCommit(sourceRepo, fixture.ref);
-  await removeGitWorktree(sourceRepo, args.workspaceRoot);
-  await runRequiredGit(sourceRepo, ['worktree', 'add', '--detach', args.workspaceRoot, resolvedRef]);
+  const resolvedRef = await trackProgress(args.progress, {
+    phase: 'workspace.resolve-ref',
+    message: `resolve target ref ${fixture.ref}`,
+    run: () => resolveGitCommit(sourceRepo, fixture.ref),
+  });
+  await trackProgress(args.progress, {
+    phase: 'workspace.cleanup',
+    message: 'remove existing dogfood worktree if needed',
+    run: () => removeGitWorktree(sourceRepo, args.workspaceRoot),
+  });
+  await trackProgress(args.progress, {
+    phase: 'workspace.worktree',
+    message: `create pinned worktree at ${fixture.ref}`,
+    run: () => runRequiredGit(sourceRepo, ['worktree', 'add', '--detach', args.workspaceRoot, resolvedRef]),
+  });
 
   const setupResults = await applyEvalSetup({
     workspaceRoot: args.workspaceRoot,
     testCase: args.testCase,
+    progress: args.progress,
   });
   const baselineCommit =
     await hasGitChanges(args.workspaceRoot) ?
-      await commitAll(args.workspaceRoot, args.testCase.setup.commitMessage ?? `Eval setup for ${args.testCase.id}`)
+      await trackProgress(args.progress, {
+        phase: 'workspace.baseline',
+        message: 'commit seeded eval baseline',
+        run: () => commitAll(args.workspaceRoot, args.testCase.setup.commitMessage ?? `Eval setup for ${args.testCase.id}`),
+      })
     : resolvedRef;
 
   return {
@@ -109,6 +135,7 @@ async function prepareGitWorktreeFixture(args: {
 async function applyEvalSetup(args: {
   workspaceRoot: string;
   testCase: AgentEvalCase;
+  progress?: EvalProgressReporter;
 }): Promise<EvalCheckResult[]> {
   for (const [relativePath, content] of Object.entries(args.testCase.setup.files ?? {})) {
     const path = join(args.workspaceRoot, relativePath);
@@ -118,13 +145,19 @@ async function applyEvalSetup(args: {
 
   const setupResults: EvalCheckResult[] = [];
   for (const command of args.testCase.setup.commands ?? []) {
-    const result = await runShellCommand({
-      command: command.command,
-      cwd: args.workspaceRoot,
-      timeoutMs: command.timeoutMs,
+    const name = command.name ?? command.command;
+    const result = await trackProgress(args.progress, {
+      phase: 'workspace.setup-command',
+      message: `run setup command: ${name}`,
+      heartbeatMessage: `still running setup command: ${name}`,
+      run: () => runShellCommand({
+        command: command.command,
+        cwd: args.workspaceRoot,
+        timeoutMs: command.timeoutMs,
+      }),
     });
     setupResults.push({
-      name: command.name ?? command.command,
+      name,
       command: command.command,
       exitCode: result.exitCode,
       stdout: result.stdout,
@@ -150,6 +183,19 @@ function copyAuthState(args: {
     mkdirSync(dirname(memoryTarget), { recursive: true });
     cpSync(memorySource, memoryTarget);
   }
+}
+
+async function trackProgress<T>(
+  progress: EvalProgressReporter | undefined,
+  args: {
+    phase: string;
+    message: string;
+    heartbeatMessage?: string;
+    heartbeatMs?: number;
+    run: () => Promise<T>;
+  },
+): Promise<T> {
+  return progress ? await progress.track(args) : await args.run();
 }
 
 async function initializeGitBaseline(workspaceRoot: string, message: string): Promise<string> {

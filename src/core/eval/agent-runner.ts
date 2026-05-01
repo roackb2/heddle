@@ -4,6 +4,7 @@ import { collectEvalArtifacts, writeTextArtifact } from './git-artifacts.js';
 import { prepareEvalWorkspace } from './workspace-fixture.js';
 import { runEvalChecks } from './check-runner.js';
 import { runCommand } from './process.js';
+import { EvalProgressReporter } from './progress.js';
 import { analyzeTraceFiles } from './trace-analyzer.js';
 import type { AgentEvalCase, EvalRunResult } from './schema.js';
 
@@ -27,12 +28,24 @@ export async function runAgentEvalCase(args: RunAgentEvalCaseArgs): Promise<Eval
   const target = args.target ?? 'current';
   const outputDir = join(args.resultsRoot, target, args.testCase.id);
   mkdirSync(outputDir, { recursive: true });
-
-  const prepared = await prepareEvalWorkspace({
-    testCase: args.testCase,
-    repoRoot: args.repoRoot,
-    workRoot: args.workRoot ? resolve(args.workRoot) : undefined,
+  const progress = new EvalProgressReporter({
+    caseId: args.testCase.id,
+    progressPath: join(outputDir, 'progress.jsonl'),
   });
+
+  progress.info('case', 'starting eval case');
+  try {
+    const prepared = await progress.track({
+      phase: 'workspace.prepare',
+      message: 'prepare eval workspace',
+      heartbeatMessage: 'still preparing eval workspace',
+      run: () => prepareEvalWorkspace({
+        testCase: args.testCase,
+        repoRoot: args.repoRoot,
+        workRoot: args.workRoot ? resolve(args.workRoot) : undefined,
+        progress,
+      }),
+    });
   const workspaceRoot = prepared.workspaceRoot;
   const model = args.model ?? args.testCase.model;
   const maxSteps = args.maxSteps ?? args.testCase.maxSteps;
@@ -57,27 +70,44 @@ export async function runAgentEvalCase(args: RunAgentEvalCaseArgs): Promise<Eval
         durationMs: 0,
         timedOut: false,
       }
-    : await runCommand({
-        command: command[0] ?? 'yarn',
-        args: command.slice(1),
-        cwd: args.repoRoot,
-        env: {
-          ...process.env,
-          HEDDLE_EVAL_AUTO_APPROVE: '1',
-        },
-        timeoutMs: args.timeoutMs ?? 15 * 60_000,
+    : await progress.track({
+        phase: 'agent.run',
+        message: 'run Heddle agent',
+        heartbeatMessage: 'still running Heddle agent',
+        run: () => runCommand({
+          command: command[0] ?? 'yarn',
+          args: command.slice(1),
+          cwd: args.repoRoot,
+          env: {
+            ...process.env,
+            HEDDLE_EVAL_AUTO_APPROVE: '1',
+          },
+          timeoutMs: args.timeoutMs ?? 15 * 60_000,
+        }),
       });
+  progress.info('agent.stdout', `write agent stdout to ${stdoutPath}`);
   writeTextArtifact(stdoutPath, agentResult.stdout);
+  progress.info('agent.stderr', `write agent stderr to ${stderrPath}`);
   writeTextArtifact(stderrPath, agentResult.stderr);
 
-  const checks = args.dryRun ? [] : await runEvalChecks({
-    checks: args.testCase.checks,
-    workspaceRoot,
+  const checks = args.dryRun ? [] : await progress.track({
+    phase: 'checks',
+    message: 'run deterministic checks',
+    heartbeatMessage: 'still running deterministic checks',
+    run: () => runEvalChecks({
+      checks: args.testCase.checks,
+      workspaceRoot,
+      progress,
+    }),
   });
-  const artifacts = await collectEvalArtifacts({
-    workspaceRoot,
-    outputDir,
-    stateDir: args.stateDir,
+  const artifacts = await progress.track({
+    phase: 'artifacts',
+    message: 'collect eval artifacts',
+    run: () => collectEvalArtifacts({
+      workspaceRoot,
+      outputDir,
+      stateDir: args.stateDir,
+    }),
   });
   const metrics = analyzeTraceFiles(artifacts.traceFiles);
   const finishedAtMs = Date.now();
@@ -105,14 +135,22 @@ export async function runAgentEvalCase(args: RunAgentEvalCaseArgs): Promise<Eval
       stderrPath,
       timedOut: agentResult.timedOut,
     },
-    artifacts,
+    artifacts: {
+      ...artifacts,
+      progressPath: progress.progressPath,
+    },
     checks,
     metrics,
     model,
     maxSteps,
   };
+  progress.info('case', `completed eval case with status ${status}`);
   writeTextArtifact(join(outputDir, 'result.json'), `${JSON.stringify(result, null, 2)}\n`);
   return result;
+  } catch (error) {
+    progress.info('case', `eval case failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw error;
+  }
 }
 
 function buildHeddleAskCommand(args: {
