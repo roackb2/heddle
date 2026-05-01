@@ -41,6 +41,7 @@ export function ModelPickerPanel({
               dimColor={!isHighlighted && !model.disabled}
             >
               {`${marker} ${model.id}${suffix ? ` ${suffix}` : ''}`}
+              {isHighlighted && model.disabled ? ` — ${OPENAI_OAUTH_MODE_DESCRIPTION}` : ''}
             </Text>
           );
         })

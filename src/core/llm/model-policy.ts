@@ -17,7 +17,7 @@ export const OPENAI_API_KEY_COMPACTION_MODEL = 'gpt-5.1-codex-mini';
 export const OPENAI_OAUTH_SYSTEM_MODEL = 'gpt-5.4';
 export const ANTHROPIC_COMPACTION_MODEL = 'claude-haiku-4-5';
 const OPENAI_OAUTH_DISABLED_REASON = 'Not supported';
-export const OPENAI_OAUTH_MODE_DESCRIPTION = 'Some OpenAI models are unavailable with account sign-in because OAuth uses the Codex backend allowlist. Use API-key mode for the broader OpenAI catalog.';
+export const OPENAI_OAUTH_MODE_DESCRIPTION = 'OAuth mode supports a smaller OpenAI allowlist.';
 
 const OPENAI_OAUTH_IMAGE_MODEL_PREFERENCES = ['gpt-5.4', 'gpt-5.4-mini'];
 

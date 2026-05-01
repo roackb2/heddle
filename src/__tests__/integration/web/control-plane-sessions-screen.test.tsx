@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatSessionDetail, ChatTurnReview, ControlPlaneState } from '../../../web/lib/api.js';
 import { SessionsScreen } from '../../../web/features/control-plane/screens/SessionsScreen.js';
@@ -65,7 +65,7 @@ const turnReview: ChatTurnReview = {
 describe('SessionsScreen review UI', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(fetchModelOptions).mockResolvedValue({ groups: [{ label: 'OpenAI', models: ['gpt-5.4'], options: [{ id: 'gpt-5.4', disabled: false }] }] });
+    vi.mocked(fetchModelOptions).mockResolvedValue({ groups: [{ label: 'OpenAI', models: ['gpt-5.4', 'gpt-5.5-pro'], options: [{ id: 'gpt-5.4', disabled: false }, { id: 'gpt-5.5-pro', disabled: false }] }] });
     vi.mocked(fetchWorkspaceChanges).mockResolvedValue({
       vcs: 'git',
       clean: false,
@@ -103,6 +103,11 @@ describe('SessionsScreen review UI', () => {
         sendingPrompt={false}
         runInFlight={false}
         memoryUpdating={false}
+        auth={{
+          preferApiKey: false,
+          openai: { type: 'oauth', provider: 'openai', accountId: 'acct-12345678', expiresAt: Date.now() + 60_000 },
+          anthropic: { type: 'missing', provider: 'anthropic' },
+        }}
         onSendPrompt={async () => undefined}
         creatingSession={false}
         onCreateSession={async () => undefined}
@@ -134,6 +139,11 @@ describe('SessionsScreen review UI', () => {
     await waitFor(() => {
       expect(fetchWorkspaceChanges).toHaveBeenCalledTimes(2);
     });
+
+    fireEvent.click(screen.getByRole('button', { name: 'model' }));
+    const modelListbox = screen.getByRole('listbox', { name: 'Model options' });
+    const unsupportedOption = within(modelListbox).getByRole('option', { name: /gpt-5.5-pro/i });
+    expect(unsupportedOption.getAttribute('disabled')).not.toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Turn history' }));
     await waitFor(() => {
