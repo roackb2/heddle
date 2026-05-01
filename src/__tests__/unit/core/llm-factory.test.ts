@@ -60,7 +60,7 @@ describe('llm adapter factory', () => {
     expect(option).toEqual({
       id: 'gpt-5.4-pro',
       disabled: true,
-      disabledReason: 'Not supported in OAuth mode',
+      disabledReason: 'Not supported',
       label: undefined,
     });
   });

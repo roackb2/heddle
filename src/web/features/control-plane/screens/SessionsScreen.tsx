@@ -14,6 +14,7 @@ import {
   type WorkspaceFileSuggestion,
 } from '../../../lib/api';
 import { formatControlPlaneAuthStatus } from '../auth-status';
+import { OPENAI_OAUTH_MODE_DESCRIPTION } from '../../../../core/llm/model-policy.js';
 import { formatDate, className } from '../utils';
 import { CodeBlock, EmptyState, Pill, WorkspaceSectionHeader } from '../components/common';
 import { SessionListButton } from '../components/lists';
@@ -605,6 +606,9 @@ export function SessionsScreen({
                   ))}
                   {!modelOptions ? <option value={sessionDetail?.model ?? activeSession.model ?? ''}>{modelOptionsError ? 'models unavailable' : sessionDetail?.model ?? activeSession.model ?? 'loading models'}</option> : null}
                 </select>
+                {modelOptions?.groups.some((group) => group.options?.some((option) => option.disabled)) ?
+                  <span>{OPENAI_OAUTH_MODE_DESCRIPTION}</span>
+                : null}
               </label>
               <Pill>turns {activeSession.turnCount}</Pill>
               {compactionStatus === 'running' ? <Pill tone="warn">compacting</Pill> : null}

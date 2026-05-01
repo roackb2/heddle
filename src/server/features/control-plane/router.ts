@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { BUILT_IN_MODEL_GROUPS } from '../../../core/llm/openai-models.js';
 import { buildCredentialAwareModelOption, credentialModeFromSource } from '../../../core/llm/model-policy.js';
 import { inferProviderFromModel } from '../../../core/llm/factory.js';
+import { resolveProviderCredentialSourceForModel } from '../../../core/runtime/api-keys.js';
 import { procedure, router } from '../../trpc.js';
 import type { HeddleServerContext } from '../../types.js';
 import {
@@ -168,7 +169,9 @@ export const controlPlaneRouter = router({
     return readChatSessionDetail(resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'), input.id) ?? null;
   }),
   modelOptions: procedure.query(({ ctx }) => {
-    const credentialMode = credentialModeFromSource(ctx.auth.openai);
+    const credentialMode = credentialModeFromSource(resolveProviderCredentialSourceForModel('gpt-5.4', {
+      preferApiKey: ctx.preferApiKey,
+    }));
     return {
       groups: BUILT_IN_MODEL_GROUPS.map((group) => ({
         label: group.label,

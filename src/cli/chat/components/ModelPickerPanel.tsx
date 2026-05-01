@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { CredentialAwareModelOption } from '../../../core/llm/model-policy.js';
+import { OPENAI_OAUTH_MODE_DESCRIPTION, type CredentialAwareModelOption } from '../../../core/llm/model-policy.js';
 
 const MAX_VISIBLE_MODELS = 8;
 
@@ -23,6 +23,7 @@ export function ModelPickerPanel({
       <Text dimColor>
         {query ? `Search: ${query}` : 'Type after /model set to filter. Use ↑/↓ or Tab to choose.'}
       </Text>
+      {visibleModels.some((model) => model.disabled) ? <Text dimColor>{OPENAI_OAUTH_MODE_DESCRIPTION}</Text> : null}
       {visibleModels.length > 0 ?
         visibleModels.map((model, index) => {
           const absoluteIndex = startIndex + index;

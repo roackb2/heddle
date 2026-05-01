@@ -1,4 +1,5 @@
 import { buildPromptRenderLines } from '../components/PromptInput.js';
+import { OPENAI_OAUTH_MODE_DESCRIPTION, type CredentialAwareModelOption } from '../../../core/llm/model-policy.js';
 import { getLocalCommandHints } from '../state/local-commands.js';
 import type { ChatSession, ConversationLine, PendingApproval } from '../state/types.js';
 import { formatApprovalHint, summarizePendingApproval, truncate } from '../utils/format.js';
@@ -31,7 +32,7 @@ export function buildTuiDebugSnapshot(args: {
   modelPicker?: {
     visible: boolean;
     query?: string;
-    items: string[];
+    items: CredentialAwareModelOption[];
     highlightedIndex: number;
   };
   sessionPicker?: {
@@ -115,7 +116,10 @@ export function buildTuiDebugSnapshot(args: {
   if (args.modelPicker?.visible) {
     lines.push('Model picker');
     lines.push(args.modelPicker.query ? `Search: ${args.modelPicker.query}` : 'Type after /model set to filter. Use ↑/↓ or Tab to choose.');
-    lines.push(...renderPickerLines(args.modelPicker.items, args.modelPicker.highlightedIndex));
+    if (args.modelPicker.items.some((item) => item.disabled)) {
+      lines.push(OPENAI_OAUTH_MODE_DESCRIPTION);
+    }
+    lines.push(...renderCredentialAwareModelPickerLines(args.modelPicker.items, args.modelPicker.highlightedIndex));
     lines.push('');
   }
 
@@ -162,6 +166,17 @@ function renderPickerLines(items: string[], highlightedIndex: number): string[] 
   }
 
   return items.slice(0, 8).map((item, index) => `${index === highlightedIndex ? '◉' : '○'} ${item}`);
+}
+
+function renderCredentialAwareModelPickerLines(items: CredentialAwareModelOption[], highlightedIndex: number): string[] {
+  if (items.length === 0) {
+    return ['No matching entries.'];
+  }
+
+  return items.slice(0, 8).map((item, index) => {
+    const suffix = item.disabled ? ` (${item.disabledReason ?? 'Not supported'})` : '';
+    return `${index === highlightedIndex ? '◉' : '○'} ${item.id}${suffix}`;
+  });
 }
 
 function indentLines(lines: string[]): string[] {
