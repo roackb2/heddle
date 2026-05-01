@@ -12,6 +12,12 @@ export const evalCheckSchema = z.object({
 }).describe('A deterministic post-run command used to decide whether the agent-produced workspace passes objective validation.');
 
 export const evalSetupSchema = z.object({
+  copyFiles: z.record(
+    z.string().trim().min(1).describe('Repository-relative source file path to copy from the eval harness repo.'),
+    z.string().trim().min(1).describe('Workspace-relative destination file path to create before the eval starts.'),
+  )
+    .describe('Fixture files to copy from the eval harness repo into the disposable workspace before committing the initial Git baseline.')
+    .optional(),
   files: z.record(
     z.string().trim().min(1).describe('Workspace-relative file path to create before the eval starts.'),
     z.string().describe('Exact UTF-8 file contents to write for the fixture file.'),

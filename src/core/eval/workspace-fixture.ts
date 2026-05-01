@@ -34,6 +34,7 @@ export async function prepareEvalWorkspace(args: {
         progress: args.progress,
       })
     : await prepareInlineFixture({
+        repoRoot: args.repoRoot,
         workspaceRoot,
         testCase: args.testCase,
         progress: args.progress,
@@ -48,6 +49,7 @@ export async function prepareEvalWorkspace(args: {
 }
 
 async function prepareInlineFixture(args: {
+  repoRoot: string;
   workspaceRoot: string;
   testCase: AgentEvalCase;
   progress?: EvalProgressReporter;
@@ -55,6 +57,7 @@ async function prepareInlineFixture(args: {
   mkdirSync(args.workspaceRoot, { recursive: true });
   const setupResults = await applyEvalSetup({
     workspaceRoot: args.workspaceRoot,
+    repoRoot: args.repoRoot,
     testCase: args.testCase,
     progress: args.progress,
   });
@@ -107,6 +110,7 @@ async function prepareGitWorktreeFixture(args: {
 
   const setupResults = await applyEvalSetup({
     workspaceRoot: args.workspaceRoot,
+    repoRoot: args.repoRoot,
     testCase: args.testCase,
     progress: args.progress,
   });
@@ -134,9 +138,17 @@ async function prepareGitWorktreeFixture(args: {
 
 async function applyEvalSetup(args: {
   workspaceRoot: string;
+  repoRoot: string;
   testCase: AgentEvalCase;
   progress?: EvalProgressReporter;
 }): Promise<EvalCheckResult[]> {
+  for (const [sourceRelativePath, targetRelativePath] of Object.entries(args.testCase.setup.copyFiles ?? {})) {
+    const sourcePath = resolve(args.repoRoot, sourceRelativePath);
+    const targetPath = join(args.workspaceRoot, targetRelativePath);
+    mkdirSync(dirname(targetPath), { recursive: true });
+    cpSync(sourcePath, targetPath);
+  }
+
   for (const [relativePath, content] of Object.entries(args.testCase.setup.files ?? {})) {
     const path = join(args.workspaceRoot, relativePath);
     mkdirSync(dirname(path), { recursive: true });

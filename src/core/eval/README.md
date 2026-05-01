@@ -133,6 +133,11 @@ Dogfood cases run against a real Heddle worktree pinned to a fixed ref.
 
 Pinned target refs are important. The evaluated Heddle runtime can change between baseline and candidate runs, but the target workspace should stay fixed. Avoid using moving `HEAD` for comparable evals.
 
+Dogfood cases should be self-contained. If the task depends on a roadmap or
+design plan, keep a public fixture copy under `evals/fixtures/` and copy it into
+the disposable workspace through `setup.copyFiles`; do not depend on private
+workspace notes or sibling repos.
+
 Example fixture:
 
 ```json
@@ -141,6 +146,11 @@ Example fixture:
     "type": "git-worktree",
     "repo": ".",
     "ref": "v0.0.37"
+  },
+  "setup": {
+    "copyFiles": {
+      "evals/fixtures/roadmaps/phase-b-tui-adapter-milestone.md": "docs/eval-roadmaps/phase-b-tui-adapter-milestone.md"
+    }
   }
 }
 ```

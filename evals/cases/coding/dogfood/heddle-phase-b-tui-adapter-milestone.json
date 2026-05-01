@@ -8,6 +8,9 @@
     "ref": "v0.0.37"
   },
   "setup": {
+    "copyFiles": {
+      "evals/fixtures/roadmaps/phase-b-tui-adapter-milestone.md": "docs/eval-roadmaps/phase-b-tui-adapter-milestone.md"
+    },
     "commands": [
       {
         "name": "install dependencies",
@@ -17,7 +20,7 @@
     ],
     "commitMessage": "Seed Phase B TUI adapter milestone eval"
   },
-  "prompt": "Complete one bounded Phase B milestone from the Heddle core refactor roadmap: thin the TUI run orchestration so useAgentRun is more of a top-level adapter/composition hook and less of an owner of workflow details. Choose one cohesive TUI concern that is still too large or too mixed inside useAgentRun, such as ordinary-turn host adaptation, direct-shell execution/finalization, compaction status handling, run-loop event handling, or turn-result finalization. Extract that concern into focused module(s) under src/cli/chat/hooks, update useAgentRun to delegate to them, and keep shared conversation/session semantics in src/core/chat rather than moving logic back into the TUI. This should be a real multi-file refactor milestone, not a one-line cleanup: expect to touch useAgentRun plus focused TUI hook module(s), and add or update focused tests that would catch behavior drift. Keep scope bounded: no browser UI redesign, no broad Phase D folder migration, no provider/auth changes. Run meaningful targeted tests and finish only after the milestone is complete enough for review.",
+  "prompt": "Read docs/eval-roadmaps/phase-b-tui-adapter-milestone.md, then complete the milestone described there. Treat that roadmap file as the task source of truth. This should be a real multi-file refactor milestone, not a one-line cleanup. Keep scope bounded to the roadmap, run meaningful targeted tests, and finish only after the milestone is complete enough for review.",
   "maxSteps": 180,
   "review": {
     "milestone": "Phase B TUI adapter thinning",

@@ -53,6 +53,9 @@ describe('prepareEvalWorkspace', () => {
         ref: 'v1.0.0',
       },
       setup: {
+        copyFiles: {
+          'package.json': 'fixtures/copied-package.json',
+        },
         files: {
           'src/seeded.test.ts': 'export const seeded = true;\n',
         },
@@ -77,6 +80,7 @@ describe('prepareEvalWorkspace', () => {
 
     expect(readFileSync(join(prepared.workspaceRoot, 'src/app.ts'), 'utf8')).toBe('export const value = 1;\n');
     expect(readFileSync(join(prepared.workspaceRoot, 'src/seeded.test.ts'), 'utf8')).toBe('export const seeded = true;\n');
+    expect(readFileSync(join(prepared.workspaceRoot, 'fixtures/copied-package.json'), 'utf8')).toContain('"name":');
     expect(prepared.fixture).toMatchObject({
       type: 'git-worktree',
       repo: sourceRepo,
