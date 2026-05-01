@@ -94,6 +94,7 @@ export async function runAgentEvalCase(args: RunAgentEvalCaseArgs): Promise<Eval
     status,
     workspaceRoot,
     outputDir,
+    fixture: prepared.fixture,
     startedAt,
     finishedAt: new Date(finishedAtMs).toISOString(),
     durationMs: finishedAtMs - startedAtMs,

@@ -26,6 +26,26 @@ export const evalSetupSchema = z.object({
     .optional(),
 }).describe('Instructions for creating the disposable repository state that the agent will work against.');
 
+export const evalInlineFixtureSchema = z.object({
+  type: z.literal('inline')
+    .describe('Create a small disposable Git repository from the case setup files and commands.'),
+}).describe('A synthetic disposable repository built from inline eval setup data.');
+
+export const evalGitWorktreeFixtureSchema = z.object({
+  type: z.literal('git-worktree')
+    .describe('Create a disposable Git worktree from an existing repository at a pinned ref.'),
+  repo: z.string().trim().min(1)
+    .describe('Repository path to create the worktree from. Relative paths are resolved from the Heddle repo root.')
+    .default('.'),
+  ref: z.string().trim().min(1)
+    .describe('Pinned target ref for the worktree, such as a release tag or commit SHA. Avoid moving HEAD for comparable evals.'),
+}).describe('A realistic disposable repository fixture created from a pinned Git ref.');
+
+export const evalFixtureSchema = z.discriminatedUnion('type', [
+  evalInlineFixtureSchema,
+  evalGitWorktreeFixtureSchema,
+]).describe('How to prepare the disposable workspace the agent edits.');
+
 export const agentEvalCaseSchema = z.object({
   id: z.string().trim().regex(/^[a-zA-Z0-9._-]+$/, 'Use a filesystem-safe case id.')
     .describe('Stable filesystem-safe case id used in result paths, filtering, and reports.'),
@@ -45,6 +65,9 @@ export const agentEvalCaseSchema = z.object({
   setup: evalSetupSchema
     .describe('Disposable workspace setup for this case.')
     .default({}),
+  fixture: evalFixtureSchema
+    .describe('Workspace fixture source. Defaults to an inline synthetic repository.')
+    .default({ type: 'inline' }),
   checks: z.array(evalCheckSchema)
     .describe('Deterministic post-agent commands that must pass for the case to be marked passed.')
     .default([]),
@@ -64,6 +87,7 @@ export const evalCaseSchema = agentEvalCaseSchema;
 
 export type EvalCheck = z.infer<typeof evalCheckSchema>;
 export type EvalSetup = z.infer<typeof evalSetupSchema>;
+export type EvalFixture = z.infer<typeof evalFixtureSchema>;
 export type AgentEvalCase = z.infer<typeof agentEvalCaseSchema>;
 export type EvalCase = z.infer<typeof evalCaseSchema>;
 
@@ -100,6 +124,13 @@ export type EvalRunResult = {
   status: 'passed' | 'failed';
   workspaceRoot: string;
   outputDir: string;
+  fixture: {
+    type: EvalFixture['type'];
+    repo?: string;
+    ref?: string;
+    resolvedRef?: string;
+    baselineCommit?: string;
+  };
   startedAt: string;
   finishedAt: string;
   durationMs: number;

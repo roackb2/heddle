@@ -59,6 +59,7 @@ function formatRunDetail(result: EvalRunResult, resultsDir: string): string[] {
     `| Model | ${escapeCell(result.model ?? 'default')} |`,
     `| Max steps | ${escapeCell(String(result.maxSteps ?? 'default'))} |`,
     `| Agent exit | ${escapeCell(`${result.agent.exitCode ?? 'unknown'}${result.agent.timedOut ? ' (timed out)' : ''}`)} |`,
+    `| Fixture | ${escapeCell(formatFixture(result))} |`,
     `| Workspace | \`${escapeCell(formatPath(result.workspaceRoot, resultsDir))}\` |`,
     `| Output | \`${escapeCell(formatPath(result.outputDir, resultsDir))}\` |`,
     `| Diff | \`${escapeCell(formatPath(result.artifacts.gitDiffPath, resultsDir))}\` |`,
@@ -98,6 +99,24 @@ function formatRunDetail(result: EvalRunResult, resultsDir: string): string[] {
   }
 
   return lines;
+}
+
+function formatFixture(result: EvalRunResult): string {
+  if (result.fixture.type === 'git-worktree') {
+    return [
+      'git-worktree',
+      result.fixture.ref ? `ref ${result.fixture.ref}` : undefined,
+      result.fixture.resolvedRef ? `commit ${shortSha(result.fixture.resolvedRef)}` : undefined,
+      result.fixture.baselineCommit && result.fixture.baselineCommit !== result.fixture.resolvedRef ?
+        `baseline ${shortSha(result.fixture.baselineCommit)}`
+      : undefined,
+    ].filter(Boolean).join(', ');
+  }
+  return result.fixture.baselineCommit ? `inline, baseline ${shortSha(result.fixture.baselineCommit)}` : 'inline';
+}
+
+function shortSha(value: string): string {
+  return value.slice(0, 12);
 }
 
 function escapeCell(value: string): string {

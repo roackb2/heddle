@@ -2,11 +2,12 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } fro
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runCommand, runShellCommand } from './process.js';
-import type { AgentEvalCase, EvalCheckResult } from './schema.js';
+import type { AgentEvalCase, EvalCheckResult, EvalRunResult } from './schema.js';
 
 export type PreparedEvalWorkspace = {
   workspaceRoot: string;
   setupResults: EvalCheckResult[];
+  fixture: EvalRunResult['fixture'];
 };
 
 export async function prepareEvalWorkspace(args: {
@@ -17,11 +18,100 @@ export async function prepareEvalWorkspace(args: {
   const parent = args.workRoot ? resolve(args.workRoot) : mkdtempSync(join(tmpdir(), 'heddle-eval-'));
   mkdirSync(parent, { recursive: true });
   const workspaceRoot = join(parent, args.testCase.id);
-  rmSync(workspaceRoot, { recursive: true, force: true });
-  mkdirSync(workspaceRoot, { recursive: true });
 
+  const fixture = args.testCase.fixture;
+  if (fixture.type === 'git-worktree') {
+    await removeGitWorktree(resolve(args.repoRoot, fixture.repo), workspaceRoot);
+  } else {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+  const prepared =
+    fixture.type === 'git-worktree' ?
+      await prepareGitWorktreeFixture({
+        repoRoot: args.repoRoot,
+        workspaceRoot,
+        testCase: args.testCase,
+      })
+    : await prepareInlineFixture({
+        workspaceRoot,
+        testCase: args.testCase,
+      });
+
+  copyAuthState({
+    repoRoot: args.repoRoot,
+    workspaceRoot,
+  });
+
+  return prepared;
+}
+
+async function prepareInlineFixture(args: {
+  workspaceRoot: string;
+  testCase: AgentEvalCase;
+}): Promise<PreparedEvalWorkspace> {
+  mkdirSync(args.workspaceRoot, { recursive: true });
+  const setupResults = await applyEvalSetup({
+    workspaceRoot: args.workspaceRoot,
+    testCase: args.testCase,
+  });
+  const baselineCommit = await initializeGitBaseline(
+    args.workspaceRoot,
+    args.testCase.setup.commitMessage ?? `Initial eval fixture for ${args.testCase.id}`,
+  );
+
+  return {
+    workspaceRoot: args.workspaceRoot,
+    setupResults,
+    fixture: {
+      type: 'inline',
+      baselineCommit,
+    },
+  };
+}
+
+async function prepareGitWorktreeFixture(args: {
+  repoRoot: string;
+  workspaceRoot: string;
+  testCase: AgentEvalCase;
+}): Promise<PreparedEvalWorkspace> {
+  const fixture = args.testCase.fixture;
+  if (fixture.type !== 'git-worktree') {
+    throw new Error(`Unsupported fixture type for git worktree setup: ${fixture.type}`);
+  }
+
+  const sourceRepo = resolve(args.repoRoot, fixture.repo);
+  const resolvedRef = await resolveGitCommit(sourceRepo, fixture.ref);
+  await removeGitWorktree(sourceRepo, args.workspaceRoot);
+  await runRequiredGit(sourceRepo, ['worktree', 'add', '--detach', args.workspaceRoot, resolvedRef]);
+
+  const setupResults = await applyEvalSetup({
+    workspaceRoot: args.workspaceRoot,
+    testCase: args.testCase,
+  });
+  const baselineCommit =
+    await hasGitChanges(args.workspaceRoot) ?
+      await commitAll(args.workspaceRoot, args.testCase.setup.commitMessage ?? `Eval setup for ${args.testCase.id}`)
+    : resolvedRef;
+
+  return {
+    workspaceRoot: args.workspaceRoot,
+    setupResults,
+    fixture: {
+      type: 'git-worktree',
+      repo: sourceRepo,
+      ref: fixture.ref,
+      resolvedRef,
+      baselineCommit,
+    },
+  };
+}
+
+async function applyEvalSetup(args: {
+  workspaceRoot: string;
+  testCase: AgentEvalCase;
+}): Promise<EvalCheckResult[]> {
   for (const [relativePath, content] of Object.entries(args.testCase.setup.files ?? {})) {
-    const path = join(workspaceRoot, relativePath);
+    const path = join(args.workspaceRoot, relativePath);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, content, 'utf8');
   }
@@ -30,7 +120,7 @@ export async function prepareEvalWorkspace(args: {
   for (const command of args.testCase.setup.commands ?? []) {
     const result = await runShellCommand({
       command: command.command,
-      cwd: workspaceRoot,
+      cwd: args.workspaceRoot,
       timeoutMs: command.timeoutMs,
     });
     setupResults.push({
@@ -47,21 +137,27 @@ export async function prepareEvalWorkspace(args: {
       throw new Error(`Eval setup command failed for ${args.testCase.id}: ${command.command}`);
     }
   }
+  return setupResults;
+}
 
-  await initializeGitBaseline(workspaceRoot, args.testCase.setup.commitMessage ?? `Initial eval fixture for ${args.testCase.id}`);
-
+function copyAuthState(args: {
+  repoRoot: string;
+  workspaceRoot: string;
+}) {
   const memorySource = join(args.repoRoot, '.heddle', 'auth.json');
-  const memoryTarget = join(workspaceRoot, '.heddle', 'auth.json');
+  const memoryTarget = join(args.workspaceRoot, '.heddle', 'auth.json');
   if (existsSync(memorySource) && !existsSync(memoryTarget)) {
     mkdirSync(dirname(memoryTarget), { recursive: true });
     cpSync(memorySource, memoryTarget);
   }
-
-  return { workspaceRoot, setupResults };
 }
 
-async function initializeGitBaseline(workspaceRoot: string, message: string) {
+async function initializeGitBaseline(workspaceRoot: string, message: string): Promise<string> {
   await runRequiredGit(workspaceRoot, ['init']);
+  return await commitAll(workspaceRoot, message, true);
+}
+
+async function commitAll(workspaceRoot: string, message: string, allowEmpty = false): Promise<string> {
   await runRequiredGit(workspaceRoot, ['add', '.']);
   await runRequiredGit(workspaceRoot, [
     '-c',
@@ -71,9 +167,53 @@ async function initializeGitBaseline(workspaceRoot: string, message: string) {
     '-c',
     'commit.gpgsign=false',
     'commit',
+    ...(allowEmpty ? ['--allow-empty'] : []),
     '-m',
     message,
   ]);
+  return await resolveGitCommit(workspaceRoot, 'HEAD');
+}
+
+async function resolveGitCommit(cwd: string, ref: string): Promise<string> {
+  const result = await runCommand({
+    command: 'git',
+    args: ['rev-parse', '--verify', `${ref}^{commit}`],
+    cwd,
+    timeoutMs: 20_000,
+  });
+  if (result.exitCode !== 0 || result.timedOut) {
+    throw new Error(`git rev-parse failed for ${ref}: ${result.stderr || result.stdout}`);
+  }
+  return result.stdout.trim();
+}
+
+async function hasGitChanges(workspaceRoot: string): Promise<boolean> {
+  const result = await runCommand({
+    command: 'git',
+    args: ['status', '--porcelain'],
+    cwd: workspaceRoot,
+    timeoutMs: 20_000,
+  });
+  if (result.exitCode !== 0 || result.timedOut) {
+    throw new Error(`git status --porcelain failed: ${result.stderr || result.stdout}`);
+  }
+  return result.stdout.trim().length > 0;
+}
+
+async function removeGitWorktree(repoRoot: string, workspaceRoot: string) {
+  if (!existsSync(workspaceRoot)) {
+    return;
+  }
+  const result = await runCommand({
+    command: 'git',
+    args: ['worktree', 'remove', '--force', workspaceRoot],
+    cwd: repoRoot,
+    timeoutMs: 20_000,
+  });
+  if (result.exitCode !== 0 || result.timedOut) {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+    await runRequiredGit(repoRoot, ['worktree', 'prune']);
+  }
 }
 
 async function runRequiredGit(cwd: string, args: string[]) {

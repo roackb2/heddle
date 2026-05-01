@@ -17,6 +17,10 @@ describe('formatEvalSuiteMarkdown', () => {
         status: 'passed',
         workspaceRoot: '/tmp/workspace',
         outputDir: '/repo/evals/results/run/current/fix-failing-test',
+        fixture: {
+          type: 'inline',
+          baselineCommit: '1234567890abcdef',
+        },
         startedAt: '2026-05-01T00:00:00.000Z',
         finishedAt: '2026-05-01T00:01:00.000Z',
         durationMs: 60_000,
@@ -68,6 +72,7 @@ describe('formatEvalSuiteMarkdown', () => {
     expect(markdown).toContain('| fix-failing-test | passed | gpt-5.4 | 1/1 | done | 3 | 1 | 1 |');
     expect(markdown).toContain('| Model | gpt-5.4 |');
     expect(markdown).toContain('| Max steps | 60 |');
+    expect(markdown).toContain('| Fixture | inline, baseline 1234567890ab |');
     expect(markdown).toContain('| Output | `current/fix-failing-test` |');
     expect(markdown).toContain('| Diff | `current/fix-failing-test/diff.patch` |');
     expect(markdown).toContain('| Trace files | `current/fix-failing-test/traces/trace.json` |');

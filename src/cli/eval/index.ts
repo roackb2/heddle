@@ -31,6 +31,8 @@ type EvalCommand = EvalArgs['command'];
 type EvalCommandParser = (rawArgs: string[]) => EvalArgs;
 type EvalCommandRunner = (args: EvalArgs, options: EvalCliOptions) => Promise<void> | void;
 
+const DEFAULT_CASES_DIR = 'evals/cases/coding/smoke';
+
 const evalCommandParsers: Partial<Record<EvalCommand, EvalCommandParser>> = {
   agent: parseAgentEvalArgs,
   clean: parseCleanEvalArgs,
@@ -175,7 +177,7 @@ function parseCleanEvalArgs(rawArgs: string[]): EvalArgs {
 function defaultEvalArgs(command: EvalCommand): EvalArgs {
   return {
     command,
-    casesDir: resolve('evals/cases/coding'),
+    casesDir: resolve(DEFAULT_CASES_DIR),
     caseIds: [],
     outputDir: resolve('evals/results', defaultRunDirName('agent')),
     resultsDir: resolve('evals/results'),
@@ -192,7 +194,7 @@ function writeEvalHelp() {
     '  heddle eval clean [options]',
     '',
     'Agent options:',
-    '  --cases-dir <path>   Directory containing JSON eval cases',
+    '  --cases-dir <path>   Directory containing JSON eval cases; defaults to evals/cases/coding/smoke',
     '  --case <id>          Run one case id; repeat to select multiple',
     '  --output <path>      Results directory; defaults to evals/results/agent-YYYY-MM-DD-HHMMSS',
     '  --work-root <path>   Parent directory for disposable workspaces; defaults to <output>/workspaces',
