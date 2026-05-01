@@ -63,15 +63,28 @@ function formatRunDetail(result: EvalRunResult, resultsDir: string): string[] {
     `| Workspace | \`${escapeCell(formatPath(result.workspaceRoot, resultsDir))}\` |`,
     `| Output | \`${escapeCell(formatPath(result.outputDir, resultsDir))}\` |`,
     `| Diff | \`${escapeCell(formatPath(result.artifacts.gitDiffPath, resultsDir))}\` |`,
+    `| Diff stat | \`${escapeCell(formatPath(result.artifacts.gitDiffStatPath, resultsDir))}\` |`,
+    `| Changed files JSON | \`${escapeCell(formatPath(result.artifacts.changedFilesPath, resultsDir))}\` |`,
     `| Git status | \`${escapeCell(formatPath(result.artifacts.gitStatusPath, resultsDir))}\` |`,
     `| Progress | ${result.artifacts.progressPath ? `\`${escapeCell(formatPath(result.artifacts.progressPath, resultsDir))}\`` : 'none'} |`,
     `| Session catalog | ${result.artifacts.sessionCatalogPath ? `\`${escapeCell(formatPath(result.artifacts.sessionCatalogPath, resultsDir))}\`` : 'none'} |`,
     `| Trace files | ${traceFiles.length ? traceFiles.map((path) => `\`${escapeCell(path)}\``).join('<br>') : 'none'} |`,
     '',
-    '### Checks',
+    '### Milestone Review',
     '',
   ];
 
+  lines.push(...formatReviewSection(result), '', '### Changed Files', '');
+  if (result.artifacts.changedFiles.length === 0) {
+    lines.push('- none');
+  } else {
+    lines.push('| File | Status | + | - |', '| --- | --- | ---: | ---: |');
+    for (const file of result.artifacts.changedFiles) {
+      lines.push(`| ${escapeCell(file.path)} | ${escapeCell(file.status)} | ${file.additions ?? ''} | ${file.deletions ?? ''} |`);
+    }
+  }
+
+  lines.push('', '### Post-Run Checks', '');
   if (result.checks.length === 0) {
     lines.push('- none');
   } else {
@@ -95,11 +108,52 @@ function formatRunDetail(result: EvalRunResult, resultsDir: string): string[] {
     `| Tool errors | ${result.metrics.toolErrors} |`,
   );
 
+  lines.push('', '### Agent Verification Commands', '');
+  if (result.metrics.verificationCommandDetails.length === 0) {
+    lines.push('- none detected after first mutation');
+  } else {
+    for (const command of result.metrics.verificationCommandDetails) {
+      lines.push(`- \`${escapeCell(command)}\``);
+    }
+  }
+
+  lines.push('', '### Rubric', '');
+  if (result.review.requiredOutcomes.length === 0 && result.review.humanQuestions.length === 0) {
+    lines.push('- none');
+  } else {
+    for (const outcome of result.review.requiredOutcomes) {
+      lines.push(`- [ ] ${outcome}`);
+    }
+    for (const question of result.review.humanQuestions) {
+      lines.push(`- [ ] ${question}`);
+    }
+  }
+
   if (result.metrics.summary) {
     lines.push('', '### Final Summary', '', result.metrics.summary);
   }
 
   return lines;
+}
+
+function formatReviewSection(result: EvalRunResult): string[] {
+  const lines: string[] = [];
+  if (result.review.milestone) {
+    lines.push(`Milestone: ${result.review.milestone}`);
+  }
+  if (result.review.intent) {
+    lines.push('', result.review.intent);
+  }
+  lines.push('', '| Review Field | Items |', '| --- | --- |');
+  lines.push(`| Required outcomes | ${formatListCell(result.review.requiredOutcomes)} |`);
+  lines.push(`| Allowed scope | ${formatListCell(result.review.allowedScope)} |`);
+  lines.push(`| Out of scope | ${formatListCell(result.review.outOfScope)} |`);
+  lines.push(`| Human questions | ${formatListCell(result.review.humanQuestions)} |`);
+  return lines;
+}
+
+function formatListCell(items: string[]): string {
+  return items.length ? items.map((item) => `- ${escapeCell(item)}`).join('<br>') : 'none';
 }
 
 function formatFixture(result: EvalRunResult): string {

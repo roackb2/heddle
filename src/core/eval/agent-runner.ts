@@ -141,6 +141,7 @@ export async function runAgentEvalCase(args: RunAgentEvalCaseArgs): Promise<Eval
     },
     checks,
     metrics,
+    review: args.testCase.review,
     model,
     maxSteps,
   };

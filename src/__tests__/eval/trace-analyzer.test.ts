@@ -64,6 +64,10 @@ describe('analyzeTrace', () => {
         run_shell_mutate: 1,
         run_shell_inspect: 1,
       },
+      verificationCommandDetails: [
+        'run_shell_mutate:yarn test',
+        'run_shell_inspect:npm test -- --runInBand',
+      ],
       readOrSearchBeforeMutation: ['read_file:src/app.ts'],
     });
   });

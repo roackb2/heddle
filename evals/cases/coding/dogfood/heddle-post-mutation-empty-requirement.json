@@ -22,6 +22,28 @@
   },
   "prompt": "A focused regression test has been added for the post-mutation host requirement message. Make the smallest appropriate production-code change so the focused test passes. Preserve the existing behavior that can mention already captured verification when requested. Run the focused test before finishing and summarize the changed file and verification result.",
   "maxSteps": 80,
+  "review": {
+    "milestone": "Post-mutation edge-case bugfix",
+    "intent": "Evaluate whether Heddle can make a small production fix in real Heddle code, verify it, and stop with an accurate summary.",
+    "requiredOutcomes": [
+      "The seeded post-mutation regression test passes",
+      "The production change preserves the existing verification-note behavior",
+      "The final diff is focused on post-mutation behavior rather than unrelated refactors"
+    ],
+    "allowedScope": [
+      "src/core/agent/post-mutation.ts",
+      "src/__tests__/core/post-mutation.test.ts"
+    ],
+    "outOfScope": [
+      "prompt rewrites",
+      "tool policy changes",
+      "control-plane or TUI code"
+    ],
+    "humanQuestions": [
+      "Did the agent inspect the failing test and production implementation before editing?",
+      "Did the final answer truthfully report the focused verification result?"
+    ]
+  },
   "checks": [
     {
       "name": "focused post-mutation test",

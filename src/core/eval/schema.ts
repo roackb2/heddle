@@ -46,6 +46,35 @@ export const evalFixtureSchema = z.discriminatedUnion('type', [
   evalGitWorktreeFixtureSchema,
 ]).describe('How to prepare the disposable workspace the agent edits.');
 
+export const evalMilestoneReviewSchema = z.object({
+  milestone: z.string().trim().min(1)
+    .describe('Short name for the user-intended milestone this case evaluates.')
+    .optional(),
+  intent: z.string().trim().min(1)
+    .describe('Human-readable statement of what the agent should accomplish beyond merely passing checks.')
+    .optional(),
+  requiredOutcomes: z.array(
+    z.string().trim().min(1).describe('Observable outcome a human reviewer should look for in the final diff, trace, or answer.'),
+  )
+    .describe('Milestone outcomes expected for a high-quality completion.')
+    .default([]),
+  allowedScope: z.array(
+    z.string().trim().min(1).describe('Files, modules, or behavior areas the agent is allowed or expected to touch.'),
+  )
+    .describe('Expected implementation scope for judging whether the diff stayed on task.')
+    .default([]),
+  outOfScope: z.array(
+    z.string().trim().min(1).describe('Files, modules, or behavior areas that should not be changed for this case.')
+  )
+    .describe('Boundaries a human reviewer should use to spot unrelated churn.')
+    .default([]),
+  humanQuestions: z.array(
+    z.string().trim().min(1).describe('Question for human review after the run completes.')
+  )
+    .describe('Review prompts that help judge task completion quality beyond deterministic checks.')
+    .default([]),
+}).describe('Human-review metadata for milestone-style eval cases where pass/fail checks are not enough.');
+
 export const agentEvalCaseSchema = z.object({
   id: z.string().trim().regex(/^[a-zA-Z0-9._-]+$/, 'Use a filesystem-safe case id.')
     .describe('Stable filesystem-safe case id used in result paths, filtering, and reports.'),
@@ -68,6 +97,14 @@ export const agentEvalCaseSchema = z.object({
   fixture: evalFixtureSchema
     .describe('Workspace fixture source. Defaults to an inline synthetic repository.')
     .default({ type: 'inline' }),
+  review: evalMilestoneReviewSchema
+    .describe('Optional milestone-completion review guidance included in reports.')
+    .default({
+      requiredOutcomes: [],
+      allowedScope: [],
+      outOfScope: [],
+      humanQuestions: [],
+    }),
   checks: z.array(evalCheckSchema)
     .describe('Deterministic post-agent commands that must pass for the case to be marked passed.')
     .default([]),
@@ -88,6 +125,7 @@ export const evalCaseSchema = agentEvalCaseSchema;
 export type EvalCheck = z.infer<typeof evalCheckSchema>;
 export type EvalSetup = z.infer<typeof evalSetupSchema>;
 export type EvalFixture = z.infer<typeof evalFixtureSchema>;
+export type EvalMilestoneReview = z.infer<typeof evalMilestoneReviewSchema>;
 export type AgentEvalCase = z.infer<typeof agentEvalCaseSchema>;
 export type EvalCase = z.infer<typeof evalCaseSchema>;
 
@@ -100,6 +138,13 @@ export type EvalCheckResult = {
   durationMs: number;
   passed: boolean;
   timedOut: boolean;
+};
+
+export type EvalChangedFile = {
+  path: string;
+  status: string;
+  additions?: number;
+  deletions?: number;
 };
 
 export type EvalTraceMetrics = {
@@ -116,6 +161,7 @@ export type EvalTraceMetrics = {
   summary?: string;
   toolsByName: Record<string, number>;
   readOrSearchBeforeMutation: string[];
+  verificationCommandDetails: string[];
 };
 
 export type EvalRunResult = {
@@ -144,12 +190,16 @@ export type EvalRunResult = {
   artifacts: {
     gitStatusPath: string;
     gitDiffPath: string;
+    gitDiffStatPath: string;
+    changedFilesPath: string;
     progressPath?: string;
     sessionCatalogPath?: string;
     traceFiles: string[];
+    changedFiles: EvalChangedFile[];
   };
   checks: EvalCheckResult[];
   metrics: EvalTraceMetrics;
+  review: EvalMilestoneReview;
   model?: string;
   maxSteps?: number;
 };

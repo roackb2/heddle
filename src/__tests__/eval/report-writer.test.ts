@@ -34,9 +34,17 @@ describe('formatEvalSuiteMarkdown', () => {
         artifacts: {
           gitStatusPath: '/repo/evals/results/run/current/fix-failing-test/git-status.txt',
           gitDiffPath: '/repo/evals/results/run/current/fix-failing-test/diff.patch',
+          gitDiffStatPath: '/repo/evals/results/run/current/fix-failing-test/diff-stat.txt',
+          changedFilesPath: '/repo/evals/results/run/current/fix-failing-test/changed-files.json',
           progressPath: '/repo/evals/results/run/current/fix-failing-test/progress.jsonl',
           sessionCatalogPath: '/repo/evals/results/run/current/fix-failing-test/session-catalog.json',
           traceFiles: ['/repo/evals/results/run/current/fix-failing-test/traces/trace.json'],
+          changedFiles: [{
+            path: 'src/app.ts',
+            status: 'M',
+            additions: 4,
+            deletions: 1,
+          }],
         },
         checks: [{
           name: 'unit test',
@@ -61,6 +69,15 @@ describe('formatEvalSuiteMarkdown', () => {
           summary: 'Fixed.',
           toolsByName: {},
           readOrSearchBeforeMutation: [],
+          verificationCommandDetails: ['run_shell_mutate:yarn test'],
+        },
+        review: {
+          milestone: 'Fix failing test',
+          intent: 'Complete the bugfix and verify it.',
+          requiredOutcomes: ['The failing test passes'],
+          allowedScope: ['src/app.ts'],
+          outOfScope: ['README.md'],
+          humanQuestions: ['Did the agent avoid unrelated churn?'],
         },
         model: 'gpt-5.4',
         maxSteps: 60,
@@ -76,10 +93,21 @@ describe('formatEvalSuiteMarkdown', () => {
     expect(markdown).toContain('| Fixture | inline, baseline 1234567890ab |');
     expect(markdown).toContain('| Output | `current/fix-failing-test` |');
     expect(markdown).toContain('| Diff | `current/fix-failing-test/diff.patch` |');
+    expect(markdown).toContain('| Diff stat | `current/fix-failing-test/diff-stat.txt` |');
     expect(markdown).toContain('| Progress | `current/fix-failing-test/progress.jsonl` |');
     expect(markdown).toContain('| Trace files | `current/fix-failing-test/traces/trace.json` |');
+    expect(markdown).toContain('### Milestone Review');
+    expect(markdown).toContain('Milestone: Fix failing test');
+    expect(markdown).toContain('| Required outcomes | - The failing test passes |');
+    expect(markdown).toContain('### Changed Files');
+    expect(markdown).toContain('| src/app.ts | M | 4 | 1 |');
     expect(markdown).toContain('### Metrics');
     expect(markdown).toContain('| Assistant turns | 3 |');
+    expect(markdown).toContain('### Agent Verification Commands');
+    expect(markdown).toContain('- `run_shell_mutate:yarn test`');
+    expect(markdown).toContain('### Rubric');
+    expect(markdown).toContain('- [ ] The failing test passes');
+    expect(markdown).toContain('- [ ] Did the agent avoid unrelated churn?');
     expect(markdown).toContain('- PASS unit test: `yarn test`');
   });
 });

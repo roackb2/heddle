@@ -17,8 +17,38 @@ describe('eval case schema', () => {
       fixture: {
         type: 'inline',
       },
+      review: {
+        requiredOutcomes: [],
+        allowedScope: [],
+        outOfScope: [],
+        humanQuestions: [],
+      },
       rubric: [],
       tags: [],
+    });
+  });
+
+  it('parses milestone review metadata', () => {
+    const parsed = evalCaseSchema.parse({
+      id: 'milestone-case',
+      kind: 'coding',
+      prompt: 'Complete the milestone.',
+      review: {
+        milestone: 'Shared runtime slice',
+        intent: 'Complete a bounded refactor milestone.',
+        requiredOutcomes: ['core runtime owns shared behavior'],
+        allowedScope: ['src/core/chat'],
+        outOfScope: ['src/web/styles.css'],
+        humanQuestions: ['Did it stop after a substep?'],
+      },
+    });
+
+    expect(parsed.review).toMatchObject({
+      milestone: 'Shared runtime slice',
+      requiredOutcomes: ['core runtime owns shared behavior'],
+      allowedScope: ['src/core/chat'],
+      outOfScope: ['src/web/styles.css'],
+      humanQuestions: ['Did it stop after a substep?'],
     });
   });
 

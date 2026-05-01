@@ -1,0 +1,91 @@
+{
+  "id": "heddle-phase-b-tui-adapter-milestone",
+  "kind": "coding",
+  "description": "Pinned Heddle dogfood case: complete a bounded Phase B TUI-adapter refactor milestone across multiple files.",
+  "fixture": {
+    "type": "git-worktree",
+    "repo": ".",
+    "ref": "v0.0.37"
+  },
+  "setup": {
+    "commands": [
+      {
+        "name": "install dependencies",
+        "command": "yarn install --ignore-scripts --silent --network-timeout 600000",
+        "timeoutMs": 300000
+      }
+    ],
+    "commitMessage": "Seed Phase B TUI adapter milestone eval"
+  },
+  "prompt": "Complete one bounded Phase B milestone from the Heddle core refactor roadmap: thin the TUI run orchestration so useAgentRun is more of a top-level adapter/composition hook and less of an owner of workflow details. Choose one cohesive TUI concern that is still too large or too mixed inside useAgentRun, such as ordinary-turn host adaptation, direct-shell execution/finalization, compaction status handling, run-loop event handling, or turn-result finalization. Extract that concern into focused module(s) under src/cli/chat/hooks, update useAgentRun to delegate to them, and keep shared conversation/session semantics in src/core/chat rather than moving logic back into the TUI. This should be a real multi-file refactor milestone, not a one-line cleanup: expect to touch useAgentRun plus focused TUI hook module(s), and add or update focused tests that would catch behavior drift. Keep scope bounded: no browser UI redesign, no broad Phase D folder migration, no provider/auth changes. Run meaningful targeted tests and finish only after the milestone is complete enough for review.",
+  "maxSteps": 180,
+  "review": {
+    "milestone": "Phase B TUI adapter thinning",
+    "intent": "Evaluate whether Heddle can carry a medium-sized, multi-file refactor milestone through planning, extraction, tests, and verification rather than stopping after a tiny local edit.",
+    "requiredOutcomes": [
+      "useAgentRun delegates at least one cohesive TUI concern to focused hook module(s)",
+      "shared conversation/session semantics remain in src/core/chat rather than being duplicated in TUI code",
+      "the diff touches multiple relevant files, including useAgentRun and at least one focused TUI hook or test file",
+      "focused regression coverage is added or updated for the extracted behavior",
+      "targeted tests pass after the refactor",
+      "the final summary explains the milestone completed, changed files, verification, and any residual risk"
+    ],
+    "allowedScope": [
+      "src/cli/chat/hooks/useAgentRun.ts",
+      "src/cli/chat/hooks/tui-*.ts",
+      "src/cli/chat/hooks/usePromptSubmission.ts",
+      "src/cli/chat/utils/runtime.ts",
+      "src/core/chat/*.ts",
+      "src/__tests__/chat/*.test.ts",
+      "src/__tests__/tools/*.test.ts"
+    ],
+    "outOfScope": [
+      "large Phase D folder migration",
+      "browser UI redesign",
+      "TUI rendering redesign",
+      "provider/auth changes",
+      "eval harness changes inside the target workspace"
+    ],
+    "humanQuestions": [
+      "Did the agent complete a coherent multi-file Phase B milestone, or stop after a small cleanup?",
+      "Did useAgentRun become thinner in a meaningful way without moving shared semantics back into TUI code?",
+      "Are the new module boundaries understandable and aligned with existing TUI hook patterns?",
+      "Did the agent add or update meaningful tests instead of relying only on existing coverage?",
+      "Did the final answer honestly distinguish completed work from remaining Phase B follow-up?"
+    ]
+  },
+  "checks": [
+    {
+      "name": "focused chat and tools tests",
+      "command": "yarn vitest run src/__tests__/chat/chat-runtime.test.ts src/__tests__/chat/chat-format.test.ts src/__tests__/tools/tools.test.ts",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "phase b touched multiple relevant files",
+      "command": "changed=$(git status --porcelain -- src/cli/chat/hooks src/core/chat src/__tests__/chat src/__tests__/tools | wc -l | tr -d ' '); test \"$changed\" -ge 3",
+      "timeoutMs": 30000
+    },
+    {
+      "name": "useAgentRun remains part of the refactor",
+      "command": "git status --porcelain -- src/cli/chat/hooks/useAgentRun.ts | grep -q useAgentRun.ts",
+      "timeoutMs": 30000
+    }
+  ],
+  "rubric": [
+    "completed a coherent multi-file TUI-adapter milestone rather than a one-line cleanup",
+    "made useAgentRun easier to read by delegating one cohesive concern to focused module(s)",
+    "kept host-specific TUI behavior in TUI adapters and shared semantics in src/core/chat",
+    "added or updated focused regression coverage for the extracted behavior",
+    "ran meaningful targeted verification and reported it truthfully",
+    "avoided unrelated Phase D folder migration, browser UI churn, or provider/auth changes"
+  ],
+  "tags": [
+    "dogfood",
+    "pinned-target",
+    "heddle",
+    "refactor",
+    "milestone",
+    "phase-b",
+    "tui-adapter"
+  ]
+}

@@ -20,6 +20,7 @@ export function analyzeTrace(trace: TraceEvent[]): EvalTraceMetrics {
   let approvalsResolved = 0;
   let toolErrors = 0;
   let verificationCommandsAfterMutation = 0;
+  const verificationCommandDetails: string[] = [];
   let firstMutationStep: number | undefined;
   let outcome: string | undefined;
   let summary: string | undefined;
@@ -46,6 +47,7 @@ export function analyzeTrace(trace: TraceEvent[]): EvalTraceMetrics {
           && isVerificationCommand(call.input)
         ) {
           verificationCommandsAfterMutation++;
+          verificationCommandDetails.push(summarizeToolInput(call.tool, call.input));
         }
       }
       continue;
@@ -81,6 +83,7 @@ export function analyzeTrace(trace: TraceEvent[]): EvalTraceMetrics {
     approvalsResolved,
     toolErrors,
     verificationCommandsAfterMutation,
+    verificationCommandDetails: [...new Set(verificationCommandDetails)],
     firstMutationStep,
     outcome,
     summary,
