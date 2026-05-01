@@ -1,5 +1,11 @@
-import { useState } from 'react';
-import { filterBuiltInModels } from '../../../core/llm/openai-models.js';
+import { useMemo, useState } from 'react';
+import { BUILT_IN_MODEL_GROUPS, filterBuiltInModels } from '../../../core/llm/openai-models.js';
+import {
+  buildCredentialAwareModelOption,
+  credentialModeFromSource,
+  type CredentialAwareModelOption,
+} from '../../../core/llm/model-policy.js';
+import type { ProviderCredentialSource } from '../utils/runtime.js';
 import type { PromptKeyInput } from '../components/PromptInput.js';
 import type { ChatSession } from '../state/types.js';
 import { filterMentionableFiles, getMentionQuery, insertMentionSelection } from '../utils/file-mentions.js';
@@ -10,12 +16,14 @@ export function useChatPickers({
   mentionableFiles,
   clearDraft,
   replaceDraft,
+  providerCredentialSource,
 }: {
   draft: string;
   recentSessions: ChatSession[];
   mentionableFiles: string[];
   clearDraft: () => void;
   replaceDraft: (value: string) => void;
+  providerCredentialSource: ProviderCredentialSource;
 }) {
   const [modelPickerIndex, setModelPickerIndex] = useState(0);
   const [sessionPickerIndex, setSessionPickerIndex] = useState(0);
@@ -27,9 +35,20 @@ export function useChatPickers({
   const safeFileMentionPickerIndex = clampPickerIndex(fileMentionPickerIndex, filteredMentionFiles.length);
   const highlightedMentionFile = filteredMentionFiles[safeFileMentionPickerIndex];
 
+  const credentialAwareModels = useMemo(() => {
+    const credentialMode = credentialModeFromSource(providerCredentialSource);
+    return BUILT_IN_MODEL_GROUPS.flatMap((group) => group.models).map((model) =>
+      buildCredentialAwareModelOption({
+        model,
+        provider: model.startsWith('claude') ? 'anthropic' : 'openai',
+        credentialMode,
+      }),
+    );
+  }, [providerCredentialSource]);
+
   const modelPickerQuery = getModelPickerQuery(draft);
   const modelPickerVisible = modelPickerQuery !== undefined;
-  const filteredModels = modelPickerVisible ? filterBuiltInModels(modelPickerQuery) : [];
+  const filteredModels = modelPickerVisible ? filterCredentialAwareModels(credentialAwareModels, modelPickerQuery) : [];
   const safeModelPickerIndex = clampPickerIndex(modelPickerIndex, filteredModels.length);
   const highlightedModel = filteredModels[safeModelPickerIndex];
 
@@ -141,6 +160,11 @@ function getSessionPickerQuery(draft: string): string | undefined {
 
   const remainder = trimmedStart.slice('/session choose'.length);
   return remainder.trim();
+}
+
+function filterCredentialAwareModels(models: CredentialAwareModelOption[], query: string): CredentialAwareModelOption[] {
+  const matchingIds = new Set(filterBuiltInModels(query));
+  return models.filter((model) => matchingIds.has(model.id));
 }
 
 function filterSessionsForPicker(

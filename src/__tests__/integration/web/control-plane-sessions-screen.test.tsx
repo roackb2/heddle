@@ -65,7 +65,7 @@ const turnReview: ChatTurnReview = {
 describe('SessionsScreen review UI', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(fetchModelOptions).mockResolvedValue({ groups: [] });
+    vi.mocked(fetchModelOptions).mockResolvedValue({ groups: [{ label: 'OpenAI', models: ['gpt-5.4'], options: [{ id: 'gpt-5.4', disabled: false }] }] });
     vi.mocked(fetchWorkspaceChanges).mockResolvedValue({
       vcs: 'git',
       clean: false,

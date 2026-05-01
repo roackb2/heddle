@@ -136,6 +136,7 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
     workspaceRoot: args.workspaceRoot,
     stateRoot: args.stateRoot,
     credentialStorePath: args.credentialStorePath,
+    providerCredentialSource: args.providerCredentialSource,
   } satisfies LocalCommandDeps);
 
   if (!commandResult.handled) {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
+import type { CredentialAwareModelOption } from '../../../core/llm/model-policy.js';
 
 const MAX_VISIBLE_MODELS = 8;
 
@@ -10,7 +11,7 @@ export function ModelPickerPanel({
   highlightedIndex,
 }: {
   query: string;
-  models: string[];
+  models: CredentialAwareModelOption[];
   activeModel: string;
   highlightedIndex: number;
 }) {
@@ -26,12 +27,19 @@ export function ModelPickerPanel({
         visibleModels.map((model, index) => {
           const absoluteIndex = startIndex + index;
           const isHighlighted = absoluteIndex === highlightedIndex;
-          const isActive = model === activeModel;
+          const isActive = model.id === activeModel;
           const marker = isHighlighted ? '◉' : '○';
-          const suffix = isActive ? ' (current)' : '';
+          const suffix = [
+            isActive ? '(current)' : undefined,
+            model.disabled ? `(${model.disabledReason ?? 'unavailable'})` : undefined,
+          ].filter(Boolean).join(' ');
           return (
-            <Text key={model} color={isHighlighted ? 'cyan' : undefined} dimColor={!isHighlighted}>
-              {`${marker} ${model}${suffix}`}
+            <Text
+              key={model.id}
+              color={isHighlighted ? 'cyan' : model.disabled ? 'yellow' : undefined}
+              dimColor={!isHighlighted && !model.disabled}
+            >
+              {`${marker} ${model.id}${suffix ? ` ${suffix}` : ''}`}
             </Text>
           );
         })
@@ -40,7 +48,10 @@ export function ModelPickerPanel({
   );
 }
 
-function getVisibleModels(models: string[], highlightedIndex: number): { visibleModels: string[]; startIndex: number } {
+function getVisibleModels(models: CredentialAwareModelOption[], highlightedIndex: number): {
+  visibleModels: CredentialAwareModelOption[];
+  startIndex: number;
+} {
   if (models.length <= MAX_VISIBLE_MODELS) {
     return { visibleModels: models, startIndex: 0 };
   }

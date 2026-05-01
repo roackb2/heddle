@@ -179,7 +179,7 @@ export function usePromptSubmission({
       modelPicker.resetIndex();
       await submitChatPrompt({
         ...submitArgs,
-        value: `/model ${modelPicker.highlighted}`,
+        value: `/model ${modelPicker.highlighted.id}`,
       });
       return;
     }

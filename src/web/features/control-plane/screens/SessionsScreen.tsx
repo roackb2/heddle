@@ -591,7 +591,16 @@ export function SessionsScreen({
                 >
                   {modelOptions?.groups.map((group) => (
                     <optgroup key={group.label} label={group.label}>
-                      {group.models.map((model) => <option key={model} value={model}>{model}</option>)}
+                      {(group.options ?? group.models.map((model) => ({ id: model, disabled: false }))).map((option) => (
+                        <option
+                          key={option.id}
+                          value={option.id}
+                          disabled={option.disabled}
+                          title={option.disabledReason}
+                        >
+                          {option.disabledReason ? `${option.id} — ${option.disabledReason}` : option.id}
+                        </option>
+                      ))}
                     </optgroup>
                   ))}
                   {!modelOptions ? <option value={sessionDetail?.model ?? activeSession.model ?? ''}>{modelOptionsError ? 'models unavailable' : sessionDetail?.model ?? activeSession.model ?? 'loading models'}</option> : null}
