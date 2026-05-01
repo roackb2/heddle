@@ -404,6 +404,8 @@ yarn build
 yarn test
 ```
 
+`yarn test` runs the default unit and integration suites. Browser e2e coverage lives under `src/__tests__/e2e` and stays out of the default test command; run it explicitly with `yarn e2e` or `yarn test:e2e`.
+
 See [Development and contributing](docs/guides/development.md) for the fuller contributor workflow.
 
 ## License

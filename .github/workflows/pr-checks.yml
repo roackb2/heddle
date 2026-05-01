@@ -48,8 +48,8 @@ jobs:
       - name: Run typecheck
         run: yarn typecheck
 
-  test:
-    name: test
+  test-unit:
+    name: test-unit
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -66,5 +66,26 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Run tests
-        run: yarn test
+      - name: Run unit tests
+        run: yarn test:unit
+
+  test-integration:
+    name: test-integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run integration tests
+        run: yarn test:integration
