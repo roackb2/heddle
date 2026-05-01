@@ -41,22 +41,24 @@ Run one smoke case:
 yarn eval:agent --case fix-failing-test
 ```
 
-Run a pinned dogfood case:
+Run the recommended behavior-quality dogfood case:
+
+```bash
+yarn eval:agent --cases-dir evals/cases/coding --case heddle-phase-b-tui-adapter-milestone --fixture-ref v0.0.37 --model gpt-5.4
+```
+
+Run the same recommended case with an explicit report label:
+
+```bash
+yarn eval:agent --cases-dir evals/cases/coding --case heddle-phase-b-tui-adapter-milestone --fixture-ref v0.0.37 --target release-candidate --model gpt-5.4
+```
+
+Run narrow dogfood regression cases only when debugging the harness or a specific
+behavior boundary:
 
 ```bash
 yarn eval:agent --cases-dir evals/cases/coding --case heddle-post-mutation-empty-requirement --model gpt-5.4
-```
-
-Run the milestone-style dogfood case:
-
-```bash
 yarn eval:agent --cases-dir evals/cases/coding --case heddle-shared-chat-runtime-milestone --model gpt-5.4
-```
-
-Run the broader Phase B TUI-adapter dogfood case:
-
-```bash
-yarn eval:agent --cases-dir evals/cases/coding --case heddle-phase-b-tui-adapter-milestone --model gpt-5.4
 ```
 
 Run the same case but override the target workspace code ref:
@@ -111,6 +113,22 @@ appearing in `git-status.txt`.
 For smoke cases, the report mostly proves the harness is working.
 
 For dogfood and milestone cases, treat `passed` as "deterministic post-run checks passed", not "the work was definitely high quality." Use the report's milestone review section, changed files, diff, trace metrics, final summary, and human review questions to decide whether the agent completed the intended task or stopped after a substep.
+
+## Recommended Cases
+
+Use these cases with different expectations:
+
+| Case | Use for | Confidence signal |
+| --- | --- | --- |
+| `evals/cases/coding/smoke/*.json` | Fast harness smoke checks | Confirms setup, runner, artifact collection, and reporting still work |
+| `heddle-phase-b-tui-adapter-milestone` | Main product-behavior dogfood eval | Best current signal for whether Heddle can complete a realistic, medium-sized coding milestone without stopping after a tiny substep |
+| `heddle-post-mutation-empty-requirement` | Narrow post-mutation behavior regression | Useful for debugging final-answer/empty-requirement behavior, not a broad product-quality benchmark |
+| `heddle-shared-chat-runtime-milestone` | Narrow shared-chat callback regression | Useful for a specific compaction-port boundary, but too small to judge sustained coding-agent behavior |
+
+For pre-release behavior review, run the smoke suite plus
+`heddle-phase-b-tui-adapter-milestone`. The other dogfood cases are supporting
+regression probes, not the main answer to "did Heddle get better as a coding
+agent?"
 
 ## Runner Versus Fixture Ref
 
