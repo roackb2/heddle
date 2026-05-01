@@ -43,9 +43,9 @@
     "daemon:dev": "tsx --no-cache src/cli/main.ts daemon --assets-dir dist/src/web",
     "eval:agent": "tsx --no-cache src/cli/main.ts eval agent",
     "eval:clean": "tsx --no-cache src/cli/main.ts eval clean",
-    "e2e": "playwright test src/__tests__/e2e",
-    "e2e:ui": "playwright test src/__tests__/e2e --ui",
-    "e2e:headed": "playwright test src/__tests__/e2e --headed",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:headed": "playwright test --headed",
     "e2e:install": "playwright install chromium",
     "cli:dev": "tsx --no-cache src/cli/main.ts",
     "chat:dev": "tsx --no-cache src/cli/main.ts chat",
@@ -60,7 +60,7 @@
     "test": "yarn test:unit && yarn test:integration",
     "test:unit": "vitest run src/__tests__/unit",
     "test:integration": "vitest run src/__tests__/integration",
-    "test:e2e": "playwright test src/__tests__/e2e",
+    "test:e2e": "playwright test",
     "prepare": "yarn build"
   },
   "keywords": [
