@@ -427,7 +427,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
         paddingY={0}
       >
         <Text bold color={pendingApproval ? 'yellow' : undefined}>
-          {pendingApproval ? 'Approval Required' : compacting ? 'Compacting…' : isRunning ? `Working${workingFrames[workingFrame]}` : 'Prompt'}
+          {pendingApproval ? 'Approval Required' : compacting ? `Compacting${workingFrames[workingFrame] ?? '...'}` : isRunning ? `Working${workingFrames[workingFrame]}` : 'Prompt'}
         </Text>
         {pendingApproval ?
           <ApprovalComposer pendingApproval={pendingApproval} approvalChoice={approvalChoice} />
