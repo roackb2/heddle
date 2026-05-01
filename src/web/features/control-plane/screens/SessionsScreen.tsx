@@ -18,6 +18,8 @@ import { formatDate, className } from '../utils';
 import { CodeBlock, EmptyState, Pill, WorkspaceSectionHeader } from '../components/common';
 import { SessionListButton } from '../components/lists';
 import { ConversationMessage } from '../components/ConversationMessage';
+import { ModelSelectorPopover } from '../components/ModelSelectorPopover.js';
+import { useCredentialAwareModelOptions } from '../hooks/useCredentialAwareModelOptions.js';
 import { MobileChatScreen } from '../mobile/MobileChatScreen';
 import { MobileReviewScreen } from '../mobile/MobileReviewScreen';
 import { FullDiffDialog, SessionReviewPanel, type ExpandedDiff, type ReviewMode } from './SessionReviewPanel';
@@ -118,6 +120,17 @@ export function SessionsScreen({
   const runActive = sendingPrompt || runInFlight;
   const authStatus = formatControlPlaneAuthStatus(sessionDetail?.model ?? activeSession?.model, auth);
   const compactionStatus = sessionDetail?.context?.compactionStatus ?? activeSession?.context?.compactionStatus;
+  const selectedModel = sessionDetail?.model ?? activeSession?.model ?? '';
+  const {
+    groups: modelOptionGroups,
+    selectedModelOption,
+    selectorDisabled: modelSelectorDisabled,
+  } = useCredentialAwareModelOptions({
+    modelOptions,
+    auth,
+    selectedModel,
+    runActive,
+  });
   const selectedReviewFile =
     turnReview?.files.find((file) => file.path === selectedReviewFilePath) ?? turnReview?.files[0];
   const selectedWorkspaceFile =
@@ -581,22 +594,21 @@ export function SessionsScreen({
             <div className="session-controls">
               <button className="mobile-nav-button" type="button" onClick={showSessionList}>← Sessions</button>
               <button className="mobile-nav-button mobile-inspector-button" type="button" onClick={openReviewInspector}>Review</button>
-              <label className="select-control">
-                <span>model</span>
-                <select
-                  value={sessionDetail?.model ?? activeSession.model ?? ''}
-                  disabled={runActive || !modelOptions}
-                  onChange={(event) => void onUpdateSessionSettings({ model: event.target.value })}
-                  title={modelOptionsError ? 'Model options unavailable. Restart the Heddle daemon if this route was just added.' : undefined}
-                >
-                  {modelOptions?.groups.map((group) => (
-                    <optgroup key={group.label} label={group.label}>
-                      {group.models.map((model) => <option key={model} value={model}>{model}</option>)}
-                    </optgroup>
-                  ))}
-                  {!modelOptions ? <option value={sessionDetail?.model ?? activeSession.model ?? ''}>{modelOptionsError ? 'models unavailable' : sessionDetail?.model ?? activeSession.model ?? 'loading models'}</option> : null}
-                </select>
-              </label>
+              <div className="model-select-control">
+                <label className="select-control">
+                  <span>model</span>
+                  <ModelSelectorPopover
+                    selectedModel={selectedModel}
+                    selectedModelUnsupported={Boolean(selectedModelOption?.disabled)}
+                    disabled={modelSelectorDisabled}
+                    groups={modelOptionGroups}
+                    runActive={runActive}
+                    modelOptionsError={modelOptionsError}
+                    onSelectModel={(model) => void onUpdateSessionSettings({ model })}
+                  />
+                </label>
+                {!modelOptions ? <p className="model-select-description">{modelOptionsError ? 'models unavailable' : 'loading models'}</p> : null}
+              </div>
               <Pill>turns {activeSession.turnCount}</Pill>
               {compactionStatus === 'running' ? <Pill tone="warn">compacting</Pill> : null}
               <button

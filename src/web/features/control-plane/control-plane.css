@@ -549,6 +549,94 @@ h3 {
   cursor: not-allowed;
 }
 
+.model-select-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.model-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 220px;
+}
+
+.model-select-trigger.unsupported,
+.model-select-trigger-reason,
+.model-select-option-reason {
+  color: var(--warn);
+}
+
+.model-select-menu {
+  width: 360px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 6px;
+}
+
+.model-select-group + .model-select-group {
+  margin-top: 6px;
+}
+
+.model-select-group-label {
+  padding: 4px 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.model-select-option-wrapper {
+  display: block;
+}
+
+.model-select-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  padding: 6px 8px;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+}
+
+.model-select-option:hover,
+.model-select-option:focus {
+  background: rgba(56, 189, 248, 0.14);
+  outline: none;
+}
+
+.model-select-option.selected {
+  color: var(--accent);
+}
+
+.model-select-option.disabled {
+  color: var(--muted);
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.model-select-option.disabled:hover,
+.model-select-option.disabled:focus {
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.model-select-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .sidebar-scroll,
 .conversation-scroll,
 .side-scroll,

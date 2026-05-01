@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { CredentialAwareModelOption } from '../../../core/llm/model-policy.js';
 import type { ConversationLine, ChatSession } from '../state/types.js';
 import { submitChatPrompt } from '../submit.js';
 import { buildPromptWithFileMentions } from '../utils/file-mentions.js';
@@ -67,7 +68,7 @@ export function usePromptSubmission({
   mentionableFiles: string[];
   modelPicker: {
     visible: boolean;
-    highlighted?: string;
+    highlighted?: CredentialAwareModelOption;
     resetIndex: () => void;
   };
   sessionPicker: {
@@ -177,9 +178,12 @@ export function usePromptSubmission({
 
     if (modelPicker.visible && modelPicker.highlighted) {
       modelPicker.resetIndex();
+      if (modelPicker.highlighted.disabled) {
+        return;
+      }
       await submitChatPrompt({
         ...submitArgs,
-        value: `/model ${modelPicker.highlighted}`,
+        value: `/model ${modelPicker.highlighted.id}`,
       });
       return;
     }

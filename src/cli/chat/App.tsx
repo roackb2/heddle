@@ -16,7 +16,7 @@ import { buildTuiDebugSnapshot } from './debug/tui-debug-snapshot.js';
 import { buildConversationMessages } from './utils/format.js';
 import { buildCompactionRunningContext, compactChatHistoryWithArchive } from './state/compaction.js';
 import { estimateBuiltInContextWindow } from '../../core/llm/openai-models.js';
-import { credentialModeFromSource, resolveSystemSelectedModel } from '../../core/llm/model-policy.js';
+import { credentialModeFromSource, resolveCompatibleActiveModel, resolveSystemSelectedModel } from '../../core/llm/model-policy.js';
 import { useApprovalFlow } from './hooks/useApprovalFlow.js';
 import { useAgentRun } from './hooks/useAgentRun.js';
 import { useChatDrift } from './hooks/useChatDrift.js';
@@ -36,7 +36,12 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
 
 function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const nextLocalId = useLocalIds();
-  const [activeModel, setActiveModel] = useState(runtime.model);
+  const initialModelCompatibility = useMemo(() => resolveCompatibleActiveModel({
+    activeModel: runtime.model,
+    provider: runtime.model.startsWith('claude') ? 'anthropic' : 'openai',
+    credentialMode: credentialModeFromSource(runtime.providerCredentialSource),
+  }), [runtime.model, runtime.providerCredentialSource]);
+  const [activeModel, setActiveModel] = useState(initialModelCompatibility.model);
   const {
     draft,
     setDraft,
@@ -77,6 +82,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     mentionableFiles,
     clearDraft,
     replaceDraft,
+    providerCredentialSource: resolveProviderCredentialSourceForModel(activeModel, runtime),
   });
   const drift = useChatDrift({
     activeSession,
@@ -86,6 +92,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const previousActiveModelRef = useRef(activeModel);
   const previousModelWriteSessionIdRef = useRef<string | undefined>(activeSession?.id);
 
+  const [modelCompatibilityNotice, setModelCompatibilityNotice] = useState<string | undefined>(initialModelCompatibility.warning);
   const {
     status,
     setStatus,
@@ -182,6 +189,21 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
       setStatus('Idle');
     });
   }, [activeModel, activeSession, runtime.providerCredentialSource, runtime.stateRoot, runtime.systemContext, setStatus, setSessionModel, updateSessionById]);
+
+  useEffect(() => {
+    const nextCompatibility = resolveCompatibleActiveModel({
+      activeModel,
+      provider: activeModel.startsWith('claude') ? 'anthropic' : 'openai',
+      credentialMode: credentialModeFromSource(resolveProviderCredentialSourceForModel(activeModel, runtime)),
+    });
+    if (nextCompatibility.model !== activeModel) {
+      setActiveModel(nextCompatibility.model);
+      if (activeSession) {
+        setSessionModel(activeSession.id, nextCompatibility.model);
+      }
+    }
+    setModelCompatibilityNotice(nextCompatibility.warning);
+  }, [activeModel, activeSession, runtime, setSessionModel]);
 
   const messages = useMemo(() => activeSession?.messages ?? [], [activeSession?.messages]);
   const sessionTitleModel = resolveSystemSelectedModel({
@@ -388,6 +410,11 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
             {runtimeHostWarning}
           </Text>
         : null}
+        {modelCompatibilityNotice ?
+          <Text color="yellow">
+            {modelCompatibilityNotice}
+          </Text>
+        : null}
       </Box>
 
       <ConversationPanel messages={messages} activeTurn={activeTurn} />
@@ -400,7 +427,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
         paddingY={0}
       >
         <Text bold color={pendingApproval ? 'yellow' : undefined}>
-          {pendingApproval ? 'Approval Required' : compacting ? 'Compacting…' : isRunning ? `Working${workingFrames[workingFrame]}` : 'Prompt'}
+          {pendingApproval ? 'Approval Required' : compacting ? `Compacting${workingFrames[workingFrame] ?? '...'}` : isRunning ? `Working${workingFrames[workingFrame]}` : 'Prompt'}
         </Text>
         {pendingApproval ?
           <ApprovalComposer pendingApproval={pendingApproval} approvalChoice={approvalChoice} />

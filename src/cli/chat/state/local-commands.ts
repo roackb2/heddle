@@ -3,7 +3,9 @@ import { summarizeSession } from './storage.js';
 import { formatAuthStatusMessage, loginProviderWithOAuth, logoutProvider } from '../../auth.js';
 import type { OpenAiOAuthCredential } from '../../../core/auth/openai-oauth.js';
 import { COMMON_BUILT_IN_MODELS, formatBuiltInModelGroups } from '../../../core/llm/openai-models.js';
+import { credentialModeFromSource, validateModelCredentialCompatibility } from '../../../core/llm/model-policy.js';
 import type { LlmProvider } from '../../../core/llm/types.js';
+import type { ProviderCredentialSource } from '../utils/runtime.js';
 import { createFileHeartbeatTaskStore } from '../../../core/runtime/heartbeat-task-store.js';
 import { join } from 'node:path';
 
@@ -33,6 +35,7 @@ export type LocalCommandArgs = {
   workspaceRoot: string;
   stateRoot: string;
   credentialStorePath?: string;
+  providerCredentialSource?: ProviderCredentialSource;
   openAiLogin?: () => Promise<OpenAiOAuthCredential>;
 };
 
@@ -251,12 +254,26 @@ function handleModelCommand(args: LocalCommandArgs, value: string): LocalCommand
     return aliased;
   }
 
+  const provider = inferProviderForModel(value);
+  const compatibility = validateModelCredentialCompatibility({
+    model: value,
+    provider,
+    credentialMode: credentialModeFromSource(args.providerCredentialSource),
+  });
+  if (!compatibility.ok) {
+    return messageResult(compatibility.error);
+  }
+
   args.setActiveModel(value);
   return messageResult(
     COMMON_BUILT_IN_MODELS.includes(value) ?
       `Switched model to ${value}`
     : `Switched model to ${value}. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.`,
   );
+}
+
+function inferProviderForModel(model: string): LlmProvider {
+  return model.startsWith('claude') ? 'anthropic' : 'openai';
 }
 
 async function handleAuthLogin(args: LocalCommandArgs, value: string): Promise<LocalCommandResult> {

@@ -1,6 +1,9 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { BUILT_IN_MODEL_GROUPS } from '../../../core/llm/openai-models.js';
+import { buildCredentialAwareModelOption, credentialModeFromSource } from '../../../core/llm/model-policy.js';
+import { inferProviderFromModel } from '../../../core/llm/factory.js';
+import { resolveProviderCredentialSourceForModel } from '../../../core/runtime/api-keys.js';
 import { procedure, router } from '../../trpc.js';
 import type { HeddleServerContext } from '../../types.js';
 import {
@@ -165,9 +168,20 @@ export const controlPlaneRouter = router({
   session: procedure.input(sessionInputSchema).query(({ ctx, input }) => {
     return readChatSessionDetail(resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'), input.id) ?? null;
   }),
-  modelOptions: procedure.query(() => {
+  modelOptions: procedure.query(({ ctx }) => {
+    const credentialMode = credentialModeFromSource(resolveProviderCredentialSourceForModel('gpt-5.4', {
+      preferApiKey: ctx.preferApiKey,
+    }));
     return {
-      groups: BUILT_IN_MODEL_GROUPS,
+      groups: BUILT_IN_MODEL_GROUPS.map((group) => ({
+        label: group.label,
+        models: group.models,
+        options: group.models.map((model) => buildCredentialAwareModelOption({
+          model,
+          provider: inferProviderFromModel(model),
+          credentialMode,
+        })),
+      })),
     };
   }),
   sessionSettingsUpdate: procedure.input(sessionSettingsInputSchema).mutation(({ ctx, input }) => {

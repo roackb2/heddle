@@ -106,6 +106,25 @@ describe('runLocalCommand', () => {
     });
   });
 
+  it('rejects unsupported OAuth model switching before updating the active model', async () => {
+    const setActiveModel = vi.fn();
+    const result = await runLocalCommand(createCommandArgs({
+      prompt: '/model gpt-5.4-pro',
+      setActiveModel,
+      providerCredentialSource: { type: 'oauth', provider: 'openai', accountId: 'acct', expiresAt: Date.now() + 60_000 },
+    }));
+
+    expect(setActiveModel).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      handled: true,
+      kind: 'message',
+    });
+    if (!result.handled || result.kind !== 'message') {
+      throw new Error('expected an OAuth incompatibility message');
+    }
+    expect(result.message).toContain('OpenAI account sign-in is not enabled for model gpt-5.4-pro');
+  });
+
   it('allows switching sessions by recent-session index', async () => {
     const switchSession = vi.fn();
     const sessions = [
