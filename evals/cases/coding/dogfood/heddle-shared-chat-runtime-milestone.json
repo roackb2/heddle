@@ -1,0 +1,82 @@
+{
+  "id": "heddle-shared-chat-runtime-milestone",
+  "kind": "coding",
+  "description": "Pinned Heddle dogfood case: complete a bounded shared-chat-runtime refactor milestone instead of stopping after a tiny substep.",
+  "fixture": {
+    "type": "git-worktree",
+    "repo": ".",
+    "ref": "v0.0.37"
+  },
+  "setup": {
+    "commands": [
+      {
+        "name": "install dependencies",
+        "command": "yarn install --ignore-scripts --silent --network-timeout 600000",
+        "timeoutMs": 300000
+      }
+    ],
+    "commitMessage": "Seed shared chat runtime milestone eval"
+  },
+  "prompt": "Complete one bounded milestone from the Heddle core refactor roadmap: remove the duplicate legacy compaction-status callback path from shared chat session submission so compaction status flows through the shared ChatTurnHostPort instead of being wired twice. Keep this as a focused shared-runtime refactor, not a folder migration or UI redesign. Add a focused regression test at src/__tests__/chat/session-submit.test.ts that would fail if submitChatSessionPrompt still passes the legacy onCompactionStatus callback through to executeOrdinaryChatTurn while also adapting the host compaction port. Update the smallest production surface needed, run the focused chat tests, and finish only after the milestone is complete enough for review.",
+  "maxSteps": 140,
+  "review": {
+    "milestone": "Shared chat runtime compaction-port cleanup",
+    "intent": "Evaluate whether Heddle can carry a bounded architecture/refactor milestone through to production code, focused regression coverage, and verification rather than stopping after a small substep.",
+    "requiredOutcomes": [
+      "submitChatSessionPrompt no longer wires duplicate legacy compaction callbacks into ordinary-turn execution",
+      "compaction status still reaches the shared host compaction port for preflight and final compaction events",
+      "a focused regression test exists at src/__tests__/chat/session-submit.test.ts",
+      "targeted chat tests pass after the refactor",
+      "the final summary explains the completed milestone, changed files, and verification"
+    ],
+    "allowedScope": [
+      "src/core/chat/session-submit.ts",
+      "src/core/chat/ordinary-turn.ts",
+      "src/core/chat/turn-host.ts",
+      "src/server/features/control-plane/services/chat-sessions.ts",
+      "src/cli/chat/hooks/tui-ordinary-turn.ts",
+      "src/__tests__/chat/session-submit.test.ts",
+      "src/__tests__/chat/chat-runtime.test.ts"
+    ],
+    "outOfScope": [
+      "large Phase D folder migration",
+      "browser UI redesign",
+      "TUI rendering redesign",
+      "provider/auth changes",
+      "eval harness changes inside the target workspace"
+    ],
+    "humanQuestions": [
+      "Did the agent complete the requested compaction-port milestone, or only make a small partial cleanup?",
+      "Does the diff preserve TUI and control-plane behavior while reducing duplicated session orchestration?",
+      "Did the agent add meaningful regression coverage instead of only changing implementation code?",
+      "Did the final answer describe residual risks or next steps honestly if the full milestone was not completed?"
+    ]
+  },
+  "checks": [
+    {
+      "name": "focused shared runtime tests",
+      "command": "yarn vitest run src/__tests__/chat/session-submit.test.ts src/__tests__/chat/chat-runtime.test.ts",
+      "timeoutMs": 180000
+    },
+    {
+      "name": "milestone changed shared chat files",
+      "command": "git diff --quiet -- src/core/chat src/server/features/control-plane/services/chat-sessions.ts src/cli/chat/hooks src/__tests__/chat/session-submit.test.ts; test $? -eq 1",
+      "timeoutMs": 30000
+    }
+  ],
+  "rubric": [
+    "completed a coherent shared-runtime milestone rather than stopping after a single local edit",
+    "kept host-specific behavior in TUI/server adapters and shared semantics in src/core/chat",
+    "added focused regression coverage for the compaction callback boundary",
+    "ran meaningful targeted verification and reported it truthfully",
+    "avoided unrelated Phase D folder migration or UI churn"
+  ],
+  "tags": [
+    "dogfood",
+    "pinned-target",
+    "heddle",
+    "refactor",
+    "milestone",
+    "shared-runtime"
+  ]
+}

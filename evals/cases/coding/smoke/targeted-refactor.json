@@ -1,0 +1,31 @@
+{
+  "id": "targeted-refactor",
+  "kind": "coding",
+  "description": "Refactor duplicated formatting logic without changing behavior.",
+  "prompt": "Refactor the duplicated name formatting logic into one shared helper. Preserve behavior, keep the change focused, and run the test before you finish.",
+  "model": "gpt-5.4",
+  "maxSteps": 80,
+  "setup": {
+    "files": {
+      "package.json": "{\n  \"name\": \"heddle-eval-targeted-refactor\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"test\": \"node test.js\"\n  }\n}\n",
+      "src/customer.js": "export function formatCustomerName(user) {\n  const first = user.firstName.trim();\n  const last = user.lastName.trim();\n  return `${last}, ${first}`;\n}\n",
+      "src/operator.js": "export function formatOperatorName(user) {\n  const first = user.firstName.trim();\n  const last = user.lastName.trim();\n  return `${last}, ${first}`;\n}\n",
+      "test.js": "import assert from 'node:assert/strict';\nimport { formatCustomerName } from './src/customer.js';\nimport { formatOperatorName } from './src/operator.js';\n\nconst user = { firstName: ' Ada ', lastName: ' Lovelace ' };\nassert.equal(formatCustomerName(user), 'Lovelace, Ada');\nassert.equal(formatOperatorName(user), 'Lovelace, Ada');\nconsole.log('ok');\n"
+    },
+    "commitMessage": "Initial duplicated formatter fixture"
+  },
+  "checks": [
+    {
+      "name": "unit test",
+      "command": "yarn test",
+      "timeoutMs": 30000
+    }
+  ],
+  "rubric": [
+    "Introduces a shared helper instead of changing only one call site.",
+    "Preserves existing observable behavior.",
+    "Avoids unrelated project churn.",
+    "Runs yarn test after editing."
+  ],
+  "tags": ["refactor", "multi-file"]
+}

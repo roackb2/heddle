@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import {
   appendMemoryCatalogSystemContext,
   DEFAULT_OPENAI_MODEL,
+  type ToolCall,
+  type ToolDefinition,
   type TraceEvent,
   createLlmAdapter,
   inferProviderFromModel,
@@ -102,6 +104,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
       preferApiKey: options.preferApiKey,
       systemContext,
       memoryMaintenanceMode: 'inline',
+      approveToolCall: createEvalAutoApprovalHandler(),
       leaseOwner: {
         ownerKind: 'ask',
         ownerId: `ask-${process.pid}`,
@@ -145,6 +148,7 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
     systemContext,
     includePlanTool: false,
     llm,
+    approveToolCall: createEvalAutoApprovalHandler(),
   });
   const maintenance = await runMaintenanceForRecordedCandidates({
     memoryRoot: memoryDir,
@@ -161,6 +165,19 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
   const traceFile = join(traceDir, `trace-${Date.now()}.json`);
   writeFileSync(traceFile, JSON.stringify(trace, null, 2));
   logger.info({ traceFile }, 'Trace saved');
+}
+
+function createEvalAutoApprovalHandler():
+  | ((call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>)
+  | undefined {
+  if (process.env.HEDDLE_EVAL_AUTO_APPROVE !== '1') {
+    return undefined;
+  }
+
+  return async (call, _tool) => ({
+    approved: true,
+    reason: `Approved by Heddle eval harness for disposable workspace execution (${call.tool}).`,
+  });
 }
 
 async function runDaemonBackedAsk(options: {

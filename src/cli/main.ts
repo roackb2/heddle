@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { chdir } from 'node:process';
 import { Command } from 'commander';
 import { createLlmAdapter, DEFAULT_OPENAI_MODEL } from '../index.js';
@@ -25,6 +25,7 @@ import { runAuthCli } from './auth.js';
 import { runAskCli } from './ask.js';
 import { startChatCli } from './chat/index.js';
 import { runDaemonCli } from './daemon.js';
+import { runEvalCli } from './eval/index.js';
 import { parseHeartbeatArgs, runHeartbeatCli } from './heartbeat.js';
 import { runSessionCli } from './session.js';
 import {
@@ -242,6 +243,20 @@ async function main() {
     });
 
   program
+    .command('eval [args...]')
+    .description('run Heddle evaluation harnesses')
+    .allowUnknownOption(true)
+    .action(async (args: string[]) => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      await runEvalCli(args ?? [], {
+        repoRoot: resolveHeddleRepoRoot(),
+        model: resolved.model,
+        maxSteps: resolved.maxSteps,
+        preferApiKey: resolved.preferApiKey,
+      });
+    });
+
+  program
     .command('heartbeat [args...]')
     .description('manage and run heartbeat tasks')
     .allowUnknownOption(true)
@@ -309,7 +324,7 @@ async function main() {
 }
 
 function isKnownCommand(command: string): boolean {
-  return ['chat', 'ask', 'init', 'memory', 'auth', 'heartbeat', 'daemon', 'session', 'help'].includes(command);
+  return ['chat', 'ask', 'init', 'memory', 'auth', 'eval', 'heartbeat', 'daemon', 'session', 'help'].includes(command);
 }
 
 async function runMemoryCli(
@@ -585,6 +600,15 @@ function resolvePackageJsonCandidates(): string[] {
     resolve(import.meta.dirname, '../../package.json'),
     resolve(import.meta.dirname, '../../../package.json'),
   ];
+}
+
+function resolveHeddleRepoRoot(): string {
+  for (const candidatePath of resolvePackageJsonCandidates()) {
+    if (existsSync(candidatePath)) {
+      return dirname(candidatePath);
+    }
+  }
+  return resolve(import.meta.dirname, '../..');
 }
 
 function loadProjectConfig(workspaceRoot: string): HeddleProjectConfig {
