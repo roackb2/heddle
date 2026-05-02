@@ -1,5 +1,4 @@
 import type { ChatSession, LocalCommandResult } from './types.js';
-import { summarizeSession } from './storage.js';
 import type { OpenAiOAuthCredential } from '../../../core/auth/openai-oauth.js';
 import type { ProviderCredentialSource } from '../utils/runtime.js';
 import { createFileHeartbeatTaskStore } from '../../../core/runtime/heartbeat-task-store.js';
@@ -44,21 +43,12 @@ type PrefixCommandHandler = (args: LocalCommandArgs, value: string) => Promise<L
 const CORE_COMMAND_REGISTRY = createSlashCommandRegistry(createCoreSlashCommandModules());
 const LOCAL_COMMAND_HINTS: LocalCommandHint[] = [
   { command: '/help', description: 'show available local commands' },
-  { command: '/continue', description: 'resume from the current transcript' },
-  { command: '/clear', description: 'reset the current session transcript' },
   { command: '/debug tui-snapshot', description: 'save the latest rendered TUI frame for inspection' },
   { command: '/heartbeat tasks', description: 'list heartbeat tasks' },
   { command: '/heartbeat task <id>', description: 'show one heartbeat task' },
   { command: '/heartbeat runs [task]', description: 'list recent heartbeat runs' },
   { command: '/heartbeat run <task> [run-id|latest]', description: 'show one heartbeat run' },
   { command: '/heartbeat continue <task> [run-id|latest]', description: 'continue in chat from a heartbeat run summary' },
-  { command: '/session list', description: 'list local chat sessions' },
-  { command: '/session choose [query]', description: 'pick a recent session with filtering' },
-  { command: '/session new [name]', description: 'create and switch to a new session' },
-  { command: '/session switch <id>', description: 'switch to another session' },
-  { command: '/session continue <id>', description: 'switch to a session and resume it' },
-  { command: '/session rename <name>', description: 'rename the current session' },
-  { command: '/session close <id>', description: 'remove a saved session' },
   { command: '!<command>', description: 'run a shell command directly in chat using the current policy' },
 ];
 const HELP_HINTS: LocalCommandHint[] = [
@@ -81,21 +71,12 @@ const HELP_MESSAGE = [
 
 const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
   ['/help', () => messageResult(HELP_MESSAGE)],
-  ['/clear', (args) => {
-    args.clearConversation();
-    return messageResult('Cleared the current chat transcript.');
-  }],
   ['/debug tui-snapshot', async (args) =>
     messageResult(
       args.saveTuiSnapshot ? await args.saveTuiSnapshot() : 'TUI snapshots are not available in this runtime.',
     )],
   ['/heartbeat tasks', (args) => listHeartbeatTasksMessage(args)],
   ['/heartbeat runs', (args) => listHeartbeatRunsMessage(args, '')],
-  ['/continue', () => ({ handled: true, kind: 'continue' })],
-  ['/session list', (args) =>
-    messageResult(args.sessions.length > 0 ? args.listRecentSessionsMessage.join('\n') : 'No sessions available.'),
-  ],
-  ['/session choose', () => messageResult('Use /session choose <query> to filter recent sessions, then use arrows and Enter to choose one.')],
 ]);
 
 const PREFIX_COMMANDS: Array<{ prefix: string; handle: PrefixCommandHandler }> = [
@@ -103,11 +84,6 @@ const PREFIX_COMMANDS: Array<{ prefix: string; handle: PrefixCommandHandler }> =
   { prefix: '/heartbeat runs ', handle: handleHeartbeatRuns },
   { prefix: '/heartbeat run ', handle: handleHeartbeatRun },
   { prefix: '/heartbeat continue ', handle: handleHeartbeatContinue },
-  { prefix: '/session new', handle: handleSessionNew },
-  { prefix: '/session switch ', handle: handleSessionSwitch },
-  { prefix: '/session continue ', handle: handleSessionContinue },
-  { prefix: '/session rename ', handle: handleSessionRename },
-  { prefix: '/session close ', handle: handleSessionClose },
 ];
 
 export function isLikelyLocalCommand(prompt: string): boolean {
@@ -273,11 +249,6 @@ async function handleHeartbeatContinue(args: LocalCommandArgs, value: string): P
   };
 }
 
-function handleSessionNew(args: LocalCommandArgs, value: string): LocalCommandResult {
-  const session = args.createSession(value || undefined);
-  return messageResult(`Created and switched to ${session.id} (${session.name}).`, session.id);
-}
-
 async function listHeartbeatTasksMessage(args: LocalCommandArgs): Promise<LocalCommandResult> {
   const tasks = await heartbeatStore(args).listTasks();
   if (!tasks.length) {
@@ -406,67 +377,6 @@ function formatInterval(intervalMs: number): string {
   if (intervalMs % 60_000 === 0) return `${intervalMs / 60_000}m`;
   if (intervalMs % 1_000 === 0) return `${intervalMs / 1_000}s`;
   return `${intervalMs}ms`;
-}
-
-function handleSessionSwitch(args: LocalCommandArgs, value: string): LocalCommandResult {
-  const session = resolveSessionReference(args, value);
-  if (!session) {
-    return messageResult(`Unknown session: ${value}. Use /session list to inspect available sessions.`);
-  }
-
-  args.switchSession(session.id);
-  return messageResult(`Switched to ${session.id} (${session.name}).\n${summarizeSession(session)}`, session.id);
-}
-
-function handleSessionContinue(args: LocalCommandArgs, value: string): LocalCommandResult {
-  const session = resolveSessionReference(args, value);
-  if (!session) {
-    return messageResult(`Unknown session: ${value}.\nUse /session list to inspect available sessions.`);
-  }
-
-  return {
-    handled: true,
-    kind: 'continue',
-    sessionId: session.id,
-    message: `Switched to ${session.id} (${session.name}).\nContinuing from that session transcript.`,
-  };
-}
-
-function handleSessionRename(args: LocalCommandArgs, value: string): LocalCommandResult {
-  if (!value) {
-    return messageResult('Usage: /session rename <name>');
-  }
-
-  args.renameSession(value);
-  return messageResult(`Renamed current session to ${value}.`);
-}
-
-function handleSessionClose(args: LocalCommandArgs, value: string): LocalCommandResult {
-  const session = resolveSessionReference(args, value);
-  if (!session) {
-    return messageResult(`Unknown session: ${value}.\nUse /session list to inspect available sessions.`);
-  }
-
-  args.removeSession(session.id);
-  return messageResult(`Closed ${session.id} (${session.name}).`);
-}
-
-function findSession(args: LocalCommandArgs, id: string): ChatSession | undefined {
-  return args.sessions.find((candidate) => candidate.id === id);
-}
-
-function resolveSessionReference(args: LocalCommandArgs, value: string): ChatSession | undefined {
-  const directMatch = findSession(args, value);
-  if (directMatch) {
-    return directMatch;
-  }
-
-  const numericIndex = Number.parseInt(value, 10);
-  if (!Number.isFinite(numericIndex) || numericIndex <= 0) {
-    return undefined;
-  }
-
-  return args.recentSessions[numericIndex - 1];
 }
 
 function messageResult(message: string, sessionId?: string): LocalCommandResult {
