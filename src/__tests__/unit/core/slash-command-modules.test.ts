@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createSlashCommandRegistry } from '../../../core/commands/slash/registry.js';
 import { createCoreSlashCommandModules } from '../../../core/commands/slash/modules/core-command-modules.js';
+import { buildHeartbeatContinuationPrompt } from '../../../core/commands/slash/modules/heartbeat/heartbeat-commands.js';
 import { resolveSessionReference } from '../../../core/commands/slash/modules/session/session-commands.js';
 import type { ChatSession } from '../../../core/chat/types.js';
 import type { SlashCommandExecutionContext } from '../../../core/commands/slash/modules/context.js';
+import type { HeartbeatTask, HeartbeatTaskRunRecordEntry } from '../../../core/runtime/heartbeat-task-store.js';
 
 function testSession(overrides: Partial<ChatSession> & Pick<ChatSession, 'id' | 'name'>): ChatSession {
   return {
@@ -12,6 +14,73 @@ function testSession(overrides: Partial<ChatSession> & Pick<ChatSession, 'id' | 
     turns: [],
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',
+    ...overrides,
+  };
+}
+
+function testHeartbeatTask(overrides: Partial<HeartbeatTask> & Pick<HeartbeatTask, 'id'>): HeartbeatTask {
+  return {
+    task: 'Check repository state',
+    enabled: true,
+    intervalMs: 60_000,
+    ...overrides,
+  };
+}
+
+function testHeartbeatRun(overrides: Partial<HeartbeatTaskRunRecordEntry> = {}): HeartbeatTaskRunRecordEntry {
+  const task = testHeartbeatTask({
+    id: 'repo-check',
+    status: 'waiting',
+    lastProgress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+    resumable: true,
+  });
+  return {
+    id: '2026-04-14T00-00-00.000Z-repo-check',
+    path: '/tmp/run.json',
+    taskId: 'repo-check',
+    runId: 'run_heartbeat_1',
+    createdAt: '2026-04-14T00:00:00.000Z',
+    record: {
+      task,
+      loadedCheckpoint: true,
+      result: {
+        decision: 'continue',
+        summary: 'Checked the repository and found one safe next step.\n\nHEARTBEAT_DECISION: continue',
+        checkpoint: {
+          version: 1,
+          runId: 'run_heartbeat_1',
+          createdAt: '2026-04-14T00:00:00.000Z',
+          state: {
+            status: 'finished',
+            runId: 'run_heartbeat_1',
+            goal: 'Heartbeat wake cycle',
+            model: 'gpt-5.4',
+            provider: 'openai',
+            workspaceRoot: '/tmp/workspace',
+            startedAt: '2026-04-13T23:59:00.000Z',
+            finishedAt: '2026-04-14T00:00:00.000Z',
+            outcome: 'done',
+            summary: 'Checked the repository and found one safe next step.\n\nHEARTBEAT_DECISION: continue',
+            transcript: [],
+            trace: [],
+          },
+        },
+        state: {
+          status: 'finished',
+          runId: 'run_heartbeat_1',
+          goal: 'Heartbeat wake cycle',
+          model: 'gpt-5.4',
+          provider: 'openai',
+          workspaceRoot: '/tmp/workspace',
+          startedAt: '2026-04-13T23:59:00.000Z',
+          finishedAt: '2026-04-14T00:00:00.000Z',
+          outcome: 'done',
+          summary: 'Checked the repository and found one safe next step.\n\nHEARTBEAT_DECISION: continue',
+          transcript: [],
+          trace: [],
+        },
+      },
+    },
     ...overrides,
   };
 }
@@ -56,6 +125,11 @@ function createContext(overrides: Partial<SlashCommandExecutionContext> = {}): S
       remove: vi.fn(),
       clear: vi.fn(),
       summarize: (session) => `Summary for ${session.id}`,
+    },
+    heartbeat: {
+      listTasks: async () => [],
+      listRunRecords: async () => [],
+      loadRunRecord: async () => undefined,
     },
     ...overrides,
   };
@@ -130,6 +204,7 @@ describe('core slash command modules', () => {
       { command: '/compact', description: 'compact earlier session history for the next run' },
       { command: '/drift', description: 'show CyberLoop semantic drift detection status' },
       { command: '/session switch <id>', description: 'switch to another session' },
+      { command: '/heartbeat continue <task> [run-id|latest]', description: 'continue in chat from a heartbeat run summary' },
     ]));
   });
 
@@ -201,5 +276,54 @@ describe('core slash command modules', () => {
     expect(resolveSessionReference({ sessions, recentSessions, value: '1' })?.id).toBe('1');
     expect(resolveSessionReference({ sessions, recentSessions, value: '2' })?.id).toBe('session-b');
     expect(resolveSessionReference({ sessions, recentSessions, value: 'missing' })).toBeUndefined();
+  });
+
+  it('routes heartbeat commands through host ports', async () => {
+    const task = testHeartbeatTask({
+      id: 'repo-check',
+      status: 'waiting',
+      nextRunAt: '2026-04-14T00:00:00.000Z',
+      lastDecision: 'continue',
+      lastProgress: 'Heartbeat wake finished.',
+    });
+    const run = testHeartbeatRun();
+    const context = createContext({
+      heartbeat: {
+        listTasks: async () => [task],
+        listRunRecords: async (options) => options?.taskId === 'repo-check' ? [run] : [],
+        loadRunRecord: async (id) => id === run.id ? run : undefined,
+      },
+    });
+
+    await expect(registry.run(context, '/heartbeat tasks')).resolves.toMatchObject({
+      kind: 'message',
+      message: expect.stringContaining('enabled repo-check'),
+    });
+    await expect(registry.run(context, '/heartbeat task repo-check')).resolves.toMatchObject({
+      kind: 'message',
+      message: expect.stringContaining('Task:\nCheck repository state'),
+    });
+    await expect(registry.run(context, '/heartbeat runs repo-check')).resolves.toMatchObject({
+      kind: 'message',
+      message: expect.stringContaining('summary=Checked the repository and found one safe next step.'),
+    });
+    await expect(registry.run(context, '/heartbeat run repo-check latest')).resolves.toMatchObject({
+      kind: 'message',
+      message: expect.stringContaining('Heartbeat run 2026-04-14T00-00-00.000Z-repo-check'),
+    });
+    await expect(registry.run(context, '/heartbeat continue repo-check latest')).resolves.toMatchObject({
+      kind: 'execute',
+      displayText: 'Continue heartbeat repo-check',
+      prompt: expect.stringContaining('Heartbeat task id: repo-check'),
+    });
+  });
+
+  it('keeps heartbeat continuation prompt formatting pure', () => {
+    const prompt = buildHeartbeatContinuationPrompt(testHeartbeatRun());
+
+    expect(prompt).toContain('Heartbeat run id: run_heartbeat_1');
+    expect(prompt).toContain('Task progress: Heartbeat wake finished.');
+    expect(prompt).toContain('Checked the repository and found one safe next step.');
+    expect(prompt).not.toContain('HEARTBEAT_DECISION');
   });
 });
