@@ -3,7 +3,6 @@ import type { TraceEvent, ToolCall } from '../types.js';
 import { truncate } from '../utils/text.js';
 
 const DEFAULT_MAX_TOOL_SUMMARY_CHARS = 96;
-const PATH_SUMMARY_TOOLS = new Set(['edit_file', 'read_file', 'list_files']);
 
 export type ConversationActivityCorrelation = {
   runId?: string;
@@ -227,8 +226,13 @@ export function summarizeToolCall(tool: string, input: unknown, maxChars = DEFAU
     return summarizeSearchInput(tool, input, maxChars);
   }
 
+  const moveSummary = summarizeMoveInput(tool, input, maxChars);
+  if (moveSummary) {
+    return moveSummary;
+  }
+
   const path = readStringField(input, 'path');
-  return PATH_SUMMARY_TOOLS.has(tool) && path ? `${tool} (${truncate(path, maxChars)})` : tool;
+  return path ? `${tool} (${truncate(path, maxChars)})` : tool;
 }
 
 export function summarizeToolResult(
@@ -241,12 +245,28 @@ export function summarizeToolResult(
     return `${tool} (${truncate(command, maxChars)})`;
   }
 
+  const moveSummary = summarizeMoveInput(tool, options.output, maxChars);
+  if (moveSummary) {
+    return moveSummary;
+  }
+
   const outputPath = readStringField(options.output, 'path');
-  if (tool === 'edit_file' && outputPath) {
+  if (outputPath) {
     return `${tool} (${truncate(outputPath, maxChars)})`;
   }
 
   return tool;
+}
+
+function summarizeMoveInput(tool: string, input: unknown, maxChars: number): string | undefined {
+  const from = readStringField(input, 'from');
+  const to = readStringField(input, 'to');
+  if (!from && !to) {
+    return undefined;
+  }
+
+  const segmentChars = Math.max(12, Math.floor(maxChars / 2));
+  return `${tool} (${from ? truncate(from, segmentChars) : '?'} -> ${to ? truncate(to, segmentChars) : '?'})`;
 }
 
 function summarizeSearchInput(tool: string, input: unknown, maxChars: number): string {

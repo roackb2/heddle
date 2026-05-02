@@ -71,6 +71,12 @@ describe('trace summarizers', () => {
         timestamp: '2026-05-02T00:00:07.000Z',
       },
       {
+        type: 'tool.call',
+        call: { id: 'call-7', tool: 'delete_file', input: { path: 'tmp/generated-report.md' } },
+        step: 5,
+        timestamp: '2026-05-02T00:00:07.500Z',
+      },
+      {
         type: 'tool.result',
         tool: 'read_file',
         result: { ok: true, output: 'contents' },
@@ -149,6 +155,7 @@ describe('trace summarizers', () => {
       'approval denied for run_shell_mutate (yarn test) (User denied in test)',
       'fallback run_shell_inspect (git status --short) -> run_shell_mutate (git status --short) (inspect policy rejected the command)',
       'tool call read_file (src/index.ts)',
+      'tool call delete_file (tmp/generated-report.md)',
       'tool result read_file: ok',
       'tool result run_shell_inspect: exit code 1',
       'memory candidate recorded: candidate-1',

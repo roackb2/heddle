@@ -166,7 +166,16 @@ describe('conversation activity projection', () => {
     expect(summarizeToolCall('update_plan', { plan: [{ step: 'Refactor projection', status: 'in_progress' }] })).toBe(
       'update_plan (Refactor projection)',
     );
+    expect(summarizeToolCall('delete_file', { path: 'tmp/generated-report.md' })).toBe(
+      'delete_file (tmp/generated-report.md)',
+    );
+    expect(summarizeToolCall('move_file', { from: 'docs/old.md', to: 'docs/archive/old.md' })).toBe(
+      'move_file (docs/old.md -> docs/archive/old.md)',
+    );
     expect(summarizeToolResult('edit_file', { output: { path: 'src/index.ts' } })).toBe('edit_file (src/index.ts)');
+    expect(summarizeToolResult('delete_file', { output: { path: 'tmp/generated-report.md' } })).toBe(
+      'delete_file (tmp/generated-report.md)',
+    );
   });
 
   it('routes nested trace loop events through the trace projector', () => {
