@@ -18,6 +18,7 @@ export function createSlashCommandRegistry<Result, Context>(
   modules: SlashCommandModule<Result, Context>[],
 ): SlashCommandRegistry<Result, Context> {
   const commands = flattenModules(modules);
+  const hints = flattenModuleHints(modules);
   validateSlashCommandRegistry(modules, commands);
 
   return {
@@ -26,10 +27,7 @@ export function createSlashCommandRegistry<Result, Context>(
     },
 
     hints() {
-      return commands.map((command) => ({
-        command: command.syntax,
-        description: command.description,
-      }));
+      return [...hints];
     },
 
     find(input) {
@@ -47,6 +45,17 @@ export function createSlashCommandRegistry<Result, Context>(
       return matched ? await matched.command.run(context, matched.input) : undefined;
     },
   };
+}
+
+function flattenModuleHints<Result, Context>(
+  modules: SlashCommandModule<Result, Context>[],
+): SlashCommandHint[] {
+  return modules.flatMap((module) =>
+    module.hints ?? module.commands.map((command) => ({
+      command: command.syntax,
+      description: command.description,
+    })),
+  );
 }
 
 function flattenModules<Result, Context>(
@@ -76,4 +85,3 @@ function assertUnique(label: string, values: string[]) {
     seen.add(value);
   }
 }
-

@@ -21,6 +21,7 @@ export type SlashCommand<Result, Context> = {
 
 export type SlashCommandModule<Result, Context> = {
   id: string;
+  hints?: SlashCommandHint[];
   commands: SlashCommand<Result, Context>[];
 };
 
@@ -28,4 +29,3 @@ export type SlashCommandMatch<Result, Context> = {
   command: SlashCommand<Result, Context>;
   input: ParsedSlashCommand;
 };
-
