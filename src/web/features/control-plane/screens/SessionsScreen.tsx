@@ -3,7 +3,6 @@ import {
   type ChatSessionDetail,
   type ChatTurnReview,
   type ControlPlaneState,
-  type WorkspaceFileSuggestion,
 } from '../../../lib/api';
 import { formatControlPlaneAuthStatus } from '../auth-status';
 import { formatDate, className } from '../utils';
@@ -11,14 +10,15 @@ import { CodeBlock, EmptyState, Pill, WorkspaceSectionHeader } from '../componen
 import { SessionListButton } from '../components/lists';
 import { ConversationMessage } from '../components/ConversationMessage';
 import { ModelSelectorPopover } from '../components/ModelSelectorPopover.js';
-import { useResizableSessionPanels } from '../hooks/useResizableSessionPanels.js';
-import { useSessionComposer } from '../hooks/useSessionComposer.js';
-import { useSessionMobileNavigation } from '../hooks/useSessionMobileNavigation.js';
-import { useSessionModelOptions } from '../hooks/useSessionModelOptions.js';
-import { useWorkspaceReviewState } from '../hooks/useWorkspaceReviewState.js';
-import { MobileChatScreen } from '../mobile/MobileChatScreen';
-import { MobileReviewScreen } from '../mobile/MobileReviewScreen';
+import { useResizableSessionPanels } from '../hooks/sessions-screen/useResizableSessionPanels.js';
+import { useSessionComposer } from '../hooks/sessions-screen/useSessionComposer.js';
+import { useSessionMobileNavigation } from '../hooks/sessions-screen/useSessionMobileNavigation.js';
+import { useSessionModelOptions } from '../hooks/sessions-screen/useSessionModelOptions.js';
+import { useWorkspaceReviewState } from '../hooks/sessions-screen/useWorkspaceReviewState.js';
 import { FullDiffDialog, SessionReviewPanel, type ExpandedDiff, type ReviewMode } from './SessionReviewPanel';
+import { FileMentionMenu } from './sessions-screen/FileMentionMenu.js';
+import { SessionsMobileLayout } from './sessions-screen/SessionsMobileLayout.js';
+import { formatDriftLabel } from './sessions-screen/sessionScreenUtils.js';
 
 export type SessionTurn = Exclude<ChatSessionDetail, null>['turns'][number];
 
@@ -186,42 +186,21 @@ export function SessionsScreen({
 
   const showMobileLayout = typeof window !== 'undefined' && window.innerWidth <= 760;
 
-  if (showMobileLayout && mobileView === 'list') {
+  if (showMobileLayout) {
     return (
-      <section className="mobile-session-screen mobile-session-list">
-        <aside className="workspace-sidebar mobile-pane">
-          <WorkspaceSectionHeader
-            title="Sessions"
-            subtitle={`${sessions.length} saved conversation${sessions.length === 1 ? '' : 's'}`}
-            actions={<button className="sidebar-action-button" type="button" data-testid="new-session-button" disabled={creatingSession} onClick={() => void onCreateSession()}>{creatingSession ? 'Creating…' : '+ New session'}</button>}
-          />
-          <div className="sidebar-scroll">
-            {sessions.length ?
-              <div className="stack-list compact">
-                {sessions.map((session) => (
-                  <SessionListButton
-                    key={session.id}
-                    session={session}
-                    active={session.id === selectedSessionId}
-                    onClick={() => selectSession(session.id)}
-                  />
-                ))}
-              </div>
-            : <div className="sidebar-empty-state"><EmptyState title="No sessions" body="Create a new web session to start a fresh conversation in the browser." /></div>}
-          </div>
-        </aside>
-      </section>
-    );
-  }
-
-  if (showMobileLayout && mobileView === 'chat') {
-    return (
-      <MobileChatScreen
+      <SessionsMobileLayout
+        mobileView={mobileView}
+        sessions={sessions}
         activeSession={activeSession}
         sessionDetail={sessionDetail}
         sessionDetailLoading={sessionDetailLoading}
         sessionDetailError={sessionDetailError}
         selectedSessionId={selectedSessionId}
+        selectedTurnId={selectedTurnId}
+        selectedTurn={selectedTurn}
+        turnReview={turnReview}
+        turnReviewLoading={turnReviewLoading}
+        turnReviewError={turnReviewError}
         runActive={runActive}
         runInFlight={runInFlight}
         memoryUpdating={memoryUpdating}
@@ -233,47 +212,33 @@ export function SessionsScreen({
         conversationScrollRef={conversationScrollRef}
         textareaRef={textareaRef}
         mentionMenu={mentionMenu}
-        renderMessage={(message) => <ConversationMessage key={message.id} message={message} />}
+        workspaceChanges={workspaceChanges}
+        workspaceChangesLoading={workspaceChangesLoading}
+        workspaceChangesError={workspaceChangesError}
+        workspaceFileDiff={workspaceFileDiff}
+        workspaceFileDiffsByPath={workspaceFileDiffsByPath}
+        workspaceFileDiffLoading={workspaceFileDiffLoading}
+        workspaceFileDiffError={workspaceFileDiffError}
+        selectedTurnPatchIsStale={selectedTurnPatchIsStale}
+        expandedDiff={expandedDiff}
+        creatingSession={creatingSession}
+        onCreateSession={onCreateSession}
+        onSelectSession={selectSession}
+        onSelectTurn={selectTurn}
         onDraftChange={updateDraft}
         onComposerKeyDown={handleComposerKeyDown}
         onBackToSessions={showSessionList}
         onOpenReview={openReviewInspector}
         onSubmitPrompt={submitDraft}
-        onContinueSession={() => void onContinueSession()}
-        onCancelSessionRun={() => void onCancelSessionRun()}
-        onResolveApproval={(approved) => void onResolveApproval(approved)}
+        onContinueSession={onContinueSession}
+        onCancelSessionRun={onCancelSessionRun}
+        onResolveApproval={onResolveApproval}
+        onSelectWorkspaceFile={selectWorkspaceFile}
+        onRefreshWorkspaceReview={refreshWorkspaceReview}
+        onOpenDiff={setExpandedDiff}
+        onOpenChat={showChatView}
+        onCloseDiff={() => setExpandedDiff(null)}
       />
-    );
-  }
-
-  if (showMobileLayout && mobileView === 'review') {
-    return (
-      <>
-        <MobileReviewScreen
-          activeSession={activeSession}
-          sessionDetail={sessionDetail}
-          selectedTurnId={selectedTurnId}
-          selectedTurn={selectedTurn}
-          turnReview={turnReview}
-          turnReviewLoading={turnReviewLoading}
-          turnReviewError={turnReviewError}
-          workspaceChanges={workspaceChanges}
-          workspaceChangesLoading={workspaceChangesLoading}
-          workspaceChangesError={workspaceChangesError}
-          workspaceFileDiff={workspaceFileDiff}
-          workspaceFileDiffsByPath={workspaceFileDiffsByPath}
-          workspaceFileDiffLoading={workspaceFileDiffLoading}
-          workspaceFileDiffError={workspaceFileDiffError}
-          onSelectWorkspaceFile={selectWorkspaceFile}
-          onRefreshWorkspaceReview={refreshWorkspaceReview}
-          selectedTurnPatchIsStale={selectedTurnPatchIsStale}
-          onOpenDiff={setExpandedDiff}
-          onBackToSessions={showSessionList}
-          onOpenChat={showChatView}
-          onSelectTurn={selectTurn}
-        />
-        <FullDiffDialog diff={expandedDiff} onClose={() => setExpandedDiff(null)} />
-      </>
     );
   }
 
@@ -464,57 +429,5 @@ export function SessionsScreen({
       />
       <FullDiffDialog diff={expandedDiff} onClose={() => setExpandedDiff(null)} />
     </section>
-  );
-}
-
-function formatDriftLabel(enabled: boolean | undefined, level: ControlPlaneState['sessions'][number]['driftLevel']): string {
-  if (!enabled) {
-    return 'drift off';
-  }
-
-  return `drift ${level ?? 'unknown'}`;
-}
-
-function FileMentionMenu({
-  loading,
-  suggestions,
-  activeIndex,
-  error,
-  query,
-  onPick,
-}: {
-  loading: boolean;
-  suggestions: WorkspaceFileSuggestion[];
-  activeIndex: number;
-  error?: string;
-  query: string;
-  onPick: (suggestion: WorkspaceFileSuggestion) => void;
-}) {
-  return (
-    <div className="mention-menu" role="listbox" aria-label="File suggestions">
-      <div className="mention-menu-header">
-        <span>@ file</span>
-        <span>{loading ? 'Searching...' : `${suggestions.length} match${suggestions.length === 1 ? '' : 'es'}`}</span>
-      </div>
-      {error ?
-        <p className="mention-empty">File search unavailable. Restart the Heddle daemon if this route was just added.</p>
-      : suggestions.length ?
-        suggestions.map((suggestion, index) => (
-          <button
-            key={suggestion.path}
-            className={className('mention-option', index === activeIndex && 'active')}
-            type="button"
-            role="option"
-            aria-selected={index === activeIndex}
-            onMouseDown={(event) => {
-              event.preventDefault();
-              onPick(suggestion);
-            }}
-          >
-            <span>@{suggestion.path}</span>
-          </button>
-        ))
-      : <p className="mention-empty">{loading ? 'Searching workspace files...' : `No files found for "${query}".`}</p>}
-    </div>
   );
 }

@@ -3,8 +3,8 @@ import {
   fetchModelOptions,
   type ControlPlaneState,
   type ModelOptions,
-} from '../../../lib/api';
-import { useCredentialAwareModelOptions } from './useCredentialAwareModelOptions.js';
+} from '../../../../lib/api';
+import { useCredentialAwareModelOptions } from '../useCredentialAwareModelOptions.js';
 
 export function useSessionModelOptions({
   auth,

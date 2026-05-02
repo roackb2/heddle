@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { className } from '../utils';
+import { className } from '../../utils';
 
 type MobileView = 'list' | 'chat' | 'review';
 

@@ -5,7 +5,7 @@ import {
   type ChatTurnReview,
   type WorkspaceChanges,
   type WorkspaceFileDiff,
-} from '../../../lib/api';
+} from '../../../../lib/api';
 
 export function useWorkspaceReviewState({
   runActive,

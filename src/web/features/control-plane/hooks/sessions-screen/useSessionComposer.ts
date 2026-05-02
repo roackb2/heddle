@@ -3,7 +3,7 @@ import type { KeyboardEvent } from 'react';
 import {
   fetchWorkspaceFileSuggestions,
   type WorkspaceFileSuggestion,
-} from '../../../lib/api';
+} from '../../../../lib/api';
 
 type FileMentionQuery = {
   query: string;
