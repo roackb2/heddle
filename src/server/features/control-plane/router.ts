@@ -163,6 +163,7 @@ export const controlPlaneRouter = router({
       workspaceId: ctx.activeWorkspace.id,
       model: input?.model,
       apiKeyPresent: input?.apiKeyPresent,
+      preferApiKey: ctx.preferApiKey,
     });
   }),
   session: procedure.input(sessionInputSchema).query(({ ctx, input }) => {

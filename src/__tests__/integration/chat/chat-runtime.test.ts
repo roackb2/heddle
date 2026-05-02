@@ -366,6 +366,77 @@ describe('executeAgentTurn final message persistence', () => {
 describe('control-plane shared chat runtime integration', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  function createControlPlaneSessionStoragePath() {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-control-plane-runtime-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    return resolve(stateRoot, 'chat-sessions.catalog.json');
+  }
+
+  it('defaults new control-plane sessions to the shared OpenAI default model', () => {
+    vi.stubEnv('OPENAI_MODEL', '');
+    vi.stubEnv('ANTHROPIC_MODEL', '');
+
+    const session = createControlPlaneChatSession({
+      sessionStoragePath: createControlPlaneSessionStoragePath(),
+      suggestedName: 'Default model test',
+    });
+
+    expect(session.model).toBe('gpt-5.4');
+  });
+
+  it('falls back to an OAuth-compatible model when a configured OpenAI model is unsupported', () => {
+    vi.stubEnv('OPENAI_MODEL', 'gpt-4.1');
+    vi.stubEnv('OPENAI_API_KEY', '');
+    vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
+    const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-control-plane-oauth-')), 'auth.json');
+    const now = '2026-05-02T00:00:00.000Z';
+    setStoredProviderCredential({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAt: Date.parse('2026-05-02T01:00:00.000Z'),
+      accountId: 'account-1234567890',
+      createdAt: now,
+      updatedAt: now,
+    }, storePath);
+
+    const session = createControlPlaneChatSession({
+      sessionStoragePath: createControlPlaneSessionStoragePath(),
+      suggestedName: 'OAuth fallback test',
+      credentialStorePath: storePath,
+    });
+
+    expect(session.model).toBe('gpt-5.4');
+  });
+
+  it('preserves broader OpenAI model choices in API-key mode', () => {
+    vi.stubEnv('OPENAI_MODEL', 'gpt-4.1');
+    vi.stubEnv('OPENAI_API_KEY', 'test-openai-key');
+    const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-control-plane-api-key-')), 'auth.json');
+    const now = '2026-05-02T00:00:00.000Z';
+    setStoredProviderCredential({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAt: Date.parse('2026-05-02T01:00:00.000Z'),
+      accountId: 'account-1234567890',
+      createdAt: now,
+      updatedAt: now,
+    }, storePath);
+
+    const session = createControlPlaneChatSession({
+      sessionStoragePath: createControlPlaneSessionStoragePath(),
+      suggestedName: 'API key model test',
+      preferApiKey: true,
+      credentialStorePath: storePath,
+    });
+
+    expect(session.model).toBe('gpt-4.1');
   });
 
   it('continues with the stored prompt while preserving continue-style transcript text', async () => {
