@@ -1,12 +1,11 @@
 import type { ChatSession, LocalCommandResult } from './types.js';
 import { summarizeSession } from './storage.js';
-import { formatAuthStatusMessage, loginProviderWithOAuth, logoutProvider } from '../../auth.js';
 import type { OpenAiOAuthCredential } from '../../../core/auth/openai-oauth.js';
-import { COMMON_BUILT_IN_MODELS, formatBuiltInModelGroups } from '../../../core/llm/openai-models.js';
-import { credentialModeFromSource, validateModelCredentialCompatibility } from '../../../core/llm/model-policy.js';
-import type { LlmProvider } from '../../../core/llm/types.js';
 import type { ProviderCredentialSource } from '../utils/runtime.js';
 import { createFileHeartbeatTaskStore } from '../../../core/runtime/heartbeat-task-store.js';
+import { createSlashCommandRegistry } from '../../../core/commands/slash/registry.js';
+import { createCoreSlashCommandModules } from '../../../core/commands/slash/modules/core-command-modules.js';
+import { createTuiSlashCommandContext } from '../adapters/slash-command-context.js';
 import { join } from 'node:path';
 
 export type LocalCommandHint = {
@@ -42,25 +41,12 @@ export type LocalCommandArgs = {
 type ExactCommandHandler = (args: LocalCommandArgs) => Promise<LocalCommandResult> | LocalCommandResult;
 type PrefixCommandHandler = (args: LocalCommandArgs, value: string) => Promise<LocalCommandResult> | LocalCommandResult;
 
-const MODEL_LIST_MESSAGE = ['Common built-in model choices', '', formatBuiltInModelGroups()].join('\n');
-const MODEL_SET_HELP_MESSAGE = 'Use /model set <query> to filter models, then use arrows and Enter to choose one.';
-const HELP_HINTS: LocalCommandHint[] = [
+const CORE_COMMAND_REGISTRY = createSlashCommandRegistry(createCoreSlashCommandModules());
+const LOCAL_COMMAND_HINTS: LocalCommandHint[] = [
   { command: '/help', description: 'show available local commands' },
-  { command: '/model', description: 'show the active model' },
-  { command: '/model <name>', description: 'switch the current model' },
-  { command: '/model set [query]', description: 'pick a model with filtering' },
-  { command: '/model list', description: 'list common built-in models' },
-  { command: '/auth', description: 'show stored provider credentials' },
-  { command: '/auth status', description: 'show stored provider credentials' },
-  { command: '/auth login openai', description: 'sign in with OpenAI ChatGPT/Codex OAuth' },
-  { command: '/auth logout <provider>', description: 'remove a stored provider credential' },
   { command: '/continue', description: 'resume from the current transcript' },
   { command: '/clear', description: 'reset the current session transcript' },
-  { command: '/compact', description: 'compact earlier session history for the next run' },
   { command: '/debug tui-snapshot', description: 'save the latest rendered TUI frame for inspection' },
-  { command: '/drift', description: 'show CyberLoop semantic drift detection status' },
-  { command: '/drift on', description: 'enable CyberLoop semantic drift detection for chat runs' },
-  { command: '/drift off', description: 'disable CyberLoop semantic drift detection' },
   { command: '/heartbeat tasks', description: 'list heartbeat tasks' },
   { command: '/heartbeat task <id>', description: 'show one heartbeat task' },
   { command: '/heartbeat runs [task]', description: 'list recent heartbeat runs' },
@@ -74,6 +60,11 @@ const HELP_HINTS: LocalCommandHint[] = [
   { command: '/session rename <name>', description: 'rename the current session' },
   { command: '/session close <id>', description: 'remove a saved session' },
   { command: '!<command>', description: 'run a shell command directly in chat using the current policy' },
+];
+const HELP_HINTS: LocalCommandHint[] = [
+  LOCAL_COMMAND_HINTS[0]!,
+  ...CORE_COMMAND_REGISTRY.hints(),
+  ...LOCAL_COMMAND_HINTS.slice(1),
 ];
 const COMMAND_ROOTS = Array.from(
   new Set(
@@ -90,31 +81,14 @@ const HELP_MESSAGE = [
 
 const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
   ['/help', () => messageResult(HELP_MESSAGE)],
-  ['/models', () => messageResult(MODEL_LIST_MESSAGE)],
-  ['/model list', () => messageResult(MODEL_LIST_MESSAGE)],
-  ['/model', (args) => messageResult(`Current model: ${args.activeModel}`)],
-  ['/model set', () => messageResult(MODEL_SET_HELP_MESSAGE)],
-  ['/auth', (args) => messageResult(formatAuthStatusMessage(args.credentialStorePath))],
-  ['/auth status', (args) => messageResult(formatAuthStatusMessage(args.credentialStorePath))],
   ['/clear', (args) => {
     args.clearConversation();
     return messageResult('Cleared the current chat transcript.');
   }],
-  ['/compact', async (args) => messageResult(await args.compactConversation())],
   ['/debug tui-snapshot', async (args) =>
     messageResult(
       args.saveTuiSnapshot ? await args.saveTuiSnapshot() : 'TUI snapshots are not available in this runtime.',
     )],
-  ['/drift', (args) => messageResult(formatDriftStatus(args.driftEnabled, args.driftError))],
-  ['/drift status', (args) => messageResult(formatDriftStatus(args.driftEnabled, args.driftError))],
-  ['/drift on', (args) => {
-    args.setDriftEnabled(true);
-    return messageResult('Enabled CyberLoop semantic drift detection for chat runs. Heddle will load real CyberLoop kinematics middleware and write annotations into traces.');
-  }],
-  ['/drift off', (args) => {
-    args.setDriftEnabled(false);
-    return messageResult('Disabled CyberLoop semantic drift detection.');
-  }],
   ['/heartbeat tasks', (args) => listHeartbeatTasksMessage(args)],
   ['/heartbeat runs', (args) => listHeartbeatRunsMessage(args, '')],
   ['/continue', () => ({ handled: true, kind: 'continue' })],
@@ -125,9 +99,6 @@ const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
 ]);
 
 const PREFIX_COMMANDS: Array<{ prefix: string; handle: PrefixCommandHandler }> = [
-  { prefix: '/model ', handle: handleModelCommand },
-  { prefix: '/auth login ', handle: handleAuthLogin },
-  { prefix: '/auth logout ', handle: handleAuthLogout },
   { prefix: '/heartbeat task ', handle: handleHeartbeatTask },
   { prefix: '/heartbeat runs ', handle: handleHeartbeatRuns },
   { prefix: '/heartbeat run ', handle: handleHeartbeatRun },
@@ -155,6 +126,10 @@ export function isLikelyLocalCommand(prompt: string): boolean {
   }
 
   if (COMMAND_ROOTS.some((root) => root.startsWith(firstToken))) {
+    return true;
+  }
+
+  if (CORE_COMMAND_REGISTRY.find(trimmed)) {
     return true;
   }
 
@@ -225,6 +200,11 @@ export async function runLocalCommand(args: LocalCommandArgs): Promise<LocalComm
     return { handled: false };
   }
 
+  const coreResult = await CORE_COMMAND_REGISTRY.run(createTuiSlashCommandContext(args), trimmed);
+  if (coreResult) {
+    return coreResult;
+  }
+
   const exact = EXACT_COMMANDS.get(trimmed);
   if (exact) {
     return await exact(args);
@@ -237,73 +217,6 @@ export async function runLocalCommand(args: LocalCommandArgs): Promise<LocalComm
   }
 
   return messageResult(`Unknown command: ${trimmed}. Use /help for available commands.`);
-}
-
-function handleModelCommand(args: LocalCommandArgs, value: string): LocalCommandResult {
-  if (!value) {
-    return messageResult('Usage: /model <name>');
-  }
-
-  const modelCommandAliases = new Map<string, LocalCommandResult>([
-    ['list', messageResult(MODEL_LIST_MESSAGE)],
-    ['set', messageResult(MODEL_SET_HELP_MESSAGE)],
-  ]);
-
-  const aliased = modelCommandAliases.get(value);
-  if (aliased) {
-    return aliased;
-  }
-
-  const provider = inferProviderForModel(value);
-  const compatibility = validateModelCredentialCompatibility({
-    model: value,
-    provider,
-    credentialMode: credentialModeFromSource(args.providerCredentialSource),
-  });
-  if (!compatibility.ok) {
-    return messageResult(compatibility.error);
-  }
-
-  args.setActiveModel(value);
-  return messageResult(
-    COMMON_BUILT_IN_MODELS.includes(value) ?
-      `Switched model to ${value}`
-    : `Switched model to ${value}. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.`,
-  );
-}
-
-function inferProviderForModel(model: string): LlmProvider {
-  return model.startsWith('claude') ? 'anthropic' : 'openai';
-}
-
-async function handleAuthLogin(args: LocalCommandArgs, value: string): Promise<LocalCommandResult> {
-  const provider = parseAuthProvider(value);
-  if (!provider) {
-    return messageResult('Usage: /auth login <provider>');
-  }
-
-  try {
-    const message = await loginProviderWithOAuth(provider, {
-      storePath: args.credentialStorePath,
-      openAiLogin: args.openAiLogin,
-    });
-    return messageResult(message);
-  } catch (error) {
-    return messageResult(`Auth login failed. ${formatErrorMessage(error)}`);
-  }
-}
-
-function handleAuthLogout(args: LocalCommandArgs, value: string): LocalCommandResult {
-  const provider = parseAuthProvider(value);
-  if (!provider) {
-    return messageResult('Usage: /auth logout <provider>');
-  }
-
-  try {
-    return messageResult(logoutProvider(provider, args.credentialStorePath));
-  } catch (error) {
-    return messageResult(`Auth logout failed. ${formatErrorMessage(error)}`);
-  }
 }
 
 async function handleHeartbeatTask(args: LocalCommandArgs, value: string): Promise<LocalCommandResult> {
@@ -556,18 +469,6 @@ function resolveSessionReference(args: LocalCommandArgs, value: string): ChatSes
   return args.recentSessions[numericIndex - 1];
 }
 
-function parseAuthProvider(value: string): LlmProvider | undefined {
-  const provider = value.trim().split(/\s+/, 1)[0]?.toLowerCase();
-  if (provider === 'openai' || provider === 'anthropic' || provider === 'google') {
-    return provider;
-  }
-  return undefined;
-}
-
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 function messageResult(message: string, sessionId?: string): LocalCommandResult {
   return {
     handled: true,
@@ -604,16 +505,6 @@ function longestSharedPrefix(values: string[]): string {
   }
 
   return prefix;
-}
-
-function formatDriftStatus(enabled: boolean, error: string | undefined): string {
-  if (!enabled) {
-    return 'CyberLoop drift detection is disabled. Use /drift on to enable observe-only kinematics telemetry.';
-  }
-
-  return error ?
-      `CyberLoop drift detection is enabled but unavailable: ${error}`
-    : 'CyberLoop drift detection is enabled. The footer shows drift=unknown|low|medium|high, and traces include cyberloop.annotation events.';
 }
 
 function capitalizeFirst(value: string): string {
