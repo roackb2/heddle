@@ -24,7 +24,7 @@ Approval behavior is currently spread across:
 
 - `src/core/agent/tool-dispatch.ts`
 - `src/core/chat/tool-approval-host.ts`
-- `src/cli/chat/state/approval-rules.ts`
+- `src/core/approvals/remembered-rules.ts`
 - `src/cli/chat/hooks/tui-tool-approval.ts`
 - `src/server/features/control-plane/services/chat-sessions.ts`
 - `src/server/features/control-plane/services/chat-session-events.ts`
@@ -50,8 +50,8 @@ adapters in their host folders.
 
 - To add a policy, write table-driven tests that cover policy order and abstain
   behavior.
-- To move remembered approvals, keep compatibility exports from old paths until
-  TUI imports are migrated.
+- Remembered approvals live in `remembered-rules.ts`; the old TUI state path is
+  a compatibility re-export while host imports are migrated.
 - To change approval trace behavior, update trace/event tests and host projection
   tests.
 
@@ -67,4 +67,3 @@ adapters in their host folders.
 - Approval policy belongs here; approval presentation belongs in hosts.
 - Use ordered policy arrays instead of nested branching.
 - Core approval code must not import from TUI, web, or server modules.
-

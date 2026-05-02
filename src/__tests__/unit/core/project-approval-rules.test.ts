@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import type { ProjectApprovalRule } from '../../../cli/chat/state/approval-rules.js';
+import type { ProjectApprovalRule } from '../../../core/approvals/remembered-rules.js';
 import {
   createProjectApprovalRule,
   createProjectApprovalRuleForCall,
@@ -12,7 +12,7 @@ import {
   loadProjectApprovalRules,
   normalizeApprovedCommand,
   saveProjectApprovalRules,
-} from '../../../cli/chat/state/approval-rules.js';
+} from '../../../core/approvals/remembered-rules.js';
 
 describe('project approval rules', () => {
   it('normalizes repeated whitespace and canonicalizes common verification command aliases', () => {
