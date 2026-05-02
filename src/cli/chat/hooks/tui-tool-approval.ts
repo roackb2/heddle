@@ -1,4 +1,6 @@
-import { requestToolApproval } from '../../../core/chat/tool-approval-host.js';
+import { rememberedApprovalPolicy } from '../../../core/approvals/default-policies.js';
+import { evaluateToolApprovalPolicies } from '../../../core/approvals/policy-chain.js';
+import { humanApprovalPolicy, requestToolApproval } from '../../../core/approvals/surface.js';
 import type { ChatTurnApprovalPort } from '../../../core/chat/turn-host.js';
 import { previewEditFileInput } from '../../../core/tools/edit-file.js';
 import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../state/approval-rules.js';
@@ -17,30 +19,34 @@ export function createTuiToolApprovalPort(args: {
         return { approved: false, reason: 'Missing approval request.' };
       }
       const { call, tool } = request;
-      if (isProjectApproved(call)) {
-        return {
-          approved: true,
-          reason: 'Approved by saved project rule',
-        };
-      }
+      const decision = await evaluateToolApprovalPolicies([
+        rememberedApprovalPolicy({
+          isApproved: ({ call: policyCall }) => isProjectApproved(policyCall),
+        }),
+        humanApprovalPolicy(async () => {
+          const editPreview = call.tool === 'edit_file' ? await previewEditFileInput(call.input) : undefined;
 
-      const editPreview = call.tool === 'edit_file' ? await previewEditFileInput(call.input) : undefined;
-
-      return await requestToolApproval({
-        call,
-        tool,
-        storePending: ({ resolve }) => {
-          const rememberedRule = createProjectApprovalRuleForCall(call);
-          state.setPendingApproval({
+          return await requestToolApproval({
             call,
             tool,
-            editPreview,
-            rememberForProject: () => rememberProjectApproval(call),
-            rememberLabel: rememberedRule ? describeProjectApprovalRule(rememberedRule) : undefined,
-            resolve,
+            storePending: ({ resolve }) => {
+              const rememberedRule = createProjectApprovalRuleForCall(call);
+              state.setPendingApproval({
+                call,
+                tool,
+                editPreview,
+                rememberForProject: () => rememberProjectApproval(call),
+                rememberLabel: rememberedRule ? describeProjectApprovalRule(rememberedRule) : undefined,
+                resolve,
+              });
+            },
           });
-        },
-      });
+        }),
+      ], { call, tool });
+      return {
+        approved: decision?.type === 'allow',
+        reason: decision?.reason,
+      };
     },
   };
 }

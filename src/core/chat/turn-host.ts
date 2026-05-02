@@ -2,7 +2,7 @@ import type { ToolCall, ToolDefinition } from '../../index.js';
 import type { AgentLoopEvent } from '../runtime/agent-loop.js';
 import type { PersistChatTurnCompactionStatus } from './session-turn-result.js';
 import type { ChatTurnPreflightCompactionStatus } from './session-turn-preflight.js';
-import type { ToolApprovalDecision } from './tool-approval-host.js';
+import type { ToolApprovalDecision } from '../approvals/types.js';
 
 export type ChatTurnApprovalRequest = {
   call: ToolCall;

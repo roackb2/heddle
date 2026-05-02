@@ -1,6 +1,9 @@
-import type { ToolCall, ToolDefinition } from '../../index.js';
-
-export type ToolApprovalDecision = { approved: boolean; reason?: string };
+import type { ToolCall, ToolDefinition } from '../types.js';
+import type {
+  ToolApprovalDecision,
+  ToolApprovalPolicy,
+  ToolApprovalSurface,
+} from './types.js';
 
 export type PendingToolApprovalView = {
   tool: string;
@@ -29,4 +32,13 @@ export function requestToolApproval(args: {
     args.storePending?.({ view, resolve });
     args.publish?.(view, args.call, args.tool);
   });
+}
+
+export function humanApprovalPolicy(surface: ToolApprovalSurface): ToolApprovalPolicy {
+  return async (context) => {
+    const decision = await surface(context);
+    return decision.approved ?
+        { type: 'allow', reason: decision.reason }
+      : { type: 'deny', reason: decision.reason };
+  };
 }
