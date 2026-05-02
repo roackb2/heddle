@@ -1,31 +1,17 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import {
-  appendMemoryCatalogSystemContext,
-  createDefaultAgentTools,
-  createLlmAdapter,
-  DEFAULT_OPENAI_MODEL,
-  inferProviderFromModel,
-  runAgentLoop,
-} from '../../index.js';
-import type { AgentLoopResult, ToolCall, ToolDefinition } from '../../index.js';
-import { runMaintenanceForRecordedCandidates } from '../memory/maintenance-integration.js';
+import { runAgentLoop } from '../../index.js';
+import type { RunAgentLoopOptions } from '../runtime/agent-loop.js';
+import type { ToolCall, ToolDefinition } from '../types.js';
 import { buildCompactionRunningContext } from './compaction.js';
 import { buildConversationMessages } from './conversation-lines.js';
 import { releaseSessionLease, type ChatSessionLeaseOwner } from './session-lease.js';
 import { prepareChatSessionTurn } from './session-turn-preflight.js';
-import { persistChatTurnResult } from './session-turn-result.js';
 import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
-import { summarizeTrace } from './trace-summary.js';
 import type { ChatTurnHostPort } from './turn-host.js';
-import type { RunAgentLoopOptions } from '../runtime/agent-loop.js';
-import {
-  formatMissingProviderCredentialMessage,
-  hasProviderCredentialForModel,
-  resolveApiKeyForModel,
-  resolveProviderCredentialSourceForModel,
-} from '../../core/runtime/api-keys.js';
-import type { AgentLoopEvent } from '../../index.js';
+import { runInlineTurnMemoryMaintenance, scheduleBackgroundTurnMemoryMaintenance } from './turn-memory-maintenance.js';
+import { persistCompletedChatTurn } from './turn-persistence.js';
+import { loadChatTurnSession } from './turn-session.js';
+import { resolveChatTurnRuntime } from './turn-runtime.js';
+import { createChatTurnTools, listChatTurnToolNames } from './turn-tools.js';
 
 export type ExecuteOrdinaryChatTurnArgs = {
   workspaceRoot: string;
@@ -48,51 +34,33 @@ export type ExecuteOrdinaryChatTurnArgs = {
 };
 
 export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs) {
-  const sessions = loadChatSessions(args.sessionStoragePath, true);
-  const session = sessions.find((candidate) => candidate.id === args.sessionId);
-  if (!session) {
-    throw new Error(`Chat session not found: ${args.sessionId}`);
-  }
-
-  const model = session.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
-  const provider = inferProviderFromModel(model);
-  const apiKey = args.apiKey ?? resolveApiKeyForModel(model, { preferApiKey: args.preferApiKey });
-  const providerCredentialSource = resolveProviderCredentialSourceForModel(model, {
-    apiKey,
-    apiKeyProvider: args.apiKey ? 'explicit' : apiKey ? provider : undefined,
-    credentialStorePath: args.credentialStorePath,
-    preferApiKey: args.preferApiKey,
+  const { sessions, session } = loadChatTurnSession({
+    sessionStoragePath: args.sessionStoragePath,
+    sessionId: args.sessionId,
   });
-  if (!hasProviderCredentialForModel(model, {
+  const runtime = resolveChatTurnRuntime({
+    stateRoot: args.stateRoot,
+    sessionModel: session.model,
     apiKey: args.apiKey,
-    apiKeyProvider: args.apiKey ? 'explicit' : undefined,
-    credentialStorePath: args.credentialStorePath,
     preferApiKey: args.preferApiKey,
-  })) {
-    throw new Error(formatMissingProviderCredentialMessage(model));
-  }
+    credentialStorePath: args.credentialStorePath,
+    systemContext: args.systemContext,
+  });
+  const tools = createChatTurnTools({
+    model: runtime.model,
+    apiKey: runtime.apiKey,
+    providerCredentialSource: runtime.providerCredentialSource,
+    credentialStorePath: args.credentialStorePath,
+    workspaceRoot: args.workspaceRoot,
+    memoryDir: runtime.memoryDir,
+  });
+  const toolNames = listChatTurnToolNames(tools);
 
   const leaseOwner = args.leaseOwner ?? {
     ownerKind: 'ask' as const,
     ownerId: `submit-${process.pid}`,
     clientLabel: 'another Heddle client',
   };
-  const llm = createLlmAdapter({ model, apiKey, credentialStorePath: args.credentialStorePath });
-  const memoryDir = join(args.stateRoot, 'memory');
-  const systemContext = appendMemoryCatalogSystemContext({
-    systemContext: args.systemContext,
-    memoryRoot: memoryDir,
-  });
-  const tools = createDefaultAgentTools({
-    model,
-    apiKey,
-    providerCredentialSource,
-    credentialStorePath: args.credentialStorePath,
-    workspaceRoot: args.workspaceRoot,
-    memoryDir,
-    searchIgnoreDirs: [],
-    includePlanTool: true,
-  });
 
   try {
     const preflight = await prepareChatSessionTurn({
@@ -100,11 +68,11 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       sessionId: session.id,
       fallbackHistory: session.history,
       prompt: args.prompt,
-      model,
+      model: runtime.model,
       stateRoot: args.stateRoot,
-      systemContext,
-      toolNames: tools.map((tool) => tool.name),
-      summarizer: { credentialSource: providerCredentialSource },
+      systemContext: runtime.systemContext,
+      toolNames,
+      summarizer: { credentialSource: runtime.providerCredentialSource },
       leaseOwner,
       onCompactionStatus: (event, _sourceHistory, leasedSession) => {
         args.onCompactionStatus?.(event);
@@ -144,16 +112,16 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
 
     const result = await runAgentLoop({
       goal: args.prompt,
-      model,
-      apiKey,
+      model: runtime.model,
+      apiKey: runtime.apiKey,
       workspaceRoot: args.workspaceRoot,
       stateDir: args.stateRoot,
-      memoryDir,
-      llm,
+      memoryDir: runtime.memoryDir,
+      llm: runtime.llm,
       tools,
       includeDefaultTools: false,
       history: preflightSession.history,
-      systemContext,
+      systemContext: runtime.systemContext,
       onAssistantStream: args.onAssistantStream,
       onTraceEvent: args.onTraceEvent,
       onEvent: args.host?.events?.onAgentLoopEvent,
@@ -164,76 +132,39 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       abortSignal: args.abortSignal,
     });
     const maintenanceMode = args.memoryMaintenanceMode ?? 'background';
-    const inlineMaintenance =
+    const resultForPersistence =
       maintenanceMode === 'inline' ?
-        await runMaintenanceForRecordedCandidates({
-          memoryRoot: memoryDir,
-          llm,
+        await runInlineTurnMemoryMaintenance({
+          memoryRoot: runtime.memoryDir,
+          llm: runtime.llm,
           source: `chat session ${session.id}`,
-          trace: result.trace,
-          maxSteps: 20,
-          onTraceEvent: (event) => args.host?.events?.onAgentLoopEvent?.({
-            type: 'trace',
-            runId: result.state.runId,
-            event,
-            timestamp: new Date().toISOString(),
-          } satisfies AgentLoopEvent),
+          result,
+          onEvent: args.host?.events?.onAgentLoopEvent,
         })
-      : undefined;
-    const resultTrace =
-      inlineMaintenance && inlineMaintenance.events.length > 0 ?
-        [...result.trace, ...inlineMaintenance.events]
-      : result.trace;
-    const resultForPersistence: AgentLoopResult = {
-      ...result,
-      trace: resultTrace,
-      state: {
-        ...result.state,
-        trace: resultTrace,
-      },
-    };
+      : result;
 
-    const persisted = await persistChatTurnResult({
+    const persisted = await persistCompletedChatTurn({
       result: resultForPersistence,
       prompt: args.prompt,
       session: preflightSession,
-      model,
+      sessions,
+      sessionStoragePath: args.sessionStoragePath,
+      model: runtime.model,
       stateRoot: args.stateRoot,
-      traceDir: join(args.stateRoot, 'traces'),
-      systemContext,
-      toolNames: tools.map((tool) => tool.name),
+      systemContext: runtime.systemContext,
+      toolNames,
       historyForTokenEstimate: session.history,
-      summarizer: { credentialSource: providerCredentialSource },
-      createTurnId: () => `server-turn-${Date.now()}`,
-      onCompactionStatus: (event) => {
-        args.onCompactionStatus?.(event);
-        args.host?.compaction?.onFinalCompactionStatus?.(event);
-        if (event.status === 'running') {
-          const compactionSeed = touchSession({
-            ...preflightSession,
-            history: result.transcript,
-            context: buildCompactionRunningContext({
-              history: resultForPersistence.transcript,
-              previous: preflightSession.context,
-              archiveCount: preflightSession.archives?.length,
-              currentSummaryPath: preflightSession.context?.currentSummaryPath,
-              lastArchivePath: event.archivePath,
-            }),
-          });
-          saveChatSessions(
-            args.sessionStoragePath,
-            sessions.map((candidate) => candidate.id === session.id ? compactionSeed : candidate),
-          );
-        }
-      },
+      credentialSource: runtime.providerCredentialSource,
+      host: args.host,
+      onCompactionStatus: args.onCompactionStatus,
     });
 
     const nextSessions = sessions.map((candidate) => candidate.id === session.id ? persisted.session : candidate);
     saveChatSessions(args.sessionStoragePath, nextSessions);
     if (maintenanceMode === 'background') {
-      scheduleBackgroundMemoryMaintenance({
-        memoryRoot: memoryDir,
-        llm,
+      scheduleBackgroundTurnMemoryMaintenance({
+        memoryRoot: runtime.memoryDir,
+        llm: runtime.llm,
         source: `chat session ${session.id}`,
         trace: result.trace,
         traceFile: persisted.traceFile,
@@ -252,83 +183,6 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
   } finally {
     clearOrdinaryChatTurnLease(args.sessionStoragePath, session.id, leaseOwner);
   }
-}
-
-function scheduleBackgroundMemoryMaintenance(args: {
-  memoryRoot: string;
-  llm: ReturnType<typeof createLlmAdapter>;
-  source: string;
-  trace: AgentLoopResult['trace'];
-  traceFile: string;
-  sessionStoragePath: string;
-  sessionId: string;
-  runId: string;
-  onEvent?: (event: AgentLoopEvent) => void;
-}) {
-  void (async () => {
-    const maintenance = await runMaintenanceForRecordedCandidates({
-      memoryRoot: args.memoryRoot,
-      llm: args.llm,
-      source: args.source,
-      trace: args.trace,
-      maxSteps: 20,
-      onTraceEvent: (event) => args.onEvent?.({ type: 'trace', runId: args.runId, event, timestamp: new Date().toISOString() }),
-    });
-    if (maintenance.events.length === 0) {
-      return;
-    }
-
-    const currentTrace = readTraceEvents(args.traceFile);
-    const nextTrace = [...currentTrace, ...maintenance.events];
-    writeFileSync(args.traceFile, `${JSON.stringify(nextTrace, null, 2)}\n`, 'utf8');
-
-    const sessions = loadChatSessions(args.sessionStoragePath, true);
-    const nextSessions = sessions.map((session) => {
-      if (session.id !== args.sessionId) {
-        return session;
-      }
-
-      return touchSession({
-        ...session,
-        turns: session.turns.map((turn, index) => (
-          index === session.turns.length - 1 ?
-            {
-              ...turn,
-              events: summarizeTrace(nextTrace),
-            }
-          : turn
-        )),
-      });
-    });
-    saveChatSessions(args.sessionStoragePath, nextSessions);
-  })().catch((error) => {
-    args.onEvent?.({
-      type: 'trace',
-      runId: args.runId,
-      event: {
-        type: 'memory.maintenance_failed',
-        runId: `memory-run-${Date.now()}`,
-        error: error instanceof Error ? error.message : String(error),
-        candidateIds: [],
-        step: nextTraceStep(args.trace),
-        timestamp: new Date().toISOString(),
-      },
-      timestamp: new Date().toISOString(),
-    });
-  });
-}
-
-function readTraceEvents(path: string): AgentLoopResult['trace'] {
-  try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
-    return Array.isArray(parsed) ? parsed as AgentLoopResult['trace'] : [];
-  } catch {
-    return [];
-  }
-}
-
-function nextTraceStep(trace: AgentLoopResult['trace']): number {
-  return trace.reduce((max, event) => 'step' in event ? Math.max(max, event.step) : max, 0) + 1;
 }
 
 export function clearOrdinaryChatTurnLease(sessionStoragePath: string, sessionId: string, owner: ChatSessionLeaseOwner) {
