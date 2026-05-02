@@ -1,7 +1,7 @@
 # Approvals
 
-The approvals domain is the planned home for approval policy, remembered
-approval rules, approval requests, and host approval surfaces.
+The approvals domain owns approval policy, remembered approval rules, approval
+requests, and host approval surfaces.
 
 ## Owns
 
@@ -20,7 +20,7 @@ approval rules, approval requests, and host approval surfaces.
 
 ## Current Source Locations
 
-Approval behavior is currently spread across:
+Approval behavior currently exists in these places:
 
 - `src/core/agent/tool-dispatch.ts`
 - `src/core/approvals/surface.ts`
@@ -29,20 +29,20 @@ Approval behavior is currently spread across:
 - `src/server/features/control-plane/services/chat-sessions.ts`
 - `src/server/features/control-plane/services/chat-session-events.ts`
 
-Future milestones should move stable policy behavior here while leaving host UI
-adapters in their host folders.
-
-## Planned Public Entry Points
+## Public Entry Points
 
 - `types.ts`: approval request, decision, policy, and surface types.
-- `policy-chain.ts`: ordered first-decision policy evaluation.
+- `policy-chain.ts`: ordered policy evaluation and request-to-human approval
+  resolution.
 - `default-policies.ts`: built-in tool, workspace-boundary, and remembered-rule policies.
 - `remembered-rules.ts`: project/user approval rule persistence and matching.
 - `surface.ts`: host human-approval surface interface.
 
 ## Extension Points
 
-- Add a new approval rule as an `ApprovalPolicy`.
+- Add a runtime approval rule by passing `approvalPolicies` into `runAgent`,
+  `runAgentLoop`, `runAgentHeartbeat`, `submitChatSessionPrompt`, or
+  `executeOrdinaryChatTurn`.
 - Add host UI by implementing an approval surface in the host adapter layer.
 - Add remembered approval storage behind a small store interface.
 
@@ -58,9 +58,9 @@ adapters in their host folders.
 ## Tests
 
 - `src/__tests__/unit/core/project-approval-rules.test.ts`
+- `src/__tests__/unit/core/approval-policy-chain.test.ts`
 - `src/__tests__/integration/core/run-agent.test.ts`
 - `src/__tests__/integration/tools/tools.test.ts`
-- Future approval policy-chain tests under `src/__tests__/unit/core`.
 
 ## Notes For Coding Agents
 

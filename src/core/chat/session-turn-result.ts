@@ -3,10 +3,10 @@ import type { ChatMessage } from '../llm/types.js';
 import { compactChatHistoryWithArchive, estimateChatHistoryTokens } from './compaction.js';
 import { buildConversationMessages } from './conversation-lines.js';
 import { formatChatFailureMessage } from './failure-messages.js';
+import { countAssistantSteps, summarizeTrace, type TraceSummarizerRegistry } from '../observability/trace-summarizers.js';
 import { touchSession } from './storage.js';
 import type { ChatSession, TurnSummary } from './types.js';
 import { saveTrace } from './trace.js';
-import { countAssistantSteps, summarizeTrace } from './trace-summary.js';
 
 export type PersistChatTurnCompactionStatus = {
   status: 'running' | 'finished' | 'failed';
@@ -26,6 +26,7 @@ export type PersistChatTurnResultArgs = {
   toolNames: string[];
   historyForTokenEstimate: ChatMessage[];
   summarizer: Parameters<typeof compactChatHistoryWithArchive>[0]['summarizer'];
+  traceSummarizerRegistry?: TraceSummarizerRegistry;
   createTurnId: () => string;
   onCompactionStatus?: (event: PersistChatTurnCompactionStatus, sourceHistory: ChatMessage[]) => void;
 };
@@ -64,7 +65,7 @@ export async function createChatTurnPersistenceArtifacts(
     summary: args.result.summary,
     steps: countAssistantSteps(args.result.trace),
     traceFile,
-    events: summarizeTrace(args.result.trace),
+    events: args.traceSummarizerRegistry?.summarizeTrace(args.result.trace) ?? summarizeTrace(args.result.trace),
   };
   const summary =
     args.result.outcome === 'error' ?

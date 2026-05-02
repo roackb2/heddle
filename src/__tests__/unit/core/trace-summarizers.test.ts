@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TraceEvent } from '../../../core/types.js';
 import {
-  countAssistantSteps as countAssistantStepsFromCompatPath,
-  summarizeTrace as summarizeTraceFromCompatPath,
-} from '../../../core/chat/trace-summary.js';
-import {
   countAssistantSteps,
   createTraceSummarizerRegistry,
   summarizeTrace,
@@ -180,7 +176,7 @@ describe('trace summarizers', () => {
     ])).toEqual(['custom 0:read_file']);
   });
 
-  it('preserves assistant step counting and the chat compatibility path', () => {
+  it('preserves assistant step counting', () => {
     const trace: TraceEvent[] = [
       { type: 'assistant.turn', content: 'One', requestedTools: false, step: 1, timestamp: '2026-05-02T00:00:00.000Z' },
       { type: 'run.finished', outcome: 'completed', summary: 'Done.', step: 1, timestamp: '2026-05-02T00:00:01.000Z' },
@@ -188,7 +184,5 @@ describe('trace summarizers', () => {
     ];
 
     expect(countAssistantSteps(trace)).toBe(2);
-    expect(countAssistantStepsFromCompatPath(trace)).toBe(2);
-    expect(summarizeTraceFromCompatPath(trace)).toEqual(summarizeTrace(trace));
   });
 });

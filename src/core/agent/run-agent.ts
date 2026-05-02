@@ -20,6 +20,7 @@ import { createMutationState, trackToolResult } from './mutation-tracking.js';
 import { createProgressReminderState, buildProgressReminders } from './progress-reminders.js';
 import { maybeDenyToolCall, executeToolCallWithFallback } from './tool-dispatch.js';
 import type { PlanItem } from '../tools/update-plan.js';
+import type { ToolApprovalPolicy } from '../approvals/types.js';
 
 const PLAN_ITEM_STATUSES = new Set<PlanItem['status']>(['pending', 'in_progress', 'completed']);
 
@@ -40,6 +41,7 @@ export type RunAgentOptions = {
   onAssistantStream?: (update: { step: number; text: string; done: boolean }) => void;
   onToolCalling?: (call: ToolCall, step: number, toolDef: ToolDefinition) => void;
   onToolCompleted?: (call: ToolCall, result: ToolResult, step: number, durationMs: number) => void;
+  approvalPolicies?: ToolApprovalPolicy[];
   approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
   shouldStop?: () => boolean;
   abortSignal?: AbortSignal;
@@ -85,6 +87,7 @@ type RunContext = {
   onAssistantStream?: RunAgentOptions['onAssistantStream'];
   onToolCalling?: RunAgentOptions['onToolCalling'];
   onToolCompleted?: RunAgentOptions['onToolCompleted'];
+  approvalPolicies: ToolApprovalPolicy[];
   approveToolCall?: RunAgentOptions['approveToolCall'];
   shouldStop?: RunAgentOptions['shouldStop'];
   abortSignal?: AbortSignal;
@@ -168,6 +171,7 @@ function createRunContext(options: RunAgentOptions): RunContext {
     onAssistantStream: options.onAssistantStream,
     onToolCalling: options.onToolCalling,
     onToolCompleted: options.onToolCompleted,
+    approvalPolicies: options.approvalPolicies ?? [],
     approveToolCall: options.approveToolCall,
     shouldStop: options.shouldStop,
     abortSignal: options.abortSignal,
@@ -300,6 +304,7 @@ async function executeToolTurn(context: RunContext, call: ToolCall): Promise<Run
     step: context.state.step,
     now: context.now,
     approveToolCall: context.approveToolCall,
+    approvalPolicies: context.approvalPolicies,
     workspaceRoot: context.workspaceRoot,
     record: context.record,
     log: context.log,
@@ -317,6 +322,7 @@ async function executeToolTurn(context: RunContext, call: ToolCall): Promise<Run
     registry: context.registry,
     seenToolCalls: context.seenToolCalls,
     approveToolCall: context.approveToolCall,
+    approvalPolicies: context.approvalPolicies,
     workspaceRoot: context.workspaceRoot,
     record: context.record,
     log: context.log,

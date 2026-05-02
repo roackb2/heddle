@@ -9,7 +9,7 @@ import { truncate } from '../../../core/utils/text.js';
 export { buildConversationMessages } from '../../../core/chat/conversation-lines.js';
 export { formatChatFailureMessage } from '../../../core/chat/failure-messages.js';
 export type { ChatFailureHintOptions } from '../../../core/chat/failure-messages.js';
-export { countAssistantSteps, summarizeTrace } from '../../../core/chat/trace-summary.js';
+export { countAssistantSteps, summarizeTrace } from '../../../core/observability/trace-summarizers.js';
 export {
   truncate,
 } from '../../../core/utils/text.js';
@@ -27,7 +27,7 @@ export type ApprovalSummary = {
 };
 
 const MAX_SHELL_OUTPUT_CHARS = 1400;
-const MAX_TOOL_CALL_SUMMARY_CHARS = 96;
+const APPROVAL_PATH_TOOLS = new Set(['read_file', 'list_files']);
 
 
 export function currentActivityText(
@@ -65,8 +65,8 @@ export function formatApprovalHint(pendingApproval: PendingApproval): string {
 
 export function summarizePendingApproval(pendingApproval: PendingApproval): ApprovalSummary {
   const policy = describePendingApprovalPolicy(pendingApproval);
-  const command = extractShellCommand(pendingApproval.call.input);
-  const editPath = extractEditPath(pendingApproval.call.input);
+  const command = readStringField(pendingApproval.call.input, 'command');
+  const editPath = readStringField(pendingApproval.call.input, 'path');
 
   if (command) {
     const title =
@@ -113,8 +113,8 @@ export function summarizePendingApproval(pendingApproval: PendingApproval): Appr
     };
   }
 
-  const path = extractPathField(pendingApproval.call.input);
-  if (isPathAwareTool(pendingApproval.call.tool) && path) {
+  const path = readStringField(pendingApproval.call.input, 'path');
+  if (APPROVAL_PATH_TOOLS.has(pendingApproval.call.tool) && path) {
     return {
       title: `Allow ${pendingApproval.call.tool}`,
       command: path,
@@ -131,83 +131,6 @@ export function summarizePendingApproval(pendingApproval: PendingApproval): Appr
     effects: ['tool-specific side effects are not yet summarized'],
     rememberLabel: pendingApproval.rememberLabel,
   };
-}
-
-export function summarizeToolCall(tool: string, input: unknown): string {
-  const planSummary = summarizePlanInput(tool, input);
-  if (planSummary) {
-    return planSummary;
-  }
-
-  const shellCommand = extractShellCommand(input);
-  if (shellCommand) {
-    return `${tool} (${truncate(shellCommand, MAX_TOOL_CALL_SUMMARY_CHARS)})`;
-  }
-
-  const searchSummary = summarizeSearchInput(tool, input);
-  if (searchSummary) {
-    return searchSummary;
-  }
-
-  const path = extractPathField(input);
-  if (isPathAwareTool(tool) && path) {
-    return `${tool} (${truncate(path, MAX_TOOL_CALL_SUMMARY_CHARS)})`;
-  }
-
-  return tool;
-}
-
-export function summarizeToolResult(tool: string, command: string | undefined, output?: unknown): string {
-  if (command) {
-    return `${tool} (${truncate(command, MAX_TOOL_CALL_SUMMARY_CHARS)})`;
-  }
-
-  const outputPath = extractOutputPath(output);
-  if (tool === 'edit_file' && outputPath) {
-    return `${tool} (${truncate(outputPath, MAX_TOOL_CALL_SUMMARY_CHARS)})`;
-  }
-
-  return tool;
-}
-
-export function extractShellCommand(value: unknown): string | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-
-  const command = (value as { command?: unknown }).command;
-  return typeof command === 'string' && command.trim() ? command.trim() : undefined;
-}
-
-export function extractEditPath(value: unknown): string | undefined {
-  return extractPathField(value);
-}
-
-export function extractPathField(value: unknown): string | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-
-  const path = (value as { path?: unknown }).path;
-  return typeof path === 'string' && path.trim() ? path.trim() : undefined;
-}
-
-export function extractQueryField(value: unknown): string | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-
-  const query = (value as { query?: unknown }).query;
-  return typeof query === 'string' && query.trim() ? query.trim() : undefined;
-}
-
-export function extractOutputPath(value: unknown): string | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-
-  const path = (value as { path?: unknown }).path;
-  return typeof path === 'string' && path.trim() ? path.trim() : undefined;
 }
 
 export function normalizeInlineText(value: string): string {
@@ -280,6 +203,10 @@ export function formatDirectShellResponse(toolName: string, command: string, res
 }
 
 export function extractTextOutput(value: unknown, field: 'stdout' | 'stderr'): string | undefined {
+  return readStringField(value, field);
+}
+
+function readStringField(value: unknown, field: string): string | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return undefined;
   }
@@ -311,7 +238,7 @@ function describePendingApprovalPolicy(pendingApproval: PendingApproval): RunShe
     return undefined;
   }
 
-  const command = extractShellCommand(pendingApproval.call.input);
+  const command = readStringField(pendingApproval.call.input, 'command');
   if (!command) {
     return undefined;
   }
@@ -386,10 +313,6 @@ export function normalizeSessionTitle(value: string | undefined): string | undef
   return truncate(normalized, 48);
 }
 
-function isPathAwareTool(tool: string): boolean {
-  return tool === 'edit_file' || tool === 'read_file' || tool === 'list_files';
-}
-
 function describePathAwareToolEffect(tool: string, path: string): string {
   switch (tool) {
     case 'list_files':
@@ -399,44 +322,6 @@ function describePathAwareToolEffect(tool: string, path: string): string {
     default:
       return `uses ${tool} on ${path}`;
   }
-}
-
-function summarizeSearchInput(tool: string, input: unknown): string | undefined {
-  if (tool !== 'search_files') {
-    return undefined;
-  }
-
-  const query = extractQueryField(input);
-  if (!query) {
-    return tool;
-  }
-
-  const path = extractPathField(input);
-  const querySummary = truncate(JSON.stringify(query), Math.max(12, Math.floor(MAX_TOOL_CALL_SUMMARY_CHARS / 2)));
-  if (path) {
-    return `${tool} (${querySummary} in ${truncate(path, Math.max(12, Math.floor(MAX_TOOL_CALL_SUMMARY_CHARS / 2)))})`;
-  }
-
-  return `${tool} (${querySummary})`;
-}
-
-function summarizePlanInput(tool: string, input: unknown): string | undefined {
-  if (tool !== 'update_plan') {
-    return undefined;
-  }
-
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    return tool;
-  }
-
-  const plan = (input as { plan?: unknown }).plan;
-  if (!Array.isArray(plan) || plan.length === 0) {
-    return tool;
-  }
-
-  const current = plan.find((item) => item && typeof item === 'object' && !Array.isArray(item) && (item as { status?: unknown }).status === 'in_progress');
-  const currentStep = current && typeof (current as { step?: unknown }).step === 'string' ? (current as { step: string }).step : undefined;
-  return currentStep ? `${tool} (${truncate(currentStep, MAX_TOOL_CALL_SUMMARY_CHARS)})` : `${tool} (${plan.length} items)`;
 }
 
 function renderUpdatePlanHistoryMessage(output: unknown): string | undefined {

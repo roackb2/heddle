@@ -1,6 +1,8 @@
 import { runAgentLoop } from '../../index.js';
 import type { RunAgentLoopOptions } from '../runtime/agent-loop.js';
 import type { ToolCall, ToolDefinition } from '../types.js';
+import type { ToolApprovalPolicy } from '../approvals/types.js';
+import type { TraceSummarizerRegistry } from '../observability/trace-summarizers.js';
 import { buildCompactionRunningContext } from './compaction.js';
 import { buildConversationMessages } from './conversation-lines.js';
 import { releaseSessionLease, type ChatSessionLeaseOwner } from './session-lease.js';
@@ -25,6 +27,8 @@ export type ExecuteOrdinaryChatTurnArgs = {
   systemContext?: string;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   host?: ChatTurnHostPort;
+  approvalPolicies?: ToolApprovalPolicy[];
+  traceSummarizerRegistry?: TraceSummarizerRegistry;
   onCompactionStatus?: (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; summaryPath?: string; error?: string }) => void;
   onAssistantStream?: RunAgentLoopOptions['onAssistantStream'];
   onTraceEvent?: RunAgentLoopOptions['onTraceEvent'];
@@ -125,6 +129,7 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       onAssistantStream: args.onAssistantStream,
       onTraceEvent: args.onTraceEvent,
       onEvent: args.host?.events?.onAgentLoopEvent,
+      approvalPolicies: args.approvalPolicies,
       approveToolCall: args.host?.approvals?.requestToolApproval ?
         ((call: ToolCall, tool: ToolDefinition) => args.host?.approvals?.requestToolApproval?.({ call, tool }) ?? Promise.resolve({ approved: false, reason: 'Missing approval port.' }))
       : undefined,
@@ -155,6 +160,7 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       toolNames,
       historyForTokenEstimate: session.history,
       credentialSource: runtime.providerCredentialSource,
+      traceSummarizerRegistry: args.traceSummarizerRegistry,
       host: args.host,
       onCompactionStatus: args.onCompactionStatus,
     });

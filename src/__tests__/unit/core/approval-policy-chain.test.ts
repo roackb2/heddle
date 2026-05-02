@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   defaultToolApprovalPolicies,
   isOutsideWorkspaceInspectionCall,
   rememberedApprovalPolicy,
 } from '../../../core/approvals/default-policies.js';
-import { evaluateToolApprovalPolicies } from '../../../core/approvals/policy-chain.js';
+import { evaluateToolApprovalPolicies, resolveToolApproval } from '../../../core/approvals/policy-chain.js';
 import { humanApprovalPolicy } from '../../../core/approvals/surface.js';
 import type { ToolApprovalPolicyContext } from '../../../core/approvals/types.js';
 
@@ -101,5 +101,43 @@ describe('approval policy chain', () => {
       type: 'deny',
       reason: 'Denied by human',
     });
+  });
+
+  it('lets later allow policies satisfy earlier request policies before human approval', async () => {
+    const human = vi.fn(async () => ({ approved: false, reason: 'should not run' }));
+
+    await expect(resolveToolApproval({
+      policies: [
+        () => ({ type: 'request', reason: 'run_shell_mutate requires approval' }),
+        rememberedApprovalPolicy({
+          isApproved: ({ call }) => call.tool === 'run_shell_mutate',
+        }),
+      ],
+      context: context(),
+      requestHumanApproval: human,
+    })).resolves.toEqual({
+      approved: true,
+      reason: 'Approved by saved project rule',
+    });
+    expect(human).not.toHaveBeenCalled();
+  });
+
+  it('falls through to human approval when a request policy is not satisfied', async () => {
+    const human = vi.fn(async (_context: ToolApprovalPolicyContext, reason?: string) => ({
+      approved: true,
+      reason: `human approved: ${reason}`,
+    }));
+
+    await expect(resolveToolApproval({
+      policies: [
+        () => ({ type: 'request', reason: 'run_shell_mutate requires approval' }),
+      ],
+      context: context(),
+      requestHumanApproval: human,
+    })).resolves.toEqual({
+      approved: true,
+      reason: 'human approved: run_shell_mutate requires approval',
+    });
+    expect(human).toHaveBeenCalledTimes(1);
   });
 });

@@ -654,6 +654,57 @@ describe('runAgent', () => {
     expect(result.trace.map((event) => event.type)).toContain('tool.approval_resolved');
   });
 
+  it('lets custom approval policies satisfy approval-gated tools before human approval', async () => {
+    const approveToolCall = vi.fn(async () => ({ approved: false, reason: 'should not be requested' }));
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        if (messages.some((message) => message.role === 'tool')) {
+          return { content: 'The command ran through policy approval.' };
+        }
+
+        return {
+          toolCalls: [{ id: 'call-1', tool: 'run_shell_mutate', input: { command: 'yarn test' } }],
+        };
+      },
+    };
+
+    const mutateTool: ToolDefinition = {
+      name: 'run_shell_mutate',
+      description: 'Runs a bounded workspace mutation command',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: { command: 'yarn test', exitCode: 0, stdout: '', stderr: '' } };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Run tests if needed.',
+      llm: fakeLlm,
+      tools: [mutateTool],
+      maxSteps: 3,
+      logger: silentLogger,
+      approvalPolicies: [
+        ({ call }) => call.tool === 'run_shell_mutate' ? { type: 'allow', reason: 'custom CI policy' } : undefined,
+      ],
+      approveToolCall,
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(approveToolCall).not.toHaveBeenCalled();
+    expect(result.trace.map((event) => event.type)).not.toContain('tool.approval_requested');
+    expect(result.trace).toContainEqual({
+      type: 'tool.result',
+      tool: 'run_shell_mutate',
+      result: {
+        ok: true,
+        output: { command: 'yarn test', exitCode: 0, stdout: '', stderr: '' },
+      },
+      step: 1,
+      timestamp: expect.any(String),
+    });
+  });
+
   it('requires approval before reading a file outside the workspace root', async () => {
     const externalRoot = await mkdtemp(join(tmpdir(), 'heddle-read-outside-'));
     const externalFile = join(externalRoot, 'secret.txt');

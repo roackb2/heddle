@@ -229,6 +229,24 @@ export { createRunShellInspectTool, createRunShellMutateTool } from './core/tool
 export { createRunShellTool } from './core/tools/run-shell.js';
 export type { RunShellOptions } from './core/tools/run-shell.js';
 
+// Approvals
+export {
+  defaultToolApprovalPolicies,
+  isOutsideWorkspaceInspectionCall,
+  outsideWorkspaceInspectionPolicy,
+  rememberedApprovalPolicy,
+  toolRequiresApprovalPolicy,
+} from './core/approvals/default-policies.js';
+export { evaluateToolApprovalPolicies, resolveToolApproval } from './core/approvals/policy-chain.js';
+export { humanApprovalPolicy, requestToolApproval } from './core/approvals/surface.js';
+export type {
+  ToolApprovalDecision,
+  ToolApprovalPolicy,
+  ToolApprovalPolicyContext,
+  ToolApprovalPolicyDecision,
+  ToolApprovalSurface,
+} from './core/approvals/types.js';
+
 // Trace
 export { createTraceRecorder } from './core/trace/recorder.js';
 export type { TraceRecorder } from './core/trace/recorder.js';
@@ -256,11 +274,15 @@ export {
   projectAgentLoopEventToConversationActivities,
   projectCompactionStatusToConversationActivities,
   projectTraceEventToConversationActivities,
-  summarizeActivityToolCall,
-  summarizeActivityToolResult,
+  applyConversationActivityHandler,
+  summarizeToolCall,
+  summarizeToolResult,
 } from './core/observability/conversation-activity.js';
 export type {
   ConversationActivity,
+  ConversationActivityCorrelation,
+  ConversationActivityHandlerMap,
+  ConversationActivityOf,
   ConversationCompactionStatus,
 } from './core/observability/conversation-activity.js';
 

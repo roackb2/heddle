@@ -1,10 +1,13 @@
 import { acquireSessionLease, getSessionLeaseConflict, releaseSessionLease } from '../../../core/chat/session-lease.js';
+import { rememberedApprovalPolicy } from '../../../core/approvals/default-policies.js';
+import { resolveToolApproval } from '../../../core/approvals/policy-chain.js';
+import { summarizeToolCall } from '../../../core/observability/conversation-activity.js';
 import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../core/tools/run-shell.js';
 import type { ToolCall, ToolResult } from '../../../index.js';
 import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../state/approval-rules.js';
 import { readChatSession, touchSession } from '../state/storage.js';
 import type { ChatSession } from '../state/types.js';
-import { shouldFallbackToMutate, summarizeToolCall } from '../utils/format.js';
+import { shouldFallbackToMutate } from '../utils/format.js';
 import type { ChatRuntimeConfig } from '../utils/runtime.js';
 import { beginTuiDirectShellAction, finishTuiDirectShellAction } from './tui-agent-turn-lifecycle.js';
 import { finalizeTuiDirectShellSuccess } from './tui-direct-shell-result.js';
@@ -101,10 +104,19 @@ export async function executeTuiDirectShell(args: {
           throw new Error('run_shell_mutate tool is not registered');
         }
 
-        const approval =
-          isProjectApproved(mutateCall) ?
-            { approved: true, reason: 'Approved by saved project rule' }
-          : await new Promise<{ approved: boolean; reason?: string }>((resolve) => {
+        const approval = await resolveToolApproval({
+          policies: [
+            () => ({ type: 'request', reason: 'Direct shell mutation requires approval' }),
+            rememberedApprovalPolicy({
+              isApproved: ({ call }) => isProjectApproved(call),
+            }),
+          ],
+          context: {
+            call: mutateCall,
+            tool: directShellTool,
+            workspaceRoot: runtime.workspaceRoot,
+          },
+          requestHumanApproval: async () => await new Promise<{ approved: boolean; reason?: string }>((resolve) => {
               const rememberedRule = createProjectApprovalRuleForCall(mutateCall);
               state.setPendingApproval({
                 call: mutateCall,
@@ -113,7 +125,8 @@ export async function executeTuiDirectShell(args: {
                 rememberLabel: rememberedRule ? describeProjectApprovalRule(rememberedRule) : undefined,
                 resolve,
               });
-            });
+            }),
+        });
 
         if (!approval.approved) {
           const denialMessage = approval.reason ? `Command denied.\n${approval.reason}` : 'Command denied.';

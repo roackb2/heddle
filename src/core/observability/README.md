@@ -28,25 +28,36 @@ Observability behavior currently exists in these places:
 - `src/core/chat/trace.ts` for persisted chat trace files.
 - `src/core/observability/trace-summarizers.ts` for turn summary evidence.
 - `src/core/observability/semantic-conventions.ts` for shared trace names.
-- `src/core/observability/conversation-activity.ts` for shared host activity projection.
+- `src/core/observability/conversation-activity.ts` for shared host activity
+  projection, typed activity handlers, and tool call/result activity summaries.
 - `src/cli/chat/hooks/tui-run-loop-events.ts` for TUI activity rendering.
 - `src/web/features/control-plane/hooks/sessions-screen/useSessionDetailSubscription.ts` for web activity rendering.
 - `src/server/features/control-plane/services/chat-session-events.ts`.
 
-Future milestones should centralize shared summarization and projection here
-while preserving compatibility wrappers for existing imports.
-
 ## Public Entry Points
 
+These APIs are exported from the package root for host authors. Treat the event
+names and core fields as stable, but treat new optional metadata fields as
+additive: consumers should ignore fields they do not use.
+
 - `semantic-conventions.ts`: event naming and correlation conventions.
-- `trace-summarizers.ts`: registry for trace event summaries.
-- `conversation-activity.ts`: shared host-agnostic activity projection.
+- `trace-summarizers.ts`: registry for durable trace event summaries. These
+  summaries feed turn/session evidence such as `TurnSummary.events`; they are
+  not the live TUI/web status layer.
+- `conversation-activity.ts`: shared host-agnostic activity projection and typed
+  handler-map helpers for frontend adapters. It also owns the small tool
+  call/result summaries used by projected activity. Activities include
+  correlation metadata such as `runId`, `step`, and `timestamp` when the source
+  event provides it.
 
 ## Extension Points
 
 - Add trace summaries by registering a summarizer for an event type.
 - Add UI activity by projecting raw runtime/trace events into host-agnostic
   activity events, then render those in TUI or web adapters.
+- Add host activity handlers with `satisfies ConversationActivityHandlerMap` so
+  each handler receives the narrowed activity type for its key. Use
+  `applyConversationActivityHandler` for dispatch.
 - Add new trace event families with compatibility tests and documented
   attributes.
 

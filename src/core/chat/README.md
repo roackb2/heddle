@@ -41,8 +41,8 @@ maintenance, traces, and host ports.
 - `turn-host.ts`: semantic host ports for events, approvals, and compaction.
 - `compaction.ts`: history compaction and archive behavior.
 - `conversation-lines.ts`: user-facing chat message projection.
-- `trace.ts` and `trace-summary.ts`: current trace persistence and turn summary
-  compatibility wrappers.
+- `trace.ts`: chat trace persistence. Turn summary formatting lives in
+  `src/core/observability/trace-summarizers.ts`.
 
 ## Extension Points
 
