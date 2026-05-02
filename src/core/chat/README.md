@@ -27,6 +27,10 @@ maintenance, traces, and host ports.
 ## Public Entry Points
 
 - `ordinary-turn.ts`: current conversation-turn harness.
+- `turn-session.ts`: session loading for ordinary chat turns.
+- `turn-runtime.ts`: model, credential, LLM, memory, and system-context
+  preparation for ordinary chat turns.
+- `turn-tools.ts`: ordinary chat turn tool bundle creation.
 - `session-submit.ts`: server-facing submit adapter over ordinary turns.
 - `storage.ts`: file-backed chat session store.
 - `session-turn-preflight.ts`: lease acquisition and preflight compaction.
@@ -70,4 +74,3 @@ maintenance, traces, and host ports.
 - Keep host-specific wording in adapters. Core chat should emit semantics and
   persist durable evidence.
 - Do not import from TUI, web, or server code.
-

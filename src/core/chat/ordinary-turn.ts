@@ -1,14 +1,9 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import {
-  appendMemoryCatalogSystemContext,
-  createDefaultAgentTools,
-  createLlmAdapter,
-  DEFAULT_OPENAI_MODEL,
-  inferProviderFromModel,
-  runAgentLoop,
-} from '../../index.js';
-import type { AgentLoopResult, ToolCall, ToolDefinition } from '../../index.js';
+import { runAgentLoop } from '../../index.js';
+import type { AgentLoopResult, RunAgentLoopOptions } from '../runtime/agent-loop.js';
+import type { ToolCall, ToolDefinition } from '../types.js';
+import type { LlmAdapter } from '../llm/types.js';
 import { runMaintenanceForRecordedCandidates } from '../memory/maintenance-integration.js';
 import { buildCompactionRunningContext } from './compaction.js';
 import { buildConversationMessages } from './conversation-lines.js';
@@ -18,14 +13,10 @@ import { persistChatTurnResult } from './session-turn-result.js';
 import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
 import { summarizeTrace } from './trace-summary.js';
 import type { ChatTurnHostPort } from './turn-host.js';
-import type { RunAgentLoopOptions } from '../runtime/agent-loop.js';
-import {
-  formatMissingProviderCredentialMessage,
-  hasProviderCredentialForModel,
-  resolveApiKeyForModel,
-  resolveProviderCredentialSourceForModel,
-} from '../../core/runtime/api-keys.js';
-import type { AgentLoopEvent } from '../../index.js';
+import type { AgentLoopEvent } from '../runtime/events.js';
+import { loadChatTurnSession } from './turn-session.js';
+import { resolveChatTurnRuntime } from './turn-runtime.js';
+import { createChatTurnTools, listChatTurnToolNames } from './turn-tools.js';
 
 export type ExecuteOrdinaryChatTurnArgs = {
   workspaceRoot: string;
@@ -48,51 +39,33 @@ export type ExecuteOrdinaryChatTurnArgs = {
 };
 
 export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs) {
-  const sessions = loadChatSessions(args.sessionStoragePath, true);
-  const session = sessions.find((candidate) => candidate.id === args.sessionId);
-  if (!session) {
-    throw new Error(`Chat session not found: ${args.sessionId}`);
-  }
-
-  const model = session.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
-  const provider = inferProviderFromModel(model);
-  const apiKey = args.apiKey ?? resolveApiKeyForModel(model, { preferApiKey: args.preferApiKey });
-  const providerCredentialSource = resolveProviderCredentialSourceForModel(model, {
-    apiKey,
-    apiKeyProvider: args.apiKey ? 'explicit' : apiKey ? provider : undefined,
-    credentialStorePath: args.credentialStorePath,
-    preferApiKey: args.preferApiKey,
+  const { sessions, session } = loadChatTurnSession({
+    sessionStoragePath: args.sessionStoragePath,
+    sessionId: args.sessionId,
   });
-  if (!hasProviderCredentialForModel(model, {
+  const runtime = resolveChatTurnRuntime({
+    stateRoot: args.stateRoot,
+    sessionModel: session.model,
     apiKey: args.apiKey,
-    apiKeyProvider: args.apiKey ? 'explicit' : undefined,
-    credentialStorePath: args.credentialStorePath,
     preferApiKey: args.preferApiKey,
-  })) {
-    throw new Error(formatMissingProviderCredentialMessage(model));
-  }
+    credentialStorePath: args.credentialStorePath,
+    systemContext: args.systemContext,
+  });
+  const tools = createChatTurnTools({
+    model: runtime.model,
+    apiKey: runtime.apiKey,
+    providerCredentialSource: runtime.providerCredentialSource,
+    credentialStorePath: args.credentialStorePath,
+    workspaceRoot: args.workspaceRoot,
+    memoryDir: runtime.memoryDir,
+  });
+  const toolNames = listChatTurnToolNames(tools);
 
   const leaseOwner = args.leaseOwner ?? {
     ownerKind: 'ask' as const,
     ownerId: `submit-${process.pid}`,
     clientLabel: 'another Heddle client',
   };
-  const llm = createLlmAdapter({ model, apiKey, credentialStorePath: args.credentialStorePath });
-  const memoryDir = join(args.stateRoot, 'memory');
-  const systemContext = appendMemoryCatalogSystemContext({
-    systemContext: args.systemContext,
-    memoryRoot: memoryDir,
-  });
-  const tools = createDefaultAgentTools({
-    model,
-    apiKey,
-    providerCredentialSource,
-    credentialStorePath: args.credentialStorePath,
-    workspaceRoot: args.workspaceRoot,
-    memoryDir,
-    searchIgnoreDirs: [],
-    includePlanTool: true,
-  });
 
   try {
     const preflight = await prepareChatSessionTurn({
@@ -100,11 +73,11 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       sessionId: session.id,
       fallbackHistory: session.history,
       prompt: args.prompt,
-      model,
+      model: runtime.model,
       stateRoot: args.stateRoot,
-      systemContext,
-      toolNames: tools.map((tool) => tool.name),
-      summarizer: { credentialSource: providerCredentialSource },
+      systemContext: runtime.systemContext,
+      toolNames,
+      summarizer: { credentialSource: runtime.providerCredentialSource },
       leaseOwner,
       onCompactionStatus: (event, _sourceHistory, leasedSession) => {
         args.onCompactionStatus?.(event);
@@ -144,16 +117,16 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
 
     const result = await runAgentLoop({
       goal: args.prompt,
-      model,
-      apiKey,
+      model: runtime.model,
+      apiKey: runtime.apiKey,
       workspaceRoot: args.workspaceRoot,
       stateDir: args.stateRoot,
-      memoryDir,
-      llm,
+      memoryDir: runtime.memoryDir,
+      llm: runtime.llm,
       tools,
       includeDefaultTools: false,
       history: preflightSession.history,
-      systemContext,
+      systemContext: runtime.systemContext,
       onAssistantStream: args.onAssistantStream,
       onTraceEvent: args.onTraceEvent,
       onEvent: args.host?.events?.onAgentLoopEvent,
@@ -167,8 +140,8 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
     const inlineMaintenance =
       maintenanceMode === 'inline' ?
         await runMaintenanceForRecordedCandidates({
-          memoryRoot: memoryDir,
-          llm,
+          memoryRoot: runtime.memoryDir,
+          llm: runtime.llm,
           source: `chat session ${session.id}`,
           trace: result.trace,
           maxSteps: 20,
@@ -197,13 +170,13 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       result: resultForPersistence,
       prompt: args.prompt,
       session: preflightSession,
-      model,
+      model: runtime.model,
       stateRoot: args.stateRoot,
       traceDir: join(args.stateRoot, 'traces'),
-      systemContext,
-      toolNames: tools.map((tool) => tool.name),
+      systemContext: runtime.systemContext,
+      toolNames,
       historyForTokenEstimate: session.history,
-      summarizer: { credentialSource: providerCredentialSource },
+      summarizer: { credentialSource: runtime.providerCredentialSource },
       createTurnId: () => `server-turn-${Date.now()}`,
       onCompactionStatus: (event) => {
         args.onCompactionStatus?.(event);
@@ -232,8 +205,8 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
     saveChatSessions(args.sessionStoragePath, nextSessions);
     if (maintenanceMode === 'background') {
       scheduleBackgroundMemoryMaintenance({
-        memoryRoot: memoryDir,
-        llm,
+        memoryRoot: runtime.memoryDir,
+        llm: runtime.llm,
         source: `chat session ${session.id}`,
         trace: result.trace,
         traceFile: persisted.traceFile,
@@ -256,7 +229,7 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
 
 function scheduleBackgroundMemoryMaintenance(args: {
   memoryRoot: string;
-  llm: ReturnType<typeof createLlmAdapter>;
+  llm: LlmAdapter;
   source: string;
   trace: AgentLoopResult['trace'];
   traceFile: string;
