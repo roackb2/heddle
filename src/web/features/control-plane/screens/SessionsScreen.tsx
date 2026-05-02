@@ -131,7 +131,6 @@ export function SessionsScreen({
     workspaceChanges,
     workspaceChangesLoading,
     workspaceChangesError,
-    selectedWorkspaceFile,
     workspaceFileDiff,
     workspaceFileDiffsByPath,
     workspaceFileDiffLoading,
