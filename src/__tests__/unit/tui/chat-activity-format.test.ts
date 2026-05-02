@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeToolCall, toLiveEvent } from '../../../cli/chat/utils/format.js';
+import { toLiveEvent } from '../../../cli/chat/adapters/conversation-activity-adapter.js';
+import { summarizeToolCall } from '../../../cli/chat/utils/format.js';
 import type { TraceEvent } from '../../../types.js';
 
 describe('chat activity formatting', () => {

@@ -5,7 +5,8 @@ import { createChatTurnPersistenceArtifacts } from '../../../core/chat/session-t
 import { estimateChatHistoryTokens } from '../state/compaction.js';
 import { touchSession } from '../state/storage.js';
 import type { ChatSession } from '../state/types.js';
-import { formatChatFailureMessage, summarizeTrace, toLiveEvent } from '../utils/format.js';
+import { toLiveEvent } from '../adapters/conversation-activity-adapter.js';
+import { formatChatFailureMessage, summarizeTrace } from '../utils/format.js';
 import type { ChatRuntimeConfig } from '../utils/runtime.js';
 import type { ActionState } from './useAgentRun.js';
 import type { TuiCompactionStatusEvent } from './tui-compaction-status.js';
