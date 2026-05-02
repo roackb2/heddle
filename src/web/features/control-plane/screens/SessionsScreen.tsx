@@ -1,16 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, KeyboardEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  fetchModelOptions,
-  fetchWorkspaceChanges,
-  fetchWorkspaceFileDiff,
-  fetchWorkspaceFileSuggestions,
   type ChatSessionDetail,
   type ChatTurnReview,
   type ControlPlaneState,
-  type ModelOptions,
-  type WorkspaceChanges,
-  type WorkspaceFileDiff,
   type WorkspaceFileSuggestion,
 } from '../../../lib/api';
 import { formatControlPlaneAuthStatus } from '../auth-status';
@@ -19,20 +11,16 @@ import { CodeBlock, EmptyState, Pill, WorkspaceSectionHeader } from '../componen
 import { SessionListButton } from '../components/lists';
 import { ConversationMessage } from '../components/ConversationMessage';
 import { ModelSelectorPopover } from '../components/ModelSelectorPopover.js';
-import { useCredentialAwareModelOptions } from '../hooks/useCredentialAwareModelOptions.js';
+import { useResizableSessionPanels } from '../hooks/useResizableSessionPanels.js';
+import { useSessionComposer } from '../hooks/useSessionComposer.js';
+import { useSessionMobileNavigation } from '../hooks/useSessionMobileNavigation.js';
+import { useSessionModelOptions } from '../hooks/useSessionModelOptions.js';
+import { useWorkspaceReviewState } from '../hooks/useWorkspaceReviewState.js';
 import { MobileChatScreen } from '../mobile/MobileChatScreen';
 import { MobileReviewScreen } from '../mobile/MobileReviewScreen';
 import { FullDiffDialog, SessionReviewPanel, type ExpandedDiff, type ReviewMode } from './SessionReviewPanel';
 
 export type SessionTurn = Exclude<ChatSessionDetail, null>['turns'][number];
-
-const PANEL_WIDTH_STORAGE_KEY = 'heddle.controlPlane.sessionPanelWidths';
-const PANEL_HANDLE_WIDTH = 12;
-const MAIN_PANEL_MIN_WIDTH = 420;
-const LEFT_PANEL_MIN_WIDTH = 220;
-const LEFT_PANEL_MAX_WIDTH = 520;
-const RIGHT_PANEL_MIN_WIDTH = 280;
-const RIGHT_PANEL_MAX_WIDTH = 620;
 
 export type SessionsScreenProps = {
   sessions: ControlPlaneState['sessions'];
@@ -93,65 +81,71 @@ export function SessionsScreen({
   pendingApproval,
   onResolveApproval,
 }: SessionsScreenProps) {
-  const shellRef = useRef<HTMLElement>(null);
   const conversationScrollRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [panelWidths, setPanelWidths] = useState<PanelWidths>(() => readStoredPanelWidths());
-  const [draft, setDraft] = useState('');
-  const [mentionQuery, setMentionQuery] = useState<FileMentionQuery | null>(null);
-  const [mentionSuggestions, setMentionSuggestions] = useState<WorkspaceFileSuggestion[]>([]);
-  const [mentionLoading, setMentionLoading] = useState(false);
-  const [mentionError, setMentionError] = useState<string | undefined>();
-  const [modelOptions, setModelOptions] = useState<ModelOptions | null>(null);
-  const [modelOptionsError, setModelOptionsError] = useState<string | undefined>();
-  const [activeMentionIndex, setActiveMentionIndex] = useState(0);
-  const [mobileView, setMobileView] = useState<MobileView>('list');
   const [selectedReviewFilePath, setSelectedReviewFilePath] = useState<string | undefined>();
-  const [workspaceChanges, setWorkspaceChanges] = useState<WorkspaceChanges | null>(null);
-  const [workspaceChangesLoading, setWorkspaceChangesLoading] = useState(false);
-  const [workspaceChangesError, setWorkspaceChangesError] = useState<string | undefined>();
-  const [selectedWorkspaceFilePath, setSelectedWorkspaceFilePath] = useState<string | undefined>();
-  const [workspaceFileDiffsByPath, setWorkspaceFileDiffsByPath] = useState<Record<string, WorkspaceFileDiff>>({});
-  const [workspaceFileDiffLoading, setWorkspaceFileDiffLoading] = useState(false);
-  const [workspaceFileDiffError, setWorkspaceFileDiffError] = useState<string | undefined>();
-  const [workspaceReviewRefreshKey, setWorkspaceReviewRefreshKey] = useState(0);
   const [reviewMode, setReviewMode] = useState<ReviewMode>('current');
   const [expandedDiff, setExpandedDiff] = useState<ExpandedDiff | null>(null);
+  const {
+    textareaRef,
+    draft,
+    mentionQuery,
+    mentionSuggestions,
+    mentionLoading,
+    mentionError,
+    activeMentionIndex,
+    updateDraft,
+    insertMention,
+    submitDraft,
+    handleComposerKeyDown,
+  } = useSessionComposer({ onSendPrompt });
+  const { shellRef, workspaceStyle, startPanelResize } = useResizableSessionPanels();
+  const {
+    mobileView,
+    shellClassName,
+    selectSession,
+    selectTurn,
+    showSessionList,
+    showChatView,
+    openReviewInspector,
+  } = useSessionMobileNavigation({
+    selectedSessionId,
+    onSelectSession,
+    onSelectTurn,
+  });
   const runActive = sendingPrompt || runInFlight;
   const authStatus = formatControlPlaneAuthStatus(sessionDetail?.model ?? activeSession?.model, auth);
   const compactionStatus = sessionDetail?.context?.compactionStatus ?? activeSession?.context?.compactionStatus;
   const selectedModel = sessionDetail?.model ?? activeSession?.model ?? '';
   const {
-    groups: modelOptionGroups,
-    selectedModelOption,
-    selectorDisabled: modelSelectorDisabled,
-  } = useCredentialAwareModelOptions({
     modelOptions,
+    modelOptionsError,
+    modelOptionGroups,
+    selectedModelOption,
+    modelSelectorDisabled,
+  } = useSessionModelOptions({
     auth,
     selectedModel,
     runActive,
   });
-  const selectedReviewFile =
-    turnReview?.files.find((file) => file.path === selectedReviewFilePath) ?? turnReview?.files[0];
-  const selectedWorkspaceFile =
-    workspaceChanges?.files.find((file) => file.path === selectedWorkspaceFilePath) ?? workspaceChanges?.files[0];
-  const workspaceFileDiff = selectedWorkspaceFile ? workspaceFileDiffsByPath[selectedWorkspaceFile.path] ?? null : null;
-  const selectedTurnPatchIsStale = Boolean(
-    selectedReviewFile?.path
-    && selectedWorkspaceFile?.path === selectedReviewFile.path
-    && selectedReviewFile.patch
-    && workspaceFileDiff?.patch
-    && normalizePatchForComparison(selectedReviewFile.patch) !== normalizePatchForComparison(workspaceFileDiff.patch),
-  );
-  const workspaceStyle = {
-    '--session-sidebar-width': `${panelWidths.left}px`,
-    '--session-side-width': `${panelWidths.right}px`,
-  } as CSSProperties;
+  const {
+    workspaceChanges,
+    workspaceChangesLoading,
+    workspaceChangesError,
+    selectedWorkspaceFile,
+    workspaceFileDiff,
+    workspaceFileDiffsByPath,
+    workspaceFileDiffLoading,
+    workspaceFileDiffError,
+    selectedTurnPatchIsStale,
+    selectWorkspaceFile,
+    refreshWorkspaceReview,
+  } = useWorkspaceReviewState({
+    runActive,
+    sessionUpdatedAt: sessionDetail?.updatedAt,
+    turnReview,
+    selectedReviewFilePath,
+  });
   const firstReviewFilePath = turnReview?.files[0]?.path;
-
-  useEffect(() => {
-    window.localStorage.setItem(PANEL_WIDTH_STORAGE_KEY, JSON.stringify(panelWidths));
-  }, [panelWidths]);
 
   useEffect(() => {
     const element = conversationScrollRef.current;
@@ -176,280 +170,8 @@ export function SessionsScreen({
   }, [mobileView, selectedSessionId, sessionDetail?.messages.length, sessionDetailLoading, sessionDetailError]);
 
   useEffect(() => {
-    let cancelled = false;
-    void fetchModelOptions().then((options) => {
-      if (!cancelled) {
-        setModelOptions(options);
-        setModelOptionsError(undefined);
-      }
-    }).catch((error) => {
-      if (!cancelled) {
-        setModelOptions(null);
-        setModelOptionsError(error instanceof Error ? error.message : String(error));
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
     setSelectedReviewFilePath(firstReviewFilePath);
   }, [firstReviewFilePath, selectedTurnId, turnReview?.traceFile]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setWorkspaceChangesLoading(true);
-    async function refreshWorkspaceChanges() {
-      try {
-        const next = await fetchWorkspaceChanges();
-        if (!cancelled) {
-          setWorkspaceChanges(next);
-          setWorkspaceChangesError(undefined);
-          setSelectedWorkspaceFilePath((current) => (
-            current && next.files.some((file) => file.path === current) ? current : next.files[0]?.path
-          ));
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setWorkspaceChangesError(error instanceof Error ? error.message : String(error));
-        }
-      } finally {
-        if (!cancelled) {
-          setWorkspaceChangesLoading(false);
-        }
-      }
-    }
-
-    void refreshWorkspaceChanges();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [runActive, sessionDetail?.updatedAt, workspaceReviewRefreshKey]);
-
-  useEffect(() => {
-    const filePaths = workspaceChanges?.files.map((file) => file.path) ?? [];
-    if (!filePaths.length) {
-      setWorkspaceFileDiffsByPath({});
-      setWorkspaceFileDiffError(undefined);
-      setWorkspaceFileDiffLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setWorkspaceFileDiffLoading(true);
-    async function refreshWorkspaceFileDiffs() {
-      try {
-        const pairs = await Promise.all(filePaths.map(async (filePath) => [
-          filePath,
-          await fetchWorkspaceFileDiff(filePath),
-        ] as const));
-        if (!cancelled) {
-          setWorkspaceFileDiffsByPath(Object.fromEntries(pairs));
-          setWorkspaceFileDiffError(undefined);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setWorkspaceFileDiffsByPath({});
-          setWorkspaceFileDiffError(error instanceof Error ? error.message : String(error));
-        }
-      } finally {
-        if (!cancelled) {
-          setWorkspaceFileDiffLoading(false);
-        }
-      }
-    }
-
-    void refreshWorkspaceFileDiffs();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceChanges, workspaceReviewRefreshKey]);
-
-  useEffect(() => {
-    if (!mentionQuery) {
-      setMentionSuggestions([]);
-      setMentionLoading(false);
-      setMentionError(undefined);
-      setActiveMentionIndex(0);
-      return;
-    }
-
-    let cancelled = false;
-    setMentionLoading(true);
-    const timeout = window.setTimeout(() => {
-      void fetchWorkspaceFileSuggestions(mentionQuery.query)
-        .then((files) => {
-          if (!cancelled) {
-            setMentionSuggestions(files);
-            setMentionError(undefined);
-            setActiveMentionIndex(0);
-          }
-        })
-        .catch((error) => {
-          if (!cancelled) {
-            setMentionSuggestions([]);
-            setMentionError(error instanceof Error ? error.message : String(error));
-          }
-        })
-        .finally(() => {
-          if (!cancelled) {
-            setMentionLoading(false);
-          }
-        });
-    }, 220);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeout);
-    };
-  }, [mentionQuery]);
-
-  const updateDraft = (value: string, cursor: number | null) => {
-    setDraft(value);
-    setMentionQuery(findFileMentionQuery(value, cursor ?? value.length));
-  };
-
-  const insertMention = (suggestion: WorkspaceFileSuggestion) => {
-    if (!mentionQuery) {
-      return;
-    }
-
-    const nextDraft = `${draft.slice(0, mentionQuery.start)}@${suggestion.path} ${draft.slice(mentionQuery.end)}`;
-    const nextCursor = mentionQuery.start + suggestion.path.length + 2;
-    setDraft(nextDraft);
-    setMentionQuery(null);
-    setMentionSuggestions([]);
-    window.requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-      textareaRef.current?.setSelectionRange(nextCursor, nextCursor);
-    });
-  };
-
-  const startPanelResize = (edge: 'left' | 'right', event: React.PointerEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    const shellWidth = shellRef.current?.getBoundingClientRect().width;
-    if (!shellWidth) {
-      return;
-    }
-
-    const startX = event.clientX;
-    const startWidths = panelWidths;
-    const maxLeft = Math.min(LEFT_PANEL_MAX_WIDTH, shellWidth - startWidths.right - MAIN_PANEL_MIN_WIDTH - PANEL_HANDLE_WIDTH);
-    const maxRight = Math.min(RIGHT_PANEL_MAX_WIDTH, shellWidth - startWidths.left - MAIN_PANEL_MIN_WIDTH - PANEL_HANDLE_WIDTH);
-
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      const delta = moveEvent.clientX - startX;
-      setPanelWidths({
-        left:
-          edge === 'left' ?
-            clamp(startWidths.left + delta, LEFT_PANEL_MIN_WIDTH, maxLeft)
-          : startWidths.left,
-        right:
-          edge === 'right' ?
-            clamp(startWidths.right - delta, RIGHT_PANEL_MIN_WIDTH, maxRight)
-          : startWidths.right,
-      });
-    };
-
-    const handlePointerUp = () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp, { once: true });
-  };
-
-  useEffect(() => {
-    if (!selectedSessionId) {
-      setMobileView('list');
-      return;
-    }
-
-    setMobileView((current) => current === 'list' ? 'chat' : current);
-  }, [selectedSessionId]);
-
-  const shellClassName = useMemo(() => {
-    return className('workspace-shell', `mobile-view-${mobileView}`);
-  }, [mobileView]);
-
-  const selectSession = (sessionId: string) => {
-    onSelectSession(sessionId);
-    setMobileView('chat');
-  };
-
-  const selectTurn = (turnId: string) => {
-    onSelectTurn(turnId);
-    setMobileView('review');
-  };
-
-  const showSessionList = () => {
-    setMobileView('list');
-  };
-
-  const showChatView = () => {
-    setMobileView('chat');
-  };
-
-  const openReviewInspector = () => {
-    setMobileView('review');
-  };
-
-  const submitDraft = () => {
-    const prompt = draft.trim();
-    if (!prompt) {
-      return;
-    }
-    setDraft('');
-    void onSendPrompt(prompt);
-  };
-
-  const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (mentionQuery && (mentionSuggestions.length || mentionLoading)) {
-      if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        setActiveMentionIndex((index) => Math.min(index + 1, Math.max(mentionSuggestions.length - 1, 0)));
-        return;
-      }
-      if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        setActiveMentionIndex((index) => Math.max(index - 1, 0));
-        return;
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        setMentionQuery(null);
-        setMentionSuggestions([]);
-        return;
-      }
-      if ((event.key === 'Enter' || event.key === 'Tab') && mentionSuggestions[activeMentionIndex]) {
-        event.preventDefault();
-        insertMention(mentionSuggestions[activeMentionIndex]);
-        return;
-      }
-    }
-
-    if (event.key !== 'Enter' || event.nativeEvent.isComposing) {
-      return;
-    }
-
-    if (typeof window !== 'undefined' && window.innerWidth <= 760) {
-      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey) {
-        event.preventDefault();
-        submitDraft();
-      }
-      return;
-    }
-
-    if (!event.shiftKey && !event.altKey) {
-      event.preventDefault();
-      submitDraft();
-    }
-  };
 
   const mentionMenu = mentionQuery ?
     <FileMentionMenu
@@ -542,8 +264,8 @@ export function SessionsScreen({
           workspaceFileDiffsByPath={workspaceFileDiffsByPath}
           workspaceFileDiffLoading={workspaceFileDiffLoading}
           workspaceFileDiffError={workspaceFileDiffError}
-          onSelectWorkspaceFile={setSelectedWorkspaceFilePath}
-          onRefreshWorkspaceReview={() => setWorkspaceReviewRefreshKey((current) => current + 1)}
+          onSelectWorkspaceFile={selectWorkspaceFile}
+          onRefreshWorkspaceReview={refreshWorkspaceReview}
           selectedTurnPatchIsStale={selectedTurnPatchIsStale}
           onOpenDiff={setExpandedDiff}
           onBackToSessions={showSessionList}
@@ -657,52 +379,9 @@ export function SessionsScreen({
             onSelect={(event) => updateDraft(draft, event.currentTarget.selectionStart)}
             disabled={!selectedSessionId || runActive}
             placeholder={runActive ? 'Heddle is working…' : 'Ask Heddle about this workspace'}
-            onKeyDown={(event) => {
-              if (mentionQuery && (mentionSuggestions.length || mentionLoading)) {
-                if (event.key === 'ArrowDown') {
-                  event.preventDefault();
-                  setActiveMentionIndex((index) => Math.min(index + 1, Math.max(mentionSuggestions.length - 1, 0)));
-                  return;
-                }
-                if (event.key === 'ArrowUp') {
-                  event.preventDefault();
-                  setActiveMentionIndex((index) => Math.max(index - 1, 0));
-                  return;
-                }
-                if (event.key === 'Escape') {
-                  event.preventDefault();
-                  setMentionQuery(null);
-                  setMentionSuggestions([]);
-                  return;
-                }
-                if ((event.key === 'Enter' || event.key === 'Tab') && mentionSuggestions[activeMentionIndex]) {
-                  event.preventDefault();
-                  insertMention(mentionSuggestions[activeMentionIndex]);
-                  return;
-                }
-              }
-
-              if (event.key === 'Enter' && !event.shiftKey && !event.altKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                const prompt = draft.trim();
-                if (!prompt) {
-                  return;
-                }
-                setDraft('');
-                void onSendPrompt(prompt);
-              }
-            }}
+            onKeyDown={handleComposerKeyDown}
           />
-          {mentionQuery ?
-            <FileMentionMenu
-              loading={mentionLoading}
-              suggestions={mentionSuggestions}
-              activeIndex={activeMentionIndex}
-              error={mentionError}
-              query={mentionQuery.query}
-              onPick={insertMention}
-            />
-          : null}
+          {mentionMenu}
           <div className="composer-footer">
             <div className="composer-status">
               <p className="muted">
@@ -744,14 +423,7 @@ export function SessionsScreen({
                 className="primary-button"
                 type="button"
                 disabled={!selectedSessionId || runActive || !draft.trim()}
-                onClick={() => {
-                  const prompt = draft.trim();
-                  if (!prompt) {
-                    return;
-                  }
-                  setDraft('');
-                  void onSendPrompt(prompt);
-                }}
+                onClick={submitDraft}
               >
                 Send
               </button>
@@ -778,8 +450,8 @@ export function SessionsScreen({
         workspaceFileDiffLoading={workspaceFileDiffLoading}
         workspaceFileDiffError={workspaceFileDiffError}
         selectedTurnPatchIsStale={selectedTurnPatchIsStale}
-        onSelectWorkspaceFile={setSelectedWorkspaceFilePath}
-        onRefreshWorkspaceReview={() => setWorkspaceReviewRefreshKey((current) => current + 1)}
+        onSelectWorkspaceFile={selectWorkspaceFile}
+        onRefreshWorkspaceReview={refreshWorkspaceReview}
         sessionDetail={sessionDetail}
         selectedTurnId={selectedTurnId}
         onSelectTurn={selectTurn}
@@ -793,44 +465,6 @@ export function SessionsScreen({
       <FullDiffDialog diff={expandedDiff} onClose={() => setExpandedDiff(null)} />
     </section>
   );
-}
-
-function normalizePatchForComparison(patch: string): string {
-  return patch.trim().replace(/\r\n/g, '\n');
-}
-
-type FileMentionQuery = {
-  query: string;
-  start: number;
-  end: number;
-};
-
-type PanelWidths = {
-  left: number;
-  right: number;
-};
-
-type MobileView = 'list' | 'chat' | 'review';
-
-function readStoredPanelWidths(): PanelWidths {
-  try {
-    const stored = window.localStorage.getItem(PANEL_WIDTH_STORAGE_KEY);
-    if (!stored) {
-      return { left: 288, right: 344 };
-    }
-
-    const parsed = JSON.parse(stored) as Partial<PanelWidths>;
-    return {
-      left: clamp(typeof parsed.left === 'number' ? parsed.left : 288, LEFT_PANEL_MIN_WIDTH, LEFT_PANEL_MAX_WIDTH),
-      right: clamp(typeof parsed.right === 'number' ? parsed.right : 344, RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH),
-    };
-  } catch {
-    return { left: 288, right: 344 };
-  }
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), Math.max(min, max));
 }
 
 function formatDriftLabel(enabled: boolean | undefined, level: ControlPlaneState['sessions'][number]['driftLevel']): string {
@@ -883,21 +517,4 @@ function FileMentionMenu({
       : <p className="mention-empty">{loading ? 'Searching workspace files...' : `No files found for "${query}".`}</p>}
     </div>
   );
-}
-
-function findFileMentionQuery(value: string, cursor: number): FileMentionQuery | null {
-  const beforeCursor = value.slice(0, cursor);
-  const match = beforeCursor.match(/(^|\s)@([^\s@]*)$/);
-  if (!match || match.index === undefined) {
-    return null;
-  }
-
-  const prefix = match[1] ?? '';
-  const query = match[2] ?? '';
-  const start = match.index + prefix.length;
-  return {
-    query,
-    start,
-    end: cursor,
-  };
 }
