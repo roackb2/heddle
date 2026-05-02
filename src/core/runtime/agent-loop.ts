@@ -6,6 +6,7 @@ import type { ChatMessage, LlmAdapter, LlmProvider } from '../llm/types.js';
 import { runAgent } from '../agent/run-agent.js';
 import type { RunAgentOptions } from '../agent/run-agent.js';
 import type { RunResult, ToolCall, ToolDefinition, TraceEvent } from '../types.js';
+import type { ToolApprovalPolicy } from '../approvals/types.js';
 import { createLogger } from '../utils/logger.js';
 import {
   resolveApiKeyForModel,
@@ -39,6 +40,7 @@ export type RunAgentLoopOptions = {
   onEvent?: (event: AgentLoopEvent) => void;
   onTraceEvent?: (event: TraceEvent) => void;
   onAssistantStream?: RunAgentOptions['onAssistantStream'];
+  approvalPolicies?: ToolApprovalPolicy[];
   approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
   shouldStop?: () => boolean;
   abortSignal?: AbortSignal;
@@ -157,6 +159,7 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
         timestamp: now(),
       });
     },
+    approvalPolicies: options.approvalPolicies,
     approveToolCall: options.approveToolCall,
     shouldStop: options.shouldStop,
     abortSignal: options.abortSignal,

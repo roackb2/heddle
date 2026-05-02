@@ -1,4 +1,5 @@
-import { appendDirectShellHistory, buildConversationMessages, formatDirectShellResponse, summarizeToolCall } from '../utils/format.js';
+import { summarizeToolCall } from '../../../core/observability/conversation-activity.js';
+import { appendDirectShellHistory, buildConversationMessages, formatDirectShellResponse } from '../utils/format.js';
 import { compactChatHistoryWithArchive } from '../state/compaction.js';
 import type { ChatSession } from '../state/types.js';
 import type { ChatRuntimeConfig } from '../utils/runtime.js';

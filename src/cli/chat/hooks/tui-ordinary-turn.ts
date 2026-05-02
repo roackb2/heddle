@@ -5,7 +5,7 @@ import type { ChatRuntimeConfig } from '../utils/runtime.js';
 import { createTuiCompactionStatusPort } from './tui-compaction-status.js';
 import { finalizeSuccessfulTuiOrdinaryTurn } from './tui-agent-turn-result.js';
 import { createTuiRunLoopEventAdapter } from './tui-run-loop-events.js';
-import { createTuiToolApprovalPort } from './tui-tool-approval.js';
+import { createTuiRememberedApprovalPolicies, createTuiToolApprovalPort } from './tui-tool-approval.js';
 import type { ActionState } from './useAgentRun.js';
 import type { CyberLoopKinematicsObserver } from '../../../index.js';
 
@@ -22,7 +22,7 @@ export async function executeTuiOrdinaryTurn(args: {
   updateSessionById: SessionUpdater;
   parsePlanState: ParsePlanState;
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
-  isProjectApproved: Parameters<typeof createTuiToolApprovalPort>[0]['isProjectApproved'];
+  isProjectApproved: Parameters<typeof createTuiRememberedApprovalPolicies>[0]['isProjectApproved'];
   rememberProjectApproval: Parameters<typeof createTuiToolApprovalPort>[0]['rememberProjectApproval'];
   driftObserver: CyberLoopKinematicsObserver | undefined;
   turnAbortSignal: AbortSignal;
@@ -65,9 +65,9 @@ export async function executeTuiOrdinaryTurn(args: {
   });
   const approvalPort = createTuiToolApprovalPort({
     state,
-    isProjectApproved,
     rememberProjectApproval,
   });
+  const approvalPolicies = createTuiRememberedApprovalPolicies({ isProjectApproved });
 
   const result = await executeOrdinaryChatTurn({
     workspaceRoot: runtime.workspaceRoot,
@@ -89,6 +89,7 @@ export async function executeTuiOrdinaryTurn(args: {
       compaction: compactionPort,
       approvals: approvalPort,
     },
+    approvalPolicies,
     onAssistantStream: runLoopEvents.onAssistantStream,
     onTraceEvent: runLoopEvents.onTraceEvent,
     shouldStop: () => state.interruptRequestedRef.current,

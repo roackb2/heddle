@@ -1,7 +1,6 @@
 import type { TraceEvent } from '../types.js';
 import { truncate } from '../utils/text.js';
-
-const MAX_TOOL_CALL_SUMMARY_CHARS = 96;
+import { summarizeToolCall } from './conversation-activity.js';
 
 export type TraceEventType = TraceEvent['type'];
 
@@ -95,36 +94,4 @@ function normalizeSummary(summary: string | string[] | undefined): string[] {
   }
 
   return summary ? [summary] : [];
-}
-
-function summarizeToolCall(tool: string, input: unknown): string {
-  const shellCommand = extractShellCommand(input);
-  if (shellCommand) {
-    return `${tool} (${truncate(shellCommand, MAX_TOOL_CALL_SUMMARY_CHARS)})`;
-  }
-
-  const path = extractPathField(input);
-  if (path) {
-    return `${tool} (${truncate(path, MAX_TOOL_CALL_SUMMARY_CHARS)})`;
-  }
-
-  return tool;
-}
-
-function extractShellCommand(value: unknown): string | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-
-  const command = (value as { command?: unknown }).command;
-  return typeof command === 'string' && command.trim() ? command.trim() : undefined;
-}
-
-function extractPathField(value: unknown): string | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-
-  const path = (value as { path?: unknown }).path;
-  return typeof path === 'string' && path.trim() ? path.trim() : undefined;
 }

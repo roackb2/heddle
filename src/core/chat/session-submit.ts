@@ -1,4 +1,6 @@
 import type { ToolCall, ToolDefinition } from '../../index.js';
+import type { ToolApprovalPolicy } from '../approvals/types.js';
+import type { TraceSummarizerRegistry } from '../observability/trace-summarizers.js';
 import { executeOrdinaryChatTurn, clearOrdinaryChatTurnLease } from './ordinary-turn.js';
 import type { ChatSessionLeaseOwner } from './session-lease.js';
 import type { AgentLoopEvent } from '../../index.js';
@@ -15,6 +17,8 @@ export type SubmitChatSessionPromptArgs = {
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   onEvent?: (event: AgentLoopEvent) => void;
   onCompactionStatus?: (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; summaryPath?: string; error?: string }) => void;
+  approvalPolicies?: ToolApprovalPolicy[];
+  traceSummarizerRegistry?: TraceSummarizerRegistry;
   approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
   abortSignal?: AbortSignal;
   leaseOwner?: ChatSessionLeaseOwner;
@@ -31,6 +35,8 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
     preferApiKey: args.preferApiKey,
     systemContext: args.systemContext,
     memoryMaintenanceMode: args.memoryMaintenanceMode,
+    approvalPolicies: args.approvalPolicies,
+    traceSummarizerRegistry: args.traceSummarizerRegistry,
     host: {
       events: args.onEvent ? { onAgentLoopEvent: args.onEvent } : undefined,
       compaction: args.onCompactionStatus ? {

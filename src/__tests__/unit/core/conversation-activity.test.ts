@@ -3,7 +3,8 @@ import {
   projectAgentLoopEventToConversationActivities,
   projectCompactionStatusToConversationActivities,
   projectTraceEventToConversationActivities,
-  summarizeActivityToolCall,
+  summarizeToolCall,
+  summarizeToolResult,
 } from '../../../core/observability/conversation-activity.js';
 import type { AgentLoopEvent } from '../../../core/runtime/events.js';
 import type { TraceEvent } from '../../../core/types.js';
@@ -20,7 +21,7 @@ describe('conversation activity projection', () => {
     };
 
     expect(projectAgentLoopEventToConversationActivities(event)).toEqual([
-      { type: 'assistant.stream', text: 'Working', done: false },
+      expect.objectContaining({ type: 'assistant.stream', text: 'Working', done: false, runId: 'run-1', step: 1 }),
     ]);
   });
 
@@ -42,9 +43,9 @@ describe('conversation activity projection', () => {
       timestamp: '2026-05-02T00:00:01.000Z',
     };
 
-    expect(projectAgentLoopEventToConversationActivities(started)).toEqual([{ type: 'loop.started' }]);
+    expect(projectAgentLoopEventToConversationActivities(started)).toEqual([expect.objectContaining({ type: 'loop.started', runId: 'run-1' })]);
     expect(projectTraceEventToConversationActivities(finishedTrace)).toEqual([
-      { type: 'run.finished', outcome: 'max_steps' },
+      expect.objectContaining({ type: 'run.finished', outcome: 'max_steps', step: 5 }),
     ]);
   });
 
@@ -71,10 +72,10 @@ describe('conversation activity projection', () => {
     };
 
     expect(projectAgentLoopEventToConversationActivities(calling)).toEqual([
-      { type: 'tool.calling', tool: 'read_file', step: 2 },
+      expect.objectContaining({ type: 'tool.calling', tool: 'read_file', step: 2, runId: 'run-1' }),
     ]);
     expect(projectAgentLoopEventToConversationActivities(completed)).toEqual([
-      { type: 'tool.completed', tool: 'read_file', durationMs: 12.4 },
+      expect.objectContaining({ type: 'tool.completed', tool: 'read_file', durationMs: 12.4, step: 2, runId: 'run-1' }),
     ]);
   });
 
@@ -95,23 +96,24 @@ describe('conversation activity projection', () => {
     };
 
     expect(projectTraceEventToConversationActivities(approval)).toEqual([
-      {
+      expect.objectContaining({
         type: 'tool.approval_requested',
         tool: 'run_shell_mutate',
         toolSummary: 'run_shell_mutate (yarn test)',
         step: 3,
         call: approval.call,
-      },
+      }),
     ]);
     expect(projectTraceEventToConversationActivities(fallback)).toEqual([
-      {
+      expect.objectContaining({
         type: 'tool.fallback',
         fromTool: 'run_shell_inspect',
         toTool: 'run_shell_mutate',
         fromSummary: 'run_shell_inspect (git status --short)',
         toSummary: 'run_shell_mutate (git status --short)',
         reason: 'inspect policy rejected the command',
-      },
+        step: 4,
+      }),
     ]);
   });
 
@@ -135,10 +137,10 @@ describe('conversation activity projection', () => {
     };
 
     expect(projectTraceEventToConversationActivities(started)).toEqual([
-      { type: 'memory.maintenance_started', candidateCount: 2 },
+      expect.objectContaining({ type: 'memory.maintenance_started', candidateCount: 2, runId: 'memory-1', step: 5 }),
     ]);
     expect(projectTraceEventToConversationActivities(finished)).toEqual([
-      { type: 'memory.maintenance_finished', outcome: 'completed', summary: 'Stored project context.' },
+      expect.objectContaining({ type: 'memory.maintenance_finished', outcome: 'completed', summary: 'Stored project context.', runId: 'memory-1', step: 5 }),
     ]);
   });
 
@@ -158,11 +160,21 @@ describe('conversation activity projection', () => {
   });
 
   it('preserves TUI tool call summary details in the shared core helper', () => {
-    expect(summarizeActivityToolCall('search_files', { query: 'trace', path: '.heddle/traces' })).toBe(
+    expect(summarizeToolCall('search_files', { query: 'trace', path: '.heddle/traces' })).toBe(
       'search_files ("trace" in .heddle/traces)',
     );
-    expect(summarizeActivityToolCall('update_plan', { plan: [{ step: 'Refactor projection', status: 'in_progress' }] })).toBe(
+    expect(summarizeToolCall('update_plan', { plan: [{ step: 'Refactor projection', status: 'in_progress' }] })).toBe(
       'update_plan (Refactor projection)',
+    );
+    expect(summarizeToolCall('delete_file', { path: 'tmp/generated-report.md' })).toBe(
+      'delete_file (tmp/generated-report.md)',
+    );
+    expect(summarizeToolCall('move_file', { from: 'docs/old.md', to: 'docs/archive/old.md' })).toBe(
+      'move_file (docs/old.md -> docs/archive/old.md)',
+    );
+    expect(summarizeToolResult('edit_file', { output: { path: 'src/index.ts' } })).toBe('edit_file (src/index.ts)');
+    expect(summarizeToolResult('delete_file', { output: { path: 'tmp/generated-report.md' } })).toBe(
+      'delete_file (tmp/generated-report.md)',
     );
   });
 
@@ -181,7 +193,7 @@ describe('conversation activity projection', () => {
     };
 
     expect(projectAgentLoopEventToConversationActivities(event)).toEqual([
-      { type: 'tool.call', toolSummary: 'read_file (README.md)' },
+      expect.objectContaining({ type: 'tool.call', toolSummary: 'read_file (README.md)', runId: 'run-1', step: 2 }),
     ]);
   });
 });

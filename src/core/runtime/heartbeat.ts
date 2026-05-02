@@ -3,6 +3,7 @@ import type { Logger } from 'pino';
 import { appendMemoryCatalogSystemContext } from '../memory/catalog.js';
 import type { ChatMessage, LlmAdapter } from '../llm/types.js';
 import type { ToolCall, ToolDefinition } from '../types.js';
+import type { ToolApprovalPolicy } from '../approvals/types.js';
 import { runAgentLoop } from './agent-loop.js';
 import { createAgentLoopCheckpoint } from './events.js';
 import type { AgentLoopCheckpoint, AgentLoopEvent, AgentLoopState } from './events.js';
@@ -30,6 +31,7 @@ export type RunAgentHeartbeatOptions = {
   includePlanTool?: boolean;
   logger?: Logger;
   onEvent?: (event: AgentLoopEvent) => void;
+  approvalPolicies?: ToolApprovalPolicy[];
   approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
   shouldStop?: () => boolean;
   abortSignal?: AbortSignal;
@@ -68,6 +70,7 @@ export async function runAgentHeartbeat(options: RunAgentHeartbeatOptions): Prom
     includePlanTool: options.includePlanTool,
     logger: options.logger,
     onEvent: options.onEvent,
+    approvalPolicies: options.approvalPolicies,
     approveToolCall: options.approveToolCall,
     shouldStop: options.shouldStop,
     abortSignal: options.abortSignal,

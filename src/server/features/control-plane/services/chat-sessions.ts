@@ -11,8 +11,7 @@ import type { ChatSessionLeaseOwner } from '../../../../core/chat/session-lease.
 import type { ChatSession, TurnSummary } from '../../../../core/chat/types.js';
 import { buildConversationMessages } from '../../../../core/chat/conversation-lines.js';
 import { submitChatSessionPrompt } from '../../../../core/chat/session-submit.js';
-import { evaluateToolApprovalPolicies } from '../../../../core/approvals/policy-chain.js';
-import { humanApprovalPolicy, requestToolApproval } from '../../../../core/approvals/surface.js';
+import { requestToolApproval } from '../../../../core/approvals/surface.js';
 import {
   createControlPlanePendingApprovalView,
   createControlPlaneSessionEventPublisher,
@@ -166,27 +165,22 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs) {
       leaseOwner: args.leaseOwner,
       onEvent: events.hostPort.events?.onAgentLoopEvent,
       approveToolCall: async (call, tool) => {
-        const decision = await evaluateToolApprovalPolicies([
-          humanApprovalPolicy(async () => await requestToolApproval({
-            call,
-            tool,
-            createView: createControlPlanePendingApprovalView,
-            storePending: ({ view, resolve }) => {
-              pendingApprovals.set(args.sessionId, {
-                approval: view,
-                resolve,
-              });
-            },
-            publish: (_view, callForEvent) => {
-              events.publishApprovalRequested(callForEvent);
-            },
-          })),
-        ], { call, tool, workspaceRoot: args.workspaceRoot });
+        const decision = await requestToolApproval({
+          call,
+          tool,
+          createView: createControlPlanePendingApprovalView,
+          storePending: ({ view, resolve }) => {
+            pendingApprovals.set(args.sessionId, {
+              approval: view,
+              resolve,
+            });
+          },
+          publish: (_view, callForEvent) => {
+            events.publishApprovalRequested(callForEvent);
+          },
+        });
         pendingApprovals.delete(args.sessionId);
-        return {
-          approved: decision?.type === 'allow',
-          reason: decision?.reason,
-        };
+        return decision;
       },
       onCompactionStatus: events.hostPort.compaction?.onFinalCompactionStatus,
     });

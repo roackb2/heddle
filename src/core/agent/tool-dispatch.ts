@@ -9,8 +9,8 @@ import { createToolRegistry } from '../tools/registry.js';
 import { executeTool } from '../tools/execute-tool.js';
 import { stableSerialize, normalizeToolInput } from './util.js';
 import { defaultToolApprovalPolicies } from '../approvals/default-policies.js';
-import { evaluateToolApprovalPolicies } from '../approvals/policy-chain.js';
-import type { ToolApprovalPolicyDecision } from '../approvals/types.js';
+import { resolveToolApproval } from '../approvals/policy-chain.js';
+import type { ToolApprovalPolicy } from '../approvals/types.js';
 import type { Logger } from 'pino';
 
 export async function maybeDenyToolCall(args: {
@@ -18,6 +18,7 @@ export async function maybeDenyToolCall(args: {
   tool: ToolDefinition | undefined;
   step: number;
   now: () => string;
+  approvalPolicies?: ToolApprovalPolicy[];
   approveToolCall: RunAgentOptions['approveToolCall'];
   workspaceRoot?: string;
   record: (event: TraceEvent) => void;
@@ -28,16 +29,27 @@ export async function maybeDenyToolCall(args: {
     return undefined;
   }
 
-  const policyDecision = await evaluateToolApprovalPolicies(defaultToolApprovalPolicies, {
-    call,
-    tool,
-    workspaceRoot: args.workspaceRoot,
+  const approval = await resolveToolApproval({
+    policies: [...defaultToolApprovalPolicies, ...(args.approvalPolicies ?? [])],
+    context: {
+      call,
+      tool,
+      workspaceRoot: args.workspaceRoot,
+    },
+    requestHumanApproval: approveToolCall ? async () => {
+      record({ type: 'tool.approval_requested', call, step, timestamp: now() });
+      const humanDecision = await approveToolCall(call, tool);
+      record({
+        type: 'tool.approval_resolved',
+        call,
+        approved: humanDecision.approved,
+        reason: humanDecision.reason,
+        step,
+        timestamp: now(),
+      });
+      return humanDecision;
+    } : undefined,
   });
-  if (!policyDecision) {
-    return undefined;
-  }
-
-  const approval = await resolveToolApproval({ call, tool, step, now, approveToolCall, record, policyDecision });
   if (approval.approved) {
     return undefined;
   }
@@ -59,6 +71,7 @@ export async function executeToolCallWithFallback(args: {
   now: () => string;
   registry: ReturnType<typeof createToolRegistry>;
   seenToolCalls: Map<string, number>;
+  approvalPolicies?: ToolApprovalPolicy[];
   approveToolCall: RunAgentOptions['approveToolCall'];
   workspaceRoot?: string;
   record: (event: TraceEvent) => void;
@@ -94,6 +107,7 @@ export async function executeToolCallWithFallback(args: {
     step: args.step,
     now: args.now,
     approveToolCall: args.approveToolCall,
+    approvalPolicies: args.approvalPolicies,
     workspaceRoot: args.workspaceRoot,
     record: args.record,
     log: args.log,
@@ -138,42 +152,6 @@ async function executeRecordedToolCall(
   log.debug({ step, tool: call.tool, ok: result.ok }, 'Tool result');
   record({ type: 'tool.result', tool: call.tool, result, step, timestamp: now() });
   return { effectiveCall: call, result };
-}
-
-async function resolveToolApproval(args: {
-  call: ToolCall;
-  tool: ToolDefinition;
-  step: number;
-  now: () => string;
-  approveToolCall: RunAgentOptions['approveToolCall'];
-  record: (event: TraceEvent) => void;
-  policyDecision: ToolApprovalPolicyDecision;
-}): Promise<{ approved: boolean; reason?: string }> {
-  const { call, tool, step, now, approveToolCall, record, policyDecision } = args;
-  if (policyDecision.type === 'allow') {
-    return { approved: true, reason: policyDecision.reason };
-  }
-
-  if (policyDecision.type === 'deny') {
-    return { approved: false, reason: policyDecision.reason };
-  }
-
-  record({ type: 'tool.approval_requested', call, step, timestamp: now() });
-  const approval =
-    approveToolCall ? await approveToolCall(call, tool)
-    : {
-        approved: false,
-        reason: `No approval handler configured for ${call.tool}`,
-      };
-  record({
-    type: 'tool.approval_resolved',
-    call,
-    approved: approval.approved,
-    reason: approval.reason,
-    step,
-    timestamp: now(),
-  });
-  return approval;
 }
 
 function getInspectFallbackReason(
