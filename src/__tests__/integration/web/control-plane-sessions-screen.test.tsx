@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ComponentProps } from 'react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatSessionDetail, ChatTurnReview, ControlPlaneState } from '../../../web/lib/api.js';
 import { SessionsScreen } from '../../../web/features/control-plane/screens/SessionsScreen.js';
 import {
   fetchModelOptions,
   fetchWorkspaceChanges,
   fetchWorkspaceFileDiff,
+  fetchWorkspaceFileSuggestions,
 } from '../../../web/lib/api.js';
 
 vi.mock('../../../web/lib/api.js', () => ({
@@ -63,8 +65,11 @@ const turnReview: ChatTurnReview = {
 };
 
 describe('SessionsScreen review UI', () => {
+  const originalInnerWidth = window.innerWidth;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    setViewportWidth(1024);
     vi.mocked(fetchModelOptions).mockResolvedValue({ groups: [{ label: 'OpenAI', models: ['gpt-5.4', 'gpt-5.5-pro'], options: [{ id: 'gpt-5.4', disabled: false }, { id: 'gpt-5.5-pro', disabled: false }] }] });
     vi.mocked(fetchWorkspaceChanges).mockResolvedValue({
       vcs: 'git',
@@ -84,6 +89,12 @@ describe('SessionsScreen review UI', () => {
       truncated: false,
       binary: false,
     });
+    vi.mocked(fetchWorkspaceFileSuggestions).mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    cleanup();
+    setViewportWidth(originalInnerWidth);
   });
 
   it('renders current workspace diff separately from trace-backed turn review', async () => {
@@ -151,4 +162,202 @@ describe('SessionsScreen review UI', () => {
       expect(screen.getByText('Raw turn patch')).toBeTruthy();
     });
   });
+
+  it('preserves desktop composer submit and disabled key behavior', async () => {
+    const onSendPrompt = vi.fn(async () => undefined);
+    renderSessionsScreen({ onSendPrompt });
+
+    const textarea = screen.getByPlaceholderText('Ask Heddle about this workspace') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: '   ' } });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+    expect(onSendPrompt).not.toHaveBeenCalled();
+
+    fireEvent.change(textarea, { target: { value: 'Explain the diff', selectionStart: 16 } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: true });
+    fireEvent.keyDown(textarea, { key: 'Enter', altKey: true });
+    expect(onSendPrompt).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+    expect(onSendPrompt).toHaveBeenCalledWith('Explain the diff');
+    await waitFor(() => {
+      expect(textarea.value).toBe('');
+    });
+
+    fireEvent.change(textarea, { target: { value: 'Send from button', selectionStart: 16 } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(onSendPrompt).toHaveBeenLastCalledWith('Send from button');
+    await waitFor(() => {
+      expect(textarea.value).toBe('');
+    });
+  });
+
+  it('preserves file mention lookup, keyboard selection, and insertion behavior', async () => {
+    vi.mocked(fetchWorkspaceFileSuggestions).mockResolvedValue([
+      { path: 'src/alpha.ts' },
+      { path: 'src/beta.ts' },
+    ]);
+    renderSessionsScreen();
+
+    const textarea = screen.getByPlaceholderText('Ask Heddle about this workspace') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: '@src', selectionStart: 4 } });
+
+    await waitFor(() => {
+      expect(fetchWorkspaceFileSuggestions).toHaveBeenCalledWith('src');
+      expect(screen.getByRole('listbox', { name: 'File suggestions' })).toBeTruthy();
+    });
+
+    fireEvent.keyDown(textarea, { key: 'ArrowDown' });
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: '@src/beta.ts' }).className).toContain('active');
+    });
+    fireEvent.keyDown(textarea, { key: 'Tab' });
+    await waitFor(() => {
+      expect(textarea.value).toBe('@src/beta.ts ');
+    });
+    expect(screen.queryByRole('listbox', { name: 'File suggestions' })).toBeNull();
+
+    fireEvent.change(textarea, { target: { value: 'Review @src', selectionStart: 11 } });
+    await waitFor(() => {
+      expect(screen.getByRole('listbox', { name: 'File suggestions' })).toBeTruthy();
+      expect(screen.getByRole('option', { name: '@src/alpha.ts' })).toBeTruthy();
+    });
+  });
+
+  it('preserves desktop layout anchors, approval card, and run-state actions', async () => {
+    renderSessionsScreen({
+      runInFlight: true,
+      pendingApproval: {
+        tool: 'run_shell',
+        callId: 'call-1',
+        input: { cmd: 'yarn test' },
+        requestedAt: '2026-04-26T00:00:00.000Z',
+      },
+    });
+
+    expect(screen.getByText('Sessions')).toBeTruthy();
+    expect(screen.getAllByText('Session 1').length).toBeGreaterThan(0);
+    expect(screen.getByText('Current workspace changes')).toBeTruthy();
+    expect(screen.getByLabelText('Resize sessions sidebar')).toBeTruthy();
+    expect(screen.getByLabelText('Resize session inspector')).toBeTruthy();
+    expect(screen.getByText('Approval required: run_shell')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Deny' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continue' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Cancel' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByRole('button', { name: 'Send' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('preserves model selection callback behavior', async () => {
+    vi.mocked(fetchModelOptions).mockResolvedValue({
+      groups: [{
+        label: 'OpenAI',
+        models: ['gpt-5.4', 'gpt-5.5-pro'],
+        options: [
+          { id: 'gpt-5.4', disabled: false },
+          { id: 'gpt-5.5-pro', disabled: false },
+        ],
+      }],
+    });
+    const onUpdateSessionSettings = vi.fn(async () => undefined);
+    renderSessionsScreen({
+      auth: {
+        preferApiKey: true,
+        openai: { type: 'api-key', provider: 'openai' },
+        anthropic: { type: 'missing', provider: 'anthropic' },
+      },
+      onUpdateSessionSettings,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'model' }).hasAttribute('disabled')).toBe(false);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'model' }));
+    const modelListbox = screen.getByRole('listbox', { name: 'Model options' });
+    fireEvent.click(within(modelListbox).getByRole('option', { name: 'gpt-5.4' }));
+    expect(onUpdateSessionSettings).toHaveBeenCalledWith({ model: 'gpt-5.4' });
+  });
+
+  it('preserves mobile list, chat, and review navigation', async () => {
+    setViewportWidth(500);
+    const onSelectSession = vi.fn();
+    renderSessionsScreen({
+      activeSession: undefined,
+      sessionDetail: null,
+      selectedSessionId: undefined,
+      selectedTurnId: undefined,
+      selectedTurn: undefined,
+      turnReview: null,
+      onSelectSession,
+    });
+
+    expect(screen.getByRole('button', { name: /Session 1/ })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /Session 1/ }));
+    expect(onSelectSession).toHaveBeenCalledWith('session-1');
+    await waitFor(() => {
+      expect(screen.getByRole('navigation', { name: 'Session views' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Review' })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    await waitFor(() => {
+      expect(screen.getByRole('navigation', { name: 'Review evidence tabs' })).toBeTruthy();
+      expect(screen.getByText('Current workspace changes')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chat' }));
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('Message Heddle')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '‹ Sessions' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Session 1/ })).toBeTruthy();
+    });
+  });
 });
+
+type SessionsScreenProps = ComponentProps<typeof SessionsScreen>;
+
+function renderSessionsScreen(overrides: Partial<SessionsScreenProps> = {}) {
+  const props: SessionsScreenProps = {
+    sessions: [sessionSummary],
+    activeSession: sessionSummary,
+    sessionDetail,
+    sessionDetailLoading: false,
+    selectedSessionId: 'session-1',
+    onSelectSession: () => undefined,
+    selectedTurnId: 'turn-1',
+    onSelectTurn: () => undefined,
+    selectedTurn: sessionDetail.turns[0],
+    turnReview,
+    turnReviewLoading: false,
+    sendingPrompt: false,
+    runInFlight: false,
+    memoryUpdating: false,
+    auth: {
+      preferApiKey: false,
+      openai: { type: 'oauth', provider: 'openai', accountId: 'acct-12345678', expiresAt: Date.now() + 60_000 },
+      anthropic: { type: 'missing', provider: 'anthropic' },
+    },
+    onSendPrompt: async () => undefined,
+    creatingSession: false,
+    onCreateSession: async () => undefined,
+    onContinueSession: async () => undefined,
+    onCancelSessionRun: async () => undefined,
+    onUpdateSessionSettings: async () => undefined,
+    pendingApproval: null,
+    onResolveApproval: async () => undefined,
+    ...overrides,
+  };
+
+  return render(<SessionsScreen {...props} />);
+}
+
+function setViewportWidth(width: number) {
+  Object.defineProperty(window, 'innerWidth', {
+    configurable: true,
+    writable: true,
+    value: width,
+  });
+}
