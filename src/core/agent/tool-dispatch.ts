@@ -3,12 +3,14 @@
 // for the agent loop.
 // ---------------------------------------------------------------------------
 
-import { isAbsolute, relative, resolve } from 'node:path';
 import type { ToolDefinition, ToolCall, TraceEvent } from '../types.js';
 import type { RunAgentOptions } from './run-agent.js';
 import { createToolRegistry } from '../tools/registry.js';
 import { executeTool } from '../tools/execute-tool.js';
 import { stableSerialize, normalizeToolInput } from './util.js';
+import { defaultToolApprovalPolicies } from '../approvals/default-policies.js';
+import { evaluateToolApprovalPolicies } from '../approvals/policy-chain.js';
+import type { ToolApprovalPolicyDecision } from '../approvals/types.js';
 import type { Logger } from 'pino';
 
 export async function maybeDenyToolCall(args: {
@@ -26,11 +28,16 @@ export async function maybeDenyToolCall(args: {
     return undefined;
   }
 
-  if (!requiresApprovalForCall(call, tool, args.workspaceRoot)) {
+  const policyDecision = await evaluateToolApprovalPolicies(defaultToolApprovalPolicies, {
+    call,
+    tool,
+    workspaceRoot: args.workspaceRoot,
+  });
+  if (!policyDecision) {
     return undefined;
   }
 
-  const approval = await resolveToolApproval({ call, tool, step, now, approveToolCall, record });
+  const approval = await resolveToolApproval({ call, tool, step, now, approveToolCall, record, policyDecision });
   if (approval.approved) {
     return undefined;
   }
@@ -140,8 +147,17 @@ async function resolveToolApproval(args: {
   now: () => string;
   approveToolCall: RunAgentOptions['approveToolCall'];
   record: (event: TraceEvent) => void;
+  policyDecision: ToolApprovalPolicyDecision;
 }): Promise<{ approved: boolean; reason?: string }> {
-  const { call, tool, step, now, approveToolCall, record } = args;
+  const { call, tool, step, now, approveToolCall, record, policyDecision } = args;
+  if (policyDecision.type === 'allow') {
+    return { approved: true, reason: policyDecision.reason };
+  }
+
+  if (policyDecision.type === 'deny') {
+    return { approved: false, reason: policyDecision.reason };
+  }
+
   record({ type: 'tool.approval_requested', call, step, timestamp: now() });
   const approval =
     approveToolCall ? await approveToolCall(call, tool)
@@ -158,39 +174,6 @@ async function resolveToolApproval(args: {
     timestamp: now(),
   });
   return approval;
-}
-
-function requiresApprovalForCall(call: ToolCall, tool: ToolDefinition, workspaceRoot?: string): boolean {
-  if (tool.requiresApproval) {
-    return true;
-  }
-
-  return isOutsideWorkspaceInspectionCall(call, workspaceRoot);
-}
-
-function isOutsideWorkspaceInspectionCall(call: ToolCall, workspaceRoot = process.cwd()): boolean {
-  if (call.tool !== 'read_file' && call.tool !== 'list_files' && call.tool !== 'search_files' && call.tool !== 'edit_file') {
-    return false;
-  }
-
-  const input = call.input;
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    return false;
-  }
-
-  const record = input as Record<string, unknown>;
-  const rawPath = typeof record.path === 'string'
-    ? record.path
-    : call.tool === 'search_files' ? '.'
-    : undefined;
-  if (!rawPath) {
-    return false;
-  }
-
-  const resolvedWorkspaceRoot = resolve(workspaceRoot);
-  const resolvedTarget = resolve(resolvedWorkspaceRoot, rawPath);
-  const relativeTarget = relative(resolvedWorkspaceRoot, resolvedTarget);
-  return relativeTarget.startsWith('..') || isAbsolute(relativeTarget);
 }
 
 function getInspectFallbackReason(

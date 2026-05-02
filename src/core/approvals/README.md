@@ -23,7 +23,7 @@ approval rules, approval requests, and host approval surfaces.
 Approval behavior is currently spread across:
 
 - `src/core/agent/tool-dispatch.ts`
-- `src/core/chat/tool-approval-host.ts`
+- `src/core/approvals/surface.ts`
 - `src/core/approvals/remembered-rules.ts`
 - `src/cli/chat/hooks/tui-tool-approval.ts`
 - `src/server/features/control-plane/services/chat-sessions.ts`
@@ -36,7 +36,7 @@ adapters in their host folders.
 
 - `types.ts`: approval request, decision, policy, and surface types.
 - `policy-chain.ts`: ordered first-decision policy evaluation.
-- `default-policies.ts`: built-in safety, tool, and workspace-boundary policies.
+- `default-policies.ts`: built-in tool, workspace-boundary, and remembered-rule policies.
 - `remembered-rules.ts`: project/user approval rule persistence and matching.
 - `surface.ts`: host human-approval surface interface.
 
