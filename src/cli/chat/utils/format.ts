@@ -1,4 +1,4 @@
-import type { ChatMessage, TraceEvent, ToolResult } from '../../../index.js';
+import type { ChatMessage, ToolResult } from '../../../index.js';
 import type { EditFilePreview } from '../../../core/tools/edit-file.js';
 import {
   classifyShellCommandPolicy,
@@ -29,80 +29,6 @@ export type ApprovalSummary = {
 const MAX_SHELL_OUTPUT_CHARS = 1400;
 const MAX_TOOL_CALL_SUMMARY_CHARS = 96;
 
-
-export function toLiveEvent(event: TraceEvent): string | undefined {
-  switch (event.type) {
-    case 'run.started':
-      return 'thinking';
-    case 'assistant.turn':
-      if (event.diagnostics?.rationale) {
-        return `reasoning: ${truncate(event.diagnostics.rationale, 140)}`;
-      }
-      if (event.requestedTools) {
-        return undefined;
-      }
-      return 'answer ready';
-    case 'tool.approval_requested':
-      return `approval needed for ${summarizeToolCall(event.call.tool, event.call.input)}`;
-    case 'tool.approval_resolved':
-      return `approval ${event.approved ? 'granted' : 'denied'} for ${summarizeToolCall(event.call.tool, event.call.input)}${event.reason ? ` (${truncate(event.reason, 80)})` : ''}`;
-    case 'tool.fallback':
-      return `retrying with ${summarizeToolCall(event.toCall.tool, event.toCall.input)} after ${summarizeToolCall(event.fromCall.tool, event.fromCall.input)} was blocked (${truncate(event.reason, 80)})`;
-    case 'tool.call':
-      return `running ${summarizeToolCall(event.call.tool, event.call.input)}`;
-    case 'tool.result':
-      return `${summarizeToolResult(event.tool, extractShellCommand(event.result.output), event.result.output)} ${event.result.ok ? 'completed' : `failed: ${event.result.error ?? 'error'}`}`;
-    case 'memory.candidate_recorded':
-      return `memory candidate recorded: ${event.candidateId}`;
-    case 'memory.maintenance_started':
-      return `memory maintenance started for ${event.candidateIds.length} candidate${event.candidateIds.length === 1 ? '' : 's'}`;
-    case 'memory.maintenance_finished':
-      return `memory maintenance ${event.outcome}`;
-    case 'memory.maintenance_failed':
-      return `memory maintenance failed: ${truncate(event.error, 80)}`;
-    case 'cyberloop.annotation':
-      return event.driftLevel === 'unknown' ? undefined : `cyberloop drift=${event.driftLevel}${formatCyberLoopMetrics(event.metadata)}`;
-    case 'run.finished':
-      return event.outcome === 'done' ? undefined : `stopped: ${event.outcome}`;
-    default:
-      return undefined;
-  }
-}
-
-function formatCyberLoopMetrics(metadata: Record<string, unknown>): string {
-  const kinematics = metadata.kinematics;
-  if (!kinematics || typeof kinematics !== 'object' || Array.isArray(kinematics)) {
-    return '';
-  }
-
-  const snapshot = kinematics as {
-    errorMagnitude?: unknown;
-    correctionMagnitude?: unknown;
-    isStable?: unknown;
-  };
-  const parts: string[] = [];
-  if (typeof snapshot.errorMagnitude === 'number') {
-    parts.push(`err=${formatMetric(snapshot.errorMagnitude)}`);
-  }
-  if (typeof snapshot.correctionMagnitude === 'number') {
-    parts.push(`corr=${formatMetric(snapshot.correctionMagnitude)}`);
-  }
-  if (typeof snapshot.isStable === 'boolean') {
-    parts.push(`stable=${snapshot.isStable}`);
-  }
-
-  return parts.length ? ` (${parts.join(' ')})` : '';
-}
-
-function formatMetric(value: number): string {
-  if (!Number.isFinite(value)) {
-    return String(value);
-  }
-  if (Math.abs(value) < 0.001 && value !== 0) {
-    return value.toExponential(2);
-  }
-  return value.toFixed(3);
-}
 
 export function currentActivityText(
   liveEvents: LiveEvent[],

@@ -252,6 +252,17 @@ export {
   TRACE_EVENT_DOMAINS,
   TRACE_EVENT_TYPES,
 } from './core/observability/semantic-conventions.js';
+export {
+  projectAgentLoopEventToConversationActivities,
+  projectCompactionStatusToConversationActivities,
+  projectTraceEventToConversationActivities,
+  summarizeActivityToolCall,
+  summarizeActivityToolResult,
+} from './core/observability/conversation-activity.js';
+export type {
+  ConversationActivity,
+  ConversationCompactionStatus,
+} from './core/observability/conversation-activity.js';
 
 // Prompts
 export { buildSystemPrompt } from './core/prompts/system-prompt.js';

@@ -1,6 +1,8 @@
 import type { TraceEvent } from '../../../index.js';
+import { projectTraceEventToConversationActivities } from '../../../core/observability/conversation-activity.js';
 import { previewEditFileInput } from '../../../core/tools/edit-file.js';
-import { formatEditPreviewHistoryMessage, formatPlanHistoryMessage, toLiveEvent } from '../utils/format.js';
+import { formatConversationActivityForTui } from '../adapters/conversation-activity-adapter.js';
+import { formatEditPreviewHistoryMessage, formatPlanHistoryMessage } from '../utils/format.js';
 import type { ChatSession } from '../state/types.js';
 import type { ActionState } from './useAgentRun.js';
 
@@ -79,18 +81,20 @@ export function createTuiRunLoopEventAdapter(args: {
         }
       }
 
-      const next = toLiveEvent(event);
-      if (!next) {
+      const nextEvents = projectTraceEventToConversationActivities(event)
+        .map(formatConversationActivityForTui)
+        .filter((text): text is string => Boolean(text));
+      if (nextEvents.length === 0) {
         return;
       }
 
       state.setLiveEvents((current) => {
-        const previous = current[current.length - 1];
-        if (previous?.text === next) {
-          return current;
-        }
+        const dedupedNextEvents = nextEvents.filter((next) => current[current.length - 1]?.text !== next);
 
-        return [...current, { id: state.nextLocalId(), text: next }].slice(-8);
+        return [
+          ...current,
+          ...dedupedNextEvents.map((text) => ({ id: state.nextLocalId(), text })),
+        ].slice(-8);
       });
     },
   };

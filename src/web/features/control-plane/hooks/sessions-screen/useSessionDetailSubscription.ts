@@ -1,4 +1,11 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
+import {
+  projectAgentLoopEventToConversationActivities,
+  projectCompactionStatusToConversationActivities,
+  type ConversationActivity,
+  type ConversationCompactionStatus,
+} from '../../../../../core/observability/conversation-activity';
+import type { AgentLoopEvent } from '../../../../../core/runtime/events';
 import type { TraceEvent } from '../../../../../core/types';
 import {
   fetchChatSessionDetail,
@@ -38,13 +45,6 @@ type SessionEventContext = {
   refresh: (options?: { silent?: boolean }) => Promise<void>;
   liveMessages: LiveSessionMessageActions;
 };
-
-type SessionEventHandler = {
-  matches: (event: LiveSessionEvent) => boolean;
-  handle: (event: LiveSessionEvent, context: SessionEventContext) => void;
-};
-
-type TraceEventContext = Pick<SessionEventContext, 'sessionId' | 'setMemoryUpdating' | 'setPendingApproval' | 'refresh' | 'liveMessages'>;
 
 export function useSessionDetailSubscription({
   selectedSessionId,
@@ -184,149 +184,138 @@ function handleSessionEvent({
     refresh,
     liveMessages,
   };
-  sessionEventHandlers.find((handler) => handler.matches(event))?.handle(event, context);
+  projectLiveSessionEvent(event).forEach((activity) => applyWebConversationActivity(activity, context));
 }
 
-const compactionStatusHandlers: Record<NonNullable<LiveSessionEvent['status']>, (event: LiveSessionEvent, context: SessionEventContext) => void> = {
-  running: (event, { liveMessages }) => {
+const webActivityHandlers: Partial<Record<ConversationActivity['type'], (activity: ConversationActivity, context: SessionEventContext) => void>> = {
+  'compaction.running': (activity, { liveMessages }) => {
+    const compactionActivity = activity as Extract<ConversationActivity, { type: 'compaction.running' }>;
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      event.archivePath ? `Compacting earlier history… ${event.archivePath}` : 'Compacting earlier history…',
+      compactionActivity.archivePath ? `Compacting earlier history… ${compactionActivity.archivePath}` : 'Compacting earlier history…',
       { pending: true, streaming: false },
     );
   },
-  failed: (event, { liveMessages }) => {
+  'compaction.failed': (activity, { liveMessages }) => {
+    const compactionActivity = activity as Extract<ConversationActivity, { type: 'compaction.failed' }>;
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      event.error ? `Compaction failed: ${event.error}` : 'Compaction failed.',
+      compactionActivity.error ? `Compaction failed: ${compactionActivity.error}` : 'Compaction failed.',
       { pending: false, streaming: false },
     );
   },
-  finished: (event, { liveMessages }) => {
+  'compaction.finished': (activity, { liveMessages }) => {
+    const compactionActivity = activity as Extract<ConversationActivity, { type: 'compaction.finished' }>;
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      event.summaryPath ? `Compaction finished. Summary: ${event.summaryPath}` : 'Compaction finished.',
+      compactionActivity.summaryPath ? `Compaction finished. Summary: ${compactionActivity.summaryPath}` : 'Compaction finished.',
       { pending: false, streaming: false },
     );
   },
-};
-
-const eventTypeHandlers: Record<string, SessionEventHandler['handle']> = {
-  'loop.started': (_event, { setRunInFlight, liveMessages }) => {
+  'loop.started': (_activity, { setRunInFlight, liveMessages }) => {
     setRunInFlight(true);
     liveMessages.upsertLiveStatusMessage('live-run-status', 'Run started…', { pending: true, streaming: true });
   },
-  'tool.calling': (event, { liveMessages }) => {
-    withStringValue(event.tool, (tool) => liveMessages.upsertLiveStatusMessage(
+  'tool.calling': (activity, { liveMessages }) => {
+    const toolActivity = activity as Extract<ConversationActivity, { type: 'tool.calling' }>;
+    liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      `Working… running ${tool}${typeof event.step === 'number' ? ` (step ${event.step})` : ''}`,
+      `Working… running ${toolActivity.tool}${typeof toolActivity.step === 'number' ? ` (step ${toolActivity.step})` : ''}`,
       { pending: true, streaming: true },
-    ));
+    );
   },
-  'tool.completed': (event, { liveMessages }) => {
-    withStringValue(event.tool, (tool) => liveMessages.upsertLiveStatusMessage(
+  'tool.completed': (activity, { liveMessages }) => {
+    const toolActivity = activity as Extract<ConversationActivity, { type: 'tool.completed' }>;
+    liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      `${tool} finished${typeof event.durationMs === 'number' ? ` in ${Math.round(event.durationMs)}ms` : ''}`,
+      `${toolActivity.tool} finished${typeof toolActivity.durationMs === 'number' ? ` in ${Math.round(toolActivity.durationMs)}ms` : ''}`,
       { pending: false, streaming: false },
-    ));
+    );
   },
-  trace: (event, context) => {
-    withValue(event.event, (traceEvent) => handleTraceEvent(traceEvent, context));
+  'assistant.stream': (activity, { liveMessages }) => {
+    const assistantActivity = activity as Extract<ConversationActivity, { type: 'assistant.stream' }>;
+    liveMessages.upsertLiveAssistantMessage(assistantActivity.text, assistantActivity.done);
+    if (assistantActivity.done) {
+      liveMessages.removeLiveStatusMessage('live-run-status');
+    }
   },
-  'assistant.stream': (event, { liveMessages }) => {
-    withStringValue(event.text, (text) => liveMessages.upsertLiveAssistantMessage(text, Boolean(event.done)));
-    when(Boolean(event.done), () => liveMessages.removeLiveStatusMessage('live-run-status'));
-  },
-  'loop.finished': (_event, { setRunInFlight, liveMessages, refresh }) => {
+  'loop.finished': (_activity, { setRunInFlight, liveMessages, refresh }) => {
     setRunInFlight(false);
     liveMessages.removeLiveStatusMessage('live-run-status');
     void refresh();
   },
-};
-
-const sessionEventHandlers: SessionEventHandler[] = [
-  {
-    matches: (event) => Boolean(event.status && compactionStatusHandlers[event.status]),
-    handle: (event, context) => event.status && compactionStatusHandlers[event.status](event, context),
-  },
-  {
-    matches: (event) => Boolean(event.type && eventTypeHandlers[event.type]),
-    handle: (event, context) => event.type && eventTypeHandlers[event.type](event, context),
-  },
-];
-
-const traceEventHandlers: Partial<{
-  [EventType in TraceEvent['type']]: (event: Extract<TraceEvent, { type: EventType }>, context: TraceEventContext) => void;
-}> = {
-  'memory.maintenance_started': (event, { setMemoryUpdating, liveMessages }) => {
+  'memory.maintenance_started': (activity, { setMemoryUpdating, liveMessages }) => {
+    const memoryActivity = activity as Extract<ConversationActivity, { type: 'memory.maintenance_started' }>;
     setMemoryUpdating(true);
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      `Memory updating… ${event.candidateIds.length} candidate${event.candidateIds.length === 1 ? '' : 's'}`,
+      `Memory updating… ${memoryActivity.candidateCount} candidate${memoryActivity.candidateCount === 1 ? '' : 's'}`,
       { pending: true, streaming: false },
     );
   },
-  'memory.maintenance_finished': (event, { setMemoryUpdating, liveMessages, refresh }) => {
+  'memory.maintenance_finished': (activity, { setMemoryUpdating, liveMessages, refresh }) => {
+    const memoryActivity = activity as Extract<ConversationActivity, { type: 'memory.maintenance_finished' }>;
     setMemoryUpdating(false);
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      event.summary ? `Memory updated. ${event.summary}` : 'Memory updated.',
+      memoryActivity.summary ? `Memory updated. ${memoryActivity.summary}` : 'Memory updated.',
       { pending: false, streaming: false },
     );
     void refresh({ silent: true });
   },
-  'memory.maintenance_failed': (event, { setMemoryUpdating, liveMessages }) => {
+  'memory.maintenance_failed': (activity, { setMemoryUpdating, liveMessages }) => {
+    const memoryActivity = activity as Extract<ConversationActivity, { type: 'memory.maintenance_failed' }>;
     setMemoryUpdating(false);
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      event.error ? `Memory update failed: ${event.error}` : 'Memory update failed.',
+      memoryActivity.error ? `Memory update failed: ${memoryActivity.error}` : 'Memory update failed.',
       { pending: false, streaming: false },
     );
   },
-  'tool.approval_requested': (event, { sessionId, setPendingApproval, liveMessages }) => {
+  'tool.approval_requested': (activity, { sessionId, setPendingApproval, liveMessages }) => {
+    const approvalActivity = activity as Extract<ConversationActivity, { type: 'tool.approval_requested' }>;
     void fetchPendingSessionApproval(sessionId).then((approval) => setPendingApproval(approval));
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      `Approval requested for ${event.call.tool}${typeof event.step === 'number' ? ` (step ${event.step})` : ''}`,
+      `Approval requested for ${approvalActivity.tool}${typeof approvalActivity.step === 'number' ? ` (step ${approvalActivity.step})` : ''}`,
       { pending: true, streaming: false },
     );
   },
-  'tool.approval_resolved': (event, { setPendingApproval, liveMessages }) => {
+  'tool.approval_resolved': (activity, { setPendingApproval, liveMessages }) => {
+    const approvalActivity = activity as Extract<ConversationActivity, { type: 'tool.approval_resolved' }>;
     setPendingApproval(null);
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      `Approval ${event.approved ? 'granted' : 'denied'} for ${event.call.tool}${event.reason ? ` — ${event.reason}` : ''}`,
+      `Approval ${approvalActivity.approved ? 'granted' : 'denied'} for ${approvalActivity.tool}${approvalActivity.reason ? ` — ${approvalActivity.reason}` : ''}`,
       { pending: false, streaming: false },
     );
   },
-  'tool.fallback': (event, { liveMessages }) => {
+  'tool.fallback': (activity, { liveMessages }) => {
+    const fallbackActivity = activity as Extract<ConversationActivity, { type: 'tool.fallback' }>;
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      `Fallback: ${event.fromCall.tool} → ${event.toCall.tool}`,
+      `Fallback: ${fallbackActivity.fromTool} → ${fallbackActivity.toTool}`,
       { pending: true, streaming: false },
     );
   },
 };
 
-function handleTraceEvent(traceEvent: TraceEvent, context: TraceEventContext) {
-  const handler = traceEventHandlers[traceEvent.type] as ((event: TraceEvent, context: TraceEventContext) => void) | undefined;
-  handler?.(traceEvent, context);
+function projectLiveSessionEvent(event: LiveSessionEvent): ConversationActivity[] {
+  if (isCompactionStatusEvent(event)) {
+    return projectCompactionStatusToConversationActivities(event);
+  }
+
+  return isAgentLoopEventLike(event) ? projectAgentLoopEventToConversationActivities(event) : [];
 }
 
-function withValue<T>(value: T | undefined, callback: (value: T) => void) {
-  if (value !== undefined) {
-    callback(value);
-  }
+function applyWebConversationActivity(activity: ConversationActivity, context: SessionEventContext) {
+  webActivityHandlers[activity.type]?.(activity, context);
 }
 
-function withStringValue(value: unknown, callback: (value: string) => void) {
-  if (typeof value === 'string') {
-    callback(value);
-  }
+function isCompactionStatusEvent(event: LiveSessionEvent): event is ConversationCompactionStatus {
+  return event.status === 'running' || event.status === 'finished' || event.status === 'failed';
 }
 
-function when(condition: boolean, callback: () => void) {
-  if (condition) {
-    callback();
-  }
+function isAgentLoopEventLike(event: LiveSessionEvent): event is AgentLoopEvent {
+  return typeof event.type === 'string';
 }
