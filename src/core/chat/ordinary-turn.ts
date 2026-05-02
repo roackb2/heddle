@@ -1,19 +1,14 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { runAgentLoop } from '../../index.js';
-import type { AgentLoopResult, RunAgentLoopOptions } from '../runtime/agent-loop.js';
+import type { RunAgentLoopOptions } from '../runtime/agent-loop.js';
 import type { ToolCall, ToolDefinition } from '../types.js';
-import type { LlmAdapter } from '../llm/types.js';
-import { runMaintenanceForRecordedCandidates } from '../memory/maintenance-integration.js';
 import { buildCompactionRunningContext } from './compaction.js';
 import { buildConversationMessages } from './conversation-lines.js';
 import { releaseSessionLease, type ChatSessionLeaseOwner } from './session-lease.js';
 import { prepareChatSessionTurn } from './session-turn-preflight.js';
-import { persistChatTurnResult } from './session-turn-result.js';
 import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
-import { summarizeTrace } from './trace-summary.js';
 import type { ChatTurnHostPort } from './turn-host.js';
-import type { AgentLoopEvent } from '../runtime/events.js';
+import { runInlineTurnMemoryMaintenance, scheduleBackgroundTurnMemoryMaintenance } from './turn-memory-maintenance.js';
+import { persistCompletedChatTurn } from './turn-persistence.js';
 import { loadChatTurnSession } from './turn-session.js';
 import { resolveChatTurnRuntime } from './turn-runtime.js';
 import { createChatTurnTools, listChatTurnToolNames } from './turn-tools.js';
@@ -137,74 +132,37 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       abortSignal: args.abortSignal,
     });
     const maintenanceMode = args.memoryMaintenanceMode ?? 'background';
-    const inlineMaintenance =
+    const resultForPersistence =
       maintenanceMode === 'inline' ?
-        await runMaintenanceForRecordedCandidates({
+        await runInlineTurnMemoryMaintenance({
           memoryRoot: runtime.memoryDir,
           llm: runtime.llm,
           source: `chat session ${session.id}`,
-          trace: result.trace,
-          maxSteps: 20,
-          onTraceEvent: (event) => args.host?.events?.onAgentLoopEvent?.({
-            type: 'trace',
-            runId: result.state.runId,
-            event,
-            timestamp: new Date().toISOString(),
-          } satisfies AgentLoopEvent),
+          result,
+          onEvent: args.host?.events?.onAgentLoopEvent,
         })
-      : undefined;
-    const resultTrace =
-      inlineMaintenance && inlineMaintenance.events.length > 0 ?
-        [...result.trace, ...inlineMaintenance.events]
-      : result.trace;
-    const resultForPersistence: AgentLoopResult = {
-      ...result,
-      trace: resultTrace,
-      state: {
-        ...result.state,
-        trace: resultTrace,
-      },
-    };
+      : result;
 
-    const persisted = await persistChatTurnResult({
+    const persisted = await persistCompletedChatTurn({
       result: resultForPersistence,
       prompt: args.prompt,
       session: preflightSession,
+      sessions,
+      sessionStoragePath: args.sessionStoragePath,
       model: runtime.model,
       stateRoot: args.stateRoot,
-      traceDir: join(args.stateRoot, 'traces'),
       systemContext: runtime.systemContext,
       toolNames,
       historyForTokenEstimate: session.history,
-      summarizer: { credentialSource: runtime.providerCredentialSource },
-      createTurnId: () => `server-turn-${Date.now()}`,
-      onCompactionStatus: (event) => {
-        args.onCompactionStatus?.(event);
-        args.host?.compaction?.onFinalCompactionStatus?.(event);
-        if (event.status === 'running') {
-          const compactionSeed = touchSession({
-            ...preflightSession,
-            history: result.transcript,
-            context: buildCompactionRunningContext({
-              history: resultForPersistence.transcript,
-              previous: preflightSession.context,
-              archiveCount: preflightSession.archives?.length,
-              currentSummaryPath: preflightSession.context?.currentSummaryPath,
-              lastArchivePath: event.archivePath,
-            }),
-          });
-          saveChatSessions(
-            args.sessionStoragePath,
-            sessions.map((candidate) => candidate.id === session.id ? compactionSeed : candidate),
-          );
-        }
-      },
+      credentialSource: runtime.providerCredentialSource,
+      host: args.host,
+      onCompactionStatus: args.onCompactionStatus,
     });
 
     const nextSessions = sessions.map((candidate) => candidate.id === session.id ? persisted.session : candidate);
     saveChatSessions(args.sessionStoragePath, nextSessions);
     if (maintenanceMode === 'background') {
-      scheduleBackgroundMemoryMaintenance({
+      scheduleBackgroundTurnMemoryMaintenance({
         memoryRoot: runtime.memoryDir,
         llm: runtime.llm,
         source: `chat session ${session.id}`,
@@ -225,83 +183,6 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
   } finally {
     clearOrdinaryChatTurnLease(args.sessionStoragePath, session.id, leaseOwner);
   }
-}
-
-function scheduleBackgroundMemoryMaintenance(args: {
-  memoryRoot: string;
-  llm: LlmAdapter;
-  source: string;
-  trace: AgentLoopResult['trace'];
-  traceFile: string;
-  sessionStoragePath: string;
-  sessionId: string;
-  runId: string;
-  onEvent?: (event: AgentLoopEvent) => void;
-}) {
-  void (async () => {
-    const maintenance = await runMaintenanceForRecordedCandidates({
-      memoryRoot: args.memoryRoot,
-      llm: args.llm,
-      source: args.source,
-      trace: args.trace,
-      maxSteps: 20,
-      onTraceEvent: (event) => args.onEvent?.({ type: 'trace', runId: args.runId, event, timestamp: new Date().toISOString() }),
-    });
-    if (maintenance.events.length === 0) {
-      return;
-    }
-
-    const currentTrace = readTraceEvents(args.traceFile);
-    const nextTrace = [...currentTrace, ...maintenance.events];
-    writeFileSync(args.traceFile, `${JSON.stringify(nextTrace, null, 2)}\n`, 'utf8');
-
-    const sessions = loadChatSessions(args.sessionStoragePath, true);
-    const nextSessions = sessions.map((session) => {
-      if (session.id !== args.sessionId) {
-        return session;
-      }
-
-      return touchSession({
-        ...session,
-        turns: session.turns.map((turn, index) => (
-          index === session.turns.length - 1 ?
-            {
-              ...turn,
-              events: summarizeTrace(nextTrace),
-            }
-          : turn
-        )),
-      });
-    });
-    saveChatSessions(args.sessionStoragePath, nextSessions);
-  })().catch((error) => {
-    args.onEvent?.({
-      type: 'trace',
-      runId: args.runId,
-      event: {
-        type: 'memory.maintenance_failed',
-        runId: `memory-run-${Date.now()}`,
-        error: error instanceof Error ? error.message : String(error),
-        candidateIds: [],
-        step: nextTraceStep(args.trace),
-        timestamp: new Date().toISOString(),
-      },
-      timestamp: new Date().toISOString(),
-    });
-  });
-}
-
-function readTraceEvents(path: string): AgentLoopResult['trace'] {
-  try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
-    return Array.isArray(parsed) ? parsed as AgentLoopResult['trace'] : [];
-  } catch {
-    return [];
-  }
-}
-
-function nextTraceStep(trace: AgentLoopResult['trace']): number {
-  return trace.reduce((max, event) => 'step' in event ? Math.max(max, event.step) : max, 0) + 1;
 }
 
 export function clearOrdinaryChatTurnLease(sessionStoragePath: string, sessionId: string, owner: ChatSessionLeaseOwner) {

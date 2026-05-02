@@ -31,6 +31,9 @@ maintenance, traces, and host ports.
 - `turn-runtime.ts`: model, credential, LLM, memory, and system-context
   preparation for ordinary chat turns.
 - `turn-tools.ts`: ordinary chat turn tool bundle creation.
+- `turn-memory-maintenance.ts`: inline/background turn memory maintenance and
+  trace summary updates.
+- `turn-persistence.ts`: final chat turn persistence orchestration.
 - `session-submit.ts`: server-facing submit adapter over ordinary turns.
 - `storage.ts`: file-backed chat session store.
 - `session-turn-preflight.ts`: lease acquisition and preflight compaction.
