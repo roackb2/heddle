@@ -233,6 +233,25 @@ export type { RunShellOptions } from './core/tools/run-shell.js';
 export { createTraceRecorder } from './core/trace/recorder.js';
 export type { TraceRecorder } from './core/trace/recorder.js';
 export { formatTraceForConsole } from './core/trace/format.js';
+export {
+  DEFAULT_TRACE_SUMMARIZERS,
+  countAssistantSteps,
+  createTraceSummarizerRegistry,
+  summarizeTrace,
+} from './core/observability/trace-summarizers.js';
+export type {
+  TraceEventOfType,
+  TraceEventType,
+  TraceSummarizer,
+  TraceSummarizerMap,
+  TraceSummarizerRegistry,
+  TraceSummaryContext,
+} from './core/observability/trace-summarizers.js';
+export {
+  TRACE_CORRELATION_FIELDS,
+  TRACE_EVENT_DOMAINS,
+  TRACE_EVENT_TYPES,
+} from './core/observability/semantic-conventions.js';
 
 // Prompts
 export { buildSystemPrompt } from './core/prompts/system-prompt.js';
