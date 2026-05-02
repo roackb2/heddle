@@ -1,15 +1,15 @@
 # Commands
 
-The commands domain is the planned home for text-command parsing, registration,
-autocomplete, and cross-host command behavior. It starts as documentation in M0;
-implementation begins with the slash-command milestones.
+The commands domain owns text-command parsing, registration, autocomplete, and
+cross-host command behavior. Host layers compose command modules into their own
+registries and render the command results.
 
 ## Owns
 
 - Generic slash-command parser and registry infrastructure.
 - Command metadata such as syntax, description, aliases, and hints.
 - Cross-host command modules for behavior that is not specific to TUI rendering.
-- Command result types that adapters can render or execute.
+- Slash command result types that adapters can render or execute.
 
 ## Does Not Own
 
@@ -19,9 +19,12 @@ implementation begins with the slash-command milestones.
   credential storage. Commands call those through ports.
 - Turn execution middleware.
 
-## Planned Public Entry Points
+## Current Entry Points
 
-- `slash/types.ts`: command, context, result, and parsed input types.
+- `slash/types.ts`: command metadata, parsed input, hints, and registry-facing
+  generic types.
+- `slash/result-types.ts`: `SlashCommandResult`, the command-domain result
+  contract.
 - `slash/parser.ts`: parse slash command text without treating absolute paths as
   commands.
 - `slash/registry.ts`: register and dispatch command modules.
@@ -48,8 +51,12 @@ implementation begins with the slash-command milestones.
 
 ## Tests
 
-- Planned: `src/__tests__/unit/core/slash-commands.test.ts`
-- Existing behavior lock: `src/__tests__/unit/tui/local-commands.test.ts`
+- Core parser, registry, and autocomplete:
+  `src/__tests__/unit/core/slash-commands.test.ts`
+- Core command modules:
+  `src/__tests__/unit/core/slash-command-modules.test.ts`
+- TUI behavior lock:
+  `src/__tests__/unit/tui/local-commands.test.ts`
 - TUI command integration: `src/__tests__/integration/tui/session-cli.test.ts`
 
 ## Notes For Coding Agents
@@ -58,4 +65,3 @@ implementation begins with the slash-command milestones.
   itself.
 - Prefer command arrays and registries over switchboards.
 - Keep command modules UI-free unless they live under a host-specific folder.
-

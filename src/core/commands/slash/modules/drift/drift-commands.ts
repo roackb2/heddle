@@ -1,9 +1,10 @@
 import { matchesAnyExactSlashCommand, matchesExactSlashCommand } from '../../parser.js';
+import type { SlashCommandResult } from '../../result-types.js';
 import type { SlashCommandModule } from '../../types.js';
-import type { CoreSlashCommandResult, SlashCommandExecutionContext } from '../context.js';
+import type { SlashCommandExecutionContext } from '../context.js';
 import { slashMessageResult } from '../results.js';
 
-export function createDriftSlashCommandModule(): SlashCommandModule<CoreSlashCommandResult, SlashCommandExecutionContext> {
+export function createDriftSlashCommandModule(): SlashCommandModule<SlashCommandResult, SlashCommandExecutionContext> {
   return {
     id: 'drift',
     hints: [

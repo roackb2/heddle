@@ -6,5 +6,7 @@ export type {
   ChatSession,
   PendingApproval,
   ApprovalChoice,
-  LocalCommandResult,
 } from '../../../core/chat/types.js';
+export type {
+  SlashCommandResult,
+} from '../../../core/commands/slash/result-types.js';

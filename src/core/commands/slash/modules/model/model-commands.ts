@@ -1,6 +1,7 @@
 import { matchesAnyExactSlashCommand, matchesExactSlashCommand, matchesSlashCommandPrefix } from '../../parser.js';
+import type { SlashCommandResult } from '../../result-types.js';
 import type { SlashCommandModule } from '../../types.js';
-import type { CoreSlashCommandResult, SlashCommandExecutionContext } from '../context.js';
+import type { SlashCommandExecutionContext } from '../context.js';
 import { argumentAfterPrefix, slashMessageResult } from '../results.js';
 import { COMMON_BUILT_IN_MODELS, formatBuiltInModelGroups } from '../../../../llm/openai-models.js';
 import { credentialModeFromSource, validateModelCredentialCompatibility } from '../../../../llm/model-policy.js';
@@ -9,12 +10,12 @@ import type { LlmProvider } from '../../../../llm/types.js';
 export const MODEL_LIST_MESSAGE = ['Common built-in model choices', '', formatBuiltInModelGroups()].join('\n');
 export const MODEL_SET_HELP_MESSAGE = 'Use /model set <query> to filter models, then use arrows and Enter to choose one.';
 
-const MODEL_SUBCOMMAND_RESULTS = new Map<string, CoreSlashCommandResult>([
+const MODEL_SUBCOMMAND_RESULTS = new Map<string, SlashCommandResult>([
   ['list', slashMessageResult(MODEL_LIST_MESSAGE)],
   ['set', slashMessageResult(MODEL_SET_HELP_MESSAGE)],
 ]);
 
-export function createModelSlashCommandModule(): SlashCommandModule<CoreSlashCommandResult, SlashCommandExecutionContext> {
+export function createModelSlashCommandModule(): SlashCommandModule<SlashCommandResult, SlashCommandExecutionContext> {
   return {
     id: 'model',
     hints: [
@@ -60,7 +61,7 @@ export function createModelSlashCommandModule(): SlashCommandModule<CoreSlashCom
 function switchModel(
   context: SlashCommandExecutionContext,
   value: string,
-): CoreSlashCommandResult {
+): SlashCommandResult {
   if (!value) {
     return slashMessageResult('Usage: /model <name>');
   }

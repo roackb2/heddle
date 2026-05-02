@@ -1,13 +1,13 @@
 import { matchesExactSlashCommand } from '../../../core/commands/slash/parser.js';
+import type { SlashCommandResult } from '../../../core/commands/slash/result-types.js';
 import type { SlashCommandModule } from '../../../core/commands/slash/types.js';
-import type { LocalCommandResult } from '../state/types.js';
 
 export type TuiSlashCommandContext = {
   saveTuiSnapshot?: () => Promise<string> | string;
 };
 
 export function createTuiDebugSnapshotCommandModule(): SlashCommandModule<
-  LocalCommandResult,
+  SlashCommandResult,
   TuiSlashCommandContext
 > {
   return {
