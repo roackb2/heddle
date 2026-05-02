@@ -3,8 +3,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../../core/chat/storage.js';
 import { DEFAULT_OPENAI_MODEL } from '../../../../core/config.js';
+import { credentialModeFromSource, resolveCompatibleActiveModel } from '../../../../core/llm/model-policy.js';
+import { inferProviderFromModel } from '../../../../core/llm/providers.js';
 import { parseUnifiedDiffFiles } from '../../../../core/review/diff-domain.js';
-import { hasProviderCredentialForModel } from '../../../../core/runtime/api-keys.js';
+import { hasProviderCredentialForModel, resolveProviderCredentialSourceForModel } from '../../../../core/runtime/api-keys.js';
 import type { ChatSessionLeaseOwner } from '../../../../core/chat/session-lease.js';
 import type { ChatSession, TurnSummary } from '../../../../core/chat/types.js';
 import { buildConversationMessages } from '../../../../core/chat/conversation-lines.js';
@@ -49,23 +51,52 @@ export function createControlPlaneChatSession(args: {
   workspaceId?: string;
   model?: string;
   apiKeyPresent?: boolean;
+  preferApiKey?: boolean;
+  credentialStorePath?: string;
 }): ChatSessionDetail {
   const existing = readChatSessionViews(args.sessionStoragePath);
   const nextNumber = existing.length + 1;
-  const model = args.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
+  const model = resolveControlPlaneSessionCreationModel(args);
+  const credentialRuntime = {
+    preferApiKey: args.preferApiKey,
+    credentialStorePath: args.credentialStorePath,
+  };
   const session = createChatSession({
     id: `session-${Date.now()}`,
     name: args.suggestedName?.trim() || `Session ${nextNumber}`,
-    apiKeyPresent: args.apiKeyPresent ?? hasProviderCredentialForModel(model),
+    apiKeyPresent: args.apiKeyPresent ?? hasProviderCredentialForModel(model, credentialRuntime),
     model,
     workspaceId: args.workspaceId,
   });
 
   const currentSessions = readChatSessionCatalog(args.sessionStoragePath)
-    .map((entry) => readChatSession(args.sessionStoragePath, entry.id, hasProviderCredentialForModel(model)))
+    .map((entry) => readChatSession(args.sessionStoragePath, entry.id, hasProviderCredentialForModel(model, credentialRuntime)))
     .filter((candidate): candidate is ChatSession => Boolean(candidate));
   saveChatSessions(args.sessionStoragePath, [session, ...currentSessions]);
   return projectChatSessionDetail(session)[0] as ChatSessionDetail;
+}
+
+function resolveControlPlaneSessionCreationModel(args: {
+  model?: string;
+  preferApiKey?: boolean;
+  credentialStorePath?: string;
+}): string {
+  const activeModel = firstNonEmpty(args.model, process.env.OPENAI_MODEL, process.env.ANTHROPIC_MODEL) ?? DEFAULT_OPENAI_MODEL;
+  const provider = inferProviderFromModel(activeModel);
+  const credentialMode = credentialModeFromSource(resolveProviderCredentialSourceForModel(activeModel, {
+    preferApiKey: args.preferApiKey,
+    credentialStorePath: args.credentialStorePath,
+  }));
+
+  return resolveCompatibleActiveModel({
+    activeModel,
+    provider,
+    credentialMode,
+  }).model;
+}
+
+function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
+  return values.find((value) => typeof value === 'string' && value.trim().length > 0);
 }
 
 export function updateControlPlaneChatSessionSettings(args: {
