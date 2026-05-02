@@ -1,10 +1,11 @@
-import type { ChatSession, LocalCommandResult } from '../../../chat/types.js';
+import type { ChatSession } from '../../../chat/types.js';
 import type { LlmProvider } from '../../../llm/types.js';
 import type { ProviderCredentialSource } from '../../../runtime/api-keys.js';
 import type {
   HeartbeatTask,
   HeartbeatTaskRunRecordEntry,
 } from '../../../runtime/heartbeat-task-store.js';
+import type { SlashCommandResult } from '../result-types.js';
 
 export type SlashCommandExecutionContext = {
   model: {
@@ -42,4 +43,4 @@ export type SlashCommandExecutionContext = {
   };
 };
 
-export type CoreSlashCommandResult = LocalCommandResult;
+export type { SlashCommandResult };

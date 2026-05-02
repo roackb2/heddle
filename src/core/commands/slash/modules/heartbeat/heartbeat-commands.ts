@@ -1,13 +1,14 @@
 import { matchesExactSlashCommand, matchesSlashCommandPrefix } from '../../parser.js';
+import type { SlashCommandResult } from '../../result-types.js';
 import type { SlashCommandModule } from '../../types.js';
 import type {
   HeartbeatTask,
   HeartbeatTaskRunRecordEntry,
 } from '../../../../runtime/heartbeat-task-store.js';
-import type { CoreSlashCommandResult, SlashCommandExecutionContext } from '../context.js';
+import type { SlashCommandExecutionContext } from '../context.js';
 import { argumentAfterPrefix, slashMessageResult } from '../results.js';
 
-export function createHeartbeatSlashCommandModule(): SlashCommandModule<CoreSlashCommandResult, SlashCommandExecutionContext> {
+export function createHeartbeatSlashCommandModule(): SlashCommandModule<SlashCommandResult, SlashCommandExecutionContext> {
   return {
     id: 'heartbeat',
     hints: [
@@ -59,7 +60,7 @@ export function createHeartbeatSlashCommandModule(): SlashCommandModule<CoreSlas
 
 export async function listHeartbeatTasksMessage(
   context: Pick<SlashCommandExecutionContext, 'heartbeat'>,
-): Promise<CoreSlashCommandResult> {
+): Promise<SlashCommandResult> {
   const tasks = await context.heartbeat.listTasks();
   if (!tasks.length) {
     return slashMessageResult('No heartbeat tasks found.');
@@ -71,7 +72,7 @@ export async function listHeartbeatTasksMessage(
 export async function listHeartbeatRunsMessage(
   context: Pick<SlashCommandExecutionContext, 'heartbeat'>,
   taskId: string,
-): Promise<CoreSlashCommandResult> {
+): Promise<SlashCommandResult> {
   const trimmedTaskId = taskId.trim();
   const runs = await context.heartbeat.listRunRecords({
     taskId: trimmedTaskId || undefined,
@@ -157,7 +158,7 @@ function matchesRequiredHeartbeatArgument(prefix: string): (input: { raw: string
 async function showHeartbeatTask(
   context: Pick<SlashCommandExecutionContext, 'heartbeat'>,
   value: string,
-): Promise<CoreSlashCommandResult> {
+): Promise<SlashCommandResult> {
   const taskId = value.trim();
   const tasks = await context.heartbeat.listTasks();
   const task = tasks.find((candidate) => candidate.id === taskId);
@@ -167,7 +168,7 @@ async function showHeartbeatTask(
 async function showHeartbeatRun(
   context: Pick<SlashCommandExecutionContext, 'heartbeat'>,
   value: string,
-): Promise<CoreSlashCommandResult> {
+): Promise<SlashCommandResult> {
   const request = parseHeartbeatRunRequest(value);
   const run = await resolveHeartbeatRun(context, request);
   return run ? slashMessageResult(formatHeartbeatRun(run)) : slashMessageResult(`Heartbeat run not found for task ${request.taskId}: ${request.runRef}`);
@@ -176,7 +177,7 @@ async function showHeartbeatRun(
 async function continueHeartbeatRun(
   context: Pick<SlashCommandExecutionContext, 'heartbeat'>,
   value: string,
-): Promise<CoreSlashCommandResult> {
+): Promise<SlashCommandResult> {
   const request = parseHeartbeatRunRequest(value);
   const run = await resolveHeartbeatRun(context, request);
   if (!run) {

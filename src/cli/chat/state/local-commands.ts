@@ -1,8 +1,10 @@
-import type { ChatSession, LocalCommandResult } from './types.js';
+import type { ChatSession } from './types.js';
 import type { OpenAiOAuthCredential } from '../../../core/auth/openai-oauth.js';
 import type { ProviderCredentialSource } from '../utils/runtime.js';
+import { autocompleteSlashCommand, filterSlashCommandHints } from '../../../core/commands/slash/autocomplete.js';
 import { createSlashCommandRegistry } from '../../../core/commands/slash/registry.js';
 import { createCoreSlashCommandModules } from '../../../core/commands/slash/modules/core-command-modules.js';
+import type { SlashCommandResult } from '../../../core/commands/slash/result-types.js';
 import { createTuiSlashCommandContext } from '../adapters/slash-command-context.js';
 import { createTuiDebugSnapshotCommandModule } from '../commands/debug-snapshot-command.js';
 
@@ -97,6 +99,10 @@ export function getLocalCommandHints(
   sessions: ChatSession[],
 ): LocalCommandHint[] {
   const trimmed = draft.trim();
+  if (!isLikelyLocalCommand(trimmed)) {
+    return [];
+  }
+
   if (trimmed.startsWith('/session switch ')) {
     const sessionHints = sessions.map((session) => ({
       command: `/session switch ${session.id}`,
@@ -105,8 +111,7 @@ export function getLocalCommandHints(
     return sessionHints.filter((hint) => hint.command.startsWith(trimmed));
   }
 
-  const filtered = HELP_HINTS.filter((hint) => hint.command.startsWith(trimmed) || trimmed === '/');
-  return filtered.length > 0 ? filtered : HELP_HINTS;
+  return filterSlashCommandHints(trimmed, HELP_HINTS);
 }
 
 export function autocompleteLocalCommand(
@@ -114,38 +119,15 @@ export function autocompleteLocalCommand(
   activeSessionId: string,
   sessions: ChatSession[],
 ): string | undefined {
-  const leadingWhitespace = draft.match(/^\s*/)?.[0] ?? '';
   const trimmedStart = draft.trimStart();
   if (!isLikelyLocalCommand(trimmedStart)) {
     return undefined;
   }
 
-  const completionCandidates = Array.from(
-    new Set(
-      getLocalCommandHints(trimmedStart, activeSessionId, sessions)
-        .map((hint) => hintCommandToCompletionCandidate(hint.command))
-        .filter((candidate) => candidate.startsWith(trimmedStart)),
-    ),
-  );
-  if (completionCandidates.length === 0) {
-    return undefined;
-  }
-
-  const sharedPrefix = longestSharedPrefix(completionCandidates);
-  const expandedPrefix =
-    completionCandidates.some((candidate) => candidate.startsWith(`${sharedPrefix} `)) ? `${sharedPrefix} ` : sharedPrefix;
-  if (expandedPrefix.length > trimmedStart.length) {
-    return `${leadingWhitespace}${expandedPrefix}`;
-  }
-
-  if (completionCandidates.length === 1 && completionCandidates[0] !== trimmedStart) {
-    return `${leadingWhitespace}${completionCandidates[0]}`;
-  }
-
-  return undefined;
+  return autocompleteSlashCommand(draft, getLocalCommandHints(trimmedStart, activeSessionId, sessions));
 }
 
-export async function runLocalCommand(args: LocalCommandArgs): Promise<LocalCommandResult> {
+export async function runLocalCommand(args: LocalCommandArgs): Promise<SlashCommandResult> {
   const trimmed = args.prompt.trim();
   if (!isLikelyLocalCommand(trimmed)) {
     return { handled: false };
@@ -168,42 +150,13 @@ export async function runLocalCommand(args: LocalCommandArgs): Promise<LocalComm
   return messageResult(`Unknown command: ${trimmed}. Use /help for available commands.`);
 }
 
-function messageResult(message: string, sessionId?: string): LocalCommandResult {
+function messageResult(message: string, sessionId?: string): SlashCommandResult {
   return {
     handled: true,
     kind: 'message',
     message,
     sessionId,
   };
-}
-
-function hintCommandToCompletionCandidate(command: string): string {
-  const placeholderMatch = command.match(/\s(?:<[^>]+>|\[[^\]]+\])/);
-  if (!placeholderMatch || placeholderMatch.index === undefined) {
-    return command;
-  }
-
-  return `${command.slice(0, placeholderMatch.index)} `;
-}
-
-function longestSharedPrefix(values: string[]): string {
-  if (values.length === 0) {
-    return '';
-  }
-
-  let prefix = values[0] ?? '';
-  for (const value of values.slice(1)) {
-    let index = 0;
-    while (index < prefix.length && index < value.length && prefix[index] === value[index]) {
-      index += 1;
-    }
-    prefix = prefix.slice(0, index);
-    if (!prefix) {
-      break;
-    }
-  }
-
-  return prefix;
 }
 
 function capitalizeFirst(value: string): string {

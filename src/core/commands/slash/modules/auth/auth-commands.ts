@@ -1,12 +1,13 @@
 import { matchesAnyExactSlashCommand, matchesSlashCommandPrefix } from '../../parser.js';
+import type { SlashCommandResult } from '../../result-types.js';
 import type { SlashCommandModule } from '../../types.js';
-import type { CoreSlashCommandResult, SlashCommandExecutionContext } from '../context.js';
+import type { SlashCommandExecutionContext } from '../context.js';
 import { argumentAfterPrefix, formatCommandError, slashMessageResult } from '../results.js';
 import type { LlmProvider } from '../../../../llm/types.js';
 
 const AUTH_PROVIDERS = new Set<LlmProvider>(['openai', 'anthropic', 'google']);
 
-export function createAuthSlashCommandModule(): SlashCommandModule<CoreSlashCommandResult, SlashCommandExecutionContext> {
+export function createAuthSlashCommandModule(): SlashCommandModule<SlashCommandResult, SlashCommandExecutionContext> {
   return {
     id: 'auth',
     hints: [
@@ -45,7 +46,7 @@ export function createAuthSlashCommandModule(): SlashCommandModule<CoreSlashComm
 async function login(
   context: SlashCommandExecutionContext,
   value: string,
-): Promise<CoreSlashCommandResult> {
+): Promise<SlashCommandResult> {
   const provider = parseAuthProvider(value);
   if (!provider) {
     return slashMessageResult('Usage: /auth login <provider>');
@@ -61,7 +62,7 @@ async function login(
 function logout(
   context: SlashCommandExecutionContext,
   value: string,
-): CoreSlashCommandResult {
+): SlashCommandResult {
   const provider = parseAuthProvider(value);
   if (!provider) {
     return slashMessageResult('Usage: /auth logout <provider>');

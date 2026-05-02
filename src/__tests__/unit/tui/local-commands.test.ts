@@ -54,6 +54,13 @@ describe('runLocalCommand', () => {
     expect(isLikelyLocalCommand('/Users/roackb2/Desktop/screenshot.png')).toBe(false);
   });
 
+  it('does not expose slash hints or completions for absolute unix paths', () => {
+    const pathLikeDraft = '/Users/roackb2/Desktop/screenshot.png';
+
+    expect(getLocalCommandHints(pathLikeDraft, 'session-1', [])).toEqual([]);
+    expect(autocompleteLocalCommand(pathLikeDraft, 'session-1', [])).toBeUndefined();
+  });
+
   it('lists grouped common built-in model choices with multi-line formatting', async () => {
     const result = await runLocalCommand(createCommandArgs({ prompt: '/model list' }));
 

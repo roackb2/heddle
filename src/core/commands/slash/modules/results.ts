@@ -1,7 +1,7 @@
 import type { ParsedSlashCommand } from '../types.js';
-import type { CoreSlashCommandResult } from './context.js';
+import type { SlashCommandResult } from '../result-types.js';
 
-export function slashMessageResult(message: string, sessionId?: string): CoreSlashCommandResult {
+export function slashMessageResult(message: string, sessionId?: string): SlashCommandResult {
   return {
     handled: true,
     kind: 'message',

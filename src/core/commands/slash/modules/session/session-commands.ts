@@ -1,10 +1,11 @@
 import { matchesExactSlashCommand, matchesSlashCommandPrefix } from '../../parser.js';
+import type { SlashCommandResult } from '../../result-types.js';
 import type { SlashCommandModule } from '../../types.js';
 import type { ChatSession } from '../../../../chat/types.js';
-import type { CoreSlashCommandResult, SlashCommandExecutionContext } from '../context.js';
+import type { SlashCommandExecutionContext } from '../context.js';
 import { argumentAfterPrefix, slashMessageResult } from '../results.js';
 
-export function createSessionSlashCommandModule(): SlashCommandModule<CoreSlashCommandResult, SlashCommandExecutionContext> {
+export function createSessionSlashCommandModule(): SlashCommandModule<SlashCommandResult, SlashCommandExecutionContext> {
   return {
     id: 'session',
     hints: [
@@ -116,7 +117,7 @@ export function resolveSessionReference(args: {
 function createSession(
   context: SlashCommandExecutionContext,
   name: string,
-): CoreSlashCommandResult {
+): SlashCommandResult {
   const session = context.session.create(name || undefined);
   return slashMessageResult(`Created and switched to ${session.id} (${session.name}).`, session.id);
 }
@@ -124,7 +125,7 @@ function createSession(
 function switchSession(
   context: SlashCommandExecutionContext,
   value: string,
-): CoreSlashCommandResult {
+): SlashCommandResult {
   const session = findSession(context, value);
   if (!session) {
     return slashMessageResult(`Unknown session: ${value}. Use /session list to inspect available sessions.`);
@@ -137,7 +138,7 @@ function switchSession(
 function continueSession(
   context: SlashCommandExecutionContext,
   value: string,
-): CoreSlashCommandResult {
+): SlashCommandResult {
   const session = findSession(context, value);
   if (!session) {
     return slashMessageResult(`Unknown session: ${value}.\nUse /session list to inspect available sessions.`);
@@ -154,7 +155,7 @@ function continueSession(
 function renameSession(
   context: SlashCommandExecutionContext,
   name: string,
-): CoreSlashCommandResult {
+): SlashCommandResult {
   if (!name) {
     return slashMessageResult('Usage: /session rename <name>');
   }
@@ -166,7 +167,7 @@ function renameSession(
 function closeSession(
   context: SlashCommandExecutionContext,
   value: string,
-): CoreSlashCommandResult {
+): SlashCommandResult {
   const session = findSession(context, value);
   if (!session) {
     return slashMessageResult(`Unknown session: ${value}.\nUse /session list to inspect available sessions.`);
