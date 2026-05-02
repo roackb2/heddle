@@ -1,4 +1,4 @@
-import type { LocalCommandResult } from '../../../chat/types.js';
+import type { ChatSession, LocalCommandResult } from '../../../chat/types.js';
 import type { LlmProvider } from '../../../llm/types.js';
 import type { ProviderCredentialSource } from '../../../runtime/api-keys.js';
 
@@ -19,6 +19,17 @@ export type SlashCommandExecutionContext = {
   drift: {
     status: () => { enabled: boolean; error?: string };
     setEnabled: (enabled: boolean) => void;
+  };
+  session: {
+    all: () => ChatSession[];
+    recent: () => ChatSession[];
+    recentListMessage: () => string[];
+    create: (name?: string) => ChatSession;
+    switch: (id: string) => void;
+    rename: (name: string) => void;
+    remove: (id: string) => void;
+    clear: () => void;
+    summarize: (session: ChatSession) => string;
   };
 };
 
