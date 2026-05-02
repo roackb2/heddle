@@ -1,4 +1,8 @@
 import type { ChatMessage, TraceEvent, ToolResult } from '../../../index.js';
+import {
+  projectTraceEventToConversationActivities,
+  type ConversationActivity,
+} from '../../../core/observability/conversation-activity.js';
 import type { EditFilePreview } from '../../../core/tools/edit-file.js';
 import {
   classifyShellCommandPolicy,
@@ -31,77 +35,53 @@ const MAX_TOOL_CALL_SUMMARY_CHARS = 96;
 
 
 export function toLiveEvent(event: TraceEvent): string | undefined {
-  switch (event.type) {
-    case 'run.started':
-      return 'thinking';
-    case 'assistant.turn':
-      if (event.diagnostics?.rationale) {
-        return `reasoning: ${truncate(event.diagnostics.rationale, 140)}`;
-      }
-      if (event.requestedTools) {
-        return undefined;
-      }
-      return 'answer ready';
-    case 'tool.approval_requested':
-      return `approval needed for ${summarizeToolCall(event.call.tool, event.call.input)}`;
-    case 'tool.approval_resolved':
-      return `approval ${event.approved ? 'granted' : 'denied'} for ${summarizeToolCall(event.call.tool, event.call.input)}${event.reason ? ` (${truncate(event.reason, 80)})` : ''}`;
-    case 'tool.fallback':
-      return `retrying with ${summarizeToolCall(event.toCall.tool, event.toCall.input)} after ${summarizeToolCall(event.fromCall.tool, event.fromCall.input)} was blocked (${truncate(event.reason, 80)})`;
-    case 'tool.call':
-      return `running ${summarizeToolCall(event.call.tool, event.call.input)}`;
-    case 'tool.result':
-      return `${summarizeToolResult(event.tool, extractShellCommand(event.result.output), event.result.output)} ${event.result.ok ? 'completed' : `failed: ${event.result.error ?? 'error'}`}`;
-    case 'memory.candidate_recorded':
-      return `memory candidate recorded: ${event.candidateId}`;
-    case 'memory.maintenance_started':
-      return `memory maintenance started for ${event.candidateIds.length} candidate${event.candidateIds.length === 1 ? '' : 's'}`;
-    case 'memory.maintenance_finished':
-      return `memory maintenance ${event.outcome}`;
-    case 'memory.maintenance_failed':
-      return `memory maintenance failed: ${truncate(event.error, 80)}`;
-    case 'cyberloop.annotation':
-      return event.driftLevel === 'unknown' ? undefined : `cyberloop drift=${event.driftLevel}${formatCyberLoopMetrics(event.metadata)}`;
-    case 'run.finished':
-      return event.outcome === 'done' ? undefined : `stopped: ${event.outcome}`;
-    default:
-      return undefined;
-  }
+  return projectTraceEventToConversationActivities(event)
+    .map(formatConversationActivityForTui)
+    .find((text): text is string => Boolean(text));
 }
 
-function formatCyberLoopMetrics(metadata: Record<string, unknown>): string {
-  const kinematics = metadata.kinematics;
-  if (!kinematics || typeof kinematics !== 'object' || Array.isArray(kinematics)) {
-    return '';
-  }
+const tuiActivityFormatters: Partial<Record<ConversationActivity['type'], (activity: ConversationActivity) => string | undefined>> = {
+  'run.started': () => 'thinking',
+  'assistant.turn': (activity) => {
+    const assistantActivity = activity as Extract<ConversationActivity, { type: 'assistant.turn' }>;
+    if (assistantActivity.rationale) {
+      return `reasoning: ${truncate(assistantActivity.rationale, 140)}`;
+    }
+    return assistantActivity.requestedTools ? undefined : 'answer ready';
+  },
+  'tool.approval_requested': (activity) => `approval needed for ${(activity as Extract<ConversationActivity, { type: 'tool.approval_requested' }>).toolSummary}`,
+  'tool.approval_resolved': (activity) => {
+    const approvalActivity = activity as Extract<ConversationActivity, { type: 'tool.approval_resolved' }>;
+    return `approval ${approvalActivity.approved ? 'granted' : 'denied'} for ${approvalActivity.toolSummary}${approvalActivity.reason ? ` (${truncate(approvalActivity.reason, 80)})` : ''}`;
+  },
+  'tool.fallback': (activity) => {
+    const fallbackActivity = activity as Extract<ConversationActivity, { type: 'tool.fallback' }>;
+    return `retrying with ${fallbackActivity.toSummary} after ${fallbackActivity.fromSummary} was blocked (${truncate(fallbackActivity.reason, 80)})`;
+  },
+  'tool.call': (activity) => `running ${(activity as Extract<ConversationActivity, { type: 'tool.call' }>).toolSummary}`,
+  'tool.result': (activity) => {
+    const toolActivity = activity as Extract<ConversationActivity, { type: 'tool.result' }>;
+    return `${toolActivity.toolSummary} ${toolActivity.ok ? 'completed' : `failed: ${toolActivity.error ?? 'error'}`}`;
+  },
+  'memory.candidate_recorded': (activity) => `memory candidate recorded: ${(activity as Extract<ConversationActivity, { type: 'memory.candidate_recorded' }>).candidateId}`,
+  'memory.maintenance_started': (activity) => {
+    const memoryActivity = activity as Extract<ConversationActivity, { type: 'memory.maintenance_started' }>;
+    return `memory maintenance started for ${memoryActivity.candidateCount} candidate${memoryActivity.candidateCount === 1 ? '' : 's'}`;
+  },
+  'memory.maintenance_finished': (activity) => `memory maintenance ${(activity as Extract<ConversationActivity, { type: 'memory.maintenance_finished' }>).outcome}`,
+  'memory.maintenance_failed': (activity) => `memory maintenance failed: ${truncate((activity as Extract<ConversationActivity, { type: 'memory.maintenance_failed' }>).error ?? 'error', 80)}`,
+  'cyberloop.annotation': (activity) => {
+    const cyberloopActivity = activity as Extract<ConversationActivity, { type: 'cyberloop.annotation' }>;
+    return `cyberloop drift=${cyberloopActivity.driftLevel}${cyberloopActivity.metrics}`;
+  },
+  'run.finished': (activity) => {
+    const runActivity = activity as Extract<ConversationActivity, { type: 'run.finished' }>;
+    return runActivity.outcome === 'done' ? undefined : `stopped: ${runActivity.outcome}`;
+  },
+};
 
-  const snapshot = kinematics as {
-    errorMagnitude?: unknown;
-    correctionMagnitude?: unknown;
-    isStable?: unknown;
-  };
-  const parts: string[] = [];
-  if (typeof snapshot.errorMagnitude === 'number') {
-    parts.push(`err=${formatMetric(snapshot.errorMagnitude)}`);
-  }
-  if (typeof snapshot.correctionMagnitude === 'number') {
-    parts.push(`corr=${formatMetric(snapshot.correctionMagnitude)}`);
-  }
-  if (typeof snapshot.isStable === 'boolean') {
-    parts.push(`stable=${snapshot.isStable}`);
-  }
-
-  return parts.length ? ` (${parts.join(' ')})` : '';
-}
-
-function formatMetric(value: number): string {
-  if (!Number.isFinite(value)) {
-    return String(value);
-  }
-  if (Math.abs(value) < 0.001 && value !== 0) {
-    return value.toExponential(2);
-  }
-  return value.toFixed(3);
+export function formatConversationActivityForTui(activity: ConversationActivity): string | undefined {
+  return tuiActivityFormatters[activity.type]?.(activity);
 }
 
 export function currentActivityText(

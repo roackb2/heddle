@@ -28,8 +28,9 @@ Observability behavior currently exists in these places:
 - `src/core/chat/trace.ts` for persisted chat trace files.
 - `src/core/observability/trace-summarizers.ts` for turn summary evidence.
 - `src/core/observability/semantic-conventions.ts` for shared trace names.
-- `src/cli/chat/hooks/tui-run-loop-events.ts`.
-- `src/web/features/control-plane/hooks/sessions-screen/useSessionDetailSubscription.ts`.
+- `src/core/observability/conversation-activity.ts` for shared host activity projection.
+- `src/cli/chat/hooks/tui-run-loop-events.ts` for TUI activity rendering.
+- `src/web/features/control-plane/hooks/sessions-screen/useSessionDetailSubscription.ts` for web activity rendering.
 - `src/server/features/control-plane/services/chat-session-events.ts`.
 
 Future milestones should centralize shared summarization and projection here
@@ -39,9 +40,6 @@ while preserving compatibility wrappers for existing imports.
 
 - `semantic-conventions.ts`: event naming and correlation conventions.
 - `trace-summarizers.ts`: registry for trace event summaries.
-
-## Planned Public Entry Points
-
 - `conversation-activity.ts`: shared host-agnostic activity projection.
 
 ## Extension Points
