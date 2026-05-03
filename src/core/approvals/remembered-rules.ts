@@ -6,7 +6,7 @@ import {
   DEFAULT_MUTATE_RULES,
   type RunShellCapability,
   type RunShellScope,
-} from '../tools/toolkits/internal/run-shell.js';
+} from '../tools/toolkits/shell-process/run-shell.js';
 
 type ApprovalMode = 'exact' | 'prefix' | 'tool';
 

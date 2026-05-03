@@ -225,9 +225,9 @@ export { createRecordKnowledgeTool, recordKnowledgeTool } from './core/tools/too
 export type { RecordKnowledgeToolOptions } from './core/tools/toolkits/knowledge/record-knowledge.js';
 export { updatePlanTool } from './core/tools/toolkits/internal/update-plan.js';
 export type { PlanItem, PlanItemStatus } from './core/tools/toolkits/internal/update-plan.js';
-export { createRunShellInspectTool, createRunShellMutateTool } from './core/tools/toolkits/internal/run-shell.js';
-export { createRunShellTool } from './core/tools/toolkits/internal/run-shell.js';
-export type { RunShellOptions } from './core/tools/toolkits/internal/run-shell.js';
+export { createRunShellInspectTool, createRunShellMutateTool } from './core/tools/toolkits/shell-process/run-shell.js';
+export { createRunShellTool } from './core/tools/toolkits/shell-process/run-shell.js';
+export type { RunShellOptions } from './core/tools/toolkits/shell-process/run-shell.js';
 
 // Approvals
 export {

@@ -14,7 +14,7 @@ import {
   createRunShellInspectTool,
   createRunShellMutateTool,
   DEFAULT_MUTATE_RULES,
-} from '../../../core/tools/toolkits/internal/run-shell.js';
+} from '../../../core/tools/toolkits/shell-process/run-shell.js';
 import { createSearchFilesTool, searchFilesTool } from '../../../core/tools/toolkits/coding-files/search-files.js';
 import { createWebSearchTool, webSearchTool } from '../../../core/tools/toolkits/external-context/web-search.js';
 import { createViewImageTool, viewImageTool } from '../../../core/tools/toolkits/external-context/view-image.js';

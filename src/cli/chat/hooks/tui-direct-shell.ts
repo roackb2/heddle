@@ -2,7 +2,7 @@ import { acquireSessionLease, getSessionLeaseConflict, releaseSessionLease } fro
 import { rememberedApprovalPolicy } from '../../../core/approvals/default-policies.js';
 import { resolveToolApproval } from '../../../core/approvals/policy-chain.js';
 import { summarizeToolCall } from '../../../core/observability/conversation-activity.js';
-import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../core/tools/toolkits/internal/run-shell.js';
+import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../core/tools/toolkits/shell-process/run-shell.js';
 import type { ToolCall, ToolResult } from '../../../index.js';
 import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../state/approval-rules.js';
 import { readChatSession, touchSession } from '../state/storage.js';
