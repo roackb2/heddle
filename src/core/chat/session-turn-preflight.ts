@@ -1,8 +1,8 @@
 import type { ChatMessage } from '../llm/types.js';
 import { buildConversationMessages } from './conversation-lines.js';
-import { compactChatHistoryWithArchive } from './compaction.js';
+import { buildCompactionRunningContext, compactChatHistoryWithArchive } from './compaction.js';
 import { acquireSessionLease, getSessionLeaseConflict, type ChatSessionLeaseOwner } from './session-lease.js';
-import { readChatSession, touchSession } from './storage.js';
+import { readChatSession, saveChatSessions, touchSession } from './storage.js';
 import type { ChatArchiveRecord, ChatContextStats, ChatSession } from './types.js';
 
 export type ChatTurnPreflightCompactionStatus = {
@@ -80,4 +80,27 @@ export async function prepareChatSessionTurn(args: PrepareChatSessionTurnArgs): 
     context: preflightCompacted.context,
     archives: preflightCompacted.archives,
   };
+}
+
+export function persistPreflightCompactionRunningSeed(args: {
+  sessionStoragePath: string;
+  sessions: ChatSession[];
+  sessionId: string;
+  leasedSession: ChatSession;
+  archivePath?: string;
+}) {
+  const compactionSeed = touchSession({
+    ...args.leasedSession,
+    context: buildCompactionRunningContext({
+      history: args.leasedSession.history,
+      previous: args.leasedSession.context,
+      archiveCount: args.leasedSession.archives?.length,
+      currentSummaryPath: args.leasedSession.context?.currentSummaryPath,
+      lastArchivePath: args.archivePath,
+    }),
+  });
+  saveChatSessions(
+    args.sessionStoragePath,
+    args.sessions.map((candidate) => candidate.id === args.sessionId ? compactionSeed : candidate),
+  );
 }

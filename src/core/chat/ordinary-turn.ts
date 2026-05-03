@@ -1,19 +1,15 @@
-import { runAgentLoop } from '../../index.js';
 import type { RunAgentLoopOptions } from '../runtime/agent-loop.js';
-import type { ToolCall, ToolDefinition } from '../types.js';
 import type { ToolApprovalPolicy } from '../approvals/types.js';
 import type { TraceSummarizerRegistry } from '../observability/trace-summarizers.js';
-import { buildCompactionRunningContext } from './compaction.js';
 import { buildConversationMessages } from './conversation-lines.js';
 import { releaseSessionLease, type ChatSessionLeaseOwner } from './session-lease.js';
-import { prepareChatSessionTurn } from './session-turn-preflight.js';
+import { persistPreflightCompactionRunningSeed, prepareChatSessionTurn } from './session-turn-preflight.js';
 import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
 import type { ChatTurnHostPort } from './turn-host.js';
+import { prepareOrdinaryChatTurnContext } from './turn-context.js';
+import { runOrdinaryChatTurnLoop } from './turn-execution.js';
 import { runInlineTurnMemoryMaintenance, scheduleBackgroundTurnMemoryMaintenance } from './turn-memory-maintenance.js';
 import { persistCompletedChatTurn } from './turn-persistence.js';
-import { loadChatTurnSession } from './turn-session.js';
-import { resolveChatTurnRuntime } from './turn-runtime.js';
-import { createChatTurnTools, listChatTurnToolNames } from './turn-tools.js';
 
 export type ExecuteOrdinaryChatTurnArgs = {
   workspaceRoot: string;
@@ -38,33 +34,18 @@ export type ExecuteOrdinaryChatTurnArgs = {
 };
 
 export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs) {
-  const { sessions, session } = loadChatTurnSession({
+  const context = prepareOrdinaryChatTurnContext({
+    workspaceRoot: args.workspaceRoot,
+    stateRoot: args.stateRoot,
     sessionStoragePath: args.sessionStoragePath,
     sessionId: args.sessionId,
-  });
-  const runtime = resolveChatTurnRuntime({
-    stateRoot: args.stateRoot,
-    sessionModel: session.model,
     apiKey: args.apiKey,
     preferApiKey: args.preferApiKey,
     credentialStorePath: args.credentialStorePath,
     systemContext: args.systemContext,
+    leaseOwner: args.leaseOwner,
   });
-  const tools = createChatTurnTools({
-    model: runtime.model,
-    apiKey: runtime.apiKey,
-    providerCredentialSource: runtime.providerCredentialSource,
-    credentialStorePath: args.credentialStorePath,
-    workspaceRoot: args.workspaceRoot,
-    memoryDir: runtime.memoryDir,
-  });
-  const toolNames = listChatTurnToolNames(tools);
-
-  const leaseOwner = args.leaseOwner ?? {
-    ownerKind: 'ask' as const,
-    ownerId: `submit-${process.pid}`,
-    clientLabel: 'another Heddle client',
-  };
+  const { sessions, session, runtime, tools, toolNames, leaseOwner } = context;
 
   try {
     const preflight = await prepareChatSessionTurn({
@@ -82,20 +63,13 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
         args.onCompactionStatus?.(event);
         args.host?.compaction?.onPreflightCompactionStatus?.(event);
         if (event.status === 'running' && leasedSession) {
-          const compactionSeed = touchSession({
-            ...leasedSession,
-            context: buildCompactionRunningContext({
-              history: leasedSession.history,
-              previous: leasedSession.context,
-              archiveCount: leasedSession.archives?.length,
-              currentSummaryPath: leasedSession.context?.currentSummaryPath,
-              lastArchivePath: event.archivePath,
-            }),
+          persistPreflightCompactionRunningSeed({
+            sessionStoragePath: args.sessionStoragePath,
+            sessions,
+            sessionId: session.id,
+            leasedSession,
+            archivePath: event.archivePath,
           });
-          saveChatSessions(
-            args.sessionStoragePath,
-            sessions.map((candidate) => candidate.id === session.id ? compactionSeed : candidate),
-          );
         }
       },
     });
@@ -114,25 +88,17 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       sessions.map((candidate) => candidate.id === session.id ? preflightSession : candidate),
     );
 
-    const result = await runAgentLoop({
-      goal: args.prompt,
-      model: runtime.model,
-      apiKey: runtime.apiKey,
+    const result = await runOrdinaryChatTurnLoop({
+      prompt: args.prompt,
       workspaceRoot: args.workspaceRoot,
-      stateDir: args.stateRoot,
-      memoryDir: runtime.memoryDir,
-      llm: runtime.llm,
+      stateRoot: args.stateRoot,
+      runtime,
       tools,
-      includeDefaultTools: false,
-      history: preflightSession.history,
-      systemContext: runtime.systemContext,
+      session: preflightSession,
+      host: args.host,
+      approvalPolicies: args.approvalPolicies,
       onAssistantStream: args.onAssistantStream,
       onTraceEvent: args.onTraceEvent,
-      onEvent: args.host?.events?.onAgentLoopEvent,
-      approvalPolicies: args.approvalPolicies,
-      approveToolCall: args.host?.approvals?.requestToolApproval ?
-        ((call: ToolCall, tool: ToolDefinition) => args.host?.approvals?.requestToolApproval?.({ call, tool }) ?? Promise.resolve({ approved: false, reason: 'Missing approval port.' }))
-      : undefined,
       shouldStop: args.shouldStop,
       abortSignal: args.abortSignal,
     });
