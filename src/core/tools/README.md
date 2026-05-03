@@ -7,66 +7,103 @@ workspace.
 ## Owns
 
 - `ToolDefinition` implementations for current built-in tools.
-- Tool registry creation and duplicate-name protection.
+- Toolkit composition and guardrails for duplicate toolkit ids and duplicate
+  tool names.
+- Tool registry creation and duplicate-name protection at execution time.
 - Tool execution wrapper and timeout behavior.
-- Workspace file tools.
+- Coding file tools under `toolkits/coding-files/`.
+- Knowledge and memory-surface tools under `toolkits/knowledge/`.
+- External context tools under `toolkits/external-context/`.
+- Internal workflow/state tools under `toolkits/internal/`.
 - Shell inspect/mutate tools and their current command policy rules.
-- Memory note and memory checkpoint tools.
-- Web search and image inspection tools.
-- Planning tool support through `update_plan`.
 
 ## Does Not Own
 
 - Model/tool step orchestration. That lives in `src/core/agent`.
-- Default runtime bundle policy. That currently lives in `src/core/runtime`.
-- Human approval policy and remembered approvals. Those should live in
+- Default runtime bundle policy. That lives in `src/core/runtime`.
+- Human approval policy and remembered approvals. Those live in
   `src/core/approvals`.
 - Host UI for tool calls or results.
-- Memory maintenance domain rules beyond tool interfaces.
+- Memory maintenance domain rules beyond the knowledge-tool interfaces.
+
+## Current Structure
+
+- `toolkit.ts`: shared toolkit types plus composition guardrails.
+- `toolkits/coding-files/`: file/search/edit tool implementations plus shared
+  edit-core behavior.
+- `toolkits/knowledge/`: memory notes, memory checkpoint, and durable knowledge
+  recording tools plus the knowledge toolkit composition and memory-mode policy.
+- `toolkits/external-context/`: provider-backed web search and image inspection
+  tools plus their toolkit composition.
+- `toolkits/internal/`: internal structured workflow tools such as
+  `update_plan`, plus the current M12 runtime-owned shell/process grouping used
+  to preserve default bundle behavior.
+- `toolkits/internal/run-shell.ts`: current shell/process tool implementation
+  and shell policy location.
+- `toolkits/*/toolkit.ts`: production toolkit composition entry points used by
+  runtime default-tool assembly.
+- Shell/process is temporarily housed under `toolkits/internal/` for M12
+  compatibility. M13 is the planned milestone for clearer shell/process policy
+  extraction.
 
 ## Public Entry Points
 
 - `registry.ts`: create a tool registry.
 - `execute-tool.ts`: execute one tool call against a registry.
-- `run-shell.ts`: shell inspect/mutate tools and command classification.
-- `read-file.ts`, `list-files.ts`, `search-files.ts`, `edit-file.ts`,
-  `delete-file.ts`, `move-file.ts`: workspace file tools.
-- `memory-notes.ts`, `record-knowledge.ts`, `memory-checkpoint.ts`: memory tools.
-- `web-search.ts`, `view-image.ts`: external/rich context tools.
-- `update-plan.ts`: structured plan tool.
+- `toolkit.ts`: toolkit composition API used by runtime default-tool assembly.
+- `toolkits/coding-files/*`: coding file tools.
+- `toolkits/knowledge/*`: knowledge and memory-surface tools.
+- `toolkits/external-context/*`: web and image tools.
+- `toolkits/internal/*`: internal workflow/state tools, including the current
+  M12 shell/process implementation at `toolkits/internal/run-shell.ts`.
 
 ## Extension Points
 
 - Add new tools as small `createXTool(options)` factories returning
   `ToolDefinition`.
-- Keep tool input validation close to the tool.
-- Group tools into toolkits when the tool-domain refactor starts; preserve
-  `createDefaultAgentTools` behavior while doing so.
+- Group related production tools under a toolkit-owned folder when the grouping
+  clarifies ownership, shared policy, or composition invariants.
+- Keep tool input validation close to the tool implementation.
+- Add toolkit composition only when the toolkit owns a meaningful capability
+  family, policy, or composition responsibility.
 - Attach approval policy through approval/toolkit registration rather than
   embedding host approval UI in tool implementations.
 
 ## Common Changes
 
-- To add a workspace tool, add a tool factory, unit/integration tests, and wire
-  it through the default tool bundle only when it is part of Heddle's standard
-  situation-awareness surface.
-- To change shell command policy, update classification tests and approval-rule
-  compatibility tests.
+- To add a coding workspace tool, place it under `toolkits/coding-files/` when
+  it belongs to the file/search/edit surface.
+- To add a knowledge or memory-surface tool, place it under
+  `toolkits/knowledge/` and keep memory-mode behavior centralized in the
+  knowledge toolkit.
+- To add a provider-backed context tool, place it under
+  `toolkits/external-context/`.
+- To add an internal structured workflow tool, place it under
+  `toolkits/internal/`.
+- To change shell/process tool behavior or shell classification policy, update
+  `toolkits/internal/run-shell.ts` for the current M12 structure, plus the
+  classification and approval-rule compatibility tests. M13 is the planned
+  milestone for extracting shell/process policy further.
 - To change a tool output shape, update trace/review projection tests if hosts
   depend on that output.
 
 ## Tests
 
 - `src/__tests__/integration/tools/tools.test.ts`
+- `src/__tests__/integration/core/agent-loop.test.ts`
+- `src/__tests__/integration/memory/memory-integration.test.ts`
 - `src/__tests__/unit/tools/run-shell.command.test.ts`
-- `src/__tests__/unit/tools/core-utils.test.ts`
-- `src/__tests__/integration/core/run-agent.test.ts`
+- toolkit/default-tool guardrail tests near runtime or tools integration suites
 
 ## Notes For Coding Agents
 
+- Production ownership should be obvious from the folder structure.
+- Do not keep duplicate old/new implementation locations for the same tool
+  family.
+- Toolkits should own real composition, grouping, or policy, not ceremonial
+  forwarding.
 - Tools should be deterministic wrappers over capability, not orchestration
   hubs.
 - Do not add UI text or React/Ink/server imports here.
 - Prefer pure helper maps and table-driven policy definitions over long
   branching logic.
-

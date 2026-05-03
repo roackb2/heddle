@@ -1,8 +1,8 @@
 import { access, readdir, readFile, stat } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
-import type { ToolDefinition, ToolResult } from '../types.js';
-import { executeScopedEdit } from './file-edit-core.js';
+import type { ToolDefinition, ToolResult } from '../../../types.js';
+import { executeScopedEdit } from '../coding-files/file-edit-core.js';
 
 export type MemoryNotesToolOptions = {
   memoryRoot?: string;

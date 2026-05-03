@@ -44,7 +44,7 @@ export function ApprovalComposer({
           paddingX={1}
         >
           <Text bold>Diff Preview</Text>
-          {pendingApproval.editPreview.diff.split('\n').map((line, index) => (
+          {pendingApproval.editPreview.diff.split('\n').map((line: string, index: number) => (
             <Text key={`${pendingApproval.editPreview?.path}-${index}`} color={diffLineColor(line)}>
               {line}
             </Text>

@@ -195,19 +195,19 @@ export type { BuiltInModelGroup } from './core/llm/openai-models.js';
 export { createToolRegistry } from './core/tools/registry.js';
 export type { ToolRegistry } from './core/tools/registry.js';
 export { executeTool } from './core/tools/execute-tool.js';
-export { listFilesTool } from './core/tools/list-files.js';
-export { readFileTool } from './core/tools/read-file.js';
-export { editFileTool } from './core/tools/edit-file.js';
-export { deleteFileTool, createDeleteFileTool } from './core/tools/delete-file.js';
-export type { DeleteFileToolOptions } from './core/tools/delete-file.js';
-export { moveFileTool, createMoveFileTool } from './core/tools/move-file.js';
-export type { MoveFileToolOptions } from './core/tools/move-file.js';
-export { searchFilesTool, createSearchFilesTool, DEFAULT_SEARCH_EXCLUDED_DIRS } from './core/tools/search-files.js';
-export type { SearchFilesOptions } from './core/tools/search-files.js';
-export { webSearchTool, createWebSearchTool } from './core/tools/web-search.js';
-export type { WebSearchToolOptions } from './core/tools/web-search.js';
-export { viewImageTool, createViewImageTool } from './core/tools/view-image.js';
-export type { ViewImageToolOptions } from './core/tools/view-image.js';
+export { listFilesTool } from './core/tools/toolkits/coding-files/list-files.js';
+export { readFileTool } from './core/tools/toolkits/coding-files/read-file.js';
+export { editFileTool } from './core/tools/toolkits/coding-files/edit-file.js';
+export { deleteFileTool, createDeleteFileTool } from './core/tools/toolkits/coding-files/delete-file.js';
+export type { DeleteFileToolOptions } from './core/tools/toolkits/coding-files/delete-file.js';
+export { moveFileTool, createMoveFileTool } from './core/tools/toolkits/coding-files/move-file.js';
+export type { MoveFileToolOptions } from './core/tools/toolkits/coding-files/move-file.js';
+export { searchFilesTool, createSearchFilesTool, DEFAULT_SEARCH_EXCLUDED_DIRS } from './core/tools/toolkits/coding-files/search-files.js';
+export type { SearchFilesOptions } from './core/tools/toolkits/coding-files/search-files.js';
+export { webSearchTool, createWebSearchTool } from './core/tools/toolkits/external-context/web-search.js';
+export type { WebSearchToolOptions } from './core/tools/toolkits/external-context/web-search.js';
+export { viewImageTool, createViewImageTool } from './core/tools/toolkits/external-context/view-image.js';
+export type { ViewImageToolOptions } from './core/tools/toolkits/external-context/view-image.js';
 export {
   listMemoryNotesTool,
   readMemoryNoteTool,
@@ -217,17 +217,17 @@ export {
   createReadMemoryNoteTool,
   createSearchMemoryNotesTool,
   createEditMemoryNoteTool,
-} from './core/tools/memory-notes.js';
-export type { MemoryNotesToolOptions } from './core/tools/memory-notes.js';
-export { createMemoryCheckpointTool } from './core/tools/memory-checkpoint.js';
-export type { MemoryCheckpointToolOptions } from './core/tools/memory-checkpoint.js';
-export { createRecordKnowledgeTool, recordKnowledgeTool } from './core/tools/record-knowledge.js';
-export type { RecordKnowledgeToolOptions } from './core/tools/record-knowledge.js';
-export { updatePlanTool } from './core/tools/update-plan.js';
-export type { PlanItem, PlanItemStatus } from './core/tools/update-plan.js';
-export { createRunShellInspectTool, createRunShellMutateTool } from './core/tools/run-shell.js';
-export { createRunShellTool } from './core/tools/run-shell.js';
-export type { RunShellOptions } from './core/tools/run-shell.js';
+} from './core/tools/toolkits/knowledge/memory-notes.js';
+export type { MemoryNotesToolOptions } from './core/tools/toolkits/knowledge/memory-notes.js';
+export { createMemoryCheckpointTool } from './core/tools/toolkits/knowledge/memory-checkpoint.js';
+export type { MemoryCheckpointToolOptions } from './core/tools/toolkits/knowledge/memory-checkpoint.js';
+export { createRecordKnowledgeTool, recordKnowledgeTool } from './core/tools/toolkits/knowledge/record-knowledge.js';
+export type { RecordKnowledgeToolOptions } from './core/tools/toolkits/knowledge/record-knowledge.js';
+export { updatePlanTool } from './core/tools/toolkits/internal/update-plan.js';
+export type { PlanItem, PlanItemStatus } from './core/tools/toolkits/internal/update-plan.js';
+export { createRunShellInspectTool, createRunShellMutateTool } from './core/tools/toolkits/internal/run-shell.js';
+export { createRunShellTool } from './core/tools/toolkits/internal/run-shell.js';
+export type { RunShellOptions } from './core/tools/toolkits/internal/run-shell.js';
 
 // Approvals
 export {

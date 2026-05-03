@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { runShellCommand, DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES } from '../../../core/tools/run-shell.js';
+import { runShellCommand, DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES } from '../../../core/tools/toolkits/internal/run-shell.js';
 
 const spawnMock = vi.fn();
 

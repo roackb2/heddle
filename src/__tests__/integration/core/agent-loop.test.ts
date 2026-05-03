@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { runAgentLoop } from '../../../core/runtime/agent-loop.js';
 import { createAgentLoopCheckpoint, getHistoryFromAgentLoopCheckpoint, getHistoryFromAgentLoopState } from '../../../core/runtime/events.js';
 import { createDefaultAgentTools } from '../../../core/runtime/default-tools.js';
+import { createToolkitToolBundle, type ToolToolkit } from '../../../core/tools/toolkit.js';
 import type { ChatMessage, LlmAdapter, LlmResponse } from '../../../core/llm/types.js';
 import type { AgentLoopEvent, ToolDefinition } from '../../../index.js';
 import { createLogger } from '../../../core/utils/logger.js';
@@ -246,7 +247,7 @@ describe('runAgentLoop', () => {
 });
 
 describe('createDefaultAgentTools', () => {
-  it('creates the default runtime tool bundle and can omit planning for single-turn hosts', () => {
+  it('creates the default runtime tool bundle with stable ordering and can omit planning for single-turn hosts', () => {
     const withPlan = createDefaultAgentTools({
       model: 'gpt-test',
       memoryDir: '/tmp/heddle-memory',
@@ -258,12 +259,31 @@ describe('createDefaultAgentTools', () => {
       includePlanTool: false,
     });
 
-    expect(withPlan.map((tool) => tool.name)).toContain('update_plan');
-    expect(withoutPlan.map((tool) => tool.name)).not.toContain('update_plan');
-    expect(withoutPlan.map((tool) => tool.name)).toEqual(expect.arrayContaining([
+    expect(withPlan.map((tool) => tool.name)).toEqual([
       'list_files',
       'read_file',
       'edit_file',
+      'delete_file',
+      'move_file',
+      'search_files',
+      'web_search',
+      'view_image',
+      'list_memory_notes',
+      'read_memory_note',
+      'search_memory_notes',
+      'memory_checkpoint',
+      'record_knowledge',
+      'update_plan',
+      'run_shell_inspect',
+      'run_shell_mutate',
+    ]);
+    expect(withoutPlan.map((tool) => tool.name)).toEqual([
+      'list_files',
+      'read_file',
+      'edit_file',
+      'delete_file',
+      'move_file',
+      'search_files',
       'web_search',
       'view_image',
       'list_memory_notes',
@@ -273,7 +293,7 @@ describe('createDefaultAgentTools', () => {
       'record_knowledge',
       'run_shell_inspect',
       'run_shell_mutate',
-    ]));
+    ]);
     expect(withoutPlan.map((tool) => tool.name)).not.toContain('edit_memory_note');
   });
 
@@ -304,6 +324,43 @@ describe('createDefaultAgentTools', () => {
     ]));
     expect(maintainer).not.toContain('record_knowledge');
     expect(legacy).toContain('edit_memory_note');
+  });
+});
+
+describe('createToolkitToolBundle', () => {
+  const context = {
+    workspaceRoot: '/tmp/workspace',
+    model: 'gpt-test',
+    memoryDir: '/tmp/memory',
+    memoryMode: 'none' as const,
+  };
+
+  it('rejects duplicate toolkit ids', () => {
+    const duplicateToolkit: ToolToolkit = {
+      id: 'duplicate',
+      createTools: () => [],
+    };
+
+    expect(() => createToolkitToolBundle({
+      toolkits: [duplicateToolkit, duplicateToolkit],
+      context,
+    })).toThrow('Duplicate toolkit id: duplicate');
+  });
+
+  it('rejects duplicate tool names across toolkits', () => {
+    const first: ToolToolkit = {
+      id: 'first',
+      createTools: () => [{ name: 'shared_tool', description: 'a', parameters: {}, execute: async () => ({ ok: true, output: 'a' }) }],
+    };
+    const second: ToolToolkit = {
+      id: 'second',
+      createTools: () => [{ name: 'shared_tool', description: 'b', parameters: {}, execute: async () => ({ ok: true, output: 'b' }) }],
+    };
+
+    expect(() => createToolkitToolBundle({
+      toolkits: [first, second],
+      context,
+    })).toThrow('Duplicate tool name from toolkits: shared_tool');
   });
 });
 

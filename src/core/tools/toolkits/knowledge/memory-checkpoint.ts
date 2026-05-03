@@ -1,4 +1,4 @@
-import type { ToolDefinition, ToolResult } from '../types.js';
+import type { ToolDefinition, ToolResult } from '../../../types.js';
 import { createRecordKnowledgeTool } from './record-knowledge.js';
 
 export type MemoryCheckpointToolOptions = {

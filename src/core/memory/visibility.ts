@@ -1,6 +1,6 @@
 import { access, readdir, readFile } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
-import { createReadMemoryNoteTool, createSearchMemoryNotesTool } from '../tools/memory-notes.js';
+import { createReadMemoryNoteTool, createSearchMemoryNotesTool } from '../tools/toolkits/knowledge/memory-notes.js';
 import { validateMemoryCatalogShape } from './catalog.js';
 import { readPendingKnowledgeCandidates, type KnowledgeMaintenanceRunRecord } from './maintainer.js';
 

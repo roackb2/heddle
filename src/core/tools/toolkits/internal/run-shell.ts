@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { spawn } from 'node:child_process';
-import type { ToolDefinition, ToolResult } from '../types.js';
+import type { ToolDefinition, ToolResult } from '../../../types.js';
 
 type RunShellInput = {
   command: string;
@@ -124,7 +124,7 @@ export function createRunShellInspectTool(options: RunShellOptions = {}): ToolDe
     description:
       `Run a bounded read-oriented shell command inside the current workspace. Use this for CLI-native inspection, search, diff, and git state checks when mature commands like rg, git, sed, or ls are a better fit than bespoke file tools. Returns structured output with command, exitCode, stdout, stderr, and policy metadata. This tool is governed by low-risk inspect rules, not arbitrary shell access. Use this when the command is clearly read-oriented and likely to fit the inspect policy. If inspect rejects a command because it is arbitrary, uses inline scripts, or needs broader shell expressiveness, retry with run_shell_mutate instead of concluding the command cannot be run. Read-only pipelines with | are allowed for inspection commands, but redirects, command chaining, and subshells are blocked.`,
     parameters: buildParameters(),
-    execute: (raw) => runShellCommand(raw, {
+    execute: (raw: unknown) => runShellCommand(raw, {
       toolName: 'run_shell_inspect',
       rules,
       allowUnknown: false,
@@ -142,7 +142,7 @@ export function createRunShellMutateTool(options: RunShellOptions = {}): ToolDef
     description:
       `Run an approval-gated shell command inside the current workspace. Use this when inspection is not enough, when the command is arbitrary or unclassified, when you need inline scripts or broader shell expressiveness, or when run_shell_inspect rejects a still-necessary command. Returns structured output with command, exitCode, stdout, stderr, and policy metadata. This tool is governed by host-side execution rules with explicit risk classification and approval instead of a narrow command allowlist. Arbitrary commands are allowed here through approval; do not assume a command is impossible just because inspect refused it.`,
     parameters: buildParameters(),
-    execute: (raw) => runShellCommand(raw, {
+    execute: (raw: unknown) => runShellCommand(raw, {
       toolName: 'run_shell_mutate',
       rules,
       allowUnknown: true,

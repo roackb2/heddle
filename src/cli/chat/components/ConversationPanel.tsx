@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { ConversationLine } from '../state/types.js';
-import type { PlanItem } from '../../../core/tools/update-plan.js';
+import type { PlanItem } from '../../../core/tools/toolkits/internal/update-plan.js';
 
 export function ConversationPanel({
   messages,

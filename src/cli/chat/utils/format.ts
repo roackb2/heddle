@@ -1,10 +1,10 @@
 import type { ChatMessage, ToolResult } from '../../../index.js';
-import type { EditFilePreview } from '../../../core/tools/edit-file.js';
+import type { EditFilePreview } from '../../../core/tools/toolkits/coding-files/edit-file.js';
 import {
   classifyShellCommandPolicy,
   DEFAULT_MUTATE_RULES,
   type RunShellPolicyDecision,
-} from '../../../core/tools/run-shell.js';
+} from '../../../core/tools/toolkits/internal/run-shell.js';
 import { truncate } from '../../../core/utils/text.js';
 export { buildConversationMessages } from '../../../core/chat/conversation-lines.js';
 export { formatChatFailureMessage } from '../../../core/chat/failure-messages.js';

@@ -1,6 +1,6 @@
 import { mkdir, appendFile } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
-import type { ToolDefinition, ToolResult } from '../types.js';
+import type { ToolDefinition, ToolResult } from '../../../types.js';
 
 export type RecordKnowledgeToolOptions = {
   memoryRoot?: string;
