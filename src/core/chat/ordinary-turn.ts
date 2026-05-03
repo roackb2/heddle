@@ -1,13 +1,13 @@
-import type { RunAgentLoopOptions } from '../runtime/agent-loop.js';
+import { runAgentLoop, type RunAgentLoopOptions } from '../runtime/agent-loop.js';
 import type { ToolApprovalPolicy } from '../approvals/types.js';
 import type { TraceSummarizerRegistry } from '../observability/trace-summarizers.js';
+import type { ToolCall, ToolDefinition } from '../types.js';
 import { buildConversationMessages } from './conversation-lines.js';
 import { releaseSessionLease, type ChatSessionLeaseOwner } from './session-lease.js';
 import { persistPreflightCompactionRunningSeed, prepareChatSessionTurn } from './session-turn-preflight.js';
 import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
 import type { ChatTurnHostPort } from './turn-host.js';
 import { prepareOrdinaryChatTurnContext } from './turn-context.js';
-import { runOrdinaryChatTurnLoop } from './turn-execution.js';
 import { runInlineTurnMemoryMaintenance, scheduleBackgroundTurnMemoryMaintenance } from './turn-memory-maintenance.js';
 import { persistCompletedChatTurn } from './turn-persistence.js';
 
@@ -88,17 +88,23 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       sessions.map((candidate) => candidate.id === session.id ? preflightSession : candidate),
     );
 
-    const result = await runOrdinaryChatTurnLoop({
-      prompt: args.prompt,
+    const result = await runAgentLoop({
+      goal: args.prompt,
+      model: runtime.model,
+      apiKey: runtime.apiKey,
       workspaceRoot: args.workspaceRoot,
-      stateRoot: args.stateRoot,
-      runtime,
+      stateDir: args.stateRoot,
+      memoryDir: runtime.memoryDir,
+      llm: runtime.llm,
       tools,
-      session: preflightSession,
-      host: args.host,
-      approvalPolicies: args.approvalPolicies,
+      includeDefaultTools: false,
+      history: preflightSession.history,
+      systemContext: runtime.systemContext,
       onAssistantStream: args.onAssistantStream,
       onTraceEvent: args.onTraceEvent,
+      onEvent: args.host?.events?.onAgentLoopEvent,
+      approvalPolicies: args.approvalPolicies,
+      approveToolCall: createHostToolApprovalBridge(args.host),
       shouldStop: args.shouldStop,
       abortSignal: args.abortSignal,
     });
@@ -172,5 +178,15 @@ export function clearOrdinaryChatTurnLease(sessionStoragePath: string, sessionId
   saveChatSessions(
     sessionStoragePath,
     sessions.map((candidate) => candidate.id === sessionId ? touchSession(released) : candidate),
+  );
+}
+
+function createHostToolApprovalBridge(host: ChatTurnHostPort | undefined): RunAgentLoopOptions['approveToolCall'] {
+  if (!host?.approvals?.requestToolApproval) {
+    return undefined;
+  }
+
+  return (call: ToolCall, tool: ToolDefinition) => (
+    host.approvals?.requestToolApproval?.({ call, tool }) ?? Promise.resolve({ approved: false, reason: 'Missing approval port.' })
   );
 }

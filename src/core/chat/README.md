@@ -29,8 +29,6 @@ maintenance, traces, and host ports.
 - `ordinary-turn.ts`: current conversation-turn harness.
 - `turn-context.ts`: ordinary turn context preparation, including session,
   runtime, tool bundle, tool names, and lease owner.
-- `turn-execution.ts`: run-loop option assembly and host approval bridge for an
-  ordinary chat turn.
 - `turn-session.ts`: session loading for ordinary chat turns.
 - `turn-runtime.ts`: model, credential, LLM, memory, and system-context
   preparation for ordinary chat turns.
