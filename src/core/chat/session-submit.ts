@@ -1,9 +1,9 @@
-import type { ToolCall, ToolDefinition } from '../../index.js';
 import type { ToolApprovalPolicy } from '../approvals/types.js';
 import type { TraceSummarizerRegistry } from '../observability/trace-summarizers.js';
+import type { AgentLoopEvent } from '../runtime/events.js';
+import type { ToolCall, ToolDefinition } from '../types.js';
 import { executeOrdinaryChatTurn, clearOrdinaryChatTurnLease } from './ordinary-turn.js';
 import type { ChatSessionLeaseOwner } from './session-lease.js';
-import type { AgentLoopEvent } from '../../index.js';
 
 export type SubmitChatSessionPromptArgs = {
   workspaceRoot: string;

@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../index.js';
+import type { ChatMessage } from '../llm/types.js';
 import { isCompactedHistorySummary } from './compaction.js';
 import type { ConversationLine } from './types.js';
 

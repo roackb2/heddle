@@ -1,9 +1,9 @@
 import type { ToolDefinition } from '../types.js';
+import { createDefaultAgentTools } from '../runtime/default-tools.js';
 import type { ChatSessionLeaseOwner } from './session-lease.js';
 import type { ChatSession } from './types.js';
 import { loadChatTurnSession } from './turn-session.js';
 import { resolveChatTurnRuntime, type ChatTurnRuntime } from './turn-runtime.js';
-import { createChatTurnTools, listChatTurnToolNames } from './turn-tools.js';
 
 export type PrepareOrdinaryChatTurnContextArgs = {
   workspaceRoot: string;
@@ -39,13 +39,15 @@ export function prepareOrdinaryChatTurnContext(args: PrepareOrdinaryChatTurnCont
     credentialStorePath: args.credentialStorePath,
     systemContext: args.systemContext,
   });
-  const tools = createChatTurnTools({
+  const tools = createDefaultAgentTools({
     model: runtime.model,
     apiKey: runtime.apiKey,
     providerCredentialSource: runtime.providerCredentialSource,
     credentialStorePath: args.credentialStorePath,
     workspaceRoot: args.workspaceRoot,
     memoryDir: runtime.memoryDir,
+    searchIgnoreDirs: [],
+    includePlanTool: true,
   });
 
   return {
@@ -53,7 +55,7 @@ export function prepareOrdinaryChatTurnContext(args: PrepareOrdinaryChatTurnCont
     session,
     runtime,
     tools,
-    toolNames: listChatTurnToolNames(tools),
+    toolNames: tools.map((tool) => tool.name),
     leaseOwner: args.leaseOwner ?? {
       ownerKind: 'ask',
       ownerId: `submit-${process.pid}`,

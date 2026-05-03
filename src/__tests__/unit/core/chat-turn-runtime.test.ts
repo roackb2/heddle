@@ -4,11 +4,13 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
 import { createChatSession, loadChatSessions, saveChatSessions } from '../../../core/chat/storage.js';
-import { persistPreflightCompactionRunningSeed } from '../../../core/chat/session-turn-preflight.js';
+import {
+  persistPreflightCompactionRunningSeed,
+  persistPreparedChatSessionTurn,
+} from '../../../core/chat/session-turn-preflight.js';
 import { prepareOrdinaryChatTurnContext } from '../../../core/chat/turn-context.js';
 import { loadChatTurnSession } from '../../../core/chat/turn-session.js';
 import { resolveChatTurnModel, resolveChatTurnRuntime } from '../../../core/chat/turn-runtime.js';
-import { createChatTurnTools, listChatTurnToolNames } from '../../../core/chat/turn-tools.js';
 import { DEFAULT_OPENAI_MODEL } from '../../../core/config.js';
 
 describe('chat turn preparation modules', () => {
@@ -119,37 +121,7 @@ describe('chat turn preparation modules', () => {
     })).toThrow('Missing Anthropic credential. Set ANTHROPIC_API_KEY for Anthropic models.');
   });
 
-  it('creates the ordinary chat turn tool bundle with the plan tool included', () => {
-    const root = mkdtempSync(join(tmpdir(), 'heddle-turn-tools-'));
-    const tools = createChatTurnTools({
-      model: 'gpt-5.4',
-      apiKey: 'explicit-key',
-      providerCredentialSource: { type: 'explicit-api-key' },
-      workspaceRoot: root,
-      memoryDir: join(root, '.heddle', 'memory'),
-    });
-
-    expect(listChatTurnToolNames(tools)).toEqual([
-      'list_files',
-      'read_file',
-      'edit_file',
-      'delete_file',
-      'move_file',
-      'search_files',
-      'web_search',
-      'view_image',
-      'list_memory_notes',
-      'read_memory_note',
-      'search_memory_notes',
-      'memory_checkpoint',
-      'record_knowledge',
-      'update_plan',
-      'run_shell_inspect',
-      'run_shell_mutate',
-    ]);
-  });
-
-  it('prepares ordinary turn context with runtime, tools, and default lease owner', () => {
+  it('prepares ordinary turn context with runtime, tool bundle, and default lease owner', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-context-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
     const session = createChatSession({
@@ -170,8 +142,24 @@ describe('chat turn preparation modules', () => {
 
     expect(context.session.id).toBe('session-1');
     expect(context.runtime.model).toBe('gpt-5.4');
-    expect(context.toolNames).toContain('read_file');
-    expect(context.toolNames).toContain('update_plan');
+    expect(context.toolNames).toEqual([
+      'list_files',
+      'read_file',
+      'edit_file',
+      'delete_file',
+      'move_file',
+      'search_files',
+      'web_search',
+      'view_image',
+      'list_memory_notes',
+      'read_memory_note',
+      'search_memory_notes',
+      'memory_checkpoint',
+      'record_knowledge',
+      'update_plan',
+      'run_shell_inspect',
+      'run_shell_mutate',
+    ]);
     expect(context.leaseOwner).toMatchObject({
       ownerKind: 'ask',
       clientLabel: 'another Heddle client',
@@ -215,5 +203,45 @@ describe('chat turn preparation modules', () => {
     expect(nextSession?.context?.compactionStatus).toBe('running');
     expect(nextSession?.context?.lastArchivePath).toBe('.heddle/chat-sessions/session-1/archives/archive-1.jsonl');
     expect(nextSession?.lease).toEqual(leasedSession.lease);
+  });
+
+  it('persists prepared preflight session state before the run loop starts', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-turn-preflight-persist-'));
+    const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
+    const session = createChatSession({
+      id: 'session-1',
+      name: 'Session 1',
+      apiKeyPresent: true,
+      model: 'gpt-5.4',
+    });
+    saveChatSessions(sessionStoragePath, [session]);
+
+    const preparedSession = persistPreparedChatSessionTurn({
+      sessionStoragePath,
+      sessions: [session],
+      session,
+      prepared: {
+        ok: true,
+        preflightHistory: [
+          { role: 'user', content: 'Earlier prompt' },
+          { role: 'assistant', content: 'Earlier answer' },
+        ],
+        historyForRun: [
+          { role: 'user', content: 'Earlier prompt' },
+          { role: 'assistant', content: 'Earlier answer' },
+        ],
+        context: {
+          estimatedHistoryTokens: 42,
+          compactionStatus: 'idle',
+        },
+        archives: [],
+      },
+    });
+
+    const persisted = loadChatSessions(sessionStoragePath, true)[0];
+    expect(preparedSession.history).toHaveLength(2);
+    expect(persisted?.history).toEqual(preparedSession.history);
+    expect(persisted?.messages.map((message) => message.text)).toEqual(['Earlier prompt', 'Earlier answer']);
+    expect(persisted?.context?.estimatedHistoryTokens).toBe(42);
   });
 });
