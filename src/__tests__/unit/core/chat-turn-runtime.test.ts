@@ -3,7 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
-import { createChatSession, saveChatSessions } from '../../../core/chat/storage.js';
+import { createChatSession, loadChatSessions, saveChatSessions } from '../../../core/chat/storage.js';
+import { persistPreflightCompactionRunningSeed } from '../../../core/chat/session-turn-preflight.js';
+import { prepareOrdinaryChatTurnContext } from '../../../core/chat/turn-context.js';
 import { loadChatTurnSession } from '../../../core/chat/turn-session.js';
 import { resolveChatTurnModel, resolveChatTurnRuntime } from '../../../core/chat/turn-runtime.js';
 import { createChatTurnTools, listChatTurnToolNames } from '../../../core/chat/turn-tools.js';
@@ -145,5 +147,73 @@ describe('chat turn preparation modules', () => {
       'run_shell_inspect',
       'run_shell_mutate',
     ]);
+  });
+
+  it('prepares ordinary turn context with runtime, tools, and default lease owner', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-turn-context-'));
+    const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
+    const session = createChatSession({
+      id: 'session-1',
+      name: 'Session 1',
+      apiKeyPresent: true,
+      model: 'gpt-5.4',
+    });
+    saveChatSessions(sessionStoragePath, [session]);
+
+    const context = prepareOrdinaryChatTurnContext({
+      workspaceRoot: root,
+      stateRoot: join(root, '.heddle'),
+      sessionStoragePath,
+      sessionId: 'session-1',
+      apiKey: 'explicit-key',
+    });
+
+    expect(context.session.id).toBe('session-1');
+    expect(context.runtime.model).toBe('gpt-5.4');
+    expect(context.toolNames).toContain('read_file');
+    expect(context.toolNames).toContain('update_plan');
+    expect(context.leaseOwner).toMatchObject({
+      ownerKind: 'ask',
+      clientLabel: 'another Heddle client',
+    });
+  });
+
+  it('persists the preflight compaction-running context for the leased session', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-turn-preflight-seed-'));
+    const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
+    const session = createChatSession({
+      id: 'session-1',
+      name: 'Session 1',
+      apiKeyPresent: true,
+      model: 'gpt-5.4',
+    });
+    const leasedSession = {
+      ...session,
+      history: [
+        { role: 'user' as const, content: 'Earlier prompt' },
+        { role: 'assistant' as const, content: 'Earlier answer' },
+      ],
+      lease: {
+        ownerId: 'owner-1',
+        ownerKind: 'ask' as const,
+        clientLabel: 'test client',
+        acquiredAt: '2026-05-03T00:00:00.000Z',
+        lastSeenAt: '2026-05-03T00:00:00.000Z',
+      },
+    };
+    saveChatSessions(sessionStoragePath, [leasedSession]);
+
+    persistPreflightCompactionRunningSeed({
+      sessionStoragePath,
+      sessions: [leasedSession],
+      sessionId: 'session-1',
+      leasedSession,
+      archivePath: '.heddle/chat-sessions/session-1/archives/archive-1.jsonl',
+    });
+
+    const nextSession = loadChatSessions(sessionStoragePath, true)[0];
+    expect(nextSession?.context?.compactionStatus).toBe('running');
+    expect(nextSession?.context?.lastArchivePath).toBe('.heddle/chat-sessions/session-1/archives/archive-1.jsonl');
+    expect(nextSession?.lease).toEqual(leasedSession.lease);
   });
 });

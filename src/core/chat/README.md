@@ -27,6 +27,10 @@ maintenance, traces, and host ports.
 ## Public Entry Points
 
 - `ordinary-turn.ts`: current conversation-turn harness.
+- `turn-context.ts`: ordinary turn context preparation, including session,
+  runtime, tool bundle, tool names, and lease owner.
+- `turn-execution.ts`: run-loop option assembly and host approval bridge for an
+  ordinary chat turn.
 - `turn-session.ts`: session loading for ordinary chat turns.
 - `turn-runtime.ts`: model, credential, LLM, memory, and system-context
   preparation for ordinary chat turns.
@@ -46,7 +50,7 @@ maintenance, traces, and host ports.
 
 ## Extension Points
 
-- Add host integration through `ChatTurnHostPort` or future conversation activity
+- Add host integration through `ChatTurnHostPort` or conversation activity
   projections.
 - Add conversation-turn phases as named services before introducing middleware.
 - Add compaction behavior through compaction helpers and tests; keep host UI
@@ -72,8 +76,8 @@ maintenance, traces, and host ports.
 
 ## Notes For Coding Agents
 
-- Treat `ordinary-turn.ts` as the current conversation-engine seam. Shrink it by
-  extracting named phases; do not move unrelated behavior into it.
+- Treat `ordinary-turn.ts` as the current conversation-engine seam. Keep lease
+  cleanup visible there, but put phase-specific mechanics in named turn modules.
 - Keep host-specific wording in adapters. Core chat should emit semantics and
   persist durable evidence.
 - Do not import from TUI, web, or server code.
