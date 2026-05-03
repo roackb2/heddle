@@ -5,7 +5,7 @@ import {
   isSessionLeaseFresh,
   isSessionLeaseOwnedByDeadLocalProcess,
   releaseSessionLease,
-} from '../../../core/chat/session-lease.js';
+} from '../../../core/chat/engine/sessions/lease.js';
 import type { ChatSession } from '../../../core/chat/types.js';
 
 function createSession(): ChatSession {

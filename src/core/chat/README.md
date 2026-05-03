@@ -1,97 +1,40 @@
 # Chat
 
-The chat domain owns Heddle's persisted conversation/session harness. It turns a
-single prompt into a durable chat turn with compaction, leases, memory
-maintenance, traces, and host ports.
+The chat domain is now primarily a boundary folder around the owning
+conversation-engine module.
 
 ## Owns
 
-- Chat session storage and catalog persistence.
-- Session creation, reading, migration, touching, and summaries.
-- Conversation-line projection from model history to user-visible messages.
-- Session leases and conflict handling.
-- Preflight and final compaction around long histories.
-- Conversation-turn orchestration through `runConversationTurn`.
-- Alpha programmatic conversation-engine facade under `engine/`.
-- Chat turn persistence: trace file, turn summary, messages, history, context,
-  archives, and continuation prompt.
-- Host ports for chat-turn events, approvals, and compaction status.
+- Shared chat/session persisted data contracts in `types.ts`.
+- High-level boundary documentation for the conversation engine domain.
+- No production behavior should accumulate here when it clearly belongs to the
+  engine bounded module.
+
+## Engine Ownership
+
+`src/core/chat/engine/` is the actual owning bounded module for Heddle's
+persisted programmatic conversation engine.
+
+That module owns:
+
+- engine config normalization and derived paths
+- session persistence, migration, titles, archives, and lease behavior
+- persisted turn execution and continuation
+- preflight and final compaction lifecycle
+- memory maintenance integration for turns
+- trace persistence for persisted turns
+- engine host normalization and conversation-activity projection
 
 ## Does Not Own
 
-- Low-level model/tool step mechanics. Those live in `src/core/agent`.
-- General runtime checkpoint/heartbeat APIs. Those live in `src/core/runtime`.
-- UI rendering of sessions or events.
-- Server routes, React hooks, or Ink components.
-- Future slash-command parsing.
-
-## Stable Core Entry Points
-
-- `conversation-turn.ts`: current persisted conversation-turn harness.
-- `session-submit.ts`: server/programmatic submit adapter over conversation turns.
-- `engine/`: alpha programmatic facade for custom hosts.
-- `storage.ts`: file-backed chat session store.
-- `compaction.ts`: history compaction and archive behavior.
-- `conversation-lines.ts`: user-facing chat message projection.
-- `turn-host.ts`: semantic host ports for events, approvals, and compaction.
-
-These are stable inside the core codebase, but they are not all exported from
-the package root. Package-root exports remain the public npm API.
-
-## Internal Turn Services
-
-- `turn-context.ts`: ordinary turn context preparation, including session,
-  runtime, default tool bundle, tool names, and lease owner.
-- `turn-runtime.ts`: model, credential, LLM, memory, and system-context
-  preparation for ordinary chat turns.
-- `turn-memory-maintenance.ts`: inline/background turn memory maintenance and
-  trace summary updates.
-- `turn-host-bridge.ts`: behavior-owning bridge from semantic host ports plus
-  legacy compaction callback compatibility into run-loop and turn callback
-  surfaces.
-- `turn-persistence.ts`: final chat turn persistence orchestration, final
-  running-state seeding, and completed session save.
-- `session-turn-preflight.ts`: lease acquisition, preflight compaction,
-  pre-run running-state seeding, and prepared session save before run-loop
-  execution.
-- `session-turn-result.ts`: persistence artifacts and final session update.
-- `trace.ts`: chat trace persistence. Turn summary formatting lives in
-  `src/core/observability/trace-summarizers.ts`.
-
-## Extension Points
-
-- Add host integration through `ChatTurnHostPort` or conversation activity
-  projections.
-- Add conversation-turn phases as named services before introducing middleware.
-- Add compaction behavior through compaction helpers and tests; keep host UI
-  rendering outside this domain.
-- Add persisted session fields with migration/read compatibility in `storage.ts`.
-
-## Common Changes
-
-- To change turn execution, first decide whether the behavior belongs in
-  preflight, run loop, memory maintenance, persistence, or host projection.
-- To add a session field, update session types, read/migration logic, projection
-  code, and storage tests.
-- To add host-visible activity, prefer a core projection helper and let TUI/web
-  render the projected activity.
-
-## Tests
-
-- `src/__tests__/integration/chat/chat-runtime.test.ts`
-- `src/__tests__/integration/chat/chat-storage.test.ts`
-- `src/__tests__/integration/chat/session-submit.test.ts`
-- `src/__tests__/unit/chat/chat-format.test.ts`
-- `src/__tests__/unit/chat/chat-session-lease.test.ts`
+- TUI rendering, Ink, React, server transport, or browser hooks
+- facade-only wrappers around engine internals
 
 ## Notes For Coding Agents
 
-- Treat `conversation-turn.ts` as the current persisted conversation-turn seam.
-  Keep lease cleanup visible there, but put phase-specific mechanics in named
-  turn modules.
-- Treat `engine/` as the alpha custom-host facade. Put path, session, host, and
-  turn-service invariants there instead of adding facade logic to TUI/server
-  adapters.
-- Keep host-specific wording in adapters. Core chat should emit semantics and
-  persist durable evidence.
-- Do not import from TUI, web, or server code.
+- Put new programmatic conversation-engine behavior under `src/core/chat/engine`.
+- Do not reintroduce flat top-level wrappers under `src/core/chat` unless there
+  is a concrete, reviewed compatibility reason.
+- `types.ts` remains at this level only as a shared persisted contract used by
+  engine code plus existing host-facing types. If future cleanup can move it into
+  engine without making imports worse, prefer that.

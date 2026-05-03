@@ -1,4 +1,4 @@
-import { acquireSessionLease, getSessionLeaseConflict, releaseSessionLease } from '../../../core/chat/session-lease.js';
+import { acquireSessionLease, getSessionLeaseConflict, releaseSessionLease } from '../../../core/chat/engine/sessions/lease.js';
 import { rememberedApprovalPolicy } from '../../../core/approvals/default-policies.js';
 import { resolveToolApproval } from '../../../core/approvals/policy-chain.js';
 import { summarizeToolCall } from '../../../core/observability/conversation-activity.js';

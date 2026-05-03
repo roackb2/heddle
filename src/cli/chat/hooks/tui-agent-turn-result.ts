@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import type { ChatMessage, LlmAdapter, RunResult } from '../../../index.js';
 import { runMaintenanceForRecordedCandidates } from '../../../core/memory/maintenance-integration.js';
-import { createChatTurnPersistenceArtifacts } from '../../../core/chat/session-turn-result.js';
+import { createChatTurnPersistenceArtifacts } from '../../../core/chat/engine/turns/result.js';
 import { estimateChatHistoryTokens } from '../state/compaction.js';
 import { touchSession } from '../state/storage.js';
 import type { ChatSession } from '../state/types.js';
@@ -75,7 +75,7 @@ export async function applyTuiAgentTurnResult(args: {
     historyForTokenEstimate: historyForRun,
     summarizer: { credentialSource: runtime.providerCredentialSource },
     createTurnId: state.nextLocalId,
-    onCompactionStatus: (event) => emitCompactionStatus(event, result.transcript),
+    onCompactionStatus: (event: TuiCompactionStatusEvent) => emitCompactionStatus(event, result.transcript),
   });
   updateSessionById(sessionId, (sessionToUpdate) => ({
     ...sessionToUpdate,

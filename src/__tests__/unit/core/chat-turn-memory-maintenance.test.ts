@@ -2,8 +2,8 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createChatSession, loadChatSessions, saveChatSessions } from '../../../core/chat/storage.js';
-import { appendAgentLoopTrace, appendTurnMemoryMaintenanceEvents } from '../../../core/chat/turn-memory-maintenance.js';
+import { createChatSession, loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/storage.js';
+import { appendAgentLoopTrace, appendTurnMemoryMaintenanceEvents } from '../../../core/chat/engine/turns/memory-maintenance.js';
 import type { AgentLoopResult } from '../../../core/runtime/agent-loop.js';
 import type { TraceEvent } from '../../../core/types.js';
 

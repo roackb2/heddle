@@ -1,4 +1,4 @@
-import type { ChatSession, ChatSessionLease } from './types.js';
+import type { ChatSession, ChatSessionLease } from '../../types.js';
 
 const DEFAULT_SESSION_LEASE_STALE_AFTER_MS = 15 * 60 * 1000;
 const LOCAL_PROCESS_LEASE_OWNER_PATTERN = /^(?:tui|ask|submit|daemon)-(\d+)$/;

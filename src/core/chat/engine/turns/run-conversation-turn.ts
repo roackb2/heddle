@@ -1,15 +1,15 @@
-import { runAgentLoop } from '../runtime/agent-loop.js';
-import type { ToolApprovalPolicy } from '../approvals/types.js';
-import type { TraceSummarizerRegistry } from '../observability/trace-summarizers.js';
-import { releaseSessionLease, type ChatSessionLeaseOwner } from './session-lease.js';
-import { prepareChatSessionTurn } from './session-turn-preflight.js';
-import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
-import type { ChatTurnHostPort } from './turn-host.js';
-import { createChatTurnHostBridge } from './turn-host-bridge.js';
-import { prepareOrdinaryChatTurnContext } from './turn-context.js';
-import type { ConversationCompactionStatus } from '../observability/conversation-activity.js';
-import { runInlineTurnMemoryMaintenance, scheduleBackgroundTurnMemoryMaintenance } from './turn-memory-maintenance.js';
-import { persistCompletedChatTurn } from './turn-persistence.js';
+import { runAgentLoop } from '../../../runtime/agent-loop.js';
+import type { ToolApprovalPolicy } from '../../../approvals/types.js';
+import type { TraceSummarizerRegistry } from '../../../observability/trace-summarizers.js';
+import type { ConversationCompactionStatus } from '../../../observability/conversation-activity.js';
+import { prepareConversationTurnContext } from './context.js';
+import { createChatTurnHostBridge } from './host-bridge.js';
+import { prepareChatSessionTurn } from './preflight.js';
+import { runInlineTurnMemoryMaintenance, scheduleBackgroundTurnMemoryMaintenance } from './memory-maintenance.js';
+import { persistCompletedChatTurn } from './persistence.js';
+import { releaseSessionLease, type ChatSessionLeaseOwner } from '../sessions/lease.js';
+import { loadChatSessions, saveChatSessions, touchSession } from '../sessions/storage.js';
+import type { ChatTurnHostPort } from './host-bridge.js';
 
 export type RunConversationTurnArgs = {
   workspaceRoot: string;
@@ -21,6 +21,7 @@ export type RunConversationTurnArgs = {
   preferApiKey?: boolean;
   credentialStorePath?: string;
   systemContext?: string;
+  traceDir: string;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   host?: ChatTurnHostPort;
   approvalPolicies?: ToolApprovalPolicy[];
@@ -40,7 +41,7 @@ export type RunConversationTurnResult = {
 };
 
 export async function runConversationTurn(args: RunConversationTurnArgs): Promise<RunConversationTurnResult> {
-  const context = prepareOrdinaryChatTurnContext({
+  const context = prepareConversationTurnContext({
     workspaceRoot: args.workspaceRoot,
     stateRoot: args.stateRoot,
     sessionStoragePath: args.sessionStoragePath,
@@ -54,7 +55,7 @@ export async function runConversationTurn(args: RunConversationTurnArgs): Promis
   const { sessions, session, runtime, tools, toolNames, leaseOwner } = context;
   const hostBridge = createChatTurnHostBridge({
     host: args.host,
-    onLegacyCompactionStatus: args.onCompactionStatus,
+    onCompactionStatus: args.onCompactionStatus,
   });
 
   try {
@@ -98,15 +99,15 @@ export async function runConversationTurn(args: RunConversationTurnArgs): Promis
     });
     const maintenanceMode = args.memoryMaintenanceMode ?? 'background';
     const resultForPersistence =
-      maintenanceMode === 'inline' ?
-        await runInlineTurnMemoryMaintenance({
-          memoryRoot: runtime.memoryDir,
-          llm: runtime.llm,
-          source: `chat session ${session.id}`,
-          result,
-          onEvent: hostBridge.onAgentLoopEvent,
-        })
-      : result;
+      maintenanceMode === 'inline'
+        ? await runInlineTurnMemoryMaintenance({
+            memoryRoot: runtime.memoryDir,
+            llm: runtime.llm,
+            source: `chat session ${session.id}`,
+            result,
+            onEvent: hostBridge.onAgentLoopEvent,
+          })
+        : result;
 
     const persisted = await persistCompletedChatTurn({
       result: resultForPersistence,
@@ -116,6 +117,7 @@ export async function runConversationTurn(args: RunConversationTurnArgs): Promis
       sessionStoragePath: args.sessionStoragePath,
       model: runtime.model,
       stateRoot: args.stateRoot,
+      traceDir: args.traceDir,
       systemContext: runtime.systemContext,
       toolNames,
       historyForTokenEstimate: session.history,

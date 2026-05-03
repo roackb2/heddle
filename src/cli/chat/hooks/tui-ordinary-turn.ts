@@ -1,5 +1,5 @@
 import type { RunResult } from '../../../index.js';
-import { runConversationTurn } from '../../../core/chat/conversation-turn.js';
+import { runConversationTurn } from '../../../core/chat/engine/turns/run-conversation-turn.js';
 import type { ChatSession } from '../state/types.js';
 import type { ChatRuntimeConfig } from '../utils/runtime.js';
 import { createTuiCompactionStatusPort } from './tui-compaction-status.js';
@@ -72,6 +72,7 @@ export async function executeTuiOrdinaryTurn(args: {
   const result = await runConversationTurn({
     workspaceRoot: runtime.workspaceRoot,
     stateRoot: runtime.stateRoot,
+    traceDir: runtime.traceDir,
     sessionStoragePath: runtime.sessionCatalogFile,
     sessionId,
     prompt,

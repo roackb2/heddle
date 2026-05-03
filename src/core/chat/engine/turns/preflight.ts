@@ -1,10 +1,10 @@
-import type { ChatMessage } from '../llm/types.js';
-import { buildConversationMessages } from './conversation-lines.js';
-import { buildCompactionRunningContext, compactChatHistoryWithArchive } from './compaction.js';
-import { acquireSessionLease, getSessionLeaseConflict, type ChatSessionLeaseOwner } from './session-lease.js';
-import { readChatSession, saveChatSessions, touchSession } from './storage.js';
-import type { ChatArchiveRecord, ChatContextStats, ChatSession } from './types.js';
-import type { ChatTurnHostBridge } from './turn-host-bridge.js';
+import type { ChatMessage } from '../../../llm/types.js';
+import { buildConversationMessages } from '../sessions/conversation-lines.js';
+import { buildCompactionRunningContext, compactChatHistoryWithArchive } from '../history/compaction.js';
+import { acquireSessionLease, getSessionLeaseConflict, type ChatSessionLeaseOwner } from '../sessions/lease.js';
+import { readChatSession, saveChatSessions, touchSession } from '../sessions/storage.js';
+import type { ChatArchiveRecord, ChatContextStats, ChatSession } from '../../types.js';
+import type { ChatTurnHostBridge } from './host-bridge.js';
 
 export type ChatTurnPreflightCompactionStatus = {
   status: 'running' | 'finished' | 'failed';
@@ -85,13 +85,15 @@ export async function prepareChatSessionTurn(args: PrepareChatSessionTurnArgs): 
     session: persistedSession ?? readRequiredFallbackSession(args.sessions, args.sessionId),
     prepared: {
       ok: true,
-      session: leasedSession ? {
-        ...leasedSession,
-        history: preflightCompacted.history,
-        context: preflightCompacted.context,
-        archives: preflightCompacted.archives,
-        messages: buildConversationMessages(preflightCompacted.history),
-      } : undefined,
+      session: leasedSession
+        ? {
+            ...leasedSession,
+            history: preflightCompacted.history,
+            context: preflightCompacted.context,
+            archives: preflightCompacted.archives,
+            messages: buildConversationMessages(preflightCompacted.history),
+          }
+        : undefined,
       historyForRun: preflightCompacted.history,
       preflightHistory: preflightCompacted.history,
       context: preflightCompacted.context,
@@ -119,7 +121,7 @@ export function persistPreflightCompactionRunningSeed(args: {
   });
   saveChatSessions(
     args.sessionStoragePath,
-    args.sessions.map((candidate) => candidate.id === args.sessionId ? compactionSeed : candidate),
+    args.sessions.map((candidate) => (candidate.id === args.sessionId ? compactionSeed : candidate)),
   );
 }
 
@@ -129,17 +131,19 @@ export function persistPreparedChatSessionTurn(args: {
   session: ChatSession;
   prepared: Extract<PrepareChatSessionTurnResult, { ok: true }>;
 }): Extract<PrepareChatSessionTurnResult, { ok: true }> {
-  const preparedSession = args.prepared.session ?? touchSession({
-    ...args.session,
-    history: args.prepared.preflightHistory,
-    context: args.prepared.context,
-    archives: args.prepared.archives,
-    messages: buildConversationMessages(args.prepared.preflightHistory),
-  });
+  const preparedSession =
+    args.prepared.session ??
+    touchSession({
+      ...args.session,
+      history: args.prepared.preflightHistory,
+      context: args.prepared.context,
+      archives: args.prepared.archives,
+      messages: buildConversationMessages(args.prepared.preflightHistory),
+    });
 
   saveChatSessions(
     args.sessionStoragePath,
-    args.sessions.map((candidate) => candidate.id === args.session.id ? preparedSession : candidate),
+    args.sessions.map((candidate) => (candidate.id === args.session.id ? preparedSession : candidate)),
   );
 
   return {

@@ -5,13 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createConversationEngine } from '../../../core/chat/engine/conversation-engine.js';
 import type { AgentLoopEvent } from '../../../core/runtime/events.js';
 import type { TraceEvent } from '../../../core/types.js';
-import { loadChatSessions, readChatSession, readChatSessionCatalog } from '../../../core/chat/storage.js';
+import { loadChatSessions, readChatSession, readChatSessionCatalog } from '../../../core/chat/engine/sessions/storage.js';
 import type { ChatSession } from '../../../core/chat/types.js';
 
 const runConversationTurnMock = vi.hoisted(() => vi.fn());
 const clearConversationTurnLeaseMock = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../core/chat/conversation-turn.js', () => ({
+vi.mock('../../../core/chat/engine/turns/run-conversation-turn.js', () => ({
   runConversationTurn: runConversationTurnMock,
   clearConversationTurnLease: clearConversationTurnLeaseMock,
 }));
@@ -82,7 +82,7 @@ describe('createConversationEngine', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const approvalPolicies = [vi.fn()];
-    const traceSummarizerRegistry = { summarize: vi.fn() } as unknown as { summarize: (event: TraceEvent) => string | undefined };
+    const traceSummarizerRegistry = { summarizeTrace: vi.fn(() => []) } as unknown as { summarizeTrace: (events: TraceEvent[]) => string[] };
     const engine = createConversationEngine({
       workspaceRoot,
       stateRoot,
@@ -105,7 +105,7 @@ describe('createConversationEngine', () => {
     const onCompactionStatus = vi.fn();
     const requestToolApproval = vi.fn(async () => ({ approved: true, reason: 'ok' }));
     const overridePolicies = [vi.fn()];
-    const overrideRegistry = { summarize: vi.fn() } as unknown as { summarize: (event: TraceEvent) => string | undefined };
+    const overrideRegistry = { summarizeTrace: vi.fn(() => []) } as unknown as { summarizeTrace: (events: TraceEvent[]) => string[] };
 
     await engine.turns.submit({
       sessionId: session.id,
@@ -151,6 +151,7 @@ describe('createConversationEngine', () => {
     expect(typeof args.onAssistantStream).toBe('function');
     expect(typeof args.onTraceEvent).toBe('function');
     expect(typeof args.onCompactionStatus).toBe('function');
+    expect(args.traceDir).toBe(join(stateRoot, 'traces'));
     expect(args.host).toBeTruthy();
     expect(args.host.approvals.requestToolApproval).toBe(requestToolApproval);
 
@@ -165,7 +166,7 @@ describe('createConversationEngine', () => {
     expect(onAgentLoopEvent).toHaveBeenCalledWith(loopEvent);
     expect(onActivity).toHaveBeenCalledWith(expect.objectContaining({ type: 'assistant.stream', text: 'partial' }));
 
-    args.onAssistantStream('hello');
+    args.onAssistantStream({ text: 'hello' });
     expect(onAssistantText).toHaveBeenCalledWith('hello');
 
     const traceEvent: TraceEvent = {
@@ -207,7 +208,7 @@ describe('createConversationEngine', () => {
     stored.updatedAt = '2026-05-03T00:00:00.000Z';
     const otherSessions = loadChatSessions(join(stateRoot, 'chat-sessions.catalog.json'), true)
       .filter((candidate) => candidate.id !== session.id);
-    const { saveChatSessions } = await import('../../../core/chat/storage.js');
+    const { saveChatSessions } = await import('../../../core/chat/engine/sessions/storage.js');
     saveChatSessions(join(stateRoot, 'chat-sessions.catalog.json'), [stored, ...otherSessions]);
 
     await engine.turns.continue({ sessionId: session.id });

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { runAskCli } from '../../../cli/ask.js';
-import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../core/chat/storage.js';
+import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../core/chat/engine/sessions/storage.js';
 import type { ChatSession } from '../../../core/chat/types.js';
 import * as agentLoopModule from '../../../core/runtime/agent-loop.js';
 import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
@@ -190,7 +190,7 @@ describe('runAskCli', () => {
       { role: 'user' as const, content: 'very large turn 2' },
       { role: 'assistant' as const, content: 'very large answer 2' },
     ];
-    const compactionSpy = vi.spyOn(await import('../../../core/chat/compaction.js'), 'compactChatHistoryWithArchive');
+    const compactionSpy = vi.spyOn(await import('../../../core/chat/engine/history/compaction.js'), 'compactChatHistoryWithArchive');
     compactionSpy
       .mockResolvedValueOnce({
         history: compactedHistory,

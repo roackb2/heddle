@@ -1,17 +1,18 @@
 import { EventEmitter } from 'node:events';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../../core/chat/storage.js';
+import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../../core/chat/engine/sessions/storage.js';
 import { DEFAULT_OPENAI_MODEL } from '../../../../core/config.js';
 import { credentialModeFromSource, resolveCompatibleActiveModel } from '../../../../core/llm/model-policy.js';
 import { inferProviderFromModel } from '../../../../core/llm/providers.js';
 import { parseUnifiedDiffFiles } from '../../../../core/review/diff-domain.js';
 import { hasProviderCredentialForModel, resolveProviderCredentialSourceForModel } from '../../../../core/runtime/api-keys.js';
-import type { ChatSessionLeaseOwner } from '../../../../core/chat/session-lease.js';
+import type { ChatSessionLeaseOwner } from '../../../../core/chat/engine/sessions/lease.js';
 import type { ChatSession, TurnSummary } from '../../../../core/chat/types.js';
-import { buildConversationMessages } from '../../../../core/chat/conversation-lines.js';
-import { submitChatSessionPrompt } from '../../../../core/chat/session-submit.js';
+import { buildConversationMessages } from '../../../../core/chat/engine/sessions/conversation-lines.js';
+import { runConversationTurn } from '../../../../core/chat/engine/index.js';
 import { requestToolApproval } from '../../../../core/approvals/surface.js';
+import type { ToolCall, ToolDefinition } from '../../../../core/types.js';
 import {
   createControlPlanePendingApprovalView,
   createControlPlaneSessionEventPublisher,
@@ -151,10 +152,11 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs) {
   });
 
   try {
-    const result = await submitChatSessionPrompt({
+    const result = await runConversationTurn({
       workspaceRoot: args.workspaceRoot,
       stateRoot: args.stateRoot,
       sessionStoragePath: args.sessionStoragePath,
+      traceDir: join(args.stateRoot, 'traces'),
       sessionId: args.sessionId,
       prompt: args.continuePrompt ?? args.prompt,
       apiKey: args.apiKey,
@@ -163,26 +165,35 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs) {
       memoryMaintenanceMode: args.memoryMaintenanceMode,
       abortSignal: controller.signal,
       leaseOwner: args.leaseOwner,
-      onEvent: events.hostPort.events?.onAgentLoopEvent,
-      approveToolCall: async (call, tool) => {
-        const decision = await requestToolApproval({
-          call,
-          tool,
-          createView: createControlPlanePendingApprovalView,
-          storePending: ({ view, resolve }) => {
-            pendingApprovals.set(args.sessionId, {
-              approval: view,
-              resolve,
+      host: {
+        events: {
+          onAgentLoopEvent: events.hostPort.events?.onAgentLoopEvent,
+        },
+        compaction: {
+          onPreflightCompactionStatus: events.hostPort.compaction?.onPreflightCompactionStatus,
+          onFinalCompactionStatus: events.hostPort.compaction?.onFinalCompactionStatus,
+        },
+        approvals: {
+          requestToolApproval: async ({ call, tool }: { call: ToolCall; tool: ToolDefinition }) => {
+            const decision = await requestToolApproval({
+              call,
+              tool,
+              createView: createControlPlanePendingApprovalView,
+              storePending: ({ view, resolve }) => {
+                pendingApprovals.set(args.sessionId, {
+                  approval: view,
+                  resolve,
+                });
+              },
+              publish: (_view, callForEvent) => {
+                events.publishApprovalRequested(callForEvent);
+              },
             });
+            pendingApprovals.delete(args.sessionId);
+            return decision;
           },
-          publish: (_view, callForEvent) => {
-            events.publishApprovalRequested(callForEvent);
-          },
-        });
-        pendingApprovals.delete(args.sessionId);
-        return decision;
+        },
       },
-      onCompactionStatus: events.hostPort.compaction?.onFinalCompactionStatus,
     });
     return {
       ...result,

@@ -1,6 +1,6 @@
 import type { EventEmitter } from 'node:events';
 import type { ToolCall, ToolDefinition } from '../../../../index.js';
-import type { ChatTurnCompactionPort, ChatTurnEventPort, ChatTurnHostPort } from '../../../../core/chat/turn-host.js';
+import type { ChatTurnCompactionPort, ChatTurnEventPort, ChatTurnHostPort } from '../../../../core/chat/engine/turns/host-bridge.js';
 import type { AgentLoopEvent } from '../../../../core/runtime/agent-loop.js';
 import type { ControlPlaneSessionLiveEvent } from '../types.js';
 

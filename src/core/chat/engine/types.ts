@@ -6,7 +6,7 @@ import type {
 import type { TraceSummarizerRegistry } from '../../observability/trace-summarizers.js';
 import type { AgentLoopEvent, RunAgentLoopOptions } from '../../runtime/agent-loop.js';
 import type { TraceEvent } from '../../types.js';
-import type { ChatSessionLeaseOwner } from '../session-lease.js';
+import type { ChatSessionLeaseOwner } from './sessions/lease.js';
 import type { ChatSession } from '../types.js';
 
 export type ConversationEngineConfig = {

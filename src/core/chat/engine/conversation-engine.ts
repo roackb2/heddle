@@ -1,23 +1,17 @@
-import { resolveConversationEnginePaths } from './paths.js';
-import { createConversationSessionService } from './session-service.js';
-import { createConversationTurnService } from './turn-service.js';
+import { normalizeConversationEngineConfig } from './config.js';
+import { createConversationSessionService } from './sessions/service.js';
+import { createConversationTurnService } from './turns/service.js';
 import type { ConversationEngine, ConversationEngineConfig } from './types.js';
 
 export function createConversationEngine(config: ConversationEngineConfig): ConversationEngine {
-  const normalizedConfig: ConversationEngineConfig = {
-    ...config,
-    memoryMaintenanceMode: config.memoryMaintenanceMode ?? 'background',
-  };
-  const paths = resolveConversationEnginePaths(normalizedConfig);
+  const normalizedConfig = normalizeConversationEngineConfig(config);
 
   return {
     sessions: createConversationSessionService({
       config: normalizedConfig,
-      paths,
     }),
     turns: createConversationTurnService({
       config: normalizedConfig,
-      paths,
     }),
   };
 }

@@ -303,11 +303,11 @@ export type {
 export {
   runConversationTurn,
   clearConversationTurnLease,
-} from './core/chat/conversation-turn.js';
+} from './core/chat/engine/turns/run-conversation-turn.js';
 export type {
   RunConversationTurnArgs,
   RunConversationTurnResult,
-} from './core/chat/conversation-turn.js';
+} from './core/chat/engine/turns/run-conversation-turn.js';
 
 // Prompts
 export { buildSystemPrompt } from './core/prompts/system-prompt.js';

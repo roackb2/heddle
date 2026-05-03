@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createChatTurnHostBridge } from '../../../core/chat/turn-host-bridge.js';
+import { createChatTurnHostBridge } from '../../../core/chat/engine/turns/host-bridge.js';
 import type { ToolCall, ToolDefinition } from '../../../core/types.js';
 
 describe('chat turn host bridge', () => {
@@ -7,7 +7,7 @@ describe('chat turn host bridge', () => {
     const onLegacyCompactionStatus = vi.fn();
     const onPreflightCompactionStatus = vi.fn();
     const bridge = createChatTurnHostBridge({
-      onLegacyCompactionStatus,
+      onCompactionStatus: onLegacyCompactionStatus,
       host: {
         compaction: {
           onPreflightCompactionStatus,
@@ -29,7 +29,7 @@ describe('chat turn host bridge', () => {
     const onLegacyCompactionStatus = vi.fn();
     const onFinalCompactionStatus = vi.fn();
     const bridge = createChatTurnHostBridge({
-      onLegacyCompactionStatus,
+      onCompactionStatus: onLegacyCompactionStatus,
       host: {
         compaction: {
           onFinalCompactionStatus,

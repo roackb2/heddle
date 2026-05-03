@@ -41,8 +41,7 @@ Approval behavior currently exists in these places:
 ## Extension Points
 
 - Add a runtime approval rule by passing `approvalPolicies` into `runAgent`,
-  `runAgentLoop`, `runAgentHeartbeat`, `submitChatSessionPrompt`, or
-  `runConversationTurn`.
+  `runAgentLoop`, `runAgentHeartbeat`, or `runConversationTurn`.
 - Add host UI by implementing an approval surface in the host adapter layer.
 - Add remembered approval storage behind a small store interface.
 

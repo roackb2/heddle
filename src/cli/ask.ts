@@ -16,9 +16,9 @@ import {
 } from '../index.js';
 import { runMaintenanceForRecordedCandidates } from '../core/memory/maintenance-integration.js';
 import type { ResolvedRuntimeHost } from '../core/runtime/runtime-hosts.js';
-import { submitChatSessionPrompt } from '../core/chat/session-submit.js';
+import { runConversationTurn } from '../core/chat/engine/index.js';
 import type { ChatSession } from '../core/chat/types.js';
-import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../core/chat/storage.js';
+import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../core/chat/engine/sessions/storage.js';
 import { resolveWorkspaceContext } from '../core/runtime/workspaces.js';
 import { createDaemonControlPlaneClient } from './remote/control-plane-client.js';
 
@@ -94,17 +94,25 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
   });
 
   if (targetSession) {
-    const result = await submitChatSessionPrompt({
+    const result = await runConversationTurn({
       workspaceRoot,
       stateRoot,
       sessionStoragePath,
+      traceDir: join(stateRoot, 'traces'),
       sessionId: targetSession.id,
       prompt: goal,
       apiKey: options.apiKey,
       preferApiKey: options.preferApiKey,
       systemContext,
       memoryMaintenanceMode: 'inline',
-      approveToolCall: createEvalAutoApprovalHandler(),
+      host: createEvalAutoApprovalHandler() ? {
+        approvals: {
+          requestToolApproval: async ({ call, tool }) => {
+            const handler = createEvalAutoApprovalHandler();
+            return await handler?.(call, tool) ?? { approved: false, reason: 'Missing approval handler.' };
+          },
+        },
+      } : undefined,
       leaseOwner: {
         ownerKind: 'ask',
         ownerId: `ask-${process.pid}`,

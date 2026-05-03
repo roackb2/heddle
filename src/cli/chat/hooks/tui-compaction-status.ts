@@ -1,4 +1,4 @@
-import type { ChatTurnCompactionPort } from '../../../core/chat/turn-host.js';
+import type { ChatTurnCompactionPort } from '../../../core/chat/engine/turns/host-bridge.js';
 import { buildCompactionRunningContext } from '../state/compaction.js';
 import type { ChatMessage } from '../../../index.js';
 import type { ChatSession } from '../state/types.js';
@@ -44,8 +44,8 @@ export function createTuiCompactionStatusPort(args: {
   };
 
   return {
-    onPreflightCompactionStatus: (event) => handleWithSourceHistory(event, []),
-    onFinalCompactionStatus: (event) => handleWithSourceHistory(event, []),
+    onPreflightCompactionStatus: (event: TuiCompactionStatusEvent) => handleWithSourceHistory(event, []),
+    onFinalCompactionStatus: (event: TuiCompactionStatusEvent) => handleWithSourceHistory(event, []),
     handleWithSourceHistory,
   };
 }

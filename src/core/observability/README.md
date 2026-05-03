@@ -25,7 +25,7 @@ Observability behavior currently exists in these places:
 - `src/core/types.ts` for `TraceEvent`.
 - `src/core/runtime/events.ts` for `AgentLoopEvent`.
 - `src/core/trace/recorder.ts` and `src/core/trace/format.ts`.
-- `src/core/chat/trace.ts` for persisted chat trace files.
+- `src/core/chat/engine/turns/trace.ts` for persisted chat trace files.
 - `src/core/observability/trace-summarizers.ts` for turn summary evidence.
 - `src/core/observability/semantic-conventions.ts` for shared trace names.
 - `src/core/observability/conversation-activity.ts` for shared host activity

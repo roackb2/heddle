@@ -9,4 +9,4 @@ export {
   readChatSession,
   migrateLegacyChatSessions,
   saveChatSessions,
-} from '../../../core/chat/storage.js';
+} from '../../../core/chat/engine/sessions/storage.js';

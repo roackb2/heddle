@@ -98,7 +98,7 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
         stateRoot: args.stateRoot,
         force: true,
         summarizer: { credentialSource: args.providerCredentialSource },
-      }).then((compacted) => {
+      }).then((compacted: Awaited<ReturnType<typeof compactChatHistoryWithArchive>>) => {
         const changed =
           compacted.history.length !== session.history.length
           || compacted.context.compactedMessages !== undefined
@@ -123,7 +123,7 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
           : compacted.context.compactionError ?
             `Compaction skipped. ${compacted.context.compactionError}`
           : 'Current session history is already compact enough.';
-      }).catch((error) => {
+      }).catch((error: unknown) => {
         args.setStatus('Idle');
         return error instanceof Error ? `Compaction failed. ${error.message}` : `Compaction failed. ${String(error)}`;
       });

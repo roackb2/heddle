@@ -2,9 +2,9 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createChatTurnPersistenceArtifacts } from '../../../core/chat/session-turn-result.js';
-import { loadChatSessions, saveChatSessions } from '../../../core/chat/storage.js';
-import { persistCompletedChatTurn } from '../../../core/chat/turn-persistence.js';
+import { createChatTurnPersistenceArtifacts } from '../../../core/chat/engine/turns/result.js';
+import { loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/storage.js';
+import { persistCompletedChatTurn } from '../../../core/chat/engine/turns/persistence.js';
 import { createTraceSummarizerRegistry } from '../../../core/observability/trace-summarizers.js';
 import type { AgentLoopResult } from '../../../core/runtime/agent-loop.js';
 import type { ChatSession } from '../../../core/chat/types.js';
@@ -110,6 +110,7 @@ describe('chat turn persistence', () => {
       sessionStoragePath,
       model: 'gpt-5.4',
       stateRoot,
+      traceDir: join(stateRoot, 'traces'),
       toolNames: ['read_file'],
       historyForTokenEstimate: session.history,
       credentialSource: { type: 'explicit-api-key' },

@@ -8,8 +8,8 @@ import { resolveApiKeyForModel, resolveChatRuntimeConfig, resolveProviderCredent
 import { createLogger } from '../../../core/utils/logger.js';
 import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../index.js';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
-import { runConversationTurn } from '../../../core/chat/conversation-turn.js';
-import { createChatSession as createCoreChatSession, loadChatSessions, saveChatSessions } from '../../../core/chat/storage.js';
+import { runConversationTurn } from '../../../core/chat/engine/turns/run-conversation-turn.js';
+import { createChatSession as createCoreChatSession, loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/storage.js';
 import * as agentLoopModule from '../../../core/runtime/agent-loop.js';
 import type { ToolApprovalPolicy } from '../../../core/approvals/types.js';
 import { continueChatPrompt, createControlPlaneChatSession, readChatSessionDetail, submitChatPrompt } from '../../../server/features/control-plane/services/chat-sessions.js';
@@ -567,6 +567,7 @@ describe('conversation turn lifecycle', () => {
     await runConversationTurn({
       workspaceRoot: storage.workspaceRoot,
       stateRoot: storage.stateRoot,
+      traceDir: join(storage.stateRoot, 'traces'),
       sessionStoragePath: storage.sessionStoragePath,
       sessionId: storage.sessionId,
       prompt: 'Edit safely.',
