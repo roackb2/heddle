@@ -1,13 +1,13 @@
 import { join } from 'node:path';
+import type { ChatMessage } from '../llm/types.js';
+import type { TraceSummarizerRegistry } from '../observability/trace-summarizers.js';
+import type { ProviderCredentialSource } from '../runtime/api-keys.js';
+import type { AgentLoopResult } from '../runtime/agent-loop.js';
 import { buildCompactionRunningContext } from './compaction.js';
 import { persistChatTurnResult, type PersistChatTurnResult } from './session-turn-result.js';
 import { saveChatSessions, touchSession } from './storage.js';
 import type { ChatSession } from './types.js';
-import type { ChatTurnHostPort } from './turn-host.js';
-import type { AgentLoopResult } from '../runtime/agent-loop.js';
-import type { ChatMessage } from '../llm/types.js';
-import type { ProviderCredentialSource } from '../runtime/api-keys.js';
-import type { TraceSummarizerRegistry } from '../observability/trace-summarizers.js';
+import type { NormalizedChatTurnHost } from './turn-host.js';
 
 export type PersistCompletedChatTurnArgs = {
   result: AgentLoopResult;
@@ -22,8 +22,8 @@ export type PersistCompletedChatTurnArgs = {
   historyForTokenEstimate: ChatMessage[];
   credentialSource: ProviderCredentialSource;
   traceSummarizerRegistry?: TraceSummarizerRegistry;
-  host?: ChatTurnHostPort;
-  onCompactionStatus?: (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; summaryPath?: string; error?: string }) => void;
+  host?: Pick<NormalizedChatTurnHost, 'onFinalCompactionStatus'>;
+  onLegacyCompactionStatus?: (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; summaryPath?: string; error?: string }) => void;
 };
 
 export async function persistCompletedChatTurn(args: PersistCompletedChatTurnArgs): Promise<PersistChatTurnResult> {
@@ -41,8 +41,8 @@ export async function persistCompletedChatTurn(args: PersistCompletedChatTurnArg
     traceSummarizerRegistry: args.traceSummarizerRegistry,
     createTurnId: () => `server-turn-${Date.now()}`,
     onCompactionStatus: (event) => {
-      args.onCompactionStatus?.(event);
-      args.host?.compaction?.onFinalCompactionStatus?.(event);
+      args.onLegacyCompactionStatus?.(event);
+      args.host?.onFinalCompactionStatus?.(event);
       if (event.status === 'running') {
         persistFinalCompactionRunningSeed({
           ...args,

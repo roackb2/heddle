@@ -4,6 +4,7 @@ import { buildCompactionRunningContext, compactChatHistoryWithArchive } from './
 import { acquireSessionLease, getSessionLeaseConflict, type ChatSessionLeaseOwner } from './session-lease.js';
 import { readChatSession, saveChatSessions, touchSession } from './storage.js';
 import type { ChatArchiveRecord, ChatContextStats, ChatSession } from './types.js';
+import type { NormalizedChatTurnHost } from './turn-host.js';
 
 export type ChatTurnPreflightCompactionStatus = {
   status: 'running' | 'finished' | 'failed';
@@ -23,7 +24,9 @@ export type PrepareChatSessionTurnArgs = {
   toolNames: string[];
   summarizer: Parameters<typeof compactChatHistoryWithArchive>[0]['summarizer'];
   leaseOwner: ChatSessionLeaseOwner;
-  onCompactionStatus?: (event: ChatTurnPreflightCompactionStatus, sourceHistory: ChatMessage[], leasedSession?: ChatSession) => void;
+  sessions: ChatSession[];
+  host?: Pick<NormalizedChatTurnHost, 'onPreflightCompactionStatus'>;
+  onLegacyCompactionStatus?: (event: ChatTurnPreflightCompactionStatus) => void;
 };
 
 export type PrepareChatSessionTurnResult =
@@ -63,23 +66,40 @@ export async function prepareChatSessionTurn(args: PrepareChatSessionTurnArgs): 
     toolNames: args.toolNames,
     goal: args.prompt,
     summarizer: args.summarizer,
-    onStatusChange: (event) => args.onCompactionStatus?.(event, initialHistory, leasedSession),
+    onStatusChange: (event) => {
+      args.onLegacyCompactionStatus?.(event);
+      args.host?.onPreflightCompactionStatus?.(event);
+      if (event.status === 'running' && leasedSession) {
+        persistPreflightCompactionRunningSeed({
+          sessionStoragePath: args.sessionStoragePath,
+          sessions: args.sessions,
+          sessionId: args.sessionId,
+          leasedSession,
+          archivePath: event.archivePath,
+        });
+      }
+    },
   });
 
-  return {
-    ok: true,
-    session: leasedSession ? {
-      ...leasedSession,
-      history: preflightCompacted.history,
+  return persistPreparedChatSessionTurn({
+    sessionStoragePath: args.sessionStoragePath,
+    sessions: args.sessions,
+    session: persistedSession ?? readRequiredFallbackSession(args.sessions, args.sessionId),
+    prepared: {
+      ok: true,
+      session: leasedSession ? {
+        ...leasedSession,
+        history: preflightCompacted.history,
+        context: preflightCompacted.context,
+        archives: preflightCompacted.archives,
+        messages: buildConversationMessages(preflightCompacted.history),
+      } : undefined,
+      historyForRun: preflightCompacted.history,
+      preflightHistory: preflightCompacted.history,
       context: preflightCompacted.context,
       archives: preflightCompacted.archives,
-      messages: buildConversationMessages(preflightCompacted.history),
-    } : undefined,
-    historyForRun: preflightCompacted.history,
-    preflightHistory: preflightCompacted.history,
-    context: preflightCompacted.context,
-    archives: preflightCompacted.archives,
-  };
+    },
+  });
 }
 
 export function persistPreflightCompactionRunningSeed(args: {
@@ -110,7 +130,7 @@ export function persistPreparedChatSessionTurn(args: {
   sessions: ChatSession[];
   session: ChatSession;
   prepared: Extract<PrepareChatSessionTurnResult, { ok: true }>;
-}): ChatSession {
+}): Extract<PrepareChatSessionTurnResult, { ok: true }> {
   const preparedSession = args.prepared.session ?? touchSession({
     ...args.session,
     history: args.prepared.preflightHistory,
@@ -123,5 +143,18 @@ export function persistPreparedChatSessionTurn(args: {
     args.sessionStoragePath,
     args.sessions.map((candidate) => candidate.id === args.session.id ? preparedSession : candidate),
   );
-  return preparedSession;
+
+  return {
+    ...args.prepared,
+    session: preparedSession,
+  };
+}
+
+function readRequiredFallbackSession(sessions: ChatSession[], sessionId: string): ChatSession {
+  const session = sessions.find((candidate) => candidate.id === sessionId);
+  if (!session) {
+    throw new Error(`Chat session not found: ${sessionId}`);
+  }
+
+  return session;
 }
