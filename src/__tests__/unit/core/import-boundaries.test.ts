@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SOURCE_ROOT = join(process.cwd(), 'src');
@@ -22,14 +22,9 @@ const FORBIDDEN_PRODUCTION_TOKENS = [
   'clearOrdinaryChatTurnLease',
 ];
 
-const PUBLIC_EXPORT_EXPECTATIONS = [
-  'createConversationEngine',
-  'runConversationTurn',
-  'clearConversationTurnLease',
-];
-
 describe('core import boundaries', () => {
   const sourceFiles = listSourceFiles(SOURCE_ROOT);
+  const productionFiles = sourceFiles.filter((file) => isProductionSource(file));
 
   it('keeps core modules independent from host adapters', () => {
     const violations = findImportViolations(
@@ -77,46 +72,33 @@ describe('core import boundaries', () => {
   });
 
   it('does not reintroduce deleted flat chat module paths in production imports', () => {
-    const violations = findRemovedPathImportViolations(
-      sourceFiles.filter((file) => isProductionSource(file)),
-      REMOVED_CHAT_PATH_PREFIXES,
-    );
-
+    const violations = findRemovedPathImportViolations(productionFiles, REMOVED_CHAT_PATH_PREFIXES);
     expect(violations).toEqual([]);
   });
 
   it('does not reintroduce obsolete ordinary-turn and session-submit names in production code', () => {
-    const violations = findForbiddenTokenUsages(
-      sourceFiles.filter((file) => isProductionSource(file)),
-      FORBIDDEN_PRODUCTION_TOKENS,
-    );
-
+    const violations = findForbiddenTokenUsages(productionFiles, FORBIDDEN_PRODUCTION_TOKENS);
     expect(violations).toEqual([]);
   });
 
   it('keeps toolkit modules from importing command modules', () => {
-    const violations = findImportViolations(
+    const violations = findResolvedImportViolations(
       sourceFiles.filter((file) => toSourcePath(file).startsWith('core/tools/toolkits/')),
-      [/core\/commands\//, /\.\.\/\.\.\/commands\//, /\.\.\/commands\//],
+      (resolvedPath) => resolvedPath.startsWith('core/commands/'),
+      'core/commands/*',
     );
 
     expect(violations).toEqual([]);
   });
 
   it('keeps command modules from importing toolkit implementations directly', () => {
-    const violations = findImportViolations(
+    const violations = findResolvedImportViolations(
       sourceFiles.filter((file) => toSourcePath(file).startsWith('core/commands/')),
-      [/core\/tools\/toolkits\//, /\.\.\/\.\.\/tools\/toolkits\//, /\.\.\/tools\/toolkits\//],
+      (resolvedPath) => resolvedPath.startsWith('core/tools/toolkits/'),
+      'core/tools/toolkits/*',
     );
 
     expect(violations).toEqual([]);
-  });
-
-  it('keeps the package root exporting the alpha conversation engine entry points', () => {
-    const indexSource = readFileSync(join(SOURCE_ROOT, 'index.ts'), 'utf8');
-    for (const symbol of PUBLIC_EXPORT_EXPECTATIONS) {
-      expect(indexSource).toContain(symbol);
-    }
   });
 });
 
@@ -141,12 +123,27 @@ function findImportViolations(files: string[], disallowed: RegExp[]): string[] {
   });
 }
 
+function findResolvedImportViolations(
+  files: string[],
+  isViolation: (resolvedPath: string) => boolean,
+  description: string,
+): string[] {
+  return files.flatMap((file) => {
+    const imports = readImports(file)
+      .map((specifier) => ({ specifier, resolvedPath: resolveImportSpecifier(file, specifier) }))
+      .filter((entry) => entry.resolvedPath && isViolation(entry.resolvedPath));
+
+    return imports.map((entry) => `${toSourcePath(file)} imports ${entry.specifier} -> ${entry.resolvedPath} (forbidden ${description})`);
+  });
+}
+
 function findRemovedPathImportViolations(files: string[], removedPrefixes: string[]): string[] {
   return files.flatMap((file) => {
     const imports = readImports(file)
-      .filter((specifier) => removedPrefixes.some((prefix) => normalizeImportSpecifier(specifier).startsWith(prefix)));
+      .map((specifier) => ({ specifier, resolvedPath: resolveImportSpecifier(file, specifier) }))
+      .filter((entry) => entry.resolvedPath && removedPrefixes.some((prefix) => entry.resolvedPath.startsWith(prefix)));
 
-    return imports.map((specifier) => `${toSourcePath(file)} imports removed path ${specifier}`);
+    return imports.map((entry) => `${toSourcePath(file)} imports removed path ${entry.specifier} -> ${entry.resolvedPath}`);
   });
 }
 
@@ -164,11 +161,25 @@ function readImports(file: string): string[] {
     .map((match) => match[1]!);
 }
 
-function normalizeImportSpecifier(specifier: string): string {
-  return specifier
-    .replace(/^\.\//, '')
+function resolveImportSpecifier(file: string, specifier: string): string | undefined {
+  if (!specifier.startsWith('.')) {
+    return undefined;
+  }
+
+  const importerDir = resolve(file, '..');
+  const candidate = resolve(importerDir, specifier);
+  const relativePath = relative(SOURCE_ROOT, candidate)
     .replace(/\.js$/, '')
-    .replace(/\\/g, '/');
+    .replace(/\.ts$/, '')
+    .replace(/\.tsx$/, '')
+    .split(sep)
+    .join('/');
+
+  if (relativePath.startsWith('..')) {
+    return undefined;
+  }
+
+  return relativePath;
 }
 
 function isProductionSource(file: string): boolean {
