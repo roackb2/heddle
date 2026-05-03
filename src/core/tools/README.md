@@ -36,11 +36,15 @@ workspace.
 - `toolkits/external-context/`: provider-backed web search and image inspection
   tools plus their toolkit composition.
 - `toolkits/internal/`: internal structured workflow tools such as
-  `update_plan` plus their toolkit composition.
+  `update_plan`, plus the current M12 runtime-owned shell/process grouping used
+  to preserve default bundle behavior.
+- `toolkits/internal/run-shell.ts`: current shell/process tool implementation
+  and shell policy location.
 - `toolkits/*/toolkit.ts`: production toolkit composition entry points used by
   runtime default-tool assembly.
-- `run-shell.ts`: shell/process tool implementation and shell policy. This still
-  stands alone until the shell-policy extraction milestone.
+- Shell/process is temporarily housed under `toolkits/internal/` for M12
+  compatibility. M13 is the planned milestone for clearer shell/process policy
+  extraction.
 
 ## Public Entry Points
 
@@ -50,8 +54,8 @@ workspace.
 - `toolkits/coding-files/*`: coding file tools.
 - `toolkits/knowledge/*`: knowledge and memory-surface tools.
 - `toolkits/external-context/*`: web and image tools.
-- `toolkits/internal/*`: internal workflow/state tools.
-- `run-shell.ts`: shell inspect/mutate tools and command classification.
+- `toolkits/internal/*`: internal workflow/state tools, including the current
+  M12 shell/process implementation at `toolkits/internal/run-shell.ts`.
 
 ## Extension Points
 
@@ -76,8 +80,10 @@ workspace.
   `toolkits/external-context/`.
 - To add an internal structured workflow tool, place it under
   `toolkits/internal/`.
-- To change shell command policy, update classification tests and approval-rule
-  compatibility tests.
+- To change shell/process tool behavior or shell classification policy, update
+  `toolkits/internal/run-shell.ts` for the current M12 structure, plus the
+  classification and approval-rule compatibility tests. M13 is the planned
+  milestone for extracting shell/process policy further.
 - To change a tool output shape, update trace/review projection tests if hosts
   depend on that output.
 
