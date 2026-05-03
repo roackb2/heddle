@@ -2,8 +2,9 @@ import type { ToolApprovalPolicy } from '../approvals/types.js';
 import type { TraceSummarizerRegistry } from '../observability/trace-summarizers.js';
 import type { AgentLoopEvent } from '../runtime/events.js';
 import type { ToolCall, ToolDefinition } from '../types.js';
-import { executeOrdinaryChatTurn, clearOrdinaryChatTurnLease } from './ordinary-turn.js';
+import { runConversationTurn, clearConversationTurnLease } from './conversation-turn.js';
 import type { ChatSessionLeaseOwner } from './session-lease.js';
+import type { ConversationCompactionStatus } from '../observability/conversation-activity.js';
 
 export type SubmitChatSessionPromptArgs = {
   workspaceRoot: string;
@@ -16,7 +17,7 @@ export type SubmitChatSessionPromptArgs = {
   systemContext?: string;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   onEvent?: (event: AgentLoopEvent) => void;
-  onCompactionStatus?: (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; summaryPath?: string; error?: string }) => void;
+  onCompactionStatus?: (event: ConversationCompactionStatus) => void;
   approvalPolicies?: ToolApprovalPolicy[];
   traceSummarizerRegistry?: TraceSummarizerRegistry;
   approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
@@ -25,7 +26,7 @@ export type SubmitChatSessionPromptArgs = {
 };
 
 export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs) {
-  const result = await executeOrdinaryChatTurn({
+  const result = await runConversationTurn({
     workspaceRoot: args.workspaceRoot,
     stateRoot: args.stateRoot,
     sessionStoragePath: args.sessionStoragePath,
@@ -54,4 +55,4 @@ export async function submitChatSessionPrompt(args: SubmitChatSessionPromptArgs)
   return result;
 }
 
-export const clearChatSessionLease = clearOrdinaryChatTurnLease;
+export const clearChatSessionLease = clearConversationTurnLease;

@@ -7,10 +7,11 @@ import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
 import type { ChatTurnHostPort } from './turn-host.js';
 import { createChatTurnHostBridge } from './turn-host-bridge.js';
 import { prepareOrdinaryChatTurnContext } from './turn-context.js';
+import type { ConversationCompactionStatus } from '../observability/conversation-activity.js';
 import { runInlineTurnMemoryMaintenance, scheduleBackgroundTurnMemoryMaintenance } from './turn-memory-maintenance.js';
 import { persistCompletedChatTurn } from './turn-persistence.js';
 
-export type ExecuteOrdinaryChatTurnArgs = {
+export type RunConversationTurnArgs = {
   workspaceRoot: string;
   stateRoot: string;
   sessionStoragePath: string;
@@ -24,7 +25,7 @@ export type ExecuteOrdinaryChatTurnArgs = {
   host?: ChatTurnHostPort;
   approvalPolicies?: ToolApprovalPolicy[];
   traceSummarizerRegistry?: TraceSummarizerRegistry;
-  onCompactionStatus?: (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; summaryPath?: string; error?: string }) => void;
+  onCompactionStatus?: (event: ConversationCompactionStatus) => void;
   onAssistantStream?: Parameters<typeof runAgentLoop>[0]['onAssistantStream'];
   onTraceEvent?: Parameters<typeof runAgentLoop>[0]['onTraceEvent'];
   shouldStop?: Parameters<typeof runAgentLoop>[0]['shouldStop'];
@@ -32,7 +33,13 @@ export type ExecuteOrdinaryChatTurnArgs = {
   leaseOwner?: ChatSessionLeaseOwner;
 };
 
-export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs) {
+export type RunConversationTurnResult = {
+  outcome: string;
+  summary: string;
+  session: Awaited<ReturnType<typeof persistCompletedChatTurn>>['session'];
+};
+
+export async function runConversationTurn(args: RunConversationTurnArgs): Promise<RunConversationTurnResult> {
   const context = prepareOrdinaryChatTurnContext({
     workspaceRoot: args.workspaceRoot,
     stateRoot: args.stateRoot,
@@ -137,11 +144,11 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       session: persisted.session,
     };
   } finally {
-    clearOrdinaryChatTurnLease(args.sessionStoragePath, session.id, leaseOwner);
+    clearConversationTurnLease(args.sessionStoragePath, session.id, leaseOwner);
   }
 }
 
-export function clearOrdinaryChatTurnLease(sessionStoragePath: string, sessionId: string, owner: ChatSessionLeaseOwner) {
+export function clearConversationTurnLease(sessionStoragePath: string, sessionId: string, owner: ChatSessionLeaseOwner) {
   const sessions = loadChatSessions(sessionStoragePath, true);
   const session = sessions.find((candidate) => candidate.id === sessionId);
   if (!session?.lease) {

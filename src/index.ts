@@ -286,6 +286,29 @@ export type {
   ConversationCompactionStatus,
 } from './core/observability/conversation-activity.js';
 
+// Chat alpha API
+export { createConversationEngine } from './core/chat/engine/conversation-engine.js';
+export type {
+  ClearConversationTurnLeaseInput,
+  ConversationEngine,
+  ConversationEngineConfig,
+  ConversationEngineHost,
+  ConversationSessionService,
+  ConversationTurnService,
+  CreateConversationSessionInput,
+  ContinueConversationTurnInput,
+  SubmitConversationTurnInput,
+  SubmitConversationTurnResult,
+} from './core/chat/engine/types.js';
+export {
+  runConversationTurn,
+  clearConversationTurnLease,
+} from './core/chat/conversation-turn.js';
+export type {
+  RunConversationTurnArgs,
+  RunConversationTurnResult,
+} from './core/chat/conversation-turn.js';
+
 // Prompts
 export { buildSystemPrompt } from './core/prompts/system-prompt.js';
 

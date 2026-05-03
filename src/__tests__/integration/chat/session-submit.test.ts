@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { submitChatSessionPrompt } from '../../../core/chat/session-submit.js';
 
-const executeOrdinaryChatTurnMock = vi.hoisted(() => vi.fn());
+const runConversationTurnMock = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../core/chat/ordinary-turn.js', () => ({
-  executeOrdinaryChatTurn: executeOrdinaryChatTurnMock,
-  clearOrdinaryChatTurnLease: vi.fn(),
+vi.mock('../../../core/chat/conversation-turn.js', () => ({
+  runConversationTurn: runConversationTurnMock,
+  clearConversationTurnLease: vi.fn(),
 }));
 
 describe('submitChatSessionPrompt', () => {
   beforeEach(() => {
-    executeOrdinaryChatTurnMock.mockReset();
-    executeOrdinaryChatTurnMock.mockResolvedValue({
+    runConversationTurnMock.mockReset();
+    runConversationTurnMock.mockResolvedValue({
       outcome: 'done',
       summary: 'ok',
       session: { id: 'session-1' },
@@ -30,7 +30,7 @@ describe('submitChatSessionPrompt', () => {
       onCompactionStatus,
     });
 
-    const callArgs = executeOrdinaryChatTurnMock.mock.calls[0]?.[0];
+    const callArgs = runConversationTurnMock.mock.calls[0]?.[0];
     expect(callArgs).toBeTruthy();
     expect(callArgs.onCompactionStatus).toBeUndefined();
     expect(callArgs.host.compaction.onPreflightCompactionStatus).toBe(onCompactionStatus);

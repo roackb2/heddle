@@ -1,5 +1,5 @@
 import type { RunResult } from '../../../index.js';
-import { executeOrdinaryChatTurn } from '../../../core/chat/ordinary-turn.js';
+import { runConversationTurn } from '../../../core/chat/conversation-turn.js';
 import type { ChatSession } from '../state/types.js';
 import type { ChatRuntimeConfig } from '../utils/runtime.js';
 import { createTuiCompactionStatusPort } from './tui-compaction-status.js';
@@ -69,7 +69,7 @@ export async function executeTuiOrdinaryTurn(args: {
   });
   const approvalPolicies = createTuiRememberedApprovalPolicies({ isProjectApproved });
 
-  const result = await executeOrdinaryChatTurn({
+  const result = await runConversationTurn({
     workspaceRoot: runtime.workspaceRoot,
     stateRoot: runtime.stateRoot,
     sessionStoragePath: runtime.sessionCatalogFile,
@@ -110,7 +110,7 @@ export async function executeTuiOrdinaryTurn(args: {
   const { latestHistory } = finalizeSuccessfulTuiOrdinaryTurn({
     persistedSession,
     displayText,
-    outcome: result.outcome,
+    outcome: result.outcome as RunResult['outcome'],
     prompt,
     sessionId,
     state,
@@ -119,7 +119,7 @@ export async function executeTuiOrdinaryTurn(args: {
   });
 
   return {
-    outcome: result.outcome,
+    outcome: result.outcome as RunResult['outcome'],
     summary: result.summary,
     transcript: latestHistory,
     trace: [],

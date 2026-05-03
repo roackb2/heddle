@@ -11,7 +11,8 @@ maintenance, traces, and host ports.
 - Conversation-line projection from model history to user-visible messages.
 - Session leases and conflict handling.
 - Preflight and final compaction around long histories.
-- Ordinary chat turn orchestration through `executeOrdinaryChatTurn`.
+- Conversation-turn orchestration through `runConversationTurn`.
+- Alpha programmatic conversation-engine facade under `engine/`.
 - Chat turn persistence: trace file, turn summary, messages, history, context,
   archives, and continuation prompt.
 - Host ports for chat-turn events, approvals, and compaction status.
@@ -26,8 +27,9 @@ maintenance, traces, and host ports.
 
 ## Stable Core Entry Points
 
-- `ordinary-turn.ts`: current conversation-turn harness.
-- `session-submit.ts`: server/programmatic submit adapter over ordinary turns.
+- `conversation-turn.ts`: current persisted conversation-turn harness.
+- `session-submit.ts`: server/programmatic submit adapter over conversation turns.
+- `engine/`: alpha programmatic facade for custom hosts.
 - `storage.ts`: file-backed chat session store.
 - `compaction.ts`: history compaction and archive behavior.
 - `conversation-lines.ts`: user-facing chat message projection.
@@ -84,8 +86,12 @@ the package root. Package-root exports remain the public npm API.
 
 ## Notes For Coding Agents
 
-- Treat `ordinary-turn.ts` as the current conversation-engine seam. Keep lease
-  cleanup visible there, but put phase-specific mechanics in named turn modules.
+- Treat `conversation-turn.ts` as the current persisted conversation-turn seam.
+  Keep lease cleanup visible there, but put phase-specific mechanics in named
+  turn modules.
+- Treat `engine/` as the alpha custom-host facade. Put path, session, host, and
+  turn-service invariants there instead of adding facade logic to TUI/server
+  adapters.
 - Keep host-specific wording in adapters. Core chat should emit semantics and
   persist durable evidence.
 - Do not import from TUI, web, or server code.
