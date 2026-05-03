@@ -128,92 +128,150 @@ type MessageBlock =
   | { kind: 'quote'; text: string }
   | { kind: 'code'; text: string; info?: string };
 
-function parseMessageBlocks(text: string): MessageBlock[] {
-  const lines = text.split(/\r?\n/);
-  const blocks: MessageBlock[] = [];
-  let inCodeBlock = false;
-  let codeLines: string[] = [];
-  let codeInfo: string | undefined;
+type MessageBlockParserState = {
+  blocks: MessageBlock[];
+  codeBlock?: {
+    info?: string;
+    lines: string[];
+  };
+};
 
-  for (const line of lines) {
-    if (line.trim().startsWith('```')) {
-      if (inCodeBlock) {
-        blocks.push({ kind: 'code', text: codeLines.join('\n'), info: codeInfo });
-        codeLines = [];
-        codeInfo = undefined;
-        inCodeBlock = false;
-      } else {
-        inCodeBlock = true;
-        codeInfo = line.trim().slice(3).trim() || undefined;
-      }
-      continue;
-    }
+const HEADING_PATTERN = /^#{1,3}\s+/;
+const BULLET_PATTERN = /^[-*]\s+/;
+const TASK_PATTERN = /^[-*]\s+(\[(?: |x|-)\])\s+(.*)$/i;
+const NUMBERED_PATTERN = /^(\d+\.)\s+(.*)$/;
+const QUOTE_PATTERN = /^>\s+/;
 
-    if (inCodeBlock) {
-      codeLines.push(line);
-      continue;
-    }
+export function parseMessageBlocks(text: string): MessageBlock[] {
+  const state = text
+    .split(/\r?\n/)
+    .reduce(parseMessageBlockLine, { blocks: [] } satisfies MessageBlockParserState);
 
-    const trimmed = line.trim();
-    if (!trimmed) {
-      blocks.push({ kind: 'blank', text: '' });
-      continue;
-    }
+  return collapseParagraphBlocks(finalizeMessageBlockParserState(state).blocks);
+}
 
-    if (/^#{1,3}\s+/.test(trimmed)) {
-      blocks.push({ kind: 'heading', text: trimmed.replace(/^#{1,3}\s+/, '') });
-      continue;
-    }
+function parseMessageBlockLine(state: MessageBlockParserState, line: string): MessageBlockParserState {
+  const trimmed = line.trim();
 
-    if (/^[-*]\s+/.test(trimmed)) {
-      const taskMatch = trimmed.match(/^[-*]\s+(\[(?: |x|-)\])\s+(.*)$/i);
-      if (taskMatch) {
-        const marker = normalizeTaskMarker(taskMatch[1]);
-        if (marker) {
-          blocks.push({ kind: 'task', marker, text: taskMatch[2] });
-          continue;
-        }
-      }
-
-      blocks.push({ kind: 'bullet', text: trimmed.replace(/^[-*]\s+/, '') });
-      continue;
-    }
-
-    const numberedMatch = trimmed.match(/^(\d+\.)\s+(.*)$/);
-    if (numberedMatch) {
-      blocks.push({ kind: 'numbered', marker: numberedMatch[1], text: numberedMatch[2] });
-      continue;
-    }
-
-    if (/^>\s+/.test(trimmed)) {
-      blocks.push({ kind: 'quote', text: trimmed.replace(/^>\s+/, '') });
-      continue;
-    }
-
-    blocks.push({ kind: 'paragraph', text: line });
+  if (trimmed.startsWith('```')) {
+    return toggleCodeBlock(state, trimmed);
   }
 
-  if (codeLines.length > 0) {
-    blocks.push({ kind: 'code', text: codeLines.join('\n'), info: codeInfo });
+  if (state.codeBlock) {
+    return {
+      ...state,
+      codeBlock: {
+        ...state.codeBlock,
+        lines: [...state.codeBlock.lines, line],
+      },
+    };
   }
 
-  return collapseParagraphBlocks(blocks);
+  return appendParsedMessageBlock(state, parseNonCodeMessageBlock(line, trimmed));
+}
+
+function toggleCodeBlock(state: MessageBlockParserState, trimmedLine: string): MessageBlockParserState {
+  if (state.codeBlock) {
+    return appendParsedMessageBlock({
+      ...state,
+      codeBlock: undefined,
+    }, {
+      kind: 'code',
+      text: state.codeBlock.lines.join('\n'),
+      info: state.codeBlock.info,
+    });
+  }
+
+  return {
+    ...state,
+    codeBlock: {
+      info: trimmedLine.slice(3).trim() || undefined,
+      lines: [],
+    },
+  };
+}
+
+function finalizeMessageBlockParserState(state: MessageBlockParserState): MessageBlockParserState {
+  if (!state.codeBlock) {
+    return state;
+  }
+
+  return appendParsedMessageBlock({
+    ...state,
+    codeBlock: undefined,
+  }, {
+    kind: 'code',
+    text: state.codeBlock.lines.join('\n'),
+    info: state.codeBlock.info,
+  });
+}
+
+function parseNonCodeMessageBlock(line: string, trimmed: string): MessageBlock {
+  if (!trimmed) {
+    return { kind: 'blank', text: '' };
+  }
+
+  if (HEADING_PATTERN.test(trimmed)) {
+    return { kind: 'heading', text: trimmed.replace(HEADING_PATTERN, '') };
+  }
+
+  const taskBlock = parseTaskMessageBlock(trimmed);
+  if (taskBlock) {
+    return taskBlock;
+  }
+
+  if (BULLET_PATTERN.test(trimmed)) {
+    return { kind: 'bullet', text: trimmed.replace(BULLET_PATTERN, '') };
+  }
+
+  const numberedMatch = trimmed.match(NUMBERED_PATTERN);
+  if (numberedMatch) {
+    return { kind: 'numbered', marker: numberedMatch[1], text: numberedMatch[2] };
+  }
+
+  if (QUOTE_PATTERN.test(trimmed)) {
+    return { kind: 'quote', text: trimmed.replace(QUOTE_PATTERN, '') };
+  }
+
+  return { kind: 'paragraph', text: line };
+}
+
+function parseTaskMessageBlock(trimmed: string): Extract<MessageBlock, { kind: 'task' }> | undefined {
+  const taskMatch = trimmed.match(TASK_PATTERN);
+  if (!taskMatch) {
+    return undefined;
+  }
+
+  const marker = normalizeTaskMarker(taskMatch[1]);
+  if (!marker) {
+    return undefined;
+  }
+
+  return { kind: 'task', marker, text: taskMatch[2] };
+}
+
+function appendParsedMessageBlock(state: MessageBlockParserState, block: MessageBlock): MessageBlockParserState {
+  return {
+    ...state,
+    blocks: [...state.blocks, block],
+  };
 }
 
 function collapseParagraphBlocks(blocks: MessageBlock[]): MessageBlock[] {
-  const collapsed: MessageBlock[] = [];
-
-  for (const block of blocks) {
+  return blocks.reduce<MessageBlock[]>((collapsed, block) => {
     const previous = collapsed.at(-1);
     if (block.kind === 'paragraph' && previous?.kind === 'paragraph') {
-      previous.text = `${previous.text} ${block.text.trim()}`;
-      continue;
+      return [
+        ...collapsed.slice(0, -1),
+        {
+          kind: 'paragraph',
+          text: `${previous.text} ${block.text.trim()}`,
+        },
+      ];
     }
 
-    collapsed.push(block);
-  }
-
-  return collapsed;
+    return [...collapsed, block];
+  }, []);
 }
 
 function renderBlock(
@@ -388,7 +446,7 @@ type InlineSegment =
   | { kind: 'bold'; text: string }
   | { kind: 'code'; text: string };
 
-function parseInlineSegments(text: string): InlineSegment[] {
+export function parseInlineSegments(text: string): InlineSegment[] {
   const segments: InlineSegment[] = [];
   let index = 0;
 
@@ -400,6 +458,10 @@ function parseInlineSegments(text: string): InlineSegment[] {
         index = end + 2;
         continue;
       }
+
+      segments.push({ kind: 'text', text: '**' });
+      index += 2;
+      continue;
     }
 
     if (text[index] === '`') {
@@ -409,11 +471,15 @@ function parseInlineSegments(text: string): InlineSegment[] {
         index = end + 1;
         continue;
       }
+
+      segments.push({ kind: 'text', text: '`' });
+      index += 1;
+      continue;
     }
 
     const nextBold = text.indexOf('**', index);
     const nextCode = text.indexOf('`', index);
-    const nextStopCandidates = [nextBold, nextCode].filter((candidate) => candidate !== -1);
+    const nextStopCandidates = [nextBold, nextCode].filter((candidate) => candidate > index);
     const nextStop = nextStopCandidates.length > 0 ? Math.min(...nextStopCandidates) : text.length;
     segments.push({ kind: 'text', text: text.slice(index, nextStop) });
     index = nextStop;
