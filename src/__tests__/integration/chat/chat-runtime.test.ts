@@ -8,6 +8,7 @@ import { resolveApiKeyForModel, resolveChatRuntimeConfig, resolveProviderCredent
 import { createLogger } from '../../../core/utils/logger.js';
 import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../index.js';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
+import * as agentLoopModule from '../../../core/runtime/agent-loop.js';
 import { continueChatPrompt, createControlPlaneChatSession, readChatSessionDetail, submitChatPrompt } from '../../../server/features/control-plane/services/chat-sessions.js';
 
 describe('resolveChatRuntimeConfig', () => {
@@ -297,7 +298,7 @@ describe('executeAgentTurn final message persistence', () => {
       ],
     };
 
-    const runAgentLoopSpy = vi.spyOn(await import('../../../index.js'), 'runAgentLoop').mockResolvedValue(result as never);
+    const runAgentLoopSpy = vi.spyOn(agentLoopModule, 'runAgentLoop').mockResolvedValue(result as never);
 
     await executeAgentTurn({
       prompt,
@@ -454,7 +455,7 @@ describe('control-plane shared chat runtime integration', () => {
       apiKeyPresent: true,
     });
 
-    const loopSpy = vi.spyOn(await import('../../../index.js'), 'runAgentLoop')
+    const loopSpy = vi.spyOn(agentLoopModule, 'runAgentLoop')
       .mockResolvedValueOnce({
         outcome: 'done',
         summary: 'First turn done.',
