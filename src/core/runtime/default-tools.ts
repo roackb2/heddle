@@ -1,23 +1,12 @@
 import { join } from 'node:path';
 import type { ToolDefinition } from '../types.js';
-import { createDeleteFileTool } from '../tools/delete-file.js';
-import { createEditFileTool } from '../tools/edit-file.js';
-import { createListFilesTool } from '../tools/list-files.js';
-import { createMoveFileTool } from '../tools/move-file.js';
-import {
-  createEditMemoryNoteTool,
-  createListMemoryNotesTool,
-  createReadMemoryNoteTool,
-  createSearchMemoryNotesTool,
-} from '../tools/memory-notes.js';
-import { createReadFileTool } from '../tools/read-file.js';
-import { createMemoryCheckpointTool } from '../tools/memory-checkpoint.js';
-import { createRecordKnowledgeTool } from '../tools/record-knowledge.js';
-import { createRunShellInspectTool, createRunShellMutateTool } from '../tools/run-shell.js';
-import { createSearchFilesTool } from '../tools/search-files.js';
-import { updatePlanTool } from '../tools/update-plan.js';
-import { createViewImageTool } from '../tools/view-image.js';
-import { createWebSearchTool } from '../tools/web-search.js';
+import { createToolkitToolBundle, type ToolToolkit } from '../tools/toolkit.js';
+import { codingFilesToolkit } from '../tools/toolkits/coding-files.js';
+import { imageToolkit } from '../tools/toolkits/image.js';
+import { memoryToolkit } from '../tools/toolkits/memory.js';
+import { planningToolkit } from '../tools/toolkits/planning.js';
+import { shellProcessToolkit } from '../tools/toolkits/shell-process.js';
+import { webToolkit } from '../tools/toolkits/web.js';
 import type { ProviderCredentialSource } from './api-keys.js';
 
 export type DefaultAgentToolsOptions = {
@@ -35,61 +24,40 @@ export type DefaultAgentToolsOptions = {
 
 export function createDefaultAgentTools(options: DefaultAgentToolsOptions): ToolDefinition[] {
   const workspaceRoot = options.workspaceRoot ?? process.cwd();
-  const memoryRoot =
+  const memoryDir =
     options.memoryDir ??
     join(workspaceRoot, options.stateDir ?? '.heddle', 'memory');
   const memoryMode = options.memoryMode ?? 'read-and-record';
-  const tools: ToolDefinition[] = [
-    createListFilesTool({ workspaceRoot }),
-    createReadFileTool({ workspaceRoot }),
-    createEditFileTool({ workspaceRoot }),
-    createDeleteFileTool({ workspaceRoot }),
-    createMoveFileTool({ workspaceRoot }),
-    createSearchFilesTool({ excludedDirs: options.searchIgnoreDirs, workspaceRoot }),
-    createWebSearchTool({
-      model: options.model,
-      apiKey: options.apiKey,
-      providerCredentialSource: options.providerCredentialSource,
-      credentialStorePath: options.credentialStorePath,
-    }),
-    createViewImageTool({
-      model: options.model,
-      apiKey: options.apiKey,
-      providerCredentialSource: options.providerCredentialSource,
-      credentialStorePath: options.credentialStorePath,
+
+  return createToolkitToolBundle({
+    toolkits: createDefaultToolkits({ includePlanTool: options.includePlanTool }),
+    context: {
       workspaceRoot,
-    }),
-  ];
-
-  tools.push(...createMemoryTools(memoryRoot, memoryMode));
-
-  if (options.includePlanTool ?? true) {
-    tools.push(updatePlanTool);
-  }
-
-  tools.push(createRunShellInspectTool({ cwd: workspaceRoot }), createRunShellMutateTool({ cwd: workspaceRoot }));
-  return tools;
+      model: options.model,
+      apiKey: options.apiKey,
+      providerCredentialSource: options.providerCredentialSource,
+      credentialStorePath: options.credentialStorePath,
+      memoryDir,
+      memoryMode,
+      searchIgnoreDirs: options.searchIgnoreDirs,
+    },
+  });
 }
 
-function createMemoryTools(memoryRoot: string, mode: NonNullable<DefaultAgentToolsOptions['memoryMode']>): ToolDefinition[] {
-  if (mode === 'none') {
-    return [];
-  }
-
-  const readTools = [
-    createListMemoryNotesTool({ memoryRoot }),
-    createReadMemoryNoteTool({ memoryRoot }),
-    createSearchMemoryNotesTool({ memoryRoot }),
+function createDefaultToolkits(args: {
+  includePlanTool?: boolean;
+}): ToolToolkit[] {
+  const toolkits: ToolToolkit[] = [
+    codingFilesToolkit,
+    webToolkit,
+    imageToolkit,
+    memoryToolkit,
   ];
 
-  if (mode === 'read-and-record') {
-    return [...readTools, createMemoryCheckpointTool({ memoryRoot }), createRecordKnowledgeTool({ memoryRoot })];
+  if (args.includePlanTool ?? true) {
+    toolkits.push(planningToolkit);
   }
 
-  if (mode === 'maintainer' || mode === 'legacy-full') {
-    return [...readTools, createEditMemoryNoteTool({ memoryRoot })];
-  }
-
-  const exhaustive: never = mode;
-  throw new Error(`Unsupported memory mode: ${exhaustive}`);
+  toolkits.push(shellProcessToolkit);
+  return toolkits;
 }

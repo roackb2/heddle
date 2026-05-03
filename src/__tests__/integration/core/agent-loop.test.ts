@@ -246,7 +246,7 @@ describe('runAgentLoop', () => {
 });
 
 describe('createDefaultAgentTools', () => {
-  it('creates the default runtime tool bundle and can omit planning for single-turn hosts', () => {
+  it('creates the default runtime tool bundle with stable ordering and can omit planning for single-turn hosts', () => {
     const withPlan = createDefaultAgentTools({
       model: 'gpt-test',
       memoryDir: '/tmp/heddle-memory',
@@ -258,12 +258,31 @@ describe('createDefaultAgentTools', () => {
       includePlanTool: false,
     });
 
-    expect(withPlan.map((tool) => tool.name)).toContain('update_plan');
-    expect(withoutPlan.map((tool) => tool.name)).not.toContain('update_plan');
-    expect(withoutPlan.map((tool) => tool.name)).toEqual(expect.arrayContaining([
+    expect(withPlan.map((tool) => tool.name)).toEqual([
       'list_files',
       'read_file',
       'edit_file',
+      'delete_file',
+      'move_file',
+      'search_files',
+      'web_search',
+      'view_image',
+      'list_memory_notes',
+      'read_memory_note',
+      'search_memory_notes',
+      'memory_checkpoint',
+      'record_knowledge',
+      'update_plan',
+      'run_shell_inspect',
+      'run_shell_mutate',
+    ]);
+    expect(withoutPlan.map((tool) => tool.name)).toEqual([
+      'list_files',
+      'read_file',
+      'edit_file',
+      'delete_file',
+      'move_file',
+      'search_files',
       'web_search',
       'view_image',
       'list_memory_notes',
@@ -273,7 +292,7 @@ describe('createDefaultAgentTools', () => {
       'record_knowledge',
       'run_shell_inspect',
       'run_shell_mutate',
-    ]));
+    ]);
     expect(withoutPlan.map((tool) => tool.name)).not.toContain('edit_memory_note');
   });
 
