@@ -9,20 +9,20 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { ImageBlockParam } from '@anthropic-ai/sdk/resources/messages/messages';
 import OpenAI from 'openai';
 import type { ResponseInputImage, ResponseInputText } from 'openai/resources/responses/responses.js';
-import type { ToolDefinition, ToolResult } from '../types.js';
-import { inferProviderFromModel } from '../llm/factory.js';
+import type { ToolDefinition, ToolResult } from '../../../types.js';
+import { inferProviderFromModel } from '../../../llm/factory.js';
 import {
   createOpenAiOAuthFetch,
   executeOpenAiOAuthCodexSse,
   extractOpenAiCodexOutputTextFromSse,
-} from '../llm/openai.js';
+} from '../../../llm/openai.js';
 import {
   resolveOpenAiOAuthImageCandidateModels,
   validateModelCredentialCompatibility,
-} from '../llm/model-policy.js';
-import type { LlmProvider } from '../llm/types.js';
-import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../config.js';
-import { resolveOAuthCredentialForModel, type ProviderCredentialSource } from '../runtime/api-keys.js';
+} from '../../../llm/model-policy.js';
+import type { LlmProvider } from '../../../llm/types.js';
+import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../../../config.js';
+import { resolveOAuthCredentialForModel, type ProviderCredentialSource } from '../../../runtime/api-keys.js';
 
 type ViewImageInput = {
   path: string;

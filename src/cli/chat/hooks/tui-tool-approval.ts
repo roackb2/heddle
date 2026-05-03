@@ -2,7 +2,7 @@ import { rememberedApprovalPolicy } from '../../../core/approvals/default-polici
 import { humanApprovalPolicy, requestToolApproval } from '../../../core/approvals/surface.js';
 import type { ToolApprovalPolicy } from '../../../core/approvals/types.js';
 import type { ChatTurnApprovalPort } from '../../../core/chat/turn-host.js';
-import { previewEditFileInput } from '../../../core/tools/edit-file.js';
+import { previewEditFileInput } from '../../../core/tools/toolkits/coding-files/edit-file.js';
 import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../state/approval-rules.js';
 import type { ActionState } from './useAgentRun.js';
 

@@ -1,6 +1,6 @@
 import type { ChatMessage } from '../llm/types.js';
 import type { ToolCall, ToolDefinition } from '../types.js';
-import type { EditFilePreview } from '../tools/edit-file.js';
+import type { EditFilePreview } from '../tools/toolkits/coding-files/edit-file.js';
 
 export type TurnSummary = {
   id: string;

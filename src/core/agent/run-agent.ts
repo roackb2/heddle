@@ -19,7 +19,7 @@ import { isAbortError } from './util.js';
 import { createMutationState, trackToolResult } from './mutation-tracking.js';
 import { createProgressReminderState, buildProgressReminders } from './progress-reminders.js';
 import { maybeDenyToolCall, executeToolCallWithFallback } from './tool-dispatch.js';
-import type { PlanItem } from '../tools/update-plan.js';
+import type { PlanItem } from '../tools/toolkits/internal/update-plan.js';
 import type { ToolApprovalPolicy } from '../approvals/types.js';
 
 const PLAN_ITEM_STATUSES = new Set<PlanItem['status']>(['pending', 'in_progress', 'completed']);

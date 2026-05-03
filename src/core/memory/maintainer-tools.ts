@@ -4,7 +4,7 @@ import {
   createListMemoryNotesTool,
   createReadMemoryNoteTool,
   createSearchMemoryNotesTool,
-} from '../tools/memory-notes.js';
+} from '../tools/toolkits/knowledge/memory-notes.js';
 
 export function createMemoryMaintainerTools(options: { memoryRoot: string }): ToolDefinition[] {
   return [

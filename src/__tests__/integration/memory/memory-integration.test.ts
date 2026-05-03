@@ -277,7 +277,7 @@ describe('memory maintenance integration', () => {
       }),
       () => ({ content: 'Recorded.' }),
     ]);
-    const { createRecordKnowledgeTool } = await import('../../../core/tools/record-knowledge.js');
+    const { createRecordKnowledgeTool } = await import('../../../core/tools/toolkits/knowledge/record-knowledge.js');
 
     const result = await runAgent({
       goal: 'Record memory.',
@@ -303,7 +303,7 @@ describe('memory maintenance integration', () => {
   it('records a memory checkpoint when the agent chooses to preserve explicit user memory intent', async () => {
     const { runAgent } = await import('../../../core/agent/run-agent.js');
     const { buildMemoryDomainSystemContext } = await import('../../../core/memory/domain-prompt.js');
-    const { createMemoryCheckpointTool } = await import('../../../core/tools/memory-checkpoint.js');
+    const { createMemoryCheckpointTool } = await import('../../../core/tools/toolkits/knowledge/memory-checkpoint.js');
     const memoryRoot = await mkdtemp(join(tmpdir(), 'heddle-memory-checkpoint-required-'));
     const seenMessages: unknown[] = [];
     const llm = scriptedMaintainer([
@@ -358,7 +358,7 @@ describe('memory maintenance integration', () => {
 
   it('allows memory checkpoint to explicitly skip one-off turns', async () => {
     const { runAgent } = await import('../../../core/agent/run-agent.js');
-    const { createMemoryCheckpointTool } = await import('../../../core/tools/memory-checkpoint.js');
+    const { createMemoryCheckpointTool } = await import('../../../core/tools/toolkits/knowledge/memory-checkpoint.js');
     const memoryRoot = await mkdtemp(join(tmpdir(), 'heddle-memory-checkpoint-skip-'));
     const llm: LlmAdapter = {
       info: fakeInfo,

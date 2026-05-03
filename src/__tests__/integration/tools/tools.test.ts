@@ -3,29 +3,29 @@ import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createListFilesTool, listFilesTool } from '../../../core/tools/list-files.js';
-import { createReadFileTool, readFileTool } from '../../../core/tools/read-file.js';
-import { createEditFileTool, editFileTool, previewEditFileInput } from '../../../core/tools/edit-file.js';
-import { createDeleteFileTool, deleteFileTool } from '../../../core/tools/delete-file.js';
-import { createMoveFileTool, moveFileTool } from '../../../core/tools/move-file.js';
-import { updatePlanTool } from '../../../core/tools/update-plan.js';
+import { createListFilesTool, listFilesTool } from '../../../core/tools/toolkits/coding-files/list-files.js';
+import { createReadFileTool, readFileTool } from '../../../core/tools/toolkits/coding-files/read-file.js';
+import { createEditFileTool, editFileTool, previewEditFileInput } from '../../../core/tools/toolkits/coding-files/edit-file.js';
+import { createDeleteFileTool, deleteFileTool } from '../../../core/tools/toolkits/coding-files/delete-file.js';
+import { createMoveFileTool, moveFileTool } from '../../../core/tools/toolkits/coding-files/move-file.js';
+import { updatePlanTool } from '../../../core/tools/toolkits/internal/update-plan.js';
 import {
   classifyShellCommandPolicy,
   createRunShellInspectTool,
   createRunShellMutateTool,
   DEFAULT_MUTATE_RULES,
-} from '../../../core/tools/run-shell.js';
-import { createSearchFilesTool, searchFilesTool } from '../../../core/tools/search-files.js';
-import { createWebSearchTool, webSearchTool } from '../../../core/tools/web-search.js';
-import { createViewImageTool, viewImageTool } from '../../../core/tools/view-image.js';
+} from '../../../core/tools/toolkits/internal/run-shell.js';
+import { createSearchFilesTool, searchFilesTool } from '../../../core/tools/toolkits/coding-files/search-files.js';
+import { createWebSearchTool, webSearchTool } from '../../../core/tools/toolkits/external-context/web-search.js';
+import { createViewImageTool, viewImageTool } from '../../../core/tools/toolkits/external-context/view-image.js';
 import {
   createListMemoryNotesTool,
   createReadMemoryNoteTool,
   createSearchMemoryNotesTool,
   createEditMemoryNoteTool,
-} from '../../../core/tools/memory-notes.js';
-import { createMemoryCheckpointTool } from '../../../core/tools/memory-checkpoint.js';
-import { createRecordKnowledgeTool } from '../../../core/tools/record-knowledge.js';
+} from '../../../core/tools/toolkits/knowledge/memory-notes.js';
+import { createMemoryCheckpointTool } from '../../../core/tools/toolkits/knowledge/memory-checkpoint.js';
+import { createRecordKnowledgeTool } from '../../../core/tools/toolkits/knowledge/record-knowledge.js';
 import { createDefaultAgentTools } from '../../../core/runtime/default-tools.js';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
 

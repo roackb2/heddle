@@ -1,6 +1,6 @@
 import { mkdir, rename, stat } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import type { ToolDefinition, ToolResult } from '../types.js';
+import type { ToolDefinition, ToolResult } from '../../../types.js';
 
 type MoveFileInput = {
   from: string;

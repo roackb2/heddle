@@ -1,12 +1,10 @@
 import { join } from 'node:path';
 import type { ToolDefinition } from '../types.js';
 import { createToolkitToolBundle, type ToolToolkit } from '../tools/toolkit.js';
-import { codingFilesToolkit } from '../tools/toolkits/coding-files.js';
-import { imageToolkit } from '../tools/toolkits/image.js';
-import { memoryToolkit } from '../tools/toolkits/memory.js';
-import { planningToolkit } from '../tools/toolkits/planning.js';
-import { shellProcessToolkit } from '../tools/toolkits/shell-process.js';
-import { webToolkit } from '../tools/toolkits/web.js';
+import { codingFilesToolkit } from '../tools/toolkits/coding-files/toolkit.js';
+import { externalContextToolkit } from '../tools/toolkits/external-context/toolkit.js';
+import { knowledgeToolkit } from '../tools/toolkits/knowledge/toolkit.js';
+import { internalToolkit } from '../tools/toolkits/internal/toolkit.js';
 import type { ProviderCredentialSource } from './api-keys.js';
 
 export type DefaultAgentToolsOptions = {
@@ -47,17 +45,25 @@ export function createDefaultAgentTools(options: DefaultAgentToolsOptions): Tool
 function createDefaultToolkits(args: {
   includePlanTool?: boolean;
 }): ToolToolkit[] {
-  const toolkits: ToolToolkit[] = [
+  return [
     codingFilesToolkit,
-    webToolkit,
-    imageToolkit,
-    memoryToolkit,
+    externalContextToolkit,
+    knowledgeToolkit,
+    createDefaultInternalToolkit({ includePlanTool: args.includePlanTool }),
   ];
+}
 
+function createDefaultInternalToolkit(args: {
+  includePlanTool?: boolean;
+}): ToolToolkit {
   if (args.includePlanTool ?? true) {
-    toolkits.push(planningToolkit);
+    return internalToolkit;
   }
 
-  toolkits.push(shellProcessToolkit);
-  return toolkits;
+  return {
+    id: internalToolkit.id,
+    createTools(context) {
+      return internalToolkit.createTools(context).filter((tool) => tool.name !== 'update_plan');
+    },
+  };
 }

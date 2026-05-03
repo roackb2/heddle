@@ -4,7 +4,7 @@ import type { ProviderCredentialSource } from '../utils/runtime.js';
 import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
 import { currentActivityText } from '../utils/format.js';
 import type { ApprovalChoice, LiveEvent, PendingApproval } from '../state/types.js';
-import type { PlanItem } from '../../../core/tools/update-plan.js';
+import type { PlanItem } from '../../../core/tools/toolkits/internal/update-plan.js';
 
 type ActiveTurnSummary = {
   title: string;

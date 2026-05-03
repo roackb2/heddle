@@ -1,6 +1,6 @@
 import type { TraceEvent } from '../../../index.js';
 import { projectTraceEventToConversationActivities } from '../../../core/observability/conversation-activity.js';
-import { previewEditFileInput } from '../../../core/tools/edit-file.js';
+import { previewEditFileInput } from '../../../core/tools/toolkits/coding-files/edit-file.js';
 import { formatConversationActivityForTui } from '../adapters/conversation-activity-adapter.js';
 import { formatEditPreviewHistoryMessage, formatPlanHistoryMessage } from '../utils/format.js';
 import type { ChatSession } from '../state/types.js';

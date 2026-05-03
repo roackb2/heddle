@@ -3,7 +3,7 @@
 // Record a concise working plan with item statuses for substantial tasks.
 // ---------------------------------------------------------------------------
 
-import type { ToolDefinition, ToolResult } from '../types.js';
+import type { ToolDefinition, ToolResult } from '../../../types.js';
 
 export type PlanItemStatus = 'pending' | 'in_progress' | 'completed';
 

@@ -8,8 +8,8 @@ import {
   createDefaultAgentTools,
 } from '../../../index.js';
 import type { CyberLoopObserverAnnotation } from '../../../index.js';
-import type { EditFilePreview } from '../../../core/tools/edit-file.js';
-import type { PlanItem } from '../../../core/tools/update-plan.js';
+import type { EditFilePreview } from '../../../core/tools/toolkits/coding-files/edit-file.js';
+import type { PlanItem } from '../../../core/tools/toolkits/internal/update-plan.js';
 import {
   formatMissingProviderCredentialMessage,
   hasProviderCredentialForModel,

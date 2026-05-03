@@ -20,5 +20,25 @@ export function createToolkitToolBundle(args: {
   toolkits: readonly ToolToolkit[];
   context: ToolToolkitContext;
 }): ToolDefinition[] {
-  return args.toolkits.flatMap((toolkit) => toolkit.createTools(args.context));
+  const seenToolkitIds = new Set<string>();
+  const seenToolNames = new Set<string>();
+  const tools: ToolDefinition[] = [];
+
+  for (const toolkit of args.toolkits) {
+    if (seenToolkitIds.has(toolkit.id)) {
+      throw new Error(`Duplicate toolkit id: ${toolkit.id}`);
+    }
+    seenToolkitIds.add(toolkit.id);
+
+    const toolkitTools = toolkit.createTools(args.context);
+    for (const tool of toolkitTools) {
+      if (seenToolNames.has(tool.name)) {
+        throw new Error(`Duplicate tool name from toolkits: ${tool.name}`);
+      }
+      seenToolNames.add(tool.name);
+      tools.push(tool);
+    }
+  }
+
+  return tools;
 }
