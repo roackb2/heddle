@@ -9,7 +9,6 @@ import {
   persistPreparedChatSessionTurn,
 } from '../../../core/chat/session-turn-preflight.js';
 import { prepareOrdinaryChatTurnContext } from '../../../core/chat/turn-context.js';
-import { loadChatTurnSession } from '../../../core/chat/turn-session.js';
 import { resolveChatTurnModel, resolveChatTurnRuntime } from '../../../core/chat/turn-runtime.js';
 import { DEFAULT_OPENAI_MODEL } from '../../../core/config.js';
 
@@ -29,10 +28,20 @@ describe('chat turn preparation modules', () => {
     });
     saveChatSessions(sessionStoragePath, [session]);
 
-    expect(loadChatTurnSession({ sessionStoragePath, sessionId: 'session-1' }).session.id).toBe('session-1');
-    expect(() => loadChatTurnSession({ sessionStoragePath, sessionId: 'missing' })).toThrow(
-      'Chat session not found: missing',
-    );
+    expect(prepareOrdinaryChatTurnContext({
+      workspaceRoot: root,
+      stateRoot: join(root, '.heddle'),
+      sessionStoragePath,
+      sessionId: 'session-1',
+      apiKey: 'explicit-key',
+    }).session.id).toBe('session-1');
+    expect(() => prepareOrdinaryChatTurnContext({
+      workspaceRoot: root,
+      stateRoot: join(root, '.heddle'),
+      sessionStoragePath,
+      sessionId: 'missing',
+      apiKey: 'explicit-key',
+    })).toThrow('Chat session not found: missing');
   });
 
   it('resolves chat turn model precedence without changing defaults', () => {
@@ -239,8 +248,8 @@ describe('chat turn preparation modules', () => {
     });
 
     const persisted = loadChatSessions(sessionStoragePath, true)[0];
-    expect(preparedSession.history).toHaveLength(2);
-    expect(persisted?.history).toEqual(preparedSession.history);
+    expect(preparedSession.session.history).toHaveLength(2);
+    expect(persisted?.history).toEqual(preparedSession.session.history);
     expect(persisted?.messages.map((message) => message.text)).toEqual(['Earlier prompt', 'Earlier answer']);
     expect(persisted?.context?.estimatedHistoryTokens).toBe(42);
   });

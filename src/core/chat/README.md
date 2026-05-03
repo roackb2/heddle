@@ -40,15 +40,18 @@ the package root. Package-root exports remain the public npm API.
 
 - `turn-context.ts`: ordinary turn context preparation, including session,
   runtime, default tool bundle, tool names, and lease owner.
-- `turn-session.ts`: session loading for ordinary chat turns.
 - `turn-runtime.ts`: model, credential, LLM, memory, and system-context
   preparation for ordinary chat turns.
 - `turn-memory-maintenance.ts`: inline/background turn memory maintenance and
   trace summary updates.
-- `turn-persistence.ts`: final chat turn persistence orchestration and completed
-  session save.
-- `session-turn-preflight.ts`: lease acquisition, preflight compaction, and
-  prepared session save before run-loop execution.
+- `turn-host-bridge.ts`: behavior-owning bridge from semantic host ports plus
+  legacy compaction callback compatibility into run-loop and turn callback
+  surfaces.
+- `turn-persistence.ts`: final chat turn persistence orchestration, final
+  running-state seeding, and completed session save.
+- `session-turn-preflight.ts`: lease acquisition, preflight compaction,
+  pre-run running-state seeding, and prepared session save before run-loop
+  execution.
 - `session-turn-result.ts`: persistence artifacts and final session update.
 - `trace.ts`: chat trace persistence. Turn summary formatting lives in
   `src/core/observability/trace-summarizers.ts`.

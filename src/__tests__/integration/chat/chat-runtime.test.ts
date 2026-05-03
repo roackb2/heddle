@@ -554,7 +554,7 @@ describe('ordinary chat turn lifecycle', () => {
     vi.unstubAllEnvs();
   });
 
-  it('passes approval policies and host approval surfaces into the run loop', async () => {
+  it('passes approval policies and normalized host surfaces into the run loop', async () => {
     const storage = createOrdinaryTurnStorage();
     const loopSpy = vi.spyOn(agentLoopModule, 'runAgentLoop').mockResolvedValue(createLoopResult({
       workspaceRoot: storage.workspaceRoot,

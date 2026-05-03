@@ -1,8 +1,8 @@
-import type { ToolDefinition } from '../types.js';
 import { createDefaultAgentTools } from '../runtime/default-tools.js';
+import type { ToolDefinition } from '../types.js';
 import type { ChatSessionLeaseOwner } from './session-lease.js';
+import { loadChatSessions } from './storage.js';
 import type { ChatSession } from './types.js';
-import { loadChatTurnSession } from './turn-session.js';
 import { resolveChatTurnRuntime, type ChatTurnRuntime } from './turn-runtime.js';
 
 export type PrepareOrdinaryChatTurnContextArgs = {
@@ -27,10 +27,12 @@ export type OrdinaryChatTurnContext = {
 };
 
 export function prepareOrdinaryChatTurnContext(args: PrepareOrdinaryChatTurnContextArgs): OrdinaryChatTurnContext {
-  const { sessions, session } = loadChatTurnSession({
-    sessionStoragePath: args.sessionStoragePath,
-    sessionId: args.sessionId,
-  });
+  const sessions = loadChatSessions(args.sessionStoragePath, true);
+  const session = sessions.find((candidate) => candidate.id === args.sessionId);
+  if (!session) {
+    throw new Error(`Chat session not found: ${args.sessionId}`);
+  }
+
   const runtime = resolveChatTurnRuntime({
     stateRoot: args.stateRoot,
     sessionModel: session.model,
