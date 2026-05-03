@@ -4,7 +4,7 @@ import {
   classifyShellCommandPolicy,
   DEFAULT_MUTATE_RULES,
   type RunShellPolicyDecision,
-} from '../../../core/tools/toolkits/internal/run-shell.js';
+} from '../../../core/tools/toolkits/shell-process/run-shell.js';
 import { truncate } from '../../../core/utils/text.js';
 export { buildConversationMessages } from '../../../core/chat/conversation-lines.js';
 export { formatChatFailureMessage } from '../../../core/chat/failure-messages.js';

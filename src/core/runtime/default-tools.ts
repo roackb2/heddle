@@ -5,6 +5,7 @@ import { codingFilesToolkit } from '../tools/toolkits/coding-files/toolkit.js';
 import { externalContextToolkit } from '../tools/toolkits/external-context/toolkit.js';
 import { knowledgeToolkit } from '../tools/toolkits/knowledge/toolkit.js';
 import { internalToolkit } from '../tools/toolkits/internal/toolkit.js';
+import { shellProcessToolkit } from '../tools/toolkits/shell-process/toolkit.js';
 import type { ProviderCredentialSource } from './api-keys.js';
 
 export type DefaultAgentToolsOptions = {
@@ -50,6 +51,7 @@ function createDefaultToolkits(args: {
     externalContextToolkit,
     knowledgeToolkit,
     createDefaultInternalToolkit({ includePlanTool: args.includePlanTool }),
+    shellProcessToolkit,
   ];
 }
 
