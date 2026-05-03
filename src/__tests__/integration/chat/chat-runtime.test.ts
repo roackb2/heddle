@@ -8,8 +8,8 @@ import { resolveApiKeyForModel, resolveChatRuntimeConfig, resolveProviderCredent
 import { createLogger } from '../../../core/utils/logger.js';
 import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../index.js';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
-import { executeOrdinaryChatTurn } from '../../../core/chat/ordinary-turn.js';
-import { createChatSession as createCoreChatSession, loadChatSessions, saveChatSessions } from '../../../core/chat/storage.js';
+import { runConversationTurn } from '../../../core/chat/engine/turns/run-conversation-turn.js';
+import { createChatSession as createCoreChatSession, loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/storage.js';
 import * as agentLoopModule from '../../../core/runtime/agent-loop.js';
 import type { ToolApprovalPolicy } from '../../../core/approvals/types.js';
 import { continueChatPrompt, createControlPlaneChatSession, readChatSessionDetail, submitChatPrompt } from '../../../server/features/control-plane/services/chat-sessions.js';
@@ -548,14 +548,14 @@ describe('control-plane shared chat runtime integration', () => {
   });
 });
 
-describe('ordinary chat turn lifecycle', () => {
+describe('conversation turn lifecycle', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 
   it('passes approval policies and normalized host surfaces into the run loop', async () => {
-    const storage = createOrdinaryTurnStorage();
+    const storage = createConversationTurnStorage();
     const loopSpy = vi.spyOn(agentLoopModule, 'runAgentLoop').mockResolvedValue(createLoopResult({
       workspaceRoot: storage.workspaceRoot,
       prompt: 'Edit safely.',
@@ -564,9 +564,10 @@ describe('ordinary chat turn lifecycle', () => {
     const policy: ToolApprovalPolicy = () => ({ type: 'allow', reason: 'test policy' });
     const requestToolApproval = vi.fn(async () => ({ approved: true, reason: 'approved by host' }));
 
-    await executeOrdinaryChatTurn({
+    await runConversationTurn({
       workspaceRoot: storage.workspaceRoot,
       stateRoot: storage.stateRoot,
+      traceDir: join(storage.stateRoot, 'traces'),
       sessionStoragePath: storage.sessionStoragePath,
       sessionId: storage.sessionId,
       prompt: 'Edit safely.',
@@ -600,10 +601,10 @@ describe('ordinary chat turn lifecycle', () => {
   });
 
   it('clears the session lease when the run loop fails', async () => {
-    const storage = createOrdinaryTurnStorage();
+    const storage = createConversationTurnStorage();
     vi.spyOn(agentLoopModule, 'runAgentLoop').mockRejectedValue(new Error('loop failed'));
 
-    await expect(executeOrdinaryChatTurn({
+    await expect(runConversationTurn({
       workspaceRoot: storage.workspaceRoot,
       stateRoot: storage.stateRoot,
       sessionStoragePath: storage.sessionStoragePath,
@@ -625,8 +626,8 @@ describe('ordinary chat turn lifecycle', () => {
   });
 });
 
-function createOrdinaryTurnStorage() {
-  const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ordinary-turn-'));
+function createConversationTurnStorage() {
+  const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-conversation-turn-'));
   const stateRoot = join(workspaceRoot, '.heddle');
   const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
   const session = createCoreChatSession({

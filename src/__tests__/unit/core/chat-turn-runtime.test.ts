@@ -3,13 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
-import { createChatSession, loadChatSessions, saveChatSessions } from '../../../core/chat/storage.js';
+import { createChatSession, loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/storage.js';
 import {
   persistPreflightCompactionRunningSeed,
   persistPreparedChatSessionTurn,
-} from '../../../core/chat/session-turn-preflight.js';
-import { prepareOrdinaryChatTurnContext } from '../../../core/chat/turn-context.js';
-import { resolveChatTurnModel, resolveChatTurnRuntime } from '../../../core/chat/turn-runtime.js';
+} from '../../../core/chat/engine/turns/preflight.js';
+import { prepareConversationTurnContext } from '../../../core/chat/engine/turns/context.js';
+import { resolveConversationTurnModel, resolveConversationTurnRuntime } from '../../../core/chat/engine/turns/runtime.js';
 import { DEFAULT_OPENAI_MODEL } from '../../../core/config.js';
 
 describe('chat turn preparation modules', () => {
@@ -28,14 +28,14 @@ describe('chat turn preparation modules', () => {
     });
     saveChatSessions(sessionStoragePath, [session]);
 
-    expect(prepareOrdinaryChatTurnContext({
+    expect(prepareConversationTurnContext({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
       sessionStoragePath,
       sessionId: 'session-1',
       apiKey: 'explicit-key',
     }).session.id).toBe('session-1');
-    expect(() => prepareOrdinaryChatTurnContext({
+    expect(() => prepareConversationTurnContext({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
       sessionStoragePath,
@@ -45,17 +45,17 @@ describe('chat turn preparation modules', () => {
   });
 
   it('resolves chat turn model precedence without changing defaults', () => {
-    expect(resolveChatTurnModel({
+    expect(resolveConversationTurnModel({
       sessionModel: 'session-model',
       env: { OPENAI_MODEL: 'openai-env', ANTHROPIC_MODEL: 'anthropic-env' },
     })).toBe('session-model');
-    expect(resolveChatTurnModel({
+    expect(resolveConversationTurnModel({
       env: { OPENAI_MODEL: 'openai-env', ANTHROPIC_MODEL: 'anthropic-env' },
     })).toBe('openai-env');
-    expect(resolveChatTurnModel({
+    expect(resolveConversationTurnModel({
       env: { OPENAI_MODEL: undefined, ANTHROPIC_MODEL: 'anthropic-env' },
     })).toBe('anthropic-env');
-    expect(resolveChatTurnModel({
+    expect(resolveConversationTurnModel({
       env: { OPENAI_MODEL: undefined, ANTHROPIC_MODEL: undefined },
     })).toBe(DEFAULT_OPENAI_MODEL);
   });
@@ -65,7 +65,7 @@ describe('chat turn preparation modules', () => {
     const stateRoot = join(root, '.heddle');
     mkdirSync(join(stateRoot, 'memory'), { recursive: true });
 
-    const runtime = resolveChatTurnRuntime({
+    const runtime = resolveConversationTurnRuntime({
       stateRoot,
       sessionModel: 'gpt-5.4',
       apiKey: 'explicit-key',
@@ -99,7 +99,7 @@ describe('chat turn preparation modules', () => {
       updatedAt: now,
     }, credentialStorePath);
 
-    const runtime = resolveChatTurnRuntime({
+    const runtime = resolveConversationTurnRuntime({
       stateRoot: join(root, '.heddle'),
       sessionModel: 'gpt-5.1-codex',
       credentialStorePath,
@@ -122,7 +122,7 @@ describe('chat turn preparation modules', () => {
     vi.stubEnv('PERSONAL_ANTHROPIC_API_KEY', '');
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-missing-'));
 
-    expect(() => resolveChatTurnRuntime({
+    expect(() => resolveConversationTurnRuntime({
       stateRoot: join(root, '.heddle'),
       sessionModel: 'claude-sonnet-4-6',
       credentialStorePath: join(root, 'missing-auth.json'),
@@ -141,7 +141,7 @@ describe('chat turn preparation modules', () => {
     });
     saveChatSessions(sessionStoragePath, [session]);
 
-    const context = prepareOrdinaryChatTurnContext({
+    const context = prepareConversationTurnContext({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
       sessionStoragePath,

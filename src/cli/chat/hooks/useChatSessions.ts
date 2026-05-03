@@ -23,9 +23,9 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
     () => resolveWorkspaceContext({ workspaceRoot, stateRoot }).activeWorkspace.id,
     [workspaceRoot, stateRoot],
   );
-  const initialSessionsRef = useRef<ChatSession[] | undefined>(undefined);
-  if (!initialSessionsRef.current) {
-    initialSessionsRef.current = loadChatSessions(sessionCatalogFile, apiKeyPresent).map((session) => ({
+  const initialSessionsRef = useRef<ChatSession[]>([]);
+  if (initialSessionsRef.current.length === 0) {
+    initialSessionsRef.current = loadChatSessions(sessionCatalogFile, apiKeyPresent).map((session: ChatSession) => ({
       ...session,
       model: session.model ?? defaultModel,
     }));

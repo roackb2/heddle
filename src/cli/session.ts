@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { deriveSessionStoragePaths, migrateLegacyChatSessions } from '../core/chat/storage.js';
+import { deriveSessionStoragePaths, migrateLegacyChatSessions } from '../core/chat/engine/sessions/storage.js';
 
 export type SessionCliOptions = {
   workspaceRoot?: string;

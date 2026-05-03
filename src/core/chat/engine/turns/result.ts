@@ -1,11 +1,11 @@
-import type { RunResult } from '../types.js';
-import type { ChatMessage } from '../llm/types.js';
-import { compactChatHistoryWithArchive, estimateChatHistoryTokens } from './compaction.js';
-import { buildConversationMessages } from './conversation-lines.js';
-import { formatChatFailureMessage } from './failure-messages.js';
-import { countAssistantSteps, summarizeTrace, type TraceSummarizerRegistry } from '../observability/trace-summarizers.js';
-import { touchSession } from './storage.js';
-import type { ChatSession, TurnSummary } from './types.js';
+import type { RunResult } from '../../../types.js';
+import type { ChatMessage } from '../../../llm/types.js';
+import { compactChatHistoryWithArchive, estimateChatHistoryTokens } from '../history/compaction.js';
+import { buildConversationMessages } from '../sessions/conversation-lines.js';
+import { formatChatFailureMessage } from '../../failure-messages.js';
+import { countAssistantSteps, summarizeTrace, type TraceSummarizerRegistry } from '../../../observability/trace-summarizers.js';
+import { touchSession } from '../sessions/storage.js';
+import type { ChatSession, TurnSummary } from '../../types.js';
 import { saveTrace } from './trace.js';
 
 export type PersistChatTurnCompactionStatus = {
@@ -65,15 +65,18 @@ export async function createChatTurnPersistenceArtifacts(
     summary: args.result.summary,
     steps: countAssistantSteps(args.result.trace),
     traceFile,
-    events: args.traceSummarizerRegistry?.summarizeTrace(args.result.trace) ?? summarizeTrace(args.result.trace),
+    events:
+      typeof args.traceSummarizerRegistry?.summarizeTrace === 'function'
+        ? args.traceSummarizerRegistry.summarizeTrace(args.result.trace)
+        : summarizeTrace(args.result.trace),
   };
   const summary =
-    args.result.outcome === 'error' ?
-      formatChatFailureMessage(args.result.summary, {
-        model: args.model,
-        estimatedHistoryTokens: estimateChatHistoryTokens(args.historyForTokenEstimate),
-      })
-    : args.result.summary;
+    args.result.outcome === 'error'
+      ? formatChatFailureMessage(args.result.summary, {
+          model: args.model,
+          estimatedHistoryTokens: estimateChatHistoryTokens(args.historyForTokenEstimate),
+        })
+      : args.result.summary;
 
   return {
     compacted,

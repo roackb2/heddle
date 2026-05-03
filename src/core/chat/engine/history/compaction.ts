@@ -1,13 +1,13 @@
-import type { ChatMessage, LlmAdapter, LlmUsage } from '../llm/types.js';
-import { createLlmAdapter, inferProviderFromModel } from '../llm/factory.js';
-import { hasProviderCredentialForModel, resolveApiKeyForModel, resolveProviderCredentialSourceForModel, type ProviderCredentialSource } from '../runtime/api-keys.js';
-import { estimateBuiltInContextWindow } from '../llm/openai-models.js';
+import type { ChatMessage, LlmAdapter, LlmUsage } from '../../../llm/types.js';
+import { createLlmAdapter, inferProviderFromModel } from '../../../llm/factory.js';
+import { hasProviderCredentialForModel, resolveApiKeyForModel, resolveProviderCredentialSourceForModel, type ProviderCredentialSource } from '../../../runtime/api-keys.js';
+import { estimateBuiltInContextWindow } from '../../../llm/openai-models.js';
 import {
   credentialModeFromSource,
   resolveSystemSelectedModel,
   type ModelCredentialMode,
-} from '../llm/model-policy.js';
-import type { ChatArchiveManifest, ChatArchiveRecord, ChatContextStats } from './types.js';
+} from '../../../llm/model-policy.js';
+import type { ChatArchiveManifest, ChatArchiveRecord, ChatContextStats } from '../../types.js';
 import {
   createArchiveId,
   deriveChatArchivePaths,
@@ -17,7 +17,7 @@ import {
   updateChatArchiveManifest,
   writeArchivedMessagesJsonl,
   writeArchiveSummaryMarkdown,
-} from './archive.js';
+} from '../sessions/archive.js';
 
 const DEFAULT_CONTEXT_WINDOW_ESTIMATE = 200_000;
 const MAX_HISTORY_RATIO = 0.6;

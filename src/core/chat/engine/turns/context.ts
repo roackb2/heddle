@@ -1,11 +1,11 @@
-import { createDefaultAgentTools } from '../runtime/default-tools.js';
-import type { ToolDefinition } from '../types.js';
-import type { ChatSessionLeaseOwner } from './session-lease.js';
-import { loadChatSessions } from './storage.js';
-import type { ChatSession } from './types.js';
-import { resolveChatTurnRuntime, type ChatTurnRuntime } from './turn-runtime.js';
+import { createDefaultAgentTools } from '../../../runtime/default-tools.js';
+import type { ToolDefinition } from '../../../types.js';
+import type { ChatSessionLeaseOwner } from '../sessions/lease.js';
+import { loadChatSessions } from '../sessions/storage.js';
+import type { ChatSession } from '../../types.js';
+import { resolveConversationTurnRuntime, type ChatTurnRuntime } from './runtime.js';
 
-export type PrepareOrdinaryChatTurnContextArgs = {
+export type PrepareConversationTurnContextArgs = {
   workspaceRoot: string;
   stateRoot: string;
   sessionStoragePath: string;
@@ -17,7 +17,7 @@ export type PrepareOrdinaryChatTurnContextArgs = {
   leaseOwner?: ChatSessionLeaseOwner;
 };
 
-export type OrdinaryChatTurnContext = {
+export type ConversationTurnContext = {
   sessions: ChatSession[];
   session: ChatSession;
   runtime: ChatTurnRuntime;
@@ -26,14 +26,14 @@ export type OrdinaryChatTurnContext = {
   leaseOwner: ChatSessionLeaseOwner;
 };
 
-export function prepareOrdinaryChatTurnContext(args: PrepareOrdinaryChatTurnContextArgs): OrdinaryChatTurnContext {
+export function prepareConversationTurnContext(args: PrepareConversationTurnContextArgs): ConversationTurnContext {
   const sessions = loadChatSessions(args.sessionStoragePath, true);
   const session = sessions.find((candidate) => candidate.id === args.sessionId);
   if (!session) {
     throw new Error(`Chat session not found: ${args.sessionId}`);
   }
 
-  const runtime = resolveChatTurnRuntime({
+  const runtime = resolveConversationTurnRuntime({
     stateRoot: args.stateRoot,
     sessionModel: session.model,
     apiKey: args.apiKey,

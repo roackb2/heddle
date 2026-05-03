@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ChatMessage } from '../llm/types.js';
-import type { ChatArchiveManifest, ChatArchiveRecord } from './types.js';
+import type { ChatMessage } from '../../../llm/types.js';
+import type { ChatArchiveManifest, ChatArchiveRecord } from '../../types.js';
 
 const ARCHIVE_MANIFEST_VERSION = 1;
 

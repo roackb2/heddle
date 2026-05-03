@@ -1,16 +1,16 @@
 import { join } from 'node:path';
-import { DEFAULT_OPENAI_MODEL } from '../config.js';
-import { createLlmAdapter } from '../llm/factory.js';
-import { inferProviderFromModel } from '../llm/providers.js';
-import type { LlmAdapter, LlmProvider } from '../llm/types.js';
+import { DEFAULT_OPENAI_MODEL } from '../../../config.js';
+import { createLlmAdapter } from '../../../llm/factory.js';
+import { inferProviderFromModel } from '../../../llm/providers.js';
+import type { LlmAdapter, LlmProvider } from '../../../llm/types.js';
 import {
   formatMissingProviderCredentialMessage,
   hasProviderCredentialForModel,
   resolveApiKeyForModel,
   resolveProviderCredentialSourceForModel,
   type ProviderCredentialSource,
-} from '../runtime/api-keys.js';
-import { appendMemoryCatalogSystemContext } from '../memory/catalog.js';
+} from '../../../runtime/api-keys.js';
+import { appendMemoryCatalogSystemContext } from '../../../memory/catalog.js';
 
 export type ChatTurnRuntime = {
   model: string;
@@ -22,7 +22,7 @@ export type ChatTurnRuntime = {
   llm: LlmAdapter;
 };
 
-export type ResolveChatTurnRuntimeArgs = {
+export type ResolveConversationTurnRuntimeArgs = {
   stateRoot: string;
   sessionModel?: string;
   apiKey?: string;
@@ -32,7 +32,7 @@ export type ResolveChatTurnRuntimeArgs = {
   env?: Pick<NodeJS.ProcessEnv, 'OPENAI_MODEL' | 'ANTHROPIC_MODEL'>;
 };
 
-export function resolveChatTurnModel(args: {
+export function resolveConversationTurnModel(args: {
   sessionModel?: string;
   env?: Pick<NodeJS.ProcessEnv, 'OPENAI_MODEL' | 'ANTHROPIC_MODEL'>;
 }): string {
@@ -40,8 +40,8 @@ export function resolveChatTurnModel(args: {
   return args.sessionModel ?? env.OPENAI_MODEL ?? env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
 }
 
-export function resolveChatTurnRuntime(args: ResolveChatTurnRuntimeArgs): ChatTurnRuntime {
-  const model = resolveChatTurnModel({
+export function resolveConversationTurnRuntime(args: ResolveConversationTurnRuntimeArgs): ChatTurnRuntime {
+  const model = resolveConversationTurnModel({
     sessionModel: args.sessionModel,
     env: args.env,
   });
@@ -54,7 +54,7 @@ export function resolveChatTurnRuntime(args: ResolveChatTurnRuntimeArgs): ChatTu
     preferApiKey: args.preferApiKey,
   });
 
-  assertChatTurnCredential({
+  assertConversationTurnCredential({
     model,
     apiKey: args.apiKey,
     credentialStorePath: args.credentialStorePath,
@@ -76,7 +76,7 @@ export function resolveChatTurnRuntime(args: ResolveChatTurnRuntimeArgs): ChatTu
   };
 }
 
-function assertChatTurnCredential(args: {
+function assertConversationTurnCredential(args: {
   model: string;
   apiKey?: string;
   credentialStorePath?: string;

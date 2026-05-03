@@ -1,13 +1,12 @@
-import { join } from 'node:path';
-import type { ChatMessage } from '../llm/types.js';
-import type { TraceSummarizerRegistry } from '../observability/trace-summarizers.js';
-import type { ProviderCredentialSource } from '../runtime/api-keys.js';
-import type { AgentLoopResult } from '../runtime/agent-loop.js';
-import { buildCompactionRunningContext } from './compaction.js';
-import { persistChatTurnResult, type PersistChatTurnResult } from './session-turn-result.js';
-import { saveChatSessions, touchSession } from './storage.js';
-import type { ChatTurnHostBridge } from './turn-host-bridge.js';
-import type { ChatSession } from './types.js';
+import type { ChatMessage } from '../../../llm/types.js';
+import type { TraceSummarizerRegistry } from '../../../observability/trace-summarizers.js';
+import type { ProviderCredentialSource } from '../../../runtime/api-keys.js';
+import type { AgentLoopResult } from '../../../runtime/agent-loop.js';
+import { buildCompactionRunningContext } from '../history/compaction.js';
+import { persistChatTurnResult, type PersistChatTurnResult } from './result.js';
+import { saveChatSessions, touchSession } from '../sessions/storage.js';
+import type { ChatTurnHostBridge } from './host-bridge.js';
+import type { ChatSession } from '../../types.js';
 
 export type PersistCompletedChatTurnArgs = {
   result: AgentLoopResult;
@@ -17,6 +16,7 @@ export type PersistCompletedChatTurnArgs = {
   sessionStoragePath: string;
   model: string;
   stateRoot: string;
+  traceDir: string;
   systemContext?: string;
   toolNames: string[];
   historyForTokenEstimate: ChatMessage[];
@@ -32,7 +32,7 @@ export async function persistCompletedChatTurn(args: PersistCompletedChatTurnArg
     session: args.session,
     model: args.model,
     stateRoot: args.stateRoot,
-    traceDir: join(args.stateRoot, 'traces'),
+    traceDir: args.traceDir,
     systemContext: args.systemContext,
     toolNames: args.toolNames,
     historyForTokenEstimate: args.historyForTokenEstimate,
@@ -52,14 +52,16 @@ export async function persistCompletedChatTurn(args: PersistCompletedChatTurnArg
 
   saveChatSessions(
     args.sessionStoragePath,
-    args.sessions.map((candidate) => candidate.id === args.session.id ? persisted.session : candidate),
+    args.sessions.map((candidate) => (candidate.id === args.session.id ? persisted.session : candidate)),
   );
   return persisted;
 }
 
-function persistFinalCompactionRunningSeed(args: PersistCompletedChatTurnArgs & {
-  archivePath?: string;
-}) {
+function persistFinalCompactionRunningSeed(
+  args: PersistCompletedChatTurnArgs & {
+    archivePath?: string;
+  },
+) {
   const compactionSeed = touchSession({
     ...args.session,
     history: args.result.transcript,
@@ -73,6 +75,6 @@ function persistFinalCompactionRunningSeed(args: PersistCompletedChatTurnArgs & 
   });
   saveChatSessions(
     args.sessionStoragePath,
-    args.sessions.map((candidate) => candidate.id === args.session.id ? compactionSeed : candidate),
+    args.sessions.map((candidate) => (candidate.id === args.session.id ? compactionSeed : candidate)),
   );
 }

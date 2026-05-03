@@ -169,7 +169,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
       systemContext: runtime.systemContext,
       goal: `Model switched from ${previousModel} to ${activeModel}`,
       summarizer: { credentialSource: runtime.providerCredentialSource },
-    }).then((compacted) => {
+    }).then((compacted: Awaited<ReturnType<typeof compactChatHistoryWithArchive>>) => {
       updateSessionById(sessionId, (session) => ({
         ...session,
         model: activeModel,

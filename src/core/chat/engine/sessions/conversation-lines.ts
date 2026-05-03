@@ -1,6 +1,6 @@
-import type { ChatMessage } from '../llm/types.js';
-import { isCompactedHistorySummary } from './compaction.js';
-import type { ConversationLine } from './types.js';
+import type { ChatMessage } from '../../../llm/types.js';
+import { isCompactedHistorySummary } from '../history/compaction.js';
+import type { ConversationLine } from '../../types.js';
 
 export function buildConversationMessages(history: ChatMessage[]): ConversationLine[] {
   return history.flatMap((message, index) => {

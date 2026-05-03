@@ -1,11 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import type { LlmAdapter } from '../llm/types.js';
-import type { AgentLoopResult } from '../runtime/agent-loop.js';
-import type { AgentLoopEvent } from '../runtime/events.js';
-import type { TraceEvent } from '../types.js';
-import { runMaintenanceForRecordedCandidates } from '../memory/maintenance-integration.js';
-import { summarizeTrace } from '../observability/trace-summarizers.js';
-import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
+import type { LlmAdapter } from '../../../llm/types.js';
+import type { AgentLoopResult } from '../../../runtime/agent-loop.js';
+import type { AgentLoopEvent } from '../../../runtime/events.js';
+import type { TraceEvent } from '../../../types.js';
+import { runMaintenanceForRecordedCandidates } from '../../../memory/maintenance-integration.js';
+import { summarizeTrace } from '../../../observability/trace-summarizers.js';
+import { loadChatSessions, saveChatSessions, touchSession } from '../sessions/storage.js';
 
 export type RunInlineTurnMemoryMaintenanceArgs = {
   memoryRoot: string;
@@ -24,12 +24,13 @@ export async function runInlineTurnMemoryMaintenance(
     source: args.source,
     trace: args.result.trace,
     maxSteps: 20,
-    onTraceEvent: (event) => args.onEvent?.({
-      type: 'trace',
-      runId: args.result.state.runId,
-      event,
-      timestamp: new Date().toISOString(),
-    }),
+    onTraceEvent: (event) =>
+      args.onEvent?.({
+        type: 'trace',
+        runId: args.result.state.runId,
+        event,
+        timestamp: new Date().toISOString(),
+      }),
   });
 
   return appendAgentLoopTrace(args.result, maintenance.events);
@@ -68,12 +69,13 @@ export async function runBackgroundTurnMemoryMaintenance(args: ScheduleBackgroun
     source: args.source,
     trace: args.trace,
     maxSteps: 20,
-    onTraceEvent: (event) => args.onEvent?.({
-      type: 'trace',
-      runId: args.runId,
-      event,
-      timestamp: new Date().toISOString(),
-    }),
+    onTraceEvent: (event) =>
+      args.onEvent?.({
+        type: 'trace',
+        runId: args.runId,
+        event,
+        timestamp: new Date().toISOString(),
+      }),
   });
   if (maintenance.events.length === 0) {
     return;
@@ -104,14 +106,14 @@ export function appendTurnMemoryMaintenanceEvents(args: {
 
     return touchSession({
       ...session,
-      turns: session.turns.map((turn, index) => (
-        index === session.turns.length - 1 ?
-          {
-            ...turn,
-            events: summarizeTrace(nextTrace),
-          }
-        : turn
-      )),
+      turns: session.turns.map((turn, index) =>
+        index === session.turns.length - 1
+          ? {
+              ...turn,
+              events: summarizeTrace(nextTrace),
+            }
+          : turn,
+      ),
     });
   });
   saveChatSessions(args.sessionStoragePath, nextSessions);
@@ -142,7 +144,7 @@ export function appendAgentLoopTrace(result: AgentLoopResult, events: TraceEvent
 function readTraceEvents(path: string): AgentLoopResult['trace'] {
   try {
     const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
-    return Array.isArray(parsed) ? parsed as AgentLoopResult['trace'] : [];
+    return Array.isArray(parsed) ? (parsed as AgentLoopResult['trace']) : [];
   } catch {
     return [];
   }
@@ -163,5 +165,5 @@ function createMemoryMaintenanceFailureEvent(args: {
 }
 
 function nextTraceStep(trace: TraceEvent[]): number {
-  return trace.reduce((max, event) => 'step' in event ? Math.max(max, event.step) : max, 0) + 1;
+  return trace.reduce((max, event) => ('step' in event ? Math.max(max, event.step) : max), 0) + 1;
 }

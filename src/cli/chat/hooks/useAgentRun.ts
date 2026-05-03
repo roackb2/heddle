@@ -16,8 +16,8 @@ import {
   resolveApiKeyForModel,
   resolveProviderCredentialSourceForModel,
 } from '../../../core/runtime/api-keys.js';
-import { releaseSessionLease } from '../../../core/chat/session-lease.js';
-import { generateSessionTitle } from '../../../core/chat/session-title.js';
+import { releaseSessionLease } from '../../../core/chat/engine/sessions/lease.js';
+import { generateSessionTitle } from '../../../core/chat/engine/sessions/title.js';
 import { isGenericSessionName } from '../state/storage.js';
 import { normalizeSessionTitle } from '../utils/format.js';
 import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval } from '../state/types.js';

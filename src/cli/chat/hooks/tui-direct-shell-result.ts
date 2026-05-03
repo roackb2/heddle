@@ -49,7 +49,7 @@ export async function finalizeTuiDirectShellSuccess(args: {
     toolNames: tools.map((tool) => tool.name),
     goal: shellDisplay,
     summarizer: { credentialSource: runtime.providerCredentialSource },
-    onStatusChange: (event) => emitCompactionStatus(event, directShellHistory),
+    onStatusChange: (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; error?: string }) => emitCompactionStatus(event, directShellHistory),
   });
   updateActiveSession((session) => ({
     ...session,

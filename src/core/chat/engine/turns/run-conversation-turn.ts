@@ -1,16 +1,17 @@
-import { runAgentLoop } from '../runtime/agent-loop.js';
-import type { ToolApprovalPolicy } from '../approvals/types.js';
-import type { TraceSummarizerRegistry } from '../observability/trace-summarizers.js';
-import { releaseSessionLease, type ChatSessionLeaseOwner } from './session-lease.js';
-import { prepareChatSessionTurn } from './session-turn-preflight.js';
-import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
-import type { ChatTurnHostPort } from './turn-host.js';
-import { createChatTurnHostBridge } from './turn-host-bridge.js';
-import { prepareOrdinaryChatTurnContext } from './turn-context.js';
-import { runInlineTurnMemoryMaintenance, scheduleBackgroundTurnMemoryMaintenance } from './turn-memory-maintenance.js';
-import { persistCompletedChatTurn } from './turn-persistence.js';
+import { runAgentLoop } from '../../../runtime/agent-loop.js';
+import type { ToolApprovalPolicy } from '../../../approvals/types.js';
+import type { TraceSummarizerRegistry } from '../../../observability/trace-summarizers.js';
+import type { ConversationCompactionStatus } from '../../../observability/conversation-activity.js';
+import { prepareConversationTurnContext } from './context.js';
+import { createChatTurnHostBridge } from './host-bridge.js';
+import { prepareChatSessionTurn } from './preflight.js';
+import { runInlineTurnMemoryMaintenance, scheduleBackgroundTurnMemoryMaintenance } from './memory-maintenance.js';
+import { persistCompletedChatTurn } from './persistence.js';
+import { releaseSessionLease, type ChatSessionLeaseOwner } from '../sessions/lease.js';
+import { loadChatSessions, saveChatSessions, touchSession } from '../sessions/storage.js';
+import type { ChatTurnHostPort } from './host-bridge.js';
 
-export type ExecuteOrdinaryChatTurnArgs = {
+export type RunConversationTurnArgs = {
   workspaceRoot: string;
   stateRoot: string;
   sessionStoragePath: string;
@@ -20,11 +21,12 @@ export type ExecuteOrdinaryChatTurnArgs = {
   preferApiKey?: boolean;
   credentialStorePath?: string;
   systemContext?: string;
+  traceDir: string;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   host?: ChatTurnHostPort;
   approvalPolicies?: ToolApprovalPolicy[];
   traceSummarizerRegistry?: TraceSummarizerRegistry;
-  onCompactionStatus?: (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; summaryPath?: string; error?: string }) => void;
+  onCompactionStatus?: (event: ConversationCompactionStatus) => void;
   onAssistantStream?: Parameters<typeof runAgentLoop>[0]['onAssistantStream'];
   onTraceEvent?: Parameters<typeof runAgentLoop>[0]['onTraceEvent'];
   shouldStop?: Parameters<typeof runAgentLoop>[0]['shouldStop'];
@@ -32,8 +34,14 @@ export type ExecuteOrdinaryChatTurnArgs = {
   leaseOwner?: ChatSessionLeaseOwner;
 };
 
-export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs) {
-  const context = prepareOrdinaryChatTurnContext({
+export type RunConversationTurnResult = {
+  outcome: string;
+  summary: string;
+  session: Awaited<ReturnType<typeof persistCompletedChatTurn>>['session'];
+};
+
+export async function runConversationTurn(args: RunConversationTurnArgs): Promise<RunConversationTurnResult> {
+  const context = prepareConversationTurnContext({
     workspaceRoot: args.workspaceRoot,
     stateRoot: args.stateRoot,
     sessionStoragePath: args.sessionStoragePath,
@@ -47,7 +55,7 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
   const { sessions, session, runtime, tools, toolNames, leaseOwner } = context;
   const hostBridge = createChatTurnHostBridge({
     host: args.host,
-    onLegacyCompactionStatus: args.onCompactionStatus,
+    onCompactionStatus: args.onCompactionStatus,
   });
 
   try {
@@ -91,15 +99,15 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
     });
     const maintenanceMode = args.memoryMaintenanceMode ?? 'background';
     const resultForPersistence =
-      maintenanceMode === 'inline' ?
-        await runInlineTurnMemoryMaintenance({
-          memoryRoot: runtime.memoryDir,
-          llm: runtime.llm,
-          source: `chat session ${session.id}`,
-          result,
-          onEvent: hostBridge.onAgentLoopEvent,
-        })
-      : result;
+      maintenanceMode === 'inline'
+        ? await runInlineTurnMemoryMaintenance({
+            memoryRoot: runtime.memoryDir,
+            llm: runtime.llm,
+            source: `chat session ${session.id}`,
+            result,
+            onEvent: hostBridge.onAgentLoopEvent,
+          })
+        : result;
 
     const persisted = await persistCompletedChatTurn({
       result: resultForPersistence,
@@ -109,6 +117,7 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       sessionStoragePath: args.sessionStoragePath,
       model: runtime.model,
       stateRoot: args.stateRoot,
+      traceDir: args.traceDir,
       systemContext: runtime.systemContext,
       toolNames,
       historyForTokenEstimate: session.history,
@@ -137,11 +146,11 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       session: persisted.session,
     };
   } finally {
-    clearOrdinaryChatTurnLease(args.sessionStoragePath, session.id, leaseOwner);
+    clearConversationTurnLease(args.sessionStoragePath, session.id, leaseOwner);
   }
 }
 
-export function clearOrdinaryChatTurnLease(sessionStoragePath: string, sessionId: string, owner: ChatSessionLeaseOwner) {
+export function clearConversationTurnLease(sessionStoragePath: string, sessionId: string, owner: ChatSessionLeaseOwner) {
   const sessions = loadChatSessions(sessionStoragePath, true);
   const session = sessions.find((candidate) => candidate.id === sessionId);
   if (!session?.lease) {

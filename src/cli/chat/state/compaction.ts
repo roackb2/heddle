@@ -4,4 +4,4 @@ export {
   compactChatHistoryWithArchive,
   estimateChatHistoryTokens,
   isCompactedHistorySummary,
-} from '../../../core/chat/compaction.js';
+} from '../../../core/chat/engine/history/compaction.js';
