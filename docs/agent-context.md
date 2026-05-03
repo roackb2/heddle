@@ -17,8 +17,12 @@ When additional project context is needed, read in this order:
 2. `../heddle-workspace-notes/agent-memory/current-state/project-summary.md`
 3. This repo's live docs and code for the relevant capability area
 4. the relevant focused file under `../heddle-workspace-notes/agent-memory/current-state/`
-5. `../heddle-workspace-notes/agent-memory/project-context.md` only when broader long-form context is needed
-6. `../heddle-workspace-notes/analysis/` and `../heddle-workspace-notes/task-plans/` as supporting historical context only
+5. `../heddle-workspace-notes/agent-memory/workflows/feature-prd-to-technical-plan.md`
+   when the user asks for a broad feature, substantial refactor, PRD,
+   architecture direction, roadmap, technical plan, milestone plan, or
+   implementation/review workflow
+6. `../heddle-workspace-notes/agent-memory/project-context.md` only when broader long-form context is needed
+7. `../heddle-workspace-notes/analysis/` and `../heddle-workspace-notes/task-plans/` as supporting historical context only
 
 For first-run situation awareness, do not stop after reading high-level memory summaries. Before answering capability-depth questions such as "what is this project?", "how does Heddle work?", or "what can it really do?", inspect the implementation path named by `agent-memory/README.md` and `current-state/project-summary.md`. The sibling notes explain intent and current state; the live code is the source of truth for actual capability depth.
 
@@ -55,6 +59,7 @@ For first-run situation awareness, do not stop after reading high-level memory s
 - Prefer `docs/agent-context.md` for stable shared workflow instructions inside this repo.
 - Prefer `../heddle-workspace-notes/agent-memory/` for evolving cross-session memory, project-state notes, and reminders primarily meant for future agents rather than end users.
 - Prefer focused files under `../heddle-workspace-notes/agent-memory/current-state/` for active workstream handoff notes instead of putting every update only into `project-context.md`.
+- Use `../heddle-workspace-notes/agent-memory/workflows/feature-prd-to-technical-plan.md` for broad feature/refactor planning and for the worker/reviewer loop after a technical plan exists.
 - When the user asks to "note this down" or preserve working context, update the most appropriate file in `../heddle-workspace-notes/agent-memory/` unless the information is better treated as stable repo guidance in this repo.
 - After meaningful implementation progress, update the relevant task plan, the focused `current-state/` file if one exists, and `../heddle-workspace-notes/agent-memory/project-context.md` if the broader project summary changed.
 - Keep agent-memory entries concrete: current repo state, what changed, what remains, verification status, and the next recommended step.
