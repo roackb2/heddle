@@ -27,7 +27,7 @@ export type PersistCompletedChatTurnArgs = {
 };
 
 export async function persistCompletedChatTurn(args: PersistCompletedChatTurnArgs): Promise<PersistChatTurnResult> {
-  return await persistChatTurnResult({
+  const persisted = await persistChatTurnResult({
     result: args.result,
     prompt: args.prompt,
     session: args.session,
@@ -51,6 +51,12 @@ export async function persistCompletedChatTurn(args: PersistCompletedChatTurnArg
       }
     },
   });
+
+  saveChatSessions(
+    args.sessionStoragePath,
+    args.sessions.map((candidate) => candidate.id === args.session.id ? persisted.session : candidate),
+  );
+  return persisted;
 }
 
 function persistFinalCompactionRunningSeed(args: PersistCompletedChatTurnArgs & {

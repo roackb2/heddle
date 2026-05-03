@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { ChatMessage } from '../../index.js';
+import type { ChatMessage } from '../llm/types.js';
 import type { ChatArchiveRecord, ChatContextStats, ChatSession, ChatSessionLease, ConversationLine, TurnSummary } from './types.js';
 import { truncate } from '../utils/text.js';
 

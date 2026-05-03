@@ -24,25 +24,32 @@ maintenance, traces, and host ports.
 - Server routes, React hooks, or Ink components.
 - Future slash-command parsing.
 
-## Public Entry Points
+## Stable Core Entry Points
 
 - `ordinary-turn.ts`: current conversation-turn harness.
+- `session-submit.ts`: server/programmatic submit adapter over ordinary turns.
+- `storage.ts`: file-backed chat session store.
+- `compaction.ts`: history compaction and archive behavior.
+- `conversation-lines.ts`: user-facing chat message projection.
+- `turn-host.ts`: semantic host ports for events, approvals, and compaction.
+
+These are stable inside the core codebase, but they are not all exported from
+the package root. Package-root exports remain the public npm API.
+
+## Internal Turn Services
+
 - `turn-context.ts`: ordinary turn context preparation, including session,
-  runtime, tool bundle, tool names, and lease owner.
+  runtime, default tool bundle, tool names, and lease owner.
 - `turn-session.ts`: session loading for ordinary chat turns.
 - `turn-runtime.ts`: model, credential, LLM, memory, and system-context
   preparation for ordinary chat turns.
-- `turn-tools.ts`: ordinary chat turn tool bundle creation.
 - `turn-memory-maintenance.ts`: inline/background turn memory maintenance and
   trace summary updates.
-- `turn-persistence.ts`: final chat turn persistence orchestration.
-- `session-submit.ts`: server-facing submit adapter over ordinary turns.
-- `storage.ts`: file-backed chat session store.
-- `session-turn-preflight.ts`: lease acquisition and preflight compaction.
+- `turn-persistence.ts`: final chat turn persistence orchestration and completed
+  session save.
+- `session-turn-preflight.ts`: lease acquisition, preflight compaction, and
+  prepared session save before run-loop execution.
 - `session-turn-result.ts`: persistence artifacts and final session update.
-- `turn-host.ts`: semantic host ports for events, approvals, and compaction.
-- `compaction.ts`: history compaction and archive behavior.
-- `conversation-lines.ts`: user-facing chat message projection.
 - `trace.ts`: chat trace persistence. Turn summary formatting lives in
   `src/core/observability/trace-summarizers.ts`.
 

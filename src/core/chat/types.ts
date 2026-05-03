@@ -1,4 +1,5 @@
-import type { ChatMessage, ToolCall, ToolDefinition } from '../../index.js';
+import type { ChatMessage } from '../llm/types.js';
+import type { ToolCall, ToolDefinition } from '../types.js';
 import type { EditFilePreview } from '../tools/edit-file.js';
 
 export type TurnSummary = {

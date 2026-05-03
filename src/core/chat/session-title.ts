@@ -1,4 +1,4 @@
-import type { LlmAdapter } from '../../index.js';
+import type { LlmAdapter } from '../llm/types.js';
 
 export function buildSessionAutoTitlePrompt(prompt: string, responseText: string) {
   return [

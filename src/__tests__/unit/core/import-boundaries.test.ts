@@ -16,6 +16,15 @@ describe('core import boundaries', () => {
     expect(violations).toEqual([]);
   });
 
+  it('keeps core modules from importing the public package root', () => {
+    const violations = findImportViolations(
+      sourceFiles.filter((file) => toSourcePath(file).startsWith('core/')),
+      [/^(?:\.\.\/)+index\.js$/],
+    );
+
+    expect(violations).toEqual([]);
+  });
+
   it('keeps command modules free of React and Ink UI dependencies', () => {
     const violations = findImportViolations(
       sourceFiles.filter((file) => toSourcePath(file).startsWith('core/commands/')),

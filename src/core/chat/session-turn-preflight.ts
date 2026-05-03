@@ -104,3 +104,24 @@ export function persistPreflightCompactionRunningSeed(args: {
     args.sessions.map((candidate) => candidate.id === args.sessionId ? compactionSeed : candidate),
   );
 }
+
+export function persistPreparedChatSessionTurn(args: {
+  sessionStoragePath: string;
+  sessions: ChatSession[];
+  session: ChatSession;
+  prepared: Extract<PrepareChatSessionTurnResult, { ok: true }>;
+}): ChatSession {
+  const preparedSession = args.prepared.session ?? touchSession({
+    ...args.session,
+    history: args.prepared.preflightHistory,
+    context: args.prepared.context,
+    archives: args.prepared.archives,
+    messages: buildConversationMessages(args.prepared.preflightHistory),
+  });
+
+  saveChatSessions(
+    args.sessionStoragePath,
+    args.sessions.map((candidate) => candidate.id === args.session.id ? preparedSession : candidate),
+  );
+  return preparedSession;
+}

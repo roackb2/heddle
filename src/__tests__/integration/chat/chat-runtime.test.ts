@@ -8,7 +8,10 @@ import { resolveApiKeyForModel, resolveChatRuntimeConfig, resolveProviderCredent
 import { createLogger } from '../../../core/utils/logger.js';
 import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../index.js';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
+import { executeOrdinaryChatTurn } from '../../../core/chat/ordinary-turn.js';
+import { createChatSession as createCoreChatSession, loadChatSessions, saveChatSessions } from '../../../core/chat/storage.js';
 import * as agentLoopModule from '../../../core/runtime/agent-loop.js';
+import type { ToolApprovalPolicy } from '../../../core/approvals/types.js';
 import { continueChatPrompt, createControlPlaneChatSession, readChatSessionDetail, submitChatPrompt } from '../../../server/features/control-plane/services/chat-sessions.js';
 
 describe('resolveChatRuntimeConfig', () => {
@@ -544,3 +547,151 @@ describe('control-plane shared chat runtime integration', () => {
     expect(continueResult.session?.lastContinuePrompt).toBe('inspect file with expanded mention contents');
   });
 });
+
+describe('ordinary chat turn lifecycle', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('passes approval policies and host approval surfaces into the run loop', async () => {
+    const storage = createOrdinaryTurnStorage();
+    const loopSpy = vi.spyOn(agentLoopModule, 'runAgentLoop').mockResolvedValue(createLoopResult({
+      workspaceRoot: storage.workspaceRoot,
+      prompt: 'Edit safely.',
+      summary: 'Done.',
+    }) as never);
+    const policy: ToolApprovalPolicy = () => ({ type: 'allow', reason: 'test policy' });
+    const requestToolApproval = vi.fn(async () => ({ approved: true, reason: 'approved by host' }));
+
+    await executeOrdinaryChatTurn({
+      workspaceRoot: storage.workspaceRoot,
+      stateRoot: storage.stateRoot,
+      sessionStoragePath: storage.sessionStoragePath,
+      sessionId: storage.sessionId,
+      prompt: 'Edit safely.',
+      apiKey: 'explicit-key',
+      memoryMaintenanceMode: 'none',
+      approvalPolicies: [policy],
+      host: {
+        approvals: {
+          requestToolApproval,
+        },
+      },
+    });
+
+    const runOptions = loopSpy.mock.calls[0]?.[0];
+    expect(runOptions?.approvalPolicies).toEqual([policy]);
+    const call: ToolCall = { id: 'call-1', tool: 'edit_file', input: { path: 'README.md' } };
+    const tool: ToolDefinition = {
+      name: 'edit_file',
+      description: 'Edit file',
+      requiresApproval: true,
+      parameters: { type: 'object' },
+      async execute() {
+        return { ok: true };
+      },
+    };
+    await expect(runOptions?.approveToolCall?.(call, tool)).resolves.toEqual({
+      approved: true,
+      reason: 'approved by host',
+    });
+    expect(requestToolApproval).toHaveBeenCalledWith({ call, tool });
+  });
+
+  it('clears the session lease when the run loop fails', async () => {
+    const storage = createOrdinaryTurnStorage();
+    vi.spyOn(agentLoopModule, 'runAgentLoop').mockRejectedValue(new Error('loop failed'));
+
+    await expect(executeOrdinaryChatTurn({
+      workspaceRoot: storage.workspaceRoot,
+      stateRoot: storage.stateRoot,
+      sessionStoragePath: storage.sessionStoragePath,
+      sessionId: storage.sessionId,
+      prompt: 'Fail after preflight.',
+      apiKey: 'explicit-key',
+      memoryMaintenanceMode: 'none',
+      leaseOwner: {
+        ownerKind: 'daemon',
+        ownerId: 'daemon-test',
+        clientLabel: 'control plane',
+      },
+    })).rejects.toThrow('loop failed');
+
+    const persisted = loadChatSessions(storage.sessionStoragePath, true)
+      .find((session) => session.id === storage.sessionId);
+    expect(persisted?.lease).toBeUndefined();
+    expect(persisted?.turns).toEqual([]);
+  });
+});
+
+function createOrdinaryTurnStorage() {
+  const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ordinary-turn-'));
+  const stateRoot = join(workspaceRoot, '.heddle');
+  const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
+  const session = createCoreChatSession({
+    id: 'session-1',
+    name: 'Session 1',
+    apiKeyPresent: true,
+    model: 'gpt-5.4',
+  });
+  saveChatSessions(sessionStoragePath, [session]);
+
+  return {
+    workspaceRoot,
+    stateRoot,
+    sessionStoragePath,
+    sessionId: session.id,
+  };
+}
+
+function createLoopResult(args: {
+  workspaceRoot: string;
+  prompt: string;
+  summary: string;
+}) {
+  const trace: RunResult['trace'] = [
+    {
+      type: 'assistant.turn',
+      content: args.summary,
+      requestedTools: false,
+      step: 1,
+      timestamp: '2026-05-03T00:00:01.000Z',
+    },
+    {
+      type: 'run.finished',
+      outcome: 'done',
+      summary: args.summary,
+      step: 1,
+      timestamp: '2026-05-03T00:00:02.000Z',
+    },
+  ];
+  const transcript = [
+    { role: 'user' as const, content: args.prompt },
+    { role: 'assistant' as const, content: args.summary },
+  ];
+
+  return {
+    outcome: 'done',
+    summary: args.summary,
+    trace,
+    transcript,
+    model: 'gpt-5.4',
+    provider: 'openai',
+    workspaceRoot: args.workspaceRoot,
+    state: {
+      status: 'finished',
+      runId: 'run-test',
+      goal: args.prompt,
+      model: 'gpt-5.4',
+      provider: 'openai',
+      workspaceRoot: args.workspaceRoot,
+      startedAt: '2026-05-03T00:00:00.000Z',
+      finishedAt: '2026-05-03T00:00:02.000Z',
+      outcome: 'done',
+      summary: args.summary,
+      transcript,
+      trace,
+    },
+  };
+}

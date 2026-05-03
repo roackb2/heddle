@@ -2,9 +2,12 @@ import { runAgentLoop, type RunAgentLoopOptions } from '../runtime/agent-loop.js
 import type { ToolApprovalPolicy } from '../approvals/types.js';
 import type { TraceSummarizerRegistry } from '../observability/trace-summarizers.js';
 import type { ToolCall, ToolDefinition } from '../types.js';
-import { buildConversationMessages } from './conversation-lines.js';
 import { releaseSessionLease, type ChatSessionLeaseOwner } from './session-lease.js';
-import { persistPreflightCompactionRunningSeed, prepareChatSessionTurn } from './session-turn-preflight.js';
+import {
+  persistPreflightCompactionRunningSeed,
+  persistPreparedChatSessionTurn,
+  prepareChatSessionTurn,
+} from './session-turn-preflight.js';
 import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
 import type { ChatTurnHostPort } from './turn-host.js';
 import { prepareOrdinaryChatTurnContext } from './turn-context.js';
@@ -76,17 +79,12 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
     if (!preflight.ok) {
       throw new Error(preflight.message);
     }
-    const preflightSession = preflight.session ?? touchSession({
-      ...session,
-      history: preflight.preflightHistory,
-      context: preflight.context,
-      archives: preflight.archives,
-      messages: buildConversationMessages(preflight.preflightHistory),
+    const preflightSession = persistPreparedChatSessionTurn({
+      sessionStoragePath: args.sessionStoragePath,
+      sessions,
+      session,
+      prepared: preflight,
     });
-    saveChatSessions(
-      args.sessionStoragePath,
-      sessions.map((candidate) => candidate.id === session.id ? preflightSession : candidate),
-    );
 
     const result = await runAgentLoop({
       goal: args.prompt,
@@ -137,8 +135,6 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       onCompactionStatus: args.onCompactionStatus,
     });
 
-    const nextSessions = sessions.map((candidate) => candidate.id === session.id ? persisted.session : candidate);
-    saveChatSessions(args.sessionStoragePath, nextSessions);
     if (maintenanceMode === 'background') {
       scheduleBackgroundTurnMemoryMaintenance({
         memoryRoot: runtime.memoryDir,
