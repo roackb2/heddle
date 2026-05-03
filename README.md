@@ -419,4 +419,4 @@ See [Development and contributing](docs/guides/development.md) for the fuller co
 
 ## License
 
-MIT
+Heddle is licensed under the MIT License. See [LICENSE](LICENSE).
