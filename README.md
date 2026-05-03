@@ -34,6 +34,15 @@ At a high level, Heddle helps with:
 
 If you want a terminal-first coding agent with local state, review traces, workspace memory, and a path toward longer-running workflows, that is the problem Heddle is trying to solve.
 
+## Programmatic Use Layers
+
+Heddle currently has two programmatic layers:
+
+- `createConversationEngine`: an alpha API for persisted multi-turn sessions with session storage, compaction, approvals, traces, semantic activity, and custom frontends or local hosts
+- `runAgentLoop`: a lower-level single-run execution loop for hosts that do not need persisted chat or session behavior
+
+If you want the programmatic surface, start with the [Programmatic use guide](docs/guides/programmatic-use.md).
+
 ## See Heddle
 
 ### Terminal coding workflow

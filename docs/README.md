@@ -71,7 +71,7 @@ Longer-term project context and design direction:
 
 ### I want to build on Heddle programmatically
 
-1. [Programmatic use](guides/programmatic-use.md)
+1. [Programmatic use](guides/programmatic-use.md) for the conversation engine alpha, persisted sessions, and turn submission
 2. [Capabilities and tools](reference/capabilities.md)
 3. [Providers and models](reference/providers-and-models.md)
 

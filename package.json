@@ -52,6 +52,7 @@
     "chat:dev:openai": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" tsx --no-cache src/cli/main.ts chat",
     "chat:dev:anthropic": "ANTHROPIC_API_KEY=\"$PERSONAL_ANTHROPIC_API_KEY\" tsx --no-cache src/cli/main.ts chat",
     "example:repo-investigator": "tsx --no-cache examples/repo-investigator.ts",
+    "example:conversation-engine": "tsx --no-cache examples/conversation-engine.ts",
     "example:programmatic": "tsx --no-cache examples/programmatic-loop.ts",
     "example:heartbeat": "tsx --no-cache examples/heartbeat.ts",
     "example:heartbeat-scheduler": "tsx --no-cache examples/heartbeat-scheduler.ts",
