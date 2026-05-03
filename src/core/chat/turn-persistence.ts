@@ -6,8 +6,8 @@ import type { AgentLoopResult } from '../runtime/agent-loop.js';
 import { buildCompactionRunningContext } from './compaction.js';
 import { persistChatTurnResult, type PersistChatTurnResult } from './session-turn-result.js';
 import { saveChatSessions, touchSession } from './storage.js';
+import type { ChatTurnHostBridge } from './turn-host-bridge.js';
 import type { ChatSession } from './types.js';
-import type { NormalizedChatTurnHost } from './turn-host.js';
 
 export type PersistCompletedChatTurnArgs = {
   result: AgentLoopResult;
@@ -22,8 +22,7 @@ export type PersistCompletedChatTurnArgs = {
   historyForTokenEstimate: ChatMessage[];
   credentialSource: ProviderCredentialSource;
   traceSummarizerRegistry?: TraceSummarizerRegistry;
-  host?: Pick<NormalizedChatTurnHost, 'onFinalCompactionStatus'>;
-  onLegacyCompactionStatus?: (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; summaryPath?: string; error?: string }) => void;
+  hostBridge: Pick<ChatTurnHostBridge, 'notifyFinalCompactionStatus'>;
 };
 
 export async function persistCompletedChatTurn(args: PersistCompletedChatTurnArgs): Promise<PersistChatTurnResult> {
@@ -41,8 +40,7 @@ export async function persistCompletedChatTurn(args: PersistCompletedChatTurnArg
     traceSummarizerRegistry: args.traceSummarizerRegistry,
     createTurnId: () => `server-turn-${Date.now()}`,
     onCompactionStatus: (event) => {
-      args.onLegacyCompactionStatus?.(event);
-      args.host?.onFinalCompactionStatus?.(event);
+      args.hostBridge.notifyFinalCompactionStatus(event);
       if (event.status === 'running') {
         persistFinalCompactionRunningSeed({
           ...args,

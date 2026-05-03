@@ -5,7 +5,7 @@ import { releaseSessionLease, type ChatSessionLeaseOwner } from './session-lease
 import { prepareChatSessionTurn } from './session-turn-preflight.js';
 import { loadChatSessions, saveChatSessions, touchSession } from './storage.js';
 import type { ChatTurnHostPort } from './turn-host.js';
-import { normalizeChatTurnHost } from './turn-host.js';
+import { createChatTurnHostBridge } from './turn-host-bridge.js';
 import { prepareOrdinaryChatTurnContext } from './turn-context.js';
 import { runInlineTurnMemoryMaintenance, scheduleBackgroundTurnMemoryMaintenance } from './turn-memory-maintenance.js';
 import { persistCompletedChatTurn } from './turn-persistence.js';
@@ -45,7 +45,10 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
     leaseOwner: args.leaseOwner,
   });
   const { sessions, session, runtime, tools, toolNames, leaseOwner } = context;
-  const host = normalizeChatTurnHost(args.host);
+  const hostBridge = createChatTurnHostBridge({
+    host: args.host,
+    onLegacyCompactionStatus: args.onCompactionStatus,
+  });
 
   try {
     const preflight = await prepareChatSessionTurn({
@@ -60,8 +63,7 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       summarizer: { credentialSource: runtime.providerCredentialSource },
       leaseOwner,
       sessions,
-      host,
-      onLegacyCompactionStatus: args.onCompactionStatus,
+      hostBridge,
     });
     if (!preflight.ok) {
       throw new Error(preflight.message);
@@ -81,9 +83,9 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       systemContext: runtime.systemContext,
       onAssistantStream: args.onAssistantStream,
       onTraceEvent: args.onTraceEvent,
-      onEvent: host.onAgentLoopEvent,
+      onEvent: hostBridge.onAgentLoopEvent,
       approvalPolicies: args.approvalPolicies,
-      approveToolCall: host.approveToolCall,
+      approveToolCall: hostBridge.approveToolCall,
       shouldStop: args.shouldStop,
       abortSignal: args.abortSignal,
     });
@@ -95,7 +97,7 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
           llm: runtime.llm,
           source: `chat session ${session.id}`,
           result,
-          onEvent: host.onAgentLoopEvent,
+          onEvent: hostBridge.onAgentLoopEvent,
         })
       : result;
 
@@ -112,8 +114,7 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
       historyForTokenEstimate: session.history,
       credentialSource: runtime.providerCredentialSource,
       traceSummarizerRegistry: args.traceSummarizerRegistry,
-      host,
-      onLegacyCompactionStatus: args.onCompactionStatus,
+      hostBridge,
     });
 
     if (maintenanceMode === 'background') {
@@ -126,7 +127,7 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
         sessionStoragePath: args.sessionStoragePath,
         sessionId: session.id,
         runId: result.state?.runId ?? `session-${session.id}`,
-        onEvent: host.onAgentLoopEvent,
+        onEvent: hostBridge.onAgentLoopEvent,
       });
     }
 

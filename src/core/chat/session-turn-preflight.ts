@@ -4,7 +4,7 @@ import { buildCompactionRunningContext, compactChatHistoryWithArchive } from './
 import { acquireSessionLease, getSessionLeaseConflict, type ChatSessionLeaseOwner } from './session-lease.js';
 import { readChatSession, saveChatSessions, touchSession } from './storage.js';
 import type { ChatArchiveRecord, ChatContextStats, ChatSession } from './types.js';
-import type { NormalizedChatTurnHost } from './turn-host.js';
+import type { ChatTurnHostBridge } from './turn-host-bridge.js';
 
 export type ChatTurnPreflightCompactionStatus = {
   status: 'running' | 'finished' | 'failed';
@@ -25,8 +25,7 @@ export type PrepareChatSessionTurnArgs = {
   summarizer: Parameters<typeof compactChatHistoryWithArchive>[0]['summarizer'];
   leaseOwner: ChatSessionLeaseOwner;
   sessions: ChatSession[];
-  host?: Pick<NormalizedChatTurnHost, 'onPreflightCompactionStatus'>;
-  onLegacyCompactionStatus?: (event: ChatTurnPreflightCompactionStatus) => void;
+  hostBridge: Pick<ChatTurnHostBridge, 'notifyPreflightCompactionStatus'>;
 };
 
 export type PrepareChatSessionTurnResult =
@@ -67,8 +66,7 @@ export async function prepareChatSessionTurn(args: PrepareChatSessionTurnArgs): 
     goal: args.prompt,
     summarizer: args.summarizer,
     onStatusChange: (event) => {
-      args.onLegacyCompactionStatus?.(event);
-      args.host?.onPreflightCompactionStatus?.(event);
+      args.hostBridge.notifyPreflightCompactionStatus(event);
       if (event.status === 'running' && leasedSession) {
         persistPreflightCompactionRunningSeed({
           sessionStoragePath: args.sessionStoragePath,

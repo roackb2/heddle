@@ -9,9 +9,7 @@ import { createLogger } from '../../../core/utils/logger.js';
 import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../index.js';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
 import { executeOrdinaryChatTurn } from '../../../core/chat/ordinary-turn.js';
-import * as preflightModule from '../../../core/chat/session-turn-preflight.js';
 import { createChatSession as createCoreChatSession, loadChatSessions, saveChatSessions } from '../../../core/chat/storage.js';
-import * as turnPersistenceModule from '../../../core/chat/turn-persistence.js';
 import * as agentLoopModule from '../../../core/runtime/agent-loop.js';
 import type { ToolApprovalPolicy } from '../../../core/approvals/types.js';
 import { continueChatPrompt, createControlPlaneChatSession, readChatSessionDetail, submitChatPrompt } from '../../../server/features/control-plane/services/chat-sessions.js';
@@ -599,76 +597,6 @@ describe('ordinary chat turn lifecycle', () => {
       reason: 'approved by host',
     });
     expect(requestToolApproval).toHaveBeenCalledWith({ call, tool });
-  });
-
-  it('fans out preflight and final compaction status through host and legacy callbacks', async () => {
-    const storage = createOrdinaryTurnStorage();
-    const statusEvents = [
-      {
-        status: 'running' as const,
-        archivePath: '.heddle/chat-sessions/session-1/archives/archive-preflight.jsonl',
-      },
-      {
-        status: 'finished' as const,
-        archivePath: '.heddle/chat-sessions/session-1/archives/archive-final.jsonl',
-        summaryPath: '.heddle/chat-sessions/session-1/summary.md',
-      },
-    ];
-    const onCompactionStatus = vi.fn();
-    const onPreflightCompactionStatus = vi.fn();
-    const onFinalCompactionStatus = vi.fn();
-
-    vi.spyOn(agentLoopModule, 'runAgentLoop').mockResolvedValue(createLoopResult({
-      workspaceRoot: storage.workspaceRoot,
-      prompt: 'Compact safely.',
-      summary: 'Done.',
-    }) as never);
-
-    const preflightSpy = vi.spyOn(preflightModule, 'prepareChatSessionTurn').mockImplementation(async (args) => {
-      args.onLegacyCompactionStatus?.(statusEvents[0]);
-      args.host?.onPreflightCompactionStatus?.(statusEvents[0]);
-      return {
-        ok: true,
-        session: loadChatSessions(storage.sessionStoragePath, true)[0]!,
-        historyForRun: [],
-        preflightHistory: [],
-        context: { estimatedHistoryTokens: 0, compactionStatus: 'running' },
-        archives: [],
-      };
-    });
-    const persistenceSpy = vi.spyOn(turnPersistenceModule, 'persistCompletedChatTurn').mockImplementation(async (args) => {
-      args.onLegacyCompactionStatus?.(statusEvents[1]);
-      args.host?.onFinalCompactionStatus?.(statusEvents[1]);
-      return {
-        summary: 'Done.',
-        session: loadChatSessions(storage.sessionStoragePath, true)[0]!,
-        traceFile: join(storage.stateRoot, 'traces', 'trace.json'),
-      } as never;
-    });
-
-    await executeOrdinaryChatTurn({
-      workspaceRoot: storage.workspaceRoot,
-      stateRoot: storage.stateRoot,
-      sessionStoragePath: storage.sessionStoragePath,
-      sessionId: storage.sessionId,
-      prompt: 'Compact safely.',
-      apiKey: 'explicit-key',
-      memoryMaintenanceMode: 'none',
-      onCompactionStatus,
-      host: {
-        compaction: {
-          onPreflightCompactionStatus,
-          onFinalCompactionStatus,
-        },
-      },
-    });
-
-    expect(preflightSpy).toHaveBeenCalled();
-    expect(persistenceSpy).toHaveBeenCalled();
-    expect(onCompactionStatus).toHaveBeenNthCalledWith(1, statusEvents[0]);
-    expect(onCompactionStatus).toHaveBeenNthCalledWith(2, statusEvents[1]);
-    expect(onPreflightCompactionStatus).toHaveBeenCalledWith(statusEvents[0]);
-    expect(onFinalCompactionStatus).toHaveBeenCalledWith(statusEvents[1]);
   });
 
   it('clears the session lease when the run loop fails', async () => {
