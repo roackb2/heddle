@@ -9,6 +9,7 @@ export type LlmStreamEvent =
   | { type: 'content.done'; content: string };
 
 export type LlmProvider = 'openai' | 'anthropic' | 'google';
+export type ReasoningEffort = 'low' | 'medium' | 'high' | 'ultrahigh';
 
 export type LlmAdapterCapabilities = {
   toolCalls: boolean;

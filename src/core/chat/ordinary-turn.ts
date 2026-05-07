@@ -77,7 +77,12 @@ export async function executeOrdinaryChatTurn(args: ExecuteOrdinaryChatTurnArgs)
     ownerId: `submit-${process.pid}`,
     clientLabel: 'another Heddle client',
   };
-  const llm = createLlmAdapter({ model, apiKey, credentialStorePath: args.credentialStorePath });
+  const llm = createLlmAdapter({
+    model,
+    apiKey,
+    credentialStorePath: args.credentialStorePath,
+    reasoningEffort: session.reasoningEffort,
+  });
   const memoryDir = join(args.stateRoot, 'memory');
   const systemContext = appendMemoryCatalogSystemContext({
     systemContext: args.systemContext,

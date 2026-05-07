@@ -11,6 +11,7 @@ type ChatSessionCatalogEntry = {
   createdAt: string;
   updatedAt: string;
   model?: string;
+  reasoningEffort?: import('../llm/types.js').ReasoningEffort;
   driftEnabled?: boolean;
   lastContinuePrompt?: string;
   context?: ChatContextStats;
@@ -47,6 +48,7 @@ export function createChatSession(options: {
   name: string;
   apiKeyPresent: boolean;
   model?: string;
+  reasoningEffort?: import('../llm/types.js').ReasoningEffort;
   workspaceId?: string;
 }): ChatSession {
   const now = new Date().toISOString();
@@ -60,6 +62,7 @@ export function createChatSession(options: {
     createdAt: now,
     updatedAt: now,
     model: options.model,
+    reasoningEffort: options.reasoningEffort,
     driftEnabled: false,
     lastContinuePrompt: undefined,
     context: undefined,
@@ -251,6 +254,13 @@ function parseCatalogEntry(value: unknown): ChatSessionCatalogEntry[] {
     createdAt,
     updatedAt,
     model: typeof candidate.model === 'string' ? candidate.model : undefined,
+    reasoningEffort:
+      candidate.reasoningEffort === 'low'
+      || candidate.reasoningEffort === 'medium'
+      || candidate.reasoningEffort === 'high'
+      || candidate.reasoningEffort === 'ultrahigh' ?
+        candidate.reasoningEffort
+      : undefined,
     driftEnabled: typeof candidate.driftEnabled === 'boolean' ? candidate.driftEnabled : false,
     lastContinuePrompt: typeof candidate.lastContinuePrompt === 'string' ? candidate.lastContinuePrompt : undefined,
     context: isChatContextStats(candidate.context) ? candidate.context : undefined,
@@ -267,6 +277,7 @@ function projectCatalogEntry(session: ChatSession): ChatSessionCatalogEntry {
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     model: session.model,
+    reasoningEffort: session.reasoningEffort,
     driftEnabled: session.driftEnabled,
     lastContinuePrompt: session.lastContinuePrompt,
     context: session.context,
@@ -299,6 +310,7 @@ function readSessionFile(
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
       model: entry.model,
+      reasoningEffort: entry.reasoningEffort,
       driftEnabled: entry.driftEnabled,
       lastContinuePrompt: entry.lastContinuePrompt,
       context: entry.context,

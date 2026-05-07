@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
+import { resolveDefaultReasoningEffort, supportsReasoningEffort } from '../../../core/llm/model-policy.js';
 import { estimateBuiltInContextWindow } from '../../../core/llm/openai-models.js';
 import type { ProviderCredentialSource } from '../utils/runtime.js';
 import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
 import { currentActivityText } from '../utils/format.js';
 import type { ApprovalChoice, LiveEvent, PendingApproval } from '../state/types.js';
 import type { PlanItem } from '../../../core/tools/update-plan.js';
+import type { ReasoningEffort } from '../../../core/llm/types.js';
 
 type ActiveTurnSummary = {
   title: string;
@@ -23,6 +25,7 @@ export function useChatStatusSummary(args: {
   activeSession?: {
     id: string;
     name: string;
+    reasoningEffort?: ReasoningEffort;
     context?: {
       compactionStatus?: 'idle' | 'running' | 'failed';
       lastRunInputTokens?: number;
@@ -62,6 +65,7 @@ export function useChatStatusSummary(args: {
       args.activeSession?.context?.lastRunInputTokens ?? args.activeSession?.context?.estimatedRequestTokens,
     );
     const authStatus = formatAuthStatus(args.credentialSource);
+    const reasoningStatus = formatReasoningStatus(args.activeModel, args.activeSession?.reasoningEffort);
     const sessionFooter = `session=${args.activeSession?.id ?? args.activeSessionId}${args.activeSession?.name ? ` (${args.activeSession.name})` : ''}`;
     const renderedStatus =
       args.pendingApproval ? 'awaiting approval'
@@ -112,6 +116,7 @@ export function useChatStatusSummary(args: {
       activityText,
       contextStatus,
       authStatus,
+      reasoningStatus,
       sessionFooter,
       renderedStatus,
       statusHint,
@@ -135,6 +140,18 @@ function formatContextStatus(model: string, estimatedTokens: number | undefined)
   const ratio = Math.min(1, estimatedTokens / window);
   const percent = Math.round(ratio * 100);
   return `estimated input ${estimatedTokens.toLocaleString()} / ${window.toLocaleString()} tokens (${percent}%)`;
+}
+
+function formatReasoningStatus(model: string, configuredEffort: ReasoningEffort | undefined): string {
+  if (!supportsReasoningEffort(model)) {
+    return 'reasoning=unsupported';
+  }
+
+  if (configuredEffort) {
+    return `reasoning=${configuredEffort}`;
+  }
+
+  return `reasoning=default(${resolveDefaultReasoningEffort(model) ?? 'none'})`;
 }
 
 function formatAuthStatus(source: ProviderCredentialSource): string {

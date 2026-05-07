@@ -15,7 +15,9 @@ type SubmitChatPromptArgs = {
   value: string;
   isRunning: boolean;
   activeModel: string;
+  activeReasoningEffort?: ChatSession['reasoningEffort'];
   setActiveModel: (model: string) => void;
+  setActiveReasoningEffort: (effort: ChatSession['reasoningEffort']) => void;
   sessions: ChatSession[];
   recentSessions: ChatSession[];
   activeSessionId: string;
@@ -57,7 +59,9 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
   const commandResult = await runLocalCommand({
     prompt,
     activeModel: args.activeModel,
+    activeReasoningEffort: args.activeReasoningEffort,
     setActiveModel: args.setActiveModel,
+    setActiveReasoningEffort: args.setActiveReasoningEffort,
     sessions: args.sessions,
     recentSessions: args.recentSessions,
     activeSessionId: args.activeSessionId,

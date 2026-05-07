@@ -1,7 +1,7 @@
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../config.js';
 import type { ProviderCredentialSource } from '../runtime/api-keys.js';
 import { isOpenAiAccountSignInModel, OPENAI_ACCOUNT_SIGN_IN_MODELS } from './openai-models.js';
-import type { LlmProvider } from './types.js';
+import type { LlmProvider, ReasoningEffort } from './types.js';
 
 export type SystemModelPurpose = 'chat-compaction' | 'session-title';
 export type ModelCredentialMode = 'api-key' | 'oauth' | 'missing';
@@ -71,6 +71,47 @@ export function assertModelCredentialCompatibility(args: {
   if (!result.ok) {
     throw new Error(result.error);
   }
+}
+
+export function validateReasoningEffortCompatibility(args: {
+  model: string;
+  provider: LlmProvider;
+  reasoningEffort?: ReasoningEffort;
+  usageLabel?: string;
+}): { ok: true } | { ok: false; error: string } {
+  if (!args.reasoningEffort) {
+    return { ok: true };
+  }
+
+  if (args.provider !== 'openai' || !supportsReasoningEffort(args.model)) {
+    return {
+      ok: false,
+      error: `${args.usageLabel ? `${args.usageLabel} ` : ''}reasoning effort is not supported for model ${args.model}.`,
+    };
+  }
+
+  return { ok: true };
+}
+
+export function assertReasoningEffortCompatibility(args: {
+  model: string;
+  provider: LlmProvider;
+  reasoningEffort?: ReasoningEffort;
+  usageLabel?: string;
+}) {
+  const result = validateReasoningEffortCompatibility(args);
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+}
+
+export function supportsReasoningEffort(model: string): boolean {
+  const normalized = model.trim().toLowerCase();
+  return normalized.startsWith('gpt-5') || normalized.startsWith('o3') || normalized.startsWith('o4');
+}
+
+export function resolveDefaultReasoningEffort(model: string): ReasoningEffort | undefined {
+  return supportsReasoningEffort(model) ? 'medium' : undefined;
 }
 
 export function resolveOpenAiOAuthImageCandidateModels(activeModel: string): string[] {

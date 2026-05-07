@@ -42,9 +42,12 @@ const sessionInputSchema = z.object({
   preferApiKey: z.boolean().optional(),
 });
 
+const reasoningEffortSchema = z.enum(['low', 'medium', 'high', 'ultrahigh']);
+
 const createSessionInputSchema = z.object({
   name: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
+  reasoningEffort: reasoningEffortSchema.optional(),
   apiKeyPresent: z.boolean().optional(),
 }).optional();
 
@@ -81,6 +84,7 @@ const sessionApprovalDecisionSchema = z.object({
 const sessionSettingsInputSchema = z.object({
   id: z.string().min(1),
   model: z.string().min(1).optional(),
+  reasoningEffort: reasoningEffortSchema.optional(),
   driftEnabled: z.boolean().optional(),
 });
 
@@ -159,6 +163,7 @@ export const controlPlaneRouter = router({
       suggestedName: input?.name,
       workspaceId: ctx.activeWorkspace.id,
       model: input?.model,
+      reasoningEffort: input?.reasoningEffort,
       apiKeyPresent: input?.apiKeyPresent,
     });
   }),
@@ -175,6 +180,7 @@ export const controlPlaneRouter = router({
       sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
       sessionId: input.id,
       model: input.model,
+      reasoningEffort: input.reasoningEffort,
       driftEnabled: input.driftEnabled,
     });
   }),

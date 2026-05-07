@@ -37,6 +37,7 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
 function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const nextLocalId = useLocalIds();
   const [activeModel, setActiveModel] = useState(runtime.model);
+  const [activeReasoningEffort, setActiveReasoningEffort] = useState(runtime.reasoningEffort);
   const {
     draft,
     setDraft,
@@ -57,6 +58,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     updateSessionById,
     updateActiveSession,
     setSessionModel,
+    setSessionReasoningEffort,
     createSession: createSessionWithDefaultModel,
     renameSession,
     removeSession,
@@ -125,6 +127,10 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
       setSessionModel(activeSession.id, activeModel);
     }
 
+    if (activeSession.reasoningEffort !== activeReasoningEffort) {
+      setSessionReasoningEffort(activeSession.id, activeReasoningEffort);
+    }
+
     const previousModel = previousActiveModelRef.current;
     previousActiveModelRef.current = activeModel;
     if (previousModel === activeModel) {
@@ -181,7 +187,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
       }));
       setStatus('Idle');
     });
-  }, [activeModel, activeSession, runtime.providerCredentialSource, runtime.stateRoot, runtime.systemContext, setStatus, setSessionModel, updateSessionById]);
+  }, [activeModel, activeReasoningEffort, activeSession, runtime.providerCredentialSource, runtime.stateRoot, runtime.systemContext, setSessionModel, setSessionReasoningEffort, setStatus, updateSessionById]);
 
   const messages = useMemo(() => activeSession?.messages ?? [], [activeSession?.messages]);
   const sessionTitleModel = resolveSystemSelectedModel({
@@ -194,6 +200,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     compacting,
     contextStatus,
     authStatus,
+    reasoningStatus,
     sessionFooter,
     renderedStatus,
     statusHint,
@@ -314,6 +321,13 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     }
   }, [activeSession, setSessionModel]);
 
+  const applyActiveReasoningEffort = useCallback((reasoningEffort: typeof activeReasoningEffort) => {
+    setActiveReasoningEffort(reasoningEffort);
+    if (activeSession && activeSession.reasoningEffort !== reasoningEffort) {
+      setSessionReasoningEffort(activeSession.id, reasoningEffort);
+    }
+  }, [activeReasoningEffort, activeSession, setSessionReasoningEffort]);
+
   const closeSession = (id: string) => {
     const removedActive = removeSession(id);
     if (removedActive) {
@@ -338,7 +352,9 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const { pendingSubmittedPrompt, clearPendingSubmittedPrompt, submitPrompt } = usePromptSubmission({
     runtime,
     activeModel,
+    activeReasoningEffort,
     setActiveModel: applyActiveModel,
+    setActiveReasoningEffort: applyActiveReasoningEffort,
     sessions,
     recentSessions,
     activeSessionId,
@@ -467,7 +483,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
           </>}
       </Box>
       <Text>
-        <Text dimColor>{`model=${activeModel} • ${authStatus} • ${contextStatus} • `}</Text>
+        <Text dimColor>{`model=${activeModel} • ${reasoningStatus} • ${authStatus} • ${contextStatus} • `}</Text>
         <Text color={drift.color} dimColor={!drift.color}>{`drift=${drift.footer}`}</Text>
         <Text dimColor>{` • ${sessionFooter}`}</Text>
       </Text>

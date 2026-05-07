@@ -172,6 +172,7 @@ export type {
   LlmAdapterCapabilities,
   LlmAdapterInfo,
   LlmUsage,
+  ReasoningEffort,
 } from './core/llm/types.js';
 export { createLlmAdapter, inferProviderFromModel, resolveLlmProvider } from './core/llm/factory.js';
 export type { CreateLlmAdapterOptions } from './core/llm/factory.js';

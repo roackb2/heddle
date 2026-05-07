@@ -9,7 +9,9 @@ function createCommandArgs(overrides: Partial<Parameters<typeof runLocalCommand>
   return {
     prompt: '/help',
     activeModel: 'gpt-5.1-codex',
+    activeReasoningEffort: undefined,
     setActiveModel: vi.fn(),
+    setActiveReasoningEffort: vi.fn(),
     sessions: [],
     recentSessions: [],
     activeSessionId: 'session-1',
@@ -88,6 +90,55 @@ describe('runLocalCommand', () => {
       handled: true,
       kind: 'message',
       message: 'Switched model to gpt-5.4-mini',
+    });
+  });
+
+  it('sets reasoning effort for the current session via slash command', async () => {
+    const setActiveReasoningEffort = vi.fn();
+    const result = await runLocalCommand(createCommandArgs({
+      prompt: '/reasoning high',
+      activeModel: 'gpt-5.5',
+      setActiveReasoningEffort,
+    }));
+
+    expect(setActiveReasoningEffort).toHaveBeenCalledWith('high');
+    expect(result).toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'Set reasoning effort to high for gpt-5.5.',
+    });
+  });
+
+  it('clears explicit reasoning effort back to default via slash command', async () => {
+    const setActiveReasoningEffort = vi.fn();
+    const result = await runLocalCommand(createCommandArgs({
+      prompt: '/reasoning default',
+      activeModel: 'gpt-5.4',
+      activeReasoningEffort: 'ultrahigh',
+      setActiveReasoningEffort,
+    }));
+
+    expect(setActiveReasoningEffort).toHaveBeenCalledWith(undefined);
+    expect(result).toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'Cleared explicit reasoning effort for gpt-5.4. Effective default: medium.',
+    });
+  });
+
+  it('reports unsupported reasoning effort models clearly', async () => {
+    const setActiveReasoningEffort = vi.fn();
+    const result = await runLocalCommand(createCommandArgs({
+      prompt: '/reasoning high',
+      activeModel: 'claude-sonnet-4-6',
+      setActiveReasoningEffort,
+    }));
+
+    expect(setActiveReasoningEffort).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'Reasoning effort is not supported for model claude-sonnet-4-6.',
     });
   });
 
@@ -327,6 +378,10 @@ describe('runLocalCommand', () => {
       description: 'compact earlier session history for the next run',
     });
     expect(hints).toContainEqual({
+      command: '/reasoning',
+      description: 'show reasoning effort for the current session',
+    });
+    expect(hints).toContainEqual({
       command: '/drift',
       description: 'show CyberLoop semantic drift detection status',
     });
@@ -343,6 +398,7 @@ describe('runLocalCommand', () => {
   it('autocompletes command roots and subcommands with tab-friendly spacing', () => {
     expect(autocompleteLocalCommand('/m', 'session-1', [])).toBe('/model ');
     expect(autocompleteLocalCommand('/model s', 'session-1', [])).toBe('/model set ');
+    expect(autocompleteLocalCommand('/rea', 'session-1', [])).toBe('/reasoning ');
     expect(autocompleteLocalCommand('/session sw', 'session-1', [])).toBe('/session switch ');
   });
 

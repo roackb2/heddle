@@ -3,7 +3,8 @@ import { summarizeSession } from './storage.js';
 import { formatAuthStatusMessage, loginProviderWithOAuth, logoutProvider } from '../../auth.js';
 import type { OpenAiOAuthCredential } from '../../../core/auth/openai-oauth.js';
 import { COMMON_BUILT_IN_MODELS, formatBuiltInModelGroups } from '../../../core/llm/openai-models.js';
-import type { LlmProvider } from '../../../core/llm/types.js';
+import { resolveDefaultReasoningEffort, supportsReasoningEffort } from '../../../core/llm/model-policy.js';
+import type { LlmProvider, ReasoningEffort } from '../../../core/llm/types.js';
 import { createFileHeartbeatTaskStore } from '../../../core/runtime/heartbeat-task-store.js';
 import { join } from 'node:path';
 
@@ -15,7 +16,9 @@ export type LocalCommandHint = {
 export type LocalCommandArgs = {
   prompt: string;
   activeModel: string;
+  activeReasoningEffort?: ReasoningEffort;
   setActiveModel: (model: string) => void;
+  setActiveReasoningEffort: (effort: ReasoningEffort | undefined) => void;
   sessions: ChatSession[];
   recentSessions: ChatSession[];
   activeSessionId: string;
@@ -47,6 +50,9 @@ const HELP_HINTS: LocalCommandHint[] = [
   { command: '/model <name>', description: 'switch the current model' },
   { command: '/model set [query]', description: 'pick a model with filtering' },
   { command: '/model list', description: 'list common built-in models' },
+  { command: '/reasoning', description: 'show reasoning effort for the current session' },
+  { command: '/reasoning <level>', description: 'set reasoning effort to low, medium, high, or ultrahigh' },
+  { command: '/reasoning default', description: 'clear explicit reasoning effort and use the model default' },
   { command: '/auth', description: 'show stored provider credentials' },
   { command: '/auth status', description: 'show stored provider credentials' },
   { command: '/auth login openai', description: 'sign in with OpenAI ChatGPT/Codex OAuth' },
@@ -91,6 +97,7 @@ const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
   ['/model list', () => messageResult(MODEL_LIST_MESSAGE)],
   ['/model', (args) => messageResult(`Current model: ${args.activeModel}`)],
   ['/model set', () => messageResult(MODEL_SET_HELP_MESSAGE)],
+  ['/reasoning', (args) => messageResult(formatReasoningEffortStatus(args.activeModel, args.activeReasoningEffort))],
   ['/auth', (args) => messageResult(formatAuthStatusMessage(args.credentialStorePath))],
   ['/auth status', (args) => messageResult(formatAuthStatusMessage(args.credentialStorePath))],
   ['/clear', (args) => {
@@ -123,6 +130,7 @@ const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
 
 const PREFIX_COMMANDS: Array<{ prefix: string; handle: PrefixCommandHandler }> = [
   { prefix: '/model ', handle: handleModelCommand },
+  { prefix: '/reasoning ', handle: handleReasoningCommand },
   { prefix: '/auth login ', handle: handleAuthLogin },
   { prefix: '/auth logout ', handle: handleAuthLogout },
   { prefix: '/heartbeat task ', handle: handleHeartbeatTask },
@@ -257,6 +265,31 @@ function handleModelCommand(args: LocalCommandArgs, value: string): LocalCommand
       `Switched model to ${value}`
     : `Switched model to ${value}. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.`,
   );
+}
+
+function handleReasoningCommand(args: LocalCommandArgs, value: string): LocalCommandResult {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return messageResult(formatReasoningEffortStatus(args.activeModel, args.activeReasoningEffort));
+  }
+
+  if (normalized === 'default') {
+    args.setActiveReasoningEffort(undefined);
+    return messageResult(
+      `Cleared explicit reasoning effort for ${args.activeModel}. Effective default: ${resolveDefaultReasoningEffort(args.activeModel) ?? 'not supported'}.`,
+    );
+  }
+
+  if (!isReasoningEffort(normalized)) {
+    return messageResult('Usage: /reasoning <low|medium|high|ultrahigh|default>');
+  }
+
+  if (!supportsReasoningEffort(args.activeModel)) {
+    return messageResult(`Reasoning effort is not supported for model ${args.activeModel}.`);
+  }
+
+  args.setActiveReasoningEffort(normalized);
+  return messageResult(`Set reasoning effort to ${normalized} for ${args.activeModel}.`);
 }
 
 async function handleAuthLogin(args: LocalCommandArgs, value: string): Promise<LocalCommandResult> {
@@ -397,6 +430,23 @@ async function resolveHeartbeatRun(
   }
   const run = await store.loadRunRecord?.(runRef);
   return run?.taskId === taskId ? run : undefined;
+}
+
+function formatReasoningEffortStatus(model: string, explicitEffort: ReasoningEffort | undefined): string {
+  const supported = supportsReasoningEffort(model);
+  const effective = explicitEffort ?? resolveDefaultReasoningEffort(model);
+  return [
+    `Current model: ${model}`,
+    `Reasoning effort support: ${supported ? 'supported' : 'unsupported'}`,
+    `Configured effort: ${explicitEffort ?? 'default'}`,
+    `Effective effort: ${effective ?? 'none'}`,
+    '',
+    'Use /reasoning <low|medium|high|ultrahigh|default> to update this session.',
+  ].join('\n');
+}
+
+function isReasoningEffort(value: string): value is ReasoningEffort {
+  return value === 'low' || value === 'medium' || value === 'high' || value === 'ultrahigh';
 }
 
 function formatHeartbeatTask(task: Awaited<ReturnType<ReturnType<typeof heartbeatStore>['listTasks']>>[number]): string {

@@ -106,6 +106,15 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
     ));
   }, [updateSessionById]);
 
+  const setSessionReasoningEffort = useCallback((
+    sessionId: string,
+    reasoningEffort: ChatSession['reasoningEffort'],
+  ) => {
+    updateSessionById(sessionId, (session) => (
+      session.reasoningEffort === reasoningEffort ? session : { ...session, reasoningEffort }
+    ));
+  }, [updateSessionById]);
+
   const createSession = useCallback((name?: string, model = defaultModel) => {
     const id = `session-${Date.now()}`;
     const nextSession = createChatSession({
@@ -163,6 +172,7 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
     updateSessionById,
     updateActiveSession,
     setSessionModel,
+    setSessionReasoningEffort,
     createSession,
     renameSession,
     removeSession,

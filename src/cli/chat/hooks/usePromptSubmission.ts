@@ -10,7 +10,9 @@ type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => 
 export function usePromptSubmission({
   runtime,
   activeModel,
+  activeReasoningEffort,
   setActiveModel,
+  setActiveReasoningEffort,
   sessions,
   recentSessions,
   activeSessionId,
@@ -41,7 +43,9 @@ export function usePromptSubmission({
 }: {
   runtime: ChatRuntimeConfig;
   activeModel: string;
+  activeReasoningEffort?: ChatSession['reasoningEffort'];
   setActiveModel: (model: string) => void;
+  setActiveReasoningEffort: (effort: ChatSession['reasoningEffort']) => void;
   sessions: ChatSession[];
   recentSessions: ChatSession[];
   activeSessionId: string;
@@ -147,7 +151,9 @@ export function usePromptSubmission({
     const submitArgs = {
       isRunning: effectiveIsRunning,
       activeModel,
+      activeReasoningEffort,
       setActiveModel,
+      setActiveReasoningEffort,
       sessions,
       recentSessions,
       activeSessionId,
@@ -208,7 +214,9 @@ export function usePromptSubmission({
     pendingApproval,
     pendingSubmittedPrompt,
     activeModel,
+    activeReasoningEffort,
     setActiveModel,
+    setActiveReasoningEffort,
     sessions,
     recentSessions,
     activeSessionId,

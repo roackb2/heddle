@@ -49,6 +49,7 @@ export function createControlPlaneChatSession(args: {
   workspaceId?: string;
   model?: string;
   apiKeyPresent?: boolean;
+  reasoningEffort?: import('../../../../core/llm/types.js').ReasoningEffort;
 }): ChatSessionDetail {
   const existing = readChatSessionViews(args.sessionStoragePath);
   const nextNumber = existing.length + 1;
@@ -58,6 +59,7 @@ export function createControlPlaneChatSession(args: {
     name: args.suggestedName?.trim() || `Session ${nextNumber}`,
     apiKeyPresent: args.apiKeyPresent ?? hasProviderCredentialForModel(model),
     model,
+    reasoningEffort: args.reasoningEffort,
     workspaceId: args.workspaceId,
   });
 
@@ -72,6 +74,7 @@ export function updateControlPlaneChatSessionSettings(args: {
   sessionStoragePath: string;
   sessionId: string;
   model?: string;
+  reasoningEffort?: import('../../../../core/llm/types.js').ReasoningEffort;
   driftEnabled?: boolean;
 }): ChatSessionDetail {
   const currentSessions = readChatSessionCatalog(args.sessionStoragePath)
@@ -82,6 +85,7 @@ export function updateControlPlaneChatSessionSettings(args: {
       {
         ...session,
         model: args.model ?? session.model,
+        reasoningEffort: args.reasoningEffort ?? session.reasoningEffort,
         driftEnabled: args.driftEnabled ?? session.driftEnabled,
         updatedAt: new Date().toISOString(),
       }
@@ -385,6 +389,13 @@ export function projectChatSessionView(raw: unknown | ChatSession): ChatSessionV
     createdAt: readString(candidate.createdAt),
     updatedAt: readString(candidate.updatedAt),
     model: readString(candidate.model),
+    reasoningEffort:
+      candidate.reasoningEffort === 'low'
+      || candidate.reasoningEffort === 'medium'
+      || candidate.reasoningEffort === 'high'
+      || candidate.reasoningEffort === 'ultrahigh' ?
+        candidate.reasoningEffort
+      : undefined,
     driftEnabled: typeof candidate.driftEnabled === 'boolean' ? candidate.driftEnabled : undefined,
     driftLevel: readLatestDriftLevel(turns),
     messageCount: messages.length,

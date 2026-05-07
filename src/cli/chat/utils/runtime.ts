@@ -1,5 +1,5 @@
 import { join, resolve } from 'node:path';
-import { appendMemoryCatalogSystemContext, DEFAULT_OPENAI_MODEL, inferProviderFromModel } from '../../../index.js';
+import { appendMemoryCatalogSystemContext, DEFAULT_OPENAI_MODEL, inferProviderFromModel, type ReasoningEffort } from '../../../index.js';
 import { saveTrace } from '../../../core/chat/trace.js';
 import type { LlmProvider } from '../../../index.js';
 import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
@@ -16,6 +16,7 @@ import { parsePositiveInt } from './format.js';
 
 export type ChatCliOptions = {
   model?: string;
+  reasoningEffort?: ReasoningEffort;
   maxSteps?: number;
   apiKey?: string;
   preferApiKey?: boolean;
@@ -30,6 +31,7 @@ export type ChatCliOptions = {
 
 export type ChatRuntimeConfig = {
   model: string;
+  reasoningEffort?: ReasoningEffort;
   maxSteps: number;
   apiKey?: string;
   apiKeyProvider?: LlmProvider | 'explicit';
@@ -84,6 +86,7 @@ export function resolveChatRuntimeConfig(options: ChatCliOptions): ChatRuntimeCo
 
   return {
     model,
+    reasoningEffort: options.reasoningEffort,
     maxSteps: options.maxSteps ?? parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 100,
     apiKey,
     apiKeyProvider,

@@ -39,7 +39,7 @@ export type SessionsScreenState = {
   createSession: () => Promise<void>;
   continueSession: () => Promise<void>;
   cancelSessionRun: () => Promise<void>;
-  updateSessionSettings: (settings: { model?: string; driftEnabled?: boolean }) => Promise<void>;
+  updateSessionSettings: (settings: { model?: string; reasoningEffort?: 'low' | 'medium' | 'high' | 'ultrahigh'; driftEnabled?: boolean }) => Promise<void>;
   pendingApproval: PendingSessionApproval;
   resolveApproval: (approved: boolean) => Promise<void>;
   selectedTurnId?: string;
@@ -661,7 +661,7 @@ export function useSessionsScreenState(
     }
   }, [notify, removeLiveStatusMessage, runInFlight, selectedSessionId]);
 
-  const updateSessionSettings = useCallback(async (settings: { model?: string; driftEnabled?: boolean }) => {
+  const updateSessionSettings = useCallback(async (settings: { model?: string; reasoningEffort?: 'low' | 'medium' | 'high' | 'ultrahigh'; driftEnabled?: boolean }) => {
     if (!selectedSessionId || runInFlight || sendingPrompt) {
       return;
     }
@@ -673,6 +673,7 @@ export function useSessionsScreenState(
         title: 'Session settings updated',
         body: [
           settings.model ? `model ${settings.model}` : undefined,
+          settings.reasoningEffort ? `reasoning ${settings.reasoningEffort}` : undefined,
           typeof settings.driftEnabled === 'boolean' ? `drift ${settings.driftEnabled ? 'on' : 'off'}` : undefined,
         ].filter(Boolean).join(', '),
         tone: 'success',

@@ -42,7 +42,7 @@ export async function fetchModelOptions(): Promise<ModelOptions> {
 
 export async function updateChatSessionSettings(
   sessionId: string,
-  settings: { model?: string; driftEnabled?: boolean },
+  settings: { model?: string; reasoningEffort?: 'low' | 'medium' | 'high' | 'ultrahigh'; driftEnabled?: boolean },
 ): Promise<Exclude<ChatSessionDetail, null>> {
   return await trpc.controlPlane.sessionSettingsUpdate.mutate({ id: sessionId, ...settings });
 }

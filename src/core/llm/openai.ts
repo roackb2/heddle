@@ -10,8 +10,9 @@ import type {
   Response as OpenAiResponse,
   ResponseStreamEvent,
 } from 'openai/resources/responses/responses.js';
+import type { ReasoningEffort as OpenAiReasoningEffort } from 'openai/resources/shared.js';
 import type { Fetch as OpenAiFetch } from 'openai/core.js';
-import type { LlmAdapter, ChatMessage, LlmResponse, LlmAdapterCapabilities, LlmUsage, LlmStreamEvent } from './types.js';
+import type { LlmAdapter, ChatMessage, LlmResponse, LlmAdapterCapabilities, LlmUsage, LlmStreamEvent, ReasoningEffort } from './types.js';
 import type { AssistantDiagnostics, ToolDefinition, ToolCall } from '../types.js';
 import { DEFAULT_OPENAI_MODEL } from '../config.js';
 import {
@@ -23,7 +24,7 @@ import {
   setStoredProviderCredential,
   type StoredProviderCredential,
 } from '../auth/provider-credentials.js';
-import { assertModelCredentialCompatibility } from './model-policy.js';
+import { assertModelCredentialCompatibility, assertReasoningEffortCompatibility, resolveDefaultReasoningEffort } from './model-policy.js';
 
 export type OpenAiAdapterOptions = {
   apiKey?: string;
@@ -31,6 +32,7 @@ export type OpenAiAdapterOptions = {
   credential?: StoredProviderCredential;
   credentialStorePath?: string;
   fetchImpl?: CompatibleFetch;
+  reasoningEffort?: ReasoningEffort;
 };
 
 type CompatibleFetch = (url: unknown, init?: unknown) => Promise<globalThis.Response>;
@@ -69,6 +71,13 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
       signal?: AbortSignal,
       onStreamEvent?: (event: LlmStreamEvent) => void,
     ): Promise<LlmResponse> {
+      assertReasoningEffortCompatibility({
+        model,
+        provider: 'openai',
+        reasoningEffort: options.reasoningEffort,
+        usageLabel: 'OpenAI Responses',
+      });
+
       if (oauthCredential) {
         assertModelCredentialCompatibility({
           model,
@@ -81,6 +90,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
         model,
         tools,
         oauthMode: Boolean(oauthCredential),
+        reasoningEffort: options.reasoningEffort,
       });
       const stream = await client.responses.stream({
         ...request,
@@ -390,13 +400,14 @@ function buildOpenAiResponsesRequest(
     model: string;
     tools: ToolDefinition[];
     oauthMode: boolean;
+    reasoningEffort?: ReasoningEffort;
   },
 ): {
   model: string;
   input: ResponseInputItem[];
   tools?: FunctionTool[];
   store: boolean;
-  reasoning: { summary: 'auto' | 'detailed' };
+  reasoning: { effort?: OpenAiReasoningEffort; summary: 'auto' | 'detailed' };
   instructions?: string;
 } {
   const systemMessages = options.oauthMode ? messages.filter((message): message is Extract<ChatMessage, { role: 'system' }> => message.role === 'system') : [];
@@ -412,10 +423,19 @@ function buildOpenAiResponsesRequest(
     tools: options.tools.length > 0 ? options.tools.map(toResponseTool) : undefined,
     store: false,
     reasoning: {
+      effort: mapReasoningEffort(options.reasoningEffort ?? resolveDefaultReasoningEffort(options.model)),
       summary: options.oauthMode ? 'auto' : 'detailed',
     },
     ...(instructions ? { instructions } : {}),
   };
+}
+
+function mapReasoningEffort(effort: ReasoningEffort | undefined): OpenAiReasoningEffort | undefined {
+  if (!effort) {
+    return undefined;
+  }
+
+  return effort === 'ultrahigh' ? 'high' : effort;
 }
 
 function toResponseInputItems(msg: ChatMessage): ResponseInputItem[] {

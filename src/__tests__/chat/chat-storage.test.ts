@@ -108,6 +108,34 @@ describe('chat session storage layout', () => {
     }));
   });
 
+  it('persists reasoning effort in catalog and per-session storage when configured', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-reasoning-'));
+    const sessionsFile = join(dir, 'chat-sessions.json');
+    const session = {
+      ...createChatSession({
+        id: 'session-1',
+        name: 'Session 1',
+        apiKeyPresent: true,
+        workspaceId: 'workspace-1',
+        reasoningEffort: 'high',
+      }),
+      model: 'gpt-5.5',
+    };
+
+    saveChatSessions(sessionsFile, [session]);
+
+    expect(readChatSessionCatalog(sessionsFile)[0]).toEqual(expect.objectContaining({
+      id: 'session-1',
+      model: 'gpt-5.5',
+      reasoningEffort: 'high',
+    }));
+    expect(readChatSession(sessionsFile, 'session-1', true)).toEqual(expect.objectContaining({
+      id: 'session-1',
+      model: 'gpt-5.5',
+      reasoningEffort: 'high',
+    }));
+  });
+
   it('does not rewrite unchanged session files when saving again', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-'));
     const sessionsFile = join(dir, 'chat-sessions.json');

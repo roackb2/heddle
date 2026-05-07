@@ -32,6 +32,10 @@ const LEFT_PANEL_MAX_WIDTH = 520;
 const RIGHT_PANEL_MIN_WIDTH = 280;
 const RIGHT_PANEL_MAX_WIDTH = 620;
 
+const REASONING_EFFORT_OPTIONS = ['low', 'medium', 'high', 'ultrahigh'] as const;
+
+type ReasoningEffortOption = (typeof REASONING_EFFORT_OPTIONS)[number];
+
 export type SessionsScreenProps = {
   sessions: ControlPlaneState['sessions'];
   activeSession?: ControlPlaneState['sessions'][number];
@@ -57,7 +61,7 @@ export type SessionsScreenProps = {
   onCreateSession: () => Promise<void>;
   onContinueSession: () => Promise<void>;
   onCancelSessionRun: () => Promise<void>;
-  onUpdateSessionSettings: (settings: { model?: string; driftEnabled?: boolean }) => Promise<void>;
+  onUpdateSessionSettings: (settings: { model?: string; reasoningEffort?: ReasoningEffortOption; driftEnabled?: boolean }) => Promise<void>;
   pendingApproval: { tool: string; callId: string; input?: unknown; requestedAt: string } | null;
   onResolveApproval: (approved: boolean) => Promise<void>;
 };
@@ -597,6 +601,20 @@ export function SessionsScreen({
                   {!modelOptions ? <option value={sessionDetail?.model ?? activeSession.model ?? ''}>{modelOptionsError ? 'models unavailable' : sessionDetail?.model ?? activeSession.model ?? 'loading models'}</option> : null}
                 </select>
               </label>
+              <label className="select-control">
+                <span>reasoning</span>
+                <select
+                  value={sessionDetail?.reasoningEffort ?? activeSession.reasoningEffort ?? ''}
+                  disabled={runActive}
+                  onChange={(event) => {
+                    const value = event.target.value as ReasoningEffortOption | '';
+                    void onUpdateSessionSettings({ reasoningEffort: value || undefined });
+                  }}
+                >
+                  <option value="">default</option>
+                  {REASONING_EFFORT_OPTIONS.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
+                </select>
+              </label>
               <Pill>turns {activeSession.turnCount}</Pill>
               {compactionStatus === 'running' ? <Pill tone="warn">compacting</Pill> : null}
               <button
@@ -705,6 +723,7 @@ export function SessionsScreen({
               <div className="pills compact-pills">
                 <Pill tone={creatingSession ? 'warn' : runActive ? 'warn' : 'good'}>{creatingSession ? 'creating session' : runActive ? 'run active' : 'idle'}</Pill>
                 {memoryUpdating ? <Pill tone="warn">memory updating</Pill> : null}
+                <Pill>{formatReasoningPill(sessionDetail?.model ?? activeSession?.model, sessionDetail?.reasoningEffort ?? activeSession?.reasoningEffort)}</Pill>
                 {authStatus ? <Pill>{authStatus}</Pill> : null}
                 {sessionDetail?.lastContinuePrompt ? <Pill>continue available</Pill> : <Pill>no continue state yet</Pill>}
               </div>
@@ -819,6 +838,21 @@ function readStoredPanelWidths(): PanelWidths {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), Math.max(min, max));
+}
+
+function formatReasoningPill(
+  model: string | undefined,
+  reasoningEffort: ReasoningEffortOption | undefined,
+): string {
+  if (!model) {
+    return 'reasoning unknown';
+  }
+
+  if (reasoningEffort) {
+    return `reasoning ${reasoningEffort}`;
+  }
+
+  return `reasoning ${model.startsWith('gpt-5') || model.startsWith('o3') || model.startsWith('o4') ? 'default' : 'unsupported'}`;
 }
 
 function formatDriftLabel(enabled: boolean | undefined, level: ControlPlaneState['sessions'][number]['driftLevel']): string {
