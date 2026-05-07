@@ -14,6 +14,8 @@ export function createTuiSlashCommandContext(args: LocalCommandArgs): SlashComma
     model: {
       active: () => args.activeModel,
       setActive: args.setActiveModel,
+      activeReasoningEffort: () => args.activeReasoningEffort,
+      setReasoningEffort: args.setActiveReasoningEffort,
       credentialSource: () => args.providerCredentialSource,
     },
     auth: {

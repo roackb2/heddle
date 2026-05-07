@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CredentialAwareModelOption } from '../../../core/llm/model-policy.js';
+import type { ReasoningEffort } from '../../../core/llm/types.js';
 import type { ConversationLine, ChatSession } from '../state/types.js';
 import { submitChatPrompt } from '../submit.js';
 import { buildPromptWithFileMentions } from '../utils/file-mentions.js';
@@ -11,7 +12,9 @@ type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => 
 export function usePromptSubmission({
   runtime,
   activeModel,
+  activeReasoningEffort,
   setActiveModel,
+  setActiveReasoningEffort,
   sessions,
   recentSessions,
   activeSessionId,
@@ -42,7 +45,9 @@ export function usePromptSubmission({
 }: {
   runtime: ChatRuntimeConfig;
   activeModel: string;
+  activeReasoningEffort?: ReasoningEffort;
   setActiveModel: (model: string) => void;
+  setActiveReasoningEffort: (effort: ReasoningEffort | undefined) => void;
   sessions: ChatSession[];
   recentSessions: ChatSession[];
   activeSessionId: string;
@@ -148,7 +153,9 @@ export function usePromptSubmission({
     const submitArgs = {
       isRunning: effectiveIsRunning,
       activeModel,
+      activeReasoningEffort,
       setActiveModel,
+      setActiveReasoningEffort,
       sessions,
       recentSessions,
       activeSessionId,

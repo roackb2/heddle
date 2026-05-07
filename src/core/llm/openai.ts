@@ -10,8 +10,9 @@ import type {
   Response as OpenAiResponse,
   ResponseStreamEvent,
 } from 'openai/resources/responses/responses.js';
+import type { ReasoningEffort as OpenAiReasoningEffort } from 'openai/resources/shared.js';
 import type { Fetch as OpenAiFetch } from 'openai/core.js';
-import type { LlmAdapter, ChatMessage, LlmResponse, LlmAdapterCapabilities, LlmUsage, LlmStreamEvent } from './types.js';
+import type { LlmAdapter, ChatMessage, LlmResponse, LlmAdapterCapabilities, LlmUsage, LlmStreamEvent, ReasoningEffort } from './types.js';
 import type { AssistantDiagnostics, ToolDefinition, ToolCall } from '../types.js';
 import { DEFAULT_OPENAI_MODEL } from '../config.js';
 import {
@@ -23,7 +24,11 @@ import {
   setStoredProviderCredential,
   type StoredProviderCredential,
 } from '../auth/provider-credentials.js';
-import { assertModelCredentialCompatibility } from './model-policy.js';
+import {
+  assertModelCredentialCompatibility,
+  resolveDefaultReasoningEffort,
+  supportsOpenAiRequestReasoningEffort,
+} from './model-policy.js';
 
 export type OpenAiAdapterOptions = {
   apiKey?: string;
@@ -31,6 +36,7 @@ export type OpenAiAdapterOptions = {
   credential?: StoredProviderCredential;
   credentialStorePath?: string;
   fetchImpl?: CompatibleFetch;
+  reasoningEffort?: ReasoningEffort;
 };
 
 type CompatibleFetch = (url: unknown, init?: unknown) => Promise<globalThis.Response>;
@@ -81,6 +87,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): LlmAdap
         model,
         tools,
         oauthMode: Boolean(oauthCredential),
+        reasoningEffort: options.reasoningEffort,
       });
       const stream = await client.responses.stream({
         ...request,
@@ -323,65 +330,73 @@ export function extractOpenAiCodexSseItems<T>(
   return items;
 }
 
-// ---------------------------------------------------------------------------
-// Internal converters
-// ---------------------------------------------------------------------------
-
-function extractAssistantContent(response: OpenAiResponse, hasToolCalls: boolean): string | undefined {
-  if (response.output_text) {
-    return response.output_text;
+function extractAssistantContent(response: OpenAiResponse, preferToolCalls: boolean): string | undefined {
+  const text = response.output_text?.trim();
+  if (text) {
+    return text;
   }
 
-  if (!hasToolCalls) {
+  if (preferToolCalls) {
     return undefined;
   }
 
-  const reasoningSummary = response.output
-    .filter((item): item is ResponseReasoningItem => item.type === 'reasoning')
-    .flatMap((item) => item.summary)
-    .map((summary) => summary.text.trim())
-    .filter(Boolean)
-    .join(' ');
+  for (const item of response.output) {
+    if (item.type !== 'message') {
+      continue;
+    }
 
-  return reasoningSummary || undefined;
+    const segment = item.content.find((part) => part.type === 'output_text');
+    if (segment?.text?.trim()) {
+      return segment.text.trim();
+    }
+  }
+
+  return undefined;
 }
 
-function extractAssistantDiagnostics(response: OpenAiResponse, hasToolCalls: boolean): AssistantDiagnostics | undefined {
-  if (!hasToolCalls) {
+function extractAssistantDiagnostics(
+  response: OpenAiResponse,
+  preferToolCalls: boolean,
+): AssistantDiagnostics | undefined {
+  const reasoning = response.output.find((item): item is ResponseReasoningItem => item.type === 'reasoning');
+  if (!reasoning || !Array.isArray(reasoning.summary)) {
     return undefined;
   }
 
-  const rationale = response.output
-    .filter((item): item is ResponseReasoningItem => item.type === 'reasoning')
-    .flatMap((item) => item.summary)
-    .map((summary) => summary.text.trim())
-    .filter(Boolean)
-    .join(' ');
-
+  const rationale = reasoning.summary
+    .map((summary) => summary.type === 'summary_text' ? summary.text.trim() : '')
+    .find(Boolean);
   if (!rationale) {
     return undefined;
   }
 
-  return { rationale };
+  if (preferToolCalls) {
+    return { rationale };
+  }
+
+  return {
+    rationale,
+  };
 }
 
 function extractUsage(response: OpenAiResponse): LlmUsage | undefined {
-  if (!response.usage) {
+  const usage = response.usage;
+  if (!usage) {
     return undefined;
   }
 
   return {
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-    totalTokens: response.usage.total_tokens,
-    cachedInputTokens: response.usage.input_tokens_details.cached_tokens || undefined,
-    reasoningTokens: response.usage.output_tokens_details.reasoning_tokens || undefined,
+    inputTokens: usage.input_tokens,
+    outputTokens: usage.output_tokens,
+    totalTokens: usage.total_tokens,
+    cachedInputTokens: usage.input_tokens_details?.cached_tokens,
+    reasoningTokens: usage.output_tokens_details?.reasoning_tokens,
     requests: 1,
   };
 }
 
 function toResponseInput(messages: ChatMessage[]): ResponseInputItem[] {
-  return messages.flatMap((message) => toResponseInputItems(message));
+  return messages.flatMap(toResponseInputItems);
 }
 
 function buildOpenAiResponsesRequest(
@@ -390,13 +405,14 @@ function buildOpenAiResponsesRequest(
     model: string;
     tools: ToolDefinition[];
     oauthMode: boolean;
+    reasoningEffort?: ReasoningEffort;
   },
 ): {
   model: string;
   input: ResponseInputItem[];
   tools?: FunctionTool[];
   store: boolean;
-  reasoning: { summary: 'auto' | 'detailed' };
+  reasoning: { summary: 'auto' | 'detailed'; effort?: OpenAiReasoningEffort };
   instructions?: string;
 } {
   const systemMessages = options.oauthMode ? messages.filter((message): message is Extract<ChatMessage, { role: 'system' }> => message.role === 'system') : [];
@@ -404,6 +420,10 @@ function buildOpenAiResponsesRequest(
   const instructions =
     options.oauthMode ?
       systemMessages.map((message) => message.content.trim()).filter(Boolean).join('\n\n')
+    : undefined;
+  const reasoningEffort =
+    supportsOpenAiRequestReasoningEffort(options.model) ?
+      toOpenAiReasoningEffort(options.reasoningEffort ?? resolveDefaultReasoningEffort(options.model))
     : undefined;
 
   return {
@@ -413,9 +433,18 @@ function buildOpenAiResponsesRequest(
     store: false,
     reasoning: {
       summary: options.oauthMode ? 'auto' : 'detailed',
+      ...(reasoningEffort ? { effort: reasoningEffort } : {}),
     },
     ...(instructions ? { instructions } : {}),
   };
+}
+
+function toOpenAiReasoningEffort(value: ReasoningEffort | undefined): OpenAiReasoningEffort | undefined {
+  if (value === 'low' || value === 'medium' || value === 'high') {
+    return value;
+  }
+
+  return undefined;
 }
 
 function toResponseInputItems(msg: ChatMessage): ResponseInputItem[] {

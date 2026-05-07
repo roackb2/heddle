@@ -84,6 +84,7 @@ const sessionApprovalDecisionSchema = z.object({
 const sessionSettingsInputSchema = z.object({
   id: z.string().min(1),
   model: z.string().min(1).optional(),
+  reasoningEffort: z.enum(['low', 'medium', 'high', 'ultrahigh']).optional().nullable(),
   driftEnabled: z.boolean().optional(),
 });
 
@@ -190,6 +191,7 @@ export const controlPlaneRouter = router({
       sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
       sessionId: input.id,
       model: input.model,
+      reasoningEffort: input.reasoningEffort ?? undefined,
       driftEnabled: input.driftEnabled,
     });
   }),

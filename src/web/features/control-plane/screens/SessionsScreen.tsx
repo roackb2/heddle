@@ -47,7 +47,7 @@ export type SessionsScreenProps = {
   onCreateSession: () => Promise<void>;
   onContinueSession: () => Promise<void>;
   onCancelSessionRun: () => Promise<void>;
-  onUpdateSessionSettings: (settings: { model?: string; driftEnabled?: boolean }) => Promise<void>;
+  onUpdateSessionSettings: (settings: { model?: string; reasoningEffort?: 'low' | 'medium' | 'high' | 'ultrahigh' | null; driftEnabled?: boolean }) => Promise<void>;
   pendingApproval: { tool: string; callId: string; input?: unknown; requestedAt: string } | null;
   onResolveApproval: (approved: boolean) => Promise<void>;
 };
@@ -116,15 +116,19 @@ export function SessionsScreen({
   const authStatus = formatControlPlaneAuthStatus(sessionDetail?.model ?? activeSession?.model, auth);
   const compactionStatus = sessionDetail?.context?.compactionStatus ?? activeSession?.context?.compactionStatus;
   const selectedModel = sessionDetail?.model ?? activeSession?.model ?? '';
+  const selectedReasoningEffort = sessionDetail?.reasoningEffort ?? activeSession?.reasoningEffort;
   const {
     modelOptions,
     modelOptionsError,
     modelOptionGroups,
     selectedModelOption,
+    reasoningEffortOptions,
+    selectedReasoningEffortOption,
     modelSelectorDisabled,
   } = useSessionModelOptions({
     auth,
     selectedModel,
+    selectedReasoningEffort,
     runActive,
   });
   const {
@@ -295,6 +299,22 @@ export function SessionsScreen({
                 </label>
                 {!modelOptions ? <p className="model-select-description">{modelOptionsError ? 'models unavailable' : 'loading models'}</p> : null}
               </div>
+              <label className="select-control">
+                <span>reasoning</span>
+                <select
+                  value={selectedReasoningEffortOption?.id ?? 'default'}
+                  disabled={modelSelectorDisabled}
+                  onChange={(event) => void onUpdateSessionSettings({
+                    reasoningEffort: event.target.value === 'default' ? null : event.target.value as 'low' | 'medium' | 'high' | 'ultrahigh',
+                  })}
+                >
+                  {reasoningEffortOptions.map((option) => (
+                    <option key={option.id} value={option.id} disabled={option.disabled}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <Pill>turns {activeSession.turnCount}</Pill>
               {compactionStatus === 'running' ? <Pill tone="warn">compacting</Pill> : null}
               <button

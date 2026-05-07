@@ -9,10 +9,12 @@ import { useCredentialAwareModelOptions } from '../useCredentialAwareModelOption
 export function useSessionModelOptions({
   auth,
   selectedModel,
+  selectedReasoningEffort,
   runActive,
 }: {
   auth: ControlPlaneState['auth'];
   selectedModel: string;
+  selectedReasoningEffort?: 'low' | 'medium' | 'high' | 'ultrahigh';
   runActive: boolean;
 }) {
   const [modelOptions, setModelOptions] = useState<ModelOptions | null>(null);
@@ -20,11 +22,14 @@ export function useSessionModelOptions({
   const {
     groups: modelOptionGroups,
     selectedModelOption,
+    reasoningEffortOptions,
+    selectedReasoningEffortOption,
     selectorDisabled: modelSelectorDisabled,
   } = useCredentialAwareModelOptions({
     modelOptions,
     auth,
     selectedModel,
+    selectedReasoningEffort,
     runActive,
   });
 
@@ -52,6 +57,8 @@ export function useSessionModelOptions({
     modelOptionsError,
     modelOptionGroups,
     selectedModelOption,
+    reasoningEffortOptions,
+    selectedReasoningEffortOption,
     modelSelectorDisabled,
   };
 }

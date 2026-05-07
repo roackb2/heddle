@@ -17,6 +17,7 @@ import { buildConversationMessages } from './utils/format.js';
 import { buildCompactionRunningContext, compactChatHistoryWithArchive } from './state/compaction.js';
 import { estimateBuiltInContextWindow } from '../../core/llm/openai-models.js';
 import { credentialModeFromSource, resolveCompatibleActiveModel, resolveSystemSelectedModel } from '../../core/llm/model-policy.js';
+import type { ReasoningEffort } from '../../core/llm/types.js';
 import { useApprovalFlow } from './hooks/useApprovalFlow.js';
 import { useAgentRun } from './hooks/useAgentRun.js';
 import { useChatDrift } from './hooks/useChatDrift.js';
@@ -52,6 +53,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     clearDraft,
     replaceDraft,
   } = usePromptDraft();
+  const [activeReasoningEffort, setActiveReasoningEffort] = useState<ReasoningEffort | undefined>(undefined);
   const mentionableFiles = useState(() => listMentionableFiles(runtime.workspaceRoot, runtime.searchIgnoreDirs))[0];
 
   const {
@@ -113,6 +115,10 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     actionState,
     workingFrames,
   } = useApprovalFlow(nextLocalId);
+  useEffect(() => {
+    setActiveReasoningEffort(activeSession?.reasoningEffort);
+  }, [activeSession?.id, activeSession?.reasoningEffort]);
+
   useEffect(() => {
     if (!activeSession) {
       previousActiveModelRef.current = activeModel;
@@ -217,6 +223,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const {
     compacting,
     contextStatus,
+    reasoningStatus,
     authStatus,
     sessionFooter,
     renderedStatus,
@@ -225,6 +232,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     activeTurn,
   } = useChatStatusSummary({
     activeModel,
+    activeReasoningEffort,
     activeSessionId,
     activeSession,
     runtimeHostWarningSource: runtime.runtimeHost,
@@ -365,7 +373,14 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const { pendingSubmittedPrompt, clearPendingSubmittedPrompt, submitPrompt } = usePromptSubmission({
     runtime,
     activeModel,
+    activeReasoningEffort,
     setActiveModel: applyActiveModel,
+    setActiveReasoningEffort: (effort) => {
+      setActiveReasoningEffort(effort);
+      if (activeSession) {
+        updateSessionById(activeSession.id, (session) => ({ ...session, reasoningEffort: effort }));
+      }
+    },
     sessions,
     recentSessions,
     activeSessionId,
@@ -518,7 +533,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
           </Box>}
       </Box>
       <Box width={promptPanelWidth} overflow="hidden">
-        <Text dimColor wrap="truncate-end">{`model=${activeModel} • ${authStatus} • ${contextStatus} • drift=${drift.footer} • ${sessionFooter}`}</Text>
+        <Text dimColor wrap="truncate-end">{`model=${activeModel} • reasoning=${reasoningStatus} • ${authStatus} • ${contextStatus} • drift=${drift.footer} • ${sessionFooter}`}</Text>
       </Box>
     </Box>
   );

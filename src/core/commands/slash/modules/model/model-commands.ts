@@ -4,8 +4,13 @@ import type { SlashCommandModule } from '../../types.js';
 import type { SlashCommandExecutionContext } from '../context.js';
 import { argumentAfterPrefix, slashMessageResult } from '../results.js';
 import { COMMON_BUILT_IN_MODELS, formatBuiltInModelGroups } from '../../../../llm/openai-models.js';
-import { credentialModeFromSource, validateModelCredentialCompatibility } from '../../../../llm/model-policy.js';
-import type { LlmProvider } from '../../../../llm/types.js';
+import {
+  credentialModeFromSource,
+  resolveDefaultReasoningEffort,
+  supportsReasoningEffort,
+  validateModelCredentialCompatibility,
+} from '../../../../llm/model-policy.js';
+import type { LlmProvider, ReasoningEffort } from '../../../../llm/types.js';
 
 export const MODEL_LIST_MESSAGE = ['Common built-in model choices', '', formatBuiltInModelGroups()].join('\n');
 export const MODEL_SET_HELP_MESSAGE = 'Use /model set <query> to filter models, then use arrows and Enter to choose one.';
@@ -58,6 +63,36 @@ export function createModelSlashCommandModule(): SlashCommandModule<SlashCommand
   };
 }
 
+export function createReasoningSlashCommandModule(): SlashCommandModule<SlashCommandResult, SlashCommandExecutionContext> {
+  return {
+    id: 'reasoning',
+    hints: [
+      { command: '/reasoning', description: 'show reasoning effort for the current session' },
+      { command: '/reasoning low', description: 'set reasoning effort to low' },
+      { command: '/reasoning medium', description: 'set reasoning effort to medium' },
+      { command: '/reasoning high', description: 'set reasoning effort to high' },
+      { command: '/reasoning ultrahigh', description: 'set reasoning effort to ultrahigh' },
+      { command: '/reasoning default', description: 'clear explicit reasoning effort and use the model default' },
+    ],
+    commands: [
+      {
+        id: 'reasoning.current',
+        syntax: '/reasoning',
+        description: 'show reasoning effort for the current session',
+        match: matchesExactSlashCommand('/reasoning'),
+        run: (context) => slashMessageResult(formatReasoningEffortStatus(context.model.active(), context.model.activeReasoningEffort())),
+      },
+      {
+        id: 'reasoning.set',
+        syntax: '/reasoning <low|medium|high|ultrahigh|default>',
+        description: 'set reasoning effort for the current session',
+        match: matchesSlashCommandPrefix('/reasoning'),
+        run: (context, input) => setReasoningEffort(context, argumentAfterPrefix(input, '/reasoning')),
+      },
+    ],
+  };
+}
+
 function switchModel(
   context: SlashCommandExecutionContext,
   value: string,
@@ -86,6 +121,51 @@ function switchModel(
       `Switched model to ${value}`
     : `Switched model to ${value}. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.`,
   );
+}
+
+function setReasoningEffort(
+  context: SlashCommandExecutionContext,
+  value: string,
+): SlashCommandResult {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return slashMessageResult(formatReasoningEffortStatus(context.model.active(), context.model.activeReasoningEffort()));
+  }
+
+  if (normalized === 'default') {
+    context.model.setReasoningEffort(undefined);
+    return slashMessageResult(
+      `Cleared explicit reasoning effort for ${context.model.active()}. Effective default: ${resolveDefaultReasoningEffort(context.model.active()) ?? 'not supported'}.`,
+    );
+  }
+
+  if (!isReasoningEffort(normalized)) {
+    return slashMessageResult('Usage: /reasoning <low|medium|high|ultrahigh|default>');
+  }
+
+  if (!supportsReasoningEffort(context.model.active())) {
+    return slashMessageResult(`Reasoning effort is not supported for model ${context.model.active()}.`);
+  }
+
+  context.model.setReasoningEffort(normalized);
+  return slashMessageResult(`Set reasoning effort to ${normalized} for ${context.model.active()}.`);
+}
+
+function formatReasoningEffortStatus(model: string, explicitEffort: ReasoningEffort | undefined): string {
+  const supported = supportsReasoningEffort(model);
+  const effective = explicitEffort ?? resolveDefaultReasoningEffort(model);
+  return [
+    `Current model: ${model}`,
+    `Reasoning effort support: ${supported ? 'supported' : 'unsupported'}`,
+    `Configured effort: ${explicitEffort ?? 'default'}`,
+    `Effective effort: ${effective ?? 'none'}`,
+    '',
+    'Use /reasoning <low|medium|high|ultrahigh|default> to update this session.',
+  ].join('\n');
+}
+
+function isReasoningEffort(value: string): value is ReasoningEffort {
+  return value === 'low' || value === 'medium' || value === 'high' || value === 'ultrahigh';
 }
 
 function inferProviderForModel(model: string): LlmProvider {

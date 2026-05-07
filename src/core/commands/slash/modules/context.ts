@@ -1,5 +1,5 @@
 import type { ChatSession } from '../../../chat/types.js';
-import type { LlmProvider } from '../../../llm/types.js';
+import type { LlmProvider, ReasoningEffort } from '../../../llm/types.js';
 import type { ProviderCredentialSource } from '../../../runtime/api-keys.js';
 import type {
   HeartbeatTask,
@@ -11,6 +11,8 @@ export type SlashCommandExecutionContext = {
   model: {
     active: () => string;
     setActive: (model: string) => void;
+    activeReasoningEffort: () => ReasoningEffort | undefined;
+    setReasoningEffort: (effort: ReasoningEffort | undefined) => void;
     credentialSource: () => ProviderCredentialSource | undefined;
   };
   auth: {

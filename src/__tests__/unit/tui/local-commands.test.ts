@@ -9,7 +9,9 @@ function createCommandArgs(overrides: Partial<Parameters<typeof runLocalCommand>
   return {
     prompt: '/help',
     activeModel: 'gpt-5.1-codex',
+    activeReasoningEffort: undefined,
     setActiveModel: vi.fn(),
+    setActiveReasoningEffort: vi.fn(),
     sessions: [],
     recentSessions: [],
     activeSessionId: 'session-1',
@@ -518,7 +520,24 @@ describe('runLocalCommand', () => {
   it('autocompletes command roots and subcommands with tab-friendly spacing', () => {
     expect(autocompleteLocalCommand('/m', 'session-1', [])).toBe('/model ');
     expect(autocompleteLocalCommand('/model s', 'session-1', [])).toBe('/model set ');
+    expect(autocompleteLocalCommand('/rea', 'session-1', [])).toBe('/reasoning ');
     expect(autocompleteLocalCommand('/session sw', 'session-1', [])).toBe('/session switch ');
+  });
+
+  it('shows current reasoning status including configured and effective values', async () => {
+    const result = await runLocalCommand(createCommandArgs({
+      prompt: '/reasoning',
+      activeModel: 'gpt-5.4',
+      activeReasoningEffort: 'high',
+    }));
+
+    expect(result).toMatchObject({ handled: true, kind: 'message' });
+    if (!result.handled || result.kind !== 'message') {
+      throw new Error('expected /reasoning to return a message result');
+    }
+    expect(result.message).toContain('Current model: gpt-5.4');
+    expect(result.message).toContain('Configured effort: high');
+    expect(result.message).toContain('Effective effort: high');
   });
 
   it('autocompletes shared prefixes while preserving leading whitespace', () => {

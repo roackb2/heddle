@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
 import { estimateBuiltInContextWindow } from '../../../core/llm/openai-models.js';
+import { resolveDefaultReasoningEffort, supportsReasoningEffort } from '../../../core/llm/model-policy.js';
+import type { ReasoningEffort } from '../../../core/llm/types.js';
 import type { ProviderCredentialSource } from '../utils/runtime.js';
 import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
 import { currentActivityText } from '../utils/format.js';
@@ -19,6 +21,7 @@ type ActiveTurnSummary = {
 
 export function useChatStatusSummary(args: {
   activeModel: string;
+  activeReasoningEffort?: ReasoningEffort;
   activeSessionId: string;
   activeSession?: {
     id: string;
@@ -61,6 +64,7 @@ export function useChatStatusSummary(args: {
       args.activeModel,
       args.activeSession?.context?.lastRunInputTokens ?? args.activeSession?.context?.estimatedRequestTokens,
     );
+    const reasoningStatus = formatReasoningStatus(args.activeModel, args.activeReasoningEffort);
     const authStatus = formatAuthStatus(args.credentialSource);
     const sessionFooter = `session=${args.activeSession?.id ?? args.activeSessionId}${args.activeSession?.name ? ` (${args.activeSession.name})` : ''}`;
     const renderedStatus =
@@ -111,6 +115,7 @@ export function useChatStatusSummary(args: {
       compacting,
       activityText,
       contextStatus,
+      reasoningStatus,
       authStatus,
       sessionFooter,
       renderedStatus,
@@ -135,6 +140,14 @@ function formatContextStatus(model: string, estimatedTokens: number | undefined)
   const ratio = Math.min(1, estimatedTokens / window);
   const percent = Math.round(ratio * 100);
   return `estimated input ${estimatedTokens.toLocaleString()} / ${window.toLocaleString()} tokens (${percent}%)`;
+}
+
+function formatReasoningStatus(model: string, explicitEffort: ReasoningEffort | undefined): string {
+  if (!supportsReasoningEffort(model)) {
+    return 'unsupported';
+  }
+
+  return explicitEffort ?? resolveDefaultReasoningEffort(model) ?? 'default';
 }
 
 function formatAuthStatus(source: ProviderCredentialSource): string {

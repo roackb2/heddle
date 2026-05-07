@@ -5,6 +5,7 @@ import type { WorkspaceDescriptor } from '../../../core/runtime/workspaces.js';
 import type { MemoryStatusView } from '../../../core/memory/visibility.js';
 import type { ReviewDiffFile } from '../../../core/review/diff-domain.js';
 import type { ProviderCredentialSource } from '../../../core/runtime/api-keys.js';
+import type { ReasoningEffort } from '../../../core/llm/types.js';
 
 export type ChatSessionView = {
   id: string;
@@ -13,6 +14,7 @@ export type ChatSessionView = {
   createdAt?: string;
   updatedAt?: string;
   model?: string;
+  reasoningEffort?: ReasoningEffort;
   driftEnabled?: boolean;
   driftLevel?: 'unknown' | 'low' | 'medium' | 'high';
   messageCount: number;

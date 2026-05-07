@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../llm/types.js';
+import type { ChatMessage, ReasoningEffort } from '../llm/types.js';
 import type { ToolCall, ToolDefinition } from '../types.js';
 import type { EditFilePreview } from '../tools/toolkits/coding-files/edit-file.js';
 
@@ -77,6 +77,7 @@ export type ChatSession = {
   createdAt: string;
   updatedAt: string;
   model?: string;
+  reasoningEffort?: ReasoningEffort;
   driftEnabled?: boolean;
   lastContinuePrompt?: string;
   context?: ChatContextStats;

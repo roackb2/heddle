@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../../core/chat/engine/sessions/storage.js';
 import { DEFAULT_OPENAI_MODEL } from '../../../../core/config.js';
 import { credentialModeFromSource, resolveCompatibleActiveModel } from '../../../../core/llm/model-policy.js';
+import type { ReasoningEffort } from '../../../../core/llm/types.js';
 import { inferProviderFromModel } from '../../../../core/llm/providers.js';
 import { parseUnifiedDiffFiles } from '../../../../core/review/diff-domain.js';
 import { hasProviderCredentialForModel, resolveProviderCredentialSourceForModel } from '../../../../core/runtime/api-keys.js';
@@ -104,6 +105,7 @@ export function updateControlPlaneChatSessionSettings(args: {
   sessionStoragePath: string;
   sessionId: string;
   model?: string;
+  reasoningEffort?: ReasoningEffort;
   driftEnabled?: boolean;
 }): ChatSessionDetail {
   const currentSessions = readChatSessionCatalog(args.sessionStoragePath)
@@ -114,6 +116,7 @@ export function updateControlPlaneChatSessionSettings(args: {
       {
         ...session,
         model: args.model ?? session.model,
+        reasoningEffort: args.reasoningEffort ?? session.reasoningEffort,
         driftEnabled: args.driftEnabled ?? session.driftEnabled,
         updatedAt: new Date().toISOString(),
       }
@@ -427,6 +430,7 @@ export function projectChatSessionView(raw: unknown | ChatSession): ChatSessionV
     createdAt: readString(candidate.createdAt),
     updatedAt: readString(candidate.updatedAt),
     model: readString(candidate.model),
+    reasoningEffort: readReasoningEffort(candidate.reasoningEffort),
     driftEnabled: typeof candidate.driftEnabled === 'boolean' ? candidate.driftEnabled : undefined,
     driftLevel: readLatestDriftLevel(turns),
     messageCount: messages.length,
@@ -437,6 +441,10 @@ export function projectChatSessionView(raw: unknown | ChatSession): ChatSessionV
     context: contextView && Object.keys(contextView).length > 0 ? contextView : undefined,
     archives: archiveViews.length > 0 ? archiveViews : undefined,
   })];
+}
+
+function readReasoningEffort(value: unknown): ReasoningEffort | undefined {
+  return value === 'low' || value === 'medium' || value === 'high' || value === 'ultrahigh' ? value : undefined;
 }
 
 function readLatestDriftLevel(turns: unknown[]): ChatSessionView['driftLevel'] {

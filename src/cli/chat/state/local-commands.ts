@@ -1,5 +1,6 @@
 import type { ChatSession } from './types.js';
 import type { OpenAiOAuthCredential } from '../../../core/auth/openai-oauth.js';
+import type { ReasoningEffort } from '../../../core/llm/types.js';
 import type { ProviderCredentialSource } from '../utils/runtime.js';
 import { autocompleteSlashCommand, filterSlashCommandHints } from '../../../core/commands/slash/autocomplete.js';
 import { createSlashCommandRegistry } from '../../../core/commands/slash/registry.js';
@@ -16,7 +17,9 @@ export type LocalCommandHint = {
 export type LocalCommandArgs = {
   prompt: string;
   activeModel: string;
+  activeReasoningEffort?: ReasoningEffort;
   setActiveModel: (model: string) => void;
+  setActiveReasoningEffort: (effort: ReasoningEffort | undefined) => void;
   sessions: ChatSession[];
   recentSessions: ChatSession[];
   activeSessionId: string;

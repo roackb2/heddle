@@ -1,6 +1,7 @@
 import { runLocalCommand } from './state/local-commands.js';
 import { buildCompactionRunningContext, compactChatHistoryWithArchive } from './state/compaction.js';
 import { createInitialMessages } from './state/storage.js';
+import type { ReasoningEffort } from '../../core/llm/types.js';
 import type { ChatSession, ConversationLine } from './state/types.js';
 import { buildConversationMessages, normalizeInlineText } from './utils/format.js';
 import type { ProviderCredentialSource } from './utils/runtime.js';
@@ -15,7 +16,9 @@ type SubmitChatPromptArgs = {
   value: string;
   isRunning: boolean;
   activeModel: string;
+  activeReasoningEffort?: ReasoningEffort;
   setActiveModel: (model: string) => void;
+  setActiveReasoningEffort: (effort: ReasoningEffort | undefined) => void;
   sessions: ChatSession[];
   recentSessions: ChatSession[];
   activeSessionId: string;
@@ -57,7 +60,9 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
   const commandResult = await runLocalCommand({
     prompt,
     activeModel: args.activeModel,
+    activeReasoningEffort: args.activeReasoningEffort,
     setActiveModel: args.setActiveModel,
+    setActiveReasoningEffort: args.setActiveReasoningEffort,
     sessions: args.sessions,
     recentSessions: args.recentSessions,
     activeSessionId: args.activeSessionId,
