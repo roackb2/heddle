@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useStdout } from 'ink';
 import {
   ApprovalComposer,
   CommandHintPanel,
@@ -36,6 +36,8 @@ export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
 
 function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const nextLocalId = useLocalIds();
+  const { stdout } = useStdout();
+  const columns = stdout.columns ?? 80;
   const initialModelCompatibility = useMemo(() => resolveCompatibleActiveModel({
     activeModel: runtime.model,
     provider: runtime.model.startsWith('claude') ? 'anthropic' : 'openai',
@@ -357,6 +359,9 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     drift: drift.observer,
   });
 
+  const promptPanelWidth = Math.max(20, columns - 2);
+  const promptBodyWidth = Math.max(1, promptPanelWidth - 2);
+
   const { pendingSubmittedPrompt, clearPendingSubmittedPrompt, submitPrompt } = usePromptSubmission({
     runtime,
     activeModel,
@@ -421,52 +426,64 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
 
       <Box
         flexDirection="column"
-        borderStyle="round"
-        borderColor={pendingApproval ? 'yellow' : isRunning ? 'yellow' : 'cyan'}
-        paddingX={1}
+        borderStyle={pendingApproval ? 'round' : undefined}
+        borderColor={pendingApproval ? 'yellow' : undefined}
+        paddingX={pendingApproval ? 1 : 0}
         paddingY={0}
+        marginTop={1}
+        width={promptPanelWidth}
+        flexShrink={0}
       >
-        <Text bold color={pendingApproval ? 'yellow' : undefined}>
-          {pendingApproval ? 'Approval Required' : compacting ? `Compacting${workingFrames[workingFrame] ?? '...'}` : isRunning ? `Working${workingFrames[workingFrame]}` : 'Prompt'}
-        </Text>
         {pendingApproval ?
-          <ApprovalComposer pendingApproval={pendingApproval} approvalChoice={approvalChoice} />
-        : <>
-            {pickers.model.visible ?
-              <ModelPickerPanel
-                query={pickers.model.query ?? ''}
-                models={pickers.model.items}
-                activeModel={activeModel}
-                highlightedIndex={pickers.model.highlightedIndex}
-              />
-            : null}
-            {pickers.session.visible ?
-              <SessionPickerPanel
-                query={pickers.session.query ?? ''}
-                sessions={pickers.session.items}
-                activeSessionId={activeSessionId}
-                highlightedIndex={pickers.session.highlightedIndex}
-              />
-            : null}
-            {pickers.fileMention.visible ?
-              <FileMentionPickerPanel
-                query={pickers.fileMention.query ?? ''}
-                files={pickers.fileMention.items}
-                highlightedIndex={pickers.fileMention.highlightedIndex}
-              />
-            : null}
-            {shouldShowSlashHints(draft) ?
-              <SlashHintPanel draft={draft} activeSessionId={activeSession?.id ?? ''} sessions={sessions} />
-            : shouldShowCommandHint(draft) ?
-              <CommandHintPanel draft={draft} />
-            : null}
-            <Box>
-              <Text color="cyan">{'>'} </Text>
-              <Box flexGrow={1}>
+          <>
+            <Text bold color="yellow">
+              Approval Required
+            </Text>
+            <ApprovalComposer pendingApproval={pendingApproval} approvalChoice={approvalChoice} />
+          </>
+        : <Box flexDirection="column" width={promptPanelWidth} flexShrink={0}>
+            <Box width={promptPanelWidth} overflow="hidden">
+              <Text dimColor wrap="truncate-end">{repeatSeparator(promptPanelWidth)}</Text>
+            </Box>
+            <Box
+              flexDirection="column"
+              width={promptBodyWidth}
+              paddingX={1}
+              paddingY={0}
+            >
+              {pickers.model.visible ?
+                <ModelPickerPanel
+                  query={pickers.model.query ?? ''}
+                  models={pickers.model.items}
+                  activeModel={activeModel}
+                  highlightedIndex={pickers.model.highlightedIndex}
+                />
+              : null}
+              {pickers.session.visible ?
+                <SessionPickerPanel
+                  query={pickers.session.query ?? ''}
+                  sessions={pickers.session.items}
+                  activeSessionId={activeSessionId}
+                  highlightedIndex={pickers.session.highlightedIndex}
+                />
+              : null}
+              {pickers.fileMention.visible ?
+                <FileMentionPickerPanel
+                  query={pickers.fileMention.query ?? ''}
+                  files={pickers.fileMention.items}
+                  highlightedIndex={pickers.fileMention.highlightedIndex}
+                />
+              : null}
+              {shouldShowSlashHints(draft) ?
+                <SlashHintPanel draft={draft} activeSessionId={activeSession?.id ?? ''} sessions={sessions} />
+              : shouldShowCommandHint(draft) ?
+                <CommandHintPanel draft={draft} />
+              : null}
+              <Box>
                 <PromptInput
                   value={draft}
                   cursor={draftCursor}
-                  isDisabled={Boolean(pendingApproval)}
+                  isDisabled={false}
                   placeholder={isRunning ? "Keep typing while Heddle works" : "Ask Heddle about this project"}
                   maxVisibleLines={10}
                   onChange={setDraft}
@@ -478,26 +495,35 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
                   }}
                 />
               </Box>
+              <Box justifyContent="space-between" flexWrap="nowrap" width={promptBodyWidth}>
+                <Box flexShrink={1} marginRight={1}>
+                  <Text dimColor wrap="truncate-end">
+                    {draft ? `${draft.length} chars`
+                    : isRunning ? 'Enter to queue'
+                    : 'Enter to send'}
+                  </Text>
+                </Box>
+                <Box flexShrink={0}>
+                  <Text dimColor>
+                    {pendingSubmittedPrompt ? '1 queued'
+                    : isRunning ? `${elapsedSeconds}s elapsed`
+                    : ''}
+                  </Text>
+                </Box>
+              </Box>
             </Box>
-            <Box justifyContent="space-between">
-              <Text dimColor>
-                {draft ? `${draft.length} chars`
-                : isRunning ? 'Enter to queue'
-                : 'Enter to send'}
-              </Text>
-              <Text dimColor>
-                {pendingSubmittedPrompt ? '1 queued'
-                : isRunning ? `${elapsedSeconds}s elapsed`
-                : ''}
-              </Text>
+            <Box width={promptPanelWidth} overflow="hidden">
+              <Text dimColor wrap="truncate-end">{repeatSeparator(promptPanelWidth)}</Text>
             </Box>
-          </>}
+          </Box>}
       </Box>
-      <Text>
-        <Text dimColor>{`model=${activeModel} • ${authStatus} • ${contextStatus} • `}</Text>
-        <Text color={drift.color} dimColor={!drift.color}>{`drift=${drift.footer}`}</Text>
-        <Text dimColor>{` • ${sessionFooter}`}</Text>
-      </Text>
+      <Box width={promptPanelWidth} overflow="hidden">
+        <Text dimColor wrap="truncate-end">{`model=${activeModel} • ${authStatus} • ${contextStatus} • drift=${drift.footer} • ${sessionFooter}`}</Text>
+      </Box>
     </Box>
   );
+}
+
+function repeatSeparator(width: number): string {
+  return '─'.repeat(Math.max(0, width));
 }

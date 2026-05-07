@@ -41,7 +41,7 @@ describe('prompt input related helpers', () => {
   });
 
   it('places a wrapped-line boundary cursor at the start of the next visual segment', () => {
-    expect(buildPromptRenderLines('abcd', 2, 8, 2)).toEqual([
+    expect(buildPromptRenderLines('abcd', 2, 8, 4)).toEqual([
       {
         before: 'ab',
         cursor: '',
@@ -52,6 +52,23 @@ describe('prompt input related helpers', () => {
         before: '',
         cursor: 'c',
         after: 'd',
+        hasCursor: true,
+      },
+    ]);
+  });
+
+  it('reserves prompt-prefix width when wrapping long input in narrow terminals', () => {
+    expect(buildPromptRenderLines('abcdef', 6, 8, 5)).toEqual([
+      {
+        before: 'abc',
+        cursor: '',
+        after: '',
+        hasCursor: false,
+      },
+      {
+        before: 'def',
+        cursor: ' ',
+        after: '',
         hasCursor: true,
       },
     ]);

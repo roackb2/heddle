@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text, useInput, useStdout } from 'ink';
 
 const DEFAULT_MAX_VISIBLE_INPUT_LINES = 8;
 const FALLBACK_WRAP_WIDTH = 80;
+const PROMPT_INPUT_PREFIX_WIDTH = 2;
 
 export type PromptKeyInput = {
   input: string;
@@ -47,6 +48,8 @@ export function PromptInput({
 }) {
   const valueRef = useRef(value);
   const cursorRef = useRef(cursor);
+  const { stdout } = useStdout();
+  const columns = stdout.columns ?? FALLBACK_WRAP_WIDTH;
 
   useEffect(() => {
     valueRef.current = value;
@@ -93,24 +96,35 @@ export function PromptInput({
     handlePromptInputCommand(command, state, actions);
   }, { isActive: !isDisabled });
 
-  const lines = useMemo(() => buildPromptRenderLines(value, cursor, maxVisibleLines), [value, cursor, maxVisibleLines]);
+  const lines = useMemo(
+    () => buildPromptRenderLines(value, cursor, maxVisibleLines, Math.max(PROMPT_INPUT_PREFIX_WIDTH + 1, columns)),
+    [value, cursor, maxVisibleLines, columns],
+  );
 
   if (!value) {
-    return <Text dimColor>{placeholder}</Text>;
+    return (
+      <Box flexGrow={1} paddingX={0} paddingY={0}>
+        <Text color="cyan">{'› '}</Text>
+        <Text dimColor>{placeholder}</Text>
+      </Box>
+    );
   }
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" flexGrow={1} paddingX={0} paddingY={0}>
       {lines.map((line, index) => (
-        <Text key={`${index}-${line.before}-${line.cursor}-${line.after}-${line.hasCursor}`}>
-          {line.hasCursor ?
-            <>
-              {line.before}
-              <Text inverse>{line.cursor}</Text>
-              {line.after}
-            </>
-          : (line.before || ' ')}
-        </Text>
+        <Box key={`${index}-${line.before}-${line.cursor}-${line.after}-${line.hasCursor}`}>
+          <Text color="cyan">{index === 0 ? '› ' : '  '}</Text>
+          <Text>
+            {line.hasCursor ?
+              <>
+                {line.before}
+                <Text inverse>{line.cursor}</Text>
+                {line.after}
+              </>
+            : (line.before || ' ')}
+          </Text>
+        </Box>
       ))}
     </Box>
   );
@@ -275,11 +289,12 @@ export function buildPromptRenderLines(
 ): PromptRenderLine[] {
   const rawLines = value.split('\n');
   const rendered: PromptRenderLine[] = [];
+  const contentWidth = Math.max(1, width - PROMPT_INPUT_PREFIX_WIDTH);
   let logicalOffset = 0;
 
   for (let lineIndex = 0; lineIndex < rawLines.length; lineIndex += 1) {
     const line = rawLines[lineIndex] ?? '';
-    const wrapped = wrapLine(line, width);
+    const wrapped = wrapLine(line, contentWidth);
     const lineStart = logicalOffset;
     const lineEnd = lineStart + line.length;
     const isLastLogicalLine = lineIndex === rawLines.length - 1;
