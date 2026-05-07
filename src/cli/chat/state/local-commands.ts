@@ -3,7 +3,8 @@ import { summarizeSession } from './storage.js';
 import { formatAuthStatusMessage, loginProviderWithOAuth, logoutProvider } from '../../auth.js';
 import type { OpenAiOAuthCredential } from '../../../core/auth/openai-oauth.js';
 import { COMMON_BUILT_IN_MODELS, formatBuiltInModelGroups } from '../../../core/llm/openai-models.js';
-import type { LlmProvider } from '../../../core/llm/types.js';
+import { resolveDefaultReasoningEffort, supportsReasoningEffort } from '../../../core/llm/model-policy.js';
+import type { LlmProvider, ReasoningEffort } from '../../../core/llm/types.js';
 import { createFileHeartbeatTaskStore } from '../../../core/runtime/heartbeat-task-store.js';
 import { join } from 'node:path';
 
@@ -15,7 +16,9 @@ export type LocalCommandHint = {
 export type LocalCommandArgs = {
   prompt: string;
   activeModel: string;
+  activeReasoningEffort?: ReasoningEffort;
   setActiveModel: (model: string) => void;
+  setActiveReasoningEffort: (effort: ReasoningEffort | undefined) => void;
   sessions: ChatSession[];
   recentSessions: ChatSession[];
   activeSessionId: string;
@@ -47,6 +50,9 @@ const HELP_HINTS: LocalCommandHint[] = [
   { command: '/model <name>', description: 'switch the current model' },
   { command: '/model set [query]', description: 'pick a model with filtering' },
   { command: '/model list', description: 'list common built-in models' },
+  { command: '/reasoning', description: 'show reasoning effort for the current session' },
+  { command: '/reasoning <level>', description: 'set reasoning effort to low, medium, high, or ultrahigh' },
+  { command: '/reasoning default', description: 'clear explicit reasoning effort and use the model default' },
   { command: '/auth', description: 'show stored provider credentials' },
   { command: '/auth status', description: 'show stored provider credentials' },
   { command: '/auth login openai', description: 'sign in with OpenAI ChatGPT/Codex OAuth' },
@@ -91,6 +97,7 @@ const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
   ['/model list', () => messageResult(MODEL_LIST_MESSAGE)],
   ['/model', (args) => messageResult(`Current model: ${args.activeModel}`)],
   ['/model set', () => messageResult(MODEL_SET_HELP_MESSAGE)],
+  ['/reasoning', (args) => messageResult(formatReasoningEffortStatus(args.activeModel, args.activeReasoningEffort))],
   ['/auth', (args) => messageResult(formatAuthStatusMessage(args.credentialStorePath))],
   ['/auth status', (args) => messageResult(formatAuthStatusMessage(args.credentialStorePath))],
   ['/clear', (args) => {
@@ -123,6 +130,7 @@ const EXACT_COMMANDS = new Map<string, ExactCommandHandler>([
 
 const PREFIX_COMMANDS: Array<{ prefix: string; handle: PrefixCommandHandler }> = [
   { prefix: '/model ', handle: handleModelCommand },
+  { prefix: '/reasoning ', handle: handleReasoningCommand },
   { prefix: '/auth login ', handle: handleAuthLogin },
   { prefix: '/auth logout ', handle: handleAuthLogout },
   { prefix: '/heartbeat task ', handle: handleHeartbeatTask },
@@ -257,6 +265,31 @@ function handleModelCommand(args: LocalCommandArgs, value: string): LocalCommand
       `Switched model to ${value}`
     : `Switched model to ${value}. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.`,
   );
+}
+
+function handleReasoningCommand(args: LocalCommandArgs, value: string): LocalCommandResult {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return messageResult(formatReasoningEffortStatus(args.activeModel, args.activeReasoningEffort));
+  }
+
+  if (normalized === 'default') {
+    args.setActiveReasoningEffort(undefined);
+    return messageResult(
+      `Cleared explicit reasoning effort for ${args.activeModel}. Effective default: ${resolveDefaultReasoningEffort(args.activeModel) ?? 'not supported'}.`,
+    );
+  }
+
+  if (!isReasoningEffort(normalized)) {
+    return messageResult('Usage: /reasoning <low|medium|high|ultrahigh|default>');
+  }
+
+  if (!supportsReasoningEffort(args.activeModel)) {
+    return messageResult(`Reasoning effort is not supported for model ${args.activeModel}.`);
+  }
+
+  args.setActiveReasoningEffort(normalized);
+  return messageResult(`Set reasoning effort to ${normalized} for ${args.activeModel}.`);
 }
 
 async function handleAuthLogin(args: LocalCommandArgs, value: string): Promise<LocalCommandResult> {
@@ -399,6 +432,23 @@ async function resolveHeartbeatRun(
   return run?.taskId === taskId ? run : undefined;
 }
 
+function formatReasoningEffortStatus(model: string, explicitEffort: ReasoningEffort | undefined): string {
+  const supported = supportsReasoningEffort(model);
+  const effective = explicitEffort ?? resolveDefaultReasoningEffort(model);
+  return [
+    `Current model: ${model}`,
+    `Reasoning effort support: ${supported ? 'supported' : 'unsupported'}`,
+    `Configured effort: ${explicitEffort ?? 'default'}`,
+    `Effective effort: ${effective ?? 'none'}`,
+    '',
+    'Use /reasoning <low|medium|high|ultrahigh|default> to update this session.',
+  ].join('\n');
+}
+
+function isReasoningEffort(value: string): value is ReasoningEffort {
+  return value === 'low' || value === 'medium' || value === 'high' || value === 'ultrahigh';
+}
+
 function formatHeartbeatTask(task: Awaited<ReturnType<ReturnType<typeof heartbeatStore>['listTasks']>>[number]): string {
   return [
     `${task.enabled ? 'enabled' : 'disabled'} ${task.id}`,
@@ -420,68 +470,77 @@ function formatHeartbeatTask(task: Awaited<ReturnType<ReturnType<typeof heartbea
   ].filter((line): line is string => line !== undefined).join('\n');
 }
 
-function formatHeartbeatRun(run: NonNullable<Awaited<ReturnType<NonNullable<ReturnType<typeof heartbeatStore>['loadRunRecord']>>>>): string {
-  const result = run.record.result;
-  return [
-    `Heartbeat run ${run.id}`,
-    `task=${run.taskId} run=${run.runId} loadedCheckpoint=${run.record.loadedCheckpoint}`,
-    `decision=${result.decision} outcome=${result.state.outcome} finished=${run.createdAt}`,
-    result.state.usage ? `usage input=${result.state.usage.inputTokens} output=${result.state.usage.outputTokens} total=${result.state.usage.totalTokens} requests=${result.state.usage.requests}` : undefined,
-    '',
-    'Task:',
-    run.record.task.task,
-    '',
-    'Summary:',
-    stripHeartbeatDecisionLine(result.summary).trim() || result.summary.trim(),
-  ].filter((line): line is string => line !== undefined).join('\n');
-}
+function buildHeartbeatContinuationPrompt(run: Awaited<ReturnType<ReturnType<typeof heartbeatStore>['listRunRecords']>>[number]): string {
+  const checkpointState = run.record.result.checkpoint?.state;
+  const checkpointSummary = checkpointState?.summary?.trim();
+  const traceTail = checkpointState?.trace?.slice(-12) ?? [];
+  const traceLines = traceTail.map((event) => {
+    const base = [event.type];
+    const step = typeof event.step === 'number' ? `step=${event.step}` : undefined;
+    const tool = typeof event.tool === 'string' ? `tool=${event.tool}` : undefined;
+    const cmd = typeof event.command === 'string' ? `cmd=${event.command}` : undefined;
+    const detail = typeof event.message === 'string' ? event.message : undefined;
+    return ['- ', ...base, step ? ` (${step}${tool ? `, ${tool}` : ''}${cmd ? `, ${cmd}` : ''})` : tool ? ` (${tool}${cmd ? `, ${cmd}` : ''})` : '', detail ? `: ${detail}` : ''].join('');
+  });
 
-function buildHeartbeatContinuationPrompt(run: NonNullable<Awaited<ReturnType<NonNullable<ReturnType<typeof heartbeatStore>['loadRunRecord']>>>>): string {
-  const result = run.record.result;
   return [
-    'Continue from this heartbeat run context.',
+    `Continue from heartbeat task ${run.taskId}.`,
     '',
-    `Heartbeat task id: ${run.taskId}`,
-    `Heartbeat run id: ${run.runId}`,
-    `Decision: ${result.decision}`,
-    `Outcome: ${result.state.outcome}`,
-    `Finished at: ${run.createdAt}`,
-    `Loaded checkpoint: ${run.record.loadedCheckpoint}`,
-    `Task status: ${run.record.task.status ?? 'unknown'}`,
-    run.record.task.lastProgress ? `Task progress: ${run.record.task.lastProgress}` : undefined,
-    run.record.task.resumable === false ? 'Resumable: no' : 'Resumable: yes',
+    `Decision: ${run.record.result.decision}`,
+    `Run id: ${run.id}`,
+    `Created at: ${run.createdAt}`,
+    `Loaded checkpoint: ${run.record.loadedCheckpoint ? 'yes' : 'no'}`,
+    checkpointState?.outcome ? `Checkpoint outcome: ${checkpointState.outcome}` : undefined,
+    checkpointSummary ? ['', 'Checkpoint summary:', checkpointSummary] : undefined,
+    traceLines.length > 0 ? ['', 'Recent trace tail:', ...traceLines] : undefined,
     '',
-    'Durable task:',
-    run.record.task.task,
-    '',
-    'Heartbeat summary:',
-    stripHeartbeatDecisionLine(result.summary).trim() || result.summary.trim(),
-    '',
-    'Treat the heartbeat summary as trusted background context from prior autonomous work. Help the user continue from there.',
-  ].filter((line): line is string => line !== undefined).join('\n');
+    'Pick up from the saved checkpoint state and continue the most useful next step for the task.',
+  ].flatMap((line) => line === undefined ? [] : Array.isArray(line) ? line : [line]).join('\n');
 }
 
 function stripHeartbeatDecisionLine(summary: string): string {
-  return summary.replace(/\n?\s*HEARTBEAT_DECISION:\s*(continue|pause|complete|escalate)\s*$/i, '');
+  return summary.replace(/\n\nHEARTBEAT_DECISION:[\s\S]*$/u, '').trim();
 }
 
 function firstLine(value: string): string {
-  const line = value.trim().split('\n').find((candidate) => candidate.trim());
-  return line?.trim() ?? '';
+  return value.split(/\r?\n/u)[0] ?? value;
 }
 
 function formatInterval(intervalMs: number): string {
-  if (intervalMs % (24 * 60 * 60_000) === 0) return `${intervalMs / (24 * 60 * 60_000)}d`;
-  if (intervalMs % (60 * 60_000) === 0) return `${intervalMs / (60 * 60_000)}h`;
-  if (intervalMs % 60_000 === 0) return `${intervalMs / 60_000}m`;
-  if (intervalMs % 1_000 === 0) return `${intervalMs / 1_000}s`;
-  return `${intervalMs}ms`;
+  const minutes = Math.round(intervalMs / 60_000);
+  return minutes >= 60 && minutes % 60 === 0 ? `${minutes / 60}h` : `${minutes}m`;
+}
+
+function parseAuthProvider(value: string): LlmProvider | undefined {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'openai' || normalized === 'anthropic') {
+    return normalized;
+  }
+  return undefined;
+}
+
+function resolveSessionReference(
+  value: string,
+  sessions: ChatSession[],
+  recentSessions: ChatSession[],
+): ChatSession | undefined {
+  const directMatch = sessions.find((session) => session.id === value || session.name === value);
+  if (directMatch) {
+    return directMatch;
+  }
+
+  const numeric = Number.parseInt(value, 10);
+  if (Number.isFinite(numeric) && numeric >= 1 && numeric <= recentSessions.length) {
+    return recentSessions[numeric - 1];
+  }
+
+  return undefined;
 }
 
 function handleSessionSwitch(args: LocalCommandArgs, value: string): LocalCommandResult {
-  const session = resolveSessionReference(args, value);
+  const session = resolveSessionReference(value, args.sessions, args.recentSessions);
   if (!session) {
-    return messageResult(`Unknown session: ${value}. Use /session list to inspect available sessions.`);
+    return messageResult(`Could not find a session for “${value}”. Use /session list first.`);
   }
 
   args.switchSession(session.id);
@@ -489,9 +548,9 @@ function handleSessionSwitch(args: LocalCommandArgs, value: string): LocalComman
 }
 
 function handleSessionContinue(args: LocalCommandArgs, value: string): LocalCommandResult {
-  const session = resolveSessionReference(args, value);
+  const session = resolveSessionReference(value, args.sessions, args.recentSessions);
   if (!session) {
-    return messageResult(`Unknown session: ${value}.\nUse /session list to inspect available sessions.`);
+    return messageResult(`Could not find a session for “${value}”. Use /session list first.`);
   }
 
   return {
@@ -508,65 +567,31 @@ function handleSessionRename(args: LocalCommandArgs, value: string): LocalComman
   }
 
   args.renameSession(value);
-  return messageResult(`Renamed current session to ${value}.`);
+  return messageResult(`Renamed current session to “${value}”.`);
 }
 
 function handleSessionClose(args: LocalCommandArgs, value: string): LocalCommandResult {
-  const session = resolveSessionReference(args, value);
+  const session = resolveSessionReference(value, args.sessions, args.recentSessions);
   if (!session) {
-    return messageResult(`Unknown session: ${value}.\nUse /session list to inspect available sessions.`);
+    return messageResult(`Could not find a session for “${value}”. Use /session list first.`);
   }
 
   args.removeSession(session.id);
-  return messageResult(`Closed ${session.id} (${session.name}).`);
-}
-
-function findSession(args: LocalCommandArgs, id: string): ChatSession | undefined {
-  return args.sessions.find((candidate) => candidate.id === id);
-}
-
-function resolveSessionReference(args: LocalCommandArgs, value: string): ChatSession | undefined {
-  const directMatch = findSession(args, value);
-  if (directMatch) {
-    return directMatch;
-  }
-
-  const numericIndex = Number.parseInt(value, 10);
-  if (!Number.isFinite(numericIndex) || numericIndex <= 0) {
-    return undefined;
-  }
-
-  return args.recentSessions[numericIndex - 1];
-}
-
-function parseAuthProvider(value: string): LlmProvider | undefined {
-  const provider = value.trim().split(/\s+/, 1)[0]?.toLowerCase();
-  if (provider === 'openai' || provider === 'anthropic' || provider === 'google') {
-    return provider;
-  }
-  return undefined;
-}
-
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return messageResult(`Closed session ${session.id} (${session.name}).`);
 }
 
 function messageResult(message: string, sessionId?: string): LocalCommandResult {
-  return {
-    handled: true,
-    kind: 'message',
-    message,
-    sessionId,
-  };
+  return sessionId ? { handled: true, kind: 'message', message, sessionId } : { handled: true, kind: 'message', message };
+}
+
+function formatDriftStatus(enabled: boolean, error?: string): string {
+  return enabled ?
+    error ? `CyberLoop drift detection is enabled, but the last run could not initialize it.\n${error}` : 'CyberLoop drift detection is enabled. Heddle will load real CyberLoop kinematics middleware and write semantic drift annotations into traces.'
+  : 'CyberLoop drift detection is disabled.';
 }
 
 function hintCommandToCompletionCandidate(command: string): string {
-  const placeholderMatch = command.match(/\s(?:<[^>]+>|\[[^\]]+\])/);
-  if (!placeholderMatch || placeholderMatch.index === undefined) {
-    return command;
-  }
-
-  return `${command.slice(0, placeholderMatch.index)} `;
+  return command.replace(/\s*\[[^\]]+\]/g, '').replace(/\s*<[^>]+>/g, '').replace(/\s+/g, ' ').trimEnd();
 }
 
 function longestSharedPrefix(values: string[]): string {
@@ -575,28 +600,16 @@ function longestSharedPrefix(values: string[]): string {
   }
 
   let prefix = values[0] ?? '';
-  for (const value of values.slice(1)) {
-    let index = 0;
-    while (index < prefix.length && index < value.length && prefix[index] === value[index]) {
-      index += 1;
+  for (let index = 1; index < values.length; index += 1) {
+    const value = values[index] ?? '';
+    while (!value.startsWith(prefix) && prefix.length > 0) {
+      prefix = prefix.slice(0, -1);
     }
-    prefix = prefix.slice(0, index);
-    if (!prefix) {
+    if (prefix.length === 0) {
       break;
     }
   }
-
   return prefix;
-}
-
-function formatDriftStatus(enabled: boolean, error: string | undefined): string {
-  if (!enabled) {
-    return 'CyberLoop drift detection is disabled. Use /drift on to enable observe-only kinematics telemetry.';
-  }
-
-  return error ?
-      `CyberLoop drift detection is enabled but unavailable: ${error}`
-    : 'CyberLoop drift detection is enabled. The footer shows drift=unknown|low|medium|high, and traces include cyberloop.annotation events.';
 }
 
 function capitalizeFirst(value: string): string {

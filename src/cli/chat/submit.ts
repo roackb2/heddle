@@ -140,6 +140,10 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
 
   if (!commandResult.handled) {
     const prepared = args.preparePrompt ? args.preparePrompt(prompt) : { prompt, displayText: prompt };
+    args.updateActiveSession((session) => ({
+      ...session,
+      promptDraftHistory: appendPromptDraftHistory(session.promptDraftHistory, prompt),
+    }));
     await args.executeTurn(prepared.prompt, prepared.displayText ?? prompt);
     return;
   }
@@ -222,6 +226,16 @@ function appendAssistantMessageToSession(
     ...session,
     messages: [...session.messages, createAssistantMessage(nextLocalId, text)],
   }));
+}
+
+function appendPromptDraftHistory(history: string[] | undefined, prompt: string): string[] {
+  const next = prompt.trim();
+  if (!next) {
+    return history ?? [];
+  }
+
+  const deduped = (history ?? []).filter((entry) => entry !== next);
+  return [...deduped, next].slice(-50);
 }
 
 function createAssistantMessage(nextLocalId: () => string, text: string): ConversationLine {

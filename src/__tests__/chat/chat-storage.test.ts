@@ -128,6 +128,26 @@ describe('chat session storage layout', () => {
     expect(secondMtime).toBe(firstMtime);
   });
 
+  it('preserves prompt draft history when saving and loading sessions', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-history-'));
+    const sessionsFile = join(dir, 'chat-sessions.json');
+    const session = {
+      ...createChatSession({
+        id: 'session-1',
+        name: 'Session 1',
+        apiKeyPresent: true,
+      }),
+      promptDraftHistory: ['first prompt', 'second prompt'],
+    };
+
+    saveChatSessions(sessionsFile, [session]);
+
+    expect(readChatSession(sessionsFile, 'session-1', true)).toEqual(expect.objectContaining({
+      id: 'session-1',
+      promptDraftHistory: ['first prompt', 'second prompt'],
+    }));
+  });
+
   it('preserves workspaceId when migrating legacy sessions', () => {
     const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-workspace-'));
     const sessionsFile = join(dir, 'chat-sessions.json');

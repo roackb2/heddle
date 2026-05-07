@@ -44,6 +44,10 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     setDraftCursor,
     clearDraft,
     replaceDraft,
+    undoDraft,
+    redoDraft,
+    historyIndex,
+    setHistoryIndex,
   } = usePromptDraft();
   const mentionableFiles = useState(() => listMentionableFiles(runtime.workspaceRoot, runtime.searchIgnoreDirs))[0];
 
@@ -289,6 +293,51 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
       return true;
     }
 
+    if ((event.key.ctrl || event.key.meta) && event.input === 'z') {
+      return event.key.shift ? redoDraft() : undoDraft();
+    }
+
+    if (event.key.ctrl && event.input === 'y') {
+      return redoDraft();
+    }
+
+    if (event.key.upArrow || event.key.downArrow) {
+      if (!activeSession?.promptDraftHistory?.length) {
+        return false;
+      }
+
+      const history = activeSession.promptDraftHistory;
+      if (event.key.upArrow) {
+        const nextIndex = historyIndex === undefined ? history.length - 1 : Math.max(0, historyIndex - 1);
+        const nextDraft = history[nextIndex];
+        if (nextDraft === undefined) {
+          return false;
+        }
+        replaceDraft(nextDraft);
+        setHistoryIndex(nextIndex);
+        return true;
+      }
+
+      if (historyIndex === undefined) {
+        return false;
+      }
+
+      const nextIndex = historyIndex + 1;
+      if (nextIndex >= history.length) {
+        clearDraft();
+        setHistoryIndex(undefined);
+        return true;
+      }
+
+      const nextDraft = history[nextIndex];
+      if (nextDraft === undefined) {
+        return false;
+      }
+      replaceDraft(nextDraft);
+      setHistoryIndex(nextIndex);
+      return true;
+    }
+
     if (!event.key.tab || draftCursor !== draft.length) {
       return false;
     }
@@ -300,7 +349,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
 
     replaceDraft(completed);
     return true;
-  }, [pickers, draftCursor, draft, activeSession, activeSessionId, sessions, replaceDraft]);
+  }, [pickers, redoDraft, undoDraft, activeSession, historyIndex, replaceDraft, setHistoryIndex, clearDraft, draftCursor, draft, activeSessionId, sessions]);
   const switchSession = useCallback((id: string) => {
     setActiveSessionId(id);
     clearDraft();
@@ -446,6 +495,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
                   onCursorChange={setDraftCursor}
                   onSpecialKey={handlePromptSpecialKey}
                   onSubmit={(value) => {
+                    setHistoryIndex(undefined);
                     clearDraft();
                     void submitPrompt(value);
                   }}

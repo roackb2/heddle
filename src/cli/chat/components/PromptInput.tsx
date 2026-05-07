@@ -128,7 +128,10 @@ type PromptInputCommand =
   | { kind: 'deletePreviousWord' }
   | { kind: 'deleteBeforeCursor' }
   | { kind: 'deleteAfterCursor' }
-  | { kind: 'move'; direction: 'start' | 'end' | 'previousChar' | 'nextChar' | 'previousWord' | 'nextWord' };
+  | { kind: 'move'; direction: 'start' | 'end' | 'previousChar' | 'nextChar' | 'previousWord' | 'nextWord' }
+  | { kind: 'history'; direction: 'previous' | 'next' }
+  | { kind: 'undo' }
+  | { kind: 'redo' };
 
 type PromptInputActions = {
   applyDraft: (value: string, cursor: number) => void;
@@ -161,11 +164,23 @@ function resolvePromptInputCommand(input: string, key: PromptKeyInput['key']): P
     return key.shift ? { kind: 'insert', input: '\n' } : { kind: 'submit' };
   }
 
+  if (key.ctrl && input === 'z') {
+    return key.shift ? { kind: 'redo' } : { kind: 'undo' };
+  }
+
+  if (key.ctrl && input === 'y') {
+    return { kind: 'redo' };
+  }
+
   if (key.ctrl && input) {
     return CTRL_COMMANDS.get(input);
   }
 
   if (key.meta && input) {
+    if (input === 'z') {
+      return key.shift ? { kind: 'redo' } : { kind: 'undo' };
+    }
+
     return META_TEXT_COMMANDS.get(input);
   }
 
@@ -175,6 +190,14 @@ function resolvePromptInputCommand(input: string, key: PromptKeyInput['key']): P
 
   if (key.backspace || key.delete) {
     return { kind: 'deletePreviousChar' };
+  }
+
+  if (key.upArrow) {
+    return { kind: 'history', direction: 'previous' };
+  }
+
+  if (key.downArrow) {
+    return { kind: 'history', direction: 'next' };
   }
 
   if (key.meta && key.leftArrow) {
@@ -240,6 +263,11 @@ function handlePromptInputCommand(
       return;
     case 'move':
       actions.moveCursor(resolvePromptCursorMove(state, command.direction));
+      return;
+    case 'history':
+    case 'undo':
+    case 'redo':
+      return;
   }
 }
 

@@ -13,6 +13,7 @@ type ChatSessionCatalogEntry = {
   model?: string;
   driftEnabled?: boolean;
   lastContinuePrompt?: string;
+  promptDraftHistory?: string[];
   context?: ChatContextStats;
   archives?: ChatArchiveRecord[];
   lease?: ChatSessionLease;
@@ -62,6 +63,7 @@ export function createChatSession(options: {
     model: options.model,
     driftEnabled: false,
     lastContinuePrompt: undefined,
+    promptDraftHistory: [],
     context: undefined,
     archives: [],
     lease: undefined,
@@ -253,6 +255,7 @@ function parseCatalogEntry(value: unknown): ChatSessionCatalogEntry[] {
     model: typeof candidate.model === 'string' ? candidate.model : undefined,
     driftEnabled: typeof candidate.driftEnabled === 'boolean' ? candidate.driftEnabled : false,
     lastContinuePrompt: typeof candidate.lastContinuePrompt === 'string' ? candidate.lastContinuePrompt : undefined,
+    promptDraftHistory: Array.isArray(candidate.promptDraftHistory) ? candidate.promptDraftHistory.filter((entry): entry is string => typeof entry === 'string') : [],
     context: isChatContextStats(candidate.context) ? candidate.context : undefined,
     archives: Array.isArray(candidate.archives) ? candidate.archives.flatMap(parseArchiveRecord) : undefined,
     lease: parseLease(candidate.lease),
@@ -269,6 +272,7 @@ function projectCatalogEntry(session: ChatSession): ChatSessionCatalogEntry {
     model: session.model,
     driftEnabled: session.driftEnabled,
     lastContinuePrompt: session.lastContinuePrompt,
+    promptDraftHistory: session.promptDraftHistory,
     context: session.context,
     archives: session.archives,
     lease: session.lease,
@@ -301,6 +305,7 @@ function readSessionFile(
       model: entry.model,
       driftEnabled: entry.driftEnabled,
       lastContinuePrompt: entry.lastContinuePrompt,
+      promptDraftHistory: entry.promptDraftHistory,
       context: entry.context,
       archives: entry.archives,
       lease: entry.lease,

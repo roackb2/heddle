@@ -78,6 +78,7 @@ export type ChatSession = {
   model?: string;
   driftEnabled?: boolean;
   lastContinuePrompt?: string;
+  promptDraftHistory?: string[];
   context?: ChatContextStats;
   archives?: ChatArchiveRecord[];
   lease?: ChatSessionLease;

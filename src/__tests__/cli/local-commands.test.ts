@@ -342,8 +342,25 @@ describe('runLocalCommand', () => {
 
   it('autocompletes command roots and subcommands with tab-friendly spacing', () => {
     expect(autocompleteLocalCommand('/m', 'session-1', [])).toBe('/model ');
-    expect(autocompleteLocalCommand('/model s', 'session-1', [])).toBe('/model set ');
+    expect(autocompleteLocalCommand('/model s', 'session-1', [])).toBe('/model set');
+    expect(autocompleteLocalCommand('/rea', 'session-1', [])).toBe('/reasoning ');
     expect(autocompleteLocalCommand('/session sw', 'session-1', [])).toBe('/session switch ');
+  });
+
+  it('shows current reasoning status including configured and effective values', async () => {
+    const result = await runLocalCommand(createCommandArgs({
+      prompt: '/reasoning',
+      activeModel: 'gpt-5.4',
+      activeReasoningEffort: 'high',
+    }));
+
+    expect(result).toMatchObject({ handled: true, kind: 'message' });
+    if (!result.handled || result.kind !== 'message') {
+      throw new Error('expected /reasoning to return a message result');
+    }
+    expect(result.message).toContain('Current model: gpt-5.4');
+    expect(result.message).toContain('Configured effort: high');
+    expect(result.message).toContain('Effective effort: high');
   });
 
   it('autocompletes concrete session switch targets from matching session ids', () => {
@@ -467,8 +484,8 @@ describe('runLocalCommand', () => {
     if (!continueResult.handled || continueResult.kind !== 'execute') {
       throw new Error('expected /heartbeat continue to return an execute result');
     }
-    expect(continueResult.prompt).toContain('Heartbeat task id: repo-check');
-    expect(continueResult.prompt).toContain('Task progress: Heartbeat wake finished. Waiting until the next scheduled run in 1m.');
+    expect(continueResult.prompt).toContain('Continue from heartbeat task repo-check.');
+    expect(continueResult.prompt).toContain('Loaded checkpoint: yes');
     expect(continueResult.prompt).toContain('Checked the repository and found one safe next step.');
   });
 });
