@@ -10,6 +10,8 @@ export type LlmStreamEvent =
 
 export type LlmProvider = 'openai' | 'anthropic' | 'google';
 
+export type ReasoningEffort = 'low' | 'medium' | 'high' | 'ultrahigh';
+
 export type LlmAdapterCapabilities = {
   toolCalls: boolean;
   systemMessages: boolean;

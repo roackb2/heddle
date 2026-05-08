@@ -70,7 +70,8 @@ import { createConversationEngine } from '@roackb2/heddle'
 const engine = createConversationEngine({
   workspaceRoot: process.cwd(),
   stateRoot: `${process.cwd()}/.heddle`,
-  model: 'gpt-5.1-codex',
+  model: 'gpt-5.4',
+  reasoningEffort: 'medium',
 })
 
 const session = engine.sessions.create({ name: 'Repo investigation' })
@@ -82,6 +83,18 @@ const result = await engine.turns.submit({
 
 console.log(result.summary)
 ```
+
+`reasoningEffort` can also be set per session:
+
+```ts
+const session = engine.sessions.create({
+  name: 'Deep repo investigation',
+  model: 'gpt-5.5',
+  reasoningEffort: 'high',
+})
+```
+
+Supported OpenAI request values are `low`, `medium`, and `high`. `ultrahigh` is reserved in Heddle's persisted type surface, but current OpenAI Responses API requests reject it instead of silently falling back to a default.
 
 ## Where State Is Stored
 
@@ -265,7 +278,8 @@ import { runAgentLoop } from '@roackb2/heddle'
 
 const result = await runAgentLoop({
   goal: 'Inspect this repo and summarize the main architecture',
-  model: 'gpt-5.1-codex',
+  model: 'gpt-5.4',
+  reasoningEffort: 'medium',
   workspaceRoot: process.cwd(),
   onEvent(event) {
     console.log(event.type)

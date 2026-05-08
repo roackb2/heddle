@@ -5,6 +5,7 @@ import type {
 } from '../../observability/conversation-activity.js';
 import type { TraceSummarizerRegistry } from '../../observability/trace-summarizers.js';
 import type { AgentLoopEvent, RunAgentLoopOptions } from '../../runtime/agent-loop.js';
+import type { ReasoningEffort } from '../../llm/types.js';
 import type { TraceEvent } from '../../types.js';
 import type { ChatSessionLeaseOwner } from './sessions/lease.js';
 import type { ChatSession } from '../types.js';
@@ -13,6 +14,7 @@ export type ConversationEngineConfig = {
   workspaceRoot: string;
   stateRoot: string;
   model: string;
+  reasoningEffort?: ReasoningEffort;
   apiKey?: string;
   preferApiKey?: boolean;
   credentialStorePath?: string;
@@ -43,6 +45,7 @@ export type CreateConversationSessionInput = {
   id?: string;
   name?: string;
   model?: string;
+  reasoningEffort?: ReasoningEffort;
   workspaceId?: string;
   apiKeyPresent?: boolean;
 };

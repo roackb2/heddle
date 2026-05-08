@@ -1,6 +1,7 @@
 import { buildPromptRenderLines } from '../components/PromptInput.js';
 import { OPENAI_OAUTH_MODE_DESCRIPTION, type CredentialAwareModelOption } from '../../../core/llm/model-policy.js';
 import { getLocalCommandHints } from '../state/local-commands.js';
+import type { ReasoningEffortPickerOption } from '../hooks/useChatPickers.js';
 import type { ChatSession, ConversationLine, PendingApproval } from '../state/types.js';
 import { formatApprovalHint, summarizePendingApproval, truncate } from '../utils/format.js';
 
@@ -33,6 +34,12 @@ export function buildTuiDebugSnapshot(args: {
     visible: boolean;
     query?: string;
     items: CredentialAwareModelOption[];
+    highlightedIndex: number;
+  };
+  reasoningPicker?: {
+    visible: boolean;
+    query?: string;
+    items: ReasoningEffortPickerOption[];
     highlightedIndex: number;
   };
   sessionPicker?: {
@@ -123,6 +130,13 @@ export function buildTuiDebugSnapshot(args: {
     lines.push('');
   }
 
+  if (args.reasoningPicker?.visible) {
+    lines.push('Reasoning effort picker');
+    lines.push(args.reasoningPicker.query ? `Search: ${args.reasoningPicker.query}` : 'Type after /reasoning set to filter. Use ↑/↓ or Tab to choose.');
+    lines.push(...renderReasoningEffortPickerLines(args.reasoningPicker.items, args.reasoningPicker.highlightedIndex));
+    lines.push('');
+  }
+
   if (args.sessionPicker?.visible) {
     lines.push('Session picker');
     lines.push(args.sessionPicker.query ? `Search: ${args.sessionPicker.query}` : 'Type after /session choose to filter. Use ↑/↓ or Tab to choose.');
@@ -158,6 +172,17 @@ export function buildTuiDebugSnapshot(args: {
 function renderMessageText(text: string): string[] {
   const normalized = text.split(/\r?\n/);
   return normalized.length > 0 ? normalized : [''];
+}
+
+function renderReasoningEffortPickerLines(items: ReasoningEffortPickerOption[], highlightedIndex: number): string[] {
+  if (items.length === 0) {
+    return ['No matching entries.'];
+  }
+
+  return items.slice(0, 8).map((item, index) => {
+    const suffix = item.disabled ? ` (${item.disabledReason ?? 'unavailable'})` : '';
+    return `${index === highlightedIndex ? '◉' : '○'} ${item.label}${suffix} — ${item.description}`;
+  });
 }
 
 function renderPickerLines(items: string[], highlightedIndex: number): string[] {

@@ -1,5 +1,6 @@
 import { join, resolve } from 'node:path';
 import type { ToolApprovalPolicy } from '../../approvals/types.js';
+import type { ReasoningEffort } from '../../llm/types.js';
 import type { TraceSummarizerRegistry } from '../../observability/trace-summarizers.js';
 import type { ConversationEngineConfig } from './types.js';
 
@@ -7,6 +8,7 @@ export type NormalizedConversationEngineConfig = {
   workspaceRoot: string;
   stateRoot: string;
   model: string;
+  reasoningEffort?: ReasoningEffort;
   apiKey?: string;
   preferApiKey?: boolean;
   credentialStorePath?: string;
@@ -33,6 +35,7 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
     workspaceRoot,
     stateRoot,
     model: config.model,
+    reasoningEffort: config.reasoningEffort,
     apiKey: config.apiKey,
     preferApiKey: config.preferApiKey,
     credentialStorePath,

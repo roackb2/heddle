@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { MutableRefObject } from 'react';
 import type { Logger } from 'pino';
 import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../index.js';
+import type { ReasoningEffort } from '../../../core/llm/types.js';
 import {
   createLogger,
   createLlmAdapter,
@@ -93,6 +94,7 @@ type ExecuteDirectShellArgs = {
 type UseAgentRunArgs = {
   runtime: ChatRuntimeConfig;
   activeModel: string;
+  activeReasoningEffort?: ReasoningEffort;
   sessionTitleModel: string;
   activeSessionId: string;
   sessions: ChatSession[];
@@ -110,7 +112,7 @@ export type ChatDriftObserverOptions = {
 };
 
 export function useAgentRun(args: UseAgentRunArgs) {
-  const { runtime, activeModel, sessionTitleModel, activeSessionId, sessions, state, updateSessionById, updateActiveSession } = args;
+  const { runtime, activeModel, activeReasoningEffort, sessionTitleModel, activeSessionId, sessions, state, updateSessionById, updateActiveSession } = args;
   const projectApprovals = useProjectApprovals(runtime.approvalsFile);
   const activeApiKey = resolveApiKeyForModel(activeModel, runtime);
   const titleApiKey = resolveApiKeyForModel(sessionTitleModel, runtime);
@@ -124,8 +126,13 @@ export function useAgentRun(args: UseAgentRunArgs) {
   );
 
   const llm = useMemo(
-    () => createLlmAdapter({ model: activeModel, apiKey: activeApiKey, credentialStorePath: runtime.credentialStorePath }),
-    [activeApiKey, activeModel, runtime.credentialStorePath],
+    () => createLlmAdapter({
+      model: activeModel,
+      apiKey: activeApiKey,
+      credentialStorePath: runtime.credentialStorePath,
+      reasoningEffort: activeReasoningEffort,
+    }),
+    [activeApiKey, activeModel, activeReasoningEffort, runtime.credentialStorePath],
   );
   const titleLlm = useMemo(
     () => createLlmAdapter({ model: sessionTitleModel, apiKey: titleApiKey, credentialStorePath: runtime.credentialStorePath }),

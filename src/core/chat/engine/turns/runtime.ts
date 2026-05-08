@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { DEFAULT_OPENAI_MODEL } from '../../../config.js';
 import { createLlmAdapter } from '../../../llm/factory.js';
 import { inferProviderFromModel } from '../../../llm/providers.js';
-import type { LlmAdapter, LlmProvider } from '../../../llm/types.js';
+import type { LlmAdapter, LlmProvider, ReasoningEffort } from '../../../llm/types.js';
 import {
   formatMissingProviderCredentialMessage,
   hasProviderCredentialForModel,
@@ -14,6 +14,7 @@ import { appendMemoryCatalogSystemContext } from '../../../memory/catalog.js';
 
 export type ChatTurnRuntime = {
   model: string;
+  reasoningEffort?: ReasoningEffort;
   provider: LlmProvider;
   apiKey: string | undefined;
   providerCredentialSource: ProviderCredentialSource;
@@ -25,6 +26,7 @@ export type ChatTurnRuntime = {
 export type ResolveConversationTurnRuntimeArgs = {
   stateRoot: string;
   sessionModel?: string;
+  sessionReasoningEffort?: ReasoningEffort;
   apiKey?: string;
   preferApiKey?: boolean;
   credentialStorePath?: string;
@@ -72,7 +74,13 @@ export function resolveConversationTurnRuntime(args: ResolveConversationTurnRunt
       systemContext: args.systemContext,
       memoryRoot: memoryDir,
     }),
-    llm: createLlmAdapter({ model, apiKey, credentialStorePath: args.credentialStorePath }),
+    reasoningEffort: args.sessionReasoningEffort,
+    llm: createLlmAdapter({
+      model,
+      apiKey,
+      credentialStorePath: args.credentialStorePath,
+      reasoningEffort: args.sessionReasoningEffort,
+    }),
   };
 }
 

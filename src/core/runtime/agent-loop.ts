@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import type { Logger } from 'pino';
 import { DEFAULT_OPENAI_MODEL } from '../config.js';
 import { inferProviderFromModel } from '../llm/providers.js';
-import type { ChatMessage, LlmAdapter, LlmProvider } from '../llm/types.js';
+import type { ChatMessage, LlmAdapter, LlmProvider, ReasoningEffort } from '../llm/types.js';
 import { runAgent } from '../agent/run-agent.js';
 import type { RunAgentOptions } from '../agent/run-agent.js';
 import type { RunResult, ToolCall, ToolDefinition, TraceEvent } from '../types.js';
@@ -22,6 +22,7 @@ export type { AgentLoopCheckpoint, AgentLoopEvent, AgentLoopState } from './even
 export type RunAgentLoopOptions = {
   goal: string;
   model?: string;
+  reasoningEffort?: ReasoningEffort;
   apiKey?: string;
   maxSteps?: number;
   workspaceRoot?: string;
@@ -71,6 +72,7 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
     model,
     apiKey,
     credentialStorePath,
+    reasoningEffort: options.reasoningEffort,
   });
   const logger = options.logger ?? createLogger({ pretty: false, level: 'info', console: false });
   const tools = await resolveTools({
@@ -232,7 +234,12 @@ function getResumeMetadata(
   };
 }
 
-async function createLoopLlmAdapter(options: { model: string; apiKey?: string; credentialStorePath?: string }): Promise<LlmAdapter> {
+async function createLoopLlmAdapter(options: {
+  model: string;
+  apiKey?: string;
+  credentialStorePath?: string;
+  reasoningEffort?: ReasoningEffort;
+}): Promise<LlmAdapter> {
   const { createLlmAdapter } = await import('../llm/factory.js');
   return createLlmAdapter(options);
 }

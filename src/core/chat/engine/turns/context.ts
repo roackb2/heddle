@@ -36,6 +36,7 @@ export function prepareConversationTurnContext(args: PrepareConversationTurnCont
   const runtime = resolveConversationTurnRuntime({
     stateRoot: args.stateRoot,
     sessionModel: session.model,
+    sessionReasoningEffort: session.reasoningEffort,
     apiKey: args.apiKey,
     preferApiKey: args.preferApiKey,
     credentialStorePath: args.credentialStorePath,

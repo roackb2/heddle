@@ -4,11 +4,18 @@ import type { SlashCommandModule } from '../../types.js';
 import type { SlashCommandExecutionContext } from '../context.js';
 import { argumentAfterPrefix, slashMessageResult } from '../results.js';
 import { COMMON_BUILT_IN_MODELS, formatBuiltInModelGroups } from '../../../../llm/openai-models.js';
-import { credentialModeFromSource, validateModelCredentialCompatibility } from '../../../../llm/model-policy.js';
-import type { LlmProvider } from '../../../../llm/types.js';
+import {
+  credentialModeFromSource,
+  resolveDefaultReasoningEffort,
+  supportsOpenAiRequestReasoningEffort,
+  supportsReasoningEffort,
+  validateModelCredentialCompatibility,
+} from '../../../../llm/model-policy.js';
+import type { LlmProvider, ReasoningEffort } from '../../../../llm/types.js';
 
 export const MODEL_LIST_MESSAGE = ['Common built-in model choices', '', formatBuiltInModelGroups()].join('\n');
 export const MODEL_SET_HELP_MESSAGE = 'Use /model set <query> to filter models, then use arrows and Enter to choose one.';
+export const REASONING_SET_HELP_MESSAGE = 'Use /reasoning set <query> to filter reasoning efforts, then use arrows and Enter to choose one.';
 
 const MODEL_SUBCOMMAND_RESULTS = new Map<string, SlashCommandResult>([
   ['list', slashMessageResult(MODEL_LIST_MESSAGE)],
@@ -58,6 +65,40 @@ export function createModelSlashCommandModule(): SlashCommandModule<SlashCommand
   };
 }
 
+export function createReasoningSlashCommandModule(): SlashCommandModule<SlashCommandResult, SlashCommandExecutionContext> {
+  return {
+    id: 'reasoning',
+    hints: [
+      { command: '/reasoning', description: 'show reasoning effort for the current session' },
+      { command: '/reasoning set [query]', description: 'pick reasoning effort with filtering' },
+      { command: '/reasoning default', description: 'clear explicit reasoning effort and use the model default' },
+    ],
+    commands: [
+      {
+        id: 'reasoning.current',
+        syntax: '/reasoning',
+        description: 'show reasoning effort for the current session',
+        match: matchesExactSlashCommand('/reasoning'),
+        run: (context) => slashMessageResult(formatReasoningEffortStatus(context.model.active(), context.model.activeReasoningEffort())),
+      },
+      {
+        id: 'reasoning.set.help',
+        syntax: '/reasoning set',
+        description: 'pick reasoning effort with filtering',
+        match: matchesExactSlashCommand('/reasoning set'),
+        run: () => slashMessageResult(REASONING_SET_HELP_MESSAGE),
+      },
+      {
+        id: 'reasoning.set',
+        syntax: '/reasoning <low|medium|high|default>',
+        description: 'set reasoning effort for the current session',
+        match: matchesSlashCommandPrefix('/reasoning'),
+        run: (context, input) => setReasoningEffort(context, argumentAfterPrefix(input, '/reasoning')),
+      },
+    ],
+  };
+}
+
 function switchModel(
   context: SlashCommandExecutionContext,
   value: string,
@@ -86,6 +127,61 @@ function switchModel(
       `Switched model to ${value}`
     : `Switched model to ${value}. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.`,
   );
+}
+
+function setReasoningEffort(
+  context: SlashCommandExecutionContext,
+  value: string,
+): SlashCommandResult {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return slashMessageResult(formatReasoningEffortStatus(context.model.active(), context.model.activeReasoningEffort()));
+  }
+
+  const selected = normalized.startsWith('set ') ? normalized.slice('set '.length).trim() : normalized;
+
+  if (selected === 'default') {
+    context.model.setReasoningEffort(undefined);
+    return slashMessageResult(
+      `Cleared explicit reasoning effort for ${context.model.active()}. Effective default: ${resolveDefaultReasoningEffort(context.model.active()) ?? 'not supported'}.`,
+    );
+  }
+
+  if (!isReasoningEffort(selected)) {
+    return slashMessageResult('Usage: /reasoning set <query> or /reasoning <low|medium|high|default>');
+  }
+
+  if (!supportsReasoningEffort(context.model.active())) {
+    return slashMessageResult(`Reasoning effort is not supported for model ${context.model.active()}.`);
+  }
+
+  if (selected === 'ultrahigh') {
+    return slashMessageResult('Reasoning effort "ultrahigh" is reserved but is not supported by the current OpenAI request path. Use low, medium, high, or default.');
+  }
+
+  if (!supportsOpenAiRequestReasoningEffort(context.model.active())) {
+    return slashMessageResult(`Reasoning effort settings are not supported by the OpenAI request path for model ${context.model.active()}.`);
+  }
+
+  context.model.setReasoningEffort(selected);
+  return slashMessageResult(`Set reasoning effort to ${selected} for ${context.model.active()}.`);
+}
+
+function formatReasoningEffortStatus(model: string, explicitEffort: ReasoningEffort | undefined): string {
+  const supported = supportsReasoningEffort(model);
+  const effective = explicitEffort ?? resolveDefaultReasoningEffort(model);
+  return [
+    `Current model: ${model}`,
+    `Reasoning effort support: ${supported ? 'supported' : 'unsupported'}`,
+    `Configured effort: ${explicitEffort ?? 'default'}`,
+    `Effective effort: ${effective ?? 'none'}`,
+    '',
+    'Use /reasoning set to choose an effort, or /reasoning default to clear it.',
+  ].join('\n');
+}
+
+function isReasoningEffort(value: string): value is ReasoningEffort {
+  return value === 'low' || value === 'medium' || value === 'high' || value === 'ultrahigh';
 }
 
 function inferProviderForModel(model: string): LlmProvider {

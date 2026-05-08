@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CredentialAwareModelOption } from '../../../core/llm/model-policy.js';
+import type { ReasoningEffort } from '../../../core/llm/types.js';
+import type { ReasoningEffortPickerOption } from './useChatPickers.js';
 import type { ConversationLine, ChatSession } from '../state/types.js';
 import { submitChatPrompt } from '../submit.js';
 import { buildPromptWithFileMentions } from '../utils/file-mentions.js';
@@ -11,7 +13,9 @@ type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => 
 export function usePromptSubmission({
   runtime,
   activeModel,
+  activeReasoningEffort,
   setActiveModel,
+  setActiveReasoningEffort,
   sessions,
   recentSessions,
   activeSessionId,
@@ -36,13 +40,16 @@ export function usePromptSubmission({
   pendingApproval,
   mentionableFiles,
   modelPicker,
+  reasoningPicker,
   sessionPicker,
   fileMentionPicker,
   resetPickerIndexes,
 }: {
   runtime: ChatRuntimeConfig;
   activeModel: string;
+  activeReasoningEffort?: ReasoningEffort;
   setActiveModel: (model: string) => void;
+  setActiveReasoningEffort: (effort: ReasoningEffort | undefined) => void;
   sessions: ChatSession[];
   recentSessions: ChatSession[];
   activeSessionId: string;
@@ -69,6 +76,11 @@ export function usePromptSubmission({
   modelPicker: {
     visible: boolean;
     highlighted?: CredentialAwareModelOption;
+    resetIndex: () => void;
+  };
+  reasoningPicker: {
+    visible: boolean;
+    highlighted?: ReasoningEffortPickerOption;
     resetIndex: () => void;
   };
   sessionPicker: {
@@ -148,7 +160,9 @@ export function usePromptSubmission({
     const submitArgs = {
       isRunning: effectiveIsRunning,
       activeModel,
+      activeReasoningEffort,
       setActiveModel,
+      setActiveReasoningEffort,
       sessions,
       recentSessions,
       activeSessionId,
@@ -188,6 +202,18 @@ export function usePromptSubmission({
       return;
     }
 
+    if (reasoningPicker.visible && reasoningPicker.highlighted) {
+      reasoningPicker.resetIndex();
+      if (reasoningPicker.highlighted.disabled) {
+        return;
+      }
+      await submitChatPrompt({
+        ...submitArgs,
+        value: reasoningPicker.highlighted.id === 'default' ? '/reasoning default' : `/reasoning ${reasoningPicker.highlighted.id}`,
+      });
+      return;
+    }
+
     if (sessionPicker.visible && sessionPicker.highlighted) {
       sessionPicker.resetIndex();
       await submitChatPrompt({
@@ -212,7 +238,9 @@ export function usePromptSubmission({
     pendingApproval,
     pendingSubmittedPrompt,
     activeModel,
+    activeReasoningEffort,
     setActiveModel,
+    setActiveReasoningEffort,
     sessions,
     recentSessions,
     activeSessionId,
@@ -239,6 +267,7 @@ export function usePromptSubmission({
     executeDirectShellCommand,
     saveTuiSnapshot,
     modelPicker,
+    reasoningPicker,
     sessionPicker,
     fileMentionPicker,
     resetPickerIndexes,

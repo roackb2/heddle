@@ -3,8 +3,12 @@ import { BUILT_IN_MODEL_GROUPS, filterBuiltInModels } from '../../../core/llm/op
 import {
   buildCredentialAwareModelOption,
   credentialModeFromSource,
+  resolveDefaultReasoningEffort,
+  supportsOpenAiRequestReasoningEffort,
+  supportsReasoningEffort,
   type CredentialAwareModelOption,
 } from '../../../core/llm/model-policy.js';
+import type { ReasoningEffort } from '../../../core/llm/types.js';
 import type { ProviderCredentialSource } from '../utils/runtime.js';
 import type { PromptKeyInput } from '../components/PromptInput.js';
 import type { ChatSession } from '../state/types.js';
@@ -17,6 +21,7 @@ export function useChatPickers({
   clearDraft,
   replaceDraft,
   providerCredentialSource,
+  activeModel,
 }: {
   draft: string;
   recentSessions: ChatSession[];
@@ -24,8 +29,10 @@ export function useChatPickers({
   clearDraft: () => void;
   replaceDraft: (value: string) => void;
   providerCredentialSource: ProviderCredentialSource;
+  activeModel: string;
 }) {
   const [modelPickerIndex, setModelPickerIndex] = useState(0);
+  const [reasoningPickerIndex, setReasoningPickerIndex] = useState(0);
   const [sessionPickerIndex, setSessionPickerIndex] = useState(0);
   const [fileMentionPickerIndex, setFileMentionPickerIndex] = useState(0);
 
@@ -52,6 +59,13 @@ export function useChatPickers({
   const safeModelPickerIndex = clampPickerIndex(modelPickerIndex, filteredModels.length);
   const highlightedModel = filteredModels[safeModelPickerIndex];
 
+  const reasoningPickerQuery = getReasoningPickerQuery(draft);
+  const reasoningPickerVisible = reasoningPickerQuery !== undefined;
+  const reasoningOptions = useMemo(() => buildReasoningEffortOptions(activeModel), [activeModel]);
+  const filteredReasoningOptions = reasoningPickerVisible ? filterReasoningEffortOptions(reasoningOptions, reasoningPickerQuery) : [];
+  const safeReasoningPickerIndex = clampPickerIndex(reasoningPickerIndex, filteredReasoningOptions.length);
+  const highlightedReasoningEffort = filteredReasoningOptions[safeReasoningPickerIndex];
+
   const sessionPickerQuery = getSessionPickerQuery(draft);
   const sessionPickerVisible = sessionPickerQuery !== undefined;
   const filteredSessions = sessionPickerVisible ? filterSessionsForPicker(recentSessions, sessionPickerQuery) : [];
@@ -60,6 +74,7 @@ export function useChatPickers({
 
   const resetPickerIndexes = () => {
     setModelPickerIndex(0);
+    setReasoningPickerIndex(0);
     setSessionPickerIndex(0);
     setFileMentionPickerIndex(0);
   };
@@ -97,6 +112,17 @@ export function useChatPickers({
       });
     }
 
+    if (reasoningPickerVisible) {
+      return handlePickerKeys({
+        key,
+        itemCount: filteredReasoningOptions.length,
+        resetDraft: clearDraft,
+        resetIndex: () => setReasoningPickerIndex(0),
+        advance: () => setReasoningPickerIndex((current) => (current + 1) % filteredReasoningOptions.length),
+        retreat: () => setReasoningPickerIndex((current) => (current <= 0 ? filteredReasoningOptions.length - 1 : current - 1)),
+      });
+    }
+
     if (fileMentionPickerVisible) {
       return handlePickerKeys({
         key,
@@ -128,6 +154,14 @@ export function useChatPickers({
       highlighted: highlightedSession,
       resetIndex: () => setSessionPickerIndex(0),
     },
+    reasoning: {
+      query: reasoningPickerQuery,
+      visible: reasoningPickerVisible,
+      items: filteredReasoningOptions,
+      highlightedIndex: safeReasoningPickerIndex,
+      highlighted: highlightedReasoningEffort,
+      resetIndex: () => setReasoningPickerIndex(0),
+    },
     fileMention: {
       query: mentionQuery,
       visible: fileMentionPickerVisible,
@@ -142,6 +176,14 @@ export function useChatPickers({
   };
 }
 
+export type ReasoningEffortPickerOption = {
+  id: 'default' | ReasoningEffort;
+  label: string;
+  description: string;
+  disabled: boolean;
+  disabledReason?: string;
+};
+
 function getModelPickerQuery(draft: string): string | undefined {
   const trimmedStart = draft.trimStart();
   if (!trimmedStart.startsWith('/model set')) {
@@ -149,6 +191,16 @@ function getModelPickerQuery(draft: string): string | undefined {
   }
 
   const remainder = trimmedStart.slice('/model set'.length);
+  return remainder.trim();
+}
+
+function getReasoningPickerQuery(draft: string): string | undefined {
+  const trimmedStart = draft.trimStart();
+  if (!trimmedStart.startsWith('/reasoning set')) {
+    return undefined;
+  }
+
+  const remainder = trimmedStart.slice('/reasoning set'.length);
   return remainder.trim();
 }
 
@@ -165,6 +217,55 @@ function getSessionPickerQuery(draft: string): string | undefined {
 function filterCredentialAwareModels(models: CredentialAwareModelOption[], query: string): CredentialAwareModelOption[] {
   const matchingIds = new Set(filterBuiltInModels(query));
   return models.filter((model) => matchingIds.has(model.id));
+}
+
+function buildReasoningEffortOptions(model: string): ReasoningEffortPickerOption[] {
+  const requestSupported = supportsOpenAiRequestReasoningEffort(model);
+  const reasoningSupported = supportsReasoningEffort(model);
+  const defaultEffort = resolveDefaultReasoningEffort(model);
+  const disabledReason =
+    reasoningSupported ?
+      'Not supported by request path'
+    : 'Not supported';
+
+  return [
+    {
+      id: 'default',
+      label: 'default',
+      description: defaultEffort ? `Use ${model} default (${defaultEffort})` : `Do not send reasoning effort for ${model}`,
+      disabled: false,
+    },
+    ...(['low', 'medium', 'high'] as const).map((effort) => ({
+      id: effort,
+      label: effort,
+      description: `Set explicit ${effort} effort`,
+      disabled: !requestSupported,
+      disabledReason: requestSupported ? undefined : disabledReason,
+    })),
+    {
+      id: 'ultrahigh' as const,
+      label: 'ultrahigh',
+      description: 'Reserved; not accepted by current OpenAI requests',
+      disabled: true,
+      disabledReason: 'Reserved',
+    },
+  ];
+}
+
+function filterReasoningEffortOptions(
+  options: ReasoningEffortPickerOption[],
+  query: string,
+): ReasoningEffortPickerOption[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return options;
+  }
+
+  return options.filter((option) =>
+    option.id.toLowerCase().includes(normalized)
+    || option.label.toLowerCase().includes(normalized)
+    || option.description.toLowerCase().includes(normalized),
+  );
 }
 
 function filterSessionsForPicker(

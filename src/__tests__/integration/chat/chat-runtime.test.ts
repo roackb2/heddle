@@ -12,7 +12,7 @@ import { runConversationTurn } from '../../../core/chat/engine/turns/run-convers
 import { createChatSession as createCoreChatSession, loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/storage.js';
 import * as agentLoopModule from '../../../core/runtime/agent-loop.js';
 import type { ToolApprovalPolicy } from '../../../core/approvals/types.js';
-import { continueChatPrompt, createControlPlaneChatSession, readChatSessionDetail, submitChatPrompt } from '../../../server/features/control-plane/services/chat-sessions.js';
+import { continueChatPrompt, createControlPlaneChatSession, readChatSessionDetail, submitChatPrompt, updateControlPlaneChatSessionSettings } from '../../../server/features/control-plane/services/chat-sessions.js';
 
 describe('resolveChatRuntimeConfig', () => {
   afterEach(() => {
@@ -441,6 +441,27 @@ describe('control-plane shared chat runtime integration', () => {
     });
 
     expect(session.model).toBe('gpt-4.1');
+  });
+
+  it('clears explicit reasoning effort when control-plane settings send null', () => {
+    const sessionStoragePath = createControlPlaneSessionStoragePath();
+    const session = createCoreChatSession({
+      id: 'session-1',
+      name: 'Session 1',
+      apiKeyPresent: true,
+      model: 'gpt-5.5',
+      reasoningEffort: 'high',
+    });
+    saveChatSessions(sessionStoragePath, [session]);
+
+    const updated = updateControlPlaneChatSessionSettings({
+      sessionStoragePath,
+      sessionId: 'session-1',
+      reasoningEffort: null,
+    });
+
+    expect(updated.reasoningEffort).toBeUndefined();
+    expect(readChatSessionDetail(sessionStoragePath, 'session-1')?.reasoningEffort).toBeUndefined();
   });
 
   it('continues with the stored prompt while preserving continue-style transcript text', async () => {

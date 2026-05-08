@@ -82,6 +82,29 @@ describe('chat turn preparation modules', () => {
     expect(runtime.llm.info?.model).toBe('gpt-5.4');
   });
 
+  it('carries stored session reasoning effort into the turn runtime', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-turn-reasoning-'));
+    const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
+    const session = createChatSession({
+      id: 'session-1',
+      name: 'Session 1',
+      apiKeyPresent: true,
+      model: 'gpt-5.5',
+      reasoningEffort: 'medium',
+    });
+    saveChatSessions(sessionStoragePath, [session]);
+
+    const context = prepareConversationTurnContext({
+      workspaceRoot: root,
+      stateRoot: join(root, '.heddle'),
+      sessionStoragePath,
+      sessionId: 'session-1',
+      apiKey: 'explicit-key',
+    });
+
+    expect(context.runtime.reasoningEffort).toBe('medium');
+  });
+
   it('preserves stored OAuth credential selection for OpenAI chat turns', () => {
     vi.stubEnv('OPENAI_API_KEY', '');
     vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');

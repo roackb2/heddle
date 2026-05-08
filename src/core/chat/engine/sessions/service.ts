@@ -27,6 +27,7 @@ export function createConversationSessionService(args: {
         name: input?.name?.trim() || `Session ${nextNumber}`,
         apiKeyPresent: input?.apiKeyPresent ?? config.apiKeyPresent,
         model: input?.model ?? config.model,
+        reasoningEffort: input?.reasoningEffort ?? config.reasoningEffort,
         workspaceId: input?.workspaceId ?? config.workspaceId,
       });
       saveChatSessions(config.sessionStoragePath, [session, ...existing]);

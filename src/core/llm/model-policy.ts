@@ -1,7 +1,7 @@
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../config.js';
 import type { ProviderCredentialSource } from '../runtime/api-keys.js';
 import { isOpenAiAccountSignInModel, OPENAI_ACCOUNT_SIGN_IN_MODELS } from './openai-models.js';
-import type { LlmProvider } from './types.js';
+import type { LlmProvider, ReasoningEffort } from './types.js';
 
 export type SystemModelPurpose = 'chat-compaction' | 'session-title';
 export type ModelCredentialMode = 'api-key' | 'oauth' | 'missing';
@@ -20,6 +20,29 @@ const OPENAI_OAUTH_DISABLED_REASON = 'Not supported';
 export const OPENAI_OAUTH_MODE_DESCRIPTION = 'OAuth mode supports a smaller OpenAI allowlist.';
 
 const OPENAI_OAUTH_IMAGE_MODEL_PREFERENCES = ['gpt-5.4', 'gpt-5.4-mini'];
+const REASONING_EFFORT_CAPABLE_OPENAI_MODELS = [
+  'gpt-5.4',
+  'gpt-5.4-pro',
+  'gpt-5.4-mini',
+  'gpt-5.4-nano',
+  'gpt-5.5',
+  'gpt-5.5-pro',
+] as const;
+const OPENAI_REQUEST_REASONING_EFFORT_COMPATIBLE_MODELS = [
+  'gpt-5.4',
+  'gpt-5.4-pro',
+  'gpt-5.4-mini',
+  'gpt-5.5',
+  'gpt-5.5-pro',
+] as const;
+const DEFAULT_OPENAI_REASONING_EFFORT: Record<string, ReasoningEffort> = {
+  'gpt-5.4': 'high',
+  'gpt-5.4-pro': 'high',
+  'gpt-5.4-mini': 'medium',
+  'gpt-5.4-nano': 'low',
+  'gpt-5.5': 'high',
+  'gpt-5.5-pro': 'high',
+};
 
 export function credentialModeFromSource(source: ProviderCredentialSource | undefined): ModelCredentialMode {
   if (source?.type === 'oauth') {
@@ -150,6 +173,18 @@ export function resolveCompatibleActiveModel(args: {
     model: fallback,
     warning: `Model ${args.activeModel} is not supported with OpenAI account sign-in. Switched to ${fallback} for this session.`,
   };
+}
+
+export function supportsReasoningEffort(model: string): boolean {
+  return REASONING_EFFORT_CAPABLE_OPENAI_MODELS.includes(model as (typeof REASONING_EFFORT_CAPABLE_OPENAI_MODELS)[number]);
+}
+
+export function supportsOpenAiRequestReasoningEffort(model: string): boolean {
+  return OPENAI_REQUEST_REASONING_EFFORT_COMPATIBLE_MODELS.includes(model as (typeof OPENAI_REQUEST_REASONING_EFFORT_COMPATIBLE_MODELS)[number]);
+}
+
+export function resolveDefaultReasoningEffort(model: string): ReasoningEffort | undefined {
+  return DEFAULT_OPENAI_REASONING_EFFORT[model];
 }
 
 export function formatOpenAiAccountSignInModels(): string {

@@ -194,6 +194,31 @@ describe('OpenAI OAuth helpers', () => {
     );
   });
 
+  it('includes the default reasoning effort for supported reasoning models', async () => {
+    const requests: Array<{ url: string; body: string }> = [];
+    const adapter = createOpenAiAdapter({
+      model: 'gpt-5.4',
+      credential: {
+        type: 'oauth',
+        provider: 'openai',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresAt: Date.now() + 120_000,
+        accountId: 'account-123',
+        createdAt: '2026-04-27T00:00:00.000Z',
+        updatedAt: '2026-04-27T00:00:00.000Z',
+      },
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), body: String((init as RequestInit | undefined)?.body ?? '') });
+        return new Response('bad request', { status: 400 });
+      }) as typeof fetch,
+    });
+
+    await expect(adapter.chat([{ role: 'user', content: 'hello' }], [])).rejects.toThrow();
+    const body = JSON.parse(requests[0]?.body ?? '{}') as { reasoning?: { effort?: string } };
+    expect(body.reasoning?.effort).toBe('high');
+  });
+
   it('uses the Codex-compatible Responses payload shape for account sign-in models', async () => {
     const requests: Array<{ url: string; body: string }> = [];
     const adapter = createOpenAiAdapter({
@@ -234,6 +259,57 @@ describe('OpenAI OAuth helpers', () => {
     expect(body.input).toEqual([
       { type: 'message', role: 'user', content: 'hello' },
     ]);
+  });
+
+  it('includes explicit reasoning effort when configured', async () => {
+    const requests: Array<{ url: string; body: string }> = [];
+    const adapter = createOpenAiAdapter({
+      model: 'gpt-5.5',
+      reasoningEffort: 'medium',
+      credential: {
+        type: 'oauth',
+        provider: 'openai',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresAt: Date.now() + 120_000,
+        accountId: 'account-123',
+        createdAt: '2026-04-27T00:00:00.000Z',
+        updatedAt: '2026-04-27T00:00:00.000Z',
+      },
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), body: String((init as RequestInit | undefined)?.body ?? '') });
+        return new Response('bad request', { status: 400 });
+      }) as typeof fetch,
+    });
+
+    await expect(adapter.chat([{ role: 'user', content: 'hello' }], [])).rejects.toThrow();
+    const body = JSON.parse(requests[0]?.body ?? '{}') as { reasoning?: { effort?: string } };
+    expect(body.reasoning?.effort).toBe('medium');
+  });
+
+  it('rejects ultrahigh reasoning effort instead of silently dropping it', async () => {
+    const requests: Array<{ url: string; body: string }> = [];
+    const adapter = createOpenAiAdapter({
+      model: 'gpt-5.5',
+      reasoningEffort: 'ultrahigh',
+      credential: {
+        type: 'oauth',
+        provider: 'openai',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresAt: Date.now() + 120_000,
+        accountId: 'account-123',
+        createdAt: '2026-04-27T00:00:00.000Z',
+        updatedAt: '2026-04-27T00:00:00.000Z',
+      },
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), body: String((init as RequestInit | undefined)?.body ?? '') });
+        return new Response('bad request', { status: 400 });
+      }) as typeof fetch,
+    });
+
+    await expect(adapter.chat([{ role: 'user', content: 'hello' }], [])).rejects.toThrow('ultrahigh');
+    expect(requests).toEqual([]);
   });
 
   it('reconstructs tool calls from streamed Codex OAuth events when final response output is empty', async () => {

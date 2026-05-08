@@ -6,6 +6,7 @@ export { FileMentionPickerPanel } from './FileMentionPickerPanel.js';
 export { ModelPickerPanel } from './ModelPickerPanel.js';
 export { PromptInput } from './PromptInput.js';
 export { RecentTurnsPanel } from './RecentTurnsPanel.js';
+export { ReasoningEffortPickerPanel } from './ReasoningEffortPickerPanel.js';
 export { RuntimeHostInterstitial } from './RuntimeHostInterstitial.js';
 export { SessionPickerPanel } from './SessionPickerPanel.js';
 export { SlashHintPanel, shouldShowSlashHints } from './SlashHintPanel.js';

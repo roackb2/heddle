@@ -169,6 +169,7 @@ export type {
   ChatMessage,
   LlmResponse,
   LlmProvider,
+  ReasoningEffort,
   LlmAdapterCapabilities,
   LlmAdapterInfo,
   LlmUsage,

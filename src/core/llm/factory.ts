@@ -6,7 +6,7 @@
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_LLM_PROVIDER, DEFAULT_OPENAI_MODEL } from '../config.js';
 import { createAnthropicAdapter } from './anthropic.js';
 import { createOpenAiAdapter } from './openai.js';
-import type { LlmAdapter, LlmProvider } from './types.js';
+import type { LlmAdapter, LlmProvider, ReasoningEffort } from './types.js';
 import { inferProviderFromModel } from './providers.js';
 import type { StoredProviderCredential } from '../auth/provider-credentials.js';
 import { resolveOAuthCredentialForModel } from '../runtime/api-keys.js';
@@ -17,6 +17,7 @@ export type CreateLlmAdapterOptions = {
   apiKey?: string;
   credential?: StoredProviderCredential;
   credentialStorePath?: string;
+  reasoningEffort?: ReasoningEffort;
 };
 
 export function createLlmAdapter(options: CreateLlmAdapterOptions = {}): LlmAdapter {
@@ -37,6 +38,7 @@ export function createLlmAdapter(options: CreateLlmAdapterOptions = {}): LlmAdap
         model,
         credential,
         credentialStorePath: options.credentialStorePath,
+        reasoningEffort: options.reasoningEffort,
       });
     case 'anthropic':
       return createAnthropicAdapter({

@@ -9,7 +9,9 @@ function createCommandArgs(overrides: Partial<Parameters<typeof runLocalCommand>
   return {
     prompt: '/help',
     activeModel: 'gpt-5.1-codex',
+    activeReasoningEffort: undefined,
     setActiveModel: vi.fn(),
+    setActiveReasoningEffort: vi.fn(),
     sessions: [],
     recentSessions: [],
     activeSessionId: 'session-1',
@@ -518,7 +520,67 @@ describe('runLocalCommand', () => {
   it('autocompletes command roots and subcommands with tab-friendly spacing', () => {
     expect(autocompleteLocalCommand('/m', 'session-1', [])).toBe('/model ');
     expect(autocompleteLocalCommand('/model s', 'session-1', [])).toBe('/model set ');
+    expect(autocompleteLocalCommand('/rea', 'session-1', [])).toBe('/reasoning ');
+    expect(autocompleteLocalCommand('/reasoning s', 'session-1', [])).toBe('/reasoning set ');
     expect(autocompleteLocalCommand('/session sw', 'session-1', [])).toBe('/session switch ');
+  });
+
+  it('shows current reasoning status including configured and effective values', async () => {
+    const result = await runLocalCommand(createCommandArgs({
+      prompt: '/reasoning',
+      activeModel: 'gpt-5.4',
+      activeReasoningEffort: 'high',
+    }));
+
+    expect(result).toMatchObject({ handled: true, kind: 'message' });
+    if (!result.handled || result.kind !== 'message') {
+      throw new Error('expected /reasoning to return a message result');
+    }
+    expect(result.message).toContain('Current model: gpt-5.4');
+    expect(result.message).toContain('Configured effort: high');
+    expect(result.message).toContain('Effective effort: high');
+    expect(result.message).toContain('Use /reasoning set to choose an effort');
+  });
+
+  it('shows picker help for reasoning set', async () => {
+    await expect(runLocalCommand(createCommandArgs({
+      prompt: '/reasoning set',
+      activeModel: 'gpt-5.4',
+    }))).resolves.toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'Use /reasoning set <query> to filter reasoning efforts, then use arrows and Enter to choose one.',
+    });
+  });
+
+  it('accepts direct reasoning set values for compatibility with picker submissions', async () => {
+    const setActiveReasoningEffort = vi.fn();
+    await expect(runLocalCommand(createCommandArgs({
+      prompt: '/reasoning set medium',
+      activeModel: 'gpt-5.4',
+      setActiveReasoningEffort,
+    }))).resolves.toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'Set reasoning effort to medium for gpt-5.4.',
+    });
+    expect(setActiveReasoningEffort).toHaveBeenCalledWith('medium');
+  });
+
+  it('rejects reserved ultrahigh reasoning effort before a run starts', async () => {
+    const setActiveReasoningEffort = vi.fn();
+    const result = await runLocalCommand(createCommandArgs({
+      prompt: '/reasoning ultrahigh',
+      activeModel: 'gpt-5.4',
+      setActiveReasoningEffort,
+    }));
+
+    expect(result).toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: expect.stringContaining('ultrahigh'),
+    });
+    expect(setActiveReasoningEffort).not.toHaveBeenCalled();
   });
 
   it('autocompletes shared prefixes while preserving leading whitespace', () => {

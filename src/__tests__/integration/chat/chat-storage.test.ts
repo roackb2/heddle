@@ -58,6 +58,7 @@ describe('chat session storage layout', () => {
         workspaceId: 'workspace-1',
       }),
       model: 'gpt-5.1-codex-mini',
+      reasoningEffort: 'high',
       lastContinuePrompt: 'continue',
       context: { estimatedHistoryTokens: 42 },
       messages: [{ id: 'm1', role: 'assistant' as const, text: 'hello there' }],
@@ -87,6 +88,7 @@ describe('chat session storage layout', () => {
       name: 'Session 1',
       workspaceId: 'workspace-1',
       model: 'gpt-5.1-codex-mini',
+      reasoningEffort: 'high',
       lastContinuePrompt: 'continue',
       context: { estimatedHistoryTokens: 42 },
     }));
@@ -94,6 +96,7 @@ describe('chat session storage layout', () => {
     expect(storedSession).toEqual(expect.objectContaining({
       id: 'session-1',
       workspaceId: 'workspace-1',
+      reasoningEffort: 'high',
       history: [],
       messages: [{ id: 'm1', role: 'assistant', text: 'hello there' }],
       turns: [{
@@ -105,6 +108,34 @@ describe('chat session storage layout', () => {
         traceFile: '/tmp/trace-1.json',
         events: ['said hello'],
       }],
+    }));
+  });
+
+  it('persists reasoning effort in catalog and per-session storage when configured', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-reasoning-'));
+    const sessionsFile = join(dir, 'chat-sessions.json');
+    const session = {
+      ...createChatSession({
+        id: 'session-1',
+        name: 'Session 1',
+        apiKeyPresent: true,
+        workspaceId: 'workspace-1',
+      }),
+      model: 'gpt-5.5',
+      reasoningEffort: 'high' as const,
+    };
+
+    saveChatSessions(sessionsFile, [session]);
+
+    expect(readChatSessionCatalog(sessionsFile)[0]).toEqual(expect.objectContaining({
+      id: 'session-1',
+      model: 'gpt-5.5',
+      reasoningEffort: 'high',
+    }));
+    expect(readChatSession(sessionsFile, 'session-1', true)).toEqual(expect.objectContaining({
+      id: 'session-1',
+      model: 'gpt-5.5',
+      reasoningEffort: 'high',
     }));
   });
 

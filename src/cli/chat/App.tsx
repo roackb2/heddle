@@ -7,6 +7,7 @@ import {
   FileMentionPickerPanel,
   ModelPickerPanel,
   PromptInput,
+  ReasoningEffortPickerPanel,
   SessionPickerPanel,
   shouldShowCommandHint,
   shouldShowSlashHints,
@@ -17,6 +18,7 @@ import { buildConversationMessages } from './utils/format.js';
 import { buildCompactionRunningContext, compactChatHistoryWithArchive } from './state/compaction.js';
 import { estimateBuiltInContextWindow } from '../../core/llm/openai-models.js';
 import { credentialModeFromSource, resolveCompatibleActiveModel, resolveSystemSelectedModel } from '../../core/llm/model-policy.js';
+import type { ReasoningEffort } from '../../core/llm/types.js';
 import { useApprovalFlow } from './hooks/useApprovalFlow.js';
 import { useAgentRun } from './hooks/useAgentRun.js';
 import { useChatDrift } from './hooks/useChatDrift.js';
@@ -52,6 +54,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     clearDraft,
     replaceDraft,
   } = usePromptDraft();
+  const [activeReasoningEffort, setActiveReasoningEffort] = useState<ReasoningEffort | undefined>(undefined);
   const mentionableFiles = useState(() => listMentionableFiles(runtime.workspaceRoot, runtime.searchIgnoreDirs))[0];
 
   const {
@@ -85,6 +88,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     clearDraft,
     replaceDraft,
     providerCredentialSource: resolveProviderCredentialSourceForModel(activeModel, runtime),
+    activeModel,
   });
   const drift = useChatDrift({
     activeSession,
@@ -113,6 +117,10 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     actionState,
     workingFrames,
   } = useApprovalFlow(nextLocalId);
+  useEffect(() => {
+    setActiveReasoningEffort(activeSession?.reasoningEffort);
+  }, [activeSession?.id, activeSession?.reasoningEffort]);
+
   useEffect(() => {
     if (!activeSession) {
       previousActiveModelRef.current = activeModel;
@@ -217,6 +225,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const {
     compacting,
     contextStatus,
+    reasoningStatus,
     authStatus,
     sessionFooter,
     renderedStatus,
@@ -225,6 +234,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     activeTurn,
   } = useChatStatusSummary({
     activeModel,
+    activeReasoningEffort,
     activeSessionId,
     activeSession,
     runtimeHostWarningSource: runtime.runtimeHost,
@@ -275,6 +285,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
         showSlashHints: shouldShowSlashHints(draft),
         showCommandHint: shouldShowCommandHint(draft),
         modelPicker: pickers.model,
+        reasoningPicker: pickers.reasoning,
         sessionPicker: pickers.session,
         fileMentionPicker: pickers.fileMention,
       }),
@@ -303,6 +314,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     draft,
     draftCursor,
     pickers.model,
+    pickers.reasoning,
     pickers.session,
     pickers.fileMention,
     renderedStatus,
@@ -350,6 +362,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const { executeTurn, executeDirectShellCommand } = useAgentRun({
     runtime,
     activeModel,
+    activeReasoningEffort,
     sessionTitleModel,
     activeSessionId,
     sessions,
@@ -365,7 +378,14 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const { pendingSubmittedPrompt, clearPendingSubmittedPrompt, submitPrompt } = usePromptSubmission({
     runtime,
     activeModel,
+    activeReasoningEffort,
     setActiveModel: applyActiveModel,
+    setActiveReasoningEffort: (effort) => {
+      setActiveReasoningEffort(effort);
+      if (activeSession) {
+        updateSessionById(activeSession.id, (session) => ({ ...session, reasoningEffort: effort }));
+      }
+    },
     sessions,
     recentSessions,
     activeSessionId,
@@ -390,6 +410,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     executeDirectShellCommand,
     mentionableFiles,
     modelPicker: pickers.model,
+    reasoningPicker: pickers.reasoning,
     sessionPicker: pickers.session,
     fileMentionPicker: pickers.fileMention,
     resetPickerIndexes: pickers.resetPickerIndexes,
@@ -459,6 +480,14 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
                   highlightedIndex={pickers.model.highlightedIndex}
                 />
               : null}
+              {pickers.reasoning.visible ?
+                <ReasoningEffortPickerPanel
+                  query={pickers.reasoning.query ?? ''}
+                  options={pickers.reasoning.items}
+                  activeReasoningEffort={activeReasoningEffort}
+                  highlightedIndex={pickers.reasoning.highlightedIndex}
+                />
+              : null}
               {pickers.session.visible ?
                 <SessionPickerPanel
                   query={pickers.session.query ?? ''}
@@ -518,7 +547,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
           </Box>}
       </Box>
       <Box width={promptPanelWidth} overflow="hidden">
-        <Text dimColor wrap="truncate-end">{`model=${activeModel} • ${authStatus} • ${contextStatus} • drift=${drift.footer} • ${sessionFooter}`}</Text>
+        <Text dimColor wrap="truncate-end">{`model=${activeModel} • reasoning=${reasoningStatus} • ${authStatus} • ${contextStatus} • drift=${drift.footer} • ${sessionFooter}`}</Text>
       </Box>
     </Box>
   );
