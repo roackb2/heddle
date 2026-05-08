@@ -37,7 +37,7 @@ export function ConversationPanel({
             ))}
             {activeTurn.currentAssistantText ?
               <Box marginTop={1}>
-                <StreamingText text={activeTurn.currentAssistantText} />
+                <StreamingAssistantBody text={activeTurn.currentAssistantText} />
               </Box>
             : null}
             {activeTurn.currentPlan ? <ActivePlanPanel plan={activeTurn.currentPlan} /> : null}
@@ -107,19 +107,25 @@ function MessageBody({
   );
 }
 
-function StreamingText({ text }: { text: string }) {
-  const lines = text.split(/\r?\n/);
-  const isThinkingText = text.startsWith('Thinking:') || text === 'Thinking...';
+function StreamingAssistantBody({ text }: { text: string }) {
+  if (isThinkingText(text)) {
+    const lines = text.split(/\r?\n/);
+    return (
+      <Box flexDirection="column">
+        {lines.map((line, index) => (
+          <Text key={`${index}-${line}`} dimColor>
+            {line || ' '}
+          </Text>
+        ))}
+      </Box>
+    );
+  }
 
-  return (
-    <Box flexDirection="column">
-      {lines.map((line, index) => (
-        <Text key={`${index}-${line}`} color={isThinkingText ? undefined : 'white'} dimColor={isThinkingText}>
-          {line || ' '}
-        </Text>
-      ))}
-    </Box>
-  );
+  return <MessageBody role="assistant" text={text} />;
+}
+
+export function isThinkingText(text: string): boolean {
+  return text.startsWith('Thinking:') || text === 'Thinking...';
 }
 
 type MessageBlock =
