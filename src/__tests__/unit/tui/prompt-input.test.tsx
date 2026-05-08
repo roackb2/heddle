@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { insertMentionSelection } from '../../../cli/chat/utils/file-mentions.js';
 import { parseInlineSegments, parseMessageBlocks } from '../../../cli/chat/components/ConversationPanel.js';
-import { buildPromptRenderLines, insertPromptText } from '../../../cli/chat/components/PromptInput.js';
+import { buildPromptRenderLines, insertPromptText, resolvePromptInputRenderWidth } from '../../../cli/chat/components/PromptInput.js';
 
 describe('prompt input related helpers', () => {
   it('places the inserted mention at the end of the current trailing mention token', () => {
@@ -67,6 +67,24 @@ describe('prompt input related helpers', () => {
       },
       {
         before: 'def',
+        cursor: ' ',
+        after: '',
+        hasCursor: true,
+      },
+    ]);
+  });
+
+  it('prefers explicit parent width over stdout width for prompt wrapping', () => {
+    expect(resolvePromptInputRenderWidth(12, 120)).toBe(12);
+    expect(buildPromptRenderLines('abcdefghijklmnop', 16, 8, resolvePromptInputRenderWidth(12, 120))).toEqual([
+      {
+        before: 'abcdefghij',
+        cursor: '',
+        after: '',
+        hasCursor: false,
+      },
+      {
+        before: 'klmnop',
         cursor: ' ',
         after: '',
         hasCursor: true,

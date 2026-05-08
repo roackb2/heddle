@@ -29,6 +29,7 @@ export function PromptInput({
   value,
   isDisabled,
   placeholder,
+  width,
   maxVisibleLines = DEFAULT_MAX_VISIBLE_INPUT_LINES,
   cursor,
   onChange,
@@ -39,6 +40,7 @@ export function PromptInput({
   value: string;
   isDisabled: boolean;
   placeholder: string;
+  width?: number;
   maxVisibleLines?: number;
   cursor: number;
   onChange: (value: string) => void;
@@ -49,7 +51,7 @@ export function PromptInput({
   const valueRef = useRef(value);
   const cursorRef = useRef(cursor);
   const { stdout } = useStdout();
-  const columns = stdout.columns ?? FALLBACK_WRAP_WIDTH;
+  const renderWidth = resolvePromptInputRenderWidth(width, stdout.columns);
 
   useEffect(() => {
     valueRef.current = value;
@@ -97,8 +99,8 @@ export function PromptInput({
   }, { isActive: !isDisabled });
 
   const lines = useMemo(
-    () => buildPromptRenderLines(value, cursor, maxVisibleLines, Math.max(PROMPT_INPUT_PREFIX_WIDTH + 1, columns)),
-    [value, cursor, maxVisibleLines, columns],
+    () => buildPromptRenderLines(value, cursor, maxVisibleLines, renderWidth),
+    [value, cursor, maxVisibleLines, renderWidth],
   );
 
   if (!value) {
@@ -128,6 +130,11 @@ export function PromptInput({
       ))}
     </Box>
   );
+}
+
+export function resolvePromptInputRenderWidth(width?: number, stdoutColumns?: number): number {
+  const candidate = width ?? stdoutColumns ?? FALLBACK_WRAP_WIDTH;
+  return Math.max(PROMPT_INPUT_PREFIX_WIDTH + 1, Math.floor(candidate));
 }
 
 export type PromptDraftState = {

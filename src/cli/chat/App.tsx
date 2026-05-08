@@ -374,6 +374,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
 
   const promptPanelWidth = Math.max(20, columns - 2);
   const promptBodyWidth = Math.max(1, promptPanelWidth - 2);
+  const promptInputWidth = Math.max(1, promptBodyWidth - 2);
 
   const { pendingSubmittedPrompt, clearPendingSubmittedPrompt, submitPrompt } = usePromptSubmission({
     runtime,
@@ -512,6 +513,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
                 <PromptInput
                   value={draft}
                   cursor={draftCursor}
+                  width={promptInputWidth}
                   isDisabled={false}
                   placeholder={isRunning ? "Keep typing while Heddle works" : "Ask Heddle about this project"}
                   maxVisibleLines={10}
