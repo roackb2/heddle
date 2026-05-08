@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
+import { canNavigatePromptHistory, usePromptHistoryNavigation } from '../hooks/usePromptHistory.js';
+import { usePromptUndoRedo, type PromptDraftState } from '../hooks/usePromptUndoRedo.js';
 
 const DEFAULT_MAX_VISIBLE_INPUT_LINES = 8;
 const FALLBACK_WRAP_WIDTH = 80;
@@ -52,31 +54,30 @@ export function PromptInput({
 }) {
   const valueRef = useRef(value);
   const cursorRef = useRef(cursor);
-  const undoStackRef = useRef<PromptDraftState[]>([]);
-  const redoStackRef = useRef<PromptDraftState[]>([]);
-  const promptHistoryRef = useRef(promptHistory);
-  const promptHistoryIndexRef = useRef<number | undefined>(undefined);
-  const savedDraftBeforeHistoryRef = useRef<PromptDraftState | undefined>(undefined);
+  const {
+    resetUndoRedo,
+    recordUndoState,
+    undoPromptEdit,
+    redoPromptEdit,
+  } = usePromptUndoRedo();
+  const {
+    resetPromptHistoryNavigation,
+    navigatePromptHistory,
+  } = usePromptHistoryNavigation(promptHistory);
   const { stdout } = useStdout();
   const renderWidth = resolvePromptInputRenderWidth(width, stdout.columns);
 
   useEffect(() => {
     if (valueRef.current !== value) {
-      undoStackRef.current = [];
-      redoStackRef.current = [];
-      promptHistoryIndexRef.current = undefined;
-      savedDraftBeforeHistoryRef.current = undefined;
+      resetUndoRedo();
+      resetPromptHistoryNavigation();
     }
     valueRef.current = value;
-  }, [value]);
+  }, [resetPromptHistoryNavigation, resetUndoRedo, value]);
 
   useEffect(() => {
     cursorRef.current = cursor;
   }, [cursor]);
-
-  useEffect(() => {
-    promptHistoryRef.current = promptHistory;
-  }, [promptHistory]);
 
   const applyDraft = (nextValue: string, nextCursor: number, options: { recordUndo?: boolean } = {}) => {
     const current = {
@@ -84,11 +85,9 @@ export function PromptInput({
       cursor: Math.min(cursorRef.current, valueRef.current.length),
     };
     const next = { value: nextValue, cursor: nextCursor };
-    if (options.recordUndo !== false && !isSamePromptDraftState(current, next)) {
-      undoStackRef.current = [...undoStackRef.current, current].slice(-100);
-      redoStackRef.current = [];
-      promptHistoryIndexRef.current = undefined;
-      savedDraftBeforeHistoryRef.current = undefined;
+    if (options.recordUndo !== false) {
+      recordUndoState(current, next);
+      resetPromptHistoryNavigation();
     }
 
     valueRef.current = nextValue;
@@ -116,38 +115,26 @@ export function PromptInput({
       },
       onSubmit,
       undo: () => {
-        const previous = resolvePromptUndo(undoStackRef.current, redoStackRef.current, state);
+        const previous = undoPromptEdit(state);
         if (!previous) {
           return;
         }
-        undoStackRef.current = previous.undoStack;
-        redoStackRef.current = previous.redoStack;
-        applyState(previous.state, { recordUndo: false });
+        applyState(previous, { recordUndo: false });
       },
       redo: () => {
-        const next = resolvePromptRedo(undoStackRef.current, redoStackRef.current, state);
+        const next = redoPromptEdit(state);
         if (!next) {
           return;
         }
-        undoStackRef.current = next.undoStack;
-        redoStackRef.current = next.redoStack;
-        applyState(next.state, { recordUndo: false });
+        applyState(next, { recordUndo: false });
       },
       navigateHistory: (direction) => {
-        const next = resolvePromptHistoryNavigation({
-          direction,
-          history: promptHistoryRef.current,
-          current: state,
-          historyIndex: promptHistoryIndexRef.current,
-          savedDraftBeforeHistory: savedDraftBeforeHistoryRef.current,
-        });
+        const next = navigatePromptHistory(direction, state);
         if (!next) {
           return;
         }
 
-        promptHistoryIndexRef.current = next.historyIndex;
-        savedDraftBeforeHistoryRef.current = next.savedDraftBeforeHistory;
-        applyState(next.state, { recordUndo: false });
+        applyState(next, { recordUndo: false });
       },
     };
 
@@ -201,11 +188,6 @@ export function resolvePromptInputRenderWidth(width?: number, stdoutColumns?: nu
   const candidate = width ?? stdoutColumns ?? FALLBACK_WRAP_WIDTH;
   return Math.max(PROMPT_INPUT_PREFIX_WIDTH + 1, Math.floor(candidate));
 }
-
-export type PromptDraftState = {
-  value: string;
-  cursor: number;
-};
 
 type PromptInputCommand =
   | { kind: 'submit' }
@@ -352,103 +334,6 @@ function handlePromptInputCommand(
     case 'move':
       actions.moveCursor(resolvePromptCursorMove(state, command.direction));
   }
-}
-
-function isSamePromptDraftState(left: PromptDraftState, right: PromptDraftState): boolean {
-  return left.value === right.value && left.cursor === right.cursor;
-}
-
-export function resolvePromptUndo(
-  undoStack: PromptDraftState[],
-  redoStack: PromptDraftState[],
-  current: PromptDraftState,
-): { state: PromptDraftState; undoStack: PromptDraftState[]; redoStack: PromptDraftState[] } | undefined {
-  const previous = undoStack[undoStack.length - 1];
-  if (!previous) {
-    return undefined;
-  }
-
-  return {
-    state: previous,
-    undoStack: undoStack.slice(0, -1),
-    redoStack: [...redoStack, current],
-  };
-}
-
-export function resolvePromptRedo(
-  undoStack: PromptDraftState[],
-  redoStack: PromptDraftState[],
-  current: PromptDraftState,
-): { state: PromptDraftState; undoStack: PromptDraftState[]; redoStack: PromptDraftState[] } | undefined {
-  const next = redoStack[redoStack.length - 1];
-  if (!next) {
-    return undefined;
-  }
-
-  return {
-    state: next,
-    undoStack: [...undoStack, current],
-    redoStack: redoStack.slice(0, -1),
-  };
-}
-
-export function canNavigatePromptHistory(direction: 'previous' | 'next', state: PromptDraftState): boolean {
-  if (!state.value.includes('\n')) {
-    return true;
-  }
-
-  if (direction === 'previous') {
-    const firstLineEnd = state.value.indexOf('\n');
-    return state.cursor <= firstLineEnd;
-  }
-
-  const lastLineStart = state.value.lastIndexOf('\n') + 1;
-  return state.cursor >= lastLineStart;
-}
-
-export function resolvePromptHistoryNavigation(args: {
-  direction: 'previous' | 'next';
-  history: string[];
-  current: PromptDraftState;
-  historyIndex?: number;
-  savedDraftBeforeHistory?: PromptDraftState;
-}): { state: PromptDraftState; historyIndex?: number; savedDraftBeforeHistory?: PromptDraftState } | undefined {
-  if (args.history.length === 0) {
-    return undefined;
-  }
-
-  if (args.direction === 'previous') {
-    const historyIndex =
-      args.historyIndex === undefined ?
-        args.history.length - 1
-      : Math.max(0, args.historyIndex - 1);
-    const value = args.history[historyIndex] ?? '';
-    return {
-      state: { value, cursor: value.length },
-      historyIndex,
-      savedDraftBeforeHistory: args.savedDraftBeforeHistory ?? args.current,
-    };
-  }
-
-  if (args.historyIndex === undefined) {
-    return undefined;
-  }
-
-  if (args.historyIndex < args.history.length - 1) {
-    const historyIndex = args.historyIndex + 1;
-    const value = args.history[historyIndex] ?? '';
-    return {
-      state: { value, cursor: value.length },
-      historyIndex,
-      savedDraftBeforeHistory: args.savedDraftBeforeHistory,
-    };
-  }
-
-  return {
-    state: args.savedDraftBeforeHistory ?? { value: '', cursor: 0 },
-    historyIndex: undefined,
-    savedDraftBeforeHistory: undefined,
-  };
 }
 
 function resolvePromptCursorMove(state: PromptDraftState, direction: Extract<PromptInputCommand, { kind: 'move' }>['direction']): number {

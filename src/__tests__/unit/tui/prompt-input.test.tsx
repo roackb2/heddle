@@ -3,13 +3,17 @@ import { insertMentionSelection } from '../../../cli/chat/utils/file-mentions.js
 import { parseInlineSegments, parseMessageBlocks } from '../../../cli/chat/components/ConversationPanel.js';
 import {
   buildPromptRenderLines,
-  canNavigatePromptHistory,
   insertPromptText,
-  resolvePromptHistoryNavigation,
   resolvePromptInputRenderWidth,
+} from '../../../cli/chat/components/PromptInput.js';
+import {
+  canNavigatePromptHistory,
+  resolvePromptHistoryNavigation,
+} from '../../../cli/chat/hooks/usePromptHistory.js';
+import {
   resolvePromptRedo,
   resolvePromptUndo,
-} from '../../../cli/chat/components/PromptInput.js';
+} from '../../../cli/chat/hooks/usePromptUndoRedo.js';
 
 describe('prompt input related helpers', () => {
   it('places the inserted mention at the end of the current trailing mention token', () => {

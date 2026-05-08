@@ -27,6 +27,7 @@ import { useChatSessions } from './hooks/useChatSessions.js';
 import { useChatStatusSummary } from './hooks/useChatStatusSummary.js';
 import { useLocalIds } from './hooks/useLocalIds.js';
 import { usePromptDraft } from './hooks/usePromptDraft.js';
+import { usePromptHistory } from './hooks/usePromptHistory.js';
 import { usePromptSubmission } from './hooks/usePromptSubmission.js';
 import { autocompleteLocalCommand } from './state/local-commands.js';
 import { listMentionableFiles } from './utils/file-mentions.js';
@@ -51,11 +52,10 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     setDraft,
     draftCursor,
     setDraftCursor,
-    promptHistory,
     clearDraft,
     replaceDraft,
-    recordPromptHistory,
   } = usePromptDraft();
+  const { promptHistory, recordPromptHistory } = usePromptHistory();
   const [activeReasoningEffort, setActiveReasoningEffort] = useState<ReasoningEffort | undefined>(undefined);
   const mentionableFiles = useState(() => listMentionableFiles(runtime.workspaceRoot, runtime.searchIgnoreDirs))[0];
 
