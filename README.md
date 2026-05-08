@@ -2,6 +2,8 @@
 
 Heddle is an open-source AI coding agent runtime and terminal-first workspace for real project work.
 
+Official website: [heddleagent.com](https://heddleagent.com/)
+
 It is designed for workflows where an agent needs to inspect a live repository, make bounded changes, verify results, keep continuity across sessions, and stay observable to the operator. Heddle supports OpenAI and Anthropic models, stores local workspace state under `.heddle/`, includes both a terminal chat experience and a browser control plane, learns durable workspace knowledge while it works, and gives users a review path for file diffs, commands, approvals, and traces.
 
 In plain terms: Heddle is for people who want an AI coding assistant that can work inside actual projects, learn each project's operating knowledge over time, switch between local workspaces, and remain inspectable instead of acting like a black box.
