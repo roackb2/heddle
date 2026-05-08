@@ -9,13 +9,15 @@ import {
 } from '../tools/toolkits/shell-process/run-shell.js';
 
 type ApprovalMode = 'exact' | 'prefix' | 'tool';
+type RememberedTool = 'run_shell_mutate' | 'edit_file' | 'list_files' | 'read_file' | 'search_files';
+type ApprovalCapability = RunShellCapability | 'file_edit' | 'file_inspection';
 
 export type ProjectApprovalRule = {
-  tool: 'run_shell_mutate' | 'edit_file';
+  tool: RememberedTool;
   mode: ApprovalMode;
   command: string;
   scope: RunShellScope | 'workspace';
-  capability: RunShellCapability | 'file_edit';
+  capability: ApprovalCapability;
   createdAt: string;
 };
 
@@ -93,6 +95,11 @@ export function createProjectApprovalRuleForCall(call: ToolCall): ProjectApprova
     };
   }
 
+  if (isInspectionApprovalTool(call.tool)) {
+    const target = extractApprovalTarget(call.tool, call.input);
+    return target ? createInspectionApprovalRule(call.tool, target) : undefined;
+  }
+
   if (call.tool !== 'run_shell_mutate') {
     return undefined;
   }
@@ -104,6 +111,10 @@ export function createProjectApprovalRuleForCall(call: ToolCall): ProjectApprova
 export function describeProjectApprovalRule(rule: ProjectApprovalRule): string {
   if (rule.tool === 'edit_file') {
     return 'allow edit_file for this project';
+  }
+
+  if (isInspectionApprovalTool(rule.tool)) {
+    return `allow ${rule.tool} on ${rule.command} for this project`;
   }
 
   if (rule.mode === 'prefix') {
@@ -127,7 +138,7 @@ export function extractApprovalTarget(tool: string, input: unknown): string | un
     return typeof command === 'string' && command.trim() ? normalizeApprovedCommand(command) : undefined;
   }
 
-  if (tool === 'edit_file') {
+  if (tool === 'edit_file' || isInspectionApprovalTool(tool)) {
     if (typeof input === 'string') {
       return normalizeApprovalPath(input);
     }
@@ -137,10 +148,29 @@ export function extractApprovalTarget(tool: string, input: unknown): string | un
     }
 
     const path = (input as { path?: unknown }).path;
-    return typeof path === 'string' && path.trim() ? normalizeApprovalPath(path) : undefined;
+    if (typeof path === 'string' && path.trim()) {
+      return normalizeApprovalPath(path);
+    }
+
+    return tool === 'search_files' ? '.' : undefined;
   }
 
   return undefined;
+}
+
+function isInspectionApprovalTool(tool: string): tool is 'list_files' | 'read_file' | 'search_files' {
+  return tool === 'list_files' || tool === 'read_file' || tool === 'search_files';
+}
+
+function createInspectionApprovalRule(tool: 'list_files' | 'read_file' | 'search_files', path: string): ProjectApprovalRule {
+  return {
+    tool,
+    mode: 'exact',
+    command: normalizeApprovalPath(path),
+    scope: 'workspace',
+    capability: 'file_inspection',
+    createdAt: new Date().toISOString(),
+  };
 }
 
 function createShellApprovalRule(command: string): ProjectApprovalRule {
@@ -314,6 +344,19 @@ function parseProjectApprovalRule(value: unknown): ProjectApprovalRule[] {
         command: '*',
         scope: 'workspace',
         capability: 'file_edit',
+        createdAt: candidate.createdAt,
+      }];
+    }
+  }
+
+  if (typeof candidate.tool === 'string' && isInspectionApprovalTool(candidate.tool) && typeof candidate.createdAt === 'string') {
+    if (candidate.mode === 'exact' && typeof candidate.command === 'string') {
+      return [{
+        tool: candidate.tool,
+        mode: 'exact',
+        command: normalizeApprovalPath(candidate.command),
+        scope: 'workspace',
+        capability: 'file_inspection',
         createdAt: candidate.createdAt,
       }];
     }

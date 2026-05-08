@@ -91,6 +91,37 @@ describe('project approval rules', () => {
     expect(findMatchingApprovalRule([rule!], 'edit_file', { path: 'src/another.ts', content: 'x', createIfMissing: true })).toBeDefined();
   });
 
+  it('creates path-scoped inspection approval rules from outside-workspace tool calls', () => {
+    const rule = createProjectApprovalRuleForCall({
+      id: 'tool-1',
+      tool: 'list_files',
+      input: { path: '../heddle-workspace-notes/task-plans/enhancements/' },
+    });
+
+    expect(rule).toMatchObject({
+      tool: 'list_files',
+      mode: 'exact',
+      command: '../heddle-workspace-notes/task-plans/enhancements',
+      scope: 'workspace',
+      capability: 'file_inspection',
+    });
+    expect(
+      findMatchingApprovalRule([rule!], 'list_files', {
+        path: '../heddle-workspace-notes/task-plans/enhancements',
+      }),
+    ).toBeDefined();
+    expect(
+      findMatchingApprovalRule([rule!], 'list_files', {
+        path: '../heddle-workspace-notes/task-plans',
+      }),
+    ).toBeUndefined();
+    expect(
+      findMatchingApprovalRule([rule!], 'read_file', {
+        path: '../heddle-workspace-notes/task-plans/enhancements',
+      }),
+    ).toBeUndefined();
+  });
+
   it('loads legacy mutate approval rules from disk without dropping them', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-approval-rules-legacy-'));
     const filePath = join(root, 'command-approvals.json');
@@ -153,12 +184,22 @@ describe('project approval rules', () => {
       createdAt: new Date().toISOString(),
     };
 
+    const inspectionRule: ProjectApprovalRule = {
+      tool: 'list_files',
+      mode: 'exact',
+      command: '../heddle-workspace-notes/task-plans/enhancements',
+      scope: 'workspace',
+      capability: 'file_inspection',
+      createdAt: new Date().toISOString(),
+    };
+
     expect(describeProjectApprovalRule(editRule)).toContain('allow edit_file');
+    expect(describeProjectApprovalRule(inspectionRule)).toContain('allow list_files');
     expect(describeProjectApprovalRule(prefixRule)).toContain('command family');
     expect(describeProjectApprovalRule(exactRule)).toContain('exact command');
   });
 
-  it('normalizes run shell and edit file approvals', () => {
+  it('normalizes run shell and file path approvals', () => {
     expect(extractApprovalTarget('run_shell_mutate', '  yarn   test  ')).toBe('yarn test');
     expect(extractApprovalTarget('run_shell_mutate', { command: ' yarn test src/ ' })).toBe('yarn test src/');
     expect(extractApprovalTarget('run_shell_mutate', { command: '' })).toBeUndefined();
@@ -169,6 +210,9 @@ describe('project approval rules', () => {
     expect(extractApprovalTarget('edit_file', './src/')).toBe('./src');
     expect(extractApprovalTarget('edit_file', { path: './foo/bar/' })).toBe('./foo/bar');
     expect(extractApprovalTarget('edit_file', { path: '' })).toBeUndefined();
+    expect(extractApprovalTarget('list_files', { path: '../notes/' })).toBe('../notes');
+    expect(extractApprovalTarget('read_file', { path: '../notes/context.md' })).toBe('../notes/context.md');
+    expect(extractApprovalTarget('search_files', {})).toBe('.');
   });
 
   it('falls back to unknown workspace rules when the shell command is blocked', () => {
@@ -191,5 +235,25 @@ describe('project approval rules', () => {
     const loaded = loadProjectApprovalRules(filePath);
     expect(loaded).toHaveLength(1);
     expect(loaded[0].command).toBe(rule.command);
+  });
+
+  it('saves and reloads inspection approval rules', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-approval-rules-inspection-'));
+    const filePath = join(root, 'command-approvals.json');
+    const rule = createProjectApprovalRuleForCall({
+      id: 'tool-1',
+      tool: 'list_files',
+      input: { path: '../heddle-workspace-notes/task-plans/enhancements' },
+    });
+
+    saveProjectApprovalRules(filePath, [rule!]);
+
+    const loaded = loadProjectApprovalRules(filePath);
+    expect(loaded).toEqual([rule]);
+    expect(
+      findMatchingApprovalRule(loaded, 'list_files', {
+        path: '../heddle-workspace-notes/task-plans/enhancements/',
+      }),
+    ).toBeDefined();
   });
 });
