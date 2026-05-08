@@ -90,6 +90,23 @@ Start the foreground heartbeat scheduler:
 heddle heartbeat start --every 30m
 ```
 
+## Interactive Chat Commands
+
+Inside `heddle` / `heddle chat`, the most-used local commands are:
+
+- `/model`: show the active model
+- `/model set <query>`: filter and choose a model interactively
+- `/reasoning`: show configured and effective reasoning effort
+- `/reasoning set <query>`: filter and choose reasoning effort interactively
+- `/reasoning <low|medium|high>`: set reasoning effort directly for the current session
+- `/reasoning default`: clear explicit reasoning effort for the current session
+- `/session list`: show recent saved sessions
+- `/session choose <query>`: filter and choose a saved session
+- `/continue`: continue the current session
+- `/compact`: compact older session history
+
+Prompt editing supports `Shift+Enter` for newlines, `Ctrl+Z`/`Ctrl+Y` for undo/redo, and `Up`/`Down` for submitted prompt history when the cursor is on the first or last logical line.
+
 ## Development Commands In This Repository
 
 Inside this repository, common development commands include:

@@ -51,7 +51,7 @@ Heddle working in the terminal with live progress, tool activity, plans, and rev
 
 ![Heddle terminal coding workflow](docs/images/terminal-active-run.png)
 
-Heddle can inspect files, explain code, make edits, run shell commands with the right approval model, and carry a task through multiple turns.
+Heddle can inspect files, explain code, make edits, run shell commands with the right approval model, and carry a task through multiple turns. Recent terminal chat updates make long-running turns easier to follow: tool activity appears while work is happening, streamed internal thinking is shown as dim `Thinking:` progress text, and assistant markdown is rendered in real time instead of waiting for the final response.
 
 ### Terminal change review
 
@@ -194,6 +194,8 @@ From there, Heddle can inspect files, explain code, make edits, run shell comman
 
 This is the core feature. If you only use Heddle as a coding agent in the terminal, this is the part you care about.
 
+The terminal composer supports multiline prompts, prompt undo/redo, prompt history navigation, model picking with `/model set`, and reasoning-effort picking with `/reasoning set`. During a run, Heddle streams visible activity so you can see whether it is thinking, calling tools, updating a plan, or waiting for approval.
+
 More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
 
 ### Sessions and continuity
@@ -208,6 +210,8 @@ Typical session commands include:
 - `/session switch <id>`
 - `/continue`
 - `/compact`
+- `/model set`
+- `/reasoning set`
 
 More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
 
@@ -248,6 +252,8 @@ If terminal chat is the execution surface, the control plane is the oversight su
 The `Workspaces` section lets you register local projects, switch the control plane between them, rename workspace entries, and pick a project folder from the browser UI. Heddle also keeps a user-level workspace registry so projects you have opened from the CLI or daemon can be rediscovered later.
 
 The `Sessions` section supports a coding-review flow built around current work first. Review starts from the live Git working tree for the active workspace, with changed files, structured read-only diffs, and a larger full-diff viewer when the side panel is too tight. Historical turn diffs, review commands, verification commands, approvals, and trace events are still available, but they are separated from current review so old evidence does not distract from the task at hand.
+
+Session chat in the control plane renders assistant markdown, preserves streamed thinking summaries as internal progress text, and keeps model/reasoning controls aligned with the terminal workflow.
 
 This is useful if you want a more inspectable and operator-friendly workflow than a plain CLI transcript. The layout adapts for phone use as well, with mobile-native navigation for Overview, Sessions, Tasks, and Workspaces, plus a focused Chat/Review session workflow.
 

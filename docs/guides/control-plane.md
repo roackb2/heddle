@@ -19,8 +19,8 @@ The current browser UI surfaces:
 - workspace management with registered workspaces, recent known workspaces, folder picking, switching, and renaming
 - saved chat sessions with sidebar navigation, resizable desktop panels, conversation view, and review-oriented detail inspection
 - browser-side session actions for new session, send, continue, cancel, and pending approval resolution
-- live per-session updates over SSE for run status, tool progress, assistant streaming text, and saved-session changes
-- a model selector backed by the server-side built-in model catalog, plus a drift toggle and latest trace-derived drift level
+- live per-session updates over SSE for run status, tool progress, assistant streaming text, thinking summaries, and saved-session changes
+- a model selector and reasoning-effort control backed by the server-side built-in model catalog and session state, plus a drift toggle and latest trace-derived drift level
 - an auth status indicator in the session composer footer so you can see whether the selected model is using OAuth or API-key mode without spending header space
 - debounced `@file` mention suggestions in the composer, backed by a capped workspace file search endpoint
 - compact tool-result cards for saved tool outputs such as `list_files: {...}`
@@ -59,6 +59,8 @@ It has three review modes:
 Current review uses Git as the source of truth for changed files. It reads workspace status and selected file patches, filters out `.heddle/` runtime state, renders structured hunks when available, and falls back to raw patch text for unsupported patches. The side panel stays focused on the selected file, and `Open full diff` expands the same diff into a larger review surface when the side panel is too constrained.
 
 Turn history remains trace-backed. It is useful for answering what the agent did at that moment, what commands it ran, and what it believed it verified. If the current workspace patch no longer matches the captured turn patch, Heddle marks that stale relationship with a compact info indicator instead of spending review space on a warning card.
+
+Conversation messages render GitHub-flavored markdown for headings, lists, task lists, code fences, links, and inline formatting. Thinking summaries stay visually distinct from final assistant responses, so they help explain what the agent is doing without pretending to be the user-facing answer.
 
 This is still intentionally short of a full IDE file-review engine: Heddle does not edit patches in the browser and does not rely on OS file watching as the review truth. The practical review model is: Git shows what changed now; traces explain how the selected turn got there.
 

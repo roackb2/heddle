@@ -59,6 +59,7 @@ Common use cases:
 - explain architecture, tests, or build setup
 - iterate on a fix over multiple prompts
 - inspect files, search the repo, and edit code inside one persistent session
+- watch streamed `Thinking:` progress, tool activity, and current plan updates while long turns are running
 - keep longer work usable through saved sessions, `/continue`, automatic history compaction, and manual `/compact`
 - let the agent create and update a short working plan for a multi-step implementation
 - search official docs or current external references with provider-backed `web_search`
@@ -77,6 +78,10 @@ Useful chat commands:
 - `/model list`: show the built-in shortlist
 - `/model set <query>`: open the interactive model picker
 - `/model <name>`: switch models directly
+- `/reasoning`: show configured and effective reasoning effort for the current session
+- `/reasoning set <query>`: open the interactive reasoning-effort picker
+- `/reasoning <low|medium|high>`: set reasoning effort directly
+- `/reasoning default`: clear explicit reasoning effort and use the model default
 - `/auth`: show stored provider credentials
 - `/auth status`: show stored provider credentials
 - `/auth login openai`: sign in with OpenAI account auth
@@ -119,7 +124,9 @@ Read-oriented commands stay in inspect mode when possible. Workspace-changing or
 
 Chat state is stored under `.heddle/`, including saved sessions, traces, approvals, and memory notes. The footer context indicator is an estimate of total request input against the active model's context window, not only raw chat history length.
 
-The footer also shows the active auth source for the selected model, so you can tell whether the session is using OpenAI account sign-in or API-key mode.
+The footer also shows the active model, effective reasoning effort, and auth source for the selected model, so you can tell whether the session is using OpenAI account sign-in or API-key mode.
+
+Reasoning effort is persisted with the saved session. When you switch sessions, Heddle restores that session's configured effort instead of treating it as a global terminal setting.
 
 For local development against the sibling CyberLoop repo, run chat with the middleware module path:
 
