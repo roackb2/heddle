@@ -51,8 +51,10 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     setDraft,
     draftCursor,
     setDraftCursor,
+    promptHistory,
     clearDraft,
     replaceDraft,
+    recordPromptHistory,
   } = usePromptDraft();
   const [activeReasoningEffort, setActiveReasoningEffort] = useState<ReasoningEffort | undefined>(undefined);
   const mentionableFiles = useState(() => listMentionableFiles(runtime.workspaceRoot, runtime.searchIgnoreDirs))[0];
@@ -313,6 +315,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     approvalChoice,
     draft,
     draftCursor,
+    promptHistory,
     pickers.model,
     pickers.reasoning,
     pickers.session,
@@ -514,6 +517,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
                   value={draft}
                   cursor={draftCursor}
                   width={promptInputWidth}
+                  promptHistory={promptHistory}
                   isDisabled={false}
                   placeholder={isRunning ? "Keep typing while Heddle works" : "Ask Heddle about this project"}
                   maxVisibleLines={10}
@@ -521,6 +525,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
                   onCursorChange={setDraftCursor}
                   onSpecialKey={handlePromptSpecialKey}
                   onSubmit={(value) => {
+                    recordPromptHistory(value);
                     clearDraft();
                     void submitPrompt(value);
                   }}

@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { insertMentionSelection } from '../../../cli/chat/utils/file-mentions.js';
 import { parseInlineSegments, parseMessageBlocks } from '../../../cli/chat/components/ConversationPanel.js';
-import { buildPromptRenderLines, insertPromptText, resolvePromptInputRenderWidth } from '../../../cli/chat/components/PromptInput.js';
+import {
+  buildPromptRenderLines,
+  canNavigatePromptHistory,
+  insertPromptText,
+  resolvePromptHistoryNavigation,
+  resolvePromptInputRenderWidth,
+  resolvePromptRedo,
+  resolvePromptUndo,
+} from '../../../cli/chat/components/PromptInput.js';
 
 describe('prompt input related helpers', () => {
   it('places the inserted mention at the end of the current trailing mention token', () => {
@@ -16,6 +24,79 @@ describe('prompt input related helpers', () => {
     const afterC = insertPromptText(afterB, 'c');
 
     expect(afterC).toEqual({ value: 'abc', cursor: 3 });
+  });
+
+  it('resolves undo and redo draft states', () => {
+    const undo = resolvePromptUndo(
+      [{ value: '', cursor: 0 }, { value: 'hello', cursor: 5 }],
+      [],
+      { value: 'hello!', cursor: 6 },
+    );
+
+    expect(undo).toEqual({
+      state: { value: 'hello', cursor: 5 },
+      undoStack: [{ value: '', cursor: 0 }],
+      redoStack: [{ value: 'hello!', cursor: 6 }],
+    });
+
+    expect(resolvePromptRedo(
+      undo?.undoStack ?? [],
+      undo?.redoStack ?? [],
+      undo?.state ?? { value: '', cursor: 0 },
+    )).toEqual({
+      state: { value: 'hello!', cursor: 6 },
+      undoStack: [{ value: '', cursor: 0 }, { value: 'hello', cursor: 5 }],
+      redoStack: [],
+    });
+  });
+
+  it('navigates prompt history while preserving the in-progress draft', () => {
+    const history = ['first prompt', 'second prompt'];
+    const current = { value: 'draft in progress', cursor: 5 };
+    const previous = resolvePromptHistoryNavigation({
+      direction: 'previous',
+      history,
+      current,
+    });
+
+    expect(previous).toEqual({
+      state: { value: 'second prompt', cursor: 'second prompt'.length },
+      historyIndex: 1,
+      savedDraftBeforeHistory: current,
+    });
+
+    expect(resolvePromptHistoryNavigation({
+      direction: 'previous',
+      history,
+      current: previous?.state ?? current,
+      historyIndex: previous?.historyIndex,
+      savedDraftBeforeHistory: previous?.savedDraftBeforeHistory,
+    })).toEqual({
+      state: { value: 'first prompt', cursor: 'first prompt'.length },
+      historyIndex: 0,
+      savedDraftBeforeHistory: current,
+    });
+
+    expect(resolvePromptHistoryNavigation({
+      direction: 'next',
+      history,
+      current: previous?.state ?? current,
+      historyIndex: previous?.historyIndex,
+      savedDraftBeforeHistory: previous?.savedDraftBeforeHistory,
+    })).toEqual({
+      state: current,
+      historyIndex: undefined,
+      savedDraftBeforeHistory: undefined,
+    });
+  });
+
+  it('only uses up/down for multiline history navigation at first or last logical line', () => {
+    const value = 'first\nsecond\nthird';
+
+    expect(canNavigatePromptHistory('previous', { value, cursor: 2 })).toBe(true);
+    expect(canNavigatePromptHistory('previous', { value, cursor: 8 })).toBe(false);
+    expect(canNavigatePromptHistory('next', { value, cursor: 8 })).toBe(false);
+    expect(canNavigatePromptHistory('next', { value, cursor: value.length })).toBe(true);
   });
 
   it('renders the cursor at the end of the line after the last typed character', () => {

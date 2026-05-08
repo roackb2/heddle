@@ -95,6 +95,16 @@ Useful chat commands:
 - `/drift off`: disable CyberLoop semantic drift detection
 - `!<command>`: run a shell command directly in chat
 
+Prompt editing shortcuts:
+
+- `Shift+Enter`: insert a newline without sending
+- `Ctrl+Z`: undo the last prompt edit
+- `Ctrl+Y`: redo a prompt edit
+- `Up` / `Down`: move through submitted prompt history when the cursor is on the first or last logical line
+- `Ctrl+A` / `Ctrl+E`: move to the start or end of the prompt
+- `Ctrl+W`: delete the previous word
+- `Ctrl+U` / `Ctrl+K`: delete before or after the cursor
+
 ## Direct Shell In Chat
 
 ```bash
