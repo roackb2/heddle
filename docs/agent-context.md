@@ -1,37 +1,45 @@
 # Shared Agent Context
 
-## Companion Repo
+This file contains public, repo-local guidance for coding agents working on Heddle.
 
-This repo has a sibling companion repo at `../heddle-workspace-notes`.
+Heddle is an open-source project. Do not assume that every contributor has access to the original maintainer's private planning notes, local memory, or companion repositories.
 
-Purpose:
+## Optional Workspace Notes
 
-- `heddle/` is the implementation repo and source of truth for code, tests, examples, and runtime behavior.
-- `heddle-workspace-notes/` is the private workspace repo for project memory, planning, analysis, and historical conversations.
+Some developers may keep a private companion notes repo next to this checkout, commonly named something like:
 
-## Reading Order
+```text
+heddle/                  # the public implementation repo
+heddle-workspace-notes/  # optional private notes, plans, and agent memory
+```
 
-When additional project context is needed, read in this order:
+If such a repo exists in the developer's workspace, agents may use it for extra context. If it is absent, continue using only this repo's docs and live code. The companion notes repo is an optional productivity pattern, not a requirement for contributing to Heddle.
 
-1. `../heddle-workspace-notes/agent-memory/README.md`
-2. `../heddle-workspace-notes/agent-memory/current-state/project-summary.md`
-3. This repo's live docs and code for the relevant capability area
-4. the relevant focused file under `../heddle-workspace-notes/agent-memory/current-state/`
-5. `../heddle-workspace-notes/agent-memory/workflows/feature-prd-to-technical-plan.md`
-   when the user asks for a broad feature, substantial refactor, PRD,
-   architecture direction, roadmap, technical plan, milestone plan, or
-   implementation/review workflow
-6. `../heddle-workspace-notes/agent-memory/project-context.md` only when broader long-form context is needed
-7. `../heddle-workspace-notes/analysis/` and `../heddle-workspace-notes/task-plans/` as supporting historical context only
+Recommended, non-binding folder shape for developers who want one:
 
-For first-run situation awareness, do not stop after reading high-level memory summaries. Before answering capability-depth questions such as "what is this project?", "how does Heddle work?", or "what can it really do?", inspect the implementation path named by `agent-memory/README.md` and `current-state/project-summary.md`. The sibling notes explain intent and current state; the live code is the source of truth for actual capability depth.
+```text
+agent-memory/
+  README.md
+  current-state/
+  workflows/
+  history/
+task-plans/
+  features/
+  enhancements/
+  refactoring/
+  integrations/
+  research/
+  done/
+analysis/
+conversations/
+tool-understanding/
+local/
+  agent-memory-private/
+```
 
-## Authority Rules
+Developers are free to structure their private notes differently. The goal is to improve multi-session coding-agent performance by giving agents durable, developer-owned context without putting personal workflow details into the public Heddle repo.
 
-- Treat `../heddle-workspace-notes/agent-memory/README.md` plus `current-state/` as the preferred discovery path for cross-session context.
-- Treat `../heddle-workspace-notes/agent-memory/project-context.md` as the broader long-form working summary.
-- Treat the live `heddle/` codebase as the implementation truth.
-- Treat `../heddle-workspace-notes/analysis/`, `../heddle-workspace-notes/task-plans/`, and `../heddle-workspace-notes/conversations/` as potentially stale historical context unless confirmed against the live repo.
+When a companion notes repo is present, treat the live Heddle codebase as the implementation source of truth. Notes are useful for routing, planning, and history, but they can drift from the code.
 
 ## Working Conventions
 
@@ -40,7 +48,7 @@ For first-run situation awareness, do not stop after reading high-level memory s
 - Use `yarn test` as the canonical test command.
 - Prefer scoped refactoring alongside feature work. Each feature should leave the touched code cleaner, easier to maintain, more structured, and named more clearly than before.
 - Do not ship features by trading implementation speed for code quality regression. Avoid accumulating tech debt in touched areas when a scoped cleanup is practical.
-- If a feature reveals that broader refactoring is needed, call it out explicitly before expanding scope. The user will often ask for a separate refactoring plan that can be revisited later.
+- If a feature reveals that broader refactoring is needed, call it out explicitly before expanding scope.
 - Coding agents should treat code quality as part of the deliverable, not optional polish. A completed feature should improve product behavior and maintainability together.
 - For web/mobile UI work, default to shadcn UI primitives and Tailwind utility composition for standard interaction behavior and design language.
 - When touching an existing UI surface, prefer migrating the touched area toward shadcn primitives instead of extending custom one-off controls unless there is a concrete product reason not to.
@@ -51,19 +59,13 @@ For first-run situation awareness, do not stop after reading high-level memory s
 - Write release notes from the real git range since the previous release tag, not from commit-prefix inference alone.
 - Keep changes aligned with the project's minimal-runtime, trace-first philosophy.
 
-## Agent Memory Usage
+## Public Source Of Truth
 
-- `../heddle-workspace-notes/agent-memory/` is writable project memory for CLI agents across sessions.
-- Treat `../heddle-workspace-notes/agent-memory/` as cross-tool session memory shared across coding agents such as Cascade/Windsurf, Codex, Claude Code, or similar tools.
-- Agents may add or update useful persistent context there when doing so will reduce repeated rediscovery in future sessions.
-- Prefer `docs/agent-context.md` for stable shared workflow instructions inside this repo.
-- Prefer `../heddle-workspace-notes/agent-memory/` for evolving cross-session memory, project-state notes, and reminders primarily meant for future agents rather than end users.
-- Prefer focused files under `../heddle-workspace-notes/agent-memory/current-state/` for active workstream handoff notes instead of putting every update only into `project-context.md`.
-- Use `../heddle-workspace-notes/agent-memory/workflows/feature-prd-to-technical-plan.md` for broad feature/refactor planning and for the worker/reviewer loop after a technical plan exists.
-- When the user asks to "note this down" or preserve working context, update the most appropriate file in `../heddle-workspace-notes/agent-memory/` unless the information is better treated as stable repo guidance in this repo.
-- After meaningful implementation progress, update the relevant task plan, the focused `current-state/` file if one exists, and `../heddle-workspace-notes/agent-memory/project-context.md` if the broader project summary changed.
-- Keep agent-memory entries concrete: current repo state, what changed, what remains, verification status, and the next recommended step.
+For contributors who only have this repo:
 
-## Maintenance
+1. Read the README and relevant docs in this repository.
+2. Inspect the live implementation path for the capability area being changed.
+3. Prefer current tests and actual runtime behavior over older comments or stale plans.
+4. Keep new durable project guidance in public docs only when it helps future contributors generally.
 
-- After meaningful implementation progress, update the relevant task plan, the relevant focused `current-state/` file, and `../heddle-workspace-notes/agent-memory/project-context.md` when the broader project picture changed.
+Do not add maintainer-specific private workflow, personal scheduling, billing, employer, or local-machine instructions to this public repo. Put that kind of material in the developer's own workspace notes instead.
