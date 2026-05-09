@@ -8,7 +8,7 @@ Use this prompt set to exercise `examples/repo-investigator.ts` against the Hedd
 2. `Where is the agent loop implemented, and how does it stop?`
 3. `What built-in tools does this runtime expose, and what are their safety limits?`
 4. `Which files define tracing behavior, and how do they relate to each other?`
-5. `Compare README.md and docs/framework-vision.md: what is the current implementation scope vs the long-term goal?`
+5. `Compare README.md and docs/strategy/framework-vision.md: what is the current implementation scope vs the long-term goal?`
 
 ## What This Batch Is For
 

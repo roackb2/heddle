@@ -385,10 +385,12 @@ npx -p @roackb2/heddle -p cyberloop heddle
 
 ### Contributors
 
+- [Agent context](docs/agent-context.md)
+- [Project posture](docs/project-posture.md)
 - [Development and contributing](docs/guides/development.md)
 - [Release convention](docs/releases/README.md)
-- [Framework Vision](docs/framework-vision.md)
-- [Coding Agent Roadmap](docs/coding-agent-roadmap.md)
+- [Framework Vision](docs/strategy/framework-vision.md)
+- [Coding Agent Roadmap](docs/strategy/coding-agent-roadmap.md)
 
 ## Project Status
 

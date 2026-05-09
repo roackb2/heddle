@@ -217,4 +217,4 @@ In short:
 - [Control plane](control-plane.md)
 - [Programmatic use](programmatic-use.md)
 - [CLI reference](../reference/cli.md)
-- [Framework Vision](../framework-vision.md)
+- [Framework Vision](../strategy/framework-vision.md)

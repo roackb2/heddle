@@ -1,6 +1,18 @@
 # Shared Agent Context
 
-This file contains public, repo-local guidance for coding agents working on Heddle.
+This file is the public entry point for coding agents working on Heddle.
+
+Read next:
+
+1. `docs/project-posture.md` for the compact product, architecture, and
+   invariant cheat sheet.
+2. The live implementation path for the area you are about to change.
+3. Nearby tests for the behavior you are touching.
+
+Do not read every doc by default. Use `docs/guides/` for user workflows,
+`docs/reference/` for command/config/tool details, `docs/strategy/` only for
+long-term direction or architecture tradeoffs, and `docs/evaluation/` only for
+eval prompt work.
 
 Heddle is an open-source project. Do not assume that every contributor has access to the original maintainer's private planning notes, local memory, or companion repositories.
 
@@ -43,6 +55,7 @@ When a companion notes repo is present, treat the live Heddle codebase as the im
 
 ## Working Conventions
 
+- Read `docs/project-posture.md` before non-trivial implementation work.
 - Use `yarn`, not `npm`.
 - Use `yarn build` as the canonical type-check.
 - Use `yarn test` as the canonical test command.

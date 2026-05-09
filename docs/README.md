@@ -1,6 +1,8 @@
 # Heddle Documentation
 
-Heddle is a terminal coding agent runtime and CLI for real project work. This docs hub is organized so new users can get started quickly, operators can find workflow guides, and contributors can find development details without digging through source first.
+Heddle is a terminal coding agent runtime and CLI for real project work. This
+docs hub is organized so humans and coding agents can read the minimum useful
+context first, then branch to deeper material only when needed.
 
 ## Start Here
 
@@ -12,6 +14,24 @@ If you are new to Heddle, begin with:
 - [Knowledge persistence](guides/knowledge-persistence.md) for how Heddle learns durable workspace knowledge while it works
 - [Control plane](guides/control-plane.md) for the browser UI, workspace switching, and session review
 - [CLI reference](reference/cli.md) for command lookup
+
+## Agent Reading Priority
+
+Coding agents should not read every document by default.
+
+Always read:
+
+1. [Agent context](agent-context.md)
+2. [Project posture](project-posture.md)
+3. The live implementation path and nearby tests for the requested change
+
+Read only when needed:
+
+- `guides/` for user/operator workflows
+- `reference/` for command, config, provider, and tool details
+- `strategy/` for long-term direction or architecture tradeoffs
+- `evaluation/` for eval prompts and behavior-checking workflows
+- `releases/` for release notes and release process
 
 ## Guides
 
@@ -39,12 +59,20 @@ Reference material for commands, configuration, and runtime behavior:
 
 ## Project Context
 
-Longer-term project context and design direction:
+Public orientation and long-term project direction:
 
-- [Framework Vision](framework-vision.md)
-- [Project Purpose](project-purpose.md)
-- [Coding Agent Roadmap](coding-agent-roadmap.md)
+- [Project Posture](project-posture.md)
 - [Agent context](agent-context.md)
+
+Longer-term strategy:
+
+- [Project Purpose](strategy/project-purpose.md)
+- [Framework Vision](strategy/framework-vision.md)
+- [Coding Agent Roadmap](strategy/coding-agent-roadmap.md)
+
+Evaluation:
+
+- [Eval prompts](evaluation/eval-prompts.md)
 
 ## Suggested Reading Paths
 
@@ -77,9 +105,11 @@ Longer-term project context and design direction:
 
 ### I want to contribute or develop locally
 
-1. [Development and contributing](guides/development.md)
-2. [CLI reference](reference/cli.md)
-3. [Framework Vision](framework-vision.md)
+1. [Agent context](agent-context.md)
+2. [Project Posture](project-posture.md)
+3. [Development and contributing](guides/development.md)
+4. [CLI reference](reference/cli.md)
+5. [Framework Vision](strategy/framework-vision.md) only for strategic context
 
 ### I want to prepare a release
 
