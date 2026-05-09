@@ -29,7 +29,7 @@ Configuration is applied in this order:
 - `maxSteps`: default agent-loop step budget
 - `stateDir`: where Heddle stores sessions, traces, approvals, logs, and memory
 - `directShellApproval`: whether explicit `!command` usage in chat still requires approval
-- `searchIgnoreDirs`: directories excluded from `search_files`
+- `searchIgnoreDirs`: directories excluded from routine `search_files` calls
 - `agentContextPaths`: project instruction files injected into the system prompt
 
 ## When To Use Config
@@ -39,7 +39,7 @@ Configuration is applied in this order:
 - a project consistently uses the same model
 - you want a non-default state directory
 - you want predictable shell approval behavior in a shared workflow
-- your repository has directories that should stay out of routine search
+- your repository has directories that should stay out of routine search unless explicitly targeted
 - the project relies on one or more instruction files such as `AGENTS.md`
 
 ## See Also

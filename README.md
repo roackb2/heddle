@@ -53,7 +53,7 @@ Heddle working in the terminal with live progress, tool activity, plans, and rev
 
 ![Heddle terminal coding workflow](docs/images/terminal-active-run.png)
 
-Heddle can inspect files, explain code, make edits, run shell commands with the right approval model, and carry a task through multiple turns. Recent terminal chat updates make long-running turns easier to follow: tool activity appears while work is happening, streamed internal thinking is shown as dim `Thinking:` progress text, and assistant markdown is rendered in real time instead of waiting for the final response.
+Heddle can inspect files, search with ignore-aware fallbacks, explain code, make edits, run shell commands with the right approval model, and carry a task through multiple turns. Terminal chat keeps long-running turns visible with tool activity, dim `Thinking:` progress text, real-time assistant markdown, and clearer approval prompts for repeated commands or searches.
 
 ### Terminal change review
 
@@ -196,7 +196,7 @@ From there, Heddle can inspect files, explain code, make edits, run shell comman
 
 This is the core feature. If you only use Heddle as a coding agent in the terminal, this is the part you care about.
 
-The terminal composer supports multiline prompts, prompt undo/redo, prompt history navigation, model picking with `/model set`, and reasoning-effort picking with `/reasoning set`. During a run, Heddle streams visible activity so you can see whether it is thinking, calling tools, updating a plan, or waiting for approval.
+The terminal composer supports multiline prompts, prompt undo/redo, prompt history navigation, model picking with `/model set`, and reasoning-effort picking with `/reasoning set`. During a run, Heddle streams visible activity so you can see whether it is thinking, searching, calling tools, updating a plan, or waiting for approval.
 
 More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
 
@@ -398,7 +398,7 @@ Current strengths include:
 
 - terminal-first coding and repository workflows
 - autonomous, catalog-backed workspace memory that helps the agent learn from normal usage
-- explicit traces, approvals, diff review, and local workspace state
+- explicit traces, approval previews, diff review, and local workspace state
 - browser-based oversight and workspace switching through the control plane
 - local-first heartbeat primitives for scheduled agent work
 - practical programmatic hooks for custom hosts

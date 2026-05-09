@@ -21,7 +21,7 @@ Current workspace-facing tool support includes:
 
 - directory inspection with `list_files`
 - file reading with `read_file`
-- text search with `search_files`
+- text search with `search_files`, using `rg` when available and an ignore-aware `grep` fallback otherwise
 - direct file editing with `edit_file`
 - direct file deletion with `delete_file`
 - direct file/directory move or rename with `move_file`
@@ -49,7 +49,7 @@ Current runtime features include:
 - automatic durable memory candidate recording and maintainer-backed catalog updates under `.heddle/memory/`
 - read-only memory visibility through `heddle memory status/list/read/search`
 - memory validation through `heddle memory validate`
-- remembered per-project approvals for repeated commands and edits
+- remembered per-project approvals for repeated commands and edits, with clearer previews before approval
 - interrupt and resume support for longer-running workflows
 - serializable checkpoints for programmatic continuation
 - request-size aware context tracking in chat
@@ -78,6 +78,7 @@ Beyond terminal chat, Heddle includes:
 - OpenAI account sign-in can now drive `view_image` through the Codex OAuth transport. Hosted `web_search` and drift embeddings still require OpenAI Platform API-key mode today.
 - `@path/to/file` mentions prioritize file inspection; they do not blindly paste file contents into the prompt.
 - Web search is provider-backed rather than a general crawler maintained inside this repository.
+- `search_files` honors project ignore files when possible; `.git` and `.heddle` stay protected from broad accidental searches unless explicitly targeted.
 
 ## See Also
 

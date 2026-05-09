@@ -58,7 +58,7 @@ Common use cases:
 
 - explain architecture, tests, or build setup
 - iterate on a fix over multiple prompts
-- inspect files, search the repo, and edit code inside one persistent session
+- inspect files, search the repo with ignore-aware fallback behavior, and edit code inside one persistent session
 - watch streamed `Thinking:` progress, tool activity, and current plan updates while long turns are running
 - keep longer work usable through saved sessions, `/continue`, automatic history compaction, and manual `/compact`
 - let the agent create and update a short working plan for a multi-step implementation
@@ -119,6 +119,8 @@ Prompt editing shortcuts:
 ```
 
 Read-oriented commands stay in inspect mode when possible. Workspace-changing or unclassified commands fall back to approval-gated execution.
+
+Approval prompts show the command or search query being requested, and remembered project approvals can cover repeated safe commands without hiding the original action from review.
 
 ## State And Continuity
 
