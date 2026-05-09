@@ -4,9 +4,10 @@ import type { ActionState } from './useAgentRun.js';
 import type { ApprovalChoice, LiveEvent, PendingApproval } from '../state/types.js';
 import type { EditFilePreview } from '../../../core/tools/toolkits/coding-files/edit-file.js';
 import type { PlanItem } from '../../../core/tools/toolkits/internal/update-plan.js';
+import { canRememberPendingApproval } from '../utils/format.js';
 
 const WORKING_FRAMES = ['.', '..', '...'];
-const APPROVAL_CHOICES: ApprovalChoice[] = ['approve', 'allow_project', 'deny'];
+const BASE_APPROVAL_CHOICES: ApprovalChoice[] = ['approve', 'allow_project', 'deny'];
 
 export function useApprovalFlow(nextLocalId: () => string) {
   const [status, setStatus] = useState('Idle');
@@ -37,27 +38,18 @@ export function useApprovalFlow(nextLocalId: () => string) {
       }
 
       if (key.leftArrow || key.upArrow) {
-        setApprovalChoice((current) => cycleApprovalChoice(current, -1));
+        setApprovalChoice((current) => cycleApprovalChoice(current, -1, pendingApproval));
         return;
       }
 
       if (key.rightArrow || key.downArrow || key.tab) {
-        setApprovalChoice((current) => cycleApprovalChoice(current, 1));
+        setApprovalChoice((current) => cycleApprovalChoice(current, 1, pendingApproval));
         return;
       }
 
       if (key.return) {
-        const approved = approvalChoice !== 'deny';
-        if (approvalChoice === 'allow_project') {
-          pendingApproval.rememberForProject?.();
-        }
-        pendingApproval.resolve({
-          approved,
-          reason:
-            approvalChoice === 'allow_project' ? 'Approved and remembered for this project in chat UI'
-            : approved ? 'Approved in chat UI'
-            : 'Denied in chat UI',
-        });
+        const decision = resolveApprovalDecision(approvalChoice, pendingApproval);
+        pendingApproval.resolve(decision);
         setPendingApproval(undefined);
         setApprovalChoice('approve');
         return;
@@ -70,7 +62,9 @@ export function useApprovalFlow(nextLocalId: () => string) {
       }
 
       if (normalized === 'a') {
-        setApprovalChoice('allow_project');
+        if (canRememberPendingApproval(pendingApproval)) {
+          setApprovalChoice('allow_project');
+        }
         return;
       }
 
@@ -169,8 +163,45 @@ export function useApprovalFlow(nextLocalId: () => string) {
   };
 }
 
-function cycleApprovalChoice(current: ApprovalChoice, direction: -1 | 1): ApprovalChoice {
-  const index = APPROVAL_CHOICES.indexOf(current);
-  const nextIndex = (index + direction + APPROVAL_CHOICES.length) % APPROVAL_CHOICES.length;
-  return APPROVAL_CHOICES[nextIndex] ?? 'approve';
+export function resolveAvailableApprovalChoices(pendingApproval: PendingApproval): ApprovalChoice[] {
+  return canRememberPendingApproval(pendingApproval)
+    ? BASE_APPROVAL_CHOICES
+    : BASE_APPROVAL_CHOICES.filter((choice) => choice !== 'allow_project');
+}
+
+export function cycleApprovalChoice(
+  current: ApprovalChoice,
+  direction: -1 | 1,
+  pendingApproval: PendingApproval,
+): ApprovalChoice {
+  const choices = resolveAvailableApprovalChoices(pendingApproval);
+  const index = choices.indexOf(current);
+  const safeIndex = index >= 0 ? index : 0;
+  const nextIndex = (safeIndex + direction + choices.length) % choices.length;
+  return choices[nextIndex] ?? 'approve';
+}
+
+export function resolveApprovalDecision(
+  choice: ApprovalChoice,
+  pendingApproval: PendingApproval,
+): { approved: boolean; reason?: string } {
+  if (choice === 'allow_project' && canRememberPendingApproval(pendingApproval)) {
+    pendingApproval.rememberForProject?.();
+    return {
+      approved: true,
+      reason: 'Approved and remembered for this project in chat UI',
+    };
+  }
+
+  if (choice === 'deny') {
+    return {
+      approved: false,
+      reason: 'Denied in chat UI',
+    };
+  }
+
+  return {
+    approved: true,
+    reason: 'Approved in chat UI',
+  };
 }

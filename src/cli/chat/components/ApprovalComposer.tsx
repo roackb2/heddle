@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import { formatApprovalHint, summarizePendingApproval } from '../utils/format.js';
+import { canRememberPendingApproval, formatApprovalHint, summarizePendingApproval } from '../utils/format.js';
 import type { ApprovalChoice, PendingApproval } from '../state/types.js';
 
 export function ApprovalComposer({
@@ -11,6 +11,7 @@ export function ApprovalComposer({
   approvalChoice: ApprovalChoice;
 }) {
   const summary = summarizePendingApproval(pendingApproval);
+  const canRemember = canRememberPendingApproval(pendingApproval);
 
   return (
     <>
@@ -53,7 +54,7 @@ export function ApprovalComposer({
         </Box>
       : null}
       <Text dimColor>{formatApprovalHint(pendingApproval)}</Text>
-      <ApprovalSelector choice={approvalChoice} />
+      <ApprovalSelector choice={approvalChoice} canRemember={canRemember} rememberLabel={summary.rememberLabel} />
       <Box justifyContent="space-between">
         <Text dimColor>Use ←/→ then Enter</Text>
         <Text dimColor>Approval stays in the conversation flow</Text>
@@ -62,16 +63,28 @@ export function ApprovalComposer({
   );
 }
 
-function ApprovalSelector({ choice }: { choice: ApprovalChoice }) {
+function ApprovalSelector({
+  choice,
+  canRemember,
+  rememberLabel,
+}: {
+  choice: ApprovalChoice;
+  canRemember: boolean;
+  rememberLabel?: string;
+}) {
   return (
     <Box marginBottom={0} flexWrap="wrap">
       <Text color={choice === 'approve' ? 'green' : 'gray'}>
         {choice === 'approve' ? '◉ Approve once' : '○ Approve once'}
       </Text>
-      <Text dimColor>   </Text>
-      <Text color={choice === 'allow_project' ? 'cyan' : 'gray'}>
-        {choice === 'allow_project' ? '◉ Remember for project' : '○ Remember for project'}
-      </Text>
+      {canRemember ? (
+        <>
+          <Text dimColor>   </Text>
+          <Text color={choice === 'allow_project' ? 'cyan' : 'gray'}>
+            {choice === 'allow_project' ? `◉ ${rememberLabel}` : `○ ${rememberLabel}`}
+          </Text>
+        </>
+      ) : null}
       <Text dimColor>   </Text>
       <Text color={choice === 'deny' ? 'red' : 'gray'}>
         {choice === 'deny' ? '◉ Deny' : '○ Deny'}

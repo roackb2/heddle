@@ -103,6 +103,34 @@ describe('approval policy chain', () => {
     });
   });
 
+  it('lets remembered outside-workspace read_file approvals satisfy request policies before human approval', async () => {
+    const human = vi.fn(async () => ({ approved: false, reason: 'should not run' }));
+    const readOutside = context({
+      call: { id: 'call-1', tool: 'read_file', input: { path: '../notes/summary.md' } },
+      tool: {
+        name: 'read_file',
+        description: 'reads files',
+        parameters: {},
+        execute: async () => ({ ok: true }),
+      },
+    });
+
+    await expect(resolveToolApproval({
+      policies: [
+        ...defaultToolApprovalPolicies,
+        rememberedApprovalPolicy({
+          isApproved: ({ call }) => call.tool === 'read_file',
+        }),
+      ],
+      context: readOutside,
+      requestHumanApproval: human,
+    })).resolves.toEqual({
+      approved: true,
+      reason: 'Approved by saved project rule',
+    });
+    expect(human).not.toHaveBeenCalled();
+  });
+
   it('lets later allow policies satisfy earlier request policies before human approval', async () => {
     const human = vi.fn(async () => ({ approved: false, reason: 'should not run' }));
 

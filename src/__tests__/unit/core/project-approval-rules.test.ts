@@ -91,6 +91,81 @@ describe('project approval rules', () => {
     expect(findMatchingApprovalRule([rule!], 'edit_file', { path: 'src/another.ts', content: 'x', createIfMissing: true })).toBeDefined();
   });
 
+  it('creates exact remembered approvals for outside-workspace read_file and list_files calls', () => {
+    const readRule = createProjectApprovalRuleForCall({
+      id: 'tool-1',
+      tool: 'read_file',
+      input: { path: '../notes/summary.md' },
+    });
+    const listRule = createProjectApprovalRuleForCall({
+      id: 'tool-2',
+      tool: 'list_files',
+      input: { path: '../notes/' },
+    });
+
+    expect(readRule).toMatchObject({
+      tool: 'read_file',
+      mode: 'exact',
+      command: '../notes/summary.md',
+      scope: 'outside_workspace',
+      capability: 'file_inspection',
+    });
+    expect(listRule).toMatchObject({
+      tool: 'list_files',
+      mode: 'exact',
+      command: '../notes',
+      scope: 'outside_workspace',
+      capability: 'file_inspection',
+    });
+    expect(findMatchingApprovalRule([readRule!], 'read_file', { path: '../notes/summary.md' })).toBeDefined();
+    expect(findMatchingApprovalRule([readRule!], 'read_file', { path: '../notes/other.md' })).toBeUndefined();
+    expect(findMatchingApprovalRule([listRule!], 'list_files', { path: '../notes' })).toBeDefined();
+  });
+
+  it('loads remembered outside-workspace file inspection approvals from disk', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-approval-rules-files-'));
+    const filePath = join(root, 'command-approvals.json');
+    const createdAt = new Date().toISOString();
+
+    writeFileSync(filePath, `${JSON.stringify([
+      {
+        tool: 'read_file',
+        mode: 'exact',
+        command: '../notes/summary.md',
+        scope: 'outside_workspace',
+        capability: 'file_inspection',
+        createdAt,
+      },
+      {
+        tool: 'list_files',
+        mode: 'exact',
+        command: '../notes/',
+        scope: 'outside_workspace',
+        capability: 'file_inspection',
+        createdAt,
+      },
+    ], null, 2)}\n`);
+
+    expect(loadProjectApprovalRules(filePath)).toEqual([
+      {
+        tool: 'read_file',
+        mode: 'exact',
+        command: '../notes/summary.md',
+        scope: 'outside_workspace',
+        capability: 'file_inspection',
+        createdAt,
+      },
+      {
+        tool: 'list_files',
+        mode: 'exact',
+        command: '../notes',
+        scope: 'outside_workspace',
+        capability: 'file_inspection',
+        createdAt,
+      },
+    ]);
+  });
+
   it('loads legacy mutate approval rules from disk without dropping them', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-approval-rules-legacy-'));
     const filePath = join(root, 'command-approvals.json');
@@ -135,6 +210,15 @@ describe('project approval rules', () => {
       createdAt: new Date().toISOString(),
     };
 
+    const readRule: ProjectApprovalRule = {
+      tool: 'read_file',
+      mode: 'exact',
+      command: '../notes/summary.md',
+      scope: 'outside_workspace',
+      capability: 'file_inspection',
+      createdAt: new Date().toISOString(),
+    };
+
     const prefixRule: ProjectApprovalRule = {
       tool: 'run_shell_mutate',
       mode: 'prefix',
@@ -154,8 +238,9 @@ describe('project approval rules', () => {
     };
 
     expect(describeProjectApprovalRule(editRule)).toContain('allow edit_file');
-    expect(describeProjectApprovalRule(prefixRule)).toContain('command family');
-    expect(describeProjectApprovalRule(exactRule)).toContain('exact command');
+    expect(describeProjectApprovalRule(readRule)).toBe('allow read_file for this project');
+    expect(describeProjectApprovalRule(prefixRule)).toContain('allow yarn lint command family for this project');
+    expect(describeProjectApprovalRule(exactRule)).toBe('allow exact command');
   });
 
   it('normalizes run shell and edit file approvals', () => {
@@ -169,6 +254,8 @@ describe('project approval rules', () => {
     expect(extractApprovalTarget('edit_file', './src/')).toBe('./src');
     expect(extractApprovalTarget('edit_file', { path: './foo/bar/' })).toBe('./foo/bar');
     expect(extractApprovalTarget('edit_file', { path: '' })).toBeUndefined();
+    expect(extractApprovalTarget('read_file', { path: '../notes/summary.md' })).toBe('../notes/summary.md');
+    expect(extractApprovalTarget('list_files', { path: '../notes/' })).toBe('../notes');
   });
 
   it('falls back to unknown workspace rules when the shell command is blocked', () => {

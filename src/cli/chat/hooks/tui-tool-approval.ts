@@ -32,7 +32,7 @@ export function createTuiToolApprovalPort(args: {
               call,
               tool,
               editPreview,
-              rememberForProject: () => rememberProjectApproval(call),
+              rememberForProject: rememberedRule ? () => rememberProjectApproval(call) : undefined,
               rememberLabel: rememberedRule ? describeProjectApprovalRule(rememberedRule) : undefined,
               resolve,
             });

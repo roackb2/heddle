@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildConversationMessages,
+  canRememberPendingApproval,
+  formatApprovalHint,
   formatChatFailureMessage,
   formatEditPreviewHistoryMessage,
   formatPlanHistoryMessage,
@@ -156,6 +158,78 @@ describe('summarizePendingApproval', () => {
     expect(summary.command).toBe('src/cli/chat');
     expect(summary.why).toBe('list_files on src/cli/chat');
     expect(summary.effects).toContain('lists entries under src/cli/chat');
+  });
+
+  it('shows the search query for search_files approvals', () => {
+    const pendingApproval: PendingApproval = {
+      call: { id: 'call-1', tool: 'search_files', input: { query: 'approvalSubject', path: '../notes' } },
+      tool: { name: 'search_files', description: 'Search files', parameters: { type: 'object', properties: {} } },
+      resolve: () => undefined,
+    };
+
+    const summary = summarizePendingApproval(pendingApproval);
+
+    expect(summary.title).toBe('Allow search_files');
+    expect(summary.command).toBe('approvalSubject');
+    expect(summary.scope).toBe('external');
+    expect(summary.why).toBe('search_files for "approvalSubject" in ../notes');
+    expect(summary.effects).toContain('searches ../notes for "approvalSubject"');
+  });
+
+  it('omits remember hint text when the approval cannot actually be remembered', () => {
+    const pendingApproval: PendingApproval = {
+      call: { id: 'call-1', tool: 'run_shell_inspect', input: { command: 'pwd' } },
+      tool: { name: 'run_shell_inspect', description: 'Inspect shell', parameters: { type: 'object', properties: {} } },
+      resolve: () => undefined,
+    };
+
+    expect(canRememberPendingApproval(pendingApproval)).toBe(false);
+    expect(formatApprovalHint(pendingApproval)).toBe('Y approve once • N deny • Enter confirms selected choice');
+  });
+
+  it('uses a short path-tool remember label while keeping the path in the summary', () => {
+    const pendingApproval: PendingApproval = {
+      call: { id: 'call-1', tool: 'read_file', input: { path: '../notes/summary.md' } },
+      tool: { name: 'read_file', description: 'Read file', parameters: { type: 'object', properties: {} } },
+      rememberForProject: () => undefined,
+      rememberLabel: 'allow read_file ../notes/summary.md for this project',
+      resolve: () => undefined,
+    };
+
+    expect(canRememberPendingApproval(pendingApproval)).toBe(true);
+    expect(formatApprovalHint(pendingApproval)).toContain('A allow read_file for this project');
+    expect(formatApprovalHint(pendingApproval)).not.toContain('../notes/summary.md');
+    expect(summarizePendingApproval(pendingApproval).command).toBe('../notes/summary.md');
+  });
+
+  it('uses a short remember label for exact shell commands without duplicating the full command', () => {
+    const pendingApproval: PendingApproval = {
+      call: { id: 'call-1', tool: 'run_shell_mutate', input: { command: 'git status --short --branch && git show --stat --oneline --no-patch HEAD' } },
+      tool: { name: 'run_shell_mutate', description: 'Mutate shell', parameters: { type: 'object', properties: {} } },
+      rememberForProject: () => undefined,
+      rememberLabel: 'allow exact command',
+      resolve: () => undefined,
+    };
+
+    const hint = formatApprovalHint(pendingApproval);
+    expect(hint).toContain('A allow exact command');
+    expect(hint).not.toContain('git status --short --branch');
+    expect(summarizePendingApproval(pendingApproval).command).toBe('git status --short --branch && git show --stat --oneline --no-patch HEAD');
+  });
+
+  it('defensively shortens legacy exact-command remember labels that include the raw command', () => {
+    const command = 'git status --short --branch && git show --stat --oneline --no-patch HEAD';
+    const pendingApproval: PendingApproval = {
+      call: { id: 'call-1', tool: 'run_shell_mutate', input: { command } },
+      tool: { name: 'run_shell_mutate', description: 'Mutate shell', parameters: { type: 'object', properties: {} } },
+      rememberForProject: () => undefined,
+      rememberLabel: `allow exact command ${command} for this project`,
+      resolve: () => undefined,
+    };
+
+    expect(formatApprovalHint(pendingApproval)).toBe('Y approve once • A allow exact command • N deny • Enter confirms selected choice');
+    expect(summarizePendingApproval(pendingApproval).rememberLabel).toBe('allow exact command');
+    expect(summarizePendingApproval(pendingApproval).command).toBe(command);
   });
 });
 

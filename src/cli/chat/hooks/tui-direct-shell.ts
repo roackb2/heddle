@@ -121,7 +121,7 @@ export async function executeTuiDirectShell(args: {
               state.setPendingApproval({
                 call: mutateCall,
                 tool: directShellTool,
-                rememberForProject: () => rememberProjectApproval(mutateCall),
+                rememberForProject: rememberedRule ? () => rememberProjectApproval(mutateCall) : undefined,
                 rememberLabel: rememberedRule ? describeProjectApprovalRule(rememberedRule) : undefined,
                 resolve,
               });

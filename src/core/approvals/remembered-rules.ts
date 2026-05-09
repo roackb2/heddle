@@ -9,13 +9,14 @@ import {
 } from '../tools/toolkits/shell-process/run-shell.js';
 
 type ApprovalMode = 'exact' | 'prefix' | 'tool';
+type ApprovalRuleTool = 'run_shell_mutate' | 'edit_file' | 'read_file' | 'list_files';
 
 export type ProjectApprovalRule = {
-  tool: 'run_shell_mutate' | 'edit_file';
+  tool: ApprovalRuleTool;
   mode: ApprovalMode;
   command: string;
-  scope: RunShellScope | 'workspace';
-  capability: RunShellCapability | 'file_edit';
+  scope: RunShellScope | 'workspace' | 'outside_workspace';
+  capability: RunShellCapability | 'file_edit' | 'file_inspection';
   createdAt: string;
 };
 
@@ -93,6 +94,18 @@ export function createProjectApprovalRuleForCall(call: ToolCall): ProjectApprova
     };
   }
 
+  if (call.tool === 'read_file' || call.tool === 'list_files') {
+    const target = extractApprovalTarget(call.tool, call.input);
+    return target ? {
+      tool: call.tool,
+      mode: 'exact',
+      command: target,
+      scope: 'outside_workspace',
+      capability: 'file_inspection',
+      createdAt: new Date().toISOString(),
+    } : undefined;
+  }
+
   if (call.tool !== 'run_shell_mutate') {
     return undefined;
   }
@@ -106,11 +119,15 @@ export function describeProjectApprovalRule(rule: ProjectApprovalRule): string {
     return 'allow edit_file for this project';
   }
 
+  if (rule.tool === 'read_file' || rule.tool === 'list_files') {
+    return `allow ${rule.tool} for this project`;
+  }
+
   if (rule.mode === 'prefix') {
     return `allow ${rule.command} command family for this project`;
   }
 
-  return `allow exact command ${rule.command} for this project`;
+  return 'allow exact command';
 }
 
 export function extractApprovalTarget(tool: string, input: unknown): string | undefined {
@@ -127,7 +144,7 @@ export function extractApprovalTarget(tool: string, input: unknown): string | un
     return typeof command === 'string' && command.trim() ? normalizeApprovedCommand(command) : undefined;
   }
 
-  if (tool === 'edit_file') {
+  if (tool === 'edit_file' || tool === 'read_file' || tool === 'list_files') {
     if (typeof input === 'string') {
       return normalizeApprovalPath(input);
     }
@@ -317,6 +334,22 @@ function parseProjectApprovalRule(value: unknown): ProjectApprovalRule[] {
         createdAt: candidate.createdAt,
       }];
     }
+  }
+
+  if (
+    (candidate.tool === 'read_file' || candidate.tool === 'list_files') &&
+    candidate.mode === 'exact' &&
+    typeof candidate.command === 'string' &&
+    typeof candidate.createdAt === 'string'
+  ) {
+    return [{
+      tool: candidate.tool,
+      mode: 'exact',
+      command: normalizeApprovalPath(candidate.command),
+      scope: 'outside_workspace',
+      capability: 'file_inspection',
+      createdAt: candidate.createdAt,
+    }];
   }
 
   return [];

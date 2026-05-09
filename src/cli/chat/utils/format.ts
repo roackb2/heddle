@@ -57,16 +57,29 @@ export function formatApprovalPrompt(pendingApproval: PendingApproval): string {
   return summarizePendingApproval(pendingApproval).title;
 }
 
+export function canRememberPendingApproval(pendingApproval: PendingApproval): boolean {
+  return typeof pendingApproval.rememberForProject === 'function'
+    && typeof pendingApproval.rememberLabel === 'string'
+    && pendingApproval.rememberLabel.trim().length > 0;
+}
+
 export function formatApprovalHint(pendingApproval: PendingApproval): string {
   const summary = summarizePendingApproval(pendingApproval);
-  const rememberLabel = summary.rememberLabel ? `A ${summary.rememberLabel}` : 'A remember for project';
-  return `Y approve once • ${rememberLabel} • N deny • Enter confirms selected choice`;
+  const parts = ['Y approve once'];
+
+  if (canRememberPendingApproval(pendingApproval) && summary.rememberLabel) {
+    parts.push(`A ${summary.rememberLabel}`);
+  }
+
+  parts.push('N deny', 'Enter confirms selected choice');
+  return parts.join(' • ');
 }
 
 export function summarizePendingApproval(pendingApproval: PendingApproval): ApprovalSummary {
   const policy = describePendingApprovalPolicy(pendingApproval);
   const command = readStringField(pendingApproval.call.input, 'command');
   const editPath = readStringField(pendingApproval.call.input, 'path');
+  const searchQuery = readStringField(pendingApproval.call.input, 'query');
 
   if (command) {
     const title =
@@ -92,7 +105,7 @@ export function summarizePendingApproval(pendingApproval: PendingApproval): Appr
       capability: policy?.capability,
       why,
       effects,
-      rememberLabel: pendingApproval.rememberLabel,
+      rememberLabel: formatRememberLabel(pendingApproval.rememberLabel),
     };
   }
 
@@ -109,7 +122,19 @@ export function summarizePendingApproval(pendingApproval: PendingApproval): Appr
         editPath ? `modifies ${editPath}` : `modifies a ${scope} file`,
         scope === 'external' ? 'writes outside the current repository' : 'stays inside the current repository',
       ],
-      rememberLabel: pendingApproval.rememberLabel,
+      rememberLabel: formatRememberLabel(pendingApproval.rememberLabel),
+    };
+  }
+
+  if (pendingApproval.call.tool === 'search_files') {
+    const path = readStringField(pendingApproval.call.input, 'path') ?? '.';
+    return {
+      title: 'Allow search_files',
+      command: searchQuery,
+      scope: path.startsWith('../') || path.startsWith('/') || path.includes('..\\') ? 'external' : 'workspace',
+      why: searchQuery ? `search_files for "${searchQuery}" in ${path}` : `search_files in ${path}`,
+      effects: [searchQuery ? `searches ${path} for "${searchQuery}"` : `searches ${path}`],
+      rememberLabel: formatRememberLabel(pendingApproval.rememberLabel),
     };
   }
 
@@ -121,7 +146,7 @@ export function summarizePendingApproval(pendingApproval: PendingApproval): Appr
       scope: path.startsWith('../') || path.startsWith('/') || path.includes('..\\') ? 'external' : 'workspace',
       why: `${pendingApproval.call.tool} on ${path}`,
       effects: [describePathAwareToolEffect(pendingApproval.call.tool, path)],
-      rememberLabel: pendingApproval.rememberLabel,
+      rememberLabel: formatRememberLabel(pendingApproval.rememberLabel),
     };
   }
 
@@ -129,8 +154,24 @@ export function summarizePendingApproval(pendingApproval: PendingApproval): Appr
     title: `Allow ${pendingApproval.call.tool}`,
     why: 'approval required for this tool call',
     effects: ['tool-specific side effects are not yet summarized'],
-    rememberLabel: pendingApproval.rememberLabel,
+    rememberLabel: formatRememberLabel(pendingApproval.rememberLabel),
   };
+}
+
+function formatRememberLabel(label: string | undefined): string | undefined {
+  if (!label) {
+    return undefined;
+  }
+
+  if (/^allow exact command .+ for this project$/.test(label)) {
+    return 'allow exact command';
+  }
+
+  if (/^allow (read_file|list_files) .+ for this project$/.test(label)) {
+    return label.replace(/^allow (read_file|list_files) .+ for this project$/, 'allow $1 for this project');
+  }
+
+  return label;
 }
 
 export function normalizeInlineText(value: string): string {
