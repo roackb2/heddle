@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   autocompleteSlashCommand,
@@ -17,6 +18,8 @@ import type { SlashCommand, SlashCommandModule } from '../../../core/commands/sl
 
 type TestResult = { kind: string; value?: string };
 type TestContext = { prefix: string };
+
+const absoluteScreenshotFixturePath = join(process.cwd(), 'src/__tests__/fixtures/screenshot.png');
 
 function command(
   overrides: Partial<SlashCommand<TestResult, TestContext>> & Pick<SlashCommand<TestResult, TestContext>, 'id' | 'syntax'>,
@@ -58,9 +61,9 @@ describe('slash command parser', () => {
 
   it('does not treat normal text or absolute Unix paths as slash commands', () => {
     expect(parseSlashCommand('hello')).toBeUndefined();
-    expect(parseSlashCommand('/Users/roackb2/Desktop/screenshot.png')).toBeUndefined();
+    expect(parseSlashCommand(absoluteScreenshotFixturePath)).toBeUndefined();
     expect(isSlashCommandInput('/session list')).toBe(true);
-    expect(isSlashCommandInput('/Users/roackb2/Desktop/screenshot.png')).toBe(false);
+    expect(isSlashCommandInput(absoluteScreenshotFixturePath)).toBe(false);
   });
 
   it('provides exact, alias, and prefix-style match helpers', () => {
@@ -169,14 +172,14 @@ describe('slash command autocomplete', () => {
       { command: '/session switch <id>', description: 'switch session' },
     ]);
     expect(filterSlashCommandHints('/nope', hints)).toEqual(hints);
-    expect(filterSlashCommandHints('/Users/roackb2/Desktop/screenshot.png', hints)).toEqual([]);
+    expect(filterSlashCommandHints(absoluteScreenshotFixturePath, hints)).toEqual([]);
   });
 
   it('autocompletes shared prefixes and strips placeholders to tab-friendly candidates', () => {
     expect(autocompleteSlashCommand('/sess', hints)).toBe('/session ');
     expect(autocompleteSlashCommand('/session sw', hints)).toBe('/session switch ');
     expect(autocompleteSlashCommand('  /model s', hints)).toBe('  /model set ');
-    expect(autocompleteSlashCommand('/Users/roackb2/Desktop/screenshot.png', hints)).toBeUndefined();
+    expect(autocompleteSlashCommand(absoluteScreenshotFixturePath, hints)).toBeUndefined();
   });
 
   it('does not autocomplete already-maximal ambiguous prefixes or ordinary text', () => {
@@ -201,4 +204,3 @@ describe('slash command autocomplete', () => {
     expect(run).not.toHaveBeenCalled();
   });
 });
-

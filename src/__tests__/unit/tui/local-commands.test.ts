@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { autocompleteLocalCommand, getLocalCommandHints, isLikelyLocalCommand, runLocalCommand } from '../../../cli/chat/state/local-commands.js';
 import { getStoredProviderCredential, setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
 
+const absoluteScreenshotFixturePath = join(process.cwd(), 'src/__tests__/fixtures/screenshot.png');
+
 function createCommandArgs(overrides: Partial<Parameters<typeof runLocalCommand>[0]> = {}): Parameters<typeof runLocalCommand>[0] {
   return {
     prompt: '/help',
@@ -53,11 +55,11 @@ describe('runLocalCommand', () => {
   });
 
   it('does not treat absolute unix paths as slash commands', () => {
-    expect(isLikelyLocalCommand('/Users/roackb2/Desktop/screenshot.png')).toBe(false);
+    expect(isLikelyLocalCommand(absoluteScreenshotFixturePath)).toBe(false);
   });
 
   it('does not expose slash hints or completions for absolute unix paths', () => {
-    const pathLikeDraft = '/Users/roackb2/Desktop/screenshot.png';
+    const pathLikeDraft = absoluteScreenshotFixturePath;
 
     expect(getLocalCommandHints(pathLikeDraft, 'session-1', [])).toEqual([]);
     expect(autocompleteLocalCommand(pathLikeDraft, 'session-1', [])).toBeUndefined();
@@ -332,7 +334,7 @@ describe('runLocalCommand', () => {
 
   it('passes through absolute unix paths as normal prompts', async () => {
     const result = await runLocalCommand(createCommandArgs({
-      prompt: '/Users/roackb2/Desktop/screenshot.png can you describe this image',
+      prompt: `${absoluteScreenshotFixturePath} can you describe this image`,
     }));
 
     expect(result).toEqual({ handled: false });

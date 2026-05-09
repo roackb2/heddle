@@ -131,7 +131,7 @@ Reasoning effort is persisted with the saved session. When you switch sessions, 
 For local development against the sibling CyberLoop repo, run chat with the middleware module path:
 
 ```bash
-HEDDLE_CYBERLOOP_ADVANCED_MODULE=/Users/roackb2/Studio/projects/CyberLoop/src/advanced/kinematics-middleware.ts yarn chat:dev:openai
+HEDDLE_CYBERLOOP_ADVANCED_MODULE=<path-to-cyberloop>/src/advanced/kinematics-middleware.ts yarn chat:dev:openai
 ```
 
 Drift telemetry is disabled by default for new sessions. For installed usage, install the optional `cyberloop` peer dependency in the same environment as Heddle so it can dynamically import `cyberloop/advanced`, then enable it with `/drift on` when you intend to use OpenAI Platform API-key mode for drift embeddings.
