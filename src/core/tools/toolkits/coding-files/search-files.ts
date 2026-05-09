@@ -151,7 +151,7 @@ function selectSearchBackend(preferred: SearchBackend, dir: string): 'rg' | 'gre
   }
 
   if (preferred === 'rg') {
-    return 'rg';
+    return isRipgrepAvailableForDir(dir) ? 'rg' : 'grep';
   }
 
   return isRipgrepAvailableForDir(dir) ? 'rg' : 'grep';
