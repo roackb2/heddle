@@ -238,9 +238,9 @@ describe('project approval rules', () => {
     };
 
     expect(describeProjectApprovalRule(editRule)).toContain('allow edit_file');
-    expect(describeProjectApprovalRule(readRule)).toContain('allow read_file ../notes/summary.md');
-    expect(describeProjectApprovalRule(prefixRule)).toContain('command family');
-    expect(describeProjectApprovalRule(exactRule)).toContain('exact command');
+    expect(describeProjectApprovalRule(readRule)).toBe('allow read_file for this project');
+    expect(describeProjectApprovalRule(prefixRule)).toContain('allow yarn lint command family for this project');
+    expect(describeProjectApprovalRule(exactRule)).toBe('allow exact command');
   });
 
   it('normalizes run shell and edit file approvals', () => {

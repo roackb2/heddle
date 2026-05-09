@@ -30,7 +30,7 @@ describe('approval flow helpers', () => {
   it('includes allow_project in available choices when remember is supported', () => {
     const pendingApproval = createPendingApproval({
       rememberForProject: () => undefined,
-      rememberLabel: 'allow exact command yarn test for this project',
+      rememberLabel: 'allow exact command',
     });
 
     expect(resolveAvailableApprovalChoices(pendingApproval)).toEqual(['approve', 'allow_project', 'deny']);
@@ -48,7 +48,7 @@ describe('approval flow helpers', () => {
     const remember = vi.fn();
     const supported = createPendingApproval({
       rememberForProject: remember,
-      rememberLabel: 'allow exact command yarn test for this project',
+      rememberLabel: 'allow exact command',
     });
     const unsupported = createPendingApproval();
 
@@ -77,7 +77,37 @@ describe('ApprovalComposer', () => {
     expect(view.container.textContent).not.toContain('allow exact command');
   });
 
-  it('renders the concrete remember label when remember is supported', () => {
+  it('renders a short exact-command remember label without duplicating the full command', () => {
+    const fullCommand = 'git status --short --branch && git show --stat --oneline --no-patch HEAD';
+    const pendingApproval = createPendingApproval({
+      call: { id: 'call-2', tool: 'run_shell_mutate', input: { command: fullCommand } },
+      tool: { name: 'run_shell_mutate', description: 'Mutate shell', parameters: { type: 'object', properties: {} } },
+      rememberForProject: () => undefined,
+      rememberLabel: 'allow exact command',
+    });
+    const view = render(<ApprovalComposer pendingApproval={pendingApproval} approvalChoice="allow_project" />);
+
+    expect(view.container.textContent).toContain('allow exact command');
+    expect(view.container.textContent).toContain(fullCommand);
+    expect(view.container.textContent).not.toContain(`allow exact command ${fullCommand}`);
+  });
+
+  it('renders legacy exact-command remember labels without the raw command in the label', () => {
+    const fullCommand = 'git status --short --branch && git show --stat --oneline --no-patch HEAD';
+    const pendingApproval = createPendingApproval({
+      call: { id: 'call-2', tool: 'run_shell_mutate', input: { command: fullCommand } },
+      tool: { name: 'run_shell_mutate', description: 'Mutate shell', parameters: { type: 'object', properties: {} } },
+      rememberForProject: () => undefined,
+      rememberLabel: `allow exact command ${fullCommand} for this project`,
+    });
+    const view = render(<ApprovalComposer pendingApproval={pendingApproval} approvalChoice="allow_project" />);
+
+    expect(view.container.textContent).toContain('allow exact command');
+    expect(view.container.textContent).toContain(fullCommand);
+    expect(view.container.textContent).not.toContain(`allow exact command ${fullCommand}`);
+  });
+
+  it('renders a short remember label when remember is supported for path-based approvals', () => {
     const pendingApproval = createPendingApproval({
       call: { id: 'call-2', tool: 'read_file', input: { path: '../notes/summary.md' } },
       tool: { name: 'read_file', description: 'Read file', parameters: { type: 'object', properties: {} } },
@@ -86,6 +116,8 @@ describe('ApprovalComposer', () => {
     });
     const view = render(<ApprovalComposer pendingApproval={pendingApproval} approvalChoice="allow_project" />);
 
-    expect(view.container.textContent).toContain('allow read_file ../notes/summary.md for this project');
+    expect(view.container.textContent).toContain('allow read_file for this project');
+    expect(view.container.textContent).toContain('../notes/summary.md');
+    expect(view.container.textContent).not.toContain('allow read_file ../notes/summary.md for this project');
   });
 });

@@ -4,8 +4,9 @@
 // ---------------------------------------------------------------------------
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, realpathSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, relative, resolve } from 'node:path';
 import type { ToolDefinition, ToolResult } from '../../../types.js';
 
 type SearchFilesInput = {
@@ -16,17 +17,12 @@ type SearchFilesInput = {
 
 type SearchBackend = 'auto' | 'rg' | 'grep';
 
-type IgnoreContext = {
-  root: string;
-  ignoreFilePaths: string[];
-};
-
 export const DEFAULT_SEARCH_EXCLUDED_DIRS = ['dist', 'node_modules', 'local'];
 const PROTECTED_STATE_DIRS = ['.git', '.heddle'];
-const IGNORE_FILE_NAMES = ['.rgignore', '.ignore', '.gitignore'];
-const GREP_TEXT_FILE_GLOBS = ['*.ts', '*.js', '*.json', '*.md', '*.txt', '*.yaml', '*.yml'];
 const SEARCH_TIMEOUT_MS = 15_000;
 const SEARCH_MAX_BUFFER = 1024 * 1024;
+const GREP_BATCH_SIZE = 200;
+const PROJECT_IGNORE_FILE_NAMES = ['.gitignore', '.ignore', '.rgignore'];
 
 export type SearchFilesOptions = {
   excludedDirs?: string[];
@@ -39,6 +35,7 @@ let cachedRipgrepAvailable: boolean | undefined;
 export function createSearchFilesTool(options: SearchFilesOptions = {}): ToolDefinition {
   const hasCustomExcludedDirs = Array.isArray(options.excludedDirs) && options.excludedDirs.length > 0;
   const configuredExcludedDirNames = sanitizeExcludedDirs(options.excludedDirs);
+  const customExcludedDirNames = getCustomExcludedDirs(configuredExcludedDirNames, hasCustomExcludedDirs);
   const configuredWorkspaceRoot = options.workspaceRoot ? resolve(options.workspaceRoot) : undefined;
   const backend = options.backend ?? 'auto';
 
@@ -76,38 +73,44 @@ export function createSearchFilesTool(options: SearchFilesOptions = {}): ToolDef
       const input: SearchFilesInput = raw;
       const workspaceRoot = configuredWorkspaceRoot ?? process.cwd();
       const dir = resolve(workspaceRoot, input.path ?? '.');
-      const nearestIgnoreContext = findNearestIgnoreContext(dir);
-      const searchRoot = determineSearchRoot(dir, nearestIgnoreContext);
-      const searchTarget = determineSearchTarget(dir, searchRoot);
-      const ignoreFilesPresent = Boolean(nearestIgnoreContext);
       const explicitlyTargetedConfiguredDirs = configuredExcludedDirNames.filter((name) => isExplicitlyTargetingExcludedDir(dir, name));
       const explicitlyTargetedProtectedDirs = PROTECTED_STATE_DIRS.filter((name) => isExplicitlyTargetingExcludedDir(dir, name));
       const includeIgnored = input.includeIgnored === true || explicitlyTargetedConfiguredDirs.length > 0 || explicitlyTargetedProtectedDirs.length > 0;
-      const excludedDirs = getEffectiveExcludedDirs({
-        configuredExcludedDirs: configuredExcludedDirNames,
-        hasCustomExcludedDirs,
-        ignoreFilesPresent,
+      const protectedExcludedDirs = getProtectedExcludedDirs(dir);
+      const customExcludedDirs = customExcludedDirNames.filter((name) => !isExplicitlyTargetingExcludedDir(dir, name));
+      const fallbackExcludedDirs = getFallbackExcludedDirs({
         dir,
-        includeIgnored,
+        fallbackExcludedDirs: customExcludedDirNames.length > 0 ? customExcludedDirNames : DEFAULT_SEARCH_EXCLUDED_DIRS,
       });
-      const selectedBackend = selectSearchBackend(backend);
+      const selectedBackend = selectSearchBackend(backend, dir);
+      const gitRepoRoot = findGitRepoRoot(dir);
+      const hasProjectIgnoreFile = findProjectIgnoreFile(dir, gitRepoRoot ?? workspaceRoot) !== undefined;
+      const fallbackExcludesApply = !includeIgnored && !hasProjectIgnoreFile;
 
       try {
         const output = selectedBackend === 'rg'
           ? runRipgrepSearch({
               query: input.query,
-              searchRoot,
-              searchTarget,
+              dir,
               includeIgnored,
-              excludedDirs,
-              ignoreFilePaths: includeIgnored ? [] : nearestIgnoreContext?.ignoreFilePaths ?? [],
+              excludedDirs:
+                includeIgnored ? protectedExcludedDirs
+                : [
+                    ...new Set([
+                      ...protectedExcludedDirs,
+                      ...customExcludedDirs,
+                      ...(fallbackExcludesApply ? fallbackExcludedDirs : []),
+                    ]),
+                  ],
             })
           : runGrepFallbackSearch({
               query: input.query,
-              searchRoot,
-              searchTarget,
-              excludedDirs,
-              ignoredDirNames: includeIgnored ? [] : parseSimpleIgnoredDirNames(nearestIgnoreContext?.ignoreFilePaths ?? []),
+              dir,
+              includeIgnored,
+              gitRepoRoot,
+              fallbackExcludesApply,
+              protectedExcludedDirs,
+              fallbackExcludedDirs,
             });
         return { ok: true, output: output.trim() || 'No matches found.' };
       } catch (err) {
@@ -142,16 +145,16 @@ function isSearchFilesInput(raw: unknown): raw is SearchFilesInput {
   return validPath && validIncludeIgnored;
 }
 
-function selectSearchBackend(preferred: SearchBackend): 'rg' | 'grep' {
+function selectSearchBackend(preferred: SearchBackend, dir: string): 'rg' | 'grep' {
   if (preferred === 'grep') {
     return 'grep';
   }
 
-  if (preferred === 'rg' || isRipgrepAvailable()) {
-    return isRipgrepAvailable() ? 'rg' : 'grep';
+  if (preferred === 'rg') {
+    return 'rg';
   }
 
-  return 'grep';
+  return isRipgrepAvailableForDir(dir) ? 'rg' : 'grep';
 }
 
 function isRipgrepAvailable(): boolean {
@@ -169,13 +172,29 @@ function isRipgrepAvailable(): boolean {
   return cachedRipgrepAvailable;
 }
 
+function isRipgrepAvailableForDir(dir: string): boolean {
+  if (!isRipgrepAvailable()) {
+    return false;
+  }
+
+  try {
+    execFileSync('rg', ['--version'], {
+      cwd: dir,
+      stdio: 'ignore',
+      timeout: 2_000,
+      maxBuffer: SEARCH_MAX_BUFFER,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function runRipgrepSearch(args: {
   query: string;
-  searchRoot: string;
-  searchTarget: string;
+  dir: string;
   includeIgnored: boolean;
   excludedDirs: string[];
-  ignoreFilePaths: string[];
 }): string {
   const commandArgs = [
     '--line-number',
@@ -183,16 +202,15 @@ function runRipgrepSearch(args: {
     '--color',
     'never',
     ...args.excludedDirs.flatMap((name) => ['--glob', `!**/${name}/**`]),
-    ...args.ignoreFilePaths.flatMap((ignorePath) => ['--ignore-file', ignorePath]),
   ];
 
   if (args.includeIgnored) {
     commandArgs.push('--no-ignore', '--hidden');
   }
 
-  commandArgs.push('--', args.query, args.searchTarget);
+  commandArgs.push('--', args.query, '.');
   return execFileSync('rg', commandArgs, {
-    cwd: args.searchRoot,
+    cwd: args.dir,
     encoding: 'utf-8',
     timeout: SEARCH_TIMEOUT_MS,
     maxBuffer: SEARCH_MAX_BUFFER,
@@ -201,30 +219,155 @@ function runRipgrepSearch(args: {
 
 function runGrepFallbackSearch(args: {
   query: string;
-  searchRoot: string;
-  searchTarget: string;
-  excludedDirs: string[];
-  ignoredDirNames: string[];
+  dir: string;
+  includeIgnored: boolean;
+  gitRepoRoot: string | undefined;
+  fallbackExcludesApply: boolean;
+  protectedExcludedDirs: string[];
+  fallbackExcludedDirs: string[];
 }): string {
-  const effectiveExcludedDirs = [...new Set([...args.excludedDirs, ...args.ignoredDirNames])];
+  if (args.includeIgnored) {
+    return runBroadGrepSearch({
+      query: args.query,
+      dir: args.dir,
+      excludedDirs: args.protectedExcludedDirs,
+    });
+  }
 
+  if (args.gitRepoRoot) {
+    const targetPathspec = determineGitPathspec(args.gitRepoRoot, args.dir);
+    const searchableFiles = listGitSearchableFiles(args.gitRepoRoot, targetPathspec);
+    const filteredFiles = filterSearchableFiles(
+      searchableFiles,
+      args.fallbackExcludesApply ?
+        [...new Set([...args.protectedExcludedDirs, ...args.fallbackExcludedDirs])]
+      : args.protectedExcludedDirs,
+    );
+    return runGrepOnFiles({
+      query: args.query,
+      cwd: args.gitRepoRoot,
+      files: filteredFiles,
+    });
+  }
+
+  return runBroadGrepSearch({
+    query: args.query,
+    dir: args.dir,
+    excludedDirs: args.fallbackExcludedDirs,
+  });
+}
+
+function runBroadGrepSearch(args: { query: string; dir: string; excludedDirs: string[] }): string {
   return execFileSync(
     'grep',
     [
       '-rnI',
-      ...effectiveExcludedDirs.map((name) => `--exclude-dir=${name}`),
-      ...GREP_TEXT_FILE_GLOBS.map((glob) => `--include=${glob}`),
+      ...args.excludedDirs.map((name) => `--exclude-dir=${name}`),
       '--',
       args.query,
-      args.searchTarget,
+      '.',
     ],
     {
-      cwd: args.searchRoot,
+      cwd: args.dir,
       encoding: 'utf-8',
       timeout: SEARCH_TIMEOUT_MS,
       maxBuffer: SEARCH_MAX_BUFFER,
     },
   );
+}
+
+function runGrepOnFiles(args: { query: string; cwd: string; files: string[] }): string {
+  if (args.files.length === 0) {
+    return '';
+  }
+
+  const outputs: string[] = [];
+  for (let index = 0; index < args.files.length; index += GREP_BATCH_SIZE) {
+    const batch = args.files.slice(index, index + GREP_BATCH_SIZE);
+    try {
+      const output = execFileSync(
+        'grep',
+        ['-nI', '--', args.query, ...batch],
+        {
+          cwd: args.cwd,
+          encoding: 'utf-8',
+          timeout: SEARCH_TIMEOUT_MS,
+          maxBuffer: SEARCH_MAX_BUFFER,
+        },
+      );
+      if (output.trim()) {
+        outputs.push(output.trim());
+      }
+    } catch (err) {
+      if (!isSearchNoMatchError(err)) {
+        throw err;
+      }
+    }
+  }
+
+  return outputs.join('\n');
+}
+
+function findGitRepoRoot(dir: string): string | undefined {
+  try {
+    const output = execFileSync(
+      'git',
+      ['-C', dir, 'rev-parse', '--show-toplevel'],
+      {
+        encoding: 'utf-8',
+        timeout: 2_000,
+        maxBuffer: SEARCH_MAX_BUFFER,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      },
+    ).trim();
+    return output ? realpathSync(output) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function determineGitPathspec(repoRoot: string, dir: string): string {
+  const normalizedRepoRoot = realpathSync(repoRoot);
+  const normalizedDir = realpathSync(dir);
+  const pathspec = relative(normalizedRepoRoot, normalizedDir).replace(/\\/g, '/');
+  return pathspec && pathspec !== '' ? pathspec : '.';
+}
+
+function listGitSearchableFiles(repoRoot: string, pathspec: string): string[] {
+  const output = execFileSync(
+    'git',
+    ['-C', repoRoot, 'ls-files', '-co', '--exclude-standard', '--', pathspec],
+    {
+      encoding: 'utf-8',
+      timeout: SEARCH_TIMEOUT_MS,
+      maxBuffer: SEARCH_MAX_BUFFER,
+    },
+  );
+
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function filterSearchableFiles(files: string[], excludedDirNames: string[]): string[] {
+  if (excludedDirNames.length === 0) {
+    return files;
+  }
+
+  return files.filter((filePath) =>
+    excludedDirNames.every((dirName) => !isPathInsideExcludedDir(filePath, dirName))
+  );
+}
+
+function isPathInsideExcludedDir(filePath: string, excludedDirName: string): boolean {
+  const normalizedExcludedName = excludedDirName.trim().replace(/^\.?\//, '').replace(/\/+$/, '');
+  if (!normalizedExcludedName) {
+    return false;
+  }
+
+  const segments = filePath.split(/[/\\]+/).filter(Boolean);
+  return segments.includes(normalizedExcludedName);
 }
 
 function isSearchNoMatchError(err: unknown): boolean {
@@ -244,113 +387,59 @@ function sanitizeExcludedDirs(custom: string[] | undefined): string[] {
   return normalized.length > 0 ? normalized : DEFAULT_SEARCH_EXCLUDED_DIRS;
 }
 
-function getEffectiveExcludedDirs(args: {
-  configuredExcludedDirs: string[];
-  hasCustomExcludedDirs: boolean;
-  ignoreFilesPresent: boolean;
-  dir: string;
-  includeIgnored: boolean;
-}): string[] {
-  const protectedDirs = PROTECTED_STATE_DIRS.filter((name) => !isExplicitlyTargetingExcludedDir(args.dir, name));
-
-  if (args.includeIgnored) {
-    return protectedDirs;
+function getCustomExcludedDirs(configuredExcludedDirs: string[], hasCustomExcludedDirs: boolean): string[] {
+  if (!hasCustomExcludedDirs) {
+    return [];
   }
 
-  const shouldUseConfiguredExcludedDirs = args.hasCustomExcludedDirs || !args.ignoreFilesPresent;
-  if (!shouldUseConfiguredExcludedDirs) {
-    return protectedDirs;
+  const nonProtectedDirs = configuredExcludedDirs.filter((name) => !PROTECTED_STATE_DIRS.includes(name));
+  if (nonProtectedDirs.every((name) => DEFAULT_SEARCH_EXCLUDED_DIRS.includes(name))) {
+    return [];
   }
 
-  const configuredDirs = args.configuredExcludedDirs.filter((name) => !isExplicitlyTargetingExcludedDir(args.dir, name));
-  return [...new Set([...protectedDirs, ...configuredDirs])];
+  return nonProtectedDirs;
 }
 
-function findNearestIgnoreContext(startDir: string): IgnoreContext | undefined {
+function getProtectedExcludedDirs(dir: string): string[] {
+  return PROTECTED_STATE_DIRS.filter((name) => !isExplicitlyTargetingExcludedDir(dir, name));
+}
+
+function getFallbackExcludedDirs(args: {
+  dir: string;
+  fallbackExcludedDirs: string[];
+}): string[] {
+  return [
+    ...new Set([
+      ...getProtectedExcludedDirs(args.dir),
+      ...args.fallbackExcludedDirs.filter((name) => !isExplicitlyTargetingExcludedDir(args.dir, name)),
+    ]),
+  ];
+}
+
+function findProjectIgnoreFile(startDir: string, stopDir: string): string | undefined {
   let currentDir = resolve(startDir);
+  const normalizedStopDir = resolve(stopDir);
+  const homeDir = homedir();
 
   while (true) {
-    const ignoreFilePaths = IGNORE_FILE_NAMES
-      .map((fileName) => resolve(currentDir, fileName))
-      .filter((filePath) => existsSync(filePath));
-    if (ignoreFilePaths.length > 0) {
-      return { root: currentDir, ignoreFilePaths };
+    for (const fileName of PROJECT_IGNORE_FILE_NAMES) {
+      const ignoreFilePath = resolve(currentDir, fileName);
+      if (existsSync(ignoreFilePath)) {
+        return ignoreFilePath;
+      }
+    }
+
+    if (currentDir === normalizedStopDir || currentDir === homeDir) {
+      return undefined;
     }
 
     const parentDir = dirname(currentDir);
     if (parentDir === currentDir) {
       return undefined;
     }
+
     currentDir = parentDir;
   }
-}
-
-function determineSearchRoot(dir: string, ignoreContext: IgnoreContext | undefined): string {
-  return ignoreContext?.root ?? dir;
-}
-
-function determineSearchTarget(dir: string, searchRoot: string): string {
-  if (searchRoot === dir) {
-    return '.';
-  }
-
-  const normalizedRoot = searchRoot.replace(/[/\\]+$/, '');
-  const normalizedDir = dir.replace(/[/\\]+$/, '');
-  if (normalizedDir.startsWith(`${normalizedRoot}/`) || normalizedDir.startsWith(`${normalizedRoot}\\`)) {
-    return normalizedDir.slice(normalizedRoot.length + 1);
-  }
-
-  return dir;
-}
-
-function parseSimpleIgnoredDirNames(ignoreFilePaths: string[]): string[] {
-  const names = new Set<string>();
-
-  for (const ignoreFilePath of ignoreFilePaths) {
-    const fileText = readIgnoreFile(ignoreFilePath);
-    if (!fileText) {
-      continue;
-    }
-
-    for (const rawLine of fileText.split(/\r?\n/)) {
-      const parsed = parseSimpleIgnoredDirName(rawLine);
-      if (parsed) {
-        names.add(parsed);
-      }
-    }
-  }
-
-  return [...names];
-}
-
-function readIgnoreFile(filePath: string): string | undefined {
-  try {
-    return readFileSync(filePath, 'utf8');
-  } catch {
-    return undefined;
-  }
-}
-
-function parseSimpleIgnoredDirName(rawLine: string): string | undefined {
-  const trimmed = rawLine.trim();
-  if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('!')) {
-    return undefined;
-  }
-
-  const withoutLeadingSlash = trimmed.replace(/^\//, '');
-  const normalized = withoutLeadingSlash.endsWith('/')
-    ? withoutLeadingSlash.slice(0, -1)
-    : withoutLeadingSlash;
-
-  if (!normalized || normalized.includes('/') || normalized.includes('\\')) {
-    return undefined;
-  }
-
-  if (/[*?[\]{}]/.test(normalized)) {
-    return undefined;
-  }
-
-  return normalized;
 }
 
 function isExplicitlyTargetingExcludedDir(dir: string, excludedName: string): boolean {

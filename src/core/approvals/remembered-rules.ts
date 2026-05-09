@@ -120,14 +120,14 @@ export function describeProjectApprovalRule(rule: ProjectApprovalRule): string {
   }
 
   if (rule.tool === 'read_file' || rule.tool === 'list_files') {
-    return `allow ${rule.tool} ${rule.command} for this project`;
+    return `allow ${rule.tool} for this project`;
   }
 
   if (rule.mode === 'prefix') {
     return `allow ${rule.command} command family for this project`;
   }
 
-  return `allow exact command ${rule.command} for this project`;
+  return 'allow exact command';
 }
 
 export function extractApprovalTarget(tool: string, input: unknown): string | undefined {

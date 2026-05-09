@@ -104,7 +104,7 @@ export function summarizePendingApproval(pendingApproval: PendingApproval): Appr
       capability: policy?.capability,
       why,
       effects,
-      rememberLabel: pendingApproval.rememberLabel,
+      rememberLabel: formatRememberLabel(pendingApproval.rememberLabel),
     };
   }
 
@@ -121,7 +121,7 @@ export function summarizePendingApproval(pendingApproval: PendingApproval): Appr
         editPath ? `modifies ${editPath}` : `modifies a ${scope} file`,
         scope === 'external' ? 'writes outside the current repository' : 'stays inside the current repository',
       ],
-      rememberLabel: pendingApproval.rememberLabel,
+      rememberLabel: formatRememberLabel(pendingApproval.rememberLabel),
     };
   }
 
@@ -133,7 +133,7 @@ export function summarizePendingApproval(pendingApproval: PendingApproval): Appr
       scope: path.startsWith('../') || path.startsWith('/') || path.includes('..\\') ? 'external' : 'workspace',
       why: `${pendingApproval.call.tool} on ${path}`,
       effects: [describePathAwareToolEffect(pendingApproval.call.tool, path)],
-      rememberLabel: pendingApproval.rememberLabel,
+      rememberLabel: formatRememberLabel(pendingApproval.rememberLabel),
     };
   }
 
@@ -141,8 +141,24 @@ export function summarizePendingApproval(pendingApproval: PendingApproval): Appr
     title: `Allow ${pendingApproval.call.tool}`,
     why: 'approval required for this tool call',
     effects: ['tool-specific side effects are not yet summarized'],
-    rememberLabel: pendingApproval.rememberLabel,
+    rememberLabel: formatRememberLabel(pendingApproval.rememberLabel),
   };
+}
+
+function formatRememberLabel(label: string | undefined): string | undefined {
+  if (!label) {
+    return undefined;
+  }
+
+  if (/^allow exact command .+ for this project$/.test(label)) {
+    return 'allow exact command';
+  }
+
+  if (/^allow (read_file|list_files) .+ for this project$/.test(label)) {
+    return label.replace(/^allow (read_file|list_files) .+ for this project$/, 'allow $1 for this project');
+  }
+
+  return label;
 }
 
 export function normalizeInlineText(value: string): string {
