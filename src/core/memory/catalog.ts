@@ -174,7 +174,7 @@ export function appendMemoryCatalogSystemContext(options: {
   const memoryContext = formatMemoryCatalogSystemContext(catalog);
   const domainContext = buildMemoryDomainSystemContext();
   const context = `${domainContext}\n\n${memoryContext}`;
-  return options.systemContext ? `${options.systemContext}\n\n${context}` : context;
+  return options.systemContext ? `${context}\n\n${options.systemContext}` : context;
 }
 
 export function validateMemoryCatalogShape(options: { memoryRoot: string }): MemoryCatalogShapeValidation {

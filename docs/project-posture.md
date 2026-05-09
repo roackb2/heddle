@@ -2,6 +2,8 @@
 
 This is the short orientation doc for coding agents working in Heddle. Read it
 after `docs/agent-context.md` and before changing non-trivial behavior.
+`HEDDLE.md` is the Heddle-native project instruction entrypoint and should stay
+small enough to route agents here instead of duplicating this document.
 
 ## Identity
 

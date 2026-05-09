@@ -165,6 +165,9 @@ describe('resolveChatRuntimeConfig', () => {
     expect(runtime.systemContext).toContain('Source: AGENTS.md');
     expect(runtime.systemContext).toContain('## Workspace Memory Catalog');
     expect(runtime.systemContext).toContain('- Read current-state first.');
+    expect(runtime.systemContext!.indexOf('## Workspace Memory Catalog')).toBeLessThan(
+      runtime.systemContext!.indexOf('Source: AGENTS.md')
+    );
   });
 
   it('resolves the default credential store to an auth file path', () => {

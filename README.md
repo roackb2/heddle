@@ -200,6 +200,14 @@ The terminal composer supports multiline prompts, prompt undo/redo, prompt histo
 
 More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
 
+### Project instructions
+
+Heddle can load a short project instruction file at startup so a fresh session starts with the repository's operating context. By default it loads the first non-empty file found in this order: `HEDDLE.md`, `AGENTS.md`, `CLAUDE.md`.
+
+Only one default file is loaded to preserve context space. If a project needs a different path or intentionally wants multiple files, set `agentContextPaths` in `heddle.config.json`.
+
+More: [Project config](docs/reference/config.md)
+
 ### Sessions and continuity
 
 Heddle keeps saved sessions under `.heddle/` so longer work does not have to reset every time. That means you can come back to an interrupted task, continue a previous debugging thread, or preserve project-specific context across runs.

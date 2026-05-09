@@ -27,6 +27,7 @@ import { startChatCli } from './chat/index.js';
 import { runDaemonCli } from './daemon.js';
 import { runEvalCli } from './eval/index.js';
 import { parseHeartbeatArgs, runHeartbeatCli } from './heartbeat.js';
+import { loadProjectAgentContext, resolveAgentContextPaths } from './project-agent-context.js';
 import { runSessionCli } from './session.js';
 import {
   daemonStartConflictMessage,
@@ -516,7 +517,10 @@ function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
     stateDir: projectConfig.stateDir ?? '.heddle',
     directShellApproval: projectConfig.directShellApproval ?? 'never',
     searchIgnoreDirs: projectConfig.searchIgnoreDirs ?? [],
-    systemContext: loadProjectAgentContext(workspaceRoot, projectConfig.agentContextPaths ?? ['AGENTS.md']),
+    systemContext: loadProjectAgentContext(
+      workspaceRoot,
+      resolveAgentContextPaths(workspaceRoot, projectConfig.agentContextPaths)
+    ),
     runtimeHost: resolveWorkspaceRuntimeHost({
       workspaceRoot,
       stateRoot,
@@ -662,31 +666,9 @@ function initializeProjectConfig(workspaceRoot: string) {
     stateDir: '.heddle',
     directShellApproval: 'never',
     searchIgnoreDirs: ['.git', 'dist', 'node_modules', '.heddle'],
-    agentContextPaths: ['AGENTS.md'],
   };
   writeFileSync(configPath, `${JSON.stringify(template, null, 2)}\n`);
   process.stdout.write(`Created ${configPath}\n`);
-}
-
-function loadProjectAgentContext(workspaceRoot: string, paths: string[]): string | undefined {
-  const sections = paths.flatMap((relativePath) => {
-    const filePath = resolve(workspaceRoot, relativePath);
-    if (!existsSync(filePath)) {
-      return [];
-    }
-
-    try {
-      const content = readFileSync(filePath, 'utf8').trim();
-      if (!content) {
-        return [];
-      }
-      return [`Source: ${relativePath}\n${truncate(content, 12000)}`];
-    } catch {
-      return [];
-    }
-  });
-
-  return sections.length > 0 ? sections.join('\n\n') : undefined;
 }
 
 function parsePositiveInt(raw: string | undefined): number | undefined {
@@ -702,13 +684,6 @@ function parsePositiveInt(raw: string | undefined): number | undefined {
   return value;
 }
 
-function truncate(value: string, maxLength: number): string {
-  if (value.length <= maxLength) {
-    return value;
-  }
-
-  return `${value.slice(0, maxLength - 1)}…`;
-}
 
 main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);

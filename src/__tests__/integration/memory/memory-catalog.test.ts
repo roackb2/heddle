@@ -86,6 +86,8 @@ describe('memory catalog', () => {
     expect(context).toContain(`Source: ${join(memoryRoot, 'README.md')}`);
     expect(context).toContain('Startup memory policy: this is the only memory document loaded automatically.');
     expect(context).not.toContain('# Current State');
+    expect(context.indexOf('## Heddle-Managed Memory Domain')).toBeLessThan(context.indexOf('Source: AGENTS.md'));
+    expect(context.indexOf('## Workspace Memory Catalog')).toBeLessThan(context.indexOf('Source: AGENTS.md'));
   });
 
   it('reports missing folder catalogs', () => {

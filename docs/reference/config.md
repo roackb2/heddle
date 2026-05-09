@@ -10,8 +10,7 @@ Heddle can store project defaults in `heddle.config.json` so you do not have to 
   "maxSteps": 100,
   "stateDir": ".heddle",
   "directShellApproval": "never",
-  "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"],
-  "agentContextPaths": ["AGENTS.md"]
+  "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"]
 }
 ```
 
@@ -30,7 +29,7 @@ Configuration is applied in this order:
 - `stateDir`: where Heddle stores sessions, traces, approvals, logs, and memory
 - `directShellApproval`: whether explicit `!command` usage in chat still requires approval
 - `searchIgnoreDirs`: directories excluded from routine `search_files` calls
-- `agentContextPaths`: project instruction files injected into the system prompt
+- `agentContextPaths`: optional project instruction files injected into the system prompt. When omitted, Heddle loads the first non-empty file found in this order: `HEDDLE.md`, `AGENTS.md`, `CLAUDE.md`. Only one default file is loaded to preserve context space. If configured, Heddle uses the listed paths exactly, so advanced projects can opt into custom names or multiple files.
 
 ## When To Use Config
 
@@ -40,7 +39,7 @@ Configuration is applied in this order:
 - you want a non-default state directory
 - you want predictable shell approval behavior in a shared workflow
 - your repository has directories that should stay out of routine search unless explicitly targeted
-- the project relies on one or more instruction files such as `AGENTS.md`
+- the project relies on custom instruction paths beyond the default `HEDDLE.md`, `AGENTS.md`, or `CLAUDE.md` discovery order
 
 ## See Also
 
