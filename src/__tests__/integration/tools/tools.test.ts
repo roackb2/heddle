@@ -305,7 +305,7 @@ describe('readFileTool', () => {
 });
 
 describe('searchFilesTool', () => {
-  it('ignores generated directories like dist and node_modules by default', async () => {
+  it('uses fallback excludes when no project ignore file is present', async () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-search-'));
     await mkdir(join(root, 'src'));
     await mkdir(join(root, 'dist'));
@@ -320,6 +320,26 @@ describe('searchFilesTool', () => {
     expect(result.output).toContain('src/main.ts');
     expect(result.output).not.toContain('dist/generated.ts');
     expect(result.output).not.toContain('node_modules/pkg.ts');
+  });
+
+  it('uses project ignore files as the primary ignore source when present on the current search path', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-search-gitignore-'));
+    await mkdir(join(root, 'packages'));
+    await mkdir(join(root, 'packages', 'app'));
+    await mkdir(join(root, 'packages', 'app', 'src'));
+    await mkdir(join(root, 'packages', 'app', 'dist'));
+    await mkdir(join(root, 'packages', 'app', 'node_modules'));
+    await writeFile(join(root, 'packages', 'app', '.gitignore'), 'dist\n');
+    await writeFile(join(root, 'packages', 'app', 'src', 'main.ts'), 'const needle = true;\n');
+    await writeFile(join(root, 'packages', 'app', 'dist', 'generated.ts'), 'const needle = true;\n');
+    await writeFile(join(root, 'packages', 'app', 'node_modules', 'pkg.ts'), 'const needle = true;\n');
+
+    const result = await searchFilesTool.execute({ query: 'needle', path: join(root, 'packages', 'app') });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('src/main.ts');
+    expect(result.output).not.toContain('dist/generated.ts');
+    expect(result.output).toContain('node_modules/pkg.ts');
   });
 
   it('supports project-specific excluded directories', async () => {
@@ -337,10 +357,43 @@ describe('searchFilesTool', () => {
     expect(result.output).not.toContain('vendor/hidden.ts');
   });
 
+  it('keeps grep fallback aligned with .gitignore dir ignores', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-search-grep-gitignore-'));
+    await mkdir(join(root, 'src'));
+    await mkdir(join(root, 'dist'));
+    await writeFile(join(root, '.gitignore'), 'dist\n');
+    await writeFile(join(root, 'src', 'main.ts'), 'const needle = true;\n');
+    await writeFile(join(root, 'dist', 'generated.ts'), 'const needle = true;\n');
+
+    const tool = createSearchFilesTool({ backend: 'grep' });
+    const result = await tool.execute({ query: 'needle', path: root });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('src/main.ts');
+    expect(result.output).not.toContain('dist/generated.ts');
+  });
+
+  it('keeps grep fallback aligned with .gitignore dir ignores that use trailing slashes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-search-grep-gitignore-slash-'));
+    await mkdir(join(root, 'src'));
+    await mkdir(join(root, 'dist'));
+    await writeFile(join(root, '.gitignore'), 'dist/\n');
+    await writeFile(join(root, 'src', 'main.ts'), 'const needle = true;\n');
+    await writeFile(join(root, 'dist', 'generated.ts'), 'const needle = true;\n');
+
+    const tool = createSearchFilesTool({ backend: 'grep' });
+    const result = await tool.execute({ query: 'needle', path: root });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('src/main.ts');
+    expect(result.output).not.toContain('dist/generated.ts');
+  });
+
   it('allows ignored dependency folders when includeIgnored is true', async () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-search-include-ignored-'));
     await mkdir(join(root, 'src'));
     await mkdir(join(root, 'node_modules'));
+    await writeFile(join(root, '.gitignore'), 'node_modules\n');
     await writeFile(join(root, 'src', 'main.ts'), 'const needle = true;\n');
     await writeFile(join(root, 'node_modules', 'pkg.ts'), 'const needle = true;\n');
 
@@ -351,11 +404,28 @@ describe('searchFilesTool', () => {
     expect(result.output).toContain('node_modules/pkg.ts');
   });
 
-  it('keeps state folders excluded with includeIgnored unless explicitly targeted', async () => {
+  it('allows ignored dependency folders through grep fallback when includeIgnored is true', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-search-grep-include-ignored-'));
+    await mkdir(join(root, 'src'));
+    await mkdir(join(root, 'node_modules'));
+    await writeFile(join(root, '.gitignore'), 'node_modules\n');
+    await writeFile(join(root, 'src', 'main.ts'), 'const needle = true;\n');
+    await writeFile(join(root, 'node_modules', 'pkg.ts'), 'const needle = true;\n');
+
+    const tool = createSearchFilesTool({ backend: 'grep' });
+    const result = await tool.execute({ query: 'needle', path: root, includeIgnored: true });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('src/main.ts');
+    expect(result.output).toContain('node_modules/pkg.ts');
+  });
+
+  it('keeps protected state folders excluded with includeIgnored unless explicitly targeted', async () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-search-state-default-'));
     await mkdir(join(root, 'src'));
     await mkdir(join(root, '.heddle'), { recursive: true });
     await mkdir(join(root, '.heddle', 'traces'));
+    await writeFile(join(root, '.gitignore'), '.heddle\n');
     await writeFile(join(root, 'src', 'main.ts'), 'const needle = true;\n');
     await writeFile(join(root, '.heddle', 'traces', 'trace-1.json'), '{"needle":true}\n');
 
@@ -366,7 +436,24 @@ describe('searchFilesTool', () => {
     expect(result.output).not.toContain('.heddle/traces/trace-1.json');
   });
 
-  it('searches inside an explicitly targeted excluded directory', async () => {
+  it('keeps .heddle excluded through grep fallback unless explicitly targeted', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-search-grep-heddle-'));
+    await mkdir(join(root, 'src'));
+    await mkdir(join(root, '.heddle'), { recursive: true });
+    await mkdir(join(root, '.heddle', 'traces'));
+    await writeFile(join(root, '.gitignore'), '.heddle\n');
+    await writeFile(join(root, 'src', 'main.ts'), 'const needle = true;\n');
+    await writeFile(join(root, '.heddle', 'traces', 'trace-1.json'), '{"needle":true}\n');
+
+    const tool = createSearchFilesTool({ backend: 'grep' });
+    const result = await tool.execute({ query: 'needle', path: root });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('src/main.ts');
+    expect(result.output).not.toContain('trace-1.json');
+  });
+
+  it('searches inside an explicitly targeted protected directory', async () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-search-state-'));
     await mkdir(join(root, '.heddle'));
     await mkdir(join(root, '.heddle', 'traces'));
@@ -375,7 +462,7 @@ describe('searchFilesTool', () => {
     const result = await searchFilesTool.execute({ query: 'needle', path: join(root, '.heddle') });
 
     expect(result.ok).toBe(true);
-    expect(result.output).toContain('.heddle/traces/trace-1.json');
+    expect(result.output).toContain('traces/trace-1.json');
   });
 
   it('rejects invalid includeIgnored input', async () => {
