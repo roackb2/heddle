@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createChatTurnPersistenceArtifacts } from '../../../core/chat/engine/turns/result.js';
-import { createLiveTraceWriter } from '../../../core/chat/engine/turns/trace.js';
+import { compactTraceForPersistence, createLiveTraceWriter } from '../../../core/chat/engine/turns/trace.js';
 import { loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/storage.js';
 import { persistCompletedChatTurn } from '../../../core/chat/engine/turns/persistence.js';
 import { createTraceSummarizerRegistry } from '../../../core/observability/trace-summarizers.js';
@@ -19,10 +19,18 @@ describe('chat turn persistence', () => {
     writer.record({
       type: 'assistant.progress',
       kind: 'reasoning_summary',
-      text: 'Thinking: Inspecting project context.',
+      text: 'Thinking: Inspecting',
       done: false,
       step: 1,
       timestamp: '2026-05-02T00:00:00.000Z',
+    });
+    writer.record({
+      type: 'assistant.progress',
+      kind: 'reasoning_summary',
+      text: 'Thinking: Inspecting project context.',
+      done: false,
+      step: 1,
+      timestamp: '2026-05-02T00:00:00.500Z',
     });
 
     await expect(readTraceFile(writer.traceFile)).resolves.toEqual([
@@ -46,6 +54,53 @@ describe('chat turn persistence', () => {
       expect.objectContaining({
         type: 'run.finished',
         outcome: 'done',
+      }),
+    ]);
+  });
+
+  it('compacts consecutive assistant progress snapshots before saving the final trace', async () => {
+    expect(compactTraceForPersistence([
+      {
+        type: 'assistant.progress',
+        kind: 'reasoning_summary',
+        text: 'Thinking: Inspecting',
+        done: false,
+        step: 1,
+        timestamp: '2026-05-02T00:00:00.000Z',
+      },
+      {
+        type: 'assistant.progress',
+        kind: 'reasoning_summary',
+        text: 'Thinking: Inspecting project context.',
+        done: false,
+        step: 1,
+        timestamp: '2026-05-02T00:00:00.500Z',
+      },
+      {
+        type: 'tool.call',
+        call: { id: 'call-1', tool: 'read_file', input: { path: 'README.md' } },
+        step: 1,
+        timestamp: '2026-05-02T00:00:01.000Z',
+      },
+      {
+        type: 'assistant.progress',
+        kind: 'reasoning_summary',
+        text: 'Thinking: Summarizing findings.',
+        done: false,
+        step: 2,
+        timestamp: '2026-05-02T00:00:02.000Z',
+      },
+    ])).toEqual([
+      expect.objectContaining({
+        type: 'assistant.progress',
+        text: 'Thinking: Inspecting project context.',
+      }),
+      expect.objectContaining({
+        type: 'tool.call',
+      }),
+      expect.objectContaining({
+        type: 'assistant.progress',
+        text: 'Thinking: Summarizing findings.',
       }),
     ]);
   });

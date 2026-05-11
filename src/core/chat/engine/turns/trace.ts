@@ -15,7 +15,7 @@ export type LiveTraceWriter = {
 export function saveTrace(traceDir: string, trace: TraceEvent[], options: SaveTraceOptions = {}): string {
   mkdirSync(traceDir, { recursive: true });
   const traceFile = options.traceFile ?? join(traceDir, `trace-${Date.now()}.json`);
-  writeFileSync(traceFile, JSON.stringify(trace, null, 2));
+  writeFileSync(traceFile, JSON.stringify(compactTraceForPersistence(trace), null, 2));
   return traceFile;
 }
 
@@ -34,4 +34,29 @@ export function createLiveTraceWriter(traceDir: string): LiveTraceWriter {
       return saveTrace(traceDir, events, { traceFile });
     },
   };
+}
+
+export function compactTraceForPersistence(trace: TraceEvent[]): TraceEvent[] {
+  const compacted: TraceEvent[] = [];
+
+  for (const event of trace) {
+    if (event.type !== 'assistant.progress') {
+      compacted.push(event);
+      continue;
+    }
+
+    const previous = compacted.at(-1);
+    if (
+      previous?.type === 'assistant.progress'
+      && previous.step === event.step
+      && previous.kind === event.kind
+    ) {
+      compacted[compacted.length - 1] = event;
+      continue;
+    }
+
+    compacted.push(event);
+  }
+
+  return compacted;
 }
