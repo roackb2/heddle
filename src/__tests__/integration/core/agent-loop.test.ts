@@ -298,6 +298,7 @@ describe('createDefaultAgentTools', () => {
     });
 
     expect(withPlan.map((tool) => tool.name)).toEqual([
+      'working_environment',
       'list_files',
       'read_file',
       'edit_file',
@@ -316,6 +317,7 @@ describe('createDefaultAgentTools', () => {
       'run_shell_mutate',
     ]);
     expect(withoutPlan.map((tool) => tool.name)).toEqual([
+      'working_environment',
       'list_files',
       'read_file',
       'edit_file',
