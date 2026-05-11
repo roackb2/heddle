@@ -22,6 +22,7 @@ export type PersistChatTurnResultArgs = {
   model: string;
   stateRoot: string;
   traceDir: string;
+  traceFile?: string;
   systemContext?: string;
   toolNames: string[];
   historyForTokenEstimate: ChatMessage[];
@@ -57,7 +58,7 @@ export async function createChatTurnPersistenceArtifacts(
     summarizer: args.summarizer,
     onStatusChange: (event) => args.onCompactionStatus?.(event, args.result.transcript),
   });
-  const traceFile = saveTrace(args.traceDir, args.result.trace);
+  const traceFile = saveTrace(args.traceDir, args.result.trace, { traceFile: args.traceFile });
   const turn: TurnSummary = {
     id: args.createTurnId(),
     prompt: args.prompt,

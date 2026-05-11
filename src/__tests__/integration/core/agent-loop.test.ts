@@ -192,7 +192,7 @@ describe('runAgentLoop', () => {
     }));
   });
 
-  it('logs streamed reasoning summaries for live run diagnostics', async () => {
+  it('keeps assistant progress snapshots out of info logs', async () => {
     const logger = {
       info: vi.fn(),
       debug: vi.fn(),
@@ -225,10 +225,16 @@ describe('runAgentLoop', () => {
       logger,
     });
 
-    expect(logger.info).toHaveBeenCalledWith(
+    expect(logger.debug).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: 'reasoning_summary',
         text: 'Thinking: Checking current files before editing.',
+      }),
+      'Assistant stream update',
+    );
+    expect(logger.info).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'reasoning_summary',
       }),
       'Assistant stream update',
     );

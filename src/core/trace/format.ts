@@ -31,6 +31,14 @@ export function formatTraceForConsole(trace: TraceEvent[]): string {
         );
         break;
 
+      case 'assistant.progress':
+        lines.push(
+          `${COLORS.magenta}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}Assistant Progress:${COLORS.reset} ${event.kind}${event.done ? ' done' : ''}`,
+          `  ${truncate(event.text, 500)}`,
+          '',
+        );
+        break;
+
       case 'assistant.turn': {
         const requestedToolNames = event.toolCalls?.map((call) => call.tool) ?? [];
         lines.push(

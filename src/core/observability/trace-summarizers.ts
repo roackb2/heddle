@@ -28,6 +28,7 @@ export type TraceSummarizerRegistry = {
 
 export const DEFAULT_TRACE_SUMMARIZERS: TraceSummarizerMap = {
   'run.started': () => undefined,
+  'assistant.progress': () => undefined,
   'assistant.turn': (event) => [
     ...(event.diagnostics?.rationale ? [`reasoning: ${truncate(event.diagnostics.rationale, 140)}`] : []),
     event.requestedTools ?

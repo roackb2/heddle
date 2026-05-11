@@ -330,6 +330,51 @@ describe('runAgent', () => {
       text: 'Hello world',
       done: true,
     });
+    expect(result.trace).toContainEqual(expect.objectContaining({
+      type: 'assistant.progress',
+      step: 1,
+      text: 'Hello world',
+      done: true,
+      kind: 'content',
+    }));
+  });
+
+  it('records coalesced reasoning progress snapshots instead of every reasoning delta', async () => {
+    const streamUpdates: Array<{ text: string; done: boolean; kind: string }> = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(_messages, _tools, _signal, onStreamEvent): Promise<LlmResponse> {
+        for (const delta of ['Inspecting', ' the', ' current', ' files', ' before', ' editing']) {
+          onStreamEvent?.({ type: 'reasoning_summary.delta', delta });
+        }
+        onStreamEvent?.({ type: 'reasoning_summary.done', text: 'Inspecting the current files before editing.' });
+        return {
+          content: 'Done.',
+        };
+      },
+    };
+
+    const result = await runAgent({
+      goal: 'Work carefully.',
+      llm: fakeLlm,
+      tools: [],
+      maxSteps: 1,
+      logger: silentLogger,
+      onAssistantStream: (update) => {
+        streamUpdates.push(update);
+      },
+    });
+
+    const progressEvents = result.trace.filter((event) => event.type === 'assistant.progress');
+    expect(result.outcome).toBe('done');
+    expect(streamUpdates).toHaveLength(2);
+    expect(progressEvents).toHaveLength(2);
+    expect(progressEvents.at(-1)).toMatchObject({
+      type: 'assistant.progress',
+      step: 1,
+      text: 'Thinking: Inspecting the current files before editing.',
+      done: false,
+      kind: 'reasoning_summary',
+    });
   });
 
   it('allows one repeated identical tool call, then blocks excessive repetition', async () => {

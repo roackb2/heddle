@@ -25,7 +25,7 @@ import type { ToolApprovalPolicy } from '../approvals/types.js';
 const PLAN_ITEM_STATUSES = new Set<PlanItem['status']>(['pending', 'in_progress', 'completed']);
 
 const DEFAULT_MAX_STEPS = 100;
-const STREAM_UPDATE_INTERVAL_MS = 75;
+const STREAM_UPDATE_INTERVAL_MS = 500;
 const INTERRUPTED_SUMMARY = 'Run interrupted by host request';
 
 export type RunAgentOptions = {
@@ -230,40 +230,55 @@ async function requestModelTurn(context: RunContext): Promise<LlmResponse | RunR
   try {
     let streamedContent = '';
     let streamedReasoningSummary = '';
-    let lastStreamRecordAt = 0;
+    let lastContentStreamRecordAt = 0;
+    let lastReasoningStreamRecordAt = 0;
+    const emitStreamProgress = (
+      kind: AssistantStreamKind,
+      text: string,
+      done: boolean,
+      options: { force?: boolean } = {},
+    ) => {
+      const nowMs = Date.now();
+      const lastStreamRecordAt = kind === 'content' ? lastContentStreamRecordAt : lastReasoningStreamRecordAt;
+      if (!options.force && nowMs - lastStreamRecordAt < STREAM_UPDATE_INTERVAL_MS) {
+        return;
+      }
+
+      if (kind === 'content') {
+        lastContentStreamRecordAt = nowMs;
+      } else {
+        lastReasoningStreamRecordAt = nowMs;
+      }
+
+      const update: AssistantStreamUpdate = { step: context.state.step, text, done, kind };
+      context.record({
+        type: 'assistant.progress',
+        ...update,
+        timestamp: context.now(),
+      });
+      context.onAssistantStream?.(update);
+    };
     const response = await context.llm.chat(
       context.messages,
       context.registry.list(),
       context.abortSignal,
       (event: LlmStreamEvent) => {
         if (event.type === 'content.delta') {
-          const nowMs = Date.now();
-          if (nowMs - lastStreamRecordAt < STREAM_UPDATE_INTERVAL_MS) {
-            streamedContent += event.delta;
-            context.onAssistantStream?.({ step: context.state.step, text: streamedContent, done: false, kind: 'content' });
-            return;
-          }
-          lastStreamRecordAt = nowMs;
           streamedContent += event.delta;
-          context.onAssistantStream?.({ step: context.state.step, text: streamedContent, done: false, kind: 'content' });
+          emitStreamProgress('content', streamedContent, false);
           return;
         }
 
         if (event.type === 'content.done') {
           streamedContent = event.content;
-          context.onAssistantStream?.({ step: context.state.step, text: streamedContent, done: true, kind: 'content' });
+          emitStreamProgress('content', streamedContent, true, { force: true });
           return;
         }
 
         if (event.type === 'reasoning_summary.delta') {
           streamedReasoningSummary += event.delta;
           if (!streamedContent) {
-            context.onAssistantStream?.({
-              step: context.state.step,
-              text: formatReasoningSummaryStream(streamedReasoningSummary),
-              done: false,
-              kind: 'reasoning_summary',
-            });
+            emitStreamProgress('reasoning_summary', formatReasoningSummaryStream(streamedReasoningSummary), false);
           }
           return;
         }
@@ -271,12 +286,7 @@ async function requestModelTurn(context: RunContext): Promise<LlmResponse | RunR
         if (event.type === 'reasoning_summary.done') {
           streamedReasoningSummary = event.text;
           if (!streamedContent) {
-            context.onAssistantStream?.({
-              step: context.state.step,
-              text: formatReasoningSummaryStream(streamedReasoningSummary),
-              done: false,
-              kind: 'reasoning_summary',
-            });
+            emitStreamProgress('reasoning_summary', formatReasoningSummaryStream(streamedReasoningSummary), false, { force: true });
           }
         }
       },

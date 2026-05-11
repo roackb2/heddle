@@ -1,8 +1,9 @@
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createChatTurnPersistenceArtifacts } from '../../../core/chat/engine/turns/result.js';
+import { createLiveTraceWriter } from '../../../core/chat/engine/turns/trace.js';
 import { loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/storage.js';
 import { persistCompletedChatTurn } from '../../../core/chat/engine/turns/persistence.js';
 import { createTraceSummarizerRegistry } from '../../../core/observability/trace-summarizers.js';
@@ -11,6 +12,44 @@ import type { ChatSession } from '../../../core/chat/types.js';
 import type { RunResult } from '../../../core/types.js';
 
 describe('chat turn persistence', () => {
+  it('writes live trace snapshots before final turn persistence', async () => {
+    const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-live-trace-'));
+    const writer = createLiveTraceWriter(join(stateRoot, 'traces'));
+
+    writer.record({
+      type: 'assistant.progress',
+      kind: 'reasoning_summary',
+      text: 'Thinking: Inspecting project context.',
+      done: false,
+      step: 1,
+      timestamp: '2026-05-02T00:00:00.000Z',
+    });
+
+    await expect(readTraceFile(writer.traceFile)).resolves.toEqual([
+      expect.objectContaining({
+        type: 'assistant.progress',
+        text: 'Thinking: Inspecting project context.',
+      }),
+    ]);
+
+    writer.replace([
+      {
+        type: 'run.finished',
+        outcome: 'done',
+        summary: 'Done.',
+        step: 1,
+        timestamp: '2026-05-02T00:00:01.000Z',
+      },
+    ]);
+
+    await expect(readTraceFile(writer.traceFile)).resolves.toEqual([
+      expect.objectContaining({
+        type: 'run.finished',
+        outcome: 'done',
+      }),
+    ]);
+  });
+
   it('uses a supplied trace summarizer registry for persisted turn events', async () => {
     const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-turn-persistence-'));
     const session = createSession();
@@ -136,4 +175,8 @@ function createSession(): ChatSession {
     createdAt: '2026-05-02T00:00:00.000Z',
     updatedAt: '2026-05-02T00:00:00.000Z',
   };
+}
+
+async function readTraceFile(path: string): Promise<unknown[]> {
+  return JSON.parse(await readFile(path, 'utf8')) as unknown[];
 }

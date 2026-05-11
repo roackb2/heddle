@@ -17,6 +17,7 @@ export type PersistCompletedChatTurnArgs = {
   model: string;
   stateRoot: string;
   traceDir: string;
+  traceFile?: string;
   systemContext?: string;
   toolNames: string[];
   historyForTokenEstimate: ChatMessage[];
@@ -33,6 +34,7 @@ export async function persistCompletedChatTurn(args: PersistCompletedChatTurnArg
     model: args.model,
     stateRoot: args.stateRoot,
     traceDir: args.traceDir,
+    traceFile: args.traceFile,
     systemContext: args.systemContext,
     toolNames: args.toolNames,
     historyForTokenEstimate: args.historyForTokenEstimate,

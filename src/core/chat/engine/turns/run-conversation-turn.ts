@@ -8,6 +8,7 @@ import { createChatTurnHostBridge } from './host-bridge.js';
 import { prepareChatSessionTurn } from './preflight.js';
 import { runInlineTurnMemoryMaintenance, scheduleBackgroundTurnMemoryMaintenance } from './memory-maintenance.js';
 import { persistCompletedChatTurn } from './persistence.js';
+import { createLiveTraceWriter } from './trace.js';
 import { releaseSessionLease, type ChatSessionLeaseOwner } from '../sessions/lease.js';
 import { loadChatSessions, saveChatSessions, touchSession } from '../sessions/storage.js';
 import type { ChatTurnHostPort } from './host-bridge.js';
@@ -79,6 +80,7 @@ export async function runConversationTurn(args: RunConversationTurnArgs): Promis
       throw new Error(preflight.message);
     }
 
+    const liveTrace = createLiveTraceWriter(args.traceDir);
     const result = await runAgentLoop({
       goal: args.prompt,
       model: runtime.model,
@@ -93,7 +95,10 @@ export async function runConversationTurn(args: RunConversationTurnArgs): Promis
       systemContext: runtime.systemContext,
       logger: args.logger,
       onAssistantStream: args.onAssistantStream,
-      onTraceEvent: args.onTraceEvent,
+      onTraceEvent: (event) => {
+        liveTrace.record(event);
+        args.onTraceEvent?.(event);
+      },
       onEvent: hostBridge.onAgentLoopEvent,
       approvalPolicies: args.approvalPolicies,
       approveToolCall: hostBridge.approveToolCall,
@@ -121,6 +126,7 @@ export async function runConversationTurn(args: RunConversationTurnArgs): Promis
       model: runtime.model,
       stateRoot: args.stateRoot,
       traceDir: args.traceDir,
+      traceFile: liveTrace.traceFile,
       systemContext: runtime.systemContext,
       toolNames,
       historyForTokenEstimate: session.history,

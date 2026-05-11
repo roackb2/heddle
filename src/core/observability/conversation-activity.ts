@@ -71,6 +71,7 @@ type CompactionProjectorMap = {
 
 const traceProjectors: TraceProjectorMap = {
   'run.started': (event) => [{ type: 'run.started', ...traceCorrelation(event) }],
+  'assistant.progress': () => [],
   'assistant.turn': (event) => [{
     type: 'assistant.turn',
     requestedTools: event.requestedTools,

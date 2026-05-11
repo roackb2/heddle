@@ -106,6 +106,8 @@ function formatTraceEvent(event: TraceEvent): string {
   switch (event.type) {
     case 'run.started':
       return `[trace] run.started goal=${JSON.stringify(shorten(event.goal))}`;
+    case 'assistant.progress':
+      return `[trace] assistant.progress step=${event.step} kind=${event.kind} done=${event.done} text=${JSON.stringify(shorten(event.text))}`;
     case 'assistant.turn':
       return `[trace] assistant.turn step=${event.step} tools=${event.requestedTools ? event.toolCalls?.map((call) => call.tool).join(',') || 'yes' : 'none'} content=${JSON.stringify(shorten(event.content))}`;
     case 'host.warning':

@@ -126,13 +126,14 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
     history: resolveHistory(options),
     systemContext: options.systemContext,
     onAssistantStream: (update) => {
-      logger.info({
+      const logStreamUpdate = update.done ? logger.info.bind(logger) : logger.debug.bind(logger);
+      logStreamUpdate({
         runId,
         step: update.step,
         kind: update.kind,
         done: update.done,
         text: truncate(update.text, 500),
-      }, 'Assistant stream update');
+      }, update.done ? 'Assistant stream complete' : 'Assistant stream update');
       options.onEvent?.({
         type: 'assistant.stream',
         runId,

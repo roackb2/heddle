@@ -63,6 +63,14 @@ export type StopReason = 'done' | 'max_steps' | 'error' | 'interrupted';
 export type TraceEvent =
   | { type: 'run.started'; goal: string; timestamp: string }
   | {
+      type: 'assistant.progress';
+      kind: 'content' | 'reasoning_summary';
+      text: string;
+      done: boolean;
+      step: number;
+      timestamp: string;
+    }
+  | {
       type: 'assistant.turn';
       content: string;
       requestedTools: boolean;
