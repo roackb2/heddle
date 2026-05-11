@@ -1,3 +1,4 @@
+import type { Logger } from 'pino';
 import { runAgentLoop } from '../../../runtime/agent-loop.js';
 import type { ToolApprovalPolicy } from '../../../approvals/types.js';
 import type { TraceSummarizerRegistry } from '../../../observability/trace-summarizers.js';
@@ -26,6 +27,7 @@ export type RunConversationTurnArgs = {
   host?: ChatTurnHostPort;
   approvalPolicies?: ToolApprovalPolicy[];
   traceSummarizerRegistry?: TraceSummarizerRegistry;
+  logger?: Logger;
   onCompactionStatus?: (event: ConversationCompactionStatus) => void;
   onAssistantStream?: Parameters<typeof runAgentLoop>[0]['onAssistantStream'];
   onTraceEvent?: Parameters<typeof runAgentLoop>[0]['onTraceEvent'];
@@ -89,6 +91,7 @@ export async function runConversationTurn(args: RunConversationTurnArgs): Promis
       includeDefaultTools: false,
       history: preflight.historyForRun,
       systemContext: runtime.systemContext,
+      logger: args.logger,
       onAssistantStream: args.onAssistantStream,
       onTraceEvent: args.onTraceEvent,
       onEvent: hostBridge.onAgentLoopEvent,

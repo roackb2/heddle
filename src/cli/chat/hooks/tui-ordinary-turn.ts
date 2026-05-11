@@ -1,3 +1,4 @@
+import type { Logger } from 'pino';
 import type { RunResult } from '../../../index.js';
 import { runConversationTurn } from '../../../core/chat/engine/turns/run-conversation-turn.js';
 import type { ChatSession } from '../state/types.js';
@@ -18,6 +19,7 @@ export async function executeTuiOrdinaryTurn(args: {
   displayText?: string;
   sessionId: string;
   runtime: ChatRuntimeConfig;
+  logger: Logger;
   state: ActionState;
   updateSessionById: SessionUpdater;
   parsePlanState: ParsePlanState;
@@ -33,6 +35,7 @@ export async function executeTuiOrdinaryTurn(args: {
     displayText,
     sessionId,
     runtime,
+    logger,
     state,
     updateSessionById,
     parsePlanState,
@@ -80,6 +83,7 @@ export async function executeTuiOrdinaryTurn(args: {
     preferApiKey: runtime.preferApiKey,
     credentialStorePath: runtime.credentialStorePath,
     systemContext: runtime.systemContext,
+    logger,
     memoryMaintenanceMode: 'background',
     host: {
       events: {

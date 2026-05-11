@@ -44,6 +44,7 @@ describe('formatTraceForConsole', () => {
         type: 'assistant.turn',
         content: 'I need to inspect the environment before answering.',
         diagnostics: {
+          rationale: 'I should inspect before making a claim.',
           missing: ['Need the current directory contents'],
           wantedTools: ['list_files'],
           wantedInputs: ['path=.'],
@@ -55,6 +56,7 @@ describe('formatTraceForConsole', () => {
       },
     ]);
 
+    expect(output).toContain('Rationale: I should inspect before making a claim.');
     expect(output).toContain('Missing: Need the current directory contents');
     expect(output).toContain('Wanted Tools: list_files');
     expect(output).toContain('Wanted Inputs: path=.');

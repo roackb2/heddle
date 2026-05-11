@@ -1,7 +1,8 @@
 import { mkdir, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import type { Logger } from 'pino';
+import { describe, expect, it, vi } from 'vitest';
 import { runAgentLoop } from '../../../core/runtime/agent-loop.js';
 import { createAgentLoopCheckpoint, getHistoryFromAgentLoopCheckpoint, getHistoryFromAgentLoopState } from '../../../core/runtime/events.js';
 import { createDefaultAgentTools } from '../../../core/runtime/default-tools.js';
@@ -187,6 +188,47 @@ describe('runAgentLoop', () => {
       text: 'Thinking: Inspecting the request before choosing tools.',
       done: false,
     }));
+  });
+
+  it('logs streamed reasoning summaries for live run diagnostics', async () => {
+    const logger = {
+      info: vi.fn(),
+      debug: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    } as unknown as Logger;
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: true,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(_messages, _tools, _signal, onStreamEvent): Promise<LlmResponse> {
+        onStreamEvent?.({ type: 'reasoning_summary.done', text: 'Checking current files before editing.' });
+        return { content: 'Done.' };
+      },
+    };
+
+    await runAgentLoop({
+      goal: 'Say hello.',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      maxSteps: 1,
+      logger,
+    });
+
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'Thinking: Checking current files before editing.',
+      }),
+      'Assistant stream update',
+    );
   });
 
   it('does not treat the workspace state directory as the OAuth credential store', async () => {

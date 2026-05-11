@@ -324,7 +324,7 @@ describe('executeAgentTurn final message persistence', () => {
 
     const runAgentLoopCall = runAgentLoopSpy.mock.calls.at(-1)?.[0];
     runAgentLoopSpy.mockRestore();
-    return { session, state, runAgentLoopCall };
+    return { session, state, runAgentLoopCall, logger };
   }
 
   it('persists one final assistant summary for done runs', async () => {
@@ -353,6 +353,12 @@ describe('executeAgentTurn final message persistence', () => {
     expect(runAgentLoopCall?.goal).toBe('inspect file with expanded mention contents');
     expect(session.messages.map((message) => message.text)).toEqual(['inspect @README.md', 'Done.']);
     expect(session.lastContinuePrompt).toBe('inspect file with expanded mention contents');
+  });
+
+  it('passes the TUI chat logger into the runtime loop', async () => {
+    const { logger, runAgentLoopCall } = await runTurn('done', 'Done.');
+
+    expect(runAgentLoopCall?.logger).toBe(logger);
   });
 
 
@@ -585,6 +591,7 @@ describe('conversation turn lifecycle', () => {
       prompt: 'Edit safely.',
       summary: 'Done.',
     }) as never);
+    const logger = createLogger({ level: 'silent', console: false });
     const policy: ToolApprovalPolicy = () => ({ type: 'allow', reason: 'test policy' });
     const requestToolApproval = vi.fn(async () => ({ approved: true, reason: 'approved by host' }));
 
@@ -596,6 +603,7 @@ describe('conversation turn lifecycle', () => {
       sessionId: storage.sessionId,
       prompt: 'Edit safely.',
       apiKey: 'explicit-key',
+      logger,
       memoryMaintenanceMode: 'none',
       approvalPolicies: [policy],
       host: {
@@ -606,6 +614,7 @@ describe('conversation turn lifecycle', () => {
     });
 
     const runOptions = loopSpy.mock.calls[0]?.[0];
+    expect(runOptions?.logger).toBe(logger);
     expect(runOptions?.approvalPolicies).toEqual([policy]);
     const call: ToolCall = { id: 'call-1', tool: 'edit_file', input: { path: 'README.md' } };
     const tool: ToolDefinition = {

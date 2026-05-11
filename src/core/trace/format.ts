@@ -48,6 +48,9 @@ export function formatTraceForConsole(trace: TraceEvent[]): string {
             `  Requested Tools: ${requestedToolNames.join(', ')} (${requestedToolNames.length})`,
           );
         }
+        if (event.diagnostics?.rationale) {
+          lines.push(`  Rationale: ${truncate(event.diagnostics.rationale, 500)}`);
+        }
         if (event.diagnostics?.missing?.length) {
           lines.push(`  Missing: ${event.diagnostics.missing.join('; ')}`);
         }

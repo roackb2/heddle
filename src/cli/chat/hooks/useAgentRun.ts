@@ -297,6 +297,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       displayText,
       sessionId,
       runtime,
+      logger,
       state,
       updateSessionById,
       parsePlanState: parsePlanStateFromToolResult,

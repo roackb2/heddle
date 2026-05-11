@@ -8,6 +8,7 @@ import type { RunAgentOptions } from '../agent/run-agent.js';
 import type { RunResult, ToolCall, ToolDefinition, TraceEvent } from '../types.js';
 import type { ToolApprovalPolicy } from '../approvals/types.js';
 import { createLogger } from '../utils/logger.js';
+import { truncate } from '../utils/text.js';
 import {
   resolveApiKeyForModel,
   resolveProviderCredentialSourceForModel,
@@ -125,6 +126,12 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
     history: resolveHistory(options),
     systemContext: options.systemContext,
     onAssistantStream: (update) => {
+      logger.debug({
+        runId,
+        step: update.step,
+        done: update.done,
+        text: truncate(update.text, 500),
+      }, 'Assistant stream update');
       options.onEvent?.({
         type: 'assistant.stream',
         runId,
@@ -134,6 +141,7 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
       options.onAssistantStream?.(update);
     },
     onEvent: (event) => {
+      logTraceEvent(logger, runId, event);
       options.onEvent?.({ type: 'trace', runId, event, timestamp: now() });
       options.onTraceEvent?.(event);
     },
@@ -196,6 +204,29 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
     workspaceRoot,
     state,
   };
+}
+
+function logTraceEvent(logger: Logger, runId: string, event: TraceEvent) {
+  if (event.type === 'assistant.turn') {
+    logger.debug({
+      runId,
+      step: event.step,
+      requestedTools: event.requestedTools,
+      toolCalls: event.toolCalls?.map((call) => call.tool),
+      content: event.content ? truncate(event.content, 500) : undefined,
+      rationale: event.diagnostics?.rationale ? truncate(event.diagnostics.rationale, 500) : undefined,
+    }, 'Trace assistant turn');
+    return;
+  }
+
+  if (event.type === 'run.finished') {
+    logger.info({
+      runId,
+      step: event.step,
+      outcome: event.outcome,
+      summary: truncate(event.summary, 500),
+    }, 'Agent run finished');
+  }
 }
 
 function resolveHistory(options: Pick<RunAgentLoopOptions, 'history' | 'resumeFrom'>): ChatMessage[] | undefined {
