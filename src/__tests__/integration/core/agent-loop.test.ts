@@ -149,6 +149,7 @@ describe('runAgentLoop', () => {
       step: 1,
       text: 'Hello',
       done: true,
+      kind: 'content',
     }));
   });
 
@@ -187,6 +188,7 @@ describe('runAgentLoop', () => {
       step: 1,
       text: 'Thinking: Inspecting the request before choosing tools.',
       done: false,
+      kind: 'reasoning_summary',
     }));
   });
 
@@ -223,8 +225,9 @@ describe('runAgentLoop', () => {
       logger,
     });
 
-    expect(logger.debug).toHaveBeenCalledWith(
+    expect(logger.info).toHaveBeenCalledWith(
       expect.objectContaining({
+        kind: 'reasoning_summary',
         text: 'Thinking: Checking current files before editing.',
       }),
       'Assistant stream update',

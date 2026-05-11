@@ -126,9 +126,10 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
     history: resolveHistory(options),
     systemContext: options.systemContext,
     onAssistantStream: (update) => {
-      logger.debug({
+      logger.info({
         runId,
         step: update.step,
+        kind: update.kind,
         done: update.done,
         text: truncate(update.text, 500),
       }, 'Assistant stream update');
@@ -208,7 +209,7 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
 
 function logTraceEvent(logger: Logger, runId: string, event: TraceEvent) {
   if (event.type === 'assistant.turn') {
-    logger.debug({
+    logger.info({
       runId,
       step: event.step,
       requestedTools: event.requestedTools,

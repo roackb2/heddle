@@ -2,6 +2,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
+import type { Logger } from 'pino';
 import { runAgent } from '../../../core/agent/run-agent.js';
 import type { ChatMessage, LlmAdapter, LlmResponse } from '../../../core/llm/types.js';
 import type { ToolDefinition } from '../../../core/types.js';
@@ -87,6 +88,66 @@ describe('runAgent', () => {
       content: 'The repo contains README.md and src/.',
       requestedTools: false,
     });
+  });
+
+  it('logs bounded tool inputs and results for live debugging', async () => {
+    const logger = {
+      info: vi.fn(),
+      debug: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    } as unknown as Logger;
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(messages);
+
+        if (seenMessages.length === 1) {
+          return {
+            content: 'I will inspect the repo first.',
+            toolCalls: [{ id: 'call-1', tool: 'list_files', input: { path: '.' } }],
+          };
+        }
+
+        return { content: 'Done.' };
+      },
+    };
+    const listFilesTool: ToolDefinition = {
+      name: 'list_files',
+      description: 'Lists files in a directory',
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: 'README.md\nsrc/' };
+      },
+    };
+
+    await runAgent({
+      goal: 'Inspect this repo.',
+      llm: fakeLlm,
+      tools: [listFilesTool],
+      maxSteps: 3,
+      logger,
+    });
+
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        step: 1,
+        tool: 'list_files',
+        toolCallId: 'call-1',
+        input: '{"path":"."}',
+      }),
+      'Executing tool',
+    );
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        step: 1,
+        tool: 'list_files',
+        toolCallId: 'call-1',
+        ok: true,
+        output: 'README.md\nsrc/',
+      }),
+      'Tool result',
+    );
   });
 
   it('records an error outcome when the LLM chat throws a non-abort error', async () => {

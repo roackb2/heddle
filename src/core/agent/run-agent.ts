@@ -38,13 +38,22 @@ export type RunAgentOptions = {
   history?: ChatMessage[];
   systemContext?: string;
   onEvent?: (event: TraceEvent) => void;
-  onAssistantStream?: (update: { step: number; text: string; done: boolean }) => void;
+  onAssistantStream?: (update: AssistantStreamUpdate) => void;
   onToolCalling?: (call: ToolCall, step: number, toolDef: ToolDefinition) => void;
   onToolCompleted?: (call: ToolCall, result: ToolResult, step: number, durationMs: number) => void;
   approvalPolicies?: ToolApprovalPolicy[];
   approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
   shouldStop?: () => boolean;
   abortSignal?: AbortSignal;
+};
+
+export type AssistantStreamKind = 'content' | 'reasoning_summary';
+
+export type AssistantStreamUpdate = {
+  step: number;
+  text: string;
+  done: boolean;
+  kind: AssistantStreamKind;
 };
 
 type RunState = {
@@ -231,18 +240,18 @@ async function requestModelTurn(context: RunContext): Promise<LlmResponse | RunR
           const nowMs = Date.now();
           if (nowMs - lastStreamRecordAt < STREAM_UPDATE_INTERVAL_MS) {
             streamedContent += event.delta;
-            context.onAssistantStream?.({ step: context.state.step, text: streamedContent, done: false });
+            context.onAssistantStream?.({ step: context.state.step, text: streamedContent, done: false, kind: 'content' });
             return;
           }
           lastStreamRecordAt = nowMs;
           streamedContent += event.delta;
-          context.onAssistantStream?.({ step: context.state.step, text: streamedContent, done: false });
+          context.onAssistantStream?.({ step: context.state.step, text: streamedContent, done: false, kind: 'content' });
           return;
         }
 
         if (event.type === 'content.done') {
           streamedContent = event.content;
-          context.onAssistantStream?.({ step: context.state.step, text: streamedContent, done: true });
+          context.onAssistantStream?.({ step: context.state.step, text: streamedContent, done: true, kind: 'content' });
           return;
         }
 
@@ -253,6 +262,7 @@ async function requestModelTurn(context: RunContext): Promise<LlmResponse | RunR
               step: context.state.step,
               text: formatReasoningSummaryStream(streamedReasoningSummary),
               done: false,
+              kind: 'reasoning_summary',
             });
           }
           return;
@@ -265,6 +275,7 @@ async function requestModelTurn(context: RunContext): Promise<LlmResponse | RunR
               step: context.state.step,
               text: formatReasoningSummaryStream(streamedReasoningSummary),
               done: false,
+              kind: 'reasoning_summary',
             });
           }
         }

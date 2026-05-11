@@ -12,6 +12,7 @@ import { defaultToolApprovalPolicies } from '../approvals/default-policies.js';
 import { resolveToolApproval } from '../approvals/policy-chain.js';
 import type { ToolApprovalPolicy } from '../approvals/types.js';
 import type { Logger } from 'pino';
+import { truncate } from '../utils/text.js';
 
 export async function maybeDenyToolCall(args: {
   call: ToolCall;
@@ -135,7 +136,12 @@ async function executeRecordedToolCall(
   },
 ): Promise<{ effectiveCall: ToolCall; result: Awaited<ReturnType<typeof executeTool>> }> {
   const { step, now, registry, seenToolCalls, record, log } = args;
-  log.info({ step, tool: call.tool }, 'Executing tool');
+  log.info({
+    step,
+    tool: call.tool,
+    toolCallId: call.id,
+    input: summarizeDiagnosticValue(call.input, 1_000),
+  }, 'Executing tool');
   record({ type: 'tool.call', call, step, timestamp: now() });
 
   const signature = `${call.tool}:${stableSerialize(normalizeToolInput(call.tool, call.input))}`;
@@ -149,9 +155,32 @@ async function executeRecordedToolCall(
 
   const result = await executeTool(registry, call);
   seenToolCalls.set(signature, seenCount + 1);
-  log.debug({ step, tool: call.tool, ok: result.ok }, 'Tool result');
+  log.info({
+    step,
+    tool: call.tool,
+    toolCallId: call.id,
+    ok: result.ok,
+    output: result.ok ? summarizeDiagnosticValue(result.output, 1_500) : undefined,
+    error: result.ok ? undefined : result.error,
+  }, 'Tool result');
   record({ type: 'tool.result', tool: call.tool, result, step, timestamp: now() });
   return { effectiveCall: call, result };
+}
+
+function summarizeDiagnosticValue(value: unknown, maxLength: number): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value === 'string') {
+    return truncate(value, maxLength);
+  }
+
+  try {
+    return truncate(JSON.stringify(value), maxLength);
+  } catch {
+    return truncate(String(value), maxLength);
+  }
 }
 
 function getInspectFallbackReason(

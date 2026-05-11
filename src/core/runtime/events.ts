@@ -1,4 +1,5 @@
 import type { ChatMessage, LlmProvider, LlmUsage } from '../llm/types.js';
+import type { AssistantStreamKind } from '../agent/run-agent.js';
 import type { RunResult, StopReason, TraceEvent } from '../types.js';
 
 export type AgentLoopStatus = 'finished';
@@ -54,6 +55,7 @@ export type AgentLoopEvent =
       step: number;
       text: string;
       done: boolean;
+      kind: AssistantStreamKind;
       timestamp: string;
     }
   | {
