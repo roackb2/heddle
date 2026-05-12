@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import { estimateBuiltInContextWindow } from '../../../core/llm/openai-models.js';
-import { resolveDefaultReasoningEffort, supportsReasoningEffort } from '../../../core/llm/model-policy.js';
 import type { ReasoningEffort } from '../../../core/llm/types.js';
 import type { ProviderCredentialSource } from '../utils/runtime.js';
 import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
 import { currentActivityText } from '../utils/format.js';
 import type { ApprovalChoice, LiveEvent, PendingApproval } from '../state/types.js';
 import type { PlanItem } from '../../../core/tools/toolkits/internal/update-plan.js';
+import { resolveEffectiveReasoningEffort } from '../../../core/chat/session-preferences/service.js';
+import { supportsReasoningEffort } from '../../../core/llm/model-policy.js';
 
 type ActiveTurnSummary = {
   title: string;
@@ -147,7 +148,10 @@ function formatReasoningStatus(model: string, explicitEffort: ReasoningEffort | 
     return 'unsupported';
   }
 
-  return explicitEffort ?? resolveDefaultReasoningEffort(model) ?? 'default';
+  return resolveEffectiveReasoningEffort({
+    model,
+    reasoningEffort: explicitEffort,
+  }) ?? 'default';
 }
 
 function formatAuthStatus(source: ProviderCredentialSource): string {

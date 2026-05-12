@@ -9,6 +9,11 @@ import {
   touchSession,
 } from '../state/storage.js';
 import { resolveWorkspaceContext } from '../../../core/runtime/workspaces.js';
+import type { SessionExecutionPreferences } from '../../../core/chat/session-preferences/service.js';
+import {
+  resolveNewSessionExecutionPreferences,
+  resolveSessionExecutionPreferences,
+} from '../../../core/chat/session-preferences/service.js';
 
 type UseChatSessionsArgs = {
   sessionCatalogFile: string;
@@ -27,7 +32,10 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
   if (initialSessionsRef.current.length === 0) {
     initialSessionsRef.current = loadChatSessions(sessionCatalogFile, apiKeyPresent).map((session: ChatSession) => ({
       ...session,
-      model: session.model ?? defaultModel,
+      ...resolveSessionExecutionPreferences({
+        session,
+        defaultModel,
+      }),
     }));
   }
 
@@ -54,7 +62,9 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
       id: 'session-1',
       name: 'Session 1',
       apiKeyPresent,
-      model: defaultModel,
+      ...resolveNewSessionExecutionPreferences({
+        defaultModel,
+      }),
       workspaceId,
     });
     setSessions([fallback]);
@@ -100,19 +110,29 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
     updateSessionById(activeSessionId, updater);
   }, [activeSessionId, updateSessionById]);
 
-  const setSessionModel = useCallback((sessionId: string, model: string) => {
+  const setSessionPreferences = useCallback((sessionId: string, preferences: SessionExecutionPreferences) => {
     updateSessionById(sessionId, (session) => (
-      session.model === model ? session : { ...session, model }
+      session.model === preferences.model && session.reasoningEffort === preferences.reasoningEffort ?
+        session
+      : {
+          ...session,
+          model: preferences.model,
+          reasoningEffort: preferences.reasoningEffort,
+        }
     ));
   }, [updateSessionById]);
 
-  const createSession = useCallback((name?: string, model = defaultModel) => {
+  const createSession = useCallback((name?: string, preferences?: SessionExecutionPreferences) => {
     const id = `session-${Date.now()}`;
+    const nextPreferences = resolveNewSessionExecutionPreferences({
+      defaultModel,
+      inherited: preferences,
+    });
     const nextSession = createChatSession({
       id,
       name: name?.trim() || `Session ${nextSessionNumberRef.current++}`,
       apiKeyPresent,
-      model,
+      ...nextPreferences,
       workspaceId,
     });
     setSessions((current) => [touchSession(nextSession), ...current].slice(0, 24));
@@ -139,7 +159,9 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
           id: 'session-1',
           name: 'Session 1',
           apiKeyPresent,
-          model: defaultModel,
+          ...resolveNewSessionExecutionPreferences({
+            defaultModel,
+          }),
           workspaceId,
         }),
       ];
@@ -162,7 +184,7 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
     listRecentSessionsMessage,
     updateSessionById,
     updateActiveSession,
-    setSessionModel,
+    setSessionPreferences,
     createSession,
     renameSession,
     removeSession,

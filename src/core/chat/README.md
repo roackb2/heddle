@@ -6,6 +6,8 @@ conversation-engine module.
 ## Owns
 
 - Shared chat/session persisted data contracts in `types.ts`.
+- Shared session execution-preference policy in `session-preferences/` for
+  model plus reasoning ownership across hosts.
 - High-level boundary documentation for the conversation engine domain.
 - No production behavior should accumulate here when it clearly belongs to the
   engine bounded module.
