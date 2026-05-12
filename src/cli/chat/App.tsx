@@ -32,6 +32,7 @@ import { usePromptSubmission } from './hooks/usePromptSubmission.js';
 import { autocompleteLocalCommand } from './state/local-commands.js';
 import { listMentionableFiles } from './utils/file-mentions.js';
 import { resolveProviderCredentialSourceForModel, type ChatRuntimeConfig } from './utils/runtime.js';
+import { resolveSessionModelSync } from './utils/session-model-sync.js';
 
 export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   return <EmbeddedChatApp runtime={runtime} />;
@@ -130,19 +131,26 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
       return;
     }
 
-    const sessionChanged = previousModelWriteSessionIdRef.current !== activeSession.id;
+    const syncAction = resolveSessionModelSync({
+      previousSessionId: previousModelWriteSessionIdRef.current,
+      currentSessionId: activeSession.id,
+      currentSessionModel: activeSession.model,
+      activeModel,
+    });
     previousModelWriteSessionIdRef.current = activeSession.id;
-    if (sessionChanged) {
-      previousActiveModelRef.current = activeModel;
-      if (activeSession.model !== activeModel) {
-        setSessionModel(activeSession.id, activeModel);
-      }
+
+    if (syncAction.kind === 'adopt_session_model') {
+      previousActiveModelRef.current = syncAction.model;
+      setActiveModel(syncAction.model);
       return;
     }
 
-    if (activeSession.model !== activeModel) {
-      setSessionModel(activeSession.id, activeModel);
+    if (syncAction.kind === 'none') {
+      previousActiveModelRef.current = activeModel;
+      return;
     }
+
+    setSessionModel(activeSession.id, activeModel);
 
     const previousModel = previousActiveModelRef.current;
     previousActiveModelRef.current = activeModel;

@@ -216,7 +216,7 @@ describe('OpenAI OAuth helpers', () => {
 
     await expect(adapter.chat([{ role: 'user', content: 'hello' }], [])).rejects.toThrow();
     const body = JSON.parse(requests[0]?.body ?? '{}') as { reasoning?: { effort?: string } };
-    expect(body.reasoning?.effort).toBe('high');
+    expect(body.reasoning?.effort).toBe('medium');
   });
 
   it('uses the Codex-compatible Responses payload shape for account sign-in models', async () => {

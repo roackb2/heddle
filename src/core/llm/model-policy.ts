@@ -36,12 +36,12 @@ const OPENAI_REQUEST_REASONING_EFFORT_COMPATIBLE_MODELS = [
   'gpt-5.5-pro',
 ] as const;
 const DEFAULT_OPENAI_REASONING_EFFORT: Record<string, ReasoningEffort> = {
-  'gpt-5.4': 'high',
-  'gpt-5.4-pro': 'high',
+  'gpt-5.4': 'medium',
+  'gpt-5.4-pro': 'medium',
   'gpt-5.4-mini': 'medium',
   'gpt-5.4-nano': 'low',
-  'gpt-5.5': 'high',
-  'gpt-5.5-pro': 'high',
+  'gpt-5.5': 'medium',
+  'gpt-5.5-pro': 'medium',
 };
 
 export function credentialModeFromSource(source: ProviderCredentialSource | undefined): ModelCredentialMode {

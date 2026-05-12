@@ -544,6 +544,21 @@ describe('runLocalCommand', () => {
     expect(result.message).toContain('Use /reasoning set to choose an effort');
   });
 
+  it('shows the model default reasoning effort when no explicit effort is configured', async () => {
+    const result = await runLocalCommand(createCommandArgs({
+      prompt: '/reasoning',
+      activeModel: 'gpt-5.4',
+      activeReasoningEffort: undefined,
+    }));
+
+    expect(result).toMatchObject({ handled: true, kind: 'message' });
+    if (!result.handled || result.kind !== 'message') {
+      throw new Error('expected /reasoning to return a message result');
+    }
+    expect(result.message).toContain('Configured effort: default');
+    expect(result.message).toContain('Effective effort: medium');
+  });
+
   it('shows picker help for reasoning set', async () => {
     await expect(runLocalCommand(createCommandArgs({
       prompt: '/reasoning set',
