@@ -17,7 +17,7 @@ import {
   DEFAULT_MUTATE_RULES,
 } from '../../../core/tools/toolkits/shell-process/run-shell.js';
 import { createSearchFilesTool, searchFilesTool } from '../../../core/tools/toolkits/coding-files/search-files.js';
-import { createProjectDashboardTool, projectDashboardTool } from '../../../core/tools/toolkits/coding-awareness/project-dashboard.js';
+import { projectDashboardTool } from '../../../core/tools/toolkits/coding-awareness/project-dashboard.js';
 import { createWebSearchTool, webSearchTool } from '../../../core/tools/toolkits/external-context/web-search.js';
 import { createViewImageTool, viewImageTool } from '../../../core/tools/toolkits/external-context/view-image.js';
 import {

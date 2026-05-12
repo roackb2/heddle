@@ -92,6 +92,67 @@ describe('coding project dashboard awareness', () => {
     }));
   });
 
+  it('preserves isDirty when omitted paths are the only changes', async () => {
+    const root = createGitWorkspace();
+
+    mkdirSync(join(root, '.heddle'), { recursive: true });
+    writeFileSync(join(root, '.heddle', 'runtime-state.json'), '{"dirty":true}\n');
+
+    const snapshot = await collectProjectDashboard(root);
+    const environment = snapshot.sections.find((section) => section.type === 'working_environment');
+
+    expect(environment?.data.isDirty).toBe(true);
+    expect(environment?.data.paths).toEqual({
+      staged: [],
+      modified: [],
+      deleted: [],
+      untracked: [],
+      renamed: [],
+    });
+    expect(snapshot.limits).toContainEqual(expect.objectContaining({
+      kind: 'omitted',
+      subject: 'git working tree paths',
+    }));
+  });
+
+  it('reports renamed-only changes', async () => {
+    const root = createGitWorkspace();
+
+    writeFileSync(join(root, 'rename-me.txt'), 'rename me\n');
+    execFileSync('git', ['add', 'rename-me.txt'], { cwd: root });
+    execFileSync('git', ['commit', '-m', 'add rename target'], { cwd: root, stdio: 'ignore' });
+
+    renameSync(join(root, 'rename-me.txt'), join(root, 'renamed.txt'));
+    execFileSync('git', ['add', '-A'], { cwd: root });
+
+    const snapshot = await collectProjectDashboard(root);
+    const environment = snapshot.sections.find((section) => section.type === 'working_environment');
+
+    expect(environment?.data.isDirty).toBe(true);
+    expect(environment?.data.paths.renamed).toEqual([
+      { from: 'rename-me.txt', to: 'renamed.txt' },
+    ]);
+    expect(environment?.data.paths.staged).toEqual([]);
+    expect(environment?.data.paths.modified).toEqual([]);
+    expect(environment?.data.paths.deleted).toEqual([]);
+    expect(environment?.data.paths.untracked).toEqual([]);
+  });
+
+  it('handles detached HEAD by leaving branch undefined while preserving git state', async () => {
+    const root = createGitWorkspace();
+    const detachedCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+
+    execFileSync('git', ['checkout', '--detach', detachedCommit], { cwd: root, stdio: 'ignore' });
+
+    const snapshot = await collectProjectDashboard(root);
+    const environment = snapshot.sections.find((section) => section.type === 'working_environment');
+
+    expect(environment?.data.isGitRepository).toBe(true);
+    expect(environment?.data.gitBranch).toBeUndefined();
+    expect(environment?.data.gitShortCommit).toMatch(/^[0-9a-f]{7,}$/);
+    expect(environment?.data.isDirty).toBe(false);
+  });
+
   it('degrades gracefully outside a git workspace', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-awareness-non-git-'));
     const snapshot = await collectProjectDashboard(root);

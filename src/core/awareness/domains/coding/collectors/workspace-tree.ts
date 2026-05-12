@@ -93,7 +93,7 @@ async function readTree(args: {
   let dirents;
   try {
     dirents = await readdir(args.absoluteRoot, { withFileTypes: true });
-  } catch (error) {
+  } catch {
     return [];
   }
 

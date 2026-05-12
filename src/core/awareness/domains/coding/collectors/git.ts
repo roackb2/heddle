@@ -85,12 +85,14 @@ export async function collectGitWorkingEnvironment(workspaceRoot: string): Promi
   const groupedStatus = groupPaths(parsedStatus);
   const boundedStatus = applyPathLimits(groupedStatus.paths);
   const paths = boundedStatus.paths;
-  const isDirty =
+  const hasVisibleChanges =
     paths.staged.length > 0 ||
     paths.modified.length > 0 ||
     paths.deleted.length > 0 ||
     paths.untracked.length > 0 ||
     paths.renamed.length > 0;
+  const hasOmittedChanges = groupedStatus.omittedCount > 0;
+  const isDirty = hasVisibleChanges || hasOmittedChanges;
 
   if (groupedStatus.omittedCount > 0) {
     limits.push({
