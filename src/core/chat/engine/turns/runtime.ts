@@ -10,6 +10,7 @@ import {
   resolveProviderCredentialSourceForModel,
   type ProviderCredentialSource,
 } from '../../../runtime/api-keys.js';
+import { appendAwarenessDomainSystemContext } from '../../../awareness/domain-prompt.js';
 import { appendMemoryCatalogSystemContext } from '../../../memory/catalog.js';
 
 export type ChatTurnRuntime = {
@@ -70,10 +71,10 @@ export function resolveConversationTurnRuntime(args: ResolveConversationTurnRunt
     apiKey,
     providerCredentialSource,
     memoryDir,
-    systemContext: appendMemoryCatalogSystemContext({
+    systemContext: appendAwarenessDomainSystemContext(appendMemoryCatalogSystemContext({
       systemContext: args.systemContext,
       memoryRoot: memoryDir,
-    }),
+    })),
     reasoningEffort: args.sessionReasoningEffort,
     llm: createLlmAdapter({
       model,

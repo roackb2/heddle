@@ -56,21 +56,28 @@ When a companion notes repo is present, treat the live Heddle codebase as the im
 ## Working Conventions
 
 - Read `docs/project-posture.md` before non-trivial implementation work.
-- Use `yarn`, not `npm`.
-- Use `yarn build` as the canonical type-check.
-- Use `yarn test` as the canonical test command.
-- Prefer scoped refactoring alongside feature work. Each feature should leave the touched code cleaner, easier to maintain, more structured, and named more clearly than before.
-- Do not ship features by trading implementation speed for code quality regression. Avoid accumulating tech debt in touched areas when a scoped cleanup is practical.
-- If a feature reveals that broader refactoring is needed, call it out explicitly before expanding scope.
-- Coding agents should treat code quality as part of the deliverable, not optional polish. A completed feature should improve product behavior and maintainability together.
-- For web/mobile UI work, default to shadcn UI primitives and Tailwind utility composition for standard interaction behavior and design language.
-- When touching an existing UI surface, prefer migrating the touched area toward shadcn primitives instead of extending custom one-off controls unless there is a concrete product reason not to.
-- Before building any non-trivial feature, state the user-facing problem, the expected user benefit, and why the feature is worth the added complexity. If that case is weak, stop and discuss before implementing.
-- Do not build safety, presence, ownership, or coordination mechanisms for corner cases unless the user has confirmed the pain is real enough to matter in actual usage.
-- Do not optimize for internal architectural consistency over user value. Product usefulness and real user workflow take precedence over neat mechanism design.
-- For user-facing releases, use an annotated git tag such as `vX.Y.Z` on the actual release commit.
-- Write release notes from the real git range since the previous release tag, not from commit-prefix inference alone.
-- Keep changes aligned with the project's minimal-runtime, trace-first philosophy.
+- Use `yarn`; `yarn build` is the canonical type-check and `yarn test` is the
+  canonical test command.
+- Treat code quality as part of the deliverable. Prefer scoped cleanup alongside
+  feature work, but call out broader refactors before expanding scope.
+- For non-trivial backend/core work, prefer domain-owned services with clear
+  boundaries. A module should own real behavior, not act as a thin wrapper.
+- When creating or substantially refactoring a non-trivial service/domain, add
+  or update a nearby `README.md` describing responsibility, boundaries, owned
+  data/behavior, and where adjacent logic should live. Include a compact
+  agent-facing example when it materially helps.
+- Use top-level file comments sparingly, only when they clarify responsibility
+  or boundary choices that are hard to infer from code.
+- For UI work, default to shadcn UI primitives and Tailwind utility composition;
+  prefer migrating touched surfaces toward those primitives over extending
+  one-off controls without a concrete product reason.
+- Before non-trivial features, state the user-facing problem, expected benefit,
+  and why the added complexity is justified.
+- Do not add safety, coordination, or architectural mechanisms for edge cases
+  unless the user has confirmed the pain is real.
+- Keep changes aligned with Heddle's minimal-runtime, trace-first philosophy.
+- For releases, use annotated tags such as `vX.Y.Z` and write release notes from
+  the real git range since the previous tag.
 
 ## Public Source Of Truth
 

@@ -17,6 +17,7 @@ import {
   DEFAULT_MUTATE_RULES,
 } from '../../../core/tools/toolkits/shell-process/run-shell.js';
 import { createSearchFilesTool, searchFilesTool } from '../../../core/tools/toolkits/coding-files/search-files.js';
+import { projectDashboardTool } from '../../../core/tools/toolkits/coding-awareness/project-dashboard.js';
 import { createWebSearchTool, webSearchTool } from '../../../core/tools/toolkits/external-context/web-search.js';
 import { createViewImageTool, viewImageTool } from '../../../core/tools/toolkits/external-context/view-image.js';
 import {
@@ -68,6 +69,15 @@ describe('tool input validation', () => {
     });
   });
 
+  it('rejects invalid project_dashboard input', async () => {
+    const result = await projectDashboardTool.execute({ path: '.' });
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Invalid input for project_dashboard. Optional fields: includeSections (working_environment|workspace_tree), maxDepth (1-4), maxEntries (1-200). Use {} for the default full dashboard.',
+    });
+  });
+
   it('rejects invalid move_file input', async () => {
     const result = await moveFileTool.execute({ from: 'a' });
 
@@ -106,6 +116,11 @@ describe('tool input validation', () => {
     expect(searchFilesTool.description).toContain('includeIgnored');
     expect(searchFilesTool.description).toContain('{ "query": "createUser" }');
     expect(searchFilesTool.description).toContain('{ "query": "incident", "path": "../shared-notes" }');
+    expect(projectDashboardTool.description).toContain('Collect the initial coding project dashboard');
+    expect(projectDashboardTool.description).toContain('current working-environment state and a bounded workspace tree');
+    expect(projectDashboardTool.description).toContain('orient in a single call');
+    expect(projectDashboardTool.description).toContain('read_file or search_files only for task-specific details');
+    expect(projectDashboardTool.description).toContain('includeSections');
     expect(webSearchTool.description).toContain('Search the public web');
     expect(webSearchTool.description).toContain("active model provider's hosted web search");
     expect(webSearchTool.description).toContain('{ "query": "OpenAI Responses API web search tool" }');
@@ -231,6 +246,12 @@ describe('workspace-bound default tools', () => {
     const processRoot = await mkdtemp(join(tmpdir(), 'heddle-default-tools-process-'));
     await writeFile(join(workspaceRoot, 'package.json'), '{"name":"selected"}\n');
     await writeFile(join(processRoot, 'package.json'), '{"name":"process"}\n');
+    execFileSync('git', ['init'], { cwd: workspaceRoot, stdio: 'ignore' });
+    execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: workspaceRoot });
+    execFileSync('git', ['config', 'user.name', 'Test User'], { cwd: workspaceRoot });
+    execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: workspaceRoot });
+    execFileSync('git', ['add', 'package.json'], { cwd: workspaceRoot });
+    execFileSync('git', ['commit', '-m', 'initial'], { cwd: workspaceRoot, stdio: 'ignore' });
 
     const previousCwd = process.cwd();
     try {
@@ -242,9 +263,11 @@ describe('workspace-bound default tools', () => {
       });
       const readTool = tools.find((tool) => tool.name === 'read_file');
       const shellTool = tools.find((tool) => tool.name === 'run_shell_inspect');
+      const awarenessTool = tools.find((tool) => tool.name === 'project_dashboard');
 
       expect(readTool).toBeDefined();
       expect(shellTool).toBeDefined();
+      expect(awarenessTool).toBeDefined();
       await expect(readTool?.execute({ path: 'package.json' })).resolves.toEqual({
         ok: true,
         output: '{"name":"selected"}\n',
@@ -254,6 +277,18 @@ describe('workspace-bound default tools', () => {
       const resolvedWorkspaceRoot = await realpath(workspaceRoot);
       expect(shellResult?.ok).toBe(true);
       expect(shellResult?.output).toMatchObject({ stdout: resolvedWorkspaceRoot });
+
+      const awarenessResult = await awarenessTool?.execute({});
+      expect(awarenessResult?.ok).toBe(true);
+      expect(awarenessResult?.output).toMatchObject({
+        workspaceRoot,
+        sections: {
+          working_environment: expect.objectContaining({
+            gitRepositoryRoot: resolvedWorkspaceRoot,
+          }),
+          workspace_tree: expect.any(Object),
+        },
+      });
     } finally {
       process.chdir(previousCwd);
     }

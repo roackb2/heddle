@@ -83,6 +83,26 @@ export {
 export type { ApiKeyRuntime, ProviderCredentialSource } from './core/runtime/api-keys.js';
 export { createDefaultAgentTools } from './core/runtime/default-tools.js';
 export type { DefaultAgentToolsOptions } from './core/runtime/default-tools.js';
+export {
+  createAwarenessService,
+  createCodingAwarenessProvider,
+  formatCodingProjectDashboardSnapshot,
+} from './core/awareness/index.js';
+export type {
+  AwarenessCollectInput,
+  AwarenessDomain,
+  AwarenessLimit,
+  AwarenessProfile,
+  AwarenessProvider,
+  AwarenessSnapshot,
+  AwarenessSource,
+  CodingAwarenessSection,
+  CodingAwarenessSnapshot,
+  CodingProjectDashboardOutput,
+  CodingWorkingEnvironment,
+  CodingWorkspaceTree,
+  CodingWorkspaceTreeEntry,
+} from './core/awareness/index.js';
 export { DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL } from './core/config.js';
 export {
   buildMemoryDomainSystemContext,

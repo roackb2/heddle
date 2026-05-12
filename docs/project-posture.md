@@ -37,6 +37,11 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
 - Fallback paths matter when implementation has multiple backends.
 - Prefer mature domain tools over custom parsing when those tools already own
   the hard behavior.
+- Prefer domain-owned services with clear responsibility boundaries for
+  non-trivial backend behavior. Do not spread one domain's logic across hosts,
+  adapters, and generic helpers when a focused service/module can own it.
+- A module boundary earns its place only when it owns meaningful behavior.
+  Wrapper-only pass-through layers are not architecture progress.
 - Private workspace notes are optional. Public Heddle behavior must not depend
   on private files.
 - Do not trade code quality for feature speed in touched areas. Scoped cleanup
@@ -57,6 +62,19 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
 - `src/__tests__/unit/` and `src/__tests__/integration/` hold behavior locks
   for touched paths.
 - `docs/` is the public contributor source of truth.
+
+Within those areas, prefer subdomains/services that are easy to identify and
+review. A good service boundary should make it obvious:
+
+- what responsibility the module owns;
+- what data or state it gathers, translates, or persists;
+- what behavior still belongs outside the module;
+- which tests lock its behavior;
+- where to extend the feature next.
+
+For non-trivial services, keep a local `README.md` near the implementation when
+it materially improves ownership clarity for future contributors and coding
+agents.
 
 ## Before Editing
 

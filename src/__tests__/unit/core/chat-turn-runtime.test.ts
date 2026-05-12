@@ -79,6 +79,12 @@ describe('chat turn preparation modules', () => {
     expect(runtime.providerCredentialSource).toEqual({ type: 'explicit-api-key' });
     expect(runtime.memoryDir).toBe(join(stateRoot, 'memory'));
     expect(runtime.systemContext).toContain('System context');
+    expect(runtime.systemContext).toContain('## Situation Awareness Domain');
+    expect(runtime.systemContext).toContain('you MUST call project_dashboard before deeper repo inspection or explanation');
+    expect(runtime.systemContext).toContain('## Heddle-Managed Memory Domain');
+    expect(runtime.systemContext?.indexOf('## Situation Awareness Domain')).toBeLessThan(
+      runtime.systemContext?.indexOf('## Heddle-Managed Memory Domain') ?? Infinity,
+    );
     expect(runtime.llm.info?.model).toBe('gpt-5.4');
   });
 
@@ -175,6 +181,7 @@ describe('chat turn preparation modules', () => {
     expect(context.session.id).toBe('session-1');
     expect(context.runtime.model).toBe('gpt-5.4');
     expect(context.toolNames).toEqual([
+      'project_dashboard',
       'list_files',
       'read_file',
       'edit_file',

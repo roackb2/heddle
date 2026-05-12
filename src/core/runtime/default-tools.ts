@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import type { ToolDefinition } from '../types.js';
 import { createToolkitToolBundle, type ToolToolkit } from '../tools/toolkit.js';
+import { codingAwarenessToolkit } from '../tools/toolkits/coding-awareness/toolkit.js';
 import { codingFilesToolkit } from '../tools/toolkits/coding-files/toolkit.js';
 import { externalContextToolkit } from '../tools/toolkits/external-context/toolkit.js';
 import { knowledgeToolkit } from '../tools/toolkits/knowledge/toolkit.js';
@@ -47,6 +48,7 @@ function createDefaultToolkits(args: {
   includePlanTool?: boolean;
 }): ToolToolkit[] {
   return [
+    codingAwarenessToolkit,
     codingFilesToolkit,
     externalContextToolkit,
     knowledgeToolkit,
