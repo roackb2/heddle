@@ -144,9 +144,11 @@ function mergeProjectSignals(
     }
   }
 
+  const normalizedObservedDirectories = normalizeObservedDirectories(observedDirectories);
+
   return {
     detectedProjects: [...detectedProjects.values()].sort((left, right) => left.kind.localeCompare(right.kind)),
-    observedDirectories,
+    observedDirectories: normalizedObservedDirectories,
     configFiles: [...configFiles].sort(),
   };
 }
@@ -226,4 +228,17 @@ function dedupeSources(sources: AwarenessSource[]): AwarenessSource[] {
   }
 
   return deduped;
+}
+
+function normalizeObservedDirectories(
+  observedDirectories: CodingProjectSignals['observedDirectories'],
+): CodingProjectSignals['observedDirectories'] {
+  return {
+    source: [...observedDirectories.source].sort(),
+    tests: [...observedDirectories.tests].sort(),
+    docs: [...observedDirectories.docs].sort(),
+    examples: [...observedDirectories.examples].sort(),
+    scripts: [...observedDirectories.scripts].sort(),
+    config: [...observedDirectories.config].sort(),
+  };
 }

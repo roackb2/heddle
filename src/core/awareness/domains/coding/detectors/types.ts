@@ -1,10 +1,7 @@
 import type { AwarenessLimit, AwarenessSource } from '../../../types.js';
 import type {
   CodingDetectedProject,
-  CodingLockfileSignal,
-  CodingManifestSignal,
   CodingProjectKind,
-  CodingVerificationSurface,
 } from '../types.js';
 
 export type CodingProjectSignalContribution = {
