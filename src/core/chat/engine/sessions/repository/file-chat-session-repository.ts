@@ -1,10 +1,21 @@
+/**
+ * File-backed chat session repository.
+ *
+ * Owns file paths, migration, serialization, deserialization, and orphan-file
+ * cleanup for chat sessions. Session services should depend on this module
+ * rather than embedding file I/O logic themselves.
+ *
+ * Current compromise:
+ * some older host or test paths may still import repository functions directly.
+ * The intended direction is host -> service -> repository -> files.
+ */
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import type { ChatMessage, ReasoningEffort } from '../../../llm/types.js';
-import type { ChatArchiveRecord, ChatContextStats, ChatSession, ChatSessionLease, ConversationLine, TurnSummary } from '../../types.js';
-import { truncate } from '../../../utils/text.js';
+import { basename, dirname, join } from 'node:path';
+import type { ChatMessage, ReasoningEffort } from '../../../../llm/types.js';
+import type { ChatArchiveRecord, ChatContextStats, ChatSession, ChatSessionLease, ConversationLine, TurnSummary } from '../../../types.js';
+import { createChatSession, createInitialMessages } from '../session-record.js';
 
-type ChatSessionCatalogEntry = {
+export type ChatSessionCatalogEntry = {
   id: string;
   name: string;
   workspaceId?: string;
@@ -24,65 +35,39 @@ type ChatSessionCatalog = {
   sessions: ChatSessionCatalogEntry[];
 };
 
-export function createInitialMessages(apiKeyPresent: boolean): ConversationLine[] {
-  return [
-    {
-      id: 'intro',
-      role: 'assistant',
-      text:
-        'Heddle conversational mode.\n\nAsk a question about this workspace.\nEach turn runs the current agent loop and carries the transcript into the next turn.\nUse !<command> to run a shell command directly in chat.',
-    },
-    ...(!apiKeyPresent ?
-      [{
-        id: 'missing-key',
-        role: 'assistant' as const,
-        text:
-          'No provider credential detected. For OpenAI, run `heddle auth login openai` or set OPENAI_API_KEY. For Anthropic, set ANTHROPIC_API_KEY. Dev fallback conventions also work: PERSONAL_OPENAI_API_KEY and PERSONAL_ANTHROPIC_API_KEY.',
-      }]
-    : []),
-  ];
-}
+export type ChatSessionRepository = {
+  list(apiKeyPresent: boolean): ChatSession[];
+  readCatalog(): ChatSessionCatalogEntry[];
+  read(sessionId: string, apiKeyPresent: boolean): ChatSession | undefined;
+  migrateLegacy(apiKeyPresent: boolean): ChatSession[];
+  save(sessions: ChatSession[]): void;
+  deriveStoragePaths(): ReturnType<typeof deriveSessionStoragePaths>;
+};
 
-export function createChatSession(options: {
-  id: string;
-  name: string;
-  apiKeyPresent: boolean;
-  model?: string;
-  reasoningEffort?: ReasoningEffort;
-  workspaceId?: string;
-}): ChatSession {
-  const now = new Date().toISOString();
+export function createFileChatSessionRepository(args: {
+  sessionStoragePath: string;
+}): ChatSessionRepository {
+  const { sessionStoragePath } = args;
   return {
-    id: options.id,
-    name: options.name,
-    workspaceId: options.workspaceId,
-    history: [],
-    messages: createInitialMessages(options.apiKeyPresent),
-    turns: [],
-    createdAt: now,
-    updatedAt: now,
-    model: options.model,
-    reasoningEffort: options.reasoningEffort,
-    driftEnabled: false,
-    lastContinuePrompt: undefined,
-    context: undefined,
-    archives: [],
-    lease: undefined,
+    list(apiKeyPresent) {
+      return loadChatSessions(sessionStoragePath, apiKeyPresent);
+    },
+    readCatalog() {
+      return readChatSessionCatalog(sessionStoragePath);
+    },
+    read(sessionId, apiKeyPresent) {
+      return readChatSession(sessionStoragePath, sessionId, apiKeyPresent);
+    },
+    migrateLegacy(apiKeyPresent) {
+      return migrateLegacyChatSessions(sessionStoragePath, apiKeyPresent);
+    },
+    save(sessions) {
+      saveChatSessions(sessionStoragePath, sessions);
+    },
+    deriveStoragePaths() {
+      return deriveSessionStoragePaths(sessionStoragePath);
+    },
   };
-}
-
-export function touchSession(session: ChatSession): ChatSession {
-  return { ...session, updatedAt: new Date().toISOString() };
-}
-
-export function summarizeSession(session: ChatSession): string {
-  const latestTurn = session.turns[session.turns.length - 1];
-  const latestPrompt = latestTurn ? truncate(latestTurn.prompt, 44) : 'no turns yet';
-  return `${session.turns.length} turns • ${latestPrompt}`;
-}
-
-export function isGenericSessionName(name: string): boolean {
-  return /^Session \d+$/.test(name.trim());
 }
 
 export function loadChatSessions(sessionsPath: string, apiKeyPresent: boolean): ChatSession[] {
@@ -162,11 +147,38 @@ export function saveChatSessions(sessionsPath: string, sessions: ChatSession[]) 
 
 export function deriveSessionStoragePaths(storagePath: string) {
   const stateDir = dirname(storagePath);
-  const legacyPath = storagePath.endsWith('chat-sessions.catalog.json') ? join(stateDir, 'chat-sessions.json') : storagePath;
+  const fileName = basename(storagePath);
+  const catalogSuffix = '.catalog.json';
+  const legacySuffix = '.json';
+
+  if (fileName.endsWith(catalogSuffix)) {
+    const catalogStem = fileName.slice(0, -catalogSuffix.length);
+    return {
+      // Current layout: preserve the configured catalog path exactly.
+      catalogPath: storagePath,
+      // Legacy fallback: older callers may still look for a flat JSON file.
+      legacyPath: join(stateDir, `${catalogStem}${legacySuffix}`),
+      sessionsDir: join(stateDir, catalogStem),
+    };
+  }
+
+  if (fileName.endsWith(legacySuffix)) {
+    const catalogStem = fileName.slice(0, -legacySuffix.length);
+    return {
+      // Current layout: upgrade legacy flat JSON paths to sibling catalog files.
+      catalogPath: join(stateDir, `${catalogStem}${catalogSuffix}`),
+      // Legacy fallback: keep reading and migrating from the original flat JSON path.
+      legacyPath: storagePath,
+      sessionsDir: join(stateDir, catalogStem),
+    };
+  }
+
   return {
-    legacyPath,
-    catalogPath: join(stateDir, 'chat-sessions.catalog.json'),
-    sessionsDir: join(stateDir, 'chat-sessions'),
+    // Non-JSON inputs are already explicit. Preserve them without inventing
+    // extra fallback paths.
+    catalogPath: storagePath,
+    legacyPath: storagePath,
+    sessionsDir: join(stateDir, fileName),
   };
 }
 

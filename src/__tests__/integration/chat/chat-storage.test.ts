@@ -3,7 +3,14 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createChatSession, migrateLegacyChatSessions, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../cli/chat/state/storage.js';
+import { createChatSession } from '../../../core/chat/engine/sessions/session-record.js';
+import {
+  deriveSessionStoragePaths,
+  migrateLegacyChatSessions,
+  readChatSession,
+  readChatSessionCatalog,
+  saveChatSessions,
+} from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
 
 describe('chat session storage layout', () => {
   it('migrates legacy chat-sessions.json into catalog plus per-session files without deleting the original file', () => {
@@ -177,5 +184,27 @@ describe('chat session storage layout', () => {
 
     expect(sessions[0]?.workspaceId).toBe('workspace-1');
     expect(readChatSessionCatalog(sessionsFile)[0]?.workspaceId).toBe('workspace-1');
+  });
+
+  it('preserves custom catalog filenames instead of collapsing them to the default layout', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-custom-catalog-'));
+    const configuredCatalogPath = join(dir, 'embedded-sessions.catalog.json');
+
+    expect(deriveSessionStoragePaths(configuredCatalogPath)).toEqual({
+      catalogPath: configuredCatalogPath,
+      legacyPath: join(dir, 'embedded-sessions.json'),
+      sessionsDir: join(dir, 'embedded-sessions'),
+    });
+  });
+
+  it('upgrades legacy custom json filenames into sibling catalog storage', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-custom-legacy-'));
+    const legacyPath = join(dir, 'embedded-sessions.json');
+
+    expect(deriveSessionStoragePaths(legacyPath)).toEqual({
+      catalogPath: join(dir, 'embedded-sessions.catalog.json'),
+      legacyPath,
+      sessionsDir: join(dir, 'embedded-sessions'),
+    });
   });
 });

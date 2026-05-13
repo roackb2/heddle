@@ -1,8 +1,8 @@
-import type { ChatTurnCompactionPort } from '../../../core/chat/engine/turns/host-bridge.js';
-import { buildCompactionRunningContext } from '../state/compaction.js';
-import type { ChatMessage } from '../../../index.js';
-import type { ChatSession } from '../state/types.js';
-import type { ActionState } from './useAgentRun.js';
+import type { ChatTurnCompactionPort } from '../../../../../core/chat/engine/turns/host-bridge.js';
+import { buildCompactionRunningContext } from '../../../state/compaction.js';
+import type { ChatMessage } from '../../../../../index.js';
+import type { ChatSession } from '../../../state/types.js';
+import type { ActionState } from '../useAgentRunController.js';
 
 type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
 type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => void;

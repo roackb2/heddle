@@ -8,7 +8,8 @@ import { prepareChatSessionTurn } from './preflight.js';
 import { runInlineTurnMemoryMaintenance, scheduleBackgroundTurnMemoryMaintenance } from './memory-maintenance.js';
 import { persistCompletedChatTurn } from './persistence.js';
 import { releaseSessionLease, type ChatSessionLeaseOwner } from '../sessions/lease.js';
-import { loadChatSessions, saveChatSessions, touchSession } from '../sessions/storage.js';
+import { touchSession } from '../sessions/session-record.js';
+import { loadChatSessions, saveChatSessions } from '../sessions/repository/file-chat-session-repository.js';
 import type { ChatTurnHostPort } from './host-bridge.js';
 
 export type RunConversationTurnArgs = {

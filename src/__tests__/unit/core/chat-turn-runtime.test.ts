@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
-import { createChatSession, loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/storage.js';
+import { createChatSession } from '../../../core/chat/engine/sessions/session-record.js';
+import { loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
 import {
   persistPreflightCompactionRunningSeed,
   persistPreparedChatSessionTurn,

@@ -4,7 +4,7 @@ import { compactChatHistoryWithArchive, estimateChatHistoryTokens } from '../his
 import { buildConversationMessages } from '../sessions/conversation-lines.js';
 import { formatChatFailureMessage } from '../../failure-messages.js';
 import { countAssistantSteps, summarizeTrace, type TraceSummarizerRegistry } from '../../../observability/trace-summarizers.js';
-import { touchSession } from '../sessions/storage.js';
+import { touchSession } from '../sessions/session-record.js';
 import type { ChatSession, TurnSummary } from '../../types.js';
 import { saveTrace } from './trace.js';
 

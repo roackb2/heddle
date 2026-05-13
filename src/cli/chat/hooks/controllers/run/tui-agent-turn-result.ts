@@ -1,14 +1,14 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import type { ChatMessage, LlmAdapter, RunResult } from '../../../index.js';
-import { runMaintenanceForRecordedCandidates } from '../../../core/memory/maintenance-integration.js';
-import { createChatTurnPersistenceArtifacts } from '../../../core/chat/engine/turns/result.js';
-import { estimateChatHistoryTokens } from '../state/compaction.js';
-import { touchSession } from '../state/storage.js';
-import type { ChatSession } from '../state/types.js';
-import { toLiveEvent } from '../adapters/conversation-activity-adapter.js';
-import { formatChatFailureMessage, summarizeTrace } from '../utils/format.js';
-import type { ChatRuntimeConfig } from '../utils/runtime.js';
-import type { ActionState } from './useAgentRun.js';
+import type { ChatMessage, LlmAdapter, RunResult } from '../../../../../index.js';
+import { runMaintenanceForRecordedCandidates } from '../../../../../core/memory/maintenance-integration.js';
+import { createChatTurnPersistenceArtifacts } from '../../../../../core/chat/engine/turns/result.js';
+import { estimateChatHistoryTokens } from '../../../state/compaction.js';
+import { touchSession } from '../../../../../core/chat/engine/sessions/session-record.js';
+import type { ChatSession } from '../../../state/types.js';
+import { toLiveEvent } from '../../../adapters/conversation-activity-adapter.js';
+import { formatChatFailureMessage, summarizeTrace } from '../../../utils/format.js';
+import type { ChatRuntimeConfig } from '../../../utils/runtime.js';
+import type { ActionState } from '../useAgentRunController.js';
 import type { TuiCompactionStatusEvent } from './tui-compaction-status.js';
 
 type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;

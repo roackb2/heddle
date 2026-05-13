@@ -1,13 +1,13 @@
-import type { RunResult } from '../../../index.js';
-import { runConversationTurn } from '../../../core/chat/engine/turns/run-conversation-turn.js';
-import type { ChatSession } from '../state/types.js';
-import type { ChatRuntimeConfig } from '../utils/runtime.js';
+import type { RunResult } from '../../../../../index.js';
+import { runConversationTurn } from '../../../../../core/chat/engine/turns/run-conversation-turn.js';
+import type { ChatSession } from '../../../state/types.js';
+import type { ChatRuntimeConfig } from '../../../utils/runtime.js';
 import { createTuiCompactionStatusPort } from './tui-compaction-status.js';
 import { finalizeSuccessfulTuiOrdinaryTurn } from './tui-agent-turn-result.js';
 import { createTuiRunLoopEventAdapter } from './tui-run-loop-events.js';
 import { createTuiRememberedApprovalPolicies, createTuiToolApprovalPort } from './tui-tool-approval.js';
-import type { ActionState } from './useAgentRun.js';
-import type { CyberLoopKinematicsObserver } from '../../../index.js';
+import type { ActionState } from '../useAgentRunController.js';
+import type { CyberLoopKinematicsObserver } from '../../../../../index.js';
 
 type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
 
@@ -103,7 +103,7 @@ export async function executeTuiOrdinaryTurn(args: {
     return undefined;
   }
 
-  const { readChatSession } = await import('../state/storage.js');
+  const { readChatSession } = await import('../../../../../core/chat/engine/sessions/repository/file-chat-session-repository.js');
   const persistedSession = readChatSession(runtime.sessionCatalogFile, sessionId, true);
   if (!persistedSession) {
     return undefined;

@@ -1,3 +1,12 @@
+/**
+ * Ask-mode host entrypoint.
+ *
+ * Current compromise:
+ * session targeting and ad-hoc session creation in this file still call the
+ * file session repository directly. The intended direction is for ask mode to
+ * use core session services for those flows, the same way the TUI host now
+ * does.
+ */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -18,7 +27,8 @@ import { runMaintenanceForRecordedCandidates } from '../core/memory/maintenance-
 import type { ResolvedRuntimeHost } from '../core/runtime/runtime-hosts.js';
 import { runConversationTurn } from '../core/chat/engine/index.js';
 import type { ChatSession } from '../core/chat/types.js';
-import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../core/chat/engine/sessions/storage.js';
+import { createChatSession } from '../core/chat/engine/sessions/session-record.js';
+import { readChatSession, readChatSessionCatalog, saveChatSessions } from '../core/chat/engine/sessions/repository/file-chat-session-repository.js';
 import { resolveWorkspaceContext } from '../core/runtime/workspaces.js';
 import { createDaemonControlPlaneClient } from './remote/control-plane-client.js';
 

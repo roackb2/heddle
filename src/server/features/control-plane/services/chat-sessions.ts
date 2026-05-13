@@ -1,7 +1,17 @@
+/**
+ * Control-plane chat session application service.
+ *
+ * Current compromise:
+ * some session create/update/read flows in this host service still call the
+ * file session repository directly. The intended direction is for shared
+ * session semantics to move into the core session service, with this layer
+ * limited to control-plane-specific orchestration and projections.
+ */
 import { EventEmitter } from 'node:events';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createChatSession, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../../core/chat/engine/sessions/storage.js';
+import { createChatSession } from '../../../../core/chat/engine/sessions/session-record.js';
+import { readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
 import { DEFAULT_OPENAI_MODEL } from '../../../../core/config.js';
 import { credentialModeFromSource, resolveCompatibleActiveModel } from '../../../../core/llm/model-policy.js';
 import type { ReasoningEffort } from '../../../../core/llm/types.js';

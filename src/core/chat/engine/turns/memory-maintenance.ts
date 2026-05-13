@@ -5,7 +5,8 @@ import type { AgentLoopEvent } from '../../../runtime/events.js';
 import type { TraceEvent } from '../../../types.js';
 import { runMaintenanceForRecordedCandidates } from '../../../memory/maintenance-integration.js';
 import { summarizeTrace } from '../../../observability/trace-summarizers.js';
-import { loadChatSessions, saveChatSessions, touchSession } from '../sessions/storage.js';
+import { touchSession } from '../sessions/session-record.js';
+import { loadChatSessions, saveChatSessions } from '../sessions/repository/file-chat-session-repository.js';
 
 export type RunInlineTurnMemoryMaintenanceArgs = {
   memoryRoot: string;

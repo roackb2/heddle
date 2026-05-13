@@ -15,12 +15,17 @@ remove.
 Use this mental model:
 
 - **View**: Ink components and `App.tsx` render state and forward user intent.
-- **Application/controller**: chat hooks, host actions, and local orchestration
-  coordinate session switching, prompt submission, picker flows, and run
-  lifecycle.
+- **Hooks**: `hooks/` are the CLI host integration layer. They include both
+  controller hooks like `use...Controller` and UI-local state hooks. Obvious
+  flow owners may live under `hooks/controllers/`.
 - **Domain/engine**: `src/core/chat/engine/` and adjacent core domains own
   persisted conversation semantics, session policy, compaction behavior,
   approval truth, and runtime defaults.
+
+Even though the TUI is local, it should behave like a client of core services:
+the host calls core services, and those services call storage/repositories.
+The host should not reach through to file-backed session storage directly as a
+stable architecture pattern.
 
 The TUI must become thinner over time. `App.tsx` should converge toward a
 presentation composition root, not a policy switchboard.
@@ -68,6 +73,20 @@ Good signs:
 - hosts pass clear intent upward;
 - views receive resolved values and render them;
 - orchestration code is short enough to review without reconstructing policy.
+
+## Controller Hooks vs UI Hooks
+
+Keep the difference strict:
+
+- `use...Controller`: interface-specific flow ownership
+- other hooks: React-local state/adaptation only
+
+Do not create a second folder full of hook files just to simulate architecture.
+The question is ownership, not syntax.
+
+If a module coordinates session switching, prompt submission, compaction
+triggering, or other multi-step CLI flow, it should live in `hooks/` but be
+named as a controller hook.
 
 See [docs/strategy/chat-layering.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/strategy/chat-layering.md)
 for the target folder structure and layering rules.

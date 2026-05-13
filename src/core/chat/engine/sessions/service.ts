@@ -1,15 +1,48 @@
-import { createChatSession, loadChatSessions, readChatSession, saveChatSessions, touchSession } from './storage.js';
+/**
+ * Conversation session service.
+ *
+ * Boundary rule:
+ * - hosts should call this service (or a later richer session service), not
+ *   file-backed storage helpers directly;
+ * - storage/repository code stays behind the service boundary;
+ * - session semantics should grow here rather than leaking back into TUI/web
+ *   host code.
+ *
+ * Current compromise:
+ * this service currently uses the file-backed repository directly. That is the
+ * intended direction for session persistence ownership, but some older host
+ * flows still bypass the service and call the repository themselves. Those
+ * flows should move inward to this service over time.
+ */
+import { join, resolve } from 'node:path';
+import {
+  createFileChatSessionRepository,
+} from './repository/file-chat-session-repository.js';
+import {
+  createChatSession,
+  isGenericSessionName,
+  summarizeSession,
+  touchSession,
+} from './session-record.js';
 import type { ChatSession } from '../../types.js';
+import type { ConversationEngineConfig } from '../types.js';
 import type { NormalizedConversationEngineConfig } from '../config.js';
 import type { ConversationSessionService } from '../types.js';
 
 export function createConversationSessionService(args: {
-  config: NormalizedConversationEngineConfig;
+  config: NormalizedConversationEngineConfig | ConversationSessionServiceConfig;
 }): ConversationSessionService {
-  const { config } = args;
+  const config = normalizeConversationSessionServiceConfig(args.config);
+  const repository = createFileChatSessionRepository({
+    sessionStoragePath: config.sessionStoragePath,
+  });
 
   function loadSessions(apiKeyPresent = config.apiKeyPresent): ChatSession[] {
-    return loadChatSessions(config.sessionStoragePath, apiKeyPresent);
+    const sessions = repository.list(apiKeyPresent);
+    if (repository.readCatalog().length === 0) {
+      repository.save(sessions);
+    }
+    return sessions;
   }
 
   return {
@@ -17,34 +50,45 @@ export function createConversationSessionService(args: {
       return loadSessions();
     },
     read(id) {
-      return readChatSession(config.sessionStoragePath, id, config.apiKeyPresent);
+      return repository.read(id, config.apiKeyPresent);
     },
     create(input) {
       const existing = loadSessions(input?.apiKeyPresent ?? config.apiKeyPresent);
-      const nextNumber = existing.length + 1;
       const session = createChatSession({
         id: input?.id?.trim() || `session-${Date.now()}`,
-        name: input?.name?.trim() || `Session ${nextNumber}`,
+        name: input?.name?.trim() || `Session ${getNextSessionNumber(existing)}`,
         apiKeyPresent: input?.apiKeyPresent ?? config.apiKeyPresent,
         model: input?.model ?? config.model,
         reasoningEffort: input?.reasoningEffort ?? config.reasoningEffort,
         workspaceId: input?.workspaceId ?? config.workspaceId,
       });
-      saveChatSessions(config.sessionStoragePath, [session, ...existing]);
+      repository.save([session, ...existing]);
       return session;
     },
-    rename(id, name) {
+    update(id, updater) {
       const sessions = loadSessions();
       const session = sessions.find((candidate) => candidate.id === id);
       if (!session) {
-        throw new Error(`Chat session not found: ${id}`);
+        return undefined;
       }
 
-      const renamed = touchSession({
+      const nextSession = updater(session);
+      if (nextSession === session) {
+        return session;
+      }
+
+      const touched = touchSession(nextSession);
+      repository.save(sessions.map((candidate) => (candidate.id === id ? touched : candidate)));
+      return touched;
+    },
+    rename(id, name) {
+      const renamed = this.update(id, (session) => ({
         ...session,
         name,
-      });
-      saveChatSessions(config.sessionStoragePath, sessions.map((candidate) => (candidate.id === id ? renamed : candidate)));
+      }));
+      if (!renamed) {
+        throw new Error(`Chat session not found: ${id}`);
+      }
       return renamed;
     },
     delete(id) {
@@ -53,8 +97,73 @@ export function createConversationSessionService(args: {
         return false;
       }
 
-      saveChatSessions(config.sessionStoragePath, sessions.filter((candidate) => candidate.id !== id));
+      const remaining = sessions.filter((candidate) => candidate.id !== id);
+      if (remaining.length > 0) {
+        repository.save(remaining);
+        return true;
+      }
+
+      repository.save([createFallbackSession(config)]);
       return true;
     },
   };
+}
+
+type ConversationSessionServiceConfig = Pick<
+  ConversationEngineConfig,
+  'workspaceRoot' | 'stateRoot' | 'model' | 'reasoningEffort' | 'sessionStoragePath' | 'workspaceId' | 'apiKeyPresent'
+>;
+
+function normalizeConversationSessionServiceConfig(
+  config: NormalizedConversationEngineConfig | ConversationSessionServiceConfig,
+): Pick<NormalizedConversationEngineConfig, 'workspaceRoot' | 'stateRoot' | 'model' | 'reasoningEffort' | 'sessionStoragePath' | 'workspaceId' | 'apiKeyPresent'> {
+  if ('memoryDir' in config && 'traceDir' in config && 'memoryMaintenanceMode' in config) {
+    return config;
+  }
+
+  const workspaceRoot = resolve(config.workspaceRoot);
+  const stateRoot = resolve(config.stateRoot);
+  return {
+    workspaceRoot,
+    stateRoot,
+    model: config.model,
+    reasoningEffort: config.reasoningEffort,
+    sessionStoragePath: resolve(config.sessionStoragePath ?? join(stateRoot, 'chat-sessions.catalog.json')),
+    workspaceId: config.workspaceId,
+    apiKeyPresent: config.apiKeyPresent ?? false,
+  };
+}
+
+function createFallbackSession(
+  config: Pick<NormalizedConversationEngineConfig, 'model' | 'reasoningEffort' | 'workspaceId' | 'apiKeyPresent'>,
+): ChatSession {
+  return createChatSession({
+    id: 'session-1',
+    name: 'Session 1',
+    apiKeyPresent: config.apiKeyPresent,
+    model: config.model,
+    reasoningEffort: config.reasoningEffort,
+    workspaceId: config.workspaceId,
+  });
+}
+
+function getNextSessionNumber(sessions: ChatSession[]): number {
+  const highestGenericNumber = sessions.reduce((highest, session) => {
+    if (!isGenericSessionName(session.name)) {
+      return highest;
+    }
+
+    const parsed = Number.parseInt(session.name.replace(/^Session\s+/, ''), 10);
+    if (!Number.isFinite(parsed)) {
+      return highest;
+    }
+
+    return Math.max(highest, parsed);
+  }, 0);
+
+  return highestGenericNumber + 1;
+}
+
+export function summarizeConversationSession(session: ChatSession): string {
+  return summarizeSession(session);
 }

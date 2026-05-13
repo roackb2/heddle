@@ -2,7 +2,8 @@ import type { ChatMessage } from '../../../llm/types.js';
 import { buildConversationMessages } from '../sessions/conversation-lines.js';
 import { buildCompactionRunningContext, compactChatHistoryWithArchive } from '../history/compaction.js';
 import { acquireSessionLease, getSessionLeaseConflict, type ChatSessionLeaseOwner } from '../sessions/lease.js';
-import { readChatSession, saveChatSessions, touchSession } from '../sessions/storage.js';
+import { touchSession } from '../sessions/session-record.js';
+import { readChatSession, saveChatSessions } from '../sessions/repository/file-chat-session-repository.js';
 import type { ChatArchiveRecord, ChatContextStats, ChatSession } from '../../types.js';
 import type { ChatTurnHostBridge } from './host-bridge.js';
 

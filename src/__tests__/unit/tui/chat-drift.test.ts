@@ -2,7 +2,8 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createChatSession, loadChatSessions } from '../../../cli/chat/state/storage.js';
+import { createChatSession } from '../../../core/chat/engine/sessions/session-record.js';
+import { loadChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
 import { driftFooterColor, formatDriftFooter } from '../../../cli/chat/utils/drift-footer.js';
 
 describe('chat drift defaults and footer formatting', () => {

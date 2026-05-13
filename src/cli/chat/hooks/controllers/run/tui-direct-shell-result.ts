@@ -1,9 +1,9 @@
-import { summarizeToolCall } from '../../../core/observability/conversation-activity.js';
-import { appendDirectShellHistory, buildConversationMessages, formatDirectShellResponse } from '../utils/format.js';
-import { compactChatHistoryWithArchive } from '../state/compaction.js';
-import type { ChatSession } from '../state/types.js';
-import type { ChatRuntimeConfig } from '../utils/runtime.js';
-import type { ActionState } from './useAgentRun.js';
+import { summarizeToolCall } from '../../../../../core/observability/conversation-activity.js';
+import { appendDirectShellHistory, buildConversationMessages, formatDirectShellResponse } from '../../../utils/format.js';
+import { compactChatHistoryWithArchive } from '../../../state/compaction.js';
+import type { ChatSession } from '../../../state/types.js';
+import type { ChatRuntimeConfig } from '../../../utils/runtime.js';
+import type { ActionState } from '../useAgentRunController.js';
 import { createTuiDirectShellCompactionStatusHandler } from './tui-compaction-status.js';
 
 type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => void;

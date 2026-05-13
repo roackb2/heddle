@@ -9,6 +9,8 @@
  * - new-session inheritance from the active session
  * - switching between stored sessions without clobbering model/reasoning state
  * - persisted catalog values after host-side changes
+ * - runtime-provided session catalog paths are honored instead of rebuilding
+ *   a default stateRoot path
  *
  * Direction:
  * - keep this script as the first concrete example of a lightweight TUI
@@ -22,7 +24,7 @@ import React, { useEffect } from 'react';
 import { act } from 'react';
 import { render, cleanup } from '@testing-library/react';
 import { JSDOM } from 'jsdom';
-import { mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -65,7 +67,23 @@ async function flush() {
   });
 }
 
-async function main() {
+function renderHarness(args: {
+  sessionCatalogFile: string;
+  workspaceRoot: string;
+  stateRoot: string;
+}) {
+  render(
+    <Harness
+      sessionCatalogFile={args.sessionCatalogFile}
+      apiKeyPresent={true}
+      defaultModel="gpt-5.4"
+      workspaceRoot={args.workspaceRoot}
+      stateRoot={args.stateRoot}
+    />,
+  );
+}
+
+async function verifySessionSwitchScenario() {
   const root = mkdtempSync(join(tmpdir(), 'heddle-session-switch-'));
   const workspaceRoot = join(root, 'workspace');
   const stateRoot = join(root, '.heddle');
@@ -73,15 +91,7 @@ async function main() {
   mkdirSync(stateRoot, { recursive: true });
   const sessionCatalogFile = join(stateRoot, 'chat-sessions.json');
 
-  render(
-    <Harness
-      sessionCatalogFile={sessionCatalogFile}
-      apiKeyPresent={true}
-      defaultModel="gpt-5.4"
-      workspaceRoot={workspaceRoot}
-      stateRoot={stateRoot}
-    />,
-  );
+  renderHarness({ sessionCatalogFile, workspaceRoot, stateRoot });
   await flush();
   assert(api, 'Harness API not initialized');
 
@@ -154,11 +164,57 @@ async function main() {
   assert(secondStored?.model === 'gpt-5.4', 'Persisted second session model is wrong');
   assert(secondStored?.reasoningEffort === 'medium', 'Persisted second session reasoning is wrong');
 
-  console.log(JSON.stringify({
+  cleanup();
+
+  return {
     firstSession: firstStored,
     secondSession: secondStored,
     activeSessionId: api!.activeSession?.id,
     message: 'session-switch verification passed',
+  };
+}
+
+async function verifyCustomCatalogScenario() {
+  api = undefined;
+  const root = mkdtempSync(join(tmpdir(), 'heddle-custom-catalog-'));
+  const workspaceRoot = join(root, 'workspace');
+  const stateRoot = join(root, '.heddle');
+  const customStateRoot = join(root, '.heddle-embedded');
+  mkdirSync(workspaceRoot, { recursive: true });
+  mkdirSync(stateRoot, { recursive: true });
+  mkdirSync(customStateRoot, { recursive: true });
+
+  const customCatalogFile = join(customStateRoot, 'embedded-sessions.catalog.json');
+  const defaultCatalogFile = join(stateRoot, 'chat-sessions.catalog.json');
+
+  renderHarness({ sessionCatalogFile: customCatalogFile, workspaceRoot, stateRoot });
+  await flush();
+  assert(api, 'Harness API not initialized for custom catalog scenario');
+
+  await act(async () => {
+    api!.createSession('Embedded Session');
+  });
+  await flush();
+
+  assert(existsSync(customCatalogFile), 'Custom catalog path was not written');
+  assert(!existsSync(defaultCatalogFile), 'Default catalog path should not be written for embedded runtimes');
+
+  cleanup();
+
+  return {
+    customCatalogFile,
+    defaultCatalogFile,
+    message: 'custom-catalog verification passed',
+  };
+}
+
+async function main() {
+  const sessionSwitch = await verifySessionSwitchScenario();
+  const customCatalog = await verifyCustomCatalogScenario();
+
+  console.log(JSON.stringify({
+    sessionSwitch,
+    customCatalog,
   }, null, 2));
 
   cleanup();

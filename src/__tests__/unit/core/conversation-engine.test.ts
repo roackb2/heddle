@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createConversationEngine } from '../../../core/chat/engine/conversation-engine.js';
 import type { AgentLoopEvent } from '../../../core/runtime/events.js';
 import type { TraceEvent } from '../../../core/types.js';
-import { loadChatSessions, readChatSession, readChatSessionCatalog } from '../../../core/chat/engine/sessions/storage.js';
+import { loadChatSessions, readChatSession, readChatSessionCatalog } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
 import type { ChatSession } from '../../../core/chat/types.js';
 
 const runConversationTurnMock = vi.hoisted(() => vi.fn());
@@ -53,7 +53,7 @@ describe('createConversationEngine', () => {
     }));
   });
 
-  it('lists sessions in persisted storage order, reads missing sessions as undefined, renames, and deletes', () => {
+  it('lists sessions in persisted storage order, reads missing sessions as undefined, updates, renames, and deletes with fallback', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const engine = createConversationEngine({
@@ -69,13 +69,23 @@ describe('createConversationEngine', () => {
     expect(engine.sessions.list().map((session) => session.id)).toEqual(['session-b', 'session-a', 'session-1']);
     expect(engine.sessions.read('missing')).toBeUndefined();
 
+    const updated = engine.sessions.update(first.id, (session) => ({
+      ...session,
+      driftEnabled: true,
+    }));
+    expect(updated?.driftEnabled).toBe(true);
+    expect(engine.sessions.read(first.id)?.driftEnabled).toBe(true);
+
     const renamed = engine.sessions.rename(first.id, 'Renamed');
     expect(renamed.name).toBe('Renamed');
     expect(engine.sessions.read(first.id)?.name).toBe('Renamed');
 
     expect(engine.sessions.delete(second.id)).toBe(true);
-    expect(engine.sessions.delete('missing')).toBe(false);
     expect(loadChatSessions(join(stateRoot, 'chat-sessions.catalog.json'), true).map((session) => session.id)).toEqual(['session-a', 'session-1']);
+    expect(engine.sessions.delete(first.id)).toBe(true);
+    expect(engine.sessions.delete('session-1')).toBe(true);
+    expect(engine.sessions.delete('missing')).toBe(false);
+    expect(loadChatSessions(join(stateRoot, 'chat-sessions.catalog.json'), true).map((session) => session.id)).toEqual(['session-1']);
   });
 
   it('submits turns with merged engine defaults, normalized host callbacks, and override options', async () => {
@@ -208,7 +218,7 @@ describe('createConversationEngine', () => {
     stored.updatedAt = '2026-05-03T00:00:00.000Z';
     const otherSessions = loadChatSessions(join(stateRoot, 'chat-sessions.catalog.json'), true)
       .filter((candidate) => candidate.id !== session.id);
-    const { saveChatSessions } = await import('../../../core/chat/engine/sessions/storage.js');
+    const { saveChatSessions } = await import('../../../core/chat/engine/sessions/repository/file-chat-session-repository.js');
     saveChatSessions(join(stateRoot, 'chat-sessions.catalog.json'), [stored, ...otherSessions]);
 
     await engine.turns.continue({ sessionId: session.id });

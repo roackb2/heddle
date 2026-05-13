@@ -2,7 +2,8 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createChatSession, saveChatSessions } from '../../../core/chat/engine/sessions/storage.js';
+import { createChatSession } from '../../../core/chat/engine/sessions/session-record.js';
+import { saveChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
 import { readChatTurnReview } from '../../../server/features/control-plane/services/chat-sessions.js';
 
 describe('control-plane turn review', () => {
