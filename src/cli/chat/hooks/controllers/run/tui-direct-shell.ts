@@ -1,18 +1,19 @@
-import { acquireSessionLease, getSessionLeaseConflict, releaseSessionLease } from '../../../core/chat/engine/sessions/lease.js';
-import { rememberedApprovalPolicy } from '../../../core/approvals/default-policies.js';
-import { resolveToolApproval } from '../../../core/approvals/policy-chain.js';
-import { summarizeToolCall } from '../../../core/observability/conversation-activity.js';
-import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../core/tools/toolkits/shell-process/run-shell.js';
-import type { ToolCall, ToolResult } from '../../../index.js';
-import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../state/approval-rules.js';
-import { readChatSession, touchSession } from '../state/storage.js';
-import type { ChatSession } from '../state/types.js';
-import { shouldFallbackToMutate } from '../utils/format.js';
-import type { ChatRuntimeConfig } from '../utils/runtime.js';
+import { acquireSessionLease, getSessionLeaseConflict, releaseSessionLease } from '../../../../../core/chat/engine/sessions/lease.js';
+import { rememberedApprovalPolicy } from '../../../../../core/approvals/default-policies.js';
+import { resolveToolApproval } from '../../../../../core/approvals/policy-chain.js';
+import { summarizeToolCall } from '../../../../../core/observability/conversation-activity.js';
+import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../../../core/tools/toolkits/shell-process/run-shell.js';
+import type { ToolCall, ToolResult } from '../../../../../index.js';
+import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../../../state/approval-rules.js';
+import { touchSession } from '../../../../../core/chat/engine/sessions/session-record.js';
+import { readChatSession } from '../../../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
+import type { ChatSession } from '../../../state/types.js';
+import { shouldFallbackToMutate } from '../../../utils/format.js';
+import type { ChatRuntimeConfig } from '../../../utils/runtime.js';
 import { beginTuiDirectShellAction, finishTuiDirectShellAction } from './tui-agent-turn-lifecycle.js';
 import { finalizeTuiDirectShellSuccess } from './tui-direct-shell-result.js';
-import type { ActionState } from './useAgentRun.js';
-import type { ToolDefinition } from '../../../index.js';
+import type { ActionState } from '../useAgentRunController.js';
+import type { ToolDefinition } from '../../../../../index.js';
 
 type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => void;
 

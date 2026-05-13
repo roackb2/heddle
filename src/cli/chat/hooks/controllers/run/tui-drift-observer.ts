@@ -1,8 +1,8 @@
 import type { Logger } from 'pino';
-import { createCyberLoopKinematicsObserver, type CyberLoopKinematicsObserver, type LlmAdapter } from '../../../index.js';
-import { resolveApiKeyForModel, resolveProviderCredentialSourceForModel } from '../utils/runtime.js';
-import type { ChatRuntimeConfig } from '../utils/runtime.js';
-import type { ChatDriftObserverOptions } from './useAgentRun.js';
+import { createCyberLoopKinematicsObserver, type CyberLoopKinematicsObserver, type LlmAdapter } from '../../../../../index.js';
+import { resolveApiKeyForModel, resolveProviderCredentialSourceForModel } from '../../../utils/runtime.js';
+import type { ChatRuntimeConfig } from '../../../utils/runtime.js';
+import type { ChatDriftObserverOptions } from '../useAgentRunController.js';
 
 export async function createTuiChatDriftObserver(args: {
   prompt: string;

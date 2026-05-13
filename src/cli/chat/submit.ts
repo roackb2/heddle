@@ -1,6 +1,6 @@
 import { runLocalCommand } from './state/local-commands.js';
 import { buildCompactionRunningContext, compactChatHistoryWithArchive } from './state/compaction.js';
-import { createInitialMessages } from './state/storage.js';
+import { createInitialMessages } from '../../core/chat/engine/sessions/session-record.js';
 import type { ReasoningEffort } from '../../core/llm/types.js';
 import type { ChatSession, ConversationLine } from './state/types.js';
 import { buildConversationMessages, normalizeInlineText } from './utils/format.js';

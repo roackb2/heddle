@@ -3,7 +3,8 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createChatSession, migrateLegacyChatSessions, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../cli/chat/state/storage.js';
+import { createChatSession } from '../../../core/chat/engine/sessions/session-record.js';
+import { migrateLegacyChatSessions, readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
 
 describe('chat session storage layout', () => {
   it('migrates legacy chat-sessions.json into catalog plus per-session files without deleting the original file', () => {

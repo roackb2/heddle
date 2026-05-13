@@ -1,5 +1,5 @@
 import { runConversationTurn, clearConversationTurnLease } from './run-conversation-turn.js';
-import { readChatSession } from '../sessions/storage.js';
+import { readChatSession } from '../sessions/repository/file-chat-session-repository.js';
 import type { NormalizedConversationEngineConfig } from '../config.js';
 import type {
   ContinueConversationTurnInput,

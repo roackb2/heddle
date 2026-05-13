@@ -10,7 +10,7 @@
  * - If a feature needs new stateful behavior, move that ownership outward
  *   instead of teaching `App.tsx` new policy or persistent semantics.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Box, Text, useStdout } from 'ink';
 import {
   ApprovalComposer,
@@ -26,27 +26,19 @@ import {
   SlashHintPanel,
 } from './components/index.js';
 import { buildTuiDebugSnapshot } from './debug/tui-debug-snapshot.js';
-import { buildConversationMessages } from './utils/format.js';
-import { buildCompactionRunningContext, compactChatHistoryWithArchive } from './state/compaction.js';
-import { estimateBuiltInContextWindow } from '../../core/llm/openai-models.js';
-import { credentialModeFromSource, resolveCompatibleActiveModel, resolveSystemSelectedModel } from '../../core/llm/model-policy.js';
 import { useApprovalFlow } from './hooks/useApprovalFlow.js';
-import { useAgentRun } from './hooks/useAgentRun.js';
+import { useAgentRunController } from './hooks/controllers/useAgentRunController.js';
+import { useChatAppController } from './hooks/controllers/useChatAppController.js';
 import { useChatDrift } from './hooks/useChatDrift.js';
 import { useChatPickers } from './hooks/useChatPickers.js';
-import { useChatSessions } from './hooks/useChatSessions.js';
 import { useChatStatusSummary } from './hooks/useChatStatusSummary.js';
 import { useLocalIds } from './hooks/useLocalIds.js';
 import { usePromptDraft } from './hooks/usePromptDraft.js';
 import { usePromptHistory } from './hooks/usePromptHistory.js';
-import { usePromptSubmission } from './hooks/usePromptSubmission.js';
+import { usePromptSubmissionController } from './hooks/controllers/usePromptSubmissionController.js';
 import { autocompleteLocalCommand } from './state/local-commands.js';
 import { listMentionableFiles } from './utils/file-mentions.js';
 import { resolveProviderCredentialSourceForModel, type ChatRuntimeConfig } from './utils/runtime.js';
-import {
-  resolveNewSessionExecutionPreferences,
-  resolveStoredSessionExecutionPreferences,
-} from '../../core/chat/engine/sessions/preferences/service.js';
 
 export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
   return <EmbeddedChatApp runtime={runtime} />;
@@ -56,11 +48,6 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const nextLocalId = useLocalIds();
   const { stdout } = useStdout();
   const columns = stdout.columns ?? 80;
-  const initialModelCompatibility = useMemo(() => resolveCompatibleActiveModel({
-    activeModel: runtime.model,
-    provider: runtime.model.startsWith('claude') ? 'anthropic' : 'openai',
-    credentialMode: credentialModeFromSource(runtime.providerCredentialSource),
-  }), [runtime.model, runtime.providerCredentialSource]);
   const {
     draft,
     setDraft,
@@ -71,70 +58,6 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   } = usePromptDraft();
   const { promptHistory, recordPromptHistory } = usePromptHistory();
   const mentionableFiles = useState(() => listMentionableFiles(runtime.workspaceRoot, runtime.searchIgnoreDirs))[0];
-
-  const {
-    sessions,
-    activeSessionId,
-    setActiveSessionId,
-    activeSession,
-    recentSessions,
-    listRecentSessionsMessage,
-    updateSessionById,
-    updateActiveSession,
-    setSessionPreferences,
-    createSession: createSessionWithDefaultModel,
-    renameSession,
-    removeSession,
-  } = useChatSessions({
-    sessionCatalogFile: runtime.sessionCatalogFile,
-    apiKeyPresent: runtime.providerCredentialPresent,
-    defaultModel: runtime.model,
-    workspaceRoot: runtime.workspaceRoot,
-    stateRoot: runtime.stateRoot,
-  });
-  const storedActivePreferences = useMemo(() => resolveStoredSessionExecutionPreferences({
-    stored: activeSession,
-    defaultModel: runtime.model,
-  }), [activeSession, runtime.model]);
-  const activeModelCompatibility = useMemo(() => resolveCompatibleActiveModel({
-    activeModel: storedActivePreferences.model,
-    provider: storedActivePreferences.model.startsWith('claude') ? 'anthropic' : 'openai',
-    credentialMode: credentialModeFromSource(resolveProviderCredentialSourceForModel(storedActivePreferences.model, runtime)),
-  }), [runtime, storedActivePreferences.model]);
-  const activeModel = activeModelCompatibility.model;
-  const activeReasoningEffort = activeSession?.reasoningEffort;
-  const createSession = useCallback((name?: string) => createSessionWithDefaultModel(
-    name,
-    resolveNewSessionExecutionPreferences({
-      defaultModel: runtime.model,
-      inherited: {
-        model: activeModel,
-        reasoningEffort: activeSession?.reasoningEffort,
-      },
-    }),
-  ), [
-    activeModel,
-    activeSession?.reasoningEffort,
-    createSessionWithDefaultModel,
-    runtime.model,
-  ]);
-  const pickers = useChatPickers({
-    draft,
-    recentSessions,
-    mentionableFiles,
-    clearDraft,
-    replaceDraft,
-    providerCredentialSource: resolveProviderCredentialSourceForModel(activeModel, runtime),
-    activeModel,
-  });
-  const drift = useChatDrift({
-    activeSession,
-    updateActiveSession,
-  });
-
-  const previousActiveModelRef = useRef(activeModel);
-  const previousActiveSessionIdRef = useRef<string | undefined>(activeSession?.id);
-  const modelCompatibilityNotice = activeModelCompatibility.warning ?? initialModelCompatibility.warning;
   const {
     status,
     setStatus,
@@ -153,92 +76,43 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     actionState,
     workingFrames,
   } = useApprovalFlow(nextLocalId);
-  useEffect(() => {
-    if (!activeSession || !activeSession.model) {
-      return;
-    }
-
-    if (activeSession.model === activeModel) {
-      return;
-    }
-
-    setSessionPreferences(activeSession.id, {
-      model: activeModel,
-      reasoningEffort: activeSession.reasoningEffort,
-    });
-  }, [activeModel, activeSession, setSessionPreferences]);
-
-  useEffect(() => {
-    if (!activeSession) {
-      previousActiveModelRef.current = activeModel;
-      previousActiveSessionIdRef.current = undefined;
-      return;
-    }
-
-    const previousSessionId = previousActiveSessionIdRef.current;
-    const previousModel = previousActiveModelRef.current;
-    previousActiveSessionIdRef.current = activeSession.id;
-    previousActiveModelRef.current = activeModel;
-    if (previousSessionId !== activeSession.id || previousModel === activeModel) {
-      return;
-    }
-
-    const previousWindow = estimateBuiltInContextWindow(previousModel);
-    const nextWindow = estimateBuiltInContextWindow(activeModel);
-    if (!nextWindow || (previousWindow !== undefined && nextWindow >= previousWindow)) {
-      return;
-    }
-
-    const sessionId = activeSession.id;
-    const sessionHistory = activeSession.history;
-    const previousContext = activeSession.context;
-    const previousArchives = activeSession.archives;
-
-    setStatus('Compacting');
-      updateSessionById(sessionId, (session) => ({
-        ...session,
-        context: buildCompactionRunningContext({
-          history: session.history,
-          previous: session.context,
-        archiveCount: session.archives?.length,
-        currentSummaryPath: session.context?.currentSummaryPath,
-      }),
-    }));
-
-    void compactChatHistoryWithArchive({
-      history: sessionHistory,
-      model: activeModel,
-      sessionId,
-      stateRoot: runtime.stateRoot,
-      systemContext: runtime.systemContext,
-      goal: `Model switched from ${previousModel} to ${activeModel}`,
-      summarizer: { credentialSource: runtime.providerCredentialSource },
-    }).then((compacted: Awaited<ReturnType<typeof compactChatHistoryWithArchive>>) => {
-      updateSessionById(sessionId, (session) => ({
-        ...session,
-        history: compacted.history,
-        context: compacted.context,
-        archives: compacted.archives,
-        messages: buildConversationMessages(compacted.history),
-      }));
-      setStatus('Idle');
-    }).catch(() => {
-      updateSessionById(sessionId, (session) => ({
-        ...session,
-        context: previousContext,
-        archives: previousArchives,
-      }));
-      setStatus('Idle');
-    });
-  }, [activeModel, activeSession, runtime.providerCredentialSource, runtime.stateRoot, runtime.systemContext, setStatus, updateSessionById]);
+  const {
+    sessions,
+    activeSessionId,
+    setActiveSessionId,
+    activeSession,
+    recentSessions,
+    listRecentSessionsMessage,
+    updateSessionById,
+    updateActiveSession,
+    createSession,
+    renameSession,
+    removeSession,
+    activeModel,
+    activeReasoningEffort,
+    sessionTitleModel,
+    modelCompatibilityNotice,
+    applyActiveModel,
+    applyActiveReasoningEffort,
+  } = useChatAppController({
+    runtime,
+    setStatus,
+  });
+  const pickers = useChatPickers({
+    draft,
+    recentSessions,
+    mentionableFiles,
+    clearDraft,
+    replaceDraft,
+    providerCredentialSource: resolveProviderCredentialSourceForModel(activeModel, runtime),
+    activeModel,
+  });
+  const drift = useChatDrift({
+    activeSession,
+    updateActiveSession,
+  });
 
   const messages = useMemo(() => activeSession?.messages ?? [], [activeSession?.messages]);
-  const sessionTitleModel = resolveSystemSelectedModel({
-    purpose: 'session-title',
-    provider: 'openai',
-    activeModel,
-    credentialMode: credentialModeFromSource(runtime.providerCredentialSource),
-  });
   const {
     compacting,
     contextStatus,
@@ -360,17 +234,6 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     resetRunState({ abortInFlight: true });
   }, [clearDraft, resetRunState, setActiveSessionId]);
 
-  const applyActiveModel = useCallback((model: string) => {
-    if (!activeSession) {
-      return;
-    }
-
-    setSessionPreferences(activeSession.id, {
-      model,
-      reasoningEffort: activeSession.reasoningEffort,
-    });
-  }, [activeSession, setSessionPreferences]);
-
   const closeSession = (id: string) => {
     const removedActive = removeSession(id);
     if (removedActive) {
@@ -380,7 +243,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     }
   };
 
-  const { executeTurn, executeDirectShellCommand } = useAgentRun({
+  const { executeTurn, executeDirectShellCommand } = useAgentRunController({
     runtime,
     activeModel,
     activeReasoningEffort,
@@ -397,21 +260,12 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const promptBodyWidth = Math.max(1, promptPanelWidth - 2);
   const promptInputWidth = Math.max(1, promptBodyWidth - 2);
 
-  const { pendingSubmittedPrompt, clearPendingSubmittedPrompt, submitPrompt } = usePromptSubmission({
+  const { pendingSubmittedPrompt, clearPendingSubmittedPrompt, submitPrompt } = usePromptSubmissionController({
     runtime,
     activeModel,
     activeReasoningEffort,
     setActiveModel: applyActiveModel,
-    setActiveReasoningEffort: (effort) => {
-      if (!activeSession) {
-        return;
-      }
-
-      setSessionPreferences(activeSession.id, {
-        model: activeSession.model ?? runtime.model,
-        reasoningEffort: effort,
-      });
-    },
+    setActiveReasoningEffort: applyActiveReasoningEffort,
     sessions,
     recentSessions,
     activeSessionId,

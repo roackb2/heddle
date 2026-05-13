@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { CredentialAwareModelOption } from '../../../core/llm/model-policy.js';
-import type { ReasoningEffort } from '../../../core/llm/types.js';
-import type { ReasoningEffortPickerOption } from './useChatPickers.js';
-import type { ConversationLine, ChatSession } from '../state/types.js';
-import { submitChatPrompt } from '../submit.js';
-import { buildPromptWithFileMentions } from '../utils/file-mentions.js';
-import type { ChatRuntimeConfig } from '../utils/runtime.js';
+import type { CredentialAwareModelOption } from '../../../../core/llm/model-policy.js';
+import type { ReasoningEffort } from '../../../../core/llm/types.js';
+import type { ReasoningEffortPickerOption } from '../useChatPickers.js';
+import type { ConversationLine, ChatSession } from '../../state/types.js';
+import { submitChatPrompt } from '../../submit.js';
+import { buildPromptWithFileMentions } from '../../utils/file-mentions.js';
+import type { ChatRuntimeConfig } from '../../utils/runtime.js';
 
 type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
 type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => void;
 
-export function usePromptSubmission({
+export function usePromptSubmissionController({
   runtime,
   activeModel,
   activeReasoningEffort,

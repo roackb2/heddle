@@ -37,6 +37,7 @@ export type ConversationSessionService = {
   list(): ChatSession[];
   read(id: string): ChatSession | undefined;
   create(input?: CreateConversationSessionInput): ChatSession;
+  update(id: string, updater: (session: ChatSession) => ChatSession): ChatSession | undefined;
   rename(id: string, name: string): ChatSession;
   delete(id: string): boolean;
 };

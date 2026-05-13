@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createChatTurnPersistenceArtifacts } from '../../../core/chat/engine/turns/result.js';
-import { loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/storage.js';
+import { loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
 import { persistCompletedChatTurn } from '../../../core/chat/engine/turns/persistence.js';
 import { createTraceSummarizerRegistry } from '../../../core/observability/trace-summarizers.js';
 import type { AgentLoopResult } from '../../../core/runtime/agent-loop.js';

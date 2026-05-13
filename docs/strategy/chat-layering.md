@@ -14,6 +14,9 @@ should know where the code belongs before they start wiring it.
   for one host.
 - **Controller**: interface-specific orchestration that wires one host's events,
   lifecycle, and UI flow to domain behavior.
+- **Hook**: a React delivery form used by React-based hosts. A hook may
+  implement controller behavior or UI-local state, so naming and docs must make
+  the role explicit.
 - **Domain / core**: shared behavior whose meaning should stay the same across
   multiple hosts.
 
@@ -53,11 +56,25 @@ Chat code should follow a strict split:
 - **Domain/engine** owns semantics, persisted meaning, defaults, fallbacks, and
   reusable policy.
 
+Hosts should call core services, not repositories or storage helpers directly.
+In a local host like the TUI, that means direct service calls instead of API
+calls; in a remote host like web, that likely means an API. The boundary rule
+is the same in both cases: hosts talk to services, and services talk to
+repositories/storage.
+
 If a behavior has one true meaning across more than one host, it belongs in the
 domain/engine layer, not in the view and not duplicated per host.
 
 If a behavior only exists because one host has a particular interaction model,
 it may belong in that host's controller.
+
+For React-based hosts, the practical relationship is:
+
+- controller is a role
+- hook is the implementation shape
+
+So a React host may express controller logic as `use...Controller` hooks inside
+its `hooks/` layer.
 
 ## Non-Negotiable Rules
 
@@ -65,6 +82,7 @@ it may belong in that host's controller.
 - Presentation layers must not resolve domain defaults or fallbacks.
 - Controllers must not become shadow domain owners.
 - Controllers must only own interface-specific wiring.
+- Hooks must not be used to hide domain ownership.
 - Domain owners should resolve effective behavior once, then pass concrete
   values downward.
 - Repeated `x ?? y ?? z` across view, hooks, controllers, and services is a
@@ -98,8 +116,8 @@ src/
         README.md                # host-side CLI/TUI rules
         App.tsx                  # presentation composition root
         components/              # pure or near-pure view components
-        controllers/             # interface-specific orchestration only
-        hooks/                   # UI hooks or controller adapters, not domain owners
+        hooks/                   # React host layer: controller hooks plus UI-local hooks
+          controllers/           # optional subfolder for obvious flow owners
         adapters/                # host-to-domain translation only
         state/                   # UI-only ephemeral state
         utils/                   # presentation helpers only
@@ -107,8 +125,8 @@ src/
       features/
         control-plane/
           components/            # pure or near-pure view components
-          controllers/           # interface-specific orchestration only
-          hooks/                 # UI hooks or controller adapters
+          hooks/                 # React host layer: controller hooks plus UI-local hooks
+            controllers/         # optional subfolder for obvious flow owners
           adapters/              # web-to-core translation only
           state/                 # UI-only ephemeral state
           utils/                 # presentation helpers only
@@ -138,11 +156,16 @@ logic into core so the CLI becomes a thinner interface layer over time.
 Inside each interface app, prefer this local split:
 
 - `components/`: rendering and UI widgets
-- `controllers/`: interface-specific orchestration only
-- `hooks/`: UI hooks or thin controller adapters
+- `hooks/`: React host layer containing both controller hooks and UI-local hooks
 - `adapters/`: translation between interface events/data and core contracts
 - `state/`: ephemeral UI-only state
 - `utils/`: presentation helpers only
+
+For readability, a React host may also use:
+
+- `hooks/controllers/` for obvious flow owners
+
+That is still one hook layer, not a separate architecture tier.
 
 ## What Should Go Where
 
@@ -210,10 +233,38 @@ Bad controller responsibilities:
 - define approval policy;
 - define compaction behavior;
 - define trace semantics;
+- call repositories or file storage directly;
 - define any rule that ask mode, web, and TUI should all share.
 
 If the same controller logic would need to be copied into another host, that is
 usually a sign it belongs in domain/core instead.
+
+### Hooks
+
+Hooks are an implementation shape. In React-based hosts, they are the real host
+integration layer.
+
+Good hook responsibilities:
+
+- local draft state
+- local picker state
+- controller hooks for interface-specific orchestration
+- React-friendly adapters around core outputs
+- UI-only convenience state derived for rendering
+
+Bad hook responsibilities:
+
+- re-resolving shared defaults/fallbacks
+- owning persisted semantics
+- pretending there is a second architecture layer just because the file system
+  has another folder
+
+If a hook owns interface-specific orchestration, name it explicitly as a
+controller hook: `use...Controller`.
+
+If the host grows enough that the top-level `hooks/` folder becomes noisy,
+group obvious controller hooks under `hooks/controllers/` before inventing a
+second parallel architecture layer.
 
 ### Domain / Engine
 

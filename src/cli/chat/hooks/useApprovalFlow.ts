@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useInput } from 'ink';
-import type { ActionState } from './useAgentRun.js';
+import type { ActionState } from './controllers/useAgentRunController.js';
 import type { ApprovalChoice, LiveEvent, PendingApproval } from '../state/types.js';
 import type { EditFilePreview } from '../../../core/tools/toolkits/coding-files/edit-file.js';
 import type { PlanItem } from '../../../core/tools/toolkits/internal/update-plan.js';

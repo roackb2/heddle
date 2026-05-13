@@ -30,7 +30,7 @@ Observability behavior currently exists in these places:
 - `src/core/observability/semantic-conventions.ts` for shared trace names.
 - `src/core/observability/conversation-activity.ts` for shared host activity
   projection, typed activity handlers, and tool call/result activity summaries.
-- `src/cli/chat/hooks/tui-run-loop-events.ts` for TUI activity rendering.
+- `src/cli/chat/hooks/controllers/run/tui-run-loop-events.ts` for TUI activity rendering.
 - `src/web/features/control-plane/hooks/sessions-screen/useSessionDetailSubscription.ts` for web activity rendering.
 - `src/server/features/control-plane/services/chat-session-events.ts`.
 

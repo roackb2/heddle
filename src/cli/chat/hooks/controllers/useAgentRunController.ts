@@ -1,37 +1,37 @@
 import { useMemo } from 'react';
 import type { MutableRefObject } from 'react';
 import type { Logger } from 'pino';
-import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../index.js';
-import type { ReasoningEffort } from '../../../core/llm/types.js';
+import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../../index.js';
+import type { ReasoningEffort } from '../../../../core/llm/types.js';
 import {
   createLogger,
   createLlmAdapter,
   createDefaultAgentTools,
-} from '../../../index.js';
-import type { CyberLoopObserverAnnotation } from '../../../index.js';
-import type { EditFilePreview } from '../../../core/tools/toolkits/coding-files/edit-file.js';
-import type { PlanItem } from '../../../core/tools/toolkits/internal/update-plan.js';
+} from '../../../../index.js';
+import type { CyberLoopObserverAnnotation } from '../../../../index.js';
+import type { EditFilePreview } from '../../../../core/tools/toolkits/coding-files/edit-file.js';
+import type { PlanItem } from '../../../../core/tools/toolkits/internal/update-plan.js';
 import {
   formatMissingProviderCredentialMessage,
   hasProviderCredentialForModel,
   resolveApiKeyForModel,
   resolveProviderCredentialSourceForModel,
-} from '../../../core/runtime/api-keys.js';
-import { releaseSessionLease } from '../../../core/chat/engine/sessions/lease.js';
-import { generateSessionTitle } from '../../../core/chat/engine/sessions/title.js';
-import { isGenericSessionName } from '../state/storage.js';
-import { normalizeSessionTitle } from '../utils/format.js';
-import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval } from '../state/types.js';
-import type { ChatRuntimeConfig } from '../utils/runtime.js';
-import { useProjectApprovals } from './useProjectApprovals.js';
+} from '../../../../core/runtime/api-keys.js';
+import { releaseSessionLease } from '../../../../core/chat/engine/sessions/lease.js';
+import { generateSessionTitle } from '../../../../core/chat/engine/sessions/title.js';
+import { isGenericSessionName } from '../../../../core/chat/engine/sessions/session-record.js';
+import { normalizeSessionTitle } from '../../utils/format.js';
+import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval } from '../../state/types.js';
+import type { ChatRuntimeConfig } from '../../utils/runtime.js';
+import { useProjectApprovals } from '../useProjectApprovals.js';
 import {
   beginTuiAgentTurn,
   finishTuiAgentTurn,
-} from './tui-agent-turn-lifecycle.js';
-import { createTuiChatDriftObserver } from './tui-drift-observer.js';
-import { executeTuiDirectShell } from './tui-direct-shell.js';
-import { applyTuiAgentTurnFailure } from './tui-agent-turn-result.js';
-import { executeTuiOrdinaryTurn } from './tui-ordinary-turn.js';
+} from './run/tui-agent-turn-lifecycle.js';
+import { createTuiChatDriftObserver } from './run/tui-drift-observer.js';
+import { executeTuiDirectShell } from './run/tui-direct-shell.js';
+import { applyTuiAgentTurnFailure } from './run/tui-agent-turn-result.js';
+import { executeTuiOrdinaryTurn } from './run/tui-ordinary-turn.js';
 
 const PLAN_ITEM_STATUSES = new Set<PlanItem['status']>(['pending', 'in_progress', 'completed']);
 
@@ -111,7 +111,7 @@ export type ChatDriftObserverOptions = {
   onError?: (error: unknown) => void;
 };
 
-export function useAgentRun(args: UseAgentRunArgs) {
+export function useAgentRunController(args: UseAgentRunArgs) {
   const { runtime, activeModel, activeReasoningEffort, sessionTitleModel, activeSessionId, sessions, state, updateSessionById, updateActiveSession } = args;
   const projectApprovals = useProjectApprovals(runtime.approvalsFile);
   const activeApiKey = resolveApiKeyForModel(activeModel, runtime);

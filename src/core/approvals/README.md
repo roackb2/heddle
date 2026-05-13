@@ -25,7 +25,7 @@ Approval behavior currently exists in these places:
 - `src/core/agent/tool-dispatch.ts`
 - `src/core/approvals/surface.ts`
 - `src/core/approvals/remembered-rules.ts`
-- `src/cli/chat/hooks/tui-tool-approval.ts`
+- `src/cli/chat/hooks/controllers/run/tui-tool-approval.ts`
 - `src/server/features/control-plane/services/chat-sessions.ts`
 - `src/server/features/control-plane/services/chat-session-events.ts`
 

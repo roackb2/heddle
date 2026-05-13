@@ -1,4 +1,4 @@
-import type { ActionState } from './useAgentRun.js';
+import type { ActionState } from '../useAgentRunController.js';
 
 export function beginTuiAgentTurn(state: ActionState): AbortController {
   const abortController = beginTuiRunningAction(state);

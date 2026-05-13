@@ -1,14 +1,14 @@
-import type { TraceEvent } from '../../../index.js';
-import type { AgentLoopEvent } from '../../../core/runtime/events.js';
+import type { TraceEvent } from '../../../../../index.js';
+import type { AgentLoopEvent } from '../../../../../core/runtime/events.js';
 import {
   projectAgentLoopEventToConversationActivities,
   projectTraceEventToConversationActivities,
-} from '../../../core/observability/conversation-activity.js';
-import { previewEditFileInput } from '../../../core/tools/toolkits/coding-files/edit-file.js';
-import { formatConversationActivityForTui } from '../adapters/conversation-activity-adapter.js';
-import { formatEditPreviewHistoryMessage, formatPlanHistoryMessage } from '../utils/format.js';
-import type { ChatSession } from '../state/types.js';
-import type { ActionState } from './useAgentRun.js';
+} from '../../../../../core/observability/conversation-activity.js';
+import { previewEditFileInput } from '../../../../../core/tools/toolkits/coding-files/edit-file.js';
+import { formatConversationActivityForTui } from '../../../adapters/conversation-activity-adapter.js';
+import { formatEditPreviewHistoryMessage, formatPlanHistoryMessage } from '../../../utils/format.js';
+import type { ChatSession } from '../../../state/types.js';
+import type { ActionState } from '../useAgentRunController.js';
 
 export type TuiAssistantStreamUpdate = { step: number; text: string; done: boolean };
 

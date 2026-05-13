@@ -1,5 +1,5 @@
 import { formatAuthStatusMessage, loginProviderWithOAuth, logoutProvider } from '../../auth.js';
-import { summarizeSession } from '../state/storage.js';
+import { summarizeSession } from '../../../core/chat/engine/sessions/session-record.js';
 import type { SlashCommandExecutionContext } from '../../../core/commands/slash/modules/context.js';
 import { createFileHeartbeatTaskStore } from '../../../core/runtime/heartbeat-task-store.js';
 import type { LocalCommandArgs } from '../state/local-commands.js';

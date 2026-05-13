@@ -1,66 +1,60 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+/**
+ * CLI host session hook.
+ *
+ * Boundary rule:
+ * - this hook should be a React-facing adapter over core session services;
+ * - it should not own session storage mechanics or session collection policy.
+ *
+ * Current compromise:
+ * this hook still keeps React state for host rendering and local selection.
+ * The intended long-term shape is for hosts to stay thin adapters over core
+ * services while storage and session semantics remain behind the engine
+ * boundary.
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChatSession } from '../state/types.js';
-import {
-  createChatSession,
-  isGenericSessionName,
-  loadChatSessions,
-  saveChatSessions,
-  summarizeSession,
-  touchSession,
-} from '../state/storage.js';
 import { resolveWorkspaceContext } from '../../../core/runtime/workspaces.js';
 import type { SessionExecutionPreferences } from '../../../core/chat/engine/sessions/preferences/service.js';
 import { resolveNewSessionExecutionPreferences } from '../../../core/chat/engine/sessions/preferences/service.js';
+import {
+  createConversationSessionService,
+  summarizeConversationSession,
+} from '../../../core/chat/engine/sessions/service.js';
 
 type UseChatSessionsArgs = {
-  sessionCatalogFile: string;
   apiKeyPresent: boolean;
   defaultModel: string;
   workspaceRoot: string;
   stateRoot: string;
 };
 
-export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultModel, workspaceRoot, stateRoot }: UseChatSessionsArgs) {
+export function useChatSessions({ apiKeyPresent, defaultModel, workspaceRoot, stateRoot }: UseChatSessionsArgs) {
   const workspaceId = useMemo(
     () => resolveWorkspaceContext({ workspaceRoot, stateRoot }).activeWorkspace.id,
     [workspaceRoot, stateRoot],
   );
-  const initialSessionsRef = useRef<ChatSession[]>([]);
-  if (initialSessionsRef.current.length === 0) {
-    initialSessionsRef.current = loadChatSessions(sessionCatalogFile, apiKeyPresent);
-  }
-
-  const nextSessionNumberRef = useRef(getNextSessionNumber(initialSessionsRef.current));
-  const [sessions, setSessions] = useState<ChatSession[]>(initialSessionsRef.current);
-  const [activeSessionId, setActiveSessionId] = useState(initialSessionsRef.current[0]?.id ?? 'session-1');
-
-  useEffect(() => {
-    saveChatSessions(sessionCatalogFile, sessions);
-  }, [sessionCatalogFile, sessions]);
+  const sessionService = useMemo(
+    () =>
+      createConversationSessionService({
+        config: {
+          workspaceRoot,
+          stateRoot,
+          model: defaultModel,
+          apiKeyPresent,
+          workspaceId,
+        },
+      }),
+    [apiKeyPresent, defaultModel, stateRoot, workspaceId, workspaceRoot],
+  );
+  const initialSessions = useMemo(() => sessionService.list(), [sessionService]);
+  const [sessions, setSessions] = useState<ChatSession[]>(initialSessions);
+  const [activeSessionId, setActiveSessionId] = useState(() => initialSessions[0]?.id ?? 'session-1');
 
   useEffect(() => {
     if (!sessions.some((session) => session.id === activeSessionId) && sessions[0]) {
       setActiveSessionId(sessions[0].id);
     }
   }, [activeSessionId, sessions]);
-
-  useEffect(() => {
-    if (sessions.length > 0) {
-      return;
-    }
-
-    const fallback = createChatSession({
-      id: 'session-1',
-      name: 'Session 1',
-      apiKeyPresent,
-      ...resolveNewSessionExecutionPreferences({
-        defaultModel,
-      }),
-      workspaceId,
-    });
-    setSessions([fallback]);
-    setActiveSessionId(fallback.id);
-  }, [apiKeyPresent, defaultModel, sessions, workspaceId]);
 
   const activeSession = useMemo(
     () => sessions.find((session) => session.id === activeSessionId) ?? sessions[0],
@@ -72,7 +66,7 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
     [sessions],
   );
 
-  const activeSessionSummary = activeSession ? summarizeSession(activeSession) : undefined;
+  const activeSessionSummary = activeSession ? summarizeConversationSession(activeSession) : undefined;
   const listRecentSessionsMessage =
     recentSessions.length > 0 ?
       [
@@ -87,15 +81,13 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
     : ['No saved sessions yet.'];
 
   const updateSessionById = useCallback((sessionId: string, updater: (session: ChatSession) => ChatSession) => {
-    setSessions((current) => current.map((session) => {
-      if (session.id !== sessionId) {
-        return session;
-      }
+    const updated = sessionService.update(sessionId, updater);
+    if (!updated) {
+      return;
+    }
 
-      const nextSession = updater(session);
-      return nextSession === session ? session : touchSession(nextSession);
-    }));
-  }, []);
+    setSessions(sessionService.list());
+  }, [sessionService]);
 
   const updateActiveSession = useCallback((updater: (session: ChatSession) => ChatSession) => {
     updateSessionById(activeSessionId, updater);
@@ -114,22 +106,21 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
   }, [updateSessionById]);
 
   const createSession = useCallback((name?: string, preferences?: SessionExecutionPreferences) => {
-    const id = `session-${Date.now()}`;
     const nextPreferences = resolveNewSessionExecutionPreferences({
       defaultModel,
       inherited: preferences,
     });
-    const nextSession = createChatSession({
-      id,
-      name: name?.trim() || `Session ${nextSessionNumberRef.current++}`,
+    const nextSession = sessionService.create({
+      id: `session-${Date.now()}`,
+      name,
       apiKeyPresent,
       ...nextPreferences,
       workspaceId,
     });
-    setSessions((current) => [touchSession(nextSession), ...current].slice(0, 24));
-    setActiveSessionId(id);
+    setSessions(sessionService.list().slice(0, 24));
+    setActiveSessionId(nextSession.id);
     return nextSession;
-  }, [apiKeyPresent, defaultModel, workspaceId]);
+  }, [apiKeyPresent, defaultModel, sessionService, workspaceId]);
 
   const renameSession = useCallback((name: string) => {
     updateActiveSession((session) => ({ ...session, name }));
@@ -137,33 +128,19 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
 
   const removeSession = useCallback((id: string) => {
     const removedActive = id === activeSessionId;
-    const nextActiveSessionId = sessions.find((session) => session.id !== id)?.id ?? 'session-1';
-
-    setSessions((current) => {
-      const remaining = current.filter((session) => session.id !== id);
-      if (remaining.length > 0) {
-        return remaining;
-      }
-
-      return [
-        createChatSession({
-          id: 'session-1',
-          name: 'Session 1',
-          apiKeyPresent,
-          ...resolveNewSessionExecutionPreferences({
-            defaultModel,
-          }),
-          workspaceId,
-        }),
-      ];
-    });
+    const deleted = sessionService.delete(id);
+    if (!deleted) {
+      return false;
+    }
+    const nextSessions = sessionService.list();
+    setSessions(nextSessions);
 
     if (removedActive) {
-      setActiveSessionId(nextActiveSessionId);
+      setActiveSessionId(nextSessions[0]?.id ?? 'session-1');
     }
 
     return removedActive;
-  }, [activeSessionId, apiKeyPresent, defaultModel, sessions, workspaceId]);
+  }, [activeSessionId, sessionService]);
 
   return {
     sessions,
@@ -180,21 +157,4 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
     renameSession,
     removeSession,
   };
-}
-
-function getNextSessionNumber(sessions: ChatSession[]): number {
-  const highestGenericNumber = sessions.reduce((highest, session) => {
-    if (!isGenericSessionName(session.name)) {
-      return highest;
-    }
-
-    const parsed = Number.parseInt(session.name.replace(/^Session\s+/, ''), 10);
-    if (!Number.isFinite(parsed)) {
-      return highest;
-    }
-
-    return Math.max(highest, parsed);
-  }, 0);
-
-  return highestGenericNumber + 1;
 }

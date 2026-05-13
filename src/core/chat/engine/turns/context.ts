@@ -1,7 +1,7 @@
 import { createDefaultAgentTools } from '../../../runtime/default-tools.js';
 import type { ToolDefinition } from '../../../types.js';
 import type { ChatSessionLeaseOwner } from '../sessions/lease.js';
-import { loadChatSessions } from '../sessions/storage.js';
+import { loadChatSessions } from '../sessions/repository/file-chat-session-repository.js';
 import type { ChatSession } from '../../types.js';
 import { resolveConversationTurnRuntime, type ChatTurnRuntime } from './runtime.js';
 
