@@ -3,7 +3,7 @@ export type AwarenessDomain = 'coding';
 export type AwarenessProfile = 'project_dashboard';
 
 export type AwarenessSource = {
-  kind: 'filesystem' | 'git' | 'runtime_config';
+  kind: 'filesystem' | 'git' | 'runtime_config' | 'package_metadata';
   command?: string;
   path?: string;
   note?: string;

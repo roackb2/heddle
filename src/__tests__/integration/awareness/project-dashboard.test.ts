@@ -37,6 +37,16 @@ describe('coding project dashboard awareness', () => {
           ]),
         }),
       }),
+      expect.objectContaining({
+        type: 'project_signals',
+        data: expect.objectContaining({
+          detectedProjects: [],
+        }),
+      }),
+      expect.objectContaining({
+        type: 'inspection_surfaces',
+        data: [],
+      }),
     ]));
     expect(snapshot.limits).toEqual(expect.arrayContaining([]));
   });
@@ -202,7 +212,18 @@ describe('coding project dashboard awareness', () => {
     const root = createGitWorkspace();
     const realRoot = realpathSync(root);
     writeFileSync(join(root, 'README.md'), 'hello\nworld\nmodified\n');
+    writeFileSync(join(root, 'package.json'), JSON.stringify({
+      name: 'awareness-test',
+      scripts: {
+        build: 'tsc -p tsconfig.json',
+        lint: 'eslint .',
+        dev: 'vite',
+      },
+    }, null, 2));
+    writeFileSync(join(root, 'yarn.lock'), '# lockfile\n');
     mkdirSync(join(root, 'src'), { recursive: true });
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    mkdirSync(join(root, 'scripts'), { recursive: true });
     writeFileSync(join(root, 'src', 'main.ts'), 'export const main = true;\n');
 
     const tool = createProjectDashboardTool({ workspaceRoot: root });
@@ -223,10 +244,166 @@ describe('coding project dashboard awareness', () => {
             expect.objectContaining({ path: 'README.md', kind: 'file' }),
           ]),
         }),
+        project_signals: expect.objectContaining({
+          detectedProjects: [
+            expect.objectContaining({
+              kind: 'javascript',
+              manifests: [
+                expect.objectContaining({ kind: 'package_json', path: 'package.json' }),
+              ],
+              lockfiles: [
+                expect.objectContaining({ kind: 'yarn_lock', path: 'yarn.lock' }),
+              ],
+              verificationSurfaces: [
+                expect.objectContaining({
+                  kind: 'script_names',
+                  label: 'package.json verification scripts',
+                  scriptNames: ['build', 'lint'],
+                }),
+              ],
+            }),
+          ],
+        }),
+        inspection_surfaces: expect.arrayContaining([
+          expect.objectContaining({ kind: 'manifest', paths: ['package.json'] }),
+          expect.objectContaining({ kind: 'directory', role: 'source', paths: ['src'] }),
+          expect.objectContaining({ kind: 'directory', role: 'docs', paths: ['docs'] }),
+          expect.objectContaining({ kind: 'directory', role: 'scripts', paths: ['scripts'] }),
+          expect.objectContaining({ kind: 'verification_surface', labels: ['package.json verification scripts'] }),
+        ]),
       },
       sources: expect.any(Array),
       limits: expect.any(Array),
     });
+  });
+
+  it('collects javascript project signals and inspection surfaces from package metadata and observed directories', async () => {
+    const root = createGitWorkspace();
+    writeFileSync(join(root, 'package.json'), JSON.stringify({
+      name: 'awareness-test',
+      scripts: {
+        build: 'tsc -p tsconfig.json',
+        lint: 'eslint .',
+        dev: 'vite',
+        test: 'vitest run',
+      },
+    }, null, 2));
+    writeFileSync(join(root, 'yarn.lock'), '# lockfile\n');
+    writeFileSync(join(root, 'tsconfig.json'), '{}\n');
+    mkdirSync(join(root, 'src'), { recursive: true });
+    mkdirSync(join(root, 'tests'), { recursive: true });
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    mkdirSync(join(root, 'examples'), { recursive: true });
+    mkdirSync(join(root, 'scripts'), { recursive: true });
+
+    const snapshot = await collectProjectDashboard(root);
+    const signals = snapshot.sections.find((section) => section.type === 'project_signals');
+    const surfaces = snapshot.sections.find((section) => section.type === 'inspection_surfaces');
+
+    expect(signals?.data).toEqual(expect.objectContaining({
+      detectedProjects: [
+        expect.objectContaining({
+          kind: 'javascript',
+          manifests: [
+            expect.objectContaining({ kind: 'package_json', path: 'package.json' }),
+          ],
+          lockfiles: [
+            expect.objectContaining({ kind: 'yarn_lock', path: 'yarn.lock' }),
+          ],
+          verificationSurfaces: [
+            expect.objectContaining({
+              kind: 'script_names',
+              label: 'package.json verification scripts',
+              scriptNames: ['build', 'lint', 'test'],
+            }),
+          ],
+        }),
+      ],
+      observedDirectories: expect.objectContaining({
+        source: ['src'],
+        tests: ['tests'],
+        docs: ['docs'],
+        examples: ['examples'],
+        scripts: ['scripts'],
+      }),
+      configFiles: ['tsconfig.json'],
+    }));
+    expect(surfaces?.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'manifest', paths: ['package.json'] }),
+      expect.objectContaining({ kind: 'directory', role: 'source', paths: ['src'] }),
+      expect.objectContaining({ kind: 'directory', role: 'tests', paths: ['tests'] }),
+      expect.objectContaining({ kind: 'config_file', paths: ['tsconfig.json'] }),
+      expect.objectContaining({ kind: 'verification_surface', labels: ['package.json verification scripts'] }),
+    ]));
+  });
+
+  it('collects python and go signals through bounded detectors instead of javascript-specific fields', async () => {
+    const root = createGitWorkspace();
+    writeFileSync(join(root, 'pyproject.toml'), [
+      '[project]',
+      'name = "py-go-workspace"',
+      '',
+      '[tool.pytest.ini_options]',
+      'addopts = "-q"',
+      '',
+      '[tool.ruff]',
+      'line-length = 100',
+      '',
+    ].join('\n'));
+    writeFileSync(join(root, 'go.mod'), 'module example.com/awareness\n\ngo 1.24.0\n');
+    writeFileSync(join(root, 'go.sum'), 'example.com/mod v1.0.0 h1:abc\n');
+    mkdirSync(join(root, 'cmd'), { recursive: true });
+    mkdirSync(join(root, 'internal'), { recursive: true });
+    mkdirSync(join(root, 'tests'), { recursive: true });
+
+    const snapshot = await collectProjectDashboard(root);
+    const signals = snapshot.sections.find((section) => section.type === 'project_signals');
+    const surfaces = snapshot.sections.find((section) => section.type === 'inspection_surfaces');
+
+    expect(signals?.data).toEqual(expect.objectContaining({
+      detectedProjects: expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'go',
+          manifests: [expect.objectContaining({ kind: 'go_mod', path: 'go.mod' })],
+          lockfiles: [expect.objectContaining({ kind: 'go_sum', path: 'go.sum' })],
+          verificationSurfaces: [
+            expect.objectContaining({
+              kind: 'command',
+              label: 'go module verification commands',
+              commands: ['go test ./...', 'go vet ./...'],
+            }),
+          ],
+        }),
+        expect.objectContaining({
+          kind: 'python',
+          manifests: [expect.objectContaining({ kind: 'pyproject_toml', path: 'pyproject.toml' })],
+          verificationSurfaces: expect.arrayContaining([
+            expect.objectContaining({
+              kind: 'command',
+              label: 'pytest command surface',
+              commands: ['python -m pytest'],
+            }),
+            expect.objectContaining({
+              kind: 'command',
+              label: 'ruff command surface',
+              commands: ['ruff check .'],
+            }),
+          ]),
+        }),
+      ]),
+      observedDirectories: expect.objectContaining({
+        source: ['cmd', 'internal'],
+        tests: ['tests'],
+      }),
+    }));
+    expect(surfaces?.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'manifest', paths: ['go.mod', 'pyproject.toml'] }),
+      expect.objectContaining({ kind: 'directory', role: 'source', paths: ['cmd', 'internal'] }),
+      expect.objectContaining({
+        kind: 'verification_surface',
+        labels: ['go module verification commands', 'pytest command surface', 'ruff command surface'],
+      }),
+    ]));
   });
 });
 

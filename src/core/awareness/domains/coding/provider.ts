@@ -20,7 +20,12 @@ export function createCodingAwarenessProvider(
       const collectedAt = (options.now ?? (() => new Date()))().toISOString();
       const id = (options.nextId ?? defaultNextId)();
       const collected = await collectCodingProjectDashboard(input);
-      const requestedSections = new Set(input.requestedSections ?? ['working_environment', 'workspace_tree']);
+      const requestedSections = new Set(input.requestedSections ?? [
+        'working_environment',
+        'workspace_tree',
+        'project_signals',
+        'inspection_surfaces',
+      ]);
       const sections: CodingAwarenessSnapshot['sections'] = [];
 
       if (requestedSections.has('working_environment')) {
@@ -33,6 +38,18 @@ export function createCodingAwarenessProvider(
         sections.push({
           type: 'workspace_tree',
           data: collected.workspaceTree,
+        });
+      }
+      if (requestedSections.has('project_signals')) {
+        sections.push({
+          type: 'project_signals',
+          data: collected.projectSignals,
+        });
+      }
+      if (requestedSections.has('inspection_surfaces')) {
+        sections.push({
+          type: 'inspection_surfaces',
+          data: collected.inspectionSurfaces,
         });
       }
 

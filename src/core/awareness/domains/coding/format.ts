@@ -10,6 +10,12 @@ export function formatCodingProjectDashboardSnapshot(snapshot: CodingAwarenessSn
     if (section.type === 'workspace_tree') {
       sections.workspace_tree = section.data;
     }
+    if (section.type === 'project_signals') {
+      sections.project_signals = section.data;
+    }
+    if (section.type === 'inspection_surfaces') {
+      sections.inspection_surfaces = section.data;
+    }
   }
 
   return {

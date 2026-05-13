@@ -74,7 +74,7 @@ describe('tool input validation', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: 'Invalid input for project_dashboard. Optional fields: includeSections (working_environment|workspace_tree), maxDepth (1-4), maxEntries (1-200). Use {} for the default full dashboard.',
+      error: 'Invalid input for project_dashboard. Optional fields: includeSections (working_environment|workspace_tree|project_signals|inspection_surfaces), maxDepth (1-4), maxEntries (1-200). Use {} for the default full dashboard.',
     });
   });
 
@@ -117,7 +117,9 @@ describe('tool input validation', () => {
     expect(searchFilesTool.description).toContain('{ "query": "createUser" }');
     expect(searchFilesTool.description).toContain('{ "query": "incident", "path": "../shared-notes" }');
     expect(projectDashboardTool.description).toContain('Collect the initial coding project dashboard');
-    expect(projectDashboardTool.description).toContain('current working-environment state and a bounded workspace tree');
+    expect(projectDashboardTool.description).toContain('current working-environment state, a bounded workspace tree');
+    expect(projectDashboardTool.description).toContain('cheap project signals');
+    expect(projectDashboardTool.description).toContain('deterministic inspection surfaces');
     expect(projectDashboardTool.description).toContain('orient in a single call');
     expect(projectDashboardTool.description).toContain('read_file or search_files only for task-specific details');
     expect(projectDashboardTool.description).toContain('includeSections');
@@ -287,6 +289,8 @@ describe('workspace-bound default tools', () => {
             gitRepositoryRoot: resolvedWorkspaceRoot,
           }),
           workspace_tree: expect.any(Object),
+          project_signals: expect.any(Object),
+          inspection_surfaces: expect.any(Array),
         },
       });
     } finally {

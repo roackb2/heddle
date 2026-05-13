@@ -4,12 +4,17 @@ import { createCodingAwarenessProvider } from '../../../awareness/domains/coding
 import { formatCodingProjectDashboardSnapshot } from '../../../awareness/domains/coding/format.js';
 import type { CodingAwarenessSnapshot } from '../../../awareness/domains/coding/types.js';
 
-const ALLOWED_SECTIONS = new Set(['working_environment', 'workspace_tree']);
+const ALLOWED_SECTIONS = new Set([
+  'working_environment',
+  'workspace_tree',
+  'project_signals',
+  'inspection_surfaces',
+]);
 const MAX_ALLOWED_DEPTH = 4;
 const MAX_ALLOWED_ENTRIES = 200;
 
 type ProjectDashboardInput = {
-  includeSections?: Array<'working_environment' | 'workspace_tree'>;
+  includeSections?: Array<'working_environment' | 'workspace_tree' | 'project_signals' | 'inspection_surfaces'>;
   maxDepth?: number;
   maxEntries?: number;
 };
@@ -27,7 +32,7 @@ export function createProjectDashboardTool(options: ProjectDashboardToolOptions 
   return {
     name: 'project_dashboard',
     description:
-      'Collect the initial coding project dashboard for the active workspace. Default output includes current working-environment state and a bounded workspace tree in one structured result, so you can orient in a single call before substantial coding, planning, or review work. Use this first, then follow with read_file or search_files only for task-specific details. Optional fields include includeSections, maxDepth, and maxEntries when you intentionally want a smaller dashboard.',
+      'Collect the initial coding project dashboard for the active workspace. Default output includes current working-environment state, a bounded workspace tree, cheap project signals, and deterministic inspection surfaces in one structured result, so you can orient in a single call before substantial coding, planning, or review work. Use this first, then follow with read_file or search_files only for task-specific details. Optional fields include includeSections, maxDepth, and maxEntries when you intentionally want a smaller dashboard.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -36,7 +41,7 @@ export function createProjectDashboardTool(options: ProjectDashboardToolOptions 
           type: 'array',
           items: {
             type: 'string',
-            enum: ['working_environment', 'workspace_tree'],
+            enum: ['working_environment', 'workspace_tree', 'project_signals', 'inspection_surfaces'],
           },
         },
         maxDepth: {
@@ -131,5 +136,5 @@ function isBoundedPositiveInteger(value: unknown, max: number): value is number 
 }
 
 function invalidProjectDashboardInput(): string {
-  return 'Invalid input for project_dashboard. Optional fields: includeSections (working_environment|workspace_tree), maxDepth (1-4), maxEntries (1-200). Use {} for the default full dashboard.';
+  return 'Invalid input for project_dashboard. Optional fields: includeSections (working_environment|workspace_tree|project_signals|inspection_surfaces), maxDepth (1-4), maxEntries (1-200). Use {} for the default full dashboard.';
 }

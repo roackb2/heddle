@@ -23,6 +23,13 @@ Current `project_dashboard` output includes:
   - bounded directory/file tree for quick structural orientation
   - configurable depth and entry budget
   - omission/truncation surfaced through `limits`
+- `project_signals`
+  - grouped detected-project summaries, each with its own manifests, lockfiles, and verification surfaces
+  - current bounded detectors: `javascript`, `python`, `go`
+  - observed source/test/docs/examples/scripts/config surfaces
+- `inspection_surfaces`
+  - deterministic follow-up surfaces derived from observed metadata
+  - manifests, directories, config files, verification surfaces, and dirty-path counts
 
 ## Boundaries
 
@@ -86,11 +93,47 @@ Example tool result shape:
           },
           { "path": "README.md", "kind": "file" }
         ]
-      }
+      },
+      "project_signals": {
+        "detectedProjects": [
+          {
+            "kind": "javascript",
+            "manifests": [
+              { "kind": "package_json", "path": "package.json" }
+            ],
+            "lockfiles": [
+              { "kind": "yarn_lock", "path": "yarn.lock" }
+            ],
+            "verificationSurfaces": [
+              {
+                "kind": "script_names",
+                "label": "package.json verification scripts",
+                "sourcePath": "package.json",
+                "scriptNames": ["build", "lint", "test"]
+              }
+            ]
+          }
+        ],
+        "observedDirectories": {
+          "source": ["src"],
+          "tests": ["tests"],
+          "docs": ["docs"],
+          "examples": ["examples"],
+          "scripts": ["scripts"],
+          "config": []
+        },
+        "configFiles": ["tsconfig.json"]
+      },
+      "inspection_surfaces": [
+        { "kind": "manifest", "paths": ["package.json"] },
+        { "kind": "directory", "role": "source", "paths": ["src"] },
+        { "kind": "verification_surface", "labels": ["package.json verification scripts"] }
+      ]
     },
     "sources": [
       { "kind": "filesystem", "path": "/workspace/heddle", "note": "workspace root" },
-      { "kind": "git", "command": "git rev-parse --show-toplevel" }
+      { "kind": "git", "command": "git rev-parse --show-toplevel" },
+      { "kind": "package_metadata", "path": "/workspace/heddle/package.json" }
     ],
     "limits": [
       {
@@ -102,3 +145,9 @@ Example tool result shape:
   }
 }
 ```
+
+Detector boundary:
+
+- ecosystem-specific logic lives under `detectors/`
+- the `project_signals` contract stays generic
+- when Heddle needs broader project-type coverage, do not keep adding endless hardcoded rules blindly; consider a dedicated project-inspection agent or similarly bounded inspection subsystem
