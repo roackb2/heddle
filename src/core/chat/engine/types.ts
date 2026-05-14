@@ -36,8 +36,11 @@ export type ConversationEngine = {
 export type ConversationSessionService = {
   list(): ChatSession[];
   read(id: string): ChatSession | undefined;
+  require(id: string): ChatSession;
+  latest(): ChatSession | undefined;
   create(input?: CreateConversationSessionInput): ChatSession;
   update(id: string, updater: (session: ChatSession) => ChatSession): ChatSession | undefined;
+  updateSettings(id: string, input: UpdateConversationSessionSettingsInput): ChatSession;
   rename(id: string, name: string): ChatSession;
   delete(id: string): boolean;
 };
@@ -49,6 +52,12 @@ export type CreateConversationSessionInput = {
   reasoningEffort?: ReasoningEffort;
   workspaceId?: string;
   apiKeyPresent?: boolean;
+};
+
+export type UpdateConversationSessionSettingsInput = {
+  model?: string;
+  reasoningEffort?: ReasoningEffort | null;
+  driftEnabled?: boolean;
 };
 
 export type ConversationTurnService = {

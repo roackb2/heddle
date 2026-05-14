@@ -12,4 +12,5 @@ export type {
   ContinueConversationTurnInput,
   SubmitConversationTurnInput,
   SubmitConversationTurnResult,
+  UpdateConversationSessionSettingsInput,
 } from './types.js';

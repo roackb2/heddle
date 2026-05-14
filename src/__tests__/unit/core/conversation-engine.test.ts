@@ -38,6 +38,17 @@ describe('createConversationEngine', () => {
       apiKeyPresent: true,
     });
 
+    const fallback = engine.sessions.latest();
+    expect(fallback).toEqual(expect.objectContaining({
+      id: 'session-1',
+      model: 'gpt-5.4',
+      workspaceId: 'workspace-1',
+    }));
+    expect(engine.sessions.require('session-1')).toEqual(expect.objectContaining({
+      id: 'session-1',
+      model: 'gpt-5.4',
+    }));
+
     const session = engine.sessions.create({ name: 'Repo investigation' });
 
     expect(readChatSessionCatalog(join(stateRoot, 'chat-sessions.catalog.json'))[0]).toEqual(expect.objectContaining({
@@ -67,7 +78,10 @@ describe('createConversationEngine', () => {
     const second = engine.sessions.create({ id: 'session-b', name: 'Second' });
 
     expect(engine.sessions.list().map((session) => session.id)).toEqual(['session-b', 'session-a', 'session-1']);
+    expect(engine.sessions.latest()?.id).toBe(engine.sessions.list()[0]?.id);
     expect(engine.sessions.read('missing')).toBeUndefined();
+    expect(engine.sessions.require(first.id).id).toBe(first.id);
+    expect(() => engine.sessions.require('missing')).toThrow('Chat session not found: missing');
 
     const updated = engine.sessions.update(first.id, (session) => ({
       ...session,
@@ -86,6 +100,49 @@ describe('createConversationEngine', () => {
     expect(engine.sessions.delete('session-1')).toBe(true);
     expect(engine.sessions.delete('missing')).toBe(false);
     expect(loadChatSessions(join(stateRoot, 'chat-sessions.catalog.json'), true).map((session) => session.id)).toEqual(['session-1']);
+  });
+
+  it('updates shared session settings for TUI and control-plane clients', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      reasoningEffort: 'medium',
+      apiKeyPresent: true,
+    });
+    const session = engine.sessions.create({
+      id: 'session-1',
+      name: 'Alpha',
+      model: 'gpt-5.4',
+      reasoningEffort: 'high',
+    });
+
+    const updated = engine.sessions.updateSettings(session.id, {
+      model: 'gpt-5.5',
+      reasoningEffort: null,
+      driftEnabled: true,
+    });
+
+    expect(updated).toEqual(expect.objectContaining({
+      id: session.id,
+      name: 'Alpha',
+      model: 'gpt-5.5',
+      reasoningEffort: undefined,
+      driftEnabled: true,
+      history: session.history,
+      messages: session.messages,
+      turns: session.turns,
+    }));
+    expect(engine.sessions.read(session.id)).toEqual(expect.objectContaining({
+      model: 'gpt-5.5',
+      reasoningEffort: undefined,
+      driftEnabled: true,
+    }));
+    expect(() => engine.sessions.updateSettings('missing', { driftEnabled: false })).toThrow(
+      'Chat session not found: missing',
+    );
   });
 
   it('submits turns with merged engine defaults, normalized host callbacks, and override options', async () => {

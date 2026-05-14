@@ -34,6 +34,14 @@ In this folder today:
 - `repository/file-chat-session-repository.ts` owns file persistence
 - `service.ts` owns session behavior and should be the main path that hosts call
 
+The service API should cover ordinary host needs directly:
+
+- use `list`, `read`, `require`, and `latest` for session lookup;
+- use `create`, `rename`, and `delete` for lifecycle changes;
+- use `updateSettings` for shared model, reasoning-effort, and drift settings;
+- reserve generic `update` for persisted session changes that are not yet
+  expressed as a named service operation.
+
 That rule applies even for local hosts like the TUI. The TUI may call core
 session services directly, but it should not call repositories or file-storage
 helpers directly. Treat the local TUI the same way you would treat a web client
