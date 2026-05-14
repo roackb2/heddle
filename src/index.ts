@@ -320,6 +320,7 @@ export type {
   ContinueConversationTurnInput,
   SubmitConversationTurnInput,
   SubmitConversationTurnResult,
+  UpdateConversationSessionSettingsInput,
 } from './core/chat/engine/types.js';
 export {
   runConversationTurn,

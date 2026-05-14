@@ -27,7 +27,10 @@ import {
 import type { ChatSession } from '../../types.js';
 import type { ConversationEngineConfig } from '../types.js';
 import type { NormalizedConversationEngineConfig } from '../config.js';
-import type { ConversationSessionService } from '../types.js';
+import type {
+  ConversationSessionService,
+  UpdateConversationSessionSettingsInput,
+} from '../types.js';
 
 export function createConversationSessionService(args: {
   config: NormalizedConversationEngineConfig | ConversationSessionServiceConfig;
@@ -40,9 +43,48 @@ export function createConversationSessionService(args: {
   function loadSessions(apiKeyPresent = config.apiKeyPresent): ChatSession[] {
     const sessions = repository.list(apiKeyPresent);
     if (repository.readCatalog().length === 0) {
-      repository.save(sessions);
+      const fallback = createFallbackSession(config, apiKeyPresent);
+      repository.save([fallback]);
+      return [fallback];
     }
     return sessions;
+  }
+
+  function readSession(id: string): ChatSession | undefined {
+    return loadSessions().find((candidate) => candidate.id === id);
+  }
+
+  function requireSession(id: string): ChatSession {
+    const session = readSession(id);
+    if (!session) {
+      throw new Error(`Chat session not found: ${id}`);
+    }
+    return session;
+  }
+
+  function updateSession(id: string, updater: (session: ChatSession) => ChatSession): ChatSession | undefined {
+    const sessions = loadSessions();
+    const session = sessions.find((candidate) => candidate.id === id);
+    if (!session) {
+      return undefined;
+    }
+
+    const nextSession = updater(session);
+    if (nextSession === session) {
+      return session;
+    }
+
+    const touched = touchSession(nextSession);
+    repository.save(sessions.map((candidate) => (candidate.id === id ? touched : candidate)));
+    return touched;
+  }
+
+  function updateRequiredSession(id: string, updater: (session: ChatSession) => ChatSession): ChatSession {
+    const updated = updateSession(id, updater);
+    if (!updated) {
+      throw new Error(`Chat session not found: ${id}`);
+    }
+    return updated;
   }
 
   return {
@@ -50,7 +92,13 @@ export function createConversationSessionService(args: {
       return loadSessions();
     },
     read(id) {
-      return repository.read(id, config.apiKeyPresent);
+      return readSession(id);
+    },
+    require(id) {
+      return requireSession(id);
+    },
+    latest() {
+      return loadSessions()[0];
     },
     create(input) {
       const existing = loadSessions(input?.apiKeyPresent ?? config.apiKeyPresent);
@@ -66,30 +114,16 @@ export function createConversationSessionService(args: {
       return session;
     },
     update(id, updater) {
-      const sessions = loadSessions();
-      const session = sessions.find((candidate) => candidate.id === id);
-      if (!session) {
-        return undefined;
-      }
-
-      const nextSession = updater(session);
-      if (nextSession === session) {
-        return session;
-      }
-
-      const touched = touchSession(nextSession);
-      repository.save(sessions.map((candidate) => (candidate.id === id ? touched : candidate)));
-      return touched;
+      return updateSession(id, updater);
+    },
+    updateSettings(id, input) {
+      return updateRequiredSession(id, (session) => applySessionSettings(session, input));
     },
     rename(id, name) {
-      const renamed = this.update(id, (session) => ({
+      return updateRequiredSession(id, (session) => ({
         ...session,
         name,
       }));
-      if (!renamed) {
-        throw new Error(`Chat session not found: ${id}`);
-      }
-      return renamed;
     },
     delete(id) {
       const sessions = loadSessions();
@@ -106,6 +140,30 @@ export function createConversationSessionService(args: {
       repository.save([createFallbackSession(config)]);
       return true;
     },
+  };
+}
+
+function applySessionSettings(
+  session: ChatSession,
+  input: UpdateConversationSessionSettingsInput,
+): ChatSession {
+  const model = input.model ?? session.model;
+  const reasoningEffort = input.reasoningEffort === null ? undefined : input.reasoningEffort ?? session.reasoningEffort;
+  const driftEnabled = input.driftEnabled ?? session.driftEnabled;
+
+  if (
+    model === session.model &&
+    reasoningEffort === session.reasoningEffort &&
+    driftEnabled === session.driftEnabled
+  ) {
+    return session;
+  }
+
+  return {
+    ...session,
+    model,
+    reasoningEffort,
+    driftEnabled,
   };
 }
 
@@ -136,11 +194,12 @@ function normalizeConversationSessionServiceConfig(
 
 function createFallbackSession(
   config: Pick<NormalizedConversationEngineConfig, 'model' | 'reasoningEffort' | 'workspaceId' | 'apiKeyPresent'>,
+  apiKeyPresent = config.apiKeyPresent,
 ): ChatSession {
   return createChatSession({
     id: 'session-1',
     name: 'Session 1',
-    apiKeyPresent: config.apiKeyPresent,
+    apiKeyPresent,
     model: config.model,
     reasoningEffort: config.reasoningEffort,
     workspaceId: config.workspaceId,

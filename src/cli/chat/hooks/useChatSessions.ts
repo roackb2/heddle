@@ -96,16 +96,9 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
   }, [activeSessionId, updateSessionById]);
 
   const setSessionPreferences = useCallback((sessionId: string, preferences: SessionExecutionPreferences) => {
-    updateSessionById(sessionId, (session) => (
-      session.model === preferences.model && session.reasoningEffort === preferences.reasoningEffort ?
-        session
-      : {
-          ...session,
-          model: preferences.model,
-          reasoningEffort: preferences.reasoningEffort,
-        }
-    ));
-  }, [updateSessionById]);
+    sessionService.updateSettings(sessionId, preferences);
+    setSessions(sessionService.list());
+  }, [sessionService]);
 
   const createSession = useCallback((name?: string, preferences?: SessionExecutionPreferences) => {
     const nextPreferences = resolveNewSessionExecutionPreferences({
@@ -125,8 +118,9 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
   }, [apiKeyPresent, defaultModel, sessionService, workspaceId]);
 
   const renameSession = useCallback((name: string) => {
-    updateActiveSession((session) => ({ ...session, name }));
-  }, [updateActiveSession]);
+    sessionService.rename(activeSessionId, name);
+    setSessions(sessionService.list());
+  }, [activeSessionId, sessionService]);
 
   const removeSession = useCallback((id: string) => {
     const removedActive = id === activeSessionId;
