@@ -23,7 +23,6 @@ import {
   createChatSession,
   createInitialMessages,
   isGenericSessionName,
-  summarizeSession,
   touchSession,
 } from './session-record.js';
 import {
@@ -34,6 +33,7 @@ import {
 } from './lease.js';
 import { buildCompactionRunningContext } from '../history/compaction.js';
 import { buildConversationMessages } from './conversation-lines.js';
+import { truncate } from '../../../utils/text.js';
 import type { ChatSession } from '../../types.js';
 import type { ConversationEngineConfig } from '../types.js';
 import type { NormalizedConversationEngineConfig } from '../config.js';
@@ -58,27 +58,29 @@ type NormalizedConversationSessionServiceConfig = Pick<
   'workspaceRoot' | 'stateRoot' | 'model' | 'reasoningEffort' | 'sessionStoragePath' | 'workspaceId' | 'apiKeyPresent'
 >;
 
-export function createConversationSessionService(args: {
-  config: NormalizedConversationEngineConfig | ConversationSessionServiceConfig;
-}): ConversationSessionService {
-  return new FileConversationSessionService(normalizeConversationSessionServiceConfig(args.config));
-}
-
-export function summarizeConversationSession(session: ChatSession): string {
-  return summarizeSession(session);
-}
-
-class FileConversationSessionService implements ConversationSessionService {
+export class FileConversationSessionService implements ConversationSessionService {
   private readonly repository: ChatSessionRepository;
+  private readonly config: NormalizedConversationSessionServiceConfig;
 
-  constructor(private readonly config: NormalizedConversationSessionServiceConfig) {
+  constructor(config: NormalizedConversationEngineConfig | ConversationSessionServiceConfig) {
+    this.config = FileConversationSessionService.normalizeConfig(config);
     this.repository = createFileChatSessionRepository({
-      sessionStoragePath: config.sessionStoragePath,
+      sessionStoragePath: this.config.sessionStoragePath,
     });
+  }
+
+  static summarize(session: ChatSession): string {
+    const latestTurn = session.turns[session.turns.length - 1];
+    const latestPrompt = latestTurn ? truncate(latestTurn.prompt, 44) : 'no turns yet';
+    return `${session.turns.length} turns • ${latestPrompt}`;
   }
 
   list(): ChatSession[] {
     return this.loadSessions();
+  }
+
+  listExisting(): ChatSession[] {
+    return this.loadExistingSessions();
   }
 
   read(id: string): ChatSession | undefined {
@@ -98,10 +100,10 @@ class FileConversationSessionService implements ConversationSessionService {
   }
 
   create(input?: CreateConversationSessionInput): ChatSession {
-    const existing = this.loadSessions(input?.apiKeyPresent ?? this.config.apiKeyPresent);
+    const existing = this.loadExistingSessions(input?.apiKeyPresent ?? this.config.apiKeyPresent);
     const session = createChatSession({
       id: input?.id?.trim() || `session-${Date.now()}`,
-      name: input?.name?.trim() || `Session ${getNextSessionNumber(existing)}`,
+      name: input?.name?.trim() || `Session ${FileConversationSessionService.getNextSessionNumber(existing)}`,
       apiKeyPresent: input?.apiKeyPresent ?? this.config.apiKeyPresent,
       model: input?.model ?? this.config.model,
       reasoningEffort: input?.reasoningEffort ?? this.config.reasoningEffort,
@@ -129,7 +131,7 @@ class FileConversationSessionService implements ConversationSessionService {
   }
 
   updateSettings(id: string, input: UpdateConversationSessionSettingsInput): ChatSession {
-    return this.updateRequiredSession(id, (session) => applySessionSettings(session, input));
+    return this.updateRequiredSession(id, (session) => FileConversationSessionService.applySettings(session, input));
   }
 
   appendMessage(id: string, input: AppendConversationMessageInput): ChatSession {
@@ -196,7 +198,7 @@ class FileConversationSessionService implements ConversationSessionService {
   }
 
   setDriftEnabled(id: string, enabled: boolean): ChatSession {
-    return this.updateRequiredSession(id, (session) => applySessionSettings(session, { driftEnabled: enabled }));
+    return this.updateRequiredSession(id, (session) => FileConversationSessionService.applySettings(session, { driftEnabled: enabled }));
   }
 
   getLeaseConflict(id: string, owner: ChatSessionLeaseOwner): string | undefined {
@@ -237,18 +239,29 @@ class FileConversationSessionService implements ConversationSessionService {
       return true;
     }
 
-    this.repository.save([createFallbackSession(this.config)]);
+    this.repository.save([this.createFallbackSession()]);
     return true;
   }
 
   private loadSessions(apiKeyPresent = this.config.apiKeyPresent): ChatSession[] {
     const sessions = this.repository.list(apiKeyPresent);
     if (this.repository.readCatalog().length === 0) {
-      const fallback = createFallbackSession(this.config, apiKeyPresent);
+      const fallback = this.createFallbackSession(apiKeyPresent);
       this.repository.save([fallback]);
       return [fallback];
     }
     return sessions;
+  }
+
+  private loadExistingSessions(apiKeyPresent = this.config.apiKeyPresent): ChatSession[] {
+    const catalog = this.repository.readCatalog();
+    if (catalog.length > 0) {
+      return catalog
+        .map((entry) => this.repository.read(entry.id, apiKeyPresent))
+        .filter((session): session is ChatSession => Boolean(session));
+    }
+
+    return this.repository.migrateLegacy(apiKeyPresent);
   }
 
   private readSession(id: string): ChatSession | undefined {
@@ -262,85 +275,76 @@ class FileConversationSessionService implements ConversationSessionService {
     }
     return updated;
   }
-}
 
-// Session mutation helpers.
-
-function applySessionSettings(
-  session: ChatSession,
-  input: UpdateConversationSessionSettingsInput,
-): ChatSession {
-  const model = input.model ?? session.model;
-  const reasoningEffort = input.reasoningEffort === null ? undefined : input.reasoningEffort ?? session.reasoningEffort;
-  const driftEnabled = input.driftEnabled ?? session.driftEnabled;
-
-  if (
-    model === session.model &&
-    reasoningEffort === session.reasoningEffort &&
-    driftEnabled === session.driftEnabled
-  ) {
-    return session;
+  private createFallbackSession(apiKeyPresent = this.config.apiKeyPresent): ChatSession {
+    return createChatSession({
+      id: 'session-1',
+      name: 'Session 1',
+      apiKeyPresent,
+      model: this.config.model,
+      reasoningEffort: this.config.reasoningEffort,
+      workspaceId: this.config.workspaceId,
+    });
   }
 
-  return {
-    ...session,
-    model,
-    reasoningEffort,
-    driftEnabled,
-  };
-}
+  private static applySettings(
+    session: ChatSession,
+    input: UpdateConversationSessionSettingsInput,
+  ): ChatSession {
+    const model = input.model ?? session.model;
+    const reasoningEffort = input.reasoningEffort === null ? undefined : input.reasoningEffort ?? session.reasoningEffort;
+    const driftEnabled = input.driftEnabled ?? session.driftEnabled;
 
-// Configuration helpers.
+    if (
+      model === session.model &&
+      reasoningEffort === session.reasoningEffort &&
+      driftEnabled === session.driftEnabled
+    ) {
+      return session;
+    }
 
-function normalizeConversationSessionServiceConfig(
-  config: NormalizedConversationEngineConfig | ConversationSessionServiceConfig,
-): NormalizedConversationSessionServiceConfig {
-  if ('memoryDir' in config && 'traceDir' in config && 'memoryMaintenanceMode' in config) {
-    return config;
+    return {
+      ...session,
+      model,
+      reasoningEffort,
+      driftEnabled,
+    };
   }
 
-  const workspaceRoot = resolve(config.workspaceRoot);
-  const stateRoot = resolve(config.stateRoot);
-  return {
-    workspaceRoot,
-    stateRoot,
-    model: config.model,
-    reasoningEffort: config.reasoningEffort,
-    sessionStoragePath: resolve(config.sessionStoragePath ?? join(stateRoot, 'chat-sessions.catalog.json')),
-    workspaceId: config.workspaceId,
-    apiKeyPresent: config.apiKeyPresent ?? false,
-  };
-}
-
-// Session creation and naming helpers.
-
-function createFallbackSession(
-  config: Pick<NormalizedConversationSessionServiceConfig, 'model' | 'reasoningEffort' | 'workspaceId' | 'apiKeyPresent'>,
-  apiKeyPresent = config.apiKeyPresent,
-): ChatSession {
-  return createChatSession({
-    id: 'session-1',
-    name: 'Session 1',
-    apiKeyPresent,
-    model: config.model,
-    reasoningEffort: config.reasoningEffort,
-    workspaceId: config.workspaceId,
-  });
-}
-
-function getNextSessionNumber(sessions: ChatSession[]): number {
-  const highestGenericNumber = sessions.reduce((highest, session) => {
-    if (!isGenericSessionName(session.name)) {
-      return highest;
+  private static normalizeConfig(
+    config: NormalizedConversationEngineConfig | ConversationSessionServiceConfig,
+  ): NormalizedConversationSessionServiceConfig {
+    if ('memoryDir' in config && 'traceDir' in config && 'memoryMaintenanceMode' in config) {
+      return config;
     }
 
-    const parsed = Number.parseInt(session.name.replace(/^Session\s+/, ''), 10);
-    if (!Number.isFinite(parsed)) {
-      return highest;
-    }
+    const workspaceRoot = resolve(config.workspaceRoot);
+    const stateRoot = resolve(config.stateRoot);
+    return {
+      workspaceRoot,
+      stateRoot,
+      model: config.model,
+      reasoningEffort: config.reasoningEffort,
+      sessionStoragePath: resolve(config.sessionStoragePath ?? join(stateRoot, 'chat-sessions.catalog.json')),
+      workspaceId: config.workspaceId,
+      apiKeyPresent: config.apiKeyPresent ?? false,
+    };
+  }
 
-    return Math.max(highest, parsed);
-  }, 0);
+  private static getNextSessionNumber(sessions: ChatSession[]): number {
+    const highestGenericNumber = sessions.reduce((highest, session) => {
+      if (!isGenericSessionName(session.name)) {
+        return highest;
+      }
 
-  return highestGenericNumber + 1;
+      const parsed = Number.parseInt(session.name.replace(/^Session\s+/, ''), 10);
+      if (!Number.isFinite(parsed)) {
+        return highest;
+      }
+
+      return Math.max(highest, parsed);
+    }, 0);
+
+    return highestGenericNumber + 1;
+  }
 }

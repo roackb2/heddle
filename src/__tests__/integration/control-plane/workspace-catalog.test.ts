@@ -76,7 +76,13 @@ describe('workspace catalog', () => {
     });
     expect(state.workspaces).toHaveLength(1);
     expect(state.knownWorkspaces).toEqual([]);
-    expect(state.sessions).toEqual([]);
+    expect(state.sessions).toEqual([
+      expect.objectContaining({
+        id: 'session-1',
+        name: 'Session 1',
+        model: 'gpt-5.4',
+      }),
+    ]);
     expect(state.heartbeat.tasks).toEqual([]);
     expect(state.memory.catalog).toBeDefined();
     expect(state.runtimeHost?.registryPath).toBe(registryPath);

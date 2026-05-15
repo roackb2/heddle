@@ -38,6 +38,7 @@ describe('createConversationEngine', () => {
       apiKeyPresent: true,
     });
 
+    expect(engine.sessions.listExisting()).toEqual([]);
     const fallback = engine.sessions.latest();
     expect(fallback).toEqual(expect.objectContaining({
       id: 'session-1',
@@ -51,6 +52,7 @@ describe('createConversationEngine', () => {
 
     const session = engine.sessions.create({ name: 'Repo investigation' });
 
+    expect(engine.sessions.listExisting().map((candidate) => candidate.id)).toEqual([session.id, 'session-1']);
     expect(readChatSessionCatalog(join(stateRoot, 'chat-sessions.catalog.json'))[0]).toEqual(expect.objectContaining({
       id: session.id,
       name: 'Repo investigation',
@@ -77,7 +79,7 @@ describe('createConversationEngine', () => {
     const first = engine.sessions.create({ id: 'session-a', name: 'First' });
     const second = engine.sessions.create({ id: 'session-b', name: 'Second' });
 
-    expect(engine.sessions.list().map((session) => session.id)).toEqual(['session-b', 'session-a', 'session-1']);
+    expect(engine.sessions.list().map((session) => session.id)).toEqual(['session-b', 'session-a']);
     expect(engine.sessions.latest()?.id).toBe(engine.sessions.list()[0]?.id);
     expect(engine.sessions.read('missing')).toBeUndefined();
     expect(engine.sessions.require(first.id).id).toBe(first.id);
@@ -95,7 +97,7 @@ describe('createConversationEngine', () => {
     expect(engine.sessions.read(first.id)?.name).toBe('Renamed');
 
     expect(engine.sessions.delete(second.id)).toBe(true);
-    expect(loadChatSessions(join(stateRoot, 'chat-sessions.catalog.json'), true).map((session) => session.id)).toEqual(['session-a', 'session-1']);
+    expect(loadChatSessions(join(stateRoot, 'chat-sessions.catalog.json'), true).map((session) => session.id)).toEqual(['session-a']);
     expect(engine.sessions.delete(first.id)).toBe(true);
     expect(engine.sessions.delete('session-1')).toBe(true);
     expect(engine.sessions.delete('missing')).toBe(false);

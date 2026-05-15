@@ -6,36 +6,14 @@ import { inferProviderFromModel } from '../../../core/llm/factory.js';
 import { resolveProviderCredentialSourceForModel } from '../../../core/runtime/api-keys.js';
 import { procedure, router } from '../../trpc.js';
 import type { HeddleServerContext } from '../../types.js';
-import {
-  cancelControlPlaneSessionRun,
-  continueChatPrompt,
-  createControlPlaneChatSession,
-  getPendingControlPlaneApproval,
-  isControlPlaneSessionRunning,
-  readChatSessionDetail,
-  readChatSessionViews,
-  readChatTurnReview,
-  resolvePendingControlPlaneApproval,
-  submitChatPrompt,
-  updateControlPlaneChatSessionSettings,
-} from './services/chat-sessions.js';
-import { runControlPlaneAsk } from './services/ask.js';
-import { loadControlPlaneState } from './services/control-plane-state.js';
-import {
-  listControlPlaneHeartbeatRuns,
-  listControlPlaneHeartbeatTasks,
-  setControlPlaneHeartbeatTaskEnabled,
-  triggerControlPlaneHeartbeatTaskRun,
-} from './services/heartbeat.js';
-import {
-  listControlPlaneMemoryNotes,
-  readControlPlaneMemoryNote,
-  readControlPlaneMemoryStatus,
-  searchControlPlaneMemoryNotes,
-} from './services/memory.js';
-import { saveControlPlaneLayoutSnapshot } from './services/layout-snapshots.js';
-import { browseWorkspaceDirectories, searchWorkspaceFiles } from './services/workspace-files.js';
-import { readWorkspaceChanges, readWorkspaceFileDiff } from './services/workspace-diff.js';
+import { controlPlaneChatSessionsController } from './controllers/chat-sessions-controller.js';
+import { ControlPlaneAskController } from './controllers/ask.js';
+import { ControlPlaneStateController } from './controllers/control-plane-state.js';
+import { ControlPlaneHeartbeatController } from './controllers/heartbeat.js';
+import { ControlPlaneMemoryController } from './controllers/memory.js';
+import { ControlPlaneLayoutSnapshotsController } from './controllers/layout-snapshots.js';
+import { ControlPlaneWorkspaceFilesController } from './controllers/workspace-files.js';
+import { ControlPlaneWorkspaceDiffController } from './controllers/workspace-diff.js';
 import { createWorkspaceDescriptor, renameWorkspaceDescriptor, setActiveWorkspace } from '../../../core/runtime/workspaces.js';
 import { registerKnownWorkspaces, resolveDaemonRegistryPath } from '../../../core/runtime/daemon-registry.js';
 
@@ -150,16 +128,16 @@ const workspaceRenameInputSchema = z.object({
 
 export const controlPlaneRouter = router({
   state: procedure.query(async ({ ctx }) => {
-    return await loadControlPlaneState(ctx);
+    return await ControlPlaneStateController.load(ctx);
   }),
   sessions: procedure.query(({ ctx }) => {
     return {
-      sessions: readChatSessionViews(resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json')),
+      sessions: controlPlaneChatSessionsController.readViews(controlPlaneSessionEngineArgs(ctx)),
     };
   }),
   sessionCreate: procedure.input(createSessionInputSchema).mutation(({ ctx, input }) => {
-    return createControlPlaneChatSession({
-      sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
+    return controlPlaneChatSessionsController.createSession({
+      ...controlPlaneSessionEngineArgs(ctx),
       suggestedName: input?.name,
       workspaceId: ctx.activeWorkspace.id,
       model: input?.model,
@@ -168,7 +146,7 @@ export const controlPlaneRouter = router({
     });
   }),
   session: procedure.input(sessionInputSchema).query(({ ctx, input }) => {
-    return readChatSessionDetail(resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'), input.id) ?? null;
+    return controlPlaneChatSessionsController.readDetail(controlPlaneSessionEngineArgs(ctx), input.id) ?? null;
   }),
   modelOptions: procedure.query(({ ctx }) => {
     const credentialMode = credentialModeFromSource(resolveProviderCredentialSourceForModel('gpt-5.4', {
@@ -187,26 +165,28 @@ export const controlPlaneRouter = router({
     };
   }),
   sessionSettingsUpdate: procedure.input(sessionSettingsInputSchema).mutation(({ ctx, input }) => {
-    return updateControlPlaneChatSessionSettings({
-      sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
+    return controlPlaneChatSessionsController.updateSettings({
+      ...controlPlaneSessionEngineArgs(ctx),
       sessionId: input.id,
-      model: input.model,
-      reasoningEffort: input.reasoningEffort,
-      driftEnabled: input.driftEnabled,
+      settings: {
+        model: input.model,
+        reasoningEffort: input.reasoningEffort,
+        driftEnabled: input.driftEnabled,
+      },
     });
   }),
   sessionTurnReview: procedure.input(turnReviewInputSchema).query(({ ctx, input }) => {
-    return readChatTurnReview(resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'), input.sessionId, input.turnId) ?? null;
+    return controlPlaneChatSessionsController.readTurnReview(controlPlaneSessionEngineArgs(ctx), input.sessionId, input.turnId) ?? null;
   }),
   sessionPendingApproval: procedure.input(sessionInputSchema).query(({ input }) => {
-    return getPendingControlPlaneApproval(input.id) ?? null;
+    return controlPlaneChatSessionsController.getPendingApproval(input.id) ?? null;
   }),
   sessionRunning: procedure.input(sessionInputSchema).query(({ input }) => {
-    return { running: isControlPlaneSessionRunning(input.id) };
+    return { running: controlPlaneChatSessionsController.isRunning(input.id) };
   }),
   sessionResolveApproval: procedure.input(sessionApprovalDecisionSchema).mutation(({ input }) => {
     return {
-      resolved: resolvePendingControlPlaneApproval(input.sessionId, {
+      resolved: controlPlaneChatSessionsController.resolvePendingApproval(input.sessionId, {
         approved: input.approved,
         reason: input.reason,
       }),
@@ -214,11 +194,11 @@ export const controlPlaneRouter = router({
   }),
   sessionCancel: procedure.input(sessionInputSchema).mutation(({ input }) => {
     return {
-      cancelled: cancelControlPlaneSessionRun(input.id),
+      cancelled: controlPlaneChatSessionsController.cancelRun(input.id),
     };
   }),
   sessionSendPrompt: procedure.input(sessionMessageInputSchema).mutation(async ({ ctx, input }) => {
-    return await submitChatPrompt({
+    return await controlPlaneChatSessionsController.submitPrompt({
       workspaceRoot: ctx.activeWorkspace.anchorRoot,
       stateRoot: ctx.activeWorkspace.stateRoot,
       sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
@@ -236,7 +216,7 @@ export const controlPlaneRouter = router({
     });
   }),
   sessionContinue: procedure.input(sessionInputSchema).mutation(async ({ ctx, input }) => {
-    return await continueChatPrompt({
+    return await controlPlaneChatSessionsController.continuePrompt({
       workspaceRoot: ctx.activeWorkspace.anchorRoot,
       stateRoot: ctx.activeWorkspace.stateRoot,
       sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
@@ -251,7 +231,7 @@ export const controlPlaneRouter = router({
     });
   }),
   agentAsk: procedure.input(agentAskInputSchema).mutation(async ({ ctx, input }) => {
-    return await runControlPlaneAsk({
+    return await ControlPlaneAskController.run({
       goal: input.goal,
       workspaceRoot: ctx.activeWorkspace.anchorRoot,
       stateRoot: ctx.activeWorkspace.stateRoot,
@@ -265,53 +245,53 @@ export const controlPlaneRouter = router({
   }),
   heartbeatTasks: procedure.query(async ({ ctx }) => {
     return {
-      tasks: await listControlPlaneHeartbeatTasks(ctx.activeWorkspace.stateRoot),
+      tasks: await ControlPlaneHeartbeatController.listTasks(ctx.activeWorkspace.stateRoot),
     };
   }),
   heartbeatRuns: procedure.input(heartbeatRunsInputSchema).query(async ({ ctx, input }) => {
     return {
-      runs: await listControlPlaneHeartbeatRuns(ctx.activeWorkspace.stateRoot, {
+      runs: await ControlPlaneHeartbeatController.listRuns(ctx.activeWorkspace.stateRoot, {
         taskId: input?.taskId,
         limit: input?.limit ?? 20,
       }),
     };
   }),
   memoryStatus: procedure.query(async ({ ctx }) => {
-    return await readControlPlaneMemoryStatus(ctx.activeWorkspace.stateRoot);
+    return await ControlPlaneMemoryController.readStatus(ctx.activeWorkspace.stateRoot);
   }),
   memoryList: procedure.input(memoryListInputSchema).query(async ({ ctx, input }) => {
-    return await listControlPlaneMemoryNotes(ctx.activeWorkspace.stateRoot, input?.path);
+    return await ControlPlaneMemoryController.listNotes(ctx.activeWorkspace.stateRoot, input?.path);
   }),
   memoryRead: procedure.input(memoryReadInputSchema).query(async ({ ctx, input }) => {
-    return await readControlPlaneMemoryNote(ctx.activeWorkspace.stateRoot, input.path, {
+    return await ControlPlaneMemoryController.readNote(ctx.activeWorkspace.stateRoot, input.path, {
       offset: input.offset,
       maxLines: input.maxLines,
     });
   }),
   memorySearch: procedure.input(memorySearchInputSchema).query(async ({ ctx, input }) => {
-    return await searchControlPlaneMemoryNotes(ctx.activeWorkspace.stateRoot, input.query, {
+    return await ControlPlaneMemoryController.searchNotes(ctx.activeWorkspace.stateRoot, input.query, {
       path: input.path,
       maxResults: input.maxResults,
     });
   }),
   heartbeatTaskEnable: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
     return {
-      task: await setControlPlaneHeartbeatTaskEnabled(ctx.activeWorkspace.stateRoot, input.taskId, true),
+      task: await ControlPlaneHeartbeatController.setTaskEnabled(ctx.activeWorkspace.stateRoot, input.taskId, true),
     };
   }),
   heartbeatTaskDisable: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
     return {
-      task: await setControlPlaneHeartbeatTaskEnabled(ctx.activeWorkspace.stateRoot, input.taskId, false),
+      task: await ControlPlaneHeartbeatController.setTaskEnabled(ctx.activeWorkspace.stateRoot, input.taskId, false),
     };
   }),
   heartbeatTaskTrigger: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
     return {
-      task: await triggerControlPlaneHeartbeatTaskRun(ctx.activeWorkspace.stateRoot, input.taskId),
+      task: await ControlPlaneHeartbeatController.triggerTaskRun(ctx.activeWorkspace.stateRoot, input.taskId),
     };
   }),
   workspaceFileSearch: procedure.input(fileSearchInputSchema).query(async ({ ctx, input }) => {
     return {
-      files: await searchWorkspaceFiles({
+      files: await ControlPlaneWorkspaceFilesController.searchFiles({
         workspaceRoot: ctx.activeWorkspace.anchorRoot,
         query: input?.query ?? '',
         limit: input?.limit ?? 20,
@@ -319,17 +299,17 @@ export const controlPlaneRouter = router({
     };
   }),
   workspaceBrowse: procedure.input(workspaceBrowseInputSchema).query(async ({ input }) => {
-    return await browseWorkspaceDirectories({
+    return await ControlPlaneWorkspaceFilesController.browseDirectories({
       path: input?.path,
       limit: input?.limit ?? 100,
       includeHidden: input?.includeHidden ?? false,
     });
   }),
   workspaceChanges: procedure.query(async ({ ctx }) => {
-    return await readWorkspaceChanges(ctx.activeWorkspace.anchorRoot);
+    return await ControlPlaneWorkspaceDiffController.readChanges(ctx.activeWorkspace.anchorRoot);
   }),
   workspaceFileDiff: procedure.input(workspaceFileDiffInputSchema).query(async ({ ctx, input }) => {
-    return await readWorkspaceFileDiff(ctx.activeWorkspace.anchorRoot, input.path);
+    return await ControlPlaneWorkspaceDiffController.readFileDiff(ctx.activeWorkspace.anchorRoot, input.path);
   }),
   workspaceSetActive: procedure.input(workspaceSetActiveInputSchema).mutation(({ ctx, input }) => {
     const resolved = setActiveWorkspace({
@@ -375,9 +355,19 @@ export const controlPlaneRouter = router({
     };
   }),
   layoutSnapshotSave: procedure.input(layoutSnapshotInputSchema).mutation(async ({ ctx, input }) => {
-    return await saveControlPlaneLayoutSnapshot(ctx.activeWorkspace.stateRoot, input.snapshot);
+    return await ControlPlaneLayoutSnapshotsController.save(ctx.activeWorkspace.stateRoot, input.snapshot);
   }),
 });
+
+function controlPlaneSessionEngineArgs(ctx: HeddleServerContext) {
+  return {
+    workspaceRoot: ctx.activeWorkspace.anchorRoot,
+    stateRoot: ctx.activeWorkspace.stateRoot,
+    sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
+    preferApiKey: ctx.preferApiKey,
+    workspaceId: ctx.activeWorkspace.id,
+  };
+}
 
 function registerControlPlaneWorkspaces(
   ctx: HeddleServerContext,

@@ -6,7 +6,7 @@ import { createRequestLoggingMiddleware } from './middleware/request-logging.js'
 import { appRouter } from './router.js';
 import { installWebStaticRoutes } from './static.js';
 import type { HeddleRuntimeHostDescriptor, HeddleServerContext } from './types.js';
-import { resolveChatSessionFilePath, subscribeToControlPlaneSessionEvents } from './features/control-plane/services/chat-sessions.js';
+import { controlPlaneChatSessionsController } from './features/control-plane/controllers/chat-sessions-controller.js';
 import { readDaemonWorkspaceRegistration } from '../core/runtime/daemon-registry.js';
 import { resolveWorkspaceContext } from '../core/runtime/workspaces.js';
 
@@ -78,7 +78,7 @@ export function createHeddleServerApp(
       workspaceRoot: options.workspaceRoot,
       stateRoot: options.stateRoot,
     });
-    const sessionFilePath = resolveChatSessionFilePath(workspaceContext.activeWorkspace.stateRoot, sessionId);
+    const sessionFilePath = controlPlaneChatSessionsController.resolveFilePath(workspaceContext.activeWorkspace.stateRoot, sessionId);
     response.setHeader('Content-Type', 'text/event-stream');
     response.setHeader('Cache-Control', 'no-cache, no-transform');
     response.setHeader('Connection', 'keep-alive');
@@ -94,7 +94,7 @@ export function createHeddleServerApp(
       send('heartbeat', { sessionId, timestamp: new Date().toISOString() });
     }, 15000);
 
-    const unsubscribe = subscribeToControlPlaneSessionEvents(sessionId, (payload) => {
+    const unsubscribe = controlPlaneChatSessionsController.subscribeToEvents(sessionId, (payload) => {
       send('session.event', payload);
     });
 

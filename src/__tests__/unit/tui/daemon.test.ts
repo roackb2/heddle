@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDaemonArgs, projectChatSessionView } from '../../../cli/daemon.js';
+import { ControlPlaneChatSessionPresenter, parseDaemonArgs } from '../../../cli/daemon.js';
 
 describe('daemon CLI helpers', () => {
   it('parses default daemon host and port', () => {
@@ -27,7 +27,7 @@ describe('daemon CLI helpers', () => {
   });
 
   it('projects chat sessions without exposing full transcript bodies', () => {
-    expect(projectChatSessionView({
+    expect(ControlPlaneChatSessionPresenter.projectView({
       id: 'session-1',
       name: 'Repo work',
       createdAt: '2026-04-15T01:00:00.000Z',
@@ -70,7 +70,7 @@ describe('daemon CLI helpers', () => {
   });
 
   it('ignores invalid chat session records', () => {
-    expect(projectChatSessionView({ id: 'missing-name' })).toEqual([]);
-    expect(projectChatSessionView(null)).toEqual([]);
+    expect(ControlPlaneChatSessionPresenter.projectView({ id: 'missing-name' })).toEqual([]);
+    expect(ControlPlaneChatSessionPresenter.projectView(null)).toEqual([]);
   });
 });

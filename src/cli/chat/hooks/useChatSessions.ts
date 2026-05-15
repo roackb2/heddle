@@ -16,10 +16,7 @@ import type { ChatSession } from '../state/types.js';
 import { resolveWorkspaceContext } from '../../../core/runtime/workspaces.js';
 import type { SessionExecutionPreferences } from '../../../core/chat/engine/sessions/preferences/service.js';
 import { resolveNewSessionExecutionPreferences } from '../../../core/chat/engine/sessions/preferences/service.js';
-import {
-  createConversationSessionService,
-  summarizeConversationSession,
-} from '../../../core/chat/engine/sessions/service.js';
+import { FileConversationSessionService } from '../../../core/chat/engine/sessions/service.js';
 
 type UseChatSessionsArgs = {
   sessionCatalogFile: string;
@@ -40,15 +37,13 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
       // createConversationEngine(...).sessions from the host boundary. Direct
       // construction is acceptable only while TUI still lacks one shared
       // engine-facing runtime config object.
-      createConversationSessionService({
-        config: {
-          workspaceRoot,
-          stateRoot,
-          sessionStoragePath: sessionCatalogFile,
-          model: defaultModel,
-          apiKeyPresent,
-          workspaceId,
-        },
+      new FileConversationSessionService({
+        workspaceRoot,
+        stateRoot,
+        sessionStoragePath: sessionCatalogFile,
+        model: defaultModel,
+        apiKeyPresent,
+        workspaceId,
       }),
     [apiKeyPresent, defaultModel, sessionCatalogFile, stateRoot, workspaceId, workspaceRoot],
   );
@@ -72,7 +67,7 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
     [sessions],
   );
 
-  const activeSessionSummary = activeSession ? summarizeConversationSession(activeSession) : undefined;
+  const activeSessionSummary = activeSession ? FileConversationSessionService.summarize(activeSession) : undefined;
   const listRecentSessionsMessage =
     recentSessions.length > 0 ?
       [

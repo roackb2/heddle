@@ -6,13 +6,13 @@ import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 import { ensureWorkspaceCatalog } from '../../../core/runtime/workspaces.js';
 import { controlPlaneRouter } from '../../../server/features/control-plane/router.js';
-import { readWorkspaceChanges, readWorkspaceFileDiff } from '../../../server/features/control-plane/services/workspace-diff.js';
+import { ControlPlaneWorkspaceDiffController } from '../../../server/features/control-plane/controllers/workspace-diff.js';
 
 describe('workspace diff review', () => {
   it('returns an empty non-git result outside a git workspace', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-workspace-diff-non-git-'));
 
-    await expect(readWorkspaceChanges(root)).resolves.toEqual({
+    await expect(ControlPlaneWorkspaceDiffController.readChanges(root)).resolves.toEqual({
       vcs: 'none',
       clean: true,
       files: [],
@@ -23,7 +23,7 @@ describe('workspace diff review', () => {
   it('reports a clean git workspace', async () => {
     const root = createGitWorkspace();
 
-    await expect(readWorkspaceChanges(root)).resolves.toEqual({
+    await expect(ControlPlaneWorkspaceDiffController.readChanges(root)).resolves.toEqual({
       vcs: 'git',
       clean: true,
       files: [],
@@ -36,7 +36,7 @@ describe('workspace diff review', () => {
     mkdirSync(join(root, '.heddle'), { recursive: true });
     writeFileSync(join(root, '.heddle', 'workspaces.catalog.json'), '{}\n');
 
-    const changes = await readWorkspaceChanges(root);
+    const changes = await ControlPlaneWorkspaceDiffController.readChanges(root);
     expect(changes).toMatchObject({
       vcs: 'git',
       clean: false,
@@ -48,12 +48,12 @@ describe('workspace diff review', () => {
       }],
     });
 
-    const diff = await readWorkspaceFileDiff(root, 'README.md');
+    const diff = await ControlPlaneWorkspaceDiffController.readFileDiff(root, 'README.md');
     expect(diff.vcs).toBe('git');
     expect(diff.patch).toContain('diff --git a/README.md b/README.md');
     expect(diff.patch).toContain('+again');
 
-    await expect(readWorkspaceFileDiff(root, '.heddle/workspaces.catalog.json')).resolves.toMatchObject({
+    await expect(ControlPlaneWorkspaceDiffController.readFileDiff(root, '.heddle/workspaces.catalog.json')).resolves.toMatchObject({
       path: '.heddle/workspaces.catalog.json',
       error: 'Heddle runtime state is not included in workspace review.',
     });
@@ -63,13 +63,13 @@ describe('workspace diff review', () => {
     const root = createGitWorkspace();
     writeFileSync(join(root, 'new-file.md'), 'new content\n');
 
-    const changes = await readWorkspaceChanges(root);
+    const changes = await ControlPlaneWorkspaceDiffController.readChanges(root);
     expect(changes.files).toEqual([expect.objectContaining({
       path: 'new-file.md',
       status: 'untracked',
     })]);
 
-    const diff = await readWorkspaceFileDiff(root, 'new-file.md');
+    const diff = await ControlPlaneWorkspaceDiffController.readFileDiff(root, 'new-file.md');
     expect(diff.patch).toContain('+++ b/new-file.md');
     expect(diff.patch).toContain('+new content');
   });
@@ -78,7 +78,7 @@ describe('workspace diff review', () => {
     const root = createGitWorkspace();
     unlinkSync(join(root, 'README.md'));
 
-    const changes = await readWorkspaceChanges(root);
+    const changes = await ControlPlaneWorkspaceDiffController.readChanges(root);
     expect(changes.files).toEqual([expect.objectContaining({
       path: 'README.md',
       status: 'deleted',
@@ -86,7 +86,7 @@ describe('workspace diff review', () => {
       deletions: 2,
     })]);
 
-    const diff = await readWorkspaceFileDiff(root, 'README.md');
+    const diff = await ControlPlaneWorkspaceDiffController.readFileDiff(root, 'README.md');
     expect(diff.patch).toContain('diff --git a/README.md b/README.md');
     expect(diff.patch).toContain('-hello');
   });

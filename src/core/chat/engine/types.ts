@@ -36,6 +36,8 @@ export type ConversationEngine = {
 export type ConversationSessionService = {
   // Reads
   list(): ChatSession[];
+  // Reads persisted sessions without materializing the host-facing fallback.
+  listExisting(): ChatSession[];
   read(id: string): ChatSession | undefined;
   require(id: string): ChatSession;
   latest(): ChatSession | undefined;

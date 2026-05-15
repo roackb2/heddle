@@ -4,11 +4,11 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createChatSession } from '../../../core/chat/engine/sessions/session-record.js';
 import { saveChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
-import { readChatTurnReview } from '../../../server/features/control-plane/services/chat-sessions.js';
+import { controlPlaneChatSessionsController } from '../../../server/features/control-plane/controllers/chat-sessions-controller.js';
 
 describe('control-plane turn review', () => {
   it('projects edit_file tool diffs as structured changed files', () => {
-    const { sessionStoragePath, sessionId, turnId } = createSessionWithTrace([
+    const { engineArgs, sessionId, turnId } = createSessionWithTrace([
       {
         type: 'tool.result',
         tool: 'edit_file',
@@ -36,7 +36,7 @@ describe('control-plane turn review', () => {
       },
     ]);
 
-    expect(readChatTurnReview(sessionStoragePath, sessionId, turnId)?.files).toEqual([
+    expect(controlPlaneChatSessionsController.readTurnReview(engineArgs, sessionId, turnId)?.files).toEqual([
       {
         path: 'README.md',
         status: 'modified',
@@ -70,7 +70,7 @@ describe('control-plane turn review', () => {
       '@@ -0,0 +1 @@',
       '+created',
     ].join('\n');
-    const { sessionStoragePath, sessionId, turnId } = createSessionWithTrace([
+    const { engineArgs, sessionId, turnId } = createSessionWithTrace([
       {
         type: 'tool.result',
         tool: 'run_shell_inspect',
@@ -88,7 +88,7 @@ describe('control-plane turn review', () => {
       },
     ]);
 
-    const review = readChatTurnReview(sessionStoragePath, sessionId, turnId);
+    const review = controlPlaneChatSessionsController.readTurnReview(engineArgs, sessionId, turnId);
     expect(review?.diffExcerpt).toBe(patch);
     expect(review?.files.map((file) => ({
       path: file.path,
@@ -115,7 +115,7 @@ describe('control-plane turn review', () => {
       '-oldName()',
       '+newName()',
     ].join('\n');
-    const { sessionStoragePath, sessionId, turnId } = createSessionWithTrace([
+    const { engineArgs, sessionId, turnId } = createSessionWithTrace([
       {
         type: 'tool.result',
         tool: 'run_shell_inspect',
@@ -133,7 +133,7 @@ describe('control-plane turn review', () => {
       },
     ]);
 
-    expect(readChatTurnReview(sessionStoragePath, sessionId, turnId)?.files[0]).toMatchObject({
+    expect(controlPlaneChatSessionsController.readTurnReview(engineArgs, sessionId, turnId)?.files[0]).toMatchObject({
       path: 'src/new-name.ts',
       status: 'renamed',
       source: 'git_diff',
@@ -142,7 +142,7 @@ describe('control-plane turn review', () => {
   });
 
   it('keeps git diff stat as command evidence without pretending it is a file patch', () => {
-    const { sessionStoragePath, sessionId, turnId } = createSessionWithTrace([
+    const { engineArgs, sessionId, turnId } = createSessionWithTrace([
       {
         type: 'tool.result',
         tool: 'run_shell_inspect',
@@ -160,7 +160,7 @@ describe('control-plane turn review', () => {
       },
     ]);
 
-    const review = readChatTurnReview(sessionStoragePath, sessionId, turnId);
+    const review = controlPlaneChatSessionsController.readTurnReview(engineArgs, sessionId, turnId);
     expect(review?.diffExcerpt).toBe('README.md | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)');
     expect(review?.files).toEqual([]);
     expect(review?.reviewCommands).toHaveLength(1);
@@ -196,5 +196,13 @@ function createSessionWithTrace(trace: unknown[]) {
     }],
   }]);
 
-  return { sessionStoragePath, sessionId, turnId };
+  return {
+    engineArgs: {
+      workspaceRoot: root,
+      stateRoot,
+      sessionStoragePath,
+    },
+    sessionId,
+    turnId,
+  };
 }
