@@ -3,13 +3,13 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { saveControlPlaneLayoutSnapshot } from '../../../server/features/control-plane/services/layout-snapshots.js';
+import { ControlPlaneLayoutSnapshotsController } from '../../../server/features/control-plane/controllers/layout-snapshots.js';
 
 describe('control-plane layout snapshots', () => {
   it('persists snapshot JSON under the debug snapshot directory', async () => {
     const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-layout-snapshot-'));
 
-    const saved = await saveControlPlaneLayoutSnapshot(stateRoot, {
+    const saved = await ControlPlaneLayoutSnapshotsController.save(stateRoot, {
       version: 1,
       capturedAt: '2026-04-19T02:16:00.000Z',
       appState: {
@@ -35,7 +35,7 @@ describe('control-plane layout snapshots', () => {
     const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-layout-snapshot-'));
     const pngDataUrl = `data:image/png;base64,${Buffer.from('fake-png').toString('base64')}`;
 
-    const saved = await saveControlPlaneLayoutSnapshot(stateRoot, {
+    const saved = await ControlPlaneLayoutSnapshotsController.save(stateRoot, {
       capturedAt: '2026-04-19T02:16:00.000Z',
       appState: {
         activeTab: 'sessions',

@@ -1,3 +1,10 @@
+/**
+ * Low-level persisted turn executor.
+ *
+ * Preferred host boundary: callers should go through
+ * createConversationEngine(...).turns. Direct imports remain only for older
+ * TUI/ask paths until those hosts migrate to the shared engine turn service.
+ */
 import { runAgentLoop } from '../../../runtime/agent-loop.js';
 import type { ToolApprovalPolicy } from '../../../approvals/types.js';
 import type { TraceSummarizerRegistry } from '../../../observability/trace-summarizers.js';

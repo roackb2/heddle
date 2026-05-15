@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import {
+  ControlPlaneChatSessionPresenter,
   listenHeddleDaemon,
-  projectChatSessionView,
 } from '../server/index.js';
 import type { HeddleServerListenOptions } from '../server/index.js';
 
@@ -21,7 +21,7 @@ export type DaemonArgs = {
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 8765;
 
-export { projectChatSessionView };
+export { ControlPlaneChatSessionPresenter };
 
 export async function runDaemonCli(args: string[], options: DaemonCliOptions = {}) {
   const parsed = parseDaemonArgs(args);

@@ -330,7 +330,7 @@ export function SessionsScreen({
           ) : undefined}
         />
 
-        <div className="conversation-scroll" ref={conversationScrollRef}>
+        <div className="conversation-scroll" data-testid="session-conversation" ref={conversationScrollRef}>
           <div className="conversation-stack">
             <div className="conversation-spacer" />
             {sessionDetailLoading ?
@@ -384,7 +384,7 @@ export function SessionsScreen({
                 {sessionDetail?.lastContinuePrompt ? <Pill>continue available</Pill> : <Pill>no continue state yet</Pill>}
               </div>
             </div>
-            <div className="pills composer-actions">
+            <div className="pills composer-actions" data-testid="session-composer-actions">
               <button
                 className="tab-button"
                 type="button"

@@ -26,8 +26,8 @@ Approval behavior currently exists in these places:
 - `src/core/approvals/surface.ts`
 - `src/core/approvals/remembered-rules.ts`
 - `src/cli/chat/hooks/controllers/run/tui-tool-approval.ts`
-- `src/server/features/control-plane/services/chat-sessions.ts`
-- `src/server/features/control-plane/services/chat-session-events.ts`
+- `src/server/features/control-plane/controllers/chat-sessions-controller.ts`
+- `src/server/features/control-plane/controllers/chat-session-events.ts`
 
 ## Public Entry Points
 

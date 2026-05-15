@@ -60,8 +60,9 @@ test('creates a session and sends a mocked prompt through the browser flow', asy
   await page.locator('textarea').fill('Explain this mocked E2E run');
   await page.getByRole('button', { name: 'Send' }).click();
 
-  await expect(page.getByText('Explain this mocked E2E run')).toBeVisible();
-  await expect(page.getByText('Mocked E2E agent response: Explain this mocked E2E run')).toBeVisible();
+  const conversation = page.getByTestId('session-conversation');
+  await expect(conversation.getByText('Explain this mocked E2E run', { exact: true })).toBeVisible();
+  await expect(conversation.getByText('Mocked E2E agent response: Explain this mocked E2E run', { exact: true })).toBeVisible();
 });
 
 test('continues a mocked browser session after an initial prompt', async ({ page }) => {
@@ -73,14 +74,15 @@ test('continues a mocked browser session after an initial prompt', async ({ page
   await page.locator('textarea').fill('Start a mocked continuation flow');
   await page.getByRole('button', { name: 'Send' }).click();
 
-  await expect(page.getByText('Mocked E2E agent response: Start a mocked continuation flow')).toBeVisible();
+  const conversation = page.getByTestId('session-conversation');
+  await expect(conversation.getByText('Mocked E2E agent response: Start a mocked continuation flow', { exact: true })).toBeVisible();
 
-  const continueButton = page.getByRole('button', { name: 'Continue' });
+  const continueButton = page.getByTestId('session-composer-actions').getByRole('button', { name: 'Continue', exact: true });
   await expect(continueButton).toBeEnabled();
   await continueButton.click();
 
-  await expect(page.getByText('Continue from where you left off.', { exact: true })).toBeVisible();
-  await expect(page.getByText('Mocked E2E agent response: Continue from where you left off.', { exact: true })).toBeVisible();
+  await expect(conversation.getByText('Start a mocked continuation flow', { exact: true })).toHaveCount(2);
+  await expect(conversation.getByText('Mocked E2E agent response: Start a mocked continuation flow', { exact: true })).toHaveCount(2);
 });
 
 test('mobile navigation exposes the primary sections', async ({ page }) => {

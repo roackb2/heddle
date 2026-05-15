@@ -9,12 +9,12 @@ import { createLogger } from '../../../core/utils/logger.js';
 import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../index.js';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
 import { runConversationTurn } from '../../../core/chat/engine/turns/run-conversation-turn.js';
-import { createConversationSessionService } from '../../../core/chat/engine/sessions/service.js';
+import { FileConversationSessionService } from '../../../core/chat/engine/sessions/service.js';
 import { createChatSession as createCoreChatSession } from '../../../core/chat/engine/sessions/session-record.js';
 import { loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
 import * as agentLoopModule from '../../../core/runtime/agent-loop.js';
 import type { ToolApprovalPolicy } from '../../../core/approvals/types.js';
-import { continueChatPrompt, createControlPlaneChatSession, readChatSessionDetail, submitChatPrompt, updateControlPlaneChatSessionSettings } from '../../../server/features/control-plane/services/chat-sessions.js';
+import { controlPlaneChatSessionsController } from '../../../server/features/control-plane/controllers/chat-sessions-controller.js';
 
 describe('resolveChatRuntimeConfig', () => {
   afterEach(() => {
@@ -244,14 +244,12 @@ describe('executeAgentTurn final message persistence', () => {
   ) {
     const runtime = createRuntime();
     const state = createState();
-    const sessionService = createConversationSessionService({
-      config: {
-        workspaceRoot: runtime.workspaceRoot,
-        stateRoot: runtime.stateRoot,
-        sessionStoragePath: runtime.sessionCatalogFile,
-        model: runtime.model,
-        apiKeyPresent: runtime.providerCredentialPresent,
-      },
+    const sessionService = new FileConversationSessionService({
+      workspaceRoot: runtime.workspaceRoot,
+      stateRoot: runtime.stateRoot,
+      sessionStoragePath: runtime.sessionCatalogFile,
+      model: runtime.model,
+      apiKeyPresent: runtime.providerCredentialPresent,
     });
     let session = sessionService.create({
       id: 'session-1',
@@ -384,18 +382,22 @@ describe('control-plane shared chat runtime integration', () => {
     vi.unstubAllEnvs();
   });
 
-  function createControlPlaneSessionStoragePath() {
+  function createControlPlaneSessionEngineArgs() {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-control-plane-runtime-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    return resolve(stateRoot, 'chat-sessions.catalog.json');
+    return {
+      workspaceRoot,
+      stateRoot,
+      sessionStoragePath: resolve(stateRoot, 'chat-sessions.catalog.json'),
+    };
   }
 
   it('defaults new control-plane sessions to the shared OpenAI default model', () => {
     vi.stubEnv('OPENAI_MODEL', '');
     vi.stubEnv('ANTHROPIC_MODEL', '');
 
-    const session = createControlPlaneChatSession({
-      sessionStoragePath: createControlPlaneSessionStoragePath(),
+    const session = controlPlaneChatSessionsController.createSession({
+      ...createControlPlaneSessionEngineArgs(),
       suggestedName: 'Default model test',
     });
 
@@ -419,8 +421,8 @@ describe('control-plane shared chat runtime integration', () => {
       updatedAt: now,
     }, storePath);
 
-    const session = createControlPlaneChatSession({
-      sessionStoragePath: createControlPlaneSessionStoragePath(),
+    const session = controlPlaneChatSessionsController.createSession({
+      ...createControlPlaneSessionEngineArgs(),
       suggestedName: 'OAuth fallback test',
       credentialStorePath: storePath,
     });
@@ -444,8 +446,8 @@ describe('control-plane shared chat runtime integration', () => {
       updatedAt: now,
     }, storePath);
 
-    const session = createControlPlaneChatSession({
-      sessionStoragePath: createControlPlaneSessionStoragePath(),
+    const session = controlPlaneChatSessionsController.createSession({
+      ...createControlPlaneSessionEngineArgs(),
       suggestedName: 'API key model test',
       preferApiKey: true,
       credentialStorePath: storePath,
@@ -455,7 +457,8 @@ describe('control-plane shared chat runtime integration', () => {
   });
 
   it('clears explicit reasoning effort when control-plane settings send null', () => {
-    const sessionStoragePath = createControlPlaneSessionStoragePath();
+    const engineArgs = createControlPlaneSessionEngineArgs();
+    const { sessionStoragePath } = engineArgs;
     const session = createCoreChatSession({
       id: 'session-1',
       name: 'Session 1',
@@ -465,14 +468,16 @@ describe('control-plane shared chat runtime integration', () => {
     });
     saveChatSessions(sessionStoragePath, [session]);
 
-    const updated = updateControlPlaneChatSessionSettings({
-      sessionStoragePath,
+    const updated = controlPlaneChatSessionsController.updateSettings({
+      ...engineArgs,
       sessionId: 'session-1',
-      reasoningEffort: null,
+      settings: {
+        reasoningEffort: null,
+      },
     });
 
     expect(updated.reasoningEffort).toBeUndefined();
-    expect(readChatSessionDetail(sessionStoragePath, 'session-1')?.reasoningEffort).toBeUndefined();
+    expect(controlPlaneChatSessionsController.readDetail(engineArgs, 'session-1')?.reasoningEffort).toBeUndefined();
   });
 
   it('continues with the stored prompt while preserving continue-style transcript text', async () => {
@@ -483,7 +488,9 @@ describe('control-plane shared chat runtime integration', () => {
     mkdirSync(traceDir, { recursive: true });
     vi.stubEnv('OPENAI_API_KEY', 'test-openai-key');
 
-    const session = createControlPlaneChatSession({
+    const session = controlPlaneChatSessionsController.createSession({
+      workspaceRoot,
+      stateRoot,
       sessionStoragePath,
       suggestedName: 'Phase C test',
       model: 'gpt-5.1-codex-mini',
@@ -540,7 +547,7 @@ describe('control-plane shared chat runtime integration', () => {
         },
       } as never);
 
-    await submitChatPrompt({
+    await controlPlaneChatSessionsController.submitPrompt({
       workspaceRoot,
       stateRoot,
       sessionStoragePath,
@@ -553,7 +560,7 @@ describe('control-plane shared chat runtime integration', () => {
       },
     });
 
-    const continueResult = await continueChatPrompt({
+    const continueResult = await controlPlaneChatSessionsController.continuePrompt({
       workspaceRoot,
       stateRoot,
       sessionStoragePath,
@@ -568,7 +575,7 @@ describe('control-plane shared chat runtime integration', () => {
     const continueCall = loopSpy.mock.calls.at(-1)?.[0];
     expect(continueCall?.goal).toBe('inspect file with expanded mention contents');
 
-    const detail = readChatSessionDetail(sessionStoragePath, session.id);
+    const detail = controlPlaneChatSessionsController.readDetail({ workspaceRoot, stateRoot, sessionStoragePath }, session.id);
     expect(detail?.messages.map((message) => message.text)).toEqual([
       'inspect file with expanded mention contents',
       'First turn done.',

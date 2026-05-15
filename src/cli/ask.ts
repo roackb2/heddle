@@ -1,11 +1,15 @@
 /**
  * Ask-mode host entrypoint.
  *
+ * Boundary rule:
+ * session-backed ask uses createConversationEngine(...).sessions and
+ * createConversationEngine(...).turns. Keep CLI flag parsing, daemon attach
+ * routing, output formatting, and stateless ask behavior in this host file.
+ *
  * Current compromise:
- * session targeting and ad-hoc session creation in this file still call the
- * file session repository directly. The intended direction is for ask mode to
- * use core session services for those flows, the same way the TUI host now
- * does.
+ * stateless ask still calls runAgentLoop and owns trace/memory-maintenance
+ * output directly. The desired shape is a core one-shot execution service that
+ * ask mode can call while this file remains a CLI adapter.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -25,10 +29,9 @@ import {
 } from '../index.js';
 import { runMaintenanceForRecordedCandidates } from '../core/memory/maintenance-integration.js';
 import type { ResolvedRuntimeHost } from '../core/runtime/runtime-hosts.js';
-import { runConversationTurn } from '../core/chat/engine/index.js';
+import { createConversationEngine } from '../core/chat/engine/index.js';
+import type { ConversationEngine } from '../core/chat/engine/index.js';
 import type { ChatSession } from '../core/chat/types.js';
-import { createChatSession } from '../core/chat/engine/sessions/session-record.js';
-import { readChatSession, readChatSessionCatalog, saveChatSessions } from '../core/chat/engine/sessions/repository/file-chat-session-repository.js';
 import { resolveWorkspaceContext } from '../core/runtime/workspaces.js';
 import { createDaemonControlPlaneClient } from './remote/control-plane-client.js';
 
@@ -88,38 +91,43 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
     return;
   }
 
+  const apiKeyPresent = hasProviderCredentialForModel(model, {
+    apiKey: options.apiKey,
+    apiKeyProvider: 'explicit',
+    preferApiKey: options.preferApiKey,
+  });
+  const askSessionEngine = createConversationEngine({
+    workspaceRoot,
+    stateRoot,
+    sessionStoragePath,
+    model,
+    apiKey: options.apiKey,
+    preferApiKey: options.preferApiKey,
+    systemContext,
+    memoryMaintenanceMode: 'inline',
+    apiKeyPresent,
+  });
   const targetSession = resolveAskSession({
+    engine: askSessionEngine,
     workspaceRoot,
     sessionId: options.sessionId,
     latestSession: options.latestSession,
     createSessionName: options.createSessionName,
-    sessionStoragePath,
     stateRoot,
     model,
-    apiKeyPresent: hasProviderCredentialForModel(model, {
-      apiKey: options.apiKey,
-      apiKeyProvider: 'explicit',
-      preferApiKey: options.preferApiKey,
-    }),
+    apiKeyPresent,
   });
 
   if (targetSession) {
-    const result = await runConversationTurn({
-      workspaceRoot,
-      stateRoot,
-      sessionStoragePath,
-      traceDir: join(stateRoot, 'traces'),
+    const approvalHandler = createEvalAutoApprovalHandler();
+    const result = await askSessionEngine.turns.submit({
       sessionId: targetSession.id,
       prompt: goal,
-      apiKey: options.apiKey,
-      preferApiKey: options.preferApiKey,
-      systemContext,
       memoryMaintenanceMode: 'inline',
-      host: createEvalAutoApprovalHandler() ? {
+      host: approvalHandler ? {
         approvals: {
           requestToolApproval: async ({ call, tool }) => {
-            const handler = createEvalAutoApprovalHandler();
-            return await handler?.(call, tool) ?? { approved: false, reason: 'Missing approval handler.' };
+            return await approvalHandler(call, tool);
           },
         },
       } : undefined,
@@ -146,6 +154,9 @@ export async function runAskCli(goal: string, options: AskCliOptions = {}) {
     return;
   }
 
+  // Desired shape: stateless ask should call a core one-shot execution service
+  // instead of locally composing LLM setup, runAgentLoop, memory maintenance,
+  // trace persistence, and console formatting in the CLI host.
   const apiKey = resolveApiKeyForModel(model, {
     apiKey: options.apiKey,
     apiKeyProvider: options.apiKey ? 'explicit' : undefined,
@@ -216,6 +227,10 @@ async function runDaemonBackedAsk(options: {
     `Heddle notice: attaching ask to daemon http://${options.runtimeHost.endpoint.host}:${options.runtimeHost.endpoint.port}\n`,
   );
 
+  // Daemon-backed session ask is already routed through the control-plane
+  // controller. Remaining cleanup here is presentation-level: share result
+  // formatting with local session-backed ask instead of hand-building the same
+  // summary lines in two places.
   if (options.targetSessionId || options.latestSession || options.createSessionName !== undefined) {
     const sessionId =
       options.targetSessionId
@@ -287,54 +302,38 @@ async function createRemoteSession(
 }
 
 function resolveAskSession(options: {
+  engine: ConversationEngine;
   workspaceRoot: string;
   sessionId?: string;
   latestSession?: boolean;
   createSessionName?: string;
-  sessionStoragePath: string;
   stateRoot: string;
   model: string;
   apiKeyPresent: boolean;
 }): ChatSession | undefined {
   if (options.createSessionName !== undefined) {
-    const existing = readChatSessionCatalog(options.sessionStoragePath);
-    const nextNumber = existing.length + 1;
     const workspace = resolveWorkspaceContext({
       workspaceRoot: options.workspaceRoot,
       stateRoot: options.stateRoot,
     }).activeWorkspace;
-    const session = createChatSession({
-      id: `session-${Date.now()}`,
-      name: options.createSessionName.trim() || `Session ${nextNumber}`,
+    return options.engine.sessions.create({
+      name: options.createSessionName.trim() || undefined,
       apiKeyPresent: options.apiKeyPresent,
       model: options.model,
       workspaceId: workspace.id,
     });
-    const currentSessions = existing
-      .map((entry) => readChatSession(options.sessionStoragePath, entry.id, options.apiKeyPresent))
-      .filter((candidate): candidate is ChatSession => Boolean(candidate));
-    saveChatSessions(options.sessionStoragePath, [session, ...currentSessions]);
-    return session;
   }
 
   if (options.latestSession) {
-    const latest = readChatSessionCatalog(options.sessionStoragePath)[0];
+    const latest = options.engine.sessions.listExisting()[0];
     if (!latest) {
       throw new Error('No saved chat sessions are available yet. Use --new-session to create one first.');
     }
-    const session = readChatSession(options.sessionStoragePath, latest.id, options.apiKeyPresent);
-    if (!session) {
-      throw new Error(`Chat session not found: ${latest.id}`);
-    }
-    return session;
+    return latest;
   }
 
   if (options.sessionId) {
-    const session = readChatSession(options.sessionStoragePath, options.sessionId, options.apiKeyPresent);
-    if (!session) {
-      throw new Error(`Chat session not found: ${options.sessionId}`);
-    }
-    return session;
+    return options.engine.sessions.require(options.sessionId);
   }
 
   return undefined;

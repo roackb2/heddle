@@ -160,6 +160,19 @@ describe('runAskCli', () => {
     expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining(`Session: ${existingSession.id}`));
   });
 
+  it('does not materialize a fallback session for --latest on an empty catalog', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-latest-empty-'));
+    const sessionStoragePath = join(workspaceRoot, '.heddle', 'chat-sessions.catalog.json');
+
+    await expect(runAskCli('follow up question', {
+      workspaceRoot,
+      model: 'gpt-5.1-codex-mini',
+      apiKey: 'test-key',
+      latestSession: true,
+    })).rejects.toThrow('No saved chat sessions are available yet. Use --new-session to create one first.');
+    expect(readChatSessionCatalog(sessionStoragePath)).toEqual([]);
+  });
+
   it('preflight compacts an oversized session before ask-mode runAgentLoop executes', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-preflight-'));
     const stateRoot = join(workspaceRoot, '.heddle');
