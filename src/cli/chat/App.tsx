@@ -78,6 +78,8 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   } = useApprovalFlow(nextLocalId);
   const {
     sessions,
+    sessionService,
+    refreshSessions,
     activeSessionId,
     setActiveSessionId,
     activeSession,
@@ -109,7 +111,8 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   });
   const drift = useChatDrift({
     activeSession,
-    updateActiveSession,
+    sessionService,
+    refreshSessions,
   });
 
   const messages = useMemo(() => activeSession?.messages ?? [], [activeSession?.messages]);
@@ -251,8 +254,9 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     activeSessionId,
     sessions,
     state: actionState,
+    sessionService,
+    refreshSessions,
     updateSessionById,
-    updateActiveSession,
     drift: drift.observer,
   });
 
@@ -275,7 +279,8 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     setStatus,
     switchSession,
     closeSession,
-    updateSessionById,
+    sessionService,
+    refreshSessions,
     updateActiveSession,
     createSession,
     renameSession,

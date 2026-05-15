@@ -1,15 +1,9 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import type { ChatMessage, LlmAdapter, RunResult } from '../../../../../index.js';
-import { runMaintenanceForRecordedCandidates } from '../../../../../core/memory/maintenance-integration.js';
-import { createChatTurnPersistenceArtifacts } from '../../../../../core/chat/engine/turns/result.js';
+import type { RunResult } from '../../../../../index.js';
+import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
 import { estimateChatHistoryTokens } from '../../../state/compaction.js';
-import { touchSession } from '../../../../../core/chat/engine/sessions/session-record.js';
 import type { ChatSession } from '../../../state/types.js';
-import { toLiveEvent } from '../../../adapters/conversation-activity-adapter.js';
-import { formatChatFailureMessage, summarizeTrace } from '../../../utils/format.js';
-import type { ChatRuntimeConfig } from '../../../utils/runtime.js';
+import { formatChatFailureMessage } from '../../../utils/format.js';
 import type { ActionState } from '../useAgentRunController.js';
-import type { TuiCompactionStatusEvent } from './tui-compaction-status.js';
 
 type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
 
@@ -34,88 +28,6 @@ export function adaptPersistedTuiOrdinaryTurn(args: {
       return message;
     }),
   };
-}
-
-export async function applyTuiAgentTurnResult(args: {
-  result: RunResult;
-  prompt: string;
-  sessionId: string;
-  historyForRun: ChatMessage[];
-  toolNames: string[];
-  runtime: ChatRuntimeConfig;
-  llm: LlmAdapter;
-  state: ActionState;
-  updateSessionById: SessionUpdater;
-  maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
-  emitCompactionStatus: (event: TuiCompactionStatusEvent, sourceHistory: RunResult['transcript']) => void;
-}): Promise<void> {
-  const {
-    result,
-    prompt,
-    sessionId,
-    historyForRun,
-    toolNames,
-    runtime,
-    llm,
-    state,
-    updateSessionById,
-    maybeAutoNameSession,
-    emitCompactionStatus,
-  } = args;
-  const model = llm.info?.model ?? runtime.model;
-  const artifacts = await createChatTurnPersistenceArtifacts({
-    result,
-    prompt,
-    session: { id: sessionId, name: sessionId, history: [], messages: [], turns: [], createdAt: '', updatedAt: '' },
-    model,
-    stateRoot: runtime.stateRoot,
-    traceDir: runtime.traceDir,
-    systemContext: runtime.systemContext,
-    toolNames,
-    historyForTokenEstimate: historyForRun,
-    summarizer: { credentialSource: runtime.providerCredentialSource },
-    createTurnId: state.nextLocalId,
-    onCompactionStatus: (event: TuiCompactionStatusEvent) => emitCompactionStatus(event, result.transcript),
-  });
-  updateSessionById(sessionId, (sessionToUpdate) => ({
-    ...sessionToUpdate,
-    history: artifacts.compacted.history,
-    context: artifacts.compacted.context,
-    archives: artifacts.compacted.archives,
-    turns: [...sessionToUpdate.turns, artifacts.turn].slice(-8),
-  }));
-
-  const formattedSummary = artifacts.summary;
-
-  state.setCurrentAssistantText(undefined);
-  updateSessionById(sessionId, (sessionToUpdate) => ({
-    ...sessionToUpdate,
-    messages: [
-      ...sessionToUpdate.messages,
-      {
-        id: state.nextLocalId(),
-        role: 'assistant',
-        text: result.outcome === 'done' ? formattedSummary : `Run stopped: ${formattedSummary}`,
-      },
-    ],
-  }));
-
-  maybeAutoNameSession(sessionId, prompt, formattedSummary);
-  if (result.outcome === 'error') {
-    state.setError(formattedSummary);
-  }
-  state.setStatus(result.outcome === 'done' ? 'Idle' : `Stopped: ${result.outcome}`);
-  scheduleBackgroundMemoryMaintenance({
-    runtime,
-    llm,
-    sessionId,
-    trace: result.trace,
-    traceFile: artifacts.traceFile,
-    updateSessionById,
-    nextLocalId: state.nextLocalId,
-    setLiveEvents: state.setLiveEvents,
-    setIsMemoryUpdating: state.setIsMemoryUpdating,
-  });
 }
 
 export function finalizeSuccessfulTuiOrdinaryTurn(args: {
@@ -156,6 +68,9 @@ export function finalizeSuccessfulTuiOrdinaryTurn(args: {
     state.setError(summaryText);
   }
 
+  // Desired shape: ConversationTurnService should return the display-adapted
+  // session, or own this final TUI display patch, so the host does not replace
+  // a persisted turn result through a generic session updater.
   updateSessionById(sessionId, () => sessionAfter);
 
   return {
@@ -171,9 +86,10 @@ export async function applyTuiAgentTurnFailure(args: {
   model: string;
   state: ActionState;
   sessionId: string;
-  updateSessionById: SessionUpdater;
+  sessionService: ConversationSessionService;
+  refreshSessions: () => void;
 }): Promise<void> {
-  const { error, promptHistory, model, state, sessionId, updateSessionById } = args;
+  const { error, promptHistory, model, state, sessionId, sessionService, refreshSessions } = args;
   const message = error instanceof Error ? error.message : String(error);
   const formattedMessage = formatChatFailureMessage(message, {
     model,
@@ -181,80 +97,10 @@ export async function applyTuiAgentTurnFailure(args: {
   });
   state.setError(formattedMessage);
   state.setStatus('Error');
-  updateSessionById(sessionId, (sessionToUpdate) => ({
-    ...sessionToUpdate,
-    messages: [
-      ...sessionToUpdate.messages,
-      { id: state.nextLocalId(), role: 'assistant', text: `Run failed before a final answer: ${formattedMessage}` },
-    ],
-  }));
-}
-
-function scheduleBackgroundMemoryMaintenance(args: {
-  runtime: ChatRuntimeConfig;
-  llm: LlmAdapter;
-  sessionId: string;
-  trace: RunResult['trace'];
-  traceFile: string;
-  updateSessionById: SessionUpdater;
-  nextLocalId: () => string;
-  setLiveEvents: ActionState['setLiveEvents'];
-  setIsMemoryUpdating: ActionState['setIsMemoryUpdating'];
-}) {
-  void (async () => {
-    const maintenance = await runMaintenanceForRecordedCandidates({
-      memoryRoot: args.runtime.memoryDir,
-      llm: args.llm,
-      source: `terminal chat session ${args.sessionId}`,
-      trace: args.trace,
-      maxSteps: 20,
-      onTraceEvent: (event) => {
-        if (event.type === 'memory.maintenance_started') {
-          args.setIsMemoryUpdating(true);
-        }
-        const next = toLiveEvent(event);
-        if (!next) {
-          return;
-        }
-        args.setLiveEvents((current) => [...current, { id: args.nextLocalId(), text: next }].slice(-8));
-      },
-    });
-    if (maintenance.events.length === 0) {
-      return;
-    }
-
-    const currentTrace = readTraceEvents(args.traceFile);
-    const nextTrace = [...currentTrace, ...maintenance.events];
-    writeFileSync(args.traceFile, `${JSON.stringify(nextTrace, null, 2)}\n`, 'utf8');
-    args.updateSessionById(args.sessionId, (session) => touchSession({
-      ...session,
-      turns: session.turns.map((turn, index) => (
-        index === session.turns.length - 1 ?
-          {
-            ...turn,
-            events: summarizeTrace(nextTrace),
-          }
-        : turn
-      )),
-    }));
-    args.setIsMemoryUpdating(false);
-  })().catch((error) => {
-    args.setIsMemoryUpdating(false);
-    args.setLiveEvents((current) => [
-      ...current,
-      {
-        id: args.nextLocalId(),
-        text: `Memory maintenance failed: ${error instanceof Error ? error.message : String(error)}`,
-      },
-    ].slice(-8));
+  sessionService.appendMessage(sessionId, {
+    id: state.nextLocalId(),
+    role: 'assistant',
+    text: `Run failed before a final answer: ${formattedMessage}`,
   });
-}
-
-function readTraceEvents(path: string): RunResult['trace'] {
-  try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
-    return Array.isArray(parsed) ? parsed as RunResult['trace'] : [];
-  } catch {
-    return [];
-  }
+  refreshSessions();
 }

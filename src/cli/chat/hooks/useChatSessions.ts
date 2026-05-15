@@ -36,6 +36,10 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
   );
   const sessionService = useMemo(
     () =>
+      // Desired shape: this hook should eventually receive
+      // createConversationEngine(...).sessions from the host boundary. Direct
+      // construction is acceptable only while TUI still lacks one shared
+      // engine-facing runtime config object.
       createConversationSessionService({
         config: {
           workspaceRoot,
@@ -82,14 +86,21 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
       ]
     : ['No saved sessions yet.'];
 
+  const refreshSessions = useCallback(() => {
+    setSessions(sessionService.list());
+  }, [sessionService]);
+
+  // Migration escape hatch: keep this local and shrink callers over time.
+  // New persisted session behavior should be a named ConversationSessionService
+  // operation or a ConversationTurnService result, not another generic updater.
   const updateSessionById = useCallback((sessionId: string, updater: (session: ChatSession) => ChatSession) => {
     const updated = sessionService.update(sessionId, updater);
     if (!updated) {
       return;
     }
 
-    setSessions(sessionService.list());
-  }, [sessionService]);
+    refreshSessions();
+  }, [refreshSessions, sessionService]);
 
   const updateActiveSession = useCallback((updater: (session: ChatSession) => ChatSession) => {
     updateSessionById(activeSessionId, updater);
@@ -97,8 +108,8 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
 
   const setSessionPreferences = useCallback((sessionId: string, preferences: SessionExecutionPreferences) => {
     sessionService.updateSettings(sessionId, preferences);
-    setSessions(sessionService.list());
-  }, [sessionService]);
+    refreshSessions();
+  }, [refreshSessions, sessionService]);
 
   const createSession = useCallback((name?: string, preferences?: SessionExecutionPreferences) => {
     const nextPreferences = resolveNewSessionExecutionPreferences({
@@ -119,8 +130,8 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
 
   const renameSession = useCallback((name: string) => {
     sessionService.rename(activeSessionId, name);
-    setSessions(sessionService.list());
-  }, [activeSessionId, sessionService]);
+    refreshSessions();
+  }, [activeSessionId, refreshSessions, sessionService]);
 
   const removeSession = useCallback((id: string) => {
     const removedActive = id === activeSessionId;
@@ -140,6 +151,8 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
 
   return {
     sessions,
+    sessionService,
+    refreshSessions,
     activeSessionId,
     setActiveSessionId,
     activeSession,

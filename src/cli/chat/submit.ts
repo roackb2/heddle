@@ -1,14 +1,10 @@
 import { runLocalCommand } from './state/local-commands.js';
-import { buildCompactionRunningContext, compactChatHistoryWithArchive } from './state/compaction.js';
-import { createInitialMessages } from '../../core/chat/engine/sessions/session-record.js';
+import { compactChatHistoryWithArchive } from './state/compaction.js';
+import type { ConversationSessionService } from '../../core/chat/engine/types.js';
 import type { ReasoningEffort } from '../../core/llm/types.js';
 import type { ChatSession, ConversationLine } from './state/types.js';
-import { buildConversationMessages, normalizeInlineText } from './utils/format.js';
+import { normalizeInlineText } from './utils/format.js';
 import type { ProviderCredentialSource } from './utils/runtime.js';
-
-type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
-
-type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => void;
 
 type LocalCommandDeps = Parameters<typeof runLocalCommand>[0];
 
@@ -28,8 +24,8 @@ type SubmitChatPromptArgs = {
   setStatus: (value: string) => void;
   switchSession: (id: string) => void;
   closeSession: (id: string) => void;
-  updateSessionById: SessionUpdater;
-  updateActiveSession: ActiveSessionUpdater;
+  sessionService: ConversationSessionService;
+  refreshSessions: () => void;
   createSession: (name?: string) => ChatSession;
   renameSession: (name: string) => void;
   listRecentSessionsMessage: string[];
@@ -71,13 +67,8 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
     renameSession: args.renameSession,
     removeSession: args.closeSession,
     clearConversation: () => {
-      args.updateActiveSession((session) => ({
-        ...session,
-        history: [],
-        turns: [],
-        lastContinuePrompt: undefined,
-        messages: createInitialMessages(args.apiKeyPresent),
-      }));
+      args.sessionService.resetConversation(args.activeSessionId, { apiKeyPresent: args.apiKeyPresent });
+      args.refreshSessions();
     },
     compactConversation: () => {
       const session = args.activeSession ?? args.sessions.find((candidate) => candidate.id === args.activeSessionId);
@@ -86,15 +77,8 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
       }
 
       args.setStatus('Compacting');
-      args.updateActiveSession((currentSession) => ({
-        ...currentSession,
-        context: buildCompactionRunningContext({
-          history: currentSession.history,
-          previous: currentSession.context,
-          archiveCount: currentSession.archives?.length,
-          currentSummaryPath: currentSession.context?.currentSummaryPath,
-        }),
-      }));
+      args.sessionService.markCompactionRunning(session.id, { sourceHistory: session.history });
+      args.refreshSessions();
 
       return compactChatHistoryWithArchive({
         history: session.history,
@@ -114,13 +98,8 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
           return 'Current session history is already compact enough.';
         }
 
-        args.updateActiveSession((currentSession) => ({
-          ...currentSession,
-          history: compacted.history,
-          context: compacted.context,
-          archives: compacted.archives,
-          messages: buildConversationMessages(compacted.history),
-        }));
+        args.sessionService.applyCompactionResult(session.id, compacted);
+        args.refreshSessions();
         args.setStatus('Idle');
 
         return compacted.context.compactedMessages && compacted.context.lastArchivePath ?
@@ -152,9 +131,9 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
 
   if (commandResult.kind === 'message') {
     if (commandResult.sessionId) {
-      appendAssistantMessageToSession(args.updateSessionById, commandResult.sessionId, args.nextLocalId, commandResult.message);
+      appendAssistantMessage(args, commandResult.sessionId, commandResult.message);
     } else {
-      appendAssistantMessage(args.updateActiveSession, args.nextLocalId, commandResult.message);
+      appendAssistantMessage(args, args.activeSessionId, commandResult.message);
     }
     args.setStatus('Idle');
     return;
@@ -162,7 +141,7 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
 
   if (commandResult.kind === 'execute') {
     if (commandResult.message) {
-      appendAssistantMessage(args.updateActiveSession, args.nextLocalId, commandResult.message);
+      appendAssistantMessage(args, args.activeSessionId, commandResult.message);
     }
     await args.executeTurn(commandResult.prompt, commandResult.displayText);
     return;
@@ -179,55 +158,29 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
   const continueMessage = commandResult.message;
 
   if (continueMessage) {
-    args.updateSessionById(targetId, (session) => ({
-      ...session,
-      messages: [...session.messages, createAssistantMessage(args.nextLocalId, continueMessage)],
-    }));
+    appendAssistantMessage(args, targetId, continueMessage);
   }
 
   if (!targetHistory.length || !targetContinuePrompt) {
-    args.updateSessionById(targetId, (session) => ({
-      ...session,
-      messages: [
-        ...session.messages,
-        createAssistantMessage(args.nextLocalId, 'There is no interrupted or prior run to continue yet.'),
-      ],
-    }));
+    appendAssistantMessage(args, targetId, 'There is no interrupted or prior run to continue yet.');
     args.setStatus('Idle');
     return;
   }
 
   if (!continueMessage) {
-    args.updateSessionById(targetId, (session) => ({
-      ...session,
-      messages: [...session.messages, createAssistantMessage(args.nextLocalId, 'Continuing from the current transcript.')],
-    }));
+    appendAssistantMessage(args, targetId, 'Continuing from the current transcript.');
   }
 
   await args.executeTurn('Continue from where you left off.', 'Continue', targetId);
 }
 
 function appendAssistantMessage(
-  updateSession: ActiveSessionUpdater,
-  nextLocalId: () => string,
-  text: string,
-) {
-  updateSession((session) => ({
-    ...session,
-    messages: [...session.messages, createAssistantMessage(nextLocalId, text)],
-  }));
-}
-
-function appendAssistantMessageToSession(
-  updateSessionById: SessionUpdater,
+  args: Pick<SubmitChatPromptArgs, 'sessionService' | 'refreshSessions' | 'nextLocalId'>,
   sessionId: string,
-  nextLocalId: () => string,
   text: string,
 ) {
-  updateSessionById(sessionId, (session) => ({
-    ...session,
-    messages: [...session.messages, createAssistantMessage(nextLocalId, text)],
-  }));
+  args.sessionService.appendMessage(sessionId, createAssistantMessage(args.nextLocalId, text));
+  args.refreshSessions();
 }
 
 function createAssistantMessage(nextLocalId: () => string, text: string): ConversationLine {

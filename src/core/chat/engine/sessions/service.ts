@@ -17,53 +17,102 @@
 import { join, resolve } from 'node:path';
 import {
   createFileChatSessionRepository,
+  type ChatSessionRepository,
 } from './repository/file-chat-session-repository.js';
 import {
   createChatSession,
+  createInitialMessages,
   isGenericSessionName,
   summarizeSession,
   touchSession,
 } from './session-record.js';
+import {
+  acquireSessionLease,
+  getSessionLeaseConflict,
+  releaseSessionLease,
+  type ChatSessionLeaseOwner,
+} from './lease.js';
+import { buildCompactionRunningContext } from '../history/compaction.js';
+import { buildConversationMessages } from './conversation-lines.js';
 import type { ChatSession } from '../../types.js';
 import type { ConversationEngineConfig } from '../types.js';
 import type { NormalizedConversationEngineConfig } from '../config.js';
 import type {
+  AppendConversationMessageInput,
+  ApplyConversationCompactionResultInput,
   ConversationSessionService,
+  CreateConversationSessionInput,
+  MarkConversationCompactionRunningInput,
+  ResetConversationSessionInput,
+  RestoreConversationCompactionStateInput,
   UpdateConversationSessionSettingsInput,
 } from '../types.js';
+
+type ConversationSessionServiceConfig = Pick<
+  ConversationEngineConfig,
+  'workspaceRoot' | 'stateRoot' | 'model' | 'reasoningEffort' | 'sessionStoragePath' | 'workspaceId' | 'apiKeyPresent'
+>;
+
+type NormalizedConversationSessionServiceConfig = Pick<
+  NormalizedConversationEngineConfig,
+  'workspaceRoot' | 'stateRoot' | 'model' | 'reasoningEffort' | 'sessionStoragePath' | 'workspaceId' | 'apiKeyPresent'
+>;
 
 export function createConversationSessionService(args: {
   config: NormalizedConversationEngineConfig | ConversationSessionServiceConfig;
 }): ConversationSessionService {
-  const config = normalizeConversationSessionServiceConfig(args.config);
-  const repository = createFileChatSessionRepository({
-    sessionStoragePath: config.sessionStoragePath,
-  });
+  return new FileConversationSessionService(normalizeConversationSessionServiceConfig(args.config));
+}
 
-  function loadSessions(apiKeyPresent = config.apiKeyPresent): ChatSession[] {
-    const sessions = repository.list(apiKeyPresent);
-    if (repository.readCatalog().length === 0) {
-      const fallback = createFallbackSession(config, apiKeyPresent);
-      repository.save([fallback]);
-      return [fallback];
-    }
-    return sessions;
+export function summarizeConversationSession(session: ChatSession): string {
+  return summarizeSession(session);
+}
+
+class FileConversationSessionService implements ConversationSessionService {
+  private readonly repository: ChatSessionRepository;
+
+  constructor(private readonly config: NormalizedConversationSessionServiceConfig) {
+    this.repository = createFileChatSessionRepository({
+      sessionStoragePath: config.sessionStoragePath,
+    });
   }
 
-  function readSession(id: string): ChatSession | undefined {
-    return loadSessions().find((candidate) => candidate.id === id);
+  list(): ChatSession[] {
+    return this.loadSessions();
   }
 
-  function requireSession(id: string): ChatSession {
-    const session = readSession(id);
+  read(id: string): ChatSession | undefined {
+    return this.readSession(id);
+  }
+
+  require(id: string): ChatSession {
+    const session = this.readSession(id);
     if (!session) {
       throw new Error(`Chat session not found: ${id}`);
     }
     return session;
   }
 
-  function updateSession(id: string, updater: (session: ChatSession) => ChatSession): ChatSession | undefined {
-    const sessions = loadSessions();
+  latest(): ChatSession | undefined {
+    return this.loadSessions()[0];
+  }
+
+  create(input?: CreateConversationSessionInput): ChatSession {
+    const existing = this.loadSessions(input?.apiKeyPresent ?? this.config.apiKeyPresent);
+    const session = createChatSession({
+      id: input?.id?.trim() || `session-${Date.now()}`,
+      name: input?.name?.trim() || `Session ${getNextSessionNumber(existing)}`,
+      apiKeyPresent: input?.apiKeyPresent ?? this.config.apiKeyPresent,
+      model: input?.model ?? this.config.model,
+      reasoningEffort: input?.reasoningEffort ?? this.config.reasoningEffort,
+      workspaceId: input?.workspaceId ?? this.config.workspaceId,
+    });
+    this.repository.save([session, ...existing]);
+    return session;
+  }
+
+  update(id: string, updater: (session: ChatSession) => ChatSession): ChatSession | undefined {
+    const sessions = this.loadSessions();
     const session = sessions.find((candidate) => candidate.id === id);
     if (!session) {
       return undefined;
@@ -75,73 +124,147 @@ export function createConversationSessionService(args: {
     }
 
     const touched = touchSession(nextSession);
-    repository.save(sessions.map((candidate) => (candidate.id === id ? touched : candidate)));
+    this.repository.save(sessions.map((candidate) => (candidate.id === id ? touched : candidate)));
     return touched;
   }
 
-  function updateRequiredSession(id: string, updater: (session: ChatSession) => ChatSession): ChatSession {
-    const updated = updateSession(id, updater);
+  updateSettings(id: string, input: UpdateConversationSessionSettingsInput): ChatSession {
+    return this.updateRequiredSession(id, (session) => applySessionSettings(session, input));
+  }
+
+  appendMessage(id: string, input: AppendConversationMessageInput): ChatSession {
+    return this.appendMessages(id, [input]);
+  }
+
+  appendMessages(id: string, inputs: AppendConversationMessageInput[]): ChatSession {
+    if (inputs.length === 0) {
+      return this.require(id);
+    }
+
+    return this.updateRequiredSession(id, (session) => ({
+      ...session,
+      messages: [...session.messages, ...inputs],
+    }));
+  }
+
+  resetConversation(id: string, input: ResetConversationSessionInput): ChatSession {
+    return this.updateRequiredSession(id, (session) => ({
+      ...session,
+      history: [],
+      turns: [],
+      lastContinuePrompt: undefined,
+      messages: createInitialMessages(input.apiKeyPresent),
+    }));
+  }
+
+  setLastContinuePrompt(id: string, prompt: string | undefined): ChatSession {
+    return this.updateRequiredSession(id, (session) => (
+      session.lastContinuePrompt === prompt ? session : {
+        ...session,
+        lastContinuePrompt: prompt,
+      }
+    ));
+  }
+
+  markCompactionRunning(id: string, input: MarkConversationCompactionRunningInput): ChatSession {
+    return this.updateRequiredSession(id, (session) => ({
+      ...session,
+      history: input.sourceHistory,
+      context: buildCompactionRunningContext({
+        history: input.sourceHistory,
+        previous: session.context,
+        archiveCount: session.archives?.length,
+        currentSummaryPath: session.context?.currentSummaryPath,
+        lastArchivePath: input.archivePath,
+      }),
+    }));
+  }
+
+  applyCompactionResult(id: string, input: ApplyConversationCompactionResultInput): ChatSession {
+    return this.updateRequiredSession(id, (session) => ({
+      ...session,
+      ...input,
+      messages: buildConversationMessages(input.history),
+    }));
+  }
+
+  restoreCompactionState(id: string, input: RestoreConversationCompactionStateInput): ChatSession {
+    return this.updateRequiredSession(id, (session) => ({
+      ...session,
+      ...input,
+    }));
+  }
+
+  setDriftEnabled(id: string, enabled: boolean): ChatSession {
+    return this.updateRequiredSession(id, (session) => applySessionSettings(session, { driftEnabled: enabled }));
+  }
+
+  getLeaseConflict(id: string, owner: ChatSessionLeaseOwner): string | undefined {
+    return getSessionLeaseConflict(this.require(id), owner);
+  }
+
+  acquireLease(id: string, owner: ChatSessionLeaseOwner): ChatSession {
+    return this.updateRequiredSession(id, (session) => {
+      const conflict = getSessionLeaseConflict(session, owner);
+      if (conflict) {
+        throw new Error(conflict);
+      }
+
+      return acquireSessionLease(session, owner);
+    });
+  }
+
+  releaseLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): ChatSession {
+    return this.updateRequiredSession(id, (session) => releaseSessionLease(session, owner));
+  }
+
+  rename(id: string, name: string): ChatSession {
+    return this.updateRequiredSession(id, (session) => ({
+      ...session,
+      name,
+    }));
+  }
+
+  delete(id: string): boolean {
+    const sessions = this.loadSessions();
+    if (!sessions.some((candidate) => candidate.id === id)) {
+      return false;
+    }
+
+    const remaining = sessions.filter((candidate) => candidate.id !== id);
+    if (remaining.length > 0) {
+      this.repository.save(remaining);
+      return true;
+    }
+
+    this.repository.save([createFallbackSession(this.config)]);
+    return true;
+  }
+
+  private loadSessions(apiKeyPresent = this.config.apiKeyPresent): ChatSession[] {
+    const sessions = this.repository.list(apiKeyPresent);
+    if (this.repository.readCatalog().length === 0) {
+      const fallback = createFallbackSession(this.config, apiKeyPresent);
+      this.repository.save([fallback]);
+      return [fallback];
+    }
+    return sessions;
+  }
+
+  private readSession(id: string): ChatSession | undefined {
+    return this.loadSessions().find((candidate) => candidate.id === id);
+  }
+
+  private updateRequiredSession(id: string, updater: (session: ChatSession) => ChatSession): ChatSession {
+    const updated = this.update(id, updater);
     if (!updated) {
       throw new Error(`Chat session not found: ${id}`);
     }
     return updated;
   }
-
-  return {
-    list() {
-      return loadSessions();
-    },
-    read(id) {
-      return readSession(id);
-    },
-    require(id) {
-      return requireSession(id);
-    },
-    latest() {
-      return loadSessions()[0];
-    },
-    create(input) {
-      const existing = loadSessions(input?.apiKeyPresent ?? config.apiKeyPresent);
-      const session = createChatSession({
-        id: input?.id?.trim() || `session-${Date.now()}`,
-        name: input?.name?.trim() || `Session ${getNextSessionNumber(existing)}`,
-        apiKeyPresent: input?.apiKeyPresent ?? config.apiKeyPresent,
-        model: input?.model ?? config.model,
-        reasoningEffort: input?.reasoningEffort ?? config.reasoningEffort,
-        workspaceId: input?.workspaceId ?? config.workspaceId,
-      });
-      repository.save([session, ...existing]);
-      return session;
-    },
-    update(id, updater) {
-      return updateSession(id, updater);
-    },
-    updateSettings(id, input) {
-      return updateRequiredSession(id, (session) => applySessionSettings(session, input));
-    },
-    rename(id, name) {
-      return updateRequiredSession(id, (session) => ({
-        ...session,
-        name,
-      }));
-    },
-    delete(id) {
-      const sessions = loadSessions();
-      if (!sessions.some((candidate) => candidate.id === id)) {
-        return false;
-      }
-
-      const remaining = sessions.filter((candidate) => candidate.id !== id);
-      if (remaining.length > 0) {
-        repository.save(remaining);
-        return true;
-      }
-
-      repository.save([createFallbackSession(config)]);
-      return true;
-    },
-  };
 }
+
+// Session mutation helpers.
 
 function applySessionSettings(
   session: ChatSession,
@@ -167,14 +290,11 @@ function applySessionSettings(
   };
 }
 
-type ConversationSessionServiceConfig = Pick<
-  ConversationEngineConfig,
-  'workspaceRoot' | 'stateRoot' | 'model' | 'reasoningEffort' | 'sessionStoragePath' | 'workspaceId' | 'apiKeyPresent'
->;
+// Configuration helpers.
 
 function normalizeConversationSessionServiceConfig(
   config: NormalizedConversationEngineConfig | ConversationSessionServiceConfig,
-): Pick<NormalizedConversationEngineConfig, 'workspaceRoot' | 'stateRoot' | 'model' | 'reasoningEffort' | 'sessionStoragePath' | 'workspaceId' | 'apiKeyPresent'> {
+): NormalizedConversationSessionServiceConfig {
   if ('memoryDir' in config && 'traceDir' in config && 'memoryMaintenanceMode' in config) {
     return config;
   }
@@ -192,8 +312,10 @@ function normalizeConversationSessionServiceConfig(
   };
 }
 
+// Session creation and naming helpers.
+
 function createFallbackSession(
-  config: Pick<NormalizedConversationEngineConfig, 'model' | 'reasoningEffort' | 'workspaceId' | 'apiKeyPresent'>,
+  config: Pick<NormalizedConversationSessionServiceConfig, 'model' | 'reasoningEffort' | 'workspaceId' | 'apiKeyPresent'>,
   apiKeyPresent = config.apiKeyPresent,
 ): ChatSession {
   return createChatSession({
@@ -221,8 +343,4 @@ function getNextSessionNumber(sessions: ChatSession[]): number {
   }, 0);
 
   return highestGenericNumber + 1;
-}
-
-export function summarizeConversationSession(session: ChatSession): string {
-  return summarizeSession(session);
 }

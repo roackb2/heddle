@@ -17,9 +17,9 @@ import {
   resolveApiKeyForModel,
   resolveProviderCredentialSourceForModel,
 } from '../../../../core/runtime/api-keys.js';
-import { releaseSessionLease } from '../../../../core/chat/engine/sessions/lease.js';
 import { generateSessionTitle } from '../../../../core/chat/engine/sessions/title.js';
 import { isGenericSessionName } from '../../../../core/chat/engine/sessions/session-record.js';
+import type { ConversationSessionService } from '../../../../core/chat/engine/types.js';
 import { normalizeSessionTitle } from '../../utils/format.js';
 import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval } from '../../state/types.js';
 import type { ChatRuntimeConfig } from '../../utils/runtime.js';
@@ -37,9 +37,11 @@ const PLAN_ITEM_STATUSES = new Set<PlanItem['status']>(['pending', 'in_progress'
 
 type StateSetter<T> = (value: T | ((current: T) => T)) => void;
 
+// Migration escape hatch carried only for ordinary-turn finalization. Do not
+// route new persisted session semantics through this type; add a named
+// ConversationSessionService method or return the updated session from
+// ConversationTurnService instead.
 type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
-
-type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => void;
 
 export type ActionState = {
   isRunning: boolean;
@@ -69,6 +71,8 @@ type ExecuteTurnArgs = {
   tools: ToolDefinition[];
   logger: Logger;
   state: ActionState;
+  sessionService: ConversationSessionService;
+  refreshSessions: () => void;
   updateSessionById: SessionUpdater;
   referenceAssistantText?: string;
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
@@ -85,7 +89,8 @@ type ExecuteDirectShellArgs = {
   runtime: ChatRuntimeConfig;
   tools: ToolDefinition[];
   state: ActionState;
-  updateActiveSession: ActiveSessionUpdater;
+  sessionService: ConversationSessionService;
+  refreshSessions: () => void;
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
   isProjectApproved: (call: ToolCall) => boolean;
   rememberProjectApproval: (call: ToolCall) => void;
@@ -99,8 +104,9 @@ type UseAgentRunArgs = {
   activeSessionId: string;
   sessions: ChatSession[];
   state: ActionState;
+  sessionService: ConversationSessionService;
+  refreshSessions: () => void;
   updateSessionById: SessionUpdater;
-  updateActiveSession: ActiveSessionUpdater;
   drift?: ChatDriftObserverOptions;
 };
 
@@ -112,7 +118,7 @@ export type ChatDriftObserverOptions = {
 };
 
 export function useAgentRunController(args: UseAgentRunArgs) {
-  const { runtime, activeModel, activeReasoningEffort, sessionTitleModel, activeSessionId, sessions, state, updateSessionById, updateActiveSession } = args;
+  const { runtime, activeModel, activeReasoningEffort, sessionTitleModel, activeSessionId, sessions, state, sessionService, refreshSessions, updateSessionById } = args;
   const projectApprovals = useProjectApprovals(runtime.approvalsFile);
   const activeApiKey = resolveApiKeyForModel(activeModel, runtime);
   const titleApiKey = resolveApiKeyForModel(sessionTitleModel, runtime);
@@ -190,9 +196,10 @@ export function useAgentRunController(args: UseAgentRunArgs) {
           return;
         }
 
-        updateSessionById(sessionId, (candidate) =>
-          isGenericSessionName(candidate.name) ? { ...candidate, name: title } : candidate,
-        );
+        if (isGenericSessionName(sessionService.require(sessionId).name)) {
+          sessionService.rename(sessionId, title);
+          refreshSessions();
+        }
       } catch (titleError) {
         logger.debug(
           { error: titleError instanceof Error ? titleError.message : String(titleError), sessionId },
@@ -215,6 +222,8 @@ export function useAgentRunController(args: UseAgentRunArgs) {
       tools,
       logger,
       state,
+      sessionService,
+      refreshSessions,
       updateSessionById,
       maybeAutoNameSession,
       isProjectApproved: projectApprovals.isApproved,
@@ -232,7 +241,8 @@ export function useAgentRunController(args: UseAgentRunArgs) {
       runtime,
       tools,
       state,
-      updateActiveSession,
+      sessionService,
+      refreshSessions,
       maybeAutoNameSession,
       isProjectApproved: projectApprovals.isApproved,
       rememberProjectApproval: projectApprovals.rememberApproval,
@@ -255,6 +265,8 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     llm,
     logger,
     state,
+    sessionService,
+    refreshSessions,
     updateSessionById,
     referenceAssistantText,
     maybeAutoNameSession,
@@ -274,7 +286,8 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
   }
 
   const turnAbortController = beginTuiAgentTurn(state);
-  updateSessionById(sessionId, (session) => ({ ...session, lastContinuePrompt: prompt }));
+  sessionService.setLastContinuePrompt(sessionId, prompt);
+  refreshSessions();
   drift?.onRunStart?.();
   const leaseOwner = {
     ownerKind: 'tui' as const,
@@ -298,6 +311,8 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       sessionId,
       runtime,
       state,
+      sessionService,
+      refreshSessions,
       updateSessionById,
       parsePlanState: parsePlanStateFromToolResult,
       maybeAutoNameSession,
@@ -317,11 +332,13 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       model: llm.info?.model ?? runtime.model,
       state,
       sessionId,
-      updateSessionById,
+      sessionService,
+      refreshSessions,
     });
     return undefined;
   } finally {
-    updateSessionById(sessionId, (sessionToUpdate) => releaseSessionLease(sessionToUpdate, leaseOwner));
+    sessionService.releaseLease(sessionId, leaseOwner);
+    refreshSessions();
     finishTuiAgentTurn(state);
   }
 }
@@ -402,7 +419,8 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
     runtime,
     tools,
     state,
-    updateActiveSession,
+    sessionService,
+    refreshSessions,
     maybeAutoNameSession,
     isProjectApproved,
     rememberProjectApproval,
@@ -422,7 +440,8 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
     runtime,
     tools,
     state,
-    updateActiveSession,
+    sessionService,
+    refreshSessions,
     maybeAutoNameSession,
     isProjectApproved,
     rememberProjectApproval,

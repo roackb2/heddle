@@ -1,21 +1,17 @@
-import { acquireSessionLease, getSessionLeaseConflict, releaseSessionLease } from '../../../../../core/chat/engine/sessions/lease.js';
 import { rememberedApprovalPolicy } from '../../../../../core/approvals/default-policies.js';
 import { resolveToolApproval } from '../../../../../core/approvals/policy-chain.js';
 import { summarizeToolCall } from '../../../../../core/observability/conversation-activity.js';
 import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../../../core/tools/toolkits/shell-process/run-shell.js';
 import type { ToolCall, ToolResult } from '../../../../../index.js';
 import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../../../state/approval-rules.js';
-import { touchSession } from '../../../../../core/chat/engine/sessions/session-record.js';
-import { readChatSession } from '../../../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
-import type { ChatSession } from '../../../state/types.js';
+import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
 import { shouldFallbackToMutate } from '../../../utils/format.js';
 import type { ChatRuntimeConfig } from '../../../utils/runtime.js';
 import { beginTuiDirectShellAction, finishTuiDirectShellAction } from './tui-agent-turn-lifecycle.js';
 import { finalizeTuiDirectShellSuccess } from './tui-direct-shell-result.js';
 import type { ActionState } from '../useAgentRunController.js';
 import type { ToolDefinition } from '../../../../../index.js';
-
-type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => void;
+import type { ChatSession } from '../../../state/types.js';
 
 export async function executeTuiDirectShell(args: {
   command: string;
@@ -26,7 +22,8 @@ export async function executeTuiDirectShell(args: {
   runtime: ChatRuntimeConfig;
   tools: ToolDefinition[];
   state: ActionState;
-  updateActiveSession: ActiveSessionUpdater;
+  sessionService: ConversationSessionService;
+  refreshSessions: () => void;
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
   isProjectApproved: (call: ToolCall) => boolean;
   rememberProjectApproval: (call: ToolCall) => void;
@@ -40,7 +37,8 @@ export async function executeTuiDirectShell(args: {
     runtime,
     tools,
     state,
-    updateActiveSession,
+    sessionService,
+    refreshSessions,
     maybeAutoNameSession,
     isProjectApproved,
     rememberProjectApproval,
@@ -51,27 +49,30 @@ export async function executeTuiDirectShell(args: {
     ownerId: `tui-${process.pid}`,
     clientLabel: 'terminal chat',
   };
-  const persistedSession = readChatSession(runtime.sessionCatalogFile, activeSessionId, true);
-  if (!persistedSession) {
+  let persistedSession: ChatSession;
+  try {
+    persistedSession = sessionService.require(activeSessionId);
+  } catch {
     return;
   }
-  const conflict = getSessionLeaseConflict(persistedSession, leaseOwner);
+  const conflict = sessionService.getLeaseConflict(activeSessionId, leaseOwner);
   if (conflict) {
     state.setError(conflict);
     state.setStatus('Blocked');
-    updateActiveSession((session) => ({
-      ...session,
-      messages: [...session.messages, { id: state.nextLocalId(), role: 'assistant', text: conflict }],
-    }));
+    sessionService.appendMessage(activeSessionId, {
+      id: state.nextLocalId(),
+      role: 'assistant',
+      text: conflict,
+    });
+    refreshSessions();
     return;
   }
-  updateActiveSession(() => touchSession(acquireSessionLease(persistedSession, leaseOwner)));
+  persistedSession = sessionService.acquireLease(activeSessionId, leaseOwner);
+  refreshSessions();
   const directShellAbortController = beginTuiDirectShellAction(state, command);
-  updateActiveSession((session) => ({
-    ...session,
-    messages: [...session.messages, { id: state.nextLocalId(), role: 'user', text: shellDisplay }],
-    lastContinuePrompt: undefined,
-  }));
+  sessionService.appendMessage(activeSessionId, { id: state.nextLocalId(), role: 'user', text: shellDisplay });
+  sessionService.setLastContinuePrompt(activeSessionId, undefined);
+  refreshSessions();
 
   try {
     const inspectCall: ToolCall = {
@@ -131,10 +132,12 @@ export async function executeTuiDirectShell(args: {
 
         if (!approval.approved) {
           const denialMessage = approval.reason ? `Command denied.\n${approval.reason}` : 'Command denied.';
-          updateActiveSession((session) => ({
-            ...session,
-            messages: [...session.messages, { id: state.nextLocalId(), role: 'assistant', text: denialMessage }],
-          }));
+          sessionService.appendMessage(activeSessionId, {
+            id: state.nextLocalId(),
+            role: 'assistant',
+            text: denialMessage,
+          });
+          refreshSessions();
           state.setLiveEvents([
             {
               id: state.nextLocalId(),
@@ -169,22 +172,23 @@ export async function executeTuiDirectShell(args: {
       runtime,
       tools,
       state,
-      updateActiveSession,
+      sessionService,
+      refreshSessions,
       maybeAutoNameSession,
     });
   } catch (shellError) {
     const message = shellError instanceof Error ? shellError.message : String(shellError);
     state.setError(message);
     state.setStatus('Error');
-    updateActiveSession((session) => ({
-      ...session,
-      messages: [
-        ...session.messages,
-        { id: state.nextLocalId(), role: 'assistant', text: `Direct shell execution failed:\n${message}` },
-      ],
-    }));
+    sessionService.appendMessage(activeSessionId, {
+      id: state.nextLocalId(),
+      role: 'assistant',
+      text: `Direct shell execution failed:\n${message}`,
+    });
+    refreshSessions();
   } finally {
-    updateActiveSession((session) => releaseSessionLease(session, leaseOwner));
+    sessionService.releaseLease(activeSessionId, leaseOwner);
+    refreshSessions();
     finishTuiDirectShellAction(state);
   }
 }

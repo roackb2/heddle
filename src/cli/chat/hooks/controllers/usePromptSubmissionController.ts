@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CredentialAwareModelOption } from '../../../../core/llm/model-policy.js';
 import type { ReasoningEffort } from '../../../../core/llm/types.js';
+import type { ConversationSessionService } from '../../../../core/chat/engine/types.js';
 import type { ReasoningEffortPickerOption } from '../useChatPickers.js';
-import type { ConversationLine, ChatSession } from '../../state/types.js';
+import type { ChatSession } from '../../state/types.js';
 import { submitChatPrompt } from '../../submit.js';
 import { buildPromptWithFileMentions } from '../../utils/file-mentions.js';
 import type { ChatRuntimeConfig } from '../../utils/runtime.js';
 
-type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
 type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => void;
 
 export function usePromptSubmissionController({
@@ -25,7 +25,8 @@ export function usePromptSubmissionController({
   setStatus,
   switchSession,
   closeSession,
-  updateSessionById,
+  sessionService,
+  refreshSessions,
   updateActiveSession,
   createSession,
   renameSession,
@@ -59,7 +60,8 @@ export function usePromptSubmissionController({
   setStatus: (value: string) => void;
   switchSession: (id: string) => void;
   closeSession: (id: string) => void;
-  updateSessionById: SessionUpdater;
+  sessionService: ConversationSessionService;
+  refreshSessions: () => void;
   updateActiveSession: ActiveSessionUpdater;
   createSession: (name?: string) => ChatSession;
   renameSession: (name: string) => void;
@@ -106,18 +108,16 @@ export function usePromptSubmissionController({
   }, [mentionableFiles, runtime.workspaceRoot]);
 
   const appendPendingUserMessage = useCallback((prompt: string) => {
-    const message: ConversationLine = {
+    const message = {
       id: nextLocalId(),
       role: 'user',
       text: prompt,
       isPending: true,
-    };
+    } as const;
 
-    updateActiveSession((session) => ({
-      ...session,
-      messages: [...session.messages, message],
-    }));
-  }, [nextLocalId, updateActiveSession]);
+    sessionService.appendMessage(activeSessionId, message);
+    refreshSessions();
+  }, [activeSessionId, nextLocalId, refreshSessions, sessionService]);
 
   const saveTuiSnapshot = useCallback(() => {
     if (saveTuiSnapshotMessage) {
@@ -139,6 +139,8 @@ export function usePromptSubmissionController({
     }
 
     if (options?.allowWhileRunning && pendingSubmittedPrompt === value) {
+      // Desired shape: ConversationSessionService should own the pending-message
+      // status transition once it has a named operation for that behavior.
       updateActiveSession((session) => {
         const pendingIndex = session.messages.findIndex(
           (message) => message.role === 'user' && message.text === value && message.isPending,
@@ -172,8 +174,8 @@ export function usePromptSubmissionController({
       setStatus,
       switchSession,
       closeSession,
-      updateSessionById,
-      updateActiveSession,
+      sessionService,
+      refreshSessions,
       createSession,
       renameSession,
       listRecentSessionsMessage,
@@ -250,7 +252,8 @@ export function usePromptSubmissionController({
     setStatus,
     switchSession,
     closeSession,
-    updateSessionById,
+    sessionService,
+    refreshSessions,
     updateActiveSession,
     createSession,
     renameSession,

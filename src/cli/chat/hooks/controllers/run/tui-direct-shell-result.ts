@@ -1,12 +1,11 @@
 import { summarizeToolCall } from '../../../../../core/observability/conversation-activity.js';
-import { appendDirectShellHistory, buildConversationMessages, formatDirectShellResponse } from '../../../utils/format.js';
+import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
+import { appendDirectShellHistory, formatDirectShellResponse } from '../../../utils/format.js';
 import { compactChatHistoryWithArchive } from '../../../state/compaction.js';
 import type { ChatSession } from '../../../state/types.js';
 import type { ChatRuntimeConfig } from '../../../utils/runtime.js';
 import type { ActionState } from '../useAgentRunController.js';
 import { createTuiDirectShellCompactionStatusHandler } from './tui-compaction-status.js';
-
-type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => void;
 
 export async function finalizeTuiDirectShellSuccess(args: {
   chosenCall: { tool: string; input: unknown };
@@ -19,7 +18,8 @@ export async function finalizeTuiDirectShellSuccess(args: {
   runtime: ChatRuntimeConfig;
   tools: Array<{ name: string }>;
   state: ActionState;
-  updateActiveSession: ActiveSessionUpdater;
+  sessionService: ConversationSessionService;
+  refreshSessions: () => void;
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
 }) {
   const {
@@ -33,13 +33,19 @@ export async function finalizeTuiDirectShellSuccess(args: {
     runtime,
     tools,
     state,
-    updateActiveSession,
+    sessionService,
+    refreshSessions,
     maybeAutoNameSession,
   } = args;
 
   const responseText = formatDirectShellResponse(chosenCall.tool, command, chosenResult);
   const directShellHistory = appendDirectShellHistory(activeSession.history, shellDisplay, chosenCall.tool, chosenResult);
-  const emitCompactionStatus = createTuiDirectShellCompactionStatusHandler({ state, updateActiveSession });
+  const emitCompactionStatus = createTuiDirectShellCompactionStatusHandler({
+    state,
+    sessionId: activeSessionId,
+    sessionService,
+    refreshSessions,
+  });
   const compacted = await compactChatHistoryWithArchive({
     history: directShellHistory,
     model,
@@ -51,13 +57,8 @@ export async function finalizeTuiDirectShellSuccess(args: {
     summarizer: { credentialSource: runtime.providerCredentialSource },
     onStatusChange: (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; error?: string }) => emitCompactionStatus(event, directShellHistory),
   });
-  updateActiveSession((session) => ({
-    ...session,
-    history: compacted.history,
-    context: compacted.context,
-    archives: compacted.archives,
-    messages: buildConversationMessages(compacted.history),
-  }));
+  sessionService.applyCompactionResult(activeSessionId, compacted);
+  refreshSessions();
   state.setLiveEvents([
     {
       id: state.nextLocalId(),

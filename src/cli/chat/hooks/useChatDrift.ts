@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CyberLoopDriftLevel, CyberLoopObserverAnnotation } from '../../../index.js';
 import type { ChatSession } from '../state/types.js';
+import type { ConversationSessionService } from '../../../core/chat/engine/types.js';
 import { driftFooterColor, formatDriftFooter } from '../utils/drift-footer.js';
-
-type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => void;
 
 export function useChatDrift({
   activeSession,
-  updateActiveSession,
+  sessionService,
+  refreshSessions,
 }: {
   activeSession?: ChatSession;
-  updateActiveSession: ActiveSessionUpdater;
+  sessionService: ConversationSessionService;
+  refreshSessions: () => void;
 }) {
   const [enabled, setEnabledState] = useState(true);
   const [level, setLevel] = useState<CyberLoopDriftLevel>('unknown');
@@ -30,11 +31,13 @@ export function useChatDrift({
   const setEnabled = useCallback((nextEnabled: boolean) => {
     setEnabledState(nextEnabled);
     setError(undefined);
-    updateActiveSession((session) => ({
-      ...session,
-      driftEnabled: nextEnabled,
-    }));
-  }, [updateActiveSession]);
+    if (!activeSession) {
+      return;
+    }
+
+    sessionService.setDriftEnabled(activeSession.id, nextEnabled);
+    refreshSessions();
+  }, [activeSession, refreshSessions, sessionService]);
 
   const observer = useMemo(() => ({
     enabled,

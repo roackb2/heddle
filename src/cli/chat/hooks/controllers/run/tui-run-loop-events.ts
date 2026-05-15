@@ -1,4 +1,5 @@
 import type { TraceEvent } from '../../../../../index.js';
+import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
 import type { AgentLoopEvent } from '../../../../../core/runtime/events.js';
 import {
   projectAgentLoopEventToConversationActivities,
@@ -7,22 +8,20 @@ import {
 import { previewEditFileInput } from '../../../../../core/tools/toolkits/coding-files/edit-file.js';
 import { formatConversationActivityForTui } from '../../../adapters/conversation-activity-adapter.js';
 import { formatEditPreviewHistoryMessage, formatPlanHistoryMessage } from '../../../utils/format.js';
-import type { ChatSession } from '../../../state/types.js';
 import type { ActionState } from '../useAgentRunController.js';
 
 export type TuiAssistantStreamUpdate = { step: number; text: string; done: boolean };
-
-type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
 
 type PlanStateParser = (output: unknown) => ActionState extends { setCurrentPlan: (value: infer T) => void } ? T : never;
 
 export function createTuiRunLoopEventAdapter(args: {
   state: ActionState;
   sessionId: string;
-  updateSessionById: SessionUpdater;
+  sessionService: ConversationSessionService;
+  refreshSessions: () => void;
   parsePlanState: PlanStateParser;
 }) {
-  const { state, sessionId, updateSessionById, parsePlanState } = args;
+  const { state, sessionId, sessionService, refreshSessions, parsePlanState } = args;
   const appendedEditPreviewIds = new Set<string>();
   const appendedPlanSteps = new Set<number>();
   const streamingBuffers = new Map<number, string>();
@@ -62,17 +61,13 @@ export function createTuiRunLoopEventAdapter(args: {
           }
 
           appendedEditPreviewIds.add(event.call.id);
-          updateSessionById(sessionId, (session) => ({
-            ...session,
-            messages: [
-              ...session.messages,
-              {
-                id: state.nextLocalId(),
-                role: 'assistant',
-                text: formatEditPreviewHistoryMessage(preview),
-              },
-            ],
-          }));
+          appendAssistantMessage({
+            sessionService,
+            refreshSessions,
+            sessionId,
+            id: state.nextLocalId(),
+            text: formatEditPreviewHistoryMessage(preview),
+          });
         });
       }
 
@@ -83,17 +78,13 @@ export function createTuiRunLoopEventAdapter(args: {
           const renderedPlan = formatPlanHistoryMessage(event.result.output);
           if (renderedPlan) {
             appendedPlanSteps.add(event.step);
-            updateSessionById(sessionId, (session) => ({
-              ...session,
-              messages: [
-                ...session.messages,
-                {
-                  id: state.nextLocalId(),
-                  role: 'assistant',
-                  text: renderedPlan,
-                },
-              ],
-            }));
+            appendAssistantMessage({
+              sessionService,
+              refreshSessions,
+              sessionId,
+              id: state.nextLocalId(),
+              text: renderedPlan,
+            });
           }
         }
       }
@@ -104,6 +95,21 @@ export function createTuiRunLoopEventAdapter(args: {
       appendLiveEvents(state, nextEvents);
     },
   };
+}
+
+function appendAssistantMessage(args: {
+  sessionService: ConversationSessionService;
+  refreshSessions: () => void;
+  sessionId: string;
+  id: string;
+  text: string;
+}) {
+  args.sessionService.appendMessage(args.sessionId, {
+    id: args.id,
+    role: 'assistant',
+    text: args.text,
+  });
+  args.refreshSessions();
 }
 
 function appendLiveEvents(state: ActionState, nextEvents: string[]) {

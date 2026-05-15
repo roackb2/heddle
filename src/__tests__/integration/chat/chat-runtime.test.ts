@@ -9,6 +9,7 @@ import { createLogger } from '../../../core/utils/logger.js';
 import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../index.js';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
 import { runConversationTurn } from '../../../core/chat/engine/turns/run-conversation-turn.js';
+import { createConversationSessionService } from '../../../core/chat/engine/sessions/service.js';
 import { createChatSession as createCoreChatSession } from '../../../core/chat/engine/sessions/session-record.js';
 import { loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
 import * as agentLoopModule from '../../../core/runtime/agent-loop.js';
@@ -236,18 +237,6 @@ describe('executeAgentTurn final message persistence', () => {
     };
   }
 
-  function createSession(): ChatSession {
-    return {
-      id: 'session-1',
-      name: 'Session 1',
-      history: [],
-      messages: [],
-      turns: [],
-      createdAt: '2026-04-17T00:00:00.000Z',
-      updatedAt: '2026-04-17T00:00:00.000Z',
-    };
-  }
-
   async function runTurn(
     outcome: RunResult['outcome'],
     summary: string,
@@ -255,7 +244,22 @@ describe('executeAgentTurn final message persistence', () => {
   ) {
     const runtime = createRuntime();
     const state = createState();
-    let session = createSession();
+    const sessionService = createConversationSessionService({
+      config: {
+        workspaceRoot: runtime.workspaceRoot,
+        stateRoot: runtime.stateRoot,
+        sessionStoragePath: runtime.sessionCatalogFile,
+        model: runtime.model,
+        apiKeyPresent: runtime.providerCredentialPresent,
+      },
+    });
+    let session = sessionService.create({
+      id: 'session-1',
+      name: 'Session 1',
+    });
+    const refreshSessions = () => {
+      session = sessionService.require(session.id);
+    };
     const prompt = options?.prompt ?? 'test prompt';
     const displayText = options?.displayText ?? 'test prompt';
 
@@ -277,7 +281,8 @@ describe('executeAgentTurn final message persistence', () => {
     const logger = createLogger({ level: 'silent', console: false });
 
     const updateSessionById = (_sessionId: string, updater: (current: ChatSession) => ChatSession) => {
-      session = updater(session);
+      sessionService.update(session.id, updater);
+      refreshSessions();
     };
 
     const result: RunResult = {
@@ -317,6 +322,8 @@ describe('executeAgentTurn final message persistence', () => {
       tools,
       logger,
       state,
+      sessionService,
+      refreshSessions,
       updateSessionById,
       maybeAutoNameSession: vi.fn(),
       isProjectApproved: (_call: ToolCall) => false,

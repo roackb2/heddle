@@ -145,6 +145,179 @@ describe('createConversationEngine', () => {
     );
   });
 
+  it('owns persisted conversation message, reset, continue prompt, and drift mutations', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+    });
+    const session = engine.sessions.create({ id: 'session-1', name: 'Alpha' });
+
+    const withUserMessage = engine.sessions.appendMessage(session.id, {
+      id: 'message-1',
+      role: 'user',
+      text: 'Inspect README',
+    });
+    expect(withUserMessage.messages.at(-1)).toEqual({
+      id: 'message-1',
+      role: 'user',
+      text: 'Inspect README',
+    });
+
+    const withAssistantMessages = engine.sessions.appendMessages(session.id, [
+      {
+        id: 'message-2',
+        role: 'assistant',
+        text: 'Looking now',
+        isStreaming: true,
+      },
+      {
+        id: 'message-3',
+        role: 'assistant',
+        text: 'Done',
+      },
+    ]);
+    expect(withAssistantMessages.messages.slice(-2)).toEqual([
+      {
+        id: 'message-2',
+        role: 'assistant',
+        text: 'Looking now',
+        isStreaming: true,
+      },
+      {
+        id: 'message-3',
+        role: 'assistant',
+        text: 'Done',
+      },
+    ]);
+
+    const withPrompt = engine.sessions.setLastContinuePrompt(session.id, 'Continue the repo read');
+    expect(withPrompt.lastContinuePrompt).toBe('Continue the repo read');
+
+    const withDrift = engine.sessions.setDriftEnabled(session.id, true);
+    expect(withDrift.driftEnabled).toBe(true);
+
+    const reset = engine.sessions.resetConversation(session.id, { apiKeyPresent: false });
+    expect(reset.history).toEqual([]);
+    expect(reset.turns).toEqual([]);
+    expect(reset.lastContinuePrompt).toBeUndefined();
+    expect(reset.messages.map((message) => message.id)).toEqual(['intro', 'missing-key']);
+    expect(engine.sessions.read(session.id)).toEqual(expect.objectContaining({
+      driftEnabled: true,
+      messages: expect.arrayContaining([
+        expect.objectContaining({ id: 'intro' }),
+        expect.objectContaining({ id: 'missing-key' }),
+      ]),
+    }));
+  });
+
+  it('owns persisted compaction state transitions', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+    });
+    const session = engine.sessions.create({ id: 'session-1', name: 'Alpha' });
+    const sourceHistory = [{ role: 'user' as const, content: 'Inspect README' }];
+    const previousState = engine.sessions.update(session.id, (current) => ({
+      ...current,
+      context: {
+        estimatedHistoryTokens: 7,
+        compactionStatus: 'idle',
+        currentSummaryPath: '.heddle/chat-sessions/session-1/current-summary.md',
+      },
+      archives: [
+        {
+          id: 'archive-1',
+          path: '.heddle/chat-sessions/session-1/archive.jsonl',
+          summaryPath: '.heddle/chat-sessions/session-1/archive-summary.md',
+          messageCount: 2,
+          createdAt: '2026-05-15T00:00:00.000Z',
+        },
+      ],
+    }))!;
+
+    const running = engine.sessions.markCompactionRunning(session.id, {
+      sourceHistory,
+      archivePath: '.heddle/chat-sessions/session-1/archive.jsonl',
+    });
+    expect(running.history).toEqual(sourceHistory);
+    expect(running.context).toEqual(expect.objectContaining({
+      compactionStatus: 'running',
+      lastArchivePath: '.heddle/chat-sessions/session-1/archive.jsonl',
+    }));
+
+    const compacted = engine.sessions.applyCompactionResult(session.id, {
+      history: [
+        { role: 'user', content: 'Short prompt' },
+        { role: 'assistant', content: 'Short answer' },
+      ],
+      context: {
+        estimatedHistoryTokens: 4,
+        compactionStatus: 'idle',
+      },
+      archives: [],
+    });
+    expect(compacted.messages.map((message) => message.text)).toEqual(['Short prompt', 'Short answer']);
+    expect(compacted.context?.compactionStatus).toBe('idle');
+
+    const restored = engine.sessions.restoreCompactionState(session.id, {
+      context: previousState.context,
+      archives: previousState.archives,
+    });
+    expect(restored.context).toEqual(previousState.context);
+    expect(restored.archives).toEqual(previousState.archives);
+  });
+
+  it('owns session lease conflict, acquire, and release semantics', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+    });
+    const session = engine.sessions.create({ id: 'session-1', name: 'Alpha' });
+    const owner = {
+      ownerKind: 'tui' as const,
+      ownerId: 'tui-test-client',
+      clientLabel: 'terminal chat',
+    };
+    const otherOwner = {
+      ownerKind: 'daemon' as const,
+      ownerId: 'daemon-1',
+      clientLabel: 'control plane',
+    };
+
+    expect(engine.sessions.getLeaseConflict(session.id, owner)).toBeUndefined();
+    const leased = engine.sessions.acquireLease(session.id, owner);
+    expect(leased.lease).toEqual(expect.objectContaining({
+      ownerKind: 'tui',
+      ownerId: 'tui-test-client',
+      clientLabel: 'terminal chat',
+    }));
+    expect(engine.sessions.getLeaseConflict(session.id, otherOwner)).toContain(
+      'Session session-1 is already active in terminal chat.',
+    );
+    expect(() => engine.sessions.acquireLease(session.id, otherOwner)).toThrow(
+      'Session session-1 is already active in terminal chat.',
+    );
+
+    const stillLeased = engine.sessions.releaseLease(session.id, { ownerId: 'daemon-1' });
+    expect(stillLeased.lease?.ownerId).toBe('tui-test-client');
+
+    const released = engine.sessions.releaseLease(session.id, owner);
+    expect(released.lease).toBeUndefined();
+    expect(engine.sessions.read(session.id)?.lease).toBeUndefined();
+  });
+
   it('submits turns with merged engine defaults, normalized host callbacks, and override options', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
     const stateRoot = join(workspaceRoot, '.heddle');

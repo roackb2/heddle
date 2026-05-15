@@ -1,11 +1,7 @@
 import type { ChatTurnCompactionPort } from '../../../../../core/chat/engine/turns/host-bridge.js';
-import { buildCompactionRunningContext } from '../../../state/compaction.js';
+import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
 import type { ChatMessage } from '../../../../../index.js';
-import type { ChatSession } from '../../../state/types.js';
 import type { ActionState } from '../useAgentRunController.js';
-
-type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
-type ActiveSessionUpdater = (updater: (session: ChatSession) => ChatSession) => void;
 
 export type TuiCompactionStatusEvent = {
   status: 'running' | 'finished' | 'failed';
@@ -16,11 +12,12 @@ export type TuiCompactionStatusEvent = {
 export function createTuiCompactionStatusPort(args: {
   state: ActionState;
   sessionId: string;
-  updateSessionById: SessionUpdater;
+  sessionService: ConversationSessionService;
+  refreshSessions: () => void;
 }): ChatTurnCompactionPort & {
   handleWithSourceHistory: (event: TuiCompactionStatusEvent, sourceHistory: ChatMessage[]) => void;
 } {
-  const { state, sessionId, updateSessionById } = args;
+  const { state, sessionId, sessionService, refreshSessions } = args;
 
   const handleWithSourceHistory = (event: TuiCompactionStatusEvent, sourceHistory: ChatMessage[]) => {
     appendCompactionLiveEvent(state, event);
@@ -30,17 +27,11 @@ export function createTuiCompactionStatusPort(args: {
     }
 
     state.setStatus('Compacting');
-    updateSessionById(sessionId, (sessionToUpdate) => ({
-      ...sessionToUpdate,
-      history: sourceHistory,
-      context: buildCompactionRunningContext({
-        history: sourceHistory,
-        previous: sessionToUpdate.context,
-        archiveCount: sessionToUpdate.archives?.length,
-        currentSummaryPath: sessionToUpdate.context?.currentSummaryPath,
-        lastArchivePath: event.archivePath,
-      }),
-    }));
+    sessionService.markCompactionRunning(sessionId, {
+      sourceHistory,
+      archivePath: event.archivePath,
+    });
+    refreshSessions();
   };
 
   return {
@@ -52,9 +43,11 @@ export function createTuiCompactionStatusPort(args: {
 
 export function createTuiDirectShellCompactionStatusHandler(args: {
   state: ActionState;
-  updateActiveSession: ActiveSessionUpdater;
+  sessionId: string;
+  sessionService: ConversationSessionService;
+  refreshSessions: () => void;
 }) {
-  const { state, updateActiveSession } = args;
+  const { state, sessionId, sessionService, refreshSessions } = args;
 
   return (event: TuiCompactionStatusEvent, sourceHistory: ChatMessage[]) => {
     appendCompactionLiveEvent(state, event);
@@ -64,16 +57,11 @@ export function createTuiDirectShellCompactionStatusHandler(args: {
     }
 
     state.setStatus('Compacting');
-    updateActiveSession((session) => ({
-      ...session,
-      context: buildCompactionRunningContext({
-        history: sourceHistory,
-        previous: session.context,
-        archiveCount: session.archives?.length,
-        currentSummaryPath: session.context?.currentSummaryPath,
-        lastArchivePath: event.archivePath,
-      }),
-    }));
+    sessionService.markCompactionRunning(sessionId, {
+      sourceHistory,
+      archivePath: event.archivePath,
+    });
+    refreshSessions();
   };
 }
 

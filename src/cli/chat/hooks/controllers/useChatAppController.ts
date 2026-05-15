@@ -9,11 +9,7 @@ import {
   resolveNewSessionExecutionPreferences,
   resolveStoredSessionExecutionPreferences,
 } from '../../../../core/chat/engine/sessions/preferences/service.js';
-import { buildConversationMessages } from '../../utils/format.js';
-import {
-  buildCompactionRunningContext,
-  compactChatHistoryWithArchive,
-} from '../../state/compaction.js';
+import { compactChatHistoryWithArchive } from '../../state/compaction.js';
 import { useChatSessions } from '../useChatSessions.js';
 import {
   resolveProviderCredentialSourceForModel,
@@ -29,6 +25,8 @@ export function useChatAppController({
 }) {
   const {
     sessions,
+    sessionService,
+    refreshSessions,
     activeSessionId,
     setActiveSessionId,
     activeSession,
@@ -187,15 +185,8 @@ export function useChatAppController({
     const previousArchives = activeSession.archives;
 
     setStatus('Compacting');
-    updateSessionById(sessionId, (session) => ({
-      ...session,
-      context: buildCompactionRunningContext({
-        history: session.history,
-        previous: session.context,
-        archiveCount: session.archives?.length,
-        currentSummaryPath: session.context?.currentSummaryPath,
-      }),
-    }));
+    sessionService.markCompactionRunning(sessionId, { sourceHistory: sessionHistory });
+    refreshSessions();
 
     void compactChatHistoryWithArchive({
       history: sessionHistory,
@@ -207,21 +198,16 @@ export function useChatAppController({
       summarizer: { credentialSource: runtime.providerCredentialSource },
     })
       .then((compacted) => {
-        updateSessionById(sessionId, (session) => ({
-          ...session,
-          history: compacted.history,
-          context: compacted.context,
-          archives: compacted.archives,
-          messages: buildConversationMessages(compacted.history),
-        }));
+        sessionService.applyCompactionResult(sessionId, compacted);
+        refreshSessions();
         setStatus('Idle');
       })
       .catch(() => {
-        updateSessionById(sessionId, (session) => ({
-          ...session,
+        sessionService.restoreCompactionState(sessionId, {
           context: previousContext,
           archives: previousArchives,
-        }));
+        });
+        refreshSessions();
         setStatus('Idle');
       });
   }, [
@@ -231,11 +217,14 @@ export function useChatAppController({
     runtime.stateRoot,
     runtime.systemContext,
     setStatus,
-    updateSessionById,
+    sessionService,
+    refreshSessions,
   ]);
 
   return {
     sessions,
+    sessionService,
+    refreshSessions,
     activeSessionId,
     setActiveSessionId,
     activeSession,

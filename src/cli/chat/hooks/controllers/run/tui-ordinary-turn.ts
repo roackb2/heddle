@@ -1,5 +1,6 @@
 import type { RunResult } from '../../../../../index.js';
 import { runConversationTurn } from '../../../../../core/chat/engine/turns/run-conversation-turn.js';
+import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
 import type { ChatSession } from '../../../state/types.js';
 import type { ChatRuntimeConfig } from '../../../utils/runtime.js';
 import { createTuiCompactionStatusPort } from './tui-compaction-status.js';
@@ -19,6 +20,8 @@ export async function executeTuiOrdinaryTurn(args: {
   sessionId: string;
   runtime: ChatRuntimeConfig;
   state: ActionState;
+  sessionService: ConversationSessionService;
+  refreshSessions: () => void;
   updateSessionById: SessionUpdater;
   parsePlanState: ParsePlanState;
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
@@ -34,6 +37,8 @@ export async function executeTuiOrdinaryTurn(args: {
     sessionId,
     runtime,
     state,
+    sessionService,
+    refreshSessions,
     updateSessionById,
     parsePlanState,
     maybeAutoNameSession,
@@ -47,20 +52,20 @@ export async function executeTuiOrdinaryTurn(args: {
   const compactionPort = createTuiCompactionStatusPort({
     state,
     sessionId,
-    updateSessionById,
+    sessionService,
+    refreshSessions,
   });
 
   if (displayText) {
-    updateSessionById(sessionId, (session) => ({
-      ...session,
-      messages: [...session.messages, { id: state.nextLocalId(), role: 'user', text: displayText }],
-    }));
+    sessionService.appendMessage(sessionId, { id: state.nextLocalId(), role: 'user', text: displayText });
+    refreshSessions();
   }
 
   const runLoopEvents = createTuiRunLoopEventAdapter({
     state,
     sessionId,
-    updateSessionById,
+    sessionService,
+    refreshSessions,
     parsePlanState,
   });
   const approvalPort = createTuiToolApprovalPort({
@@ -69,6 +74,11 @@ export async function executeTuiOrdinaryTurn(args: {
   });
   const approvalPolicies = createTuiRememberedApprovalPolicies({ isProjectApproved });
 
+  // Desired shape: ordinary TUI turns should call
+  // createConversationEngine(...).turns.submit after the shared turn service
+  // exposes every TUI-required control, especially shouldStop, streaming,
+  // trace events, compaction status, approval policy, and the updated session.
+  // Until then, this is the remaining lower-level turn boundary violation.
   const result = await runConversationTurn({
     workspaceRoot: runtime.workspaceRoot,
     stateRoot: runtime.stateRoot,
@@ -103,11 +113,7 @@ export async function executeTuiOrdinaryTurn(args: {
     return undefined;
   }
 
-  const { readChatSession } = await import('../../../../../core/chat/engine/sessions/repository/file-chat-session-repository.js');
-  const persistedSession = readChatSession(runtime.sessionCatalogFile, sessionId, true);
-  if (!persistedSession) {
-    return undefined;
-  }
+  const persistedSession = sessionService.require(sessionId);
 
   const { latestHistory } = finalizeSuccessfulTuiOrdinaryTurn({
     persistedSession,

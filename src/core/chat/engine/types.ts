@@ -5,7 +5,7 @@ import type {
 } from '../../observability/conversation-activity.js';
 import type { TraceSummarizerRegistry } from '../../observability/trace-summarizers.js';
 import type { AgentLoopEvent, RunAgentLoopOptions } from '../../runtime/agent-loop.js';
-import type { ReasoningEffort } from '../../llm/types.js';
+import type { ChatMessage, ReasoningEffort } from '../../llm/types.js';
 import type { TraceEvent } from '../../types.js';
 import type { ChatSessionLeaseOwner } from './sessions/lease.js';
 import type { ChatSession } from '../types.js';
@@ -34,15 +34,41 @@ export type ConversationEngine = {
 };
 
 export type ConversationSessionService = {
+  // Reads
   list(): ChatSession[];
   read(id: string): ChatSession | undefined;
   require(id: string): ChatSession;
   latest(): ChatSession | undefined;
+
+  // Lifecycle
   create(input?: CreateConversationSessionInput): ChatSession;
-  update(id: string, updater: (session: ChatSession) => ChatSession): ChatSession | undefined;
-  updateSettings(id: string, input: UpdateConversationSessionSettingsInput): ChatSession;
   rename(id: string, name: string): ChatSession;
   delete(id: string): boolean;
+
+  // Generic mutation escape hatch
+  update(id: string, updater: (session: ChatSession) => ChatSession): ChatSession | undefined;
+
+  // Settings
+  updateSettings(id: string, input: UpdateConversationSessionSettingsInput): ChatSession;
+  setDriftEnabled(id: string, enabled: boolean): ChatSession;
+
+  // Messages
+  appendMessage(id: string, input: AppendConversationMessageInput): ChatSession;
+  appendMessages(id: string, inputs: AppendConversationMessageInput[]): ChatSession;
+
+  // Conversation state
+  resetConversation(id: string, input: ResetConversationSessionInput): ChatSession;
+  setLastContinuePrompt(id: string, prompt: string | undefined): ChatSession;
+
+  // Compaction state
+  markCompactionRunning(id: string, input: MarkConversationCompactionRunningInput): ChatSession;
+  applyCompactionResult(id: string, input: ApplyConversationCompactionResultInput): ChatSession;
+  restoreCompactionState(id: string, input: RestoreConversationCompactionStateInput): ChatSession;
+
+  // Leases
+  getLeaseConflict(id: string, owner: ChatSessionLeaseOwner): string | undefined;
+  acquireLease(id: string, owner: ChatSessionLeaseOwner): ChatSession;
+  releaseLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): ChatSession;
 };
 
 export type CreateConversationSessionInput = {
@@ -59,6 +85,27 @@ export type UpdateConversationSessionSettingsInput = {
   reasoningEffort?: ReasoningEffort | null;
   driftEnabled?: boolean;
 };
+
+export type AppendConversationMessageInput = {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  isStreaming?: boolean;
+  isPending?: boolean;
+};
+
+export type ResetConversationSessionInput = {
+  apiKeyPresent: boolean;
+};
+
+export type MarkConversationCompactionRunningInput = {
+  sourceHistory: ChatMessage[];
+  archivePath?: string;
+};
+
+export type ApplyConversationCompactionResultInput = Pick<ChatSession, 'history' | 'context' | 'archives'>;
+
+export type RestoreConversationCompactionStateInput = Pick<ChatSession, 'context' | 'archives'>;
 
 export type ConversationTurnService = {
   submit(input: SubmitConversationTurnInput): Promise<SubmitConversationTurnResult>;

@@ -38,6 +38,9 @@ export type ChatRuntimeConfig = {
   providerCredentialSource: ProviderCredentialSource;
   stateRoot: string;
   logFile: string;
+  // Desired shape: resolve the TUI-to-engine config boundary here once.
+  // Future TUI turn paths should consume an engine-facing config object instead
+  // of remapping sessionCatalogFile/providerCredentialPresent at each call site.
   sessionCatalogFile: string;
   approvalsFile: string;
   traceDir: string;
