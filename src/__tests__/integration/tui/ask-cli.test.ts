@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { runAskCli } from '../../../cli/ask.js';
+import { AskCliHost } from '../../../cli/ask.js';
 import { createChatSession } from '../../../core/chat/engine/sessions/session-record.js';
 import { readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
 import type { ChatSession } from '../../../core/chat/types.js';
@@ -12,15 +12,16 @@ import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js
 import type { RunResult } from '../../../index.js';
 import { createHeddleServerApp } from '../../../server/app.js';
 
-describe('runAskCli', () => {
+describe('AskCliHost.run', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 
-  it('runs a stateless ask and writes a trace file', async () => {
+  it('runs default ask through a persisted one-off session', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-'));
     const memoryRoot = join(workspaceRoot, '.heddle', 'memory');
+    const sessionStoragePath = join(workspaceRoot, '.heddle', 'chat-sessions.catalog.json');
     mkdirSync(memoryRoot, { recursive: true });
     writeFileSync(join(memoryRoot, 'README.md'), '# Workspace Memory\n\n- Ask uses memory context.\n', 'utf8');
     const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
@@ -43,17 +44,27 @@ describe('runAskCli', () => {
     };
     const runAgentLoopSpy = vi.spyOn(agentLoopModule, 'runAgentLoop').mockResolvedValue(result as never);
 
-    await runAskCli('what is this project', {
+    await AskCliHost.run('what is this project', {
       workspaceRoot,
       model: 'gpt-5.1-codex-mini',
+      maxSteps: 7,
       apiKey: 'test-key',
     });
 
     expect(runAgentLoopSpy).toHaveBeenCalledTimes(1);
     expect(runAgentLoopSpy).toHaveBeenCalledWith(expect.objectContaining({
+      maxSteps: 7,
+      includeDefaultTools: false,
       systemContext: expect.stringContaining('- Ask uses memory context.'),
     }));
     expect(existsSync(join(workspaceRoot, '.heddle', 'traces'))).toBe(true);
+    const catalog = readChatSessionCatalog(sessionStoragePath);
+    expect(catalog).toHaveLength(1);
+    expect(catalog[0]?.retention).toBe('one_off');
+    const session = readChatSession(sessionStoragePath, catalog[0]!.id, true);
+    expect(session?.retention).toBe('one_off');
+    expect(session?.history).toEqual(result.transcript);
+    expect(session?.turns).toHaveLength(1);
     expect(stdoutSpy).toHaveBeenCalled();
   });
 
@@ -79,7 +90,7 @@ describe('runAskCli', () => {
     };
     vi.spyOn(agentLoopModule, 'runAgentLoop').mockResolvedValue(result as never);
 
-    await runAskCli('inspect the repository', {
+    await AskCliHost.run('inspect the repository', {
       workspaceRoot,
       model: 'gpt-5.1-codex-mini',
       apiKey: 'test-key',
@@ -90,8 +101,10 @@ describe('runAskCli', () => {
     const catalog = readChatSessionCatalog(sessionStoragePath);
     expect(catalog).toHaveLength(1);
     expect(catalog[0]?.name).toBe('Ask test session');
+    expect(catalog[0]?.retention).toBe('reusable');
 
     const session = readChatSession(sessionStoragePath, catalog[0]!.id, true);
+    expect(session?.retention).toBe('reusable');
     expect(session?.history).toEqual(result.transcript);
     expect(session?.turns).toHaveLength(1);
     expect(session?.lastContinuePrompt).toBe('inspect the repository');
@@ -146,7 +159,7 @@ describe('runAskCli', () => {
       return result as never;
     });
 
-    await runAskCli('follow up question', {
+    await AskCliHost.run('follow up question', {
       workspaceRoot,
       model: 'gpt-5.1-codex-mini',
       apiKey: 'test-key',
@@ -164,7 +177,7 @@ describe('runAskCli', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-latest-empty-'));
     const sessionStoragePath = join(workspaceRoot, '.heddle', 'chat-sessions.catalog.json');
 
-    await expect(runAskCli('follow up question', {
+    await expect(AskCliHost.run('follow up question', {
       workspaceRoot,
       model: 'gpt-5.1-codex-mini',
       apiKey: 'test-key',
@@ -268,7 +281,7 @@ describe('runAskCli', () => {
       return result as never;
     });
 
-    await runAskCli('follow up question', {
+    await AskCliHost.run('follow up question', {
       workspaceRoot,
       model: 'gpt-5.1-codex-mini',
       apiKey: 'test-key',
@@ -280,7 +293,7 @@ describe('runAskCli', () => {
     expect(readChatSession(sessionStoragePath, existingSession.id, true)?.archives).toHaveLength(1);
   });
 
-  it('attaches stateless ask to a live daemon host', async () => {
+  it('attaches default ask to a live daemon host through a persisted one-off session', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-remote-stateless-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
@@ -319,7 +332,7 @@ describe('runAskCli', () => {
     };
 
     try {
-      await runAskCli('daemon stateless ask', {
+      await AskCliHost.run('daemon stateless ask', {
         workspaceRoot,
         model: 'gpt-5.1-codex-mini',
         apiKey: 'test-key',
@@ -330,6 +343,12 @@ describe('runAskCli', () => {
     }
 
     expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('attaching ask to daemon'));
+    const catalog = readChatSessionCatalog(join(stateRoot, 'chat-sessions.catalog.json'));
+    expect(catalog).toHaveLength(1);
+    expect(catalog[0]?.retention).toBe('one_off');
+    const session = readChatSession(join(stateRoot, 'chat-sessions.catalog.json'), catalog[0]!.id, true);
+    expect(session?.history).toEqual(result.transcript);
+    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining(`Session: ${catalog[0]?.id}`));
     expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('Trace:'));
   });
 
@@ -372,7 +391,7 @@ describe('runAskCli', () => {
     };
 
     try {
-      await runAskCli('remote session ask', {
+      await AskCliHost.run('remote session ask', {
         workspaceRoot,
         model: 'gpt-5.1-codex-mini',
         apiKey: 'test-key',
@@ -386,6 +405,7 @@ describe('runAskCli', () => {
     const catalog = readChatSessionCatalog(join(stateRoot, 'chat-sessions.catalog.json'));
     expect(catalog).toHaveLength(1);
     expect(catalog[0]?.name).toBe('Remote ask session');
+    expect(catalog[0]?.retention).toBe('reusable');
     expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining(`Session: ${catalog[0]?.id}`));
   });
 });

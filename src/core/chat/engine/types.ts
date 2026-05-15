@@ -8,7 +8,7 @@ import type { AgentLoopEvent, RunAgentLoopOptions } from '../../runtime/agent-lo
 import type { ChatMessage, ReasoningEffort } from '../../llm/types.js';
 import type { TraceEvent } from '../../types.js';
 import type { ChatSessionLeaseOwner } from './sessions/lease.js';
-import type { ChatSession } from '../types.js';
+import type { ChatSession, ChatSessionRetention } from '../types.js';
 
 export type ConversationEngineConfig = {
   workspaceRoot: string;
@@ -41,9 +41,11 @@ export type ConversationSessionService = {
   read(id: string): ChatSession | undefined;
   require(id: string): ChatSession;
   latest(): ChatSession | undefined;
+  latestExisting(): ChatSession | undefined;
 
   // Lifecycle
   create(input?: CreateConversationSessionInput): ChatSession;
+  createOneOff(input?: CreateConversationSessionInput): ChatSession;
   rename(id: string, name: string): ChatSession;
   delete(id: string): boolean;
 
@@ -80,6 +82,7 @@ export type CreateConversationSessionInput = {
   reasoningEffort?: ReasoningEffort;
   workspaceId?: string;
   apiKeyPresent?: boolean;
+  retention?: ChatSessionRetention;
 };
 
 export type UpdateConversationSessionSettingsInput = {
@@ -118,6 +121,9 @@ export type ConversationTurnService = {
 export type SubmitConversationTurnInput = {
   sessionId: string;
   prompt: string;
+  maxSteps?: number;
+  searchIgnoreDirs?: string[];
+  includePlanTool?: boolean;
   host?: ConversationEngineHost;
   abortSignal?: AbortSignal;
   leaseOwner?: ChatSessionLeaseOwner;
@@ -129,6 +135,9 @@ export type SubmitConversationTurnInput = {
 export type ContinueConversationTurnInput = {
   sessionId: string;
   prompt?: string;
+  maxSteps?: number;
+  searchIgnoreDirs?: string[];
+  includePlanTool?: boolean;
   host?: ConversationEngineHost;
   abortSignal?: AbortSignal;
   leaseOwner?: ChatSessionLeaseOwner;

@@ -30,6 +30,9 @@ export type RunConversationTurnArgs = {
   credentialStorePath?: string;
   systemContext?: string;
   traceDir: string;
+  maxSteps?: number;
+  searchIgnoreDirs?: string[];
+  includePlanTool?: boolean;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   host?: ChatTurnHostPort;
   approvalPolicies?: ToolApprovalPolicy[];
@@ -58,6 +61,8 @@ export async function runConversationTurn(args: RunConversationTurnArgs): Promis
     preferApiKey: args.preferApiKey,
     credentialStorePath: args.credentialStorePath,
     systemContext: args.systemContext,
+    searchIgnoreDirs: args.searchIgnoreDirs,
+    includePlanTool: args.includePlanTool,
     leaseOwner: args.leaseOwner,
   });
   const { sessions, session, runtime, tools, toolNames, leaseOwner } = context;
@@ -89,6 +94,7 @@ export async function runConversationTurn(args: RunConversationTurnArgs): Promis
       goal: args.prompt,
       model: runtime.model,
       apiKey: runtime.apiKey,
+      maxSteps: args.maxSteps,
       workspaceRoot: args.workspaceRoot,
       stateDir: args.stateRoot,
       memoryDir: runtime.memoryDir,

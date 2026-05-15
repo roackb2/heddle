@@ -49,6 +49,7 @@ type ControlPlaneSessionReadArgs = Omit<ConversationEngineConfig, 'model'> & {
 
 type CreateControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & {
   suggestedName?: string;
+  retention?: ChatSession['retention'];
 };
 
 type UpdateControlPlaneChatSessionSettingsArgs = ControlPlaneSessionReadArgs & {
@@ -59,6 +60,9 @@ type UpdateControlPlaneChatSessionSettingsArgs = ControlPlaneSessionReadArgs & {
 type SubmitChatPromptArgs = ControlPlaneSessionReadArgs & {
   sessionId: string;
   prompt: string;
+  maxSteps?: number;
+  searchIgnoreDirs?: string[];
+  includePlanTool?: boolean;
   leaseOwner: ChatSessionLeaseOwner;
 };
 
@@ -93,6 +97,7 @@ export class ControlPlaneChatSessionsController {
       apiKeyPresent,
       model,
       workspaceId: args.workspaceId,
+      retention: args.retention,
     });
 
     return ControlPlaneChatSessionPresenter.projectDetail(session)[0] as ChatSessionDetail;
@@ -113,6 +118,9 @@ export class ControlPlaneChatSessionsController {
       return await engine.turns.submit({
         sessionId: args.sessionId,
         prompt: args.prompt,
+        maxSteps: args.maxSteps,
+        searchIgnoreDirs: args.searchIgnoreDirs,
+        includePlanTool: args.includePlanTool,
         host,
         abortSignal,
         leaseOwner: args.leaseOwner,

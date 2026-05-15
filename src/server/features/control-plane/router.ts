@@ -26,12 +26,16 @@ const sessionInputSchema = z.object({
 const createSessionInputSchema = z.object({
   name: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
+  retention: z.enum(['reusable', 'one_off']).optional(),
   apiKeyPresent: z.boolean().optional(),
 }).optional();
 
 const sessionMessageInputSchema = z.object({
   sessionId: z.string().min(1),
   prompt: z.string().min(1),
+  maxSteps: z.number().int().min(1).max(500).optional(),
+  searchIgnoreDirs: z.array(z.string().min(1)).optional(),
+  includePlanTool: z.boolean().optional(),
   apiKey: z.string().min(1).optional(),
   preferApiKey: z.boolean().optional(),
   systemContext: z.string().min(1).optional(),
@@ -141,6 +145,7 @@ export const controlPlaneRouter = router({
       suggestedName: input?.name,
       workspaceId: ctx.activeWorkspace.id,
       model: input?.model,
+      retention: input?.retention,
       apiKeyPresent: input?.apiKeyPresent,
       preferApiKey: ctx.preferApiKey,
     });
@@ -204,6 +209,9 @@ export const controlPlaneRouter = router({
       sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
       sessionId: input.sessionId,
       prompt: input.prompt,
+      maxSteps: input.maxSteps,
+      searchIgnoreDirs: input.searchIgnoreDirs,
+      includePlanTool: input.includePlanTool,
       apiKey: input.apiKey,
       preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
       systemContext: input.systemContext,

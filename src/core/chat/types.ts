@@ -67,9 +67,12 @@ export type ChatSessionLease = {
   clientLabel?: string;
 };
 
+export type ChatSessionRetention = 'reusable' | 'one_off';
+
 export type ChatSession = {
   id: string;
   name: string;
+  retention?: ChatSessionRetention;
   workspaceId?: string;
   history: ChatMessage[];
   messages: ConversationLine[];

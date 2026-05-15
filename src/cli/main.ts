@@ -22,7 +22,7 @@ import {
 } from '../core/memory/validation.js';
 import { resolveApiKeyForModel } from '../core/runtime/api-keys.js';
 import { runAuthCli } from './auth.js';
-import { runAskCli } from './ask.js';
+import { AskCliHost } from './ask.js';
 import { startChatCli } from './chat/index.js';
 import { runDaemonCli } from './daemon.js';
 import { runEvalCli } from './eval/index.js';
@@ -106,7 +106,7 @@ async function main() {
     .action(async (goalParts: string[], askOptions: { session?: string; latest?: boolean; newSession?: string | boolean }) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      await runAskCli(goalParts.join(' ').trim(), {
+      await AskCliHost.run(goalParts.join(' ').trim(), {
         workspaceRoot: resolved.workspaceRoot,
         model: resolved.model,
         maxSteps: resolved.maxSteps,
@@ -308,7 +308,7 @@ async function main() {
   if (knownCommand && !isKnownCommand(knownCommand) && !knownCommand.startsWith('-')) {
     const resolved = resolveCliOptions(program.opts<RootCliOptions>());
     chdir(resolved.workspaceRoot);
-    await runAskCli(argv.join(' ').trim(), {
+    await AskCliHost.run(argv.join(' ').trim(), {
       workspaceRoot: resolved.workspaceRoot,
       model: resolved.model,
       maxSteps: resolved.maxSteps,

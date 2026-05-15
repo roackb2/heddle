@@ -12,12 +12,13 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import type { ChatMessage, ReasoningEffort } from '../../../../llm/types.js';
-import type { ChatArchiveRecord, ChatContextStats, ChatSession, ChatSessionLease, ConversationLine, TurnSummary } from '../../../types.js';
+import type { ChatArchiveRecord, ChatContextStats, ChatSession, ChatSessionLease, ChatSessionRetention, ConversationLine, TurnSummary } from '../../../types.js';
 import { createChatSession, createInitialMessages } from '../session-record.js';
 
 export type ChatSessionCatalogEntry = {
   id: string;
   name: string;
+  retention?: ChatSessionRetention;
   workspaceId?: string;
   createdAt: string;
   updatedAt: string;
@@ -262,6 +263,7 @@ function parseCatalogEntry(value: unknown): ChatSessionCatalogEntry[] {
   return [{
     id: candidate.id,
     name: candidate.name,
+    retention: parseRetention(candidate.retention),
     workspaceId: typeof candidate.workspaceId === 'string' ? candidate.workspaceId : undefined,
     createdAt,
     updatedAt,
@@ -282,6 +284,7 @@ function projectCatalogEntry(session: ChatSession): ChatSessionCatalogEntry {
   return {
     id: session.id,
     name: session.name,
+    retention: session.retention,
     workspaceId: session.workspaceId,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
@@ -315,6 +318,7 @@ function readSessionFile(
     return [{
       id: entry.id,
       name: entry.name,
+      retention: entry.retention,
       workspaceId: entry.workspaceId,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
@@ -367,6 +371,7 @@ function writeCatalogIfChanged(
 function serializeSessionBody(session: ChatSession): string {
   return `${JSON.stringify({
     id: session.id,
+    retention: session.retention,
     workspaceId: session.workspaceId,
     history: session.history,
     messages: session.messages,
@@ -459,6 +464,7 @@ function parseSavedSession(value: unknown, apiKeyPresent: boolean): ChatSession[
   return [{
     id: candidate.id,
     name: candidate.name,
+    retention: parseRetention(candidate.retention),
     workspaceId: typeof candidate.workspaceId === 'string' ? candidate.workspaceId : undefined,
     history: Array.isArray(candidate.history) ? candidate.history as ChatMessage[] : [],
     messages:
@@ -479,6 +485,10 @@ function parseSavedSession(value: unknown, apiKeyPresent: boolean): ChatSession[
     archives: Array.isArray(candidate.archives) ? candidate.archives.flatMap(parseArchiveRecord) : undefined,
     lease: parseLease(candidate.lease),
   }];
+}
+
+function parseRetention(value: unknown): ChatSessionRetention | undefined {
+  return value === 'reusable' || value === 'one_off' ? value : undefined;
 }
 
 function parseLease(value: unknown): ChatSessionLease | undefined {
