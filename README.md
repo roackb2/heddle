@@ -38,7 +38,7 @@ If you want a terminal-first coding agent with local state, review traces, works
 
 ## Programmatic Use Layers
 
-Heddle currently has two programmatic layers:
+Heddle currently has two main programmatic layers:
 
 - `createConversationEngine`: an alpha API for persisted multi-turn sessions with session storage, compaction, approvals, traces, semantic activity, and custom frontends or local hosts
 - `runAgentLoop`: a lower-level single-run execution loop for hosts that do not need persisted chat or session behavior
@@ -157,6 +157,14 @@ heddle daemon
 ```
 
 Open the browser control plane from the daemon output. From there you can use `Overview`, `Sessions`, `Tasks`, and `Workspaces` to inspect the active workspace, continue saved sessions, review changes, and switch to another local project.
+
+If you prefer a one-shot CLI run instead of interactive chat, use:
+
+```bash
+heddle ask "Summarize this repository"
+```
+
+`ask` still exits after one prompt, but it now records the run as a one-off saved session under `.heddle/` so traces, memory maintenance, and later inspection use the same persisted conversation path as normal sessions.
 
 The terminal chat footer and the control-plane session composer both show the active auth source for the selected model, so you can tell whether a session is using OpenAI account sign-in, API-key mode, or missing credentials.
 

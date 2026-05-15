@@ -22,11 +22,11 @@ Use it when you want:
 
 This is the best fit for custom frontends, local tools, daemon-like wrappers, or apps that want a real Heddle conversation engine instead of manually assembling the lower-level turn runner.
 
-### Use `runConversationTurn` for low-level persisted turn execution
+### Use `runConversationTurn` only for low-level persisted turn execution
 
-Use `runConversationTurn` when you want the persisted turn/session machinery, but you do not want to instantiate the higher-level engine service.
+Use `runConversationTurn` only when your host already owns session ids and storage paths and you intentionally want the lower-level persisted turn runner.
 
-It is useful when you already manage session ids and paths yourself and want direct control over one persisted turn at a time.
+For most hosts, `createConversationEngine` is the better entrypoint. It keeps session creation, target resolution, and turn submission behind one surface instead of making the host assemble those boundaries manually.
 
 Compared with `createConversationEngine`, this is lower-level and more manual:
 
@@ -250,7 +250,7 @@ console.log('Session:', result.session.id)
 
 ## `runConversationTurn`
 
-If you want one persisted turn without building the engine service first, call `runConversationTurn` directly:
+If you already manage session ids and paths yourself and want one persisted turn without building the engine service first, call `runConversationTurn` directly:
 
 ```ts
 import { runConversationTurn } from '@roackb2/heddle'
@@ -267,7 +267,7 @@ const result = await runConversationTurn({
 
 `runConversationTurn` does not take a `model` argument directly. It resolves the active model from the stored session model plus runtime credential policy. If your host wants to set model defaults up front, `createConversationEngine` is the easier path.
 
-Choose this when your host already owns session creation/storage details and only needs the low-level persisted turn runner.
+Choose this only when your host already owns session creation/storage details and only needs the low-level persisted turn runner. For new hosts, prefer `createConversationEngine`.
 
 ## `runAgentLoop`
 

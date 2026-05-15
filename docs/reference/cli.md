@@ -7,7 +7,7 @@ This page is a command lookup for the current Heddle CLI surface.
 ### Chat and one-shot use
 
 - `heddle` or `heddle chat`: start interactive chat mode in the current workspace
-- `heddle ask "<goal>"`: run a single prompt and exit
+- `heddle ask "<goal>"`: run a single prompt and exit, backed by a one-off saved session
 
 ### Control plane
 
@@ -61,6 +61,8 @@ Run a one-shot question:
 ```bash
 heddle ask "Summarize the test strategy in this repository"
 ```
+
+`ask` still behaves like a one-shot command from the terminal, but Heddle stores the run as a one-off session under `.heddle/` so traces, memory maintenance, and later review use the same persisted conversation path as other session-backed runs.
 
 Run against another workspace:
 
