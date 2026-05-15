@@ -18,9 +18,10 @@ describe('runAskCli', () => {
     vi.unstubAllEnvs();
   });
 
-  it('runs a stateless ask and writes a trace file', async () => {
+  it('runs default ask through a persisted one-off session', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-'));
     const memoryRoot = join(workspaceRoot, '.heddle', 'memory');
+    const sessionStoragePath = join(workspaceRoot, '.heddle', 'chat-sessions.catalog.json');
     mkdirSync(memoryRoot, { recursive: true });
     writeFileSync(join(memoryRoot, 'README.md'), '# Workspace Memory\n\n- Ask uses memory context.\n', 'utf8');
     const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
@@ -46,14 +47,24 @@ describe('runAskCli', () => {
     await runAskCli('what is this project', {
       workspaceRoot,
       model: 'gpt-5.1-codex-mini',
+      maxSteps: 7,
       apiKey: 'test-key',
     });
 
     expect(runAgentLoopSpy).toHaveBeenCalledTimes(1);
     expect(runAgentLoopSpy).toHaveBeenCalledWith(expect.objectContaining({
+      maxSteps: 7,
+      includeDefaultTools: false,
       systemContext: expect.stringContaining('- Ask uses memory context.'),
     }));
     expect(existsSync(join(workspaceRoot, '.heddle', 'traces'))).toBe(true);
+    const catalog = readChatSessionCatalog(sessionStoragePath);
+    expect(catalog).toHaveLength(1);
+    expect(catalog[0]?.retention).toBe('one_off');
+    const session = readChatSession(sessionStoragePath, catalog[0]!.id, true);
+    expect(session?.retention).toBe('one_off');
+    expect(session?.history).toEqual(result.transcript);
+    expect(session?.turns).toHaveLength(1);
     expect(stdoutSpy).toHaveBeenCalled();
   });
 
@@ -90,8 +101,10 @@ describe('runAskCli', () => {
     const catalog = readChatSessionCatalog(sessionStoragePath);
     expect(catalog).toHaveLength(1);
     expect(catalog[0]?.name).toBe('Ask test session');
+    expect(catalog[0]?.retention).toBe('reusable');
 
     const session = readChatSession(sessionStoragePath, catalog[0]!.id, true);
+    expect(session?.retention).toBe('reusable');
     expect(session?.history).toEqual(result.transcript);
     expect(session?.turns).toHaveLength(1);
     expect(session?.lastContinuePrompt).toBe('inspect the repository');
@@ -280,7 +293,7 @@ describe('runAskCli', () => {
     expect(readChatSession(sessionStoragePath, existingSession.id, true)?.archives).toHaveLength(1);
   });
 
-  it('attaches stateless ask to a live daemon host', async () => {
+  it('attaches default ask to a live daemon host through a persisted one-off session', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-remote-stateless-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
@@ -330,6 +343,12 @@ describe('runAskCli', () => {
     }
 
     expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('attaching ask to daemon'));
+    const catalog = readChatSessionCatalog(join(stateRoot, 'chat-sessions.catalog.json'));
+    expect(catalog).toHaveLength(1);
+    expect(catalog[0]?.retention).toBe('one_off');
+    const session = readChatSession(join(stateRoot, 'chat-sessions.catalog.json'), catalog[0]!.id, true);
+    expect(session?.history).toEqual(result.transcript);
+    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining(`Session: ${catalog[0]?.id}`));
     expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('Trace:'));
   });
 
@@ -386,6 +405,7 @@ describe('runAskCli', () => {
     const catalog = readChatSessionCatalog(join(stateRoot, 'chat-sessions.catalog.json'));
     expect(catalog).toHaveLength(1);
     expect(catalog[0]?.name).toBe('Remote ask session');
+    expect(catalog[0]?.retention).toBe('reusable');
     expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining(`Session: ${catalog[0]?.id}`));
   });
 });

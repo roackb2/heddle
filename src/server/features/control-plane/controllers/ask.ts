@@ -12,6 +12,9 @@ import {
 } from '../../../../index.js';
 import { runMaintenanceForRecordedCandidates } from '../../../../core/memory/maintenance-integration.js';
 
+// Legacy control-plane one-shot ask path. New ask callers should create a
+// `retention: "one_off"` chat session and submit through the session turn API
+// so daemon, CLI, and web ask modes share persistence and runtime behavior.
 export type RunControlPlaneAskArgs = {
   goal: string;
   workspaceRoot: string;

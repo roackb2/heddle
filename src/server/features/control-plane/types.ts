@@ -6,10 +6,12 @@ import type { MemoryStatusView } from '../../../core/memory/visibility.js';
 import type { ReviewDiffFile } from '../../../core/review/diff-domain.js';
 import type { ProviderCredentialSource } from '../../../core/runtime/api-keys.js';
 import type { ReasoningEffort } from '../../../core/llm/types.js';
+import type { ChatSessionRetention } from '../../../core/chat/types.js';
 
 export type ChatSessionView = {
   id: string;
   name: string;
+  retention?: ChatSessionRetention;
   workspaceId?: string;
   createdAt?: string;
   updatedAt?: string;

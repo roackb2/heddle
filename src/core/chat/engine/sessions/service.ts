@@ -99,6 +99,10 @@ export class FileConversationSessionService implements ConversationSessionServic
     return this.loadSessions()[0];
   }
 
+  latestExisting(): ChatSession | undefined {
+    return this.loadExistingSessions()[0];
+  }
+
   create(input?: CreateConversationSessionInput): ChatSession {
     const existing = this.loadExistingSessions(input?.apiKeyPresent ?? this.config.apiKeyPresent);
     const session = createChatSession({
@@ -108,9 +112,18 @@ export class FileConversationSessionService implements ConversationSessionServic
       model: input?.model ?? this.config.model,
       reasoningEffort: input?.reasoningEffort ?? this.config.reasoningEffort,
       workspaceId: input?.workspaceId ?? this.config.workspaceId,
+      retention: input?.retention,
     });
     this.repository.save([session, ...existing]);
     return session;
+  }
+
+  createOneOff(input?: CreateConversationSessionInput): ChatSession {
+    return this.create({
+      ...input,
+      name: input?.name?.trim() || `Ask ${new Date().toISOString()}`,
+      retention: 'one_off',
+    });
   }
 
   update(id: string, updater: (session: ChatSession) => ChatSession): ChatSession | undefined {
@@ -284,6 +297,7 @@ export class FileConversationSessionService implements ConversationSessionServic
       model: this.config.model,
       reasoningEffort: this.config.reasoningEffort,
       workspaceId: this.config.workspaceId,
+      retention: 'reusable',
     });
   }
 

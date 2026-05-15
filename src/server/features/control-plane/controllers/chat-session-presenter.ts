@@ -87,6 +87,7 @@ export class ControlPlaneChatSessionPresenter {
     return [omitUndefined({
       id,
       name,
+      retention: candidate.retention === 'reusable' || candidate.retention === 'one_off' ? candidate.retention : undefined,
       workspaceId: readString(candidate.workspaceId),
       createdAt: readString(candidate.createdAt),
       updatedAt: readString(candidate.updatedAt),

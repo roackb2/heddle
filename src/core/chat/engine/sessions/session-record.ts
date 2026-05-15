@@ -10,7 +10,7 @@
  */
 import { truncate } from '../../../utils/text.js';
 import type { ReasoningEffort } from '../../../llm/types.js';
-import type { ChatSession, ConversationLine } from '../../types.js';
+import type { ChatSession, ChatSessionRetention, ConversationLine } from '../../types.js';
 
 export function createInitialMessages(apiKeyPresent: boolean): ConversationLine[] {
   return [
@@ -38,11 +38,13 @@ export function createChatSession(options: {
   model?: string;
   reasoningEffort?: ReasoningEffort;
   workspaceId?: string;
+  retention?: ChatSessionRetention;
 }): ChatSession {
   const now = new Date().toISOString();
   return {
     id: options.id,
     name: options.name,
+    retention: options.retention ?? 'reusable',
     workspaceId: options.workspaceId,
     history: [],
     messages: createInitialMessages(options.apiKeyPresent),

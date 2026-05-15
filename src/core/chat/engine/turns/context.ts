@@ -14,6 +14,8 @@ export type PrepareConversationTurnContextArgs = {
   preferApiKey?: boolean;
   credentialStorePath?: string;
   systemContext?: string;
+  searchIgnoreDirs?: string[];
+  includePlanTool?: boolean;
   leaseOwner?: ChatSessionLeaseOwner;
 };
 
@@ -49,8 +51,8 @@ export function prepareConversationTurnContext(args: PrepareConversationTurnCont
     credentialStorePath: args.credentialStorePath,
     workspaceRoot: args.workspaceRoot,
     memoryDir: runtime.memoryDir,
-    searchIgnoreDirs: [],
-    includePlanTool: true,
+    searchIgnoreDirs: args.searchIgnoreDirs,
+    includePlanTool: args.includePlanTool,
   });
 
   return {
