@@ -9,7 +9,7 @@ coordination that sit around the lower-level agent loop.
 - Host-facing `AgentLoopEvent` shapes and checkpoint state.
 - Provider credential resolution for runtime execution.
 - Default runtime tool bundle assembly.
-- Workspace and daemon/runtime-host registration helpers.
+- Workspace catalog ownership and daemon/runtime-host discovery.
 
 ## Does Not Own
 
@@ -27,8 +27,9 @@ coordination that sit around the lower-level agent loop.
   checkpoint state helpers.
 - `credentials/`: provider credential source resolution for runtime execution.
 - `tools/`: default runtime tool bundle assembly.
-- `workspaces.ts`, `runtime-hosts.ts`, `daemon-registry.ts`: workspace/runtime
-  host coordination.
+- `workspaces/`: workspace catalog service, repository, types, and schemas.
+- `daemon/`: daemon registry service, host resolver, message formatter, types,
+  and schemas.
 
 ## Extension Points
 
@@ -62,3 +63,7 @@ coordination that sit around the lower-level agent loop.
   not couple it to chat sessions.
 - Preserve `AgentLoopEvent` compatibility. External hosts and examples consume
   these events.
+- New runtime subdomains should follow the class-backed service shape used by
+  `workspaces/` and `daemon/`: root `types.ts` for the contract, `schemas.ts`
+  for persisted JSON, repository classes for file I/O, service classes for
+  domain behavior, and short file/class comments that explain ownership.

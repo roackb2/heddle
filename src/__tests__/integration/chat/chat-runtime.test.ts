@@ -12,7 +12,7 @@ import { EngineConversationTurnService } from '../../../core/chat/engine/turns/s
 import { FileConversationSessionService } from '../../../core/chat/engine/sessions/service.js';
 import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
-import * as agentLoopModule from '../../../core/runtime/loop/index.js';
+import * as agentLoopModule from '@/core/runtime/loop/index.js';
 import type { ToolApprovalPolicy } from '../../../core/approvals/types.js';
 import { controlPlaneChatSessionsController } from '../../../server/features/control-plane/controllers/chat-sessions-controller.js';
 

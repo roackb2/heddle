@@ -7,8 +7,8 @@ import { AskCliHost } from '../../../cli/ask.js';
 import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
-import * as agentLoopModule from '../../../core/runtime/loop/index.js';
-import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
+import * as agentLoopModule from '@/core/runtime/loop/index.js';
+import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 import type { RunResult } from '../../../index.js';
 import { createHeddleServerApp } from '../../../server/app.js';
 

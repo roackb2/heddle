@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChatSession } from '../state/types.js';
-import { resolveWorkspaceContext } from '../../../core/runtime/workspaces.js';
+import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import type { SessionExecutionPreferences } from '../../../core/chat/engine/sessions/preferences/service.js';
 import { resolveNewSessionExecutionPreferences } from '../../../core/chat/engine/sessions/preferences/service.js';
 import { FileConversationSessionService } from '../../../core/chat/engine/sessions/service.js';
@@ -28,7 +28,7 @@ type UseChatSessionsArgs = {
 
 export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultModel, workspaceRoot, stateRoot }: UseChatSessionsArgs) {
   const workspaceId = useMemo(
-    () => resolveWorkspaceContext({ workspaceRoot, stateRoot }).activeWorkspace.id,
+    () => RuntimeWorkspaceService.resolveContext({ workspaceRoot, stateRoot }).activeWorkspace.id,
     [workspaceRoot, stateRoot],
   );
   const sessionService = useMemo(

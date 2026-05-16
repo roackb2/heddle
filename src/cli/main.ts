@@ -20,7 +20,7 @@ import {
   repairMissingMemoryCatalogs,
   validateMemoryWorkspace,
 } from '../core/memory/validation.js';
-import { RuntimeCredentialService } from '../core/runtime/credentials/index.js';
+import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { runAuthCli } from './auth.js';
 import { AskCliHost } from './ask.js';
 import { startChatCli } from './chat/index.js';
@@ -28,15 +28,9 @@ import { runDaemonCli } from './daemon.js';
 import { runEvalCli } from './eval/index.js';
 import { parseHeartbeatArgs, runHeartbeatCli } from './heartbeat.js';
 import { loadProjectAgentContext, resolveAgentContextPaths } from './project-agent-context.js';
-import {
-  daemonStartConflictMessage,
-  embeddedCommandConflictMessage,
-  formatRuntimeHostNotice,
-  resolveWorkspaceRuntimeHost,
-  type ResolvedRuntimeHost,
-} from '../core/runtime/runtime-hosts.js';
-import { registerKnownWorkspaces, resolveDaemonRegistryPath } from '../core/runtime/daemon-registry.js';
-import { resolveWorkspaceContext } from '../core/runtime/workspaces.js';
+import { RuntimeHostMessages, RuntimeHostResolver, type ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
+import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
+import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 
 type RootCliOptions = {
   cwd?: string;
@@ -488,12 +482,12 @@ function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
   const workspaceRoot = resolve(flags.cwd ?? process.cwd());
   const projectConfig = loadProjectConfig(workspaceRoot);
   const stateRoot = resolve(workspaceRoot, projectConfig.stateDir ?? '.heddle');
-  const workspaceContext = resolveWorkspaceContext({
+  const workspaceContext = RuntimeWorkspaceService.resolveContext({
     workspaceRoot,
     stateRoot,
   });
-  registerKnownWorkspaces({
-    registryPath: resolveDaemonRegistryPath(),
+  RuntimeDaemonRegistryService.registerKnownWorkspaces({
+    registryPath: FileDaemonRegistryRepository.resolvePath(),
     workspaces: workspaceContext.workspaces,
   });
   return {
@@ -508,7 +502,7 @@ function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
       workspaceRoot,
       resolveAgentContextPaths(workspaceRoot, projectConfig.agentContextPaths)
     ),
-    runtimeHost: resolveWorkspaceRuntimeHost({
+    runtimeHost: RuntimeHostResolver.resolveWorkspaceHost({
       workspaceRoot,
       stateRoot,
     }),
@@ -517,7 +511,7 @@ function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
 }
 
 function writeRuntimeHostNotice(command: string, runtimeHost: ResolvedRuntimeHost) {
-  const notice = formatRuntimeHostNotice(command, runtimeHost);
+  const notice = RuntimeHostMessages.formatNotice(command, runtimeHost);
   if (!notice) {
     return;
   }
@@ -530,7 +524,7 @@ function enforceDaemonStartOwnership(runtimeHost: ResolvedRuntimeHost, forceOwne
     return;
   }
 
-  const message = daemonStartConflictMessage(runtimeHost);
+  const message = RuntimeHostMessages.daemonStartConflict(runtimeHost);
   if (message) {
     throw new Error(message);
   }
@@ -549,7 +543,7 @@ function enforceHeartbeatOwnership(args: string[], runtimeHost: ResolvedRuntimeH
     return;
   }
 
-  const message = embeddedCommandConflictMessage('heartbeat', runtimeHost);
+  const message = RuntimeHostMessages.embeddedCommandConflict('heartbeat', runtimeHost);
   if (message) {
     throw new Error(message);
   }

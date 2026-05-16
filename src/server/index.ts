@@ -6,12 +6,8 @@ import { createHeddleServerApp } from './app.js';
 import { createServerLogger } from './logger.js';
 import { assertWebAssetsBuilt } from './static.js';
 import type { HeddleServerListenOptions } from './types.js';
-import {
-  clearDaemonWorkspaceRegistration,
-  resolveDaemonRegistryPath,
-  upsertDaemonWorkspaceRegistration,
-} from '../core/runtime/daemon-registry.js';
-import { resolveWorkspaceContext } from '../core/runtime/workspaces.js';
+import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
+import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 
 export type { HeddleServerListenOptions, HeddleServerOptions } from './types.js';
 export { appRouter, type AppRouter } from './router.js';
@@ -26,15 +22,15 @@ export async function listenHeddleDaemon(options: HeddleServerListenOptions): Pr
     assertWebAssetsBuilt(assetsDir);
   }
   const logger = options.logger ?? createServerLogger({ stateRoot: options.stateRoot });
-  const registryPath = options.daemonRegistryPath ?? resolveDaemonRegistryPath();
+  const registryPath = options.daemonRegistryPath ?? FileDaemonRegistryRepository.resolvePath();
   const ownerId = `daemon-${process.pid}-${Date.now()}`;
   const startedAt = new Date().toISOString();
   const registerDaemon = (lastSeenAt?: string) => {
-    const workspaceContext = resolveWorkspaceContext({
+    const workspaceContext = RuntimeWorkspaceService.resolveContext({
       workspaceRoot: options.workspaceRoot,
       stateRoot: options.stateRoot,
     });
-    upsertDaemonWorkspaceRegistration({
+    RuntimeDaemonRegistryService.upsertWorkspaceRegistration({
       registryPath,
       workspaces: workspaceContext.workspaces,
       owner: {
@@ -51,11 +47,11 @@ export async function listenHeddleDaemon(options: HeddleServerListenOptions): Pr
     });
   };
   const unregisterDaemon = () => {
-    const workspaceContext = resolveWorkspaceContext({
+    const workspaceContext = RuntimeWorkspaceService.resolveContext({
       workspaceRoot: options.workspaceRoot,
       stateRoot: options.stateRoot,
     });
-    clearDaemonWorkspaceRegistration({
+    RuntimeDaemonRegistryService.clearWorkspaceRegistration({
       registryPath,
       workspaceIds: workspaceContext.workspaces.map((workspace) => workspace.id),
       stateRoots: workspaceContext.workspaces.map((workspace) => workspace.stateRoot),

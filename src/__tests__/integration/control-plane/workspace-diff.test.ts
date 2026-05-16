@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
-import { ensureWorkspaceCatalog } from '../../../core/runtime/workspaces.js';
+import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import { controlPlaneRouter } from '../../../server/features/control-plane/router.js';
 import { ControlPlaneWorkspaceDiffController } from '../../../server/features/control-plane/controllers/workspace-diff.js';
 
@@ -95,7 +95,7 @@ describe('workspace diff review', () => {
     const root = createGitWorkspace();
     writeFileSync(join(root, 'README.md'), 'hello\nworld\nrouter\n');
     const stateRoot = join(root, '.heddle');
-    const catalog = ensureWorkspaceCatalog({ workspaceRoot: root, stateRoot });
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot: root, stateRoot });
     const activeWorkspace = catalog.workspaces[0];
     if (!activeWorkspace) {
       throw new Error('expected default workspace');

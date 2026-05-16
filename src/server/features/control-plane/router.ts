@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { BUILT_IN_MODEL_GROUPS } from '../../../core/llm/openai-models.js';
 import { buildCredentialAwareModelOption, credentialModeFromSource } from '../../../core/llm/model-policy.js';
 import { inferProviderFromModel } from '../../../core/llm/factory.js';
-import { RuntimeCredentialService } from '../../../core/runtime/credentials/index.js';
+import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { procedure, router } from '../../trpc.js';
 import type { HeddleServerContext } from '../../types.js';
 import { controlPlaneChatSessionsController } from './controllers/chat-sessions-controller.js';
@@ -14,8 +14,8 @@ import { ControlPlaneMemoryController } from './controllers/memory.js';
 import { ControlPlaneLayoutSnapshotsController } from './controllers/layout-snapshots.js';
 import { ControlPlaneWorkspaceFilesController } from './controllers/workspace-files.js';
 import { ControlPlaneWorkspaceDiffController } from './controllers/workspace-diff.js';
-import { createWorkspaceDescriptor, renameWorkspaceDescriptor, setActiveWorkspace } from '../../../core/runtime/workspaces.js';
-import { registerKnownWorkspaces, resolveDaemonRegistryPath } from '../../../core/runtime/daemon-registry.js';
+import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
+import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 
 const sessionInputSchema = z.object({
   id: z.string().min(1),
@@ -320,7 +320,7 @@ export const controlPlaneRouter = router({
     return await ControlPlaneWorkspaceDiffController.readFileDiff(ctx.activeWorkspace.anchorRoot, input.path);
   }),
   workspaceSetActive: procedure.input(workspaceSetActiveInputSchema).mutation(({ ctx, input }) => {
-    const resolved = setActiveWorkspace({
+    const resolved = RuntimeWorkspaceService.setActive({
       workspaceRoot: ctx.workspaceRoot,
       stateRoot: ctx.stateRoot,
       workspaceId: input.workspaceId,
@@ -333,7 +333,7 @@ export const controlPlaneRouter = router({
     };
   }),
   workspaceCreate: procedure.input(workspaceCreateInputSchema).mutation(({ ctx, input }) => {
-    const resolved = createWorkspaceDescriptor({
+    const resolved = RuntimeWorkspaceService.createDescriptor({
       workspaceRoot: ctx.workspaceRoot,
       stateRoot: ctx.stateRoot,
       name: input.name,
@@ -349,7 +349,7 @@ export const controlPlaneRouter = router({
     };
   }),
   workspaceRename: procedure.input(workspaceRenameInputSchema).mutation(({ ctx, input }) => {
-    const resolved = renameWorkspaceDescriptor({
+    const resolved = RuntimeWorkspaceService.rename({
       workspaceRoot: ctx.workspaceRoot,
       stateRoot: ctx.stateRoot,
       workspaceId: input.workspaceId,
@@ -379,10 +379,10 @@ function controlPlaneSessionEngineArgs(ctx: HeddleServerContext) {
 
 function registerControlPlaneWorkspaces(
   ctx: HeddleServerContext,
-  workspaces: Parameters<typeof registerKnownWorkspaces>[0]['workspaces'],
+  workspaces: Parameters<typeof RuntimeDaemonRegistryService.registerKnownWorkspaces>[0]['workspaces'],
 ) {
-  registerKnownWorkspaces({
-    registryPath: ctx.runtimeHost?.registryPath ?? resolveDaemonRegistryPath(),
+  RuntimeDaemonRegistryService.registerKnownWorkspaces({
+    registryPath: ctx.runtimeHost?.registryPath ?? FileDaemonRegistryRepository.resolvePath(),
     workspaces,
   });
 }

@@ -7,8 +7,8 @@ import { appRouter } from './router.js';
 import { installWebStaticRoutes } from './static.js';
 import type { HeddleRuntimeHostDescriptor, HeddleServerContext } from './types.js';
 import { controlPlaneChatSessionsController } from './features/control-plane/controllers/chat-sessions-controller.js';
-import { readDaemonWorkspaceRegistration } from '../core/runtime/daemon-registry.js';
-import { resolveWorkspaceContext } from '../core/runtime/workspaces.js';
+import { RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
+import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 
 export function createHeddleServerApp(
   options: Pick<HeddleServerContext, 'workspaceRoot' | 'stateRoot'>
@@ -25,13 +25,13 @@ export function createHeddleServerApp(
   app.use('/trpc', createExpressMiddleware({
     router: appRouter,
     createContext: () => {
-      const workspaceContext = resolveWorkspaceContext({
+      const workspaceContext = RuntimeWorkspaceService.resolveContext({
         workspaceRoot: options.workspaceRoot,
         stateRoot: options.stateRoot,
       });
       const workspaceOwner =
         options.runtimeHost ?
-          readDaemonWorkspaceRegistration(
+          RuntimeDaemonRegistryService.readWorkspaceRegistration(
             options.runtimeHost.registryPath,
             workspaceContext.activeWorkspaceId,
             workspaceContext.activeWorkspace.stateRoot,
@@ -74,7 +74,7 @@ export function createHeddleServerApp(
       return;
     }
 
-    const workspaceContext = resolveWorkspaceContext({
+    const workspaceContext = RuntimeWorkspaceService.resolveContext({
       workspaceRoot: options.workspaceRoot,
       stateRoot: options.stateRoot,
     });

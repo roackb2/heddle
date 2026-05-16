@@ -2,23 +2,17 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import {
-  clearDaemonWorkspaceRegistration,
-  readDaemonWorkspaceRegistration,
-  registerKnownWorkspaces,
-  resolveDaemonRegistryPath,
-  upsertDaemonWorkspaceRegistration,
-} from '../../../core/runtime/daemon-registry.js';
-import { ensureWorkspaceCatalog } from '../../../core/runtime/workspaces.js';
+import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
+import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 
 describe('daemon registry', () => {
   it('registers daemon ownership for workspace catalog entries', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-daemon-registry-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    const registryPath = resolveDaemonRegistryPath(mkdtempSync(join(tmpdir(), 'heddle-daemon-registry-home-')));
-    const catalog = ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
+    const registryPath = FileDaemonRegistryRepository.resolvePath(mkdtempSync(join(tmpdir(), 'heddle-daemon-registry-home-')));
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
 
-    const registry = upsertDaemonWorkspaceRegistration({
+    const registry = RuntimeDaemonRegistryService.upsertWorkspaceRegistration({
       registryPath,
       workspaces: catalog.workspaces,
       owner: {
@@ -48,16 +42,16 @@ describe('daemon registry', () => {
       },
     });
 
-    expect(readDaemonWorkspaceRegistration(registryPath, 'default')?.owner?.ownerId).toBe('daemon-1');
+    expect(RuntimeDaemonRegistryService.readWorkspaceRegistration(registryPath, 'default')?.owner?.ownerId).toBe('daemon-1');
   });
 
   it('clears ownership only for the matching daemon owner', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-daemon-clear-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    const registryPath = resolveDaemonRegistryPath(mkdtempSync(join(tmpdir(), 'heddle-daemon-clear-home-')));
-    const catalog = ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
+    const registryPath = FileDaemonRegistryRepository.resolvePath(mkdtempSync(join(tmpdir(), 'heddle-daemon-clear-home-')));
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
 
-    upsertDaemonWorkspaceRegistration({
+    RuntimeDaemonRegistryService.upsertWorkspaceRegistration({
       registryPath,
       workspaces: catalog.workspaces,
       owner: {
@@ -72,33 +66,33 @@ describe('daemon registry', () => {
       },
     });
 
-    clearDaemonWorkspaceRegistration({
+    RuntimeDaemonRegistryService.clearWorkspaceRegistration({
       registryPath,
       workspaceIds: ['default'],
       ownerId: 'daemon-2',
     });
-    expect(readDaemonWorkspaceRegistration(registryPath, 'default')?.owner?.ownerId).toBe('daemon-1');
+    expect(RuntimeDaemonRegistryService.readWorkspaceRegistration(registryPath, 'default')?.owner?.ownerId).toBe('daemon-1');
 
-    clearDaemonWorkspaceRegistration({
+    RuntimeDaemonRegistryService.clearWorkspaceRegistration({
       registryPath,
       workspaceIds: ['default'],
       ownerId: 'daemon-1',
     });
-    expect(readDaemonWorkspaceRegistration(registryPath, 'default')?.owner).toBeUndefined();
+    expect(RuntimeDaemonRegistryService.readWorkspaceRegistration(registryPath, 'default')?.owner).toBeUndefined();
   });
 
   it('keeps default-id workspaces distinct by state root', () => {
     const firstRoot = mkdtempSync(join(tmpdir(), 'heddle-daemon-registry-first-'));
     const secondRoot = mkdtempSync(join(tmpdir(), 'heddle-daemon-registry-second-'));
-    const registryPath = resolveDaemonRegistryPath(mkdtempSync(join(tmpdir(), 'heddle-daemon-registry-global-home-')));
-    const firstCatalog = ensureWorkspaceCatalog({ workspaceRoot: firstRoot, stateRoot: join(firstRoot, '.heddle') });
-    const secondCatalog = ensureWorkspaceCatalog({ workspaceRoot: secondRoot, stateRoot: join(secondRoot, '.heddle') });
+    const registryPath = FileDaemonRegistryRepository.resolvePath(mkdtempSync(join(tmpdir(), 'heddle-daemon-registry-global-home-')));
+    const firstCatalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot: firstRoot, stateRoot: join(firstRoot, '.heddle') });
+    const secondCatalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot: secondRoot, stateRoot: join(secondRoot, '.heddle') });
 
-    registerKnownWorkspaces({ registryPath, workspaces: firstCatalog.workspaces });
-    const registry = registerKnownWorkspaces({ registryPath, workspaces: secondCatalog.workspaces });
+    RuntimeDaemonRegistryService.registerKnownWorkspaces({ registryPath, workspaces: firstCatalog.workspaces });
+    const registry = RuntimeDaemonRegistryService.registerKnownWorkspaces({ registryPath, workspaces: secondCatalog.workspaces });
 
     expect(registry.workspaces).toHaveLength(2);
-    expect(readDaemonWorkspaceRegistration(registryPath, 'default', join(firstRoot, '.heddle'))?.workspace.anchorRoot).toBe(firstRoot);
-    expect(readDaemonWorkspaceRegistration(registryPath, 'default', join(secondRoot, '.heddle'))?.workspace.anchorRoot).toBe(secondRoot);
+    expect(RuntimeDaemonRegistryService.readWorkspaceRegistration(registryPath, 'default', join(firstRoot, '.heddle'))?.workspace.anchorRoot).toBe(firstRoot);
+    expect(RuntimeDaemonRegistryService.readWorkspaceRegistration(registryPath, 'default', join(secondRoot, '.heddle'))?.workspace.anchorRoot).toBe(secondRoot);
   });
 });

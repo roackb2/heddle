@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
-import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
+import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 
 export function RuntimeHostInterstitial({
   runtimeHost,

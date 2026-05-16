@@ -13,7 +13,7 @@ import type { EditFilePreview } from '../../../../core/tools/toolkits/coding-fil
 import type { PlanItem } from '../../../../core/tools/toolkits/internal/update-plan.js';
 import {
   RuntimeCredentialService,
-} from '../../../../core/runtime/credentials/index.js';
+} from '@/core/runtime/credentials/index.js';
 import { ChatSessionRecords, ChatSessionTitles } from '../../../../core/chat/engine/sessions/records/index.js';
 import type { ConversationSessionService } from '../../../../core/chat/engine/types.js';
 import { normalizeSessionTitle } from '../../utils/format.js';

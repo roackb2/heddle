@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 import { createFileHeartbeatTaskStore, type HeartbeatTask } from '../../../index.js';
-import { ensureWorkspaceCatalog } from '../../../core/runtime/workspaces.js';
+import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import { controlPlaneRouter } from '../../../server/features/control-plane/router.js';
 import { ControlPlaneHeartbeatController } from '../../../server/features/control-plane/controllers/heartbeat.js';
 
@@ -60,7 +60,7 @@ describe('control-plane heartbeat mutations', () => {
     const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-router-'));
     const store = createFileHeartbeatTaskStore({ dir: join(stateRoot, 'heartbeat') });
     await store.saveTask(createTask());
-    const catalog = ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
     const activeWorkspace = catalog.workspaces[0];
     if (!activeWorkspace) {
       throw new Error('expected default workspace');
