@@ -1,5 +1,5 @@
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
-import { buildSessionCompactionRunningContext, compactChatHistoryWithArchive } from '@/core/chat/engine/history/compaction.js';
+import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import { ChatSessionLeases } from '@/core/chat/engine/sessions/leases/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
@@ -35,7 +35,7 @@ export class ConversationTurnPreflightService {
       toolNames: args.toolNames,
       goal: args.prompt,
     };
-    const preflightCompacted = await compactChatHistoryWithArchive({
+    const preflightCompacted = await ConversationCompactionService.compact({
       history: initialHistory,
       runtime: compactionRuntime,
       session: { id: args.sessionId },
@@ -95,7 +95,7 @@ export class ConversationTurnPreflightService {
   }
 
   private static buildRunningCompactionContext(args: PersistPreflightRunningSeedArgs) {
-    return buildSessionCompactionRunningContext({
+    return ConversationCompactionService.buildSessionRunningContext({
       session: args.leasedSession,
       lastArchivePath: args.archivePath,
     });

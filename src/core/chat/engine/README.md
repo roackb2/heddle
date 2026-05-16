@@ -56,7 +56,7 @@ should expose one answer rather than letting each host improvise.
   `turns/host/`.
 - Put submit/continue behavior in `turns/service.ts`.
 - Put persisted turn phases in the explicit `turns/*/` subdomains.
-- Put shared compaction/history behavior in `history/compaction.ts`.
+- Put shared compaction behavior in `compaction/`.
 
 ## Notes For Coding Agents
 

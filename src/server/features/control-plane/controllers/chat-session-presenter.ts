@@ -34,28 +34,47 @@ export class ControlPlaneChatSessionPresenter {
     const messages = Array.isArray(candidate.messages) ? candidate.messages : [];
     const lastTurn = readObject(turns.at(-1));
     const context = readObject(candidate.context);
+    const request = readObject(context?.request);
+    const usage = readObject(request?.usage);
+    const compaction = readObject(context?.compaction);
+    const archive = readObject(context?.archive);
     const archives = Array.isArray(candidate.archives) ? candidate.archives.map(readObject).filter(Boolean) : [];
-    const rawCompactionStatus = readString(context?.compactionStatus);
-    const compactionStatus: ChatSessionContextView['compactionStatus'] =
+    const rawCompactionStatus = readString(compaction?.status);
+    const compactionStatus: NonNullable<ChatSessionContextView['compaction']>['status'] =
       rawCompactionStatus === 'idle' || rawCompactionStatus === 'running' || rawCompactionStatus === 'failed' ?
         rawCompactionStatus
       : undefined;
+    const requestView = omitEmpty({
+      estimatedTokens: readNumber(request?.estimatedTokens),
+      toolNames: readStringArray(request?.toolNames),
+      goal: readString(request?.goal),
+      usage: omitEmpty({
+        inputTokens: readNumber(usage?.inputTokens),
+        outputTokens: readNumber(usage?.outputTokens),
+        totalTokens: readNumber(usage?.totalTokens),
+        cachedInputTokens: readNumber(usage?.cachedInputTokens),
+        reasoningTokens: readNumber(usage?.reasoningTokens),
+      }),
+    });
+    const compactionView = omitEmpty({
+      compactedMessages: readNumber(compaction?.compactedMessages),
+      compactedAt: readString(compaction?.compactedAt),
+      status: compactionStatus,
+      error: readString(compaction?.error),
+    });
+    const archiveView = omitEmpty({
+      count: readNumber(archive?.count),
+      currentSummaryPath: readString(archive?.currentSummaryPath),
+      lastArchivePath: readString(archive?.lastArchivePath),
+    });
 
     const contextView =
       context ?
         omitUndefined({
           estimatedHistoryTokens: readNumber(context.estimatedHistoryTokens),
-          estimatedRequestTokens: readNumber(context.estimatedRequestTokens),
-          lastRunInputTokens: readNumber(context.lastRunInputTokens),
-          lastRunOutputTokens: readNumber(context.lastRunOutputTokens),
-          lastRunTotalTokens: readNumber(context.lastRunTotalTokens),
-          compactedMessages: readNumber(context.compactedMessages),
-          compactedAt: readString(context.compactedAt),
-          compactionStatus,
-          compactionError: readString(context.compactionError),
-          archiveCount: readNumber(context.archiveCount),
-          currentSummaryPath: readString(context.currentSummaryPath),
-          lastArchivePath: readString(context.lastArchivePath),
+          request: requestView,
+          compaction: compactionView,
+          archive: archiveView,
         })
       : undefined;
     const archiveViews = archives.flatMap((archive) => {
@@ -218,4 +237,13 @@ export class ControlPlaneChatSessionPresenter {
 
     return undefined;
   }
+}
+
+function omitEmpty<T extends Record<string, unknown>>(value: T): T | undefined {
+  const compact = omitUndefined(value);
+  return Object.keys(compact).length > 0 ? compact : undefined;
+}
+
+function readStringArray(value: unknown): string[] | undefined {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string') ? value : undefined;
 }

@@ -1,5 +1,6 @@
 import { runLocalCommand } from './state/local-commands.js';
-import { compactChatHistoryWithArchive } from './state/compaction.js';
+import { ConversationCompactionService } from './state/compaction.js';
+import type { ConversationCompactionResult } from './state/compaction.js';
 import type { ConversationSessionService } from '../../core/chat/engine/types.js';
 import type { ReasoningEffort } from '../../core/llm/types.js';
 import type { ChatSession, ConversationLine } from './state/types.js';
@@ -80,7 +81,7 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
       args.sessionService.markCompactionRunning(session.id, { sourceHistory: session.history });
       args.refreshSessions();
 
-      return compactChatHistoryWithArchive({
+      return ConversationCompactionService.compact({
         history: session.history,
         runtime: {
           model: args.activeModel,
@@ -89,11 +90,11 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
         session,
         force: true,
         summarizer: { credentialSource: args.providerCredentialSource },
-      }).then((compacted: Awaited<ReturnType<typeof compactChatHistoryWithArchive>>) => {
+      }).then((compacted: ConversationCompactionResult) => {
         const changed =
           compacted.history.length !== session.history.length
-          || compacted.context.compactedMessages !== undefined
-          || compacted.archives.length !== (session.archives?.length ?? 0);
+          || compacted.context.compaction?.compactedMessages !== undefined
+          || compacted.archive.archives.length !== (session.archives?.length ?? 0);
 
         if (!changed) {
           args.setStatus('Idle');
@@ -104,10 +105,10 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
         args.refreshSessions();
         args.setStatus('Idle');
 
-        return compacted.context.compactedMessages && compacted.context.lastArchivePath ?
-            `Compacted earlier session history into a rolling summary and archived ${compacted.context.compactedMessages} messages.\nArchive: ${compacted.context.lastArchivePath}`
-          : compacted.context.compactionError ?
-            `Compaction skipped. ${compacted.context.compactionError}`
+        return compacted.context.compaction?.compactedMessages && compacted.context.archive?.lastArchivePath ?
+            `Compacted earlier session history into a rolling summary and archived ${compacted.context.compaction?.compactedMessages} messages.\nArchive: ${compacted.context.archive?.lastArchivePath}`
+          : compacted.context.compaction?.error ?
+            `Compaction skipped. ${compacted.context.compaction?.error}`
           : 'Current session history is already compact enough.';
       }).catch((error: unknown) => {
         args.setStatus('Idle');

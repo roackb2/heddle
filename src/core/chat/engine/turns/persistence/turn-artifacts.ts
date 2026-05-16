@@ -1,4 +1,4 @@
-import { compactChatHistoryWithArchive, estimateChatHistoryTokens } from '@/core/chat/engine/history/compaction.js';
+import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import { formatChatFailureMessage } from '@/core/chat/failure-messages.js';
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { TraceWriter } from '../trace/index.js';
@@ -22,7 +22,7 @@ export class ConversationTurnArtifacts {
       toolNames: args.toolNames,
       goal: args.prompt,
     };
-    const compacted = await compactChatHistoryWithArchive({
+    const compacted = await ConversationCompactionService.compact({
       history: sourceHistory,
       runtime: compactionRuntime,
       session: args.session,
@@ -42,7 +42,7 @@ export class ConversationTurnArtifacts {
       args.result.outcome === 'error'
         ? formatChatFailureMessage(args.result.summary, {
             model: compactionRuntime.model,
-            estimatedHistoryTokens: estimateChatHistoryTokens(args.historyForTokenEstimate),
+            estimatedHistoryTokens: ConversationCompactionService.estimateTokens(args.historyForTokenEstimate),
           })
         : args.result.summary;
 

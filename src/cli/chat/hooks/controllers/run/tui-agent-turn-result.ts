@@ -1,6 +1,6 @@
 import type { RunResult } from '../../../../../index.js';
 import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
-import { estimateChatHistoryTokens } from '../../../state/compaction.js';
+import { ConversationCompactionService } from '../../../state/compaction.js';
 import type { ChatSession } from '../../../state/types.js';
 import { formatChatFailureMessage } from '../../../utils/format.js';
 import type { ActionState } from '../useAgentRunController.js';
@@ -93,7 +93,7 @@ export async function applyTuiAgentTurnFailure(args: {
   const message = error instanceof Error ? error.message : String(error);
   const formattedMessage = formatChatFailureMessage(message, {
     model,
-    estimatedHistoryTokens: estimateChatHistoryTokens(promptHistory),
+    estimatedHistoryTokens: ConversationCompactionService.estimateTokens(promptHistory),
   });
   state.setError(formattedMessage);
   state.setStatus('Error');

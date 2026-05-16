@@ -45,7 +45,13 @@ describe('daemon CLI helpers', () => {
       }],
       context: {
         estimatedHistoryTokens: 100,
-        lastRunTotalTokens: 250,
+        request: {
+          usage: {
+            inputTokens: 100,
+            outputTokens: 150,
+            totalTokens: 250,
+          },
+        },
       },
     })).toEqual([{
       id: 'session-1',
@@ -61,10 +67,13 @@ describe('daemon CLI helpers', () => {
       lastSummary: 'Found the implementation area.',
       context: {
         estimatedHistoryTokens: 100,
-        estimatedRequestTokens: undefined,
-        lastRunInputTokens: undefined,
-        lastRunOutputTokens: undefined,
-        lastRunTotalTokens: 250,
+        request: {
+          usage: {
+            inputTokens: 100,
+            outputTokens: 150,
+            totalTokens: 250,
+          },
+        },
       },
     }]);
   });

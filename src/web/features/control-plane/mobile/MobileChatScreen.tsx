@@ -67,7 +67,7 @@ export function MobileChatScreen({
   const canSend = Boolean(selectedSessionId && !runActive && draft.trim());
   const canContinue = Boolean(selectedSessionId && !runActive && sessionDetail?.lastContinuePrompt);
   const title = sessionDetail?.name ?? activeSession?.name ?? 'Chat session';
-  const compacting = (sessionDetail?.context?.compactionStatus ?? activeSession?.context?.compactionStatus) === 'running';
+  const compacting = (sessionDetail?.context?.compaction?.status ?? activeSession?.context?.compaction?.status) === 'running';
   const [approvalSheetOpen, setApprovalSheetOpen] = useState(false);
 
   useEffect(() => {

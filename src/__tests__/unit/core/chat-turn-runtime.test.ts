@@ -243,8 +243,8 @@ describe('chat turn preparation modules', () => {
     });
 
     const nextSession = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list(true)[0];
-    expect(nextSession?.context?.compactionStatus).toBe('running');
-    expect(nextSession?.context?.lastArchivePath).toBe('.heddle/chat-sessions/session-1/archives/archive-1.jsonl');
+    expect(nextSession?.context?.compaction?.status).toBe('running');
+    expect(nextSession?.context?.archive?.lastArchivePath).toBe('.heddle/chat-sessions/session-1/archives/archive-1.jsonl');
     expect(nextSession?.lease).toEqual(leasedSession.lease);
   });
 
@@ -270,9 +270,11 @@ describe('chat turn preparation modules', () => {
         ],
         context: {
           estimatedHistoryTokens: 42,
-          compactionStatus: 'idle',
+          compaction: { status: 'idle' },
         },
-        archives: [],
+        archive: {
+          archives: [],
+        },
       },
     });
 

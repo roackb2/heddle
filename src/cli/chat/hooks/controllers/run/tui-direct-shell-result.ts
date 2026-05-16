@@ -1,7 +1,7 @@
 import { summarizeToolCall } from '../../../../../core/observability/conversation-activity.js';
 import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
 import { appendDirectShellHistory, formatDirectShellResponse } from '../../../utils/format.js';
-import { compactChatHistoryWithArchive } from '../../../state/compaction.js';
+import { ConversationCompactionService } from '../../../state/compaction.js';
 import type { ChatSession } from '../../../state/types.js';
 import type { ChatRuntimeConfig } from '../../../utils/runtime.js';
 import type { ActionState } from '../useAgentRunController.js';
@@ -46,7 +46,7 @@ export async function finalizeTuiDirectShellSuccess(args: {
     sessionService,
     refreshSessions,
   });
-  const compacted = await compactChatHistoryWithArchive({
+  const compacted = await ConversationCompactionService.compact({
     history: directShellHistory,
     runtime: {
       model,

@@ -10,6 +10,7 @@ import type { TraceEvent } from '../../types.js';
 import type { ChatSessionLeaseOwner } from './sessions/leases/index.js';
 import type { ChatSession, ChatSessionRetention } from '../types.js';
 import type { ChatTurnHostPort } from './turns/host/index.js';
+import type { ConversationCompactionResult } from '@/core/chat/engine/compaction/index.js';
 
 export type ConversationEngineConfig = {
   workspaceRoot: string;
@@ -109,7 +110,7 @@ export type MarkConversationCompactionRunningInput = {
   archivePath?: string;
 };
 
-export type ApplyConversationCompactionResultInput = Pick<ChatSession, 'history' | 'context' | 'archives'>;
+export type ApplyConversationCompactionResultInput = ConversationCompactionResult;
 
 export type RestoreConversationCompactionStateInput = Pick<ChatSession, 'context' | 'archives'>;
 

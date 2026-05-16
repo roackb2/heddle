@@ -26,17 +26,29 @@ export type ChatSessionView = {
   lastSummary?: string;
   context?: {
     estimatedHistoryTokens?: number;
-    estimatedRequestTokens?: number;
-    lastRunInputTokens?: number;
-    lastRunOutputTokens?: number;
-    lastRunTotalTokens?: number;
-    compactedMessages?: number;
-    compactedAt?: string;
-    compactionStatus?: 'idle' | 'running' | 'failed';
-    compactionError?: string;
-    archiveCount?: number;
-    currentSummaryPath?: string;
-    lastArchivePath?: string;
+    request?: {
+      estimatedTokens?: number;
+      toolNames?: string[];
+      goal?: string;
+      usage?: {
+        inputTokens?: number;
+        outputTokens?: number;
+        totalTokens?: number;
+        cachedInputTokens?: number;
+        reasoningTokens?: number;
+      };
+    };
+    compaction?: {
+      compactedMessages?: number;
+      compactedAt?: string;
+      status?: 'idle' | 'running' | 'failed';
+      error?: string;
+    };
+    archive?: {
+      count?: number;
+      currentSummaryPath?: string;
+      lastArchivePath?: string;
+    };
   };
   archives?: Array<{
     id: string;

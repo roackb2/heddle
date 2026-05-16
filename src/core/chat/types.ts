@@ -1,4 +1,4 @@
-import type { ChatMessage, ReasoningEffort } from '../llm/types.js';
+import type { ChatMessage, LlmUsage, ReasoningEffort } from '../llm/types.js';
 import type { ToolCall, ToolDefinition } from '../types.js';
 import type { EditFilePreview } from '../tools/toolkits/coding-files/edit-file.js';
 
@@ -27,19 +27,23 @@ export type LiveEvent = {
 
 export type ChatContextStats = {
   estimatedHistoryTokens: number;
-  estimatedRequestTokens?: number;
-  lastRunInputTokens?: number;
-  lastRunOutputTokens?: number;
-  lastRunTotalTokens?: number;
-  cachedInputTokens?: number;
-  reasoningTokens?: number;
-  compactedMessages?: number;
-  compactedAt?: string;
-  compactionStatus?: 'idle' | 'running' | 'failed';
-  compactionError?: string;
-  archiveCount?: number;
-  currentSummaryPath?: string;
-  lastArchivePath?: string;
+  request?: {
+    estimatedTokens?: number;
+    toolNames?: string[];
+    goal?: string;
+    usage?: LlmUsage;
+  };
+  compaction?: {
+    compactedMessages?: number;
+    compactedAt?: string;
+    status?: 'idle' | 'running' | 'failed';
+    error?: string;
+  };
+  archive?: {
+    count?: number;
+    currentSummaryPath?: string;
+    lastArchivePath?: string;
+  };
 };
 
 export type ChatArchiveRecord = {

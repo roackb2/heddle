@@ -88,7 +88,7 @@ export class ChatSessionRecords {
       ...input.session,
       history: input.compacted.history,
       context: input.compacted.context,
-      archives: input.compacted.archives,
+      archives: input.compacted.archive.archives,
       messages: ConversationLines.fromHistory(input.compacted.history),
     };
   }

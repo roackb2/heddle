@@ -5,13 +5,13 @@
  * about storage, host state, or session lifecycle policy.
  */
 import type { ChatMessage } from '@/core/llm/types.js';
-import { isCompactedHistorySummary } from '@/core/chat/engine/history/compaction.js';
+import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import type { ConversationLine } from '@/core/chat/types.js';
 
 export class ConversationLines {
   static fromHistory(history: ChatMessage[]): ConversationLine[] {
     return history.flatMap((message, index) => {
-      if (isCompactedHistorySummary(message)) {
+      if (ConversationCompactionService.isCompactedHistorySummary(message)) {
         const archiveRootMatch = message.content.match(/Archive root:\s*(.+)/);
         return [{
           id: `compacted-${index}`,

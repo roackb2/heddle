@@ -5,7 +5,10 @@ import type { ProviderCredentialSource } from '@/core/runtime/api-keys.js';
 import type { TraceSummarizerRegistry } from '@/core/observability/trace-summarizers.js';
 import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
 import type { ChatTurnHostPort } from '../host/index.js';
-import type { compactChatHistoryWithArchive } from '@/core/chat/engine/history/compaction.js';
+import type {
+  ConversationCompactionResult,
+  ConversationCompactionOptions,
+} from '@/core/chat/engine/compaction/index.js';
 
 export type PersistChatTurnCompactionStatus = {
   status: 'running' | 'finished' | 'failed';
@@ -24,7 +27,7 @@ export type PersistChatTurnResultArgs = {
   systemContext?: string;
   toolNames: string[];
   historyForTokenEstimate: ChatMessage[];
-  summarizer: Parameters<typeof compactChatHistoryWithArchive>[0]['summarizer'];
+  summarizer: ConversationCompactionOptions['summarizer'];
   traceSummarizerRegistry?: TraceSummarizerRegistry;
   createTurnId: () => string;
   onCompactionStatus?: (event: PersistChatTurnCompactionStatus, sourceHistory: ChatMessage[]) => void;
@@ -42,7 +45,7 @@ export type PersistTurnCompactionRequest = {
 };
 
 export type PersistChatTurnArtifacts = {
-  compacted: Awaited<ReturnType<typeof compactChatHistoryWithArchive>>;
+  compacted: ConversationCompactionResult;
   summary: string;
   traceFile: string;
   turn: TurnSummary;

@@ -1,8 +1,5 @@
-export {
-  buildCompactionRunningContext,
-  buildSessionCompactionRunningContext,
-  compactChatHistory,
-  compactChatHistoryWithArchive,
-  estimateChatHistoryTokens,
-  isCompactedHistorySummary,
-} from '../../../core/chat/engine/history/compaction.js';
+export { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
+export type {
+  ConversationCompactionResult,
+  ConversationCompactionOptions,
+} from '@/core/chat/engine/compaction/index.js';

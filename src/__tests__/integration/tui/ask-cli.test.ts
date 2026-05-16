@@ -217,24 +217,29 @@ describe('AskCliHost.run', () => {
       { role: 'user' as const, content: 'very large turn 2' },
       { role: 'assistant' as const, content: 'very large answer 2' },
     ];
-    const compactionSpy = vi.spyOn(await import('../../../core/chat/engine/history/compaction.js'), 'compactChatHistoryWithArchive');
+    const compactionModule = await import('@/core/chat/engine/compaction/index.js');
+    const compactionSpy = vi.spyOn(compactionModule.ConversationCompactionService, 'compact');
     compactionSpy
       .mockResolvedValueOnce({
         history: compactedHistory,
         context: {
           estimatedHistoryTokens: 123,
-          compactionStatus: 'idle',
-          archiveCount: 1,
-          lastArchivePath: '.heddle/chat-sessions/session-preflight/archives/archive-1.jsonl',
+          compaction: { status: 'idle' },
+          archive: {
+            count: 1,
+            lastArchivePath: '.heddle/chat-sessions/session-preflight/archives/archive-1.jsonl',
+          },
         },
-        archives: [{
-          id: 'archive-1',
-          path: '.heddle/chat-sessions/session-preflight/archives/archive-1.jsonl',
-          summaryPath: '.heddle/chat-sessions/session-preflight/archives/archive-1.summary.md',
-          messageCount: 2,
-          createdAt: '2026-04-21T00:00:00.000Z',
-          summaryModel: 'gpt-5.1-codex-mini',
-        }],
+        archive: {
+          archives: [{
+            id: 'archive-1',
+            path: '.heddle/chat-sessions/session-preflight/archives/archive-1.jsonl',
+            summaryPath: '.heddle/chat-sessions/session-preflight/archives/archive-1.summary.md',
+            messageCount: 2,
+            createdAt: '2026-04-21T00:00:00.000Z',
+            summaryModel: 'gpt-5.1-codex-mini',
+          }],
+        },
       })
       .mockResolvedValueOnce({
         history: [
@@ -244,18 +249,22 @@ describe('AskCliHost.run', () => {
         ],
         context: {
           estimatedHistoryTokens: 150,
-          compactionStatus: 'idle',
-          archiveCount: 1,
-          lastArchivePath: '.heddle/chat-sessions/session-preflight/archives/archive-1.jsonl',
+          compaction: { status: 'idle' },
+          archive: {
+            count: 1,
+            lastArchivePath: '.heddle/chat-sessions/session-preflight/archives/archive-1.jsonl',
+          },
         },
-        archives: [{
-          id: 'archive-1',
-          path: '.heddle/chat-sessions/session-preflight/archives/archive-1.jsonl',
-          summaryPath: '.heddle/chat-sessions/session-preflight/archives/archive-1.summary.md',
-          messageCount: 2,
-          createdAt: '2026-04-21T00:00:00.000Z',
-          summaryModel: 'gpt-5.1-codex-mini',
-        }],
+        archive: {
+          archives: [{
+            id: 'archive-1',
+            path: '.heddle/chat-sessions/session-preflight/archives/archive-1.jsonl',
+            summaryPath: '.heddle/chat-sessions/session-preflight/archives/archive-1.summary.md',
+            messageCount: 2,
+            createdAt: '2026-04-21T00:00:00.000Z',
+            summaryModel: 'gpt-5.1-codex-mini',
+          }],
+        },
       });
 
     const result: RunResult = {

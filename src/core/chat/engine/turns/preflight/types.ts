@@ -3,9 +3,9 @@ import type { ChatSession } from '@/core/chat/types.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import type { ChatTurnHostPort } from '../host/index.js';
 import type {
-  compactChatHistoryWithArchive,
-  CompactChatHistoryResult,
-} from '@/core/chat/engine/history/compaction.js';
+  ConversationCompactionResult,
+  ConversationCompactionOptions,
+} from '@/core/chat/engine/compaction/index.js';
 
 export type ChatTurnPreflightCompactionStatus = {
   status: 'running' | 'finished' | 'failed';
@@ -23,7 +23,7 @@ export type PrepareChatSessionTurnArgs = {
   stateRoot: string;
   systemContext?: string;
   toolNames: string[];
-  summarizer: Parameters<typeof compactChatHistoryWithArchive>[0]['summarizer'];
+  summarizer: ConversationCompactionOptions['summarizer'];
   leaseOwner: ChatSessionLeaseOwner;
   sessions: ChatSession[];
   host: Pick<ChatTurnHostPort, 'onCompactionStatus'>;
@@ -52,14 +52,14 @@ export type PersistPreparedChatSessionTurnArgs = Pick<
   'sessionStoragePath' | 'sessions'
 > & {
   session: ChatSession;
-  compacted: CompactChatHistoryResult;
+  compacted: ConversationCompactionResult;
 };
 
 export type PrepareChatSessionTurnResult =
   | {
       ok: true;
       session: ChatSession;
-      compacted: CompactChatHistoryResult;
+      compacted: ConversationCompactionResult;
     }
   | {
       ok: false;

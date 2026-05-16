@@ -230,8 +230,10 @@ describe('createConversationEngine', () => {
       ...current,
       context: {
         estimatedHistoryTokens: 7,
-        compactionStatus: 'idle',
-        currentSummaryPath: '.heddle/chat-sessions/session-1/current-summary.md',
+        compaction: { status: 'idle' },
+        archive: {
+          currentSummaryPath: '.heddle/chat-sessions/session-1/current-summary.md',
+        },
       },
       archives: [
         {
@@ -250,8 +252,8 @@ describe('createConversationEngine', () => {
     });
     expect(running.history).toEqual(sourceHistory);
     expect(running.context).toEqual(expect.objectContaining({
-      compactionStatus: 'running',
-      lastArchivePath: '.heddle/chat-sessions/session-1/archive.jsonl',
+      compaction: expect.objectContaining({ status: 'running' }),
+      archive: expect.objectContaining({ lastArchivePath: '.heddle/chat-sessions/session-1/archive.jsonl' }),
     }));
 
     const compacted = engine.sessions.applyCompactionResult(session.id, {
@@ -261,12 +263,14 @@ describe('createConversationEngine', () => {
       ],
       context: {
         estimatedHistoryTokens: 4,
-        compactionStatus: 'idle',
+        compaction: { status: 'idle' },
       },
-      archives: [],
+      archive: {
+        archives: [],
+      },
     });
     expect(compacted.messages.map((message) => message.text)).toEqual(['Short prompt', 'Short answer']);
-    expect(compacted.context?.compactionStatus).toBe('idle');
+    expect(compacted.context?.compaction?.status).toBe('idle');
 
     const restored = engine.sessions.restoreCompactionState(session.id, {
       context: previousState.context,

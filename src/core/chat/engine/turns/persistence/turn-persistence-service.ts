@@ -1,4 +1,4 @@
-import { buildSessionCompactionRunningContext } from '@/core/chat/engine/history/compaction.js';
+import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import { ConversationTurnArtifacts } from './turn-artifacts.js';
@@ -51,7 +51,7 @@ export class ConversationTurnPersistenceService {
   }
 
   private static buildRunningCompactionContext(args: PersistFinalCompactionRunningContextArgs) {
-    return buildSessionCompactionRunningContext({
+    return ConversationCompactionService.buildSessionRunningContext({
       session: args.session,
       history: args.sourceHistory,
       lastArchivePath: args.archivePath,

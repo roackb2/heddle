@@ -159,7 +159,7 @@ export class AskCliHost {
       outcome: result.outcome,
       summary: result.summary,
       traceFile: latestTraceFile,
-      latestArchivePath: result.session.context?.lastArchivePath,
+      latestArchivePath: result.session.context?.archive?.lastArchivePath,
     });
   }
 
@@ -213,7 +213,7 @@ export class AskCliHost {
       outcome: result.outcome,
       summary: result.summary,
       traceFile: result.session?.turns.at(-1)?.traceFile,
-      latestArchivePath: result.session?.context?.lastArchivePath,
+      latestArchivePath: result.session?.context?.archive?.lastArchivePath,
     });
   }
 

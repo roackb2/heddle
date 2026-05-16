@@ -114,7 +114,7 @@ export function SessionsScreen({
   });
   const runActive = sendingPrompt || runInFlight;
   const authStatus = formatControlPlaneAuthStatus(sessionDetail?.model ?? activeSession?.model, auth);
-  const compactionStatus = sessionDetail?.context?.compactionStatus ?? activeSession?.context?.compactionStatus;
+  const compactionStatus = sessionDetail?.context?.compaction?.status ?? activeSession?.context?.compaction?.status;
   const selectedModel = sessionDetail?.model ?? activeSession?.model ?? '';
   const selectedReasoningEffort = sessionDetail?.reasoningEffort ?? activeSession?.reasoningEffort;
   const {

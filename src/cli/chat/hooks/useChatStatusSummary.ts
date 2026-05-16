@@ -28,9 +28,15 @@ export function useChatStatusSummary(args: {
     id: string;
     name: string;
     context?: {
-      compactionStatus?: 'idle' | 'running' | 'failed';
-      lastRunInputTokens?: number;
-      estimatedRequestTokens?: number;
+      compaction?: {
+        status?: 'idle' | 'running' | 'failed';
+      };
+      request?: {
+        estimatedTokens?: number;
+        usage?: {
+          inputTokens?: number;
+        };
+      };
     };
   };
   runtimeHostWarningSource?: ResolvedRuntimeHost;
@@ -53,7 +59,7 @@ export function useChatStatusSummary(args: {
   credentialSource: ProviderCredentialSource;
 }) {
   return useMemo(() => {
-    const compacting = args.activeSession?.context?.compactionStatus === 'running';
+    const compacting = args.activeSession?.context?.compaction?.status === 'running';
     const activityText = currentActivityText(
       args.liveEvents,
       args.isRunning,
@@ -63,7 +69,7 @@ export function useChatStatusSummary(args: {
     );
     const contextStatus = formatContextStatus(
       args.activeModel,
-      args.activeSession?.context?.lastRunInputTokens ?? args.activeSession?.context?.estimatedRequestTokens,
+      args.activeSession?.context?.request?.usage?.inputTokens ?? args.activeSession?.context?.request?.estimatedTokens,
     );
     const reasoningStatus = formatReasoningStatus(args.activeModel, args.activeReasoningEffort);
     const authStatus = formatAuthStatus(args.credentialSource);

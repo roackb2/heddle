@@ -18,7 +18,7 @@ import { join, resolve } from 'node:path';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/types.js';
 import { ChatSessionLeases, type ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
-import { buildSessionCompactionRunningContext } from '../history/compaction.js';
+import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import { ChatSessionRecords, ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { NormalizedConversationEngineConfig } from '../config.js';
@@ -162,7 +162,7 @@ export class FileConversationSessionService implements ConversationSessionServic
     return this.updateRequiredSession(id, (session) => ({
       ...session,
       history: input.sourceHistory,
-      context: buildSessionCompactionRunningContext({
+      context: ConversationCompactionService.buildSessionRunningContext({
         session,
         history: input.sourceHistory,
         lastArchivePath: input.archivePath,
@@ -173,7 +173,9 @@ export class FileConversationSessionService implements ConversationSessionServic
   applyCompactionResult(id: string, input: ApplyConversationCompactionResultInput): ChatSession {
     return this.updateRequiredSession(id, (session) => ({
       ...session,
-      ...input,
+      history: input.history,
+      context: input.context,
+      archives: input.archive.archives,
       messages: ConversationLines.fromHistory(input.history),
     }));
   }

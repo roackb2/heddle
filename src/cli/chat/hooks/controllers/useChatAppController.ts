@@ -9,7 +9,7 @@ import {
   resolveNewSessionExecutionPreferences,
   resolveStoredSessionExecutionPreferences,
 } from '../../../../core/chat/engine/sessions/preferences/service.js';
-import { compactChatHistoryWithArchive } from '../../state/compaction.js';
+import { ConversationCompactionService } from '../../state/compaction.js';
 import { useChatSessions } from '../useChatSessions.js';
 import {
   resolveProviderCredentialSourceForModel,
@@ -188,7 +188,7 @@ export function useChatAppController({
     sessionService.markCompactionRunning(sessionId, { sourceHistory: sessionHistory });
     refreshSessions();
 
-    void compactChatHistoryWithArchive({
+    void ConversationCompactionService.compact({
       history: sessionHistory,
       runtime: {
         model: activeModel,

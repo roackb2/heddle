@@ -530,21 +530,43 @@ export class FileChatSessionRepository implements ChatSessionRepository {
     }
 
     const candidate = value as Partial<ChatContextStats>;
+    const request = candidate.request;
+    const usage = request?.usage;
+    const compaction = candidate.compaction;
+    const archive = candidate.archive;
     return (
       typeof candidate.estimatedHistoryTokens === 'number' &&
-      (candidate.estimatedRequestTokens === undefined || typeof candidate.estimatedRequestTokens === 'number') &&
-      (candidate.lastRunInputTokens === undefined || typeof candidate.lastRunInputTokens === 'number') &&
-      (candidate.lastRunOutputTokens === undefined || typeof candidate.lastRunOutputTokens === 'number') &&
-      (candidate.lastRunTotalTokens === undefined || typeof candidate.lastRunTotalTokens === 'number') &&
-      (candidate.cachedInputTokens === undefined || typeof candidate.cachedInputTokens === 'number') &&
-      (candidate.reasoningTokens === undefined || typeof candidate.reasoningTokens === 'number') &&
-      (candidate.compactedMessages === undefined || typeof candidate.compactedMessages === 'number') &&
-      (candidate.compactedAt === undefined || typeof candidate.compactedAt === 'string') &&
-      (candidate.compactionStatus === undefined || candidate.compactionStatus === 'idle' || candidate.compactionStatus === 'running' || candidate.compactionStatus === 'failed') &&
-      (candidate.compactionError === undefined || typeof candidate.compactionError === 'string') &&
-      (candidate.archiveCount === undefined || typeof candidate.archiveCount === 'number') &&
-      (candidate.currentSummaryPath === undefined || typeof candidate.currentSummaryPath === 'string') &&
-      (candidate.lastArchivePath === undefined || typeof candidate.lastArchivePath === 'string')
+      (request === undefined || (
+        typeof request === 'object' &&
+        !Array.isArray(request) &&
+        (request.estimatedTokens === undefined || typeof request.estimatedTokens === 'number') &&
+        (request.goal === undefined || typeof request.goal === 'string') &&
+        (request.toolNames === undefined || (Array.isArray(request.toolNames) && request.toolNames.every((toolName) => typeof toolName === 'string'))) &&
+        (usage === undefined || (
+          typeof usage === 'object' &&
+          !Array.isArray(usage) &&
+          typeof usage.inputTokens === 'number' &&
+          typeof usage.outputTokens === 'number' &&
+          typeof usage.totalTokens === 'number' &&
+          (usage.cachedInputTokens === undefined || typeof usage.cachedInputTokens === 'number') &&
+          (usage.reasoningTokens === undefined || typeof usage.reasoningTokens === 'number')
+        ))
+      )) &&
+      (compaction === undefined || (
+        typeof compaction === 'object' &&
+        !Array.isArray(compaction) &&
+        (compaction.compactedMessages === undefined || typeof compaction.compactedMessages === 'number') &&
+        (compaction.compactedAt === undefined || typeof compaction.compactedAt === 'string') &&
+        (compaction.status === undefined || compaction.status === 'idle' || compaction.status === 'running' || compaction.status === 'failed') &&
+        (compaction.error === undefined || typeof compaction.error === 'string')
+      )) &&
+      (archive === undefined || (
+        typeof archive === 'object' &&
+        !Array.isArray(archive) &&
+        (archive.count === undefined || typeof archive.count === 'number') &&
+        (archive.currentSummaryPath === undefined || typeof archive.currentSummaryPath === 'string') &&
+        (archive.lastArchivePath === undefined || typeof archive.lastArchivePath === 'string')
+      ))
     );
   }
 
