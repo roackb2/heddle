@@ -148,7 +148,7 @@ export type TraceEvent =
   | { type: 'run.finished'; outcome: StopReason; summary: string; step: number; timestamp: string };
 
 /**
- * The result returned from `runAgent`.
+ * The result returned from `AgentRunService.run`.
  */
 export type RunResult = {
   outcome: StopReason;

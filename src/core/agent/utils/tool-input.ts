@@ -1,7 +1,3 @@
-// ---------------------------------------------------------------------------
-// Small utilities shared across the run-agent submodules.
-// ---------------------------------------------------------------------------
-
 export function extractShellCommand(input: unknown): string | undefined {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return undefined;
@@ -9,19 +5,6 @@ export function extractShellCommand(input: unknown): string | undefined {
 
   const command = (input as { command?: unknown }).command;
   return typeof command === 'string' && command.trim() ? command.trim() : undefined;
-}
-
-export function stableSerialize(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableSerialize(item)).join(',')}]`;
-  }
-
-  if (value && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right));
-    return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${stableSerialize(entryValue)}`).join(',')}}`;
-  }
-
-  return JSON.stringify(value);
 }
 
 export function normalizeToolInput(tool: string, input: unknown): unknown {
@@ -54,24 +37,3 @@ function normalizePathValue(path: string): string {
 
   return trimmed.replace(/\/+$/, '') || '.';
 }
-
-export function isRecoverableToolError(error: string | undefined): boolean {
-  if (!error) {
-    return false;
-  }
-
-  return error.startsWith('Invalid input for ');
-}
-
-export function isAbortError(err: unknown): boolean {
-  if (!(err instanceof Error)) {
-    return false;
-  }
-
-  return (
-    err.name === 'AbortError' ||
-    err.name === 'APIUserAbortError' ||
-    /aborted/i.test(err.message)
-  );
-}
-

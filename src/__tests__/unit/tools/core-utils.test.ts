@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createToolRegistry } from '../../../core/tools/registry.js';
 import { createBudget } from '../../../core/utils/budget.js';
 import { createTraceRecorder } from '../../../core/trace/recorder.js';
-import { isRepoReviewCommand } from '../../../core/agent/mutation-tracking.js';
+import { AgentMutationTracker } from '../../../core/agent/mutation/index.js';
 import type { ToolDefinition, TraceEvent } from '../../../core/types.js';
 
 describe('createToolRegistry', () => {
@@ -95,11 +95,11 @@ describe('createTraceRecorder', () => {
 
 describe('isRepoReviewCommand', () => {
   it('only accepts the stricter git evidence commands', () => {
-    expect(isRepoReviewCommand('git diff --stat')).toBe(true);
-    expect(isRepoReviewCommand('git diff --stat=10')).toBe(true);
-    expect(isRepoReviewCommand('git status --short')).toBe(true);
-    expect(isRepoReviewCommand('git diff')).toBe(false);
-    expect(isRepoReviewCommand('git status')).toBe(false);
-    expect(isRepoReviewCommand('git status --long')).toBe(false);
+    expect(AgentMutationTracker.isRepoReviewCommand('git diff --stat')).toBe(true);
+    expect(AgentMutationTracker.isRepoReviewCommand('git diff --stat=10')).toBe(true);
+    expect(AgentMutationTracker.isRepoReviewCommand('git status --short')).toBe(true);
+    expect(AgentMutationTracker.isRepoReviewCommand('git diff')).toBe(false);
+    expect(AgentMutationTracker.isRepoReviewCommand('git status')).toBe(false);
+    expect(AgentMutationTracker.isRepoReviewCommand('git status --long')).toBe(false);
   });
 });

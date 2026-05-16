@@ -2,14 +2,14 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
-import { runAgent } from '../../../core/agent/run-agent.js';
+import { AgentRunService } from '../../../core/agent/index.js';
 import type { ChatMessage, LlmAdapter, LlmResponse } from '../../../core/llm/types.js';
 import type { ToolDefinition } from '../../../core/types.js';
 import { createLogger } from '../../../core/utils/logger.js';
 
 const silentLogger = createLogger({ level: 'silent', console: false });
 
-describe('runAgent', () => {
+describe('AgentRunService.run', () => {
   it('executes tool calls, appends tool output, and finishes with a final answer', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
@@ -38,7 +38,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'What is in this repo?',
       llm: fakeLlm,
       tools: [listFilesTool],
@@ -96,7 +96,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Handle LLM errors gracefully.',
       llm: fakeLlm,
       tools: [],
@@ -134,7 +134,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Inspect this repo.',
       llm: fakeLlm,
       tools: [listFilesTool],
@@ -164,7 +164,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'yep, continue on the work',
       llm: fakeLlm,
       tools: [],
@@ -219,7 +219,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Inspect this repo.',
       llm: fakeLlm,
       tools: [listFilesTool],
@@ -250,7 +250,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Say hello.',
       llm: fakeLlm,
       tools: [],
@@ -300,7 +300,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Inspect this repo.',
       llm: fakeLlm,
       tools: [listFilesTool],
@@ -370,7 +370,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Inspect this repo.',
       llm: fakeLlm,
       tools: [listFilesTool],
@@ -426,7 +426,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Inspect this repo.',
       llm: fakeLlm,
       tools: [listFilesTool],
@@ -469,7 +469,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Inspect this repo.',
       llm: fakeLlm,
       tools: [listFilesTool],
@@ -512,7 +512,7 @@ describe('runAgent', () => {
       },
     };
 
-    await runAgent({
+    await AgentRunService.run({
       goal: 'Figure out the next concrete step.',
       llm: fakeLlm,
       tools: [listFilesTool],
@@ -537,7 +537,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'What did I ask before this?',
       llm: fakeLlm,
       tools: [],
@@ -574,7 +574,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Can you try again?',
       llm: fakeLlm,
       tools: [],
@@ -583,7 +583,7 @@ describe('runAgent', () => {
         {
           role: 'assistant',
           content: 'I will inspect run-agent next.',
-          toolCalls: [{ id: 'call-1', tool: 'read_file', input: { path: 'src/run-agent.ts' } }],
+          toolCalls: [{ id: 'call-1', tool: 'read_file', input: { path: 'src/core/agent/service.ts' } }],
         },
       ],
       maxSteps: 1,
@@ -632,7 +632,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Run tests if needed.',
       llm: fakeLlm,
       tools: [mutateTool],
@@ -678,7 +678,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Run tests if needed.',
       llm: fakeLlm,
       tools: [mutateTool],
@@ -734,7 +734,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Read the external file.',
       llm: fakeLlm,
       tools: [readTool],
@@ -798,7 +798,7 @@ describe('runAgent', () => {
       };
 
       const approveToolCall = vi.fn(async () => ({ approved: true }));
-      const result = await runAgent({
+      const result = await AgentRunService.run({
         goal: 'Read the workspace file.',
         llm: fakeLlm,
         tools: [readTool],
@@ -843,7 +843,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Edit an external file.',
       llm: fakeLlm,
       tools: [editTool],
@@ -905,7 +905,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Try the AWS CLI command.',
       llm: fakeLlm,
       tools: [inspectTool, mutateTool],
@@ -1004,7 +1004,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Apply the fix and tell me it worked.',
       llm: fakeLlm,
       tools: [mutateTool, inspectTool],
@@ -1070,7 +1070,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Update the README and tell me it worked.',
       llm: fakeLlm,
       tools: [editTool, inspectTool, mutateTool],
@@ -1146,7 +1146,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Apply lint fix and summarize.',
       llm: fakeLlm,
       tools: [mutateTool, inspectTool],
@@ -1227,7 +1227,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Apply fix, verify it, commit, push, and summarize.',
       llm: fakeLlm,
       tools: [mutateTool, inspectTool],
@@ -1305,7 +1305,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Apply the fix and tell me it worked.',
       llm: fakeLlm,
       tools: [mutateTool, inspectTool],
@@ -1380,7 +1380,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Apply the fix and tell me it worked.',
       llm: fakeLlm,
       tools: [mutateTool, inspectTool],
@@ -1413,7 +1413,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Inspect this repo and then stop.',
       llm: fakeLlm,
       tools: [listFilesTool],
@@ -1469,7 +1469,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Move the file and tell me the result.',
       llm: fakeLlm,
       tools: [mutateTool],
@@ -1523,7 +1523,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Apply the fix and report back.',
       llm: fakeLlm,
       tools: [mutateTool],
@@ -1555,7 +1555,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Fix the issue and summarize.',
       llm: fakeLlm,
       tools: [],
@@ -1605,7 +1605,7 @@ describe('runAgent', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Implement the next step.',
       llm: fakeLlm,
       tools: [updatePlanTool],

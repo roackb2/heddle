@@ -3,8 +3,8 @@ import type { Logger } from 'pino';
 import { DEFAULT_OPENAI_MODEL } from '../config.js';
 import { inferProviderFromModel } from '../llm/providers.js';
 import type { ChatMessage, LlmAdapter, LlmProvider, ReasoningEffort } from '../llm/types.js';
-import { runAgent } from '../agent/run-agent.js';
-import type { RunAgentOptions } from '../agent/run-agent.js';
+import { AgentRunService } from '../agent/index.js';
+import type { RunAgentOptions } from '../agent/index.js';
 import type { RunResult, ToolCall, ToolDefinition, TraceEvent } from '../types.js';
 import type { ToolApprovalPolicy } from '../approvals/types.js';
 import { createLogger } from '../utils/logger.js';
@@ -115,7 +115,7 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<AgentL
     });
   }
 
-  const result = await runAgent({
+  const result = await AgentRunService.run({
     goal: options.goal,
     llm,
     tools,

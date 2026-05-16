@@ -9,7 +9,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   DEFAULT_OPENAI_MODEL,
-  runAgent,
+  AgentRunService,
   createOpenAiAdapter,
   listFilesTool,
   readFileTool,
@@ -47,7 +47,7 @@ async function main() {
     createRunShellMutateTool(),
   ];
 
-  const result = await runAgent({ goal, llm, tools, maxSteps, logger });
+  const result = await AgentRunService.run({ goal, llm, tools, maxSteps, logger });
 
   // Print formatted trace
   console.log(formatTraceForConsole(result.trace));

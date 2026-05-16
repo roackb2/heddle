@@ -24,13 +24,21 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
 
 ## Public Entry Points
 
-- `run-agent.ts`: low-level run loop and `RunAgentOptions`.
-- `tool-dispatch.ts`: approval, execution, fallback, and repeat tracking around
-  tool calls.
-- `history.ts`: transcript sanitation helpers.
-- `mutation-tracking.ts`: mutation classification used by run state.
-- `progress-reminders.ts` and `post-mutation.ts`: currently conservative
-  scaffolds for future follow-up behavior.
+- `service.ts`: `AgentRunService`, the class-owned low-level run loop.
+- `types.ts`: public run-loop contract and mutable run context shape.
+
+## Internal Structure
+
+- `context/`: builds the mutable run context and initial model transcript.
+- `model/`: owns one LLM request, stream presentation, and usage accumulation.
+- `tools/`: owns assistant tool-call turns, dispatch, approval, fallback, and
+  repeat tracking.
+- `finish/`: owns final response, interruption, error, and max-step completion.
+- `history/`: sanitizes reused transcripts before model calls.
+- `mutation/`: classifies workspace-changing tool results.
+- `memory/`: tracks in-run memory-checkpoint requirements.
+- `planning/`: parses `update_plan` tool output into run state.
+- `utils/`: low-level serialization, abort, and tool-input helpers only.
 
 ## Extension Points
 
@@ -43,7 +51,7 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
 ## Common Changes
 
 - To add a new trace event from the inner loop, update `TraceEvent`, record it in
-  `run-agent.ts` or `tool-dispatch.ts`, and add tests for trace ordering.
+  the owning service class, and add tests for trace ordering.
 - To change tool fallback behavior, keep fallback rules pure and covered by
   integration tests in `run-agent.test.ts`.
 - To change approval behavior, prefer the approval domain. The agent loop should
@@ -53,11 +61,14 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
 
 - `src/__tests__/integration/core/run-agent.test.ts`
 - `src/__tests__/unit/core/trace-format.test.ts`
-- `src/__tests__/integration/core/progress.test.ts`
 
 ## Notes For Coding Agents
 
 - This is the inner loop. Keep it small, deterministic, and host-agnostic.
-- Prefer handler maps and small helpers over long nested conditionals.
+- Follow the chat-engine reference pattern here too: meaningful behavior belongs
+  inside an owning class, contracts live in nearby `types.ts`, and file/class
+  comments should briefly explain responsibility.
+- Avoid adding root-level one-off exported domain functions. If behavior belongs
+  to this domain, put it on the owning class. If it is low-level and
+  domain-agnostic, keep it under `utils/`.
 - Do not add session, TUI, web, or server concepts here.
-

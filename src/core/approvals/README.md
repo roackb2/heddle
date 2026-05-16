@@ -22,7 +22,7 @@ requests, and host approval surfaces.
 
 Approval behavior currently exists in these places:
 
-- `src/core/agent/tool-dispatch.ts`
+- `src/core/agent/tools/tool-dispatcher.ts`
 - `src/core/approvals/surface.ts`
 - `src/core/approvals/remembered-rules.ts`
 - `src/cli/chat/hooks/controllers/run/tui-tool-approval.ts`
@@ -40,7 +40,7 @@ Approval behavior currently exists in these places:
 
 ## Extension Points
 
-- Add a runtime approval rule by passing `approvalPolicies` into `runAgent`,
+- Add a runtime approval rule by passing `approvalPolicies` into `AgentRunService.run`,
   `runAgentLoop`, `runAgentHeartbeat`, or `createConversationEngine(...).turns`.
 - Add host UI by implementing an approval surface in the host adapter layer.
 - Add remembered approval storage behind a small store interface.

@@ -259,7 +259,7 @@ describe('memory maintenance integration', () => {
   });
 
   it('records candidate trace events when record_knowledge succeeds', async () => {
-    const { runAgent } = await import('../../../core/agent/run-agent.js');
+    const { AgentRunService } = await import('../../../core/agent/index.js');
     const memoryRoot = await mkdtemp(join(tmpdir(), 'heddle-memory-candidate-trace-'));
     const trace: TraceEvent[] = [];
     const llm = scriptedMaintainer([
@@ -279,7 +279,7 @@ describe('memory maintenance integration', () => {
     ]);
     const { createRecordKnowledgeTool } = await import('../../../core/tools/toolkits/knowledge/record-knowledge.js');
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Record memory.',
       llm,
       tools: [createRecordKnowledgeTool({
@@ -301,7 +301,7 @@ describe('memory maintenance integration', () => {
   });
 
   it('records a memory checkpoint when the agent chooses to preserve explicit user memory intent', async () => {
-    const { runAgent } = await import('../../../core/agent/run-agent.js');
+    const { AgentRunService } = await import('../../../core/agent/index.js');
     const { buildMemoryDomainSystemContext } = await import('../../../core/memory/domain-prompt.js');
     const { createMemoryCheckpointTool } = await import('../../../core/tools/toolkits/knowledge/memory-checkpoint.js');
     const memoryRoot = await mkdtemp(join(tmpdir(), 'heddle-memory-checkpoint-required-'));
@@ -333,7 +333,7 @@ describe('memory maintenance integration', () => {
       return await originalChat(messages, tools, signal, onStream);
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Remember that my preferred ticket format is compact, but do not create a ticket now.',
       llm,
       tools: [createMemoryCheckpointTool({
@@ -357,7 +357,7 @@ describe('memory maintenance integration', () => {
   });
 
   it('allows memory checkpoint to explicitly skip one-off turns', async () => {
-    const { runAgent } = await import('../../../core/agent/run-agent.js');
+    const { AgentRunService } = await import('../../../core/agent/index.js');
     const { createMemoryCheckpointTool } = await import('../../../core/tools/toolkits/knowledge/memory-checkpoint.js');
     const memoryRoot = await mkdtemp(join(tmpdir(), 'heddle-memory-checkpoint-skip-'));
     const llm: LlmAdapter = {
@@ -395,7 +395,7 @@ describe('memory maintenance integration', () => {
       },
     };
 
-    const result = await runAgent({
+    const result = await AgentRunService.run({
       goal: 'Do a one-off check.',
       llm,
       tools: [

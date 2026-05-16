@@ -23,7 +23,7 @@ coordination that sit around the lower-level agent loop.
 
 ## Public Entry Points
 
-- `agent-loop.ts`: evented programmatic run wrapper around `runAgent`.
+- `agent-loop.ts`: evented programmatic run wrapper around `AgentRunService.run`.
 - `events.ts`: runtime event and checkpoint types.
 - `default-tools.ts`: default tool bundle assembly.
 - `heartbeat.ts`, `heartbeat-store.ts`, `heartbeat-task-store.ts`,
@@ -66,4 +66,3 @@ coordination that sit around the lower-level agent loop.
   sessions.
 - Preserve `AgentLoopEvent` compatibility. External hosts and examples consume
   these events.
-

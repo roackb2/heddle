@@ -2,7 +2,7 @@ import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import type { LlmAdapter } from '../llm/types.js';
 import type { RunResult } from '../types.js';
-import { runAgent } from '../agent/run-agent.js';
+import { AgentRunService } from '../agent/index.js';
 import { createLogger } from '../utils/logger.js';
 import { bootstrapMemoryWorkspace, loadMemoryRootCatalog, validateMemoryCatalogShape } from './catalog.js';
 import { createMemoryMaintainerTools } from './maintainer-tools.js';
@@ -111,7 +111,7 @@ export async function runKnowledgeMaintenance(options: RunKnowledgeMaintenanceOp
   const rootCatalog = loadMemoryRootCatalog({ memoryRoot }).content;
   const goal = buildMaintenanceGoal(observations);
   const systemContext = buildMaintainerSystemContext(rootCatalog);
-  const result = await runAgent({
+  const result = await AgentRunService.run({
     goal,
     llm: options.llm,
     tools: createMemoryMaintainerTools({ memoryRoot }),

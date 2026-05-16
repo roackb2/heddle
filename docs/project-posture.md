@@ -109,7 +109,7 @@ scope.
 ## Common Discovery Paths
 
 - Agent loop and runtime: `src/core/runtime/agent-loop.ts`,
-  `src/core/agent/run-agent.ts`, `src/core/runtime/default-tools.ts`.
+  `src/core/agent/service.ts`, `src/core/runtime/default-tools.ts`.
 - Tool behavior: `src/core/tools/toolkits/`, `src/core/tools/registry.ts`,
   `src/core/tools/execute-tool.ts`.
 - Shell and approvals: `src/core/tools/toolkits/shell-process/`,
