@@ -55,14 +55,16 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
 
 ## Architecture Map
 
-- `src/core/runtime/` owns agent runtime boundaries, default tools, and
-  host-facing execution.
+- `src/core/agent/` owns the inner model/tool execution loop.
+- `src/core/runtime/` owns host-facing runtime boundaries, default tool
+  assembly, credentials, workspace catalogs, daemon discovery, and evented
+  single-run execution over `src/core/agent/`.
 - `src/core/heartbeat/` owns autonomous wake cycles, heartbeat scheduling,
   checkpoint reuse, and heartbeat task/run views.
 - `src/core/chat/engine/` owns persisted conversation sessions, turns,
   compaction, leases, approvals, traces, and package-level programmatic use.
-- `src/core/chat/` defines the shared chat boundary and layering guidance above
-  the engine. It should stay small.
+- `src/core/chat/` defines the shared chat boundary above the engine. It should
+  stay small.
 - `src/core/tools/` owns tool definitions, registries, execution, and toolkits.
 - `src/core/approvals/` owns approval policy chains and remembered rules.
 - `src/core/observability/` owns trace and activity projection.
@@ -81,6 +83,10 @@ review. A good service boundary should make it obvious:
 - what behavior still belongs outside the module;
 - which tests lock its behavior;
 - where to extend the feature next.
+
+For core dependency direction, use
+`docs/architecture/core-layering.md`. For chat-specific placement, use
+`docs/architecture/chat-layering.md`.
 
 For host-heavy areas, prefer an MVC-like split that stays easy to reason about:
 
@@ -110,8 +116,8 @@ scope.
 
 ## Common Discovery Paths
 
-- Agent loop and runtime: `src/core/runtime/loop/`,
-  `src/core/agent/service.ts`, `src/core/runtime/tools/`.
+- Agent loop and runtime: `src/core/agent/`, `src/core/runtime/loop/`,
+  `src/core/runtime/tools/`.
 - Tool behavior: `src/core/tools/toolkits/`, `src/core/tools/registry.ts`,
   `src/core/tools/execute-tool.ts`.
 - Shell and approvals: `src/core/tools/toolkits/shell-process/`,
@@ -120,6 +126,8 @@ scope.
 - Control plane: `src/server/features/control-plane/`,
   `src/web/features/control-plane/`.
 - Memory: `src/core/tools/toolkits/knowledge/`, `src/core/memory/`.
+- Architecture boundaries: `docs/architecture/core-layering.md`,
+  `docs/architecture/chat-layering.md`.
 - Project direction: `docs/strategy/project-purpose.md`,
   `docs/strategy/framework-vision.md`.
 

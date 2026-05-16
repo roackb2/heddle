@@ -115,7 +115,7 @@ yarn client:dev
 
 The daemon-backed backend runs on `127.0.0.1:8765` and the Vite client runs on `127.0.0.1:5173`.
 
-`yarn daemon:dev` uses the real daemon path, including workspace ownership, daemon-registry heartbeats, and built control-plane static assets from `dist/src/web`. This is the closest development path to the shipped `heddle daemon` behavior.
+`yarn daemon:dev` uses the real daemon path, including workspace ownership, daemon registry refreshes, and built control-plane static assets from `dist/src/web`. This is the closest development path to the shipped `heddle daemon` behavior.
 
 Because it serves built assets, run `yarn build` after frontend changes before relying on `yarn daemon:dev` for UI validation.
 

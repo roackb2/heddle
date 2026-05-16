@@ -10,9 +10,9 @@ Read next:
 3. Nearby tests for the behavior you are touching.
 
 Do not read every doc by default. Use `docs/guides/` for user workflows,
-`docs/reference/` for command/config/tool details, `docs/strategy/` only for
-long-term direction or architecture tradeoffs, and `docs/evaluation/` only for
-eval prompt work.
+`docs/reference/` for command/config/tool details, `docs/architecture/` for
+agreed code boundaries, `docs/strategy/` only for long-term direction, and
+`docs/evaluation/` only for eval prompt work.
 
 Heddle is an open-source project. Do not assume that every contributor has access to the original maintainer's private planning notes, local memory, or companion repositories.
 
@@ -63,12 +63,15 @@ When a companion notes repo is present, treat the live Heddle codebase as the im
 - For non-trivial backend/core work, prefer domain-owned services with clear
   boundaries. A module should own real behavior, not act as a thin wrapper.
 - When creating or refactoring core services, use `src/core/chat/engine/` as the
-  current reference pattern: class-based services and repositories, explicit
+  current reference pattern together with `src/core/runtime/workspaces/` and
+  `src/core/runtime/daemon/`: class-based services and repositories, explicit
   `types.ts` contracts, schema/codec-owned persistence validation, and no loose
   one-off exported domain functions. Add brief class or file-top comments for
   meaningful classes to explain their responsibility and placement boundary.
 - Prefer a simple layered split: presentation renders, host/application code
   orchestrates, and core domains own policy and persisted semantics.
+- For core dependency direction, follow
+  `docs/architecture/core-layering.md`.
 - When creating or substantially refactoring a non-trivial service/domain, add
   or update a nearby `README.md` describing responsibility, boundaries, owned
   data/behavior, and where adjacent logic should live. Include a compact

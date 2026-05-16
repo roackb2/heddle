@@ -88,5 +88,5 @@ If a module coordinates session switching, prompt submission, compaction
 triggering, or other multi-step CLI flow, it should live in `hooks/` but be
 named as a controller hook.
 
-See [docs/strategy/chat-layering.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/strategy/chat-layering.md)
+See [docs/architecture/chat-layering.md](../../../docs/architecture/chat-layering.md)
 for the target folder structure and layering rules.

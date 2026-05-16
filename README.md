@@ -45,6 +45,10 @@ Heddle currently has two main programmatic layers:
 
 If you want the programmatic surface, start with the [Programmatic use guide](docs/guides/programmatic-use.md).
 
+For contributors, the compact architecture map lives in
+[Core Layering](docs/architecture/core-layering.md) and
+[Chat Layering](docs/architecture/chat-layering.md).
+
 ## See Heddle
 
 ### Terminal coding workflow

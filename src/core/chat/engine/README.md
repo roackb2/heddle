@@ -93,5 +93,5 @@ Use this pattern when it fits the domain:
   activity through engine host normalization.
 - Keep docs and exports clearly marked alpha.
 
-See [docs/strategy/chat-layering.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/strategy/chat-layering.md)
+See [docs/architecture/chat-layering.md](../../../../docs/architecture/chat-layering.md)
 for the target folder structure and layering rules.

@@ -29,7 +29,8 @@ Read only when needed:
 
 - `guides/` for user/operator workflows
 - `reference/` for command, config, provider, and tool details
-- `strategy/` for long-term direction or architecture tradeoffs
+- `architecture/` for agreed code boundaries and layering
+- `strategy/` for long-term direction and product tradeoffs
 - `evaluation/` for eval prompts and behavior-checking workflows
 - `releases/` for release notes and release process
 
@@ -56,6 +57,13 @@ Reference material for commands, configuration, and runtime behavior:
 - [Capabilities and tools](reference/capabilities.md)
 - [Providers and models](reference/providers-and-models.md)
 - [Project config](reference/config.md)
+
+## Architecture
+
+Contributor-facing architecture boundaries:
+
+- [Core Layering](architecture/core-layering.md)
+- [Chat Layering](architecture/chat-layering.md)
 
 ## Project Context
 
@@ -110,6 +118,7 @@ Evaluation:
 3. [Development and contributing](guides/development.md)
 4. [CLI reference](reference/cli.md)
 5. [Framework Vision](strategy/framework-vision.md) only for strategic context
+6. [Core Layering](architecture/core-layering.md) when changing core boundaries
 
 ### I want to prepare a release
 

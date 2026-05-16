@@ -2,6 +2,9 @@
 
 Heddle exports several runtime layers for hosts that want to build on top of the project instead of only using the CLI.
 
+For the contributor-facing dependency map behind these APIs, see
+[Core Layering](../architecture/core-layering.md).
+
 If you want persisted conversations and session continuity, start with `createConversationEngine`.
 
 ## Choose The Right API
@@ -45,7 +48,9 @@ This is the right choice when you want:
 - default tools and model assembly without chat session persistence
 - checkpointable state that your own host will manage
 
-`AgentLoopRuntimeService.run(...)` is not the main persisted conversation API. It is the lower-level execution loop that the conversation engine builds on.
+`AgentLoopRuntimeService.run(...)` is not the main persisted conversation API.
+It is the host-facing runtime wrapper over the lower-level agent run loop that
+the conversation engine builds on.
 
 ### Use heartbeat APIs for scheduled or background wake cycles
 

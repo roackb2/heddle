@@ -72,5 +72,5 @@ That module owns:
   engine code plus existing host-facing types. If future cleanup can move it into
   engine without making imports worse, prefer that.
 
-See [docs/strategy/chat-layering.md](/Users/roackb2/Studio/projects/ProjectHeddle/heddle/docs/strategy/chat-layering.md)
+See [docs/architecture/chat-layering.md](../../../docs/architecture/chat-layering.md)
 for the target folder structure and layering rules.
