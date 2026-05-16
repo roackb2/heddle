@@ -18,7 +18,7 @@ import { join, resolve } from 'node:path';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/types.js';
 import { ChatSessionLeases, type ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
-import { ConversationCompactionService } from '../compaction/index.js';
+import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import { ChatSessionRecords, ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { NormalizedConversationEngineConfig } from '../config.js';

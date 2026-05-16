@@ -217,7 +217,7 @@ describe('AskCliHost.run', () => {
       { role: 'user' as const, content: 'very large turn 2' },
       { role: 'assistant' as const, content: 'very large answer 2' },
     ];
-    const compactionModule = await import('../../../core/chat/engine/compaction/index.js');
+    const compactionModule = await import('@/core/chat/engine/compaction/index.js');
     const compactionSpy = vi.spyOn(compactionModule.ConversationCompactionService, 'compact');
     compactionSpy
       .mockResolvedValueOnce({
