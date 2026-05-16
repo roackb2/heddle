@@ -6,8 +6,6 @@ import {
   type RunShellPolicyDecision,
 } from '../../../core/tools/toolkits/shell-process/run-shell.js';
 import { truncate } from '../../../core/utils/text.js';
-export { formatChatFailureMessage } from '../../../core/chat/failure-messages.js';
-export type { ChatFailureHintOptions } from '../../../core/chat/failure-messages.js';
 export { countAssistantSteps, summarizeTrace } from '../../../core/observability/trace-summarizers.js';
 export {
   truncate,

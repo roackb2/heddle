@@ -7,6 +7,7 @@ dist/
 # Local files
 local/
 .heddle/
+.heddle.*/
 coverage/
 .e2e/
 evals/results/

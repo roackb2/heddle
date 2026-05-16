@@ -218,7 +218,7 @@ More: [Project config](docs/reference/config.md)
 
 ### Sessions and continuity
 
-Heddle keeps saved sessions under `.heddle/` so longer work does not have to reset every time. That means you can come back to an interrupted task, continue a previous debugging thread, or preserve project-specific context across runs.
+Heddle keeps saved sessions under `.heddle/` so longer work does not have to reset every time. Current versions store the session catalog at `.heddle/chat-sessions.catalog.json` and per-session bodies under `.heddle/chat-sessions/`. That means you can come back to an interrupted task, continue a previous debugging thread, or preserve project-specific context across runs.
 
 This matters if you are doing real multi-step work rather than one-shot prompts.
 

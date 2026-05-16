@@ -129,7 +129,7 @@ yarn typecheck
 
 - The installed command is `heddle`.
 - By default, commands operate on the current working directory unless `--cwd` is provided.
-- Workspace state is local to the project under `.heddle/`. The browser control plane can register and switch between local workspaces, but each workspace keeps its own sessions, traces, memory, and tasks.
+- Workspace state is local to the project under `.heddle/`. Saved sessions use `.heddle/chat-sessions.catalog.json` plus per-session files under `.heddle/chat-sessions/`. The browser control plane can register and switch between local workspaces, but each workspace keeps its own sessions, traces, memory, and tasks.
 - Heartbeat scheduler commands are local-first; adding a task does not create a background OS service by itself.
 
 ## See Also

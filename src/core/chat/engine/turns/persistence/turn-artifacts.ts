@@ -1,5 +1,5 @@
 import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
-import { formatChatFailureMessage } from '@/core/chat/failure-messages.js';
+import { ConversationTurnFailureMessages } from '@/core/chat/engine/turns/failure/index.js';
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { TraceWriter } from '../trace/index.js';
 import type {
@@ -40,7 +40,7 @@ export class ConversationTurnArtifacts {
     });
     const summary =
       args.result.outcome === 'error'
-        ? formatChatFailureMessage(args.result.summary, {
+        ? ConversationTurnFailureMessages.format(args.result.summary, {
             model: compactionRuntime.model,
             estimatedHistoryTokens: ConversationCompactionService.estimateTokens(args.historyForTokenEstimate),
           })

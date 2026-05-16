@@ -24,7 +24,6 @@ export type ChatSessionCatalog = {
 
 export type SessionStoragePaths = {
   catalogPath: string;
-  legacyPath: string;
   sessionsDir: string;
 };
 
@@ -32,7 +31,6 @@ export type ChatSessionRepository = {
   list(apiKeyPresent: boolean): ChatSession[];
   readCatalog(): ChatSessionCatalogEntry[];
   read(sessionId: string, apiKeyPresent: boolean): ChatSession | undefined;
-  migrateLegacy(apiKeyPresent: boolean): ChatSession[];
   save(sessions: ChatSession[]): void;
   deriveStoragePaths(): SessionStoragePaths;
 };

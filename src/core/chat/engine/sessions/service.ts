@@ -251,7 +251,7 @@ export class FileConversationSessionService implements ConversationSessionServic
         .filter((session): session is ChatSession => Boolean(session));
     }
 
-    return this.repository.migrateLegacy(apiKeyPresent);
+    return [];
   }
 
   private readSession(id: string): ChatSession | undefined {
