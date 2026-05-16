@@ -47,10 +47,10 @@
     "verify:tui-session-switch": "yarn verify:tui-behavior",
     "eval:agent": "tsx --no-cache src/cli/main.ts eval agent",
     "eval:clean": "tsx --no-cache src/cli/main.ts eval clean",
-    "e2e": "playwright test",
-    "e2e:ui": "playwright test --ui",
-    "e2e:headed": "playwright test --headed",
-    "e2e:install": "playwright install chromium",
+    "test:browser-integration": "playwright test",
+    "test:browser-integration:ui": "playwright test --ui",
+    "test:browser-integration:headed": "playwright test --headed",
+    "test:browser-integration:install": "playwright install chromium",
     "cli:dev": "tsx --no-cache src/cli/main.ts",
     "chat:dev": "tsx --no-cache src/cli/main.ts chat",
     "chat:dev:openai": "OPENAI_API_KEY=\"$PERSONAL_OPENAI_API_KEY\" tsx --no-cache src/cli/main.ts chat",
@@ -65,7 +65,6 @@
     "test": "yarn test:unit && yarn test:integration",
     "test:unit": "vitest run src/__tests__/unit",
     "test:integration": "vitest run src/__tests__/integration",
-    "test:e2e": "playwright test",
     "prepare": "yarn build"
   },
   "keywords": [

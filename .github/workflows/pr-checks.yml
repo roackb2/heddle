@@ -89,3 +89,27 @@ jobs:
 
       - name: Run integration tests
         run: yarn test:integration
+
+  test-browser-integration:
+    name: test-browser-integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: yarn test:browser-integration:install --with-deps
+
+      - name: Run browser integration tests
+        run: yarn test:browser-integration

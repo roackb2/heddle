@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const repoRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const secondaryWorkspace = resolve(repoRoot, '.e2e/workspaces/secondary');
+const repoRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
+const secondaryWorkspace = resolve(repoRoot, '.browser-integration/workspaces/secondary');
 
 test('loads overview with fixture workspace state', async ({ page }) => {
   await page.goto('/overview');
@@ -57,12 +57,12 @@ test('creates a session and sends a mocked prompt through the browser flow', asy
   await page.getByTestId('new-session-button').click();
   await expect(page.locator('textarea')).toBeVisible();
 
-  await page.locator('textarea').fill('Explain this mocked E2E run');
+  await page.locator('textarea').fill('Explain this mocked browser integration run');
   await page.getByRole('button', { name: 'Send' }).click();
 
   const conversation = page.getByTestId('session-conversation');
-  await expect(conversation.getByText('Explain this mocked E2E run', { exact: true })).toBeVisible();
-  await expect(conversation.getByText('Mocked E2E agent response: Explain this mocked E2E run', { exact: true })).toBeVisible();
+  await expect(conversation.getByText('Explain this mocked browser integration run', { exact: true })).toBeVisible();
+  await expect(conversation.getByText('Mocked browser integration agent response: Explain this mocked browser integration run', { exact: true })).toBeVisible();
 });
 
 test('continues a mocked browser session after an initial prompt', async ({ page }) => {
@@ -75,14 +75,14 @@ test('continues a mocked browser session after an initial prompt', async ({ page
   await page.getByRole('button', { name: 'Send' }).click();
 
   const conversation = page.getByTestId('session-conversation');
-  await expect(conversation.getByText('Mocked E2E agent response: Start a mocked continuation flow', { exact: true })).toBeVisible();
+  await expect(conversation.getByText('Mocked browser integration agent response: Start a mocked continuation flow', { exact: true })).toBeVisible();
 
   const continueButton = page.getByTestId('session-composer-actions').getByRole('button', { name: 'Continue', exact: true });
   await expect(continueButton).toBeEnabled();
   await continueButton.click();
 
   await expect(conversation.getByText('Start a mocked continuation flow', { exact: true })).toHaveCount(2);
-  await expect(conversation.getByText('Mocked E2E agent response: Start a mocked continuation flow', { exact: true })).toHaveCount(2);
+  await expect(conversation.getByText('Mocked browser integration agent response: Start a mocked continuation flow', { exact: true })).toHaveCount(2);
 });
 
 test('mobile navigation exposes the primary sections', async ({ page }) => {

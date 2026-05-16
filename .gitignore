@@ -10,6 +10,7 @@ local/
 .heddle.*/
 coverage/
 .e2e/
+.browser-integration/
 evals/results/
 playwright-report/
 test-results/

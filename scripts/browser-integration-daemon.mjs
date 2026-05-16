@@ -6,18 +6,18 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const fixtureRoot = resolve(repoRoot, '.e2e');
+const fixtureRoot = resolve(repoRoot, '.browser-integration');
 const homeRoot = join(fixtureRoot, 'home');
 const workspacesRoot = join(fixtureRoot, 'workspaces');
 const primaryWorkspace = join(workspacesRoot, 'primary');
 const secondaryWorkspace = join(workspacesRoot, 'secondary');
 
 prepareFixtureWorkspace(primaryWorkspace, {
-  name: 'Primary E2E Workspace',
-  extraReadmeLine: 'This line is an uncommitted E2E change.',
+  name: 'Primary Browser Integration Workspace',
+  extraReadmeLine: 'This line is an uncommitted browser integration change.',
 });
 prepareFixtureWorkspace(secondaryWorkspace, {
-  name: 'Secondary E2E Workspace',
+  name: 'Secondary Browser Integration Workspace',
 });
 mkdirSync(homeRoot, { recursive: true });
 
@@ -33,16 +33,16 @@ const child = spawn(
     '--host',
     '127.0.0.1',
     '--port',
-    process.env.HEDDLE_E2E_SERVER_PORT ?? '9876',
+    process.env.HEDDLE_BROWSER_INTEGRATION_SERVER_PORT ?? '9876',
   ],
   {
     cwd: repoRoot,
     env: {
       ...process.env,
       HOME: homeRoot,
-      HEDDLE_E2E_PRIMARY_WORKSPACE: primaryWorkspace,
-      HEDDLE_E2E_SECONDARY_WORKSPACE: secondaryWorkspace,
-      HEDDLE_E2E_FAKE_AGENT: '1',
+      HEDDLE_BROWSER_INTEGRATION_PRIMARY_WORKSPACE: primaryWorkspace,
+      HEDDLE_BROWSER_INTEGRATION_SECONDARY_WORKSPACE: secondaryWorkspace,
+      HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT: '1',
     },
     stdio: 'inherit',
   },
@@ -68,7 +68,7 @@ function prepareFixtureWorkspace(workspaceRoot, options) {
   mkdirSync(workspaceRoot, { recursive: true });
   writeFileSync(
     join(workspaceRoot, 'README.md'),
-    `# ${options.name}\n\nThis workspace is used by Heddle Playwright tests.\n`,
+    `# ${options.name}\n\nThis workspace is used by Heddle browser integration tests.\n`,
     'utf8',
   );
   writeFileSync(
@@ -81,9 +81,9 @@ function prepareFixtureWorkspace(workspaceRoot, options) {
   execGit(workspaceRoot, ['add', 'README.md', 'package.json']);
   execGit(workspaceRoot, [
     '-c',
-    'user.name=Heddle E2E',
+    'user.name=Heddle Browser Integration',
     '-c',
-    'user.email=heddle-e2e@example.com',
+    'user.email=heddle-browser-integration@example.com',
     '-c',
     'commit.gpgsign=false',
     'commit',
@@ -94,7 +94,7 @@ function prepareFixtureWorkspace(workspaceRoot, options) {
   if (options.extraReadmeLine) {
     writeFileSync(
       join(workspaceRoot, 'README.md'),
-      `# ${options.name}\n\nThis workspace is used by Heddle Playwright tests.\n\n${options.extraReadmeLine}\n`,
+      `# ${options.name}\n\nThis workspace is used by Heddle browser integration tests.\n\n${options.extraReadmeLine}\n`,
       'utf8',
     );
   }
