@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { deriveSessionStoragePaths, migrateLegacyChatSessions } from '../core/chat/engine/sessions/repository/file-chat-session-repository.js';
+import { FileChatSessionRepository } from '../core/chat/engine/sessions/repository/index.js';
 
 export type SessionCliOptions = {
   workspaceRoot?: string;
@@ -17,11 +17,12 @@ export async function runSessionCli(args: string[], options: SessionCliOptions =
   const workspaceRoot = options.workspaceRoot ?? process.cwd();
   const stateDir = options.stateDir ?? '.heddle';
   const sessionsPath = resolve(workspaceRoot, stateDir, 'chat-sessions.json');
-  const paths = deriveSessionStoragePaths(sessionsPath);
+  const repository = new FileChatSessionRepository({ sessionStoragePath: sessionsPath });
+  const paths = FileChatSessionRepository.deriveStoragePaths(sessionsPath);
   const hadLegacyFile = existsSync(paths.legacyPath);
   const hadCatalog = existsSync(paths.catalogPath);
 
-  const sessions = migrateLegacyChatSessions(sessionsPath, true);
+  const sessions = repository.migrateLegacy(true);
 
   process.stdout.write(
     [

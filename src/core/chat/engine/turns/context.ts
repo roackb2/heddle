@@ -1,7 +1,7 @@
 import { createDefaultAgentTools } from '../../../runtime/default-tools.js';
 import type { ToolDefinition } from '../../../types.js';
-import type { ChatSessionLeaseOwner } from '../sessions/lease.js';
-import { loadChatSessions } from '../sessions/repository/file-chat-session-repository.js';
+import type { ChatSessionLeaseOwner } from '../sessions/leases/index.js';
+import { FileChatSessionRepository } from '../sessions/repository/index.js';
 import type { ChatSession } from '../../types.js';
 import { resolveConversationTurnRuntime, type ChatTurnRuntime } from './runtime.js';
 
@@ -29,7 +29,7 @@ export type ConversationTurnContext = {
 };
 
 export function prepareConversationTurnContext(args: PrepareConversationTurnContextArgs): ConversationTurnContext {
-  const sessions = loadChatSessions(args.sessionStoragePath, true);
+  const sessions = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath }).list(true);
   const session = sessions.find((candidate) => candidate.id === args.sessionId);
   if (!session) {
     throw new Error(`Chat session not found: ${args.sessionId}`);

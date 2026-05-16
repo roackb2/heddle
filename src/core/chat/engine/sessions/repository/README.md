@@ -17,7 +17,9 @@ This folder owns file-backed chat session persistence.
 
 ## Boundary
 
-- session services call this repository
+- session services instantiate `FileChatSessionRepository`
+- legacy host and test paths may call class methods directly while they are
+  being moved behind services
 - hosts should not call it directly when a core session service can own the flow
 - do not add wrapper-only repository files; this folder earns its place by
   owning real file persistence mechanics

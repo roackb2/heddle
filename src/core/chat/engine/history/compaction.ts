@@ -8,16 +8,7 @@ import {
   type ModelCredentialMode,
 } from '../../../llm/model-policy.js';
 import type { ChatArchiveManifest, ChatArchiveRecord, ChatContextStats } from '../../types.js';
-import {
-  createArchiveId,
-  deriveChatArchivePaths,
-  loadChatArchiveManifest,
-  readArchiveSummaryMarkdown,
-  saveChatArchiveManifest,
-  updateChatArchiveManifest,
-  writeArchivedMessagesJsonl,
-  writeArchiveSummaryMarkdown,
-} from '../sessions/archive.js';
+import { FileChatArchiveRepository } from '../sessions/archives/index.js';
 
 const DEFAULT_CONTEXT_WINDOW_ESTIMATE = 200_000;
 const MAX_HISTORY_RATIO = 0.6;
@@ -74,7 +65,11 @@ export async function compactChatHistoryWithArchive(
     || (Boolean(options.force) && countNonCompactedMessages(options.history) > 0);
 
   if (!needsCompaction) {
-    const manifest = loadChatArchiveManifest(options.stateRoot, options.sessionId);
+    const archiveRepository = new FileChatArchiveRepository({
+      stateRoot: options.stateRoot,
+      sessionId: options.sessionId,
+    });
+    const manifest = archiveRepository.loadManifest();
     return {
       history: options.history,
       context: buildContextStats({
@@ -99,7 +94,11 @@ export async function compactChatHistoryWithArchive(
     stopAtPreferredMessages: Boolean(options.force),
   });
   if (splitIndex <= 0 || splitIndex >= options.history.length) {
-    const manifest = loadChatArchiveManifest(options.stateRoot, options.sessionId);
+    const archiveRepository = new FileChatArchiveRepository({
+      stateRoot: options.stateRoot,
+      sessionId: options.sessionId,
+    });
+    const manifest = archiveRepository.loadManifest();
     return {
       history: options.history,
       context: buildContextStats({
@@ -120,13 +119,17 @@ export async function compactChatHistoryWithArchive(
 
   const archivedMessages = options.history.slice(0, splitIndex);
   const recentMessages = options.history.slice(splitIndex);
-  const manifest = loadChatArchiveManifest(options.stateRoot, options.sessionId);
+  const archiveRepository = new FileChatArchiveRepository({
+    stateRoot: options.stateRoot,
+    sessionId: options.sessionId,
+  });
+  const manifest = archiveRepository.loadManifest();
   const previousRollingSummary =
-    (manifest.currentSummaryPath ? readArchiveSummaryMarkdown(manifest.currentSummaryPath, options.stateRoot) : undefined)
+    (manifest.currentSummaryPath ? archiveRepository.readSummaryMarkdown(manifest.currentSummaryPath) : undefined)
     ?? extractPriorSummary(options.history);
 
-  const archiveId = createArchiveId();
-  const archivePath = writeArchivedMessagesJsonl(options.stateRoot, options.sessionId, archiveId, archivedMessages);
+  const archiveId = FileChatArchiveRepository.createArchiveId();
+  const archivePath = archiveRepository.writeMessagesJsonl(archiveId, archivedMessages);
   options.onStatusChange?.({ status: 'running', archivePath });
 
   try {
@@ -144,7 +147,7 @@ export async function compactChatHistoryWithArchive(
       previousRollingSummary,
       archivedMessages,
     });
-    const summaryPath = writeArchiveSummaryMarkdown(options.stateRoot, options.sessionId, archiveId, rollingSummary);
+    const summaryPath = archiveRepository.writeSummaryMarkdown(archiveId, rollingSummary);
     const archiveRecord: ChatArchiveRecord = {
       id: archiveId,
       path: archivePath,
@@ -154,8 +157,8 @@ export async function compactChatHistoryWithArchive(
       createdAt: new Date().toISOString(),
       summaryModel: summarizer.model,
     };
-    const nextManifest = updateChatArchiveManifest(manifest, archiveRecord);
-    saveChatArchiveManifest(options.stateRoot, options.sessionId, nextManifest);
+    const nextManifest = FileChatArchiveRepository.appendManifestArchive(manifest, archiveRecord);
+    archiveRepository.saveManifest(nextManifest);
 
     const compactedHistory = [
       buildCompactedSummaryMessage({
@@ -357,7 +360,7 @@ function buildCompactedSummaryMessage(options: {
   const content = [
     COMPACTED_HISTORY_MARKER,
     '',
-    `Archive root: ${deriveChatArchivePaths('.', options.sessionId).displayArchivesDir}`,
+    `Archive root: ${FileChatArchiveRepository.derivePaths('.', options.sessionId).displayArchivesDir}`,
     '',
     'Current rolling summary:',
     truncateSummary(options.rollingSummary),

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createConversationEngine } from '../../../core/chat/engine/conversation-engine.js';
 import type { AgentLoopEvent } from '../../../core/runtime/events.js';
 import type { TraceEvent } from '../../../core/types.js';
-import { loadChatSessions, readChatSession, readChatSessionCatalog } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
+import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
 
 const runConversationTurnMock = vi.hoisted(() => vi.fn());
@@ -23,7 +23,8 @@ describe('createConversationEngine', () => {
     runConversationTurnMock.mockImplementation(async (args: { sessionStoragePath: string; sessionId: string }) => ({
       outcome: 'done',
       summary: 'ok',
-      session: readChatSession(args.sessionStoragePath, args.sessionId, true) as ChatSession,
+      session: new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
+        .read(args.sessionId, true) as ChatSession,
     }));
   });
 
@@ -53,13 +54,16 @@ describe('createConversationEngine', () => {
     const session = engine.sessions.create({ name: 'Repo investigation' });
 
     expect(engine.sessions.listExisting().map((candidate) => candidate.id)).toEqual([session.id, 'session-1']);
-    expect(readChatSessionCatalog(join(stateRoot, 'chat-sessions.catalog.json'))[0]).toEqual(expect.objectContaining({
+    const sessionRepository = new FileChatSessionRepository({
+      sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
+    });
+    expect(sessionRepository.readCatalog()[0]).toEqual(expect.objectContaining({
       id: session.id,
       name: 'Repo investigation',
       model: 'gpt-5.4',
       workspaceId: 'workspace-1',
     }));
-    expect(readChatSession(join(stateRoot, 'chat-sessions.catalog.json'), session.id, true)).toEqual(expect.objectContaining({
+    expect(sessionRepository.read(session.id, true)).toEqual(expect.objectContaining({
       id: session.id,
       model: 'gpt-5.4',
       workspaceId: 'workspace-1',
@@ -97,11 +101,14 @@ describe('createConversationEngine', () => {
     expect(engine.sessions.read(first.id)?.name).toBe('Renamed');
 
     expect(engine.sessions.delete(second.id)).toBe(true);
-    expect(loadChatSessions(join(stateRoot, 'chat-sessions.catalog.json'), true).map((session) => session.id)).toEqual(['session-a']);
+    const sessionRepository = new FileChatSessionRepository({
+      sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
+    });
+    expect(sessionRepository.list(true).map((session) => session.id)).toEqual(['session-a']);
     expect(engine.sessions.delete(first.id)).toBe(true);
     expect(engine.sessions.delete('session-1')).toBe(true);
     expect(engine.sessions.delete('missing')).toBe(false);
-    expect(loadChatSessions(join(stateRoot, 'chat-sessions.catalog.json'), true).map((session) => session.id)).toEqual(['session-1']);
+    expect(sessionRepository.list(true).map((session) => session.id)).toEqual(['session-1']);
   });
 
   it('updates shared session settings for TUI and control-plane clients', () => {
@@ -444,14 +451,16 @@ describe('createConversationEngine', () => {
       'There is no interrupted or prior run to continue yet.',
     );
 
-    const stored = readChatSession(join(stateRoot, 'chat-sessions.catalog.json'), session.id, true) as ChatSession;
+    const sessionRepository = new FileChatSessionRepository({
+      sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
+    });
+    const stored = sessionRepository.read(session.id, true) as ChatSession;
     stored.lastContinuePrompt = 'continue investigating';
     stored.history = [{ role: 'user', content: 'prior' }];
     stored.updatedAt = '2026-05-03T00:00:00.000Z';
-    const otherSessions = loadChatSessions(join(stateRoot, 'chat-sessions.catalog.json'), true)
+    const otherSessions = sessionRepository.list(true)
       .filter((candidate) => candidate.id !== session.id);
-    const { saveChatSessions } = await import('../../../core/chat/engine/sessions/repository/file-chat-session-repository.js');
-    saveChatSessions(join(stateRoot, 'chat-sessions.catalog.json'), [stored, ...otherSessions]);
+    sessionRepository.save([stored, ...otherSessions]);
 
     await engine.turns.continue({ sessionId: session.id });
     expect(runConversationTurnMock.mock.calls[0]?.[0]?.prompt).toBe('continue investigating');

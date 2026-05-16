@@ -2,8 +2,8 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createChatSession } from '../../../core/chat/engine/sessions/session-record.js';
-import { loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
+import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
+import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import { appendAgentLoopTrace, appendTurnMemoryMaintenanceEvents } from '../../../core/chat/engine/turns/memory-maintenance.js';
 import type { AgentLoopResult } from '../../../core/runtime/agent-loop.js';
 import type { TraceEvent } from '../../../core/types.js';
@@ -22,13 +22,13 @@ describe('chat turn memory maintenance helpers', () => {
     }];
     writeFileSync(traceFile, `${JSON.stringify(baseTrace, null, 2)}\n`, 'utf8');
 
-    const session = createChatSession({
+    const session = ChatSessionRecords.create({
       id: 'session-1',
       name: 'Session 1',
       apiKeyPresent: true,
       model: 'gpt-5.4',
     });
-    saveChatSessions(sessionStoragePath, [{
+    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([{
       ...session,
       turns: [{
         id: 'turn-1',
@@ -62,7 +62,7 @@ describe('chat turn memory maintenance helpers', () => {
       'memory.candidate_recorded',
       'memory.maintenance_finished',
     ]);
-    expect(loadChatSessions(sessionStoragePath, true)[0]?.turns[0]?.events).toEqual([
+    expect(new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list(true)[0]?.turns[0]?.events).toEqual([
       'memory candidate recorded: candidate-1',
       'memory maintenance finished: done',
     ]);

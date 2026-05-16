@@ -15,25 +15,11 @@
  * flows should move inward to this service over time.
  */
 import { join, resolve } from 'node:path';
-import {
-  createFileChatSessionRepository,
-  type ChatSessionRepository,
-} from './repository/file-chat-session-repository.js';
-import {
-  createChatSession,
-  createInitialMessages,
-  isGenericSessionName,
-  touchSession,
-} from './session-record.js';
-import {
-  acquireSessionLease,
-  getSessionLeaseConflict,
-  releaseSessionLease,
-  type ChatSessionLeaseOwner,
-} from './lease.js';
+import { FileChatSessionRepository } from './repository/index.js';
+import type { ChatSessionRepository } from './repository/types.js';
+import { ChatSessionLeases, type ChatSessionLeaseOwner } from './leases/index.js';
 import { buildCompactionRunningContext } from '../history/compaction.js';
-import { buildConversationMessages } from './conversation-lines.js';
-import { truncate } from '../../../utils/text.js';
+import { ChatSessionRecords, ConversationLines } from './records/index.js';
 import type { ChatSession } from '../../types.js';
 import type { ConversationEngineConfig } from '../types.js';
 import type { NormalizedConversationEngineConfig } from '../config.js';
@@ -64,15 +50,13 @@ export class FileConversationSessionService implements ConversationSessionServic
 
   constructor(config: NormalizedConversationEngineConfig | ConversationSessionServiceConfig) {
     this.config = FileConversationSessionService.normalizeConfig(config);
-    this.repository = createFileChatSessionRepository({
+    this.repository = new FileChatSessionRepository({
       sessionStoragePath: this.config.sessionStoragePath,
     });
   }
 
   static summarize(session: ChatSession): string {
-    const latestTurn = session.turns[session.turns.length - 1];
-    const latestPrompt = latestTurn ? truncate(latestTurn.prompt, 44) : 'no turns yet';
-    return `${session.turns.length} turns • ${latestPrompt}`;
+    return ChatSessionRecords.summarize(session);
   }
 
   list(): ChatSession[] {
@@ -105,7 +89,7 @@ export class FileConversationSessionService implements ConversationSessionServic
 
   create(input?: CreateConversationSessionInput): ChatSession {
     const existing = this.loadExistingSessions(input?.apiKeyPresent ?? this.config.apiKeyPresent);
-    const session = createChatSession({
+    const session = ChatSessionRecords.create({
       id: input?.id?.trim() || `session-${Date.now()}`,
       name: input?.name?.trim() || `Session ${FileConversationSessionService.getNextSessionNumber(existing)}`,
       apiKeyPresent: input?.apiKeyPresent ?? this.config.apiKeyPresent,
@@ -138,7 +122,7 @@ export class FileConversationSessionService implements ConversationSessionServic
       return session;
     }
 
-    const touched = touchSession(nextSession);
+    const touched = ChatSessionRecords.touch(nextSession);
     this.repository.save(sessions.map((candidate) => (candidate.id === id ? touched : candidate)));
     return touched;
   }
@@ -168,7 +152,7 @@ export class FileConversationSessionService implements ConversationSessionServic
       history: [],
       turns: [],
       lastContinuePrompt: undefined,
-      messages: createInitialMessages(input.apiKeyPresent),
+      messages: ChatSessionRecords.createInitialMessages(input.apiKeyPresent),
     }));
   }
 
@@ -199,7 +183,7 @@ export class FileConversationSessionService implements ConversationSessionServic
     return this.updateRequiredSession(id, (session) => ({
       ...session,
       ...input,
-      messages: buildConversationMessages(input.history),
+      messages: ConversationLines.fromHistory(input.history),
     }));
   }
 
@@ -215,22 +199,22 @@ export class FileConversationSessionService implements ConversationSessionServic
   }
 
   getLeaseConflict(id: string, owner: ChatSessionLeaseOwner): string | undefined {
-    return getSessionLeaseConflict(this.require(id), owner);
+    return ChatSessionLeases.conflict(this.require(id), owner);
   }
 
   acquireLease(id: string, owner: ChatSessionLeaseOwner): ChatSession {
     return this.updateRequiredSession(id, (session) => {
-      const conflict = getSessionLeaseConflict(session, owner);
+      const conflict = ChatSessionLeases.conflict(session, owner);
       if (conflict) {
         throw new Error(conflict);
       }
 
-      return acquireSessionLease(session, owner);
+      return ChatSessionLeases.acquire(session, owner);
     });
   }
 
   releaseLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): ChatSession {
-    return this.updateRequiredSession(id, (session) => releaseSessionLease(session, owner));
+    return this.updateRequiredSession(id, (session) => ChatSessionLeases.release(session, owner));
   }
 
   rename(id: string, name: string): ChatSession {
@@ -290,7 +274,7 @@ export class FileConversationSessionService implements ConversationSessionServic
   }
 
   private createFallbackSession(apiKeyPresent = this.config.apiKeyPresent): ChatSession {
-    return createChatSession({
+    return ChatSessionRecords.create({
       id: 'session-1',
       name: 'Session 1',
       apiKeyPresent,
@@ -347,7 +331,7 @@ export class FileConversationSessionService implements ConversationSessionServic
 
   private static getNextSessionNumber(sessions: ChatSession[]): number {
     const highestGenericNumber = sessions.reduce((highest, session) => {
-      if (!isGenericSessionName(session.name)) {
+      if (!ChatSessionRecords.isGenericName(session.name)) {
         return highest;
       }
 

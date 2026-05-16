@@ -5,8 +5,8 @@ import type { AgentLoopEvent } from '../../../runtime/events.js';
 import type { TraceEvent } from '../../../types.js';
 import { runMaintenanceForRecordedCandidates } from '../../../memory/maintenance-integration.js';
 import { summarizeTrace } from '../../../observability/trace-summarizers.js';
-import { touchSession } from '../sessions/session-record.js';
-import { loadChatSessions, saveChatSessions } from '../sessions/repository/file-chat-session-repository.js';
+import { ChatSessionRecords } from '../sessions/records/index.js';
+import { FileChatSessionRepository } from '../sessions/repository/index.js';
 
 export type RunInlineTurnMemoryMaintenanceArgs = {
   memoryRoot: string;
@@ -99,13 +99,14 @@ export function appendTurnMemoryMaintenanceEvents(args: {
   const nextTrace = [...readTraceEvents(args.traceFile), ...args.events];
   writeFileSync(args.traceFile, `${JSON.stringify(nextTrace, null, 2)}\n`, 'utf8');
 
-  const sessions = loadChatSessions(args.sessionStoragePath, true);
+  const repository = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath });
+  const sessions = repository.list(true);
   const nextSessions = sessions.map((session) => {
     if (session.id !== args.sessionId) {
       return session;
     }
 
-    return touchSession({
+    return ChatSessionRecords.touch({
       ...session,
       turns: session.turns.map((turn, index) =>
         index === session.turns.length - 1
@@ -117,7 +118,7 @@ export function appendTurnMemoryMaintenanceEvents(args: {
       ),
     });
   });
-  saveChatSessions(args.sessionStoragePath, nextSessions);
+  repository.save(nextSessions);
 }
 
 export function appendAgentLoopTrace(result: AgentLoopResult, events: TraceEvent[]): AgentLoopResult {

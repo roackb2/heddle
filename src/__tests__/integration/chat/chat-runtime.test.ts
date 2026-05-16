@@ -10,8 +10,8 @@ import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../i
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
 import { runConversationTurn } from '../../../core/chat/engine/turns/run-conversation-turn.js';
 import { FileConversationSessionService } from '../../../core/chat/engine/sessions/service.js';
-import { createChatSession as createCoreChatSession } from '../../../core/chat/engine/sessions/session-record.js';
-import { loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
+import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
+import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import * as agentLoopModule from '../../../core/runtime/agent-loop.js';
 import type { ToolApprovalPolicy } from '../../../core/approvals/types.js';
 import { controlPlaneChatSessionsController } from '../../../server/features/control-plane/controllers/chat-sessions-controller.js';
@@ -459,14 +459,14 @@ describe('control-plane shared chat runtime integration', () => {
   it('clears explicit reasoning effort when control-plane settings send null', () => {
     const engineArgs = createControlPlaneSessionEngineArgs();
     const { sessionStoragePath } = engineArgs;
-    const session = createCoreChatSession({
+    const session = ChatSessionRecords.create({
       id: 'session-1',
       name: 'Session 1',
       apiKeyPresent: true,
       model: 'gpt-5.5',
       reasoningEffort: 'high',
     });
-    saveChatSessions(sessionStoragePath, [session]);
+    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
 
     const updated = controlPlaneChatSessionsController.updateSettings({
       ...engineArgs,
@@ -658,7 +658,7 @@ describe('conversation turn lifecycle', () => {
       },
     })).rejects.toThrow('loop failed');
 
-    const persisted = loadChatSessions(storage.sessionStoragePath, true)
+    const persisted = new FileChatSessionRepository({ sessionStoragePath: storage.sessionStoragePath }).list(true)
       .find((session) => session.id === storage.sessionId);
     expect(persisted?.lease).toBeUndefined();
     expect(persisted?.turns).toEqual([]);
@@ -669,13 +669,13 @@ function createConversationTurnStorage() {
   const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-conversation-turn-'));
   const stateRoot = join(workspaceRoot, '.heddle');
   const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
-  const session = createCoreChatSession({
+  const session = ChatSessionRecords.create({
     id: 'session-1',
     name: 'Session 1',
     apiKeyPresent: true,
     model: 'gpt-5.4',
   });
-  saveChatSessions(sessionStoragePath, [session]);
+  new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
 
   return {
     workspaceRoot,

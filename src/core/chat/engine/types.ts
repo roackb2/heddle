@@ -7,7 +7,7 @@ import type { TraceSummarizerRegistry } from '../../observability/trace-summariz
 import type { AgentLoopEvent, RunAgentLoopOptions } from '../../runtime/agent-loop.js';
 import type { ChatMessage, ReasoningEffort } from '../../llm/types.js';
 import type { TraceEvent } from '../../types.js';
-import type { ChatSessionLeaseOwner } from './sessions/lease.js';
+import type { ChatSessionLeaseOwner } from './sessions/leases/index.js';
 import type { ChatSession, ChatSessionRetention } from '../types.js';
 
 export type ConversationEngineConfig = {

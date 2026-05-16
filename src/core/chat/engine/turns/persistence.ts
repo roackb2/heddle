@@ -4,8 +4,8 @@ import type { ProviderCredentialSource } from '../../../runtime/api-keys.js';
 import type { AgentLoopResult } from '../../../runtime/agent-loop.js';
 import { buildCompactionRunningContext } from '../history/compaction.js';
 import { persistChatTurnResult, type PersistChatTurnResult } from './result.js';
-import { touchSession } from '../sessions/session-record.js';
-import { saveChatSessions } from '../sessions/repository/file-chat-session-repository.js';
+import { ChatSessionRecords } from '../sessions/records/index.js';
+import { FileChatSessionRepository } from '../sessions/repository/index.js';
 import type { ChatTurnHostBridge } from './host-bridge.js';
 import type { ChatSession } from '../../types.js';
 
@@ -51,10 +51,8 @@ export async function persistCompletedChatTurn(args: PersistCompletedChatTurnArg
     },
   });
 
-  saveChatSessions(
-    args.sessionStoragePath,
-    args.sessions.map((candidate) => (candidate.id === args.session.id ? persisted.session : candidate)),
-  );
+  new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
+    .save(args.sessions.map((candidate) => (candidate.id === args.session.id ? persisted.session : candidate)));
   return persisted;
 }
 
@@ -63,7 +61,7 @@ function persistFinalCompactionRunningSeed(
     archivePath?: string;
   },
 ) {
-  const compactionSeed = touchSession({
+  const compactionSeed = ChatSessionRecords.touch({
     ...args.session,
     history: args.result.transcript,
     context: buildCompactionRunningContext({
@@ -74,8 +72,6 @@ function persistFinalCompactionRunningSeed(
       lastArchivePath: args.archivePath,
     }),
   });
-  saveChatSessions(
-    args.sessionStoragePath,
-    args.sessions.map((candidate) => (candidate.id === args.session.id ? compactionSeed : candidate)),
-  );
+  new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
+    .save(args.sessions.map((candidate) => (candidate.id === args.session.id ? compactionSeed : candidate)));
 }

@@ -28,11 +28,30 @@ The target direction is:
 - session services own session behavior and policy;
 - hosts consume session services instead of touching storage mechanics.
 
-In this folder today:
+The intended structure is class-based by responsibility:
 
-- `session-record.ts` owns in-memory session record helpers
-- `repository/file-chat-session-repository.ts` owns file persistence
-- `service.ts` owns session behavior and should be the main path that hosts call
+- `service.ts` owns the stateful session boundary and should be the main path
+  that hosts call.
+- `records/` owns pure in-memory session record behavior, such as record
+  creation, touch semantics, summaries, generic-name checks, and conversation
+  line projection. These are static domain methods because they need no
+  service instance.
+- `leases/` owns pure lease policy. Lease acquisition, release, freshness, and
+  conflict semantics live together as static domain methods.
+- `repository/file-chat-session-repository.ts` owns file persistence.
+- `archives/` owns file-backed archived transcript and rolling-summary
+  persistence for compacted chat history.
+- session title prompting lives under `records/` as session metadata behavior;
+  host auto-rename timing stays in the host.
+- each meaningful subfolder exposes a `types.ts` contract so callers can see
+  the boundary shape without reading implementation details first.
+
+Avoid adding loose exported helper functions for session-domain behavior. If the
+behavior is part of session semantics and needs state or dependencies, put it on
+the session service or another instantiated collaborator. If it is pure session
+domain logic, put it on a static domain class under the relevant subfolder. Use
+`utils/` only for low-level formatting or mechanical transforms that are not
+session policy.
 
 The service API should cover ordinary host needs directly:
 

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildConversationMessages,
   canRememberPendingApproval,
   formatApprovalHint,
   formatChatFailureMessage,
@@ -8,6 +7,7 @@ import {
   formatPlanHistoryMessage,
   summarizePendingApproval,
 } from '../../../cli/chat/utils/format.js';
+import { ConversationLines } from '../../../core/chat/engine/sessions/records/index.js';
 import type { ChatMessage } from '../../../core/llm/types.js';
 import type { PendingApproval } from '../../../core/chat/types.js';
 
@@ -44,7 +44,7 @@ describe('buildConversationMessages', () => {
       { role: 'assistant', content: 'Done.' },
     ];
 
-    const messages = buildConversationMessages(history);
+    const messages = ConversationLines.fromHistory(history);
 
     expect(messages).toEqual([
       { id: 'user-0-Update the file.', role: 'user', text: 'Update the file.' },
@@ -69,7 +69,7 @@ describe('buildConversationMessages', () => {
       },
     ];
 
-    const messages = buildConversationMessages(history);
+    const messages = ConversationLines.fromHistory(history);
 
     expect(messages).toEqual([
       { id: 'user-0-Inspect the repo.', role: 'user', text: 'Inspect the repo.' },
@@ -104,7 +104,7 @@ describe('buildConversationMessages', () => {
       },
     ];
 
-    const messages = buildConversationMessages(history);
+    const messages = ConversationLines.fromHistory(history);
 
     expect(messages).toEqual([
       { id: 'user-0-Move the project forward.', role: 'user', text: 'Move the project forward.' },

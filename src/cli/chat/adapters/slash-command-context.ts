@@ -1,5 +1,5 @@
 import { formatAuthStatusMessage, loginProviderWithOAuth, logoutProvider } from '../../auth.js';
-import { summarizeSession } from '../../../core/chat/engine/sessions/session-record.js';
+import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
 import type { SlashCommandExecutionContext } from '../../../core/commands/slash/modules/context.js';
 import { createFileHeartbeatTaskStore } from '../../../core/runtime/heartbeat-task-store.js';
 import type { LocalCommandArgs } from '../state/local-commands.js';
@@ -43,7 +43,7 @@ export function createTuiSlashCommandContext(args: LocalCommandArgs): SlashComma
       rename: args.renameSession,
       remove: args.removeSession,
       clear: args.clearConversation,
-      summarize: summarizeSession,
+      summarize: ChatSessionRecords.summarize,
     },
     heartbeat: {
       listTasks: heartbeatStore.listTasks,

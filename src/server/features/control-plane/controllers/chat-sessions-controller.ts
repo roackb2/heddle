@@ -14,7 +14,7 @@
  */
 import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
-import { readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
+import { FileChatSessionRepository } from '../../../../core/chat/engine/sessions/repository/index.js';
 import { createConversationEngine } from '../../../../core/chat/engine/conversation-engine.js';
 import type {
   ConversationEngine,
@@ -26,9 +26,9 @@ import { DEFAULT_OPENAI_MODEL } from '../../../../core/config.js';
 import { credentialModeFromSource, resolveCompatibleActiveModel } from '../../../../core/llm/model-policy.js';
 import { inferProviderFromModel } from '../../../../core/llm/providers.js';
 import { hasProviderCredentialForModel, resolveProviderCredentialSourceForModel } from '../../../../core/runtime/api-keys.js';
-import type { ChatSessionLeaseOwner } from '../../../../core/chat/engine/sessions/lease.js';
+import type { ChatSessionLeaseOwner } from '../../../../core/chat/engine/sessions/leases/index.js';
 import type { ChatSession, TurnSummary } from '../../../../core/chat/types.js';
-import { buildConversationMessages } from '../../../../core/chat/engine/sessions/conversation-lines.js';
+import { ConversationLines } from '../../../../core/chat/engine/sessions/records/index.js';
 import { requestToolApproval } from '../../../../core/approvals/surface.js';
 import type { ToolCall, ToolDefinition } from '../../../../core/types.js';
 import { ControlPlaneChatSessionEventsController } from './chat-session-events.js';
@@ -296,7 +296,8 @@ export class ControlPlaneChatSessionsController {
     // Desired shape: fake E2E should become an injectable engine test host.
     // This is the only control-plane session path that should mutate the file
     // repository directly.
-    const session = readChatSession(args.sessionStoragePath, args.sessionId, true);
+    const repository = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath });
+    const session = repository.read(args.sessionId, true);
     if (!session) {
       throw new Error(`Chat session not found: ${args.sessionId}`);
     }
@@ -320,17 +321,16 @@ export class ControlPlaneChatSessionsController {
     const updatedSession: ChatSession = {
       ...session,
       history: nextHistory,
-      messages: buildConversationMessages(nextHistory),
+      messages: ConversationLines.fromHistory(nextHistory),
       turns: [...session.turns, nextTurn].slice(-8),
       updatedAt: timestamp,
       lastContinuePrompt: args.prompt,
       lease: undefined,
     };
 
-    saveChatSessions(
-      args.sessionStoragePath,
-      readChatSessionCatalog(args.sessionStoragePath)
-        .map((entry) => readChatSession(args.sessionStoragePath, entry.id, true))
+    repository.save(
+      repository.readCatalog()
+        .map((entry) => repository.read(entry.id, true))
         .filter((candidate): candidate is ChatSession => Boolean(candidate))
         .map((candidate) => candidate.id === session.id ? updatedSession : candidate),
     );

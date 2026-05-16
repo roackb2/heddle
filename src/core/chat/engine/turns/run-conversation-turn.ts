@@ -14,9 +14,9 @@ import { createChatTurnHostBridge } from './host-bridge.js';
 import { prepareChatSessionTurn } from './preflight.js';
 import { runInlineTurnMemoryMaintenance, scheduleBackgroundTurnMemoryMaintenance } from './memory-maintenance.js';
 import { persistCompletedChatTurn } from './persistence.js';
-import { releaseSessionLease, type ChatSessionLeaseOwner } from '../sessions/lease.js';
-import { touchSession } from '../sessions/session-record.js';
-import { loadChatSessions, saveChatSessions } from '../sessions/repository/file-chat-session-repository.js';
+import { ChatSessionLeases, type ChatSessionLeaseOwner } from '../sessions/leases/index.js';
+import { ChatSessionRecords } from '../sessions/records/index.js';
+import { FileChatSessionRepository } from '../sessions/repository/index.js';
 import type { ChatTurnHostPort } from './host-bridge.js';
 
 export type RunConversationTurnArgs = {
@@ -165,19 +165,17 @@ export async function runConversationTurn(args: RunConversationTurnArgs): Promis
 }
 
 export function clearConversationTurnLease(sessionStoragePath: string, sessionId: string, owner: ChatSessionLeaseOwner) {
-  const sessions = loadChatSessions(sessionStoragePath, true);
+  const repository = new FileChatSessionRepository({ sessionStoragePath });
+  const sessions = repository.list(true);
   const session = sessions.find((candidate) => candidate.id === sessionId);
   if (!session?.lease) {
     return;
   }
 
-  const released = releaseSessionLease(session, owner);
+  const released = ChatSessionLeases.release(session, owner);
   if (released === session) {
     return;
   }
 
-  saveChatSessions(
-    sessionStoragePath,
-    sessions.map((candidate) => candidate.id === sessionId ? touchSession(released) : candidate),
-  );
+  repository.save(sessions.map((candidate) => candidate.id === sessionId ? ChatSessionRecords.touch(released) : candidate));
 }

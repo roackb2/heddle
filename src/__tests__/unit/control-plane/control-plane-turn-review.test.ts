@@ -2,8 +2,8 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createChatSession } from '../../../core/chat/engine/sessions/session-record.js';
-import { saveChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
+import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
+import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import { controlPlaneChatSessionsController } from '../../../server/features/control-plane/controllers/chat-sessions-controller.js';
 
 describe('control-plane turn review', () => {
@@ -177,13 +177,13 @@ function createSessionWithTrace(trace: unknown[]) {
 
   writeFileSync(traceFile, JSON.stringify(trace), 'utf8');
 
-  const session = createChatSession({
+  const session = ChatSessionRecords.create({
     id: sessionId,
     name: 'Review test',
     apiKeyPresent: true,
     model: 'gpt-test',
   });
-  saveChatSessions(sessionStoragePath, [{
+  new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([{
     ...session,
     turns: [{
       id: turnId,

@@ -2,13 +2,13 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createChatSession } from '../../../core/chat/engine/sessions/session-record.js';
-import { loadChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
+import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
+import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import { driftFooterColor, formatDriftFooter } from '../../../cli/chat/utils/drift-footer.js';
 
 describe('chat drift defaults and footer formatting', () => {
   it('leaves CyberLoop drift detection disabled by default for new sessions', () => {
-    const session = createChatSession({
+    const session = ChatSessionRecords.create({
       id: 'session-1',
       name: 'Session 1',
       apiKeyPresent: true,
@@ -30,7 +30,7 @@ describe('chat drift defaults and footer formatting', () => {
       updatedAt: '2026-04-13T00:00:00.000Z',
     }]));
 
-    const [session] = loadChatSessions(sessionsFile, true);
+    const [session] = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).list(true);
 
     expect(session?.driftEnabled).toBe(false);
   });
@@ -49,7 +49,7 @@ describe('chat drift defaults and footer formatting', () => {
       driftEnabled: false,
     }]));
 
-    const [session] = loadChatSessions(sessionsFile, true);
+    const [session] = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).list(true);
 
     expect(session?.driftEnabled).toBe(false);
   });

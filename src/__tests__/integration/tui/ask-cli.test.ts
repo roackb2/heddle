@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AskCliHost } from '../../../cli/ask.js';
-import { createChatSession } from '../../../core/chat/engine/sessions/session-record.js';
-import { readChatSession, readChatSessionCatalog, saveChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
+import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
+import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
 import * as agentLoopModule from '../../../core/runtime/agent-loop.js';
 import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
@@ -58,10 +58,10 @@ describe('AskCliHost.run', () => {
       systemContext: expect.stringContaining('- Ask uses memory context.'),
     }));
     expect(existsSync(join(workspaceRoot, '.heddle', 'traces'))).toBe(true);
-    const catalog = readChatSessionCatalog(sessionStoragePath);
+    const catalog = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).readCatalog();
     expect(catalog).toHaveLength(1);
     expect(catalog[0]?.retention).toBe('one_off');
-    const session = readChatSession(sessionStoragePath, catalog[0]!.id, true);
+    const session = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(catalog[0]!.id, true);
     expect(session?.retention).toBe('one_off');
     expect(session?.history).toEqual(result.transcript);
     expect(session?.turns).toHaveLength(1);
@@ -98,12 +98,12 @@ describe('AskCliHost.run', () => {
     });
 
     const sessionStoragePath = join(workspaceRoot, '.heddle', 'chat-sessions.catalog.json');
-    const catalog = readChatSessionCatalog(sessionStoragePath);
+    const catalog = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).readCatalog();
     expect(catalog).toHaveLength(1);
     expect(catalog[0]?.name).toBe('Ask test session');
     expect(catalog[0]?.retention).toBe('reusable');
 
-    const session = readChatSession(sessionStoragePath, catalog[0]!.id, true);
+    const session = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(catalog[0]!.id, true);
     expect(session?.retention).toBe('reusable');
     expect(session?.history).toEqual(result.transcript);
     expect(session?.turns).toHaveLength(1);
@@ -118,7 +118,7 @@ describe('AskCliHost.run', () => {
     const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
     const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
     const existingSession: ChatSession = {
-      ...createChatSession({
+      ...ChatSessionRecords.create({
         id: 'session-existing',
         name: 'Existing session',
         apiKeyPresent: true,
@@ -133,7 +133,7 @@ describe('AskCliHost.run', () => {
         { id: 'assistant-1', role: 'assistant', text: 'first answer' },
       ],
     };
-    saveChatSessions(sessionStoragePath, [existingSession]);
+    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([existingSession]);
 
     const result: RunResult = {
       outcome: 'done',
@@ -166,7 +166,7 @@ describe('AskCliHost.run', () => {
       sessionId: existingSession.id,
     });
 
-    const updated = readChatSession(sessionStoragePath, existingSession.id, true);
+    const updated = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(existingSession.id, true);
     expect(runAgentLoopSpy).toHaveBeenCalledTimes(1);
     expect(updated?.history).toEqual(result.transcript);
     expect(updated?.turns).toHaveLength(1);
@@ -183,7 +183,7 @@ describe('AskCliHost.run', () => {
       apiKey: 'test-key',
       latestSession: true,
     })).rejects.toThrow('No saved chat sessions are available yet. Use --new-session to create one first.');
-    expect(readChatSessionCatalog(sessionStoragePath)).toEqual([]);
+    expect(new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).readCatalog()).toEqual([]);
   });
 
   it('preflight compacts an oversized session before ask-mode runAgentLoop executes', async () => {
@@ -191,7 +191,7 @@ describe('AskCliHost.run', () => {
     const stateRoot = join(workspaceRoot, '.heddle');
     const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
     const existingSession: ChatSession = {
-      ...createChatSession({
+      ...ChatSessionRecords.create({
         id: 'session-preflight',
         name: 'Preflight session',
         apiKeyPresent: true,
@@ -210,7 +210,7 @@ describe('AskCliHost.run', () => {
         { id: 'assistant-2', role: 'assistant', text: 'very large answer 2' },
       ],
     };
-    saveChatSessions(sessionStoragePath, [existingSession]);
+    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([existingSession]);
 
     const compactedHistory = [
       { role: 'system' as const, content: 'Heddle compacted earlier conversation history.\n\nArchive root: .heddle/chat-sessions/session-preflight/archives' },
@@ -290,7 +290,7 @@ describe('AskCliHost.run', () => {
 
     expect(compactionSpy).toHaveBeenCalledTimes(2);
     expect(runAgentLoopSpy).toHaveBeenCalledTimes(1);
-    expect(readChatSession(sessionStoragePath, existingSession.id, true)?.archives).toHaveLength(1);
+    expect(new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(existingSession.id, true)?.archives).toHaveLength(1);
   });
 
   it('attaches default ask to a live daemon host through a persisted one-off session', async () => {
@@ -343,10 +343,13 @@ describe('AskCliHost.run', () => {
     }
 
     expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('attaching ask to daemon'));
-    const catalog = readChatSessionCatalog(join(stateRoot, 'chat-sessions.catalog.json'));
+    const sessionRepository = new FileChatSessionRepository({
+      sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
+    });
+    const catalog = sessionRepository.readCatalog();
     expect(catalog).toHaveLength(1);
     expect(catalog[0]?.retention).toBe('one_off');
-    const session = readChatSession(join(stateRoot, 'chat-sessions.catalog.json'), catalog[0]!.id, true);
+    const session = sessionRepository.read(catalog[0]!.id, true);
     expect(session?.history).toEqual(result.transcript);
     expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining(`Session: ${catalog[0]?.id}`));
     expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('Trace:'));
@@ -402,7 +405,10 @@ describe('AskCliHost.run', () => {
       await closeServer(server);
     }
 
-    const catalog = readChatSessionCatalog(join(stateRoot, 'chat-sessions.catalog.json'));
+    const sessionRepository = new FileChatSessionRepository({
+      sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
+    });
+    const catalog = sessionRepository.readCatalog();
     expect(catalog).toHaveLength(1);
     expect(catalog[0]?.name).toBe('Remote ask session');
     expect(catalog[0]?.retention).toBe('reusable');

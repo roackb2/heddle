@@ -1,9 +1,8 @@
 import type { ChatMessage } from '../../../llm/types.js';
-import { buildConversationMessages } from '../sessions/conversation-lines.js';
+import { ConversationLines, ChatSessionRecords } from '../sessions/records/index.js';
 import { buildCompactionRunningContext, compactChatHistoryWithArchive } from '../history/compaction.js';
-import { acquireSessionLease, getSessionLeaseConflict, type ChatSessionLeaseOwner } from '../sessions/lease.js';
-import { touchSession } from '../sessions/session-record.js';
-import { readChatSession, saveChatSessions } from '../sessions/repository/file-chat-session-repository.js';
+import { ChatSessionLeases, type ChatSessionLeaseOwner } from '../sessions/leases/index.js';
+import { FileChatSessionRepository } from '../sessions/repository/index.js';
 import type { ChatArchiveRecord, ChatContextStats, ChatSession } from '../../types.js';
 import type { ChatTurnHostBridge } from './host-bridge.js';
 
@@ -45,8 +44,9 @@ export type PrepareChatSessionTurnResult =
     };
 
 export async function prepareChatSessionTurn(args: PrepareChatSessionTurnArgs): Promise<PrepareChatSessionTurnResult> {
-  const persistedSession = readChatSession(args.sessionStoragePath, args.sessionId, true);
-  const leaseConflict = persistedSession ? getSessionLeaseConflict(persistedSession, args.leaseOwner) : undefined;
+  const persistedSession = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
+    .read(args.sessionId, true);
+  const leaseConflict = persistedSession ? ChatSessionLeases.conflict(persistedSession, args.leaseOwner) : undefined;
   if (leaseConflict) {
     return {
       ok: false,
@@ -55,7 +55,7 @@ export async function prepareChatSessionTurn(args: PrepareChatSessionTurnArgs): 
     };
   }
 
-  const leasedSession = persistedSession ? touchSession(acquireSessionLease(persistedSession, args.leaseOwner)) : undefined;
+  const leasedSession = persistedSession ? ChatSessionRecords.touch(ChatSessionLeases.acquire(persistedSession, args.leaseOwner)) : undefined;
   const initialHistory = leasedSession?.history ?? args.fallbackHistory;
   const preflightCompacted = await compactChatHistoryWithArchive({
     history: initialHistory,
@@ -92,7 +92,7 @@ export async function prepareChatSessionTurn(args: PrepareChatSessionTurnArgs): 
             history: preflightCompacted.history,
             context: preflightCompacted.context,
             archives: preflightCompacted.archives,
-            messages: buildConversationMessages(preflightCompacted.history),
+            messages: ConversationLines.fromHistory(preflightCompacted.history),
           }
         : undefined,
       historyForRun: preflightCompacted.history,
@@ -110,7 +110,7 @@ export function persistPreflightCompactionRunningSeed(args: {
   leasedSession: ChatSession;
   archivePath?: string;
 }) {
-  const compactionSeed = touchSession({
+  const compactionSeed = ChatSessionRecords.touch({
     ...args.leasedSession,
     context: buildCompactionRunningContext({
       history: args.leasedSession.history,
@@ -120,10 +120,8 @@ export function persistPreflightCompactionRunningSeed(args: {
       lastArchivePath: args.archivePath,
     }),
   });
-  saveChatSessions(
-    args.sessionStoragePath,
-    args.sessions.map((candidate) => (candidate.id === args.sessionId ? compactionSeed : candidate)),
-  );
+  new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
+    .save(args.sessions.map((candidate) => (candidate.id === args.sessionId ? compactionSeed : candidate)));
 }
 
 export function persistPreparedChatSessionTurn(args: {
@@ -134,18 +132,16 @@ export function persistPreparedChatSessionTurn(args: {
 }): Extract<PrepareChatSessionTurnResult, { ok: true }> {
   const preparedSession =
     args.prepared.session ??
-    touchSession({
+    ChatSessionRecords.touch({
       ...args.session,
       history: args.prepared.preflightHistory,
       context: args.prepared.context,
       archives: args.prepared.archives,
-      messages: buildConversationMessages(args.prepared.preflightHistory),
+      messages: ConversationLines.fromHistory(args.prepared.preflightHistory),
     });
 
-  saveChatSessions(
-    args.sessionStoragePath,
-    args.sessions.map((candidate) => (candidate.id === args.session.id ? preparedSession : candidate)),
-  );
+  new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
+    .save(args.sessions.map((candidate) => (candidate.id === args.session.id ? preparedSession : candidate)));
 
   return {
     ...args.prepared,

@@ -1,10 +1,9 @@
 import type { RunResult } from '../../../types.js';
 import type { ChatMessage } from '../../../llm/types.js';
 import { compactChatHistoryWithArchive, estimateChatHistoryTokens } from '../history/compaction.js';
-import { buildConversationMessages } from '../sessions/conversation-lines.js';
 import { formatChatFailureMessage } from '../../failure-messages.js';
 import { countAssistantSteps, summarizeTrace, type TraceSummarizerRegistry } from '../../../observability/trace-summarizers.js';
-import { touchSession } from '../sessions/session-record.js';
+import { ChatSessionRecords, ConversationLines } from '../sessions/records/index.js';
 import type { ChatSession, TurnSummary } from '../../types.js';
 import { saveTrace } from './trace.js';
 
@@ -88,14 +87,14 @@ export async function createChatTurnPersistenceArtifacts(
 
 export async function persistChatTurnResult(args: PersistChatTurnResultArgs): Promise<PersistChatTurnResult> {
   const artifacts = await createChatTurnPersistenceArtifacts(args);
-  const session = touchSession({
+  const session = ChatSessionRecords.touch({
     ...args.session,
     lastContinuePrompt: args.prompt,
     history: artifacts.compacted.history,
     context: artifacts.compacted.context,
     archives: artifacts.compacted.archives,
     lease: undefined,
-    messages: buildConversationMessages(artifacts.compacted.history),
+    messages: ConversationLines.fromHistory(artifacts.compacted.history),
     turns: [...args.session.turns, artifacts.turn].slice(-8),
   });
 

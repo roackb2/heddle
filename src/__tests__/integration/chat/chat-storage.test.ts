@@ -3,14 +3,8 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createChatSession } from '../../../core/chat/engine/sessions/session-record.js';
-import {
-  deriveSessionStoragePaths,
-  migrateLegacyChatSessions,
-  readChatSession,
-  readChatSessionCatalog,
-  saveChatSessions,
-} from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
+import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
+import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 
 describe('chat session storage layout', () => {
   it('migrates legacy chat-sessions.json into catalog plus per-session files without deleting the original file', () => {
@@ -36,7 +30,7 @@ describe('chat session storage layout', () => {
       },
     ], null, 2));
 
-    const sessions = migrateLegacyChatSessions(sessionsFile, true);
+    const sessions = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).migrateLegacy(true);
 
     expect(sessions).toHaveLength(1);
     expect(sessions[0]?.id).toBe('session-1');
@@ -58,7 +52,7 @@ describe('chat session storage layout', () => {
     const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-'));
     const sessionsFile = join(dir, 'chat-sessions.json');
     const session = {
-      ...createChatSession({
+      ...ChatSessionRecords.create({
         id: 'session-1',
         name: 'Session 1',
         apiKeyPresent: true,
@@ -80,14 +74,14 @@ describe('chat session storage layout', () => {
       }],
     };
 
-    saveChatSessions(sessionsFile, [session]);
+    new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).save([session]);
 
     const catalog = JSON.parse(readFileSync(join(dir, 'chat-sessions.catalog.json'), 'utf8')) as {
       version: number;
       sessions: Array<Record<string, unknown>>;
     };
-    const storedCatalog = readChatSessionCatalog(sessionsFile);
-    const storedSession = readChatSession(sessionsFile, 'session-1', true);
+    const storedCatalog = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).readCatalog();
+    const storedSession = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).read('session-1', true);
 
     expect(catalog.version).toBe(1);
     expect(storedCatalog[0]).toEqual(expect.objectContaining({
@@ -122,7 +116,7 @@ describe('chat session storage layout', () => {
     const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-reasoning-'));
     const sessionsFile = join(dir, 'chat-sessions.json');
     const session = {
-      ...createChatSession({
+      ...ChatSessionRecords.create({
         id: 'session-1',
         name: 'Session 1',
         apiKeyPresent: true,
@@ -132,14 +126,14 @@ describe('chat session storage layout', () => {
       reasoningEffort: 'high' as const,
     };
 
-    saveChatSessions(sessionsFile, [session]);
+    new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).save([session]);
 
-    expect(readChatSessionCatalog(sessionsFile)[0]).toEqual(expect.objectContaining({
+    expect(new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).readCatalog()[0]).toEqual(expect.objectContaining({
       id: 'session-1',
       model: 'gpt-5.5',
       reasoningEffort: 'high',
     }));
-    expect(readChatSession(sessionsFile, 'session-1', true)).toEqual(expect.objectContaining({
+    expect(new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).read('session-1', true)).toEqual(expect.objectContaining({
       id: 'session-1',
       model: 'gpt-5.5',
       reasoningEffort: 'high',
@@ -149,18 +143,18 @@ describe('chat session storage layout', () => {
   it('does not rewrite unchanged session files when saving again', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-'));
     const sessionsFile = join(dir, 'chat-sessions.json');
-    const session = createChatSession({
+    const session = ChatSessionRecords.create({
       id: 'session-1',
       name: 'Session 1',
       apiKeyPresent: true,
     });
 
-    saveChatSessions(sessionsFile, [session]);
+    new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).save([session]);
     const sessionFile = join(dir, 'chat-sessions', 'session-1.json');
     const firstMtime = statSync(sessionFile).mtimeMs;
 
     await new Promise((resolve) => setTimeout(resolve, 20));
-    saveChatSessions(sessionsFile, [session]);
+    new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).save([session]);
     const secondMtime = statSync(sessionFile).mtimeMs;
 
     expect(secondMtime).toBe(firstMtime);
@@ -180,17 +174,17 @@ describe('chat session storage layout', () => {
       },
     ], null, 2));
 
-    const sessions = migrateLegacyChatSessions(sessionsFile, true);
+    const sessions = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).migrateLegacy(true);
 
     expect(sessions[0]?.workspaceId).toBe('workspace-1');
-    expect(readChatSessionCatalog(sessionsFile)[0]?.workspaceId).toBe('workspace-1');
+    expect(new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).readCatalog()[0]?.workspaceId).toBe('workspace-1');
   });
 
   it('preserves custom catalog filenames instead of collapsing them to the default layout', () => {
     const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-custom-catalog-'));
     const configuredCatalogPath = join(dir, 'embedded-sessions.catalog.json');
 
-    expect(deriveSessionStoragePaths(configuredCatalogPath)).toEqual({
+    expect(FileChatSessionRepository.deriveStoragePaths(configuredCatalogPath)).toEqual({
       catalogPath: configuredCatalogPath,
       legacyPath: join(dir, 'embedded-sessions.json'),
       sessionsDir: join(dir, 'embedded-sessions'),
@@ -201,7 +195,7 @@ describe('chat session storage layout', () => {
     const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-custom-legacy-'));
     const legacyPath = join(dir, 'embedded-sessions.json');
 
-    expect(deriveSessionStoragePaths(legacyPath)).toEqual({
+    expect(FileChatSessionRepository.deriveStoragePaths(legacyPath)).toEqual({
       catalogPath: join(dir, 'embedded-sessions.catalog.json'),
       legacyPath,
       sessionsDir: join(dir, 'embedded-sessions'),

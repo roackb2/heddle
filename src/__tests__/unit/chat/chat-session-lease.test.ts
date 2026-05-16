@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  acquireSessionLease,
-  getSessionLeaseConflict,
-  isSessionLeaseFresh,
-  isSessionLeaseOwnedByDeadLocalProcess,
-  releaseSessionLease,
-} from '../../../core/chat/engine/sessions/lease.js';
+import { ChatSessionLeases } from '../../../core/chat/engine/sessions/leases/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
 
 function createSession(): ChatSession {
@@ -23,7 +17,7 @@ function createSession(): ChatSession {
 
 describe('chat session leases', () => {
   it('acquires and releases a lease for the same owner', () => {
-    const leased = acquireSessionLease(createSession(), {
+    const leased = ChatSessionLeases.acquire(createSession(), {
       ownerKind: 'tui',
       ownerId: 'tui-123',
       clientLabel: 'terminal chat',
@@ -36,14 +30,14 @@ describe('chat session leases', () => {
       ownerId: 'tui-123',
       clientLabel: 'terminal chat',
     });
-    expect(isSessionLeaseFresh(leased.lease, { now: Date.parse('2026-04-21T01:05:00.000Z') })).toBe(true);
+    expect(ChatSessionLeases.isFresh(leased.lease, { now: Date.parse('2026-04-21T01:05:00.000Z') })).toBe(true);
 
-    const released = releaseSessionLease(leased, { ownerId: 'tui-123' });
+    const released = ChatSessionLeases.release(leased, { ownerId: 'tui-123' });
     expect(released.lease).toBeUndefined();
   });
 
   it('reports a conflict for a different fresh owner', () => {
-    const leased = acquireSessionLease(createSession(), {
+    const leased = ChatSessionLeases.acquire(createSession(), {
       ownerKind: 'daemon',
       ownerId: 'daemon-1',
       clientLabel: 'control plane',
@@ -51,7 +45,7 @@ describe('chat session leases', () => {
       now: Date.parse('2026-04-21T01:00:00.000Z'),
     });
 
-    expect(getSessionLeaseConflict(leased, {
+    expect(ChatSessionLeases.conflict(leased, {
       ownerKind: 'tui',
       ownerId: 'tui-123',
       clientLabel: 'terminal chat',
@@ -61,7 +55,7 @@ describe('chat session leases', () => {
   });
 
   it('ignores stale leases', () => {
-    const leased = acquireSessionLease(createSession(), {
+    const leased = ChatSessionLeases.acquire(createSession(), {
       ownerKind: 'ask',
       ownerId: 'ask-123',
       clientLabel: 'heddle ask',
@@ -69,7 +63,7 @@ describe('chat session leases', () => {
       now: Date.parse('2026-04-21T01:00:00.000Z'),
     });
 
-    expect(getSessionLeaseConflict(leased, {
+    expect(ChatSessionLeases.conflict(leased, {
       ownerKind: 'tui',
       ownerId: 'tui-123',
       clientLabel: 'terminal chat',
@@ -79,7 +73,7 @@ describe('chat session leases', () => {
   });
 
   it('ignores fresh leases owned by dead local Heddle processes', () => {
-    const leased = acquireSessionLease(createSession(), {
+    const leased = ChatSessionLeases.acquire(createSession(), {
       ownerKind: 'tui',
       ownerId: 'tui-4686',
       clientLabel: 'terminal chat',
@@ -87,8 +81,8 @@ describe('chat session leases', () => {
       now: Date.parse('2026-04-21T01:00:00.000Z'),
     });
 
-    expect(isSessionLeaseOwnedByDeadLocalProcess(leased.lease, { isProcessAlive: () => false })).toBe(true);
-    expect(getSessionLeaseConflict(leased, {
+    expect(ChatSessionLeases.isOwnedByDeadLocalProcess(leased.lease, { isProcessAlive: () => false })).toBe(true);
+    expect(ChatSessionLeases.conflict(leased, {
       ownerKind: 'tui',
       ownerId: 'tui-123',
       clientLabel: 'terminal chat',
@@ -99,7 +93,7 @@ describe('chat session leases', () => {
   });
 
   it('still reports fresh local process leases when the owner is alive', () => {
-    const leased = acquireSessionLease(createSession(), {
+    const leased = ChatSessionLeases.acquire(createSession(), {
       ownerKind: 'tui',
       ownerId: 'tui-4686',
       clientLabel: 'terminal chat',
@@ -107,7 +101,7 @@ describe('chat session leases', () => {
       now: Date.parse('2026-04-21T01:00:00.000Z'),
     });
 
-    expect(getSessionLeaseConflict(leased, {
+    expect(ChatSessionLeases.conflict(leased, {
       ownerKind: 'tui',
       ownerId: 'tui-123',
       clientLabel: 'terminal chat',

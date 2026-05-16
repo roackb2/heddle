@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createChatTurnPersistenceArtifacts } from '../../../core/chat/engine/turns/result.js';
-import { loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
+import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import { persistCompletedChatTurn } from '../../../core/chat/engine/turns/persistence.js';
 import { createTraceSummarizerRegistry } from '../../../core/observability/trace-summarizers.js';
 import type { AgentLoopResult } from '../../../core/runtime/agent-loop.js';
@@ -54,7 +54,7 @@ describe('chat turn persistence', () => {
     const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-turn-persistence-save-'));
     const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
     const session = createSession();
-    saveChatSessions(sessionStoragePath, [session]);
+    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
 
     const result: AgentLoopResult = {
       outcome: 'done',
@@ -116,7 +116,7 @@ describe('chat turn persistence', () => {
       credentialSource: { type: 'explicit-api-key' },
     });
 
-    const stored = loadChatSessions(sessionStoragePath, true)[0];
+    const stored = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list(true)[0];
     expect(stored?.id).toBe(session.id);
     expect(stored?.lastContinuePrompt).toBe('Persist this turn.');
     expect(stored?.messages.map((message) => message.text)).toEqual(['Persist this turn.', 'Done.']);

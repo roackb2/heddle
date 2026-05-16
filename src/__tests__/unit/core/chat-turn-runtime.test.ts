@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
-import { createChatSession } from '../../../core/chat/engine/sessions/session-record.js';
-import { loadChatSessions, saveChatSessions } from '../../../core/chat/engine/sessions/repository/file-chat-session-repository.js';
+import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
+import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import {
   persistPreflightCompactionRunningSeed,
   persistPreparedChatSessionTurn,
@@ -21,13 +21,13 @@ describe('chat turn preparation modules', () => {
   it('loads the requested session or preserves the existing missing-session error', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-session-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
-    const session = createChatSession({
+    const session = ChatSessionRecords.create({
       id: 'session-1',
       name: 'Session 1',
       apiKeyPresent: true,
       model: 'gpt-5.4',
     });
-    saveChatSessions(sessionStoragePath, [session]);
+    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
 
     expect(prepareConversationTurnContext({
       workspaceRoot: root,
@@ -92,14 +92,14 @@ describe('chat turn preparation modules', () => {
   it('carries stored session reasoning effort into the turn runtime', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-reasoning-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
-    const session = createChatSession({
+    const session = ChatSessionRecords.create({
       id: 'session-1',
       name: 'Session 1',
       apiKeyPresent: true,
       model: 'gpt-5.5',
       reasoningEffort: 'medium',
     });
-    saveChatSessions(sessionStoragePath, [session]);
+    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
 
     const context = prepareConversationTurnContext({
       workspaceRoot: root,
@@ -163,13 +163,13 @@ describe('chat turn preparation modules', () => {
   it('prepares ordinary turn context with runtime, tool bundle, and default lease owner', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-context-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
-    const session = createChatSession({
+    const session = ChatSessionRecords.create({
       id: 'session-1',
       name: 'Session 1',
       apiKeyPresent: true,
       model: 'gpt-5.4',
     });
-    saveChatSessions(sessionStoragePath, [session]);
+    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
 
     const context = prepareConversationTurnContext({
       workspaceRoot: root,
@@ -209,7 +209,7 @@ describe('chat turn preparation modules', () => {
   it('persists the preflight compaction-running context for the leased session', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-preflight-seed-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
-    const session = createChatSession({
+    const session = ChatSessionRecords.create({
       id: 'session-1',
       name: 'Session 1',
       apiKeyPresent: true,
@@ -229,7 +229,7 @@ describe('chat turn preparation modules', () => {
         lastSeenAt: '2026-05-03T00:00:00.000Z',
       },
     };
-    saveChatSessions(sessionStoragePath, [leasedSession]);
+    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([leasedSession]);
 
     persistPreflightCompactionRunningSeed({
       sessionStoragePath,
@@ -239,7 +239,7 @@ describe('chat turn preparation modules', () => {
       archivePath: '.heddle/chat-sessions/session-1/archives/archive-1.jsonl',
     });
 
-    const nextSession = loadChatSessions(sessionStoragePath, true)[0];
+    const nextSession = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list(true)[0];
     expect(nextSession?.context?.compactionStatus).toBe('running');
     expect(nextSession?.context?.lastArchivePath).toBe('.heddle/chat-sessions/session-1/archives/archive-1.jsonl');
     expect(nextSession?.lease).toEqual(leasedSession.lease);
@@ -248,13 +248,13 @@ describe('chat turn preparation modules', () => {
   it('persists prepared preflight session state before the run loop starts', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-preflight-persist-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
-    const session = createChatSession({
+    const session = ChatSessionRecords.create({
       id: 'session-1',
       name: 'Session 1',
       apiKeyPresent: true,
       model: 'gpt-5.4',
     });
-    saveChatSessions(sessionStoragePath, [session]);
+    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
 
     const preparedSession = persistPreparedChatSessionTurn({
       sessionStoragePath,
@@ -278,7 +278,7 @@ describe('chat turn preparation modules', () => {
       },
     });
 
-    const persisted = loadChatSessions(sessionStoragePath, true)[0];
+    const persisted = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list(true)[0];
     expect(preparedSession.session.history).toHaveLength(2);
     expect(persisted?.history).toEqual(preparedSession.session.history);
     expect(persisted?.messages.map((message) => message.text)).toEqual(['Earlier prompt', 'Earlier answer']);

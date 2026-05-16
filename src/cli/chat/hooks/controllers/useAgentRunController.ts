@@ -17,8 +17,7 @@ import {
   resolveApiKeyForModel,
   resolveProviderCredentialSourceForModel,
 } from '../../../../core/runtime/api-keys.js';
-import { generateSessionTitle } from '../../../../core/chat/engine/sessions/title.js';
-import { isGenericSessionName } from '../../../../core/chat/engine/sessions/session-record.js';
+import { ChatSessionRecords, ChatSessionTitles } from '../../../../core/chat/engine/sessions/records/index.js';
 import type { ConversationSessionService } from '../../../../core/chat/engine/types.js';
 import { normalizeSessionTitle } from '../../utils/format.js';
 import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval } from '../../state/types.js';
@@ -180,13 +179,13 @@ export function useAgentRunController(args: UseAgentRunArgs) {
 
   const maybeAutoNameSession = (sessionId: string, prompt: string, responseText: string) => {
     const session = sessions.find((candidate) => candidate.id === sessionId);
-    if (!session || !isGenericSessionName(session.name) || titleCredentialSource.type === 'missing') {
+    if (!session || !ChatSessionRecords.isGenericName(session.name) || titleCredentialSource.type === 'missing') {
       return;
     }
 
     void (async () => {
       try {
-        const title = await generateSessionTitle({
+        const title = await ChatSessionTitles.generate({
           llm: titleLlm,
           prompt,
           responseText,
@@ -196,7 +195,7 @@ export function useAgentRunController(args: UseAgentRunArgs) {
           return;
         }
 
-        if (isGenericSessionName(sessionService.require(sessionId).name)) {
+        if (ChatSessionRecords.isGenericName(sessionService.require(sessionId).name)) {
           sessionService.rename(sessionId, title);
           refreshSessions();
         }

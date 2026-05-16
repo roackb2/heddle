@@ -6,7 +6,6 @@ import {
   type RunShellPolicyDecision,
 } from '../../../core/tools/toolkits/shell-process/run-shell.js';
 import { truncate } from '../../../core/utils/text.js';
-export { buildConversationMessages } from '../../../core/chat/engine/sessions/conversation-lines.js';
 export { formatChatFailureMessage } from '../../../core/chat/failure-messages.js';
 export type { ChatFailureHintOptions } from '../../../core/chat/failure-messages.js';
 export { countAssistantSteps, summarizeTrace } from '../../../core/observability/trace-summarizers.js';
@@ -331,10 +330,6 @@ function buildApprovalEffects(options: {
   }
 
   return effects;
-}
-
-export function isGenericSessionName(name: string): boolean {
-  return /^Session \d+$/.test(name.trim());
 }
 
 export function normalizeSessionTitle(value: string | undefined): string | undefined {
