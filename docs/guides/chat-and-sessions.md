@@ -126,7 +126,7 @@ Approval prompts show the command or search query being requested, and remembere
 
 ## State And Continuity
 
-Chat state is stored under `.heddle/`, including saved sessions, traces, approvals, and memory notes. The footer context indicator is an estimate of total request input against the active model's context window, not only raw chat history length.
+Chat state is stored under `.heddle/`, including saved sessions, traces, approvals, and memory notes. Saved sessions use `.heddle/chat-sessions.catalog.json` plus per-session files under `.heddle/chat-sessions/`; older flat `chat-sessions.json` files are not read by current versions. The footer context indicator is an estimate of total request input against the active model's context window, not only raw chat history length.
 
 The footer also shows the active model, effective reasoning effort, and auth source for the selected model, so you can tell whether the session is using OpenAI account sign-in or API-key mode.
 

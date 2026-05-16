@@ -103,7 +103,7 @@ async function verifySessionSwitchScenario() {
   const stateRoot = join(root, '.heddle');
   mkdirSync(workspaceRoot, { recursive: true });
   mkdirSync(stateRoot, { recursive: true });
-  const sessionCatalogFile = join(stateRoot, 'chat-sessions.json');
+  const sessionCatalogFile = join(stateRoot, 'chat-sessions.catalog.json');
 
   renderHarness({ sessionCatalogFile, workspaceRoot, stateRoot });
   await flush();
@@ -233,8 +233,8 @@ async function verifySessionBoundaryScenario() {
   });
   await flush();
 
-  assert(getActiveSession().context?.compactionStatus === 'running', 'Compaction running state did not refresh through service');
-  assert(getActiveSession().context?.lastArchivePath?.endsWith('verify.jsonl'), 'Compaction archive path was not stored');
+  assert(getActiveSession().context?.compaction?.status === 'running', 'Compaction running state did not refresh through service');
+  assert(getActiveSession().context?.archive?.lastArchivePath?.endsWith('verify.jsonl'), 'Compaction archive path was not stored');
 
   await act(async () => {
     api!.sessionService.applyCompactionResult(sessionId, {
@@ -242,8 +242,8 @@ async function verifySessionBoundaryScenario() {
         { role: 'user', content: 'Compact prompt' },
         { role: 'assistant', content: 'Compact answer' },
       ],
-      context: { estimatedHistoryTokens: 2, compactionStatus: 'idle' },
-      archives: [],
+      context: { estimatedHistoryTokens: 2, compaction: { status: 'idle' } },
+      archive: { archives: [] },
     });
     api!.sessionService.releaseLease(sessionId, { ownerId: 'verify-session-boundary' });
     api!.refreshSessions();
@@ -252,11 +252,11 @@ async function verifySessionBoundaryScenario() {
 
   assert(getActiveSession().messages.at(-2)?.text === 'Compact prompt', 'Compaction result did not rebuild visible user message');
   assert(getActiveSession().messages.at(-1)?.text === 'Compact answer', 'Compaction result did not rebuild visible assistant message');
-  assert(getActiveSession().context?.compactionStatus === 'idle', 'Compaction result did not refresh idle status');
+  assert(getActiveSession().context?.compaction?.status === 'idle', 'Compaction result did not refresh idle status');
   assert(getActiveSession().lease === undefined, 'Lease release did not refresh through service');
 
   const messages = getActiveSession().messages.map((message) => `${message.role}:${message.text}`);
-  const compactionStatus = getActiveSession().context?.compactionStatus;
+  const compactionStatus = getActiveSession().context?.compaction?.status;
   cleanup();
 
   return {

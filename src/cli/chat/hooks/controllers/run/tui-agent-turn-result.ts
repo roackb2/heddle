@@ -1,8 +1,8 @@
 import type { RunResult } from '../../../../../index.js';
 import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
+import { ConversationTurnFailureMessages } from '../../../../../core/chat/engine/turns/failure/index.js';
 import { ConversationCompactionService } from '../../../state/compaction.js';
 import type { ChatSession } from '../../../state/types.js';
-import { formatChatFailureMessage } from '../../../utils/format.js';
 import type { ActionState } from '../useAgentRunController.js';
 
 type SessionUpdater = (sessionId: string, updater: (session: ChatSession) => ChatSession) => void;
@@ -91,7 +91,7 @@ export async function applyTuiAgentTurnFailure(args: {
 }): Promise<void> {
   const { error, promptHistory, model, state, sessionId, sessionService, refreshSessions } = args;
   const message = error instanceof Error ? error.message : String(error);
-  const formattedMessage = formatChatFailureMessage(message, {
+  const formattedMessage = ConversationTurnFailureMessages.format(message, {
     model,
     estimatedHistoryTokens: ConversationCompactionService.estimateTokens(promptHistory),
   });

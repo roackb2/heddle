@@ -1,0 +1,283 @@
+/**
+ * Zod schemas for the current chat session persistence format.
+ *
+ * Keep field descriptions human-friendly because this file is the canonical
+ * contract for catalog and per-session JSON on disk.
+ */
+import { z } from 'zod';
+
+const ReasoningEffortSchema = z.enum(['low', 'medium', 'high', 'ultrahigh']);
+const ChatSessionRetentionSchema = z.enum(['reusable', 'one_off']);
+const ChatSessionLeaseOwnerSchema = z.enum(['tui', 'daemon', 'ask']);
+const CompactionStatusSchema = z.enum(['idle', 'running', 'failed']);
+
+const ToolCallSchema = z.object({
+  id: z.string().describe('Provider-assigned tool call identifier used to pair tool results with assistant requests.'),
+  tool: z.string().describe('Registered Heddle tool name requested by the assistant.'),
+  input: z.unknown().describe('Raw structured input passed to the requested tool.'),
+});
+
+const ChatMessageSchema = z.union([
+  z.object({
+    role: z.literal('system').describe('Transcript role for host-provided system instructions.'),
+    content: z.string().describe('System message text sent to the model.'),
+  }),
+  z.object({
+    role: z.literal('user').describe('Transcript role for user prompts.'),
+    content: z.string().describe('User prompt text sent to the model.'),
+  }),
+  z.object({
+    role: z.literal('assistant').describe('Transcript role for assistant responses.'),
+    content: z.string().describe('Assistant text content returned by the model.'),
+    toolCalls: z.array(ToolCallSchema)
+      .describe('Tool calls requested by this assistant message.')
+      .optional(),
+  }),
+  z.object({
+    role: z.literal('tool').describe('Transcript role for tool execution results.'),
+    content: z.string().describe('Serialized tool result content returned to the model.'),
+    toolCallId: z.string().describe('Identifier of the assistant tool call this result answers.'),
+  }),
+]);
+
+const ChatMessagesSchema = z.array(z.unknown())
+  .transform((messages) => messages.flatMap((message) => {
+    const parsed = ChatMessageSchema.safeParse(message);
+    return parsed.success ? [parsed.data] : [];
+  }));
+
+export const ConversationLineSchema = z.object({
+  id: z.string().describe('Stable visible message identifier used by chat surfaces.'),
+  role: z.enum(['user', 'assistant']).describe('Visible chat role rendered in host interfaces.'),
+  text: z.string().describe('Human-facing message text shown in chat history.'),
+  isStreaming: z.boolean()
+    .describe('Whether this visible line was still streaming when captured.')
+    .optional(),
+  isPending: z.boolean()
+    .describe('Whether this visible line represented pending local UI state.')
+    .optional(),
+});
+
+const ConversationLinesSchema = z.array(z.unknown())
+  .transform((messages) => messages.flatMap((message) => {
+    const parsed = ConversationLineSchema.safeParse(message);
+    return parsed.success ? [parsed.data] : [];
+  }));
+
+const TurnSummarySchema = z.object({
+  id: z.string().describe('Stable identifier for this completed turn summary.'),
+  prompt: z.string().describe('User prompt that started the turn.'),
+  outcome: z.string().describe('Final stop reason or outcome reported by the agent loop.'),
+  summary: z.string().describe('Short human-readable turn summary.'),
+  steps: z.number().describe('Number of assistant loop steps executed in the turn.'),
+  traceFile: z.string().describe('Path to the persisted trace file for this turn.'),
+  events: z.array(z.string()).describe('Compact event summaries extracted from the turn trace.'),
+});
+
+const TurnSummariesSchema = z.array(z.unknown())
+  .transform((turns) => turns.flatMap((turn) => {
+    const parsed = TurnSummarySchema.safeParse(turn);
+    return parsed.success ? [parsed.data] : [];
+  }));
+
+const LlmUsageSchema = z.object({
+  inputTokens: z.number().describe('Prompt tokens charged or reported for the model request.'),
+  outputTokens: z.number().describe('Completion tokens charged or reported for the model request.'),
+  totalTokens: z.number().describe('Total tokens reported for the model request.'),
+  cachedInputTokens: z.number()
+    .describe('Input tokens served from provider-side prompt cache, when reported.')
+    .optional(),
+  reasoningTokens: z.number()
+    .describe('Reasoning tokens reported by reasoning-capable model providers.')
+    .optional(),
+  requests: z.number()
+    .describe('Number of provider requests represented by this usage aggregate.')
+    .optional(),
+});
+
+const ChatContextStatsSchema = z.object({
+  estimatedHistoryTokens: z.number().describe('Estimated token count for the session history currently retained in context.'),
+  request: z.object({
+    estimatedTokens: z.number()
+      .describe('Estimated token count for the most recent turn request.')
+      .optional(),
+    toolNames: z.array(z.string())
+      .describe('Tool names available to the most recent turn request.')
+      .optional(),
+    goal: z.string()
+      .describe('Most recent user goal or prompt associated with these context stats.')
+      .optional(),
+    usage: LlmUsageSchema
+      .describe('Provider usage reported by the most recent turn request.')
+      .optional(),
+  }).describe('Most recent request-level context and usage metadata.').optional(),
+  compaction: z.object({
+    compactedMessages: z.number()
+      .describe('Number of transcript messages replaced by the latest compaction summary.')
+      .optional(),
+    compactedAt: z.string()
+      .describe('Timestamp when the latest compaction completed.')
+      .optional(),
+    status: CompactionStatusSchema
+      .describe('Current or latest compaction lifecycle status.')
+      .optional(),
+    error: z.string()
+      .describe('Last compaction error message, when compaction failed.')
+      .optional(),
+  }).describe('Session compaction lifecycle metadata.').optional(),
+  archive: z.object({
+    count: z.number()
+      .describe('Number of archive records currently associated with the session.')
+      .optional(),
+    currentSummaryPath: z.string()
+      .describe('Path to the active compacted summary used for context reconstruction.')
+      .optional(),
+    lastArchivePath: z.string()
+      .describe('Path to the most recently written conversation archive.')
+      .optional(),
+  }).describe('Archive metadata used to reconnect compacted history with persisted files.').optional(),
+});
+
+const ChatArchiveRecordSchema = z.object({
+  id: z.string().describe('Stable identifier for this conversation archive.'),
+  path: z.string().describe('Path to the archived raw conversation history.'),
+  summaryPath: z.string().describe('Path to the compacted summary generated for this archive.'),
+  shortDescription: z.string()
+    .describe('Short human-readable description of the archived conversation slice.')
+    .optional(),
+  messageCount: z.number().describe('Number of messages stored in this archive.'),
+  createdAt: z.string().describe('Timestamp when this archive was created.'),
+  summaryModel: z.string()
+    .describe('Model used to generate the archive summary, when available.')
+    .optional(),
+});
+
+const ChatArchiveRecordsSchema = z.array(z.unknown())
+  .transform((archives) => archives.flatMap((archive) => {
+    const parsed = ChatArchiveRecordSchema.safeParse(archive);
+    return parsed.success ? [parsed.data] : [];
+  }));
+
+const ChatSessionLeaseSchema = z.object({
+  ownerKind: ChatSessionLeaseOwnerSchema.describe('Kind of host currently holding the session lease.'),
+  ownerId: z.string().describe('Unique owner identifier for the current lease holder.'),
+  acquiredAt: z.string().describe('Timestamp when the current lease was acquired.'),
+  lastSeenAt: z.string().describe('Timestamp when the lease holder last refreshed ownership.'),
+  clientLabel: z.string()
+    .describe('Optional human-facing label for the lease holder.')
+    .optional(),
+});
+
+export const CatalogEntryReadSchema = z.object({
+  id: z.string().describe('Stable session identifier used by all host surfaces.'),
+  name: z.string().describe('Human-facing session title shown in session lists.'),
+  retention: ChatSessionRetentionSchema
+    .describe('Whether the session is reusable or intended as a one-off ask session.')
+    .optional()
+    .catch(undefined),
+  workspaceId: z.string()
+    .describe('Workspace identifier this session belongs to, when known.')
+    .optional(),
+  createdAt: z.string()
+    .describe('Timestamp when the session was created.')
+    .optional(),
+  updatedAt: z.string()
+    .describe('Timestamp when the session was last changed.')
+    .optional(),
+  model: z.string()
+    .describe('Default model selected for future turns in this session.')
+    .optional(),
+  reasoningEffort: ReasoningEffortSchema
+    .describe('Default reasoning effort selected for future turns in this session.')
+    .optional()
+    .catch(undefined),
+  driftEnabled: z.boolean()
+    .describe('Whether semantic drift awareness is enabled for this session.')
+    .optional()
+    .catch(false),
+  lastContinuePrompt: z.string()
+    .describe('Most recent continue prompt recorded for follow-up turn ergonomics.')
+    .optional(),
+  context: ChatContextStatsSchema
+    .describe('Current context, compaction, and archive metadata for this session.')
+    .optional()
+    .catch(undefined),
+  archives: ChatArchiveRecordsSchema
+    .describe('Conversation archives associated with this session.')
+    .optional()
+    .catch(undefined),
+  lease: ChatSessionLeaseSchema
+    .describe('Current session lease held by a TUI, daemon, or ask host.')
+    .optional()
+    .catch(undefined),
+});
+
+export const CatalogEntryWriteSchema = CatalogEntryReadSchema.required({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const CatalogReadSchema = z.object({
+  version: z.literal(1).describe('Persisted catalog schema version.'),
+  sessions: z.array(z.unknown()).describe('Session metadata entries; invalid entries are skipped during reads.'),
+});
+
+export const CatalogWriteSchema = z.object({
+  version: z.literal(1).describe('Persisted catalog schema version.'),
+  sessions: z.array(CatalogEntryWriteSchema).describe('Session metadata entries written to the catalog file.'),
+});
+
+export const SessionBodyReadSchema = z.object({
+  id: z.string()
+    .describe('Session identifier duplicated in the body for human inspection.')
+    .optional(),
+  retention: ChatSessionRetentionSchema
+    .describe('Whether the session is reusable or intended as a one-off ask session.')
+    .optional()
+    .catch(undefined),
+  workspaceId: z.string()
+    .describe('Workspace identifier duplicated in the body for human inspection.')
+    .optional(),
+  history: ChatMessagesSchema
+    .describe('Model-facing transcript retained for future turns.')
+    .optional()
+    .catch([]),
+  messages: ConversationLinesSchema
+    .describe('Host-facing visible conversation lines.')
+    .optional()
+    .catch([]),
+  turns: TurnSummariesSchema
+    .describe('Recent completed turn summaries shown in session detail surfaces.')
+    .optional()
+    .catch([]),
+  archives: ChatArchiveRecordsSchema
+    .describe('Conversation archives duplicated in the body for session reconstruction.')
+    .optional()
+    .catch(undefined),
+  lease: ChatSessionLeaseSchema
+    .describe('Current session lease duplicated in the body for session reconstruction.')
+    .optional()
+    .catch(undefined),
+});
+
+export const SessionBodyWriteSchema = z.object({
+  id: z.string().describe('Session identifier duplicated in the body for human inspection.'),
+  retention: ChatSessionRetentionSchema
+    .describe('Whether the session is reusable or intended as a one-off ask session.')
+    .optional(),
+  workspaceId: z.string()
+    .describe('Workspace identifier duplicated in the body for human inspection.')
+    .optional(),
+  history: z.array(ChatMessageSchema).describe('Model-facing transcript retained for future turns.'),
+  messages: z.array(ConversationLineSchema).describe('Host-facing visible conversation lines.'),
+  turns: z.array(TurnSummarySchema).describe('Recent completed turn summaries shown in session detail surfaces.'),
+  archives: z.array(ChatArchiveRecordSchema)
+    .describe('Conversation archives duplicated in the body for session reconstruction.')
+    .optional(),
+  lease: ChatSessionLeaseSchema
+    .describe('Current session lease duplicated in the body for session reconstruction.')
+    .optional(),
+});
+
+export type CatalogEntryRead = z.infer<typeof CatalogEntryReadSchema>;
+export type ConversationLineValue = z.infer<typeof ConversationLineSchema>;

@@ -127,7 +127,6 @@ Today, that means:
 
 - `heddle chat` is blocked from starting embedded against the same workspace
 - mutating `heddle heartbeat ...` commands are blocked
-- `heddle session ...` mutation paths are blocked
 - starting a second daemon is blocked
 - `heddle ask` can attach to the live daemon instead of failing
 

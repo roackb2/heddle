@@ -28,7 +28,6 @@ import { runDaemonCli } from './daemon.js';
 import { runEvalCli } from './eval/index.js';
 import { parseHeartbeatArgs, runHeartbeatCli } from './heartbeat.js';
 import { loadProjectAgentContext, resolveAgentContextPaths } from './project-agent-context.js';
-import { runSessionCli } from './session.js';
 import {
   daemonStartConflictMessage,
   embeddedCommandConflictMessage,
@@ -281,18 +280,6 @@ async function main() {
     });
 
   program
-    .command('session [args...]')
-    .description('manage local chat session storage')
-    .allowUnknownOption(true)
-    .action(async (args: string[]) => {
-      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
-      chdir(resolved.workspaceRoot);
-      enforceEmbeddedOwnership('session', resolved.runtimeHost, resolved.forceOwnerConflict);
-      writeRuntimeHostNotice('session', resolved.runtimeHost);
-      await runSessionCli(args ?? [], resolved);
-    });
-
-  program
     .action(async () => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
@@ -325,7 +312,7 @@ async function main() {
 }
 
 function isKnownCommand(command: string): boolean {
-  return ['chat', 'ask', 'init', 'memory', 'auth', 'eval', 'heartbeat', 'daemon', 'session', 'help'].includes(command);
+  return ['chat', 'ask', 'init', 'memory', 'auth', 'eval', 'heartbeat', 'daemon', 'help'].includes(command);
 }
 
 async function runMemoryCli(
@@ -536,17 +523,6 @@ function writeRuntimeHostNotice(command: string, runtimeHost: ResolvedRuntimeHos
   }
 
   process.stdout.write(`${notice}\n`);
-}
-
-function enforceEmbeddedOwnership(command: string, runtimeHost: ResolvedRuntimeHost, forceOwnerConflict: boolean) {
-  if (forceOwnerConflict) {
-    return;
-  }
-
-  const message = embeddedCommandConflictMessage(command, runtimeHost);
-  if (message) {
-    throw new Error(message);
-  }
 }
 
 function enforceDaemonStartOwnership(runtimeHost: ResolvedRuntimeHost, forceOwnerConflict: boolean) {

@@ -108,10 +108,12 @@ At a high level:
 By default, the normalized engine config derives these paths from `stateRoot`:
 
 - session catalog: `stateRoot/chat-sessions.catalog.json`
+- per-session bodies: `stateRoot/chat-sessions/<session-id>.json`
 - memory directory: `stateRoot/memory`
 - trace directory: `stateRoot/traces`
 
 For ordinary Heddle usage, that state root is typically the workspace-local `.heddle/` directory.
+The current session storage format is the catalog plus per-session JSON files; older flat `chat-sessions.json` files are not migrated or read.
 
 ## Host Callbacks
 
