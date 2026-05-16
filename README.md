@@ -305,6 +305,10 @@ Heartbeat is Heddle's model for bounded autonomous wake cycles.
 
 Instead of only running when a human types a prompt, a heartbeat task lets Heddle wake up on a schedule, do a limited amount of work, checkpoint the result, and decide whether to continue, pause, complete, or escalate.
 
+Heartbeat keeps the latest wake result and saved run history in the same
+record shape, so terminal commands and the browser control plane show the same
+decision, summary, outcome, and usage data.
+
 Example commands:
 
 ```bash
@@ -338,7 +342,7 @@ More: [Semantic drift](docs/guides/semantic-drift.md)
 
 ### Programmatic runtime APIs
 
-Heddle is not only a CLI. The npm package also exposes runtime primitives such as `AgentLoopRuntimeService.run(...)` and `runAgentHeartbeat` so other hosts can build on top of it.
+Heddle is not only a CLI. The npm package also exposes runtime primitives such as `AgentLoopRuntimeService.run(...)` and `HeartbeatWakeService.run` so other hosts can build on top of it.
 
 This is for people building their own agent hosts, schedulers, or control surfaces rather than only using the packaged CLI.
 

@@ -5,7 +5,7 @@ import { buildHeartbeatContinuationPrompt } from '../../../core/commands/slash/m
 import { resolveSessionReference } from '../../../core/commands/slash/modules/session/session-commands.js';
 import type { ChatSession } from '../../../core/chat/types.js';
 import type { SlashCommandExecutionContext } from '../../../core/commands/slash/modules/context.js';
-import type { HeartbeatTask, HeartbeatTaskRunRecordEntry } from '@/core/heartbeat/heartbeat-task-store.js';
+import type { HeartbeatTask, HeartbeatTaskRunRecordEntry } from '@/core/heartbeat/index.js';
 
 function testSession(overrides: Partial<ChatSession> & Pick<ChatSession, 'id' | 'name'>): ChatSession {
   return {
@@ -22,7 +22,7 @@ function testHeartbeatTask(overrides: Partial<HeartbeatTask> & Pick<HeartbeatTas
   return {
     task: 'Check repository state',
     enabled: true,
-    intervalMs: 60_000,
+    schedule: { intervalMs: 60_000 },
     ...overrides,
   };
 }
@@ -30,9 +30,11 @@ function testHeartbeatTask(overrides: Partial<HeartbeatTask> & Pick<HeartbeatTas
 function testHeartbeatRun(overrides: Partial<HeartbeatTaskRunRecordEntry> = {}): HeartbeatTaskRunRecordEntry {
   const task = testHeartbeatTask({
     id: 'repo-check',
-    status: 'waiting',
-    lastProgress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
-    resumable: true,
+    state: {
+      status: 'waiting',
+      progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+      resumable: true,
+    },
   });
   return {
     id: '2026-04-14T00-00-00.000Z-repo-check',
@@ -281,10 +283,16 @@ describe('core slash command modules', () => {
   it('routes heartbeat commands through host ports', async () => {
     const task = testHeartbeatTask({
       id: 'repo-check',
-      status: 'waiting',
-      nextRunAt: '2026-04-14T00:00:00.000Z',
-      lastDecision: 'continue',
-      lastProgress: 'Heartbeat wake finished.',
+      schedule: {
+        intervalMs: 60_000,
+        nextRunAt: '2026-04-14T00:00:00.000Z',
+      },
+      state: {
+        status: 'waiting',
+        decision: 'continue',
+        progress: 'Heartbeat wake finished.',
+        resumable: true,
+      },
     });
     const run = testHeartbeatRun();
     const context = createContext({

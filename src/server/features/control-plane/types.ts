@@ -1,6 +1,6 @@
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { DaemonOwnerRecord } from '@/core/runtime/daemon/index.js';
-import type { HeartbeatRunView, HeartbeatTaskView } from '@/core/heartbeat/heartbeat-views.js';
+import type { HeartbeatRunView, HeartbeatTaskView } from '@/core/heartbeat/index.js';
 import type { WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
 import type { MemoryStatusView } from '../../../core/memory/visibility.js';
 import type { ReviewDiffFile } from '../../../core/review/diff-domain.js';

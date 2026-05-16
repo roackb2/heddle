@@ -12,7 +12,7 @@
  *   HEDDLE_EXAMPLE_MODEL=gpt-5.1-codex-mini npx tsx examples/host-events.ts
  */
 
-import { AgentLoopRuntimeService, runAgentHeartbeat, type AgentHeartbeatEvent, type ToolDefinition } from '../src/index.js';
+import { AgentLoopRuntimeService, HeartbeatWakeService, type AgentHeartbeatEvent, type ToolDefinition } from '../src/index.js';
 import type { LlmAdapter, LlmResponse } from '../src/core/llm/types.js';
 
 // ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ async function exampleHeartbeatEscalation(): Promise<void> {
 
   const logger = new StructuredEventLogger();
 
-  const result = await runAgentHeartbeat({
+  const result = await HeartbeatWakeService.run({
     task: 'Background maintenance task',
     llm: createMockLlm('escalate'),
     tools: [],

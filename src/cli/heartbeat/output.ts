@@ -1,4 +1,4 @@
-import type { AgentHeartbeatEvent, HeartbeatSchedulerEvent } from '../../index.js';
+import type { AgentHeartbeatEvent, HeartbeatSchedulerEvent } from '@/core/heartbeat/index.js';
 import { stripHeartbeatDecisionLine } from './summary.js';
 
 export function printAgentLoopEvent(event: AgentHeartbeatEvent) {
@@ -51,17 +51,19 @@ export function printSchedulerEvent(event: HeartbeatSchedulerEvent) {
     case 'heartbeat.task.started':
       process.stdout.write(`[heartbeat] task started id=${event.taskId} loadedCheckpoint=${event.loadedCheckpoint} status=${event.status} progress=${event.progress}\n`);
       break;
-    case 'heartbeat.task.finished':
+    case 'heartbeat.task.finished': {
+      const { task, result } = event.record;
       process.stdout.write([
-        `[heartbeat] task finished id=${event.taskId} decision=${event.decision} outcome=${event.outcome} status=${event.status} enabled=${event.enabled} next=${event.nextRunAt ?? 'none'}`,
-        `[heartbeat] progress ${event.progress}`,
-        event.usage ? `[heartbeat] usage input=${event.usage.inputTokens} output=${event.usage.outputTokens} total=${event.usage.totalTokens} requests=${event.usage.requests}` : undefined,
+        `[heartbeat] task finished id=${event.taskId} decision=${result.decision} outcome=${result.state.outcome} status=${task.state?.status ?? 'waiting'} enabled=${task.enabled} next=${task.schedule.nextRunAt ?? 'none'}`,
+        `[heartbeat] progress ${task.state?.progress ?? ''}`,
+        result.state.usage ? `[heartbeat] usage input=${result.state.usage.inputTokens} output=${result.state.usage.outputTokens} total=${result.state.usage.totalTokens} requests=${result.state.usage.requests}` : undefined,
         '',
         'Heartbeat summary:',
-        stripHeartbeatDecisionLine(event.summary).trim() || event.summary.trim(),
+        stripHeartbeatDecisionLine(result.summary).trim() || result.summary.trim(),
         '',
       ].filter((line): line is string => line !== undefined).join('\n'));
       break;
+    }
     case 'heartbeat.task.failed':
       process.stdout.write(`[heartbeat] task failed id=${event.taskId} status=${event.status} error=${event.error} next=${event.nextRunAt ?? 'none'}\n[heartbeat] progress ${event.progress}\n`);
       break;

@@ -3,14 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  createFileHeartbeatTaskStore,
-  runDueHeartbeatTasks,
-  runHeartbeatScheduler,
+  FileHeartbeatTaskRepository,
+  HeartbeatSchedulerService,
   type HeartbeatSchedulerEvent,
   type HeartbeatTask,
   type HeartbeatTaskStore,
 } from '../../../index.js';
-import type { AgentHeartbeatResult } from '@/core/heartbeat/heartbeat.js';
+import type { AgentHeartbeatResult } from '@/core/heartbeat/index.js';
 import { AgentLoopCheckpointService, type AgentLoopCheckpoint } from '@/core/runtime/loop/index.js';
 
 const NOW = new Date('2026-04-13T00:00:00.000Z');
@@ -22,8 +21,10 @@ describe('heartbeat scheduler', () => {
       id: 'project-maintenance',
       task: 'Maintain this project.',
       enabled: true,
-      intervalMs: 5_000,
-      nextRunAt: '2026-04-12T23:59:00.000Z',
+      schedule: {
+        intervalMs: 5_000,
+        nextRunAt: '2026-04-12T23:59:00.000Z',
+      },
     };
     let savedTask: HeartbeatTask | undefined;
     let savedCheckpoint: AgentLoopCheckpoint | undefined;
@@ -42,7 +43,7 @@ describe('heartbeat scheduler', () => {
       },
     };
 
-    const result = await runDueHeartbeatTasks({
+    const result = await HeartbeatSchedulerService.runDueTasks({
       store,
       now: () => NOW,
       onEvent: (event) => events.push(event),
@@ -54,14 +55,22 @@ describe('heartbeat scheduler', () => {
     expect(savedTask).toMatchObject({
       id: 'project-maintenance',
       enabled: true,
-      status: 'waiting',
-      lastProgress: 'Heartbeat wake finished. Waiting until the next scheduled run in 5s.',
-      lastRunId: 'run-continue',
-      lastLoadedCheckpoint: false,
-      resumable: true,
-      nextRunAt: '2026-04-13T00:00:05.000Z',
-      lastDecision: 'continue',
-      lastOutcome: 'done',
+      schedule: {
+        nextRunAt: '2026-04-13T00:00:05.000Z',
+      },
+      state: {
+        status: 'waiting',
+        progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 5s.',
+        runId: 'run-continue',
+        loadedCheckpoint: false,
+        resumable: true,
+        result: {
+          decision: 'continue',
+          state: {
+            outcome: 'done',
+          },
+        },
+      },
     });
     expect(events.map((event) => event.type)).toEqual([
       'heartbeat.task.due',
@@ -75,11 +84,11 @@ describe('heartbeat scheduler', () => {
       id: 'done-task',
       task: 'Finish this task.',
       enabled: true,
-      intervalMs: 60_000,
+      schedule: { intervalMs: 60_000 },
     };
     let savedTask: HeartbeatTask | undefined;
 
-    await runDueHeartbeatTasks({
+    await HeartbeatSchedulerService.runDueTasks({
       store: createMemoryTaskStore({
         tasks: [task],
         saveTask: (nextTask) => {
@@ -92,9 +101,13 @@ describe('heartbeat scheduler', () => {
 
     expect(savedTask).toMatchObject({
       enabled: false,
-      status: 'complete',
-      lastDecision: 'complete',
-      nextRunAt: undefined,
+      schedule: { nextRunAt: undefined },
+      state: {
+        status: 'complete',
+        result: {
+          decision: 'complete',
+        },
+      },
     });
   });
 
@@ -103,12 +116,12 @@ describe('heartbeat scheduler', () => {
       id: 'flaky-task',
       task: 'Try flaky work.',
       enabled: true,
-      intervalMs: 60_000,
+      schedule: { intervalMs: 60_000 },
     };
     let savedTask: HeartbeatTask | undefined;
     const events: HeartbeatSchedulerEvent[] = [];
 
-    const result = await runDueHeartbeatTasks({
+    const result = await HeartbeatSchedulerService.runDueTasks({
       store: createMemoryTaskStore({
         tasks: [task],
         saveTask: (nextTask) => {
@@ -126,10 +139,14 @@ describe('heartbeat scheduler', () => {
     expect(result).toMatchObject({ checked: 1, ran: 0, failed: 1 });
     expect(savedTask).toMatchObject({
       enabled: true,
-      status: 'failed',
-      lastProgress: 'Heartbeat wake failed and will retry later.',
-      nextRunAt: '2026-04-13T00:00:10.000Z',
-      lastError: 'temporary failure',
+      schedule: {
+        nextRunAt: '2026-04-13T00:00:10.000Z',
+      },
+      state: {
+        status: 'failed',
+        progress: 'Heartbeat wake failed and will retry later.',
+        error: 'temporary failure',
+      },
     });
     expect(events.at(-1)).toMatchObject({
       type: 'heartbeat.task.failed',
@@ -141,13 +158,13 @@ describe('heartbeat scheduler', () => {
   it('includes result details on finished task events', async () => {
     const events: HeartbeatSchedulerEvent[] = [];
 
-    await runDueHeartbeatTasks({
+    await HeartbeatSchedulerService.runDueTasks({
       store: createMemoryTaskStore({
         tasks: [{
           id: 'summary-task',
           task: 'Summarize work.',
           enabled: true,
-          intervalMs: 60_000,
+          schedule: { intervalMs: 60_000 },
         }],
       }),
       now: () => NOW,
@@ -158,24 +175,34 @@ describe('heartbeat scheduler', () => {
     expect(events.at(-1)).toMatchObject({
       type: 'heartbeat.task.finished',
       taskId: 'summary-task',
-      decision: 'pause',
-      outcome: 'done',
-      status: 'waiting',
-      progress: 'Heartbeat paused. Waiting 15m before the next wake.',
-      summary: expect.stringContaining('Heartbeat result.'),
-      runId: 'run-pause',
+      record: {
+        result: {
+          decision: 'pause',
+          summary: expect.stringContaining('Heartbeat result.'),
+          state: {
+            outcome: 'done',
+            runId: 'run-pause',
+          },
+        },
+        task: {
+          state: {
+            status: 'waiting',
+            progress: 'Heartbeat paused. Waiting 15m before the next wake.',
+          },
+        },
+      },
     });
   });
 
   it('stores tasks and checkpoints in a local heartbeat directory', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'heddle-heartbeat-scheduler-'));
-    const store = createFileHeartbeatTaskStore({ dir });
+    const store = new FileHeartbeatTaskRepository({ dir });
     const task: HeartbeatTask = {
       id: 'local-task',
       task: 'Local task.',
       enabled: true,
-      status: 'waiting',
-      intervalMs: 60_000,
+      schedule: { intervalMs: 60_000 },
+      state: { status: 'waiting', resumable: true },
     };
     const checkpoint = createHeartbeatResult('pause').checkpoint;
 
@@ -192,13 +219,13 @@ describe('heartbeat scheduler', () => {
 
   it('lists stored heartbeat run records newest first', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'heddle-heartbeat-runs-'));
-    const store = createFileHeartbeatTaskStore({ dir });
+    const store = new FileHeartbeatTaskRepository({ dir });
     const task: HeartbeatTask = {
       id: 'local-task',
       task: 'Local task.',
       enabled: true,
-      status: 'waiting',
-      intervalMs: 60_000,
+      schedule: { intervalMs: 60_000 },
+      state: { status: 'waiting', resumable: true },
     };
 
     await store.saveRunRecord?.({
@@ -214,7 +241,9 @@ describe('heartbeat scheduler', () => {
       runId: 'run-pause',
       record: {
         task: {
-          status: 'waiting',
+          state: {
+            status: 'waiting',
+          },
         },
         loadedCheckpoint: false,
       },
@@ -229,7 +258,7 @@ describe('heartbeat scheduler', () => {
     const events: HeartbeatSchedulerEvent[] = [];
     let cycles = 0;
 
-    await runHeartbeatScheduler({
+    await HeartbeatSchedulerService.runLoop({
       store: createMemoryTaskStore({ tasks: [] }),
       now: () => NOW,
       pollIntervalMs: 1,

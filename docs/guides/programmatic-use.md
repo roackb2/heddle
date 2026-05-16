@@ -54,7 +54,7 @@ the conversation engine builds on.
 
 ### Use heartbeat APIs for scheduled or background wake cycles
 
-Use `runAgentHeartbeat`, `runStoredHeartbeat`, `runDueHeartbeatTasks`, and `runHeartbeatScheduler` when you want bounded autonomous work that wakes up from durable task/checkpoint state.
+Use `HeartbeatWakeService.run`, `StoredHeartbeatService.run`, `HeartbeatSchedulerService.runDueTasks`, and `HeartbeatSchedulerService.runLoop` when you want bounded autonomous work that wakes up from durable task/checkpoint state.
 
 Use heartbeat APIs when you want:
 
@@ -298,35 +298,41 @@ Persist `result.state` directly, or wrap it with `createAgentLoopCheckpoint(resu
 
 ## Heartbeat APIs
 
-For bounded autonomous background work, use `runAgentHeartbeat` and the scheduler/task-store helpers:
+For bounded autonomous background work, use `HeartbeatWakeService.run` and the scheduler/task repository:
 
 ```ts
-import { runAgentHeartbeat } from '@roackb2/heddle'
+import { HeartbeatWakeService } from '@roackb2/heddle'
 
-const heartbeat = await runAgentHeartbeat({
+const heartbeat = await HeartbeatWakeService.run({
   task: 'Check whether there is safe maintenance work to do for this project',
   checkpoint,
   maxSteps: 8,
 })
 ```
 
+The scheduler path stores the wake result as one `AgentHeartbeatResult`.
+Task state keeps that result under `state.result`, and run history persists the
+same result inside each run record. That means hosts can use the same shape for
+the latest task status, saved run history, and `heartbeat.task.finished` events
+instead of maintaining separate flattened copies.
+
 For repeated local or hosted wake cycles, Heddle also exports:
 
-- `runDueHeartbeatTasks`
-- `runHeartbeatScheduler`
-- `createFileHeartbeatTaskStore`
-- `createFileHeartbeatCheckpointStore`
-- `runStoredHeartbeat`
-- `suggestNextHeartbeatDelayMs`
-- `listHeartbeatTaskViews`
-- `listHeartbeatRunViews`
-- `loadHeartbeatRunView`
+- `HeartbeatSchedulerService.runDueTasks`
+- `HeartbeatSchedulerService.runLoop`
+- `FileHeartbeatTaskRepository`
+- `FileHeartbeatCheckpointRepository`
+- `StoredHeartbeatService.run`
+- `HeartbeatDecisionPolicy.suggestNextDelayMs`
+- `HeartbeatViewsPresenter.listTaskViews`
+- `HeartbeatViewsPresenter.listRunViews`
+- `HeartbeatViewsPresenter.loadRunView`
 
 These are useful when you want to provide your own surrounding host, queue, cron, service manager, or control surface.
 
 ## Host Adapters And Observer Utilities
 
-The package also exports compact heartbeat views plus a thin status/progress/response adapter layer for hosts that do not want to consume the full trace or event model directly.
+The package also exports compact heartbeat views plus a thin status/progress/response adapter layer for hosts that do not want to consume the full task/run record shape directly.
 
 For passive semantic-drift experiments, `createCyberLoopObserver` can consume Heddle's event stream and run CyberLoop-compatible middleware over normalized runtime frames.
 

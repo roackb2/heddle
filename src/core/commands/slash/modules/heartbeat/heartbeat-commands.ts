@@ -4,7 +4,7 @@ import type { SlashCommandModule } from '../../types.js';
 import type {
   HeartbeatTask,
   HeartbeatTaskRunRecordEntry,
-} from '@/core/heartbeat/heartbeat-task-store.js';
+} from '@/core/heartbeat/index.js';
 import type { SlashCommandExecutionContext } from '../context.js';
 import { argumentAfterPrefix, slashMessageResult } from '../results.js';
 
@@ -86,23 +86,24 @@ export async function listHeartbeatRunsMessage(
 }
 
 export function formatHeartbeatTask(task: HeartbeatTask): string {
+  const state = task.state;
   return [
     `${task.enabled ? 'enabled' : 'disabled'} ${task.id}`,
-    `status=${task.status ?? 'idle'} every=${formatInterval(task.intervalMs)} next=${task.nextRunAt ?? 'none'} model=${task.model ?? 'default'}`,
+    `status=${state?.status ?? 'idle'} every=${formatInterval(task.schedule.intervalMs)} next=${task.schedule.nextRunAt ?? 'none'} model=${task.runtime?.model ?? 'default'}`,
     '',
     'Task:',
     task.task,
     '',
-    task.lastProgress ? `Progress: ${task.lastProgress}` : undefined,
-    `Last decision: ${task.lastDecision ?? 'none'}`,
-    task.lastOutcome ? `Last outcome: ${task.lastOutcome}` : undefined,
-    task.lastRunAt ? `Last run: ${task.lastRunAt}` : undefined,
-    task.lastRunId ? `Last run id: ${task.lastRunId}` : undefined,
-    task.lastRunId ? `Resumable: ${task.resumable === false ? 'no' : 'yes'}` : undefined,
-    task.lastRunId ? `Loaded checkpoint: ${task.lastLoadedCheckpoint ? 'yes' : 'no'}` : undefined,
-    task.lastUsage ? `Usage: input=${task.lastUsage.inputTokens} output=${task.lastUsage.outputTokens} total=${task.lastUsage.totalTokens} requests=${task.lastUsage.requests}` : undefined,
-    task.lastError ? `Last error: ${task.lastError}` : undefined,
-    task.lastSummary ? ['', 'Last summary:', stripHeartbeatDecisionLine(task.lastSummary).trim() || task.lastSummary.trim()].join('\n') : undefined,
+    state?.progress ? `Progress: ${state.progress}` : undefined,
+    `Last decision: ${state?.result?.decision ?? 'none'}`,
+    state?.result ? `Last outcome: ${state.result.state.outcome}` : undefined,
+    state?.runAt ? `Last run: ${state.runAt}` : undefined,
+    state?.runId ? `Last run id: ${state.runId}` : undefined,
+    state?.runId ? `Resumable: ${state.resumable === false ? 'no' : 'yes'}` : undefined,
+    state?.runId ? `Loaded checkpoint: ${state.loadedCheckpoint ? 'yes' : 'no'}` : undefined,
+    state?.result?.state.usage ? `Usage: input=${state.result.state.usage.inputTokens} output=${state.result.state.usage.outputTokens} total=${state.result.state.usage.totalTokens} requests=${state.result.state.usage.requests}` : undefined,
+    state?.error ? `Last error: ${state.error}` : undefined,
+    state?.result ? ['', 'Last summary:', stripHeartbeatDecisionLine(state.result.summary).trim() || state.result.summary.trim()].join('\n') : undefined,
   ].filter((line): line is string => line !== undefined).join('\n');
 }
 
@@ -133,9 +134,9 @@ export function buildHeartbeatContinuationPrompt(run: HeartbeatTaskRunRecordEntr
     `Outcome: ${result.state.outcome}`,
     `Finished at: ${run.createdAt}`,
     `Loaded checkpoint: ${run.record.loadedCheckpoint}`,
-    `Task status: ${run.record.task.status ?? 'unknown'}`,
-    run.record.task.lastProgress ? `Task progress: ${run.record.task.lastProgress}` : undefined,
-    run.record.task.resumable === false ? 'Resumable: no' : 'Resumable: yes',
+    `Task status: ${run.record.task.state?.status ?? 'unknown'}`,
+    run.record.task.state?.progress ? `Task progress: ${run.record.task.state.progress}` : undefined,
+    run.record.task.state?.resumable === false ? 'Resumable: no' : 'Resumable: yes',
     '',
     'Durable task:',
     run.record.task.task,
@@ -211,12 +212,13 @@ function parseHeartbeatRunRequest(value: string): { taskId: string; runRef: stri
 }
 
 function formatHeartbeatTaskListItem(task: HeartbeatTask): string {
-  const next = task.nextRunAt ?? 'none';
-  const decision = task.lastDecision ?? 'none';
+  const next = task.schedule.nextRunAt ?? 'none';
+  const state = task.state;
+  const decision = state?.result?.decision ?? 'none';
   return [
     `${task.enabled ? 'enabled' : 'disabled'} ${task.id}`,
-    `  status=${task.status ?? 'idle'} every=${formatInterval(task.intervalMs)} next=${next} decision=${decision}`,
-    task.lastProgress ? `  progress=${task.lastProgress}` : undefined,
+    `  status=${state?.status ?? 'idle'} every=${formatInterval(task.schedule.intervalMs)} next=${next} decision=${decision}`,
+    state?.progress ? `  progress=${state.progress}` : undefined,
   ].filter((line): line is string => line !== undefined).join('\n');
 }
 

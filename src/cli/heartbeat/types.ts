@@ -1,4 +1,4 @@
-import type { HeartbeatTaskStore } from '../../index.js';
+import type { HeartbeatTaskStore } from '@/core/heartbeat/index.js';
 
 export type HeartbeatCliOptions = {
   model?: string;

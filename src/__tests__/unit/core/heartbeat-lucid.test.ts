@@ -1,25 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import {
-  heartbeatSchedulerEventToLucidMessages,
-  heartbeatRunViewToLucidMessages,
-  heartbeatTaskStatusToLucidStatus,
-  heartbeatTaskViewToLucidMessages,
+  HeartbeatLucidPresenter,
+  type AgentHeartbeatResult,
+  type AgentLoopState,
   type HeartbeatRunView,
+  type HeartbeatSchedulerEvent,
   type HeartbeatTaskView,
 } from '../../../index.js';
 
 describe('heartbeat Lucid adapter', () => {
   it('maps heartbeat task states into Lucid-style agent statuses', () => {
-    expect(heartbeatTaskStatusToLucidStatus('running')).toBe('running');
-    expect(heartbeatTaskStatusToLucidStatus('waiting')).toBe('asleep');
-    expect(heartbeatTaskStatusToLucidStatus('idle')).toBe('asleep');
-    expect(heartbeatTaskStatusToLucidStatus('complete')).toBe('terminated');
-    expect(heartbeatTaskStatusToLucidStatus('blocked')).toBe('blocked');
-    expect(heartbeatTaskStatusToLucidStatus('failed')).toBe('failed');
+    expect(HeartbeatLucidPresenter.taskStatusToLucidStatus('running')).toBe('running');
+    expect(HeartbeatLucidPresenter.taskStatusToLucidStatus('waiting')).toBe('asleep');
+    expect(HeartbeatLucidPresenter.taskStatusToLucidStatus('idle')).toBe('asleep');
+    expect(HeartbeatLucidPresenter.taskStatusToLucidStatus('complete')).toBe('terminated');
+    expect(HeartbeatLucidPresenter.taskStatusToLucidStatus('blocked')).toBe('blocked');
+    expect(HeartbeatLucidPresenter.taskStatusToLucidStatus('failed')).toBe('failed');
   });
 
   it('projects a task view into Lucid-style status, progress, and response messages', () => {
-    const messages = heartbeatTaskViewToLucidMessages(createTaskView(), {
+    const messages = HeartbeatLucidPresenter.taskViewToMessages(createTaskView(), {
       taskIdToAgentId: (taskId) => `agent:${taskId}`,
     });
 
@@ -58,7 +58,7 @@ describe('heartbeat Lucid adapter', () => {
   });
 
   it('projects a run view into Lucid-style messages', () => {
-    const messages = heartbeatRunViewToLucidMessages(createRunView());
+    const messages = HeartbeatLucidPresenter.runViewToMessages(createRunView());
 
     expect(messages).toEqual([
       {
@@ -95,7 +95,7 @@ describe('heartbeat Lucid adapter', () => {
   });
 
   it('converts scheduler events into Lucid-style incremental notifications', () => {
-    const started = heartbeatSchedulerEventToLucidMessages({
+    const started = HeartbeatLucidPresenter.schedulerEventToMessages({
       type: 'heartbeat.task.started',
       taskId: 'repo-check',
       loadedCheckpoint: true,
@@ -127,17 +127,10 @@ describe('heartbeat Lucid adapter', () => {
       },
     ]);
 
-    const finished = heartbeatSchedulerEventToLucidMessages({
+    const finished = HeartbeatLucidPresenter.schedulerEventToMessages({
       type: 'heartbeat.task.finished',
       taskId: 'repo-check',
-      decision: 'continue',
-      outcome: 'done',
-      status: 'waiting',
-      progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
-      summary: 'Repository check complete.',
-      runId: 'run_1',
-      enabled: true,
-      nextRunAt: '2026-04-14T00:01:00.000Z',
+      record: createFinishedRecord(),
       timestamp: '2026-04-14T00:00:00.000Z',
     });
 
@@ -152,7 +145,7 @@ describe('heartbeat Lucid adapter', () => {
       },
     });
 
-    const failed = heartbeatSchedulerEventToLucidMessages({
+    const failed = HeartbeatLucidPresenter.schedulerEventToMessages({
       type: 'heartbeat.task.failed',
       taskId: 'repo-check',
       error: 'temporary failure',
@@ -178,7 +171,17 @@ describe('heartbeat Lucid adapter', () => {
         data: {
           progress: {
             agent_id: 'repo-check',
-            progress: 'Heartbeat wake failed and will retry later. Error: temporary failure',
+            progress: 'Heartbeat wake failed and will retry later.',
+            timestamp: '2026-04-14T00:00:00.000Z',
+          },
+        },
+      },
+      {
+        event: 'agent_response',
+        data: {
+          response: {
+            agent_id: 'repo-check',
+            response: 'temporary failure',
             timestamp: '2026-04-14T00:00:00.000Z',
           },
         },
@@ -192,6 +195,19 @@ function createTaskView(): HeartbeatTaskView {
     taskId: 'repo-check',
     task: 'Inspect repo state',
     enabled: true,
+    schedule: {
+      intervalMs: 60_000,
+      nextRunAt: '2026-04-14T00:01:00.000Z',
+    },
+    state: {
+      status: 'waiting',
+      progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+      runAt: '2026-04-14T00:00:00.000Z',
+      runId: 'run_1',
+      loadedCheckpoint: true,
+      resumable: true,
+      result: createHeartbeatResult(),
+    },
     status: 'waiting',
     decision: 'continue',
     outcome: 'done',
@@ -203,6 +219,7 @@ function createTaskView(): HeartbeatTaskView {
     loadedCheckpoint: true,
     resumable: true,
     intervalMs: 60_000,
+    id: 'repo-check',
   };
 }
 
@@ -214,6 +231,13 @@ function createRunView(): HeartbeatRunView {
     createdAt: '2026-04-14T00:00:00.000Z',
     task: 'Inspect repo state',
     enabled: true,
+    schedule: {
+      intervalMs: 60_000,
+    },
+    state: {
+      status: 'waiting',
+      resumable: true,
+    },
     status: 'waiting',
     decision: 'continue',
     outcome: 'done',
@@ -221,5 +245,65 @@ function createRunView(): HeartbeatRunView {
     summary: 'Repository check complete.',
     loadedCheckpoint: true,
     resumable: true,
+  };
+}
+
+function createFinishedRecord(): Extract<HeartbeatSchedulerEvent, { type: 'heartbeat.task.finished' }>['record'] {
+  return {
+    task: {
+      id: 'repo-check',
+      task: 'Inspect repo state',
+      enabled: true,
+      schedule: {
+        intervalMs: 60_000,
+        nextRunAt: '2026-04-14T00:01:00.000Z',
+      },
+      state: {
+        status: 'waiting',
+        progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+        runAt: '2026-04-14T00:00:00.000Z',
+        runId: 'run_1',
+        loadedCheckpoint: true,
+        resumable: true,
+        result: createHeartbeatResult(),
+      },
+    },
+    result: createHeartbeatResult(),
+    loadedCheckpoint: true,
+  };
+}
+
+function createHeartbeatResult(): AgentHeartbeatResult {
+  const state: AgentLoopState = {
+    status: 'finished',
+    runId: 'run_1',
+    goal: 'Heartbeat wake cycle',
+    model: 'gpt-5.1-codex-mini',
+    provider: 'openai',
+    workspaceRoot: '/tmp/workspace',
+    startedAt: '2026-04-13T23:59:00.000Z',
+    finishedAt: '2026-04-14T00:00:00.000Z',
+    outcome: 'done',
+    summary: 'Repository check complete.',
+    usage: {
+      inputTokens: 100,
+      outputTokens: 20,
+      totalTokens: 120,
+      requests: 1,
+    },
+    transcript: [],
+    trace: [],
+  };
+
+  return {
+    decision: 'continue',
+    summary: 'Repository check complete.',
+    checkpoint: {
+      version: 1,
+      runId: 'run_1',
+      createdAt: '2026-04-14T00:00:00.000Z',
+      state,
+    },
+    state,
   };
 }

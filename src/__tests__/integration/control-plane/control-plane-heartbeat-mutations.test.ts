@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
-import { createFileHeartbeatTaskStore, type HeartbeatTask } from '../../../index.js';
+import { FileHeartbeatTaskRepository, type HeartbeatTask } from '../../../index.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import { controlPlaneRouter } from '../../../server/features/control-plane/router.js';
 import { ControlPlaneHeartbeatController } from '../../../server/features/control-plane/controllers/heartbeat.js';
@@ -13,9 +13,14 @@ function createTask(partial: Partial<HeartbeatTask> = {}): HeartbeatTask {
     id: 'repo-check',
     task: 'Inspect repo state and summarize changes.',
     enabled: true,
-    intervalMs: 60_000,
-    status: 'waiting',
-    nextRunAt: '2026-04-21T00:00:00.000Z',
+    schedule: {
+      intervalMs: 60_000,
+      nextRunAt: '2026-04-21T00:00:00.000Z',
+    },
+    state: {
+      status: 'waiting',
+      resumable: true,
+    },
     ...partial,
   };
 }
@@ -23,7 +28,7 @@ function createTask(partial: Partial<HeartbeatTask> = {}): HeartbeatTask {
 describe('control-plane heartbeat mutations', () => {
   it('enables and disables heartbeat tasks through service helpers', async () => {
     const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-enable-'));
-    const store = createFileHeartbeatTaskStore({ dir: join(stateRoot, 'heartbeat') });
+    const store = new FileHeartbeatTaskRepository({ dir: join(stateRoot, 'heartbeat') });
     await store.saveTask(createTask());
 
     const disabled = await ControlPlaneHeartbeatController.setTaskEnabled(stateRoot, 'repo-check', false);
@@ -40,8 +45,12 @@ describe('control-plane heartbeat mutations', () => {
 
   it('queues run-now when enabled and rejects trigger while disabled', async () => {
     const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-trigger-'));
-    const store = createFileHeartbeatTaskStore({ dir: join(stateRoot, 'heartbeat') });
-    await store.saveTask(createTask({ enabled: false, status: 'idle', nextRunAt: undefined }));
+    const store = new FileHeartbeatTaskRepository({ dir: join(stateRoot, 'heartbeat') });
+    await store.saveTask(createTask({
+      enabled: false,
+      schedule: { intervalMs: 60_000, nextRunAt: undefined },
+      state: { status: 'idle', resumable: true },
+    }));
 
     await expect(ControlPlaneHeartbeatController.triggerTaskRun(stateRoot, 'repo-check')).rejects.toThrow(/disabled/i);
 
@@ -51,14 +60,14 @@ describe('control-plane heartbeat mutations', () => {
     expect(triggered.nextRunAt).toBeTruthy();
 
     const task = (await store.listTasks())[0];
-    expect(task.nextRunAt).toBeTruthy();
-    expect(Date.parse(task.nextRunAt ?? '')).toBeLessThanOrEqual(Date.now());
+    expect(task?.schedule.nextRunAt).toBeTruthy();
+    expect(Date.parse(task?.schedule.nextRunAt ?? '')).toBeLessThanOrEqual(Date.now());
   });
 
   it('exposes heartbeat mutation procedures on the control-plane router', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-workspace-'));
     const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-router-'));
-    const store = createFileHeartbeatTaskStore({ dir: join(stateRoot, 'heartbeat') });
+    const store = new FileHeartbeatTaskRepository({ dir: join(stateRoot, 'heartbeat') });
     await store.saveTask(createTask());
     const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
     const activeWorkspace = catalog.workspaces[0];

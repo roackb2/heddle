@@ -35,6 +35,17 @@ test('shows current git diff in the review surface', async ({ page }) => {
   await expect(page.getByTestId('monaco-diff-viewer').first()).toContainText('markdown');
 });
 
+test('shows heartbeat task and run history in the browser', async ({ page }) => {
+  await page.goto('/tasks');
+
+  await expect(page.getByTestId('nav-tasks')).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('button', { name: 'Browser heartbeat 4/14/2026' })).toBeVisible();
+  await expect(page.getByText('Check browser integration heartbeat state.').first()).toBeVisible();
+  await expect(page.getByText('Browser heartbeat completed.').first()).toBeVisible();
+  await expect(page.getByText('2026-04-14T00-00-00.000Z-browser-heartbeat').first()).toBeVisible();
+  await expect(page.getByText('in 12 • out 6 • total 18').first()).toBeVisible();
+});
+
 test('registers and switches to another workspace from the browser', async ({ page }) => {
   await page.goto('/workspaces');
 

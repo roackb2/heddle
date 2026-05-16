@@ -1,6 +1,6 @@
 # Heartbeat
 
-Heddle exposes `runAgentHeartbeat` for autonomous, scheduler-driven agent work.
+Heddle exposes `HeartbeatWakeService.run` for autonomous, scheduler-driven agent work.
 
 Heartbeat is not interactive chat mode. It is a host/runtime primitive for systems that want to wake an agent periodically, let it work within budget and approval limits, checkpoint the result, and decide what should happen next.
 
@@ -13,6 +13,11 @@ A heartbeat wake cycle:
 - lets the agent do bounded useful work without a human prompt
 - checkpoints the new state
 - returns a decision: `continue`, `pause`, `complete`, or `escalate`
+
+Scheduler state keeps the latest wake result as one nested result object instead
+of copying decision, outcome, summary, and usage into separate task fields. Run
+history stores the same result in a durable run record, so CLI, control-plane,
+and host integrations read the same source of truth.
 
 ## CLI Usage
 
@@ -41,9 +46,14 @@ heddle heartbeat task disable repo-gardener
 
 For repeated wake cycles, Heddle also exposes a local-first scheduler core:
 
-- `runDueHeartbeatTasks`
-- `runHeartbeatScheduler`
-- `createFileHeartbeatTaskStore`
+- `HeartbeatSchedulerService.runDueTasks`
+- `HeartbeatSchedulerService.runLoop`
+- `FileHeartbeatTaskRepository`
+
+`HeartbeatSchedulerService.runDueTasks` returns durable run records, and
+`heartbeat.task.finished` events include the same run record. If you need a
+compact display shape for a UI or service integration, use
+`HeartbeatViewsPresenter` instead of flattening task state yourself.
 
 Cron, launchd, systemd, hosted queues, and Lucid-style services should be treated as hosts around this API, not as Heddle's internal scheduler model.
 

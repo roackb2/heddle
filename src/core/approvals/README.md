@@ -46,7 +46,7 @@ Approval behavior currently exists in these places:
 ## Extension Points
 
 - Add a runtime approval rule by passing `approvalPolicies` into `AgentRunService.run`,
-  `AgentLoopRuntimeService.run`, `runAgentHeartbeat`, or `createConversationEngine(...).turns`.
+  `AgentLoopRuntimeService.run`, `HeartbeatWakeService.run`, or `createConversationEngine(...).turns`.
 - Add host UI by implementing an approval surface in the host adapter layer.
 - Add remembered approval storage through `FileProjectApprovalRuleRepository` or
   a focused repository with the same service/codec boundary.

@@ -1,4 +1,4 @@
-import type { AgentHeartbeatEvent } from '@/core/heartbeat/heartbeat.js';
+import type { AgentHeartbeatEvent } from '@/core/heartbeat/index.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 
 export type CyberLoopMetadataChannels = Record<string, unknown>;

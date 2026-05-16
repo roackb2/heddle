@@ -9,14 +9,20 @@ operator-facing heartbeat views.
 
 ## Owns
 
-- `heartbeat.ts`: single heartbeat wake execution on top of `AgentLoopRuntimeService.run`.
-- `heartbeat-store.ts`: checkpoint-backed one-off heartbeat execution.
-- `heartbeat-task-store.ts`: durable heartbeat task/checkpoint/run storage.
-- `heartbeat-scheduler.ts`: due-task selection and scheduler loop.
-- `heartbeat-task-state.ts`: heartbeat task state projection after success or
-  failure.
-- `heartbeat-views.ts`: task/run view projection for host surfaces.
-- `heartbeat-lucid.ts`: Lucid-facing heartbeat status/progress projection.
+- `wake/`: `HeartbeatWakeService` owns one heartbeat wake cycle on top of
+  `AgentLoopRuntimeService.run`, with prompt and decision policy classes kept
+  beside it.
+- `checkpoint/`: `StoredHeartbeatService` and
+  `FileHeartbeatCheckpointRepository` own checkpoint-backed one-off heartbeat
+  execution.
+- `tasks/`: `FileHeartbeatTaskRepository` owns durable task/checkpoint/run
+  storage through zod-backed schemas; `HeartbeatTaskStateProjector` owns task
+  state transitions after success or failure.
+- `scheduler/`: `HeartbeatSchedulerService` owns due-task selection and the
+  scheduler loop; `HeartbeatTaskRunnerService` is the narrow task-to-wake
+  translation boundary.
+- `views/`: `HeartbeatViewsPresenter` and `HeartbeatLucidPresenter` own
+  operator-facing heartbeat projections.
 
 ## Does Not Own
 

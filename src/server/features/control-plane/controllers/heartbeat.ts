@@ -1,26 +1,25 @@
 import { resolve } from 'node:path';
 import {
-  createFileHeartbeatTaskStore,
-  listHeartbeatRunViews,
-  listHeartbeatTaskViews,
-  projectHeartbeatTaskView,
+  FileHeartbeatTaskRepository,
+  HeartbeatViewsPresenter,
   type HeartbeatTask,
-} from '../../../../index.js';
+  type HeartbeatTaskStore,
+} from '@/core/heartbeat/index.js';
 
 export class ControlPlaneHeartbeatController {
-  static createStore(stateRoot: string) {
-    return createFileHeartbeatTaskStore({ dir: resolve(stateRoot, 'heartbeat') });
+  static createStore(stateRoot: string): HeartbeatTaskStore {
+    return new FileHeartbeatTaskRepository({ dir: resolve(stateRoot, 'heartbeat') });
   }
 
   static async listTasks(stateRoot: string) {
-    return await listHeartbeatTaskViews(ControlPlaneHeartbeatController.createStore(stateRoot));
+    return await HeartbeatViewsPresenter.listTaskViews(ControlPlaneHeartbeatController.createStore(stateRoot));
   }
 
   static async listRuns(
     stateRoot: string,
     options: { taskId?: string; limit?: number } = {},
   ) {
-    return await listHeartbeatRunViews(ControlPlaneHeartbeatController.createStore(stateRoot), options);
+    return await HeartbeatViewsPresenter.listRunViews(ControlPlaneHeartbeatController.createStore(stateRoot), options);
   }
 
   static async setTaskEnabled(
@@ -31,19 +30,25 @@ export class ControlPlaneHeartbeatController {
     const store = ControlPlaneHeartbeatController.createStore(stateRoot);
     const task = await ControlPlaneHeartbeatController.loadTaskById(store, taskId);
     const now = new Date();
-    const status = enabled ? (task.status ?? 'waiting') : (task.status === 'running' ? 'running' : 'idle');
+    const status = enabled ? (task.state?.status ?? 'waiting') : (task.state?.status === 'running' ? 'running' : 'idle');
     const nextTask: HeartbeatTask = {
       ...task,
       enabled,
-      status,
-      nextRunAt:
-        enabled ?
-          task.nextRunAt ?? new Date(now.getTime() - 1_000).toISOString()
-        : undefined,
-      updatedAt: now.toISOString(),
+      schedule: {
+        ...task.schedule,
+        nextRunAt:
+          enabled ?
+            task.schedule.nextRunAt ?? new Date(now.getTime() - 1_000).toISOString()
+          : undefined,
+      },
+      state: {
+        ...task.state,
+        status,
+        updatedAt: now.toISOString(),
+      },
     };
     await store.saveTask(nextTask);
-    return projectHeartbeatTaskView(nextTask);
+    return HeartbeatViewsPresenter.projectTask(nextTask);
   }
 
   static async triggerTaskRun(stateRoot: string, taskId: string) {
@@ -54,19 +59,25 @@ export class ControlPlaneHeartbeatController {
     }
 
     const now = new Date();
-    const status = task.status === 'running' ? 'running' : 'waiting';
+    const status = task.state?.status === 'running' ? 'running' : 'waiting';
     const nextTask: HeartbeatTask = {
       ...task,
-      status,
-      lastProgress:
-        task.status === 'running' ?
-          task.lastProgress
-        : 'Task manually triggered from control plane. Waiting for the next heartbeat worker poll.',
-      nextRunAt: new Date(now.getTime() - 1_000).toISOString(),
-      updatedAt: now.toISOString(),
+      schedule: {
+        ...task.schedule,
+        nextRunAt: new Date(now.getTime() - 1_000).toISOString(),
+      },
+      state: {
+        ...task.state,
+        status,
+        progress:
+          task.state?.status === 'running' ?
+            task.state.progress
+          : 'Task manually triggered from control plane. Waiting for the next heartbeat worker poll.',
+        updatedAt: now.toISOString(),
+      },
     };
     await store.saveTask(nextTask);
-    return projectHeartbeatTaskView(nextTask);
+    return HeartbeatViewsPresenter.projectTask(nextTask);
   }
 
   private static async loadTaskById(

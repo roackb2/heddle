@@ -16,11 +16,12 @@ import { join } from 'node:path';
 import { inferProviderFromModel } from '../src/core/llm/providers.js';
 import { RuntimeCredentialService } from '../src/core/runtime/credentials/index.js';
 import {
-  createFileHeartbeatTaskStore,
-  runDueHeartbeatTasks,
+  FileHeartbeatTaskRepository,
+  HeartbeatSchedulerService,
   type HeartbeatSchedulerEvent,
   type HeartbeatTask,
-} from '../src/core/heartbeat/heartbeat-scheduler.js';
+  type HeartbeatTaskStore,
+} from '../src/core/heartbeat/index.js';
 
 const DEFAULT_EXAMPLE_MODEL = 'gpt-5.1-codex-mini';
 const STORE_DIR = join(process.cwd(), '.heddle', 'examples', 'heartbeat-scheduler');
@@ -37,10 +38,10 @@ async function main() {
     );
   }
 
-  const store = createFileHeartbeatTaskStore({ dir: STORE_DIR });
+  const store = new FileHeartbeatTaskRepository({ dir: STORE_DIR });
   await ensureDemoTask(store, model);
 
-  const result = await runDueHeartbeatTasks({
+  const result = await HeartbeatSchedulerService.runDueTasks({
     store,
     now: () => new Date(),
     heartbeat: {
@@ -66,7 +67,7 @@ async function main() {
 }
 
 async function ensureDemoTask(
-  store: ReturnType<typeof createFileHeartbeatTaskStore>,
+  store: HeartbeatTaskStore,
   model: string,
 ) {
   const existing = (await store.listTasks()).find((task) => task.id === TASK_ID);
@@ -77,11 +78,15 @@ async function ensureDemoTask(
     task:
       'Check whether there is useful autonomous maintenance work to do for this demo. No tools are available in this scheduler example. If no useful work is available, explain that the task should pause.',
     enabled: true,
-    intervalMs: 60_000,
-    nextRunAt: new Date(Date.now() - 1_000).toISOString(),
-    model,
-    maxSteps: 2,
-    workspaceRoot: process.cwd(),
+    schedule: {
+      intervalMs: 60_000,
+      nextRunAt: new Date(Date.now() - 1_000).toISOString(),
+    },
+    runtime: {
+      model,
+      maxSteps: 2,
+      workspaceRoot: process.cwd(),
+    },
   };
 
   await store.saveTask(task);
@@ -94,7 +99,7 @@ function formatSchedulerEvent(event: HeartbeatSchedulerEvent): string | undefine
     case 'heartbeat.task.started':
       return `[event] task.started id=${event.taskId} loadedCheckpoint=${event.loadedCheckpoint}`;
     case 'heartbeat.task.finished':
-      return `[event] task.finished id=${event.taskId} decision=${event.decision} enabled=${event.enabled} nextRunAt=${event.nextRunAt ?? 'none'}`;
+      return `[event] task.finished id=${event.taskId} decision=${event.record.result.decision} enabled=${event.record.task.enabled} nextRunAt=${event.record.task.schedule.nextRunAt ?? 'none'}`;
     case 'heartbeat.task.failed':
       return `[event] task.failed id=${event.taskId} error=${event.error}`;
     default:

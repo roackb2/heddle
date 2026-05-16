@@ -4,7 +4,7 @@ import type { ProviderCredentialSource } from '../../../runtime/credentials/inde
 import type {
   HeartbeatTask,
   HeartbeatTaskRunRecordEntry,
-} from '@/core/heartbeat/heartbeat-task-store.js';
+} from '@/core/heartbeat/index.js';
 import type { SlashCommandResult } from '../result-types.js';
 
 export type SlashCommandExecutionContext = {

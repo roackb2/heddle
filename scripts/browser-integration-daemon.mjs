@@ -16,6 +16,7 @@ prepareFixtureWorkspace(primaryWorkspace, {
   name: 'Primary Browser Integration Workspace',
   extraReadmeLine: 'This line is an uncommitted browser integration change.',
 });
+seedHeartbeatFixture(primaryWorkspace);
 prepareFixtureWorkspace(secondaryWorkspace, {
   name: 'Secondary Browser Integration Workspace',
 });
@@ -105,4 +106,76 @@ function execGit(cwd, args) {
     cwd,
     stdio: 'ignore',
   });
+}
+
+function seedHeartbeatFixture(workspaceRoot) {
+  const task = {
+    id: 'browser-heartbeat',
+    workspaceId: 'primary',
+    name: 'Browser heartbeat',
+    task: 'Check browser integration heartbeat state.',
+    enabled: true,
+    schedule: {
+      intervalMs: 3600000,
+      nextRunAt: '2026-04-14T01:00:00.000Z',
+    },
+    state: {
+      status: 'waiting',
+      progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1h.',
+      runId: 'browser-run-1',
+      runAt: '2026-04-14T00:00:00.000Z',
+      loadedCheckpoint: true,
+      resumable: true,
+      result: createHeartbeatResult(),
+      updatedAt: '2026-04-14T00:00:00.000Z',
+    },
+  };
+  const heartbeatRoot = join(workspaceRoot, '.heddle', 'heartbeat');
+  mkdirSync(join(heartbeatRoot, 'tasks'), { recursive: true });
+  mkdirSync(join(heartbeatRoot, 'runs'), { recursive: true });
+  writeFileSync(join(heartbeatRoot, 'tasks', `${task.id}.json`), `${JSON.stringify(task, null, 2)}\n`, 'utf8');
+  writeFileSync(
+    join(heartbeatRoot, 'runs', '2026-04-14T00-00-00.000Z-browser-heartbeat.json'),
+    `${JSON.stringify({
+      task,
+      result: createHeartbeatResult(),
+      loadedCheckpoint: true,
+    }, null, 2)}\n`,
+    'utf8',
+  );
+}
+
+function createHeartbeatResult() {
+  const state = {
+    status: 'finished',
+    runId: 'browser-run-1',
+    goal: 'Heartbeat browser integration fixture.',
+    model: 'gpt-5.1-codex-mini',
+    provider: 'openai',
+    workspaceRoot: primaryWorkspace,
+    startedAt: '2026-04-13T23:59:00.000Z',
+    finishedAt: '2026-04-14T00:00:00.000Z',
+    outcome: 'done',
+    summary: 'Browser heartbeat completed.',
+    usage: {
+      inputTokens: 12,
+      outputTokens: 6,
+      totalTokens: 18,
+      requests: 1,
+    },
+    transcript: [],
+    trace: [],
+  };
+
+  return {
+    decision: 'continue',
+    summary: 'Browser heartbeat completed.',
+    checkpoint: {
+      version: 1,
+      runId: 'browser-run-1',
+      createdAt: '2026-04-14T00:00:00.000Z',
+      state,
+    },
+    state,
+  };
 }

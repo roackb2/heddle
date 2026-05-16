@@ -15,7 +15,7 @@
 import { join } from 'node:path';
 import { inferProviderFromModel } from '../src/core/llm/providers.js';
 import { RuntimeCredentialService } from '../src/core/runtime/credentials/index.js';
-import { createFileHeartbeatCheckpointStore, runStoredHeartbeat } from '../src/core/heartbeat/heartbeat-store.js';
+import { FileHeartbeatCheckpointRepository, StoredHeartbeatService } from '../src/core/heartbeat/index.js';
 
 const DEFAULT_EXAMPLE_MODEL = 'gpt-5.1-codex-mini';
 const CHECKPOINT_PATH = join(process.cwd(), '.heddle', 'examples', 'heartbeat-demo-checkpoint.json');
@@ -31,8 +31,8 @@ async function main() {
     );
   }
 
-  const store = createFileHeartbeatCheckpointStore({ path: CHECKPOINT_PATH });
-  const result = await runStoredHeartbeat({
+  const store = new FileHeartbeatCheckpointRepository({ path: CHECKPOINT_PATH });
+  const result = await StoredHeartbeatService.run({
     store,
     task:
       'Check whether there is useful autonomous work to do for this demo. No tools are available in this demo wake cycle. If no external task is available, explain that this wake cycle should pause.',

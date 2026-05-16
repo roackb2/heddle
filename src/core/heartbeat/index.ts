@@ -1,4 +1,28 @@
-export { runAgentHeartbeat } from './heartbeat.js';
+export { FileHeartbeatCheckpointRepository, StoredHeartbeatService } from './checkpoint/index.js';
+export type {
+  FileHeartbeatCheckpointRepositoryOptions,
+  HeartbeatCheckpointStore,
+  RunStoredHeartbeatOptions,
+  StoredHeartbeatResult,
+} from './checkpoint/index.js';
+export { HeartbeatSchedulerService, HeartbeatTaskRunnerService } from './scheduler/index.js';
+export type {
+  HeartbeatSchedulerEvent,
+  HeartbeatTaskRunner,
+  RunDueHeartbeatTasksOptions,
+  RunDueHeartbeatTasksResult,
+  RunHeartbeatSchedulerOptions,
+} from './scheduler/index.js';
+export { FileHeartbeatTaskRepository, HeartbeatTaskStateProjector } from './tasks/index.js';
+export type {
+  FileHeartbeatTaskRepositoryOptions,
+  HeartbeatTask,
+  HeartbeatTaskRunRecord,
+  HeartbeatTaskRunRecordEntry,
+  HeartbeatTaskStatus,
+  HeartbeatTaskStore,
+} from './tasks/index.js';
+export { HeartbeatDecisionPolicy, HeartbeatWakePrompt, HeartbeatWakeService } from './wake/index.js';
 export type {
   AgentHeartbeatEvent,
   AgentHeartbeatResult,
@@ -6,54 +30,15 @@ export type {
   HeartbeatDecisionEvent,
   HeartbeatEscalationEvent,
   RunAgentHeartbeatOptions,
-} from './heartbeat.js';
-export {
-  createFileHeartbeatCheckpointStore,
-  runStoredHeartbeat,
-  suggestNextHeartbeatDelayMs,
-} from './heartbeat-store.js';
+} from './wake/index.js';
+export { HeartbeatLucidPresenter, HeartbeatViewsPresenter } from './views/index.js';
 export type {
-  FileHeartbeatCheckpointStoreOptions,
-  HeartbeatCheckpointStore,
-  RunStoredHeartbeatOptions,
-  StoredHeartbeatResult,
-} from './heartbeat-store.js';
-export { createFileHeartbeatTaskStore } from './heartbeat-task-store.js';
-export type {
-  FileHeartbeatTaskStoreOptions,
-  HeartbeatTask,
-  HeartbeatTaskRunRecord,
-  HeartbeatTaskRunRecordEntry,
-  HeartbeatTaskStore,
-  HeartbeatTaskStatus,
-} from './heartbeat-task-store.js';
-export { runDueHeartbeatTasks, runHeartbeatScheduler } from './heartbeat-scheduler.js';
-export type {
-  HeartbeatSchedulerEvent,
-  HeartbeatTaskRunner,
-  RunDueHeartbeatTasksOptions,
-  RunDueHeartbeatTasksResult,
-  RunHeartbeatSchedulerOptions,
-} from './heartbeat-scheduler.js';
-export {
-  listHeartbeatRunViews,
-  listHeartbeatTaskViews,
-  loadHeartbeatRunView,
-  projectHeartbeatRunView,
-  projectHeartbeatTaskView,
-} from './heartbeat-views.js';
-export type { HeartbeatRunView, HeartbeatTaskView } from './heartbeat-views.js';
-export {
-  heartbeatSchedulerEventToLucidMessages,
-  heartbeatRunViewToLucidMessages,
-  heartbeatTaskStatusToLucidStatus,
-  heartbeatTaskViewToLucidMessages,
-} from './heartbeat-lucid.js';
-export type {
+  HeartbeatRunView,
+  HeartbeatTaskView,
   LucidAdapterOptions,
   LucidAgentMessage,
   LucidAgentProgressNotification,
   LucidAgentResponseNotification,
   LucidAgentStatus,
   LucidAgentStatusNotification,
-} from './heartbeat-lucid.js';
+} from './views/index.js';

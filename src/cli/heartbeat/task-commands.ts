@@ -1,4 +1,4 @@
-import type { HeartbeatTask } from '../../index.js';
+import type { HeartbeatTask } from '@/core/heartbeat/index.js';
 import { resolve } from 'node:path';
 import type { ParsedHeartbeatArgs } from './args.js';
 import { booleanFlag, parsePositiveInt, stringFlag } from './args.js';
@@ -58,18 +58,22 @@ async function addHeartbeatTask(
     name: stringFlag(parsed.flags, 'name'),
     task: taskText.trim(),
     enabled: !booleanFlag(parsed.flags, 'disabled'),
-    intervalMs,
-    nextRunAt: booleanFlag(parsed.flags, 'defer') ? new Date(now.getTime() + intervalMs).toISOString() : new Date(now.getTime() - 1_000).toISOString(),
-    model: stringFlag(parsed.flags, 'model') ?? options.model,
-    maxSteps: parsePositiveInt(stringFlag(parsed.flags, 'max-steps')) ?? options.maxSteps,
-    workspaceRoot,
-    stateDir: options.stateDir,
-    searchIgnoreDirs: options.searchIgnoreDirs,
-    systemContext: options.systemContext,
+    schedule: {
+      intervalMs,
+      nextRunAt: booleanFlag(parsed.flags, 'defer') ? new Date(now.getTime() + intervalMs).toISOString() : new Date(now.getTime() - 1_000).toISOString(),
+    },
+    runtime: {
+      model: stringFlag(parsed.flags, 'model') ?? options.model,
+      maxSteps: parsePositiveInt(stringFlag(parsed.flags, 'max-steps')) ?? options.maxSteps,
+      workspaceRoot,
+      stateDir: options.stateDir,
+      searchIgnoreDirs: options.searchIgnoreDirs,
+      systemContext: options.systemContext,
+    },
   };
 
   await store.saveTask(task);
-  process.stdout.write(`Saved heartbeat task ${task.id} (${formatDurationMs(intervalMs)} interval)\n`);
+  process.stdout.write(`Saved heartbeat task ${task.id} (${formatDurationMs(task.schedule.intervalMs)} interval)\n`);
 }
 
 async function listHeartbeatTasks(store: HeartbeatCliStore) {
@@ -80,15 +84,16 @@ async function listHeartbeatTasks(store: HeartbeatCliStore) {
   }
 
   for (const task of tasks) {
+    const state = task.state;
     process.stdout.write([
       `${task.enabled ? 'enabled ' : 'disabled'} ${task.id}${task.name ? ` (${task.name})` : ''}`,
-      `  status=${task.status ?? 'idle'} every=${formatDurationMs(task.intervalMs)} next=${task.nextRunAt ?? 'now'} model=${task.model ?? 'default'}`,
+      `  status=${state?.status ?? 'idle'} every=${formatDurationMs(task.schedule.intervalMs)} next=${task.schedule.nextRunAt ?? 'now'} model=${task.runtime?.model ?? 'default'}`,
       `  task=${task.task}`,
-      task.lastProgress ? `  progress=${task.lastProgress}` : undefined,
-      task.lastRunId ? `  run=${task.lastRunId} resumable=${task.resumable === false ? 'no' : 'yes'} loadedCheckpoint=${task.lastLoadedCheckpoint ? 'yes' : 'no'}` : undefined,
-      task.lastUsage ? `  usage input=${task.lastUsage.inputTokens} output=${task.lastUsage.outputTokens} total=${task.lastUsage.totalTokens} requests=${task.lastUsage.requests}` : undefined,
-      task.lastDecision ? `  last=${task.lastDecision} outcome=${task.lastOutcome ?? 'unknown'} runAt=${task.lastRunAt ?? 'unknown'}` : undefined,
-      task.lastError ? `  error=${task.lastError}` : undefined,
+      state?.progress ? `  progress=${state.progress}` : undefined,
+      state?.runId ? `  run=${state.runId} resumable=${state.resumable === false ? 'no' : 'yes'} loadedCheckpoint=${state.loadedCheckpoint ? 'yes' : 'no'}` : undefined,
+      state?.result?.state.usage ? `  usage input=${state.result.state.usage.inputTokens} output=${state.result.state.usage.outputTokens} total=${state.result.state.usage.totalTokens} requests=${state.result.state.usage.requests}` : undefined,
+      state?.result ? `  last=${state.result.decision} outcome=${state.result.state.outcome} runAt=${state.runAt ?? 'unknown'}` : undefined,
+      state?.error ? `  error=${state.error}` : undefined,
     ].filter((line): line is string => Boolean(line)).join('\n') + '\n');
   }
 }
@@ -112,8 +117,14 @@ async function setHeartbeatTaskEnabled(
   await store.saveTask({
     ...task,
     enabled,
-    nextRunAt: enabled && !task.nextRunAt ? new Date(Date.now() - 1_000).toISOString() : task.nextRunAt,
-    updatedAt: new Date().toISOString(),
+    schedule: {
+      ...task.schedule,
+      nextRunAt: enabled && !task.schedule.nextRunAt ? new Date(Date.now() - 1_000).toISOString() : task.schedule.nextRunAt,
+    },
+    state: {
+      ...task.state,
+      updatedAt: new Date().toISOString(),
+    },
   });
   process.stdout.write(`${enabled ? 'Enabled' : 'Disabled'} heartbeat task ${id}\n`);
 }
@@ -133,23 +144,24 @@ async function showHeartbeatTask(
     throw new Error(`Heartbeat task not found: ${id}`);
   }
 
+  const state = task.state;
   process.stdout.write([
     `${task.enabled ? 'enabled ' : 'disabled'} ${task.id}${task.name ? ` (${task.name})` : ''}`,
-    `status=${task.status ?? 'idle'} every=${formatDurationMs(task.intervalMs)} next=${task.nextRunAt ?? 'none'} model=${task.model ?? 'default'}`,
+    `status=${state?.status ?? 'idle'} every=${formatDurationMs(task.schedule.intervalMs)} next=${task.schedule.nextRunAt ?? 'none'} model=${task.runtime?.model ?? 'default'}`,
     '',
     'Task:',
     task.task,
     '',
-    task.lastProgress ? `Progress: ${task.lastProgress}` : undefined,
-    task.lastDecision ? `Last decision: ${task.lastDecision}` : 'Last decision: none',
-    task.lastOutcome ? `Last outcome: ${task.lastOutcome}` : undefined,
-    task.lastRunAt ? `Last run: ${task.lastRunAt}` : undefined,
-    task.lastRunId ? `Last run id: ${task.lastRunId}` : undefined,
-    task.lastRunId ? `Resumable: ${task.resumable === false ? 'no' : 'yes'}` : undefined,
-    task.lastRunId ? `Loaded checkpoint: ${task.lastLoadedCheckpoint ? 'yes' : 'no'}` : undefined,
-    task.lastUsage ? `Usage: input=${task.lastUsage.inputTokens} output=${task.lastUsage.outputTokens} total=${task.lastUsage.totalTokens} requests=${task.lastUsage.requests}` : undefined,
-    task.lastError ? `Last error: ${task.lastError}` : undefined,
-    task.lastSummary ? ['', 'Last summary:', task.lastSummary].join('\n') : undefined,
+    state?.progress ? `Progress: ${state.progress}` : undefined,
+    state?.result ? `Last decision: ${state.result.decision}` : 'Last decision: none',
+    state?.result ? `Last outcome: ${state.result.state.outcome}` : undefined,
+    state?.runAt ? `Last run: ${state.runAt}` : undefined,
+    state?.runId ? `Last run id: ${state.runId}` : undefined,
+    state?.runId ? `Resumable: ${state.resumable === false ? 'no' : 'yes'}` : undefined,
+    state?.runId ? `Loaded checkpoint: ${state.loadedCheckpoint ? 'yes' : 'no'}` : undefined,
+    state?.result?.state.usage ? `Usage: input=${state.result.state.usage.inputTokens} output=${state.result.state.usage.outputTokens} total=${state.result.state.usage.totalTokens} requests=${state.result.state.usage.requests}` : undefined,
+    state?.error ? `Last error: ${state.error}` : undefined,
+    state?.result ? ['', 'Last summary:', state.result.summary].join('\n') : undefined,
     '',
   ].filter((line): line is string => Boolean(line)).join('\n'));
 }

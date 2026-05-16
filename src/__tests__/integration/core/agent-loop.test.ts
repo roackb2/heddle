@@ -8,8 +8,12 @@ import { createToolkitToolBundle, type ToolToolkit } from '../../../core/tools/t
 import type { ChatMessage, LlmAdapter, LlmResponse } from '../../../core/llm/types.js';
 import type { AgentHeartbeatEvent, AgentLoopEvent, ToolDefinition } from '../../../index.js';
 import { createLogger } from '../../../core/utils/logger.js';
-import { runAgentHeartbeat } from '@/core/heartbeat/heartbeat.js';
-import { runStoredHeartbeat, suggestNextHeartbeatDelayMs, type HeartbeatCheckpointStore } from '@/core/heartbeat/heartbeat-store.js';
+import {
+  HeartbeatDecisionPolicy,
+  HeartbeatWakeService,
+  StoredHeartbeatService,
+  type HeartbeatCheckpointStore,
+} from '@/core/heartbeat/index.js';
 
 const silentLogger = createLogger({ level: 'silent', console: false });
 
@@ -403,7 +407,7 @@ describe('createToolkitToolBundle', () => {
   });
 });
 
-describe('runAgentHeartbeat', () => {
+describe('HeartbeatWakeService.run', () => {
   it('runs an autonomous wake cycle and returns a checkpoint with the parsed decision', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
@@ -425,7 +429,7 @@ describe('runAgentHeartbeat', () => {
       },
     };
 
-    const result = await runAgentHeartbeat({
+    const result = await HeartbeatWakeService.run({
       task: 'Keep watching for useful project maintenance work.',
       llm: fakeLlm,
       tools: [],
@@ -468,7 +472,7 @@ describe('runAgentHeartbeat', () => {
       },
     };
 
-    const first = await runAgentHeartbeat({
+    const first = await HeartbeatWakeService.run({
       task: 'Maintain background task.',
       llm: fakeLlm,
       tools: [],
@@ -477,7 +481,7 @@ describe('runAgentHeartbeat', () => {
       logger: silentLogger,
     });
 
-    await runAgentHeartbeat({
+    await HeartbeatWakeService.run({
       task: 'Maintain background task.',
       checkpoint: first.checkpoint,
       llm: fakeLlm,
@@ -494,7 +498,7 @@ describe('runAgentHeartbeat', () => {
   });
 });
 
-describe('runStoredHeartbeat', () => {
+describe('StoredHeartbeatService.run', () => {
   it('loads, saves, and returns scheduling hints for checkpoint-backed wake cycles', async () => {
     let stored: unknown;
     const store: HeartbeatCheckpointStore = {
@@ -523,7 +527,7 @@ describe('runStoredHeartbeat', () => {
       },
     };
 
-    const result = await runStoredHeartbeat({
+    const result = await StoredHeartbeatService.run({
       task: 'Maintain background work.',
       store,
       llm: fakeLlm,
@@ -545,9 +549,9 @@ describe('runStoredHeartbeat', () => {
   });
 
   it('maps terminal heartbeat decisions to no scheduling hint', () => {
-    expect(suggestNextHeartbeatDelayMs('complete')).toBeUndefined();
-    expect(suggestNextHeartbeatDelayMs('escalate')).toBeUndefined();
-    expect(suggestNextHeartbeatDelayMs('pause')).toBe(15 * 60_000);
+    expect(HeartbeatDecisionPolicy.suggestNextDelayMs('complete')).toBeUndefined();
+    expect(HeartbeatDecisionPolicy.suggestNextDelayMs('escalate')).toBeUndefined();
+    expect(HeartbeatDecisionPolicy.suggestNextDelayMs('pause')).toBe(15 * 60_000);
   });
 });
 
@@ -699,7 +703,7 @@ describe('AgentLoopEvent contracts', () => {
       },
     };
 
-    await runAgentHeartbeat({
+    await HeartbeatWakeService.run({
       task: 'Background work.',
       llm: fakeLlm,
       tools: [],
@@ -753,7 +757,7 @@ describe('AgentLoopEvent contracts', () => {
       },
     };
 
-    await runAgentHeartbeat({
+    await HeartbeatWakeService.run({
       task: 'Risky work.',
       llm: fakeLlm,
       tools: [],

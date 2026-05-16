@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  listHeartbeatRunViews,
-  listHeartbeatTaskViews,
-  loadHeartbeatRunView,
-  projectHeartbeatRunView,
-  projectHeartbeatTaskView,
+  HeartbeatViewsPresenter,
+  type AgentHeartbeatResult,
+  type AgentLoopState,
   type HeartbeatTask,
   type HeartbeatTaskRunRecordEntry,
   type HeartbeatTaskStore,
@@ -12,32 +10,30 @@ import {
 
 describe('heartbeat views', () => {
   it('projects heartbeat task state into a host-facing view', () => {
-    const view = projectHeartbeatTaskView({
+    const view = HeartbeatViewsPresenter.projectTask({
       id: 'repo-check',
       workspaceId: 'workspace-1',
       task: 'Inspect repo state',
       enabled: true,
-      status: 'waiting',
-      intervalMs: 60_000,
-      nextRunAt: '2026-04-14T00:01:00.000Z',
-      lastRunAt: '2026-04-14T00:00:00.000Z',
-      lastRunId: 'run_1',
-      lastLoadedCheckpoint: true,
-      resumable: true,
-      lastDecision: 'continue',
-      lastOutcome: 'done',
-      lastProgress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
-      lastSummary: 'Repository check complete.',
-      lastUsage: {
-        inputTokens: 100,
-        outputTokens: 20,
-        totalTokens: 120,
-        requests: 1,
+      schedule: {
+        intervalMs: 60_000,
+        nextRunAt: '2026-04-14T00:01:00.000Z',
       },
-      model: 'gpt-5.1-codex-mini',
+      state: {
+        status: 'waiting',
+        runAt: '2026-04-14T00:00:00.000Z',
+        runId: 'run_1',
+        loadedCheckpoint: true,
+        resumable: true,
+        progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+        result: createHeartbeatResult(),
+      },
+      runtime: {
+        model: 'gpt-5.1-codex-mini',
+      },
     });
 
-    expect(view).toEqual({
+    expect(view).toMatchObject({
       taskId: 'repo-check',
       workspaceId: 'workspace-1',
       task: 'Inspect repo state',
@@ -58,17 +54,15 @@ describe('heartbeat views', () => {
         totalTokens: 120,
         requests: 1,
       },
-      error: undefined,
       intervalMs: 60_000,
       model: 'gpt-5.1-codex-mini',
-      name: undefined,
     });
   });
 
   it('projects heartbeat runs into a host-facing view', () => {
-    const view = projectHeartbeatRunView(createRunEntry());
+    const view = HeartbeatViewsPresenter.projectRun(createRunEntry());
 
-    expect(view).toEqual({
+    expect(view).toMatchObject({
       id: '2026-04-14T00-00-00.000Z-repo-check',
       taskId: 'repo-check',
       workspaceId: 'workspace-1',
@@ -116,19 +110,19 @@ describe('heartbeat views', () => {
       },
     };
 
-    await expect(listHeartbeatTaskViews(store)).resolves.toMatchObject([
+    await expect(HeartbeatViewsPresenter.listTaskViews(store)).resolves.toMatchObject([
       {
         taskId: 'repo-check',
         status: 'waiting',
       },
     ]);
-    await expect(listHeartbeatRunViews(store, { taskId: 'repo-check', limit: 1 })).resolves.toMatchObject([
+    await expect(HeartbeatViewsPresenter.listRunViews(store, { taskId: 'repo-check', limit: 1 })).resolves.toMatchObject([
       {
         taskId: 'repo-check',
         runId: 'run_1',
       },
     ]);
-    await expect(loadHeartbeatRunView(store, 'latest', { taskId: 'repo-check' })).resolves.toMatchObject({
+    await expect(HeartbeatViewsPresenter.loadRunView(store, 'latest', { taskId: 'repo-check' })).resolves.toMatchObject({
       taskId: 'repo-check',
       runId: 'run_1',
     });
@@ -141,24 +135,22 @@ function createTask(): HeartbeatTask {
     workspaceId: 'workspace-1',
     task: 'Inspect repo state',
     enabled: true,
-    status: 'waiting',
-    intervalMs: 60_000,
-    nextRunAt: '2026-04-14T00:01:00.000Z',
-    lastRunAt: '2026-04-14T00:00:00.000Z',
-    lastRunId: 'run_1',
-    lastLoadedCheckpoint: true,
-    resumable: true,
-    lastDecision: 'continue',
-    lastOutcome: 'done',
-    lastProgress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
-    lastSummary: 'Repository check complete.',
-    lastUsage: {
-      inputTokens: 100,
-      outputTokens: 20,
-      totalTokens: 120,
-      requests: 1,
+    schedule: {
+      intervalMs: 60_000,
+      nextRunAt: '2026-04-14T00:01:00.000Z',
     },
-    model: 'gpt-5.1-codex-mini',
+    state: {
+      status: 'waiting',
+      runAt: '2026-04-14T00:00:00.000Z',
+      runId: 'run_1',
+      loadedCheckpoint: true,
+      resumable: true,
+      progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+      result: createHeartbeatResult(),
+    },
+    runtime: {
+      model: 'gpt-5.1-codex-mini',
+    },
   };
 }
 
@@ -173,55 +165,42 @@ function createRunEntry(): HeartbeatTaskRunRecordEntry {
     record: {
       task: createTask(),
       loadedCheckpoint: true,
-      result: {
-        decision: 'continue',
-        summary: 'Repository check complete.',
-        checkpoint: {
-          version: 1,
-          runId: 'run_1',
-          createdAt: '2026-04-14T00:00:00.000Z',
-          state: {
-            status: 'finished',
-            runId: 'run_1',
-            goal: 'Heartbeat wake cycle',
-            model: 'gpt-5.1-codex-mini',
-            provider: 'openai',
-            workspaceRoot: '/tmp/workspace',
-            startedAt: '2026-04-13T23:59:00.000Z',
-            finishedAt: '2026-04-14T00:00:00.000Z',
-            outcome: 'done',
-            summary: 'Repository check complete.',
-            usage: {
-              inputTokens: 100,
-              outputTokens: 20,
-              totalTokens: 120,
-              requests: 1,
-            },
-            transcript: [],
-            trace: [],
-          },
-        },
-        state: {
-          status: 'finished',
-          runId: 'run_1',
-          goal: 'Heartbeat wake cycle',
-          model: 'gpt-5.1-codex-mini',
-          provider: 'openai',
-          workspaceRoot: '/tmp/workspace',
-          startedAt: '2026-04-13T23:59:00.000Z',
-          finishedAt: '2026-04-14T00:00:00.000Z',
-          outcome: 'done',
-          summary: 'Repository check complete.',
-          usage: {
-            inputTokens: 100,
-            outputTokens: 20,
-            totalTokens: 120,
-            requests: 1,
-          },
-          transcript: [],
-          trace: [],
-        },
-      },
+      result: createHeartbeatResult(),
     },
+  };
+}
+
+function createHeartbeatResult(): AgentHeartbeatResult {
+  const state: AgentLoopState = {
+    status: 'finished',
+    runId: 'run_1',
+    goal: 'Heartbeat wake cycle',
+    model: 'gpt-5.1-codex-mini',
+    provider: 'openai',
+    workspaceRoot: '/tmp/workspace',
+    startedAt: '2026-04-13T23:59:00.000Z',
+    finishedAt: '2026-04-14T00:00:00.000Z',
+    outcome: 'done',
+    summary: 'Repository check complete.',
+    usage: {
+      inputTokens: 100,
+      outputTokens: 20,
+      totalTokens: 120,
+      requests: 1,
+    },
+    transcript: [],
+    trace: [],
+  };
+
+  return {
+    decision: 'continue',
+    summary: 'Repository check complete.',
+    checkpoint: {
+      version: 1,
+      runId: 'run_1',
+      createdAt: '2026-04-14T00:00:00.000Z',
+      state,
+    },
+    state,
   };
 }

@@ -1,9 +1,10 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { autocompleteLocalCommand, getLocalCommandHints, isLikelyLocalCommand, runLocalCommand } from '../../../cli/chat/state/local-commands.js';
 import { getStoredProviderCredential, setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
+import { FileHeartbeatTaskRepository } from '@/core/heartbeat/index.js';
 
 const absoluteScreenshotFixturePath = join(process.cwd(), 'src/__tests__/fixtures/screenshot.png');
 
@@ -735,38 +736,34 @@ describe('runLocalCommand', () => {
     mkdirSync(workspaceRoot, { recursive: true });
     const stateRoot = join(workspaceRoot, '.heddle');
     const heartbeatRoot = join(stateRoot, 'heartbeat');
-    mkdirSync(join(heartbeatRoot, 'tasks'), { recursive: true });
-    mkdirSync(join(heartbeatRoot, 'runs'), { recursive: true });
+    const heartbeatStore = new FileHeartbeatTaskRepository({ dir: heartbeatRoot });
 
-    writeFileSync(join(heartbeatRoot, 'tasks', 'repo-check.json'), JSON.stringify({
+    const task = {
       id: 'repo-check',
       task: 'Check repository state',
       enabled: true,
-      status: 'waiting',
-      intervalMs: 60_000,
-      nextRunAt: '2026-04-14T00:00:00.000Z',
-      lastDecision: 'continue',
-      lastProgress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
-      lastRunId: 'run_heartbeat_1',
-      lastLoadedCheckpoint: true,
-      resumable: true,
-      lastUsage: {
-        inputTokens: 100,
-        outputTokens: 20,
-        totalTokens: 120,
-        requests: 1,
-      },
-    }, null, 2));
-    writeFileSync(join(heartbeatRoot, 'runs', '2026-04-14T00-00-00.000Z-repo-check.json'), JSON.stringify({
-      task: {
-        id: 'repo-check',
-        task: 'Check repository state',
-        enabled: true,
-        status: 'waiting',
-        lastProgress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
-        resumable: true,
+      schedule: {
         intervalMs: 60_000,
+        nextRunAt: '2026-04-14T00:00:00.000Z',
       },
+      state: {
+        status: 'waiting',
+        decision: 'continue',
+        progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+        runId: 'run_heartbeat_1',
+        loadedCheckpoint: true,
+        resumable: true,
+        usage: {
+          inputTokens: 100,
+          outputTokens: 20,
+          totalTokens: 120,
+          requests: 1,
+        },
+      },
+    } as const;
+    await heartbeatStore.saveTask(task);
+    await heartbeatStore.saveRunRecord({
+      task,
       loadedCheckpoint: true,
       result: {
         decision: 'continue',
@@ -811,7 +808,7 @@ describe('runLocalCommand', () => {
           trace: [],
         },
       },
-    }, null, 2));
+    });
 
     const tasksResult = await runLocalCommand(createCommandArgs({
       prompt: '/heartbeat tasks',

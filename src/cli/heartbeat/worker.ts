@@ -1,12 +1,7 @@
-import {
-  RuntimeCredentialService,
-  runDueHeartbeatTasks,
-  runHeartbeatScheduler,
-  type HeartbeatTask,
-  type ToolCall,
-  type ToolDefinition,
-} from '../../index.js';
 import { resolve } from 'node:path';
+import { HeartbeatSchedulerService, type HeartbeatTask } from '@/core/heartbeat/index.js';
+import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
+import type { ToolCall, ToolDefinition } from '@/core/types.js';
 import type { ParsedHeartbeatArgs } from './args.js';
 import { booleanFlag, parsePositiveInt, stringFlag } from './args.js';
 import { formatDurationMs, parseDurationMs } from './duration.js';
@@ -45,7 +40,7 @@ export async function runHeartbeatWorkerCli(
   };
 
   if (booleanFlag(parsed.flags, 'once')) {
-    const result = await runDueHeartbeatTasks({
+    const result = await HeartbeatSchedulerService.runDueTasks({
       store,
       heartbeat,
       onEvent: printSchedulerEvent,
@@ -57,7 +52,7 @@ export async function runHeartbeatWorkerCli(
   const controller = new AbortController();
   process.on('SIGINT', () => controller.abort());
   process.on('SIGTERM', () => controller.abort());
-  await runHeartbeatScheduler({
+  await HeartbeatSchedulerService.runLoop({
     store,
     heartbeat,
     pollIntervalMs: parseDurationMs(stringFlag(parsed.flags, 'poll') ?? '60s'),
@@ -89,15 +84,23 @@ export async function startHeartbeatCli(
     name: stringFlag(parsed.flags, 'name') ?? existing?.name,
     task: taskText.trim(),
     enabled: true,
-    intervalMs,
-    nextRunAt: booleanFlag(parsed.flags, 'defer') ? new Date(now.getTime() + intervalMs).toISOString() : new Date(now.getTime() - 1_000).toISOString(),
-    model: stringFlag(parsed.flags, 'model') ?? existing?.model ?? options.model,
-    maxSteps: parsePositiveInt(stringFlag(parsed.flags, 'max-steps')) ?? existing?.maxSteps ?? options.maxSteps,
-    workspaceRoot,
-    stateDir: options.stateDir,
-    searchIgnoreDirs: options.searchIgnoreDirs,
-    systemContext: options.systemContext,
-    updatedAt: now.toISOString(),
+    schedule: {
+      intervalMs,
+      nextRunAt: booleanFlag(parsed.flags, 'defer') ? new Date(now.getTime() + intervalMs).toISOString() : new Date(now.getTime() - 1_000).toISOString(),
+    },
+    runtime: {
+      ...existing?.runtime,
+      model: stringFlag(parsed.flags, 'model') ?? existing?.runtime?.model ?? options.model,
+      maxSteps: parsePositiveInt(stringFlag(parsed.flags, 'max-steps')) ?? existing?.runtime?.maxSteps ?? options.maxSteps,
+      workspaceRoot,
+      stateDir: options.stateDir,
+      searchIgnoreDirs: options.searchIgnoreDirs,
+      systemContext: options.systemContext,
+    },
+    state: {
+      ...existing?.state,
+      updatedAt: now.toISOString(),
+    },
   };
 
   await store.saveTask(task);
