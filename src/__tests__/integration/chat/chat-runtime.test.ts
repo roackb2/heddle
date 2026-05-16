@@ -8,7 +8,7 @@ import { resolveApiKeyForModel, resolveChatRuntimeConfig, resolveProviderCredent
 import { createLogger } from '../../../core/utils/logger.js';
 import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../index.js';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
-import { runConversationTurn } from '../../../core/chat/engine/turns/run-conversation-turn.js';
+import { EngineConversationTurnService } from '../../../core/chat/engine/turns/service.js';
 import { FileConversationSessionService } from '../../../core/chat/engine/sessions/service.js';
 import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
@@ -603,7 +603,7 @@ describe('conversation turn lifecycle', () => {
     const policy: ToolApprovalPolicy = () => ({ type: 'allow', reason: 'test policy' });
     const requestToolApproval = vi.fn(async () => ({ approved: true, reason: 'approved by host' }));
 
-    await runConversationTurn({
+    await EngineConversationTurnService.run({
       workspaceRoot: storage.workspaceRoot,
       stateRoot: storage.stateRoot,
       traceDir: join(storage.stateRoot, 'traces'),
@@ -643,7 +643,7 @@ describe('conversation turn lifecycle', () => {
     const storage = createConversationTurnStorage();
     vi.spyOn(agentLoopModule, 'runAgentLoop').mockRejectedValue(new Error('loop failed'));
 
-    await expect(runConversationTurn({
+    await expect(EngineConversationTurnService.run({
       workspaceRoot: storage.workspaceRoot,
       stateRoot: storage.stateRoot,
       sessionStoragePath: storage.sessionStoragePath,

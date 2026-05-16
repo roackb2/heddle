@@ -1,7 +1,7 @@
 import { rememberedApprovalPolicy } from '../../../../../core/approvals/default-policies.js';
 import { humanApprovalPolicy, requestToolApproval } from '../../../../../core/approvals/surface.js';
 import type { ToolApprovalPolicy } from '../../../../../core/approvals/types.js';
-import type { ChatTurnApprovalPort } from '../../../../../core/chat/engine/turns/host-bridge.js';
+import type { ChatTurnApprovalPort } from '../../../../../core/chat/engine/turns/host/index.js';
 import { previewEditFileInput } from '../../../../../core/tools/toolkits/coding-files/edit-file.js';
 import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../../../state/approval-rules.js';
 import type { ActionState } from '../useAgentRunController.js';

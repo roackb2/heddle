@@ -1,5 +1,6 @@
 export {
   buildCompactionRunningContext,
+  buildSessionCompactionRunningContext,
   compactChatHistory,
   compactChatHistoryWithArchive,
   estimateChatHistoryTokens,

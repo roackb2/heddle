@@ -190,11 +190,15 @@ export function useChatAppController({
 
     void compactChatHistoryWithArchive({
       history: sessionHistory,
-      model: activeModel,
-      sessionId,
-      stateRoot: runtime.stateRoot,
-      systemContext: runtime.systemContext,
-      goal: `Model switched from ${previousModel} to ${activeModel}`,
+      runtime: {
+        model: activeModel,
+        stateRoot: runtime.stateRoot,
+        systemContext: runtime.systemContext,
+      },
+      session: activeSession,
+      request: {
+        goal: `Model switched from ${previousModel} to ${activeModel}`,
+      },
       summarizer: { credentialSource: runtime.providerCredentialSource },
     })
       .then((compacted) => {

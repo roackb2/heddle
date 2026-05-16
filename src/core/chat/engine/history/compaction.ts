@@ -1,13 +1,19 @@
 import type { ChatMessage, LlmAdapter, LlmUsage } from '../../../llm/types.js';
 import { createLlmAdapter, inferProviderFromModel } from '../../../llm/factory.js';
-import { hasProviderCredentialForModel, resolveApiKeyForModel, resolveProviderCredentialSourceForModel, type ProviderCredentialSource } from '../../../runtime/api-keys.js';
+import {
+  hasProviderCredentialForModel,
+  resolveApiKeyForModel,
+  resolveProviderCredentialSourceForModel,
+  type ApiKeyRuntime,
+  type ProviderCredentialSource,
+} from '../../../runtime/api-keys.js';
 import { estimateBuiltInContextWindow } from '../../../llm/openai-models.js';
 import {
   credentialModeFromSource,
   resolveSystemSelectedModel,
   type ModelCredentialMode,
 } from '../../../llm/model-policy.js';
-import type { ChatArchiveManifest, ChatArchiveRecord, ChatContextStats } from '../../types.js';
+import type { ChatArchiveManifest, ChatArchiveRecord, ChatContextStats, ChatSession } from '../../types.js';
 import { FileChatArchiveRepository } from '../sessions/archives/index.js';
 
 const DEFAULT_CONTEXT_WINDOW_ESTIMATE = 200_000;
@@ -35,14 +41,20 @@ export type CompactionSummarizerOptions = {
 
 export type CompactChatHistoryWithArchiveOptions = {
   history: ChatMessage[];
-  model: string;
-  sessionId: string;
-  stateRoot: string;
-  usage?: LlmUsage;
+  runtime: {
+    model: string;
+    stateRoot: string;
+    systemContext?: string;
+  };
+  session: {
+    id: string;
+  };
+  request?: {
+    usage?: LlmUsage;
+    toolNames?: string[];
+    goal?: string;
+  };
   force?: boolean;
-  systemContext?: string;
-  toolNames?: string[];
-  goal?: string;
   summarizer?: CompactionSummarizerOptions;
   onStatusChange?: (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; summaryPath?: string; error?: string }) => void;
 };
@@ -56,7 +68,7 @@ export type CompactChatHistoryResult = {
 export async function compactChatHistoryWithArchive(
   options: CompactChatHistoryWithArchiveOptions,
 ): Promise<CompactChatHistoryResult> {
-  const estimatedWindow = estimateBuiltInContextWindow(options.model) ?? DEFAULT_CONTEXT_WINDOW_ESTIMATE;
+  const estimatedWindow = estimateBuiltInContextWindow(options.runtime.model) ?? DEFAULT_CONTEXT_WINDOW_ESTIMATE;
   const maxHistoryTokens = Math.floor(estimatedWindow * MAX_HISTORY_RATIO);
   const recentTokenBudget = resolveRecentHistoryTokenBudget(estimatedWindow);
   const preferredRecentMessages = options.force ? PREFERRED_FORCED_RECENT_MESSAGES : PREFERRED_RECENT_MESSAGES;
@@ -66,20 +78,20 @@ export async function compactChatHistoryWithArchive(
 
   if (!needsCompaction) {
     const archiveRepository = new FileChatArchiveRepository({
-      stateRoot: options.stateRoot,
-      sessionId: options.sessionId,
+      stateRoot: options.runtime.stateRoot,
+      sessionId: options.session.id,
     });
     const manifest = archiveRepository.loadManifest();
     return {
       history: options.history,
       context: buildContextStats({
         history: options.history,
-        usage: options.usage,
+        usage: options.request?.usage,
         estimatedRequestTokens: estimateRequestTokens({
           history: options.history,
-          systemContext: options.systemContext,
-          toolNames: options.toolNames ?? [],
-          goal: options.goal,
+          systemContext: options.runtime.systemContext,
+          toolNames: options.request?.toolNames ?? [],
+          goal: options.request?.goal,
         }),
         archives: manifest.archives,
         currentSummaryPath: manifest.currentSummaryPath,
@@ -95,20 +107,20 @@ export async function compactChatHistoryWithArchive(
   });
   if (splitIndex <= 0 || splitIndex >= options.history.length) {
     const archiveRepository = new FileChatArchiveRepository({
-      stateRoot: options.stateRoot,
-      sessionId: options.sessionId,
+      stateRoot: options.runtime.stateRoot,
+      sessionId: options.session.id,
     });
     const manifest = archiveRepository.loadManifest();
     return {
       history: options.history,
       context: buildContextStats({
         history: options.history,
-        usage: options.usage,
+        usage: options.request?.usage,
         estimatedRequestTokens: estimateRequestTokens({
           history: options.history,
-          systemContext: options.systemContext,
-          toolNames: options.toolNames ?? [],
-          goal: options.goal,
+          systemContext: options.runtime.systemContext,
+          toolNames: options.request?.toolNames ?? [],
+          goal: options.request?.goal,
         }),
         archives: manifest.archives,
         currentSummaryPath: manifest.currentSummaryPath,
@@ -120,8 +132,8 @@ export async function compactChatHistoryWithArchive(
   const archivedMessages = options.history.slice(0, splitIndex);
   const recentMessages = options.history.slice(splitIndex);
   const archiveRepository = new FileChatArchiveRepository({
-    stateRoot: options.stateRoot,
-    sessionId: options.sessionId,
+    stateRoot: options.runtime.stateRoot,
+    sessionId: options.session.id,
   });
   const manifest = archiveRepository.loadManifest();
   const previousRollingSummary =
@@ -141,7 +153,7 @@ export async function compactChatHistoryWithArchive(
     const rollingSummary = await summarizeChatArchive({
       llm: summarizer.llm,
       summaryModel: summarizer.model,
-      sessionId: options.sessionId,
+      sessionId: options.session.id,
       archivePath,
       manifest,
       previousRollingSummary,
@@ -162,7 +174,7 @@ export async function compactChatHistoryWithArchive(
 
     const compactedHistory = [
       buildCompactedSummaryMessage({
-        sessionId: options.sessionId,
+        sessionId: options.session.id,
         rollingSummary,
         archives: nextManifest.archives,
       }),
@@ -179,13 +191,13 @@ export async function compactChatHistoryWithArchive(
       history: compactedHistory,
       context: buildContextStats({
         history: compactedHistory,
-        usage: options.usage,
+        usage: options.request?.usage,
         compactedMessages: archiveRecord.messageCount,
         estimatedRequestTokens: estimateRequestTokens({
           history: compactedHistory,
-          systemContext: options.systemContext,
-          toolNames: options.toolNames ?? [],
-          goal: options.goal,
+          systemContext: options.runtime.systemContext,
+          toolNames: options.request?.toolNames ?? [],
+          goal: options.request?.goal,
         }),
         compactedAt: archiveRecord.createdAt,
         archives: nextManifest.archives,
@@ -201,12 +213,12 @@ export async function compactChatHistoryWithArchive(
       history: options.history,
       context: buildContextStats({
         history: options.history,
-        usage: options.usage,
+        usage: options.request?.usage,
         estimatedRequestTokens: estimateRequestTokens({
           history: options.history,
-          systemContext: options.systemContext,
-          toolNames: options.toolNames ?? [],
-          goal: options.goal,
+          systemContext: options.runtime.systemContext,
+          toolNames: options.request?.toolNames ?? [],
+          goal: options.request?.goal,
         }),
         compactionStatus: 'failed',
         compactionError: message,
@@ -293,6 +305,20 @@ export function buildCompactionRunningContext(options: {
     currentSummaryPath: options.currentSummaryPath ?? options.previous?.currentSummaryPath,
     lastArchivePath: options.lastArchivePath ?? options.previous?.lastArchivePath,
   };
+}
+
+export function buildSessionCompactionRunningContext(options: {
+  session: ChatSession;
+  history?: ChatMessage[];
+  lastArchivePath?: string;
+}): ChatContextStats {
+  return buildCompactionRunningContext({
+    history: options.history ?? options.session.history,
+    previous: options.session.context,
+    archiveCount: options.session.archives?.length,
+    currentSummaryPath: options.session.context?.currentSummaryPath,
+    lastArchivePath: options.lastArchivePath,
+  });
 }
 
 function buildContextStats(options: {
@@ -450,31 +476,32 @@ function resolveSummarizer(options: CompactChatHistoryWithArchiveOptions): { llm
   if (options.summarizer?.llm) {
     return {
       llm: options.summarizer.llm,
-      model: options.summarizer.llm.info?.model ?? options.summarizer.model ?? options.model,
+      model: options.summarizer.llm.info?.model ?? options.summarizer.model ?? options.runtime.model,
     };
   }
 
   const provider =
     options.summarizer?.provider === 'active' || !options.summarizer?.provider ?
-      inferProviderFromModel(options.model)
+      inferProviderFromModel(options.runtime.model)
     : options.summarizer.provider;
   const model =
     options.summarizer?.model
     ?? resolveSystemSelectedModel({
       purpose: 'chat-compaction',
       provider,
-      activeModel: options.model,
+      activeModel: options.runtime.model,
       credentialMode: resolveCompactionCredentialMode({
-        activeModel: options.model,
+        activeModel: options.runtime.model,
         explicitApiKey: options.summarizer?.apiKey,
         credentialSource: options.summarizer?.credentialSource,
       }),
     });
   const apiKey = options.summarizer?.apiKey ?? resolveApiKeyForModel(model);
-  if (!hasProviderCredentialForModel(model, {
+  const summarizerCredentialRuntime: ApiKeyRuntime = {
     apiKey,
     apiKeyProvider: options.summarizer?.apiKey ? 'explicit' : apiKey ? provider : undefined,
-  })) {
+  };
+  if (!hasProviderCredentialForModel(model, summarizerCredentialRuntime)) {
     return { model };
   }
 
@@ -490,11 +517,13 @@ function resolveCompactionCredentialMode(args: {
   credentialSource?: ProviderCredentialSource;
   credentialStorePath?: string;
 }): ModelCredentialMode {
-  return credentialModeFromSource(args.credentialSource ?? resolveProviderCredentialSourceForModel(args.activeModel, {
-    apiKey: args.explicitApiKey,
-    apiKeyProvider: args.explicitApiKey ? 'explicit' : undefined,
-    credentialStorePath: args.credentialStorePath,
-  }));
+  const { activeModel, explicitApiKey, credentialSource, credentialStorePath } = args;
+  const credentialRuntime: ApiKeyRuntime = {
+    apiKey: explicitApiKey,
+    apiKeyProvider: explicitApiKey ? 'explicit' : undefined,
+    credentialStorePath,
+  };
+  return credentialModeFromSource(credentialSource ?? resolveProviderCredentialSourceForModel(activeModel, credentialRuntime));
 }
 
 function extractPriorSummary(history: ChatMessage[]): string | undefined {

@@ -48,12 +48,16 @@ export async function finalizeTuiDirectShellSuccess(args: {
   });
   const compacted = await compactChatHistoryWithArchive({
     history: directShellHistory,
-    model,
-    sessionId: activeSessionId,
-    stateRoot: runtime.stateRoot,
-    systemContext: runtime.systemContext,
-    toolNames: tools.map((tool) => tool.name),
-    goal: shellDisplay,
+    runtime: {
+      model,
+      stateRoot: runtime.stateRoot,
+      systemContext: runtime.systemContext,
+    },
+    session: activeSession,
+    request: {
+      toolNames: tools.map((tool) => tool.name),
+      goal: shellDisplay,
+    },
     summarizer: { credentialSource: runtime.providerCredentialSource },
     onStatusChange: (event: { status: 'running' | 'finished' | 'failed'; archivePath?: string; error?: string }) => emitCompactionStatus(event, directShellHistory),
   });

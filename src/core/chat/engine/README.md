@@ -44,8 +44,7 @@ should expose one answer rather than letting each host improvise.
 ## Public Entry Points
 
 - `createConversationEngine`
-- `runConversationTurn`
-- `clearConversationTurnLease`
+- `EngineConversationTurnService`
 - engine-facing types in `types.ts`
 
 ## Common Changes
@@ -53,11 +52,11 @@ should expose one answer rather than letting each host improvise.
 - Put normalized config, path defaults, and engine-wide defaults in `config.ts`.
 - Put persisted session lifecycle behavior in `sessions/service.ts` and related
   `sessions/*` modules.
-- Put lower-level turn-host bridge fanout in `turns/host-bridge.ts`.
+- Put lower-level turn-host bridge fanout in `turns/host/`.
 - Put engine host normalization and `ConversationActivity` projection in
-  `turns/host.ts`.
+  `turns/host/`.
 - Put submit/continue behavior in `turns/service.ts`.
-- Put persisted turn phases in `turns/*`.
+- Put persisted turn phases in the explicit `turns/*/` subdomains.
 - Put shared compaction/history behavior in `history/compaction.ts`.
 
 ## Notes For Coding Agents

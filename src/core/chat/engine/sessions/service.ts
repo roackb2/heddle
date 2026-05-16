@@ -15,11 +15,11 @@
  * flows should move inward to this service over time.
  */
 import { join, resolve } from 'node:path';
-import { FileChatSessionRepository } from './repository/index.js';
-import type { ChatSessionRepository } from './repository/types.js';
-import { ChatSessionLeases, type ChatSessionLeaseOwner } from './leases/index.js';
-import { buildCompactionRunningContext } from '../history/compaction.js';
-import { ChatSessionRecords, ConversationLines } from './records/index.js';
+import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
+import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/types.js';
+import { ChatSessionLeases, type ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
+import { buildSessionCompactionRunningContext } from '../history/compaction.js';
+import { ChatSessionRecords, ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { NormalizedConversationEngineConfig } from '../config.js';
 import type {
@@ -162,11 +162,9 @@ export class FileConversationSessionService implements ConversationSessionServic
     return this.updateRequiredSession(id, (session) => ({
       ...session,
       history: input.sourceHistory,
-      context: buildCompactionRunningContext({
+      context: buildSessionCompactionRunningContext({
+        session,
         history: input.sourceHistory,
-        previous: session.context,
-        archiveCount: session.archives?.length,
-        currentSummaryPath: session.context?.currentSummaryPath,
         lastArchivePath: input.archivePath,
       }),
     }));

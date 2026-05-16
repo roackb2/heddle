@@ -24,8 +24,7 @@ const FORBIDDEN_PRODUCTION_TOKENS = [
 
 const PUBLIC_EXPORT_EXPECTATIONS = [
   'createConversationEngine',
-  'runConversationTurn',
-  'clearConversationTurnLease',
+  'EngineConversationTurnService',
 ];
 
 describe('core import boundaries', () => {

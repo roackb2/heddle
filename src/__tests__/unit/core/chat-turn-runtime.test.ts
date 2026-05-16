@@ -5,12 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
 import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
-import {
-  persistPreflightCompactionRunningSeed,
-  persistPreparedChatSessionTurn,
-} from '../../../core/chat/engine/turns/preflight.js';
-import { prepareConversationTurnContext } from '../../../core/chat/engine/turns/context.js';
-import { resolveConversationTurnModel, resolveConversationTurnRuntime } from '../../../core/chat/engine/turns/runtime.js';
+import { ConversationTurnPreflightService } from '../../../core/chat/engine/turns/preflight/index.js';
+import { ConversationTurnContextBuilder } from '../../../core/chat/engine/turns/context/index.js';
+import { ConversationTurnRuntimeResolver } from '../../../core/chat/engine/turns/runtime/index.js';
 import { DEFAULT_OPENAI_MODEL } from '../../../core/config.js';
 
 describe('chat turn preparation modules', () => {
@@ -29,14 +26,14 @@ describe('chat turn preparation modules', () => {
     });
     new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
 
-    expect(prepareConversationTurnContext({
+    expect(ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
       sessionStoragePath,
       sessionId: 'session-1',
       apiKey: 'explicit-key',
     }).session.id).toBe('session-1');
-    expect(() => prepareConversationTurnContext({
+    expect(() => ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
       sessionStoragePath,
@@ -46,17 +43,17 @@ describe('chat turn preparation modules', () => {
   });
 
   it('resolves chat turn model precedence without changing defaults', () => {
-    expect(resolveConversationTurnModel({
+    expect(ConversationTurnRuntimeResolver.resolveModel({
       sessionModel: 'session-model',
       env: { OPENAI_MODEL: 'openai-env', ANTHROPIC_MODEL: 'anthropic-env' },
     })).toBe('session-model');
-    expect(resolveConversationTurnModel({
+    expect(ConversationTurnRuntimeResolver.resolveModel({
       env: { OPENAI_MODEL: 'openai-env', ANTHROPIC_MODEL: 'anthropic-env' },
     })).toBe('openai-env');
-    expect(resolveConversationTurnModel({
+    expect(ConversationTurnRuntimeResolver.resolveModel({
       env: { OPENAI_MODEL: undefined, ANTHROPIC_MODEL: 'anthropic-env' },
     })).toBe('anthropic-env');
-    expect(resolveConversationTurnModel({
+    expect(ConversationTurnRuntimeResolver.resolveModel({
       env: { OPENAI_MODEL: undefined, ANTHROPIC_MODEL: undefined },
     })).toBe(DEFAULT_OPENAI_MODEL);
   });
@@ -66,12 +63,14 @@ describe('chat turn preparation modules', () => {
     const stateRoot = join(root, '.heddle');
     mkdirSync(join(stateRoot, 'memory'), { recursive: true });
 
-    const runtime = resolveConversationTurnRuntime({
-      stateRoot,
-      sessionModel: 'gpt-5.4',
-      apiKey: 'explicit-key',
-      systemContext: 'System context',
-      env: { OPENAI_MODEL: undefined, ANTHROPIC_MODEL: undefined },
+    const runtime = ConversationTurnRuntimeResolver.resolve({
+      config: {
+        stateRoot,
+        apiKey: 'explicit-key',
+        systemContext: 'System context',
+        env: { OPENAI_MODEL: undefined, ANTHROPIC_MODEL: undefined },
+      },
+      session: { model: 'gpt-5.4' },
     });
 
     expect(runtime.model).toBe('gpt-5.4');
@@ -101,7 +100,7 @@ describe('chat turn preparation modules', () => {
     });
     new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
 
-    const context = prepareConversationTurnContext({
+    const context = ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
       sessionStoragePath,
@@ -129,11 +128,13 @@ describe('chat turn preparation modules', () => {
       updatedAt: now,
     }, credentialStorePath);
 
-    const runtime = resolveConversationTurnRuntime({
-      stateRoot: join(root, '.heddle'),
-      sessionModel: 'gpt-5.1-codex',
-      credentialStorePath,
-      env: { OPENAI_MODEL: undefined, ANTHROPIC_MODEL: undefined },
+    const runtime = ConversationTurnRuntimeResolver.resolve({
+      config: {
+        stateRoot: join(root, '.heddle'),
+        credentialStorePath,
+        env: { OPENAI_MODEL: undefined, ANTHROPIC_MODEL: undefined },
+      },
+      session: { model: 'gpt-5.1-codex' },
     });
 
     expect(runtime.apiKey).toBeUndefined();
@@ -152,11 +153,13 @@ describe('chat turn preparation modules', () => {
     vi.stubEnv('PERSONAL_ANTHROPIC_API_KEY', '');
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-missing-'));
 
-    expect(() => resolveConversationTurnRuntime({
-      stateRoot: join(root, '.heddle'),
-      sessionModel: 'claude-sonnet-4-6',
-      credentialStorePath: join(root, 'missing-auth.json'),
-      env: { OPENAI_MODEL: undefined, ANTHROPIC_MODEL: undefined },
+    expect(() => ConversationTurnRuntimeResolver.resolve({
+      config: {
+        stateRoot: join(root, '.heddle'),
+        credentialStorePath: join(root, 'missing-auth.json'),
+        env: { OPENAI_MODEL: undefined, ANTHROPIC_MODEL: undefined },
+      },
+      session: { model: 'claude-sonnet-4-6' },
     })).toThrow('Missing Anthropic credential. Set ANTHROPIC_API_KEY for Anthropic models.');
   });
 
@@ -171,7 +174,7 @@ describe('chat turn preparation modules', () => {
     });
     new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
 
-    const context = prepareConversationTurnContext({
+    const context = ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
       sessionStoragePath,
@@ -231,7 +234,7 @@ describe('chat turn preparation modules', () => {
     };
     new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([leasedSession]);
 
-    persistPreflightCompactionRunningSeed({
+    ConversationTurnPreflightService.persistRunningSeed({
       sessionStoragePath,
       sessions: [leasedSession],
       sessionId: 'session-1',
@@ -256,7 +259,7 @@ describe('chat turn preparation modules', () => {
     });
     new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
 
-    const preparedSession = persistPreparedChatSessionTurn({
+    const preparedSession = ConversationTurnPreflightService.persistPrepared({
       sessionStoragePath,
       sessions: [session],
       session,

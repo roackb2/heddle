@@ -322,14 +322,11 @@ export type {
   SubmitConversationTurnResult,
   UpdateConversationSessionSettingsInput,
 } from './core/chat/engine/types.js';
-export {
-  runConversationTurn,
-  clearConversationTurnLease,
-} from './core/chat/engine/turns/run-conversation-turn.js';
+export { EngineConversationTurnService } from './core/chat/engine/turns/service.js';
 export type {
   RunConversationTurnArgs,
   RunConversationTurnResult,
-} from './core/chat/engine/turns/run-conversation-turn.js';
+} from './core/chat/engine/turns/types.js';
 
 // Prompts
 export { buildSystemPrompt } from './core/prompts/system-prompt.js';

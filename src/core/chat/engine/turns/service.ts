@@ -1,6 +1,6 @@
-import { runConversationTurn, clearConversationTurnLease } from './run-conversation-turn.js';
-import { FileConversationSessionService } from '../sessions/service.js';
-import type { NormalizedConversationEngineConfig } from '../config.js';
+import { runAgentLoop } from '@/core/runtime/agent-loop.js';
+import { FileConversationSessionService } from '@/core/chat/engine/sessions/service.js';
+import type { NormalizedConversationEngineConfig } from '@/core/chat/engine/config.js';
 import type {
   ClearConversationTurnLeaseInput,
   ContinueConversationTurnInput,
@@ -8,8 +8,28 @@ import type {
   ConversationTurnService,
   SubmitConversationTurnInput,
   SubmitConversationTurnResult,
-} from '../types.js';
-import { normalizeConversationEngineHost } from './host.js';
+} from '@/core/chat/engine/types.js';
+import { ConversationEngineHostNormalizer, ChatTurnHostBridgeBuilder } from './host/index.js';
+import { ConversationTurnContextBuilder } from './context/index.js';
+import { ConversationTurnPreflightService } from './preflight/index.js';
+import { ConversationTurnMemoryMaintenance } from './memory/index.js';
+import type { TurnMemoryMaintenanceRuntimeInput } from './memory/index.js';
+import { ConversationTurnPersistenceService } from './persistence/index.js';
+import { ChatSessionLeases, type ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
+import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
+import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
+import type { PrepareConversationTurnContextArgs } from './context/index.js';
+import type { CreateChatTurnHostBridgeArgs } from './host/index.js';
+import type {
+  RunConversationTurnArgs,
+  RunConversationTurnResult,
+  AgentLoopTurnInput,
+  TurnPersistenceInput,
+  TurnPreflightInput,
+  TurnHostInput,
+  TurnRuntimeConfigInput,
+  TurnSubmitInput,
+} from './types.js';
 
 export class EngineConversationTurnService implements ConversationTurnService {
   private readonly sessions: ConversationSessionService;
@@ -19,30 +39,16 @@ export class EngineConversationTurnService implements ConversationTurnService {
   }
 
   async submit(input: SubmitConversationTurnInput): Promise<SubmitConversationTurnResult> {
-    const normalizedHost = normalizeConversationEngineHost(input.host);
-    return await runConversationTurn({
-      workspaceRoot: this.config.workspaceRoot,
-      stateRoot: this.config.stateRoot,
-      sessionStoragePath: this.config.sessionStoragePath,
-      sessionId: input.sessionId,
-      prompt: input.prompt,
-      maxSteps: input.maxSteps,
-      searchIgnoreDirs: input.searchIgnoreDirs,
-      includePlanTool: input.includePlanTool,
-      apiKey: this.config.apiKey,
-      preferApiKey: this.config.preferApiKey,
-      credentialStorePath: this.config.credentialStorePath,
-      systemContext: this.config.systemContext,
+    const normalizedHost = ConversationEngineHostNormalizer.normalize(input.host);
+    const runtimeConfigInput: TurnRuntimeConfigInput = this.config;
+    const turnInput: TurnSubmitInput = input;
+    return await EngineConversationTurnService.run({
+      ...runtimeConfigInput,
+      ...turnInput,
+      ...EngineConversationTurnService.hostInput(normalizedHost, input),
       memoryMaintenanceMode: input.memoryMaintenanceMode ?? this.config.memoryMaintenanceMode,
-      host: normalizedHost.turnHost,
       approvalPolicies: input.approvalPolicies ?? this.config.approvalPolicies,
       traceSummarizerRegistry: input.traceSummarizerRegistry ?? this.config.traceSummarizerRegistry,
-      onCompactionStatus: normalizedHost.onCompactionStatus,
-      onAssistantStream: normalizedHost.onAssistantStream,
-      onTraceEvent: normalizedHost.onTraceEvent,
-      abortSignal: input.abortSignal,
-      leaseOwner: input.leaseOwner,
-      traceDir: this.config.traceDir,
     });
   }
 
@@ -59,6 +65,133 @@ export class EngineConversationTurnService implements ConversationTurnService {
   }
 
   clearLease(input: ClearConversationTurnLeaseInput): void {
-    clearConversationTurnLease(this.config.sessionStoragePath, input.sessionId, input.owner);
+    if (!this.sessions.read(input.sessionId)?.lease) {
+      return;
+    }
+
+    this.sessions.releaseLease(input.sessionId, input.owner);
+  }
+
+  static async run(args: RunConversationTurnArgs): Promise<RunConversationTurnResult> {
+    const contextInput: PrepareConversationTurnContextArgs = args;
+    const context = ConversationTurnContextBuilder.build(contextInput);
+    const { sessions, session, runtime, tools, toolNames, leaseOwner } = context;
+    const hostBridgeInput: CreateChatTurnHostBridgeArgs = args;
+    const hostBridge = ChatTurnHostBridgeBuilder.build(hostBridgeInput);
+    const source = `chat session ${session.id}`;
+    const preflightInput: TurnPreflightInput = args;
+    const agentLoopInput: AgentLoopTurnInput = args;
+    const persistenceInput: TurnPersistenceInput = args;
+    const memoryRuntime: TurnMemoryMaintenanceRuntimeInput = {
+      memoryRoot: runtime.memoryDir,
+      llm: runtime.llm,
+      source,
+      onEvent: hostBridge.onAgentLoopEvent,
+    };
+
+    try {
+      const preflight = await ConversationTurnPreflightService.prepare({
+        ...preflightInput,
+        sessionId: session.id,
+        fallbackHistory: session.history,
+        model: runtime.model,
+        systemContext: runtime.systemContext,
+        toolNames,
+        summarizer: { credentialSource: runtime.providerCredentialSource },
+        leaseOwner,
+        sessions,
+        hostBridge,
+      });
+      if (!preflight.ok) {
+        throw new Error(preflight.message);
+      }
+
+      const result = await runAgentLoop({
+        ...agentLoopInput,
+        goal: args.prompt,
+        model: runtime.model,
+        apiKey: runtime.apiKey,
+        stateDir: args.stateRoot,
+        memoryDir: runtime.memoryDir,
+        llm: runtime.llm,
+        tools,
+        includeDefaultTools: false,
+        history: preflight.historyForRun,
+        systemContext: runtime.systemContext,
+        onEvent: hostBridge.onAgentLoopEvent,
+        approveToolCall: hostBridge.approveToolCall,
+      });
+      const maintenanceMode = args.memoryMaintenanceMode ?? 'background';
+      const resultForPersistence =
+        maintenanceMode === 'inline'
+          ? await ConversationTurnMemoryMaintenance.runInline({
+              ...memoryRuntime,
+              result,
+            })
+          : result;
+
+      const persisted = await ConversationTurnPersistenceService.persistCompleted({
+        ...persistenceInput,
+        result: resultForPersistence,
+        session: preflight.session ?? session,
+        sessions,
+        model: runtime.model,
+        systemContext: runtime.systemContext,
+        toolNames,
+        historyForTokenEstimate: session.history,
+        credentialSource: runtime.providerCredentialSource,
+        hostBridge,
+      });
+
+      if (maintenanceMode === 'background') {
+        ConversationTurnMemoryMaintenance.scheduleBackground({
+          ...memoryRuntime,
+          trace: result.trace,
+          traceFile: persisted.traceFile,
+          sessionStoragePath: args.sessionStoragePath,
+          sessionId: session.id,
+          runId: result.state?.runId ?? `session-${session.id}`,
+        });
+      }
+
+      return {
+        outcome: resultForPersistence.outcome,
+        summary: persisted.summary,
+        session: persisted.session,
+      };
+    } finally {
+      EngineConversationTurnService.clearLeaseFromStorage(args.sessionStoragePath, session.id, leaseOwner);
+    }
+  }
+
+  static clearLeaseFromStorage(sessionStoragePath: string, sessionId: string, owner: ChatSessionLeaseOwner): void {
+    const repository = new FileChatSessionRepository({ sessionStoragePath });
+    const sessions = repository.list(true);
+    const session = sessions.find((candidate) => candidate.id === sessionId);
+    if (!session?.lease) {
+      return;
+    }
+
+    const released = ChatSessionLeases.release(session, owner);
+    if (released === session) {
+      return;
+    }
+
+    repository.save(sessions.map((candidate) => (
+      candidate.id === sessionId ? ChatSessionRecords.touch(released) : candidate
+    )));
+  }
+
+  private static hostInput(
+    normalizedHost: ReturnType<typeof ConversationEngineHostNormalizer.normalize>,
+    input: SubmitConversationTurnInput,
+  ): TurnHostInput {
+    return {
+      host: normalizedHost.turnHost,
+      onCompactionStatus: normalizedHost.onCompactionStatus,
+      onAssistantStream: normalizedHost.onAssistantStream,
+      onTraceEvent: normalizedHost.onTraceEvent,
+      shouldStop: input.shouldStop,
+    };
   }
 }

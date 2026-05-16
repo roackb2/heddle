@@ -1,5 +1,5 @@
 import type { RunResult } from '../../../../../index.js';
-import { runConversationTurn } from '../../../../../core/chat/engine/turns/run-conversation-turn.js';
+import { createConversationEngine } from '../../../../../core/chat/engine/index.js';
 import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
 import type { ChatSession } from '../../../state/types.js';
 import type { ChatRuntimeConfig } from '../../../utils/runtime.js';
@@ -74,23 +74,24 @@ export async function executeTuiOrdinaryTurn(args: {
   });
   const approvalPolicies = createTuiRememberedApprovalPolicies({ isProjectApproved });
 
-  // Desired shape: ordinary TUI turns should call
-  // createConversationEngine(...).turns.submit after the shared turn service
-  // exposes every TUI-required control, especially shouldStop, streaming,
-  // trace events, compaction status, approval policy, and the updated session.
-  // Until then, this is the remaining lower-level turn boundary violation.
-  const result = await runConversationTurn({
+  const engine = createConversationEngine({
     workspaceRoot: runtime.workspaceRoot,
     stateRoot: runtime.stateRoot,
-    traceDir: runtime.traceDir,
     sessionStoragePath: runtime.sessionCatalogFile,
-    sessionId,
-    prompt,
+    model: runtime.model,
     apiKey: runtime.apiKey,
     preferApiKey: runtime.preferApiKey,
     credentialStorePath: runtime.credentialStorePath,
     systemContext: runtime.systemContext,
     memoryMaintenanceMode: 'background',
+    apiKeyPresent: runtime.providerCredentialPresent,
+  });
+
+  const result = await engine.turns.submit({
+    sessionId,
+    prompt,
+    maxSteps: runtime.maxSteps,
+    searchIgnoreDirs: runtime.searchIgnoreDirs,
     host: {
       events: {
         onAgentLoopEvent: (event) => {
@@ -100,10 +101,14 @@ export async function executeTuiOrdinaryTurn(args: {
       },
       compaction: compactionPort,
       approvals: approvalPort,
+      assistant: {
+        onStream: runLoopEvents.onAssistantStream,
+      },
+      trace: {
+        onEvent: runLoopEvents.onTraceEvent,
+      },
     },
     approvalPolicies,
-    onAssistantStream: runLoopEvents.onAssistantStream,
-    onTraceEvent: runLoopEvents.onTraceEvent,
     shouldStop: () => state.interruptRequestedRef.current,
     abortSignal: turnAbortSignal,
     leaseOwner,

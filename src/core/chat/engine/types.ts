@@ -9,6 +9,7 @@ import type { ChatMessage, ReasoningEffort } from '../../llm/types.js';
 import type { TraceEvent } from '../../types.js';
 import type { ChatSessionLeaseOwner } from './sessions/leases/index.js';
 import type { ChatSession, ChatSessionRetention } from '../types.js';
+import type { ChatTurnCompactionPort } from './turns/host/index.js';
 
 export type ConversationEngineConfig = {
   workspaceRoot: string;
@@ -126,6 +127,7 @@ export type SubmitConversationTurnInput = {
   includePlanTool?: boolean;
   host?: ConversationEngineHost;
   abortSignal?: AbortSignal;
+  shouldStop?: RunAgentLoopOptions['shouldStop'];
   leaseOwner?: ChatSessionLeaseOwner;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   approvalPolicies?: ToolApprovalPolicy[];
@@ -140,6 +142,7 @@ export type ContinueConversationTurnInput = {
   includePlanTool?: boolean;
   host?: ConversationEngineHost;
   abortSignal?: AbortSignal;
+  shouldStop?: RunAgentLoopOptions['shouldStop'];
   leaseOwner?: ChatSessionLeaseOwner;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   approvalPolicies?: ToolApprovalPolicy[];
@@ -165,10 +168,11 @@ export type ConversationEngineHost = {
   approvals?: {
     requestToolApproval?: ToolApprovalSurface;
   };
-  compaction?: {
+  compaction?: ChatTurnCompactionPort & {
     onStatus?: (event: ConversationCompactionStatus) => void;
   };
   assistant?: {
+    onStream?: RunAgentLoopOptions['onAssistantStream'];
     onText?: (text: string) => void;
   };
   trace?: {
