@@ -2,9 +2,8 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createChatTurnPersistenceArtifacts } from '../../../core/chat/engine/turns/result.js';
+import { ConversationTurnArtifacts, ConversationTurnPersistenceService } from '../../../core/chat/engine/turns/persistence/index.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
-import { persistCompletedChatTurn } from '../../../core/chat/engine/turns/persistence.js';
 import { createTraceSummarizerRegistry } from '../../../core/observability/trace-summarizers.js';
 import type { AgentLoopResult } from '../../../core/runtime/agent-loop.js';
 import type { ChatSession } from '../../../core/chat/types.js';
@@ -31,7 +30,7 @@ describe('chat turn persistence', () => {
       ],
     };
 
-    const artifacts = await createChatTurnPersistenceArtifacts({
+    const artifacts = await ConversationTurnArtifacts.build({
       result,
       prompt: 'Read README.',
       session,
@@ -102,7 +101,7 @@ describe('chat turn persistence', () => {
       },
     };
 
-    const persisted = await persistCompletedChatTurn({
+    const persisted = await ConversationTurnPersistenceService.persistCompleted({
       result,
       prompt: 'Persist this turn.',
       session,

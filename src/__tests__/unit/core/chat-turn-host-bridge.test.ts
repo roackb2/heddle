@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createChatTurnHostBridge } from '../../../core/chat/engine/turns/host-bridge.js';
+import { ChatTurnHostBridgeBuilder } from '../../../core/chat/engine/turns/host/index.js';
 import type { ToolCall, ToolDefinition } from '../../../core/types.js';
 
 describe('chat turn host bridge', () => {
   it('fans out preflight compaction status to both legacy and host callbacks', () => {
     const onLegacyCompactionStatus = vi.fn();
     const onPreflightCompactionStatus = vi.fn();
-    const bridge = createChatTurnHostBridge({
+    const bridge = ChatTurnHostBridgeBuilder.build({
       onCompactionStatus: onLegacyCompactionStatus,
       host: {
         compaction: {
@@ -28,7 +28,7 @@ describe('chat turn host bridge', () => {
   it('fans out final compaction status to both legacy and host callbacks', () => {
     const onLegacyCompactionStatus = vi.fn();
     const onFinalCompactionStatus = vi.fn();
-    const bridge = createChatTurnHostBridge({
+    const bridge = ChatTurnHostBridgeBuilder.build({
       onCompactionStatus: onLegacyCompactionStatus,
       host: {
         compaction: {
@@ -50,7 +50,7 @@ describe('chat turn host bridge', () => {
 
   it('normalizes tool approval requests for the run loop', async () => {
     const requestToolApproval = vi.fn(async () => ({ approved: true, reason: 'approved by host' }));
-    const bridge = createChatTurnHostBridge({
+    const bridge = ChatTurnHostBridgeBuilder.build({
       host: {
         approvals: {
           requestToolApproval,

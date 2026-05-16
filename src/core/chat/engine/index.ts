@@ -1,6 +1,6 @@
 export { createConversationEngine } from './conversation-engine.js';
-export { runConversationTurn, clearConversationTurnLease } from './turns/run-conversation-turn.js';
-export type { RunConversationTurnArgs, RunConversationTurnResult } from './turns/run-conversation-turn.js';
+export { EngineConversationTurnService } from './turns/service.js';
+export type { RunConversationTurnArgs, RunConversationTurnResult } from './turns/types.js';
 export type {
   AppendConversationMessageInput,
   ClearConversationTurnLeaseInput,

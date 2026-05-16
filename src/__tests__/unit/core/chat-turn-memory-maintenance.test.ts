@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
-import { appendAgentLoopTrace, appendTurnMemoryMaintenanceEvents } from '../../../core/chat/engine/turns/memory-maintenance.js';
+import { ConversationTurnMemoryMaintenance } from '../../../core/chat/engine/turns/memory/index.js';
 import type { AgentLoopResult } from '../../../core/runtime/agent-loop.js';
 import type { TraceEvent } from '../../../core/types.js';
 
@@ -41,7 +41,7 @@ describe('chat turn memory maintenance helpers', () => {
       }],
     }]);
 
-    appendTurnMemoryMaintenanceEvents({
+    ConversationTurnMemoryMaintenance.appendEvents({
       traceFile,
       events: [{
         type: 'memory.maintenance_finished',
@@ -98,7 +98,7 @@ describe('chat turn memory maintenance helpers', () => {
       },
     };
 
-    const next = appendAgentLoopTrace(result, [{
+    const next = ConversationTurnMemoryMaintenance.appendAgentLoopTrace(result, [{
       type: 'memory.maintenance_failed',
       runId: 'memory-run-1',
       error: 'failed',

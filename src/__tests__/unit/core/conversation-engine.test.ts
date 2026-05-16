@@ -3,24 +3,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createConversationEngine } from '../../../core/chat/engine/conversation-engine.js';
+import { EngineConversationTurnService } from '../../../core/chat/engine/turns/service.js';
 import type { AgentLoopEvent } from '../../../core/runtime/events.js';
 import type { TraceEvent } from '../../../core/types.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
 
-const runConversationTurnMock = vi.hoisted(() => vi.fn());
-const clearConversationTurnLeaseMock = vi.hoisted(() => vi.fn());
-
-vi.mock('../../../core/chat/engine/turns/run-conversation-turn.js', () => ({
-  runConversationTurn: runConversationTurnMock,
-  clearConversationTurnLease: clearConversationTurnLeaseMock,
-}));
-
 describe('createConversationEngine', () => {
   beforeEach(() => {
-    runConversationTurnMock.mockReset();
-    clearConversationTurnLeaseMock.mockReset();
-    runConversationTurnMock.mockImplementation(async (args: { sessionStoragePath: string; sessionId: string }) => ({
+    vi.restoreAllMocks();
+    vi.spyOn(EngineConversationTurnService, 'run').mockImplementation(async (args) => ({
       outcome: 'done',
       summary: 'ok',
       session: new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
@@ -382,7 +374,8 @@ describe('createConversationEngine', () => {
       },
     });
 
-    const args = runConversationTurnMock.mock.calls[0]?.[0];
+    const runSpy = vi.mocked(EngineConversationTurnService.run);
+    const args = runSpy.mock.calls[0]?.[0];
     expect(args).toEqual(expect.objectContaining({
       workspaceRoot,
       stateRoot,
@@ -463,13 +456,14 @@ describe('createConversationEngine', () => {
     sessionRepository.save([stored, ...otherSessions]);
 
     await engine.turns.continue({ sessionId: session.id });
-    expect(runConversationTurnMock.mock.calls[0]?.[0]?.prompt).toBe('continue investigating');
+    const runSpy = vi.mocked(EngineConversationTurnService.run);
+    expect(runSpy.mock.calls[0]?.[0]?.prompt).toBe('continue investigating');
 
     await engine.turns.continue({ sessionId: session.id, prompt: 'override prompt' });
-    expect(runConversationTurnMock.mock.calls[1]?.[0]?.prompt).toBe('override prompt');
+    expect(runSpy.mock.calls[1]?.[0]?.prompt).toBe('override prompt');
   });
 
-  it('clears leases through the renamed low-level helper', () => {
+  it('clears leases through the turn service boundary', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const engine = createConversationEngine({
@@ -479,15 +473,26 @@ describe('createConversationEngine', () => {
       apiKeyPresent: true,
     });
 
+    expect(() => engine.turns.clearLease({
+      sessionId: 'missing',
+      owner: { ownerKind: 'daemon', ownerId: 'daemon-1', clientLabel: 'control plane' },
+    })).not.toThrow();
+
+    const session = engine.sessions.create({ id: 'session-1', name: 'Leased' });
+    engine.sessions.acquireLease(session.id, {
+      ownerKind: 'daemon',
+      ownerId: 'daemon-1',
+      clientLabel: 'control plane',
+    });
+
     engine.turns.clearLease({
       sessionId: 'session-1',
       owner: { ownerKind: 'daemon', ownerId: 'daemon-1', clientLabel: 'control plane' },
     });
 
-    expect(clearConversationTurnLeaseMock).toHaveBeenCalledWith(
-      join(stateRoot, 'chat-sessions.catalog.json'),
-      'session-1',
-      { ownerKind: 'daemon', ownerId: 'daemon-1', clientLabel: 'control plane' },
-    );
+    const sessionRepository = new FileChatSessionRepository({
+      sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
+    });
+    expect(sessionRepository.read('session-1', true)?.lease).toBeUndefined();
   });
 });

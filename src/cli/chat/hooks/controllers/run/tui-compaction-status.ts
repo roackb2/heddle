@@ -1,4 +1,4 @@
-import type { ChatTurnCompactionPort } from '../../../../../core/chat/engine/turns/host-bridge.js';
+import type { ChatTurnCompactionPort } from '../../../../../core/chat/engine/turns/host/index.js';
 import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
 import type { ChatMessage } from '../../../../../index.js';
 import type { ActionState } from '../useAgentRunController.js';

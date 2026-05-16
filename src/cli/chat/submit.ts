@@ -82,9 +82,11 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
 
       return compactChatHistoryWithArchive({
         history: session.history,
-        model: args.activeModel,
-        sessionId: session.id,
-        stateRoot: args.stateRoot,
+        runtime: {
+          model: args.activeModel,
+          stateRoot: args.stateRoot,
+        },
+        session,
         force: true,
         summarizer: { credentialSource: args.providerCredentialSource },
       }).then((compacted: Awaited<ReturnType<typeof compactChatHistoryWithArchive>>) => {

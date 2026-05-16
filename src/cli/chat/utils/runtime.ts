@@ -1,6 +1,5 @@
 import { join, resolve } from 'node:path';
 import { appendMemoryCatalogSystemContext, DEFAULT_OPENAI_MODEL, inferProviderFromModel } from '../../../index.js';
-import { saveTrace } from '../../../core/chat/engine/turns/trace.js';
 import type { LlmProvider } from '../../../index.js';
 import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
 import { resolveProviderCredentialStorePath } from '../../../core/auth/provider-credentials.js';
@@ -58,8 +57,6 @@ export type ChatRuntimeConfig = {
     jsonPath: string;
   };
 };
-
-export { saveTrace };
 
 export type { ProviderCredentialSource };
 
