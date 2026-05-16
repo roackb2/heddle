@@ -4,7 +4,7 @@ import type { ParsedHeartbeatArgs } from './args.js';
 import { booleanFlag, parsePositiveInt, stringFlag } from './args.js';
 import { formatDurationMs, parseDurationMs } from './duration.js';
 import type { HeartbeatCliOptions, HeartbeatCliStore } from './types.js';
-import { resolveWorkspaceContext } from '../../core/runtime/workspaces.js';
+import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 
 export async function runHeartbeatTaskCli(
   parsed: ParsedHeartbeatArgs,
@@ -48,7 +48,7 @@ async function addHeartbeatTask(
   const now = new Date();
   const workspaceRoot = options.workspaceRoot ?? process.cwd();
   const stateDir = options.stateDir ?? '.heddle';
-  const workspace = resolveWorkspaceContext({
+  const workspace = RuntimeWorkspaceService.resolveContext({
     workspaceRoot,
     stateRoot: resolve(workspaceRoot, stateDir),
   }).activeWorkspace;

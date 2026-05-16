@@ -28,7 +28,7 @@ import {
 } from '../../../core/tools/toolkits/knowledge/memory-notes.js';
 import { createMemoryCheckpointTool } from '../../../core/tools/toolkits/knowledge/memory-checkpoint.js';
 import { createRecordKnowledgeTool } from '../../../core/tools/toolkits/knowledge/record-knowledge.js';
-import { RuntimeToolService } from '../../../core/runtime/tools/index.js';
+import { RuntimeToolService } from '@/core/runtime/tools/index.js';
 import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
 
 describe('tool input validation', () => {

@@ -23,11 +23,11 @@ import {
   createLogger,
   RuntimeCredentialService,
 } from '../index.js';
-import type { ResolvedRuntimeHost } from '../core/runtime/runtime-hosts.js';
+import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 import { createConversationEngine } from '../core/chat/engine/index.js';
 import type { ConversationEngine } from '../core/chat/engine/index.js';
 import type { ChatSession, ChatSessionRetention } from '../core/chat/types.js';
-import { resolveWorkspaceContext } from '../core/runtime/workspaces.js';
+import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import { createDaemonControlPlaneClient } from './remote/control-plane-client.js';
 
 export type AskCliOptions = {
@@ -250,7 +250,7 @@ export class AskCliHost {
     apiKeyPresent: boolean;
   }): ChatSession {
     if (options.createSessionName !== undefined) {
-      const workspace = resolveWorkspaceContext({
+      const workspace = RuntimeWorkspaceService.resolveContext({
         workspaceRoot: options.workspaceRoot,
         stateRoot: options.stateRoot,
       }).activeWorkspace;
@@ -274,7 +274,7 @@ export class AskCliHost {
       return options.engine.sessions.require(options.sessionId);
     }
 
-    const workspace = resolveWorkspaceContext({
+    const workspace = RuntimeWorkspaceService.resolveContext({
       workspaceRoot: options.workspaceRoot,
       stateRoot: options.stateRoot,
     }).activeWorkspace;

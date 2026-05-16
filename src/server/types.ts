@@ -1,6 +1,6 @@
 import type { Logger } from 'pino';
-import type { DaemonOwnerRecord } from '../core/runtime/daemon-registry.js';
-import type { WorkspaceDescriptor } from '../core/runtime/workspaces.js';
+import type { DaemonOwnerRecord } from '@/core/runtime/daemon/index.js';
+import type { WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
 
 export type HeddleServerOptions = {
   workspaceRoot: string;

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createConversationEngine } from '../../../core/chat/engine/conversation-engine.js';
 import { EngineConversationTurnService } from '../../../core/chat/engine/turns/service.js';
-import type { AgentLoopEvent } from '../../../core/runtime/loop/index.js';
+import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../core/types.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';

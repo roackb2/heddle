@@ -3,22 +3,21 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  daemonStartConflictMessage,
-  embeddedCommandConflictMessage,
-  formatRuntimeHostNotice,
-  resolveWorkspaceRuntimeHost,
-} from '../../../core/runtime/runtime-hosts.js';
-import { upsertDaemonWorkspaceRegistration, resolveDaemonRegistryPath } from '../../../core/runtime/daemon-registry.js';
-import { ensureWorkspaceCatalog } from '../../../core/runtime/workspaces.js';
+  FileDaemonRegistryRepository,
+  RuntimeDaemonRegistryService,
+  RuntimeHostMessages,
+  RuntimeHostResolver,
+} from '@/core/runtime/daemon/index.js';
+import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 
 describe('runtime host discovery', () => {
   it('returns none when no daemon owner exists for the workspace', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-runtime-host-none-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    const registryPath = resolveDaemonRegistryPath(mkdtempSync(join(tmpdir(), 'heddle-runtime-host-none-home-')));
+    const registryPath = FileDaemonRegistryRepository.resolvePath(mkdtempSync(join(tmpdir(), 'heddle-runtime-host-none-home-')));
 
-    ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
-    const resolved = resolveWorkspaceRuntimeHost({ workspaceRoot, stateRoot, registryPath });
+    RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
+    const resolved = RuntimeHostResolver.resolveWorkspaceHost({ workspaceRoot, stateRoot, registryPath });
 
     expect(resolved).toMatchObject({
       kind: 'none',
@@ -29,10 +28,10 @@ describe('runtime host discovery', () => {
   it('returns active daemon ownership when the registry owner is fresh', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-runtime-host-daemon-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    const registryPath = resolveDaemonRegistryPath(mkdtempSync(join(tmpdir(), 'heddle-runtime-host-home-')));
-    const catalog = ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
+    const registryPath = FileDaemonRegistryRepository.resolvePath(mkdtempSync(join(tmpdir(), 'heddle-runtime-host-home-')));
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
 
-    upsertDaemonWorkspaceRegistration({
+    RuntimeDaemonRegistryService.upsertWorkspaceRegistration({
       registryPath,
       workspaces: catalog.workspaces,
       owner: {
@@ -48,7 +47,7 @@ describe('runtime host discovery', () => {
       },
     });
 
-    const resolved = resolveWorkspaceRuntimeHost({
+    const resolved = RuntimeHostResolver.resolveWorkspaceHost({
       workspaceRoot,
       stateRoot,
       registryPath,
@@ -65,18 +64,18 @@ describe('runtime host discovery', () => {
       },
       stale: false,
     });
-    expect(formatRuntimeHostNotice('chat', resolved)).toContain('Embedded chat still works here');
-    expect(embeddedCommandConflictMessage('chat', resolved)).toContain('Refusing embedded `chat`');
-    expect(daemonStartConflictMessage(resolved)).toContain('Refusing to start a second daemon');
+    expect(RuntimeHostMessages.formatNotice('chat', resolved)).toContain('Embedded chat still works here');
+    expect(RuntimeHostMessages.embeddedCommandConflict('chat', resolved)).toContain('Refusing embedded `chat`');
+    expect(RuntimeHostMessages.daemonStartConflict(resolved)).toContain('Refusing to start a second daemon');
   });
 
   it('marks daemon ownership stale when lastSeenAt is too old', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-runtime-host-stale-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    const registryPath = resolveDaemonRegistryPath(mkdtempSync(join(tmpdir(), 'heddle-runtime-host-stale-home-')));
-    const catalog = ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
+    const registryPath = FileDaemonRegistryRepository.resolvePath(mkdtempSync(join(tmpdir(), 'heddle-runtime-host-stale-home-')));
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
 
-    upsertDaemonWorkspaceRegistration({
+    RuntimeDaemonRegistryService.upsertWorkspaceRegistration({
       registryPath,
       workspaces: catalog.workspaces,
       owner: {
@@ -92,7 +91,7 @@ describe('runtime host discovery', () => {
       },
     });
 
-    const resolved = resolveWorkspaceRuntimeHost({
+    const resolved = RuntimeHostResolver.resolveWorkspaceHost({
       workspaceRoot,
       stateRoot,
       registryPath,
@@ -105,18 +104,18 @@ describe('runtime host discovery', () => {
       kind: 'daemon',
       stale: true,
     });
-    expect(formatRuntimeHostNotice('ask', resolved)).toBeUndefined();
-    expect(embeddedCommandConflictMessage('ask', resolved)).toBeUndefined();
-    expect(daemonStartConflictMessage(resolved)).toBeUndefined();
+    expect(RuntimeHostMessages.formatNotice('ask', resolved)).toBeUndefined();
+    expect(RuntimeHostMessages.embeddedCommandConflict('ask', resolved)).toBeUndefined();
+    expect(RuntimeHostMessages.daemonStartConflict(resolved)).toBeUndefined();
   });
 
   it('marks daemon ownership stale when the recorded daemon pid is gone', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-runtime-host-dead-pid-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    const registryPath = resolveDaemonRegistryPath(mkdtempSync(join(tmpdir(), 'heddle-runtime-host-dead-pid-home-')));
-    const catalog = ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
+    const registryPath = FileDaemonRegistryRepository.resolvePath(mkdtempSync(join(tmpdir(), 'heddle-runtime-host-dead-pid-home-')));
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
 
-    upsertDaemonWorkspaceRegistration({
+    RuntimeDaemonRegistryService.upsertWorkspaceRegistration({
       registryPath,
       workspaces: catalog.workspaces,
       owner: {
@@ -132,7 +131,7 @@ describe('runtime host discovery', () => {
       },
     });
 
-    const resolved = resolveWorkspaceRuntimeHost({
+    const resolved = RuntimeHostResolver.resolveWorkspaceHost({
       workspaceRoot,
       stateRoot,
       registryPath,
@@ -144,6 +143,6 @@ describe('runtime host discovery', () => {
       kind: 'daemon',
       stale: true,
     });
-    expect(daemonStartConflictMessage(resolved)).toBeUndefined();
+    expect(RuntimeHostMessages.daemonStartConflict(resolved)).toBeUndefined();
   });
 });

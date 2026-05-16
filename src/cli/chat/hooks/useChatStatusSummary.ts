@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { estimateBuiltInContextWindow } from '../../../core/llm/openai-models.js';
 import type { ReasoningEffort } from '../../../core/llm/types.js';
 import type { ProviderCredentialSource } from '../utils/runtime.js';
-import type { ResolvedRuntimeHost } from '../../../core/runtime/runtime-hosts.js';
+import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 import { currentActivityText } from '../utils/format.js';
 import type { ApprovalChoice, LiveEvent, PendingApproval } from '../state/types.js';
 import type { PlanItem } from '../../../core/tools/toolkits/internal/update-plan.js';

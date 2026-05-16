@@ -1,6 +1,6 @@
 import type { EventEmitter } from 'node:events';
 import type { ToolCall, ToolDefinition } from '../../../../index.js';
-import type { AgentLoopEvent } from '../../../../core/runtime/loop/index.js';
+import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { ControlPlaneSessionLiveEvent } from '../types.js';
 
 export class ControlPlaneChatSessionEventsController {

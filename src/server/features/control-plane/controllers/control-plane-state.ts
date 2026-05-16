@@ -1,8 +1,8 @@
 import { resolve } from 'node:path';
 import type { HeddleServerContext } from '../../../types.js';
 import type { ControlPlaneState } from '../types.js';
-import { readDaemonRegistry, registerKnownWorkspaces, resolveDaemonRegistryPath } from '../../../../core/runtime/daemon-registry.js';
-import { RuntimeCredentialService } from '../../../../core/runtime/credentials/index.js';
+import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
+import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { controlPlaneChatSessionsController } from './chat-sessions-controller.js';
 import { ControlPlaneHeartbeatController } from './heartbeat.js';
 import { ControlPlaneMemoryController } from './memory.js';
@@ -46,14 +46,14 @@ export class ControlPlaneStateController {
   }
 
   private static readKnownWorkspaces(context: HeddleServerContext): ControlPlaneState['knownWorkspaces'] {
-    const registryPath = context.runtimeHost?.registryPath ?? resolveDaemonRegistryPath();
-    registerKnownWorkspaces({
+    const registryPath = context.runtimeHost?.registryPath ?? FileDaemonRegistryRepository.resolvePath();
+    RuntimeDaemonRegistryService.registerKnownWorkspaces({
       registryPath,
       workspaces: context.workspaces,
     });
     const current = new Set(context.workspaces.map((workspace) => resolve(workspace.stateRoot)));
     const known = new Map<string, ControlPlaneState['knownWorkspaces'][number]>();
-    for (const record of readDaemonRegistry(registryPath).workspaces) {
+    for (const record of RuntimeDaemonRegistryService.read(registryPath).workspaces) {
       const stateRoot = resolve(record.workspace.stateRoot);
       if (current.has(stateRoot)) {
         continue;

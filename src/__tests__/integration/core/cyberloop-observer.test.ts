@@ -10,7 +10,7 @@ import {
   type HeddleRuntimeFrame,
 } from '../../../integrations/cyberloop.js';
 import { createCyberLoopKinematicsObserver } from '../../../integrations/cyberloop-kinematics.js';
-import type { AgentLoopEvent } from '../../../core/runtime/loop/index.js';
+import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 
 describe('CyberLoop observer integration', () => {
   it('converts host-facing runtime events into Heddle runtime frames', () => {

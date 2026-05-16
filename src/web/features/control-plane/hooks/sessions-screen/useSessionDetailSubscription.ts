@@ -7,7 +7,7 @@ import {
   type ConversationActivityHandlerMap,
   type ConversationCompactionStatus,
 } from '../../../../../core/observability/conversation-activity';
-import type { AgentLoopEvent } from '../../../../../core/runtime/loop';
+import type { AgentLoopEvent } from '@/core/runtime/loop';
 import type { TraceEvent } from '../../../../../core/types';
 import {
   fetchChatSessionDetail,

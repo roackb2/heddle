@@ -4,14 +4,11 @@ import { join } from 'node:path';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 import {
-  createWorkspaceDescriptor,
   DEFAULT_WORKSPACE_ID,
-  ensureWorkspaceCatalog,
-  renameWorkspaceDescriptor,
-  resolveWorkspaceCatalogPath,
-  setActiveWorkspace,
-} from '../../../core/runtime/workspaces.js';
-import { readDaemonRegistry, registerKnownWorkspaces, resolveDaemonRegistryPath } from '../../../core/runtime/daemon-registry.js';
+  FileWorkspaceRepository,
+  RuntimeWorkspaceService,
+} from '@/core/runtime/workspaces/index.js';
+import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import { controlPlaneRouter } from '../../../server/features/control-plane/router.js';
 
 describe('workspace catalog', () => {
@@ -19,8 +16,8 @@ describe('workspace catalog', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-catalog-'));
     const stateRoot = join(workspaceRoot, '.heddle');
 
-    const catalog = ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
-    const catalogPath = resolveWorkspaceCatalogPath(stateRoot);
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
+    const catalogPath = FileWorkspaceRepository.resolveCatalogPath(stateRoot);
 
     expect(existsSync(catalogPath)).toBe(true);
     expect(catalog).toMatchObject({
@@ -43,8 +40,8 @@ describe('workspace catalog', () => {
   it('exposes the active workspace in control-plane state', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-router-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    const registryPath = resolveDaemonRegistryPath(mkdtempSync(join(tmpdir(), 'heddle-workspace-router-home-')));
-    const catalog = ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
+    const registryPath = FileDaemonRegistryRepository.resolvePath(mkdtempSync(join(tmpdir(), 'heddle-workspace-router-home-')));
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
     const activeWorkspace = catalog.workspaces[0];
     if (!activeWorkspace) {
       throw new Error('expected default workspace');
@@ -86,15 +83,15 @@ describe('workspace catalog', () => {
     expect(state.heartbeat.tasks).toEqual([]);
     expect(state.memory.catalog).toBeDefined();
     expect(state.runtimeHost?.registryPath).toBe(registryPath);
-    expect(readDaemonRegistry(registryPath).workspaces.map((record) => record.workspace.stateRoot)).toContain(stateRoot);
+    expect(RuntimeDaemonRegistryService.read(registryPath).workspaces.map((record) => record.workspace.stateRoot)).toContain(stateRoot);
   });
 
   it('can create and switch the active workspace', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-switch-'));
     const stateRoot = join(workspaceRoot, '.heddle');
 
-    ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
-    const created = createWorkspaceDescriptor({
+    RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
+    const created = RuntimeWorkspaceService.createDescriptor({
       workspaceRoot,
       stateRoot,
       name: 'Second workspace',
@@ -106,7 +103,7 @@ describe('workspace catalog', () => {
     expect(created.workspaces).toHaveLength(2);
     expect(created.activeWorkspaceId).toBe(DEFAULT_WORKSPACE_ID);
 
-    const switched = setActiveWorkspace({
+    const switched = RuntimeWorkspaceService.setActive({
       workspaceRoot,
       stateRoot,
       workspaceId: 'workspace-2',
@@ -124,9 +121,9 @@ describe('workspace catalog', () => {
   it('can rename a workspace', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-rename-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
+    RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
 
-    const renamed = renameWorkspaceDescriptor({
+    const renamed = RuntimeWorkspaceService.rename({
       workspaceRoot,
       stateRoot,
       workspaceId: DEFAULT_WORKSPACE_ID,
@@ -140,8 +137,8 @@ describe('workspace catalog', () => {
   it('exposes router mutations for workspace create and switch', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-router-mutations-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    const registryPath = resolveDaemonRegistryPath(mkdtempSync(join(tmpdir(), 'heddle-workspace-router-mutations-home-')));
-    const catalog = ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
+    const registryPath = FileDaemonRegistryRepository.resolvePath(mkdtempSync(join(tmpdir(), 'heddle-workspace-router-mutations-home-')));
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
     const activeWorkspace = catalog.workspaces[0];
     if (!activeWorkspace) {
       throw new Error('expected default workspace');
@@ -183,7 +180,7 @@ describe('workspace catalog', () => {
     const renamed = await caller.workspaceRename({ workspaceId: DEFAULT_WORKSPACE_ID, name: 'Renamed default' });
     expect(renamed.workspace.name).toBe('Renamed default');
 
-    const registeredStateRoots = readDaemonRegistry(registryPath).workspaces.map((record) => record.workspace.stateRoot);
+    const registeredStateRoots = RuntimeDaemonRegistryService.read(registryPath).workspaces.map((record) => record.workspace.stateRoot);
     expect(registeredStateRoots).toContain(stateRoot);
     expect(registeredStateRoots).toContain(join(workspaceRoot, 'second', '.heddle'));
   });
@@ -192,15 +189,15 @@ describe('workspace catalog', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-known-current-'));
     const otherRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-known-other-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    const registryPath = resolveDaemonRegistryPath(mkdtempSync(join(tmpdir(), 'heddle-workspace-known-home-')));
-    const catalog = ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
-    const otherCatalog = ensureWorkspaceCatalog({ workspaceRoot: otherRoot, stateRoot: join(otherRoot, '.heddle') });
+    const registryPath = FileDaemonRegistryRepository.resolvePath(mkdtempSync(join(tmpdir(), 'heddle-workspace-known-home-')));
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
+    const otherCatalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot: otherRoot, stateRoot: join(otherRoot, '.heddle') });
     const activeWorkspace = catalog.workspaces[0];
     if (!activeWorkspace) {
       throw new Error('expected default workspace');
     }
-    registerKnownWorkspaces({ registryPath, workspaces: catalog.workspaces });
-    registerKnownWorkspaces({ registryPath, workspaces: otherCatalog.workspaces });
+    RuntimeDaemonRegistryService.registerKnownWorkspaces({ registryPath, workspaces: catalog.workspaces });
+    RuntimeDaemonRegistryService.registerKnownWorkspaces({ registryPath, workspaces: otherCatalog.workspaces });
 
     const caller = controlPlaneRouter.createCaller({
       workspaceRoot,
@@ -234,7 +231,7 @@ describe('workspace catalog', () => {
     writeFileSync(join(appRoot, 'package.json'), '{}\n');
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-browse-current-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    const catalog = ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
     const activeWorkspace = catalog.workspaces[0];
     if (!activeWorkspace) {
       throw new Error('expected default workspace');

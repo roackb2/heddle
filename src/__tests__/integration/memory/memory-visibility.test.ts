@@ -14,7 +14,7 @@ import {
   repairMissingMemoryCatalogs,
   validateMemoryWorkspace,
 } from '../../../core/memory/validation.js';
-import { ensureWorkspaceCatalog } from '../../../core/runtime/workspaces.js';
+import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import { controlPlaneRouter } from '../../../server/features/control-plane/router.js';
 
 describe('memory visibility', () => {
@@ -62,7 +62,7 @@ describe('memory visibility', () => {
     const memoryRoot = join(stateRoot, 'memory');
     bootstrapMemoryWorkspace({ memoryRoot });
     await writeFile(join(memoryRoot, 'operations', 'verification.md'), '# Verification\n\nRun `yarn build`.\n', 'utf8');
-    const catalog = ensureWorkspaceCatalog({ workspaceRoot, stateRoot });
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
     const activeWorkspace = catalog.workspaces[0];
     if (!activeWorkspace) {
       throw new Error('expected default workspace');

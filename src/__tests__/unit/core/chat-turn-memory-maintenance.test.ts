@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import { ConversationTurnMemoryMaintenance } from '../../../core/chat/engine/turns/memory/index.js';
-import type { AgentLoopResult } from '../../../core/runtime/loop/index.js';
+import type { AgentLoopResult } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../core/types.js';
 
 describe('chat turn memory maintenance helpers', () => {

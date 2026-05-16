@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { formatConversationActivityForTui, toLiveEvent } from '../../../cli/chat/adapters/conversation-activity-adapter.js';
 import { projectAgentLoopEventToConversationActivities, summarizeToolCall } from '../../../core/observability/conversation-activity.js';
-import type { AgentLoopEvent } from '../../../core/runtime/loop/index.js';
+import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../types.js';
 
 describe('chat activity formatting', () => {

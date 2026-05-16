@@ -11,7 +11,7 @@ import {
   type HeartbeatTaskStore,
 } from '../../../index.js';
 import type { AgentHeartbeatResult } from '@/core/heartbeat/heartbeat.js';
-import { AgentLoopCheckpointService, type AgentLoopCheckpoint } from '../../../core/runtime/loop/index.js';
+import { AgentLoopCheckpointService, type AgentLoopCheckpoint } from '@/core/runtime/loop/index.js';
 
 const NOW = new Date('2026-04-13T00:00:00.000Z');
 

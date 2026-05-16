@@ -1,6 +1,6 @@
 import type { TraceEvent } from '../../../../../index.js';
 import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
-import type { AgentLoopEvent } from '../../../../../core/runtime/loop/index.js';
+import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import {
   projectAgentLoopEventToConversationActivities,
   projectTraceEventToConversationActivities,

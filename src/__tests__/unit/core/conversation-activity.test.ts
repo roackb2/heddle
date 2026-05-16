@@ -6,7 +6,7 @@ import {
   summarizeToolCall,
   summarizeToolResult,
 } from '../../../core/observability/conversation-activity.js';
-import type { AgentLoopEvent } from '../../../core/runtime/loop/index.js';
+import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../core/types.js';
 
 describe('conversation activity projection', () => {

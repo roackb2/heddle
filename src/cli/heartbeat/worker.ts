@@ -12,7 +12,7 @@ import { booleanFlag, parsePositiveInt, stringFlag } from './args.js';
 import { formatDurationMs, parseDurationMs } from './duration.js';
 import { printAgentLoopEvent, printSchedulerEvent } from './output.js';
 import type { HeartbeatCliOptions, HeartbeatCliStore } from './types.js';
-import { resolveWorkspaceContext } from '../../core/runtime/workspaces.js';
+import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 
 const DEFAULT_MODEL = 'gpt-5.1-codex-mini';
 const DEFAULT_HEARTBEAT_TASK_ID = 'default';
@@ -78,7 +78,7 @@ export async function startHeartbeatCli(
   const now = new Date();
   const taskText = stringFlag(parsed.flags, 'task') ?? stringFlag(parsed.flags, 'goal') ?? existing?.task ?? DEFAULT_HEARTBEAT_TASK;
   const workspaceRoot = options.workspaceRoot ?? process.cwd();
-  const workspace = resolveWorkspaceContext({
+  const workspace = RuntimeWorkspaceService.resolveContext({
     workspaceRoot,
     stateRoot: resolve(workspaceRoot, options.stateDir ?? '.heddle'),
   }).activeWorkspace;

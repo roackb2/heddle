@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { ConversationTurnArtifacts, ConversationTurnPersistenceService } from '../../../core/chat/engine/turns/persistence/index.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import { createTraceSummarizerRegistry } from '../../../core/observability/trace-summarizers.js';
-import type { AgentLoopResult } from '../../../core/runtime/loop/index.js';
+import type { AgentLoopResult } from '@/core/runtime/loop/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
 import type { RunResult } from '../../../core/types.js';
 
