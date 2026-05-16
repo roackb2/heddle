@@ -60,7 +60,7 @@ export type TurnSubmitInput = Pick<
 
 export type TurnHostInput = Pick<
   RunConversationTurnArgs,
-  'host' | 'onCompactionStatus' | 'onAssistantStream' | 'onTraceEvent' | 'shouldStop'
+  'host' | 'onAssistantStream' | 'onTraceEvent' | 'shouldStop'
 >;
 
 export type TurnPreflightInput = Pick<

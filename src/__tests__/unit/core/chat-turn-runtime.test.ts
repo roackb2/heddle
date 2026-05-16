@@ -263,13 +263,8 @@ describe('chat turn preparation modules', () => {
       sessionStoragePath,
       sessions: [session],
       session,
-      prepared: {
-        ok: true,
-        preflightHistory: [
-          { role: 'user', content: 'Earlier prompt' },
-          { role: 'assistant', content: 'Earlier answer' },
-        ],
-        historyForRun: [
+      compacted: {
+        history: [
           { role: 'user', content: 'Earlier prompt' },
           { role: 'assistant', content: 'Earlier answer' },
         ],

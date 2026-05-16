@@ -21,7 +21,7 @@ export class ConversationTurnPersistenceService {
       summarizer: { credentialSource: args.credentialSource },
       createTurnId: () => `server-turn-${Date.now()}`,
       onCompactionStatus: (event) => {
-        args.hostBridge.notifyFinalCompactionStatus(event);
+        args.host.onCompactionStatus?.(event, 'final');
         if (event.status === 'running') {
           ConversationTurnPersistenceService.persistFinalCompactionRunningSeed({
             ...args,

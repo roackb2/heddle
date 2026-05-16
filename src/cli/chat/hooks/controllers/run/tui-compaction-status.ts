@@ -1,5 +1,4 @@
-import type { ChatTurnCompactionPort } from '../../../../../core/chat/engine/turns/host/index.js';
-import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
+import type { ConversationEngineHost, ConversationSessionService } from '../../../../../core/chat/engine/types.js';
 import type { ChatMessage } from '../../../../../index.js';
 import type { ActionState } from '../useAgentRunController.js';
 
@@ -14,7 +13,7 @@ export function createTuiCompactionStatusPort(args: {
   sessionId: string;
   sessionService: ConversationSessionService;
   refreshSessions: () => void;
-}): ChatTurnCompactionPort & {
+}): NonNullable<ConversationEngineHost['compaction']> & {
   handleWithSourceHistory: (event: TuiCompactionStatusEvent, sourceHistory: ChatMessage[]) => void;
 } {
   const { state, sessionId, sessionService, refreshSessions } = args;

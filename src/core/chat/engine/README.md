@@ -52,7 +52,6 @@ should expose one answer rather than letting each host improvise.
 - Put normalized config, path defaults, and engine-wide defaults in `config.ts`.
 - Put persisted session lifecycle behavior in `sessions/service.ts` and related
   `sessions/*` modules.
-- Put lower-level turn-host bridge fanout in `turns/host/`.
 - Put engine host normalization and `ConversationActivity` projection in
   `turns/host/`.
 - Put submit/continue behavior in `turns/service.ts`.

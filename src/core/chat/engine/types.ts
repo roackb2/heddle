@@ -9,7 +9,7 @@ import type { ChatMessage, ReasoningEffort } from '../../llm/types.js';
 import type { TraceEvent } from '../../types.js';
 import type { ChatSessionLeaseOwner } from './sessions/leases/index.js';
 import type { ChatSession, ChatSessionRetention } from '../types.js';
-import type { ChatTurnCompactionPort } from './turns/host/index.js';
+import type { ChatTurnHostPort } from './turns/host/index.js';
 
 export type ConversationEngineConfig = {
   workspaceRoot: string;
@@ -168,8 +168,10 @@ export type ConversationEngineHost = {
   approvals?: {
     requestToolApproval?: ToolApprovalSurface;
   };
-  compaction?: ChatTurnCompactionPort & {
+  compaction?: {
     onStatus?: (event: ConversationCompactionStatus) => void;
+    onPreflightCompactionStatus?: (event: ConversationCompactionStatus) => void;
+    onFinalCompactionStatus?: (event: ConversationCompactionStatus) => void;
   };
   assistant?: {
     onStream?: RunAgentLoopOptions['onAssistantStream'];
@@ -181,19 +183,7 @@ export type ConversationEngineHost = {
 };
 
 export type NormalizedConversationEngineHost = {
-  turnHost?: {
-    events?: {
-      onAgentLoopEvent?: (event: AgentLoopEvent) => void;
-    };
-    approvals?: {
-      requestToolApproval?: ToolApprovalSurface;
-    };
-    compaction?: {
-      onPreflightCompactionStatus?: (event: ConversationCompactionStatus) => void;
-      onFinalCompactionStatus?: (event: ConversationCompactionStatus) => void;
-    };
-  };
+  turnHost?: ChatTurnHostPort;
   onAssistantStream?: RunAgentLoopOptions['onAssistantStream'];
   onTraceEvent?: RunAgentLoopOptions['onTraceEvent'];
-  onCompactionStatus?: (event: ConversationCompactionStatus) => void;
 };

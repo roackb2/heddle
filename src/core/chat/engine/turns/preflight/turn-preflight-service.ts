@@ -1,4 +1,4 @@
-import { ConversationLines, ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
+import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { buildSessionCompactionRunningContext, compactChatHistoryWithArchive } from '@/core/chat/engine/history/compaction.js';
 import { ChatSessionLeases } from '@/core/chat/engine/sessions/leases/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
@@ -42,7 +42,7 @@ export class ConversationTurnPreflightService {
       request: compactionRequest,
       summarizer: args.summarizer,
       onStatusChange: (event) => {
-        args.hostBridge.notifyPreflightCompactionStatus(event);
+        args.host.onCompactionStatus?.(event, 'preflight');
         if (event.status === 'running' && leasedSession) {
           ConversationTurnPreflightService.persistRunningSeed({
             ...args,
@@ -56,10 +56,7 @@ export class ConversationTurnPreflightService {
     return ConversationTurnPreflightService.persistPrepared({
       ...args,
       session: persistedSession ?? ConversationTurnPreflightService.readRequiredFallbackSession(args.sessions, args.sessionId),
-      prepared: ConversationTurnPreflightService.buildPreparedTurn({
-        leasedSession,
-        preflightCompacted,
-      }),
+      compacted: preflightCompacted,
     });
   }
 
@@ -73,22 +70,18 @@ export class ConversationTurnPreflightService {
   }
 
   static persistPrepared(args: PersistPreparedChatSessionTurnArgs): Extract<PrepareChatSessionTurnResult, { ok: true }> {
-    const preparedSession =
-      args.prepared.session ??
-      ChatSessionRecords.touch({
-        ...args.session,
-        history: args.prepared.preflightHistory,
-        context: args.prepared.context,
-        archives: args.prepared.archives,
-        messages: ConversationLines.fromHistory(args.prepared.preflightHistory),
-      });
+    const preparedSession = ChatSessionRecords.touch(ChatSessionRecords.applyCompactedHistory({
+      session: args.session,
+      compacted: args.compacted,
+    }));
 
     new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
       .save(args.sessions.map((candidate) => (candidate.id === args.session.id ? preparedSession : candidate)));
 
     return {
-      ...args.prepared,
+      ok: true,
       session: preparedSession,
+      compacted: args.compacted,
     };
   }
 
@@ -108,33 +101,4 @@ export class ConversationTurnPreflightService {
     });
   }
 
-  private static buildPreparedTurn(args: {
-    leasedSession?: ChatSession;
-    preflightCompacted: Awaited<ReturnType<typeof compactChatHistoryWithArchive>>;
-  }): Extract<PrepareChatSessionTurnResult, { ok: true }> {
-    return {
-      ok: true,
-      session: args.leasedSession ? ConversationTurnPreflightService.applyCompactedHistory({
-        session: args.leasedSession,
-        compacted: args.preflightCompacted,
-      }) : undefined,
-      historyForRun: args.preflightCompacted.history,
-      preflightHistory: args.preflightCompacted.history,
-      context: args.preflightCompacted.context,
-      archives: args.preflightCompacted.archives,
-    };
-  }
-
-  private static applyCompactedHistory(args: {
-    session: ChatSession;
-    compacted: Awaited<ReturnType<typeof compactChatHistoryWithArchive>>;
-  }): ChatSession {
-    return {
-      ...args.session,
-      history: args.compacted.history,
-      context: args.compacted.context,
-      archives: args.compacted.archives,
-      messages: ConversationLines.fromHistory(args.compacted.history),
-    };
-  }
 }
