@@ -43,6 +43,8 @@ The intended structure is class-based by responsibility:
   persistence for compacted chat history.
 - session title prompting lives under `records/` as session metadata behavior;
   host auto-rename timing stays in the host.
+- `types.ts` at this folder root describes the main session service contract
+  and config shape.
 - each meaningful subfolder exposes a `types.ts` contract so callers can see
   the boundary shape without reading implementation details first.
 

@@ -21,7 +21,6 @@ import { ChatSessionLeases, type ChatSessionLeaseOwner } from './leases/index.js
 import { buildCompactionRunningContext } from '../history/compaction.js';
 import { ChatSessionRecords, ConversationLines } from './records/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
-import type { ConversationEngineConfig } from '../types.js';
 import type { NormalizedConversationEngineConfig } from '../config.js';
 import type {
   AppendConversationMessageInput,
@@ -33,16 +32,10 @@ import type {
   RestoreConversationCompactionStateInput,
   UpdateConversationSessionSettingsInput,
 } from '../types.js';
-
-type ConversationSessionServiceConfig = Pick<
-  ConversationEngineConfig,
-  'workspaceRoot' | 'stateRoot' | 'model' | 'reasoningEffort' | 'sessionStoragePath' | 'workspaceId' | 'apiKeyPresent'
->;
-
-type NormalizedConversationSessionServiceConfig = Pick<
-  NormalizedConversationEngineConfig,
-  'workspaceRoot' | 'stateRoot' | 'model' | 'reasoningEffort' | 'sessionStoragePath' | 'workspaceId' | 'apiKeyPresent'
->;
+import type {
+  ConversationSessionServiceConfig,
+  NormalizedConversationSessionServiceConfig,
+} from './types.js';
 
 export class FileConversationSessionService implements ConversationSessionService {
   private readonly repository: ChatSessionRepository;
