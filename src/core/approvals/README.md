@@ -23,8 +23,10 @@ requests, and host approval surfaces.
 Approval behavior currently exists in these places:
 
 - `src/core/agent/tools/tool-dispatcher.ts`
-- `src/core/approvals/surface.ts`
-- `src/core/approvals/remembered-rules.ts`
+- `src/core/approvals/service.ts`
+- `src/core/approvals/policies.ts`
+- `src/core/approvals/pending-approval.ts`
+- `src/core/approvals/remembered-rules/`
 - `src/cli/chat/hooks/controllers/run/tui-tool-approval.ts`
 - `src/server/features/control-plane/controllers/chat-sessions-controller.ts`
 - `src/server/features/control-plane/controllers/chat-session-events.ts`
@@ -32,25 +34,30 @@ Approval behavior currently exists in these places:
 ## Public Entry Points
 
 - `types.ts`: approval request, decision, policy, and surface types.
-- `policy-chain.ts`: ordered policy evaluation and request-to-human approval
-  resolution.
-- `default-policies.ts`: built-in tool, workspace-boundary, and remembered-rule policies.
-- `remembered-rules.ts`: project/user approval rule persistence and matching.
-- `surface.ts`: host human-approval surface interface.
+- `service.ts`: `ToolApprovalService` ordered policy evaluation and request-to-human
+  approval resolution.
+- `policies.ts`: `ToolApprovalPolicies` built-in tool, workspace-boundary,
+  remembered-rule, and human-surface policy constructors.
+- `pending-approval.ts`: `PendingToolApprovalRequests` host-neutral pending
+  approval promise/view primitive.
+- `remembered-rules/`: project approval rule service, repository, codec,
+  schemas, and types.
 
 ## Extension Points
 
 - Add a runtime approval rule by passing `approvalPolicies` into `AgentRunService.run`,
   `runAgentLoop`, `runAgentHeartbeat`, or `createConversationEngine(...).turns`.
 - Add host UI by implementing an approval surface in the host adapter layer.
-- Add remembered approval storage behind a small store interface.
+- Add remembered approval storage through `FileProjectApprovalRuleRepository` or
+  a focused repository with the same service/codec boundary.
 
 ## Common Changes
 
 - To add a policy, write table-driven tests that cover policy order and abstain
   behavior.
-- Remembered approvals live in `remembered-rules.ts`; the old TUI state path is
-  a compatibility re-export while host imports are migrated.
+- Remembered approval rule semantics live in `ProjectApprovalRules`; file IO
+  lives in `FileProjectApprovalRuleRepository`; persisted JSON validation lives
+  in `ProjectApprovalRuleCodec` and Zod schemas.
 - To change approval trace behavior, update trace/event tests and host projection
   tests.
 
@@ -66,3 +73,5 @@ Approval behavior currently exists in these places:
 - Approval policy belongs here; approval presentation belongs in hosts.
 - Use ordered policy arrays instead of nested branching.
 - Core approval code must not import from TUI, web, or server modules.
+- Meaningful behavior belongs on the owning approval class. Do not add thin
+  wrapper functions for old import paths.

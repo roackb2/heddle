@@ -1,16 +1,14 @@
-import { rememberedApprovalPolicy } from '../../../../../core/approvals/default-policies.js';
-import { resolveToolApproval } from '../../../../../core/approvals/policy-chain.js';
-import { summarizeToolCall } from '../../../../../core/observability/conversation-activity.js';
-import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '../../../../../core/tools/toolkits/shell-process/run-shell.js';
-import type { ToolCall, ToolResult } from '../../../../../index.js';
-import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../../../state/approval-rules.js';
-import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
+import { ToolApprovalPolicies, ToolApprovalService } from '@/core/approvals/index.js';
+import { ProjectApprovalRules } from '@/core/approvals/remembered-rules/index.js';
+import type { ConversationSessionService } from '@/core/chat/engine/types.js';
+import { summarizeToolCall } from '@/core/observability/conversation-activity.js';
+import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '@/core/tools/toolkits/shell-process/run-shell.js';
+import type { ToolCall, ToolDefinition, ToolResult } from '@/core/types.js';
 import { shouldFallbackToMutate } from '../../../utils/format.js';
 import type { ChatRuntimeConfig } from '../../../utils/runtime.js';
 import { beginTuiDirectShellAction, finishTuiDirectShellAction } from './tui-agent-turn-lifecycle.js';
 import { finalizeTuiDirectShellSuccess } from './tui-direct-shell-result.js';
 import type { ActionState } from '../useAgentRunController.js';
-import type { ToolDefinition } from '../../../../../index.js';
 import type { ChatSession } from '../../../state/types.js';
 
 export async function executeTuiDirectShell(args: {
@@ -106,10 +104,10 @@ export async function executeTuiDirectShell(args: {
           throw new Error('run_shell_mutate tool is not registered');
         }
 
-        const approval = await resolveToolApproval({
+        const approval = await ToolApprovalService.resolve({
           policies: [
             () => ({ type: 'request', reason: 'Direct shell mutation requires approval' }),
-            rememberedApprovalPolicy({
+            ToolApprovalPolicies.rememberedProjectRule({
               isApproved: ({ call }) => isProjectApproved(call),
             }),
           ],
@@ -119,12 +117,12 @@ export async function executeTuiDirectShell(args: {
             workspaceRoot: runtime.workspaceRoot,
           },
           requestHumanApproval: async () => await new Promise<{ approved: boolean; reason?: string }>((resolve) => {
-              const rememberedRule = createProjectApprovalRuleForCall(mutateCall);
+              const rememberedRule = ProjectApprovalRules.createForCall(mutateCall);
               state.setPendingApproval({
                 call: mutateCall,
                 tool: directShellTool,
                 rememberForProject: rememberedRule ? () => rememberProjectApproval(mutateCall) : undefined,
-                rememberLabel: rememberedRule ? describeProjectApprovalRule(rememberedRule) : undefined,
+                rememberLabel: rememberedRule ? ProjectApprovalRules.describe(rememberedRule) : undefined,
                 resolve,
               });
             }),

@@ -2,24 +2,14 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import type { ProjectApprovalRule } from '../../../core/approvals/remembered-rules.js';
-import {
-  createProjectApprovalRule,
-  createProjectApprovalRuleForCall,
-  describeProjectApprovalRule,
-  extractApprovalTarget,
-  findMatchingApprovalRule,
-  loadProjectApprovalRules,
-  normalizeApprovedCommand,
-  saveProjectApprovalRules,
-} from '../../../core/approvals/remembered-rules.js';
+import { FileProjectApprovalRuleRepository, ProjectApprovalRules, type ProjectApprovalRule } from '@/core/approvals/remembered-rules/index.js';
 
 describe('project approval rules', () => {
   it('normalizes repeated whitespace and canonicalizes common verification command aliases', () => {
-    expect(normalizeApprovedCommand('  yarn   test   --watch  ')).toBe('yarn test --watch');
-    expect(normalizeApprovedCommand('npx tsc --noEmit')).toBe('tsc --noEmit');
-    expect(normalizeApprovedCommand('./node_modules/.bin/tsc --noEmit')).toBe('tsc --noEmit');
-    expect(normalizeApprovedCommand('node_modules/.bin/vitest run src/__tests__/tools.test.ts')).toBe(
+    expect(ProjectApprovalRules.normalizeCommand('  yarn   test   --watch  ')).toBe('yarn test --watch');
+    expect(ProjectApprovalRules.normalizeCommand('npx tsc --noEmit')).toBe('tsc --noEmit');
+    expect(ProjectApprovalRules.normalizeCommand('./node_modules/.bin/tsc --noEmit')).toBe('tsc --noEmit');
+    expect(ProjectApprovalRules.normalizeCommand('node_modules/.bin/vitest run src/__tests__/tools.test.ts')).toBe(
       'vitest run src/__tests__/tools.test.ts',
     );
   });
@@ -27,55 +17,95 @@ describe('project approval rules', () => {
   it('saves and reloads project approval rules', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-approval-rules-'));
     const filePath = join(root, 'command-approvals.json');
-    const rule = createProjectApprovalRule('yarn test');
+    const rule = ProjectApprovalRules.createForCommand('yarn test');
 
-    saveProjectApprovalRules(filePath, [rule]);
+    new FileProjectApprovalRuleRepository(filePath).save([rule]);
 
-    expect(loadProjectApprovalRules(filePath)).toEqual([rule]);
+    expect(new FileProjectApprovalRuleRepository(filePath).list()).toEqual([rule]);
   });
 
   it('matches exact normalized mutate commands only', () => {
-    const rules = [createProjectApprovalRule('gh pr view 123')];
+    const rules = [ProjectApprovalRules.createForCommand('gh pr view 123')];
 
-    expect(findMatchingApprovalRule(rules, 'run_shell_mutate', { command: 'gh pr view 123' })).toBeDefined();
-    expect(findMatchingApprovalRule(rules, 'run_shell_mutate', { command: 'gh pr view 124' })).toBeUndefined();
-    expect(findMatchingApprovalRule(rules, 'run_shell_inspect', { command: 'yarn test' })).toBeUndefined();
+    expect(ProjectApprovalRules.findMatching({
+      rules,
+      tool: 'run_shell_mutate',
+      input: { command: 'gh pr view 123' },
+    })).toBeDefined();
+    expect(ProjectApprovalRules.findMatching({
+      rules,
+      tool: 'run_shell_mutate',
+      input: { command: 'gh pr view 124' },
+    })).toBeUndefined();
+    expect(ProjectApprovalRules.findMatching({
+      rules,
+      tool: 'run_shell_inspect',
+      input: { command: 'yarn test' },
+    })).toBeUndefined();
   });
 
   it('broadens low-risk workspace verification approvals to a command-family prefix', () => {
-    const rule = createProjectApprovalRule('yarn test src/__tests__/tools.test.ts');
+    const rule = ProjectApprovalRules.createForCommand('yarn test src/__tests__/tools.test.ts');
 
     expect(rule.mode).toBe('prefix');
     expect(rule.command).toBe('yarn test');
     expect(rule.scope).toBe('workspace');
     expect(rule.capability).toBe('verification');
-    expect(findMatchingApprovalRule([rule], 'run_shell_mutate', { command: 'yarn test' })).toBeDefined();
-    expect(findMatchingApprovalRule([rule], 'run_shell_mutate', { command: 'yarn test src/__tests__/run-agent.test.ts' })).toBeDefined();
-    expect(findMatchingApprovalRule([rule], 'run_shell_mutate', { command: 'yarn build' })).toBeUndefined();
+    expect(ProjectApprovalRules.findMatching({
+      rules: [rule],
+      tool: 'run_shell_mutate',
+      input: { command: 'yarn test' },
+    })).toBeDefined();
+    expect(ProjectApprovalRules.findMatching({
+      rules: [rule],
+      tool: 'run_shell_mutate',
+      input: { command: 'yarn test src/__tests__/run-agent.test.ts' },
+    })).toBeDefined();
+    expect(ProjectApprovalRules.findMatching({
+      rules: [rule],
+      tool: 'run_shell_mutate',
+      input: { command: 'yarn build' },
+    })).toBeUndefined();
   });
 
   it('broadens canonicalized tsc verification approvals to a reusable family rule', () => {
-    const rule = createProjectApprovalRule('npx tsc --noEmit');
+    const rule = ProjectApprovalRules.createForCommand('npx tsc --noEmit');
 
     expect(rule.mode).toBe('prefix');
     expect(rule.command).toBe('tsc');
     expect(rule.capability).toBe('verification');
-    expect(findMatchingApprovalRule([rule], 'run_shell_mutate', { command: 'tsc -p tsconfig.build.json --noEmit' })).toBeDefined();
-    expect(findMatchingApprovalRule([rule], 'run_shell_mutate', { command: './node_modules/.bin/tsc --pretty false' })).toBeDefined();
+    expect(ProjectApprovalRules.findMatching({
+      rules: [rule],
+      tool: 'run_shell_mutate',
+      input: { command: 'tsc -p tsconfig.build.json --noEmit' },
+    })).toBeDefined();
+    expect(ProjectApprovalRules.findMatching({
+      rules: [rule],
+      tool: 'run_shell_mutate',
+      input: { command: './node_modules/.bin/tsc --pretty false' },
+    })).toBeDefined();
   });
 
   it('broadens canonicalized vitest verification approvals to a reusable family rule', () => {
-    const rule = createProjectApprovalRule('./node_modules/.bin/vitest run src/__tests__/tools.test.ts');
+    const rule = ProjectApprovalRules.createForCommand('./node_modules/.bin/vitest run src/__tests__/tools.test.ts');
 
     expect(rule.mode).toBe('prefix');
     expect(rule.command).toBe('vitest run');
     expect(rule.capability).toBe('verification');
-    expect(findMatchingApprovalRule([rule], 'run_shell_mutate', { command: 'vitest run src/__tests__/run-agent.test.ts' })).toBeDefined();
-    expect(findMatchingApprovalRule([rule], 'run_shell_mutate', { command: 'node_modules/.bin/vitest run src/__tests__/chat-format.test.ts' })).toBeDefined();
+    expect(ProjectApprovalRules.findMatching({
+      rules: [rule],
+      tool: 'run_shell_mutate',
+      input: { command: 'vitest run src/__tests__/run-agent.test.ts' },
+    })).toBeDefined();
+    expect(ProjectApprovalRules.findMatching({
+      rules: [rule],
+      tool: 'run_shell_mutate',
+      input: { command: 'node_modules/.bin/vitest run src/__tests__/chat-format.test.ts' },
+    })).toBeDefined();
   });
 
   it('creates a project-wide edit_file approval rule from a tool call', () => {
-    const rule = createProjectApprovalRuleForCall({
+    const rule = ProjectApprovalRules.createForCall({
       id: 'tool-1',
       tool: 'edit_file',
       input: { path: 'src/example.ts', oldText: 'a', newText: 'b' },
@@ -88,16 +118,20 @@ describe('project approval rules', () => {
       scope: 'workspace',
       capability: 'file_edit',
     });
-    expect(findMatchingApprovalRule([rule!], 'edit_file', { path: 'src/another.ts', content: 'x', createIfMissing: true })).toBeDefined();
+    expect(ProjectApprovalRules.findMatching({
+      rules: [rule!],
+      tool: 'edit_file',
+      input: { path: 'src/another.ts', content: 'x', createIfMissing: true },
+    })).toBeDefined();
   });
 
   it('creates exact remembered approvals for outside-workspace read_file and list_files calls', () => {
-    const readRule = createProjectApprovalRuleForCall({
+    const readRule = ProjectApprovalRules.createForCall({
       id: 'tool-1',
       tool: 'read_file',
       input: { path: '../notes/summary.md' },
     });
-    const listRule = createProjectApprovalRuleForCall({
+    const listRule = ProjectApprovalRules.createForCall({
       id: 'tool-2',
       tool: 'list_files',
       input: { path: '../notes/' },
@@ -117,9 +151,21 @@ describe('project approval rules', () => {
       scope: 'outside_workspace',
       capability: 'file_inspection',
     });
-    expect(findMatchingApprovalRule([readRule!], 'read_file', { path: '../notes/summary.md' })).toBeDefined();
-    expect(findMatchingApprovalRule([readRule!], 'read_file', { path: '../notes/other.md' })).toBeUndefined();
-    expect(findMatchingApprovalRule([listRule!], 'list_files', { path: '../notes' })).toBeDefined();
+    expect(ProjectApprovalRules.findMatching({
+      rules: [readRule!],
+      tool: 'read_file',
+      input: { path: '../notes/summary.md' },
+    })).toBeDefined();
+    expect(ProjectApprovalRules.findMatching({
+      rules: [readRule!],
+      tool: 'read_file',
+      input: { path: '../notes/other.md' },
+    })).toBeUndefined();
+    expect(ProjectApprovalRules.findMatching({
+      rules: [listRule!],
+      tool: 'list_files',
+      input: { path: '../notes' },
+    })).toBeDefined();
   });
 
   it('loads remembered outside-workspace file inspection approvals from disk', () => {
@@ -146,7 +192,7 @@ describe('project approval rules', () => {
       },
     ], null, 2)}\n`);
 
-    expect(loadProjectApprovalRules(filePath)).toEqual([
+    expect(new FileProjectApprovalRuleRepository(filePath).list()).toEqual([
       {
         tool: 'read_file',
         mode: 'exact',
@@ -170,7 +216,7 @@ describe('project approval rules', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-approval-rules-legacy-'));
     const filePath = join(root, 'command-approvals.json');
 
-    saveProjectApprovalRules(filePath, [
+    new FileProjectApprovalRuleRepository(filePath).save([
       {
         tool: 'run_shell_mutate',
         mode: 'exact',
@@ -192,7 +238,7 @@ describe('project approval rules', () => {
 
     writeFileSync(legacyFilePath, `${JSON.stringify(legacyRules, null, 2)}\n`);
 
-    const loaded = loadProjectApprovalRules(legacyFilePath);
+    const loaded = new FileProjectApprovalRuleRepository(legacyFilePath).list();
     expect(loaded[0]).toMatchObject({
       tool: 'run_shell_mutate',
       mode: 'prefix',
@@ -237,29 +283,29 @@ describe('project approval rules', () => {
       createdAt: new Date().toISOString(),
     };
 
-    expect(describeProjectApprovalRule(editRule)).toContain('allow edit_file');
-    expect(describeProjectApprovalRule(readRule)).toBe('allow read_file for this project');
-    expect(describeProjectApprovalRule(prefixRule)).toContain('allow yarn lint command family for this project');
-    expect(describeProjectApprovalRule(exactRule)).toBe('allow exact command');
+    expect(ProjectApprovalRules.describe(editRule)).toContain('allow edit_file');
+    expect(ProjectApprovalRules.describe(readRule)).toBe('allow read_file for this project');
+    expect(ProjectApprovalRules.describe(prefixRule)).toContain('allow yarn lint command family for this project');
+    expect(ProjectApprovalRules.describe(exactRule)).toBe('allow exact command');
   });
 
   it('normalizes run shell and edit file approvals', () => {
-    expect(extractApprovalTarget('run_shell_mutate', '  yarn   test  ')).toBe('yarn test');
-    expect(extractApprovalTarget('run_shell_mutate', { command: ' yarn test src/ ' })).toBe('yarn test src/');
-    expect(extractApprovalTarget('run_shell_mutate', { command: '' })).toBeUndefined();
-    expect(extractApprovalTarget('run_shell_mutate', 42)).toBeUndefined();
+    expect(ProjectApprovalRules.extractTarget({ tool: 'run_shell_mutate', input: '  yarn   test  ' })).toBe('yarn test');
+    expect(ProjectApprovalRules.extractTarget({ tool: 'run_shell_mutate', input: { command: ' yarn test src/ ' } })).toBe('yarn test src/');
+    expect(ProjectApprovalRules.extractTarget({ tool: 'run_shell_mutate', input: { command: '' } })).toBeUndefined();
+    expect(ProjectApprovalRules.extractTarget({ tool: 'run_shell_mutate', input: 42 })).toBeUndefined();
 
-    expect(extractApprovalTarget('edit_file', '.')).toBe('.');
-    expect(extractApprovalTarget('edit_file', './')).toBe('.');
-    expect(extractApprovalTarget('edit_file', './src/')).toBe('./src');
-    expect(extractApprovalTarget('edit_file', { path: './foo/bar/' })).toBe('./foo/bar');
-    expect(extractApprovalTarget('edit_file', { path: '' })).toBeUndefined();
-    expect(extractApprovalTarget('read_file', { path: '../notes/summary.md' })).toBe('../notes/summary.md');
-    expect(extractApprovalTarget('list_files', { path: '../notes/' })).toBe('../notes');
+    expect(ProjectApprovalRules.extractTarget({ tool: 'edit_file', input: '.' })).toBe('.');
+    expect(ProjectApprovalRules.extractTarget({ tool: 'edit_file', input: './' })).toBe('.');
+    expect(ProjectApprovalRules.extractTarget({ tool: 'edit_file', input: './src/' })).toBe('./src');
+    expect(ProjectApprovalRules.extractTarget({ tool: 'edit_file', input: { path: './foo/bar/' } })).toBe('./foo/bar');
+    expect(ProjectApprovalRules.extractTarget({ tool: 'edit_file', input: { path: '' } })).toBeUndefined();
+    expect(ProjectApprovalRules.extractTarget({ tool: 'read_file', input: { path: '../notes/summary.md' } })).toBe('../notes/summary.md');
+    expect(ProjectApprovalRules.extractTarget({ tool: 'list_files', input: { path: '../notes/' } })).toBe('../notes');
   });
 
   it('falls back to unknown workspace rules when the shell command is blocked', () => {
-    const rule = createProjectApprovalRule('yarn test; echo hi');
+    const rule = ProjectApprovalRules.createForCommand('yarn test; echo hi');
 
     expect(rule.mode).toBe('exact');
     expect(rule.scope).toBe('workspace');
@@ -270,12 +316,12 @@ describe('project approval rules', () => {
   it('deduplicates duplicate rules when loading from disk', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-approval-rules-dedupe-'));
     const filePath = join(root, 'command-approvals.json');
-    const rule = createProjectApprovalRule('yarn lint');
+    const rule = ProjectApprovalRules.createForCommand('yarn lint');
     const duplicate = { ...rule, createdAt: new Date().toISOString() };
 
     writeFileSync(filePath, `${JSON.stringify([rule, duplicate], null, 2)}\n`);
 
-    const loaded = loadProjectApprovalRules(filePath);
+    const loaded = new FileProjectApprovalRuleRepository(filePath).list();
     expect(loaded).toHaveLength(1);
     expect(loaded[0].command).toBe(rule.command);
   });

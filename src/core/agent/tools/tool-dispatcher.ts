@@ -1,7 +1,6 @@
 import type { Logger } from 'pino';
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
-import { defaultToolApprovalPolicies } from '@/core/approvals/default-policies.js';
-import { resolveToolApproval } from '@/core/approvals/policy-chain.js';
+import { ToolApprovalPolicies, ToolApprovalService } from '@/core/approvals/index.js';
 import { executeTool } from '@/core/tools/execute-tool.js';
 import { createToolRegistry } from '@/core/tools/registry.js';
 import type { ToolCall, ToolDefinition, TraceEvent } from '@/core/types.js';
@@ -31,8 +30,8 @@ export class AgentToolDispatcher {
       return undefined;
     }
 
-    const approval = await resolveToolApproval({
-      policies: [...defaultToolApprovalPolicies, ...(args.approvalPolicies ?? [])],
+    const approval = await ToolApprovalService.resolve({
+      policies: [...ToolApprovalPolicies.default(), ...(args.approvalPolicies ?? [])],
       context: {
         call,
         tool,

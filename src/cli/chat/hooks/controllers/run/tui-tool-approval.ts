@@ -1,8 +1,7 @@
-import { rememberedApprovalPolicy } from '../../../../../core/approvals/default-policies.js';
-import { humanApprovalPolicy, requestToolApproval } from '../../../../../core/approvals/surface.js';
-import type { ToolApprovalPolicy, ToolApprovalSurface } from '../../../../../core/approvals/types.js';
-import { previewEditFileInput } from '../../../../../core/tools/toolkits/coding-files/edit-file.js';
-import { createProjectApprovalRuleForCall, describeProjectApprovalRule } from '../../../state/approval-rules.js';
+import { PendingToolApprovalRequests, ToolApprovalPolicies } from '@/core/approvals/index.js';
+import type { ToolApprovalPolicy, ToolApprovalSurface } from '@/core/approvals/types.js';
+import { ProjectApprovalRules } from '@/core/approvals/remembered-rules/index.js';
+import { previewEditFileInput } from '@/core/tools/toolkits/coding-files/edit-file.js';
 import type { ActionState } from '../useAgentRunController.js';
 
 type TuiApprovalCall = Parameters<ToolApprovalSurface>[0]['call'];
@@ -19,20 +18,20 @@ export function createTuiToolApprovalPort(args: {
         return { approved: false, reason: 'Missing approval request.' };
       }
       const { call, tool } = request;
-      const decision = await humanApprovalPolicy(async () => {
+      const decision = await ToolApprovalPolicies.humanSurface(async () => {
         const editPreview = call.tool === 'edit_file' ? await previewEditFileInput(call.input) : undefined;
 
-        return await requestToolApproval({
+        return await PendingToolApprovalRequests.request({
           call,
           tool,
           storePending: ({ resolve }) => {
-            const rememberedRule = createProjectApprovalRuleForCall(call);
+            const rememberedRule = ProjectApprovalRules.createForCall(call);
             state.setPendingApproval({
               call,
               tool,
               editPreview,
               rememberForProject: rememberedRule ? () => rememberProjectApproval(call) : undefined,
-              rememberLabel: rememberedRule ? describeProjectApprovalRule(rememberedRule) : undefined,
+              rememberLabel: rememberedRule ? ProjectApprovalRules.describe(rememberedRule) : undefined,
               resolve,
             });
           },
@@ -50,7 +49,7 @@ export function createTuiRememberedApprovalPolicies(args: {
   isProjectApproved: (call: TuiApprovalCall) => boolean;
 }): ToolApprovalPolicy[] {
   return [
-    rememberedApprovalPolicy({
+    ToolApprovalPolicies.rememberedProjectRule({
       isApproved: ({ call }) => args.isProjectApproved(call),
     }),
   ];

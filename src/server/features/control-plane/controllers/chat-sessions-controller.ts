@@ -14,23 +14,23 @@
  */
 import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
-import { FileChatSessionRepository } from '../../../../core/chat/engine/sessions/repository/index.js';
-import { createConversationEngine } from '../../../../core/chat/engine/conversation-engine.js';
+import { PendingToolApprovalRequests } from '@/core/approvals/index.js';
+import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
+import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type {
   ConversationEngine,
   ConversationEngineConfig,
   ConversationEngineHost,
   UpdateConversationSessionSettingsInput,
-} from '../../../../core/chat/engine/types.js';
-import { DEFAULT_OPENAI_MODEL } from '../../../../core/config.js';
-import { credentialModeFromSource, resolveCompatibleActiveModel } from '../../../../core/llm/model-policy.js';
-import { inferProviderFromModel } from '../../../../core/llm/providers.js';
-import { hasProviderCredentialForModel, resolveProviderCredentialSourceForModel } from '../../../../core/runtime/api-keys.js';
-import type { ChatSessionLeaseOwner } from '../../../../core/chat/engine/sessions/leases/index.js';
-import type { ChatSession, TurnSummary } from '../../../../core/chat/types.js';
-import { ConversationLines } from '../../../../core/chat/engine/sessions/records/index.js';
-import { requestToolApproval } from '../../../../core/approvals/surface.js';
-import type { ToolCall, ToolDefinition } from '../../../../core/types.js';
+} from '@/core/chat/engine/types.js';
+import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
+import { ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
+import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
+import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
+import { credentialModeFromSource, resolveCompatibleActiveModel } from '@/core/llm/model-policy.js';
+import { inferProviderFromModel } from '@/core/llm/providers.js';
+import { hasProviderCredentialForModel, resolveProviderCredentialSourceForModel } from '@/core/runtime/api-keys.js';
+import type { ToolCall, ToolDefinition } from '@/core/types.js';
 import { ControlPlaneChatSessionEventsController } from './chat-session-events.js';
 import { ControlPlaneChatSessionPresenter } from './chat-session-presenter.js';
 import { ControlPlaneChatTurnReviewPresenter } from './chat-turn-review-presenter.js';
@@ -271,7 +271,7 @@ export class ControlPlaneChatSessionsController {
       },
       approvals: {
         requestToolApproval: async ({ call, tool }: { call: ToolCall; tool: ToolDefinition }) => {
-          const decision = await requestToolApproval({
+          const decision = await PendingToolApprovalRequests.request({
             call,
             tool,
             createView: ControlPlaneChatSessionEventsController.createPendingApprovalView,

@@ -1,12 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  defaultToolApprovalPolicies,
-  isOutsideWorkspaceInspectionCall,
-  rememberedApprovalPolicy,
-} from '../../../core/approvals/default-policies.js';
-import { evaluateToolApprovalPolicies, resolveToolApproval } from '../../../core/approvals/policy-chain.js';
-import { humanApprovalPolicy } from '../../../core/approvals/surface.js';
-import type { ToolApprovalPolicyContext } from '../../../core/approvals/types.js';
+  ToolApprovalPolicies,
+  ToolApprovalService,
+} from '@/core/approvals/index.js';
+import type { ToolApprovalPolicyContext } from '@/core/approvals/types.js';
 
 function context(overrides: Partial<ToolApprovalPolicyContext> = {}): ToolApprovalPolicyContext {
   return {
@@ -26,7 +23,8 @@ function context(overrides: Partial<ToolApprovalPolicyContext> = {}): ToolApprov
 describe('approval policy chain', () => {
   it('returns the first policy decision and skips later policies', async () => {
     const seen: string[] = [];
-    const decision = await evaluateToolApprovalPolicies([
+    const decision = await ToolApprovalService.evaluate({
+      policies: [
       () => {
         seen.push('abstain');
         return undefined;
@@ -39,14 +37,19 @@ describe('approval policy chain', () => {
         seen.push('deny');
         return { type: 'deny', reason: 'too late' };
       },
-    ], context());
+      ],
+      context: context(),
+    });
 
     expect(decision).toEqual({ type: 'allow', reason: 'remembered' });
     expect(seen).toEqual(['abstain', 'allow']);
   });
 
   it('requests approval for explicit approval-gated tools', async () => {
-    await expect(evaluateToolApprovalPolicies(defaultToolApprovalPolicies, context())).resolves.toEqual({
+    await expect(ToolApprovalService.evaluate({
+      policies: ToolApprovalPolicies.default(),
+      context: context(),
+    })).resolves.toEqual({
       type: 'request',
       reason: 'run_shell_mutate requires approval',
     });
@@ -63,15 +66,20 @@ describe('approval policy chain', () => {
       },
     });
 
-    await expect(evaluateToolApprovalPolicies(defaultToolApprovalPolicies, readOutside)).resolves.toEqual({
+    await expect(ToolApprovalService.evaluate({
+      policies: ToolApprovalPolicies.default(),
+      context: readOutside,
+    })).resolves.toEqual({
       type: 'request',
       reason: 'read_file targets a path outside the workspace',
     });
-    expect(isOutsideWorkspaceInspectionCall(readOutside)).toBe(true);
+    expect(ToolApprovalPolicies.isOutsideWorkspaceInspectionCall(readOutside)).toBe(true);
   });
 
   it('abstains for normal non-approval tools', async () => {
-    await expect(evaluateToolApprovalPolicies(defaultToolApprovalPolicies, context({
+    await expect(ToolApprovalService.evaluate({
+      policies: ToolApprovalPolicies.default(),
+      context: context({
       call: { id: 'call-1', tool: 'read_file', input: { path: 'README.md' } },
       tool: {
         name: 'read_file',
@@ -79,11 +87,12 @@ describe('approval policy chain', () => {
         parameters: {},
         execute: async () => ({ ok: true }),
       },
-    }))).resolves.toBeUndefined();
+    }),
+    })).resolves.toBeUndefined();
   });
 
   it('turns remembered project approvals into allow decisions', async () => {
-    const decision = await rememberedApprovalPolicy({
+    const decision = await ToolApprovalPolicies.rememberedProjectRule({
       isApproved: ({ call }) => call.tool === 'run_shell_mutate',
     })(context());
 
@@ -94,7 +103,7 @@ describe('approval policy chain', () => {
   });
 
   it('wraps human approval surfaces as policy decisions', async () => {
-    await expect(humanApprovalPolicy(async () => ({
+    await expect(ToolApprovalPolicies.humanSurface(async () => ({
       approved: false,
       reason: 'Denied by human',
     }))(context())).resolves.toEqual({
@@ -115,10 +124,10 @@ describe('approval policy chain', () => {
       },
     });
 
-    await expect(resolveToolApproval({
+    await expect(ToolApprovalService.resolve({
       policies: [
-        ...defaultToolApprovalPolicies,
-        rememberedApprovalPolicy({
+        ...ToolApprovalPolicies.default(),
+        ToolApprovalPolicies.rememberedProjectRule({
           isApproved: ({ call }) => call.tool === 'read_file',
         }),
       ],
@@ -134,10 +143,10 @@ describe('approval policy chain', () => {
   it('lets later allow policies satisfy earlier request policies before human approval', async () => {
     const human = vi.fn(async () => ({ approved: false, reason: 'should not run' }));
 
-    await expect(resolveToolApproval({
+    await expect(ToolApprovalService.resolve({
       policies: [
         () => ({ type: 'request', reason: 'run_shell_mutate requires approval' }),
-        rememberedApprovalPolicy({
+        ToolApprovalPolicies.rememberedProjectRule({
           isApproved: ({ call }) => call.tool === 'run_shell_mutate',
         }),
       ],
@@ -156,7 +165,7 @@ describe('approval policy chain', () => {
       reason: `human approved: ${reason}`,
     }));
 
-    await expect(resolveToolApproval({
+    await expect(ToolApprovalService.resolve({
       policies: [
         () => ({ type: 'request', reason: 'run_shell_mutate requires approval' }),
       ],

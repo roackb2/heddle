@@ -252,21 +252,31 @@ export type { RunShellOptions } from './core/tools/toolkits/shell-process/run-sh
 
 // Approvals
 export {
-  defaultToolApprovalPolicies,
-  isOutsideWorkspaceInspectionCall,
-  outsideWorkspaceInspectionPolicy,
-  rememberedApprovalPolicy,
-  toolRequiresApprovalPolicy,
-} from './core/approvals/default-policies.js';
-export { evaluateToolApprovalPolicies, resolveToolApproval } from './core/approvals/policy-chain.js';
-export { humanApprovalPolicy, requestToolApproval } from './core/approvals/surface.js';
+  PendingToolApprovalRequests,
+  ToolApprovalPolicies,
+  ToolApprovalService,
+} from './core/approvals/index.js';
+export {
+  FileProjectApprovalRuleRepository,
+  ProjectApprovalRuleCodec,
+  ProjectApprovalRules,
+} from './core/approvals/remembered-rules/index.js';
 export type {
+  EvaluateToolApprovalPoliciesArgs,
+  PendingToolApprovalView,
+  RequestPendingToolApprovalArgs,
+  ResolveToolApprovalArgs,
   ToolApprovalDecision,
   ToolApprovalPolicy,
   ToolApprovalPolicyContext,
   ToolApprovalPolicyDecision,
   ToolApprovalSurface,
 } from './core/approvals/types.js';
+export type {
+  ApprovalMode,
+  ApprovalRuleTool,
+  ProjectApprovalRule,
+} from './core/approvals/remembered-rules/index.js';
 
 // Trace
 export { createTraceRecorder } from './core/trace/recorder.js';

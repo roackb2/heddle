@@ -1,15 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
-import type { ToolCall } from '../../../index.js';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ToolCall } from '@/core/types.js';
 import {
-  createProjectApprovalRuleForCall,
-  findMatchingApprovalRule,
-  loadProjectApprovalRules,
-  saveProjectApprovalRules,
+  FileProjectApprovalRuleRepository,
+  ProjectApprovalRules,
   type ProjectApprovalRule,
-} from '../state/approval-rules.js';
+} from '@/core/approvals/remembered-rules/index.js';
 
 export function useProjectApprovals(approvalsFile: string) {
-  const [rules, setRules] = useState<ProjectApprovalRule[]>(() => loadProjectApprovalRules(approvalsFile));
+  const repository = useMemo(() => new FileProjectApprovalRuleRepository(approvalsFile), [approvalsFile]);
+  const [rules, setRules] = useState<ProjectApprovalRule[]>(() => repository.list());
   const rulesRef = useRef<ProjectApprovalRule[]>(rules);
 
   useEffect(() => {
@@ -17,20 +16,28 @@ export function useProjectApprovals(approvalsFile: string) {
   }, [rules]);
 
   useEffect(() => {
-    saveProjectApprovalRules(approvalsFile, rules);
-  }, [approvalsFile, rules]);
+    repository.save(rules);
+  }, [repository, rules]);
 
   const isApproved = (call: ToolCall): boolean => {
-    return Boolean(findMatchingApprovalRule(rulesRef.current, call.tool, call.input));
+    return Boolean(ProjectApprovalRules.findMatching({
+      rules: rulesRef.current,
+      tool: call.tool,
+      input: call.input,
+    }));
   };
 
   const rememberApproval = (call: ToolCall) => {
-    const rule = createProjectApprovalRuleForCall(call);
+    const rule = ProjectApprovalRules.createForCall(call);
     if (!rule) {
       return;
     }
 
-    if (findMatchingApprovalRule(rulesRef.current, rule.tool, rule.command)) {
+    if (ProjectApprovalRules.findMatching({
+      rules: rulesRef.current,
+      tool: rule.tool,
+      input: rule.command,
+    })) {
       return;
     }
 
