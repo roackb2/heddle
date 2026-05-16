@@ -1,8 +1,11 @@
 import type { ChatMessage } from '@/core/llm/types.js';
-import type { ChatArchiveRecord, ChatContextStats, ChatSession } from '@/core/chat/types.js';
+import type { ChatSession } from '@/core/chat/types.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
-import type { ChatTurnHostBridge } from '../host/index.js';
-import type { compactChatHistoryWithArchive } from '@/core/chat/engine/history/compaction.js';
+import type { ChatTurnHostPort } from '../host/index.js';
+import type {
+  compactChatHistoryWithArchive,
+  CompactChatHistoryResult,
+} from '@/core/chat/engine/history/compaction.js';
 
 export type ChatTurnPreflightCompactionStatus = {
   status: 'running' | 'finished' | 'failed';
@@ -23,7 +26,7 @@ export type PrepareChatSessionTurnArgs = {
   summarizer: Parameters<typeof compactChatHistoryWithArchive>[0]['summarizer'];
   leaseOwner: ChatSessionLeaseOwner;
   sessions: ChatSession[];
-  hostBridge: Pick<ChatTurnHostBridge, 'notifyPreflightCompactionStatus'>;
+  host: Pick<ChatTurnHostPort, 'onCompactionStatus'>;
 };
 
 export type PreflightTurnCompactionRuntime = Pick<
@@ -49,17 +52,14 @@ export type PersistPreparedChatSessionTurnArgs = Pick<
   'sessionStoragePath' | 'sessions'
 > & {
   session: ChatSession;
-  prepared: Extract<PrepareChatSessionTurnResult, { ok: true }>;
+  compacted: CompactChatHistoryResult;
 };
 
 export type PrepareChatSessionTurnResult =
   | {
       ok: true;
-      session?: ChatSession;
-      historyForRun: ChatMessage[];
-      preflightHistory: ChatMessage[];
-      context: ChatContextStats;
-      archives: ChatArchiveRecord[];
+      session: ChatSession;
+      compacted: CompactChatHistoryResult;
     }
   | {
       ok: false;

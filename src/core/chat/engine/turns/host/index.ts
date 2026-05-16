@@ -1,11 +1,7 @@
-export { ChatTurnHostBridgeBuilder } from './host-bridge.js';
 export { ConversationEngineHostNormalizer } from './host-normalizer.js';
 export type {
-  ChatTurnApprovalPort,
-  ChatTurnApprovalRequest,
-  ChatTurnCompactionPort,
-  ChatTurnEventPort,
-  ChatTurnHostBridge,
+  ChatTurnCompactionPhase,
+  ChatTurnCompactionStatus,
   ChatTurnHostPort,
-  CreateChatTurnHostBridgeArgs,
+  ConversationEngineHostAdapterResult,
 } from './types.js';

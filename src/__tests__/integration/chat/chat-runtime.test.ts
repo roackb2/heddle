@@ -614,9 +614,7 @@ describe('conversation turn lifecycle', () => {
       memoryMaintenanceMode: 'none',
       approvalPolicies: [policy],
       host: {
-        approvals: {
-          requestToolApproval,
-        },
+        approveToolCall: (call, tool) => requestToolApproval({ call, tool }),
       },
     });
 

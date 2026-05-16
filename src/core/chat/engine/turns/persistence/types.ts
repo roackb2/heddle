@@ -4,7 +4,7 @@ import type { ChatMessage } from '@/core/llm/types.js';
 import type { ProviderCredentialSource } from '@/core/runtime/api-keys.js';
 import type { TraceSummarizerRegistry } from '@/core/observability/trace-summarizers.js';
 import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
-import type { ChatTurnHostBridge } from '../host/index.js';
+import type { ChatTurnHostPort } from '../host/index.js';
 import type { compactChatHistoryWithArchive } from '@/core/chat/engine/history/compaction.js';
 
 export type PersistChatTurnCompactionStatus = {
@@ -69,7 +69,7 @@ export type PersistCompletedChatTurnArgs = PersistCompletedChatTurnBase & {
   sessions: ChatSession[];
   sessionStoragePath: string;
   credentialSource: ProviderCredentialSource;
-  hostBridge: Pick<ChatTurnHostBridge, 'notifyFinalCompactionStatus'>;
+  host: Pick<ChatTurnHostPort, 'onCompactionStatus'>;
 };
 
 export type PersistFinalCompactionRunningSeedArgs = PersistCompletedChatTurnArgs & {

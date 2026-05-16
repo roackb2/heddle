@@ -7,7 +7,14 @@
  */
 import { truncate } from '@/core/utils/text.js';
 import type { ChatSession, ConversationLine } from '@/core/chat/types.js';
-import type { CreateChatSessionRecordOptions } from './types.js';
+import { countAssistantSteps, summarizeTrace } from '@/core/observability/trace-summarizers.js';
+import { ConversationLines } from './conversation-lines.js';
+import type {
+  ApplyCompactedChatSessionHistoryInput,
+  ApplyCompletedChatSessionTurnInput,
+  BuildChatTurnSummaryInput,
+  CreateChatSessionRecordOptions,
+} from './types.js';
 
 export class ChatSessionRecords {
   static createInitialMessages(apiKeyPresent: boolean): ConversationLine[] {
@@ -59,6 +66,40 @@ export class ChatSessionRecords {
     const latestTurn = session.turns[session.turns.length - 1];
     const latestPrompt = latestTurn ? truncate(latestTurn.prompt, 44) : 'no turns yet';
     return `${session.turns.length} turns • ${latestPrompt}`;
+  }
+
+  static buildTurnSummary(input: BuildChatTurnSummaryInput) {
+    return {
+      id: input.id,
+      prompt: input.prompt,
+      outcome: input.result.outcome,
+      summary: input.result.summary,
+      steps: countAssistantSteps(input.result.trace),
+      traceFile: input.traceFile,
+      events:
+        typeof input.traceSummarizerRegistry?.summarizeTrace === 'function'
+          ? input.traceSummarizerRegistry.summarizeTrace(input.result.trace)
+          : summarizeTrace(input.result.trace),
+    };
+  }
+
+  static applyCompactedHistory(input: ApplyCompactedChatSessionHistoryInput): ChatSession {
+    return {
+      ...input.session,
+      history: input.compacted.history,
+      context: input.compacted.context,
+      archives: input.compacted.archives,
+      messages: ConversationLines.fromHistory(input.compacted.history),
+    };
+  }
+
+  static applyCompletedTurn(input: ApplyCompletedChatSessionTurnInput): ChatSession {
+    return ChatSessionRecords.touch({
+      ...ChatSessionRecords.applyCompactedHistory(input),
+      lastContinuePrompt: input.prompt,
+      lease: undefined,
+      turns: [...input.session.turns, input.turn].slice(-8),
+    });
   }
 
   static isGenericName(name: string): boolean {

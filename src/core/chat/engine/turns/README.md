@@ -19,7 +19,7 @@ the class that owns that phase.
   session storage.
 - `memory/`: runs inline/background memory maintenance and records its trace
   evidence.
-- `host/`: normalizes host callbacks and bridges them into agent-loop ports.
+- `host/`: normalizes public host callbacks into turn-runtime ports.
 - `trace/`: writes persisted trace files.
 
 ## Boundary Rules

@@ -9,7 +9,7 @@ import type {
   SubmitConversationTurnInput,
   SubmitConversationTurnResult,
 } from '@/core/chat/engine/types.js';
-import { ConversationEngineHostNormalizer, ChatTurnHostBridgeBuilder } from './host/index.js';
+import { ConversationEngineHostNormalizer } from './host/index.js';
 import { ConversationTurnContextBuilder } from './context/index.js';
 import { ConversationTurnPreflightService } from './preflight/index.js';
 import { ConversationTurnMemoryMaintenance } from './memory/index.js';
@@ -19,7 +19,7 @@ import { ChatSessionLeases, type ChatSessionLeaseOwner } from '@/core/chat/engin
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { PrepareConversationTurnContextArgs } from './context/index.js';
-import type { CreateChatTurnHostBridgeArgs } from './host/index.js';
+import type { ChatTurnHostPort } from './host/index.js';
 import type {
   RunConversationTurnArgs,
   RunConversationTurnResult,
@@ -76,8 +76,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
     const contextInput: PrepareConversationTurnContextArgs = args;
     const context = ConversationTurnContextBuilder.build(contextInput);
     const { sessions, session, runtime, tools, toolNames, leaseOwner } = context;
-    const hostBridgeInput: CreateChatTurnHostBridgeArgs = args;
-    const hostBridge = ChatTurnHostBridgeBuilder.build(hostBridgeInput);
+    const host = EngineConversationTurnService.turnHost(args);
     const source = `chat session ${session.id}`;
     const preflightInput: TurnPreflightInput = args;
     const agentLoopInput: AgentLoopTurnInput = args;
@@ -86,7 +85,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
       memoryRoot: runtime.memoryDir,
       llm: runtime.llm,
       source,
-      onEvent: hostBridge.onAgentLoopEvent,
+      onEvent: host.onAgentLoopEvent,
     };
 
     try {
@@ -100,7 +99,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         summarizer: { credentialSource: runtime.providerCredentialSource },
         leaseOwner,
         sessions,
-        hostBridge,
+        host,
       });
       if (!preflight.ok) {
         throw new Error(preflight.message);
@@ -116,10 +115,10 @@ export class EngineConversationTurnService implements ConversationTurnService {
         llm: runtime.llm,
         tools,
         includeDefaultTools: false,
-        history: preflight.historyForRun,
+        history: preflight.compacted.history,
         systemContext: runtime.systemContext,
-        onEvent: hostBridge.onAgentLoopEvent,
-        approveToolCall: hostBridge.approveToolCall,
+        onEvent: host.onAgentLoopEvent,
+        approveToolCall: host.approveToolCall,
       });
       const maintenanceMode = args.memoryMaintenanceMode ?? 'background';
       const resultForPersistence =
@@ -140,7 +139,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         toolNames,
         historyForTokenEstimate: session.history,
         credentialSource: runtime.providerCredentialSource,
-        hostBridge,
+        host,
       });
 
       if (maintenanceMode === 'background') {
@@ -188,10 +187,23 @@ export class EngineConversationTurnService implements ConversationTurnService {
   ): TurnHostInput {
     return {
       host: normalizedHost.turnHost,
-      onCompactionStatus: normalizedHost.onCompactionStatus,
       onAssistantStream: normalizedHost.onAssistantStream,
       onTraceEvent: normalizedHost.onTraceEvent,
       shouldStop: input.shouldStop,
+    };
+  }
+
+  private static turnHost(args: Pick<RunConversationTurnArgs, 'host' | 'onCompactionStatus'>): ChatTurnHostPort {
+    if (!args.onCompactionStatus) {
+      return args.host ?? {};
+    }
+
+    return {
+      ...args.host,
+      onCompactionStatus: (event, phase) => {
+        args.onCompactionStatus?.(event);
+        args.host?.onCompactionStatus?.(event, phase);
+      },
     };
   }
 }

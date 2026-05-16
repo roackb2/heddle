@@ -1,9 +1,7 @@
 import { compactChatHistoryWithArchive, estimateChatHistoryTokens } from '@/core/chat/engine/history/compaction.js';
 import { formatChatFailureMessage } from '@/core/chat/failure-messages.js';
-import { countAssistantSteps, summarizeTrace } from '@/core/observability/trace-summarizers.js';
-import { ChatSessionRecords, ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
+import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { TraceWriter } from '../trace/index.js';
-import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
 import type {
   PersistChatTurnArtifacts,
   PersistChatTurnResult,
@@ -33,7 +31,13 @@ export class ConversationTurnArtifacts {
       onStatusChange: (event) => args.onCompactionStatus?.(event, sourceHistory),
     });
     const traceFile = TraceWriter.write(args.traceDir, args.result.trace);
-    const turn = ConversationTurnArtifacts.buildTurnSummary({ turn: args, traceFile });
+    const turn = ChatSessionRecords.buildTurnSummary({
+      id: args.createTurnId(),
+      prompt: args.prompt,
+      result: args.result,
+      traceFile,
+      traceSummarizerRegistry: args.traceSummarizerRegistry,
+    });
     const summary =
       args.result.outcome === 'error'
         ? formatChatFailureMessage(args.result.summary, {
@@ -52,45 +56,16 @@ export class ConversationTurnArtifacts {
 
   static async persist(args: PersistChatTurnResultArgs): Promise<PersistChatTurnResult> {
     const artifacts = await ConversationTurnArtifacts.build(args);
-    const session = ConversationTurnArtifacts.buildPersistedSession({ turn: args, artifacts });
+    const session = ChatSessionRecords.applyCompletedTurn({
+      session: args.session,
+      prompt: args.prompt,
+      compacted: artifacts.compacted,
+      turn: artifacts.turn,
+    });
 
     return {
       ...artifacts,
       session,
     };
-  }
-
-  private static buildTurnSummary(args: {
-    turn: PersistChatTurnResultArgs;
-    traceFile: string;
-  }): TurnSummary {
-    return {
-      id: args.turn.createTurnId(),
-      prompt: args.turn.prompt,
-      outcome: args.turn.result.outcome,
-      summary: args.turn.result.summary,
-      steps: countAssistantSteps(args.turn.result.trace),
-      traceFile: args.traceFile,
-      events:
-        typeof args.turn.traceSummarizerRegistry?.summarizeTrace === 'function'
-          ? args.turn.traceSummarizerRegistry.summarizeTrace(args.turn.result.trace)
-          : summarizeTrace(args.turn.result.trace),
-    };
-  }
-
-  private static buildPersistedSession(args: {
-    turn: PersistChatTurnResultArgs;
-    artifacts: PersistChatTurnArtifacts;
-  }): ChatSession {
-    return ChatSessionRecords.touch({
-      ...args.turn.session,
-      lastContinuePrompt: args.turn.prompt,
-      history: args.artifacts.compacted.history,
-      context: args.artifacts.compacted.context,
-      archives: args.artifacts.compacted.archives,
-      lease: undefined,
-      messages: ConversationLines.fromHistory(args.artifacts.compacted.history),
-      turns: [...args.turn.session.turns, args.artifacts.turn].slice(-8),
-    });
   }
 }

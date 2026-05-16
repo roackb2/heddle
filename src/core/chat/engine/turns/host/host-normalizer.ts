@@ -1,37 +1,42 @@
-import type {
-  ConversationEngineHost,
-  NormalizedConversationEngineHost,
-} from '@/core/chat/engine/types.js';
+import type { ConversationEngineHost } from '@/core/chat/engine/types.js';
 import {
   projectAgentLoopEventToConversationActivities,
   projectCompactionStatusToConversationActivities,
   projectTraceEventToConversationActivities,
 } from '@/core/observability/conversation-activity.js';
-import type { ChatTurnHostPort } from './types.js';
+import type { ChatTurnHostPort, ConversationEngineHostAdapterResult } from './types.js';
 
 /**
  * Normalizes host-facing engine callbacks into turn-runtime ports.
  */
 export class ConversationEngineHostNormalizer {
-  static normalize(host?: ConversationEngineHost): NormalizedConversationEngineHost {
+  static normalize(host?: ConversationEngineHost): ConversationEngineHostAdapterResult {
     const onActivity = host?.events?.onActivity;
     const onAgentLoopEvent = host?.events?.onAgentLoopEvent;
     const onTraceEvent = host?.trace?.onEvent;
+    const requestToolApproval = host?.approvals?.requestToolApproval;
 
     const turnHost: ChatTurnHostPort = {
-      events: {
-        onAgentLoopEvent: (event) => {
-          onAgentLoopEvent?.(event);
-          for (const activity of projectAgentLoopEventToConversationActivities(event)) {
-            onActivity?.(activity);
-          }
-        },
+      onAgentLoopEvent: (event) => {
+        onAgentLoopEvent?.(event);
+        for (const activity of projectAgentLoopEventToConversationActivities(event)) {
+          onActivity?.(activity);
+        }
       },
-      approvals: host?.approvals?.requestToolApproval
-        ? {
-            requestToolApproval: host.approvals.requestToolApproval,
-          }
+      approveToolCall: requestToolApproval
+        ? ((call, tool) => requestToolApproval({ call, tool }))
         : undefined,
+      onCompactionStatus: (event, phase) => {
+        host?.compaction?.onStatus?.(event);
+        if (phase === 'preflight') {
+          host?.compaction?.onPreflightCompactionStatus?.(event);
+        } else {
+          host?.compaction?.onFinalCompactionStatus?.(event);
+        }
+        for (const activity of projectCompactionStatusToConversationActivities(event)) {
+          onActivity?.(activity);
+        }
+      },
     };
 
     return {
@@ -45,12 +50,6 @@ export class ConversationEngineHostNormalizer {
       onTraceEvent: (event) => {
         onTraceEvent?.(event);
         for (const activity of projectTraceEventToConversationActivities(event)) {
-          onActivity?.(activity);
-        }
-      },
-      onCompactionStatus: (event) => {
-        host?.compaction?.onStatus?.(event);
-        for (const activity of projectCompactionStatusToConversationActivities(event)) {
           onActivity?.(activity);
         }
       },

@@ -392,10 +392,9 @@ describe('createConversationEngine', () => {
     }));
     expect(typeof args.onAssistantStream).toBe('function');
     expect(typeof args.onTraceEvent).toBe('function');
-    expect(typeof args.onCompactionStatus).toBe('function');
     expect(args.traceDir).toBe(join(stateRoot, 'traces'));
     expect(args.host).toBeTruthy();
-    expect(args.host.approvals.requestToolApproval).toBe(requestToolApproval);
+    expect(typeof args.host.approveToolCall).toBe('function');
 
     const loopEvent: AgentLoopEvent = {
       type: 'assistant.stream',
@@ -404,7 +403,7 @@ describe('createConversationEngine', () => {
       done: false,
       timestamp: '2026-05-03T00:00:00.000Z',
     };
-    args.host.events.onAgentLoopEvent(loopEvent);
+    args.host.onAgentLoopEvent(loopEvent);
     expect(onAgentLoopEvent).toHaveBeenCalledWith(loopEvent);
     expect(onActivity).toHaveBeenCalledWith(expect.objectContaining({ type: 'assistant.stream', text: 'partial' }));
 
@@ -421,7 +420,7 @@ describe('createConversationEngine', () => {
     expect(onTraceEvent).toHaveBeenCalledWith(traceEvent);
     expect(onActivity).toHaveBeenCalledWith(expect.objectContaining({ type: 'tool.call' }));
 
-    args.onCompactionStatus({ status: 'finished', summaryPath: '/tmp/summary.md' });
+    args.host.onCompactionStatus({ status: 'finished', summaryPath: '/tmp/summary.md' }, 'final');
     expect(onCompactionStatus).toHaveBeenCalledWith({ status: 'finished', summaryPath: '/tmp/summary.md' });
     expect(onActivity.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({
       type: 'compaction.finished',
