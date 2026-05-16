@@ -8,7 +8,7 @@
  * DTO projection.
  *
  * Current compromise:
- * the fake E2E shortcut below still mutates file-backed session storage
+ * the fake browser-integration shortcut below still mutates file-backed session storage
  * directly. Keep that path isolated until test fakes can be injected through
  * the engine turn boundary.
  */
@@ -110,8 +110,8 @@ export class ControlPlaneChatSessionsController {
   }
 
   async submitPrompt(args: SubmitChatPromptArgs) {
-    if (process.env.HEDDLE_E2E_FAKE_AGENT === '1') {
-      return await this.runFakeE2eSessionPrompt(args);
+    if (process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT === '1') {
+      return await this.runFakeBrowserIntegrationSessionPrompt(args);
     }
 
     return await this.runEngineTurn(args, async ({ engine, host, abortSignal }) => {
@@ -129,13 +129,13 @@ export class ControlPlaneChatSessionsController {
   }
 
   async continuePrompt(args: ContinueChatPromptArgs) {
-    if (process.env.HEDDLE_E2E_FAKE_AGENT === '1') {
+    if (process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT === '1') {
       const session = this.createEngine(args).sessions.require(args.sessionId);
       if (!session.history.length || !session.lastContinuePrompt) {
         throw new Error('There is no interrupted or prior run to continue yet.');
       }
 
-      return await this.runFakeE2eSessionPrompt({
+      return await this.runFakeBrowserIntegrationSessionPrompt({
         ...args,
         prompt: session.lastContinuePrompt,
       });
@@ -292,8 +292,8 @@ export class ControlPlaneChatSessionsController {
     };
   }
 
-  private async runFakeE2eSessionPrompt(args: SubmitChatPromptArgs) {
-    // Desired shape: fake E2E should become an injectable engine test host.
+  private async runFakeBrowserIntegrationSessionPrompt(args: SubmitChatPromptArgs) {
+    // Desired shape: fake browser integration should become an injectable engine test host.
     // This is the only control-plane session path that should mutate the file
     // repository directly.
     const repository = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath });
@@ -303,20 +303,20 @@ export class ControlPlaneChatSessionsController {
     }
 
     const timestamp = new Date().toISOString();
-    const assistantText = `Mocked E2E agent response: ${args.prompt}`;
+    const assistantText = `Mocked browser integration agent response: ${args.prompt}`;
     const nextHistory = [
       ...session.history,
       { role: 'user' as const, content: args.prompt },
       { role: 'assistant' as const, content: assistantText },
     ];
     const nextTurn: TurnSummary = {
-      id: `e2e-turn-${Date.now()}`,
+      id: `browser-integration-turn-${Date.now()}`,
       prompt: args.prompt,
       outcome: 'done',
       summary: assistantText,
       steps: 1,
-      traceFile: 'e2e-fake-trace.jsonl',
-      events: ['Mocked E2E session run completed.'],
+      traceFile: 'browser-integration-fake-trace.jsonl',
+      events: ['Mocked browser integration session run completed.'],
     };
     const updatedSession: ChatSession = {
       ...session,
@@ -340,7 +340,7 @@ export class ControlPlaneChatSessionsController {
       timestamp,
       event: {
         type: 'trace',
-        runId: `e2e-${args.sessionId}`,
+        runId: `browser-integration-${args.sessionId}`,
         timestamp,
         event: {
           type: 'run.finished',

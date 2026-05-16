@@ -30,7 +30,8 @@ Run the default fast test suites:
 yarn test
 ```
 
-That runs unit and integration suites, but excludes browser e2e by default.
+That runs unit and integration suites, but excludes browser integration by
+default.
 
 Run focused suites by test layer:
 
@@ -39,20 +40,27 @@ yarn test:unit
 yarn test:integration
 ```
 
-Run browser workflow tests explicitly:
+Run browser integration tests explicitly:
 
 ```bash
-yarn e2e:install
-yarn e2e
-yarn e2e:headed
-yarn test:e2e
+yarn test:browser-integration:install
+yarn test:browser-integration
+yarn test:browser-integration:headed
 ```
 
-`yarn e2e` runs Playwright against an isolated fixture daemon on `127.0.0.1:9876` and a Vite client on `127.0.0.1:5174`. It does not call live LLM providers. The first suite covers control-plane loading, route persistence, workspace switching, current Git diff review, and mobile navigation.
+`yarn test:browser-integration` runs Playwright against an isolated fixture
+daemon on `127.0.0.1:9876` and a Vite client on `127.0.0.1:5174`. It does not
+call live LLM providers; agent execution is mocked so the suite can run on every
+PR. The first suite covers control-plane loading, route persistence, workspace
+switching, current Git diff review, and mobile navigation.
 
-Use `yarn e2e:headed` when you want to watch the browser execute the workflow live.
+Use `yarn test:browser-integration:headed` when you want to watch the browser execute the workflow live.
 
-Use `yarn e2e:ui` when you want Playwright's timeline, trace, and selector tooling. If the preview pane shows `about:blank` after a completed run, select a specific test action in the left/timeline panels or rerun the selected test from the UI; the deterministic pass/fail result is still authoritative.
+Use `yarn test:browser-integration:ui` when you want Playwright's timeline,
+trace, and selector tooling. If the preview pane shows `about:blank` after a
+completed run, select a specific test action in the left/timeline panels or
+rerun the selected test from the UI; the deterministic pass/fail result is still
+authoritative.
 
 Run lint and type checking when you are making code changes:
 
@@ -144,7 +152,9 @@ High-level areas:
 - `src/web/`: control-plane frontend
 - `src/__tests__/unit/`: fast unit suites organized by product surface
 - `src/__tests__/integration/`: higher-level integration suites organized by product surface
-- `src/__tests__/e2e/`: Playwright/browser end-to-end suites excluded from default `yarn test`
+- `src/__tests__/browser-integration/`: Playwright browser suites that use a
+  fixture daemon and mocked agent execution
+- `src/__tests__/e2e/`: reserved for future true end-to-end suites
 - `examples/`: programmatic and workflow examples
 - `docs/`: user, operator, and project documentation
 

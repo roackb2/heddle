@@ -1,12 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const clientPort = process.env.HEDDLE_E2E_CLIENT_PORT ?? '5174';
-const controlPlaneUrl = process.env.HEDDLE_E2E_BASE_URL ?? `http://127.0.0.1:${clientPort}`;
-const serverPort = process.env.HEDDLE_E2E_SERVER_PORT ?? '9876';
+const clientPort = process.env.HEDDLE_BROWSER_INTEGRATION_CLIENT_PORT ?? '5174';
+const controlPlaneUrl = process.env.HEDDLE_BROWSER_INTEGRATION_BASE_URL ?? `http://127.0.0.1:${clientPort}`;
+const serverPort = process.env.HEDDLE_BROWSER_INTEGRATION_SERVER_PORT ?? '9876';
 const serverUrl = `http://127.0.0.1:${serverPort}`;
 
 export default defineConfig({
-  testDir: './src/__tests__/e2e',
+  testDir: './src/__tests__/browser-integration',
   timeout: 30_000,
   expect: {
     timeout: 10_000,
@@ -21,12 +21,12 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'node scripts/e2e-daemon.mjs',
+      command: 'node scripts/browser-integration-daemon.mjs',
       url: `${serverUrl}/trpc/controlPlane.state?batch=1&input=%7B%7D`,
       reuseExistingServer: false,
       timeout: 30_000,
       env: {
-        HEDDLE_E2E_SERVER_PORT: serverPort,
+        HEDDLE_BROWSER_INTEGRATION_SERVER_PORT: serverPort,
       },
     },
     {
