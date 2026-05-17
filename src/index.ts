@@ -271,38 +271,33 @@ export type { TraceRecorder } from './core/trace/recorder.js';
 export { formatTraceForConsole } from './core/trace/format.js';
 export {
   DEFAULT_TRACE_SUMMARIZERS,
-  countAssistantSteps,
-  createTraceSummarizerRegistry,
-  summarizeTrace,
-} from './core/observability/trace-summarizers.js';
+  ConversationActivityProjector,
+  ToolActivitySummarizer,
+  TraceSummaryService,
+} from './core/observability/index.js';
 export type {
+  ApplyConversationActivityHandlerArgs,
+  ConversationActivity,
+  ConversationActivityCorrelation,
+  ConversationActivityDerived,
+  ConversationActivityHandlerMap,
+  ConversationActivityOf,
+  ConversationCompactionStatus,
   TraceEventOfType,
   TraceEventType,
   TraceSummarizer,
   TraceSummarizerMap,
-  TraceSummarizerRegistry,
   TraceSummaryContext,
-} from './core/observability/trace-summarizers.js';
+  TraceSummaryValue,
+  ToolCallSummaryInput,
+  ToolResultSummaryOptions,
+  ToolSummaryOptions,
+} from './core/observability/index.js';
 export {
   TRACE_CORRELATION_FIELDS,
   TRACE_EVENT_DOMAINS,
   TRACE_EVENT_TYPES,
-} from './core/observability/semantic-conventions.js';
-export {
-  projectAgentLoopEventToConversationActivities,
-  projectCompactionStatusToConversationActivities,
-  projectTraceEventToConversationActivities,
-  applyConversationActivityHandler,
-  summarizeToolCall,
-  summarizeToolResult,
-} from './core/observability/conversation-activity.js';
-export type {
-  ConversationActivity,
-  ConversationActivityCorrelation,
-  ConversationActivityHandlerMap,
-  ConversationActivityOf,
-  ConversationCompactionStatus,
-} from './core/observability/conversation-activity.js';
+} from './core/observability/index.js';
 
 // Chat alpha API
 export { createConversationEngine } from './core/chat/engine/conversation-engine.js';

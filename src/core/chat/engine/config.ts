@@ -1,7 +1,7 @@
 import { join, resolve } from 'node:path';
 import type { ToolApprovalPolicy } from '../../approvals/types.js';
 import type { ReasoningEffort } from '../../llm/types.js';
-import type { TraceSummarizerRegistry } from '../../observability/trace-summarizers.js';
+import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { ConversationEngineConfig } from './types.js';
 
 export type NormalizedConversationEngineConfig = {
@@ -14,7 +14,7 @@ export type NormalizedConversationEngineConfig = {
   credentialStorePath?: string;
   systemContext?: string;
   memoryMaintenanceMode: 'none' | 'background' | 'inline';
-  traceSummarizerRegistry?: TraceSummarizerRegistry;
+  traceSummarizerRegistry?: TraceSummaryService;
   approvalPolicies?: ToolApprovalPolicy[];
   sessionStoragePath: string;
   memoryDir: string;

@@ -1,4 +1,4 @@
-import type { TraceEvent } from '../types.js';
+import type { TraceEvent } from '@/core/types.js';
 
 export const TRACE_EVENT_DOMAINS = {
   run: 'run',

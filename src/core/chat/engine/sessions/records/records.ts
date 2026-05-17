@@ -7,7 +7,7 @@
  */
 import { truncate } from '@/core/utils/text.js';
 import type { ChatSession, ConversationLine } from '@/core/chat/types.js';
-import { countAssistantSteps, summarizeTrace } from '@/core/observability/trace-summarizers.js';
+import { TraceSummaryService } from '@/core/observability/index.js';
 import { ConversationLines } from './conversation-lines.js';
 import type {
   ApplyCompactedChatSessionHistoryInput,
@@ -74,12 +74,12 @@ export class ChatSessionRecords {
       prompt: input.prompt,
       outcome: input.result.outcome,
       summary: input.result.summary,
-      steps: countAssistantSteps(input.result.trace),
+      steps: TraceSummaryService.default().countAssistantSteps(input.result.trace),
       traceFile: input.traceFile,
       events:
         typeof input.traceSummarizerRegistry?.summarizeTrace === 'function'
           ? input.traceSummarizerRegistry.summarizeTrace(input.result.trace)
-          : summarizeTrace(input.result.trace),
+          : TraceSummaryService.default().summarizeTrace(input.result.trace),
     };
   }
 

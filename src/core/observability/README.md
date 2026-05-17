@@ -1,15 +1,16 @@
 # Observability
 
 The observability domain is the home for trace/event conventions,
-summarizers, activity projections, and debugging evidence contracts.
+source-event-backed activity projection, trace summaries, and debugging
+evidence contracts.
 
 ## Owns
 
 - Stable trace/event naming conventions.
-- Trace summarizer registration.
+- Durable trace summary policy.
 - Conversation activity projection from runtime/trace events.
+- Compact tool call/result summaries used by activity and trace summaries.
 - Correlation-field conventions such as run id, session id, turn id, and step.
-- Compatibility guidance for trace files and host projections.
 
 ## Does Not Own
 
@@ -23,13 +24,13 @@ summarizers, activity projections, and debugging evidence contracts.
 Observability behavior currently exists in these places:
 
 - `src/core/types.ts` for `TraceEvent`.
-- `src/core/runtime/events.ts` for `AgentLoopEvent`.
+- `src/core/runtime/loop/types.ts` for `AgentLoopEvent`.
 - `src/core/trace/recorder.ts` and `src/core/trace/format.ts`.
 - `src/core/chat/engine/turns/trace/` for persisted chat trace files.
-- `src/core/observability/trace-summarizers.ts` for turn summary evidence.
-- `src/core/observability/semantic-conventions.ts` for shared trace names.
-- `src/core/observability/conversation-activity.ts` for shared host activity
-  projection, typed activity handlers, and tool call/result activity summaries.
+- `src/core/observability/summaries/` for turn summary evidence.
+- `src/core/observability/semantics/` for shared trace names.
+- `src/core/observability/activity/` for shared host activity projection,
+  typed activity handlers, and tool call/result activity summaries.
 - `src/cli/chat/hooks/controllers/run/tui-run-loop-events.ts` for TUI activity rendering.
 - `src/web/features/control-plane/hooks/sessions-screen/useSessionDetailSubscription.ts` for web activity rendering.
 - `src/server/features/control-plane/controllers/chat-session-events.ts`.
@@ -40,24 +41,30 @@ These APIs are exported from the package root for host authors. Treat the event
 names and core fields as stable, but treat new optional metadata fields as
 additive: consumers should ignore fields they do not use.
 
-- `semantic-conventions.ts`: event naming and correlation conventions.
-- `trace-summarizers.ts`: registry for durable trace event summaries. These
-  summaries feed turn/session evidence such as `TurnSummary.events`; they are
-  not the live TUI/web status layer.
-- `conversation-activity.ts`: shared host-agnostic activity projection and typed
-  handler-map helpers for frontend adapters. It also owns the small tool
-  call/result summaries used by projected activity. Activities include
-  correlation metadata such as `runId`, `step`, and `timestamp` when the source
-  event provides it.
+- `TraceSummaryService`: durable trace event summaries. These summaries feed
+  turn/session evidence such as `TurnSummary.events`; they are not the live
+  TUI/web status layer.
+- `ConversationActivityProjector`: shared host-agnostic activity projection and
+  typed handler-map dispatch for frontend adapters.
+- `ToolActivitySummarizer`: compact tool call/result labels. Reuse this instead
+  of reimplementing path/command/query summaries in host adapters.
+- `TRACE_EVENT_TYPES`, `TRACE_EVENT_DOMAINS`, and `TRACE_CORRELATION_FIELDS`:
+  event naming and correlation conventions.
+
+Projected activities retain the original source event under `activity.event`.
+Do not copy fields such as `tool`, `step`, `timestamp`, `ok`, or `summary` into
+another parallel activity shape. Add `activity.derived` only when this boundary
+does real work, such as tool summary generation or CyberLoop metric formatting.
 
 ## Extension Points
 
-- Add trace summaries by registering a summarizer for an event type.
+- Add trace summaries by constructing `new TraceSummaryService(...)` with a
+  domain-specific summarizer map.
 - Add UI activity by projecting raw runtime/trace events into host-agnostic
   activity events, then render those in TUI or web adapters.
 - Add host activity handlers with `satisfies ConversationActivityHandlerMap` so
   each handler receives the narrowed activity type for its key. Use
-  `applyConversationActivityHandler` for dispatch.
+  `ConversationActivityProjector.applyHandler(...)` for dispatch.
 - Add new trace event families with compatibility tests and documented
   attributes.
 
@@ -83,3 +90,6 @@ additive: consumers should ignore fields they do not use.
   changes them.
 - Use handler maps and registries for projections/summaries; avoid central
   switchboards growing without structure.
+- Keep activity vocabulary aligned with upstream event vocabulary. If a layer is
+  only passing fields through, pass the source event instead of reassigning each
+  field.

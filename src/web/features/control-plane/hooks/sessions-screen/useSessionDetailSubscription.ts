@@ -1,12 +1,10 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import {
-  applyConversationActivityHandler,
-  projectAgentLoopEventToConversationActivities,
-  projectCompactionStatusToConversationActivities,
+  ConversationActivityProjector,
   type ConversationActivity,
   type ConversationActivityHandlerMap,
   type ConversationCompactionStatus,
-} from '../../../../../core/observability/conversation-activity';
+} from '../../../../../core/observability';
 import type { AgentLoopEvent } from '@/core/runtime/loop';
 import type { TraceEvent } from '../../../../../core/types';
 import {
@@ -193,21 +191,21 @@ const webActivityHandlers = {
   'compaction.running': (activity, { liveMessages }) => {
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      activity.archivePath ? `Compacting earlier history… ${activity.archivePath}` : 'Compacting earlier history…',
+      activity.event.archivePath ? `Compacting earlier history… ${activity.event.archivePath}` : 'Compacting earlier history…',
       { pending: true, streaming: false },
     );
   },
   'compaction.failed': (activity, { liveMessages }) => {
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      activity.error ? `Compaction failed: ${activity.error}` : 'Compaction failed.',
+      activity.event.error ? `Compaction failed: ${activity.event.error}` : 'Compaction failed.',
       { pending: false, streaming: false },
     );
   },
   'compaction.finished': (activity, { liveMessages }) => {
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      activity.summaryPath ? `Compaction finished. Summary: ${activity.summaryPath}` : 'Compaction finished.',
+      activity.event.summaryPath ? `Compaction finished. Summary: ${activity.event.summaryPath}` : 'Compaction finished.',
       { pending: false, streaming: false },
     );
   },
@@ -218,20 +216,20 @@ const webActivityHandlers = {
   'tool.calling': (activity, { liveMessages }) => {
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      `Working… running ${activity.tool}${typeof activity.step === 'number' ? ` (step ${activity.step})` : ''}`,
+      `Working… running ${activity.event.tool}${typeof activity.correlation.step === 'number' ? ` (step ${activity.correlation.step})` : ''}`,
       { pending: true, streaming: true },
     );
   },
   'tool.completed': (activity, { liveMessages }) => {
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      `${activity.tool} finished${typeof activity.durationMs === 'number' ? ` in ${Math.round(activity.durationMs)}ms` : ''}`,
+      `${activity.event.tool} finished in ${Math.round(activity.event.durationMs)}ms`,
       { pending: false, streaming: false },
     );
   },
   'assistant.stream': (activity, { liveMessages }) => {
-    liveMessages.upsertLiveAssistantMessage(activity.text, activity.done);
-    if (activity.done) {
+    liveMessages.upsertLiveAssistantMessage(activity.event.text, activity.event.done);
+    if (activity.event.done) {
       liveMessages.removeLiveStatusMessage('live-run-status');
     }
   },
@@ -244,7 +242,7 @@ const webActivityHandlers = {
     setMemoryUpdating(true);
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      `Memory updating… ${activity.candidateCount} candidate${activity.candidateCount === 1 ? '' : 's'}`,
+      `Memory updating… ${activity.event.candidateIds.length} candidate${activity.event.candidateIds.length === 1 ? '' : 's'}`,
       { pending: true, streaming: false },
     );
   },
@@ -252,7 +250,7 @@ const webActivityHandlers = {
     setMemoryUpdating(false);
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      activity.summary ? `Memory updated. ${activity.summary}` : 'Memory updated.',
+      activity.event.summary ? `Memory updated. ${activity.event.summary}` : 'Memory updated.',
       { pending: false, streaming: false },
     );
     void refresh({ silent: true });
@@ -261,7 +259,7 @@ const webActivityHandlers = {
     setMemoryUpdating(false);
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      activity.error ? `Memory update failed: ${activity.error}` : 'Memory update failed.',
+      activity.event.error ? `Memory update failed: ${activity.event.error}` : 'Memory update failed.',
       { pending: false, streaming: false },
     );
   },
@@ -269,7 +267,7 @@ const webActivityHandlers = {
     void fetchPendingSessionApproval(sessionId).then((approval) => setPendingApproval(approval));
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      `Approval requested for ${activity.tool}${typeof activity.step === 'number' ? ` (step ${activity.step})` : ''}`,
+      `Approval requested for ${activity.event.call.tool}${typeof activity.correlation.step === 'number' ? ` (step ${activity.correlation.step})` : ''}`,
       { pending: true, streaming: false },
     );
   },
@@ -277,14 +275,14 @@ const webActivityHandlers = {
     setPendingApproval(null);
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      `Approval ${activity.approved ? 'granted' : 'denied'} for ${activity.tool}${activity.reason ? ` — ${activity.reason}` : ''}`,
+      `Approval ${activity.event.approved ? 'granted' : 'denied'} for ${activity.event.call.tool}${activity.event.reason ? ` — ${activity.event.reason}` : ''}`,
       { pending: false, streaming: false },
     );
   },
   'tool.fallback': (activity, { liveMessages }) => {
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
-      `Fallback: ${activity.fromTool} → ${activity.toTool}`,
+      `Fallback: ${activity.event.fromCall.tool} → ${activity.event.toCall.tool}`,
       { pending: true, streaming: false },
     );
   },
@@ -292,14 +290,18 @@ const webActivityHandlers = {
 
 function projectLiveSessionEvent(event: LiveSessionEvent): ConversationActivity[] {
   if (isCompactionStatusEvent(event)) {
-    return projectCompactionStatusToConversationActivities(event);
+    return ConversationActivityProjector.fromCompactionStatus(event);
   }
 
-  return isAgentLoopEventLike(event) ? projectAgentLoopEventToConversationActivities(event) : [];
+  return isAgentLoopEventLike(event) ? ConversationActivityProjector.fromAgentLoopEvent(event) : [];
 }
 
 function applyWebConversationActivity(activity: ConversationActivity, context: SessionEventContext) {
-  applyConversationActivityHandler(activity, webActivityHandlers, context);
+  ConversationActivityProjector.applyHandler({
+    activity,
+    handlers: webActivityHandlers,
+    context,
+  });
 }
 
 function isCompactionStatusEvent(event: LiveSessionEvent): event is ConversationCompactionStatus {

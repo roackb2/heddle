@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ConversationTurnArtifacts, ConversationTurnPersistenceService } from '../../../core/chat/engine/turns/persistence/index.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
-import { createTraceSummarizerRegistry } from '../../../core/observability/trace-summarizers.js';
+import { TraceSummaryService } from '@/core/observability/index.js';
 import type { AgentLoopResult } from '@/core/runtime/loop/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
 import type { RunResult } from '../../../core/types.js';
@@ -40,7 +40,7 @@ describe('chat turn persistence', () => {
       toolNames: ['read_file'],
       historyForTokenEstimate: session.history,
       summarizer: {},
-      traceSummarizerRegistry: createTraceSummarizerRegistry({
+      traceSummarizerRegistry: new TraceSummaryService({
         'tool.call': (event) => `custom summary for ${event.call.tool}`,
       }),
       createTurnId: () => 'turn-1',

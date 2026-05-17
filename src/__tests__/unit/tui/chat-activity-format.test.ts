@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { formatConversationActivityForTui, toLiveEvent } from '../../../cli/chat/adapters/conversation-activity-adapter.js';
-import { projectAgentLoopEventToConversationActivities, summarizeToolCall } from '../../../core/observability/conversation-activity.js';
+import { ConversationActivityProjector, ToolActivitySummarizer } from '@/core/observability/index.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../types.js';
 
 describe('chat activity formatting', () => {
   it('includes read_file paths in tool call summaries', () => {
-    expect(summarizeToolCall('read_file', { path: 'docs/framework-vision.md' })).toBe(
+    expect(ToolActivitySummarizer.summarizeCall({ tool: 'read_file', input: { path: 'docs/framework-vision.md' } })).toBe(
       'read_file (docs/framework-vision.md)',
     );
   });
 
   it('includes list_files paths in tool call summaries', () => {
-    expect(summarizeToolCall('list_files', { path: 'src/cli/chat' })).toBe(
+    expect(ToolActivitySummarizer.summarizeCall({ tool: 'list_files', input: { path: 'src/cli/chat' } })).toBe(
       'list_files (src/cli/chat)',
     );
   });
 
   it('includes search_files query and path in tool call summaries', () => {
-    expect(summarizeToolCall('search_files', { query: 'trace-1775195542429', path: '.heddle/traces' })).toBe(
+    expect(ToolActivitySummarizer.summarizeCall({ tool: 'search_files', input: { query: 'trace-1775195542429', path: '.heddle/traces' } })).toBe(
       'search_files ("trace-1775195542429" in .heddle/traces)',
     );
   });
@@ -68,7 +68,7 @@ describe('chat activity formatting', () => {
       timestamp: '2026-05-08T00:00:00.000Z',
     };
 
-    expect(projectAgentLoopEventToConversationActivities(event).map(formatConversationActivityForTui)).toEqual([
+    expect(ConversationActivityProjector.fromAgentLoopEvent(event).map(formatConversationActivityForTui)).toEqual([
       'running read_file (README.md)',
     ]);
   });

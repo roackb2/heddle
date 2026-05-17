@@ -1,4 +1,4 @@
-import { summarizeToolCall } from '../../../../../core/observability/conversation-activity.js';
+import { ToolActivitySummarizer } from '@/core/observability/index.js';
 import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
 import { appendDirectShellHistory, formatDirectShellResponse } from '../../../utils/format.js';
 import { ConversationCompactionService } from '../../../state/compaction.js';
@@ -68,8 +68,8 @@ export async function finalizeTuiDirectShellSuccess(args: {
       id: state.nextLocalId(),
       text:
         chosenResult.ok ?
-          `${summarizeToolCall(chosenCall.tool, chosenCall.input)} completed`
-        : `${summarizeToolCall(chosenCall.tool, chosenCall.input)} failed`,
+          `${ToolActivitySummarizer.summarizeCall(chosenCall)} completed`
+        : `${ToolActivitySummarizer.summarizeCall(chosenCall)} failed`,
     },
   ]);
   state.setStatus(chosenResult.ok ? 'Idle' : 'Stopped: error');

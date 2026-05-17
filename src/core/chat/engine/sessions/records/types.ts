@@ -1,5 +1,5 @@
 import type { ReasoningEffort } from '@/core/llm/types.js';
-import type { TraceSummarizerRegistry } from '@/core/observability/trace-summarizers.js';
+import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { ConversationCompactionResult } from '@/core/chat/engine/compaction/index.js';
 import type { RunResult } from '@/core/types.js';
 import type { ChatSession, ChatSessionRetention, TurnSummary } from '@/core/chat/types.js';
@@ -25,7 +25,7 @@ export type BuildChatTurnSummaryInput = {
   prompt: string;
   result: RunResult;
   traceFile: string;
-  traceSummarizerRegistry?: TraceSummarizerRegistry;
+  traceSummarizerRegistry?: TraceSummaryService;
 };
 
 export type ApplyCompactedChatSessionHistoryInput = {
