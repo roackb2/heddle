@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import {
   OPENAI_CODEX_RESPONSES_ENDPOINT,
 } from '../../../core/auth/openai-oauth.js';
-import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
+import { ProviderCredentialRepository } from '../../../core/auth/index.js';
 import { AnthropicAdapter } from '../../../core/llm/adapters/anthropic/index.js';
 import { LlmAdapterService } from '../../../core/llm/index.js';
 import { ModelPolicyService } from '../../../core/llm/models/index.js';
@@ -38,7 +38,7 @@ describe('llm adapter factory', () => {
 
   it('loads stored OpenAI OAuth credentials when creating an adapter without an API key', async () => {
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-llm-oauth-')), 'auth.json');
-    setStoredProviderCredential({
+    new ProviderCredentialRepository({ storePath }).set({
       type: 'oauth',
       provider: 'openai',
       accessToken: 'stored-access-token',
@@ -47,7 +47,7 @@ describe('llm adapter factory', () => {
       accountId: 'account-123',
       createdAt: '2026-05-17T00:00:00.000Z',
       updatedAt: '2026-05-17T00:00:00.000Z',
-    }, storePath);
+    });
     const requests: Array<{ url: string; headers: Headers }> = [];
     const adapter = LlmAdapterService.create({
       model: 'gpt-5.4',

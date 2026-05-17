@@ -2,10 +2,10 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { runAuthCli } from '../../../cli/auth.js';
-import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
+import { AuthCliController } from '../../../cli/auth.js';
+import { ProviderCredentialRepository } from '../../../core/auth/index.js';
 
-describe('runAuthCli', () => {
+describe('AuthCliController', () => {
   const writes: string[] = [];
   const originalWrite = process.stdout.write;
 
@@ -26,7 +26,7 @@ describe('runAuthCli', () => {
     captureStdout();
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-auth-cli-')), 'auth.json');
 
-    await runAuthCli('status', undefined, { storePath });
+    await AuthCliController.run('status', undefined, { storePath });
 
     expect(writes.join('')).toContain(`Auth store: ${storePath}`);
     expect(writes.join('')).toContain('Stored credentials: none');
@@ -35,7 +35,7 @@ describe('runAuthCli', () => {
   it('prints stored credential summaries without secrets and removes provider credentials', async () => {
     captureStdout();
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-auth-cli-')), 'auth.json');
-    setStoredProviderCredential({
+    new ProviderCredentialRepository({ storePath }).set({
       type: 'oauth',
       provider: 'openai',
       accessToken: 'access-secret',
@@ -44,10 +44,10 @@ describe('runAuthCli', () => {
       accountId: 'account-123',
       createdAt: '2026-04-27T00:00:00.000Z',
       updatedAt: '2026-04-27T00:00:00.000Z',
-    }, storePath);
+    });
 
-    await runAuthCli('status', undefined, { storePath });
-    await runAuthCli('logout', 'openai', { storePath });
+    await AuthCliController.run('status', undefined, { storePath });
+    await AuthCliController.run('logout', 'openai', { storePath });
 
     const output = writes.join('');
     expect(output).toContain('- openai: type=oauth account=account-123');
@@ -60,7 +60,7 @@ describe('runAuthCli', () => {
     captureStdout();
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-auth-cli-')), 'auth.json');
 
-    await runAuthCli('login', 'openai', {
+    await AuthCliController.run('login', 'openai', {
       storePath,
       openAiLogin: async () => ({
         type: 'oauth',
@@ -74,7 +74,7 @@ describe('runAuthCli', () => {
         label: 'ChatGPT/Codex OAuth',
       }),
     });
-    await runAuthCli('status', undefined, { storePath });
+    await AuthCliController.run('status', undefined, { storePath });
 
     const output = writes.join('');
     expect(output).toContain('Starting OpenAI ChatGPT/Codex OAuth login...');

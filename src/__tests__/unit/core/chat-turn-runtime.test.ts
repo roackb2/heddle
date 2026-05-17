@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
+import { ProviderCredentialRepository } from '../../../core/auth/index.js';
 import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import { ConversationTurnPreflightService } from '../../../core/chat/engine/turns/preflight/index.js';
@@ -117,7 +117,7 @@ describe('chat turn preparation modules', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-oauth-'));
     const credentialStorePath = join(root, 'auth.json');
     const now = '2026-05-02T00:00:00.000Z';
-    setStoredProviderCredential({
+    new ProviderCredentialRepository({ storePath: credentialStorePath }).set({
       type: 'oauth',
       provider: 'openai',
       accessToken: 'access-token',
@@ -126,7 +126,7 @@ describe('chat turn preparation modules', () => {
       accountId: 'account-123',
       createdAt: now,
       updatedAt: now,
-    }, credentialStorePath);
+    });
 
     const runtime = ConversationTurnRuntimeResolver.resolve({
       config: {

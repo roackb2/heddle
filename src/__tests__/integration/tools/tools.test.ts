@@ -29,7 +29,7 @@ import {
 import { createMemoryCheckpointTool } from '../../../core/tools/toolkits/knowledge/memory-checkpoint.js';
 import { createRecordKnowledgeTool } from '../../../core/tools/toolkits/knowledge/record-knowledge.js';
 import { RuntimeToolService } from '@/core/runtime/tools/index.js';
-import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
+import { ProviderCredentialRepository } from '../../../core/auth/index.js';
 
 describe('tool input validation', () => {
   it('rejects unexpected fields for list_files', async () => {
@@ -646,7 +646,7 @@ describe('webSearchTool', () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-web-search-oauth-success-'));
     const credentialStorePath = join(root, 'auth.json');
     writeFileSync(credentialStorePath, '{}\n');
-    setStoredProviderCredential({
+    new ProviderCredentialRepository({ storePath: credentialStorePath }).set({
       type: 'oauth',
       provider: 'openai',
       accessToken: 'access-token',
@@ -655,7 +655,7 @@ describe('webSearchTool', () => {
       accountId: 'account-123',
       createdAt: '2026-04-27T00:00:00.000Z',
       updatedAt: '2026-04-27T00:00:00.000Z',
-    }, credentialStorePath);
+    });
 
     const requests: Array<{ url: string; headers: Headers; body: string }> = [];
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
@@ -796,7 +796,7 @@ describe('viewImageTool', () => {
     const credentialStorePath = join(root, 'auth.json');
     await writeFile(imagePath, 'fake');
     writeFileSync(credentialStorePath, '{}\n');
-    setStoredProviderCredential({
+    new ProviderCredentialRepository({ storePath: credentialStorePath }).set({
       type: 'oauth',
       provider: 'openai',
       accessToken: 'access-token',
@@ -805,7 +805,7 @@ describe('viewImageTool', () => {
       accountId: 'account-123',
       createdAt: '2026-04-27T00:00:00.000Z',
       updatedAt: '2026-04-27T00:00:00.000Z',
-    }, credentialStorePath);
+    });
 
     const result = await createViewImageTool({
       model: 'o3',
@@ -832,7 +832,7 @@ describe('viewImageTool', () => {
     const credentialStorePath = join(root, 'auth.json');
     await writeFile(imagePath, 'fake-image-data');
     writeFileSync(credentialStorePath, '{}\n');
-    setStoredProviderCredential({
+    new ProviderCredentialRepository({ storePath: credentialStorePath }).set({
       type: 'oauth',
       provider: 'openai',
       accessToken: 'access-token',
@@ -841,7 +841,7 @@ describe('viewImageTool', () => {
       accountId: 'account-123',
       createdAt: '2026-04-27T00:00:00.000Z',
       updatedAt: '2026-04-27T00:00:00.000Z',
-    }, credentialStorePath);
+    });
 
     const requests: Array<{ url: string; headers: Headers; body: string }> = [];
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
@@ -908,7 +908,7 @@ describe('viewImageTool', () => {
     const credentialStorePath = join(root, 'auth.json');
     await writeFile(imagePath, 'fake-image-data');
     writeFileSync(credentialStorePath, '{}\n');
-    setStoredProviderCredential({
+    new ProviderCredentialRepository({ storePath: credentialStorePath }).set({
       type: 'oauth',
       provider: 'openai',
       accessToken: 'access-token',
@@ -917,7 +917,7 @@ describe('viewImageTool', () => {
       accountId: 'account-123',
       createdAt: '2026-04-27T00:00:00.000Z',
       updatedAt: '2026-04-27T00:00:00.000Z',
-    }, credentialStorePath);
+    });
 
     vi.stubGlobal('fetch', vi.fn(async () => {
       return new Response('', { status: 400 });

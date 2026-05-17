@@ -1,5 +1,5 @@
 import type { ChatSession } from './types.js';
-import type { OpenAiOAuthCredential } from '../../../core/auth/openai-oauth.js';
+import type { OpenAiOAuthCredential } from '@/core/auth/index.js';
 import type { ReasoningEffort } from '../../../core/llm/types.js';
 import type { ProviderCredentialSource } from '../utils/runtime.js';
 import { autocompleteSlashCommand, filterSlashCommandHints } from '../../../core/commands/slash/autocomplete.js';

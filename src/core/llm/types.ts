@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { AssistantDiagnostics, ToolCall, ToolDefinition } from '../types.js';
-import type { StoredProviderCredential } from '@/core/auth/provider-credentials.js';
+import type { StoredProviderCredential } from '@/core/auth/index.js';
 
 export type LlmStreamEvent =
   | { type: 'content.delta'; delta: string }

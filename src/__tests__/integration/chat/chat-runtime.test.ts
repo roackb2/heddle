@@ -7,7 +7,7 @@ import type { ChatSession } from '../../../cli/chat/state/types.js';
 import { resolveApiKeyForModel, resolveChatRuntimeConfig, resolveProviderCredentialSourceForModel } from '../../../cli/chat/utils/runtime.js';
 import { createLogger } from '../../../core/utils/logger.js';
 import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../index.js';
-import { setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
+import { ProviderCredentialRepository } from '../../../core/auth/index.js';
 import { EngineConversationTurnService } from '../../../core/chat/engine/turns/service.js';
 import { FileConversationSessionService } from '../../../core/chat/engine/sessions/service.js';
 import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
@@ -73,7 +73,7 @@ describe('resolveChatRuntimeConfig', () => {
     vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-chat-oauth-')), 'auth.json');
     const now = '2026-04-27T00:00:00.000Z';
-    setStoredProviderCredential({
+    new ProviderCredentialRepository({ storePath }).set({
       type: 'oauth',
       provider: 'openai',
       accessToken: 'access-token',
@@ -82,7 +82,7 @@ describe('resolveChatRuntimeConfig', () => {
       accountId: 'account-1234567890',
       createdAt: now,
       updatedAt: now,
-    }, storePath);
+    });
 
     const runtime = resolveChatRuntimeConfig({
       workspaceRoot: '/tmp/heddle-test',
@@ -125,7 +125,7 @@ describe('resolveChatRuntimeConfig', () => {
     vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-chat-prefer-key-')), 'auth.json');
     const now = '2026-04-27T00:00:00.000Z';
-    setStoredProviderCredential({
+    new ProviderCredentialRepository({ storePath }).set({
       type: 'oauth',
       provider: 'openai',
       accessToken: 'access-token',
@@ -134,7 +134,7 @@ describe('resolveChatRuntimeConfig', () => {
       accountId: 'account-1234567890',
       createdAt: now,
       updatedAt: now,
-    }, storePath);
+    });
 
     const runtime = resolveChatRuntimeConfig({
       workspaceRoot: '/tmp/heddle-test',
@@ -410,7 +410,7 @@ describe('control-plane shared chat runtime integration', () => {
     vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-control-plane-oauth-')), 'auth.json');
     const now = '2026-05-02T00:00:00.000Z';
-    setStoredProviderCredential({
+    new ProviderCredentialRepository({ storePath }).set({
       type: 'oauth',
       provider: 'openai',
       accessToken: 'access-token',
@@ -419,7 +419,7 @@ describe('control-plane shared chat runtime integration', () => {
       accountId: 'account-1234567890',
       createdAt: now,
       updatedAt: now,
-    }, storePath);
+    });
 
     const session = controlPlaneChatSessionsController.createSession({
       ...createControlPlaneSessionEngineArgs(),
@@ -435,7 +435,7 @@ describe('control-plane shared chat runtime integration', () => {
     vi.stubEnv('OPENAI_API_KEY', 'test-openai-key');
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-control-plane-api-key-')), 'auth.json');
     const now = '2026-05-02T00:00:00.000Z';
-    setStoredProviderCredential({
+    new ProviderCredentialRepository({ storePath }).set({
       type: 'oauth',
       provider: 'openai',
       accessToken: 'access-token',
@@ -444,7 +444,7 @@ describe('control-plane shared chat runtime integration', () => {
       accountId: 'account-1234567890',
       createdAt: now,
       updatedAt: now,
-    }, storePath);
+    });
 
     const session = controlPlaneChatSessionsController.createSession({
       ...createControlPlaneSessionEngineArgs(),

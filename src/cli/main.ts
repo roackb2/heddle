@@ -21,7 +21,7 @@ import {
   validateMemoryWorkspace,
 } from '../core/memory/validation.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
-import { runAuthCli } from './auth.js';
+import { AuthCliController } from './auth.js';
 import { AskCliHost } from './ask.js';
 import { startChatCli } from './chat/index.js';
 import { runDaemonCli } from './daemon.js';
@@ -211,7 +211,7 @@ async function main() {
     .command('auth')
     .description('manage provider credentials')
     .action(async () => {
-      await runAuthCli('status');
+      await AuthCliController.run('status');
     });
 
   authCommand
@@ -219,21 +219,21 @@ async function main() {
     .description('log in to a provider')
     .option('--no-browser', 'print the authorization URL without opening a browser')
     .action(async (provider: string, flags: { browser?: boolean }) => {
-      await runAuthCli('login', provider, { openBrowser: flags.browser });
+      await AuthCliController.run('login', provider, { openBrowser: flags.browser });
     });
 
   authCommand
     .command('status')
     .description('show stored provider credentials')
     .action(async () => {
-      await runAuthCli('status');
+      await AuthCliController.run('status');
     });
 
   authCommand
     .command('logout <provider>')
     .description('remove a stored provider credential')
     .action(async (provider: string) => {
-      await runAuthCli('logout', provider);
+      await AuthCliController.run('logout', provider);
     });
 
   program

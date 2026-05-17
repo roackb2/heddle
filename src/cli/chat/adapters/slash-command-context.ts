@@ -1,4 +1,4 @@
-import { formatAuthStatusMessage, loginProviderWithOAuth, logoutProvider } from '../../auth.js';
+import { AuthCliController } from '../../auth.js';
 import { FileHeartbeatTaskRepository } from '@/core/heartbeat/index.js';
 import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
 import type { SlashCommandExecutionContext } from '../../../core/commands/slash/modules/context.js';
@@ -19,13 +19,13 @@ export function createTuiSlashCommandContext(args: LocalCommandArgs): SlashComma
       credentialSource: () => args.providerCredentialSource,
     },
     auth: {
-      status: () => formatAuthStatusMessage(args.credentialStorePath),
+      status: () => AuthCliController.formatStatusMessage(args.credentialStorePath),
       login: (provider) =>
-        loginProviderWithOAuth(provider, {
+        AuthCliController.loginProviderWithOAuth(provider, {
           storePath: args.credentialStorePath,
           openAiLogin: args.openAiLogin,
         }),
-      logout: (provider) => logoutProvider(provider, args.credentialStorePath),
+      logout: (provider) => AuthCliController.logoutProvider(provider, args.credentialStorePath),
     },
     compaction: {
       compactActive: args.compactConversation,

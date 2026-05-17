@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { autocompleteLocalCommand, getLocalCommandHints, isLikelyLocalCommand, runLocalCommand } from '../../../cli/chat/state/local-commands.js';
-import { getStoredProviderCredential, setStoredProviderCredential } from '../../../core/auth/provider-credentials.js';
+import { ProviderCredentialRepository } from '../../../core/auth/index.js';
 import { FileHeartbeatTaskRepository } from '@/core/heartbeat/index.js';
 
 const absoluteScreenshotFixturePath = join(process.cwd(), 'src/__tests__/fixtures/screenshot.png');
@@ -466,7 +466,7 @@ describe('runLocalCommand', () => {
     expect(login.message).toContain('Stored OpenAI OAuth credential.');
     expect(login.message).toContain('Account: account-123');
     expect(login.message).not.toContain('access-secret');
-    expect(getStoredProviderCredential('openai', storePath)).toMatchObject({
+    expect(new ProviderCredentialRepository({ storePath }).get('openai')).toMatchObject({
       type: 'oauth',
       provider: 'openai',
       accountId: 'account-123',
@@ -475,7 +475,7 @@ describe('runLocalCommand', () => {
 
   it('supports provider credential logout from chat', async () => {
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-chat-auth-')), 'auth.json');
-    setStoredProviderCredential({
+    new ProviderCredentialRepository({ storePath }).set({
       type: 'oauth',
       provider: 'openai',
       accessToken: 'access-secret',
@@ -484,7 +484,7 @@ describe('runLocalCommand', () => {
       accountId: 'account-123',
       createdAt: '2026-04-27T00:00:00.000Z',
       updatedAt: '2026-04-27T00:00:00.000Z',
-    }, storePath);
+    });
 
     const logout = await runLocalCommand(createCommandArgs({
       prompt: '/auth logout openai',
@@ -496,7 +496,7 @@ describe('runLocalCommand', () => {
       kind: 'message',
       message: 'Removed stored openai credential.',
     });
-    expect(getStoredProviderCredential('openai', storePath)).toBeUndefined();
+    expect(new ProviderCredentialRepository({ storePath }).get('openai')).toBeUndefined();
   });
 
   it('includes /compact and /drift in shared slash-command hints', () => {

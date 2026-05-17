@@ -6,21 +6,15 @@ import {
   OPENAI_AUTH_ISSUER,
   OPENAI_CODEX_RESPONSES_ENDPOINT,
   OPENAI_CODEX_CLIENT_ID,
-  buildOpenUrlCommand,
-  buildOpenAiAuthorizeUrl,
-  createOpenAiOAuthCredential,
-  exchangeOpenAiOAuthCode,
-  extractOpenAiAccountId,
-  generatePkceCodes,
-  refreshOpenAiOAuthToken,
-  type OpenAiOAuthTokenResponse,
+  OpenAiOAuthService,
 } from '../../../core/auth/openai-oauth.js';
+import type { OpenAiOAuthTokenResponse } from '../../../core/auth/index.js';
 import { OpenAiAdapter, OpenAiOAuthFetchService } from '../../../core/llm/adapters/openai/index.js';
 import type { ReasoningEffort } from '../../../core/llm/types.js';
 
 describe('OpenAI OAuth helpers', () => {
   it('generates PKCE verifier and challenge values', () => {
-    const pkce = generatePkceCodes();
+    const pkce = OpenAiOAuthService.generatePkceCodes();
 
     expect(pkce.verifier).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(pkce.challenge).toMatch(/^[A-Za-z0-9_-]+$/);
@@ -29,7 +23,7 @@ describe('OpenAI OAuth helpers', () => {
   });
 
   it('builds the Codex OAuth authorize URL', () => {
-    const url = new URL(buildOpenAiAuthorizeUrl({
+    const url = new URL(OpenAiOAuthService.buildAuthorizeUrl({
       redirectUri: 'http://localhost:1455/auth/callback',
       pkce: { verifier: 'verifier', challenge: 'challenge' },
       state: 'state',
@@ -46,7 +40,7 @@ describe('OpenAI OAuth helpers', () => {
 
   it('opens OAuth URLs on Windows without routing query separators through cmd.exe', () => {
     const authorizeUrl = 'https://auth.openai.com/oauth/authorize?response_type=code&client_id=client&redirect_uri=http%3A%2F%2Flocalhost%3A1455%2Fauth%2Fcallback';
-    const command = buildOpenUrlCommand(authorizeUrl, 'win32');
+    const command = OpenAiOAuthService.buildOpenUrlCommand(authorizeUrl, 'win32');
     const encodedCommand = command.args.at(-1);
 
     expect(command.command).toBe('powershell.exe');
@@ -63,8 +57,8 @@ describe('OpenAI OAuth helpers', () => {
       refresh_token: 'refresh',
     };
 
-    expect(extractOpenAiAccountId(tokens)).toBe('account-nested');
-    expect(createOpenAiOAuthCredential(tokens, Date.parse('2026-04-27T00:00:00.000Z'))).toMatchObject({
+    expect(OpenAiOAuthService.extractAccountId(tokens)).toBe('account-nested');
+    expect(OpenAiOAuthService.createCredential(tokens, Date.parse('2026-04-27T00:00:00.000Z'))).toMatchObject({
       type: 'oauth',
       provider: 'openai',
       accountId: 'account-nested',
@@ -87,13 +81,13 @@ describe('OpenAI OAuth helpers', () => {
       });
     }) as typeof fetch;
 
-    await exchangeOpenAiOAuthCode({
+    await OpenAiOAuthService.exchangeCode({
       code: 'code',
       redirectUri: 'http://localhost:1455/auth/callback',
       codeVerifier: 'verifier',
       fetchImpl,
     });
-    await refreshOpenAiOAuthToken({
+    await OpenAiOAuthService.refreshToken({
       refreshToken: 'refresh-token',
       fetchImpl,
     });

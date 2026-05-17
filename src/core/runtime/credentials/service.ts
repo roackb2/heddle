@@ -1,7 +1,7 @@
 import {
-  getStoredProviderCredential,
+  ProviderCredentialRepository,
   type StoredProviderCredential,
-} from '@/core/auth/provider-credentials.js';
+} from '@/core/auth/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
 import type { LlmProvider } from '@/core/llm/types.js';
 import type { ApiKeyRuntime, ProviderCredentialSource } from './types.js';
@@ -44,7 +44,7 @@ export class RuntimeCredentialService {
     options: { storePath?: string } = {},
   ): Extract<StoredProviderCredential, { type: 'oauth' }> | undefined {
     const provider = LlmAdapterService.inferProvider(model);
-    const credential = getStoredProviderCredential(provider, options.storePath);
+    const credential = new ProviderCredentialRepository({ storePath: options.storePath }).get(provider);
     return credential?.type === 'oauth' ? credential : undefined;
   }
 

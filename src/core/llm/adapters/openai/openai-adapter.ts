@@ -12,13 +12,13 @@ import type { ToolDefinition, ToolCall } from '@/core/types.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import {
   OPENAI_CODEX_RESPONSES_ENDPOINT,
-  refreshOpenAiOAuthCredential,
-  type OpenAiOAuthCredential,
+  OpenAiOAuthService,
 } from '@/core/auth/openai-oauth.js';
 import {
-  setStoredProviderCredential,
+  ProviderCredentialRepository,
+  type OpenAiOAuthCredential,
   type StoredProviderCredential,
-} from '@/core/auth/provider-credentials.js';
+} from '@/core/auth/index.js';
 import { ModelPolicyService } from '@/core/llm/models/index.js';
 import { OpenAiCodec } from './openai-codec.js';
 
@@ -225,8 +225,8 @@ export class OpenAiOAuthFetchService {
 
     const oauthFetch: CompatibleFetch = async (requestInput, init) => {
       if (credential.expiresAt <= Date.now() + refreshBeforeMs) {
-        credential = await refreshOpenAiOAuthCredential(credential, { fetchImpl: fetcher as typeof fetch });
-        setStoredProviderCredential(credential, options.storePath);
+        credential = await OpenAiOAuthService.refreshCredential(credential, { fetchImpl: fetcher as typeof fetch });
+        new ProviderCredentialRepository({ storePath: options.storePath }).set(credential);
       }
 
       const request = requestInput instanceof Request ? requestInput : undefined;

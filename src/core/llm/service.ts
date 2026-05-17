@@ -1,7 +1,7 @@
 import {
-  getStoredProviderCredential,
+  ProviderCredentialRepository,
   type StoredProviderCredential,
-} from '@/core/auth/provider-credentials.js';
+} from '@/core/auth/index.js';
 import { BuiltinLlmProviderRegistry } from './registry/index.js';
 import type { LlmAdapter, LlmAdapterCreateInput, LlmProvider, LlmProviderResolutionInput } from './types.js';
 
@@ -51,7 +51,7 @@ export class LlmAdapterService {
     provider: LlmProvider,
     storePath?: string,
   ): Extract<StoredProviderCredential, { type: 'oauth' }> | undefined {
-    const credential = getStoredProviderCredential(provider, storePath);
+    const credential = new ProviderCredentialRepository({ storePath }).get(provider);
     return credential?.type === 'oauth' ? credential : undefined;
   }
 

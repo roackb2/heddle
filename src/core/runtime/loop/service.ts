@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { resolveProviderCredentialStorePath } from '@/core/auth/provider-credentials.js';
+import { ProviderCredentialRepository } from '@/core/auth/index.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import { AgentRunService } from '@/core/agent/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
@@ -163,7 +163,7 @@ export class AgentLoopRuntimeService {
     stateDir?: string;
   }): string | undefined {
     return args.stateDir
-      ? resolveProviderCredentialStorePath(resolve(args.workspaceRoot, args.stateDir))
+      ? ProviderCredentialRepository.resolveStorePath(resolve(args.workspaceRoot, args.stateDir))
       : undefined;
   }
 
