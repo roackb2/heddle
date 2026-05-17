@@ -112,19 +112,19 @@ const requestExampleToolApproval = async (request: ToolApprovalPolicyContext) =>
 function formatActivity(activity: ConversationActivity): string {
   switch (activity.type) {
     case 'run.started':
-      return `[activity] run.started run=${activity.runId ?? 'unknown'}`;
+      return `[activity] run.started run=${activity.correlation.runId ?? 'unknown'}`;
     case 'assistant.stream':
-      return activity.done
-        ? `[activity] assistant.stream done chars=${activity.text.length}`
-        : `[activity] assistant.stream chunk chars=${activity.text.length}`;
+      return activity.event.done
+        ? `[activity] assistant.stream done chars=${activity.event.text.length}`
+        : `[activity] assistant.stream chunk chars=${activity.event.text.length}`;
     case 'tool.calling':
-      return `[activity] tool.calling tool=${activity.tool} step=${activity.step ?? 'n/a'}`;
+      return `[activity] tool.calling tool=${activity.event.tool} step=${activity.correlation.step ?? 'n/a'}`;
     case 'tool.approval_requested':
-      return `[activity] tool.approval_requested tool=${activity.tool} step=${activity.step ?? 'n/a'}`;
+      return `[activity] tool.approval_requested tool=${activity.event.call.tool} step=${activity.correlation.step ?? 'n/a'}`;
     case 'memory.maintenance_started':
-      return `[activity] memory.maintenance_started candidates=${activity.candidateCount}`;
+      return `[activity] memory.maintenance_started candidates=${activity.event.candidateIds.length}`;
     case 'run.finished':
-      return `[activity] run.finished outcome=${activity.outcome}`;
+      return `[activity] run.finished outcome=${activity.event.outcome}`;
     default:
       return `[activity] ${activity.type}`;
   }

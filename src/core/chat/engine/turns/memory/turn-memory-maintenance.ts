@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import type { AgentLoopResult } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '@/core/types.js';
 import { runMaintenanceForRecordedCandidates } from '@/core/memory/maintenance-integration.js';
-import { summarizeTrace } from '@/core/observability/trace-summarizers.js';
+import { TraceSummaryService } from '@/core/observability/index.js';
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type {
@@ -92,7 +92,7 @@ export class ConversationTurnMemoryMaintenance {
           index === session.turns.length - 1
             ? {
                 ...turn,
-                events: summarizeTrace(nextTrace),
+                events: TraceSummaryService.default().summarizeTrace(nextTrace),
               }
             : turn,
         ),

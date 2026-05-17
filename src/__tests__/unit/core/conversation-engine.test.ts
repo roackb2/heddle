@@ -8,6 +8,7 @@ import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../core/types.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
+import { TraceSummaryService } from '@/core/observability/index.js';
 
 describe('createConversationEngine', () => {
   beforeEach(() => {
@@ -327,7 +328,8 @@ describe('createConversationEngine', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const approvalPolicies = [vi.fn()];
-    const traceSummarizerRegistry = { summarizeTrace: vi.fn(() => []) } as unknown as { summarizeTrace: (events: TraceEvent[]) => string[] };
+    const traceSummarizerRegistry = new TraceSummaryService({ 'run.started': () => [] });
+    vi.spyOn(traceSummarizerRegistry, 'summarizeTrace').mockReturnValue([]);
     const engine = createConversationEngine({
       workspaceRoot,
       stateRoot,
@@ -338,7 +340,7 @@ describe('createConversationEngine', () => {
       systemContext: 'Engine system context',
       memoryMaintenanceMode: 'background',
       approvalPolicies,
-      traceSummarizerRegistry: traceSummarizerRegistry as never,
+      traceSummarizerRegistry,
       workspaceId: 'workspace-1',
       apiKeyPresent: true,
     });
@@ -350,14 +352,15 @@ describe('createConversationEngine', () => {
     const onCompactionStatus = vi.fn();
     const requestToolApproval = vi.fn(async () => ({ approved: true, reason: 'ok' }));
     const overridePolicies = [vi.fn()];
-    const overrideRegistry = { summarizeTrace: vi.fn(() => []) } as unknown as { summarizeTrace: (events: TraceEvent[]) => string[] };
+    const overrideRegistry = new TraceSummaryService({ 'run.started': () => [] });
+    vi.spyOn(overrideRegistry, 'summarizeTrace').mockReturnValue([]);
 
     await engine.turns.submit({
       sessionId: session.id,
       prompt: 'Summarize the repo.',
       memoryMaintenanceMode: 'inline',
       approvalPolicies: overridePolicies as never,
-      traceSummarizerRegistry: overrideRegistry as never,
+      traceSummarizerRegistry: overrideRegistry,
       host: {
         events: {
           onActivity,
@@ -409,7 +412,10 @@ describe('createConversationEngine', () => {
     };
     args.host.onAgentLoopEvent(loopEvent);
     expect(onAgentLoopEvent).toHaveBeenCalledWith(loopEvent);
-    expect(onActivity).toHaveBeenCalledWith(expect.objectContaining({ type: 'assistant.stream', text: 'partial' }));
+    expect(onActivity).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'assistant.stream',
+      event: loopEvent,
+    }));
 
     args.onAssistantStream({ text: 'hello' });
     expect(onAssistantText).toHaveBeenCalledWith('hello');
@@ -422,13 +428,16 @@ describe('createConversationEngine', () => {
     };
     args.onTraceEvent(traceEvent);
     expect(onTraceEvent).toHaveBeenCalledWith(traceEvent);
-    expect(onActivity).toHaveBeenCalledWith(expect.objectContaining({ type: 'tool.call' }));
+    expect(onActivity).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'tool.call',
+      event: traceEvent,
+    }));
 
     args.host.onCompactionStatus({ status: 'finished', summaryPath: '/tmp/summary.md' }, 'final');
     expect(onCompactionStatus).toHaveBeenCalledWith({ status: 'finished', summaryPath: '/tmp/summary.md' });
     expect(onActivity.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({
       type: 'compaction.finished',
-      summaryPath: '/tmp/summary.md',
+      event: { status: 'finished', summaryPath: '/tmp/summary.md' },
     }));
   });
 

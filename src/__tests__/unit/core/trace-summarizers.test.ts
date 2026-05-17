@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TraceEvent } from '../../../core/types.js';
-import {
-  countAssistantSteps,
-  createTraceSummarizerRegistry,
-  summarizeTrace,
-} from '../../../core/observability/trace-summarizers.js';
+import { TraceSummaryService } from '@/core/observability/index.js';
 
 describe('trace summarizers', () => {
   it('preserves current built-in trace summary output', () => {
@@ -146,7 +142,7 @@ describe('trace summarizers', () => {
       },
     ];
 
-    expect(summarizeTrace(trace)).toEqual([
+    expect(TraceSummaryService.default().summarizeTrace(trace)).toEqual([
       'reasoning: Need current workspace context before answering.',
       'assistant requested run_shell_inspect (rg -n "TraceEvent" src), read_file (README.md)',
       'assistant answered',
@@ -168,7 +164,7 @@ describe('trace summarizers', () => {
   });
 
   it('allows domain modules to override a trace event summarizer', () => {
-    const registry = createTraceSummarizerRegistry({
+    const registry = new TraceSummaryService({
       'tool.result': (event, context) => `custom ${context.index}:${event.tool}`,
     });
 
@@ -190,6 +186,6 @@ describe('trace summarizers', () => {
       { type: 'assistant.turn', content: 'Two', requestedTools: false, step: 2, timestamp: '2026-05-02T00:00:02.000Z' },
     ];
 
-    expect(countAssistantSteps(trace)).toBe(2);
+    expect(TraceSummaryService.default().countAssistantSteps(trace)).toBe(2);
   });
 });

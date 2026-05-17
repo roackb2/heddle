@@ -2,8 +2,8 @@ import type { ToolApprovalPolicy, ToolApprovalSurface } from '../../approvals/ty
 import type {
   ConversationActivity,
   ConversationCompactionStatus,
-} from '../../observability/conversation-activity.js';
-import type { TraceSummarizerRegistry } from '../../observability/trace-summarizers.js';
+  TraceSummaryService,
+} from '@/core/observability/index.js';
 import type { AgentLoopEvent, RunAgentLoopOptions } from '../../runtime/loop/index.js';
 import type { ChatMessage, ReasoningEffort } from '../../llm/types.js';
 import type { TraceEvent } from '../../types.js';
@@ -22,7 +22,7 @@ export type ConversationEngineConfig = {
   credentialStorePath?: string;
   systemContext?: string;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
-  traceSummarizerRegistry?: TraceSummarizerRegistry;
+  traceSummarizerRegistry?: TraceSummaryService;
   approvalPolicies?: ToolApprovalPolicy[];
   sessionStoragePath?: string;
   memoryDir?: string;
@@ -132,7 +132,7 @@ export type SubmitConversationTurnInput = {
   leaseOwner?: ChatSessionLeaseOwner;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   approvalPolicies?: ToolApprovalPolicy[];
-  traceSummarizerRegistry?: TraceSummarizerRegistry;
+  traceSummarizerRegistry?: TraceSummaryService;
 };
 
 export type ContinueConversationTurnInput = {
@@ -147,7 +147,7 @@ export type ContinueConversationTurnInput = {
   leaseOwner?: ChatSessionLeaseOwner;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   approvalPolicies?: ToolApprovalPolicy[];
-  traceSummarizerRegistry?: TraceSummarizerRegistry;
+  traceSummarizerRegistry?: TraceSummaryService;
 };
 
 export type ClearConversationTurnLeaseInput = {

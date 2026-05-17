@@ -1,6 +1,5 @@
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
-import type { ConversationCompactionStatus } from '@/core/observability/conversation-activity.js';
-import type { TraceSummarizerRegistry } from '@/core/observability/trace-summarizers.js';
+import type { ConversationCompactionStatus, TraceSummaryService } from '@/core/observability/index.js';
 import type { RunAgentLoopOptions } from '@/core/runtime/loop/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
@@ -23,7 +22,7 @@ export type RunConversationTurnArgs = {
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   host?: ChatTurnHostPort;
   approvalPolicies?: ToolApprovalPolicy[];
-  traceSummarizerRegistry?: TraceSummarizerRegistry;
+  traceSummarizerRegistry?: TraceSummaryService;
   onCompactionStatus?: (event: ConversationCompactionStatus) => void;
   onAssistantStream?: RunAgentLoopOptions['onAssistantStream'];
   onTraceEvent?: RunAgentLoopOptions['onTraceEvent'];

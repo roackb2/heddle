@@ -2,7 +2,7 @@ import type { AgentLoopResult } from '@/core/runtime/loop/index.js';
 import type { RunResult } from '@/core/types.js';
 import type { ChatMessage } from '@/core/llm/types.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
-import type { TraceSummarizerRegistry } from '@/core/observability/trace-summarizers.js';
+import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
 import type { ChatTurnHostPort } from '../host/index.js';
 import type {
@@ -28,7 +28,7 @@ export type PersistChatTurnResultArgs = {
   toolNames: string[];
   historyForTokenEstimate: ChatMessage[];
   summarizer: ConversationCompactionOptions['summarizer'];
-  traceSummarizerRegistry?: TraceSummarizerRegistry;
+  traceSummarizerRegistry?: TraceSummaryService;
   createTurnId: () => string;
   onCompactionStatus?: (event: PersistChatTurnCompactionStatus, sourceHistory: ChatMessage[]) => void;
 };
@@ -65,7 +65,7 @@ export type PersistCompletedChatTurnBase = {
   systemContext?: string;
   toolNames: string[];
   historyForTokenEstimate: ChatMessage[];
-  traceSummarizerRegistry?: TraceSummarizerRegistry;
+  traceSummarizerRegistry?: TraceSummaryService;
 };
 
 export type PersistCompletedChatTurnArgs = PersistCompletedChatTurnBase & {

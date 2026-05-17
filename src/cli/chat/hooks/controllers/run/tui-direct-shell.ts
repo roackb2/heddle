@@ -1,7 +1,7 @@
 import { ToolApprovalPolicies, ToolApprovalService } from '@/core/approvals/index.js';
 import { ProjectApprovalRules } from '@/core/approvals/remembered-rules/index.js';
 import type { ConversationSessionService } from '@/core/chat/engine/types.js';
-import { summarizeToolCall } from '@/core/observability/conversation-activity.js';
+import { ToolActivitySummarizer } from '@/core/observability/index.js';
 import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '@/core/tools/toolkits/shell-process/run-shell.js';
 import type { ToolCall, ToolDefinition, ToolResult } from '@/core/types.js';
 import { shouldFallbackToMutate } from '../../../utils/format.js';
@@ -139,7 +139,7 @@ export async function executeTuiDirectShell(args: {
           state.setLiveEvents([
             {
               id: state.nextLocalId(),
-              text: `approval denied for ${summarizeToolCall(mutateCall.tool, mutateCall.input)}`,
+              text: `approval denied for ${ToolActivitySummarizer.summarizeCall(mutateCall)}`,
             },
           ]);
           state.setStatus('Idle');

@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  projectAgentLoopEventToConversationActivities,
-  projectCompactionStatusToConversationActivities,
-  projectTraceEventToConversationActivities,
-  summarizeToolCall,
-  summarizeToolResult,
-} from '../../../core/observability/conversation-activity.js';
+  ConversationActivityProjector,
+  ToolActivitySummarizer,
+} from '@/core/observability/index.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../core/types.js';
 
@@ -20,8 +17,13 @@ describe('conversation activity projection', () => {
       timestamp: '2026-05-02T00:00:00.000Z',
     };
 
-    expect(projectAgentLoopEventToConversationActivities(event)).toEqual([
-      expect.objectContaining({ type: 'assistant.stream', text: 'Working', done: false, runId: 'run-1', step: 1 }),
+    expect(ConversationActivityProjector.fromAgentLoopEvent(event)).toEqual([
+      expect.objectContaining({
+        source: 'agent-loop',
+        type: 'assistant.stream',
+        event,
+        correlation: expect.objectContaining({ runId: 'run-1', step: 1 }),
+      }),
     ]);
   });
 
@@ -43,9 +45,17 @@ describe('conversation activity projection', () => {
       timestamp: '2026-05-02T00:00:01.000Z',
     };
 
-    expect(projectAgentLoopEventToConversationActivities(started)).toEqual([expect.objectContaining({ type: 'loop.started', runId: 'run-1' })]);
-    expect(projectTraceEventToConversationActivities(finishedTrace)).toEqual([
-      expect.objectContaining({ type: 'run.finished', outcome: 'max_steps', step: 5 }),
+    expect(ConversationActivityProjector.fromAgentLoopEvent(started)).toEqual([expect.objectContaining({
+      type: 'loop.started',
+      event: started,
+      correlation: expect.objectContaining({ runId: 'run-1' }),
+    })]);
+    expect(ConversationActivityProjector.fromTraceEvent(finishedTrace)).toEqual([
+      expect.objectContaining({
+        type: 'run.finished',
+        event: finishedTrace,
+        correlation: expect.objectContaining({ step: 5 }),
+      }),
     ]);
   });
 
@@ -71,18 +81,20 @@ describe('conversation activity projection', () => {
       timestamp: '2026-05-02T00:00:01.000Z',
     };
 
-    expect(projectAgentLoopEventToConversationActivities(calling)).toEqual([
+    expect(ConversationActivityProjector.fromAgentLoopEvent(calling)).toEqual([
       expect.objectContaining({
         type: 'tool.calling',
-        tool: 'read_file',
-        toolSummary: 'read_file (README.md)',
-        requiresApproval: false,
-        step: 2,
-        runId: 'run-1',
+        event: calling,
+        correlation: expect.objectContaining({ step: 2, runId: 'run-1' }),
+        derived: { kind: 'tool-summary', summary: 'read_file (README.md)' },
       }),
     ]);
-    expect(projectAgentLoopEventToConversationActivities(completed)).toEqual([
-      expect.objectContaining({ type: 'tool.completed', tool: 'read_file', durationMs: 12.4, step: 2, runId: 'run-1' }),
+    expect(ConversationActivityProjector.fromAgentLoopEvent(completed)).toEqual([
+      expect.objectContaining({
+        type: 'tool.completed',
+        event: completed,
+        correlation: expect.objectContaining({ step: 2, runId: 'run-1' }),
+      }),
     ]);
   });
 
@@ -102,24 +114,24 @@ describe('conversation activity projection', () => {
       timestamp: '2026-05-02T00:00:01.000Z',
     };
 
-    expect(projectTraceEventToConversationActivities(approval)).toEqual([
+    expect(ConversationActivityProjector.fromTraceEvent(approval)).toEqual([
       expect.objectContaining({
         type: 'tool.approval_requested',
-        tool: 'run_shell_mutate',
-        toolSummary: 'run_shell_mutate (yarn test)',
-        step: 3,
-        call: approval.call,
+        event: approval,
+        derived: { kind: 'tool-summary', summary: 'run_shell_mutate (yarn test)' },
+        correlation: expect.objectContaining({ step: 3 }),
       }),
     ]);
-    expect(projectTraceEventToConversationActivities(fallback)).toEqual([
+    expect(ConversationActivityProjector.fromTraceEvent(fallback)).toEqual([
       expect.objectContaining({
         type: 'tool.fallback',
-        fromTool: 'run_shell_inspect',
-        toTool: 'run_shell_mutate',
-        fromSummary: 'run_shell_inspect (git status --short)',
-        toSummary: 'run_shell_mutate (git status --short)',
-        reason: 'inspect policy rejected the command',
-        step: 4,
+        event: fallback,
+        derived: {
+          kind: 'tool-fallback-summary',
+          fromSummary: 'run_shell_inspect (git status --short)',
+          toSummary: 'run_shell_mutate (git status --short)',
+        },
+        correlation: expect.objectContaining({ step: 4 }),
       }),
     ]);
   });
@@ -143,44 +155,52 @@ describe('conversation activity projection', () => {
       timestamp: '2026-05-02T00:00:01.000Z',
     };
 
-    expect(projectTraceEventToConversationActivities(started)).toEqual([
-      expect.objectContaining({ type: 'memory.maintenance_started', candidateCount: 2, runId: 'memory-1', step: 5 }),
+    expect(ConversationActivityProjector.fromTraceEvent(started)).toEqual([
+      expect.objectContaining({
+        type: 'memory.maintenance_started',
+        event: started,
+        correlation: expect.objectContaining({ runId: 'memory-1', step: 5 }),
+      }),
     ]);
-    expect(projectTraceEventToConversationActivities(finished)).toEqual([
-      expect.objectContaining({ type: 'memory.maintenance_finished', outcome: 'completed', summary: 'Stored project context.', runId: 'memory-1', step: 5 }),
+    expect(ConversationActivityProjector.fromTraceEvent(finished)).toEqual([
+      expect.objectContaining({
+        type: 'memory.maintenance_finished',
+        event: finished,
+        correlation: expect.objectContaining({ runId: 'memory-1', step: 5 }),
+      }),
     ]);
   });
 
   it('projects compaction status activities', () => {
-    expect(projectCompactionStatusToConversationActivities({
+    expect(ConversationActivityProjector.fromCompactionStatus({
       status: 'running',
       archivePath: '.heddle/chat-sessions/session-1/archive.jsonl',
     })).toEqual([
-      { type: 'compaction.running', archivePath: '.heddle/chat-sessions/session-1/archive.jsonl' },
+      { source: 'compaction', type: 'compaction.running', event: { status: 'running', archivePath: '.heddle/chat-sessions/session-1/archive.jsonl' } },
     ]);
-    expect(projectCompactionStatusToConversationActivities({
+    expect(ConversationActivityProjector.fromCompactionStatus({
       status: 'failed',
       error: 'summary failed',
     })).toEqual([
-      { type: 'compaction.failed', error: 'summary failed' },
+      { source: 'compaction', type: 'compaction.failed', event: { status: 'failed', error: 'summary failed' } },
     ]);
   });
 
   it('preserves TUI tool call summary details in the shared core helper', () => {
-    expect(summarizeToolCall('search_files', { query: 'trace', path: '.heddle/traces' })).toBe(
+    expect(ToolActivitySummarizer.summarizeCall({ tool: 'search_files', input: { query: 'trace', path: '.heddle/traces' } })).toBe(
       'search_files ("trace" in .heddle/traces)',
     );
-    expect(summarizeToolCall('update_plan', { plan: [{ step: 'Refactor projection', status: 'in_progress' }] })).toBe(
+    expect(ToolActivitySummarizer.summarizeCall({ tool: 'update_plan', input: { plan: [{ step: 'Refactor projection', status: 'in_progress' }] } })).toBe(
       'update_plan (Refactor projection)',
     );
-    expect(summarizeToolCall('delete_file', { path: 'tmp/generated-report.md' })).toBe(
+    expect(ToolActivitySummarizer.summarizeCall({ tool: 'delete_file', input: { path: 'tmp/generated-report.md' } })).toBe(
       'delete_file (tmp/generated-report.md)',
     );
-    expect(summarizeToolCall('move_file', { from: 'docs/old.md', to: 'docs/archive/old.md' })).toBe(
+    expect(ToolActivitySummarizer.summarizeCall({ tool: 'move_file', input: { from: 'docs/old.md', to: 'docs/archive/old.md' } })).toBe(
       'move_file (docs/old.md -> docs/archive/old.md)',
     );
-    expect(summarizeToolResult('edit_file', { output: { path: 'src/index.ts' } })).toBe('edit_file (src/index.ts)');
-    expect(summarizeToolResult('delete_file', { output: { path: 'tmp/generated-report.md' } })).toBe(
+    expect(ToolActivitySummarizer.summarizeResult({ tool: 'edit_file', result: { ok: true, output: { path: 'src/index.ts' } } })).toBe('edit_file (src/index.ts)');
+    expect(ToolActivitySummarizer.summarizeResult({ tool: 'delete_file', result: { ok: true, output: { path: 'tmp/generated-report.md' } } })).toBe(
       'delete_file (tmp/generated-report.md)',
     );
   });
@@ -199,8 +219,12 @@ describe('conversation activity projection', () => {
       timestamp: '2026-05-02T00:00:01.000Z',
     };
 
-    expect(projectAgentLoopEventToConversationActivities(event)).toEqual([
-      expect.objectContaining({ type: 'tool.call', toolSummary: 'read_file (README.md)', runId: 'run-1', step: 2 }),
+    expect(ConversationActivityProjector.fromAgentLoopEvent(event)).toEqual([
+      expect.objectContaining({
+        type: 'tool.call',
+        derived: { kind: 'tool-summary', summary: 'read_file (README.md)' },
+        correlation: expect.objectContaining({ runId: 'run-1', step: 2 }),
+      }),
     ]);
   });
 });
