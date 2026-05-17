@@ -27,8 +27,8 @@ import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/i
 import { ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
 import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
-import { credentialModeFromSource, resolveCompatibleActiveModel } from '@/core/llm/model-policy.js';
-import { inferProviderFromModel } from '@/core/llm/providers.js';
+import { ModelPolicyService } from '@/core/llm/models/index.js';
+import { LlmAdapterService } from '@/core/llm/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import type { ToolCall, ToolDefinition } from '@/core/types.js';
 import { ControlPlaneChatSessionEventsController } from './chat-session-events.js';
@@ -365,13 +365,13 @@ export class ControlPlaneChatSessionsController {
     credentialStorePath?: string;
   }): string {
     const activeModel = this.firstNonEmpty(args.model, process.env.OPENAI_MODEL, process.env.ANTHROPIC_MODEL) ?? DEFAULT_OPENAI_MODEL;
-    const provider = inferProviderFromModel(activeModel);
-    const credentialMode = credentialModeFromSource(RuntimeCredentialService.resolveCredentialSourceForModel(activeModel, {
+    const provider = LlmAdapterService.inferProvider(activeModel);
+    const credentialMode = ModelPolicyService.credentialModeFromSource(RuntimeCredentialService.resolveCredentialSourceForModel(activeModel, {
       preferApiKey: args.preferApiKey,
       credentialStorePath: args.credentialStorePath,
     }));
 
-    return resolveCompatibleActiveModel({
+    return ModelPolicyService.resolveCompatibleActiveModel({
       activeModel,
       provider,
       credentialMode,

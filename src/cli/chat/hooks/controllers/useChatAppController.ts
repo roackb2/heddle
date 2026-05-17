@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { estimateBuiltInContextWindow } from '../../../../core/llm/openai-models.js';
-import {
-  credentialModeFromSource,
-  resolveCompatibleActiveModel,
-  resolveSystemSelectedModel,
-} from '../../../../core/llm/model-policy.js';
+import { ModelCatalogService, ModelPolicyService } from '../../../../core/llm/models/index.js';
 import {
   resolveNewSessionExecutionPreferences,
   resolveStoredSessionExecutionPreferences,
@@ -57,22 +52,22 @@ export function useChatAppController({
 
   const initialModelCompatibility = useMemo(
     () =>
-      resolveCompatibleActiveModel({
+      ModelPolicyService.resolveCompatibleActiveModel({
         activeModel: runtime.model,
         provider: runtime.model.startsWith('claude') ? 'anthropic' : 'openai',
-        credentialMode: credentialModeFromSource(runtime.providerCredentialSource),
+        credentialMode: ModelPolicyService.credentialModeFromSource(runtime.providerCredentialSource),
       }),
     [runtime.model, runtime.providerCredentialSource],
   );
 
   const activeModelCompatibility = useMemo(
     () =>
-      resolveCompatibleActiveModel({
+      ModelPolicyService.resolveCompatibleActiveModel({
         activeModel: storedActivePreferences.model,
         provider: storedActivePreferences.model.startsWith('claude')
           ? 'anthropic'
           : 'openai',
-        credentialMode: credentialModeFromSource(
+        credentialMode: ModelPolicyService.credentialModeFromSource(
           resolveProviderCredentialSourceForModel(storedActivePreferences.model, runtime),
         ),
       }),
@@ -84,11 +79,11 @@ export function useChatAppController({
   const modelCompatibilityNotice =
     activeModelCompatibility.warning ?? initialModelCompatibility.warning;
 
-  const sessionTitleModel = resolveSystemSelectedModel({
+  const sessionTitleModel = ModelPolicyService.resolveSystemSelectedModel({
     purpose: 'session-title',
     provider: 'openai',
     activeModel,
-    credentialMode: credentialModeFromSource(runtime.providerCredentialSource),
+    credentialMode: ModelPolicyService.credentialModeFromSource(runtime.providerCredentialSource),
   });
 
   const createSession = useCallback(
@@ -173,8 +168,8 @@ export function useChatAppController({
       return;
     }
 
-    const previousWindow = estimateBuiltInContextWindow(previousModel);
-    const nextWindow = estimateBuiltInContextWindow(activeModel);
+    const previousWindow = ModelCatalogService.estimateBuiltInContextWindow(previousModel);
+    const nextWindow = ModelCatalogService.estimateBuiltInContextWindow(activeModel);
     if (!nextWindow || (previousWindow !== undefined && nextWindow >= previousWindow)) {
       return;
     }

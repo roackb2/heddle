@@ -1,4 +1,7 @@
-import { inferProviderFromModel } from '../../../core/llm/providers.js';
+// Boundary note: this browser code only reaches into a browser-safe provider inference helper as a
+// temporary bridge. Desired shape: auth/provider display state should come from the control-plane
+// API, and web code should not import LLM adapter or core runtime services directly.
+import { LlmProviderInference } from '../../../core/llm/registry/provider-inference.js';
 import type { ControlPlaneState } from '../../lib/api';
 
 export function formatControlPlaneAuthStatus(
@@ -9,7 +12,7 @@ export function formatControlPlaneAuthStatus(
     return undefined;
   }
 
-  const provider = inferProviderFromModel(model);
+  const provider = LlmProviderInference.inferBuiltin(model);
   if (provider === 'openai') {
     return formatProviderSource('openai', auth.openai);
   }

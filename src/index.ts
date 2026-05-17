@@ -173,6 +173,7 @@ export type {
 // LLM
 export type {
   LlmAdapter,
+  LlmAdapterCreateInput,
   ChatMessage,
   LlmResponse,
   LlmProvider,
@@ -181,23 +182,30 @@ export type {
   LlmAdapterInfo,
   LlmUsage,
 } from './core/llm/types.js';
-export { createLlmAdapter, inferProviderFromModel, resolveLlmProvider } from './core/llm/factory.js';
-export type { CreateLlmAdapterOptions } from './core/llm/factory.js';
-export { createOpenAiAdapter } from './core/llm/openai.js';
-export type { OpenAiAdapterOptions } from './core/llm/openai.js';
-export { createAnthropicAdapter } from './core/llm/anthropic.js';
-export type { AnthropicAdapterOptions } from './core/llm/anthropic.js';
+export {
+  AnthropicAdapter,
+  AnthropicProviderAdapter,
+  LlmAdapterService,
+  LlmProviderRegistry,
+  OpenAiAdapter,
+  OpenAiCodexSseService,
+  OpenAiOAuthFetchService,
+  OpenAiProviderAdapter,
+} from './core/llm/index.js';
+export type {
+  AnthropicAdapterOptions,
+  LlmProviderAdapter,
+  OpenAiAdapterOptions,
+  OpenAiOAuthFetchOptions,
+} from './core/llm/index.js';
 export {
   OPENAI_MODEL_GROUPS,
   COMMON_OPENAI_MODELS,
   COMMON_BUILT_IN_MODELS,
-  formatOpenAiModelGroups,
-  formatBuiltInModelGroups,
-  estimateOpenAiContextWindow,
-  estimateBuiltInContextWindow,
-  filterBuiltInModels,
-} from './core/llm/openai-models.js';
-export type { BuiltInModelGroup } from './core/llm/openai-models.js';
+  ModelCatalogService,
+  ModelPolicyService,
+} from './core/llm/models/index.js';
+export type { BuiltInModelGroup } from './core/llm/models/index.js';
 
 // Tools
 export { createToolRegistry } from './core/tools/registry.js';

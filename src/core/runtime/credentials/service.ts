@@ -2,7 +2,7 @@ import {
   getStoredProviderCredential,
   type StoredProviderCredential,
 } from '@/core/auth/provider-credentials.js';
-import { inferProviderFromModel } from '@/core/llm/providers.js';
+import { LlmAdapterService } from '@/core/llm/index.js';
 import type { LlmProvider } from '@/core/llm/types.js';
 import type { ApiKeyRuntime, ProviderCredentialSource } from './types.js';
 
@@ -17,6 +17,8 @@ export class RuntimeCredentialService {
       case 'anthropic':
         return this.firstDefinedNonEmpty(process.env.ANTHROPIC_API_KEY, process.env.PERSONAL_ANTHROPIC_API_KEY);
       case 'google':
+      case 'ollama':
+      case 'huggingface':
         return undefined;
     }
   }
@@ -41,7 +43,7 @@ export class RuntimeCredentialService {
     model: string,
     options: { storePath?: string } = {},
   ): Extract<StoredProviderCredential, { type: 'oauth' }> | undefined {
-    const provider = inferProviderFromModel(model);
+    const provider = LlmAdapterService.inferProvider(model);
     const credential = getStoredProviderCredential(provider, options.storePath);
     return credential?.type === 'oauth' ? credential : undefined;
   }
@@ -57,7 +59,7 @@ export class RuntimeCredentialService {
     model: string,
     runtime?: ApiKeyRuntime,
   ): ProviderCredentialSource {
-    const provider = inferProviderFromModel(model);
+    const provider = LlmAdapterService.inferProvider(model);
     if (runtime?.apiKey && runtime.apiKeyProvider === 'explicit') {
       return { type: 'explicit-api-key' };
     }
@@ -96,7 +98,7 @@ export class RuntimeCredentialService {
   }
 
   static formatMissingCredentialMessage(model: string): string {
-    const provider = inferProviderFromModel(model);
+    const provider = LlmAdapterService.inferProvider(model);
     if (provider === 'openai') {
       return 'Missing OpenAI credential. Run `heddle auth login openai` to use OpenAI account sign-in, or set OPENAI_API_KEY for Platform API-key mode.';
     }

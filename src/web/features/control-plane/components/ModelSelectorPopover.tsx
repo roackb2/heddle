@@ -1,7 +1,10 @@
 import { Button } from '../../../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../../../components/ui/popover.js';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../../components/ui/tooltip.js';
-import { OPENAI_OAUTH_MODE_DESCRIPTION } from '../../../../core/llm/model-policy.js';
+// Boundary note: this copy is temporarily imported from the LLM domain for consistency. Desired
+// shape: browser UI copy should live in web/view-model code or arrive through the control-plane API,
+// not require importing core LLM modules.
+import { OPENAI_OAUTH_MODE_DESCRIPTION } from '../../../../core/llm/models/index.js';
 import type { CredentialAwareModelGroup } from '../hooks/useCredentialAwareModelOptions.js';
 import { className } from '../utils.js';
 

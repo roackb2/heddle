@@ -1,5 +1,5 @@
 import { buildPromptRenderLines } from '../components/PromptInput.js';
-import { OPENAI_OAUTH_MODE_DESCRIPTION, type CredentialAwareModelOption } from '../../../core/llm/model-policy.js';
+import { OPENAI_OAUTH_MODE_DESCRIPTION, type CredentialAwareModelOption } from '../../../core/llm/models/index.js';
 import { getLocalCommandHints } from '../state/local-commands.js';
 import type { ReasoningEffortPickerOption } from '../hooks/useChatPickers.js';
 import type { ChatSession, ConversationLine, PendingApproval } from '../state/types.js';

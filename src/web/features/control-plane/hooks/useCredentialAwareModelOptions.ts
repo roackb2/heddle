@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import type { ModelOptions } from '../../../lib/api.js';
-import { isOpenAiAccountSignInModel } from '../../../../core/llm/openai-models.js';
-import { resolveDefaultReasoningEffort, supportsReasoningEffort } from '../../../../core/llm/model-policy.js';
+// Boundary note: this hook temporarily reuses browser-safe model catalog/policy logic. Desired
+// shape: model availability and reasoning-effort view models should come from the control-plane API
+// or a dedicated browser-safe interaction-surface package, not direct core service imports.
+import { ModelCatalogService, ModelPolicyService } from '../../../../core/llm/models/index.js';
 import type { ControlPlaneState } from '../../../lib/api.js';
 
 export type CredentialAwareModelGroup = {
@@ -38,7 +40,7 @@ export function useCredentialAwareModelOptions(args: {
       ...group,
       resolvedOptions: (group.options ?? group.models.map((model) => ({ id: model, disabled: false }))).map((option) => {
         const disabled = openAiOauthActive && option.id.startsWith('gpt-')
-          ? !isOpenAiAccountSignInModel(option.id)
+          ? !ModelCatalogService.isOpenAiAccountSignInModel(option.id)
           : false;
         return {
           id: option.id,
@@ -54,8 +56,8 @@ export function useCredentialAwareModelOptions(args: {
   ), [groups, args.selectedModel]);
 
   const reasoningEffortOptions = useMemo<ReasoningEffortOption[]>(() => {
-    const supported = args.selectedModel ? supportsReasoningEffort(args.selectedModel) : false;
-    const defaultEffort = args.selectedModel ? resolveDefaultReasoningEffort(args.selectedModel) : undefined;
+    const supported = args.selectedModel ? ModelPolicyService.supportsReasoningEffort(args.selectedModel) : false;
+    const defaultEffort = args.selectedModel ? ModelPolicyService.resolveDefaultReasoningEffort(args.selectedModel) : undefined;
     return [
       { id: 'default', disabled: !supported, label: defaultEffort ? `Default (${defaultEffort})` : 'Default' },
       { id: 'low', disabled: !supported, label: 'Low' },

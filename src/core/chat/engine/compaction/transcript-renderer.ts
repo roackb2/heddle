@@ -1,5 +1,5 @@
 import type { ChatMessage } from '@/core/llm/types.js';
-import { estimateBuiltInContextWindow } from '@/core/llm/openai-models.js';
+import { ModelCatalogService } from '@/core/llm/models/index.js';
 import {
   DEFAULT_CONTEXT_WINDOW_ESTIMATE,
   MAX_SUMMARIZER_CONTEXT_RATIO,
@@ -47,7 +47,7 @@ export class CompactionTranscriptRenderer {
   }
 
   private static resolveTranscriptCharBudget(summaryModel: string): number {
-    const contextWindow = estimateBuiltInContextWindow(summaryModel) ?? DEFAULT_CONTEXT_WINDOW_ESTIMATE;
+    const contextWindow = ModelCatalogService.estimateBuiltInContextWindow(summaryModel) ?? DEFAULT_CONTEXT_WINDOW_ESTIMATE;
     const budgetByContext = Math.floor(contextWindow * MAX_SUMMARIZER_CONTEXT_RATIO);
     const tokenBudget = Math.min(MAX_SUMMARIZER_TRANSCRIPT_TOKENS, budgetByContext);
     return Math.min(MAX_SUMMARIZER_TRANSCRIPT_CHARS, tokenBudget * 4);

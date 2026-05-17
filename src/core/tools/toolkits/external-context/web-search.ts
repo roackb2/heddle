@@ -13,14 +13,12 @@ import type {
 import OpenAI from 'openai';
 import type { Response, ResponseOutputText, WebSearchTool } from 'openai/resources/responses/responses.js';
 import type { ToolDefinition, ToolResult } from '../../../types.js';
-import { inferProviderFromModel } from '../../../llm/factory.js';
+import { LlmAdapterService } from '../../../llm/index.js';
 import {
-  createOpenAiOAuthFetch,
-  executeOpenAiOAuthCodexSse,
-  extractOpenAiCodexOutputTextFromSse,
-  extractOpenAiCodexSseItems,
-} from '../../../llm/openai.js';
-import { validateModelCredentialCompatibility } from '../../../llm/model-policy.js';
+  OpenAiCodexSseService,
+  OpenAiOAuthFetchService,
+} from '../../../llm/adapters/openai/index.js';
+import { ModelPolicyService } from '../../../llm/models/index.js';
 import type { LlmProvider } from '../../../llm/types.js';
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../../../config.js';
 import {
@@ -73,7 +71,7 @@ export function createWebSearchTool(options: WebSearchToolOptions = {}): ToolDef
       }
 
       const input = raw as WebSearchInput;
-      const provider = options.provider ?? inferProviderFromModel(options.model ?? DEFAULT_OPENAI_MODEL);
+      const provider = options.provider ?? LlmAdapterService.inferProvider(options.model ?? DEFAULT_OPENAI_MODEL);
 
       try {
         switch (provider) {
@@ -85,6 +83,12 @@ export function createWebSearchTool(options: WebSearchToolOptions = {}): ToolDef
             return {
               ok: false,
               error: 'web_search is not wired for Google models yet.',
+            };
+          case 'ollama':
+          case 'huggingface':
+            return {
+              ok: false,
+              error: `web_search is not wired for ${provider} models yet.`,
             };
         }
       } catch (error) {
@@ -111,7 +115,7 @@ async function executeOpenAiWebSearch(input: WebSearchInput, options: WebSearchT
     };
   }
 
-  const compatibility = validateModelCredentialCompatibility({
+  const compatibility = ModelPolicyService.validateCredentialCompatibility({
     model,
     provider: 'openai',
     credentialMode: oauthCredential ? 'oauth' : undefined,
@@ -157,8 +161,8 @@ async function executeOpenAiOAuthWebSearch(
   options: WebSearchToolOptions & { model: string },
   oauthCredential: NonNullable<ReturnType<typeof RuntimeCredentialService.resolveOAuthCredentialForModel>>,
 ): Promise<ToolResult> {
-  const oauthFetch = createOpenAiOAuthFetch(oauthCredential, { storePath: options.credentialStorePath });
-  const sseText = await executeOpenAiOAuthCodexSse({
+  const oauthFetch = OpenAiOAuthFetchService.create(oauthCredential, { storePath: options.credentialStorePath });
+  const sseText = await OpenAiCodexSseService.execute({
     oauthFetch,
     body: {
       model: options.model,
@@ -297,7 +301,7 @@ function formatOpenAiOAuthWebSearchSseResult(sseText: string, model: string): {
   return {
     provider: 'openai',
     model,
-    summary: extractOpenAiCodexOutputTextFromSse(sseText).trim() || 'No summary returned.',
+    summary: OpenAiCodexSseService.extractOutputText(sseText).trim() || 'No summary returned.',
     citations: extractSseWebSearchSources(sseText),
   };
 }
@@ -306,7 +310,7 @@ function extractSseWebSearchSources(sseText: string): Array<{ title: string; url
   const citations: Array<{ title: string; url: string }> = [];
   const seen = new Set<string>();
 
-  const items = extractOpenAiCodexSseItems<{
+  const items = OpenAiCodexSseService.extractItems<{
     type: 'web_search_call';
     action?: { sources?: Array<{ type?: string; url?: string }> };
   }>(

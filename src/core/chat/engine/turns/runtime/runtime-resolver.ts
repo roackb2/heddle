@@ -1,7 +1,6 @@
 import { join } from 'node:path';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
-import { createLlmAdapter } from '@/core/llm/factory.js';
-import { inferProviderFromModel } from '@/core/llm/providers.js';
+import { LlmAdapterService } from '@/core/llm/index.js';
 import {
   RuntimeCredentialService,
 } from '@/core/runtime/credentials/index.js';
@@ -28,7 +27,7 @@ export class ConversationTurnRuntimeResolver {
       sessionModel: session.model,
       env: config.env,
     });
-    const provider = inferProviderFromModel(model);
+    const provider = LlmAdapterService.inferProvider(model);
     const credentialRuntime = ConversationTurnRuntimeResolver.credentialRuntime(config);
     const apiKey = config.apiKey ?? RuntimeCredentialService.resolveApiKeyForModel(model, credentialRuntime);
     const providerCredentialSource = RuntimeCredentialService.resolveCredentialSourceForModel(model, {
@@ -54,11 +53,15 @@ export class ConversationTurnRuntimeResolver {
         memoryRoot: memoryDir,
       })),
       reasoningEffort: session.reasoningEffort,
-      llm: createLlmAdapter({
+      llm: LlmAdapterService.create({
         model,
-        apiKey,
-        credentialStorePath: config.credentialStorePath,
-        reasoningEffort: session.reasoningEffort,
+        credentials: {
+          apiKey,
+          credentialStorePath: config.credentialStorePath,
+        },
+        runtime: {
+          reasoningEffort: session.reasoningEffort,
+        },
       }),
     };
   }

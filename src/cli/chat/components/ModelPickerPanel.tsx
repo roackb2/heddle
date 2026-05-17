@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import { OPENAI_OAUTH_MODE_DESCRIPTION, type CredentialAwareModelOption } from '../../../core/llm/model-policy.js';
+import { OPENAI_OAUTH_MODE_DESCRIPTION, type CredentialAwareModelOption } from '../../../core/llm/models/index.js';
 
 const MAX_VISIBLE_MODELS = 8;
 

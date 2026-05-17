@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { estimateBuiltInContextWindow } from '../../../core/llm/openai-models.js';
+import { ModelCatalogService, ModelPolicyService } from '../../../core/llm/models/index.js';
 import type { ReasoningEffort } from '../../../core/llm/types.js';
 import type { ProviderCredentialSource } from '../utils/runtime.js';
 import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
@@ -7,7 +7,6 @@ import { currentActivityText } from '../utils/format.js';
 import type { ApprovalChoice, LiveEvent, PendingApproval } from '../state/types.js';
 import type { PlanItem } from '../../../core/tools/toolkits/internal/update-plan.js';
 import { resolveEffectiveReasoningEffort } from '../../../core/chat/engine/sessions/preferences/service.js';
-import { supportsReasoningEffort } from '../../../core/llm/model-policy.js';
 
 type ActiveTurnSummary = {
   title: string;
@@ -135,7 +134,7 @@ export function useChatStatusSummary(args: {
 }
 
 function formatContextStatus(model: string, estimatedTokens: number | undefined): string {
-  const window = estimateBuiltInContextWindow(model);
+  const window = ModelCatalogService.estimateBuiltInContextWindow(model);
   if (!window) {
     return estimatedTokens ? `estimated input tokens ${estimatedTokens}` : 'context window unknown';
   }
@@ -150,7 +149,7 @@ function formatContextStatus(model: string, estimatedTokens: number | undefined)
 }
 
 function formatReasoningStatus(model: string, explicitEffort: ReasoningEffort | undefined): string {
-  if (!supportsReasoningEffort(model)) {
+  if (!ModelPolicyService.supportsReasoningEffort(model)) {
     return 'unsupported';
   }
 

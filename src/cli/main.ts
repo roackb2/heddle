@@ -4,7 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { chdir } from 'node:process';
 import { Command } from 'commander';
-import { createLlmAdapter, DEFAULT_OPENAI_MODEL } from '../index.js';
+import { DEFAULT_OPENAI_MODEL, LlmAdapterService } from '../index.js';
 import { bootstrapMemoryWorkspace } from '../core/memory/catalog.js';
 import {
   readPendingKnowledgeCandidates,
@@ -445,7 +445,10 @@ async function runMemoryMaintainCli(options: ResolvedCliOptions, flags: { dryRun
 
   const result = await runKnowledgeMaintenanceForBacklog({
     memoryRoot,
-    llm: createLlmAdapter({ model, apiKey }),
+    llm: LlmAdapterService.create({
+      model,
+      credentials: { apiKey },
+    }),
     source: 'heddle memory maintain',
   });
 

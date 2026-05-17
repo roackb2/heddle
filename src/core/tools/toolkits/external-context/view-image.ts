@@ -10,16 +10,12 @@ import type { ImageBlockParam } from '@anthropic-ai/sdk/resources/messages/messa
 import OpenAI from 'openai';
 import type { ResponseInputImage, ResponseInputText } from 'openai/resources/responses/responses.js';
 import type { ToolDefinition, ToolResult } from '../../../types.js';
-import { inferProviderFromModel } from '../../../llm/factory.js';
+import { LlmAdapterService } from '../../../llm/index.js';
 import {
-  createOpenAiOAuthFetch,
-  executeOpenAiOAuthCodexSse,
-  extractOpenAiCodexOutputTextFromSse,
-} from '../../../llm/openai.js';
-import {
-  resolveOpenAiOAuthImageCandidateModels,
-  validateModelCredentialCompatibility,
-} from '../../../llm/model-policy.js';
+  OpenAiCodexSseService,
+  OpenAiOAuthFetchService,
+} from '../../../llm/adapters/openai/index.js';
+import { ModelPolicyService } from '../../../llm/models/index.js';
 import type { LlmProvider } from '../../../llm/types.js';
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../../../config.js';
 import { RuntimeCredentialService, type ProviderCredentialSource } from '../../../runtime/credentials/index.js';
@@ -82,7 +78,7 @@ export function createViewImageTool(options: ViewImageToolOptions = {}): ToolDef
         };
       }
 
-      const provider = options.provider ?? inferProviderFromModel(options.model ?? DEFAULT_OPENAI_MODEL);
+      const provider = options.provider ?? LlmAdapterService.inferProvider(options.model ?? DEFAULT_OPENAI_MODEL);
       const prompt = input.prompt?.trim() || DEFAULT_IMAGE_PROMPT;
 
       try {
@@ -97,6 +93,12 @@ export function createViewImageTool(options: ViewImageToolOptions = {}): ToolDef
             return {
               ok: false,
               error: 'view_image is not wired for Google models yet.',
+            };
+          case 'ollama':
+          case 'huggingface':
+            return {
+              ok: false,
+              error: `view_image is not wired for ${provider} models yet.`,
             };
         }
       } catch (error) {
@@ -129,7 +131,7 @@ async function executeOpenAiImageView(args: {
     };
   }
 
-  const compatibility = validateModelCredentialCompatibility({
+  const compatibility = ModelPolicyService.validateCredentialCompatibility({
     model,
     provider: 'openai',
     credentialMode: oauthCredential ? 'oauth' : undefined,
@@ -151,14 +153,14 @@ async function executeOpenAiImageView(args: {
   }
 
   const oauthFetch =
-    oauthCredential ? createOpenAiOAuthFetch(oauthCredential, { storePath: args.options.credentialStorePath })
+    oauthCredential ? OpenAiOAuthFetchService.create(oauthCredential, { storePath: args.options.credentialStorePath })
     : undefined;
   const client = new OpenAI({
     apiKey: oauthCredential ? 'heddle-oauth-placeholder' : apiKey,
     fetch: oauthFetch,
   });
   const imageBase64 = args.data.toString('base64');
-  const candidateModels = oauthCredential ? resolveOpenAiOAuthImageCandidateModels(model) : [model];
+  const candidateModels = oauthCredential ? ModelPolicyService.resolveOpenAiOAuthImageCandidateModels(model) : [model];
   let lastError: unknown;
 
   for (const candidateModel of candidateModels) {
@@ -213,7 +215,7 @@ async function executeOpenAiImageView(args: {
 }
 
 async function executeOpenAiOAuthImageStream(args: {
-  oauthFetch: ReturnType<typeof createOpenAiOAuthFetch> | undefined;
+  oauthFetch: ReturnType<typeof OpenAiOAuthFetchService.create> | undefined;
   accountId?: string;
   model: string;
   prompt: string;
@@ -223,7 +225,7 @@ async function executeOpenAiOAuthImageStream(args: {
     throw new Error('Missing OAuth fetch implementation for OpenAI image inspection.');
   }
 
-  const text = await executeOpenAiOAuthCodexSse({
+  const text = await OpenAiCodexSseService.execute({
     oauthFetch: args.oauthFetch,
     body: {
       model: args.model,
@@ -246,7 +248,7 @@ async function executeOpenAiOAuthImageStream(args: {
     },
   });
 
-  const outputText = extractOpenAiCodexOutputTextFromSse(text);
+  const outputText = OpenAiCodexSseService.extractOutputText(text);
   return {
     model: args.model,
     output_text: outputText || undefined,

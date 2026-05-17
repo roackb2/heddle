@@ -14,7 +14,7 @@
 
 import {
   createConversationEngine,
-  inferProviderFromModel,
+  LlmAdapterService,
   RuntimeCredentialService,
   type ConversationActivity,
   type ConversationCompactionStatus,
@@ -28,7 +28,7 @@ async function main() {
   const workspaceRoot = process.cwd();
   const stateRoot = `${workspaceRoot}/.heddle`;
   const model = process.env.HEDDLE_EXAMPLE_MODEL ?? process.env.OPENAI_MODEL ?? DEFAULT_EXAMPLE_MODEL;
-  const provider = inferProviderFromModel(model);
+  const provider = LlmAdapterService.inferProvider(model);
   const apiKey = RuntimeCredentialService.resolveProviderApiKey(provider);
 
   if (!apiKey) {

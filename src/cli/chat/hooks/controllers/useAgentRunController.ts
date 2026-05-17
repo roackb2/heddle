@@ -5,7 +5,7 @@ import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition } fro
 import type { ReasoningEffort } from '../../../../core/llm/types.js';
 import {
   createLogger,
-  createLlmAdapter,
+  LlmAdapterService,
   RuntimeToolService,
 } from '../../../../index.js';
 import type { CyberLoopObserverAnnotation } from '../../../../index.js';
@@ -128,16 +128,26 @@ export function useAgentRunController(args: UseAgentRunArgs) {
   );
 
   const llm = useMemo(
-    () => createLlmAdapter({
+    () => LlmAdapterService.create({
       model: activeModel,
-      apiKey: activeApiKey,
-      credentialStorePath: runtime.credentialStorePath,
-      reasoningEffort: activeReasoningEffort,
+      credentials: {
+        apiKey: activeApiKey,
+        credentialStorePath: runtime.credentialStorePath,
+      },
+      runtime: {
+        reasoningEffort: activeReasoningEffort,
+      },
     }),
     [activeApiKey, activeModel, activeReasoningEffort, runtime.credentialStorePath],
   );
   const titleLlm = useMemo(
-    () => createLlmAdapter({ model: sessionTitleModel, apiKey: titleApiKey, credentialStorePath: runtime.credentialStorePath }),
+    () => LlmAdapterService.create({
+      model: sessionTitleModel,
+      credentials: {
+        apiKey: titleApiKey,
+        credentialStorePath: runtime.credentialStorePath,
+      },
+    }),
     [runtime.credentialStorePath, sessionTitleModel, titleApiKey],
   );
   const tools = useMemo(

@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { resolveProviderCredentialStorePath } from '@/core/auth/provider-credentials.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import { AgentRunService } from '@/core/agent/index.js';
-import { inferProviderFromModel } from '@/core/llm/providers.js';
+import { LlmAdapterService } from '@/core/llm/index.js';
 import type { LlmAdapter, ReasoningEffort } from '@/core/llm/types.js';
 import type { ToolDefinition } from '@/core/types.js';
 import { createLogger } from '@/core/utils/logger.js';
@@ -19,7 +19,7 @@ export class AgentLoopRuntimeService {
   static async run(options: RunAgentLoopOptions): Promise<AgentLoopResult> {
     const runId = AgentLoopCheckpointService.generateRunId();
     const model = options.model ?? options.llm?.info?.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
-    const provider = inferProviderFromModel(model);
+    const provider = LlmAdapterService.inferProvider(model);
     const workspaceRoot = resolve(options.workspaceRoot ?? process.cwd());
     const apiKey = options.apiKey ?? RuntimeCredentialService.resolveApiKeyForModel(model);
     const credentialStorePath = this.resolveCredentialStorePath({ workspaceRoot, stateDir: options.stateDir });
@@ -173,8 +173,16 @@ export class AgentLoopRuntimeService {
     credentialStorePath?: string;
     reasoningEffort?: ReasoningEffort;
   }): Promise<LlmAdapter> {
-    const { createLlmAdapter } = await import('@/core/llm/factory.js');
-    return createLlmAdapter(options);
+    return LlmAdapterService.create({
+      model: options.model,
+      credentials: {
+        apiKey: options.apiKey,
+        credentialStorePath: options.credentialStorePath,
+      },
+      runtime: {
+        reasoningEffort: options.reasoningEffort,
+      },
+    });
   }
 
   private static resolveTools(

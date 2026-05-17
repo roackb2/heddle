@@ -1,8 +1,7 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { BUILT_IN_MODEL_GROUPS } from '../../../core/llm/openai-models.js';
-import { buildCredentialAwareModelOption, credentialModeFromSource } from '../../../core/llm/model-policy.js';
-import { inferProviderFromModel } from '../../../core/llm/factory.js';
+import { BUILT_IN_MODEL_GROUPS, ModelPolicyService } from '../../../core/llm/models/index.js';
+import { LlmAdapterService } from '../../../core/llm/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { procedure, router } from '../../trpc.js';
 import type { HeddleServerContext } from '../../types.js';
@@ -154,16 +153,16 @@ export const controlPlaneRouter = router({
     return controlPlaneChatSessionsController.readDetail(controlPlaneSessionEngineArgs(ctx), input.id) ?? null;
   }),
   modelOptions: procedure.query(({ ctx }) => {
-    const credentialMode = credentialModeFromSource(RuntimeCredentialService.resolveCredentialSourceForModel('gpt-5.4', {
+    const credentialMode = ModelPolicyService.credentialModeFromSource(RuntimeCredentialService.resolveCredentialSourceForModel('gpt-5.4', {
       preferApiKey: ctx.preferApiKey,
     }));
     return {
       groups: BUILT_IN_MODEL_GROUPS.map((group) => ({
         label: group.label,
         models: group.models,
-        options: group.models.map((model) => buildCredentialAwareModelOption({
+        options: group.models.map((model) => ModelPolicyService.buildCredentialAwareModelOption({
           model,
-          provider: inferProviderFromModel(model),
+          provider: LlmAdapterService.inferProvider(model),
           credentialMode,
         })),
       })),

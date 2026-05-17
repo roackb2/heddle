@@ -1,4 +1,7 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
+// Boundary note: live session rendering currently reuses core event projection and trace types in
+// the browser. Desired shape: the server should publish web-facing session event DTOs through the
+// control-plane API, with browser presenters depending on that API contract instead of core internals.
 import {
   ConversationActivityProjector,
   type ConversationActivity,

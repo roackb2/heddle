@@ -1,4 +1,4 @@
-import { estimateBuiltInContextWindow } from '@/core/llm/openai-models.js';
+import { ModelCatalogService } from '@/core/llm/models/index.js';
 import type { ChatArchiveRecord } from '@/core/chat/types.js';
 import {
   DEFAULT_CONTEXT_WINDOW_ESTIMATE,
@@ -31,7 +31,7 @@ export class ConversationCompactionService {
   static async compact(
     options: ConversationCompactionOptions,
   ): Promise<ConversationCompactionResult> {
-    const estimatedWindow = estimateBuiltInContextWindow(options.runtime.model) ?? DEFAULT_CONTEXT_WINDOW_ESTIMATE;
+    const estimatedWindow = ModelCatalogService.estimateBuiltInContextWindow(options.runtime.model) ?? DEFAULT_CONTEXT_WINDOW_ESTIMATE;
     const maxHistoryTokens = Math.floor(estimatedWindow * MAX_HISTORY_RATIO);
     const recentTokenBudget = ConversationCompactionSplitPolicy.resolveRecentHistoryTokenBudget(estimatedWindow, MAX_RECENT_HISTORY_RATIO);
     const preferredRecentMessages = options.force ? PREFERRED_FORCED_RECENT_MESSAGES : PREFERRED_RECENT_MESSAGES;

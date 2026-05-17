@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { AssistantDiagnostics, ToolCall, ToolDefinition } from '../types.js';
+import type { StoredProviderCredential } from '@/core/auth/provider-credentials.js';
 
 export type LlmStreamEvent =
   | { type: 'content.delta'; delta: string }
@@ -10,7 +11,7 @@ export type LlmStreamEvent =
   | { type: 'reasoning_summary.delta'; delta: string }
   | { type: 'reasoning_summary.done'; text: string };
 
-export type LlmProvider = 'openai' | 'anthropic' | 'google';
+export type LlmProvider = 'openai' | 'anthropic' | 'google' | 'ollama' | 'huggingface';
 
 export type ReasoningEffort = 'low' | 'medium' | 'high' | 'ultrahigh';
 
@@ -68,3 +69,23 @@ export interface LlmAdapter {
     onStreamEvent?: (event: LlmStreamEvent) => void,
   ): Promise<LlmResponse>;
 }
+
+export type LlmCredentialContext = {
+  apiKey?: string;
+  credential?: StoredProviderCredential;
+  credentialStorePath?: string;
+};
+
+export type LlmRuntimeContext = {
+  reasoningEffort?: ReasoningEffort;
+  fetchImpl?: (url: unknown, init?: unknown) => Promise<globalThis.Response>;
+};
+
+export type LlmAdapterCreateInput = {
+  provider?: LlmProvider;
+  model?: string;
+  credentials?: LlmCredentialContext;
+  runtime?: LlmRuntimeContext;
+};
+
+export type LlmProviderResolutionInput = Pick<LlmAdapterCreateInput, 'provider' | 'model'>;

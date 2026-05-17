@@ -18,7 +18,7 @@ import {
   type ToolCall,
   type ToolDefinition,
   type TraceEvent,
-  inferProviderFromModel,
+  LlmAdapterService,
   formatTraceForConsole,
   createLogger,
   RuntimeCredentialService,
@@ -74,7 +74,7 @@ export class AskCliHost {
       memoryRoot: join(stateRoot, 'memory'),
     });
     const logger = createLogger({ pretty: true, level: 'debug' });
-    const provider = inferProviderFromModel(model);
+    const provider = LlmAdapterService.inferProvider(model);
     const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
 
     logger.info({ goal, model, provider, maxSteps, cwd: workspaceRoot }, 'Heddle');

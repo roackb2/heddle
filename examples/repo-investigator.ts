@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import {
   DEFAULT_OPENAI_MODEL,
   AgentRunService,
-  createOpenAiAdapter,
+  OpenAiAdapter,
   listFilesTool,
   readFileTool,
   editFileTool,
@@ -34,9 +34,9 @@ async function main() {
 
   logger.info({ goal, model, maxSteps }, '🧵 Heddle — Repo Investigator');
 
-  const llm = createOpenAiAdapter({
+  const llm = new OpenAiAdapter({
     model,
-    apiKey: process.env.OPENAI_API_KEY ?? process.env.PERSONAL_OPENAI_API_KEY,
+    credentials: { apiKey: process.env.OPENAI_API_KEY ?? process.env.PERSONAL_OPENAI_API_KEY },
   });
   const tools = [
     listFilesTool,

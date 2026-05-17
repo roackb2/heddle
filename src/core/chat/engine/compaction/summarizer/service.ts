@@ -1,14 +1,10 @@
-import { createLlmAdapter, inferProviderFromModel } from '@/core/llm/factory.js';
+import { LlmAdapterService } from '@/core/llm/index.js';
 import {
   RuntimeCredentialService,
   type ApiKeyRuntime,
   type ProviderCredentialSource,
 } from '@/core/runtime/credentials/index.js';
-import {
-  credentialModeFromSource,
-  resolveSystemSelectedModel,
-  type ModelCredentialMode,
-} from '@/core/llm/model-policy.js';
+import { ModelPolicyService, type ModelCredentialMode } from '@/core/llm/models/index.js';
 import { CompactionText } from '../text.js';
 import type { ConversationCompactionOptions } from '../types.js';
 import { ConversationArchiveSummarizerContextBuilder } from './context-builder.js';
@@ -32,11 +28,11 @@ export class ConversationArchiveSummarizer {
 
     const provider =
       options.summarizer?.provider === 'active' || !options.summarizer?.provider ?
-        inferProviderFromModel(options.runtime.model)
+        LlmAdapterService.inferProvider(options.runtime.model)
       : options.summarizer.provider;
     const model =
       options.summarizer?.model
-      ?? resolveSystemSelectedModel({
+      ?? ModelPolicyService.resolveSystemSelectedModel({
         purpose: 'chat-compaction',
         provider,
         activeModel: options.runtime.model,
@@ -57,7 +53,10 @@ export class ConversationArchiveSummarizer {
 
     return {
       model,
-      llm: createLlmAdapter({ model, apiKey }),
+      llm: LlmAdapterService.create({
+        model,
+        credentials: { apiKey },
+      }),
     };
   }
 
@@ -89,7 +88,7 @@ export class ConversationArchiveSummarizer {
       apiKeyProvider: explicitApiKey ? 'explicit' : undefined,
       credentialStorePath,
     };
-    return credentialModeFromSource(credentialSource ?? RuntimeCredentialService.resolveCredentialSourceForModel(activeModel, credentialRuntime));
+    return ModelPolicyService.credentialModeFromSource(credentialSource ?? RuntimeCredentialService.resolveCredentialSourceForModel(activeModel, credentialRuntime));
   }
 
   static deriveShortDescription(summary: string): string | undefined {

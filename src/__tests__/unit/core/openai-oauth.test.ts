@@ -15,7 +15,8 @@ import {
   refreshOpenAiOAuthToken,
   type OpenAiOAuthTokenResponse,
 } from '../../../core/auth/openai-oauth.js';
-import { createOpenAiAdapter, createOpenAiOAuthFetch } from '../../../core/llm/openai.js';
+import { OpenAiAdapter, OpenAiOAuthFetchService } from '../../../core/llm/adapters/openai/index.js';
+import type { ReasoningEffort } from '../../../core/llm/types.js';
 
 describe('OpenAI OAuth helpers', () => {
   it('generates PKCE verifier and challenge values', () => {
@@ -124,7 +125,7 @@ describe('OpenAI OAuth helpers', () => {
       }
       return new Response('ok');
     }) as typeof fetch;
-    const oauthFetch = createOpenAiOAuthFetch({
+    const oauthFetch = OpenAiOAuthFetchService.create({
       type: 'oauth',
       provider: 'openai',
       accessToken: 'expired-access-token',
@@ -152,7 +153,7 @@ describe('OpenAI OAuth helpers', () => {
   });
 
   it('fails clearly for account sign-in with a model outside the known Codex set', async () => {
-    const adapter = createOpenAiAdapter({
+    const adapter = createOpenAiTestAdapter({
       model: 'o3',
       credential: {
         type: 'oauth',
@@ -172,7 +173,7 @@ describe('OpenAI OAuth helpers', () => {
   });
 
   it('fails clearly before routing gpt-5.1-codex-mini through account sign-in', async () => {
-    const adapter = createOpenAiAdapter({
+    const adapter = createOpenAiTestAdapter({
       model: 'gpt-5.1-codex-mini',
       credential: {
         type: 'oauth',
@@ -196,7 +197,7 @@ describe('OpenAI OAuth helpers', () => {
 
   it('includes the default reasoning effort for supported reasoning models', async () => {
     const requests: Array<{ url: string; body: string }> = [];
-    const adapter = createOpenAiAdapter({
+    const adapter = createOpenAiTestAdapter({
       model: 'gpt-5.4',
       credential: {
         type: 'oauth',
@@ -221,7 +222,7 @@ describe('OpenAI OAuth helpers', () => {
 
   it('uses the Codex-compatible Responses payload shape for account sign-in models', async () => {
     const requests: Array<{ url: string; body: string }> = [];
-    const adapter = createOpenAiAdapter({
+    const adapter = createOpenAiTestAdapter({
       model: 'gpt-5.4',
       credential: {
         type: 'oauth',
@@ -263,7 +264,7 @@ describe('OpenAI OAuth helpers', () => {
 
   it('includes explicit reasoning effort when configured', async () => {
     const requests: Array<{ url: string; body: string }> = [];
-    const adapter = createOpenAiAdapter({
+    const adapter = createOpenAiTestAdapter({
       model: 'gpt-5.5',
       reasoningEffort: 'medium',
       credential: {
@@ -289,7 +290,7 @@ describe('OpenAI OAuth helpers', () => {
 
   it('rejects ultrahigh reasoning effort instead of silently dropping it', async () => {
     const requests: Array<{ url: string; body: string }> = [];
-    const adapter = createOpenAiAdapter({
+    const adapter = createOpenAiTestAdapter({
       model: 'gpt-5.5',
       reasoningEffort: 'ultrahigh',
       credential: {
@@ -313,7 +314,7 @@ describe('OpenAI OAuth helpers', () => {
   });
 
   it('reconstructs tool calls from streamed Codex OAuth events when final response output is empty', async () => {
-    const adapter = createOpenAiAdapter({
+    const adapter = createOpenAiTestAdapter({
       model: 'gpt-5.4',
       credential: {
         type: 'oauth',
@@ -385,7 +386,7 @@ describe('OpenAI OAuth helpers', () => {
   });
 
   it('streams OpenAI reasoning summary text events to the LLM stream callback', async () => {
-    const adapter = createOpenAiAdapter({
+    const adapter = createOpenAiTestAdapter({
       model: 'gpt-5.4',
       credential: {
         type: 'oauth',
@@ -447,4 +448,20 @@ function createJwt(payload: unknown): string {
     Buffer.from(JSON.stringify(payload)).toString('base64url'),
     'signature',
   ].join('.');
+}
+
+function createOpenAiTestAdapter(options: {
+  model: string;
+  credential?: Parameters<typeof OpenAiOAuthFetchService.create>[0];
+  fetchImpl?: typeof fetch;
+  reasoningEffort?: ReasoningEffort;
+}): OpenAiAdapter {
+  return new OpenAiAdapter({
+    model: options.model,
+    credentials: { credential: options.credential },
+    runtime: {
+      fetchImpl: options.fetchImpl,
+      reasoningEffort: options.reasoningEffort,
+    },
+  });
 }

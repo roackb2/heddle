@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { CredentialAwareModelOption } from '../../../../core/llm/model-policy.js';
+import type { CredentialAwareModelOption } from '../../../../core/llm/models/index.js';
 import type { ReasoningEffort } from '../../../../core/llm/types.js';
 import type { ConversationSessionService } from '../../../../core/chat/engine/types.js';
 import type { ReasoningEffortPickerOption } from '../useChatPickers.js';

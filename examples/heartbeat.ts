@@ -13,7 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import { join } from 'node:path';
-import { inferProviderFromModel } from '../src/core/llm/providers.js';
+import { LlmAdapterService } from '../src/core/llm/index.js';
 import { RuntimeCredentialService } from '../src/core/runtime/credentials/index.js';
 import { FileHeartbeatCheckpointRepository, StoredHeartbeatService } from '../src/core/heartbeat/index.js';
 
@@ -22,7 +22,7 @@ const CHECKPOINT_PATH = join(process.cwd(), '.heddle', 'examples', 'heartbeat-de
 
 async function main() {
   const model = process.env.HEDDLE_EXAMPLE_MODEL ?? process.env.OPENAI_MODEL ?? DEFAULT_EXAMPLE_MODEL;
-  const provider = inferProviderFromModel(model);
+  const provider = LlmAdapterService.inferProvider(model);
   const apiKey = RuntimeCredentialService.resolveProviderApiKey(provider);
   if (!apiKey) {
     throw new Error(

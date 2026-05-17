@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import {
   appendMemoryCatalogSystemContext,
   DEFAULT_OPENAI_MODEL,
-  createLlmAdapter,
+  LlmAdapterService,
   createLogger,
   formatTraceForConsole,
   AgentLoopRuntimeService,
@@ -43,7 +43,10 @@ export class ControlPlaneAskController {
       apiKeyProvider: args.apiKey ? 'explicit' : undefined,
       preferApiKey: args.preferApiKey,
     });
-    const llm = createLlmAdapter({ model, apiKey });
+    const llm = LlmAdapterService.create({
+      model,
+      credentials: { apiKey },
+    });
 
     const result = await AgentLoopRuntimeService.run({
       goal: args.goal,

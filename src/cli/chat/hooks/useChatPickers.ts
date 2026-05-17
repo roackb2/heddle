@@ -1,13 +1,10 @@
 import { useMemo, useState } from 'react';
-import { BUILT_IN_MODEL_GROUPS, filterBuiltInModels } from '../../../core/llm/openai-models.js';
 import {
-  buildCredentialAwareModelOption,
-  credentialModeFromSource,
-  resolveDefaultReasoningEffort,
-  supportsOpenAiRequestReasoningEffort,
-  supportsReasoningEffort,
+  BUILT_IN_MODEL_GROUPS,
+  ModelCatalogService,
+  ModelPolicyService,
   type CredentialAwareModelOption,
-} from '../../../core/llm/model-policy.js';
+} from '../../../core/llm/models/index.js';
 import type { ReasoningEffort } from '../../../core/llm/types.js';
 import type { ProviderCredentialSource } from '../utils/runtime.js';
 import type { PromptKeyInput } from '../components/PromptInput.js';
@@ -43,9 +40,9 @@ export function useChatPickers({
   const highlightedMentionFile = filteredMentionFiles[safeFileMentionPickerIndex];
 
   const credentialAwareModels = useMemo(() => {
-    const credentialMode = credentialModeFromSource(providerCredentialSource);
+    const credentialMode = ModelPolicyService.credentialModeFromSource(providerCredentialSource);
     return BUILT_IN_MODEL_GROUPS.flatMap((group) => group.models).map((model) =>
-      buildCredentialAwareModelOption({
+      ModelPolicyService.buildCredentialAwareModelOption({
         model,
         provider: model.startsWith('claude') ? 'anthropic' : 'openai',
         credentialMode,
@@ -215,14 +212,14 @@ function getSessionPickerQuery(draft: string): string | undefined {
 }
 
 function filterCredentialAwareModels(models: CredentialAwareModelOption[], query: string): CredentialAwareModelOption[] {
-  const matchingIds = new Set(filterBuiltInModels(query));
+  const matchingIds = new Set(ModelCatalogService.filterBuiltInModels(query));
   return models.filter((model) => matchingIds.has(model.id));
 }
 
 function buildReasoningEffortOptions(model: string): ReasoningEffortPickerOption[] {
-  const requestSupported = supportsOpenAiRequestReasoningEffort(model);
-  const reasoningSupported = supportsReasoningEffort(model);
-  const defaultEffort = resolveDefaultReasoningEffort(model);
+  const requestSupported = ModelPolicyService.supportsOpenAiRequestReasoningEffort(model);
+  const reasoningSupported = ModelPolicyService.supportsReasoningEffort(model);
+  const defaultEffort = ModelPolicyService.resolveDefaultReasoningEffort(model);
   const disabledReason =
     reasoningSupported ?
       'Not supported by request path'

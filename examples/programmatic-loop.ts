@@ -18,7 +18,7 @@ import { AgentLoopCheckpointService, AgentLoopRuntimeService, type AgentLoopEven
 import type { ToolDefinition } from '../src/core/types.js';
 import type { TraceEvent } from '../src/core/types.js';
 import { RuntimeCredentialService } from '../src/core/runtime/credentials/index.js';
-import { inferProviderFromModel } from '../src/core/llm/providers.js';
+import { LlmAdapterService } from '../src/core/llm/index.js';
 
 const DEFAULT_EXAMPLE_MODEL = 'gpt-5.1-codex-mini';
 
@@ -46,7 +46,7 @@ const echoTool: ToolDefinition = {
 
 async function main() {
   const model = process.env.HEDDLE_EXAMPLE_MODEL ?? process.env.OPENAI_MODEL ?? DEFAULT_EXAMPLE_MODEL;
-  const provider = inferProviderFromModel(model);
+  const provider = LlmAdapterService.inferProvider(model);
   const apiKey = RuntimeCredentialService.resolveProviderApiKey(provider);
   if (!apiKey) {
     throw new Error(

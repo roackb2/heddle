@@ -1,5 +1,5 @@
 import type { ChatSession } from '@/core/chat/types.js';
-import { resolveDefaultReasoningEffort, supportsReasoningEffort } from '@/core/llm/model-policy.js';
+import { ModelPolicyService } from '@/core/llm/models/index.js';
 import type { ReasoningEffort } from '@/core/llm/types.js';
 
 export type SessionExecutionPreferences = {
@@ -31,14 +31,14 @@ export function resolveEffectiveReasoningEffort(args: {
   model: string;
   reasoningEffort?: ReasoningEffort;
 }): ReasoningEffort | undefined {
-  return args.reasoningEffort ?? resolveDefaultReasoningEffort(args.model);
+  return args.reasoningEffort ?? ModelPolicyService.resolveDefaultReasoningEffort(args.model);
 }
 
 export function formatSessionReasoningEffortStatus(args: {
   model: string;
   reasoningEffort?: ReasoningEffort;
 }): string {
-  const supported = supportsReasoningEffort(args.model);
+  const supported = ModelPolicyService.supportsReasoningEffort(args.model);
   const effective = resolveEffectiveReasoningEffort(args);
   return [
     `Current model: ${args.model}`,

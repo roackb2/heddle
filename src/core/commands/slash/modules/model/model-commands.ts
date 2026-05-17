@@ -3,20 +3,18 @@ import type { SlashCommandResult } from '../../result-types.js';
 import type { SlashCommandModule } from '../../types.js';
 import type { SlashCommandExecutionContext } from '../context.js';
 import { argumentAfterPrefix, slashMessageResult } from '../results.js';
-import { COMMON_BUILT_IN_MODELS, formatBuiltInModelGroups } from '../../../../llm/openai-models.js';
 import {
-  credentialModeFromSource,
-  supportsOpenAiRequestReasoningEffort,
-  supportsReasoningEffort,
-  validateModelCredentialCompatibility,
-} from '../../../../llm/model-policy.js';
+  COMMON_BUILT_IN_MODELS,
+  ModelCatalogService,
+  ModelPolicyService,
+} from '../../../../llm/models/index.js';
 import type { LlmProvider, ReasoningEffort } from '../../../../llm/types.js';
 import {
   formatSessionReasoningEffortStatus,
   resolveEffectiveReasoningEffort,
 } from '../../../../chat/engine/sessions/preferences/service.js';
 
-export const MODEL_LIST_MESSAGE = ['Common built-in model choices', '', formatBuiltInModelGroups()].join('\n');
+export const MODEL_LIST_MESSAGE = ['Common built-in model choices', '', ModelCatalogService.formatBuiltInModelGroups()].join('\n');
 export const MODEL_SET_HELP_MESSAGE = 'Use /model set <query> to filter models, then use arrows and Enter to choose one.';
 export const REASONING_SET_HELP_MESSAGE = 'Use /reasoning set <query> to filter reasoning efforts, then use arrows and Enter to choose one.';
 
@@ -118,10 +116,10 @@ function switchModel(
     return aliased;
   }
 
-  const compatibility = validateModelCredentialCompatibility({
+  const compatibility = ModelPolicyService.validateCredentialCompatibility({
     model: value,
     provider: inferProviderForModel(value),
-    credentialMode: credentialModeFromSource(context.model.credentialSource()),
+    credentialMode: ModelPolicyService.credentialModeFromSource(context.model.credentialSource()),
   });
   if (!compatibility.ok) {
     return slashMessageResult(compatibility.error);
@@ -163,7 +161,7 @@ function setReasoningEffort(
     return slashMessageResult('Usage: /reasoning set <query> or /reasoning <low|medium|high|default>');
   }
 
-  if (!supportsReasoningEffort(context.model.active())) {
+  if (!ModelPolicyService.supportsReasoningEffort(context.model.active())) {
     return slashMessageResult(`Reasoning effort is not supported for model ${context.model.active()}.`);
   }
 
@@ -171,7 +169,7 @@ function setReasoningEffort(
     return slashMessageResult('Reasoning effort "ultrahigh" is reserved but is not supported by the current OpenAI request path. Use low, medium, high, or default.');
   }
 
-  if (!supportsOpenAiRequestReasoningEffort(context.model.active())) {
+  if (!ModelPolicyService.supportsOpenAiRequestReasoningEffort(context.model.active())) {
     return slashMessageResult(`Reasoning effort settings are not supported by the OpenAI request path for model ${context.model.active()}.`);
   }
 
