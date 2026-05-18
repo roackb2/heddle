@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from 'react';
-import { AppNavigation } from './components/AppNavigation';
-import { SettingsNavigation } from './components/SettingsNavigation';
+import { AppNavigation, SettingsNavigation } from '../components/navigation';
+import { useI18n } from '../i18n';
 import type { AppSurfaceId, NavigationItem, SettingsSectionId } from './types';
 
 interface AppFrameProps {
@@ -29,10 +29,12 @@ export function AppFrame({
   onCloseSettings,
   children,
 }: PropsWithChildren<AppFrameProps>) {
+  const { t } = useI18n();
+
   return (
     <div className="flex h-dvh bg-background font-sans text-foreground">
-      <a className="sr-only focus:not-sr-only" href="#main-content">Skip to Main Content</a>
-      <aside className="flex w-60 shrink-0 flex-col border-r bg-card" aria-label="Primary navigation">
+      <a className="sr-only focus:not-sr-only" href="#main-content">{t('navigation.skipToMain')}</a>
+      <aside className="flex w-60 shrink-0 flex-col border-r bg-card" aria-label={t('navigation.primaryAriaLabel')}>
         {settingsOpen ? (
           <SettingsNavigation
             activeItemId={activeSettingsSectionId}
