@@ -42,7 +42,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/web/**/*.{ts,tsx}'],
+    files: ['src/web/**/*.{ts,tsx}', 'src/web-v2/**/*.{ts,tsx}'],
     languageOptions: {
       globals: {
         ...globals.browser,
