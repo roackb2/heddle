@@ -1,9 +1,12 @@
 import type { NavigationItem } from './types';
 
-export const NAV_ITEMS: NavigationItem[] = [
-  { id: 'sessions', label: 'Sessions' },
-  { id: 'review', label: 'Review' },
-  { id: 'tasks', label: 'Tasks' },
-  { id: 'workspaces', label: 'Workspaces' },
-  { id: 'settings', label: 'Settings' },
+export const APP_NAV_ITEMS: NavigationItem[] = [
+  { id: 'sessions', label: 'Sessions', href: '#sessions' },
+  { id: 'tasks', label: 'Tasks', href: '#tasks' },
+];
+
+export const SETTINGS_NAV_ITEMS: NavigationItem[] = [
+  { id: 'general', label: 'General', href: '#settings-general' },
+  { id: 'workspaces', label: 'Workspace Management', href: '#settings-workspaces' },
+  { id: 'memory', label: 'Memory Status', href: '#settings-memory' },
 ];

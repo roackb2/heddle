@@ -18,6 +18,9 @@ current user-facing UI.
   global hooks until two real surfaces need the same behavior.
 - Start with navigation structure only, then build one complete workflow at a
   time.
+- Visual design follows [`design-language.md`](./design-language.md). Start with
+  shadcn/Tailwind semantic tokens and extend them only when a concrete product
+  need appears.
 
 ## Folder Shape
 

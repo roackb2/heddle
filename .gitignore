@@ -24,3 +24,6 @@ test-results/
 
 # IDE
 .claude/
+
+# Agents
+.agents/
