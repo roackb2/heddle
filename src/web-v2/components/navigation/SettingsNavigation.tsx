@@ -1,18 +1,17 @@
-import { Button } from '../ui/button';
-import { useI18n } from '../../i18n';
-import type { NavigationItem, SettingsSectionId } from '../../layout/types';
+import { Button } from '@web/components/ui/button';
+import { useI18n } from '@web/i18n';
+import type { NavigationItem, SettingsSectionId } from '@web/layout/types';
 import { SidebarLink } from './SidebarLink';
 
 interface SettingsNavigationProps {
   activeItemId: SettingsSectionId;
-  items: NavigationItem[];
+  items: readonly NavigationItem[];
   onBack: () => void;
-  onSelect: (id: SettingsSectionId) => void;
 }
 
 // SettingsNavigation owns the alternate sidebar mode for configuration surfaces
 // that should not crowd the main agent workbench.
-export function SettingsNavigation({ activeItemId, items, onBack, onSelect }: SettingsNavigationProps) {
+export function SettingsNavigation({ activeItemId, items, onBack }: SettingsNavigationProps) {
   const { t } = useI18n();
 
   return (
@@ -29,7 +28,6 @@ export function SettingsNavigation({ activeItemId, items, onBack, onSelect }: Se
             active={item.id === activeItemId}
             href={item.href}
             label={t(item.labelKey)}
-            onClick={() => onSelect(item.id as SettingsSectionId)}
           />
         ))}
       </nav>

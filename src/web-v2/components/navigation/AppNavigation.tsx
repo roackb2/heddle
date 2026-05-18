@@ -1,18 +1,17 @@
-import { useI18n } from '../../i18n';
-import type { AppSurfaceId, NavigationItem } from '../../layout/types';
+import { useI18n } from '@web/i18n';
+import type { AppSurfaceId, NavigationItem } from '@web/layout/types';
 import { SettingsMenu } from './SettingsMenu';
 import { SidebarLink } from './SidebarLink';
 
 interface AppNavigationProps {
   activeItemId: AppSurfaceId;
-  items: NavigationItem[];
+  items: readonly NavigationItem[];
   onOpenSettings: () => void;
-  onSelect: (id: AppSurfaceId) => void;
 }
 
 // AppNavigation owns the primary workbench sidebar mode: app surfaces, the
 // future session list region, and the bottom settings entry point.
-export function AppNavigation({ activeItemId, items, onOpenSettings, onSelect }: AppNavigationProps) {
+export function AppNavigation({ activeItemId, items, onOpenSettings }: AppNavigationProps) {
   const { t } = useI18n();
 
   return (
@@ -25,7 +24,6 @@ export function AppNavigation({ activeItemId, items, onOpenSettings, onSelect }:
             active={item.id === activeItemId}
             href={item.href}
             label={t(item.labelKey)}
-            onClick={() => onSelect(item.id as AppSurfaceId)}
           />
         ))}
       </nav>

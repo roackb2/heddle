@@ -1,7 +1,7 @@
-import { useWorkbenchNavigation } from './hooks/useWorkbenchNavigation';
-import { AppFrame } from './layout/AppFrame';
-import { APP_NAV_ITEMS, SETTINGS_NAV_ITEMS } from './layout/navigation';
-import { WorkbenchView } from './views/WorkbenchView';
+import { useWorkbenchNavigation } from '@web/hooks/useWorkbenchNavigation';
+import { AppFrame } from '@web/layout/AppFrame';
+import { AppRoutes } from '@web/layout/AppRoutes';
+import { APP_ROUTES, SETTINGS_ROUTES } from '@web/layout/routes';
 
 export function App() {
   const navigation = useWorkbenchNavigation();
@@ -10,18 +10,15 @@ export function App() {
     <AppFrame
       activeSurfaceId={navigation.activeSurfaceId}
       activeSettingsSectionId={navigation.activeSettingsSectionId}
-      appNavigationItems={APP_NAV_ITEMS}
-      settingsNavigationItems={SETTINGS_NAV_ITEMS}
+      appNavigationItems={APP_ROUTES}
+      settingsNavigationItems={SETTINGS_ROUTES}
       settingsOpen={navigation.settingsOpen}
-      onAppNavigation={navigation.openSurface}
-      onSettingsNavigation={navigation.openSettingsSection}
       onOpenSettings={navigation.openSettings}
       onCloseSettings={navigation.closeSettings}
     >
-      <WorkbenchView
+      <AppRoutes
         activeSurfaceId={navigation.activeSurfaceId}
         activeSettingsSectionId={navigation.activeSettingsSectionId}
-        settingsOpen={navigation.settingsOpen}
       />
     </AppFrame>
   );

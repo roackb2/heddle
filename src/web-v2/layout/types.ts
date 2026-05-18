@@ -1,4 +1,4 @@
-import type { I18nMessageKey } from '../i18n/messages';
+import type { I18nMessageKey } from '@web/i18n/messages';
 
 export type AppSurfaceId = 'sessions' | 'tasks';
 export type SettingsSectionId = 'general' | 'workspaces' | 'memory';

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const repoRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
+const repoRoot = resolve(fileURLToPath(new URL('../../../..', import.meta.url)));
 const secondaryWorkspace = resolve(repoRoot, '.browser-integration/workspaces/secondary');
 
 test('loads overview with fixture workspace state', async ({ page }) => {

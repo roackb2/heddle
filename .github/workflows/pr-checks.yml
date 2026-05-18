@@ -111,5 +111,8 @@ jobs:
       - name: Install Playwright Chromium
         run: yarn test:browser-integration:install --with-deps
 
-      - name: Run browser integration tests
-        run: yarn test:browser-integration
+      - name: Run web v1 browser integration tests
+        run: yarn test:browser-integration:v1
+
+      - name: Run web v2 browser integration tests
+        run: yarn test:browser-integration:v2

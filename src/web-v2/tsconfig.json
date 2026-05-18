@@ -11,7 +11,9 @@
     "outDir": "../../dist/web-v2-types",
     "rootDir": "../..",
     "baseUrl": "../..",
+    "ignoreDeprecations": "5.0",
     "paths": {
+      "@web/*": ["src/web-v2/*"],
       "@/*": ["src/*"]
     },
     "types": ["vite/client"]

@@ -1,6 +1,6 @@
-import type { I18nMessageKey } from '../i18n';
-import { useI18n } from '../i18n';
-import type { AppSurfaceId, SettingsSectionId } from '../layout/types';
+import type { I18nMessageKey } from '@web/i18n';
+import { useI18n } from '@web/i18n';
+import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
 
 interface WorkbenchViewProps {
   activeSurfaceId: AppSurfaceId;

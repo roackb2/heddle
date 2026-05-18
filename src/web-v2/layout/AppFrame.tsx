@@ -3,19 +3,17 @@ import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
-} from '../components/ui/resizable';
-import { AppNavigation, SettingsNavigation } from '../components/navigation';
-import { useI18n } from '../i18n';
-import type { AppSurfaceId, NavigationItem, SettingsSectionId } from './types';
+} from '@web/components/ui/resizable';
+import { ContextInspector, ConversationWorkspace, SessionSidebar } from '@web/components/panels';
+import { useI18n } from '@web/i18n';
+import type { AppSurfaceId, NavigationItem, SettingsSectionId } from '@web/layout/types';
 
 interface AppFrameProps {
   activeSurfaceId: AppSurfaceId;
   activeSettingsSectionId: SettingsSectionId;
-  appNavigationItems: NavigationItem[];
-  settingsNavigationItems: NavigationItem[];
+  appNavigationItems: readonly NavigationItem[];
+  settingsNavigationItems: readonly NavigationItem[];
   settingsOpen: boolean;
-  onAppNavigation: (id: AppSurfaceId) => void;
-  onSettingsNavigation: (id: SettingsSectionId) => void;
   onOpenSettings: () => void;
   onCloseSettings: () => void;
 }
@@ -28,8 +26,6 @@ export function AppFrame({
   appNavigationItems,
   settingsNavigationItems,
   settingsOpen,
-  onAppNavigation,
-  onSettingsNavigation,
   onOpenSettings,
   onCloseSettings,
   children,
@@ -41,33 +37,25 @@ export function AppFrame({
       <a className="sr-only focus:not-sr-only" href="#main-content">{t('navigation.skipToMain')}</a>
       <ResizablePanelGroup direction="horizontal">
         <ResizablePanel defaultSize="16%" minSize="12rem" maxSize="28rem">
-          <aside className="flex h-full min-w-0 flex-col bg-card" aria-label={t('navigation.primaryAriaLabel')}>
-            {settingsOpen ? (
-              <SettingsNavigation
-                activeItemId={activeSettingsSectionId}
-                items={settingsNavigationItems}
-                onBack={onCloseSettings}
-                onSelect={onSettingsNavigation}
-              />
-            ) : (
-              <AppNavigation
-                activeItemId={activeSurfaceId}
-                items={appNavigationItems}
-                onOpenSettings={onOpenSettings}
-                onSelect={onAppNavigation}
-              />
-            )}
-          </aside>
+          <SessionSidebar
+            activeSurfaceId={activeSurfaceId}
+            activeSettingsSectionId={activeSettingsSectionId}
+            appNavigationItems={appNavigationItems}
+            settingsNavigationItems={settingsNavigationItems}
+            settingsOpen={settingsOpen}
+            onOpenSettings={onOpenSettings}
+            onCloseSettings={onCloseSettings}
+          />
         </ResizablePanel>
 
         <ResizableHandle />
         <ResizablePanel defaultSize="62%" minSize="32rem">
-          <main id="main-content" className="h-full min-w-0">{children}</main>
+          <ConversationWorkspace>{children}</ConversationWorkspace>
         </ResizablePanel>
 
         <ResizableHandle />
         <ResizablePanel defaultSize="22%" minSize="14rem" maxSize="36rem">
-          <aside className="h-full min-w-0 bg-card" aria-label={t('inspector.contextAriaLabel')} />
+          <ContextInspector />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

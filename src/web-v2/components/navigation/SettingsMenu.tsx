@@ -1,11 +1,11 @@
-import { Button } from '../ui/button';
+import { Button } from '@web/components/ui/button';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '../ui/popover';
+} from '@web/components/ui/popover';
 import { LanguageSelect } from './LanguageSelect';
-import { useI18n } from '../../i18n';
+import { useI18n } from '@web/i18n';
 
 interface SettingsMenuProps {
   onOpenSettings: () => void;
