@@ -1,4 +1,9 @@
 import type { PropsWithChildren } from 'react';
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@/web/components/ui/resizable';
 import { AppNavigation, SettingsNavigation } from '../components/navigation';
 import { useI18n } from '../i18n';
 import type { AppSurfaceId, NavigationItem, SettingsSectionId } from './types';
@@ -32,27 +37,39 @@ export function AppFrame({
   const { t } = useI18n();
 
   return (
-    <div className="flex h-dvh bg-background font-sans text-foreground">
+    <div className="h-dvh bg-background font-sans text-foreground">
       <a className="sr-only focus:not-sr-only" href="#main-content">{t('navigation.skipToMain')}</a>
-      <aside className="flex w-60 shrink-0 flex-col border-r bg-card" aria-label={t('navigation.primaryAriaLabel')}>
-        {settingsOpen ? (
-          <SettingsNavigation
-            activeItemId={activeSettingsSectionId}
-            items={settingsNavigationItems}
-            onBack={onCloseSettings}
-            onSelect={onSettingsNavigation}
-          />
-        ) : (
-          <AppNavigation
-            activeItemId={activeSurfaceId}
-            items={appNavigationItems}
-            onOpenSettings={onOpenSettings}
-            onSelect={onAppNavigation}
-          />
-        )}
-      </aside>
+      <ResizablePanelGroup direction="horizontal">
+        <ResizablePanel defaultSize={16} minSize={12} maxSize={28}>
+          <aside className="flex h-full min-w-0 flex-col bg-card" aria-label={t('navigation.primaryAriaLabel')}>
+            {settingsOpen ? (
+              <SettingsNavigation
+                activeItemId={activeSettingsSectionId}
+                items={settingsNavigationItems}
+                onBack={onCloseSettings}
+                onSelect={onSettingsNavigation}
+              />
+            ) : (
+              <AppNavigation
+                activeItemId={activeSurfaceId}
+                items={appNavigationItems}
+                onOpenSettings={onOpenSettings}
+                onSelect={onAppNavigation}
+              />
+            )}
+          </aside>
+        </ResizablePanel>
 
-      <main id="main-content" className="min-w-0 flex-1">{children}</main>
+        <ResizableHandle />
+        <ResizablePanel defaultSize={62} minSize={36}>
+          <main id="main-content" className="h-full min-w-0">{children}</main>
+        </ResizablePanel>
+
+        <ResizableHandle />
+        <ResizablePanel defaultSize={22} minSize={14} maxSize={36}>
+          <aside className="h-full min-w-0 bg-card" aria-label={t('inspector.contextAriaLabel')} />
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 }

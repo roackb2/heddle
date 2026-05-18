@@ -1,0 +1,23 @@
+{
+  "app.name": "Heddle",
+  "inspector.contextAriaLabel": "上下文检查器",
+  "language.en-us": "英文（美国）",
+  "language.label": "语言",
+  "language.zh-cn": "简体中文",
+  "language.zh-tw": "繁体中文",
+  "navigation.backToApp": "返回应用",
+  "navigation.mainAriaLabel": "主应用导航",
+  "navigation.openSettings": "打开设置",
+  "navigation.primaryAriaLabel": "主导航",
+  "navigation.sessionListAriaLabel": "会话列表",
+  "navigation.settings": "设置",
+  "navigation.settingsAriaLabel": "设置导航",
+  "navigation.settingsMenuAriaLabel": "设置菜单",
+  "navigation.skipToMain": "跳到主要内容",
+  "settings.general": "通用",
+  "settings.memory": "记忆状态",
+  "settings.workspaces": "工作区管理",
+  "surface.sessions": "会话",
+  "surface.tasks": "任务",
+  "workbench.workspaceAriaLabel": "工作区"
+}

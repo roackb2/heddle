@@ -1,5 +1,5 @@
-import { useI18n } from '../i18n';
 import type { I18nMessageKey } from '../i18n';
+import { useI18n } from '../i18n';
 import type { AppSurfaceId, SettingsSectionId } from '../layout/types';
 
 interface WorkbenchViewProps {
@@ -26,15 +26,11 @@ export function WorkbenchView({ activeSurfaceId, activeSettingsSectionId, settin
   const title = t(settingsOpen ? settingsSectionLabelKeys[activeSettingsSectionId] : appSurfaceLabelKeys[activeSurfaceId]);
 
   return (
-    <section className="flex h-dvh min-w-0 bg-background">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 items-center border-b bg-card px-4">
-          <h1 className="text-balance text-sm font-medium">{title}</h1>
-        </header>
-        <div className="min-h-0 flex-1 bg-background" aria-label={`${title} ${t('workbench.workspaceAriaLabel')}`} />
-      </div>
-
-      <aside className="w-80 shrink-0 border-l bg-card" aria-label={t('inspector.contextAriaLabel')} />
+    <section className="flex h-full min-w-0 flex-col bg-background">
+      <header className="flex h-12 items-center border-b bg-card px-4">
+        <h1 className="text-balance text-sm font-medium">{title}</h1>
+      </header>
+      <div className="min-h-0 flex-1 bg-background" aria-label={`${title} ${t('workbench.workspaceAriaLabel')}`} />
     </section>
   );
 }

@@ -1,0 +1,23 @@
+{
+  "app.name": "Heddle",
+  "inspector.contextAriaLabel": "Context inspector",
+  "language.en-us": "English (US)",
+  "language.label": "Language",
+  "language.zh-cn": "Simplified Chinese",
+  "language.zh-tw": "Traditional Chinese",
+  "navigation.backToApp": "Back to App",
+  "navigation.mainAriaLabel": "Main app navigation",
+  "navigation.openSettings": "Open settings",
+  "navigation.primaryAriaLabel": "Primary navigation",
+  "navigation.sessionListAriaLabel": "Session list",
+  "navigation.settings": "Settings",
+  "navigation.settingsAriaLabel": "Settings navigation",
+  "navigation.settingsMenuAriaLabel": "Settings menu",
+  "navigation.skipToMain": "Skip to Main Content",
+  "settings.general": "General",
+  "settings.memory": "Memory Status",
+  "settings.workspaces": "Workspace Management",
+  "surface.sessions": "Sessions",
+  "surface.tasks": "Tasks",
+  "workbench.workspaceAriaLabel": "workspace"
+}

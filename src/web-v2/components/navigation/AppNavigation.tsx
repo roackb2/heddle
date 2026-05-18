@@ -1,6 +1,6 @@
-import { Button } from '@/web/components/ui/button';
 import { useI18n } from '../../i18n';
 import type { AppSurfaceId, NavigationItem } from '../../layout/types';
+import { SettingsMenu } from './SettingsMenu';
 import { SidebarLink } from './SidebarLink';
 
 interface AppNavigationProps {
@@ -31,9 +31,7 @@ export function AppNavigation({ activeItemId, items, onOpenSettings, onSelect }:
       </nav>
       <div className="min-h-0 flex-1 border-t bg-background" aria-label={t('navigation.sessionListAriaLabel')} />
       <div className="border-t p-2">
-        <Button className="h-8 w-full justify-start px-2" onClick={onOpenSettings} type="button" variant="ghost">
-          {t('navigation.settings')}
-        </Button>
+        <SettingsMenu onOpenSettings={onOpenSettings} />
       </div>
     </>
   );

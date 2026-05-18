@@ -20,8 +20,11 @@ current user-facing UI.
   components under one page. Page folders should own only page-specific pieces.
 - Keep shell/application hooks under `hooks/`; move feature-specific hooks next
   to their feature when they start owning data or behavior.
-- All user-facing strings go through `i18n/` so `en-us`, `zh-tw`, and `zh-cn`
-  stay aligned from the start.
+- All user-facing strings go through JSON files in `i18n/locales/` so `en-us`,
+  `zh-tw`, and `zh-cn` stay aligned from the start.
+- Use shadcn primitives for real interaction behavior. The v2 shell starts with
+  `resizable` for panes, `popover` for compact global settings, and `select`
+  for language switching.
 - Start with navigation structure only, then build one complete workflow at a
   time.
 - Visual design follows [`design-language.md`](./design-language.md). Start with
@@ -33,7 +36,8 @@ current user-facing UI.
 - `api/`: tRPC clients and inferred server contracts.
 - `components/`: reusable v2-only components grouped by feature.
 - `hooks/`: shell-level client state hooks.
-- `i18n/`: typed locale dictionaries and the client translation provider.
+- `i18n/`: typed locale dictionaries, locale JSON files, and the client
+  translation provider.
 - `layout/`: app frame and shell-level placement.
 - `views/`: route-level workflow surfaces.
 

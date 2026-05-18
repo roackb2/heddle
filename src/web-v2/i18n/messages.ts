@@ -1,56 +1,12 @@
+import enUs from './locales/en-us.json';
+import zhCn from './locales/zh-cn.json';
+import zhTw from './locales/zh-tw.json';
+
 export const messages = {
-  'en-us': {
-    'app.name': 'Heddle',
-    'navigation.backToApp': 'Back to App',
-    'navigation.mainAriaLabel': 'Main app navigation',
-    'navigation.primaryAriaLabel': 'Primary navigation',
-    'navigation.sessionListAriaLabel': 'Session list',
-    'navigation.settings': 'Settings',
-    'navigation.settingsAriaLabel': 'Settings navigation',
-    'navigation.skipToMain': 'Skip to Main Content',
-    'inspector.contextAriaLabel': 'Context inspector',
-    'settings.general': 'General',
-    'settings.memory': 'Memory Status',
-    'settings.workspaces': 'Workspace Management',
-    'surface.sessions': 'Sessions',
-    'surface.tasks': 'Tasks',
-    'workbench.workspaceAriaLabel': 'workspace',
-  },
-  'zh-tw': {
-    'app.name': 'Heddle',
-    'navigation.backToApp': '返回應用程式',
-    'navigation.mainAriaLabel': '主要應用導覽',
-    'navigation.primaryAriaLabel': '主要導覽',
-    'navigation.sessionListAriaLabel': '對話清單',
-    'navigation.settings': '設定',
-    'navigation.settingsAriaLabel': '設定導覽',
-    'navigation.skipToMain': '跳到主要內容',
-    'inspector.contextAriaLabel': '脈絡檢視器',
-    'settings.general': '一般',
-    'settings.memory': '記憶狀態',
-    'settings.workspaces': '工作區管理',
-    'surface.sessions': '對話',
-    'surface.tasks': '任務',
-    'workbench.workspaceAriaLabel': '工作區',
-  },
-  'zh-cn': {
-    'app.name': 'Heddle',
-    'navigation.backToApp': '返回应用',
-    'navigation.mainAriaLabel': '主应用导航',
-    'navigation.primaryAriaLabel': '主导航',
-    'navigation.sessionListAriaLabel': '会话列表',
-    'navigation.settings': '设置',
-    'navigation.settingsAriaLabel': '设置导航',
-    'navigation.skipToMain': '跳到主要内容',
-    'inspector.contextAriaLabel': '上下文检查器',
-    'settings.general': '通用',
-    'settings.memory': '记忆状态',
-    'settings.workspaces': '工作区管理',
-    'surface.sessions': '会话',
-    'surface.tasks': '任务',
-    'workbench.workspaceAriaLabel': '工作区',
-  },
-} as const;
+  'en-us': enUs,
+  'zh-tw': zhTw satisfies typeof enUs,
+  'zh-cn': zhCn satisfies typeof enUs,
+};
 
 export type Locale = keyof typeof messages;
-export type I18nMessageKey = keyof typeof messages['en-us'];
+export type I18nMessageKey = keyof typeof enUs;
