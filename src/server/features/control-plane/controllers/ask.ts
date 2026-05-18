@@ -4,13 +4,13 @@ import {
   DEFAULT_OPENAI_MODEL,
   LlmAdapterService,
   createLogger,
-  formatTraceForConsole,
+  TraceConsoleFormatter,
   AgentLoopRuntimeService,
   RuntimeCredentialService,
   type RunResult,
 } from '../../../../index.js';
-import { MemoryCatalogService } from '../../../../core/memory/catalog.js';
-import { MemoryMaintenanceIntegrationService } from '../../../../core/memory/maintenance-integration.js';
+import { MemoryCatalogService } from '@/core/memory/catalog.js';
+import { MemoryMaintenanceIntegrationService } from '@/core/memory/maintenance-integration.js';
 
 // Legacy control-plane one-shot ask path. New ask callers should create a
 // `retention: "one_off"` chat session and submit through the session turn API
@@ -81,7 +81,7 @@ export class ControlPlaneAskController {
       ...result,
       trace,
       traceFile,
-      consoleOutput: formatTraceForConsole(trace),
+      consoleOutput: TraceConsoleFormatter.format(trace),
     };
   }
 

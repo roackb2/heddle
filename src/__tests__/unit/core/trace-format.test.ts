@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { formatTraceForConsole } from '../../../core/trace/format.js';
+import { TraceConsoleFormatter } from '@/core/trace/index.js';
 
-describe('formatTraceForConsole', () => {
+describe('TraceConsoleFormatter', () => {
   it('renders assistant turns with text and requested tools', () => {
-    const output = formatTraceForConsole([
+    const output = TraceConsoleFormatter.format([
       {
         type: 'assistant.turn',
         content: 'I will inspect the repo first.',
@@ -20,7 +20,7 @@ describe('formatTraceForConsole', () => {
   });
 
   it('renders assistant turns with no text and requested tools compactly', () => {
-    const output = formatTraceForConsole([
+    const output = TraceConsoleFormatter.format([
       {
         type: 'assistant.turn',
         content: '',
@@ -39,7 +39,7 @@ describe('formatTraceForConsole', () => {
   });
 
   it('renders assistant diagnostics for missing gaps and desired tools', () => {
-    const output = formatTraceForConsole([
+    const output = TraceConsoleFormatter.format([
       {
         type: 'assistant.turn',
         content: 'I need to inspect the environment before answering.',
@@ -61,7 +61,7 @@ describe('formatTraceForConsole', () => {
   });
 
   it('renders assistant turns with final text only', () => {
-    const output = formatTraceForConsole([
+    const output = TraceConsoleFormatter.format([
       {
         type: 'assistant.turn',
         content: 'The repo contains README.md and src/.',
@@ -77,7 +77,7 @@ describe('formatTraceForConsole', () => {
   });
 
   it('renders host warnings readably', () => {
-    const output = formatTraceForConsole([
+    const output = TraceConsoleFormatter.format([
       {
         type: 'host.warning',
         code: 'actionless_completion',
@@ -97,7 +97,7 @@ describe('formatTraceForConsole', () => {
   });
 
   it('renders structured tool outputs readably instead of object coercions', () => {
-    const output = formatTraceForConsole([
+    const output = TraceConsoleFormatter.format([
       {
         type: 'tool.result',
         tool: 'run_shell_inspect',
@@ -122,7 +122,7 @@ describe('formatTraceForConsole', () => {
   });
 
   it('renders approval events readably', () => {
-    const output = formatTraceForConsole([
+    const output = TraceConsoleFormatter.format([
       {
         type: 'tool.approval_requested',
         call: {
@@ -154,7 +154,7 @@ describe('formatTraceForConsole', () => {
   });
 
   it('renders tool fallback events readably', () => {
-    const output = formatTraceForConsole([
+    const output = TraceConsoleFormatter.format([
       {
         type: 'tool.fallback',
         fromCall: {
@@ -180,7 +180,7 @@ describe('formatTraceForConsole', () => {
   });
 
   it('renders CyberLoop annotation events readably', () => {
-    const output = formatTraceForConsole([
+    const output = TraceConsoleFormatter.format([
       {
         type: 'cyberloop.annotation',
         step: 3,

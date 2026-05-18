@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createToolRegistry } from '../../../core/tools/registry.js';
 import { createBudget } from '../../../core/utils/budget.js';
-import { createTraceRecorder } from '../../../core/trace/recorder.js';
+import { TraceRecorder } from '@/core/trace/index.js';
 import { AgentMutationTracker } from '../../../core/agent/mutation/index.js';
 import type { ToolDefinition, TraceEvent } from '../../../core/types.js';
 
@@ -51,9 +51,9 @@ describe('createBudget', () => {
   });
 });
 
-describe('createTraceRecorder', () => {
+describe('TraceRecorder', () => {
   it('records events and exports them', () => {
-    const recorder = createTraceRecorder();
+    const recorder = new TraceRecorder();
 
     const event1: TraceEvent = { type: 'run.started', goal: 'test', timestamp: '2024-01-01T00:00:00Z' };
     const event2: TraceEvent = {
@@ -74,7 +74,7 @@ describe('createTraceRecorder', () => {
   });
 
   it('exports valid JSON', () => {
-    const recorder = createTraceRecorder();
+    const recorder = new TraceRecorder();
     recorder.record({ type: 'run.started', goal: 'test', timestamp: '2024-01-01T00:00:00Z' });
 
     const json = recorder.toJSON();
@@ -84,7 +84,7 @@ describe('createTraceRecorder', () => {
   });
 
   it('returns a copy from getTrace so mutations do not affect the recorder', () => {
-    const recorder = createTraceRecorder();
+    const recorder = new TraceRecorder();
     recorder.record({ type: 'run.started', goal: 'test', timestamp: '2024-01-01T00:00:00Z' });
 
     const trace = recorder.getTrace();

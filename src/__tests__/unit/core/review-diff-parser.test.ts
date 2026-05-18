@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseUnifiedDiffFiles } from '../../../core/review/diff-domain.js';
+import { ReviewDiffParser } from '@/core/review/index.js';
 
 describe('diff domain parser', () => {
   it('parses a modified file patch into hunks and line counts', () => {
-    const files = parseUnifiedDiffFiles(`diff --git a/src/a.ts b/src/a.ts
+    const files = ReviewDiffParser.parseUnifiedDiffFiles(`diff --git a/src/a.ts b/src/a.ts
 index 1111111..2222222 100644
 --- a/src/a.ts
 +++ b/src/a.ts
@@ -30,7 +30,7 @@ index 1111111..2222222 100644
   });
 
   it('parses add, delete, and rename metadata', () => {
-    const files = parseUnifiedDiffFiles(`diff --git a/new.md b/new.md
+    const files = ReviewDiffParser.parseUnifiedDiffFiles(`diff --git a/new.md b/new.md
 new file mode 100644
 index 0000000..1111111
 --- /dev/null
@@ -62,7 +62,7 @@ rename to after.md
   });
 
   it('parses binary patches without hunks', () => {
-    const files = parseUnifiedDiffFiles(`diff --git a/image.png b/image.png
+    const files = ReviewDiffParser.parseUnifiedDiffFiles(`diff --git a/image.png b/image.png
 index 1111111..2222222 100644
 Binary files a/image.png and b/image.png differ
 `);
