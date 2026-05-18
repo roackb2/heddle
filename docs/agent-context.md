@@ -63,11 +63,13 @@ When a companion notes repo is present, treat the live Heddle codebase as the im
 - For non-trivial backend/core work, prefer domain-owned services with clear
   boundaries. A module should own real behavior, not act as a thin wrapper.
 - When creating or refactoring core services, use `src/core/chat/engine/` as the
-  current reference pattern together with `src/core/runtime/workspaces/` and
-  `src/core/runtime/daemon/`: class-based services and repositories, explicit
-  `types.ts` contracts, schema/codec-owned persistence validation, and no loose
-  one-off exported domain functions. Add brief class or file-top comments for
-  meaningful classes to explain their responsibility and placement boundary.
+  larger reference pattern together with smaller class-boundary examples such as
+  `src/core/tools/`, `src/core/commands/`, `src/core/trace/`, and
+  `src/core/review/`: class-based services and repositories when behavior is
+  grouped, explicit `types.ts` contracts where a domain has a public shape,
+  schema/codec-owned persistence validation, and no loose one-off exported
+  domain functions. Add brief class or file-top comments for meaningful classes
+  to explain their responsibility and placement boundary.
 - Prefer a simple layered split: presentation renders, host/application code
   orchestrates, and core domains own policy and persisted semantics.
 - For core dependency direction, follow

@@ -25,9 +25,9 @@ Use it when you want:
 
 This is the best fit for custom frontends, local tools, daemon-like wrappers, or apps that want a real Heddle conversation engine instead of manually assembling the lower-level turn runner.
 
-### Use `runConversationTurn` only for low-level persisted turn execution
+### Use `EngineConversationTurnService.run(...)` only for low-level persisted turn execution
 
-Use `runConversationTurn` only when your host already owns session ids and storage paths and you intentionally want the lower-level persisted turn runner.
+Use `EngineConversationTurnService.run(...)` only when your host already owns session ids and storage paths and you intentionally want the lower-level persisted turn runner.
 
 For most hosts, `createConversationEngine` is the better entrypoint. It keeps session creation, target resolution, and turn submission behind one surface instead of making the host assemble those boundaries manually.
 
@@ -255,14 +255,14 @@ console.log('Summary:', result.summary)
 console.log('Session:', result.session.id)
 ```
 
-## `runConversationTurn`
+## `EngineConversationTurnService.run(...)`
 
-If you already manage session ids and paths yourself and want one persisted turn without building the engine service first, call `runConversationTurn` directly:
+If you already manage session ids and paths yourself and want one persisted turn without building the engine service first, call `EngineConversationTurnService.run(...)` directly:
 
 ```ts
-import { runConversationTurn } from '@roackb2/heddle'
+import { EngineConversationTurnService } from '@roackb2/heddle'
 
-const result = await runConversationTurn({
+const result = await EngineConversationTurnService.run({
   workspaceRoot: process.cwd(),
   stateRoot: `${process.cwd()}/.heddle`,
   sessionStoragePath: `${process.cwd()}/.heddle/chat-sessions.catalog.json`,
@@ -272,7 +272,7 @@ const result = await runConversationTurn({
 })
 ```
 
-`runConversationTurn` does not take a `model` argument directly. It resolves the active model from the stored session model plus runtime credential policy. If your host wants to set model defaults up front, `createConversationEngine` is the easier path.
+`EngineConversationTurnService.run(...)` does not take a `model` argument directly. It resolves the active model from the stored session model plus runtime credential policy. If your host wants to set model defaults up front, `createConversationEngine` is the easier path.
 
 Choose this only when your host already owns session creation/storage details and only needs the low-level persisted turn runner. For new hosts, prefer `createConversationEngine`.
 
@@ -335,6 +335,24 @@ These are useful when you want to provide your own surrounding host, queue, cron
 The package also exports compact heartbeat views plus a thin status/progress/response adapter layer for hosts that do not want to consume the full task/run record shape directly.
 
 For passive semantic-drift experiments, `createCyberLoopObserver` can consume Heddle's event stream and run CyberLoop-compatible middleware over normalized runtime frames.
+
+## Lower-Level Class Utilities
+
+Some lower-level APIs are exported for hosts that intentionally assemble their
+own runtime or review surfaces:
+
+- `ToolRegistry`, `ToolExecutionService`, and `ToolBundleComposer` for custom
+  tool execution and toolkit composition.
+- `TraceRecorder` and `TraceConsoleFormatter` for raw trace capture and
+  terminal-style trace rendering.
+- `ReviewDiffParser` for turning unified Git diff text into Heddle's structured
+  review model.
+- `AgentStepBudget` for hosts that reuse the inner agent-loop step budget
+  primitive directly.
+
+These are building blocks. Prefer `createConversationEngine`,
+`AgentLoopRuntimeService.run(...)`, or heartbeat services when you want a
+complete workflow.
 
 ## Installation
 

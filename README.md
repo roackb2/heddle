@@ -43,6 +43,11 @@ Heddle currently has two main programmatic layers:
 - `createConversationEngine`: an alpha API for persisted multi-turn sessions with session storage, compaction, approvals, traces, semantic activity, and custom frontends or local hosts
 - `AgentLoopRuntimeService.run(...)`: a lower-level single-run execution loop for hosts that do not need persisted chat or session behavior
 
+Advanced hosts can also reuse lower-level class APIs such as `ToolRegistry`,
+`ToolExecutionService`, `TraceRecorder`, `TraceConsoleFormatter`, and
+`ReviewDiffParser` when they intentionally assemble custom runtime or review
+surfaces.
+
 If you want the programmatic surface, start with the [Programmatic use guide](docs/guides/programmatic-use.md).
 
 For contributors, the compact architecture map lives in

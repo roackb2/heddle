@@ -20,7 +20,8 @@ Layer 5: Interface adapters
 src/cli, src/server, src/web
 
 Layer 4: Product/domain workflows
-src/core/chat/engine, src/core/heartbeat, src/core/memory, src/core/awareness
+src/core/chat/engine, src/core/heartbeat, src/core/memory, src/core/awareness,
+src/core/review
 
 Layer 3: Runtime host foundation
 src/core/runtime
@@ -29,7 +30,8 @@ Layer 2: Inner execution engine
 src/core/agent
 
 Layer 1: Infrastructure and domain primitives
-src/core/llm, src/core/tools, src/core/trace, src/core/auth, src/core/approvals
+src/core/llm, src/core/tools, src/core/trace, src/core/auth, src/core/approvals,
+src/core/commands
 
 Layer 0: Shared types and utilities
 src/core/types, src/core/utils, src/core/config
@@ -72,7 +74,9 @@ For non-trivial core domains, prefer the service shape now used by
 
 Small pure utilities are fine when they are genuinely domain-agnostic. Put them
 under a clearly named `utils/` or helper module instead of mixing them with
-service behavior.
+service behavior. If a utility clearly belongs to one domain, place it in that
+domain instead; for example, step-budget behavior lives under `src/core/agent`
+rather than generic `src/core/utils`.
 
 ## Current Violations And Improvement Areas
 
@@ -83,9 +87,9 @@ These are known cleanup directions, not blockers for every feature:
 - `AgentLoopRuntimeService` is correctly above `AgentRunService`, but the name
   can make runtime and agent feel like they both own the same loop. Future
   naming should make the runtime wrapper role clearer.
-- `RuntimeToolService` currently assembles default tools. This is acceptable
-  for now, but the tool-domain refactor may eventually make toolkit
-  composition a clearer lower-level contract.
+- `RuntimeToolService` assembles the default tool bundle through the lower-level
+  `ToolBundleComposer` contract. Future cleanup should keep runtime policy in
+  runtime and low-level duplicate/toolkit checks in `src/core/tools`.
 - Interface adapters should continue moving toward "host calls service" rather
   than host-side storage, fallback, or repository access.
 
