@@ -10,6 +10,9 @@ current user-facing UI.
   modules.
 - Browser code must not import `src/core` directly. Shared behavior belongs
   behind server APIs or in browser-safe contracts.
+- Browser code must not import from `src/web`. If v2 needs a shadcn primitive
+  or helper, copy it into `src/web-v2` so the old browser surface can be deleted
+  cleanly later.
 - Reuse tRPC-inferred server types from `AppRouter`. Do not redeclare DTOs in
   the browser unless they are truly web-interface view models.
 - Start from shadcn/Tailwind tokens and primitives. Add custom CSS only when a
@@ -20,8 +23,8 @@ current user-facing UI.
   components under one page. Page folders should own only page-specific pieces.
 - Keep shell/application hooks under `hooks/`; move feature-specific hooks next
   to their feature when they start owning data or behavior.
-- All user-facing strings go through JSON files in `i18n/locales/` so `en-us`,
-  `zh-tw`, and `zh-cn` stay aligned from the start.
+- All user-facing strings go through nested JSON files in `i18n/locales/` so
+  `en-us`, `zh-tw`, and `zh-cn` stay aligned from the start.
 - Use shadcn primitives for real interaction behavior. The v2 shell starts with
   `resizable` for panes, `popover` for compact global settings, and `select`
   for language switching.
@@ -35,6 +38,7 @@ current user-facing UI.
 
 - `api/`: tRPC clients and inferred server contracts.
 - `components/`: reusable v2-only components grouped by feature.
+- `components/ui/`: v2-owned shadcn primitives copied into this surface.
 - `hooks/`: shell-level client state hooks.
 - `i18n/`: typed locale dictionaries, locale JSON files, and the client
   translation provider.

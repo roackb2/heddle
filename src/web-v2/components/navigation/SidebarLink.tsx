@@ -1,5 +1,5 @@
-import { Button } from '@/web/components/ui/button';
-import { cn } from '@/web/lib/utils';
+import { Button } from '../ui/button';
+import { cn } from '../../lib/utils';
 
 interface SidebarLinkProps {
   active: boolean;

@@ -4,7 +4,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/web/components/ui/select';
+} from '../ui/select';
 import { LOCALE_OPTIONS, useI18n, type Locale } from '../../i18n';
 
 // LanguageSelect is the first settings control for v2. Keep it local to the

@@ -1,4 +1,4 @@
-import { Button } from '@/web/components/ui/button';
+import { Button } from '../ui/button';
 import { useI18n } from '../../i18n';
 import type { NavigationItem, SettingsSectionId } from '../../layout/types';
 import { SidebarLink } from './SidebarLink';

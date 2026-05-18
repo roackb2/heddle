@@ -6,7 +6,7 @@ export interface LocaleOption {
 }
 
 export const LOCALE_OPTIONS: LocaleOption[] = [
-  { locale: 'en-us', labelKey: 'language.en-us' },
-  { locale: 'zh-tw', labelKey: 'language.zh-tw' },
-  { locale: 'zh-cn', labelKey: 'language.zh-cn' },
+  { locale: 'en-us', labelKey: 'language.enUs' },
+  { locale: 'zh-tw', labelKey: 'language.zhTw' },
+  { locale: 'zh-cn', labelKey: 'language.zhCn' },
 ];

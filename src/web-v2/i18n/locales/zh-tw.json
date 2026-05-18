@@ -1,23 +1,37 @@
 {
-  "app.name": "Heddle",
-  "inspector.contextAriaLabel": "脈絡檢視器",
-  "language.en-us": "英文（美國）",
-  "language.label": "語言",
-  "language.zh-cn": "簡體中文",
-  "language.zh-tw": "繁體中文",
-  "navigation.backToApp": "返回應用程式",
-  "navigation.mainAriaLabel": "主要應用導覽",
-  "navigation.openSettings": "開啟設定",
-  "navigation.primaryAriaLabel": "主要導覽",
-  "navigation.sessionListAriaLabel": "對話清單",
-  "navigation.settings": "設定",
-  "navigation.settingsAriaLabel": "設定導覽",
-  "navigation.settingsMenuAriaLabel": "設定選單",
-  "navigation.skipToMain": "跳到主要內容",
-  "settings.general": "一般",
-  "settings.memory": "記憶狀態",
-  "settings.workspaces": "工作區管理",
-  "surface.sessions": "對話",
-  "surface.tasks": "任務",
-  "workbench.workspaceAriaLabel": "工作區"
+  "app": {
+    "name": "Heddle"
+  },
+  "inspector": {
+    "contextAriaLabel": "脈絡檢視器"
+  },
+  "language": {
+    "enUs": "英文（美國）",
+    "label": "語言",
+    "zhCn": "簡體中文",
+    "zhTw": "繁體中文"
+  },
+  "navigation": {
+    "backToApp": "返回應用程式",
+    "mainAriaLabel": "主要應用導覽",
+    "openSettings": "開啟設定",
+    "primaryAriaLabel": "主要導覽",
+    "sessionListAriaLabel": "對話清單",
+    "settings": "設定",
+    "settingsAriaLabel": "設定導覽",
+    "settingsMenuAriaLabel": "設定選單",
+    "skipToMain": "跳到主要內容"
+  },
+  "settings": {
+    "general": "一般",
+    "memory": "記憶狀態",
+    "workspaces": "工作區管理"
+  },
+  "surface": {
+    "sessions": "對話",
+    "tasks": "任務"
+  },
+  "workbench": {
+    "workspaceAriaLabel": "工作區"
+  }
 }
