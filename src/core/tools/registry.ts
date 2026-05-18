@@ -1,36 +1,29 @@
-// ---------------------------------------------------------------------------
-// Tool Registry
-// ---------------------------------------------------------------------------
-
-import type { ToolDefinition } from '../types.js';
-
-export type ToolRegistry = {
-  get(name: string): ToolDefinition | undefined;
-  list(): ToolDefinition[];
-  names(): string[];
-};
+import type { ToolDefinition } from '@/core/types.js';
 
 /**
- * Create a registry from an array of tool definitions.
+ * Registry for the executable tool set available to one agent run.
  */
-export function createToolRegistry(tools: ToolDefinition[]): ToolRegistry {
-  const map = new Map<string, ToolDefinition>();
-  for (const tool of tools) {
-    if (map.has(tool.name)) {
-      throw new Error(`Duplicate tool name: ${tool.name}`);
+export class ToolRegistry {
+  private readonly toolMap = new Map<string, ToolDefinition>();
+
+  constructor(tools: ToolDefinition[]) {
+    for (const tool of tools) {
+      if (this.toolMap.has(tool.name)) {
+        throw new Error(`Duplicate tool name: ${tool.name}`);
+      }
+      this.toolMap.set(tool.name, tool);
     }
-    map.set(tool.name, tool);
   }
 
-  return {
-    get(name: string) {
-      return map.get(name);
-    },
-    list() {
-      return [...map.values()];
-    },
-    names() {
-      return [...map.keys()];
-    },
-  };
+  get(name: string): ToolDefinition | undefined {
+    return this.toolMap.get(name);
+  }
+
+  list(): ToolDefinition[] {
+    return [...this.toolMap.values()];
+  }
+
+  names(): string[] {
+    return [...this.toolMap.keys()];
+  }
 }

@@ -28,7 +28,9 @@ workspace.
 
 ## Current Structure
 
-- `toolkit.ts`: shared toolkit types plus composition guardrails.
+- `index.ts`: public class-based boundary for registry, execution, and bundle
+  composition.
+- `toolkit.ts`: shared toolkit types plus `ToolBundleComposer` guardrails.
 - `toolkits/coding-files/`: file/search/edit tool implementations plus shared
   edit-core behavior.
 - `toolkits/knowledge/`: memory notes, memory checkpoint, and durable knowledge
@@ -44,9 +46,11 @@ workspace.
 
 ## Public Entry Points
 
-- `registry.ts`: create a tool registry.
-- `execute-tool.ts`: execute one tool call against a registry.
-- `toolkit.ts`: toolkit composition API used by runtime default-tool assembly.
+- `ToolRegistry`: duplicate-checked registry for the tools in one run.
+- `ToolExecutionService`: executes one tool call against a registry with
+  timeout/error normalization.
+- `ToolBundleComposer`: toolkit composition API used by runtime default-tool
+  assembly.
 - `toolkits/coding-files/*`: coding file tools.
 - `toolkits/knowledge/*`: knowledge and memory-surface tools.
 - `toolkits/external-context/*`: web and image tools.

@@ -1,4 +1,4 @@
-import { matchesExactSlashCommand, matchesSlashCommandPrefix } from '../../parser.js';
+import { SlashCommandParser } from '../../parser.js';
 import type { SlashCommandResult } from '../../result-types.js';
 import type { SlashCommandModule } from '../../types.js';
 import type {
@@ -23,7 +23,7 @@ export function createHeartbeatSlashCommandModule(): SlashCommandModule<SlashCom
         id: 'heartbeat.tasks',
         syntax: '/heartbeat tasks',
         description: 'list heartbeat tasks',
-        match: matchesExactSlashCommand('/heartbeat tasks'),
+        match: SlashCommandParser.matchesExact('/heartbeat tasks'),
         run: (context) => listHeartbeatTasksMessage(context),
       },
       {
@@ -37,7 +37,7 @@ export function createHeartbeatSlashCommandModule(): SlashCommandModule<SlashCom
         id: 'heartbeat.runs.list',
         syntax: '/heartbeat runs [task]',
         description: 'list recent heartbeat runs',
-        match: matchesSlashCommandPrefix('/heartbeat runs'),
+        match: SlashCommandParser.matchesPrefix('/heartbeat runs'),
         run: (context, input) => listHeartbeatRunsMessage(context, argumentAfterPrefix(input, '/heartbeat runs')),
       },
       {

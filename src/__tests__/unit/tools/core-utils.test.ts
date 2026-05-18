@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { createToolRegistry } from '../../../core/tools/registry.js';
-import { createBudget } from '../../../core/utils/budget.js';
+import { ToolRegistry } from '@/core/tools/index.js';
+import { AgentStepBudget } from '@/core/agent/budget/index.js';
 import { TraceRecorder } from '@/core/trace/index.js';
 import { AgentMutationTracker } from '../../../core/agent/mutation/index.js';
 import type { ToolDefinition, TraceEvent } from '../../../core/types.js';
 
-describe('createToolRegistry', () => {
+describe('ToolRegistry', () => {
   const fakeTool: ToolDefinition = {
     name: 'test_tool',
     description: 'A test tool',
@@ -14,29 +14,29 @@ describe('createToolRegistry', () => {
   };
 
   it('registers and retrieves a tool by name', () => {
-    const registry = createToolRegistry([fakeTool]);
+    const registry = new ToolRegistry([fakeTool]);
     expect(registry.get('test_tool')).toBe(fakeTool);
   });
 
   it('returns undefined for unknown tools', () => {
-    const registry = createToolRegistry([fakeTool]);
+    const registry = new ToolRegistry([fakeTool]);
     expect(registry.get('nonexistent')).toBeUndefined();
   });
 
   it('lists all tool names', () => {
     const another: ToolDefinition = { ...fakeTool, name: 'another' };
-    const registry = createToolRegistry([fakeTool, another]);
+    const registry = new ToolRegistry([fakeTool, another]);
     expect(registry.names()).toEqual(['test_tool', 'another']);
   });
 
   it('throws on duplicate tool names', () => {
-    expect(() => createToolRegistry([fakeTool, fakeTool])).toThrow('Duplicate tool name');
+    expect(() => new ToolRegistry([fakeTool, fakeTool])).toThrow('Duplicate tool name');
   });
 });
 
-describe('createBudget', () => {
+describe('AgentStepBudget', () => {
   it('counts steps and reports exhaustion', () => {
-    const budget = createBudget(3);
+    const budget = new AgentStepBudget(3);
 
     expect(budget.remaining()).toBe(3);
     expect(budget.exhausted()).toBe(false);

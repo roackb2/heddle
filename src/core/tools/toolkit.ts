@@ -16,29 +16,34 @@ export type ToolToolkit = {
   createTools(context: ToolToolkitContext): ToolDefinition[];
 };
 
-export function createToolkitToolBundle(args: {
-  toolkits: readonly ToolToolkit[];
-  context: ToolToolkitContext;
-}): ToolDefinition[] {
-  const seenToolkitIds = new Set<string>();
-  const seenToolNames = new Set<string>();
-  const tools: ToolDefinition[] = [];
+/**
+ * Composes production toolkits into a duplicate-checked tool bundle.
+ */
+export class ToolBundleComposer {
+  static compose(args: {
+    toolkits: readonly ToolToolkit[];
+    context: ToolToolkitContext;
+  }): ToolDefinition[] {
+    const seenToolkitIds = new Set<string>();
+    const seenToolNames = new Set<string>();
+    const tools: ToolDefinition[] = [];
 
-  for (const toolkit of args.toolkits) {
-    if (seenToolkitIds.has(toolkit.id)) {
-      throw new Error(`Duplicate toolkit id: ${toolkit.id}`);
-    }
-    seenToolkitIds.add(toolkit.id);
-
-    const toolkitTools = toolkit.createTools(args.context);
-    for (const tool of toolkitTools) {
-      if (seenToolNames.has(tool.name)) {
-        throw new Error(`Duplicate tool name from toolkits: ${tool.name}`);
+    for (const toolkit of args.toolkits) {
+      if (seenToolkitIds.has(toolkit.id)) {
+        throw new Error(`Duplicate toolkit id: ${toolkit.id}`);
       }
-      seenToolNames.add(tool.name);
-      tools.push(tool);
-    }
-  }
+      seenToolkitIds.add(toolkit.id);
 
-  return tools;
+      const toolkitTools = toolkit.createTools(args.context);
+      for (const tool of toolkitTools) {
+        if (seenToolNames.has(tool.name)) {
+          throw new Error(`Duplicate tool name from toolkits: ${tool.name}`);
+        }
+        seenToolNames.add(tool.name);
+        tools.push(tool);
+      }
+    }
+
+    return tools;
+  }
 }

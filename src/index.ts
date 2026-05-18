@@ -207,9 +207,12 @@ export {
 export type { BuiltInModelGroup } from './core/llm/models/index.js';
 
 // Tools
-export { createToolRegistry } from './core/tools/registry.js';
-export type { ToolRegistry } from './core/tools/registry.js';
-export { executeTool } from './core/tools/execute-tool.js';
+export {
+  ToolBundleComposer,
+  ToolExecutionService,
+  ToolRegistry,
+} from './core/tools/index.js';
+export type { ToolToolkit, ToolToolkitContext } from './core/tools/index.js';
 export { listFilesTool } from './core/tools/toolkits/coding-files/list-files.js';
 export { readFileTool } from './core/tools/toolkits/coding-files/read-file.js';
 export { editFileTool } from './core/tools/toolkits/coding-files/edit-file.js';
@@ -337,7 +340,6 @@ export type {
 export { buildSystemPrompt } from './core/prompts/system-prompt.js';
 
 // Utils
-export { createBudget } from './core/utils/budget.js';
-export type { Budget } from './core/utils/budget.js';
+export { AgentStepBudget } from './core/agent/budget/index.js';
 export { HeddleError, ToolExecutionError, LlmError, BudgetExhaustedError } from './core/utils/errors.js';
 export { createLogger, logger } from './core/utils/logger.js';

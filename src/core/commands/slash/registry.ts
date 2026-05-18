@@ -1,4 +1,4 @@
-import { parseSlashCommand } from './parser.js';
+import { SlashCommandParser } from './parser.js';
 import type {
   ParsedSlashCommand,
   SlashCommand,
@@ -7,81 +7,78 @@ import type {
   SlashCommandModule,
 } from './types.js';
 
-export type SlashCommandRegistry<Result, Context> = {
-  commands(): SlashCommand<Result, Context>[];
-  hints(): SlashCommandHint[];
-  find(input: string | ParsedSlashCommand): SlashCommandMatch<Result, Context> | undefined;
-  run(context: Context, input: string | ParsedSlashCommand): Promise<Result | undefined>;
-};
+/**
+ * Registers slash-command modules and dispatches parsed command input.
+ */
+export class SlashCommandRegistry<Result, Context> {
+  private readonly commandList: SlashCommand<Result, Context>[];
+  private readonly hintList: SlashCommandHint[];
 
-export function createSlashCommandRegistry<Result, Context>(
-  modules: SlashCommandModule<Result, Context>[],
-): SlashCommandRegistry<Result, Context> {
-  const commands = flattenModules(modules);
-  const hints = flattenModuleHints(modules);
-  validateSlashCommandRegistry(modules, commands);
+  constructor(modules: SlashCommandModule<Result, Context>[]) {
+    this.commandList = SlashCommandRegistry.flattenModules(modules);
+    this.hintList = SlashCommandRegistry.flattenModuleHints(modules);
+    SlashCommandRegistry.validate(modules, this.commandList);
+  }
 
-  return {
-    commands() {
-      return [...commands];
-    },
+  commands(): SlashCommand<Result, Context>[] {
+    return [...this.commandList];
+  }
 
-    hints() {
-      return [...hints];
-    },
+  hints(): SlashCommandHint[] {
+    return [...this.hintList];
+  }
 
-    find(input) {
-      const parsed = typeof input === 'string' ? parseSlashCommand(input) : input;
-      if (!parsed) {
-        return undefined;
-      }
-
-      const command = commands.find((candidate) => candidate.match(parsed));
-      return command ? { command, input: parsed } : undefined;
-    },
-
-    async run(context, input) {
-      const matched = this.find(input);
-      return matched ? await matched.command.run(context, matched.input) : undefined;
-    },
-  };
-}
-
-function flattenModuleHints<Result, Context>(
-  modules: SlashCommandModule<Result, Context>[],
-): SlashCommandHint[] {
-  return modules.flatMap((module) =>
-    module.hints ?? module.commands.map((command) => ({
-      command: command.syntax,
-      description: command.description,
-    })),
-  );
-}
-
-function flattenModules<Result, Context>(
-  modules: SlashCommandModule<Result, Context>[],
-): SlashCommand<Result, Context>[] {
-  return modules.flatMap((module) => module.commands);
-}
-
-function validateSlashCommandRegistry<Result, Context>(
-  modules: SlashCommandModule<Result, Context>[],
-  commands: SlashCommand<Result, Context>[],
-) {
-  assertUnique('slash command module id', modules.map((module) => module.id));
-  assertUnique('slash command id', commands.map((command) => command.id));
-  assertUnique(
-    'slash command syntax',
-    commands.flatMap((command) => [command.syntax, ...(command.aliases ?? [])]),
-  );
-}
-
-function assertUnique(label: string, values: string[]) {
-  const seen = new Set<string>();
-  for (const value of values) {
-    if (seen.has(value)) {
-      throw new Error(`Duplicate ${label}: ${value}`);
+  find(input: string | ParsedSlashCommand): SlashCommandMatch<Result, Context> | undefined {
+    const parsed = typeof input === 'string' ? SlashCommandParser.parse(input) : input;
+    if (!parsed) {
+      return undefined;
     }
-    seen.add(value);
+
+    const command = this.commandList.find((candidate) => candidate.match(parsed));
+    return command ? { command, input: parsed } : undefined;
+  }
+
+  async run(context: Context, input: string | ParsedSlashCommand): Promise<Result | undefined> {
+    const matched = this.find(input);
+    return matched ? await matched.command.run(context, matched.input) : undefined;
+  }
+
+  private static flattenModuleHints<Result, Context>(
+    modules: SlashCommandModule<Result, Context>[],
+  ): SlashCommandHint[] {
+    return modules.flatMap((module) =>
+      module.hints ?? module.commands.map((command) => ({
+        command: command.syntax,
+        description: command.description,
+      })),
+    );
+  }
+
+  private static flattenModules<Result, Context>(
+    modules: SlashCommandModule<Result, Context>[],
+  ): SlashCommand<Result, Context>[] {
+    return modules.flatMap((module) => module.commands);
+  }
+
+  private static validate<Result, Context>(
+    modules: SlashCommandModule<Result, Context>[],
+    commands: SlashCommand<Result, Context>[],
+  ) {
+    SlashCommandRegistry.assertUnique('slash command module id', modules.map((module) => module.id));
+    SlashCommandRegistry.assertUnique('slash command id', commands.map((command) => command.id));
+    SlashCommandRegistry.assertUnique(
+      'slash command syntax',
+      commands.flatMap((command) => [command.syntax, ...(command.aliases ?? [])]),
+    );
+  }
+
+  private static assertUnique(label: string, values: string[]) {
+    const seen = new Set<string>();
+    for (const value of values) {
+      if (seen.has(value)) {
+        throw new Error(`Duplicate ${label}: ${value}`);
+      }
+      seen.add(value);
+    }
   }
 }

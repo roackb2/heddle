@@ -1,11 +1,11 @@
 import type { Logger } from 'pino';
 import type { LlmAdapter, ChatMessage, LlmUsage } from '@/core/llm/types.js';
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
-import type { ToolRegistry } from '@/core/tools/registry.js';
+import type { ToolRegistry } from '@/core/tools/index.js';
 import type { PlanItem } from '@/core/tools/toolkits/internal/update-plan.js';
 import type { RunResult, ToolDefinition, ToolCall, ToolResult, TraceEvent, StopReason } from '@/core/types.js';
-import type { createBudget } from '@/core/utils/budget.js';
 import type { TraceRecorder } from '@/core/trace/index.js';
+import type { AgentStepBudget } from './budget/index.js';
 import type { MutationState } from './mutation/index.js';
 
 export type RunAgentOptions = {
@@ -66,7 +66,7 @@ export type AgentRunContext = {
   trace: TraceRecorder;
   record: (event: TraceEvent) => void;
   now: () => string;
-  budget: ReturnType<typeof createBudget>;
+  budget: AgentStepBudget;
   seenToolCalls: Map<string, number>;
   mutation: MutationState;
   onAssistantStream?: RunAgentOptions['onAssistantStream'];

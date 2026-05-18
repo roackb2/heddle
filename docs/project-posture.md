@@ -120,8 +120,7 @@ scope.
 
 - Agent loop and runtime: `src/core/agent/`, `src/core/runtime/loop/`,
   `src/core/runtime/tools/`.
-- Tool behavior: `src/core/tools/toolkits/`, `src/core/tools/registry.ts`,
-  `src/core/tools/execute-tool.ts`.
+- Tool behavior: `src/core/tools/toolkits/`, `src/core/tools/index.ts`.
 - Shell and approvals: `src/core/tools/toolkits/shell-process/`,
   `src/core/approvals/`.
 - TUI approvals and chat: `src/cli/chat/`.

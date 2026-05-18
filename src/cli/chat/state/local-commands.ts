@@ -2,8 +2,8 @@ import type { ChatSession } from './types.js';
 import type { OpenAiOAuthCredential } from '@/core/auth/index.js';
 import type { ReasoningEffort } from '../../../core/llm/types.js';
 import type { ProviderCredentialSource } from '../utils/runtime.js';
-import { autocompleteSlashCommand, filterSlashCommandHints } from '../../../core/commands/slash/autocomplete.js';
-import { createSlashCommandRegistry } from '../../../core/commands/slash/registry.js';
+import { SlashCommandAutocomplete } from '../../../core/commands/slash/autocomplete.js';
+import { SlashCommandRegistry } from '../../../core/commands/slash/registry.js';
 import { createCoreSlashCommandModules } from '../../../core/commands/slash/modules/core-command-modules.js';
 import type { SlashCommandResult } from '../../../core/commands/slash/result-types.js';
 import { createTuiSlashCommandContext } from '../adapters/slash-command-context.js';
@@ -41,8 +41,8 @@ export type LocalCommandArgs = {
   openAiLogin?: () => Promise<OpenAiOAuthCredential>;
 };
 
-const CORE_COMMAND_REGISTRY = createSlashCommandRegistry(createCoreSlashCommandModules());
-const TUI_COMMAND_REGISTRY = createSlashCommandRegistry([createTuiDebugSnapshotCommandModule()]);
+const CORE_COMMAND_REGISTRY = new SlashCommandRegistry(createCoreSlashCommandModules());
+const TUI_COMMAND_REGISTRY = new SlashCommandRegistry([createTuiDebugSnapshotCommandModule()]);
 const LOCAL_COMMAND_HINTS: LocalCommandHint[] = [
   { command: '/help', description: 'show available local commands' },
   { command: '!<command>', description: 'run a shell command directly in chat using the current policy' },
@@ -114,7 +114,7 @@ export function getLocalCommandHints(
     return sessionHints.filter((hint) => hint.command.startsWith(trimmed));
   }
 
-  return filterSlashCommandHints(trimmed, HELP_HINTS);
+  return SlashCommandAutocomplete.filterHints(trimmed, HELP_HINTS);
 }
 
 export function autocompleteLocalCommand(
@@ -127,7 +127,7 @@ export function autocompleteLocalCommand(
     return undefined;
   }
 
-  return autocompleteSlashCommand(draft, getLocalCommandHints(trimmedStart, activeSessionId, sessions));
+  return SlashCommandAutocomplete.complete(draft, getLocalCommandHints(trimmedStart, activeSessionId, sessions));
 }
 
 export async function runLocalCommand(args: LocalCommandArgs): Promise<SlashCommandResult> {

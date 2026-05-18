@@ -25,10 +25,10 @@ registries and render the command results.
   generic types.
 - `slash/result-types.ts`: `SlashCommandResult`, the command-domain result
   contract.
-- `slash/parser.ts`: parse slash command text without treating absolute paths as
-  commands.
-- `slash/registry.ts`: register and dispatch command modules.
-- `slash/autocomplete.ts`: command hints and completions.
+- `SlashCommandParser`: parse slash command text without treating absolute
+  paths as commands and provide match predicates.
+- `SlashCommandRegistry`: register and dispatch command modules.
+- `SlashCommandAutocomplete`: filter command hints and produce completions.
 - `slash/modules/*`: model, auth, session, compaction, heartbeat, and drift
   command modules.
 

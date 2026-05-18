@@ -1,4 +1,4 @@
-import { matchesAnyExactSlashCommand, matchesExactSlashCommand } from '../../parser.js';
+import { SlashCommandParser } from '../../parser.js';
 import type { SlashCommandResult } from '../../result-types.js';
 import type { SlashCommandModule } from '../../types.js';
 import type { SlashCommandExecutionContext } from '../context.js';
@@ -18,7 +18,7 @@ export function createDriftSlashCommandModule(): SlashCommandModule<SlashCommand
         syntax: '/drift',
         aliases: ['/drift status'],
         description: 'show CyberLoop semantic drift detection status',
-        match: matchesAnyExactSlashCommand(['/drift', '/drift status']),
+        match: SlashCommandParser.matchesAnyExact(['/drift', '/drift status']),
         run: (context) => {
           const status = context.drift.status();
           return slashMessageResult(formatDriftStatus(status.enabled, status.error));
@@ -28,7 +28,7 @@ export function createDriftSlashCommandModule(): SlashCommandModule<SlashCommand
         id: 'drift.enable',
         syntax: '/drift on',
         description: 'enable CyberLoop semantic drift detection for chat runs',
-        match: matchesExactSlashCommand('/drift on'),
+        match: SlashCommandParser.matchesExact('/drift on'),
         run: (context) => {
           context.drift.setEnabled(true);
           return slashMessageResult('Enabled CyberLoop semantic drift detection for chat runs. Heddle will load real CyberLoop kinematics middleware and write annotations into traces.');
@@ -38,7 +38,7 @@ export function createDriftSlashCommandModule(): SlashCommandModule<SlashCommand
         id: 'drift.disable',
         syntax: '/drift off',
         description: 'disable CyberLoop semantic drift detection',
-        match: matchesExactSlashCommand('/drift off'),
+        match: SlashCommandParser.matchesExact('/drift off'),
         run: (context) => {
           context.drift.setEnabled(false);
           return slashMessageResult('Disabled CyberLoop semantic drift detection.');

@@ -5,7 +5,7 @@ import { externalContextToolkit } from '@/core/tools/toolkits/external-context/t
 import { internalToolkit } from '@/core/tools/toolkits/internal/toolkit.js';
 import { knowledgeToolkit } from '@/core/tools/toolkits/knowledge/toolkit.js';
 import { shellProcessToolkit } from '@/core/tools/toolkits/shell-process/toolkit.js';
-import { createToolkitToolBundle, type ToolToolkit } from '@/core/tools/toolkit.js';
+import { ToolBundleComposer, type ToolToolkit } from '@/core/tools/index.js';
 import type { ToolDefinition } from '@/core/types.js';
 import type { DefaultAgentToolsOptions } from './types.js';
 
@@ -20,7 +20,7 @@ export class RuntimeToolService {
       join(workspaceRoot, options.stateDir ?? '.heddle', 'memory');
     const memoryMode = options.memoryMode ?? 'read-and-record';
 
-    return createToolkitToolBundle({
+    return ToolBundleComposer.compose({
       toolkits: this.createDefaultToolkits({ includePlanTool: options.includePlanTool }),
       context: {
         workspaceRoot,

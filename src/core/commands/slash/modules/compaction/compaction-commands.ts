@@ -1,4 +1,4 @@
-import { matchesExactSlashCommand } from '../../parser.js';
+import { SlashCommandParser } from '../../parser.js';
 import type { SlashCommandResult } from '../../result-types.js';
 import type { SlashCommandModule } from '../../types.js';
 import type { SlashCommandExecutionContext } from '../context.js';
@@ -15,7 +15,7 @@ export function createCompactionSlashCommandModule(): SlashCommandModule<SlashCo
         id: 'compaction.compact',
         syntax: '/compact',
         description: 'compact earlier session history for the next run',
-        match: matchesExactSlashCommand('/compact'),
+        match: SlashCommandParser.matchesExact('/compact'),
         run: async (context) => slashMessageResult(await context.compaction.compactActive()),
       },
     ],

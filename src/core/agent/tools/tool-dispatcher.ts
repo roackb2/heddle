@@ -1,8 +1,7 @@
 import type { Logger } from 'pino';
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
 import { ToolApprovalPolicies, ToolApprovalService } from '@/core/approvals/index.js';
-import { executeTool } from '@/core/tools/execute-tool.js';
-import { createToolRegistry } from '@/core/tools/registry.js';
+import { ToolExecutionService, type ToolRegistry } from '@/core/tools/index.js';
 import type { ToolCall, ToolDefinition, TraceEvent } from '@/core/types.js';
 import { normalizeToolInput, stableSerialize } from '@/core/agent/utils/index.js';
 import type { RunAgentOptions } from '../types.js';
@@ -70,14 +69,14 @@ export class AgentToolDispatcher {
     call: ToolCall;
     step: number;
     now: () => string;
-    registry: ReturnType<typeof createToolRegistry>;
+    registry: ToolRegistry;
     seenToolCalls: Map<string, number>;
     approvalPolicies?: ToolApprovalPolicy[];
     approveToolCall: RunAgentOptions['approveToolCall'];
     workspaceRoot?: string;
     record: (event: TraceEvent) => void;
     log: Logger;
-  }): Promise<{ effectiveCall: ToolCall; result: Awaited<ReturnType<typeof executeTool>> }> {
+  }): Promise<{ effectiveCall: ToolCall; result: Awaited<ReturnType<typeof ToolExecutionService.execute>> }> {
     const primary = await AgentToolDispatcher.executeRecordedToolCall(args.call, args);
     const fallbackReason = AgentToolDispatcher.getInspectFallbackReason(args.call, primary.result);
     if (!fallbackReason) {
@@ -129,12 +128,12 @@ export class AgentToolDispatcher {
     args: {
       step: number;
       now: () => string;
-      registry: ReturnType<typeof createToolRegistry>;
+      registry: ToolRegistry;
       seenToolCalls: Map<string, number>;
       record: (event: TraceEvent) => void;
       log: Logger;
     },
-  ): Promise<{ effectiveCall: ToolCall; result: Awaited<ReturnType<typeof executeTool>> }> {
+  ): Promise<{ effectiveCall: ToolCall; result: Awaited<ReturnType<typeof ToolExecutionService.execute>> }> {
     const { step, now, registry, seenToolCalls, record, log } = args;
     log.info({ step, tool: call.tool }, 'Executing tool');
     record({ type: 'tool.call', call, step, timestamp: now() });
@@ -148,7 +147,7 @@ export class AgentToolDispatcher {
       );
     }
 
-    const result = await executeTool(registry, call);
+    const result = await ToolExecutionService.execute(registry, call);
     seenToolCalls.set(signature, seenCount + 1);
     log.debug({ step, tool: call.tool, ok: result.ok }, 'Tool result');
     record({ type: 'tool.result', tool: call.tool, result, step, timestamp: now() });

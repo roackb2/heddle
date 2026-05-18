@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createSlashCommandRegistry } from '../../../core/commands/slash/registry.js';
+import { SlashCommandRegistry } from '../../../core/commands/slash/registry.js';
 import { createCoreSlashCommandModules } from '../../../core/commands/slash/modules/core-command-modules.js';
 import { buildHeartbeatContinuationPrompt } from '../../../core/commands/slash/modules/heartbeat/heartbeat-commands.js';
 import { resolveSessionReference } from '../../../core/commands/slash/modules/session/session-commands.js';
@@ -138,7 +138,7 @@ function createContext(overrides: Partial<SlashCommandExecutionContext> = {}): S
 }
 
 describe('core slash command modules', () => {
-  const registry = createSlashCommandRegistry(createCoreSlashCommandModules());
+  const registry = new SlashCommandRegistry(createCoreSlashCommandModules());
 
   it('runs model commands through the registry and preserves compatibility aliases', async () => {
     const context = createContext();

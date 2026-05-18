@@ -1,19 +1,8 @@
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  autocompleteSlashCommand,
-  filterSlashCommandHints,
-  hintCommandToCompletionCandidate,
-  longestSharedPrefix,
-} from '../../../core/commands/slash/autocomplete.js';
-import {
-  isSlashCommandInput,
-  matchesAnyExactSlashCommand,
-  matchesExactSlashCommand,
-  matchesSlashCommandPrefix,
-  parseSlashCommand,
-} from '../../../core/commands/slash/parser.js';
-import { createSlashCommandRegistry } from '../../../core/commands/slash/registry.js';
+import { SlashCommandAutocomplete } from '../../../core/commands/slash/autocomplete.js';
+import { SlashCommandParser } from '../../../core/commands/slash/parser.js';
+import { SlashCommandRegistry } from '../../../core/commands/slash/registry.js';
 import type { SlashCommand, SlashCommandModule } from '../../../core/commands/slash/types.js';
 
 type TestResult = { kind: string; value?: string };
@@ -27,7 +16,7 @@ function command(
   return {
     description: `${overrides.id} description`,
     aliases: [],
-    match: matchesExactSlashCommand(overrides.syntax),
+    match: SlashCommandParser.matchesExact(overrides.syntax),
     run: (context, input) => ({ kind: overrides.id, value: `${context.prefix}:${input.rest}` }),
     ...overrides,
   };
@@ -42,7 +31,7 @@ function moduleWith(commands: SlashCommand<TestResult, TestContext>[]): SlashCom
 
 describe('slash command parser', () => {
   it('parses slash commands into root, tokens, and rest', () => {
-    expect(parseSlashCommand('  /model set gpt-5.4  ')).toEqual({
+    expect(SlashCommandParser.parse('  /model set gpt-5.4  ')).toEqual({
       raw: '/model set gpt-5.4',
       root: 'model',
       tokens: ['model', 'set', 'gpt-5.4'],
@@ -51,7 +40,7 @@ describe('slash command parser', () => {
   });
 
   it('parses the bare slash command as an empty root', () => {
-    expect(parseSlashCommand('/')).toEqual({
+    expect(SlashCommandParser.parse('/')).toEqual({
       raw: '/',
       root: '',
       tokens: [],
@@ -60,23 +49,23 @@ describe('slash command parser', () => {
   });
 
   it('does not treat normal text or absolute Unix paths as slash commands', () => {
-    expect(parseSlashCommand('hello')).toBeUndefined();
-    expect(parseSlashCommand(absoluteScreenshotFixturePath)).toBeUndefined();
-    expect(isSlashCommandInput('/session list')).toBe(true);
-    expect(isSlashCommandInput(absoluteScreenshotFixturePath)).toBe(false);
+    expect(SlashCommandParser.parse('hello')).toBeUndefined();
+    expect(SlashCommandParser.parse(absoluteScreenshotFixturePath)).toBeUndefined();
+    expect(SlashCommandParser.isInput('/session list')).toBe(true);
+    expect(SlashCommandParser.isInput(absoluteScreenshotFixturePath)).toBe(false);
   });
 
   it('provides exact, alias, and prefix-style match helpers', () => {
-    const parsed = parseSlashCommand('/session switch session-a');
+    const parsed = SlashCommandParser.parse('/session switch session-a');
     if (!parsed) {
       throw new Error('expected parsed command');
     }
 
-    expect(matchesExactSlashCommand('/session switch session-a')(parsed)).toBe(true);
-    expect(matchesExactSlashCommand('/session switch')(parsed)).toBe(false);
-    expect(matchesAnyExactSlashCommand(['/session list', '/session switch session-a'])(parsed)).toBe(true);
-    expect(matchesSlashCommandPrefix('/session switch')(parsed)).toBe(true);
-    expect(matchesSlashCommandPrefix('/session close')(parsed)).toBe(false);
+    expect(SlashCommandParser.matchesExact('/session switch session-a')(parsed)).toBe(true);
+    expect(SlashCommandParser.matchesExact('/session switch')(parsed)).toBe(false);
+    expect(SlashCommandParser.matchesAnyExact(['/session list', '/session switch session-a'])(parsed)).toBe(true);
+    expect(SlashCommandParser.matchesPrefix('/session switch')(parsed)).toBe(true);
+    expect(SlashCommandParser.matchesPrefix('/session close')(parsed)).toBe(false);
   });
 });
 
@@ -90,14 +79,14 @@ describe('slash command registry', () => {
       id: 'model.list',
       syntax: '/model list',
       aliases: ['/models'],
-      match: matchesAnyExactSlashCommand(['/model list', '/models']),
+      match: SlashCommandParser.matchesAnyExact(['/model list', '/models']),
     });
     const prefix = command({
       id: 'session.switch',
       syntax: '/session switch <id>',
-      match: matchesSlashCommandPrefix('/session switch'),
+      match: SlashCommandParser.matchesPrefix('/session switch'),
     });
-    const registry = createSlashCommandRegistry([moduleWith([exact, alias, prefix])]);
+    const registry = new SlashCommandRegistry([moduleWith([exact, alias, prefix])]);
 
     expect(registry.find('/help')?.command.id).toBe('help');
     expect(registry.find('/models')?.command.id).toBe('model.list');
@@ -109,7 +98,7 @@ describe('slash command registry', () => {
   });
 
   it('returns undefined for non-command input and unmatched slash commands', async () => {
-    const registry = createSlashCommandRegistry([moduleWith([
+    const registry = new SlashCommandRegistry([moduleWith([
       command({ id: 'help', syntax: '/help' }),
     ])]);
 
@@ -119,7 +108,7 @@ describe('slash command registry', () => {
   });
 
   it('returns immutable command and hint snapshots', () => {
-    const registry = createSlashCommandRegistry([moduleWith([
+    const registry = new SlashCommandRegistry([moduleWith([
       command({ id: 'help', syntax: '/help', description: 'show help' }),
     ])]);
 
@@ -135,22 +124,22 @@ describe('slash command registry', () => {
   it('rejects duplicate module ids, command ids, syntaxes, and aliases', () => {
     const help = command({ id: 'help', syntax: '/help' });
 
-    expect(() => createSlashCommandRegistry([
+    expect(() => new SlashCommandRegistry([
       { id: 'duplicate', commands: [help] },
       { id: 'duplicate', commands: [command({ id: 'model', syntax: '/model' })] },
     ])).toThrow('Duplicate slash command module id: duplicate');
 
-    expect(() => createSlashCommandRegistry([moduleWith([
+    expect(() => new SlashCommandRegistry([moduleWith([
       command({ id: 'help', syntax: '/help' }),
       command({ id: 'help', syntax: '/help again' }),
     ])])).toThrow('Duplicate slash command id: help');
 
-    expect(() => createSlashCommandRegistry([moduleWith([
+    expect(() => new SlashCommandRegistry([moduleWith([
       command({ id: 'help', syntax: '/help' }),
       command({ id: 'help.alias', syntax: '/help' }),
     ])])).toThrow('Duplicate slash command syntax: /help');
 
-    expect(() => createSlashCommandRegistry([moduleWith([
+    expect(() => new SlashCommandRegistry([moduleWith([
       command({ id: 'model.list', syntax: '/model list', aliases: ['/models'] }),
       command({ id: 'models', syntax: '/models' }),
     ])])).toThrow('Duplicate slash command syntax: /models');
@@ -168,39 +157,32 @@ describe('slash command autocomplete', () => {
   ];
 
   it('filters hints by command prefix and falls back for unmatched slash drafts', () => {
-    expect(filterSlashCommandHints('/session sw', hints)).toEqual([
+    expect(SlashCommandAutocomplete.filterHints('/session sw', hints)).toEqual([
       { command: '/session switch <id>', description: 'switch session' },
     ]);
-    expect(filterSlashCommandHints('/nope', hints)).toEqual(hints);
-    expect(filterSlashCommandHints(absoluteScreenshotFixturePath, hints)).toEqual([]);
+    expect(SlashCommandAutocomplete.filterHints('/nope', hints)).toEqual(hints);
+    expect(SlashCommandAutocomplete.filterHints(absoluteScreenshotFixturePath, hints)).toEqual([]);
   });
 
   it('autocompletes shared prefixes and strips placeholders to tab-friendly candidates', () => {
-    expect(autocompleteSlashCommand('/sess', hints)).toBe('/session ');
-    expect(autocompleteSlashCommand('/session sw', hints)).toBe('/session switch ');
-    expect(autocompleteSlashCommand('  /model s', hints)).toBe('  /model set ');
-    expect(autocompleteSlashCommand(absoluteScreenshotFixturePath, hints)).toBeUndefined();
+    expect(SlashCommandAutocomplete.complete('/sess', hints)).toBe('/session ');
+    expect(SlashCommandAutocomplete.complete('/session sw', hints)).toBe('/session switch ');
+    expect(SlashCommandAutocomplete.complete('  /model s', hints)).toBe('  /model set ');
+    expect(SlashCommandAutocomplete.complete(absoluteScreenshotFixturePath, hints)).toBeUndefined();
   });
 
   it('does not autocomplete already-maximal ambiguous prefixes or ordinary text', () => {
-    expect(autocompleteSlashCommand('/model ', hints)).toBeUndefined();
-    expect(autocompleteSlashCommand('hello', hints)).toBeUndefined();
-  });
-
-  it('exposes pure completion helpers for host adapters', () => {
-    expect(hintCommandToCompletionCandidate('/session switch <id>')).toBe('/session switch ');
-    expect(hintCommandToCompletionCandidate('/model set [query]')).toBe('/model set ');
-    expect(hintCommandToCompletionCandidate('/help')).toBe('/help');
-    expect(longestSharedPrefix(['/session switch ', '/session close '])).toBe('/session ');
+    expect(SlashCommandAutocomplete.complete('/model ', hints)).toBeUndefined();
+    expect(SlashCommandAutocomplete.complete('hello', hints)).toBeUndefined();
   });
 
   it('does not call command run handlers while autocompleting', () => {
     const run = vi.fn();
-    const registry = createSlashCommandRegistry([moduleWith([
+    const registry = new SlashCommandRegistry([moduleWith([
       command({ id: 'help', syntax: '/help', run }),
     ])]);
 
-    expect(autocompleteSlashCommand('/h', registry.hints())).toBe('/help');
+    expect(SlashCommandAutocomplete.complete('/h', registry.hints())).toBe('/help');
     expect(run).not.toHaveBeenCalled();
   });
 });

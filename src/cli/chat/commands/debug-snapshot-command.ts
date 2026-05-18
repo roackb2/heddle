@@ -1,4 +1,4 @@
-import { matchesExactSlashCommand } from '../../../core/commands/slash/parser.js';
+import { SlashCommandParser } from '../../../core/commands/slash/parser.js';
 import type { SlashCommandResult } from '../../../core/commands/slash/result-types.js';
 import type { SlashCommandModule } from '../../../core/commands/slash/types.js';
 
@@ -20,7 +20,7 @@ export function createTuiDebugSnapshotCommandModule(): SlashCommandModule<
         id: 'tui.debug-snapshot.save',
         syntax: '/debug tui-snapshot',
         description: 'save the latest rendered TUI frame for inspection',
-        match: matchesExactSlashCommand('/debug tui-snapshot'),
+        match: SlashCommandParser.matchesExact('/debug tui-snapshot'),
         run: async (context) => ({
           handled: true,
           kind: 'message',

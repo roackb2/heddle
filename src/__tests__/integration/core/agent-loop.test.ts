@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AgentLoopCheckpointService, AgentLoopRuntimeService } from '@/core/runtime/loop/index.js';
 import { RuntimeToolService } from '@/core/runtime/tools/index.js';
-import { createToolkitToolBundle, type ToolToolkit } from '../../../core/tools/toolkit.js';
+import { ToolBundleComposer, type ToolToolkit } from '@/core/tools/index.js';
 import type { ChatMessage, LlmAdapter, LlmResponse } from '../../../core/llm/types.js';
 import type { AgentHeartbeatEvent, AgentLoopEvent, ToolDefinition } from '../../../index.js';
 import { createLogger } from '../../../core/utils/logger.js';
@@ -370,7 +370,7 @@ describe('RuntimeToolService.createDefaultAgentTools', () => {
   });
 });
 
-describe('createToolkitToolBundle', () => {
+describe('ToolBundleComposer', () => {
   const context = {
     workspaceRoot: '/tmp/workspace',
     model: 'gpt-test',
@@ -384,7 +384,7 @@ describe('createToolkitToolBundle', () => {
       createTools: () => [],
     };
 
-    expect(() => createToolkitToolBundle({
+    expect(() => ToolBundleComposer.compose({
       toolkits: [duplicateToolkit, duplicateToolkit],
       context,
     })).toThrow('Duplicate toolkit id: duplicate');
@@ -400,7 +400,7 @@ describe('createToolkitToolBundle', () => {
       createTools: () => [{ name: 'shared_tool', description: 'b', parameters: {}, execute: async () => ({ ok: true, output: 'b' }) }],
     };
 
-    expect(() => createToolkitToolBundle({
+    expect(() => ToolBundleComposer.compose({
       toolkits: [first, second],
       context,
     })).toThrow('Duplicate tool name from toolkits: shared_tool');

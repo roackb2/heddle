@@ -1,4 +1,4 @@
-import { matchesAnyExactSlashCommand, matchesSlashCommandPrefix } from '../../parser.js';
+import { SlashCommandParser } from '../../parser.js';
 import type { SlashCommandResult } from '../../result-types.js';
 import type { SlashCommandModule } from '../../types.js';
 import type { SlashCommandExecutionContext } from '../context.js';
@@ -22,21 +22,21 @@ export function createAuthSlashCommandModule(): SlashCommandModule<SlashCommandR
         syntax: '/auth status',
         aliases: ['/auth'],
         description: 'show stored provider credentials',
-        match: matchesAnyExactSlashCommand(['/auth', '/auth status']),
+        match: SlashCommandParser.matchesAnyExact(['/auth', '/auth status']),
         run: (context) => slashMessageResult(context.auth.status()),
       },
       {
         id: 'auth.login',
         syntax: '/auth login <provider>',
         description: 'sign in with a provider',
-        match: matchesSlashCommandPrefix('/auth login'),
+        match: SlashCommandParser.matchesPrefix('/auth login'),
         run: (context, input) => login(context, argumentAfterPrefix(input, '/auth login')),
       },
       {
         id: 'auth.logout',
         syntax: '/auth logout <provider>',
         description: 'remove a stored provider credential',
-        match: matchesSlashCommandPrefix('/auth logout'),
+        match: SlashCommandParser.matchesPrefix('/auth logout'),
         run: (context, input) => logout(context, argumentAfterPrefix(input, '/auth logout')),
       },
     ],

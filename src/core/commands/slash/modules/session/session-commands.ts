@@ -1,4 +1,4 @@
-import { matchesExactSlashCommand, matchesSlashCommandPrefix } from '../../parser.js';
+import { SlashCommandParser } from '../../parser.js';
 import type { SlashCommandResult } from '../../result-types.js';
 import type { SlashCommandModule } from '../../types.js';
 import type { ChatSession } from '../../../../chat/types.js';
@@ -24,14 +24,14 @@ export function createSessionSlashCommandModule(): SlashCommandModule<SlashComma
         id: 'session.continue-current',
         syntax: '/continue',
         description: 'resume from the current transcript',
-        match: matchesExactSlashCommand('/continue'),
+        match: SlashCommandParser.matchesExact('/continue'),
         run: () => ({ handled: true, kind: 'continue' }),
       },
       {
         id: 'session.clear',
         syntax: '/clear',
         description: 'reset the current session transcript',
-        match: matchesExactSlashCommand('/clear'),
+        match: SlashCommandParser.matchesExact('/clear'),
         run: (context) => {
           context.session.clear();
           return slashMessageResult('Cleared the current chat transcript.');
@@ -41,7 +41,7 @@ export function createSessionSlashCommandModule(): SlashCommandModule<SlashComma
         id: 'session.list',
         syntax: '/session list',
         description: 'list local chat sessions',
-        match: matchesExactSlashCommand('/session list'),
+        match: SlashCommandParser.matchesExact('/session list'),
         run: (context) =>
           slashMessageResult(
             context.session.all().length > 0 ?
@@ -53,7 +53,7 @@ export function createSessionSlashCommandModule(): SlashCommandModule<SlashComma
         id: 'session.choose.help',
         syntax: '/session choose',
         description: 'pick a recent session with filtering',
-        match: matchesExactSlashCommand('/session choose'),
+        match: SlashCommandParser.matchesExact('/session choose'),
         run: () =>
           slashMessageResult('Use /session choose <query> to filter recent sessions, then use arrows and Enter to choose one.'),
       },
@@ -61,7 +61,7 @@ export function createSessionSlashCommandModule(): SlashCommandModule<SlashComma
         id: 'session.new',
         syntax: '/session new [name]',
         description: 'create and switch to a new session',
-        match: matchesSlashCommandPrefix('/session new'),
+        match: SlashCommandParser.matchesPrefix('/session new'),
         run: (context, input) => createSession(context, argumentAfterPrefix(input, '/session new')),
       },
       {

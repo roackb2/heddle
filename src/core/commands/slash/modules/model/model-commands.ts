@@ -1,4 +1,4 @@
-import { matchesAnyExactSlashCommand, matchesExactSlashCommand, matchesSlashCommandPrefix } from '../../parser.js';
+import { SlashCommandParser } from '../../parser.js';
 import type { SlashCommandResult } from '../../result-types.js';
 import type { SlashCommandModule } from '../../types.js';
 import type { SlashCommandExecutionContext } from '../context.js';
@@ -38,28 +38,28 @@ export function createModelSlashCommandModule(): SlashCommandModule<SlashCommand
         syntax: '/model list',
         aliases: ['/models'],
         description: 'list common built-in models',
-        match: matchesAnyExactSlashCommand(['/model list', '/models']),
+        match: SlashCommandParser.matchesAnyExact(['/model list', '/models']),
         run: () => slashMessageResult(MODEL_LIST_MESSAGE),
       },
       {
         id: 'model.current',
         syntax: '/model',
         description: 'show the active model',
-        match: matchesExactSlashCommand('/model'),
+        match: SlashCommandParser.matchesExact('/model'),
         run: (context) => slashMessageResult(`Current model: ${context.model.active()}`),
       },
       {
         id: 'model.set.help',
         syntax: '/model set',
         description: 'pick a model with filtering',
-        match: matchesExactSlashCommand('/model set'),
+        match: SlashCommandParser.matchesExact('/model set'),
         run: () => slashMessageResult(MODEL_SET_HELP_MESSAGE),
       },
       {
         id: 'model.switch',
         syntax: '/model <name>',
         description: 'switch the current model',
-        match: matchesSlashCommandPrefix('/model'),
+        match: SlashCommandParser.matchesPrefix('/model'),
         run: (context, input) => switchModel(context, argumentAfterPrefix(input, '/model')),
       },
     ],
@@ -79,7 +79,7 @@ export function createReasoningSlashCommandModule(): SlashCommandModule<SlashCom
         id: 'reasoning.current',
         syntax: '/reasoning',
         description: 'show reasoning effort for the current session',
-        match: matchesExactSlashCommand('/reasoning'),
+        match: SlashCommandParser.matchesExact('/reasoning'),
         run: (context) => slashMessageResult(formatSessionReasoningEffortStatus({
           model: context.model.active(),
           reasoningEffort: context.model.activeReasoningEffort(),
@@ -89,14 +89,14 @@ export function createReasoningSlashCommandModule(): SlashCommandModule<SlashCom
         id: 'reasoning.set.help',
         syntax: '/reasoning set',
         description: 'pick reasoning effort with filtering',
-        match: matchesExactSlashCommand('/reasoning set'),
+        match: SlashCommandParser.matchesExact('/reasoning set'),
         run: () => slashMessageResult(REASONING_SET_HELP_MESSAGE),
       },
       {
         id: 'reasoning.set',
         syntax: '/reasoning <low|medium|high|default>',
         description: 'set reasoning effort for the current session',
-        match: matchesSlashCommandPrefix('/reasoning'),
+        match: SlashCommandParser.matchesPrefix('/reasoning'),
         run: (context, input) => setReasoningEffort(context, argumentAfterPrefix(input, '/reasoning')),
       },
     ],

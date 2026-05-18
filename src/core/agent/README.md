@@ -30,6 +30,7 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
 ## Internal Structure
 
 - `context/`: builds the mutable run context and initial model transcript.
+- `budget/`: tracks max-step consumption for one run.
 - `model/`: owns one LLM request, stream presentation, and usage accumulation.
 - `tools/`: owns assistant tool-call turns, dispatch, approval, fallback, and
   repeat tracking.
