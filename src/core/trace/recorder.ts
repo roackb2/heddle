@@ -1,30 +1,23 @@
-// ---------------------------------------------------------------------------
-// Trace Recorder
-// ---------------------------------------------------------------------------
-
-import type { TraceEvent } from '../types.js';
-
-export type TraceRecorder = {
-  record(event: TraceEvent): void;
-  getTrace(): TraceEvent[];
-  toJSON(): string;
-};
+import type { TraceEvent } from '@/core/types.js';
 
 /**
- * Create a trace recorder that accumulates events in memory.
+ * Mutable in-memory recorder for one trace-producing run.
+ *
+ * This class owns event accumulation only. Projection, summaries, and
+ * user-facing review views belong in observability or review domains.
  */
-export function createTraceRecorder(): TraceRecorder {
-  const events: TraceEvent[] = [];
+export class TraceRecorder {
+  private readonly events: TraceEvent[] = [];
 
-  return {
-    record(event: TraceEvent) {
-      events.push(event);
-    },
-    getTrace() {
-      return [...events];
-    },
-    toJSON() {
-      return JSON.stringify(events, null, 2);
-    },
-  };
+  record(event: TraceEvent): void {
+    this.events.push(event);
+  }
+
+  getTrace(): TraceEvent[] {
+    return [...this.events];
+  }
+
+  toJSON(): string {
+    return JSON.stringify(this.events, null, 2);
+  }
 }

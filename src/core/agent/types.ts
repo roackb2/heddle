@@ -5,7 +5,7 @@ import type { ToolRegistry } from '@/core/tools/registry.js';
 import type { PlanItem } from '@/core/tools/toolkits/internal/update-plan.js';
 import type { RunResult, ToolDefinition, ToolCall, ToolResult, TraceEvent, StopReason } from '@/core/types.js';
 import type { createBudget } from '@/core/utils/budget.js';
-import type { createTraceRecorder } from '@/core/trace/recorder.js';
+import type { TraceRecorder } from '@/core/trace/index.js';
 import type { MutationState } from './mutation/index.js';
 
 export type RunAgentOptions = {
@@ -63,7 +63,7 @@ export type AgentRunContext = {
   workspaceRoot: string;
   log: Logger;
   messages: ChatMessage[];
-  trace: ReturnType<typeof createTraceRecorder>;
+  trace: TraceRecorder;
   record: (event: TraceEvent) => void;
   now: () => string;
   budget: ReturnType<typeof createBudget>;

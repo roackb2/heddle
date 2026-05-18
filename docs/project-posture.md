@@ -68,6 +68,8 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
 - `src/core/tools/` owns tool definitions, registries, execution, and toolkits.
 - `src/core/approvals/` owns approval policy chains and remembered rules.
 - `src/core/observability/` owns trace and activity projection.
+- `src/core/review/` owns reusable review projections such as structured Git
+  diff parsing.
 - `src/cli/` owns terminal and TUI host surfaces.
 - `src/server/` owns the daemon/control-plane API.
 - `src/web/` owns the browser control plane.

@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
-import { parseUnifiedDiffFiles } from '../../../../core/review/diff-domain.js';
+import { ReviewDiffParser } from '@/core/review/index.js';
 import type {
   WorkspaceChangedFileView,
   WorkspaceChangesView,
@@ -108,7 +108,7 @@ export class ControlPlaneWorkspaceDiffController {
 
     const patch = patches.join('\n').trim();
     const truncated = patch ? ControlPlaneWorkspaceDiffController.truncatePatch(patch) : undefined;
-    const parsedFiles = patch ? parseUnifiedDiffFiles(patch) : [];
+    const parsedFiles = patch ? ReviewDiffParser.parseUnifiedDiffFiles(patch) : [];
     const parsedFile = parsedFiles.find((file) => file.path === scopedPath.path || file.oldPath === scopedPath.path);
     return {
       vcs: 'git',
