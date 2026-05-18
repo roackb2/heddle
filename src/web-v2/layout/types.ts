@@ -1,8 +1,10 @@
+import type { I18nMessageKey } from '../i18n/messages';
+
 export type AppSurfaceId = 'sessions' | 'tasks';
 export type SettingsSectionId = 'general' | 'workspaces' | 'memory';
 
 export interface NavigationItem {
   id: AppSurfaceId | SettingsSectionId;
-  label: string;
+  labelKey: I18nMessageKey;
   href: string;
 }

@@ -16,6 +16,12 @@ current user-facing UI.
   real product need cannot be expressed by the shared design system.
 - Keep workflow state close to the feature that owns it. Do not create broad
   global hooks until two real surfaces need the same behavior.
+- Put reusable UI under `components/<feature>/` instead of nesting shared
+  components under one page. Page folders should own only page-specific pieces.
+- Keep shell/application hooks under `hooks/`; move feature-specific hooks next
+  to their feature when they start owning data or behavior.
+- All user-facing strings go through `i18n/` so `en-us`, `zh-tw`, and `zh-cn`
+  stay aligned from the start.
 - Start with navigation structure only, then build one complete workflow at a
   time.
 - Visual design follows [`design-language.md`](./design-language.md). Start with
@@ -25,10 +31,11 @@ current user-facing UI.
 ## Folder Shape
 
 - `api/`: tRPC clients and inferred server contracts.
-- `layout/`: app frame, navigation, and shell-level placement.
+- `components/`: reusable v2-only components grouped by feature.
+- `hooks/`: shell-level client state hooks.
+- `i18n/`: typed locale dictionaries and the client translation provider.
+- `layout/`: app frame and shell-level placement.
 - `views/`: route-level workflow surfaces.
-- `components/`: reusable v2-only presentation components when a second caller
-  exists.
 
 V2 should borrow from v1 only when the source module already respects the API
 boundary and does not carry legacy control-plane assumptions.
