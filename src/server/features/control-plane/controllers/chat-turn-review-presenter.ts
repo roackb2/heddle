@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { parseUnifiedDiffFiles } from '../../../../core/review/diff-domain.js';
+import { ReviewDiffParser } from '@/core/review/index.js';
 import type {
   ApprovalEventView,
   ChangedFileReviewView,
@@ -188,7 +188,7 @@ export class ControlPlaneChatTurnReviewPresenter {
       status: ControlPlaneChatTurnReviewPresenter.statusFromEditAction(readString(output.action)),
       source: 'edit_file',
       patch,
-      diff: patch ? parseUnifiedDiffFiles(patch).find((file) => file.path === path || file.oldPath === path) : undefined,
+      diff: patch ? ReviewDiffParser.parseUnifiedDiffFiles(patch).find((file) => file.path === path || file.oldPath === path) : undefined,
       truncated: readBoolean(diff?.truncated),
     };
   }
@@ -206,7 +206,7 @@ export class ControlPlaneChatTurnReviewPresenter {
   }
 
   private static parseGitDiffFiles(diff: string): ChangedFileReviewView[] {
-    return parseUnifiedDiffFiles(diff).map((file) => ({
+    return ReviewDiffParser.parseUnifiedDiffFiles(diff).map((file) => ({
       path: file.path,
       status: file.status === 'copied' ? 'modified' : file.status,
       source: 'git_diff' as const,

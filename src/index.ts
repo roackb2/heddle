@@ -273,9 +273,15 @@ export type {
 } from './core/approvals/remembered-rules/index.js';
 
 // Trace
-export { createTraceRecorder } from './core/trace/recorder.js';
-export type { TraceRecorder } from './core/trace/recorder.js';
-export { formatTraceForConsole } from './core/trace/format.js';
+export { TraceConsoleFormatter, TraceRecorder } from './core/trace/index.js';
+export type { TraceRecordSink } from './core/trace/index.js';
+export { ReviewDiffParser } from './core/review/index.js';
+export type {
+  ReviewDiffFile,
+  ReviewDiffHunk,
+  ReviewDiffLine,
+  ReviewFileStatus,
+} from './core/review/index.js';
 export {
   DEFAULT_TRACE_SUMMARIZERS,
   ConversationActivityProjector,

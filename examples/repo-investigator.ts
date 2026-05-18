@@ -17,7 +17,7 @@ import {
   searchFilesTool,
   createRunShellInspectTool,
   createRunShellMutateTool,
-  formatTraceForConsole,
+  TraceConsoleFormatter,
   createLogger,
 } from '../src/index.js';
 
@@ -50,7 +50,7 @@ async function main() {
   const result = await AgentRunService.run({ goal, llm, tools, maxSteps, logger });
 
   // Print formatted trace
-  console.log(formatTraceForConsole(result.trace));
+  console.log(TraceConsoleFormatter.format(result.trace));
 
   // Save JSON trace
   const traceDir = join(process.cwd(), 'local', 'traces');

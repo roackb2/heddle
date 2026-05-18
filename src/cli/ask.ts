@@ -18,7 +18,7 @@ import {
   type ToolDefinition,
   type TraceEvent,
   LlmAdapterService,
-  formatTraceForConsole,
+  TraceConsoleFormatter,
   createLogger,
   RuntimeCredentialService,
 } from '../index.js';
@@ -151,7 +151,7 @@ export class AskCliHost {
     const latestTraceFile = result.session.turns.at(-1)?.traceFile;
     const trace = latestTraceFile ? AskCliHost.readTraceFile(latestTraceFile) : undefined;
     if (trace) {
-      process.stdout.write(`${formatTraceForConsole(trace)}\n`);
+      process.stdout.write(`${TraceConsoleFormatter.format(trace)}\n`);
     }
     AskCliHost.writeAskSessionResult({
       sessionId: result.session.id,
