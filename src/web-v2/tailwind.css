@@ -49,14 +49,21 @@
     padding-inline: 1rem;
   }
 
+  .v2-shell[data-sidebar-collapsed="true"] .v2-panel-header {
+    padding-left: 3rem;
+  }
+
   .v2-nav-row {
-    width: 100% !important;
-    height: 1.75rem !important;
-    justify-content: flex-start !important;
+    display: inline-flex;
+    width: 100%;
+    height: 1.75rem;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
     border-radius: var(--radius-md);
-    padding-inline: 0.5rem !important;
-    font-size: 0.875rem !important;
-    font-weight: 400 !important;
+    padding-inline: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 400;
     text-align: left;
     color: var(--color-muted-foreground);
   }

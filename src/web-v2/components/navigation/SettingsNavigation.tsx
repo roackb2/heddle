@@ -1,4 +1,3 @@
-import { Button } from '@web/components/ui/button';
 import { useI18n } from '@web/i18n';
 import type { SettingsRoute } from '@web/layout/routes';
 import type { SettingsSectionId } from '@web/layout/types';
@@ -18,14 +17,13 @@ export function SettingsNavigation({ activeItemId, items, onBack }: SettingsNavi
   return (
     <>
       <div className="v2-panel-divider border-b p-1.5">
-        <Button
-          className="v2-nav-row w-full"
+        <button
+          className="v2-nav-row"
           onClick={onBack}
           type="button"
-          variant="ghost"
         >
           {t('navigation.backToApp')}
-        </Button>
+        </button>
       </div>
       <nav className="v2-sidebar-section" aria-label={t('navigation.settingsAriaLabel')}>
         {items.map((item) => (
