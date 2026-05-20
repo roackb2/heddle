@@ -250,9 +250,9 @@ function SidebarTrigger({
   );
 }
 
-function SidebarInset({ className, ...props }: React.ComponentProps<'main'>) {
+function SidebarInset({ className, ...props }: React.ComponentProps<'div'>) {
   return (
-    <main
+    <div
       data-slot="sidebar-inset"
       className={cn('relative flex min-w-0 flex-1 flex-col bg-background', className)}
       {...props}
