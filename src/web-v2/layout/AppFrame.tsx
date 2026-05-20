@@ -43,6 +43,7 @@ export function AppFrame({
     <SidebarProvider className="v2-shell h-dvh bg-background font-sans text-foreground">
       <a className="sr-only focus:not-sr-only" href="#main-content">{t('navigation.skipToMain')}</a>
       <Sidebar
+        aria-label={t('navigation.primaryAriaLabel')}
         className="v2-sidebar-panel v2-panel-divider"
         collapsible="offcanvas"
       >
@@ -59,7 +60,6 @@ export function AppFrame({
 
       <SidebarInset>
         <SidebarTrigger
-          aria-label={t('navigation.collapseSidebar')}
           className="absolute left-2 top-2 z-20"
         />
         <ResizablePanelGroup direction="horizontal">

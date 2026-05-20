@@ -141,7 +141,7 @@ function Sidebar({
   className,
   children,
   ...props
-}: React.ComponentProps<'div'> & {
+}: React.ComponentProps<'aside'> & {
   side?: 'left' | 'right';
   collapsible?: 'offcanvas' | 'none';
 }) {
@@ -149,13 +149,13 @@ function Sidebar({
 
   if (collapsible === 'none') {
     return (
-      <div
+      <aside
         data-slot="sidebar"
         className={cn('flex h-full w-[var(--sidebar-width)] flex-col bg-sidebar text-sidebar-foreground', className)}
         {...props}
       >
         {children}
-      </div>
+      </aside>
     );
   }
 
@@ -183,12 +183,13 @@ function Sidebar({
   }
 
   return (
-    <div
+    <aside
       className="group peer hidden text-sidebar-foreground md:block"
       data-state={state}
       data-collapsible={state === 'collapsed' ? collapsible : ''}
       data-side={side}
       data-slot="sidebar"
+      {...props}
     >
       <div
         data-slot="sidebar-gap"
@@ -207,7 +208,6 @@ function Sidebar({
           side === 'left' ? 'border-r' : 'border-l',
           className,
         )}
-        {...props}
       >
         <div
           data-sidebar="sidebar"
@@ -217,7 +217,7 @@ function Sidebar({
           {children}
         </div>
       </div>
-    </div>
+    </aside>
   );
 }
 
@@ -226,7 +226,8 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar();
+  const { open, toggleSidebar } = useSidebar();
+  const label = open ? 'Collapse sidebar' : 'Expand sidebar';
 
   return (
     <Button
@@ -234,6 +235,8 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
+      aria-expanded={open}
+      aria-label={label}
       className={cn('v2-icon-button size-7', className)}
       onClick={(event) => {
         onClick?.(event);
@@ -242,7 +245,7 @@ function SidebarTrigger({
       {...props}
     >
       <PanelLeftIcon />
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only">{label}</span>
     </Button>
   );
 }

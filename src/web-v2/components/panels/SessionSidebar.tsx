@@ -1,5 +1,4 @@
 import { AppNavigation, SettingsNavigation } from '@web/components/navigation';
-import { useI18n } from '@web/i18n';
 import type { AppRoute, SettingsRoute } from '@web/layout/routes';
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
 
@@ -24,10 +23,8 @@ export function SessionSidebar({
   onOpenSettings,
   onCloseSettings,
 }: SessionSidebarProps) {
-  const { t } = useI18n();
-
   return (
-    <div className="flex h-full min-w-0 flex-col text-sm" role="navigation" aria-label={t('navigation.primaryAriaLabel')}>
+    <div className="flex h-full min-w-0 flex-col text-sm">
       {settingsOpen ? (
         <SettingsNavigation
           activeItemId={activeSettingsSectionId}
