@@ -6,13 +6,14 @@ import {
 } from '@web/components/ui/resizable';
 import { ContextInspector, ConversationWorkspace, SessionSidebar } from '@web/components/panels';
 import { useI18n } from '@web/i18n';
-import type { AppSurfaceId, NavigationItem, SettingsSectionId } from '@web/layout/types';
+import type { AppRoute, SettingsRoute } from '@web/layout/routes';
+import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
 
 interface AppFrameProps {
   activeSurfaceId: AppSurfaceId;
   activeSettingsSectionId: SettingsSectionId;
-  appNavigationItems: readonly NavigationItem[];
-  settingsNavigationItems: readonly NavigationItem[];
+  appNavigationItems: readonly AppRoute[];
+  settingsNavigationItems: readonly SettingsRoute[];
   settingsOpen: boolean;
   onOpenSettings: () => void;
   onCloseSettings: () => void;

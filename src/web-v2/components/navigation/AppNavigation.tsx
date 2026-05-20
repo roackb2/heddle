@@ -1,11 +1,13 @@
 import { useI18n } from '@web/i18n';
-import type { AppSurfaceId, NavigationItem } from '@web/layout/types';
-import { SettingsMenu } from './SettingsMenu';
-import { SidebarLink } from './SidebarLink';
+import type { AppRoute } from '@web/layout/routes';
+import type { AppSurfaceId } from '@web/layout/types';
+import { MainNavigationSection } from './MainNavigationSection';
+import { SidebarContentRegion } from './SidebarContentRegion';
+import { SidebarSettingsEntry } from './SidebarSettingsEntry';
 
 interface AppNavigationProps {
   activeItemId: AppSurfaceId;
-  items: readonly NavigationItem[];
+  items: readonly AppRoute[];
   onOpenSettings: () => void;
 }
 
@@ -16,21 +18,10 @@ export function AppNavigation({ activeItemId, items, onOpenSettings }: AppNaviga
 
   return (
     <>
-      <div className="border-b px-3 py-2 text-sm font-medium text-foreground">Heddle</div>
-      <nav className="grid gap-1 p-2" aria-label={t('navigation.mainAriaLabel')}>
-        {items.map((item) => (
-          <SidebarLink
-            key={item.id}
-            active={item.id === activeItemId}
-            href={item.href}
-            label={t(item.labelKey)}
-          />
-        ))}
-      </nav>
-      <div className="min-h-0 flex-1 border-t bg-background" aria-label={t('navigation.sessionListAriaLabel')} />
-      <div className="border-t p-2">
-        <SettingsMenu onOpenSettings={onOpenSettings} />
-      </div>
+      <div className="border-b border-border/70 px-3 py-2 text-sm font-medium text-foreground">Heddle</div>
+      <MainNavigationSection activeItemId={activeItemId} items={items} />
+      <SidebarContentRegion ariaLabel={t('navigation.sessionListAriaLabel')} />
+      <SidebarSettingsEntry onOpenSettings={onOpenSettings} />
     </>
   );
 }
