@@ -1,9 +1,11 @@
+import { Settings } from 'lucide-react';
 import { Button } from '@web/components/ui/button';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@web/components/ui/popover';
+import { SidebarMenuButton } from '@web/components/ui/sidebar';
 import { LanguageSelect } from './LanguageSelect';
 import { useI18n } from '@web/i18n';
 
@@ -19,19 +21,26 @@ export function SettingsMenu({ onOpenSettings }: SettingsMenuProps) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button className="h-8 w-full justify-start px-2" type="button" variant="ghost">
-          {t('navigation.settings')}
-        </Button>
+        <SidebarMenuButton tooltip={t('navigation.settings')}>
+          <Settings aria-hidden="true" />
+          <span>{t('navigation.settings')}</span>
+        </SidebarMenuButton>
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-72"
-        side="right"
+        className="w-64 p-2"
+        side="top"
+        sideOffset={8}
         aria-label={t('navigation.settingsMenuAriaLabel')}
       >
-        <div className="grid gap-4">
+        <div className="grid gap-2">
           <LanguageSelect />
-          <Button className="h-8 justify-start px-2" onClick={onOpenSettings} type="button" variant="ghost">
+          <Button
+            className="v2-nav-row w-full"
+            onClick={onOpenSettings}
+            type="button"
+            variant="ghost"
+          >
             {t('navigation.openSettings')}
           </Button>
         </div>

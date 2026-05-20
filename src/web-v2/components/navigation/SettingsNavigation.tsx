@@ -1,11 +1,20 @@
-import { Button } from '@web/components/ui/button';
+import {
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from '@web/components/ui/sidebar';
 import { useI18n } from '@web/i18n';
-import type { NavigationItem, SettingsSectionId } from '@web/layout/types';
+import type { SettingsRoute } from '@web/layout/routes';
+import type { SettingsSectionId } from '@web/layout/types';
 import { SidebarLink } from './SidebarLink';
 
 interface SettingsNavigationProps {
   activeItemId: SettingsSectionId;
-  items: readonly NavigationItem[];
+  items: readonly SettingsRoute[];
   onBack: () => void;
 }
 
@@ -16,21 +25,41 @@ export function SettingsNavigation({ activeItemId, items, onBack }: SettingsNavi
 
   return (
     <>
-      <div className="border-b p-2">
-        <Button className="h-8 w-full justify-start px-2 text-muted-foreground" onClick={onBack} type="button" variant="ghost">
-          {t('navigation.backToApp')}
-        </Button>
-      </div>
-      <nav className="grid gap-1 p-2" aria-label={t('navigation.settingsAriaLabel')}>
-        {items.map((item) => (
-          <SidebarLink
-            key={item.id}
-            active={item.id === activeItemId}
-            href={item.href}
-            label={t(item.labelKey)}
-          />
-        ))}
-      </nav>
+      <SidebarHeader className="v2-panel-divider h-12 justify-center border-b px-2 py-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-foreground">{t('settings.general')}</span>
+        </div>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup className="v2-panel-divider border-b">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={onBack}>
+                  {t('navigation.backToApp')}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <nav aria-label={t('navigation.settingsAriaLabel')}>
+              <SidebarMenu>
+                {items.map((item) => (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarLink
+                      active={item.id === activeItemId}
+                      href={item.href}
+                      label={t(item.labelKey)}
+                    />
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </nav>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
     </>
   );
 }

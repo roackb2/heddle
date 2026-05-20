@@ -4,15 +4,22 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@web/components/ui/resizable';
+import {
+  Sidebar,
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@web/components/ui/sidebar';
 import { ContextInspector, ConversationWorkspace, SessionSidebar } from '@web/components/panels';
 import { useI18n } from '@web/i18n';
-import type { AppSurfaceId, NavigationItem, SettingsSectionId } from '@web/layout/types';
+import type { AppRoute, SettingsRoute } from '@web/layout/routes';
+import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
 
 interface AppFrameProps {
   activeSurfaceId: AppSurfaceId;
   activeSettingsSectionId: SettingsSectionId;
-  appNavigationItems: readonly NavigationItem[];
-  settingsNavigationItems: readonly NavigationItem[];
+  appNavigationItems: readonly AppRoute[];
+  settingsNavigationItems: readonly SettingsRoute[];
   settingsOpen: boolean;
   onOpenSettings: () => void;
   onCloseSettings: () => void;
@@ -33,31 +40,39 @@ export function AppFrame({
   const { t } = useI18n();
 
   return (
-    <div className="h-dvh bg-background font-sans text-foreground">
+    <SidebarProvider className="v2-shell h-dvh bg-background font-sans text-foreground">
       <a className="sr-only focus:not-sr-only" href="#main-content">{t('navigation.skipToMain')}</a>
-      <ResizablePanelGroup direction="horizontal">
-        <ResizablePanel defaultSize="16%" minSize="12rem" maxSize="28rem">
-          <SessionSidebar
-            activeSurfaceId={activeSurfaceId}
-            activeSettingsSectionId={activeSettingsSectionId}
-            appNavigationItems={appNavigationItems}
-            settingsNavigationItems={settingsNavigationItems}
-            settingsOpen={settingsOpen}
-            onOpenSettings={onOpenSettings}
-            onCloseSettings={onCloseSettings}
-          />
-        </ResizablePanel>
+      <Sidebar
+        aria-label={t('navigation.primaryAriaLabel')}
+        className="v2-sidebar-panel v2-panel-divider"
+        collapsible="offcanvas"
+      >
+        <SessionSidebar
+          activeSurfaceId={activeSurfaceId}
+          activeSettingsSectionId={activeSettingsSectionId}
+          appNavigationItems={appNavigationItems}
+          settingsNavigationItems={settingsNavigationItems}
+          settingsOpen={settingsOpen}
+          onOpenSettings={onOpenSettings}
+          onCloseSettings={onCloseSettings}
+        />
+      </Sidebar>
 
-        <ResizableHandle />
-        <ResizablePanel defaultSize="62%" minSize="32rem">
-          <ConversationWorkspace>{children}</ConversationWorkspace>
-        </ResizablePanel>
+      <SidebarInset>
+        <SidebarTrigger
+          className="absolute left-2 top-2 z-20"
+        />
+        <ResizablePanelGroup direction="horizontal">
+          <ResizablePanel defaultSize="74%" minSize="32rem">
+            <ConversationWorkspace>{children}</ConversationWorkspace>
+          </ResizablePanel>
 
-        <ResizableHandle />
-        <ResizablePanel defaultSize="22%" minSize="14rem" maxSize="36rem">
-          <ContextInspector />
-        </ResizablePanel>
-      </ResizablePanelGroup>
-    </div>
+          <ResizableHandle />
+          <ResizablePanel defaultSize="26%" minSize="14rem" maxSize="36rem">
+            <ContextInspector />
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

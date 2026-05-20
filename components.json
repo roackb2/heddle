@@ -4,17 +4,17 @@
   "rsc": false,
   "tsx": true,
   "tailwind": {
-    "css": "src/web/tailwind.css",
+    "css": "src/web-v2/tailwind.css",
     "baseColor": "slate",
     "cssVariables": true,
     "prefix": ""
   },
   "aliases": {
-    "components": "@/web/components",
-    "utils": "@/web/lib/utils",
-    "ui": "@/web/components/ui",
-    "lib": "@/web/lib",
-    "hooks": "@/web/hooks"
+    "components": "@/web-v2/components",
+    "utils": "@/web-v2/lib/utils",
+    "ui": "@/web-v2/components/ui",
+    "lib": "@/web-v2/lib",
+    "hooks": "@/web-v2/hooks"
   },
   "iconLibrary": "lucide"
 }

@@ -6,6 +6,6 @@ export function ContextInspector() {
   const { t } = useI18n();
 
   return (
-    <aside className="h-full min-w-0 bg-card" aria-label={t('inspector.contextAriaLabel')} />
+    <aside className="v2-panel-surface h-full min-w-0" aria-label={t('inspector.contextAriaLabel')} />
   );
 }

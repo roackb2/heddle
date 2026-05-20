@@ -13,6 +13,8 @@
   },
   "navigation": {
     "backToApp": "Back to App",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
     "mainAriaLabel": "Main app navigation",
     "openSettings": "Open settings",
     "primaryAriaLabel": "Primary navigation",

@@ -27,7 +27,7 @@ export function WorkbenchView({ activeSurfaceId, activeSettingsSectionId, settin
 
   return (
     <section className="flex h-full min-w-0 flex-col bg-background">
-      <header className="flex h-12 items-center border-b bg-card px-4">
+      <header className="v2-panel-header">
         <h1 className="text-balance text-sm font-medium">{title}</h1>
       </header>
       <div className="min-h-0 flex-1 bg-background" aria-label={`${title} ${t('workbench.workspaceAriaLabel')}`} />

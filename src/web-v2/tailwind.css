@@ -4,28 +4,141 @@
   --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 
-  --color-background: hsl(225 22% 6%);
+  --color-background: hsl(235 18% 7%);
   --color-foreground: hsl(220 18% 92%);
-  --color-card: hsl(225 18% 9%);
+  --color-card: hsl(235 16% 11%);
   --color-card-foreground: hsl(220 18% 92%);
-  --color-popover: hsl(225 18% 9%);
+  --color-popover: hsl(235 15% 16%);
   --color-popover-foreground: hsl(220 18% 92%);
   --color-primary: hsl(220 14% 88%);
   --color-primary-foreground: hsl(225 22% 6%);
-  --color-secondary: hsl(225 14% 15%);
+  --color-secondary: hsl(235 13% 18%);
   --color-secondary-foreground: hsl(220 18% 90%);
-  --color-muted: hsl(225 13% 13%);
+  --color-muted: hsl(235 12% 16%);
   --color-muted-foreground: hsl(220 10% 62%);
-  --color-accent: hsl(225 12% 18%);
+  --color-accent: hsl(235 12% 20%);
   --color-accent-foreground: hsl(220 18% 94%);
   --color-destructive: hsl(0 72% 63%);
   --color-destructive-foreground: hsl(0 0% 98%);
-  --color-border: hsl(225 13% 18%);
-  --color-input: hsl(225 13% 18%);
+  --color-border: hsl(235 12% 25%);
+  --color-input: hsl(235 12% 25%);
   --color-ring: hsl(220 11% 64%);
+  --color-sidebar: var(--color-card);
+  --color-sidebar-foreground: var(--color-card-foreground);
+  --color-sidebar-accent: var(--color-accent);
+  --color-sidebar-accent-foreground: var(--color-accent-foreground);
+  --color-sidebar-border: var(--color-border);
+  --color-sidebar-ring: var(--color-ring);
 
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
   --radius-xl: 10px;
+}
+
+@layer components {
+  .v2-panel-surface {
+    background: var(--color-card);
+  }
+
+  .v2-panel-divider {
+    border-color: color-mix(in oklab, var(--color-border) 72%, transparent);
+  }
+
+  .v2-panel-header {
+    display: flex;
+    height: 3rem;
+    align-items: center;
+    border-bottom-width: 1px;
+    border-color: color-mix(in oklab, var(--color-border) 72%, transparent);
+    background: var(--color-card);
+    padding-inline: 1rem;
+  }
+
+  .v2-shell .v2-panel-header {
+    padding-left: 3rem;
+  }
+
+  .v2-nav-row {
+    display: inline-flex;
+    width: 100%;
+    height: 1.75rem;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    border-radius: var(--radius-md);
+    padding-inline: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 400;
+    text-align: left;
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-nav-row:hover {
+    background: color-mix(in oklab, var(--color-accent) 70%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .v2-nav-row-active {
+    background: var(--color-accent);
+    color: var(--color-accent-foreground);
+  }
+
+  .v2-nav-row-active:hover {
+    background: var(--color-accent);
+  }
+
+  .v2-control {
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in oklab, var(--color-border) 72%, transparent);
+    background: color-mix(in oklab, var(--color-card) 84%, var(--color-background));
+    box-shadow: none;
+  }
+
+  .v2-control:hover {
+    border-color: color-mix(in oklab, var(--color-border) 90%, transparent);
+  }
+
+  .v2-control:focus-visible {
+    border-color: var(--color-ring);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-ring) 55%, transparent);
+    outline: none;
+  }
+
+  .v2-icon-button {
+    height: 1.75rem;
+    width: 1.75rem;
+    border-radius: var(--radius-md);
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-icon-button:hover {
+    background: color-mix(in oklab, var(--color-accent) 70%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .v2-sidebar-section {
+    display: grid;
+    gap: 0.125rem;
+    padding: 0.375rem;
+  }
+
+  .v2-sidebar-panel {
+    transition: flex-basis 160ms ease, width 160ms ease;
+  }
+
+  .v2-popover-surface {
+    border-radius: var(--radius-xl);
+    border: 1px solid color-mix(in oklab, var(--color-border) 76%, transparent);
+    background: var(--color-popover);
+    box-shadow: 0 12px 28px hsl(235 18% 3% / 0.32);
+  }
+
+  .v2-resize-handle {
+    background: color-mix(in oklab, var(--color-border) 74%, transparent);
+  }
+
+  .v2-resize-handle:hover {
+    background: color-mix(in oklab, var(--color-border) 90%, transparent);
+  }
 }

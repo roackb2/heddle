@@ -8,6 +8,17 @@ Use Tailwind v4 `@theme` tokens in `src/web-v2/tailwind.css` as the visual sourc
 
 Do not use raw palette utilities like `bg-slate-900`, `text-blue-300`, or ad hoc hex values in v2 components unless the design language is intentionally extended first.
 
+Use the v2 component classes in `src/web-v2/tailwind.css` for repeated surfaces:
+
+- `v2-panel-surface`, `v2-panel-divider`, and `v2-panel-header` for panes and structural dividers.
+- `v2-nav-row` and `v2-nav-row-active` for sidebar navigation rows.
+- `v2-sidebar-section` for compact sidebar groups with consistent inset and row gaps.
+- `v2-control` for form controls.
+- `v2-popover-surface` for floating menus.
+- `v2-resize-handle` for resizable panel separators.
+
+If a new component needs a different border, radius, or surface treatment, add or adjust a named v2 class first instead of hardcoding one-off utility combinations.
+
 ## Visual Direction
 
 - Neutral dark palette with one restrained accent for selected, active, or focused state.

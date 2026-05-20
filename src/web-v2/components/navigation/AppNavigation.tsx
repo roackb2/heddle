@@ -1,11 +1,20 @@
+import {
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
+} from '@web/components/ui/sidebar';
 import { useI18n } from '@web/i18n';
-import type { AppSurfaceId, NavigationItem } from '@web/layout/types';
-import { SettingsMenu } from './SettingsMenu';
-import { SidebarLink } from './SidebarLink';
+import type { AppRoute } from '@web/layout/routes';
+import type { AppSurfaceId } from '@web/layout/types';
+import { MainNavigationSection } from './MainNavigationSection';
+import { SidebarContentRegion } from './SidebarContentRegion';
+import { SidebarSettingsEntry } from './SidebarSettingsEntry';
 
 interface AppNavigationProps {
   activeItemId: AppSurfaceId;
-  items: readonly NavigationItem[];
+  items: readonly AppRoute[];
   onOpenSettings: () => void;
 }
 
@@ -16,21 +25,22 @@ export function AppNavigation({ activeItemId, items, onOpenSettings }: AppNaviga
 
   return (
     <>
-      <div className="border-b px-3 py-2 text-sm font-medium text-foreground">Heddle</div>
-      <nav className="grid gap-1 p-2" aria-label={t('navigation.mainAriaLabel')}>
-        {items.map((item) => (
-          <SidebarLink
-            key={item.id}
-            active={item.id === activeItemId}
-            href={item.href}
-            label={t(item.labelKey)}
-          />
-        ))}
-      </nav>
-      <div className="min-h-0 flex-1 border-t bg-background" aria-label={t('navigation.sessionListAriaLabel')} />
-      <div className="border-t p-2">
-        <SettingsMenu onOpenSettings={onOpenSettings} />
-      </div>
+      <SidebarHeader className="v2-panel-divider h-12 justify-center border-b px-2 py-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-foreground">Heddle</span>
+        </div>
+      </SidebarHeader>
+      <MainNavigationSection activeItemId={activeItemId} items={items} />
+      <SidebarContent>
+        <SidebarContentRegion ariaLabel={t('navigation.sessionListAriaLabel')} />
+      </SidebarContent>
+      <SidebarFooter className="v2-panel-divider border-t p-1.5">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarSettingsEntry onOpenSettings={onOpenSettings} />
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </>
   );
 }

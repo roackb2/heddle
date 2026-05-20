@@ -1,12 +1,12 @@
 import { AppNavigation, SettingsNavigation } from '@web/components/navigation';
-import { useI18n } from '@web/i18n';
-import type { AppSurfaceId, NavigationItem, SettingsSectionId } from '@web/layout/types';
+import type { AppRoute, SettingsRoute } from '@web/layout/routes';
+import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
 
 interface SessionSidebarProps {
   activeSurfaceId: AppSurfaceId;
   activeSettingsSectionId: SettingsSectionId;
-  appNavigationItems: readonly NavigationItem[];
-  settingsNavigationItems: readonly NavigationItem[];
+  appNavigationItems: readonly AppRoute[];
+  settingsNavigationItems: readonly SettingsRoute[];
   settingsOpen: boolean;
   onOpenSettings: () => void;
   onCloseSettings: () => void;
@@ -23,10 +23,8 @@ export function SessionSidebar({
   onOpenSettings,
   onCloseSettings,
 }: SessionSidebarProps) {
-  const { t } = useI18n();
-
   return (
-    <aside className="flex h-full min-w-0 flex-col bg-card" aria-label={t('navigation.primaryAriaLabel')}>
+    <div className="flex h-full min-w-0 flex-col text-sm">
       {settingsOpen ? (
         <SettingsNavigation
           activeItemId={activeSettingsSectionId}
@@ -40,6 +38,6 @@ export function SessionSidebar({
           onOpenSettings={onOpenSettings}
         />
       )}
-    </aside>
+    </div>
   );
 }
