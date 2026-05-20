@@ -27,7 +27,7 @@ export function SettingsNavigation({ activeItemId, items, onBack }: SettingsNavi
           {t('navigation.backToApp')}
         </Button>
       </div>
-      <nav className="grid gap-0.5 p-1.5" aria-label={t('navigation.settingsAriaLabel')}>
+      <nav className="v2-sidebar-section" aria-label={t('navigation.settingsAriaLabel')}>
         {items.map((item) => (
           <SidebarLink
             key={item.id}

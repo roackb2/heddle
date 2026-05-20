@@ -13,6 +13,8 @@
   },
   "navigation": {
     "backToApp": "返回應用程式",
+    "collapseSidebar": "收合側邊欄",
+    "expandSidebar": "展開側邊欄",
     "mainAriaLabel": "主要應用導覽",
     "openSettings": "開啟設定",
     "primaryAriaLabel": "主要導覽",

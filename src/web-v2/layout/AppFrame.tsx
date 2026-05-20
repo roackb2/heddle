@@ -1,4 +1,7 @@
 import type { PropsWithChildren } from 'react';
+import { useState } from 'react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { usePanelRef } from 'react-resizable-panels';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -32,12 +35,50 @@ export function AppFrame({
   children,
 }: PropsWithChildren<AppFrameProps>) {
   const { t } = useI18n();
+  const sidebarPanelRef = usePanelRef();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  function toggleSidebar() {
+    const panel = sidebarPanelRef.current;
+    if (!panel) {
+      return;
+    }
+
+    if (panel.isCollapsed()) {
+      panel.expand();
+      setSidebarCollapsed(false);
+      return;
+    }
+
+    panel.collapse();
+    setSidebarCollapsed(true);
+  }
+
+  const ToggleIcon = sidebarCollapsed ? PanelLeftOpen : PanelLeftClose;
 
   return (
-    <div className="h-dvh bg-background font-sans text-foreground">
+    <div className="relative h-dvh bg-background font-sans text-foreground">
       <a className="sr-only focus:not-sr-only" href="#main-content">{t('navigation.skipToMain')}</a>
+      <button
+        aria-expanded={!sidebarCollapsed}
+        aria-label={t(sidebarCollapsed ? 'navigation.expandSidebar' : 'navigation.collapseSidebar')}
+        className="v2-icon-button absolute left-2 top-2 z-20 inline-flex items-center justify-center"
+        onClick={toggleSidebar}
+        type="button"
+      >
+        <ToggleIcon className="size-3.5" aria-hidden="true" />
+      </button>
       <ResizablePanelGroup direction="horizontal">
-        <ResizablePanel defaultSize="16%" minSize="12rem" maxSize="28rem">
+        <ResizablePanel
+          className="v2-sidebar-panel"
+          collapsedSize="0px"
+          collapsible
+          defaultSize="16%"
+          maxSize="28rem"
+          minSize="12rem"
+          onResize={() => setSidebarCollapsed(sidebarPanelRef.current?.isCollapsed() ?? false)}
+          panelRef={sidebarPanelRef}
+        >
           <SessionSidebar
             activeSurfaceId={activeSurfaceId}
             activeSettingsSectionId={activeSettingsSectionId}

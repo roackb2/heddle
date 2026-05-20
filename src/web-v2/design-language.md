@@ -12,6 +12,7 @@ Use the v2 component classes in `src/web-v2/tailwind.css` for repeated surfaces:
 
 - `v2-panel-surface`, `v2-panel-divider`, and `v2-panel-header` for panes and structural dividers.
 - `v2-nav-row` and `v2-nav-row-active` for sidebar navigation rows.
+- `v2-sidebar-section` for compact sidebar groups with consistent inset and row gaps.
 - `v2-control` for form controls.
 - `v2-popover-surface` for floating menus.
 - `v2-resize-handle` for resizable panel separators.

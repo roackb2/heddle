@@ -50,12 +50,14 @@
   }
 
   .v2-nav-row {
-    height: 1.75rem;
-    justify-content: flex-start;
+    width: 100% !important;
+    height: 1.75rem !important;
+    justify-content: flex-start !important;
     border-radius: var(--radius-md);
-    padding-inline: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 400;
+    padding-inline: 0.5rem !important;
+    font-size: 0.875rem !important;
+    font-weight: 400 !important;
+    text-align: left;
     color: var(--color-muted-foreground);
   }
 
@@ -88,6 +90,28 @@
     border-color: var(--color-ring);
     box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-ring) 55%, transparent);
     outline: none;
+  }
+
+  .v2-icon-button {
+    height: 1.75rem;
+    width: 1.75rem;
+    border-radius: var(--radius-md);
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-icon-button:hover {
+    background: color-mix(in oklab, var(--color-accent) 70%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .v2-sidebar-section {
+    display: grid;
+    gap: 0.125rem;
+    padding: 0.375rem;
+  }
+
+  .v2-sidebar-panel {
+    transition: flex-basis 160ms ease, width 160ms ease;
   }
 
   .v2-popover-surface {

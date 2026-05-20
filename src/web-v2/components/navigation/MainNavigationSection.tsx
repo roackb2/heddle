@@ -14,7 +14,7 @@ export function MainNavigationSection({ activeItemId, items }: MainNavigationSec
   const { t } = useI18n();
 
   return (
-    <nav className="grid gap-0.5 px-1.5 py-1.5" aria-label={t('navigation.mainAriaLabel')}>
+    <nav className="v2-sidebar-section" aria-label={t('navigation.mainAriaLabel')}>
       {items.map((item) => (
         <SidebarLink
           key={item.id}
