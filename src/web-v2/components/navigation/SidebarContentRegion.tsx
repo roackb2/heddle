@@ -7,7 +7,7 @@ interface SidebarContentRegionProps {
 export function SidebarContentRegion({ ariaLabel }: SidebarContentRegionProps) {
   return (
     <div
-      className="min-h-0 flex-1 border-t border-border/70 bg-card"
+      className="v2-panel-divider v2-panel-surface min-h-0 flex-1 border-t"
       aria-label={ariaLabel}
     />
   );

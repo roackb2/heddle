@@ -18,7 +18,7 @@ export function LanguageSelect() {
         {t('language.label')}
       </label>
       <Select value={locale} onValueChange={(value) => setLocale(value as Locale)}>
-        <SelectTrigger id="web-v2-language-select" className="h-8 rounded-md border-border/80 bg-card">
+        <SelectTrigger id="web-v2-language-select">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

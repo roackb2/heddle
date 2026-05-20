@@ -21,7 +21,7 @@ export function SettingsMenu({ onOpenSettings }: SettingsMenuProps) {
     <Popover>
       <PopoverTrigger asChild>
         <Button
-          className="h-7 w-full justify-start rounded-md px-2 text-sm font-normal text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+          className="v2-nav-row w-full"
           type="button"
           variant="ghost"
         >
@@ -31,7 +31,7 @@ export function SettingsMenu({ onOpenSettings }: SettingsMenuProps) {
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-64 rounded-xl border-border/80 bg-popover p-2 shadow-lg"
+        className="w-64 p-2"
         side="top"
         sideOffset={8}
         aria-label={t('navigation.settingsMenuAriaLabel')}
@@ -39,7 +39,7 @@ export function SettingsMenu({ onOpenSettings }: SettingsMenuProps) {
         <div className="grid gap-2">
           <LanguageSelect />
           <Button
-            className="h-8 justify-start rounded-md px-2 text-sm font-normal"
+            className="v2-nav-row w-full"
             onClick={onOpenSettings}
             type="button"
             variant="ghost"

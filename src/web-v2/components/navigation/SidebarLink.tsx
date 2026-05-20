@@ -18,8 +18,8 @@ export function SidebarLink({ active, href, label, surfaceId }: SidebarLinkProps
   return (
     <Button
       className={cn(
-        'h-7 justify-start rounded-md px-2 text-sm font-normal text-muted-foreground hover:bg-accent/70 hover:text-foreground',
-        active && 'bg-accent text-accent-foreground hover:bg-accent',
+        'v2-nav-row',
+        active && 'v2-nav-row-active',
       )}
       asChild
       variant="ghost"

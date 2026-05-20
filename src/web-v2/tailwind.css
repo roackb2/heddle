@@ -29,3 +29,79 @@
   --radius-lg: 8px;
   --radius-xl: 10px;
 }
+
+@layer components {
+  .v2-panel-surface {
+    background: var(--color-card);
+  }
+
+  .v2-panel-divider {
+    border-color: color-mix(in oklab, var(--color-border) 72%, transparent);
+  }
+
+  .v2-panel-header {
+    display: flex;
+    height: 3rem;
+    align-items: center;
+    border-bottom-width: 1px;
+    border-color: color-mix(in oklab, var(--color-border) 72%, transparent);
+    background: var(--color-card);
+    padding-inline: 1rem;
+  }
+
+  .v2-nav-row {
+    height: 1.75rem;
+    justify-content: flex-start;
+    border-radius: var(--radius-md);
+    padding-inline: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 400;
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-nav-row:hover {
+    background: color-mix(in oklab, var(--color-accent) 70%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .v2-nav-row-active {
+    background: var(--color-accent);
+    color: var(--color-accent-foreground);
+  }
+
+  .v2-nav-row-active:hover {
+    background: var(--color-accent);
+  }
+
+  .v2-control {
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in oklab, var(--color-border) 72%, transparent);
+    background: color-mix(in oklab, var(--color-card) 84%, var(--color-background));
+    box-shadow: none;
+  }
+
+  .v2-control:hover {
+    border-color: color-mix(in oklab, var(--color-border) 90%, transparent);
+  }
+
+  .v2-control:focus-visible {
+    border-color: var(--color-ring);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-ring) 55%, transparent);
+    outline: none;
+  }
+
+  .v2-popover-surface {
+    border-radius: var(--radius-xl);
+    border: 1px solid color-mix(in oklab, var(--color-border) 76%, transparent);
+    background: var(--color-popover);
+    box-shadow: 0 12px 28px hsl(235 18% 3% / 0.32);
+  }
+
+  .v2-resize-handle {
+    background: color-mix(in oklab, var(--color-border) 74%, transparent);
+  }
+
+  .v2-resize-handle:hover {
+    background: color-mix(in oklab, var(--color-border) 90%, transparent);
+  }
+}

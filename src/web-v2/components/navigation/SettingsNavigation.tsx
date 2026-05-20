@@ -17,9 +17,9 @@ export function SettingsNavigation({ activeItemId, items, onBack }: SettingsNavi
 
   return (
     <>
-      <div className="border-b border-border/70 p-1.5">
+      <div className="v2-panel-divider border-b p-1.5">
         <Button
-          className="h-7 w-full justify-start rounded-md px-2 text-sm font-normal text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+          className="v2-nav-row w-full"
           onClick={onBack}
           type="button"
           variant="ghost"

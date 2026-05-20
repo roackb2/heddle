@@ -18,7 +18,7 @@ export function AppNavigation({ activeItemId, items, onOpenSettings }: AppNaviga
 
   return (
     <>
-      <div className="border-b border-border/70 px-3 py-2 text-sm font-medium text-foreground">Heddle</div>
+      <div className="v2-panel-divider border-b px-3 py-2 text-sm font-medium text-foreground">Heddle</div>
       <MainNavigationSection activeItemId={activeItemId} items={items} />
       <SidebarContentRegion ariaLabel={t('navigation.sessionListAriaLabel')} />
       <SidebarSettingsEntry onOpenSettings={onOpenSettings} />
