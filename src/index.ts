@@ -286,7 +286,6 @@ export type {
   ReviewFileStatus,
 } from './core/review/index.js';
 export {
-  ConversationActivityProjector,
   ToolActivitySummarizer,
 } from './core/chat/engine/index.js';
 export {
@@ -294,7 +293,6 @@ export {
   TraceSummaryService,
 } from './core/observability/index.js';
 export type {
-  ApplyConversationActivityHandlerArgs,
   ConversationActivity,
   ConversationActivityCorrelation,
   ConversationActivityDerived,

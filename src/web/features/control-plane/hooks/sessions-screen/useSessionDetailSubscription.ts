@@ -1,9 +1,5 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
-import {
-  ConversationActivityProjector,
-  type ConversationActivity,
-  type ConversationActivityHandlerMap,
-} from '../../../../../core/chat/engine/live';
+import type { ConversationActivity, ConversationActivityHandlerMap } from '../../../../../core/chat/engine/live';
 import {
   fetchChatSessionDetail,
   fetchPendingSessionApproval,
@@ -169,7 +165,7 @@ function applySessionActivities({
   activities.forEach((activity) => applySessionActivity(activity as ConversationActivity, context));
 }
 
-const sessionActivityHandlers = {
+const sessionActivityHandlers: ConversationActivityHandlerMap<SessionEventContext> = {
   'compaction.running': (activity, { liveMessages }) => {
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
@@ -268,12 +264,9 @@ const sessionActivityHandlers = {
       { pending: true, streaming: false },
     );
   },
-} satisfies ConversationActivityHandlerMap<SessionEventContext>;
+};
 
 function applySessionActivity(activity: ConversationActivity, context: SessionEventContext) {
-  ConversationActivityProjector.applyHandler({
-    activity,
-    handlers: sessionActivityHandlers,
-    context,
-  });
+  const handler = sessionActivityHandlers[activity.type] as ((activity: ConversationActivity, context: SessionEventContext) => void) | undefined;
+  handler?.(activity, context);
 }

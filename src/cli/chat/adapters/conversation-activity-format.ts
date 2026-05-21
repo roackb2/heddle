@@ -1,11 +1,7 @@
-import {
-  ConversationActivityProjector,
-  type ConversationActivity,
-  type ConversationActivityHandlerMap,
-} from '@/core/chat/engine/live/index.js';
+import type { ConversationActivity, ConversationActivityHandlerMap } from '@/core/chat/engine/live/index.js';
 import { truncate } from '../../../core/utils/text.js';
 
-const tuiActivityFormatters = {
+const tuiActivityFormatters: ConversationActivityHandlerMap<undefined, string | undefined> = {
   'run.started': () => 'thinking',
   'assistant.turn': (activity) => {
     const rationale = activity.event.diagnostics?.rationale;
@@ -47,12 +43,9 @@ const tuiActivityFormatters = {
   'run.finished': (activity) => {
     return activity.event.outcome === 'done' ? undefined : `stopped: ${activity.event.outcome}`;
   },
-} satisfies ConversationActivityHandlerMap<undefined, string | undefined>;
+};
 
 export function formatTuiConversationActivity(activity: ConversationActivity): string | undefined {
-  return ConversationActivityProjector.applyHandler({
-    activity,
-    handlers: tuiActivityFormatters,
-    context: undefined,
-  });
+  const formatter = tuiActivityFormatters[activity.type] as ((activity: ConversationActivity) => string | undefined) | undefined;
+  return formatter?.(activity);
 }

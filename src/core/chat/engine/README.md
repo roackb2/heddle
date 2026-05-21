@@ -79,8 +79,9 @@ Use this pattern when it fits the domain:
 - Put normalized config, path defaults, and engine-wide defaults in `config.ts`.
 - Put persisted session lifecycle behavior in `sessions/service.ts` and related
   `sessions/*` modules.
-- Put engine host normalization and `ConversationActivity` projection in
-  `live/` and keep host adapters consuming that shared activity vocabulary.
+- Put raw runtime/trace/compaction-to-`ConversationActivity` adaptation at the
+  `turns/host/` boundary. Above that boundary, hosts and interfaces should use
+  `events.onActivity` directly.
 - Put submit/continue behavior in `turns/service.ts`.
 - Put persisted turn phases in the explicit `turns/*/` subdomains.
 - Put shared compaction behavior in `compaction/`.

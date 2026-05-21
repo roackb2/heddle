@@ -74,12 +74,6 @@ export type ConversationActivityHandlerMap<Context, Result = void> = {
   [Type in ConversationActivity['type']]?: (activity: ConversationActivityOf<Type>, context: Context) => Result;
 };
 
-export type ApplyConversationActivityHandlerArgs<Context, Result = void> = {
-  activity: ConversationActivity;
-  handlers: ConversationActivityHandlerMap<Context, Result>;
-  context: Context;
-};
-
 export type ToolSummaryOptions = {
   maxChars?: number;
 };

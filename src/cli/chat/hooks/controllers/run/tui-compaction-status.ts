@@ -1,7 +1,5 @@
 import type { ConversationEngineHost, ConversationSessionService } from '../../../../../core/chat/engine/types.js';
 import type { ChatMessage } from '../../../../../index.js';
-import { ConversationActivityProjector } from '@/core/chat/engine/live/index.js';
-import { formatTuiConversationActivity } from '../../../adapters/conversation-activity-format.js';
 import type { ActionState } from '../useAgentRunController.js';
 
 export type TuiCompactionStatusEvent = {
@@ -65,15 +63,23 @@ export function createTuiDirectShellCompactionStatusHandler(args: {
 }
 
 function appendCompactionLiveEvent(state: ActionState, event: TuiCompactionStatusEvent) {
-  const liveEvents = ConversationActivityProjector.fromCompactionStatus(event)
-    .map(formatTuiConversationActivity)
-    .filter((text): text is string => Boolean(text));
-  if (liveEvents.length === 0) {
+  const text = formatDirectShellCompactionStatus(event);
+  if (!text) {
     return;
   }
 
   state.setLiveEvents((current) => [
     ...current,
-    ...liveEvents.map((text) => ({ id: state.nextLocalId(), text })),
+    { id: state.nextLocalId(), text },
   ].slice(-8));
+}
+
+function formatDirectShellCompactionStatus(event: TuiCompactionStatusEvent): string | undefined {
+  const formatters = {
+    running: () => 'Compacting earlier conversation history…',
+    failed: () => `Compaction failed: ${event.error ?? 'unknown error'}`,
+    finished: () => 'Compaction finished.',
+  } satisfies Record<TuiCompactionStatusEvent['status'], () => string | undefined>;
+
+  return formatters[event.status]();
 }

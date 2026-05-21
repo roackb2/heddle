@@ -16,7 +16,6 @@ import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
 import { PendingToolApprovalRequests } from '@/core/approvals/index.js';
 import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
-import { ConversationActivityProjector } from '@/core/chat/engine/live/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type {
   ConversationEngine,
@@ -265,10 +264,7 @@ export class ControlPlaneChatSessionsController {
   private createEngineHost(sessionId: string, publisher: ControlPlaneTurnPublisher): ConversationEngineHost {
     return {
       events: {
-        onAgentLoopEvent: publisher.publishAgentLoopEvent,
-      },
-      compaction: {
-        onStatus: publisher.publishCompactionStatus,
+        onActivity: publisher.publishActivity,
       },
       approvals: {
         requestToolApproval: async ({ call, tool }: { call: ToolCall; tool: ToolDefinition }) => {
@@ -281,9 +277,6 @@ export class ControlPlaneChatSessionsController {
                 approval: view,
                 resolve,
               });
-            },
-            publish: (_view, callForEvent) => {
-              publisher.publishApprovalRequested(callForEvent);
             },
           });
           this.pendingApprovals.delete(sessionId);
@@ -335,18 +328,6 @@ export class ControlPlaneChatSessionsController {
         .filter((candidate): candidate is ChatSession => Boolean(candidate))
         .map((candidate) => candidate.id === session.id ? updatedSession : candidate),
     );
-
-    this.sessionEventBus.emit(args.sessionId, {
-      sessionId: args.sessionId,
-      timestamp,
-      activities: ConversationActivityProjector.fromTraceEvent({
-        type: 'run.finished',
-        outcome: 'done',
-        summary: assistantText,
-        step: 1,
-        timestamp,
-      }),
-    } satisfies ControlPlaneSessionLiveEvent);
 
     return {
       outcome: 'done',

@@ -1,5 +1,5 @@
 import type { ConversationEngineHost } from '@/core/chat/engine/types.js';
-import { ConversationActivityProjector } from '@/core/chat/engine/live/index.js';
+import { ConversationEngineActivityAdapter } from './conversation-activity-adapter.js';
 import type { ChatTurnHostPort, ConversationEngineHostAdapterResult } from './types.js';
 
 /**
@@ -15,7 +15,7 @@ export class ConversationEngineHostNormalizer {
     const turnHost: ChatTurnHostPort = {
       onAgentLoopEvent: (event) => {
         onAgentLoopEvent?.(event);
-        for (const activity of ConversationActivityProjector.fromAgentLoopEvent(event)) {
+        for (const activity of ConversationEngineActivityAdapter.fromAgentLoopEvent(event)) {
           onActivity?.(activity);
         }
       },
@@ -29,7 +29,7 @@ export class ConversationEngineHostNormalizer {
         } else {
           host?.compaction?.onFinalCompactionStatus?.(event);
         }
-        for (const activity of ConversationActivityProjector.fromCompactionStatus(event)) {
+        for (const activity of ConversationEngineActivityAdapter.fromCompactionStatus(event)) {
           onActivity?.(activity);
         }
       },
@@ -45,7 +45,7 @@ export class ConversationEngineHostNormalizer {
           : undefined),
       onTraceEvent: (event) => {
         onTraceEvent?.(event);
-        for (const activity of ConversationActivityProjector.fromTraceEvent(event)) {
+        for (const activity of ConversationEngineActivityAdapter.fromTraceEvent(event)) {
           onActivity?.(activity);
         }
       },

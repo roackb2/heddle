@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import {
-  ConversationActivityProjector,
-  ToolActivitySummarizer,
-} from '@/core/chat/engine/live/index.js';
+import { ToolActivitySummarizer } from '@/core/chat/engine/live/index.js';
+import { ConversationEngineActivityAdapter } from '@/core/chat/engine/turns/host/conversation-activity-adapter.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../core/types.js';
 
-describe('conversation activity projection', () => {
-  it('projects assistant stream events from the agent loop', () => {
+describe('conversation engine activity adapter', () => {
+  it('creates assistant stream activities from agent loop events', () => {
     const event: AgentLoopEvent = {
       type: 'assistant.stream',
       runId: 'run-1',
@@ -17,7 +15,7 @@ describe('conversation activity projection', () => {
       timestamp: '2026-05-02T00:00:00.000Z',
     };
 
-    expect(ConversationActivityProjector.fromAgentLoopEvent(event)).toEqual([
+    expect(ConversationEngineActivityAdapter.fromAgentLoopEvent(event)).toEqual([
       expect.objectContaining({
         source: 'agent-loop',
         type: 'assistant.stream',
@@ -45,12 +43,12 @@ describe('conversation activity projection', () => {
       timestamp: '2026-05-02T00:00:01.000Z',
     };
 
-    expect(ConversationActivityProjector.fromAgentLoopEvent(started)).toEqual([expect.objectContaining({
+    expect(ConversationEngineActivityAdapter.fromAgentLoopEvent(started)).toEqual([expect.objectContaining({
       type: 'loop.started',
       event: started,
       correlation: expect.objectContaining({ runId: 'run-1' }),
     })]);
-    expect(ConversationActivityProjector.fromTraceEvent(finishedTrace)).toEqual([
+    expect(ConversationEngineActivityAdapter.fromTraceEvent(finishedTrace)).toEqual([
       expect.objectContaining({
         type: 'run.finished',
         event: finishedTrace,
@@ -81,7 +79,7 @@ describe('conversation activity projection', () => {
       timestamp: '2026-05-02T00:00:01.000Z',
     };
 
-    expect(ConversationActivityProjector.fromAgentLoopEvent(calling)).toEqual([
+    expect(ConversationEngineActivityAdapter.fromAgentLoopEvent(calling)).toEqual([
       expect.objectContaining({
         type: 'tool.calling',
         event: calling,
@@ -89,7 +87,7 @@ describe('conversation activity projection', () => {
         derived: { kind: 'tool-summary', summary: 'read_file (README.md)' },
       }),
     ]);
-    expect(ConversationActivityProjector.fromAgentLoopEvent(completed)).toEqual([
+    expect(ConversationEngineActivityAdapter.fromAgentLoopEvent(completed)).toEqual([
       expect.objectContaining({
         type: 'tool.completed',
         event: completed,
@@ -114,7 +112,7 @@ describe('conversation activity projection', () => {
       timestamp: '2026-05-02T00:00:01.000Z',
     };
 
-    expect(ConversationActivityProjector.fromTraceEvent(approval)).toEqual([
+    expect(ConversationEngineActivityAdapter.fromTraceEvent(approval)).toEqual([
       expect.objectContaining({
         type: 'tool.approval_requested',
         event: approval,
@@ -122,7 +120,7 @@ describe('conversation activity projection', () => {
         correlation: expect.objectContaining({ step: 3 }),
       }),
     ]);
-    expect(ConversationActivityProjector.fromTraceEvent(fallback)).toEqual([
+    expect(ConversationEngineActivityAdapter.fromTraceEvent(fallback)).toEqual([
       expect.objectContaining({
         type: 'tool.fallback',
         event: fallback,
@@ -155,14 +153,14 @@ describe('conversation activity projection', () => {
       timestamp: '2026-05-02T00:00:01.000Z',
     };
 
-    expect(ConversationActivityProjector.fromTraceEvent(started)).toEqual([
+    expect(ConversationEngineActivityAdapter.fromTraceEvent(started)).toEqual([
       expect.objectContaining({
         type: 'memory.maintenance_started',
         event: started,
         correlation: expect.objectContaining({ runId: 'memory-1', step: 5 }),
       }),
     ]);
-    expect(ConversationActivityProjector.fromTraceEvent(finished)).toEqual([
+    expect(ConversationEngineActivityAdapter.fromTraceEvent(finished)).toEqual([
       expect.objectContaining({
         type: 'memory.maintenance_finished',
         event: finished,
@@ -172,13 +170,13 @@ describe('conversation activity projection', () => {
   });
 
   it('projects compaction status activities', () => {
-    expect(ConversationActivityProjector.fromCompactionStatus({
+    expect(ConversationEngineActivityAdapter.fromCompactionStatus({
       status: 'running',
       archivePath: '.heddle/chat-sessions/session-1/archive.jsonl',
     })).toEqual([
       { source: 'compaction', type: 'compaction.running', event: { status: 'running', archivePath: '.heddle/chat-sessions/session-1/archive.jsonl' } },
     ]);
-    expect(ConversationActivityProjector.fromCompactionStatus({
+    expect(ConversationEngineActivityAdapter.fromCompactionStatus({
       status: 'failed',
       error: 'summary failed',
     })).toEqual([
@@ -219,7 +217,7 @@ describe('conversation activity projection', () => {
       timestamp: '2026-05-02T00:00:01.000Z',
     };
 
-    expect(ConversationActivityProjector.fromAgentLoopEvent(event)).toEqual([
+    expect(ConversationEngineActivityAdapter.fromAgentLoopEvent(event)).toEqual([
       expect.objectContaining({
         type: 'tool.call',
         derived: { kind: 'tool-summary', summary: 'read_file (README.md)' },

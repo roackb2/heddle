@@ -1,114 +1,106 @@
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '@/core/types.js';
 import type {
-  ApplyConversationActivityHandlerArgs,
   ConversationAgentLoopActivityEvent,
   ConversationActivity,
   ConversationActivityCorrelation,
   ConversationActivityDerived,
   ConversationCompactionStatus,
-} from './types.js';
-import { ToolActivitySummarizer } from './tool-activity-summarizer.js';
+} from '@/core/chat/engine/live/types.js';
+import { ToolActivitySummarizer } from '@/core/chat/engine/live/tool-activity-summarizer.js';
 
-type TraceProjectorMap = {
+type TraceActivityAdapterMap = {
   [Type in TraceEvent['type']]: (event: Extract<TraceEvent, { type: Type }>) => ConversationActivity[];
 };
 
-type AgentLoopProjectorMap = {
+type AgentLoopActivityAdapterMap = {
   [Type in AgentLoopEvent['type']]?: (event: Extract<AgentLoopEvent, { type: Type }>) => ConversationActivity[];
 };
 
-type CompactionProjectorMap = {
+type CompactionActivityAdapterMap = {
   [Status in ConversationCompactionStatus['status']]: (event: Extract<ConversationCompactionStatus, { status: Status }>) => ConversationActivity[];
 };
 
 /**
- * Projects raw runtime, trace, and compaction events into host-agnostic
- * conversation activities. Activities retain their source event and only add
- * derived fields when this boundary performs real semantic work.
+ * Converts lower-level runtime, trace, and compaction events at the chat-engine
+ * host boundary. Above this boundary, hosts and interfaces should consume
+ * `ConversationActivity` directly through `events.onActivity`.
  */
-export class ConversationActivityProjector {
-  private static readonly traceProjectors: TraceProjectorMap = {
-    'run.started': (event) => [ConversationActivityProjector.traceActivity(event)],
-    'assistant.turn': (event) => [ConversationActivityProjector.traceActivity(event)],
+export class ConversationEngineActivityAdapter {
+  private static readonly traceAdapters: TraceActivityAdapterMap = {
+    'run.started': (event) => [ConversationEngineActivityAdapter.traceActivity(event)],
+    'assistant.turn': (event) => [ConversationEngineActivityAdapter.traceActivity(event)],
     'host.warning': () => [],
-    'tool.approval_requested': (event) => [ConversationActivityProjector.traceActivity(event, {
+    'tool.approval_requested': (event) => [ConversationEngineActivityAdapter.traceActivity(event, {
       kind: 'tool-summary',
       summary: ToolActivitySummarizer.summarizeCall(event.call),
     })],
-    'tool.approval_resolved': (event) => [ConversationActivityProjector.traceActivity(event, {
+    'tool.approval_resolved': (event) => [ConversationEngineActivityAdapter.traceActivity(event, {
       kind: 'tool-summary',
       summary: ToolActivitySummarizer.summarizeCall(event.call),
     })],
-    'tool.fallback': (event) => [ConversationActivityProjector.traceActivity(event, {
+    'tool.fallback': (event) => [ConversationEngineActivityAdapter.traceActivity(event, {
       kind: 'tool-fallback-summary',
       fromSummary: ToolActivitySummarizer.summarizeCall(event.fromCall),
       toSummary: ToolActivitySummarizer.summarizeCall(event.toCall),
     })],
-    'tool.call': (event) => [ConversationActivityProjector.traceActivity(event, {
+    'tool.call': (event) => [ConversationEngineActivityAdapter.traceActivity(event, {
       kind: 'tool-summary',
       summary: ToolActivitySummarizer.summarizeCall(event.call),
     })],
-    'tool.result': (event) => [ConversationActivityProjector.traceActivity(event, {
+    'tool.result': (event) => [ConversationEngineActivityAdapter.traceActivity(event, {
       kind: 'tool-summary',
       summary: ToolActivitySummarizer.summarizeResult(event),
     })],
-    'memory.candidate_recorded': (event) => [ConversationActivityProjector.traceActivity(event)],
+    'memory.candidate_recorded': (event) => [ConversationEngineActivityAdapter.traceActivity(event)],
     'memory.checkpoint_skipped': () => [],
-    'memory.maintenance_started': (event) => [ConversationActivityProjector.traceActivity(event)],
-    'memory.maintenance_finished': (event) => [ConversationActivityProjector.traceActivity(event)],
-    'memory.maintenance_failed': (event) => [ConversationActivityProjector.traceActivity(event)],
+    'memory.maintenance_started': (event) => [ConversationEngineActivityAdapter.traceActivity(event)],
+    'memory.maintenance_finished': (event) => [ConversationEngineActivityAdapter.traceActivity(event)],
+    'memory.maintenance_failed': (event) => [ConversationEngineActivityAdapter.traceActivity(event)],
     'cyberloop.annotation': (event) => (
-      event.driftLevel === 'unknown' ? [] : [ConversationActivityProjector.traceActivity(event, {
+      event.driftLevel === 'unknown' ? [] : [ConversationEngineActivityAdapter.traceActivity(event, {
         kind: 'cyberloop-metrics',
-        metrics: ConversationActivityProjector.formatCyberLoopMetrics(event.metadata),
+        metrics: ConversationEngineActivityAdapter.formatCyberLoopMetrics(event.metadata),
       })]
     ),
-    'run.finished': (event) => [ConversationActivityProjector.traceActivity(event)],
+    'run.finished': (event) => [ConversationEngineActivityAdapter.traceActivity(event)],
   };
 
-  private static readonly agentLoopProjectors: AgentLoopProjectorMap = {
-    'loop.started': (event) => [ConversationActivityProjector.agentLoopActivity(event)],
-    'assistant.stream': (event) => [ConversationActivityProjector.agentLoopActivity(event)],
-    'tool.calling': (event) => [ConversationActivityProjector.agentLoopActivity(event, {
+  private static readonly agentLoopAdapters: AgentLoopActivityAdapterMap = {
+    'loop.started': (event) => [ConversationEngineActivityAdapter.agentLoopActivity(event)],
+    'assistant.stream': (event) => [ConversationEngineActivityAdapter.agentLoopActivity(event)],
+    'tool.calling': (event) => [ConversationEngineActivityAdapter.agentLoopActivity(event, {
       kind: 'tool-summary',
       summary: ToolActivitySummarizer.summarizeCall(event),
     })],
-    'tool.completed': (event) => [ConversationActivityProjector.agentLoopActivity(event)],
-    trace: (event) => ConversationActivityProjector.fromTraceEvent(event.event)
+    'tool.completed': (event) => [ConversationEngineActivityAdapter.agentLoopActivity(event)],
+    trace: (event) => ConversationEngineActivityAdapter.fromTraceEvent(event.event)
       .map((activity) => activity.source === 'trace' ? {
         ...activity,
         correlation: { ...activity.correlation, runId: event.runId },
       } : activity),
-    'loop.finished': (event) => [ConversationActivityProjector.agentLoopActivity(event)],
+    'loop.finished': (event) => [ConversationEngineActivityAdapter.agentLoopActivity(event)],
   };
 
-  private static readonly compactionProjectors: CompactionProjectorMap = {
+  private static readonly compactionAdapters: CompactionActivityAdapterMap = {
     running: (event) => [{ source: 'compaction', type: 'compaction.running', event }],
     finished: (event) => [{ source: 'compaction', type: 'compaction.finished', event }],
     failed: (event) => [{ source: 'compaction', type: 'compaction.failed', event }],
   };
 
   static fromTraceEvent(event: TraceEvent): ConversationActivity[] {
-    const projector = ConversationActivityProjector.traceProjectors[event.type] as (event: TraceEvent) => ConversationActivity[];
-    return projector(event);
+    const adapter = ConversationEngineActivityAdapter.traceAdapters[event.type] as (event: TraceEvent) => ConversationActivity[];
+    return adapter(event);
   }
 
   static fromAgentLoopEvent(event: AgentLoopEvent): ConversationActivity[] {
-    const projector = ConversationActivityProjector.agentLoopProjectors[event.type] as ((event: AgentLoopEvent) => ConversationActivity[]) | undefined;
-    return projector?.(event) ?? [];
+    const adapter = ConversationEngineActivityAdapter.agentLoopAdapters[event.type] as ((event: AgentLoopEvent) => ConversationActivity[]) | undefined;
+    return adapter?.(event) ?? [];
   }
 
   static fromCompactionStatus(event: ConversationCompactionStatus): ConversationActivity[] {
-    const projector = ConversationActivityProjector.compactionProjectors[event.status] as (event: ConversationCompactionStatus) => ConversationActivity[];
-    return projector(event);
-  }
-
-  static applyHandler<Context, Result = void>(
-    args: ApplyConversationActivityHandlerArgs<Context, Result>,
-  ): Result | undefined {
-    const handler = args.handlers[args.activity.type] as ((activity: ConversationActivity, context: Context) => Result) | undefined;
-    return handler?.(args.activity, args.context);
+    const adapter = ConversationEngineActivityAdapter.compactionAdapters[event.status] as (event: ConversationCompactionStatus) => ConversationActivity[];
+    return adapter(event);
   }
 
   private static traceActivity<Type extends TraceEvent['type']>(
@@ -119,7 +111,7 @@ export class ConversationActivityProjector {
       source: 'trace',
       type: event.type,
       event,
-      correlation: ConversationActivityProjector.traceCorrelation(event),
+      correlation: ConversationEngineActivityAdapter.traceCorrelation(event),
       derived,
     } as ConversationActivity;
   }
@@ -132,7 +124,7 @@ export class ConversationActivityProjector {
       source: 'agent-loop',
       type: event.type,
       event,
-      correlation: ConversationActivityProjector.agentLoopCorrelation(event),
+      correlation: ConversationEngineActivityAdapter.agentLoopCorrelation(event),
       derived,
     } as ConversationActivity;
   }
@@ -172,10 +164,10 @@ export class ConversationActivityProjector {
     };
     const parts: string[] = [];
     if (typeof snapshot.errorMagnitude === 'number') {
-      parts.push(`err=${ConversationActivityProjector.formatMetric(snapshot.errorMagnitude)}`);
+      parts.push(`err=${ConversationEngineActivityAdapter.formatMetric(snapshot.errorMagnitude)}`);
     }
     if (typeof snapshot.correctionMagnitude === 'number') {
-      parts.push(`corr=${ConversationActivityProjector.formatMetric(snapshot.correctionMagnitude)}`);
+      parts.push(`corr=${ConversationEngineActivityAdapter.formatMetric(snapshot.correctionMagnitude)}`);
     }
     if (typeof snapshot.isStable === 'boolean') {
       parts.push(`stable=${snapshot.isStable}`);

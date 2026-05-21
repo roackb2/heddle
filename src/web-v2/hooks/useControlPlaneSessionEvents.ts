@@ -1,9 +1,5 @@
 import { useCallback, useEffect, type Dispatch, type SetStateAction } from 'react';
-import {
-  ConversationActivityProjector,
-  type ConversationActivity,
-  type ConversationActivityHandlerMap,
-} from '@/core/chat/engine/live/index.js';
+import type { ConversationActivity, ConversationActivityHandlerMap } from '@/core/chat/engine/live/index.js';
 import type { ControlPlaneSessionDetail } from '@web/api/client';
 import {
   SessionEventStreamController,
@@ -74,7 +70,7 @@ type SessionActivityContext = {
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
 };
 
-const sessionActivityHandlers = {
+const sessionActivityHandlers: ConversationActivityHandlerMap<SessionActivityContext> = {
   'assistant.stream': (activity, { setSession, setLiveStatus }) => {
     setSession((current) => (
       SessionMessageController.upsertLiveAssistantMessage(
@@ -117,14 +113,11 @@ const sessionActivityHandlers = {
   'compaction.finished': (activity, { setLiveStatus }) => {
     setLiveStatus(activity.event.summaryPath ? `Compaction finished. Summary: ${activity.event.summaryPath}` : 'Compaction finished.');
   },
-} satisfies ConversationActivityHandlerMap<SessionActivityContext>;
+};
 
 function applySessionActivity(activity: ConversationActivity, context: SessionActivityContext) {
-  ConversationActivityProjector.applyHandler({
-    activity,
-    handlers: sessionActivityHandlers,
-    context,
-  });
+  const handler = sessionActivityHandlers[activity.type] as ((activity: ConversationActivity, context: SessionActivityContext) => void) | undefined;
+  handler?.(activity, context);
 }
 
 function formatStep(step: number | undefined): string {

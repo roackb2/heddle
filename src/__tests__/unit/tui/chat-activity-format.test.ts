@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { formatTuiConversationActivity } from '../../../cli/chat/adapters/conversation-activity-format.js';
-import { ConversationActivityProjector, ToolActivitySummarizer } from '@/core/chat/engine/live/index.js';
+import { ToolActivitySummarizer } from '@/core/chat/engine/live/index.js';
+import { ConversationEngineActivityAdapter } from '@/core/chat/engine/turns/host/conversation-activity-adapter.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../types.js';
 
@@ -31,7 +32,7 @@ describe('chat activity formatting', () => {
       timestamp: '2024-01-01T00:00:00Z',
     };
 
-    expect(ConversationActivityProjector.fromTraceEvent(event).map(formatTuiConversationActivity)).toEqual([
+    expect(ConversationEngineActivityAdapter.fromTraceEvent(event).map(formatTuiConversationActivity)).toEqual([
       'running read_file (README.md)',
     ]);
   });
@@ -44,7 +45,7 @@ describe('chat activity formatting', () => {
       timestamp: '2024-01-01T00:00:01Z',
     };
 
-    expect(ConversationActivityProjector.fromTraceEvent(event).map(formatTuiConversationActivity)).toEqual([
+    expect(ConversationEngineActivityAdapter.fromTraceEvent(event).map(formatTuiConversationActivity)).toEqual([
       'approval needed for list_files (src)',
     ]);
   });
@@ -57,7 +58,7 @@ describe('chat activity formatting', () => {
       timestamp: '2024-01-01T00:00:02Z',
     };
 
-    expect(ConversationActivityProjector.fromTraceEvent(event).map(formatTuiConversationActivity)).toEqual([
+    expect(ConversationEngineActivityAdapter.fromTraceEvent(event).map(formatTuiConversationActivity)).toEqual([
       'running search_files ("trace" in .heddle/traces)',
     ]);
   });
@@ -74,7 +75,7 @@ describe('chat activity formatting', () => {
       timestamp: '2026-05-08T00:00:00.000Z',
     };
 
-    expect(ConversationActivityProjector.fromAgentLoopEvent(event).map(formatTuiConversationActivity)).toEqual([
+    expect(ConversationEngineActivityAdapter.fromAgentLoopEvent(event).map(formatTuiConversationActivity)).toEqual([
       'running read_file (README.md)',
     ]);
   });

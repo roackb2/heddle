@@ -1,11 +1,6 @@
 import type { EventEmitter } from 'node:events';
 import type { ToolCall, ToolDefinition } from '../../../../index.js';
-import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
-import {
-  ConversationActivityProjector,
-  type ConversationActivity,
-  type ConversationCompactionStatus,
-} from '@/core/chat/engine/live/index.js';
+import type { ConversationActivity } from '@/core/chat/engine/live/index.js';
 import type { ControlPlaneSessionLiveEvent } from '../types.js';
 
 export class ControlPlaneChatSessionEventsController {
@@ -38,27 +33,11 @@ export class ControlPlaneChatSessionEventsController {
     };
 
     const publisher = {
-      publishAgentLoopEvent(event: AgentLoopEvent) {
-        publishActivities(ConversationActivityProjector.fromAgentLoopEvent(event));
+      publishActivity(activity: ConversationActivity) {
+        publishActivities([activity]);
       },
 
-      publishCompactionStatus(event: ConversationCompactionStatus) {
-        publishActivities(ConversationActivityProjector.fromCompactionStatus(event));
-      },
-
-      publishApprovalRequested(call: ToolCall) {
-        publishActivities(ConversationActivityProjector.fromAgentLoopEvent({
-          type: 'trace',
-          runId: 'pending-approval',
-          timestamp: new Date().toISOString(),
-          event: {
-            type: 'tool.approval_requested',
-            call,
-            step: 0,
-            timestamp: new Date().toISOString(),
-          },
-        }));
-      },
+      publishActivities,
     };
 
     return publisher;
