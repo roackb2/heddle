@@ -11,7 +11,6 @@ interface WorkbenchViewProps {
   selectedSessionLoading: boolean;
   selectedSessionSubmitting: boolean;
   selectedSessionLiveStatus?: string;
-  selectedSessionError?: string;
   settingsOpen: boolean;
   onSubmitSessionPrompt: (prompt: string) => Promise<void>;
 }
@@ -36,7 +35,6 @@ export function WorkbenchView({
   selectedSessionLoading,
   selectedSessionSubmitting,
   selectedSessionLiveStatus,
-  selectedSessionError,
   settingsOpen,
   onSubmitSessionPrompt,
 }: WorkbenchViewProps) {
@@ -62,7 +60,6 @@ export function WorkbenchView({
         {!settingsOpen && activeSurfaceId === 'sessions' ? (
           <ConversationThread
             emptyTitle={t('workbench.emptyConversation')}
-            error={selectedSessionError}
             liveStatus={selectedSessionLiveStatus}
             loading={selectedSessionLoading}
             session={selectedSession}
