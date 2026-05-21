@@ -1,9 +1,8 @@
 import type { TraceEvent } from '../../../../../index.js';
 import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
-import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
-import { ConversationActivityProjector } from '@/core/chat/engine/live/index.js';
+import type { ConversationActivity } from '@/core/chat/engine/live/index.js';
 import { previewEditFileInput } from '../../../../../core/tools/toolkits/coding-files/edit-file.js';
-import { formatConversationActivityForTui } from '../../../adapters/conversation-activity-adapter.js';
+import { formatTuiConversationActivity } from '../../../adapters/conversation-activity-format.js';
 import { formatEditPreviewHistoryMessage, formatPlanHistoryMessage } from '../../../utils/format.js';
 import type { ActionState } from '../useAgentRunController.js';
 
@@ -32,17 +31,8 @@ export function createTuiRunLoopEventAdapter(args: {
       }
     },
 
-    onAgentLoopEvent(event: AgentLoopEvent) {
-      if (event.type === 'trace') {
-        return;
-      }
-
-      appendLiveEvents(
-        state,
-        ConversationActivityProjector.fromAgentLoopEvent(event)
-          .map(formatConversationActivityForTui)
-          .filter((text): text is string => Boolean(text)),
-      );
+    onActivity(activity: ConversationActivity) {
+      appendLiveEvents(state, [formatTuiConversationActivity(activity)].filter((text): text is string => Boolean(text)));
     },
 
     onTraceEvent(event: TraceEvent) {
@@ -86,10 +76,6 @@ export function createTuiRunLoopEventAdapter(args: {
         }
       }
 
-      const nextEvents = ConversationActivityProjector.fromTraceEvent(event)
-        .map(formatConversationActivityForTui)
-        .filter((text): text is string => Boolean(text));
-      appendLiveEvents(state, nextEvents);
     },
   };
 }

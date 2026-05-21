@@ -3,14 +3,7 @@ import {
   type ConversationActivity,
   type ConversationActivityHandlerMap,
 } from '@/core/chat/engine/live/index.js';
-import type { TraceEvent } from '../../../index.js';
 import { truncate } from '../../../core/utils/text.js';
-
-export function toLiveEvent(event: TraceEvent): string | undefined {
-  return ConversationActivityProjector.fromTraceEvent(event)
-    .map(formatConversationActivityForTui)
-    .find((text): text is string => Boolean(text));
-}
 
 const tuiActivityFormatters = {
   'run.started': () => 'thinking',
@@ -56,7 +49,7 @@ const tuiActivityFormatters = {
   },
 } satisfies ConversationActivityHandlerMap<undefined, string | undefined>;
 
-export function formatConversationActivityForTui(activity: ConversationActivity): string | undefined {
+export function formatTuiConversationActivity(activity: ConversationActivity): string | undefined {
   return ConversationActivityProjector.applyHandler({
     activity,
     handlers: tuiActivityFormatters,

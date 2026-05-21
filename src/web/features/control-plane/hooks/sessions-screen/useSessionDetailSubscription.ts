@@ -111,7 +111,7 @@ export function useSessionDetailSubscription({
         return;
       }
 
-      handleSessionEvent({
+      applySessionActivities({
         sessionId,
         activities: event.activities ?? [],
         setRunInFlight,
@@ -141,7 +141,7 @@ export function useSessionDetailSubscription({
   ]);
 }
 
-function handleSessionEvent({
+function applySessionActivities({
   sessionId,
   activities,
   setRunInFlight,
@@ -166,10 +166,10 @@ function handleSessionEvent({
     refresh,
     liveMessages,
   };
-  activities.forEach((activity) => applyWebConversationActivity(activity as ConversationActivity, context));
+  activities.forEach((activity) => applySessionActivity(activity as ConversationActivity, context));
 }
 
-const webActivityHandlers = {
+const sessionActivityHandlers = {
   'compaction.running': (activity, { liveMessages }) => {
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
@@ -270,10 +270,10 @@ const webActivityHandlers = {
   },
 } satisfies ConversationActivityHandlerMap<SessionEventContext>;
 
-function applyWebConversationActivity(activity: ConversationActivity, context: SessionEventContext) {
+function applySessionActivity(activity: ConversationActivity, context: SessionEventContext) {
   ConversationActivityProjector.applyHandler({
     activity,
-    handlers: webActivityHandlers,
+    handlers: sessionActivityHandlers,
     context,
   });
 }
