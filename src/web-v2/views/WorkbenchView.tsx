@@ -9,7 +9,12 @@ interface WorkbenchViewProps {
   activeSettingsSectionId: SettingsSectionId;
   selectedSession: ControlPlaneSessionDetail;
   selectedSessionLoading: boolean;
+  selectedSessionSubmitting: boolean;
+  selectedSessionRunning: boolean;
+  selectedSessionLiveStatus?: string;
+  selectedSessionError?: string;
   settingsOpen: boolean;
+  onSubmitSessionPrompt: (prompt: string) => Promise<void>;
 }
 
 const appSurfaceLabelKeys = {
@@ -30,7 +35,12 @@ export function WorkbenchView({
   activeSettingsSectionId,
   selectedSession,
   selectedSessionLoading,
+  selectedSessionSubmitting,
+  selectedSessionRunning,
+  selectedSessionLiveStatus,
+  selectedSessionError,
   settingsOpen,
+  onSubmitSessionPrompt,
 }: WorkbenchViewProps) {
   const { t } = useI18n();
   const title =
@@ -54,8 +64,13 @@ export function WorkbenchView({
         {!settingsOpen && activeSurfaceId === 'sessions' ? (
           <ConversationThread
             emptyTitle={t('workbench.emptyConversation')}
+            error={selectedSessionError}
+            liveStatus={selectedSessionLiveStatus}
             loading={selectedSessionLoading}
+            running={selectedSessionRunning}
             session={selectedSession}
+            submitting={selectedSessionSubmitting}
+            onSubmitPrompt={onSubmitSessionPrompt}
           />
         ) : null}
       </div>

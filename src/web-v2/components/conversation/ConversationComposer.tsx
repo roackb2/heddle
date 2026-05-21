@@ -32,9 +32,17 @@ type MockReasoningEffortValue = (typeof mockReasoningEfforts)[number]['value'];
 const composerTextareaMinHeight = 50;
 const composerTextareaMaxHeight = 176;
 
-// ConversationComposer is visual-only for this slice. Model and reasoning
-// options are local mocks until the v2 composer is wired to control-plane APIs.
-export function ConversationComposer() {
+// ConversationComposer owns the prompt draft and visual controls. Model and
+// reasoning options stay local mocks until v2 wires them to control-plane APIs.
+export function ConversationComposer({
+  disabled,
+  submitting,
+  onSubmitPrompt,
+}: {
+  disabled?: boolean;
+  submitting?: boolean;
+  onSubmitPrompt: (prompt: string) => Promise<void>;
+}) {
   const { t } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState('');
@@ -53,16 +61,41 @@ export function ConversationComposer() {
     textarea.style.overflowY = textarea.scrollHeight > composerTextareaMaxHeight ? 'auto' : 'hidden';
   }, [draft]);
 
+  const sendDisabled = disabled || submitting || !draft.trim();
+
+  async function handleSubmit() {
+    const prompt = draft.trim();
+    if (!prompt || sendDisabled) {
+      return;
+    }
+
+    setDraft('');
+    await onSubmitPrompt(prompt);
+  }
+
   return (
-    <form className="v2-composer-shell" onSubmit={(event) => event.preventDefault()}>
+    <form
+      className="v2-composer-shell"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void handleSubmit();
+      }}
+    >
       <Textarea
         ref={textareaRef}
         aria-label={t('composer.promptAriaLabel')}
         className="v2-composer-textarea"
+        disabled={disabled || submitting}
         placeholder={t('composer.placeholder')}
         rows={2}
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && !event.shiftKey && !event.altKey && !event.metaKey) {
+            event.preventDefault();
+            void handleSubmit();
+          }
+        }}
       />
       <div className="v2-composer-toolbar">
         <Button
@@ -86,7 +119,7 @@ export function ConversationComposer() {
             size="none"
             className="v2-composer-send-button"
             aria-label={t('composer.send')}
-            disabled={!draft.trim()}
+            disabled={sendDisabled}
           >
             <ArrowUp aria-hidden="true" />
           </Button>

@@ -284,6 +284,17 @@
     background: color-mix(in oklab, var(--color-muted) 78%, transparent);
   }
 
+  .v2-live-status-line,
+  .v2-live-error-line {
+    color: var(--color-muted-foreground);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+
+  .v2-live-error-line {
+    color: color-mix(in oklab, var(--color-destructive) 82%, var(--color-foreground));
+  }
+
   .v2-composer-region {
     padding: 0 1.5rem 1.25rem;
   }

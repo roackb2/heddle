@@ -13,6 +13,11 @@ interface AppRoutesProps {
   activeSettingsSectionId: SettingsSectionId;
   selectedSession: ControlPlaneSessionDetail;
   selectedSessionLoading: boolean;
+  selectedSessionSubmitting: boolean;
+  selectedSessionRunning: boolean;
+  selectedSessionLiveStatus?: string;
+  selectedSessionError?: string;
+  onSubmitSessionPrompt: (prompt: string) => Promise<void>;
 }
 
 // AppRoutes renders route config into v2 workbench views. Keep route inventory
@@ -22,6 +27,11 @@ export function AppRoutes({
   activeSettingsSectionId,
   selectedSession,
   selectedSessionLoading,
+  selectedSessionSubmitting,
+  selectedSessionRunning,
+  selectedSessionLiveStatus,
+  selectedSessionError,
+  onSubmitSessionPrompt,
 }: AppRoutesProps) {
   return (
     <Routes>
@@ -36,7 +46,12 @@ export function AppRoutes({
               activeSettingsSectionId={activeSettingsSectionId}
               selectedSession={selectedSession}
               selectedSessionLoading={selectedSessionLoading}
+              selectedSessionSubmitting={selectedSessionSubmitting}
+              selectedSessionRunning={selectedSessionRunning}
+              selectedSessionLiveStatus={selectedSessionLiveStatus}
+              selectedSessionError={selectedSessionError}
               settingsOpen={false}
+              onSubmitSessionPrompt={onSubmitSessionPrompt}
             />
           )}
         />
@@ -51,7 +66,12 @@ export function AppRoutes({
               activeSettingsSectionId={route.id}
               selectedSession={selectedSession}
               selectedSessionLoading={selectedSessionLoading}
+              selectedSessionSubmitting={selectedSessionSubmitting}
+              selectedSessionRunning={selectedSessionRunning}
+              selectedSessionLiveStatus={selectedSessionLiveStatus}
+              selectedSessionError={selectedSessionError}
               settingsOpen
+              onSubmitSessionPrompt={onSubmitSessionPrompt}
             />
           )}
         />

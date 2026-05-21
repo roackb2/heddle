@@ -5,12 +5,25 @@ import { ConversationMessage } from './ConversationMessage';
 interface ConversationThreadProps {
   session: ControlPlaneSessionDetail;
   loading: boolean;
+  submitting: boolean;
+  running: boolean;
+  liveStatus?: string;
+  error?: string;
   emptyTitle: string;
+  onSubmitPrompt: (prompt: string) => Promise<void>;
 }
 
 // ConversationThread renders the selected session in the central work area.
-// It stays read-only until the composer and turn-running flow are introduced.
-export function ConversationThread({ session, loading, emptyTitle }: ConversationThreadProps) {
+export function ConversationThread({
+  session,
+  loading,
+  submitting,
+  running,
+  liveStatus,
+  error,
+  emptyTitle,
+  onSubmitPrompt,
+}: ConversationThreadProps) {
   if (loading && !session) {
     return (
       <div className="flex h-full min-w-0 flex-col">
@@ -18,7 +31,7 @@ export function ConversationThread({ session, loading, emptyTitle }: Conversatio
           {emptyTitle}
         </div>
         <div className="v2-composer-region">
-          <ConversationComposer />
+          <ConversationComposer disabled onSubmitPrompt={onSubmitPrompt} />
         </div>
       </div>
     );
@@ -31,7 +44,7 @@ export function ConversationThread({ session, loading, emptyTitle }: Conversatio
           {emptyTitle}
         </div>
         <div className="v2-composer-region">
-          <ConversationComposer />
+          <ConversationComposer disabled onSubmitPrompt={onSubmitPrompt} />
         </div>
       </div>
     );
@@ -44,10 +57,16 @@ export function ConversationThread({ session, loading, emptyTitle }: Conversatio
           {session.messages.map((message) => (
             <ConversationMessage key={message.id} message={message} />
           ))}
+          {liveStatus ? <p className="v2-live-status-line" data-testid="web-v2-live-status">{liveStatus}</p> : null}
+          {error ? <p className="v2-live-error-line" data-testid="web-v2-session-error">{error}</p> : null}
         </div>
       </div>
       <div className="v2-composer-region">
-        <ConversationComposer />
+        <ConversationComposer
+          disabled={running}
+          submitting={submitting}
+          onSubmitPrompt={onSubmitPrompt}
+        />
       </div>
     </div>
   );

@@ -1,46 +1,58 @@
-import { useEffect, useState } from 'react';
-import { trpc, type RouterOutputs } from '@web/api/client';
+import { useMemo, useState } from 'react';
+import type { ControlPlaneSessionDetail } from '@web/api/client';
+import { useControlPlaneSessionEvents } from './useControlPlaneSessionEvents';
+import { useControlPlaneSessionLoader } from './useControlPlaneSessionLoader';
+import { useControlPlaneSessionPromptSubmit } from './useControlPlaneSessionPromptSubmit';
 
-export type ControlPlaneSessionDetail = RouterOutputs['controlPlane']['session'];
+export type { ControlPlaneSessionDetail } from '@web/api/client';
 
 type ControlPlaneSessionDetailState = {
   session: ControlPlaneSessionDetail;
   loading: boolean;
+  submitting: boolean;
+  running: boolean;
+  error?: string;
+  liveStatus?: string;
+  submitPrompt: (prompt: string) => Promise<void>;
 };
 
-// useControlPlaneSessionDetail loads the selected conversation detail from the
-// same control-plane endpoint that web-v1 uses.
+// Composes the web-v2 session detail workflow from focused hooks: persisted
+// detail loading, live event subscription, and prompt submission.
 export function useControlPlaneSessionDetail(sessionId: string | undefined): ControlPlaneSessionDetailState {
-  const [state, setState] = useState<ControlPlaneSessionDetailState>({
-    session: null,
-    loading: false,
+  const [running, setRunning] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<string | undefined>();
+  const loader = useControlPlaneSessionLoader(sessionId);
+  const promptSubmit = useControlPlaneSessionPromptSubmit({
+    sessionId,
+    setSession: loader.setSession,
+    setRunning,
+    setError: loader.setError,
+    setLiveStatus,
   });
 
-  useEffect(() => {
-    if (!sessionId) {
-      setState({ session: null, loading: false });
-      return;
-    }
+  useControlPlaneSessionEvents({
+    sessionId,
+    refresh: loader.refresh,
+    setSession: loader.setSession,
+    setRunning,
+    setLiveStatus,
+  });
 
-    let cancelled = false;
-    const id = sessionId;
-    setState((current) => ({ ...current, loading: true }));
-
-    async function load() {
-      const session = await trpc.controlPlane.session.query({ id });
-      if (cancelled) {
-        return;
-      }
-
-      setState({ session, loading: false });
-    }
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId]);
-
-  return state;
+  return useMemo(() => ({
+    session: loader.session,
+    loading: loader.loading,
+    submitting: promptSubmit.submitting,
+    running,
+    error: loader.error,
+    liveStatus,
+    submitPrompt: promptSubmit.submitPrompt,
+  }), [
+    liveStatus,
+    loader.error,
+    loader.loading,
+    loader.session,
+    promptSubmit.submitting,
+    promptSubmit.submitPrompt,
+    running,
+  ]);
 }
