@@ -62,6 +62,8 @@ export function useControlPlaneSessionEvents({
       return;
     }
 
+    setRunning(false);
+    setLiveStatus(undefined);
     setStreamConnected(false);
     return SessionEventStreamController.subscribe(sessionId, (event) => {
       if (event.type === 'session.updated') {
