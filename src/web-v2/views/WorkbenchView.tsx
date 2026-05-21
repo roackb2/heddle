@@ -11,6 +11,7 @@ interface WorkbenchViewProps {
   selectedSessionLoading: boolean;
   selectedSessionSubmitting: boolean;
   selectedSessionRunning: boolean;
+  selectedSessionLiveStreamConnected: boolean;
   selectedSessionLiveStatus?: string;
   selectedSessionError?: string;
   settingsOpen: boolean;
@@ -37,6 +38,7 @@ export function WorkbenchView({
   selectedSessionLoading,
   selectedSessionSubmitting,
   selectedSessionRunning,
+  selectedSessionLiveStreamConnected,
   selectedSessionLiveStatus,
   selectedSessionError,
   settingsOpen,
@@ -68,6 +70,7 @@ export function WorkbenchView({
             liveStatus={selectedSessionLiveStatus}
             loading={selectedSessionLoading}
             running={selectedSessionRunning}
+            liveStreamConnected={selectedSessionLiveStreamConnected}
             session={selectedSession}
             submitting={selectedSessionSubmitting}
             onSubmitPrompt={onSubmitSessionPrompt}

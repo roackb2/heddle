@@ -7,6 +7,7 @@ interface ConversationThreadProps {
   loading: boolean;
   submitting: boolean;
   running: boolean;
+  liveStreamConnected: boolean;
   liveStatus?: string;
   error?: string;
   emptyTitle: string;
@@ -19,6 +20,7 @@ export function ConversationThread({
   loading,
   submitting,
   running,
+  liveStreamConnected,
   liveStatus,
   error,
   emptyTitle,
@@ -63,7 +65,7 @@ export function ConversationThread({
       </div>
       <div className="v2-composer-region">
         <ConversationComposer
-          disabled={running}
+          disabled={running || !liveStreamConnected}
           submitting={submitting}
           onSubmitPrompt={onSubmitPrompt}
         />

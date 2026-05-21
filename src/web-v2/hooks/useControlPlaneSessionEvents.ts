@@ -1,4 +1,4 @@
-import { useCallback, useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type { ConversationActivity, ConversationActivityHandlerMap } from '@/core/chat/engine/live/index.js';
 import type { ControlPlaneSessionDetail } from '@web/api/client';
 import {
@@ -16,6 +16,10 @@ type UseControlPlaneSessionEventsArgs = {
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
 };
 
+export type ControlPlaneSessionEventsState = {
+  streamConnected: boolean;
+};
+
 // Subscribes to the selected session's live event stream and applies only the
 // web-v2 conversation state transitions that this interface currently renders.
 export function useControlPlaneSessionEvents({
@@ -24,10 +28,16 @@ export function useControlPlaneSessionEvents({
   setSession,
   setRunning,
   setLiveStatus,
-}: UseControlPlaneSessionEventsArgs) {
+}: UseControlPlaneSessionEventsArgs): ControlPlaneSessionEventsState {
+  const [streamConnected, setStreamConnected] = useState(false);
   const applySessionEvent = useCallback((event: ControlPlaneSessionEventEnvelope) => {
     if (event.type === 'waiting') {
       setLiveStatus('Waiting for the session event stream...');
+      return;
+    }
+
+    if (event.type === 'ready') {
+      setLiveStatus(undefined);
       return;
     }
 
@@ -48,9 +58,11 @@ export function useControlPlaneSessionEvents({
     if (!sessionId) {
       setRunning(false);
       setLiveStatus(undefined);
+      setStreamConnected(false);
       return;
     }
 
+    setStreamConnected(false);
     return SessionEventStreamController.subscribe(sessionId, (event) => {
       if (event.type === 'session.updated') {
         void refresh(sessionId, { silent: true });
@@ -58,8 +70,10 @@ export function useControlPlaneSessionEvents({
       }
 
       applySessionEvent(event);
-    });
+    }, setStreamConnected);
   }, [applySessionEvent, refresh, sessionId, setLiveStatus, setRunning]);
+
+  return { streamConnected };
 }
 
 type SessionActivityContext = {

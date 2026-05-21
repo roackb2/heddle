@@ -4,6 +4,7 @@ import { SessionMessageController } from '@web/controllers/session-messages';
 
 type UseControlPlaneSessionPromptSubmitArgs = {
   sessionId?: string;
+  streamConnected: boolean;
   setSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
   setRunning: Dispatch<SetStateAction<boolean>>;
   setError: Dispatch<SetStateAction<string | undefined>>;
@@ -18,6 +19,7 @@ export type ControlPlaneSessionPromptSubmitState = {
 // Owns prompt mutation state and optimistic conversation updates for web-v2.
 export function useControlPlaneSessionPromptSubmit({
   sessionId,
+  streamConnected,
   setSession,
   setRunning,
   setError,
@@ -32,6 +34,11 @@ export function useControlPlaneSessionPromptSubmit({
   const submitPrompt = useCallback(async (prompt: string) => {
     const trimmed = prompt.trim();
     if (!sessionId || !trimmed || submitting) {
+      return;
+    }
+
+    if (!streamConnected) {
+      setLiveStatus('Connecting to the live session stream...');
       return;
     }
 
@@ -53,7 +60,7 @@ export function useControlPlaneSessionPromptSubmit({
     } finally {
       setSubmitting(false);
     }
-  }, [sessionId, setError, setLiveStatus, setRunning, setSession, submitting]);
+  }, [sessionId, setError, setLiveStatus, setRunning, setSession, streamConnected, submitting]);
 
   return {
     submitting,

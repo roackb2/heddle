@@ -13,6 +13,7 @@ type ControlPlaneSessionDetailState = {
   running: boolean;
   error?: string;
   liveStatus?: string;
+  liveStreamConnected: boolean;
   submitPrompt: (prompt: string) => Promise<void>;
 };
 
@@ -22,19 +23,19 @@ export function useControlPlaneSessionDetail(sessionId: string | undefined): Con
   const [running, setRunning] = useState(false);
   const [liveStatus, setLiveStatus] = useState<string | undefined>();
   const loader = useControlPlaneSessionLoader(sessionId);
-  const promptSubmit = useControlPlaneSessionPromptSubmit({
-    sessionId,
-    setSession: loader.setSession,
-    setRunning,
-    setError: loader.setError,
-    setLiveStatus,
-  });
-
-  useControlPlaneSessionEvents({
+  const events = useControlPlaneSessionEvents({
     sessionId,
     refresh: loader.refresh,
     setSession: loader.setSession,
     setRunning,
+    setLiveStatus,
+  });
+  const promptSubmit = useControlPlaneSessionPromptSubmit({
+    sessionId,
+    streamConnected: events.streamConnected,
+    setSession: loader.setSession,
+    setRunning,
+    setError: loader.setError,
     setLiveStatus,
   });
 
@@ -45,8 +46,10 @@ export function useControlPlaneSessionDetail(sessionId: string | undefined): Con
     running,
     error: loader.error,
     liveStatus,
+    liveStreamConnected: events.streamConnected,
     submitPrompt: promptSubmit.submitPrompt,
   }), [
+    events.streamConnected,
     liveStatus,
     loader.error,
     loader.loading,

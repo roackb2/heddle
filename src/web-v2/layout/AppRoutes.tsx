@@ -15,6 +15,7 @@ interface AppRoutesProps {
   selectedSessionLoading: boolean;
   selectedSessionSubmitting: boolean;
   selectedSessionRunning: boolean;
+  selectedSessionLiveStreamConnected: boolean;
   selectedSessionLiveStatus?: string;
   selectedSessionError?: string;
   onSubmitSessionPrompt: (prompt: string) => Promise<void>;
@@ -29,6 +30,7 @@ export function AppRoutes({
   selectedSessionLoading,
   selectedSessionSubmitting,
   selectedSessionRunning,
+  selectedSessionLiveStreamConnected,
   selectedSessionLiveStatus,
   selectedSessionError,
   onSubmitSessionPrompt,
@@ -48,6 +50,7 @@ export function AppRoutes({
               selectedSessionLoading={selectedSessionLoading}
               selectedSessionSubmitting={selectedSessionSubmitting}
               selectedSessionRunning={selectedSessionRunning}
+              selectedSessionLiveStreamConnected={selectedSessionLiveStreamConnected}
               selectedSessionLiveStatus={selectedSessionLiveStatus}
               selectedSessionError={selectedSessionError}
               settingsOpen={false}
@@ -68,6 +71,7 @@ export function AppRoutes({
               selectedSessionLoading={selectedSessionLoading}
               selectedSessionSubmitting={selectedSessionSubmitting}
               selectedSessionRunning={selectedSessionRunning}
+              selectedSessionLiveStreamConnected={selectedSessionLiveStreamConnected}
               selectedSessionLiveStatus={selectedSessionLiveStatus}
               selectedSessionError={selectedSessionError}
               settingsOpen
