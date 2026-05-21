@@ -17,6 +17,10 @@ export default defineConfig({
     port: 5174,
     allowedHosts: ['.ts.net'],
     proxy: {
+      '/trpc': {
+        target: process.env.HEDDLE_SERVER_URL ?? 'http://127.0.0.1:8765',
+        changeOrigin: true,
+      },
       '/control-plane': {
         target: process.env.HEDDLE_SERVER_URL ?? 'http://127.0.0.1:8765',
         changeOrigin: true,

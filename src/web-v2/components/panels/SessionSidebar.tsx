@@ -1,4 +1,5 @@
 import { AppNavigation, SettingsNavigation } from '@web/components/navigation';
+import type { ControlPlaneState } from '@web/api/client';
 import type { AppRoute, SettingsRoute } from '@web/layout/routes';
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
 
@@ -8,8 +9,12 @@ interface SessionSidebarProps {
   appNavigationItems: readonly AppRoute[];
   settingsNavigationItems: readonly SettingsRoute[];
   settingsOpen: boolean;
+  selectedSessionId?: string;
+  sessions: ControlPlaneState['sessions'];
+  tasks: ControlPlaneState['heartbeat']['tasks'];
   onOpenSettings: () => void;
   onCloseSettings: () => void;
+  onSelectSession: (sessionId: string) => void;
 }
 
 // SessionSidebar owns the primary agent workbench rail: app navigation,
@@ -20,8 +25,12 @@ export function SessionSidebar({
   appNavigationItems,
   settingsNavigationItems,
   settingsOpen,
+  selectedSessionId,
+  sessions,
+  tasks,
   onOpenSettings,
   onCloseSettings,
+  onSelectSession,
 }: SessionSidebarProps) {
   return (
     <div className="flex h-full min-w-0 flex-col text-sm">
@@ -35,7 +44,11 @@ export function SessionSidebar({
         <AppNavigation
           activeItemId={activeSurfaceId}
           items={appNavigationItems}
+          selectedSessionId={selectedSessionId}
+          sessions={sessions}
+          tasks={tasks}
           onOpenSettings={onOpenSettings}
+          onSelectSession={onSelectSession}
         />
       )}
     </div>

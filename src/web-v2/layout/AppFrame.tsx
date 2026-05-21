@@ -10,6 +10,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@web/components/ui/sidebar';
+import type { ControlPlaneState } from '@web/api/client';
 import { ContextInspector, ConversationWorkspace, SessionSidebar } from '@web/components/panels';
 import { useI18n } from '@web/i18n';
 import type { AppRoute, SettingsRoute } from '@web/layout/routes';
@@ -21,8 +22,12 @@ interface AppFrameProps {
   appNavigationItems: readonly AppRoute[];
   settingsNavigationItems: readonly SettingsRoute[];
   settingsOpen: boolean;
+  selectedSessionId?: string;
+  sessions: ControlPlaneState['sessions'];
+  tasks: ControlPlaneState['heartbeat']['tasks'];
   onOpenSettings: () => void;
   onCloseSettings: () => void;
+  onSelectSession: (sessionId: string) => void;
 }
 
 // AppFrame owns only shell placement. Workflow state should stay in feature
@@ -33,8 +38,12 @@ export function AppFrame({
   appNavigationItems,
   settingsNavigationItems,
   settingsOpen,
+  selectedSessionId,
+  sessions,
+  tasks,
   onOpenSettings,
   onCloseSettings,
+  onSelectSession,
   children,
 }: PropsWithChildren<AppFrameProps>) {
   const { t } = useI18n();
@@ -53,8 +62,12 @@ export function AppFrame({
           appNavigationItems={appNavigationItems}
           settingsNavigationItems={settingsNavigationItems}
           settingsOpen={settingsOpen}
+          selectedSessionId={selectedSessionId}
+          sessions={sessions}
+          tasks={tasks}
           onOpenSettings={onOpenSettings}
           onCloseSettings={onCloseSettings}
+          onSelectSession={onSelectSession}
         />
       </Sidebar>
 

@@ -2,6 +2,14 @@
   "app": {
     "name": "Heddle"
   },
+  "composer": {
+    "addContext": "Add context",
+    "model": "Model",
+    "placeholder": "Send follow-up",
+    "promptAriaLabel": "Message",
+    "reasoningEffort": "Reasoning effort",
+    "send": "Send"
+  },
   "inspector": {
     "contextAriaLabel": "Context inspector"
   },
@@ -19,10 +27,13 @@
     "openSettings": "Open settings",
     "primaryAriaLabel": "Primary navigation",
     "sessionListAriaLabel": "Session list",
+    "sessionListTitle": "Recent sessions",
     "settings": "Settings",
     "settingsAriaLabel": "Settings navigation",
     "settingsMenuAriaLabel": "Settings menu",
-    "skipToMain": "Skip to Main Content"
+    "skipToMain": "Skip to Main Content",
+    "taskListAriaLabel": "Task list",
+    "taskListTitle": "Tasks"
   },
   "settings": {
     "general": "General",
@@ -34,6 +45,7 @@
     "tasks": "Tasks"
   },
   "workbench": {
+    "emptyConversation": "Select a session to view the conversation.",
     "workspaceAriaLabel": "workspace"
   }
 }

@@ -5,6 +5,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
 } from '@web/components/ui/sidebar';
+import type { ControlPlaneState } from '@web/api/client';
 import { useI18n } from '@web/i18n';
 import type { AppRoute } from '@web/layout/routes';
 import type { AppSurfaceId } from '@web/layout/types';
@@ -15,12 +16,24 @@ import { SidebarSettingsEntry } from './SidebarSettingsEntry';
 interface AppNavigationProps {
   activeItemId: AppSurfaceId;
   items: readonly AppRoute[];
+  selectedSessionId?: string;
+  sessions: ControlPlaneState['sessions'];
+  tasks: ControlPlaneState['heartbeat']['tasks'];
   onOpenSettings: () => void;
+  onSelectSession: (sessionId: string) => void;
 }
 
 // AppNavigation owns the primary workbench sidebar mode: app surfaces, the
 // future session list region, and the bottom settings entry point.
-export function AppNavigation({ activeItemId, items, onOpenSettings }: AppNavigationProps) {
+export function AppNavigation({
+  activeItemId,
+  items,
+  selectedSessionId,
+  sessions,
+  tasks,
+  onOpenSettings,
+  onSelectSession,
+}: AppNavigationProps) {
   const { t } = useI18n();
 
   return (
@@ -32,7 +45,16 @@ export function AppNavigation({ activeItemId, items, onOpenSettings }: AppNaviga
       </SidebarHeader>
       <MainNavigationSection activeItemId={activeItemId} items={items} />
       <SidebarContent>
-        <SidebarContentRegion ariaLabel={t('navigation.sessionListAriaLabel')} />
+        <SidebarContentRegion
+          ariaLabel={activeItemId === 'tasks' ? t('navigation.taskListAriaLabel') : t('navigation.sessionListAriaLabel')}
+          activeSurfaceId={activeItemId}
+          selectedSessionId={selectedSessionId}
+          sessionListTitle={t('navigation.sessionListTitle')}
+          taskListTitle={t('navigation.taskListTitle')}
+          sessions={sessions}
+          tasks={tasks}
+          onSelectSession={onSelectSession}
+        />
       </SidebarContent>
       <SidebarFooter className="v2-panel-divider border-t p-1.5">
         <SidebarMenu>

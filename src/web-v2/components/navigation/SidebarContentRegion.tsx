@@ -1,14 +1,46 @@
+import type { ControlPlaneState } from '@web/api/client';
+import type { AppSurfaceId } from '@web/layout/types';
+import { SessionListSection } from './SessionListSection';
+import { TaskListSection } from './TaskListSection';
+
 interface SidebarContentRegionProps {
   ariaLabel: string;
+  activeSurfaceId: AppSurfaceId;
+  selectedSessionId?: string;
+  sessionListTitle: string;
+  taskListTitle: string;
+  sessions: ControlPlaneState['sessions'];
+  tasks: ControlPlaneState['heartbeat']['tasks'];
+  onSelectSession: (sessionId: string) => void;
 }
 
-// SidebarContentRegion reserves the future session-list area without inventing
-// sample sessions or extra product surfaces.
-export function SidebarContentRegion({ ariaLabel }: SidebarContentRegionProps) {
+// SidebarContentRegion owns the scrollable content area below primary
+// navigation. Lists use the same shapes as their tRPC-backed views.
+export function SidebarContentRegion({
+  ariaLabel,
+  activeSurfaceId,
+  selectedSessionId,
+  sessionListTitle,
+  taskListTitle,
+  sessions,
+  tasks,
+  onSelectSession,
+}: SidebarContentRegionProps) {
   return (
     <div
-      className="v2-panel-divider v2-panel-surface min-h-0 flex-1 border-t"
+      className="v2-panel-divider v2-panel-surface flex min-h-0 flex-1 flex-col border-t"
       aria-label={ariaLabel}
-    />
+    >
+      {activeSurfaceId === 'tasks' ? (
+        <TaskListSection tasks={tasks} title={taskListTitle} />
+      ) : (
+        <SessionListSection
+          selectedSessionId={selectedSessionId}
+          sessions={sessions}
+          title={sessionListTitle}
+          onSelectSession={onSelectSession}
+        />
+      )}
+    </div>
   );
 }

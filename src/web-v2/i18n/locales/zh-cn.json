@@ -2,6 +2,14 @@
   "app": {
     "name": "Heddle"
   },
+  "composer": {
+    "addContext": "添加上下文",
+    "model": "模型",
+    "placeholder": "发送后续消息",
+    "promptAriaLabel": "消息",
+    "reasoningEffort": "推理强度",
+    "send": "发送"
+  },
   "inspector": {
     "contextAriaLabel": "上下文检查器"
   },
@@ -19,10 +27,13 @@
     "openSettings": "打开设置",
     "primaryAriaLabel": "主导航",
     "sessionListAriaLabel": "会话列表",
+    "sessionListTitle": "最近会话",
     "settings": "设置",
     "settingsAriaLabel": "设置导航",
     "settingsMenuAriaLabel": "设置菜单",
-    "skipToMain": "跳到主要内容"
+    "skipToMain": "跳到主要内容",
+    "taskListAriaLabel": "任务列表",
+    "taskListTitle": "任务"
   },
   "settings": {
     "general": "通用",
@@ -34,6 +45,7 @@
     "tasks": "任务"
   },
   "workbench": {
+    "emptyConversation": "选择一个会话以查看对话内容。",
     "workspaceAriaLabel": "工作区"
   }
 }

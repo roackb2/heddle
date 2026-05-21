@@ -2,6 +2,14 @@
   "app": {
     "name": "Heddle"
   },
+  "composer": {
+    "addContext": "加入脈絡",
+    "model": "模型",
+    "placeholder": "送出後續訊息",
+    "promptAriaLabel": "訊息",
+    "reasoningEffort": "推理強度",
+    "send": "送出"
+  },
   "inspector": {
     "contextAriaLabel": "脈絡檢視器"
   },
@@ -19,10 +27,13 @@
     "openSettings": "開啟設定",
     "primaryAriaLabel": "主要導覽",
     "sessionListAriaLabel": "對話清單",
+    "sessionListTitle": "最近對話",
     "settings": "設定",
     "settingsAriaLabel": "設定導覽",
     "settingsMenuAriaLabel": "設定選單",
-    "skipToMain": "跳到主要內容"
+    "skipToMain": "跳到主要內容",
+    "taskListAriaLabel": "任務清單",
+    "taskListTitle": "任務"
   },
   "settings": {
     "general": "一般",
@@ -34,6 +45,7 @@
     "tasks": "任務"
   },
   "workbench": {
+    "emptyConversation": "選擇一個對話以查看內容。",
     "workspaceAriaLabel": "工作區"
   }
 }
