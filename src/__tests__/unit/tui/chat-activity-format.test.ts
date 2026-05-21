@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatConversationActivityForTui, toLiveEvent } from '../../../cli/chat/adapters/conversation-activity-adapter.js';
-import { ConversationActivityProjector, ToolActivitySummarizer } from '@/core/observability/index.js';
+import { ConversationActivityProjector, ToolActivitySummarizer } from '@/core/chat/engine/live/index.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../types.js';
 

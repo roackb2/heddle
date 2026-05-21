@@ -1,6 +1,22 @@
 export { createConversationEngine } from './conversation-engine.js';
 export { EngineConversationTurnService } from './turns/service.js';
+export {
+  ConversationActivityProjector,
+  ToolActivitySummarizer,
+} from './live/index.js';
 export type { RunConversationTurnArgs, RunConversationTurnResult } from './turns/types.js';
+export type {
+  ApplyConversationActivityHandlerArgs,
+  ConversationActivity,
+  ConversationActivityCorrelation,
+  ConversationActivityDerived,
+  ConversationActivityHandlerMap,
+  ConversationActivityOf,
+  ConversationCompactionStatus,
+  ToolCallSummaryInput,
+  ToolResultSummaryOptions,
+  ToolSummaryOptions,
+} from './live/index.js';
 export type {
   AppendConversationMessageInput,
   ClearConversationTurnLeaseInput,

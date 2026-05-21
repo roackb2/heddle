@@ -286,9 +286,11 @@ export type {
   ReviewFileStatus,
 } from './core/review/index.js';
 export {
-  DEFAULT_TRACE_SUMMARIZERS,
   ConversationActivityProjector,
   ToolActivitySummarizer,
+} from './core/chat/engine/index.js';
+export {
+  DEFAULT_TRACE_SUMMARIZERS,
   TraceSummaryService,
 } from './core/observability/index.js';
 export type {
@@ -299,15 +301,17 @@ export type {
   ConversationActivityHandlerMap,
   ConversationActivityOf,
   ConversationCompactionStatus,
+  ToolCallSummaryInput,
+  ToolResultSummaryOptions,
+  ToolSummaryOptions,
+} from './core/chat/engine/index.js';
+export type {
   TraceEventOfType,
   TraceEventType,
   TraceSummarizer,
   TraceSummarizerMap,
   TraceSummaryContext,
   TraceSummaryValue,
-  ToolCallSummaryInput,
-  ToolResultSummaryOptions,
-  ToolSummaryOptions,
 } from './core/observability/index.js';
 export {
   TRACE_CORRELATION_FIELDS,

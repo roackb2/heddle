@@ -1,5 +1,5 @@
 import type { ConversationEngineHost } from '@/core/chat/engine/types.js';
-import { ConversationActivityProjector } from '@/core/observability/index.js';
+import { ConversationActivityProjector } from '@/core/chat/engine/live/index.js';
 import type { ChatTurnHostPort, ConversationEngineHostAdapterResult } from './types.js';
 
 /**

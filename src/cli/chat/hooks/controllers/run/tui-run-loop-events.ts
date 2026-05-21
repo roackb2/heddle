@@ -1,7 +1,7 @@
 import type { TraceEvent } from '../../../../../index.js';
 import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
-import { ConversationActivityProjector } from '@/core/observability/index.js';
+import { ConversationActivityProjector } from '@/core/chat/engine/live/index.js';
 import { previewEditFileInput } from '../../../../../core/tools/toolkits/coding-files/edit-file.js';
 import { formatConversationActivityForTui } from '../../../adapters/conversation-activity-adapter.js';
 import { formatEditPreviewHistoryMessage, formatPlanHistoryMessage } from '../../../utils/format.js';

@@ -1,5 +1,6 @@
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
-import type { ConversationCompactionStatus, TraceSummaryService } from '@/core/observability/index.js';
+import type { ConversationCompactionStatus } from '@/core/chat/engine/live/index.js';
+import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { RunAgentLoopOptions } from '@/core/runtime/loop/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';

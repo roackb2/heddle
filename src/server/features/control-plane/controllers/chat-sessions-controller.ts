@@ -16,6 +16,7 @@ import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
 import { PendingToolApprovalRequests } from '@/core/approvals/index.js';
 import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
+import { ConversationActivityProjector } from '@/core/chat/engine/live/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type {
   ConversationEngine,
@@ -338,18 +339,13 @@ export class ControlPlaneChatSessionsController {
     this.sessionEventBus.emit(args.sessionId, {
       sessionId: args.sessionId,
       timestamp,
-      event: {
-        type: 'trace',
-        runId: `browser-integration-${args.sessionId}`,
+      activities: ConversationActivityProjector.fromTraceEvent({
+        type: 'run.finished',
+        outcome: 'done',
+        summary: assistantText,
+        step: 1,
         timestamp,
-        event: {
-          type: 'run.finished',
-          outcome: 'done',
-          summary: assistantText,
-          step: 1,
-          timestamp,
-        },
-      },
+      }),
     } satisfies ControlPlaneSessionLiveEvent);
 
     return {

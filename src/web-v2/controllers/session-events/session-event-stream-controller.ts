@@ -12,12 +12,12 @@ export class SessionEventStreamController {
     const source = new EventSource(`/control-plane/sessions/${encodeURIComponent(sessionId)}/events`);
     const handle = (type: string) => (event: MessageEvent<string>) => {
       try {
-        const parsed = JSON.parse(event.data) as { sessionId?: string; timestamp?: string; event?: unknown };
+        const parsed = JSON.parse(event.data) as Pick<ControlPlaneSessionEventEnvelope, 'sessionId' | 'timestamp' | 'activities'>;
         onUpdate({
           type,
           sessionId: parsed.sessionId ?? sessionId,
           timestamp: parsed.timestamp,
-          event: parsed.event,
+          activities: parsed.activities,
         });
       } catch {
         onUpdate({ type, sessionId });

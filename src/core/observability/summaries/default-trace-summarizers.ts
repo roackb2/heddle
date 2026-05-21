@@ -1,5 +1,5 @@
 import { truncate } from '@/core/utils/text.js';
-import { ToolActivitySummarizer } from '../activity/index.js';
+import { ToolActivitySummarizer } from '@/core/chat/engine/live/index.js';
 import type { TraceSummarizerMap } from './types.js';
 
 export const DEFAULT_TRACE_SUMMARIZERS: TraceSummarizerMap = {

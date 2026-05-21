@@ -1,18 +1,27 @@
 import type { EventEmitter } from 'node:events';
 import type { ToolCall, ToolDefinition } from '../../../../index.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
+import {
+  ConversationActivityProjector,
+  type ConversationActivity,
+  type ConversationCompactionStatus,
+} from '@/core/chat/engine/live/index.js';
 import type { ControlPlaneSessionLiveEvent } from '../types.js';
 
 export class ControlPlaneChatSessionEventsController {
-  static emitSessionEvent(args: {
+  static emitSessionActivities(args: {
     eventBus: EventEmitter;
     sessionId: string;
-    event: ControlPlaneSessionLiveEvent['event'];
+    activities: ConversationActivity[];
   }) {
+    if (args.activities.length === 0) {
+      return;
+    }
+
     args.eventBus.emit(args.sessionId, {
       sessionId: args.sessionId,
       timestamp: new Date().toISOString(),
-      event: args.event,
+      activities: args.activities,
     } satisfies ControlPlaneSessionLiveEvent);
   }
 
@@ -20,25 +29,25 @@ export class ControlPlaneChatSessionEventsController {
     eventBus: EventEmitter;
     sessionId: string;
   }) {
-    const publishEvent = (event: ControlPlaneSessionLiveEvent['event']) => {
-      ControlPlaneChatSessionEventsController.emitSessionEvent({
+    const publishActivities = (activities: ConversationActivity[]) => {
+      ControlPlaneChatSessionEventsController.emitSessionActivities({
         eventBus: args.eventBus,
         sessionId: args.sessionId,
-        event,
+        activities,
       });
     };
 
     const publisher = {
       publishAgentLoopEvent(event: AgentLoopEvent) {
-        publishEvent(event);
+        publishActivities(ConversationActivityProjector.fromAgentLoopEvent(event));
       },
 
-      publishCompactionStatus(event: ControlPlaneSessionLiveEvent['event']) {
-        publishEvent(event);
+      publishCompactionStatus(event: ConversationCompactionStatus) {
+        publishActivities(ConversationActivityProjector.fromCompactionStatus(event));
       },
 
       publishApprovalRequested(call: ToolCall) {
-        publishEvent({
+        publishActivities(ConversationActivityProjector.fromAgentLoopEvent({
           type: 'trace',
           runId: 'pending-approval',
           timestamp: new Date().toISOString(),
@@ -48,7 +57,7 @@ export class ControlPlaneChatSessionEventsController {
             step: 0,
             timestamp: new Date().toISOString(),
           },
-        });
+        }));
       },
     };
 

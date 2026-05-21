@@ -2,7 +2,7 @@ import {
   ConversationActivityProjector,
   type ConversationActivity,
   type ConversationActivityHandlerMap,
-} from '@/core/observability/index.js';
+} from '@/core/chat/engine/live/index.js';
 import type { TraceEvent } from '../../../index.js';
 import { truncate } from '../../../core/utils/text.js';
 
@@ -48,6 +48,9 @@ const tuiActivityFormatters = {
     const metrics = activity.derived?.kind === 'cyberloop-metrics' ? activity.derived.metrics : '';
     return `cyberloop drift=${activity.event.driftLevel}${metrics}`;
   },
+  'compaction.running': () => 'Compacting earlier conversation history…',
+  'compaction.failed': (activity) => `Compaction failed: ${activity.event.error ?? 'unknown error'}`,
+  'compaction.finished': () => 'Compaction finished.',
   'run.finished': (activity) => {
     return activity.event.outcome === 'done' ? undefined : `stopped: ${activity.event.outcome}`;
   },

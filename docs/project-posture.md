@@ -62,7 +62,8 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
 - `src/core/heartbeat/` owns autonomous wake cycles, heartbeat scheduling,
   checkpoint reuse, and heartbeat task/run views.
 - `src/core/chat/engine/` owns persisted conversation sessions, turns,
-  compaction, leases, approvals, traces, and package-level programmatic use.
+  compaction, leases, approvals, traces, user-facing conversation activities,
+  and package-level programmatic use.
 - `src/core/chat/` defines the shared chat boundary above the engine. It should
   stay small.
 - `src/core/tools/` owns tool definitions, registries, execution, and toolkits.
@@ -70,7 +71,8 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
   and cross-host command modules.
 - `src/core/approvals/` owns approval policy chains and remembered rules.
 - `src/core/trace/` owns low-level trace recording and console formatting.
-- `src/core/observability/` owns trace and activity projection.
+- `src/core/observability/` owns trace semantics, trace summaries, and
+  debugging evidence contracts.
 - `src/core/review/` owns reusable review projections such as structured Git
   diff parsing.
 - `src/cli/` owns terminal and TUI host surfaces.

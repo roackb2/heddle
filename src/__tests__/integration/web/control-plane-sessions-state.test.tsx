@@ -126,11 +126,22 @@ describe('useSessionsScreenState', () => {
       eventHandler?.({
         type: 'session.event',
         sessionId: 'session-1',
-        event: {
+        activities: [{
+          source: 'agent-loop',
           type: 'assistant.stream',
-          text: 'Inspecting the repo…',
-          done: false,
-        },
+          event: {
+            type: 'assistant.stream',
+            runId: 'run-1',
+            step: 1,
+            text: 'Inspecting the repo…',
+            done: false,
+            timestamp: new Date().toISOString(),
+          },
+          correlation: {
+            runId: 'run-1',
+            step: 1,
+          },
+        }],
       });
     });
 

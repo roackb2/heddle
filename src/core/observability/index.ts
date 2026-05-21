@@ -1,17 +1,3 @@
-export { ConversationActivityProjector, ToolActivitySummarizer } from './activity/index.js';
-export type {
-  ApplyConversationActivityHandlerArgs,
-  ConversationAgentLoopActivityEvent,
-  ConversationActivity,
-  ConversationActivityCorrelation,
-  ConversationActivityDerived,
-  ConversationActivityHandlerMap,
-  ConversationActivityOf,
-  ConversationCompactionStatus,
-  ToolCallSummaryInput,
-  ToolResultSummaryOptions,
-  ToolSummaryOptions,
-} from './activity/index.js';
 export { DEFAULT_TRACE_SUMMARIZERS, TraceSummaryService } from './summaries/index.js';
 export type {
   TraceEventOfType,

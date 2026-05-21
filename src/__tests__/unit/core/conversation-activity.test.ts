@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ConversationActivityProjector,
   ToolActivitySummarizer,
-} from '@/core/observability/index.js';
+} from '@/core/chat/engine/live/index.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../core/types.js';
 
