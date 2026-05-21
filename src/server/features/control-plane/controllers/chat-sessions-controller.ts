@@ -344,6 +344,7 @@ export class ControlPlaneChatSessionsController {
 
     const timestamp = new Date().toISOString();
     const assistantText = `Mocked browser integration agent response: ${args.prompt}`;
+    await this.emitBrowserIntegrationStreamPreview(args.sessionId, assistantText);
     const nextHistory = [
       ...session.history,
       { role: 'user' as const, content: args.prompt },
@@ -380,6 +381,39 @@ export class ControlPlaneChatSessionsController {
       summary: assistantText,
       session: ControlPlaneChatSessionPresenter.projectDetail(updatedSession)[0] ?? null,
     };
+  }
+
+  private async emitBrowserIntegrationStreamPreview(sessionId: string, assistantText: string): Promise<void> {
+    // The browser-integration fake has to emit a real live activity before its
+    // final mutation result so web-v2 can regression-test incremental streaming.
+    const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
+      eventBus: this.sessionEventBus,
+      sessionId,
+    });
+    const runId = `browser-integration-run-${Date.now()}`;
+    const timestamp = new Date().toISOString();
+
+    publisher.publishActivity({
+      source: 'agent-loop',
+      type: 'assistant.stream',
+      event: {
+        type: 'assistant.stream',
+        runId,
+        step: 1,
+        text: assistantText.slice(0, 'Mocked browser integration agent response'.length),
+        done: false,
+        timestamp,
+      },
+      correlation: {
+        runId,
+        step: 1,
+        timestamp,
+      },
+    });
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 750);
+    });
   }
 
   private resolveSessionCreationModel(args: {

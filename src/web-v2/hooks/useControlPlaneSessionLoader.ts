@@ -74,14 +74,16 @@ export function useControlPlaneSessionLoader(sessionId: string | undefined): Con
       return;
     }
 
-    if (latestRefreshMode.current === 'silent' && session?.id === sessionQuery.data.id) {
-      latestRefreshMode.current = null;
-      return;
-    }
+    const querySession = sessionQuery.data;
+    setSession((current) => {
+      if (latestRefreshMode.current === 'silent' && current?.id === querySession.id) {
+        return current;
+      }
 
-    setSession(sessionQuery.data);
+      return querySession;
+    });
     latestRefreshMode.current = null;
-  }, [session, sessionId, sessionQuery.data, sessionQuery.isLoading]);
+  }, [sessionId, sessionQuery.data]);
 
   useEffect(() => {
     if (sessionQuery.error) {
