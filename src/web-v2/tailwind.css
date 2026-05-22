@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  --font-sans: "Inter Variable", Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 
   --color-background: hsl(235 18% 7%);
@@ -37,6 +37,14 @@
 }
 
 @layer components {
+  .v2-shell {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-optical-sizing: auto;
+    font-synthesis-weight: none;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
   .v2-panel-surface {
     background: var(--color-card);
   }
@@ -282,7 +290,7 @@
   .v2-assistant-markdown h4 {
     margin-top: 1.45rem;
     margin-bottom: 0.55rem;
-    font-weight: 650;
+    font-weight: 600;
     line-height: 1.25;
     color: var(--color-foreground);
   }

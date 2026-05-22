@@ -167,11 +167,11 @@ function DiffPreviewEmpty({
 }) {
   return (
     <div className={cn(
-      'rounded-md border border-border/70 bg-background/50',
+      'text-muted-foreground',
       compact ? 'px-3 py-2' : 'px-3 py-4',
-      tone === 'danger' && 'border-destructive/50 text-destructive',
+      tone === 'danger' && 'text-destructive',
     )}>
-      <p className={cn('font-medium', compact ? 'text-xs' : 'text-sm')}>{title}</p>
+      <p className={cn('font-medium text-foreground', compact ? 'text-xs' : 'text-sm')}>{title}</p>
       <p className={cn('mt-1 text-muted-foreground', compact ? 'text-xs' : 'text-sm')}>{body}</p>
     </div>
   );
