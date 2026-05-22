@@ -36,8 +36,8 @@ export function DiffPreview() {
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col" aria-label={t('diffPreview.title')}>
       <header className="shrink-0 border-b border-border/70 px-3 py-2">
-        <p className="text-sm font-semibold text-foreground">{t('diffPreview.title')}</p>
-        <p className="text-xs text-muted-foreground">{t('diffPreview.subtitle')}</p>
+        <p className="v2-type-panel-title text-foreground">{t('diffPreview.title')}</p>
+        <p className="v2-type-panel-subtitle text-muted-foreground">{t('diffPreview.subtitle')}</p>
       </header>
 
       <div className="v2-scrollbar-hidden min-h-0 flex-1 overflow-y-auto">
@@ -93,12 +93,15 @@ function DiffPreviewFile({
           <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         : <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-foreground">{file.path}</span>
-          {file.oldPath ? <span className="block truncate text-xs text-muted-foreground">{t('diffPreview.from')} {file.oldPath}</span> : null}
+          <span className="v2-type-nav-primary block truncate text-foreground">{file.path}</span>
+          {file.oldPath ? <span className="v2-type-nav-secondary block truncate text-muted-foreground">{t('diffPreview.from')} {file.oldPath}</span> : null}
         </span>
         <DiffPreviewBadge>{file.status}</DiffPreviewBadge>
         {file.additions !== undefined || file.deletions !== undefined ?
-          <DiffPreviewBadge tone="good">+{file.additions ?? 0} / -{file.deletions ?? 0}</DiffPreviewBadge>
+          <span className="v2-type-nav-primary inline-flex shrink-0 items-center gap-1.5" aria-label={`${file.additions ?? 0} additions, ${file.deletions ?? 0} deletions`}>
+            <span className="text-emerald-200">+{file.additions ?? 0}</span>
+            <span className="text-rose-300">-{file.deletions ?? 0}</span>
+          </span>
         : null}
         {file.binary ? <DiffPreviewBadge tone="warn">{t('diffPreview.binary')}</DiffPreviewBadge> : null}
       </button>
@@ -144,7 +147,7 @@ function FileDiffContent({ fileDiff }: { fileDiff?: ControlPlaneWorkspaceFileDif
 function DiffPreviewBadge({ children, tone }: { children: ReactNode; tone?: 'good' | 'warn' }) {
   return (
     <span className={cn(
-      'shrink-0 rounded-sm border px-1.5 py-0.5 text-[11px] leading-4',
+      'v2-type-caption shrink-0 rounded-sm border px-1.5 py-0.5',
       tone === 'good' && 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200',
       tone === 'warn' && 'border-amber-300/30 bg-amber-300/10 text-amber-100',
       !tone && 'border-border/80 bg-muted/70 text-muted-foreground',
@@ -157,7 +160,6 @@ function DiffPreviewBadge({ children, tone }: { children: ReactNode; tone?: 'goo
 function DiffPreviewEmpty({
   title,
   body,
-  compact,
   tone,
 }: {
   title: string;
@@ -168,11 +170,11 @@ function DiffPreviewEmpty({
   return (
     <div className={cn(
       'text-muted-foreground',
-      compact ? 'px-3 py-2' : 'px-3 py-4',
+      'px-3 py-4',
       tone === 'danger' && 'text-destructive',
     )}>
-      <p className={cn('font-medium text-foreground', compact ? 'text-xs' : 'text-sm')}>{title}</p>
-      <p className={cn('mt-1 text-muted-foreground', compact ? 'text-xs' : 'text-sm')}>{body}</p>
+      <p className="v2-type-body-strong text-foreground">{title}</p>
+      <p className="v2-type-panel-subtitle mt-1 text-muted-foreground">{body}</p>
     </div>
   );
 }

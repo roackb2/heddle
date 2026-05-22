@@ -36,7 +36,7 @@ export function SessionListSection({
         <span>{t('navigation.newChat')}</span>
       </Button>
       <div
-        className="px-2 pt-2 pb-1 text-[0.6875rem] font-medium uppercase tracking-normal text-muted-foreground"
+        className="v2-type-section-label px-2 pt-2 pb-1 tracking-normal text-muted-foreground"
       >
         {title}
       </div>
@@ -64,7 +64,7 @@ export function SessionListSection({
               />
               <span
                 className={cn(
-                  'w-full truncate text-sm font-medium leading-5 text-sidebar-foreground group-hover:text-sidebar-accent-foreground',
+                  'v2-type-nav-primary w-full truncate text-sidebar-foreground group-hover:text-sidebar-accent-foreground',
                   selected && 'text-sidebar-accent-foreground',
                 )}
               >
@@ -72,7 +72,7 @@ export function SessionListSection({
               </span>
               <span
                 className={cn(
-                  'w-full truncate text-xs leading-4 text-muted-foreground',
+                  'v2-type-nav-secondary w-full truncate text-muted-foreground',
                   selected && 'text-sidebar-accent-foreground/75',
                 )}
               >

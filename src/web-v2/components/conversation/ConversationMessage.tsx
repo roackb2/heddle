@@ -8,7 +8,7 @@ export const ConversationMessage = memo(function ConversationMessage({ message }
   if (message.role === 'user') {
     return (
       <article className="v2-message-row v2-message-row-user" data-message-role="user">
-        <div className="v2-user-message-card">
+        <div className="v2-type-body v2-user-message-card">
           {message.text}
         </div>
       </article>
@@ -17,7 +17,7 @@ export const ConversationMessage = memo(function ConversationMessage({ message }
 
   return (
     <article className="v2-message-row v2-message-row-assistant" data-message-role="assistant">
-      <div className="v2-assistant-article-shell">
+      <div className="v2-type-body v2-assistant-article-shell">
         <AssistantMarkdown markdown={message.text} />
       </div>
     </article>

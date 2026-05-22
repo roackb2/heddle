@@ -62,7 +62,7 @@ export function WorkbenchView({
   return (
     <section className="flex h-full min-w-0 flex-col bg-background" data-testid={testId}>
       <header className="v2-panel-header">
-        <h1 className="text-balance text-sm font-medium" data-testid="web-v2-workbench-title">{title}</h1>
+        <h1 className="v2-type-panel-title text-balance" data-testid="web-v2-workbench-title">{title}</h1>
       </header>
       <div
         className="min-h-0 flex-1 bg-background"

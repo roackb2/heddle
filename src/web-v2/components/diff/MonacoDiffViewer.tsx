@@ -76,6 +76,9 @@ export function MonacoDiffViewer({ diff }: { diff: ReviewDiffFile }) {
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
         fontSize: 12,
         glyphMargin: false,
+        guides: {
+          indentation: false,
+        },
         lineDecorationsWidth: 8,
         lineNumbers: (lineNumber) => model.lines[lineNumber - 1]?.lineNumber ?? '',
         lineNumbersMinChars: 4,

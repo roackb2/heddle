@@ -37,7 +37,7 @@ export function ConversationThread({
   if (loading && !session) {
     return (
       <div className="flex h-full min-w-0 flex-col">
-        <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground">
+        <div className="v2-type-panel-subtitle flex min-h-0 flex-1 items-center justify-center text-muted-foreground">
           <div className="inline-flex items-center gap-2">
             <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
             <span>{emptyTitle}</span>
@@ -53,7 +53,7 @@ export function ConversationThread({
   if (!session) {
     return (
       <div className="flex h-full min-w-0 flex-col">
-        <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground">
+        <div className="v2-type-panel-subtitle flex min-h-0 flex-1 items-center justify-center text-muted-foreground">
           {emptyTitle}
         </div>
         <div className="v2-composer-region">
@@ -68,7 +68,7 @@ export function ConversationThread({
       <div className="v2-scrollbar-hidden min-h-0 flex-1 overflow-auto">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-6 py-8">
           {loading ? (
-            <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="v2-type-panel-subtitle inline-flex items-center gap-2 text-muted-foreground">
               <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
               Updating conversation...
             </div>
