@@ -37,3 +37,6 @@ export type ControlPlaneSessionMessage = NonNullable<ControlPlaneSessionDetail>[
 export type ControlPlanePendingApproval = RouterOutputs['controlPlane']['sessionPendingApproval'];
 export type ControlPlaneApprovalDecision = RouterInputs['controlPlane']['sessionResolveApproval']['decision'];
 export type ControlPlaneSessionSendPromptResult = RouterOutputs['controlPlane']['sessionSendPrompt'];
+export type ControlPlaneWorkspaceChanges = RouterOutputs['controlPlane']['workspaceChanges'];
+export type ControlPlaneWorkspaceChangedFile = ControlPlaneWorkspaceChanges['files'][number];
+export type ControlPlaneWorkspaceFileDiff = RouterOutputs['controlPlane']['workspaceFileDiff'];

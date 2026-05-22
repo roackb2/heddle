@@ -31,7 +31,12 @@ export function useControlPlaneSessionEvents({
   setRunning,
   setLiveStatus,
 }: UseControlPlaneSessionEventsArgs): ControlPlaneSessionEventsState {
+  const utils = trpcReact.useUtils();
   const [streamConnected, setStreamConnected] = useState(false);
+  const invalidateWorkspaceDiff = useCallback(() => {
+    void utils.controlPlane.workspaceChanges.invalidate();
+    void utils.controlPlane.workspaceFileDiff.invalidate();
+  }, [utils]);
   const applySessionEvent = useCallback((event: ControlPlaneSessionEventEnvelope) => {
     if (event.type === 'waiting') {
       setLiveStatus('Waiting for the session event stream...');
@@ -51,11 +56,12 @@ export function useControlPlaneSessionEvents({
       sessionId: event.sessionId,
       refresh,
       refreshPendingApproval,
+      invalidateWorkspaceDiff,
       setLiveStatus,
       setRunning,
       setSession,
     }));
-  }, [refresh, refreshPendingApproval, setLiveStatus, setRunning, setSession]);
+  }, [invalidateWorkspaceDiff, refresh, refreshPendingApproval, setLiveStatus, setRunning, setSession]);
 
   const subscription = trpcReact.controlPlane.sessionEvents.useSubscription(
     sessionId ? { sessionId } : skipToken,
@@ -97,6 +103,7 @@ type SessionActivityContext = {
   sessionId: string;
   refresh: RefreshControlPlaneSession;
   refreshPendingApproval: (sessionId: string) => void;
+  invalidateWorkspaceDiff: () => void;
   setSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
   setRunning: Dispatch<SetStateAction<boolean>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
@@ -125,16 +132,18 @@ const sessionActivityHandlers: SessionActivityHandlerMap = {
     setRunning(true);
     setLiveStatus('Run started...');
   },
-  'loop.finished': (_activity, { sessionId, refresh, setRunning, setLiveStatus }) => {
+  'loop.finished': (_activity, { sessionId, refresh, invalidateWorkspaceDiff, setRunning, setLiveStatus }) => {
     setRunning(false);
     setLiveStatus(undefined);
     void refresh(sessionId, { silent: true });
+    invalidateWorkspaceDiff();
   },
   'tool.calling': (activity, { setLiveStatus }) => {
     setLiveStatus(`Working... running ${activity.derived?.kind === 'tool-summary' ? activity.derived.summary : activity.tool}${formatStep(activity.step)}`);
   },
-  'tool.completed': (activity, { setLiveStatus }) => {
+  'tool.completed': (activity, { invalidateWorkspaceDiff, setLiveStatus }) => {
     setLiveStatus(`${activity.tool} finished in ${Math.round(activity.durationMs)}ms`);
+    invalidateWorkspaceDiff();
   },
   'tool.approval_requested': (activity, { sessionId, refreshPendingApproval, setLiveStatus }) => {
     refreshPendingApproval(sessionId);

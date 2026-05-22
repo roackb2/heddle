@@ -23,6 +23,27 @@
     "reasoningEffort": "Reasoning effort",
     "send": "Send"
   },
+  "diffPreview": {
+    "binary": "binary",
+    "binaryBody": "Git reports this as a binary diff, so Heddle cannot render line-level changes.",
+    "binaryTitle": "Binary file",
+    "cleanBody": "Git does not report current workspace changes.",
+    "cleanTitle": "Clean workspace",
+    "failedTitle": "Workspace diff failed",
+    "fileFailedTitle": "File diff failed",
+    "fileUnavailableTitle": "File diff unavailable",
+    "from": "from",
+    "loadingBody": "Reading current Git changes from the active workspace.",
+    "loadingFileBody": "Reading the selected file patch.",
+    "loadingFileTitle": "Loading file diff",
+    "loadingTitle": "Loading workspace diff",
+    "noGitBody": "Current workspace changes require a Git-backed workspace.",
+    "noGitTitle": "Not a git workspace",
+    "noPatchBody": "Git reports this file as changed, but no patch text is available for it.",
+    "noPatchTitle": "No patch available",
+    "subtitle": "Current workspace changes",
+    "title": "Diff preview"
+  },
   "inspector": {
     "collapsePanel": "Collapse context inspector",
     "contextAriaLabel": "Context inspector",
