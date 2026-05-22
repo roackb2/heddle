@@ -16,7 +16,6 @@ import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
 import { join } from 'node:path';
 import {
-  FileProjectApprovalRuleRepository,
   ToolApprovalPolicies,
   ToolApprovalService,
   type ToolApprovalUserDecision,
@@ -367,7 +366,7 @@ export class ControlPlaneChatSessionsController {
   private createApprovalService(args: Pick<ControlPlaneSessionReadArgs, 'stateRoot' | 'workspaceRoot'>): ToolApprovalService {
     return new ToolApprovalService({
       workspaceRoot: args.workspaceRoot,
-      projectApprovalRuleRepository: new FileProjectApprovalRuleRepository(join(args.stateRoot, 'command-approvals.json')),
+      projectApprovalRulesFile: join(args.stateRoot, 'command-approvals.json'),
     });
   }
 

@@ -1,12 +1,12 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  FileProjectApprovalRuleRepository,
   ToolApprovalPolicies,
   ToolApprovalService,
 } from '@/core/approvals/index.js';
+import { ProjectApprovalRuleCodec } from '@/core/approvals/remembered-rules/index.js';
 import type { ToolApprovalPolicyContext } from '@/core/approvals/types.js';
 
 function context(overrides: Partial<ToolApprovalPolicyContext> = {}): ToolApprovalPolicyContext {
@@ -220,8 +220,8 @@ describe('approval policy chain', () => {
 
   it('resolves approve-and-remember decisions through the existing project approval repository', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-approval-service-'));
-    const repository = new FileProjectApprovalRuleRepository(join(root, 'command-approvals.json'));
-    const service = new ToolApprovalService({ projectApprovalRuleRepository: repository });
+    const rulesFile = join(root, 'command-approvals.json');
+    const service = new ToolApprovalService({ projectApprovalRulesFile: rulesFile });
     const approvalContext = context();
 
     expect(service.resolveUserDecision({
@@ -233,6 +233,6 @@ describe('approval policy chain', () => {
     });
 
     expect(service.isApprovedByRememberedProjectRule(approvalContext)).toBe(true);
-    expect(repository.list()).toHaveLength(1);
+    expect(ProjectApprovalRuleCodec.parseList(JSON.parse(readFileSync(rulesFile, 'utf8')) as unknown)).toHaveLength(1);
   });
 });

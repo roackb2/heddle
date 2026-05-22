@@ -19,7 +19,7 @@ import type { ToolApprovalPolicyContext } from './types.js';
 
 export type ToolApprovalServiceOptions = {
   workspaceRoot?: string;
-  projectApprovalRuleRepository?: FileProjectApprovalRuleRepository;
+  projectApprovalRulesFile?: string;
   now?: () => Date;
 };
 
@@ -148,7 +148,7 @@ export class ToolApprovalService {
   }
 
   rememberProjectApproval(context: ToolApprovalPolicyContext): ProjectApprovalRule | undefined {
-    const repository = this.options.projectApprovalRuleRepository;
+    const repository = this.createProjectApprovalRuleRepository();
     const rule = ProjectApprovalRules.createForCall(context.call);
     if (!repository || !rule) {
       return undefined;
@@ -169,11 +169,17 @@ export class ToolApprovalService {
   }
 
   isApprovedByRememberedProjectRule(context: ToolApprovalPolicyContext): boolean {
-    const rules = this.options.projectApprovalRuleRepository?.list() ?? [];
+    const rules = this.createProjectApprovalRuleRepository()?.list() ?? [];
     return Boolean(ProjectApprovalRules.findMatching({
       rules,
       tool: context.call.tool,
       input: context.call.input,
     }));
+  }
+
+  private createProjectApprovalRuleRepository(): FileProjectApprovalRuleRepository | undefined {
+    return this.options.projectApprovalRulesFile
+      ? new FileProjectApprovalRuleRepository(this.options.projectApprovalRulesFile)
+      : undefined;
   }
 }

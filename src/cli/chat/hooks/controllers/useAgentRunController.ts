@@ -14,7 +14,7 @@ import type { PlanItem } from '../../../../core/tools/toolkits/internal/update-p
 import {
   RuntimeCredentialService,
 } from '@/core/runtime/credentials/index.js';
-import { FileProjectApprovalRuleRepository, ToolApprovalService } from '@/core/approvals/index.js';
+import { ToolApprovalService } from '@/core/approvals/index.js';
 import { ChatSessionRecords, ChatSessionTitles } from '../../../../core/chat/engine/sessions/records/index.js';
 import type { ConversationSessionService } from '../../../../core/chat/engine/types.js';
 import { normalizeSessionTitle } from '../../utils/format.js';
@@ -116,7 +116,7 @@ export function useAgentRunController(args: UseAgentRunArgs) {
   const approvalService = useMemo(
     () => new ToolApprovalService({
       workspaceRoot: runtime.workspaceRoot,
-      projectApprovalRuleRepository: new FileProjectApprovalRuleRepository(runtime.approvalsFile),
+      projectApprovalRulesFile: runtime.approvalsFile,
     }),
     [runtime.approvalsFile, runtime.workspaceRoot],
   );

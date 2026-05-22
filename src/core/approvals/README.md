@@ -42,7 +42,81 @@ Approval behavior currently exists in these places:
 - `pending-approval.ts`: `PendingToolApprovalRequests` host-neutral pending
   approval promise primitive used by `ToolApprovalService`.
 - `remembered-rules/`: project approval rule service, repository, codec,
-  schemas, and types.
+  schemas, and types. The repository is an internal storage boundary for
+  `ToolApprovalService`; host/controller code must not import it directly.
+
+## Runtime Flow
+
+Tool approval starts in the agent tool dispatcher, not in a host UI:
+
+```text
+AgentToolDispatcher
+  -> ToolApprovalService.resolve(...)
+  -> ToolApprovalPolicies.default() and host-supplied policies
+  -> requestHumanApproval(...) only when policy resolution requires a person
+  -> host/controller displays ToolApprovalRequest and resolves the pending promise
+  -> ToolApprovalService.resolveUserDecision(...)
+  -> tool execution continues or receives an approval-denied tool result
+```
+
+`ToolApprovalService` owns the host-neutral request shape. A request includes
+the tool name, call id, raw input, requested timestamp, compact summary, policy
+reason, optional edit preview, and optional remembered project approval metadata.
+Hosts should render that request as-is and return a `ToolApprovalUserDecision`.
+Hosts should not rebuild summaries, create remembered rules, read/write the
+approval rules file, or call `previewEditFileInput` for approval UI.
+
+## Pending Approval Storage
+
+Pending approvals are live runtime coordination state. They are not persisted to
+disk.
+
+- TUI stores the current pending request in React/Ink state so the keyboard
+  approval flow can render it and resolve the promise.
+- The control-plane server stores pending requests in an in-memory `Map` keyed
+  by session id inside `ControlPlaneChatSessionsController`. The map entry
+  contains the `ToolApprovalRequest` and the resolver for the paused tool call.
+- Browser clients fetch the current pending request through the control-plane
+  API. If the daemon/server process restarts, pending approval state is gone and
+  the run should be treated as interrupted rather than replayed from disk.
+
+Remembered project approvals are different: they are durable rules stored in the
+configured approvals file, currently `command-approvals.json` under the active
+state root. Only `ToolApprovalService` should construct the
+`FileProjectApprovalRuleRepository` and decide whether a call is already allowed
+by remembered project rules.
+
+## Browser Propagation
+
+The web control plane receives approval state through two paths:
+
+```text
+agent event stream emits tool.approval_requested
+  -> web invalidates/refetches pending approval state
+  -> control-plane API returns ToolApprovalRequest from the in-memory session map
+  -> user approves or denies
+  -> web calls sessionResolveApproval
+  -> controller resolves the pending promise
+  -> agent emits tool.approval_resolved
+```
+
+The live event is a notification that approval state changed. The API query is
+the source of truth for the request payload. This avoids duplicating request
+projection in every frontend and keeps stale clients from inventing approval
+state from event fragments.
+
+## Layering Rules
+
+- Interface adapters may instantiate `ToolApprovalService` with a workspace root
+  and approvals file path.
+- Interface adapters may store host-local pending state and resolve a pending
+  approval promise.
+- Interface adapters must not import approval repositories, remembered-rule
+  services, edit-preview helpers, or pending-approval primitives directly.
+- `ToolApprovalService` is the boundary that calls approval repositories and
+  lower-level approval helpers.
+- `ProjectApprovalRules` owns remembered-rule semantics. It should stay below
+  `ToolApprovalService`, not leak into TUI, web, or server controllers.
 
 ## Extension Points
 
@@ -50,8 +124,9 @@ Approval behavior currently exists in these places:
   `AgentLoopRuntimeService.run`, `HeartbeatWakeService.run`, or `createConversationEngine(...).turns`.
 - Add host UI by instantiating `ToolApprovalService` in the host controller and
   passing its request payload to the host presentation layer.
-- Add remembered approval storage through `FileProjectApprovalRuleRepository` or
-  a focused repository with the same service/codec boundary.
+- Add remembered approval storage by extending `ToolApprovalService` and the
+  remembered-rules repository/codec boundary together. Do not make hosts call
+  repositories directly.
 
 ## Common Changes
 

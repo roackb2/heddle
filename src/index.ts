@@ -249,19 +249,16 @@ export type { RunShellOptions } from './core/tools/toolkits/shell-process/run-sh
 
 // Approvals
 export {
-  PendingToolApprovalRequests,
   ToolApprovalPolicies,
   ToolApprovalService,
 } from './core/approvals/index.js';
 export type { ToolApprovalServiceOptions } from './core/approvals/index.js';
 export {
-  FileProjectApprovalRuleRepository,
   ProjectApprovalRuleCodec,
   ProjectApprovalRules,
 } from './core/approvals/remembered-rules/index.js';
 export type {
   EvaluateToolApprovalPoliciesArgs,
-  RequestPendingToolApprovalArgs,
   RequestToolApprovalThroughServiceArgs,
   ResolveToolApprovalArgs,
   ToolApprovalDecision,
