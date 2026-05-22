@@ -1,5 +1,9 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  FileProjectApprovalRuleRepository,
   ToolApprovalPolicies,
   ToolApprovalService,
 } from '@/core/approvals/index.js';
@@ -176,5 +180,59 @@ describe('approval policy chain', () => {
       reason: 'human approved: run_shell_mutate requires approval',
     });
     expect(human).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates a host-neutral approval request with summary, reason, preview, and remembered rule metadata', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-approval-service-'));
+    writeFileSync(join(workspaceRoot, 'README.md'), 'old text\n');
+    const service = new ToolApprovalService({
+      workspaceRoot,
+      now: () => new Date('2026-05-22T10:00:00.000Z'),
+    });
+    const request = await service.createRequest(context({
+      call: {
+        id: 'call-edit',
+        tool: 'edit_file',
+        input: { path: 'README.md', oldText: 'old text', newText: 'new text' },
+      },
+      tool: {
+        name: 'edit_file',
+        description: 'edits files',
+        requiresApproval: true,
+        parameters: {},
+        execute: async () => ({ ok: true }),
+      },
+      workspaceRoot,
+      reason: 'edit_file requires approval',
+    }));
+
+    expect(request).toEqual(expect.objectContaining({
+      tool: 'edit_file',
+      callId: 'call-edit',
+      input: { path: 'README.md', oldText: 'old text', newText: 'new text' },
+      requestedAt: '2026-05-22T10:00:00.000Z',
+      summary: 'edit_file (README.md)',
+      reason: 'edit_file requires approval',
+    }));
+    expect(request.editPreview?.path).toBe('README.md');
+    expect(request.rememberProjectApproval?.label).toBe('allow edit_file for this project');
+  });
+
+  it('resolves approve-and-remember decisions through the existing project approval repository', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-approval-service-'));
+    const repository = new FileProjectApprovalRuleRepository(join(root, 'command-approvals.json'));
+    const service = new ToolApprovalService({ projectApprovalRuleRepository: repository });
+    const approvalContext = context();
+
+    expect(service.resolveUserDecision({
+      context: approvalContext,
+      decision: { type: 'approve_and_remember_project', reason: 'remember it' },
+    })).toEqual({
+      approved: true,
+      reason: 'remember it',
+    });
+
+    expect(service.isApprovedByRememberedProjectRule(approvalContext)).toBe(true);
+    expect(repository.list()).toHaveLength(1);
   });
 });

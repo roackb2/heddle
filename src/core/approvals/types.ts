@@ -1,6 +1,13 @@
 import type { ToolCall, ToolDefinition } from '@/core/types.js';
+import type { EditFilePreview } from '@/core/tools/toolkits/coding-files/edit-file.js';
+import type { ProjectApprovalRule } from './remembered-rules/index.js';
 
 export type ToolApprovalDecision = { approved: boolean; reason?: string };
+
+export type ToolApprovalUserDecision =
+  | { type: 'approve'; reason?: string }
+  | { type: 'deny'; reason?: string }
+  | { type: 'approve_and_remember_project'; reason?: string };
 
 export type ToolApprovalPolicyDecision =
   | { type: 'allow'; reason?: string }
@@ -30,17 +37,26 @@ export type ResolveToolApprovalArgs = EvaluateToolApprovalPoliciesArgs & {
   requestHumanApproval?: (context: ToolApprovalPolicyContext, reason?: string) => Promise<ToolApprovalDecision>;
 };
 
-export type PendingToolApprovalView = {
+export type ToolApprovalRequest = {
   tool: string;
   callId: string;
   input: unknown;
   requestedAt: string;
+  summary: string;
+  reason?: string;
+  editPreview?: EditFilePreview;
+  rememberProjectApproval?: {
+    label: string;
+    rule: ProjectApprovalRule;
+  };
 };
 
 export type RequestPendingToolApprovalArgs = {
-  call: ToolCall;
-  tool: ToolDefinition;
-  createView?: (call: ToolCall, tool: ToolDefinition) => PendingToolApprovalView;
-  publish?: (view: PendingToolApprovalView, call: ToolCall, tool: ToolDefinition) => void;
-  storePending?: (pending: { view: PendingToolApprovalView; resolve: (decision: ToolApprovalDecision) => void }) => void;
+  request: ToolApprovalRequest;
+  storePending?: (pending: { request: ToolApprovalRequest; resolve: (decision: ToolApprovalUserDecision) => void }) => void;
+};
+
+export type RequestToolApprovalThroughServiceArgs = ToolApprovalPolicyContext & {
+  reason?: string;
+  storePending?: RequestPendingToolApprovalArgs['storePending'];
 };

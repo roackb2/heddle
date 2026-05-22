@@ -191,7 +191,7 @@ describe('summarizePendingApproval', () => {
     const pendingApproval: PendingApproval = {
       call: { id: 'call-1', tool: 'read_file', input: { path: '../notes/summary.md' } },
       tool: { name: 'read_file', description: 'Read file', parameters: { type: 'object', properties: {} } },
-      rememberForProject: () => undefined,
+      canRememberForProject: true,
       rememberLabel: 'allow read_file ../notes/summary.md for this project',
       resolve: () => undefined,
     };
@@ -206,7 +206,7 @@ describe('summarizePendingApproval', () => {
     const pendingApproval: PendingApproval = {
       call: { id: 'call-1', tool: 'run_shell_mutate', input: { command: 'git status --short --branch && git show --stat --oneline --no-patch HEAD' } },
       tool: { name: 'run_shell_mutate', description: 'Mutate shell', parameters: { type: 'object', properties: {} } },
-      rememberForProject: () => undefined,
+      canRememberForProject: true,
       rememberLabel: 'allow exact command',
       resolve: () => undefined,
     };
@@ -222,7 +222,7 @@ describe('summarizePendingApproval', () => {
     const pendingApproval: PendingApproval = {
       call: { id: 'call-1', tool: 'run_shell_mutate', input: { command } },
       tool: { name: 'run_shell_mutate', description: 'Mutate shell', parameters: { type: 'object', properties: {} } },
-      rememberForProject: () => undefined,
+      canRememberForProject: true,
       rememberLabel: `allow exact command ${command} for this project`,
       resolve: () => undefined,
     };

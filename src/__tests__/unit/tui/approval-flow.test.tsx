@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { render } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { ApprovalComposer } from '../../../cli/chat/components/ApprovalComposer.js';
 import {
   cycleApprovalChoice,
@@ -29,7 +29,7 @@ describe('approval flow helpers', () => {
 
   it('includes allow_project in available choices when remember is supported', () => {
     const pendingApproval = createPendingApproval({
-      rememberForProject: () => undefined,
+      canRememberForProject: true,
       rememberLabel: 'allow exact command',
     });
 
@@ -45,21 +45,19 @@ describe('approval flow helpers', () => {
   });
 
   it('remembers and returns the remembered reason only for supported approvals', () => {
-    const remember = vi.fn();
     const supported = createPendingApproval({
-      rememberForProject: remember,
+      canRememberForProject: true,
       rememberLabel: 'allow exact command',
     });
     const unsupported = createPendingApproval();
 
     expect(resolveApprovalDecision('allow_project', supported)).toEqual({
-      approved: true,
+      type: 'approve_and_remember_project',
       reason: 'Approved and remembered for this project in chat UI',
     });
-    expect(remember).toHaveBeenCalledTimes(1);
 
     expect(resolveApprovalDecision('allow_project', unsupported)).toEqual({
-      approved: true,
+      type: 'approve',
       reason: 'Approved in chat UI',
     });
   });
@@ -82,7 +80,7 @@ describe('ApprovalComposer', () => {
     const pendingApproval = createPendingApproval({
       call: { id: 'call-2', tool: 'run_shell_mutate', input: { command: fullCommand } },
       tool: { name: 'run_shell_mutate', description: 'Mutate shell', parameters: { type: 'object', properties: {} } },
-      rememberForProject: () => undefined,
+      canRememberForProject: true,
       rememberLabel: 'allow exact command',
     });
     const view = render(<ApprovalComposer pendingApproval={pendingApproval} approvalChoice="allow_project" />);
@@ -97,7 +95,7 @@ describe('ApprovalComposer', () => {
     const pendingApproval = createPendingApproval({
       call: { id: 'call-2', tool: 'run_shell_mutate', input: { command: fullCommand } },
       tool: { name: 'run_shell_mutate', description: 'Mutate shell', parameters: { type: 'object', properties: {} } },
-      rememberForProject: () => undefined,
+      canRememberForProject: true,
       rememberLabel: `allow exact command ${fullCommand} for this project`,
     });
     const view = render(<ApprovalComposer pendingApproval={pendingApproval} approvalChoice="allow_project" />);
@@ -111,7 +109,7 @@ describe('ApprovalComposer', () => {
     const pendingApproval = createPendingApproval({
       call: { id: 'call-2', tool: 'read_file', input: { path: '../notes/summary.md' } },
       tool: { name: 'read_file', description: 'Read file', parameters: { type: 'object', properties: {} } },
-      rememberForProject: () => undefined,
+      canRememberForProject: true,
       rememberLabel: 'allow read_file ../notes/summary.md for this project',
     });
     const view = render(<ApprovalComposer pendingApproval={pendingApproval} approvalChoice="allow_project" />);

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { MutableRefObject } from 'react';
 import type { Logger } from 'pino';
-import type { ChatMessage, LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../../index.js';
+import type { ChatMessage, LlmAdapter, RunResult, ToolDefinition } from '../../../../index.js';
 import type { ReasoningEffort } from '../../../../core/llm/types.js';
 import {
   createLogger,
@@ -14,12 +14,12 @@ import type { PlanItem } from '../../../../core/tools/toolkits/internal/update-p
 import {
   RuntimeCredentialService,
 } from '@/core/runtime/credentials/index.js';
+import { FileProjectApprovalRuleRepository, ToolApprovalService } from '@/core/approvals/index.js';
 import { ChatSessionRecords, ChatSessionTitles } from '../../../../core/chat/engine/sessions/records/index.js';
 import type { ConversationSessionService } from '../../../../core/chat/engine/types.js';
 import { normalizeSessionTitle } from '../../utils/format.js';
 import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval } from '../../state/types.js';
 import type { ChatRuntimeConfig } from '../../utils/runtime.js';
-import { useProjectApprovals } from '../useProjectApprovals.js';
 import {
   beginTuiAgentTurn,
   finishTuiAgentTurn,
@@ -72,8 +72,7 @@ type ExecuteTurnArgs = {
   updateSessionById: SessionUpdater;
   referenceAssistantText?: string;
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
-  isProjectApproved: (call: ToolCall) => boolean;
-  rememberProjectApproval: (call: ToolCall) => void;
+  approvalService: ToolApprovalService;
   drift?: ChatDriftObserverOptions;
 };
 
@@ -88,8 +87,7 @@ type ExecuteDirectShellArgs = {
   sessionService: ConversationSessionService;
   refreshSessions: () => void;
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
-  isProjectApproved: (call: ToolCall) => boolean;
-  rememberProjectApproval: (call: ToolCall) => void;
+  approvalService: ToolApprovalService;
 };
 
 type UseAgentRunArgs = {
@@ -115,7 +113,13 @@ export type ChatDriftObserverOptions = {
 
 export function useAgentRunController(args: UseAgentRunArgs) {
   const { runtime, activeModel, activeReasoningEffort, sessionTitleModel, activeSessionId, sessions, state, sessionService, refreshSessions, updateSessionById } = args;
-  const projectApprovals = useProjectApprovals(runtime.approvalsFile);
+  const approvalService = useMemo(
+    () => new ToolApprovalService({
+      workspaceRoot: runtime.workspaceRoot,
+      projectApprovalRuleRepository: new FileProjectApprovalRuleRepository(runtime.approvalsFile),
+    }),
+    [runtime.approvalsFile, runtime.workspaceRoot],
+  );
   const activeApiKey = RuntimeCredentialService.resolveApiKeyForModel(activeModel, runtime);
   const titleApiKey = RuntimeCredentialService.resolveApiKeyForModel(sessionTitleModel, runtime);
   const titleCredentialSource = useMemo(
@@ -232,8 +236,7 @@ export function useAgentRunController(args: UseAgentRunArgs) {
       refreshSessions,
       updateSessionById,
       maybeAutoNameSession,
-      isProjectApproved: projectApprovals.isApproved,
-      rememberProjectApproval: projectApprovals.rememberApproval,
+      approvalService,
       drift: args.drift,
     });
   };
@@ -250,8 +253,7 @@ export function useAgentRunController(args: UseAgentRunArgs) {
       sessionService,
       refreshSessions,
       maybeAutoNameSession,
-      isProjectApproved: projectApprovals.isApproved,
-      rememberProjectApproval: projectApprovals.rememberApproval,
+      approvalService,
     });
   };
 
@@ -276,8 +278,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
     updateSessionById,
     referenceAssistantText,
     maybeAutoNameSession,
-    isProjectApproved,
-    rememberProjectApproval,
+    approvalService,
     drift,
   } = args;
 
@@ -322,8 +323,7 @@ export async function executeAgentTurn(args: ExecuteTurnArgs): Promise<RunResult
       updateSessionById,
       parsePlanState: parsePlanStateFromToolResult,
       maybeAutoNameSession,
-      isProjectApproved,
-      rememberProjectApproval,
+      approvalService,
       driftObserver,
       turnAbortSignal: turnAbortController.signal,
       leaseOwner,
@@ -428,8 +428,7 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
     sessionService,
     refreshSessions,
     maybeAutoNameSession,
-    isProjectApproved,
-    rememberProjectApproval,
+    approvalService,
   } = args;
 
   const command = rawCommand.trim();
@@ -449,7 +448,6 @@ async function runDirectShellAction(args: ExecuteDirectShellArgs): Promise<void>
     sessionService,
     refreshSessions,
     maybeAutoNameSession,
-    isProjectApproved,
-    rememberProjectApproval,
+    approvalService,
   });
 }

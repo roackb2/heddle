@@ -15,7 +15,12 @@
 import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
 import { join } from 'node:path';
-import { PendingToolApprovalRequests } from '@/core/approvals/index.js';
+import {
+  FileProjectApprovalRuleRepository,
+  ToolApprovalPolicies,
+  ToolApprovalService,
+  type ToolApprovalUserDecision,
+} from '@/core/approvals/index.js';
 import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type {
@@ -76,7 +81,7 @@ export class ControlPlaneChatSessionsController {
   private readonly sessionEventBus = new EventEmitter();
   private readonly pendingApprovals = new Map<string, {
     approval: ControlPlanePendingApproval;
-    resolve: (decision: { approved: boolean; reason?: string }) => void;
+    resolve: (decision: ToolApprovalUserDecision) => void;
   }>();
   private readonly inFlightRuns = new Map<string, AbortController>();
 
@@ -251,7 +256,9 @@ export class ControlPlaneChatSessionsController {
     }
 
     this.pendingApprovals.delete(sessionId);
-    pending.resolve(decision);
+    pending.resolve(decision.approved
+      ? { type: 'approve', reason: decision.reason }
+      : { type: 'deny', reason: decision.reason });
     return true;
   }
 
@@ -302,7 +309,7 @@ export class ControlPlaneChatSessionsController {
     try {
       const result = await run({
         engine: this.createEngine(args),
-        host: this.createEngineHost(args.sessionId, publisher),
+        host: this.createEngineHost(args, publisher),
         abortSignal: controller.signal,
       });
       return {
@@ -316,26 +323,36 @@ export class ControlPlaneChatSessionsController {
   }
 
   private createEngine(args: ControlPlaneSessionReadArgs): ConversationEngine {
+    const approvalService = this.createApprovalService(args);
     return createConversationEngine({
       ...args,
       model: args.model ?? DEFAULT_OPENAI_MODEL,
+      approvalPolicies: [
+        ...(args.approvalPolicies ?? []),
+        ToolApprovalPolicies.rememberedProjectRule({
+          isApproved: (context) => approvalService.isApprovedByRememberedProjectRule(context),
+        }),
+      ],
     });
   }
 
-  private createEngineHost(sessionId: string, publisher: ControlPlaneTurnPublisher): ConversationEngineHost {
+  private createEngineHost(args: ControlPlaneSessionReadArgs & { sessionId: string }, publisher: ControlPlaneTurnPublisher): ConversationEngineHost {
+    const sessionId = args.sessionId;
+    const approvalService = this.createApprovalService(args);
+
     return {
       events: {
         onActivity: publisher.publishActivity,
       },
       approvals: {
         requestToolApproval: async ({ call, tool }: { call: ToolCall; tool: ToolDefinition }) => {
-          const decision = await PendingToolApprovalRequests.request({
+          const decision = await approvalService.requestHumanApproval({
             call,
             tool,
-            createView: ControlPlaneChatSessionEventsController.createPendingApprovalView,
-            storePending: ({ view, resolve }) => {
+            workspaceRoot: args.workspaceRoot,
+            storePending: ({ request, resolve }) => {
               this.pendingApprovals.set(sessionId, {
-                approval: view,
+                approval: request,
                 resolve,
               });
             },
@@ -345,6 +362,13 @@ export class ControlPlaneChatSessionsController {
         },
       },
     };
+  }
+
+  private createApprovalService(args: Pick<ControlPlaneSessionReadArgs, 'stateRoot' | 'workspaceRoot'>): ToolApprovalService {
+    return new ToolApprovalService({
+      workspaceRoot: args.workspaceRoot,
+      projectApprovalRuleRepository: new FileProjectApprovalRuleRepository(join(args.stateRoot, 'command-approvals.json')),
+    });
   }
 
   private async runFakeBrowserIntegrationSessionPrompt(args: SubmitChatPromptArgs) {

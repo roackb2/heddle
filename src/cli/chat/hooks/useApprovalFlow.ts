@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useInput } from 'ink';
+import type { ToolApprovalUserDecision } from '@/core/approvals/index.js';
 import type { ActionState } from './controllers/useAgentRunController.js';
 import type { ApprovalChoice, LiveEvent, PendingApproval } from '../state/types.js';
 import type { EditFilePreview } from '../../../core/tools/toolkits/coding-files/edit-file.js';
@@ -74,7 +75,7 @@ export function useApprovalFlow(nextLocalId: () => string) {
       }
 
       if (key.escape) {
-        pendingApproval.resolve({ approved: false, reason: 'Denied in chat UI' });
+        pendingApproval.resolve({ type: 'deny', reason: 'Denied in chat UI' });
         setPendingApproval(undefined);
         setApprovalChoice('approve');
       }
@@ -184,24 +185,23 @@ export function cycleApprovalChoice(
 export function resolveApprovalDecision(
   choice: ApprovalChoice,
   pendingApproval: PendingApproval,
-): { approved: boolean; reason?: string } {
+): ToolApprovalUserDecision {
   if (choice === 'allow_project' && canRememberPendingApproval(pendingApproval)) {
-    pendingApproval.rememberForProject?.();
     return {
-      approved: true,
+      type: 'approve_and_remember_project',
       reason: 'Approved and remembered for this project in chat UI',
     };
   }
 
   if (choice === 'deny') {
     return {
-      approved: false,
+      type: 'deny',
       reason: 'Denied in chat UI',
     };
   }
 
   return {
-    approved: true,
+    type: 'approve',
     reason: 'Approved in chat UI',
   };
 }

@@ -1,5 +1,4 @@
 import { ToolApprovalPolicies, ToolApprovalService } from '@/core/approvals/index.js';
-import { ProjectApprovalRules } from '@/core/approvals/remembered-rules/index.js';
 import type { ConversationSessionService } from '@/core/chat/engine/types.js';
 import { ToolActivitySummarizer } from '@/core/live/index.js';
 import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '@/core/tools/toolkits/shell-process/run-shell.js';
@@ -23,8 +22,7 @@ export async function executeTuiDirectShell(args: {
   sessionService: ConversationSessionService;
   refreshSessions: () => void;
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
-  isProjectApproved: (call: ToolCall) => boolean;
-  rememberProjectApproval: (call: ToolCall) => void;
+  approvalService: ToolApprovalService;
 }) {
   const {
     command,
@@ -38,8 +36,7 @@ export async function executeTuiDirectShell(args: {
     sessionService,
     refreshSessions,
     maybeAutoNameSession,
-    isProjectApproved,
-    rememberProjectApproval,
+    approvalService,
   } = args;
 
   const leaseOwner = {
@@ -108,7 +105,7 @@ export async function executeTuiDirectShell(args: {
           policies: [
             () => ({ type: 'request', reason: 'Direct shell mutation requires approval' }),
             ToolApprovalPolicies.rememberedProjectRule({
-              isApproved: ({ call }) => isProjectApproved(call),
+              isApproved: (context) => approvalService.isApprovedByRememberedProjectRule(context),
             }),
           ],
           context: {
@@ -116,16 +113,21 @@ export async function executeTuiDirectShell(args: {
             tool: directShellTool,
             workspaceRoot: runtime.workspaceRoot,
           },
-          requestHumanApproval: async () => await new Promise<{ approved: boolean; reason?: string }>((resolve) => {
-              const rememberedRule = ProjectApprovalRules.createForCall(mutateCall);
+          requestHumanApproval: async (_context, reason) => await approvalService.requestHumanApproval({
+            call: mutateCall,
+            tool: directShellTool,
+            workspaceRoot: runtime.workspaceRoot,
+            reason,
+            storePending: ({ request: approvalRequest, resolve }) => {
               state.setPendingApproval({
                 call: mutateCall,
                 tool: directShellTool,
-                rememberForProject: rememberedRule ? () => rememberProjectApproval(mutateCall) : undefined,
-                rememberLabel: rememberedRule ? ProjectApprovalRules.describe(rememberedRule) : undefined,
+                canRememberForProject: Boolean(approvalRequest.rememberProjectApproval),
+                rememberLabel: approvalRequest.rememberProjectApproval?.label,
                 resolve,
               });
-            }),
+            },
+          }),
         });
 
         if (!approval.approved) {

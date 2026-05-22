@@ -1,6 +1,7 @@
 import type { ChatMessage, LlmUsage, ReasoningEffort } from '../llm/types.js';
 import type { ToolCall, ToolDefinition } from '../types.js';
 import type { EditFilePreview } from '../tools/toolkits/coding-files/edit-file.js';
+import type { ToolApprovalUserDecision } from '../approvals/types.js';
 
 export type TurnSummary = {
   id: string;
@@ -96,9 +97,9 @@ export type PendingApproval = {
   call: ToolCall;
   tool: ToolDefinition;
   editPreview?: EditFilePreview;
-  rememberForProject?: () => void;
+  canRememberForProject?: boolean;
   rememberLabel?: string;
-  resolve: (decision: { approved: boolean; reason?: string }) => void;
+  resolve: (decision: ToolApprovalUserDecision) => void;
 };
 
 export type ApprovalChoice = 'approve' | 'allow_project' | 'deny';

@@ -1,56 +1,44 @@
-import { PendingToolApprovalRequests, ToolApprovalPolicies } from '@/core/approvals/index.js';
+import { ToolApprovalPolicies, ToolApprovalService } from '@/core/approvals/index.js';
 import type { ToolApprovalPolicy, ToolApprovalSurface } from '@/core/approvals/types.js';
-import { ProjectApprovalRules } from '@/core/approvals/remembered-rules/index.js';
-import { previewEditFileInput } from '@/core/tools/toolkits/coding-files/edit-file.js';
 import type { ActionState } from '../useAgentRunController.js';
-
-type TuiApprovalCall = Parameters<ToolApprovalSurface>[0]['call'];
 
 export function createTuiToolApprovalPort(args: {
   state: ActionState;
-  rememberProjectApproval: (call: TuiApprovalCall) => void;
+  approvalService: ToolApprovalService;
 }): { requestToolApproval: ToolApprovalSurface } {
-  const { state, rememberProjectApproval } = args;
+  const { state, approvalService } = args;
 
   return {
     async requestToolApproval(request: Parameters<ToolApprovalSurface>[0]) {
       if (!request) {
         return { approved: false, reason: 'Missing approval request.' };
       }
-      const { call, tool } = request;
-      const decision = await ToolApprovalPolicies.humanSurface(async () => {
-        const editPreview = call.tool === 'edit_file' ? await previewEditFileInput(call.input) : undefined;
 
-        return await PendingToolApprovalRequests.request({
-          call,
-          tool,
-          storePending: ({ resolve }) => {
-            const rememberedRule = ProjectApprovalRules.createForCall(call);
-            state.setPendingApproval({
-              call,
-              tool,
-              editPreview,
-              rememberForProject: rememberedRule ? () => rememberProjectApproval(call) : undefined,
-              rememberLabel: rememberedRule ? ProjectApprovalRules.describe(rememberedRule) : undefined,
-              resolve,
-            });
-          },
-        });
-      })({ call, tool });
-      return {
-        approved: decision?.type === 'allow',
-        reason: decision?.reason,
-      };
+      const { call, tool } = request;
+      return await approvalService.requestHumanApproval({
+        call,
+        tool,
+        storePending: ({ request: approvalRequest, resolve }) => {
+          state.setPendingApproval({
+            call,
+            tool,
+            editPreview: approvalRequest.editPreview,
+            canRememberForProject: Boolean(approvalRequest.rememberProjectApproval),
+            rememberLabel: approvalRequest.rememberProjectApproval?.label,
+            resolve,
+          });
+        },
+      });
     },
   };
 }
 
 export function createTuiRememberedApprovalPolicies(args: {
-  isProjectApproved: (call: TuiApprovalCall) => boolean;
+  approvalService: ToolApprovalService;
 }): ToolApprovalPolicy[] {
   return [
     ToolApprovalPolicies.rememberedProjectRule({
-      isApproved: ({ call }) => args.isProjectApproved(call),
+      isApproved: (context) => args.approvalService.isApprovedByRememberedProjectRule(context),
     }),
   ];
 }

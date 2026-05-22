@@ -34,12 +34,13 @@ Approval behavior currently exists in these places:
 ## Public Entry Points
 
 - `types.ts`: approval request, decision, policy, and surface types.
-- `service.ts`: `ToolApprovalService` ordered policy evaluation and request-to-human
-  approval resolution.
+- `service.ts`: `ToolApprovalService` ordered policy evaluation,
+  request-to-human approval resolution, approval request view construction,
+  edit previews, and remembered project approval rule application.
 - `policies.ts`: `ToolApprovalPolicies` built-in tool, workspace-boundary,
   remembered-rule, and human-surface policy constructors.
 - `pending-approval.ts`: `PendingToolApprovalRequests` host-neutral pending
-  approval promise/view primitive.
+  approval promise primitive used by `ToolApprovalService`.
 - `remembered-rules/`: project approval rule service, repository, codec,
   schemas, and types.
 
@@ -47,7 +48,8 @@ Approval behavior currently exists in these places:
 
 - Add a runtime approval rule by passing `approvalPolicies` into `AgentRunService.run`,
   `AgentLoopRuntimeService.run`, `HeartbeatWakeService.run`, or `createConversationEngine(...).turns`.
-- Add host UI by implementing an approval surface in the host adapter layer.
+- Add host UI by instantiating `ToolApprovalService` in the host controller and
+  passing its request payload to the host presentation layer.
 - Add remembered approval storage through `FileProjectApprovalRuleRepository` or
   a focused repository with the same service/codec boundary.
 
