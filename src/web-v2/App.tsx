@@ -1,17 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { trpcReact } from '@web/api/client';
+import { useControlPlaneErrorToasts } from '@web/hooks/useControlPlaneErrorToasts';
 import { useControlPlaneSessionDetail } from '@web/hooks/useControlPlaneSessionDetail';
 import { useWorkbenchNavigation } from '@web/hooks/useWorkbenchNavigation';
 import { AppFrame } from '@web/layout/AppFrame';
 import { AppRoutes } from '@web/layout/AppRoutes';
-import { toast } from '@web/components/ui/use-toast';
 import { APP_ROUTES, SETTINGS_ROUTES } from '@web/layout/routes';
 
 export function App() {
   const navigation = useWorkbenchNavigation();
   const stateQuery = trpcReact.controlPlane.state.useQuery();
-  const lastStateQueryError = useRef<string | undefined>(undefined);
-  const lastSessionError = useRef<string | undefined>(undefined);
   const sidebarSessions = useMemo(
     () => stateQuery.data?.sessions ?? [],
     [stateQuery.data?.sessions],
@@ -22,6 +20,10 @@ export function App() {
   );
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>();
   const selectedSession = useControlPlaneSessionDetail(selectedSessionId);
+  useControlPlaneErrorToasts({
+    stateError: stateQuery.error,
+    sessionError: selectedSession.error,
+  });
 
   useEffect(() => {
     if (selectedSessionId || sidebarSessions.length === 0) {
@@ -30,40 +32,6 @@ export function App() {
 
     setSelectedSessionId(sidebarSessions[0]?.id);
   }, [selectedSessionId, sidebarSessions]);
-
-  useEffect(() => {
-    const message = stateQuery.error instanceof Error ? stateQuery.error.message : undefined;
-    if (!message) {
-      lastStateQueryError.current = undefined;
-      return;
-    }
-
-    if (lastStateQueryError.current !== message) {
-      toast({
-        title: 'Failed to load control plane state',
-        body: message,
-        tone: 'error',
-      });
-      lastStateQueryError.current = message;
-    }
-  }, [stateQuery.error]);
-
-  useEffect(() => {
-    const message = selectedSession.error;
-    if (!message) {
-      lastSessionError.current = undefined;
-      return;
-    }
-
-    if (lastSessionError.current !== message) {
-      toast({
-        title: 'Failed to load session detail',
-        body: message,
-        tone: 'error',
-      });
-      lastSessionError.current = message;
-    }
-  }, [selectedSession.error]);
 
   return (
     <AppFrame

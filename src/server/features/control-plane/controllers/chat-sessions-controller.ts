@@ -169,17 +169,28 @@ export class ControlPlaneChatSessionsController {
     signal?: AbortSignal;
   }): AsyncGenerator<ControlPlaneSessionEventEnvelope> {
     const queue = new ControlPlaneSessionEventQueue();
+
+    // Live LLM/tool/compaction updates arrive through the in-memory event bus.
+    // This is the path that streams assistant text to the client during a run;
+    // it does not touch the session file for each model delta.
     const unsubscribe = this.subscribeToEvents(args.sessionId, (event) => {
       queue.push({
         ...event,
         type: 'session.event',
       });
     });
+
+    // Closing the browser subscription closes the queue, which lets the async
+    // iterator below exit and release the EventEmitter listener/file watcher.
     const abort = () => queue.close();
     args.signal?.addEventListener('abort', abort, { once: true });
 
     let watcher: ReturnType<typeof watch> | undefined;
     try {
+      // File changes represent durable session persistence, usually after a
+      // turn finishes or settings/session metadata are saved. They are not the
+      // source of token streaming; they only tell the client to refetch the
+      // persisted session snapshot.
       watcher = watch(this.resolveFilePath(args.stateRoot, args.sessionId), { persistent: false }, () => {
         queue.push({
           type: 'session.updated',
@@ -188,6 +199,8 @@ export class ControlPlaneChatSessionsController {
         });
       });
     } catch {
+      // A newly selected or newly created session may not have a watchable file
+      // yet. Keep the subscription alive so later live events can still flow.
       queue.push({
         type: 'waiting',
         sessionId: args.sessionId,
@@ -196,6 +209,8 @@ export class ControlPlaneChatSessionsController {
     }
 
     try {
+      // tRPC consumes this AsyncGenerator and forwards each envelope to the
+      // browser as a subscription payload.
       for await (const event of queue) {
         yield event;
       }

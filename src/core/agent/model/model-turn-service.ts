@@ -58,6 +58,9 @@ export class AgentModelTurnService {
       if (nowMs - streamState.lastRecordAt >= STREAM_UPDATE_INTERVAL_MS) {
         streamState.lastRecordAt = nowMs;
       }
+      // Stream the accumulated assistant text through the live event path. This
+      // is intentionally in-memory; durable session files are updated later by
+      // turn persistence, not once per LLM delta.
       context.onAssistantStream?.({ step: context.state.step, text: streamState.content, done: false });
       return;
     }
