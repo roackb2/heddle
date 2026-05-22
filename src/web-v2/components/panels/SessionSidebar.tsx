@@ -35,7 +35,7 @@ export function SessionSidebar({
   onSelectSession,
 }: SessionSidebarProps) {
   return (
-    <div className="flex h-full min-w-0 flex-col text-sm">
+    <div className="flex h-full min-w-0 flex-col">
       {settingsOpen ? (
         <SettingsNavigation
           activeItemId={activeSettingsSectionId}

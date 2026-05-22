@@ -14,7 +14,7 @@ export function LanguageSelect() {
 
   return (
     <div className="grid gap-2">
-      <label className="text-xs font-medium text-muted-foreground" htmlFor="web-v2-language-select">
+      <label className="v2-type-section-label text-muted-foreground" htmlFor="web-v2-language-select">
         {t('language.label')}
       </label>
       <Select value={locale} onValueChange={(value) => setLocale(value as Locale)}>

@@ -27,8 +27,8 @@ export function ApprovalPanel({ approval, resolving, error, onResolve }: Approva
         <div className="v2-approval-header">
           <ShieldAlert aria-hidden="true" className="size-4" />
           <div className="min-w-0">
-            <h2 className="text-balance text-sm font-semibold text-foreground">{t('approval.title')}</h2>
-            <p className="truncate text-xs text-muted-foreground">{approval.summary}</p>
+            <h2 className="v2-type-panel-title text-balance text-foreground">{t('approval.title')}</h2>
+            <p className="v2-type-panel-subtitle truncate text-muted-foreground">{approval.summary}</p>
           </div>
         </div>
 
