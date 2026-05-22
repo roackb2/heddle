@@ -1,0 +1,84 @@
+@layer components {
+  .v2-shell {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-optical-sizing: auto;
+    font-synthesis-weight: none;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .v2-panel-surface {
+    background: var(--color-card);
+  }
+
+  .v2-panel-divider {
+    border-color: color-mix(in oklab, var(--color-border) 72%, transparent);
+  }
+
+  .v2-panel-header {
+    display: flex;
+    height: 3rem;
+    align-items: center;
+    border-bottom-width: 1px;
+    border-color: color-mix(in oklab, var(--color-border) 72%, transparent);
+    background: var(--color-card);
+    padding-inline: 1rem;
+  }
+
+  .v2-shell .v2-panel-header {
+    padding-left: 3rem;
+  }
+
+  .v2-control {
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in oklab, var(--color-border) 72%, transparent);
+    background: color-mix(in oklab, var(--color-card) 84%, var(--color-background));
+    box-shadow: none;
+  }
+
+  .v2-control:hover {
+    border-color: color-mix(in oklab, var(--color-border) 90%, transparent);
+  }
+
+  .v2-control:focus-visible {
+    border-color: var(--color-ring);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-ring) 55%, transparent);
+    outline: none;
+  }
+
+  .v2-icon-button {
+    height: 1.75rem;
+    width: 1.75rem;
+    border-radius: var(--radius-md);
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-icon-button:hover {
+    background: color-mix(in oklab, var(--color-accent) 70%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .v2-popover-surface {
+    border-radius: var(--radius-xl);
+    border: 1px solid color-mix(in oklab, var(--color-border) 76%, transparent);
+    background: var(--color-popover);
+    box-shadow: 0 12px 28px hsl(235 18% 3% / 0.32);
+  }
+
+  .v2-scrollbar-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .v2-scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+
+  .v2-resize-handle {
+    background: color-mix(in oklab, var(--color-border) 74%, transparent);
+  }
+
+  .v2-resize-handle:hover {
+    background: color-mix(in oklab, var(--color-border) 90%, transparent);
+  }
+}

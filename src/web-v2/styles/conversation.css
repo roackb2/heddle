@@ -1,0 +1,150 @@
+@layer components {
+  .v2-message-row {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .v2-message-row-user {
+    justify-content: flex-end;
+  }
+
+  .v2-message-row-assistant {
+    justify-content: flex-start;
+  }
+
+  .v2-user-message-card {
+    max-width: min(42rem, 78%);
+    white-space: pre-wrap;
+    border-radius: var(--radius-xl);
+    background: color-mix(in oklab, var(--color-accent) 82%, var(--color-background));
+    padding: 0.75rem 0.875rem;
+    color: var(--color-foreground);
+  }
+
+  .v2-assistant-article-shell {
+    width: 100%;
+    min-width: 0;
+    color: color-mix(in oklab, var(--color-foreground) 94%, transparent);
+  }
+
+  .v2-assistant-markdown {
+    max-width: 100%;
+  }
+
+  .v2-assistant-markdown > :last-child {
+    margin-bottom: 0;
+  }
+
+  .v2-assistant-markdown p,
+  .v2-assistant-markdown ul,
+  .v2-assistant-markdown ol,
+  .v2-assistant-markdown pre,
+  .v2-assistant-markdown blockquote,
+  .v2-assistant-markdown table {
+    margin-bottom: 0.9rem;
+  }
+
+  .v2-assistant-markdown h1,
+  .v2-assistant-markdown h2,
+  .v2-assistant-markdown h3,
+  .v2-assistant-markdown h4 {
+    margin-top: 1.45rem;
+    margin-bottom: 0.55rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--color-foreground);
+  }
+
+  .v2-assistant-markdown h1:first-child,
+  .v2-assistant-markdown h2:first-child,
+  .v2-assistant-markdown h3:first-child,
+  .v2-assistant-markdown h4:first-child {
+    margin-top: 0;
+  }
+
+  .v2-assistant-markdown h1 {
+    font-size: 1.35rem;
+  }
+
+  .v2-assistant-markdown h2 {
+    font-size: 1.15rem;
+  }
+
+  .v2-assistant-markdown h3 {
+    font-size: 1rem;
+  }
+
+  .v2-assistant-markdown ul,
+  .v2-assistant-markdown ol {
+    padding-left: 1.25rem;
+  }
+
+  .v2-assistant-markdown li + li {
+    margin-top: 0.25rem;
+  }
+
+  .v2-assistant-markdown a {
+    color: color-mix(in oklab, var(--color-foreground) 88%, hsl(210 100% 70%));
+    text-decoration-line: underline;
+    text-underline-offset: 0.18em;
+  }
+
+  .v2-assistant-markdown code {
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklab, var(--color-muted) 88%, var(--color-background));
+    padding: 0.1rem 0.28rem;
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+  }
+
+  .v2-assistant-markdown pre {
+    overflow: auto;
+    border-radius: var(--radius-lg);
+    border: 1px solid color-mix(in oklab, var(--color-border) 62%, transparent);
+    background: color-mix(in oklab, var(--color-background) 92%, black);
+    padding: 0.85rem;
+  }
+
+  .v2-assistant-markdown pre code {
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    font-size: 0.8125rem;
+  }
+
+  .v2-assistant-markdown blockquote {
+    border-left: 2px solid color-mix(in oklab, var(--color-border) 86%, transparent);
+    color: var(--color-muted-foreground);
+    padding-left: 0.85rem;
+  }
+
+  .v2-assistant-markdown table {
+    display: block;
+    width: 100%;
+    overflow: auto;
+    border-collapse: collapse;
+  }
+
+  .v2-assistant-markdown th,
+  .v2-assistant-markdown td {
+    border: 1px solid color-mix(in oklab, var(--color-border) 70%, transparent);
+    padding: 0.4rem 0.55rem;
+    text-align: left;
+  }
+
+  .v2-assistant-markdown th {
+    background: color-mix(in oklab, var(--color-muted) 78%, transparent);
+  }
+
+  .v2-live-status-line,
+  .v2-live-error-line {
+    color: var(--color-muted-foreground);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+
+  .v2-live-error-line {
+    color: color-mix(in oklab, var(--color-destructive) 82%, var(--color-foreground));
+  }
+}

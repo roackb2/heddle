@@ -27,7 +27,7 @@ export function SettingsNavigation({ activeItemId, items, onBack }: SettingsNavi
     <>
       <SidebarHeader className="v2-panel-divider h-12 justify-center border-b px-2 py-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">{t('settings.general')}</span>
+          <span className="v2-type-app-title text-foreground">{t('settings.general')}</span>
         </div>
       </SidebarHeader>
       <SidebarContent>

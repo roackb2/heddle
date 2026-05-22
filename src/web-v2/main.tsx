@@ -5,6 +5,7 @@ import { ControlPlaneApiProvider } from '@web/api/ControlPlaneApiProvider';
 import { Toaster } from '@web/components/ui/toaster';
 import { App } from '@web/App';
 import { I18nProvider } from '@web/i18n';
+import '@fontsource-variable/inter';
 import './tailwind.css';
 
 createRoot(document.getElementById('root')!).render(

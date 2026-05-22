@@ -1,0 +1,63 @@
+@layer components {
+  .v2-type-app-title {
+    font-size: 0.875rem;
+    font-weight: 550;
+    line-height: 1.25rem;
+  }
+
+  .v2-type-panel-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+  }
+
+  .v2-type-panel-subtitle {
+    font-size: 0.8125rem;
+    font-weight: 400;
+    line-height: 1.25rem;
+  }
+
+  .v2-type-section-label {
+    font-size: 0.6875rem;
+    font-weight: 550;
+    line-height: 1rem;
+    text-transform: uppercase;
+  }
+
+  .v2-type-nav-primary {
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+  }
+
+  .v2-type-nav-secondary {
+    font-size: 0.8125rem;
+    font-weight: 400;
+    line-height: 1.125rem;
+  }
+
+  .v2-type-body {
+    font-size: 0.9375rem;
+    font-weight: 400;
+    line-height: 1.65;
+  }
+
+  .v2-type-body-strong {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+  .v2-type-caption {
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.125rem;
+  }
+
+  .v2-type-code {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.55;
+  }
+}

@@ -42,7 +42,7 @@ export function AppNavigation({
     <>
       <SidebarHeader className="v2-panel-divider h-12 justify-center border-b px-2 py-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">Heddle</span>
+          <span className="v2-type-app-title text-foreground">Heddle</span>
         </div>
       </SidebarHeader>
       <MainNavigationSection activeItemId={activeItemId} items={items} />
