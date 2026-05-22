@@ -4,7 +4,11 @@ import {
   DEFAULT_APP_ROUTE,
   SETTINGS_ROUTES,
 } from '@web/layout/routes';
-import type { ControlPlaneSessionDetail } from '@web/hooks/useControlPlaneSessionDetail';
+import type {
+  ControlPlaneApprovalDecision,
+  ControlPlanePendingApproval,
+  ControlPlaneSessionDetail,
+} from '@web/hooks/useControlPlaneSessionDetail';
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
 import { WorkbenchView } from '@web/views/WorkbenchView';
 
@@ -15,7 +19,11 @@ interface AppRoutesProps {
   selectedSessionLoading: boolean;
   selectedSessionSubmitting: boolean;
   selectedSessionLiveStatus?: string;
+  selectedSessionPendingApproval: ControlPlanePendingApproval;
+  selectedSessionApprovalResolving: boolean;
+  selectedSessionApprovalError?: string;
   onSubmitSessionPrompt: (prompt: string) => Promise<void>;
+  onResolveSessionApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
 }
 
 // AppRoutes renders route config into v2 workbench views. Keep route inventory
@@ -27,7 +35,11 @@ export function AppRoutes({
   selectedSessionLoading,
   selectedSessionSubmitting,
   selectedSessionLiveStatus,
+  selectedSessionPendingApproval,
+  selectedSessionApprovalResolving,
+  selectedSessionApprovalError,
   onSubmitSessionPrompt,
+  onResolveSessionApproval,
 }: AppRoutesProps) {
   return (
     <Routes>
@@ -44,8 +56,12 @@ export function AppRoutes({
               selectedSessionLoading={selectedSessionLoading}
               selectedSessionSubmitting={selectedSessionSubmitting}
               selectedSessionLiveStatus={selectedSessionLiveStatus}
+              selectedSessionPendingApproval={selectedSessionPendingApproval}
+              selectedSessionApprovalResolving={selectedSessionApprovalResolving}
+              selectedSessionApprovalError={selectedSessionApprovalError}
               settingsOpen={false}
               onSubmitSessionPrompt={onSubmitSessionPrompt}
+              onResolveSessionApproval={onResolveSessionApproval}
             />
           )}
         />
@@ -62,8 +78,12 @@ export function AppRoutes({
               selectedSessionLoading={selectedSessionLoading}
               selectedSessionSubmitting={selectedSessionSubmitting}
               selectedSessionLiveStatus={selectedSessionLiveStatus}
+              selectedSessionPendingApproval={selectedSessionPendingApproval}
+              selectedSessionApprovalResolving={selectedSessionApprovalResolving}
+              selectedSessionApprovalError={selectedSessionApprovalError}
               settingsOpen
               onSubmitSessionPrompt={onSubmitSessionPrompt}
+              onResolveSessionApproval={onResolveSessionApproval}
             />
           )}
         />

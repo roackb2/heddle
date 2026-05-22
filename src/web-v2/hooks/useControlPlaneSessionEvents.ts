@@ -11,6 +11,7 @@ import type { RefreshControlPlaneSession } from './useControlPlaneSessionLoader'
 type UseControlPlaneSessionEventsArgs = {
   sessionId?: string;
   refresh: RefreshControlPlaneSession;
+  refreshPendingApproval: (sessionId: string) => void;
   setSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
   setRunning: Dispatch<SetStateAction<boolean>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
@@ -25,6 +26,7 @@ export type ControlPlaneSessionEventsState = {
 export function useControlPlaneSessionEvents({
   sessionId,
   refresh,
+  refreshPendingApproval,
   setSession,
   setRunning,
   setLiveStatus,
@@ -48,11 +50,12 @@ export function useControlPlaneSessionEvents({
     event.activities?.forEach((activity) => applySessionActivity(activity, {
       sessionId: event.sessionId,
       refresh,
+      refreshPendingApproval,
       setLiveStatus,
       setRunning,
       setSession,
     }));
-  }, [refresh, setLiveStatus, setRunning, setSession]);
+  }, [refresh, refreshPendingApproval, setLiveStatus, setRunning, setSession]);
 
   const subscription = trpcReact.controlPlane.sessionEvents.useSubscription(
     sessionId ? { sessionId } : skipToken,
@@ -93,6 +96,7 @@ export function useControlPlaneSessionEvents({
 type SessionActivityContext = {
   sessionId: string;
   refresh: RefreshControlPlaneSession;
+  refreshPendingApproval: (sessionId: string) => void;
   setSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
   setRunning: Dispatch<SetStateAction<boolean>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
@@ -132,13 +136,13 @@ const sessionActivityHandlers: SessionActivityHandlerMap = {
   'tool.completed': (activity, { setLiveStatus }) => {
     setLiveStatus(`${activity.tool} finished in ${Math.round(activity.durationMs)}ms`);
   },
-  'tool.approval_requested': (activity, { setLiveStatus }) => {
+  'tool.approval_requested': (activity, { sessionId, refreshPendingApproval, setLiveStatus }) => {
+    refreshPendingApproval(sessionId);
     setLiveStatus(`Approval requested for ${activity.derived?.kind === 'tool-summary' ? activity.derived.summary : activity.call.tool}`);
   },
-  'run.finished': (_activity, { sessionId, refresh, setRunning, setLiveStatus }) => {
-    setRunning(false);
-    setLiveStatus(undefined);
-    void refresh(sessionId, { silent: true });
+  'tool.approval_resolved': (_activity, { sessionId, refreshPendingApproval, setLiveStatus }) => {
+    refreshPendingApproval(sessionId);
+    setLiveStatus('Approval resolved. Resuming...');
   },
   'compaction.running': (activity, { setLiveStatus }) => {
     setLiveStatus(activity.archivePath ? `Compacting earlier history... ${activity.archivePath}` : 'Compacting earlier history...');

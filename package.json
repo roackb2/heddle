@@ -42,7 +42,7 @@
     "client:dev": "vite --config src/web/vite.config.ts",
     "client:v2:build": "tsc -p src/web-v2/tsconfig.json --noEmit && vite build --config src/web-v2/vite.config.ts",
     "client:v2:dev": "vite --config src/web-v2/vite.config.ts",
-    "server:dev": "tsx --no-cache src/server/dev.ts",
+    "server:dev": "tsx watch --clear-screen=false --no-cache src/server/dev.ts",
     "daemon:dev": "tsx --no-cache src/cli/main.ts daemon --assets-dir dist/src/web",
     "verify:tui-behavior": "node --import tsx/esm scripts/verify-tui-behavior.tsx",
     "verify:tui-session-boundary": "yarn verify:tui-behavior",

@@ -1,4 +1,9 @@
-import type { ControlPlaneSessionDetail } from '@web/hooks/useControlPlaneSessionDetail';
+import type {
+  ControlPlaneApprovalDecision,
+  ControlPlanePendingApproval,
+  ControlPlaneSessionDetail,
+} from '@web/hooks/useControlPlaneSessionDetail';
+import { ApprovalPanel } from './ApprovalPanel';
 import { ConversationComposer } from './ConversationComposer';
 import { ConversationMessage } from './ConversationMessage';
 import { Loader2 } from 'lucide-react';
@@ -8,8 +13,12 @@ interface ConversationThreadProps {
   loading: boolean;
   submitting: boolean;
   liveStatus?: string;
+  pendingApproval: ControlPlanePendingApproval;
+  approvalResolving: boolean;
+  approvalError?: string;
   emptyTitle: string;
   onSubmitPrompt: (prompt: string) => Promise<void>;
+  onResolveApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
 }
 
 // ConversationThread renders the selected session in the central work area.
@@ -18,8 +27,12 @@ export function ConversationThread({
   loading,
   submitting,
   liveStatus,
+  pendingApproval,
+  approvalResolving,
+  approvalError,
   emptyTitle,
   onSubmitPrompt,
+  onResolveApproval,
 }: ConversationThreadProps) {
   if (loading && !session) {
     return (
@@ -66,8 +79,19 @@ export function ConversationThread({
           {liveStatus ? <p className="v2-live-status-line" data-testid="web-v2-live-status">{liveStatus}</p> : null}
         </div>
       </div>
+      {pendingApproval ? (
+        <div className="v2-approval-region">
+          <ApprovalPanel
+            approval={pendingApproval}
+            error={approvalError}
+            resolving={approvalResolving}
+            onResolve={onResolveApproval}
+          />
+        </div>
+      ) : null}
       <div className="v2-composer-region">
         <ConversationComposer
+          disabled={Boolean(pendingApproval)}
           submitting={submitting}
           onSubmitPrompt={onSubmitPrompt}
         />

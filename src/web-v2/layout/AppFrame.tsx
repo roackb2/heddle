@@ -27,6 +27,7 @@ interface AppFrameProps {
   tasks: ControlPlaneState['heartbeat']['tasks'];
   onOpenSettings: () => void;
   onCloseSettings: () => void;
+  onCreateSession: () => Promise<void>;
   onSelectSession: (sessionId: string) => void;
 }
 
@@ -43,6 +44,7 @@ export function AppFrame({
   tasks,
   onOpenSettings,
   onCloseSettings,
+  onCreateSession,
   onSelectSession,
   children,
 }: PropsWithChildren<AppFrameProps>) {
@@ -67,6 +69,7 @@ export function AppFrame({
           tasks={tasks}
           onOpenSettings={onOpenSettings}
           onCloseSettings={onCloseSettings}
+          onCreateSession={onCreateSession}
           onSelectSession={onSelectSession}
         />
       </Sidebar>

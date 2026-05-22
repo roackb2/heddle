@@ -1,5 +1,9 @@
 import { ConversationThread } from '@web/components/conversation';
-import type { ControlPlaneSessionDetail } from '@web/hooks/useControlPlaneSessionDetail';
+import type {
+  ControlPlaneApprovalDecision,
+  ControlPlanePendingApproval,
+  ControlPlaneSessionDetail,
+} from '@web/hooks/useControlPlaneSessionDetail';
 import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
@@ -11,8 +15,12 @@ interface WorkbenchViewProps {
   selectedSessionLoading: boolean;
   selectedSessionSubmitting: boolean;
   selectedSessionLiveStatus?: string;
+  selectedSessionPendingApproval: ControlPlanePendingApproval;
+  selectedSessionApprovalResolving: boolean;
+  selectedSessionApprovalError?: string;
   settingsOpen: boolean;
   onSubmitSessionPrompt: (prompt: string) => Promise<void>;
+  onResolveSessionApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
 }
 
 const appSurfaceLabelKeys = {
@@ -35,8 +43,12 @@ export function WorkbenchView({
   selectedSessionLoading,
   selectedSessionSubmitting,
   selectedSessionLiveStatus,
+  selectedSessionPendingApproval,
+  selectedSessionApprovalResolving,
+  selectedSessionApprovalError,
   settingsOpen,
   onSubmitSessionPrompt,
+  onResolveSessionApproval,
 }: WorkbenchViewProps) {
   const { t } = useI18n();
   const title =
@@ -62,9 +74,13 @@ export function WorkbenchView({
             emptyTitle={t('workbench.emptyConversation')}
             liveStatus={selectedSessionLiveStatus}
             loading={selectedSessionLoading}
+            pendingApproval={selectedSessionPendingApproval}
+            approvalResolving={selectedSessionApprovalResolving}
+            approvalError={selectedSessionApprovalError}
             session={selectedSession}
             submitting={selectedSessionSubmitting}
             onSubmitPrompt={onSubmitSessionPrompt}
+            onResolveApproval={onResolveSessionApproval}
           />
         ) : null}
       </div>

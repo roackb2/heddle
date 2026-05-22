@@ -9,7 +9,9 @@ import { APP_ROUTES, SETTINGS_ROUTES } from '@web/layout/routes';
 
 export function App() {
   const navigation = useWorkbenchNavigation();
+  const utils = trpcReact.useUtils();
   const stateQuery = trpcReact.controlPlane.state.useQuery();
+  const createSessionMutation = trpcReact.controlPlane.sessionCreate.useMutation();
   const sidebarSessions = useMemo(
     () => stateQuery.data?.sessions ?? [],
     [stateQuery.data?.sessions],
@@ -33,6 +35,12 @@ export function App() {
     setSelectedSessionId(sidebarSessions[0]?.id);
   }, [selectedSessionId, sidebarSessions]);
 
+  async function createSession() {
+    const session = await createSessionMutation.mutateAsync();
+    setSelectedSessionId(session.id);
+    await utils.controlPlane.state.invalidate();
+  }
+
   return (
     <AppFrame
       activeSurfaceId={navigation.activeSurfaceId}
@@ -45,6 +53,7 @@ export function App() {
       tasks={sidebarTasks}
       onOpenSettings={navigation.openSettings}
       onCloseSettings={navigation.closeSettings}
+      onCreateSession={createSession}
       onSelectSession={setSelectedSessionId}
     >
       <AppRoutes
@@ -54,7 +63,11 @@ export function App() {
         selectedSessionLoading={selectedSession.loading}
         selectedSessionSubmitting={selectedSession.submitting}
         selectedSessionLiveStatus={selectedSession.liveStatus}
+        selectedSessionPendingApproval={selectedSession.pendingApproval}
+        selectedSessionApprovalResolving={selectedSession.approvalResolving}
+        selectedSessionApprovalError={selectedSession.approvalError}
         onSubmitSessionPrompt={selectedSession.submitPrompt}
+        onResolveSessionApproval={selectedSession.resolvePendingApproval}
       />
     </AppFrame>
   );

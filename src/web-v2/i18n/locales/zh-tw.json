@@ -2,6 +2,19 @@
   "app": {
     "name": "Heddle"
   },
+  "approval": {
+    "approveOnce": "核准一次",
+    "ariaLabel": "待核准工具請求",
+    "command": "指令",
+    "deny": "拒絕",
+    "path": "路徑",
+    "payload": "承載資料",
+    "reason": "原因",
+    "requestedAt": "請求時間",
+    "title": "需要核准",
+    "tool": "工具",
+    "truncated": "已截斷"
+  },
   "composer": {
     "addContext": "加入脈絡",
     "model": "模型",
@@ -24,6 +37,7 @@
     "collapseSidebar": "收合側邊欄",
     "expandSidebar": "展開側邊欄",
     "mainAriaLabel": "主要應用導覽",
+    "newChat": "新增對話",
     "openSettings": "開啟設定",
     "primaryAriaLabel": "主要導覽",
     "sessionListAriaLabel": "對話清單",

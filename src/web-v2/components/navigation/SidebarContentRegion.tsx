@@ -11,6 +11,7 @@ interface SidebarContentRegionProps {
   taskListTitle: string;
   sessions: ControlPlaneState['sessions'];
   tasks: ControlPlaneState['heartbeat']['tasks'];
+  onCreateSession: () => Promise<void>;
   onSelectSession: (sessionId: string) => void;
 }
 
@@ -24,6 +25,7 @@ export function SidebarContentRegion({
   taskListTitle,
   sessions,
   tasks,
+  onCreateSession,
   onSelectSession,
 }: SidebarContentRegionProps) {
   return (
@@ -38,6 +40,7 @@ export function SidebarContentRegion({
           selectedSessionId={selectedSessionId}
           sessions={sessions}
           title={sessionListTitle}
+          onCreateSession={onCreateSession}
           onSelectSession={onSelectSession}
         />
       )}

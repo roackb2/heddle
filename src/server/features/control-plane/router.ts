@@ -62,8 +62,20 @@ const turnReviewInputSchema = z.object({
 
 const sessionApprovalDecisionSchema = z.object({
   sessionId: z.string().min(1),
-  approved: z.boolean(),
-  reason: z.string().optional(),
+  decision: z.discriminatedUnion('type', [
+    z.object({
+      type: z.literal('approve'),
+      reason: z.string().optional(),
+    }),
+    z.object({
+      type: z.literal('deny'),
+      reason: z.string().optional(),
+    }),
+    z.object({
+      type: z.literal('approve_and_remember_project'),
+      reason: z.string().optional(),
+    }),
+  ]),
 });
 
 const sessionSettingsInputSchema = z.object({
@@ -201,10 +213,7 @@ export const controlPlaneRouter = router({
   }),
   sessionResolveApproval: procedure.input(sessionApprovalDecisionSchema).mutation(({ input }) => {
     return {
-      resolved: controlPlaneChatSessionsController.resolvePendingApproval(input.sessionId, {
-        approved: input.approved,
-        reason: input.reason,
-      }),
+      resolved: controlPlaneChatSessionsController.resolvePendingApproval(input.sessionId, input.decision),
     };
   }),
   sessionCancel: procedure.input(sessionInputSchema).mutation(({ input }) => {

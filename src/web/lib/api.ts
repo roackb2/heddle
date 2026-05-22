@@ -106,7 +106,13 @@ export async function resolvePendingSessionApproval(
   approved: boolean,
   reason?: string,
 ): Promise<{ resolved: boolean }> {
-  return await trpc.controlPlane.sessionResolveApproval.mutate({ sessionId, approved, reason });
+  return await trpc.controlPlane.sessionResolveApproval.mutate({
+    sessionId,
+    decision: {
+      type: approved ? 'approve' : 'deny',
+      reason,
+    },
+  });
 }
 
 export async function fetchWorkspaceFileSuggestions(query: string): Promise<WorkspaceFileSuggestion[]> {

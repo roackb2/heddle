@@ -2,6 +2,19 @@
   "app": {
     "name": "Heddle"
   },
+  "approval": {
+    "approveOnce": "Approve once",
+    "ariaLabel": "Pending tool approval",
+    "command": "Command",
+    "deny": "Deny",
+    "path": "Path",
+    "payload": "Payload",
+    "reason": "Reason",
+    "requestedAt": "Requested",
+    "title": "Approval required",
+    "tool": "Tool",
+    "truncated": "truncated"
+  },
   "composer": {
     "addContext": "Add context",
     "model": "Model",
@@ -24,6 +37,7 @@
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
     "mainAriaLabel": "Main app navigation",
+    "newChat": "New chat",
     "openSettings": "Open settings",
     "primaryAriaLabel": "Primary navigation",
     "sessionListAriaLabel": "Session list",

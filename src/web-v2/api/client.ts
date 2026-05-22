@@ -34,4 +34,6 @@ export type ControlPlaneState = RouterOutputs['controlPlane']['state'];
 export type ControlPlaneSessionDetail = RouterOutputs['controlPlane']['session'];
 export type ControlPlaneSessionEventEnvelope = AsyncIterableValue<RouterOutputs['controlPlane']['sessionEvents']>;
 export type ControlPlaneSessionMessage = NonNullable<ControlPlaneSessionDetail>['messages'][number];
+export type ControlPlanePendingApproval = RouterOutputs['controlPlane']['sessionPendingApproval'];
+export type ControlPlaneApprovalDecision = RouterInputs['controlPlane']['sessionResolveApproval']['decision'];
 export type ControlPlaneSessionSendPromptResult = RouterOutputs['controlPlane']['sessionSendPrompt'];

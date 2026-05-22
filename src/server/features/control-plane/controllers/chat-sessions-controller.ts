@@ -247,7 +247,7 @@ export class ControlPlaneChatSessionsController {
 
   resolvePendingApproval(
     sessionId: string,
-    decision: { approved: boolean; reason?: string },
+    decision: ToolApprovalUserDecision,
   ): boolean {
     const pending = this.pendingApprovals.get(sessionId);
     if (!pending) {
@@ -257,9 +257,7 @@ export class ControlPlaneChatSessionsController {
     this.pendingApprovals.delete(sessionId);
     // This resolves the promise created by ToolApprovalService.requestHumanApproval.
     // The paused agent turn resumes immediately after this call returns.
-    pending.resolve(decision.approved
-      ? { type: 'approve', reason: decision.reason }
-      : { type: 'deny', reason: decision.reason });
+    pending.resolve(decision);
     return true;
   }
 

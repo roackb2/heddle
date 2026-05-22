@@ -14,6 +14,7 @@ interface SessionSidebarProps {
   tasks: ControlPlaneState['heartbeat']['tasks'];
   onOpenSettings: () => void;
   onCloseSettings: () => void;
+  onCreateSession: () => Promise<void>;
   onSelectSession: (sessionId: string) => void;
 }
 
@@ -30,6 +31,7 @@ export function SessionSidebar({
   tasks,
   onOpenSettings,
   onCloseSettings,
+  onCreateSession,
   onSelectSession,
 }: SessionSidebarProps) {
   return (
@@ -48,6 +50,7 @@ export function SessionSidebar({
           sessions={sessions}
           tasks={tasks}
           onOpenSettings={onOpenSettings}
+          onCreateSession={onCreateSession}
           onSelectSession={onSelectSession}
         />
       )}

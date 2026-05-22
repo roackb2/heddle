@@ -20,6 +20,7 @@ interface AppNavigationProps {
   sessions: ControlPlaneState['sessions'];
   tasks: ControlPlaneState['heartbeat']['tasks'];
   onOpenSettings: () => void;
+  onCreateSession: () => Promise<void>;
   onSelectSession: (sessionId: string) => void;
 }
 
@@ -32,6 +33,7 @@ export function AppNavigation({
   sessions,
   tasks,
   onOpenSettings,
+  onCreateSession,
   onSelectSession,
 }: AppNavigationProps) {
   const { t } = useI18n();
@@ -53,6 +55,7 @@ export function AppNavigation({
           taskListTitle={t('navigation.taskListTitle')}
           sessions={sessions}
           tasks={tasks}
+          onCreateSession={onCreateSession}
           onSelectSession={onSelectSession}
         />
       </SidebarContent>

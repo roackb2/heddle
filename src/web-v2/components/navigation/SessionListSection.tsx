@@ -1,20 +1,42 @@
 import type { ControlPlaneState } from '@web/api/client';
+import { Button } from '@web/components/ui/button';
+import { useI18n } from '@web/i18n';
 import { cn } from '@web/lib/utils';
+import { Plus } from 'lucide-react';
 
 interface SessionListSectionProps {
   selectedSessionId?: string;
   sessions: ControlPlaneState['sessions'];
   title: string;
+  onCreateSession: () => Promise<void>;
   onSelectSession: (sessionId: string) => void;
 }
 
 // SessionListSection renders the left-rail session list using the same view
 // shape returned by the control-plane tRPC sessions endpoint.
-export function SessionListSection({ selectedSessionId, sessions, title, onSelectSession }: SessionListSectionProps) {
+export function SessionListSection({
+  selectedSessionId,
+  sessions,
+  title,
+  onCreateSession,
+  onSelectSession,
+}: SessionListSectionProps) {
+  const { t } = useI18n();
+
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-1 px-2 py-2" aria-label={title}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="none"
+        className="v2-sidebar-action"
+        onClick={() => void onCreateSession()}
+      >
+        <Plus aria-hidden="true" />
+        <span>{t('navigation.newChat')}</span>
+      </Button>
       <div
-        className="px-2 pb-1 text-[0.6875rem] font-medium uppercase tracking-normal text-muted-foreground"
+        className="px-2 pt-2 pb-1 text-[0.6875rem] font-medium uppercase tracking-normal text-muted-foreground"
       >
         {title}
       </div>
