@@ -1,4 +1,5 @@
 import type { ControlPlaneState } from '@web/api/client';
+import { cn } from '@web/lib/utils';
 
 interface SessionListSectionProps {
   selectedSessionId?: string;
@@ -18,22 +19,46 @@ export function SessionListSection({ selectedSessionId, sessions, title, onSelec
         {title}
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto">
-        {sessions.map((session) => (
-          <button
-            key={session.id}
-            type="button"
-            aria-current={selectedSessionId === session.id ? 'page' : undefined}
-            className="group flex w-full min-w-0 flex-col rounded-md px-2 py-1.5 text-left outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring aria-current-page:bg-sidebar-accent aria-current-page:text-sidebar-accent-foreground"
-            onClick={() => onSelectSession(session.id)}
-          >
-            <span className="w-full truncate text-sm font-medium leading-5 text-sidebar-foreground group-hover:text-sidebar-accent-foreground">
-              {session.name}
-            </span>
-            <span className="w-full truncate text-xs leading-4 text-muted-foreground">
-              {session.lastSummary ?? session.lastPrompt ?? session.model ?? session.id}
-            </span>
-          </button>
-        ))}
+        {sessions.map((session) => {
+          const selected = selectedSessionId === session.id;
+
+          return (
+            <button
+              key={session.id}
+              type="button"
+              aria-current={selected ? 'true' : undefined}
+              className={cn(
+                'group relative flex w-full min-w-0 flex-col rounded-md py-1.5 pl-4 pr-2 text-left outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring',
+                selected && 'bg-sidebar-accent text-sidebar-accent-foreground',
+              )}
+              onClick={() => onSelectSession(session.id)}
+            >
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'absolute bottom-1.5 left-1 top-1.5 w-0.5 rounded-full bg-transparent',
+                  selected && 'bg-sidebar-accent-foreground',
+                )}
+              />
+              <span
+                className={cn(
+                  'w-full truncate text-sm font-medium leading-5 text-sidebar-foreground group-hover:text-sidebar-accent-foreground',
+                  selected && 'text-sidebar-accent-foreground',
+                )}
+              >
+                {session.name}
+              </span>
+              <span
+                className={cn(
+                  'w-full truncate text-xs leading-4 text-muted-foreground',
+                  selected && 'text-sidebar-accent-foreground/75',
+                )}
+              >
+                {session.lastSummary ?? session.lastPrompt ?? session.model ?? session.id}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </section>
   );

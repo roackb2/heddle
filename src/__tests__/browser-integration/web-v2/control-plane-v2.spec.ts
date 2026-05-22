@@ -71,7 +71,10 @@ test('submits a prompt and renders the mocked session response', async ({ page }
   const session = await trpc.controlPlane.sessionCreate.mutate({ name: 'Web v2 submit smoke' });
 
   await page.goto('/sessions');
-  await page.getByRole('button', { name: /Web v2 submit smoke/ }).click();
+  const sessionListItem = page.getByRole('button', { name: /Web v2 submit smoke/ });
+  await sessionListItem.click();
+  await expect(sessionListItem).toHaveAttribute('aria-current', 'true');
+  await expect(sessionListItem).toHaveClass(/bg-sidebar-accent/);
   await page.getByRole('textbox', { name: 'Message' }).fill('Run the web v2 submit smoke');
   await page.getByRole('button', { name: 'Send' }).click();
 
