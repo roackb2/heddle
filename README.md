@@ -72,9 +72,9 @@ Terminal chat/dev workflow showing file edits, inline diff output, and verificat
 
 ### Browser control plane overview
 
-The local control plane gives you a browser-based view of the current workspace, saved sessions, heartbeat tasks, workspace memory, and recent activity. It also shows which workspace is active, so browser sessions follow the selected project instead of the daemon launch directory:
+The next-generation local control plane is a browser-based workspace for sessions, tool approvals, and live diff review. This v2 interface is **work in progress and not yet released**; it shows the direction for the control plane rewrite, while the current released control plane remains the supported browser UI:
 
-![Heddle control plane overview with workspace memory](docs/images/control-plane-overview-workspace-memory.png)
+![Heddle web-v2 control plane work in progress](docs/images/control-plane-v2.png)
 
 ### Browser session review
 
