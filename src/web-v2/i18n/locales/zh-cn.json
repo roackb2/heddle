@@ -23,6 +23,27 @@
     "reasoningEffort": "推理强度",
     "send": "发送"
   },
+  "diffPreview": {
+    "binary": "二进制",
+    "binaryBody": "Git 报告这是二进制差异，因此 Heddle 无法呈现逐行变更。",
+    "binaryTitle": "二进制文件",
+    "cleanBody": "Git 未报告当前工作区有变更。",
+    "cleanTitle": "工作区没有变更",
+    "failedTitle": "工作区差异读取失败",
+    "fileFailedTitle": "文件差异读取失败",
+    "fileUnavailableTitle": "文件差异不可用",
+    "from": "来自",
+    "loadingBody": "正在读取当前启用工作区的 Git 变更。",
+    "loadingFileBody": "正在读取所选文件的 patch。",
+    "loadingFileTitle": "正在加载文件差异",
+    "loadingTitle": "正在加载工作区差异",
+    "noGitBody": "当前工作区变更需要 Git 工作区。",
+    "noGitTitle": "不是 Git 工作区",
+    "noPatchBody": "Git 报告此文件已变更，但没有可用的 patch 文本。",
+    "noPatchTitle": "没有可用 patch",
+    "subtitle": "当前工作区变更",
+    "title": "差异预览"
+  },
   "inspector": {
     "collapsePanel": "收起上下文检查器",
     "contextAriaLabel": "上下文检查器",

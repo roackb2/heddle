@@ -169,6 +169,63 @@
     background: color-mix(in oklab, var(--color-border) 90%, transparent);
   }
 
+  .v2-diff-file {
+    overflow: hidden;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-border) 64%, transparent);
+    background: var(--color-card);
+  }
+
+  .v2-diff-file-expanded {
+    background: var(--color-card);
+  }
+
+  .v2-diff-patch {
+    max-height: 20rem;
+    overflow: auto;
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in oklab, var(--color-border) 70%, transparent);
+    background: var(--color-background);
+    padding: 0.75rem;
+    color: var(--color-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.55;
+  }
+
+  .v2-monaco-diff-viewer {
+    overflow: hidden;
+    background: var(--color-card);
+  }
+
+  .v2-monaco-diff-viewer-editor {
+    min-height: 10rem;
+  }
+
+  .v2-monaco-diff-line-added {
+    background: color-mix(in oklab, hsl(140 45% 42%) 22%, transparent);
+  }
+
+  .v2-monaco-diff-line-deleted {
+    background: color-mix(in oklab, hsl(350 72% 58%) 22%, transparent);
+  }
+
+  .v2-monaco-diff-line-separator {
+    background: color-mix(in oklab, var(--color-muted) 80%, transparent);
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-monaco-diff-gutter-added {
+    color: hsl(135 78% 80%) !important;
+  }
+
+  .v2-monaco-diff-gutter-deleted {
+    color: hsl(350 88% 78%) !important;
+  }
+
+  .v2-monaco-diff-gutter-separator {
+    color: var(--color-muted-foreground) !important;
+  }
+
   .v2-message-row {
     display: flex;
     width: 100%;
