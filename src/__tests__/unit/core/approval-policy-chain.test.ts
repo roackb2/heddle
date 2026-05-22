@@ -1,8 +1,12 @@
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ToolApprovalPolicies,
   ToolApprovalService,
 } from '@/core/approvals/index.js';
+import { ProjectApprovalRuleCodec } from '@/core/approvals/remembered-rules/index.js';
 import type { ToolApprovalPolicyContext } from '@/core/approvals/types.js';
 
 function context(overrides: Partial<ToolApprovalPolicyContext> = {}): ToolApprovalPolicyContext {
@@ -22,8 +26,9 @@ function context(overrides: Partial<ToolApprovalPolicyContext> = {}): ToolApprov
 
 describe('approval policy chain', () => {
   it('returns the first policy decision and skips later policies', async () => {
+    const service = new ToolApprovalService();
     const seen: string[] = [];
-    const decision = await ToolApprovalService.evaluate({
+    const decision = await service.evaluate({
       policies: [
       () => {
         seen.push('abstain');
@@ -46,7 +51,8 @@ describe('approval policy chain', () => {
   });
 
   it('requests approval for explicit approval-gated tools', async () => {
-    await expect(ToolApprovalService.evaluate({
+    const service = new ToolApprovalService();
+    await expect(service.evaluate({
       policies: ToolApprovalPolicies.default(),
       context: context(),
     })).resolves.toEqual({
@@ -56,6 +62,7 @@ describe('approval policy chain', () => {
   });
 
   it('requests approval for outside-workspace inspection paths', async () => {
+    const service = new ToolApprovalService();
     const readOutside = context({
       call: { id: 'call-1', tool: 'read_file', input: { path: '../secrets.txt' } },
       tool: {
@@ -66,7 +73,7 @@ describe('approval policy chain', () => {
       },
     });
 
-    await expect(ToolApprovalService.evaluate({
+    await expect(service.evaluate({
       policies: ToolApprovalPolicies.default(),
       context: readOutside,
     })).resolves.toEqual({
@@ -77,7 +84,8 @@ describe('approval policy chain', () => {
   });
 
   it('abstains for normal non-approval tools', async () => {
-    await expect(ToolApprovalService.evaluate({
+    const service = new ToolApprovalService();
+    await expect(service.evaluate({
       policies: ToolApprovalPolicies.default(),
       context: context({
       call: { id: 'call-1', tool: 'read_file', input: { path: 'README.md' } },
@@ -113,6 +121,7 @@ describe('approval policy chain', () => {
   });
 
   it('lets remembered outside-workspace read_file approvals satisfy request policies before human approval', async () => {
+    const service = new ToolApprovalService();
     const human = vi.fn(async () => ({ approved: false, reason: 'should not run' }));
     const readOutside = context({
       call: { id: 'call-1', tool: 'read_file', input: { path: '../notes/summary.md' } },
@@ -124,7 +133,7 @@ describe('approval policy chain', () => {
       },
     });
 
-    await expect(ToolApprovalService.resolve({
+    await expect(service.resolve({
       policies: [
         ...ToolApprovalPolicies.default(),
         ToolApprovalPolicies.rememberedProjectRule({
@@ -141,9 +150,10 @@ describe('approval policy chain', () => {
   });
 
   it('lets later allow policies satisfy earlier request policies before human approval', async () => {
+    const service = new ToolApprovalService();
     const human = vi.fn(async () => ({ approved: false, reason: 'should not run' }));
 
-    await expect(ToolApprovalService.resolve({
+    await expect(service.resolve({
       policies: [
         () => ({ type: 'request', reason: 'run_shell_mutate requires approval' }),
         ToolApprovalPolicies.rememberedProjectRule({
@@ -160,12 +170,13 @@ describe('approval policy chain', () => {
   });
 
   it('falls through to human approval when a request policy is not satisfied', async () => {
+    const service = new ToolApprovalService();
     const human = vi.fn(async (_context: ToolApprovalPolicyContext, reason?: string) => ({
       approved: true,
       reason: `human approved: ${reason}`,
     }));
 
-    await expect(ToolApprovalService.resolve({
+    await expect(service.resolve({
       policies: [
         () => ({ type: 'request', reason: 'run_shell_mutate requires approval' }),
       ],
@@ -176,5 +187,59 @@ describe('approval policy chain', () => {
       reason: 'human approved: run_shell_mutate requires approval',
     });
     expect(human).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates a host-neutral approval request with summary, reason, preview, and remembered rule metadata', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-approval-service-'));
+    writeFileSync(join(workspaceRoot, 'README.md'), 'old text\n');
+    const service = new ToolApprovalService({
+      workspaceRoot,
+      now: () => new Date('2026-05-22T10:00:00.000Z'),
+    });
+    const request = await service.createRequest(context({
+      call: {
+        id: 'call-edit',
+        tool: 'edit_file',
+        input: { path: 'README.md', oldText: 'old text', newText: 'new text' },
+      },
+      tool: {
+        name: 'edit_file',
+        description: 'edits files',
+        requiresApproval: true,
+        parameters: {},
+        execute: async () => ({ ok: true }),
+      },
+      workspaceRoot,
+      reason: 'edit_file requires approval',
+    }));
+
+    expect(request).toEqual(expect.objectContaining({
+      tool: 'edit_file',
+      callId: 'call-edit',
+      input: { path: 'README.md', oldText: 'old text', newText: 'new text' },
+      requestedAt: '2026-05-22T10:00:00.000Z',
+      summary: 'edit_file (README.md)',
+      reason: 'edit_file requires approval',
+    }));
+    expect(request.editPreview?.path).toBe('README.md');
+    expect(request.rememberProjectApproval?.label).toBe('allow edit_file for this project');
+  });
+
+  it('resolves approve-and-remember decisions through the existing project approval repository', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-approval-service-'));
+    const rulesFile = join(root, 'command-approvals.json');
+    const service = new ToolApprovalService({ projectApprovalRulesFile: rulesFile });
+    const approvalContext = context();
+
+    expect(service.resolveUserDecision({
+      context: approvalContext,
+      decision: { type: 'approve_and_remember_project', reason: 'remember it' },
+    })).toEqual({
+      approved: true,
+      reason: 'remember it',
+    });
+
+    expect(service.isApprovedByRememberedProjectRule(approvalContext)).toBe(true);
+    expect(ProjectApprovalRuleCodec.parseList(JSON.parse(readFileSync(rulesFile, 'utf8')) as unknown)).toHaveLength(1);
   });
 });

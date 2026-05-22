@@ -280,7 +280,7 @@ The `Workspaces` section lets you register local projects, switch the control pl
 
 The `Sessions` section supports a coding-review flow built around current work first. Review starts from the live Git working tree for the active workspace, with changed files, structured read-only diffs, and a larger full-diff viewer when the side panel is too tight. Historical turn diffs, review commands, verification commands, approvals, and trace events are still available, but they are separated from current review so old evidence does not distract from the task at hand.
 
-Session chat in the control plane renders assistant markdown, preserves streamed thinking summaries as internal progress text, and keeps model/reasoning controls aligned with the terminal workflow.
+Session chat in the control plane renders assistant markdown, receives per-session live updates for assistant streaming, tool progress, approvals, and saved-session refreshes, and keeps model/reasoning controls aligned with the terminal workflow.
 
 This is useful if you want a more inspectable and operator-friendly workflow than a plain CLI transcript. The layout adapts for phone use as well, with mobile-native navigation for Overview, Sessions, Tasks, and Workspaces, plus a focused Chat/Review session workflow.
 

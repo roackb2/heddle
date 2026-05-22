@@ -54,7 +54,7 @@ export function formatApprovalPrompt(pendingApproval: PendingApproval): string {
 }
 
 export function canRememberPendingApproval(pendingApproval: PendingApproval): boolean {
-  return typeof pendingApproval.rememberForProject === 'function'
+  return pendingApproval.canRememberForProject === true
     && typeof pendingApproval.rememberLabel === 'string'
     && pendingApproval.rememberLabel.trim().length > 0;
 }

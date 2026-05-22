@@ -10,6 +10,7 @@ Current stack:
 
 - `src/server`: Express-hosted tRPC server
 - `src/web`: React/Vite web client
+- `src/web-v2`: React/Vite web-v2 client for new control-plane work
 - `src/server/features/control-plane`: control-plane-specific server feature logic
 - pino logs written locally for debugging
 
@@ -19,7 +20,7 @@ The current browser UI surfaces:
 - workspace management with registered workspaces, recent known workspaces, folder picking, switching, and renaming
 - saved chat sessions with sidebar navigation, resizable desktop panels, conversation view, and review-oriented detail inspection
 - browser-side session actions for new session, send, continue, cancel, and pending approval resolution
-- live per-session updates over SSE for run status, tool progress, assistant streaming text, thinking summaries, and saved-session changes
+- live per-session updates for run status, tool progress, approval waits, assistant streaming text, thinking summaries, and saved-session changes
 - a model selector and reasoning-effort control backed by the server-side built-in model catalog and session state, plus a drift toggle and latest trace-derived drift level
 - an auth status indicator in the session composer footer so you can see whether the selected model is using OAuth or API-key mode without spending header space
 - debounced `@file` mention suggestions in the composer, backed by a capped workspace file search endpoint
@@ -29,6 +30,13 @@ The current browser UI surfaces:
 - lightweight toast notifications for session/action success and failure
 - heartbeat task status, scheduling state, selected task detail, and run history
 - recent heartbeat run summaries and usage data
+
+Live session updates come from the daemon's per-session event stream. Web-v2
+uses the `controlPlane.sessionEvents` tRPC subscription for those updates; the
+legacy browser surface still has an SSE compatibility path. In both cases,
+streaming activity is separate from durable session refreshes: assistant/tool
+progress arrives as live activity, while saved-session changes tell the browser
+to refetch persisted session detail.
 
 ## Workspaces
 

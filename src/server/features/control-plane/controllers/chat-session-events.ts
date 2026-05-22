@@ -1,5 +1,4 @@
 import type { EventEmitter } from 'node:events';
-import type { ToolCall, ToolDefinition } from '../../../../index.js';
 import type { ConversationActivity } from '@/core/live/index.js';
 import type { ControlPlaneSessionLiveEvent } from '../types.js';
 
@@ -41,14 +40,5 @@ export class ControlPlaneChatSessionEventsController {
     };
 
     return publisher;
-  }
-
-  static createPendingApprovalView(call: ToolCall, tool: ToolDefinition) {
-    return {
-      tool: tool.name,
-      callId: call.id,
-      input: call.input,
-      requestedAt: new Date().toISOString(),
-    };
   }
 }

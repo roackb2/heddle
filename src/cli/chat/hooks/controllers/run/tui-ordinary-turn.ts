@@ -3,6 +3,7 @@ import { createConversationEngine } from '../../../../../core/chat/engine/index.
 import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
 import type { ChatSession } from '../../../state/types.js';
 import type { ChatRuntimeConfig } from '../../../utils/runtime.js';
+import type { ToolApprovalService } from '@/core/approvals/index.js';
 import { createTuiCompactionStatusPort } from './tui-compaction-status.js';
 import { finalizeSuccessfulTuiOrdinaryTurn } from './tui-agent-turn-result.js';
 import { createTuiRunLoopEventAdapter } from './tui-run-loop-events.js';
@@ -25,8 +26,7 @@ export async function executeTuiOrdinaryTurn(args: {
   updateSessionById: SessionUpdater;
   parsePlanState: ParsePlanState;
   maybeAutoNameSession: (sessionId: string, prompt: string, responseText: string) => void;
-  isProjectApproved: Parameters<typeof createTuiRememberedApprovalPolicies>[0]['isProjectApproved'];
-  rememberProjectApproval: Parameters<typeof createTuiToolApprovalPort>[0]['rememberProjectApproval'];
+  approvalService: ToolApprovalService;
   driftObserver: CyberLoopKinematicsObserver | undefined;
   turnAbortSignal: AbortSignal;
   leaseOwner: { ownerKind: 'tui'; ownerId: string; clientLabel: string };
@@ -42,8 +42,7 @@ export async function executeTuiOrdinaryTurn(args: {
     updateSessionById,
     parsePlanState,
     maybeAutoNameSession,
-    isProjectApproved,
-    rememberProjectApproval,
+    approvalService,
     driftObserver,
     turnAbortSignal,
     leaseOwner,
@@ -70,9 +69,9 @@ export async function executeTuiOrdinaryTurn(args: {
   });
   const approvalPort = createTuiToolApprovalPort({
     state,
-    rememberProjectApproval,
+    approvalService,
   });
-  const approvalPolicies = createTuiRememberedApprovalPolicies({ isProjectApproved });
+  const approvalPolicies = createTuiRememberedApprovalPolicies({ approvalService });
 
   const engine = createConversationEngine({
     workspaceRoot: runtime.workspaceRoot,

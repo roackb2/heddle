@@ -59,7 +59,7 @@ Current runtime features include:
 Beyond terminal chat, Heddle includes:
 
 - a local browser control plane via `heddle daemon`
-- live session updates and review-oriented run inspection
+- live per-session updates for assistant streaming, tool progress, approval waits, and saved-session refreshes
 - workspace management for registering, renaming, choosing, and switching local project workspaces
 - Git-backed current workspace review with changed files and selected-file patches
 - trace-backed historical turn review for captured file diffs

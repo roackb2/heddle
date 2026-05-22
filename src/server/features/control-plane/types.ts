@@ -149,13 +149,6 @@ export type ChatSessionDetail = ChatSessionView & {
   lastContinuePrompt?: string;
 };
 
-export type ControlPlanePendingApproval = {
-  tool: string;
-  callId: string;
-  input: unknown;
-  requestedAt: string;
-};
-
 export type ControlPlaneSessionLiveEvent = {
   sessionId: string;
   timestamp: string;
