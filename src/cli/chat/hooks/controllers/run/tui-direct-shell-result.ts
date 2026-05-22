@@ -1,4 +1,4 @@
-import { ToolActivitySummarizer } from '@/core/observability/index.js';
+import { ToolActivitySummarizer } from '@/core/chat/engine/live/index.js';
 import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
 import { appendDirectShellHistory, formatDirectShellResponse } from '../../../utils/format.js';
 import { ConversationCompactionService } from '../../../state/compaction.js';

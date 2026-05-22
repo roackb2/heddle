@@ -1,16 +1,13 @@
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { ToolCall, ToolResult, TraceEvent } from '@/core/types.js';
+import type { ConversationCompactionStatus } from '../compaction/index.js';
+export type { ConversationCompactionStatus } from '../compaction/index.js';
 
 export type ConversationActivityCorrelation = {
   runId?: string;
   step?: number;
   timestamp?: string;
 };
-
-export type ConversationCompactionStatus =
-  | { status: 'running'; archivePath?: string }
-  | { status: 'finished'; summaryPath?: string }
-  | { status: 'failed'; error?: string };
 
 export type ConversationToolSummary = {
   kind: 'tool-summary';
@@ -62,7 +59,7 @@ type CompactionActivity = {
   [Status in ConversationCompactionStatus['status']]: {
     source: 'compaction';
     type: `compaction.${Status}`;
-    event: Extract<ConversationCompactionStatus, { status: Status }>;
+    event: ConversationCompactionStatus & { status: Status };
   };
 }[ConversationCompactionStatus['status']];
 
@@ -75,12 +72,6 @@ export type ConversationActivityOf<Type extends ConversationActivity['type']> = 
 
 export type ConversationActivityHandlerMap<Context, Result = void> = {
   [Type in ConversationActivity['type']]?: (activity: ConversationActivityOf<Type>, context: Context) => Result;
-};
-
-export type ApplyConversationActivityHandlerArgs<Context, Result = void> = {
-  activity: ConversationActivity;
-  handlers: ConversationActivityHandlerMap<Context, Result>;
-  context: Context;
 };
 
 export type ToolSummaryOptions = {

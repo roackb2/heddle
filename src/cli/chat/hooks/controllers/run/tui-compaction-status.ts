@@ -19,8 +19,6 @@ export function createTuiCompactionStatusPort(args: {
   const { state, sessionId, sessionService, refreshSessions } = args;
 
   const handleWithSourceHistory = (event: TuiCompactionStatusEvent, sourceHistory: ChatMessage[]) => {
-    appendCompactionLiveEvent(state, event);
-
     if (event.status !== 'running') {
       return;
     }
@@ -65,21 +63,23 @@ export function createTuiDirectShellCompactionStatusHandler(args: {
 }
 
 function appendCompactionLiveEvent(state: ActionState, event: TuiCompactionStatusEvent) {
-  const liveText = compactionLiveEventText(event);
-  if (!liveText) {
+  const text = formatDirectShellCompactionStatus(event);
+  if (!text) {
     return;
   }
 
-  state.setLiveEvents((current) => [...current, { id: state.nextLocalId(), text: liveText }].slice(-8));
+  state.setLiveEvents((current) => [
+    ...current,
+    { id: state.nextLocalId(), text },
+  ].slice(-8));
 }
 
-function compactionLiveEventText(event: TuiCompactionStatusEvent): string {
-  switch (event.status) {
-    case 'running':
-      return 'Compacting earlier conversation history…';
-    case 'failed':
-      return `Compaction failed: ${event.error ?? 'unknown error'}`;
-    case 'finished':
-      return 'Compaction finished.';
-  }
+function formatDirectShellCompactionStatus(event: TuiCompactionStatusEvent): string | undefined {
+  const formatters = {
+    running: () => 'Compacting earlier conversation history…',
+    failed: () => `Compaction failed: ${event.error ?? 'unknown error'}`,
+    finished: () => 'Compaction finished.',
+  } satisfies Record<TuiCompactionStatusEvent['status'], () => string | undefined>;
+
+  return formatters[event.status]();
 }

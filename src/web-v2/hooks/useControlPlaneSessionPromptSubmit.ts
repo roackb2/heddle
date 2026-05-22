@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import { sendControlPlaneSessionPrompt, type ControlPlaneSessionDetail } from '@web/api/client';
+import { trpcReact, type ControlPlaneSessionDetail } from '@web/api/client';
 import { SessionMessageController } from '@web/controllers/session-messages';
 
 type UseControlPlaneSessionPromptSubmitArgs = {
   sessionId?: string;
+  streamConnected: boolean;
   setSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
   setRunning: Dispatch<SetStateAction<boolean>>;
   setError: Dispatch<SetStateAction<string | undefined>>;
@@ -18,12 +19,14 @@ export type ControlPlaneSessionPromptSubmitState = {
 // Owns prompt mutation state and optimistic conversation updates for web-v2.
 export function useControlPlaneSessionPromptSubmit({
   sessionId,
+  streamConnected,
   setSession,
   setRunning,
   setError,
   setLiveStatus,
 }: UseControlPlaneSessionPromptSubmitArgs): ControlPlaneSessionPromptSubmitState {
   const [submitting, setSubmitting] = useState(false);
+  const sessionSendPromptMutation = trpcReact.controlPlane.sessionSendPrompt.useMutation();
 
   useEffect(() => {
     setSubmitting(false);
@@ -38,11 +41,11 @@ export function useControlPlaneSessionPromptSubmit({
     setSubmitting(true);
     setRunning(true);
     setError(undefined);
-    setLiveStatus('Heddle is working...');
+    setLiveStatus(streamConnected ? 'Heddle is working...' : 'Heddle is working... reconnecting live stream if needed.');
     setSession((current) => SessionMessageController.appendOptimisticUserTurn(current, trimmed));
 
     try {
-      const result = await sendControlPlaneSessionPrompt(sessionId, trimmed);
+      const result = await sessionSendPromptMutation.mutateAsync({ sessionId, prompt: trimmed });
       setSession(result.session);
       setRunning(false);
       setLiveStatus(undefined);
@@ -53,7 +56,16 @@ export function useControlPlaneSessionPromptSubmit({
     } finally {
       setSubmitting(false);
     }
-  }, [sessionId, setError, setLiveStatus, setRunning, setSession, submitting]);
+  }, [
+    sessionId,
+    setError,
+    setLiveStatus,
+    setRunning,
+    setSession,
+    streamConnected,
+    submitting,
+    sessionSendPromptMutation,
+  ]);
 
   return {
     submitting,

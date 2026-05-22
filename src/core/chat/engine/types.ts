@@ -2,6 +2,8 @@ import type { ToolApprovalPolicy, ToolApprovalSurface } from '../../approvals/ty
 import type {
   ConversationActivity,
   ConversationCompactionStatus,
+} from '@/core/chat/engine/live/index.js';
+import type {
   TraceSummaryService,
 } from '@/core/observability/index.js';
 import type { AgentLoopEvent, RunAgentLoopOptions } from '../../runtime/loop/index.js';

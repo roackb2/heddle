@@ -1,18 +1,7 @@
-import {
-  ConversationActivityProjector,
-  type ConversationActivity,
-  type ConversationActivityHandlerMap,
-} from '@/core/observability/index.js';
-import type { TraceEvent } from '../../../index.js';
+import type { ConversationActivity, ConversationActivityHandlerMap } from '@/core/chat/engine/live/index.js';
 import { truncate } from '../../../core/utils/text.js';
 
-export function toLiveEvent(event: TraceEvent): string | undefined {
-  return ConversationActivityProjector.fromTraceEvent(event)
-    .map(formatConversationActivityForTui)
-    .find((text): text is string => Boolean(text));
-}
-
-const tuiActivityFormatters = {
+const tuiActivityFormatters: ConversationActivityHandlerMap<undefined, string | undefined> = {
   'run.started': () => 'thinking',
   'assistant.turn': (activity) => {
     const rationale = activity.event.diagnostics?.rationale;
@@ -48,15 +37,15 @@ const tuiActivityFormatters = {
     const metrics = activity.derived?.kind === 'cyberloop-metrics' ? activity.derived.metrics : '';
     return `cyberloop drift=${activity.event.driftLevel}${metrics}`;
   },
+  'compaction.running': () => 'Compacting earlier conversation history…',
+  'compaction.failed': (activity) => `Compaction failed: ${activity.event.error ?? 'unknown error'}`,
+  'compaction.finished': () => 'Compaction finished.',
   'run.finished': (activity) => {
     return activity.event.outcome === 'done' ? undefined : `stopped: ${activity.event.outcome}`;
   },
-} satisfies ConversationActivityHandlerMap<undefined, string | undefined>;
+};
 
-export function formatConversationActivityForTui(activity: ConversationActivity): string | undefined {
-  return ConversationActivityProjector.applyHandler({
-    activity,
-    handlers: tuiActivityFormatters,
-    context: undefined,
-  });
+export function formatTuiConversationActivity(activity: ConversationActivity): string | undefined {
+  const formatter = tuiActivityFormatters[activity.type] as ((activity: ConversationActivity) => string | undefined) | undefined;
+  return formatter?.(activity);
 }

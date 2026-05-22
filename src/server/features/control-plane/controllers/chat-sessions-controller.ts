@@ -13,6 +13,7 @@
  * the engine turn boundary.
  */
 import { EventEmitter } from 'node:events';
+import { watch } from 'node:fs';
 import { join } from 'node:path';
 import { PendingToolApprovalRequests } from '@/core/approvals/index.js';
 import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
@@ -39,6 +40,7 @@ import type {
   ChatSessionView,
   ChatTurnReview,
   ControlPlanePendingApproval,
+  ControlPlaneSessionEventEnvelope,
   ControlPlaneSessionLiveEvent,
 } from '../types.js';
 
@@ -161,6 +163,65 @@ export class ControlPlaneChatSessionsController {
     };
   }
 
+  async *subscribeLiveEvents(args: {
+    stateRoot: string;
+    sessionId: string;
+    signal?: AbortSignal;
+  }): AsyncGenerator<ControlPlaneSessionEventEnvelope> {
+    const queue = new ControlPlaneSessionEventQueue();
+
+    // Live LLM/tool/compaction updates arrive through the in-memory event bus.
+    // This is the path that streams assistant text to the client during a run;
+    // it does not touch the session file for each model delta.
+    const unsubscribe = this.subscribeToEvents(args.sessionId, (event) => {
+      queue.push({
+        ...event,
+        type: 'session.event',
+      });
+    });
+
+    // Closing the browser subscription closes the queue, which lets the async
+    // iterator below exit and release the EventEmitter listener/file watcher.
+    const abort = () => queue.close();
+    args.signal?.addEventListener('abort', abort, { once: true });
+
+    let watcher: ReturnType<typeof watch> | undefined;
+    try {
+      // File changes represent durable session persistence, usually after a
+      // turn finishes or settings/session metadata are saved. They are not the
+      // source of token streaming; they only tell the client to refetch the
+      // persisted session snapshot.
+      watcher = watch(this.resolveFilePath(args.stateRoot, args.sessionId), { persistent: false }, () => {
+        queue.push({
+          type: 'session.updated',
+          sessionId: args.sessionId,
+          timestamp: new Date().toISOString(),
+        });
+      });
+    } catch {
+      // A newly selected or newly created session may not have a watchable file
+      // yet. Keep the subscription alive so later live events can still flow.
+      queue.push({
+        type: 'waiting',
+        sessionId: args.sessionId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    try {
+      // tRPC consumes this AsyncGenerator and forwards each envelope to the
+      // browser as a subscription payload.
+      for await (const event of queue) {
+        yield event;
+      }
+    } finally {
+      unsubscribe();
+      watcher?.close();
+      args.signal?.removeEventListener('abort', abort);
+      queue.close();
+    }
+  }
+
   getPendingApproval(sessionId: string): ControlPlanePendingApproval | undefined {
     return this.pendingApprovals.get(sessionId)?.approval;
   }
@@ -264,10 +325,7 @@ export class ControlPlaneChatSessionsController {
   private createEngineHost(sessionId: string, publisher: ControlPlaneTurnPublisher): ConversationEngineHost {
     return {
       events: {
-        onAgentLoopEvent: publisher.publishAgentLoopEvent,
-      },
-      compaction: {
-        onStatus: publisher.publishCompactionStatus,
+        onActivity: publisher.publishActivity,
       },
       approvals: {
         requestToolApproval: async ({ call, tool }: { call: ToolCall; tool: ToolDefinition }) => {
@@ -280,9 +338,6 @@ export class ControlPlaneChatSessionsController {
                 approval: view,
                 resolve,
               });
-            },
-            publish: (_view, callForEvent) => {
-              publisher.publishApprovalRequested(callForEvent);
             },
           });
           this.pendingApprovals.delete(sessionId);
@@ -304,6 +359,7 @@ export class ControlPlaneChatSessionsController {
 
     const timestamp = new Date().toISOString();
     const assistantText = `Mocked browser integration agent response: ${args.prompt}`;
+    await this.emitBrowserIntegrationStreamPreview(args.sessionId, assistantText);
     const nextHistory = [
       ...session.history,
       { role: 'user' as const, content: args.prompt },
@@ -335,28 +391,44 @@ export class ControlPlaneChatSessionsController {
         .map((candidate) => candidate.id === session.id ? updatedSession : candidate),
     );
 
-    this.sessionEventBus.emit(args.sessionId, {
-      sessionId: args.sessionId,
-      timestamp,
-      event: {
-        type: 'trace',
-        runId: `browser-integration-${args.sessionId}`,
-        timestamp,
-        event: {
-          type: 'run.finished',
-          outcome: 'done',
-          summary: assistantText,
-          step: 1,
-          timestamp,
-        },
-      },
-    } satisfies ControlPlaneSessionLiveEvent);
-
     return {
       outcome: 'done',
       summary: assistantText,
       session: ControlPlaneChatSessionPresenter.projectDetail(updatedSession)[0] ?? null,
     };
+  }
+
+  private async emitBrowserIntegrationStreamPreview(sessionId: string, assistantText: string): Promise<void> {
+    // The browser-integration fake has to emit a real live activity before its
+    // final mutation result so web-v2 can regression-test incremental streaming.
+    const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
+      eventBus: this.sessionEventBus,
+      sessionId,
+    });
+    const runId = `browser-integration-run-${Date.now()}`;
+    const timestamp = new Date().toISOString();
+
+    publisher.publishActivity({
+      source: 'agent-loop',
+      type: 'assistant.stream',
+      event: {
+        type: 'assistant.stream',
+        runId,
+        step: 1,
+        text: assistantText.slice(0, 'Mocked browser integration agent response'.length),
+        done: false,
+        timestamp,
+      },
+      correlation: {
+        runId,
+        step: 1,
+        timestamp,
+      },
+    });
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 750);
+    });
   }
 
   private resolveSessionCreationModel(args: {
@@ -384,3 +456,58 @@ export class ControlPlaneChatSessionsController {
 }
 
 export const controlPlaneChatSessionsController = new ControlPlaneChatSessionsController();
+
+/**
+ * Per-subscription delivery queue for control-plane session events.
+ *
+ * The controller uses EventEmitter for in-process fanout, while tRPC
+ * subscriptions consume an AsyncIterable. This queue is the transport adapter
+ * between those two shapes: it buffers events when the browser is not awaiting
+ * the next item yet, wakes pending readers when an event arrives, and closes
+ * cleanly when the subscription is aborted.
+ *
+ * Boundary: this class must stay transport/infrastructure-only. It should not
+ * inspect or transform conversation activities; event vocabulary belongs to the
+ * conversation engine and control-plane event publisher.
+ */
+class ControlPlaneSessionEventQueue implements AsyncIterable<ControlPlaneSessionEventEnvelope> {
+  private readonly events: ControlPlaneSessionEventEnvelope[] = [];
+  private readonly waiters: Array<(event: ControlPlaneSessionEventEnvelope | undefined) => void> = [];
+  private closed = false;
+
+  push(event: ControlPlaneSessionEventEnvelope): void {
+    if (this.closed) {
+      return;
+    }
+
+    const waiter = this.waiters.shift();
+    if (waiter) {
+      waiter(event);
+      return;
+    }
+
+    this.events.push(event);
+  }
+
+  close(): void {
+    if (this.closed) {
+      return;
+    }
+
+    this.closed = true;
+    this.waiters.splice(0).forEach((waiter) => waiter(undefined));
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterator<ControlPlaneSessionEventEnvelope> {
+    while (!this.closed || this.events.length > 0) {
+      const event = this.events.shift() ?? await new Promise<ControlPlaneSessionEventEnvelope | undefined>((resolve) => {
+        this.waiters.push(resolve);
+      });
+      if (!event) {
+        break;
+      }
+
+      yield event;
+    }
+  }
+}

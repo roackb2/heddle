@@ -143,6 +143,7 @@ function formatCompactionStatus(event: ConversationCompactionStatus): string {
     case 'failed':
       return event.error ? `failed error=${event.error}` : 'failed';
   }
+  return event.status;
 }
 
 main().catch((error) => {

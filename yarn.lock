@@ -1266,6 +1266,18 @@
     "@tailwindcss/oxide" "4.2.2"
     tailwindcss "4.2.2"
 
+"@tanstack/query-core@5.100.11":
+  version "5.100.11"
+  resolved "https://registry.yarnpkg.com/@tanstack/query-core/-/query-core-5.100.11.tgz#fdf273bec49277600311a4c552e2c2d95f4df73b"
+  integrity sha512-lmE0994apShXPj8CUxgx4ch5yUJhE9k/+tVwihBvPOyerACWdBocfFg24t8+0RhtlTd7tEgchDkhlCxNssvDxw==
+
+"@tanstack/react-query@^5.100.11":
+  version "5.100.11"
+  resolved "https://registry.yarnpkg.com/@tanstack/react-query/-/react-query-5.100.11.tgz#096005bf2868be2f5798c9a48e8f3f7f08c77f20"
+  integrity sha512-J0f9s5x3LE1450nNNfYx+e/n0DMa0uOBdFJUy5r0RvmsXd4nB/n0rbHtHI1vYXhikNFan+wf51p6Tmp4c8ucrg==
+  dependencies:
+    "@tanstack/query-core" "5.100.11"
+
 "@testing-library/dom@^10.4.1":
   version "10.4.1"
   resolved "https://registry.yarnpkg.com/@testing-library/dom/-/dom-10.4.1.tgz#d444f8a889e9a46e9a3b4f3b88e0fcb3efb6cf95"
@@ -1291,6 +1303,11 @@
   version "11.16.0"
   resolved "https://registry.yarnpkg.com/@trpc/client/-/client-11.16.0.tgz#fd3844118aeabaf4b4cb025155603b08169bd9d1"
   integrity sha512-TxIzm7OoK3baKZ0XCbuMUbI3GhgjcbKHIc4nWVKaRpCRnbSh0T31BT6fTPYwtnA/Nur8pBCGqC2B4J5hEPiPFQ==
+
+"@trpc/react-query@11.16.0":
+  version "11.16.0"
+  resolved "https://registry.yarnpkg.com/@trpc/react-query/-/react-query-11.16.0.tgz#31a9eed87a598303835c758b1c30bf9299abd43a"
+  integrity sha512-ah6ULOu4k7lCEFAEoEgqg14YPVu1lnCVVYcz8TP7avPPKwtcB0CbFKYve3ElRP+V5DoBT75Q+G66bRdR+rQ5fg==
 
 "@trpc/server@^11.16.0":
   version "11.16.0"

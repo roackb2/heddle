@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { formatConversationActivityForTui, toLiveEvent } from '../../../cli/chat/adapters/conversation-activity-adapter.js';
-import { ConversationActivityProjector, ToolActivitySummarizer } from '@/core/observability/index.js';
+import { formatTuiConversationActivity } from '../../../cli/chat/adapters/conversation-activity-format.js';
+import { ToolActivitySummarizer } from '@/core/chat/engine/live/index.js';
+import { ConversationEngineActivityAdapter } from '@/core/chat/engine/turns/host/conversation-activity-adapter.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../types.js';
 
@@ -31,7 +32,9 @@ describe('chat activity formatting', () => {
       timestamp: '2024-01-01T00:00:00Z',
     };
 
-    expect(toLiveEvent(event)).toBe('running read_file (README.md)');
+    expect(ConversationEngineActivityAdapter.fromTraceEvent(event).map(formatTuiConversationActivity)).toEqual([
+      'running read_file (README.md)',
+    ]);
   });
 
   it('includes list paths in approval activity events', () => {
@@ -42,7 +45,9 @@ describe('chat activity formatting', () => {
       timestamp: '2024-01-01T00:00:01Z',
     };
 
-    expect(toLiveEvent(event)).toBe('approval needed for list_files (src)');
+    expect(ConversationEngineActivityAdapter.fromTraceEvent(event).map(formatTuiConversationActivity)).toEqual([
+      'approval needed for list_files (src)',
+    ]);
   });
 
   it('includes search query details in live activity events', () => {
@@ -53,7 +58,9 @@ describe('chat activity formatting', () => {
       timestamp: '2024-01-01T00:00:02Z',
     };
 
-    expect(toLiveEvent(event)).toBe('running search_files ("trace" in .heddle/traces)');
+    expect(ConversationEngineActivityAdapter.fromTraceEvent(event).map(formatTuiConversationActivity)).toEqual([
+      'running search_files ("trace" in .heddle/traces)',
+    ]);
   });
 
   it('formats loop-level tool calling events with input details for immediate TUI activity', () => {
@@ -68,7 +75,7 @@ describe('chat activity formatting', () => {
       timestamp: '2026-05-08T00:00:00.000Z',
     };
 
-    expect(ConversationActivityProjector.fromAgentLoopEvent(event).map(formatConversationActivityForTui)).toEqual([
+    expect(ConversationEngineActivityAdapter.fromAgentLoopEvent(event).map(formatTuiConversationActivity)).toEqual([
       'running read_file (README.md)',
     ]);
   });

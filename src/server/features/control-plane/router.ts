@@ -41,6 +41,10 @@ const sessionMessageInputSchema = z.object({
   memoryMaintenanceMode: z.enum(['background', 'inline', 'none']).optional(),
 });
 
+const sessionEventsInputSchema = z.object({
+  sessionId: z.string().min(1),
+});
+
 const agentAskInputSchema = z.object({
   goal: z.string().min(1),
   model: z.string().min(1).optional(),
@@ -151,6 +155,13 @@ export const controlPlaneRouter = router({
   }),
   session: procedure.input(sessionInputSchema).query(({ ctx, input }) => {
     return controlPlaneChatSessionsController.readDetail(controlPlaneSessionEngineArgs(ctx), input.id) ?? null;
+  }),
+  sessionEvents: procedure.input(sessionEventsInputSchema).subscription(({ ctx, input, signal }) => {
+    return controlPlaneChatSessionsController.subscribeLiveEvents({
+      stateRoot: ctx.activeWorkspace.stateRoot,
+      sessionId: input.sessionId,
+      signal,
+    });
   }),
   modelOptions: procedure.query(({ ctx }) => {
     const credentialMode = ModelPolicyService.credentialModeFromSource(RuntimeCredentialService.resolveCredentialSourceForModel('gpt-5.4', {

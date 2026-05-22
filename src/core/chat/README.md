@@ -42,7 +42,7 @@ That module owns:
 - preflight and final compaction lifecycle
 - memory maintenance integration for turns
 - trace persistence for persisted turns
-- engine host normalization and conversation-activity projection
+- engine host normalization and user-facing live conversation activity
 
 ## Does Not Own
 

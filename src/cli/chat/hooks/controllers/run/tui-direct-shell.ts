@@ -1,7 +1,7 @@
 import { ToolApprovalPolicies, ToolApprovalService } from '@/core/approvals/index.js';
 import { ProjectApprovalRules } from '@/core/approvals/remembered-rules/index.js';
 import type { ConversationSessionService } from '@/core/chat/engine/types.js';
-import { ToolActivitySummarizer } from '@/core/observability/index.js';
+import { ToolActivitySummarizer } from '@/core/chat/engine/live/index.js';
 import { DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES, runShellCommand } from '@/core/tools/toolkits/shell-process/run-shell.js';
 import type { ToolCall, ToolDefinition, ToolResult } from '@/core/types.js';
 import { shouldFallbackToMutate } from '../../../utils/format.js';

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import { trpc, type ControlPlaneSessionDetail } from '@web/api/client';
+import { skipToken } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { trpcReact, type ControlPlaneSessionDetail } from '@web/api/client';
 import { SessionMessageController } from '@web/controllers/session-messages';
 
 export type RefreshControlPlaneSession = (
@@ -16,20 +17,38 @@ export type ControlPlaneSessionLoaderState = {
   refresh: RefreshControlPlaneSession;
 };
 
-// Loads persisted session detail and preserves browser-only transient messages
-// during silent refreshes triggered by session file or stream events.
+// Loads persisted session detail through React Query and preserves browser-only
+// transient messages during silent refreshes.
 export function useControlPlaneSessionLoader(sessionId: string | undefined): ControlPlaneSessionLoaderState {
   const [session, setSession] = useState<ControlPlaneSessionDetail>(null);
-  const [loading, setLoading] = useState(false);
+  const [manualLoading, setManualLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const latestRefreshMode = useRef<'normal' | 'silent' | null>(null);
+
+  const sessionQuery = trpcReact.controlPlane.session.useQuery(
+    sessionId ? { id: sessionId } : skipToken,
+    {
+      enabled: Boolean(sessionId),
+    },
+  );
 
   const refresh = useCallback<RefreshControlPlaneSession>(async (id, options = {}) => {
-    if (!options.silent) {
-      setLoading(true);
+    if (!id || id !== sessionId) {
+      return;
     }
 
+    if (!options.silent) {
+      setManualLoading(true);
+    }
+    latestRefreshMode.current = options.silent ? 'silent' : 'normal';
+
     try {
-      const next = await trpc.controlPlane.session.query({ id });
+      const nextResult = await sessionQuery.refetch();
+      const next = nextResult.data;
+      if (!next) {
+        throw new Error('Session not available');
+      }
+
       setSession((current) => (
         options.silent ? SessionMessageController.mergeTransientMessages(current, next) : next
       ));
@@ -38,25 +57,43 @@ export function useControlPlaneSessionLoader(sessionId: string | undefined): Con
       setError(loadError instanceof Error ? loadError.message : String(loadError));
     } finally {
       if (!options.silent) {
-        setLoading(false);
+        setManualLoading(false);
       }
     }
-  }, []);
+  }, [sessionId, sessionQuery]);
 
   useEffect(() => {
     if (!sessionId) {
       setSession(null);
-      setLoading(false);
+      setManualLoading(false);
       setError(undefined);
       return;
     }
 
-    void refresh(sessionId);
-  }, [refresh, sessionId]);
+    if (!sessionQuery.data) {
+      return;
+    }
+
+    const querySession = sessionQuery.data;
+    setSession((current) => {
+      if (latestRefreshMode.current === 'silent' && current?.id === querySession.id) {
+        return current;
+      }
+
+      return querySession;
+    });
+    latestRefreshMode.current = null;
+  }, [sessionId, sessionQuery.data]);
+
+  useEffect(() => {
+    if (sessionQuery.error) {
+      setError(sessionQuery.error instanceof Error ? sessionQuery.error.message : String(sessionQuery.error));
+    }
+  }, [sessionQuery.error]);
 
   return {
     session,
-    loading,
+    loading: manualLoading || sessionQuery.isLoading || sessionQuery.isFetching,
     error,
     setSession,
     setError,

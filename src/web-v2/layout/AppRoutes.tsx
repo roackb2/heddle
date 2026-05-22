@@ -14,9 +14,7 @@ interface AppRoutesProps {
   selectedSession: ControlPlaneSessionDetail;
   selectedSessionLoading: boolean;
   selectedSessionSubmitting: boolean;
-  selectedSessionRunning: boolean;
   selectedSessionLiveStatus?: string;
-  selectedSessionError?: string;
   onSubmitSessionPrompt: (prompt: string) => Promise<void>;
 }
 
@@ -28,9 +26,7 @@ export function AppRoutes({
   selectedSession,
   selectedSessionLoading,
   selectedSessionSubmitting,
-  selectedSessionRunning,
   selectedSessionLiveStatus,
-  selectedSessionError,
   onSubmitSessionPrompt,
 }: AppRoutesProps) {
   return (
@@ -47,9 +43,7 @@ export function AppRoutes({
               selectedSession={selectedSession}
               selectedSessionLoading={selectedSessionLoading}
               selectedSessionSubmitting={selectedSessionSubmitting}
-              selectedSessionRunning={selectedSessionRunning}
               selectedSessionLiveStatus={selectedSessionLiveStatus}
-              selectedSessionError={selectedSessionError}
               settingsOpen={false}
               onSubmitSessionPrompt={onSubmitSessionPrompt}
             />
@@ -67,9 +61,7 @@ export function AppRoutes({
               selectedSession={selectedSession}
               selectedSessionLoading={selectedSessionLoading}
               selectedSessionSubmitting={selectedSessionSubmitting}
-              selectedSessionRunning={selectedSessionRunning}
               selectedSessionLiveStatus={selectedSessionLiveStatus}
-              selectedSessionError={selectedSessionError}
               settingsOpen
               onSubmitSessionPrompt={onSubmitSessionPrompt}
             />

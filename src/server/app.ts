@@ -82,11 +82,13 @@ export function createHeddleServerApp(
     response.setHeader('Content-Type', 'text/event-stream');
     response.setHeader('Cache-Control', 'no-cache, no-transform');
     response.setHeader('Connection', 'keep-alive');
+    response.setHeader('X-Accel-Buffering', 'no');
     response.flushHeaders?.();
 
     const send = (event: string, data: Record<string, unknown>) => {
       response.write(`event: ${event}\n`);
       response.write(`data: ${JSON.stringify(data)}\n\n`);
+      (response as typeof response & { flush?: () => void }).flush?.();
     };
 
     send('ready', { sessionId });

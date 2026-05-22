@@ -1,15 +1,5 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
-// Boundary note: live session rendering currently reuses core event projection and trace types in
-// the browser. Desired shape: the server should publish web-facing session event DTOs through the
-// control-plane API, with browser presenters depending on that API contract instead of core internals.
-import {
-  ConversationActivityProjector,
-  type ConversationActivity,
-  type ConversationActivityHandlerMap,
-  type ConversationCompactionStatus,
-} from '../../../../../core/observability';
-import type { AgentLoopEvent } from '@/core/runtime/loop';
-import type { TraceEvent } from '../../../../../core/types';
+import type { ConversationActivity, ConversationActivityHandlerMap } from '../../../../../core/chat/engine/live';
 import {
   fetchChatSessionDetail,
   fetchPendingSessionApproval,
@@ -24,20 +14,6 @@ type LiveSessionMessageActions = {
   upsertLiveStatusMessage: (id: string, text: string, options?: { pending?: boolean; streaming?: boolean }) => void;
   removeLiveStatusMessage: (id: string) => void;
   upsertLiveAssistantMessage: (text: string, isDone: boolean) => void;
-};
-
-type LiveSessionEvent = {
-  type?: string;
-  text?: string;
-  done?: boolean;
-  tool?: string;
-  step?: number;
-  durationMs?: number;
-  event?: TraceEvent;
-  status?: 'running' | 'finished' | 'failed';
-  archivePath?: string;
-  summaryPath?: string;
-  error?: string;
 };
 
 type SessionEventContext = {
@@ -127,13 +103,13 @@ export function useSessionDetailSubscription({
         return;
       }
 
-      if (event.type !== 'session.event' || !event.event || typeof event.event !== 'object') {
+      if (event.type !== 'session.event') {
         return;
       }
 
-      handleSessionEvent({
+      applySessionActivities({
         sessionId,
-        liveEvent: event.event,
+        activities: event.activities ?? [],
         setRunInFlight,
         setMemoryUpdating,
         setPendingApproval,
@@ -161,9 +137,9 @@ export function useSessionDetailSubscription({
   ]);
 }
 
-function handleSessionEvent({
+function applySessionActivities({
   sessionId,
-  liveEvent,
+  activities,
   setRunInFlight,
   setMemoryUpdating,
   setPendingApproval,
@@ -171,14 +147,13 @@ function handleSessionEvent({
   liveMessages,
 }: {
   sessionId: string;
-  liveEvent: unknown;
+  activities: unknown[];
   setRunInFlight: Dispatch<SetStateAction<boolean>>;
   setMemoryUpdating: Dispatch<SetStateAction<boolean>>;
   setPendingApproval: Dispatch<SetStateAction<PendingSessionApproval>>;
   refresh: (options?: { silent?: boolean }) => Promise<void>;
   liveMessages: LiveSessionMessageActions;
 }) {
-  const event = liveEvent as LiveSessionEvent;
   const context: SessionEventContext = {
     sessionId,
     setRunInFlight,
@@ -187,10 +162,10 @@ function handleSessionEvent({
     refresh,
     liveMessages,
   };
-  projectLiveSessionEvent(event).forEach((activity) => applyWebConversationActivity(activity, context));
+  activities.forEach((activity) => applySessionActivity(activity as ConversationActivity, context));
 }
 
-const webActivityHandlers = {
+const sessionActivityHandlers: ConversationActivityHandlerMap<SessionEventContext> = {
   'compaction.running': (activity, { liveMessages }) => {
     liveMessages.upsertLiveStatusMessage(
       'live-run-status',
@@ -289,28 +264,9 @@ const webActivityHandlers = {
       { pending: true, streaming: false },
     );
   },
-} satisfies ConversationActivityHandlerMap<SessionEventContext>;
+};
 
-function projectLiveSessionEvent(event: LiveSessionEvent): ConversationActivity[] {
-  if (isCompactionStatusEvent(event)) {
-    return ConversationActivityProjector.fromCompactionStatus(event);
-  }
-
-  return isAgentLoopEventLike(event) ? ConversationActivityProjector.fromAgentLoopEvent(event) : [];
-}
-
-function applyWebConversationActivity(activity: ConversationActivity, context: SessionEventContext) {
-  ConversationActivityProjector.applyHandler({
-    activity,
-    handlers: webActivityHandlers,
-    context,
-  });
-}
-
-function isCompactionStatusEvent(event: LiveSessionEvent): event is ConversationCompactionStatus {
-  return event.status === 'running' || event.status === 'finished' || event.status === 'failed';
-}
-
-function isAgentLoopEventLike(event: LiveSessionEvent): event is AgentLoopEvent {
-  return typeof event.type === 'string';
+function applySessionActivity(activity: ConversationActivity, context: SessionEventContext) {
+  const handler = sessionActivityHandlers[activity.type] as ((activity: ConversationActivity, context: SessionEventContext) => void) | undefined;
+  handler?.(activity, context);
 }

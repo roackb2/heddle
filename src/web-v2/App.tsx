@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useControlPlaneSidebarData } from '@web/hooks/useControlPlaneSidebarData';
+import { useEffect, useMemo, useState } from 'react';
+import { trpcReact } from '@web/api/client';
+import { useControlPlaneErrorToasts } from '@web/hooks/useControlPlaneErrorToasts';
 import { useControlPlaneSessionDetail } from '@web/hooks/useControlPlaneSessionDetail';
 import { useWorkbenchNavigation } from '@web/hooks/useWorkbenchNavigation';
 import { AppFrame } from '@web/layout/AppFrame';
@@ -8,17 +9,29 @@ import { APP_ROUTES, SETTINGS_ROUTES } from '@web/layout/routes';
 
 export function App() {
   const navigation = useWorkbenchNavigation();
-  const sidebarData = useControlPlaneSidebarData();
+  const stateQuery = trpcReact.controlPlane.state.useQuery();
+  const sidebarSessions = useMemo(
+    () => stateQuery.data?.sessions ?? [],
+    [stateQuery.data?.sessions],
+  );
+  const sidebarTasks = useMemo(
+    () => stateQuery.data?.heartbeat.tasks ?? [],
+    [stateQuery.data?.heartbeat.tasks],
+  );
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>();
   const selectedSession = useControlPlaneSessionDetail(selectedSessionId);
+  useControlPlaneErrorToasts({
+    stateError: stateQuery.error,
+    sessionError: selectedSession.error,
+  });
 
   useEffect(() => {
-    if (selectedSessionId || sidebarData.sessions.length === 0) {
+    if (selectedSessionId || sidebarSessions.length === 0) {
       return;
     }
 
-    setSelectedSessionId(sidebarData.sessions[0]?.id);
-  }, [selectedSessionId, sidebarData.sessions]);
+    setSelectedSessionId(sidebarSessions[0]?.id);
+  }, [selectedSessionId, sidebarSessions]);
 
   return (
     <AppFrame
@@ -28,8 +41,8 @@ export function App() {
       settingsNavigationItems={SETTINGS_ROUTES}
       settingsOpen={navigation.settingsOpen}
       selectedSessionId={selectedSessionId}
-      sessions={sidebarData.sessions}
-      tasks={sidebarData.tasks}
+      sessions={sidebarSessions}
+      tasks={sidebarTasks}
       onOpenSettings={navigation.openSettings}
       onCloseSettings={navigation.closeSettings}
       onSelectSession={setSelectedSessionId}
@@ -40,9 +53,7 @@ export function App() {
         selectedSession={selectedSession.session}
         selectedSessionLoading={selectedSession.loading}
         selectedSessionSubmitting={selectedSession.submitting}
-        selectedSessionRunning={selectedSession.running}
         selectedSessionLiveStatus={selectedSession.liveStatus}
-        selectedSessionError={selectedSession.error}
         onSubmitSessionPrompt={selectedSession.submitPrompt}
       />
     </AppFrame>

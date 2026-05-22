@@ -22,19 +22,19 @@ export function useControlPlaneSessionDetail(sessionId: string | undefined): Con
   const [running, setRunning] = useState(false);
   const [liveStatus, setLiveStatus] = useState<string | undefined>();
   const loader = useControlPlaneSessionLoader(sessionId);
-  const promptSubmit = useControlPlaneSessionPromptSubmit({
-    sessionId,
-    setSession: loader.setSession,
-    setRunning,
-    setError: loader.setError,
-    setLiveStatus,
-  });
-
-  useControlPlaneSessionEvents({
+  const events = useControlPlaneSessionEvents({
     sessionId,
     refresh: loader.refresh,
     setSession: loader.setSession,
     setRunning,
+    setLiveStatus,
+  });
+  const promptSubmit = useControlPlaneSessionPromptSubmit({
+    sessionId,
+    streamConnected: events.streamConnected,
+    setSession: loader.setSession,
+    setRunning,
+    setError: loader.setError,
     setLiveStatus,
   });
 

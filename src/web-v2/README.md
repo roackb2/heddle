@@ -19,6 +19,10 @@ current user-facing UI.
   the browser unless they are truly web-interface view models.
 - Start from shadcn/Tailwind tokens and primitives. Add custom CSS only when a
   real product need cannot be expressed by the shared design system.
+- Use React Query + `@trpc/react-query` for all web-v2 API usage, including
+  session listing, session details, prompt mutation, and subscription-driven
+  UI updates. Prefer these APIs over custom `useEffect` fetch wrappers for
+  loading/error/caching/refresh behavior.
 - Keep workflow state close to the feature that owns it. Do not create broad
   global hooks until two real surfaces need the same behavior.
 - Put reusable UI under `components/<feature>/` instead of nesting shared

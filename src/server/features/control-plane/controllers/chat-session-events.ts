@@ -1,18 +1,22 @@
 import type { EventEmitter } from 'node:events';
 import type { ToolCall, ToolDefinition } from '../../../../index.js';
-import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
+import type { ConversationActivity } from '@/core/chat/engine/live/index.js';
 import type { ControlPlaneSessionLiveEvent } from '../types.js';
 
 export class ControlPlaneChatSessionEventsController {
-  static emitSessionEvent(args: {
+  static emitSessionActivities(args: {
     eventBus: EventEmitter;
     sessionId: string;
-    event: ControlPlaneSessionLiveEvent['event'];
+    activities: ConversationActivity[];
   }) {
+    if (args.activities.length === 0) {
+      return;
+    }
+
     args.eventBus.emit(args.sessionId, {
       sessionId: args.sessionId,
       timestamp: new Date().toISOString(),
-      event: args.event,
+      activities: args.activities,
     } satisfies ControlPlaneSessionLiveEvent);
   }
 
@@ -20,36 +24,20 @@ export class ControlPlaneChatSessionEventsController {
     eventBus: EventEmitter;
     sessionId: string;
   }) {
-    const publishEvent = (event: ControlPlaneSessionLiveEvent['event']) => {
-      ControlPlaneChatSessionEventsController.emitSessionEvent({
+    const publishActivities = (activities: ConversationActivity[]) => {
+      ControlPlaneChatSessionEventsController.emitSessionActivities({
         eventBus: args.eventBus,
         sessionId: args.sessionId,
-        event,
+        activities,
       });
     };
 
     const publisher = {
-      publishAgentLoopEvent(event: AgentLoopEvent) {
-        publishEvent(event);
+      publishActivity(activity: ConversationActivity) {
+        publishActivities([activity]);
       },
 
-      publishCompactionStatus(event: ControlPlaneSessionLiveEvent['event']) {
-        publishEvent(event);
-      },
-
-      publishApprovalRequested(call: ToolCall) {
-        publishEvent({
-          type: 'trace',
-          runId: 'pending-approval',
-          timestamp: new Date().toISOString(),
-          event: {
-            type: 'tool.approval_requested',
-            call,
-            step: 0,
-            timestamp: new Date().toISOString(),
-          },
-        });
-      },
+      publishActivities,
     };
 
     return publisher;

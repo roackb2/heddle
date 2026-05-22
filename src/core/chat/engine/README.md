@@ -16,6 +16,8 @@ not each invent their own version.
 - Persisted turn execution, runtime resolution, preflight compaction, memory
   maintenance, trace persistence, final durable persistence, and host adaptation
   under `turns/`.
+- User-facing live conversation activity under `live/`. This is the shared
+  event contract for TUI, browser control plane, and programmatic hosts.
 - The alpha programmatic API through `conversation-engine.ts` and `index.ts`.
 
 ## Domain Ownership Rule
@@ -77,8 +79,9 @@ Use this pattern when it fits the domain:
 - Put normalized config, path defaults, and engine-wide defaults in `config.ts`.
 - Put persisted session lifecycle behavior in `sessions/service.ts` and related
   `sessions/*` modules.
-- Put engine host normalization and `ConversationActivity` projection in
-  `turns/host/`.
+- Put raw runtime/trace/compaction-to-`ConversationActivity` adaptation at the
+  `turns/host/` boundary. Above that boundary, hosts and interfaces should use
+  `events.onActivity` directly.
 - Put submit/continue behavior in `turns/service.ts`.
 - Put persisted turn phases in the explicit `turns/*/` subdomains.
 - Put shared compaction behavior in `compaction/`.
@@ -91,6 +94,9 @@ Use this pattern when it fits the domain:
   engine-owned service instead of adding another host-level reconciliation step.
 - If a host only provides `events.onActivity`, it must still receive compaction
   activity through engine host normalization.
+- Keep live activity vocabulary aligned with upstream event vocabulary. If a
+  layer is only passing fields through, pass the source event instead of
+  reassigning each field into another shape.
 - Keep docs and exports clearly marked alpha.
 
 See [docs/architecture/chat-layering.md](../../../../docs/architecture/chat-layering.md)
