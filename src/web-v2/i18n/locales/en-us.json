@@ -24,7 +24,9 @@
     "send": "Send"
   },
   "inspector": {
-    "contextAriaLabel": "Context inspector"
+    "collapsePanel": "Collapse context inspector",
+    "contextAriaLabel": "Context inspector",
+    "expandPanel": "Expand context inspector"
   },
   "language": {
     "enUs": "English (US)",

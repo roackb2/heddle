@@ -152,6 +152,15 @@
     box-shadow: 0 12px 28px hsl(235 18% 3% / 0.32);
   }
 
+  .v2-scrollbar-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .v2-scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+
   .v2-resize-handle {
     background: color-mix(in oklab, var(--color-border) 74%, transparent);
   }

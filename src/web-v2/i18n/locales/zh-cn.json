@@ -24,7 +24,9 @@
     "send": "发送"
   },
   "inspector": {
-    "contextAriaLabel": "上下文检查器"
+    "collapsePanel": "收起上下文检查器",
+    "contextAriaLabel": "上下文检查器",
+    "expandPanel": "展开上下文检查器"
   },
   "language": {
     "enUs": "英文（美国）",

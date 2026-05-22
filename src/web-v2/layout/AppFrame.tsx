@@ -1,4 +1,6 @@
-import type { PropsWithChildren } from 'react';
+import { useRef, useState, type PropsWithChildren } from 'react';
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -8,9 +10,10 @@ import {
   Sidebar,
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
+  useSidebar,
 } from '@web/components/ui/sidebar';
 import type { ControlPlaneState } from '@web/api/client';
+import { Button } from '@web/components/ui/button';
 import { ContextInspector, ConversationWorkspace, SessionSidebar } from '@web/components/panels';
 import { useI18n } from '@web/i18n';
 import type { AppRoute, SettingsRoute } from '@web/layout/routes';
@@ -48,47 +51,172 @@ export function AppFrame({
   onSelectSession,
   children,
 }: PropsWithChildren<AppFrameProps>) {
+  return (
+    <SidebarProvider className="v2-shell h-dvh overflow-hidden bg-background font-sans text-foreground">
+      <AppFramePanels
+        activeSurfaceId={activeSurfaceId}
+        activeSettingsSectionId={activeSettingsSectionId}
+        appNavigationItems={appNavigationItems}
+        settingsNavigationItems={settingsNavigationItems}
+        settingsOpen={settingsOpen}
+        selectedSessionId={selectedSessionId}
+        sessions={sessions}
+        tasks={tasks}
+        onOpenSettings={onOpenSettings}
+        onCloseSettings={onCloseSettings}
+        onCreateSession={onCreateSession}
+        onSelectSession={onSelectSession}
+      >
+        {children}
+      </AppFramePanels>
+    </SidebarProvider>
+  );
+}
+
+function AppFramePanels({
+  activeSurfaceId,
+  activeSettingsSectionId,
+  appNavigationItems,
+  settingsNavigationItems,
+  settingsOpen,
+  selectedSessionId,
+  sessions,
+  tasks,
+  onOpenSettings,
+  onCloseSettings,
+  onCreateSession,
+  onSelectSession,
+  children,
+}: PropsWithChildren<AppFrameProps>) {
   const { t } = useI18n();
+  const { setOpen: setSidebarOpen } = useSidebar();
+  const sidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
+  const inspectorPanelRef = useRef<PanelImperativeHandle | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+
+  function toggleSidebarPanel() {
+    if (sidebarCollapsed) {
+      sidebarPanelRef.current?.expand();
+      setSidebarOpen(true);
+      setSidebarCollapsed(false);
+      return;
+    }
+
+    sidebarPanelRef.current?.collapse();
+    setSidebarOpen(false);
+    setSidebarCollapsed(true);
+  }
+
+  function toggleInspectorPanel() {
+    if (inspectorCollapsed) {
+      inspectorPanelRef.current?.expand();
+      setInspectorCollapsed(false);
+      return;
+    }
+
+    inspectorPanelRef.current?.collapse();
+    setInspectorCollapsed(true);
+  }
+
+  function syncSidebarCollapsed(panelSize: PanelSize) {
+    const collapsed = panelSize.asPercentage <= 1;
+    setSidebarCollapsed((previous) => {
+      if (previous !== collapsed) {
+        setSidebarOpen(!collapsed);
+      }
+
+      return collapsed;
+    });
+  }
+
+  function syncInspectorCollapsed(panelSize: PanelSize) {
+    setInspectorCollapsed(panelSize.asPercentage <= 1);
+  }
 
   return (
-    <SidebarProvider className="v2-shell h-dvh bg-background font-sans text-foreground">
+    <>
       <a className="sr-only focus:not-sr-only" href="#main-content">{t('navigation.skipToMain')}</a>
-      <Sidebar
-        aria-label={t('navigation.primaryAriaLabel')}
-        className="v2-sidebar-panel v2-panel-divider"
-        collapsible="offcanvas"
-      >
-        <SessionSidebar
-          activeSurfaceId={activeSurfaceId}
-          activeSettingsSectionId={activeSettingsSectionId}
-          appNavigationItems={appNavigationItems}
-          settingsNavigationItems={settingsNavigationItems}
-          settingsOpen={settingsOpen}
-          selectedSessionId={selectedSessionId}
-          sessions={sessions}
-          tasks={tasks}
-          onOpenSettings={onOpenSettings}
-          onCloseSettings={onCloseSettings}
-          onCreateSession={onCreateSession}
-          onSelectSession={onSelectSession}
-        />
-      </Sidebar>
+      <ResizablePanelGroup className="min-h-0 overflow-hidden" direction="horizontal">
+        <ResizablePanel
+          collapsible
+          className="h-full min-h-0 overflow-hidden"
+          collapsedSize={0}
+          defaultSize="17rem"
+          minSize="14rem"
+          maxSize="24rem"
+          panelRef={sidebarPanelRef}
+          onResize={syncSidebarCollapsed}
+        >
+          <Sidebar
+            aria-label={t('navigation.primaryAriaLabel')}
+            className="v2-sidebar-panel v2-panel-divider w-full"
+            collapsible="none"
+          >
+            <SessionSidebar
+              activeSurfaceId={activeSurfaceId}
+              activeSettingsSectionId={activeSettingsSectionId}
+              appNavigationItems={appNavigationItems}
+              settingsNavigationItems={settingsNavigationItems}
+              settingsOpen={settingsOpen}
+              selectedSessionId={selectedSessionId}
+              sessions={sessions}
+              tasks={tasks}
+              onOpenSettings={onOpenSettings}
+              onCloseSettings={onCloseSettings}
+              onCreateSession={onCreateSession}
+              onSelectSession={onSelectSession}
+            />
+          </Sidebar>
+        </ResizablePanel>
 
-      <SidebarInset>
-        <SidebarTrigger
-          className="absolute left-2 top-2 z-20"
-        />
-        <ResizablePanelGroup direction="horizontal">
-          <ResizablePanel defaultSize="74%" minSize="32rem">
+        <ResizableHandle />
+
+        <ResizablePanel className="h-full min-h-0 overflow-hidden" defaultSize="58%" minSize="32rem">
+          <SidebarInset className="h-full min-h-0 overflow-hidden">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-expanded={!sidebarCollapsed}
+              aria-label={t(sidebarCollapsed ? 'navigation.expandSidebar' : 'navigation.collapseSidebar')}
+              className="v2-icon-button absolute left-2 top-2 z-20 size-7"
+              onClick={toggleSidebarPanel}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />}
+              <span className="sr-only">{t(sidebarCollapsed ? 'navigation.expandSidebar' : 'navigation.collapseSidebar')}</span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-expanded={!inspectorCollapsed}
+              aria-label={t(inspectorCollapsed ? 'inspector.expandPanel' : 'inspector.collapsePanel')}
+              className="v2-icon-button absolute right-2 top-2 z-20 size-7"
+              onClick={toggleInspectorPanel}
+            >
+              {inspectorCollapsed ? <PanelRightOpen aria-hidden="true" /> : <PanelRightClose aria-hidden="true" />}
+              <span className="sr-only">{t(inspectorCollapsed ? 'inspector.expandPanel' : 'inspector.collapsePanel')}</span>
+            </Button>
             <ConversationWorkspace>{children}</ConversationWorkspace>
-          </ResizablePanel>
+          </SidebarInset>
+        </ResizablePanel>
 
-          <ResizableHandle />
-          <ResizablePanel defaultSize="26%" minSize="14rem" maxSize="36rem">
-            <ContextInspector />
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      </SidebarInset>
-    </SidebarProvider>
+        <ResizableHandle />
+
+        <ResizablePanel
+          collapsible
+          className="h-full min-h-0 overflow-hidden"
+          collapsedSize={0}
+          defaultSize="22rem"
+          minSize="14rem"
+          maxSize="36rem"
+          panelRef={inspectorPanelRef}
+          onResize={syncInspectorCollapsed}
+        >
+          <ContextInspector />
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </>
   );
 }

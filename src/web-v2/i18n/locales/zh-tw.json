@@ -24,7 +24,9 @@
     "send": "送出"
   },
   "inspector": {
-    "contextAriaLabel": "脈絡檢視器"
+    "collapsePanel": "收合脈絡檢視器",
+    "contextAriaLabel": "脈絡檢視器",
+    "expandPanel": "展開脈絡檢視器"
   },
   "language": {
     "enUs": "英文（美國）",

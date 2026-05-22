@@ -4,7 +4,7 @@ import type { PropsWithChildren } from 'react';
 // Feature views render inside it and should stay API-backed.
 export function ConversationWorkspace({ children }: PropsWithChildren) {
   return (
-    <main id="main-content" className="h-full min-w-0">
+    <main id="main-content" className="h-full min-h-0 min-w-0 overflow-hidden">
       {children}
     </main>
   );

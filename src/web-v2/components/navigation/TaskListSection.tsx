@@ -15,7 +15,7 @@ export function TaskListSection({ tasks, title }: TaskListSectionProps) {
       >
         {title}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto">
+      <div className="v2-scrollbar-hidden flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto">
         {tasks.map((task) => (
           <button
             key={task.taskId}

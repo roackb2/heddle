@@ -40,7 +40,7 @@ export function SessionListSection({
       >
         {title}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto">
+      <div className="v2-scrollbar-hidden flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto">
         {sessions.map((session) => {
           const selected = selectedSessionId === session.id;
 
