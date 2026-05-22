@@ -23,6 +23,27 @@
     "reasoningEffort": "推理強度",
     "send": "送出"
   },
+  "diffPreview": {
+    "binary": "二進位",
+    "binaryBody": "Git 回報這是二進位差異，因此 Heddle 無法呈現逐行變更。",
+    "binaryTitle": "二進位檔案",
+    "cleanBody": "Git 未回報目前工作區有變更。",
+    "cleanTitle": "工作區沒有變更",
+    "failedTitle": "工作區差異讀取失敗",
+    "fileFailedTitle": "檔案差異讀取失敗",
+    "fileUnavailableTitle": "檔案差異無法使用",
+    "from": "來自",
+    "loadingBody": "正在讀取目前啟用工作區的 Git 變更。",
+    "loadingFileBody": "正在讀取選取檔案的 patch。",
+    "loadingFileTitle": "正在載入檔案差異",
+    "loadingTitle": "正在載入工作區差異",
+    "noGitBody": "目前工作區變更需要 Git 工作區。",
+    "noGitTitle": "不是 Git 工作區",
+    "noPatchBody": "Git 回報此檔案已變更，但沒有可用的 patch 文字。",
+    "noPatchTitle": "沒有可用 patch",
+    "subtitle": "目前工作區變更",
+    "title": "差異預覽"
+  },
   "inspector": {
     "collapsePanel": "收合脈絡檢視器",
     "contextAriaLabel": "脈絡檢視器",
