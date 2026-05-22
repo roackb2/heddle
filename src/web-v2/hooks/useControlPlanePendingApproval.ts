@@ -14,13 +14,24 @@ export type ControlPlanePendingApprovalState = {
   resolvePendingApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
 };
 
-export function useControlPlanePendingApproval(sessionId: string | undefined): ControlPlanePendingApprovalState {
+type UseControlPlanePendingApprovalOptions = {
+  pollingEnabled?: boolean;
+};
+
+export function useControlPlanePendingApproval(
+  sessionId: string | undefined,
+  options: UseControlPlanePendingApprovalOptions = {},
+): ControlPlanePendingApprovalState {
   const utils = trpcReact.useUtils();
   const [approvalError, setApprovalError] = useState<string | undefined>();
   const pendingApprovalQuery = trpcReact.controlPlane.sessionPendingApproval.useQuery(
     sessionId ? { id: sessionId } : skipToken,
     {
       enabled: Boolean(sessionId),
+      // The live stream is only a notification channel. Poll while a run is
+      // active so a prompt submitted during subscription setup still discovers
+      // server-held approval requests.
+      refetchInterval: options.pollingEnabled ? 750 : false,
       refetchOnWindowFocus: false,
     },
   );

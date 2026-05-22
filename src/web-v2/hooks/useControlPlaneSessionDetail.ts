@@ -27,7 +27,9 @@ export function useControlPlaneSessionDetail(sessionId: string | undefined): Con
   const [running, setRunning] = useState(false);
   const [liveStatus, setLiveStatus] = useState<string | undefined>();
   const loader = useControlPlaneSessionLoader(sessionId);
-  const approval = useControlPlanePendingApproval(sessionId);
+  const approval = useControlPlanePendingApproval(sessionId, {
+    pollingEnabled: running,
+  });
   const events = useControlPlaneSessionEvents({
     sessionId,
     refresh: loader.refresh,
