@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { formatTuiConversationActivity } from '../../../cli/chat/adapters/conversation-activity-format.js';
-import { ToolActivitySummarizer } from '@/core/chat/engine/live/index.js';
-import { ConversationEngineActivityAdapter } from '@/core/chat/engine/turns/host/conversation-activity-adapter.js';
-import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
-import type { TraceEvent } from '../../../types.js';
+import { ToolActivitySummarizer } from '@/core/live/index.js';
+import type { ConversationActivity } from '@/core/live/index.js';
 
 describe('chat activity formatting', () => {
   it('includes read_file paths in tool call summaries', () => {
@@ -25,46 +23,56 @@ describe('chat activity formatting', () => {
   });
 
   it('includes read paths in live activity events', () => {
-    const event: TraceEvent = {
-      type: 'tool.call',
-      call: { id: 'call-1', tool: 'read_file', input: { path: 'README.md' } },
+    const activity: ConversationActivity = {
+      source: 'agent-loop',
+      type: 'tool.calling',
+      runId: 'run-1',
       step: 1,
+      tool: 'read_file',
+      toolCallId: 'call-1',
+      input: { path: 'README.md' },
+      requiresApproval: false,
       timestamp: '2024-01-01T00:00:00Z',
+      derived: { kind: 'tool-summary', summary: 'read_file (README.md)' },
     };
 
-    expect(ConversationEngineActivityAdapter.fromTraceEvent(event).map(formatTuiConversationActivity)).toEqual([
-      'running read_file (README.md)',
-    ]);
+    expect(formatTuiConversationActivity(activity)).toBe('running read_file (README.md)');
   });
 
   it('includes list paths in approval activity events', () => {
-    const event: TraceEvent = {
+    const activity: ConversationActivity = {
+      source: 'agent-loop',
       type: 'tool.approval_requested',
+      runId: 'run-1',
       call: { id: 'call-2', tool: 'list_files', input: { path: 'src' } },
       step: 2,
       timestamp: '2024-01-01T00:00:01Z',
+      derived: { kind: 'tool-summary', summary: 'list_files (src)' },
     };
 
-    expect(ConversationEngineActivityAdapter.fromTraceEvent(event).map(formatTuiConversationActivity)).toEqual([
-      'approval needed for list_files (src)',
-    ]);
+    expect(formatTuiConversationActivity(activity)).toBe('approval needed for list_files (src)');
   });
 
   it('includes search query details in live activity events', () => {
-    const event: TraceEvent = {
-      type: 'tool.call',
-      call: { id: 'call-3', tool: 'search_files', input: { query: 'trace', path: '.heddle/traces' } },
+    const activity: ConversationActivity = {
+      source: 'agent-loop',
+      type: 'tool.calling',
+      runId: 'run-1',
       step: 3,
+      tool: 'search_files',
+      toolCallId: 'call-3',
+      input: { query: 'trace', path: '.heddle/traces' },
+      requiresApproval: false,
       timestamp: '2024-01-01T00:00:02Z',
+      derived: { kind: 'tool-summary', summary: 'search_files ("trace" in .heddle/traces)' },
     };
 
-    expect(ConversationEngineActivityAdapter.fromTraceEvent(event).map(formatTuiConversationActivity)).toEqual([
-      'running search_files ("trace" in .heddle/traces)',
-    ]);
+    expect(formatTuiConversationActivity(activity)).toBe('running search_files ("trace" in .heddle/traces)');
   });
 
   it('formats loop-level tool calling events with input details for immediate TUI activity', () => {
-    const event: AgentLoopEvent = {
+    const activity: ConversationActivity = {
+      source: 'agent-loop',
       type: 'tool.calling',
       runId: 'run-1',
       step: 1,
@@ -75,8 +83,6 @@ describe('chat activity formatting', () => {
       timestamp: '2026-05-08T00:00:00.000Z',
     };
 
-    expect(ConversationEngineActivityAdapter.fromAgentLoopEvent(event).map(formatTuiConversationActivity)).toEqual([
-      'running read_file (README.md)',
-    ]);
+    expect(formatTuiConversationActivity(activity)).toBe('running read_file');
   });
 });

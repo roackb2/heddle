@@ -1,4 +1,5 @@
 import type { LlmStreamEvent, LlmUsage } from '@/core/llm/types.js';
+import { HeddleEventType } from '@/core/event-types.js';
 import { isAbortError } from '@/core/agent/utils/index.js';
 import { STREAM_UPDATE_INTERVAL_MS } from '../constants.js';
 import { AgentRunFinisher } from '../finish/index.js';
@@ -61,20 +62,21 @@ export class AgentModelTurnService {
       // Stream the accumulated assistant text through the live event path. This
       // is intentionally in-memory; durable session files are updated later by
       // turn persistence, not once per LLM delta.
-      context.onAssistantStream?.({ step: context.state.step, text: streamState.content, done: false });
+      context.live.activity({ type: HeddleEventType.assistantStream, step: context.state.step, text: streamState.content, done: false });
       return;
     }
 
     if (event.type === 'content.done') {
       streamState.content = event.content;
-      context.onAssistantStream?.({ step: context.state.step, text: streamState.content, done: true });
+      context.live.activity({ type: HeddleEventType.assistantStream, step: context.state.step, text: streamState.content, done: true });
       return;
     }
 
     if (event.type === 'reasoning_summary.delta') {
       streamState.reasoningSummary += event.delta;
       if (!streamState.content) {
-        context.onAssistantStream?.({
+        context.live.activity({
+          type: HeddleEventType.assistantStream,
           step: context.state.step,
           text: AgentModelTurnService.formatReasoningSummary(streamState.reasoningSummary),
           done: false,
@@ -86,7 +88,8 @@ export class AgentModelTurnService {
     if (event.type === 'reasoning_summary.done') {
       streamState.reasoningSummary = event.text;
       if (!streamState.content) {
-        context.onAssistantStream?.({
+        context.live.activity({
+          type: HeddleEventType.assistantStream,
           step: context.state.step,
           text: AgentModelTurnService.formatReasoningSummary(streamState.reasoningSummary),
           done: false,

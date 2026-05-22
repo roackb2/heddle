@@ -66,7 +66,7 @@ export class TraceConsoleFormatter {
           );
           break;
 
-        case 'tool.call':
+        case 'tool.calling':
           lines.push(
             `${COLORS.yellow}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}Tool Call:${COLORS.reset} ${event.call.tool}`,
             `  Input: ${TraceConsoleFormatter.truncate(JSON.stringify(event.call.input), 200)}`,
@@ -95,14 +95,14 @@ export class TraceConsoleFormatter {
           );
           break;
 
-        case 'tool.result': {
+        case 'tool.completed': {
           const color = event.result.ok ? COLORS.green : COLORS.red;
           const status = event.result.ok ? '✓' : '✗';
           const content = event.result.ok
             ? TraceConsoleFormatter.formatToolResultOutput(event.result.output)
             : `ERROR: ${event.result.error}`;
           lines.push(
-            `${color}  ${status} ${event.tool}${COLORS.reset}: ${content}`,
+            `${color}  ${status} ${event.call.tool}${COLORS.reset}: ${content}`,
             '',
           );
           break;

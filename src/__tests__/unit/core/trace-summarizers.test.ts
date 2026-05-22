@@ -61,27 +61,29 @@ describe('trace summarizers', () => {
         timestamp: '2026-05-02T00:00:06.000Z',
       },
       {
-        type: 'tool.call',
+        type: 'tool.calling',
         call: { id: 'call-6', tool: 'read_file', input: { path: 'src/index.ts' } },
+        requiresApproval: false,
         step: 5,
         timestamp: '2026-05-02T00:00:07.000Z',
       },
       {
-        type: 'tool.call',
+        type: 'tool.calling',
         call: { id: 'call-7', tool: 'delete_file', input: { path: 'tmp/generated-report.md' } },
+        requiresApproval: false,
         step: 5,
         timestamp: '2026-05-02T00:00:07.500Z',
       },
       {
-        type: 'tool.result',
-        tool: 'read_file',
+        type: 'tool.completed',
+        call: { id: 'call-6', tool: 'read_file', input: { path: 'src/index.ts' } },
         result: { ok: true, output: 'contents' },
         step: 5,
         timestamp: '2026-05-02T00:00:08.000Z',
       },
       {
-        type: 'tool.result',
-        tool: 'run_shell_inspect',
+        type: 'tool.completed',
+        call: { id: 'call-8', tool: 'run_shell_inspect', input: { command: 'false' } },
         result: { ok: false, error: 'exit code 1' },
         step: 5,
         timestamp: '2026-05-02T00:00:09.000Z',
@@ -150,10 +152,10 @@ describe('trace summarizers', () => {
       'approval requested for run_shell_mutate (yarn test)',
       'approval denied for run_shell_mutate (yarn test) (User denied in test)',
       'fallback run_shell_inspect (git status --short) -> run_shell_mutate (git status --short) (inspect policy rejected the command)',
-      'tool call read_file (src/index.ts)',
-      'tool call delete_file (tmp/generated-report.md)',
-      'tool result read_file: ok',
-      'tool result run_shell_inspect: exit code 1',
+      'tool calling read_file (src/index.ts)',
+      'tool calling delete_file (tmp/generated-report.md)',
+      'tool completed read_file: ok',
+      'tool completed run_shell_inspect: exit code 1',
       'memory candidate recorded: candidate-1',
       'memory checkpoint skipped: No durable information was found.',
       'memory maintenance started: candidate-1, candidate-2',
@@ -165,13 +167,13 @@ describe('trace summarizers', () => {
 
   it('allows domain modules to override a trace event summarizer', () => {
     const registry = new TraceSummaryService({
-      'tool.result': (event, context) => `custom ${context.index}:${event.tool}`,
+      'tool.completed': (event, context) => `custom ${context.index}:${event.call.tool}`,
     });
 
     expect(registry.summarizeTrace([
       {
-        type: 'tool.result',
-        tool: 'read_file',
+        type: 'tool.completed',
+        call: { id: 'call-1', tool: 'read_file', input: { path: 'README.md' } },
         result: { ok: true, output: 'contents' },
         step: 1,
         timestamp: '2026-05-02T00:00:00.000Z',

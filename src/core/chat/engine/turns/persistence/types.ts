@@ -1,6 +1,7 @@
 import type { AgentLoopResult } from '@/core/runtime/loop/index.js';
 import type { RunResult } from '@/core/types.js';
 import type { ChatMessage } from '@/core/llm/types.js';
+import type { ConversationCompactionStatus } from '@/core/live/index.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
@@ -10,12 +11,7 @@ import type {
   ConversationCompactionOptions,
 } from '@/core/chat/engine/compaction/index.js';
 
-export type PersistChatTurnCompactionStatus = {
-  status: 'running' | 'finished' | 'failed';
-  archivePath?: string;
-  summaryPath?: string;
-  error?: string;
-};
+export type PersistChatTurnCompactionStatus = ConversationCompactionStatus;
 
 export type PersistChatTurnResultArgs = {
   result: RunResult;

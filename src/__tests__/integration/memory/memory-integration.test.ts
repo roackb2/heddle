@@ -282,7 +282,11 @@ describe('memory maintenance integration', () => {
         nextId: () => 'candidate-trace',
       })],
       maxSteps: 3,
-      onEvent: (event) => trace.push(event),
+      onEvent: (event) => {
+        if (event.type === 'trace') {
+          trace.push(event.event);
+        }
+      },
     });
 
     expect(result.outcome).toBe('done');

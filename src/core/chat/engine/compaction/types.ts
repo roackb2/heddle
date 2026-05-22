@@ -1,6 +1,8 @@
 import type { ChatArchiveRecord, ChatContextStats, ChatSession } from '@/core/chat/types.js';
+import type { ConversationCompactionStatus } from '@/core/live/index.js';
 import type { ChatMessage, LlmAdapter, LlmUsage } from '@/core/llm/types.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
+export type { ConversationCompactionStatus } from '@/core/live/index.js';
 
 export type ConversationCompactionSummarizerOptions = {
   provider?: 'openai' | 'anthropic' | 'active';
@@ -59,13 +61,6 @@ export type ConversationCompactionResult = {
   history: ChatMessage[];
   context: ChatContextStats;
   archive: ConversationCompactionArchiveState;
-};
-
-export type ConversationCompactionStatus = {
-  status: 'running' | 'finished' | 'failed';
-  archivePath?: string;
-  summaryPath?: string;
-  error?: string;
 };
 
 export type BuildSessionCompactionRunningContextOptions = {

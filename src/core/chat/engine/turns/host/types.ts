@@ -8,13 +8,12 @@ export type ChatTurnCompactionPhase = 'preflight' | 'final';
 export type ChatTurnCompactionStatus = ChatTurnPreflightCompactionStatus | PersistChatTurnCompactionStatus;
 
 export type ChatTurnHostPort = {
-  onAgentLoopEvent?: (event: AgentLoopEvent) => void;
+  onEvent?: (event: AgentLoopEvent) => void;
   approveToolCall?: RunAgentLoopOptions['approveToolCall'];
   onCompactionStatus?: (event: ChatTurnCompactionStatus, phase: ChatTurnCompactionPhase) => void;
 };
 
 export type ConversationEngineHostAdapterResult = {
   turnHost?: ChatTurnHostPort;
-  onAssistantStream?: RunAgentLoopOptions['onAssistantStream'];
   onTraceEvent?: RunAgentLoopOptions['onTraceEvent'];
 };

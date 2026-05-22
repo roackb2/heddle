@@ -1,6 +1,5 @@
 export { createConversationEngine } from './conversation-engine.js';
 export { EngineConversationTurnService } from './turns/service.js';
-export { ToolActivitySummarizer } from './live/index.js';
 export type { RunConversationTurnArgs, RunConversationTurnResult } from './turns/types.js';
 export type {
   ConversationActivity,
@@ -12,7 +11,7 @@ export type {
   ToolCallSummaryInput,
   ToolResultSummaryOptions,
   ToolSummaryOptions,
-} from './live/index.js';
+} from '@/core/live/index.js';
 export type {
   AppendConversationMessageInput,
   ClearConversationTurnLeaseInput,

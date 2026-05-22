@@ -111,11 +111,11 @@ const sessionActivityHandlers: SessionActivityHandlerMap = {
     setSession((current) => (
       SessionMessageController.upsertLiveAssistantMessage(
         current,
-        activity.event.text,
-        activity.event.done,
+        activity.text,
+        activity.done,
       )
     ));
-    setLiveStatus(activity.event.done ? undefined : 'Receiving assistant response...');
+    setLiveStatus(activity.done ? undefined : 'Receiving assistant response...');
   },
   'loop.started': (_activity, { setRunning, setLiveStatus }) => {
     setRunning(true);
@@ -127,13 +127,13 @@ const sessionActivityHandlers: SessionActivityHandlerMap = {
     void refresh(sessionId, { silent: true });
   },
   'tool.calling': (activity, { setLiveStatus }) => {
-    setLiveStatus(`Working... running ${activity.derived?.kind === 'tool-summary' ? activity.derived.summary : activity.event.tool}${formatStep(activity.correlation.step)}`);
+    setLiveStatus(`Working... running ${activity.derived?.kind === 'tool-summary' ? activity.derived.summary : activity.tool}${formatStep(activity.step)}`);
   },
   'tool.completed': (activity, { setLiveStatus }) => {
-    setLiveStatus(`${activity.event.tool} finished in ${Math.round(activity.event.durationMs)}ms`);
+    setLiveStatus(`${activity.tool} finished in ${Math.round(activity.durationMs)}ms`);
   },
   'tool.approval_requested': (activity, { setLiveStatus }) => {
-    setLiveStatus(`Approval requested for ${activity.derived?.kind === 'tool-summary' ? activity.derived.summary : activity.event.call.tool}`);
+    setLiveStatus(`Approval requested for ${activity.derived?.kind === 'tool-summary' ? activity.derived.summary : activity.call.tool}`);
   },
   'run.finished': (_activity, { sessionId, refresh, setRunning, setLiveStatus }) => {
     setRunning(false);
@@ -141,13 +141,13 @@ const sessionActivityHandlers: SessionActivityHandlerMap = {
     void refresh(sessionId, { silent: true });
   },
   'compaction.running': (activity, { setLiveStatus }) => {
-    setLiveStatus(activity.event.archivePath ? `Compacting earlier history... ${activity.event.archivePath}` : 'Compacting earlier history...');
+    setLiveStatus(activity.archivePath ? `Compacting earlier history... ${activity.archivePath}` : 'Compacting earlier history...');
   },
   'compaction.failed': (activity, { setLiveStatus }) => {
-    setLiveStatus(activity.event.error ? `Compaction failed: ${activity.event.error}` : 'Compaction failed.');
+    setLiveStatus(activity.error ? `Compaction failed: ${activity.error}` : 'Compaction failed.');
   },
   'compaction.finished': (activity, { setLiveStatus }) => {
-    setLiveStatus(activity.event.summaryPath ? `Compaction finished. Summary: ${activity.event.summaryPath}` : 'Compaction finished.');
+    setLiveStatus(activity.summaryPath ? `Compaction finished. Summary: ${activity.summaryPath}` : 'Compaction finished.');
   },
 };
 

@@ -1,6 +1,16 @@
 import type { Logger } from 'pino';
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
-import type { RunAgentOptions } from '@/core/agent/index.js';
+import { HeddleEventType } from '@/core/event-types.js';
+import type {
+  ConversationAssistantStreamActivity,
+  ConversationLoopFinishedActivity,
+  ConversationLoopStartedActivity,
+  ConversationToolApprovalRequestedActivity,
+  ConversationToolApprovalResolvedActivity,
+  ConversationToolFallbackActivity,
+  ConversationToolCallingActivity,
+  ConversationToolCompletedActivity,
+} from '@/core/live/index.js';
 import type { ChatMessage, LlmAdapter, LlmProvider, LlmUsage, ReasoningEffort } from '@/core/llm/types.js';
 import type { RunResult, StopReason, ToolCall, ToolDefinition, TraceEvent } from '@/core/types.js';
 
@@ -30,72 +40,35 @@ export type AgentLoopCheckpoint = {
 };
 
 export type AgentLoopEvent =
+  | ConversationLoopStartedActivity
   | {
-      type: 'loop.started';
-      runId: string;
-      goal: string;
-      model: string;
-      provider: LlmProvider;
-      workspaceRoot: string;
-      resumedFromCheckpoint?: string;
-      timestamp: string;
-    }
-  | {
-      type: 'loop.resumed';
+      type: typeof HeddleEventType.loopResumed;
       runId: string;
       fromCheckpoint: string;
       priorTraceEvents: number;
       timestamp: string;
     }
+  | ConversationAssistantStreamActivity
+  | ConversationToolApprovalRequestedActivity
+  | ConversationToolApprovalResolvedActivity
+  | ConversationToolFallbackActivity
+  | ConversationToolCallingActivity
+  | ConversationToolCompletedActivity
   | {
-      type: 'assistant.stream';
-      runId: string;
-      step: number;
-      text: string;
-      done: boolean;
-      timestamp: string;
-    }
-  | {
-      type: 'tool.calling';
-      runId: string;
-      step: number;
-      tool: string;
-      toolCallId: string;
-      input: unknown;
-      requiresApproval: boolean;
-      timestamp: string;
-    }
-  | {
-      type: 'tool.completed';
-      runId: string;
-      step: number;
-      tool: string;
-      toolCallId: string;
-      result: { ok: boolean; output?: unknown; error?: string };
-      durationMs: number;
-      timestamp: string;
-    }
-  | {
-      type: 'trace';
+      type: typeof HeddleEventType.trace;
       runId: string;
       event: TraceEvent;
       timestamp: string;
     }
   | {
-      type: 'checkpoint.saved';
+      type: typeof HeddleEventType.checkpointSaved;
       runId: string;
       checkpoint: AgentLoopCheckpoint;
       step: number;
       timestamp: string;
     }
-  | {
-      type: 'loop.finished';
-      runId: string;
-      outcome: RunResult['outcome'];
-      summary: string;
-      usage: RunResult['usage'];
+  | ConversationLoopFinishedActivity & {
       state: AgentLoopState;
-      timestamp: string;
     };
 
 export type RunAgentLoopOptions = {
@@ -119,7 +92,6 @@ export type RunAgentLoopOptions = {
   logger?: Logger;
   onEvent?: (event: AgentLoopEvent) => void;
   onTraceEvent?: (event: TraceEvent) => void;
-  onAssistantStream?: RunAgentOptions['onAssistantStream'];
   approvalPolicies?: ToolApprovalPolicy[];
   approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
   shouldStop?: () => boolean;

@@ -85,7 +85,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
       memoryRoot: runtime.memoryDir,
       llm: runtime.llm,
       source,
-      onEvent: host.onAgentLoopEvent,
+      onEvent: host.onEvent,
     };
 
     try {
@@ -117,7 +117,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         includeDefaultTools: false,
         history: preflight.compacted.history,
         systemContext: runtime.systemContext,
-        onEvent: host.onAgentLoopEvent,
+        onEvent: host.onEvent,
         approveToolCall: host.approveToolCall,
       });
       const maintenanceMode = args.memoryMaintenanceMode ?? 'background';
@@ -187,7 +187,6 @@ export class EngineConversationTurnService implements ConversationTurnService {
   ): TurnHostInput {
     return {
       host: normalizedHost.turnHost,
-      onAssistantStream: normalizedHost.onAssistantStream,
       onTraceEvent: normalizedHost.onTraceEvent,
       shouldStop: input.shouldStop,
     };

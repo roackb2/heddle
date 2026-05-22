@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import type { ChatMessage, LlmUsage } from './llm/types.js';
+import { HeddleEventType } from './event-types.js';
 
 /**
  * Input to the agent loop.
@@ -61,9 +62,9 @@ export type StopReason = 'done' | 'max_steps' | 'error' | 'interrupted';
  * A single event in the run trace. Discriminated union on `type`.
  */
 export type TraceEvent =
-  | { type: 'run.started'; goal: string; timestamp: string }
+  | { type: typeof HeddleEventType.runStarted; goal: string; timestamp: string }
   | {
-      type: 'assistant.turn';
+      type: typeof HeddleEventType.assistantTurn;
       content: string;
       requestedTools: boolean;
       diagnostics?: AssistantDiagnostics;
@@ -72,16 +73,16 @@ export type TraceEvent =
       timestamp: string;
     }
   | {
-      type: 'host.warning';
+      type: typeof HeddleEventType.hostWarning;
       code: 'actionless_completion';
       message: string;
       details?: Record<string, unknown>;
       step: number;
       timestamp: string;
     }
-  | { type: 'tool.approval_requested'; call: ToolCall; step: number; timestamp: string }
+  | { type: typeof HeddleEventType.toolApprovalRequested; call: ToolCall; step: number; timestamp: string }
   | {
-      type: 'tool.approval_resolved';
+      type: typeof HeddleEventType.toolApprovalResolved;
       call: ToolCall;
       approved: boolean;
       reason?: string;
@@ -89,37 +90,44 @@ export type TraceEvent =
       timestamp: string;
     }
   | {
-      type: 'tool.fallback';
+      type: typeof HeddleEventType.toolFallback;
       fromCall: ToolCall;
       toCall: ToolCall;
       reason: string;
       step: number;
       timestamp: string;
     }
-  | { type: 'tool.call'; call: ToolCall; step: number; timestamp: string }
-  | { type: 'tool.result'; tool: string; result: ToolResult; step: number; timestamp: string }
+  | { type: typeof HeddleEventType.toolCalling; call: ToolCall; requiresApproval: boolean; step: number; timestamp: string }
   | {
-      type: 'memory.candidate_recorded';
+      type: typeof HeddleEventType.toolCompleted;
+      call: ToolCall;
+      result: ToolResult;
+      durationMs?: number;
+      step: number;
+      timestamp: string;
+    }
+  | {
+      type: typeof HeddleEventType.memoryCandidateRecorded;
       candidateId: string;
       path: string;
       step: number;
       timestamp: string;
     }
   | {
-      type: 'memory.checkpoint_skipped';
+      type: typeof HeddleEventType.memoryCheckpointSkipped;
       rationale: string;
       step: number;
       timestamp: string;
     }
   | {
-      type: 'memory.maintenance_started';
+      type: typeof HeddleEventType.memoryMaintenanceStarted;
       runId: string;
       candidateIds: string[];
       step: number;
       timestamp: string;
     }
   | {
-      type: 'memory.maintenance_finished';
+      type: typeof HeddleEventType.memoryMaintenanceFinished;
       runId: string;
       outcome: StopReason | 'skipped';
       summary: string;
@@ -129,7 +137,7 @@ export type TraceEvent =
       timestamp: string;
     }
   | {
-      type: 'memory.maintenance_failed';
+      type: typeof HeddleEventType.memoryMaintenanceFailed;
       runId: string;
       error: string;
       candidateIds: string[];
@@ -137,7 +145,7 @@ export type TraceEvent =
       timestamp: string;
     }
   | {
-      type: 'cyberloop.annotation';
+      type: typeof HeddleEventType.cyberloopAnnotation;
       step: number;
       frameKind: string;
       driftLevel: 'unknown' | 'low' | 'medium' | 'high';
@@ -145,7 +153,7 @@ export type TraceEvent =
       metadata: Record<string, unknown>;
       timestamp: string;
     }
-  | { type: 'run.finished'; outcome: StopReason; summary: string; step: number; timestamp: string };
+  | { type: typeof HeddleEventType.runFinished; outcome: StopReason; summary: string; step: number; timestamp: string };
 
 /**
  * The result returned from `AgentRunService.run`.

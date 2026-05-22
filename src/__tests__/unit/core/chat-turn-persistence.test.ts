@@ -18,8 +18,9 @@ describe('chat turn persistence', () => {
       summary: 'Done.',
       trace: [
         {
-          type: 'tool.call',
+          type: 'tool.calling',
           call: { id: 'call-1', tool: 'read_file', input: { path: 'README.md' } },
+          requiresApproval: false,
           step: 1,
           timestamp: '2026-05-02T00:00:00.000Z',
         },
@@ -41,7 +42,7 @@ describe('chat turn persistence', () => {
       historyForTokenEstimate: session.history,
       summarizer: {},
       traceSummarizerRegistry: new TraceSummaryService({
-        'tool.call': (event) => `custom summary for ${event.call.tool}`,
+        'tool.calling': (event) => `custom summary for ${event.call.tool}`,
       }),
       createTurnId: () => 'turn-1',
     });

@@ -3,6 +3,7 @@ import { AgentMutationTracker } from '../mutation/index.js';
 import { AgentPlanStateParser } from '../planning/index.js';
 import { AgentRunFinisher } from '../finish/index.js';
 import { AgentToolDispatcher } from './tool-dispatcher.js';
+import { HeddleEventType } from '@/core/event-types.js';
 import type {
   AgentToolTurnResult,
   ExecuteAgentToolTurnArgs,
@@ -18,8 +19,8 @@ export class AgentToolTurnService {
   static async handle(args: HandleAgentToolTurnArgs): Promise<AgentToolTurnResult> {
     const { context, response } = args;
     const toolCalls = response.toolCalls ?? [];
-    context.record({
-      type: 'assistant.turn',
+    context.live.trace({
+      type: HeddleEventType.assistantTurn,
       content: response.content ?? '',
       diagnostics: response.diagnostics,
       requestedTools: true,
@@ -52,11 +53,6 @@ export class AgentToolTurnService {
     }
 
     const tool = context.registry.get(call.tool);
-    if (tool) {
-      context.onToolCalling?.(call, context.state.step, tool);
-    }
-    const toolStartTime = Date.now();
-
     const approvalDeniedResult = await AgentToolDispatcher.maybeDenyToolCall({
       call,
       tool,
@@ -65,12 +61,10 @@ export class AgentToolTurnService {
       approveToolCall: context.approveToolCall,
       approvalPolicies: context.approvalPolicies,
       workspaceRoot: context.workspaceRoot,
-      record: context.record,
+      live: context.live,
       log: context.log,
     });
     if (approvalDeniedResult) {
-      const durationMs = Date.now() - toolStartTime;
-      context.onToolCompleted?.(call, approvalDeniedResult, context.state.step, durationMs);
       return AgentToolTurnService.handleDeniedResult(context, call.id, approvalDeniedResult);
     }
 
@@ -83,13 +77,11 @@ export class AgentToolTurnService {
       approveToolCall: context.approveToolCall,
       approvalPolicies: context.approvalPolicies,
       workspaceRoot: context.workspaceRoot,
-      record: context.record,
+      live: context.live,
       log: context.log,
     });
 
-    const durationMs = Date.now() - toolStartTime;
     context.state.executedToolCalls++;
-    context.onToolCompleted?.(execution.effectiveCall, execution.result, context.state.step, durationMs);
 
     return AgentToolTurnService.handleExecutedResult({
       context,

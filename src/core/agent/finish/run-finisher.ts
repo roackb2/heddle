@@ -1,4 +1,5 @@
 import { INTERRUPTED_SUMMARY } from '../constants.js';
+import { HeddleEventType } from '@/core/event-types.js';
 import type { LlmResponse } from '@/core/llm/types.js';
 import type { RunResult, StopReason } from '@/core/types.js';
 import type { AgentRunContext } from '../types.js';
@@ -28,8 +29,8 @@ export class AgentRunFinisher {
       return AgentRunFinisher.finish(context, 'error', 'Model returned an empty response');
     }
 
-    context.record({
-      type: 'assistant.turn',
+    context.live.trace({
+      type: HeddleEventType.assistantTurn,
       content: response.content,
       diagnostics: response.diagnostics,
       requestedTools: false,
@@ -64,8 +65,8 @@ export class AgentRunFinisher {
       context.log[logging.logLevel]({ step: context.state.step, outcome, maxSteps: context.maxSteps }, logging.logMessage);
     }
 
-    context.record({
-      type: 'run.finished',
+    context.live.trace({
+      type: HeddleEventType.runFinished,
       outcome,
       summary,
       step: context.state.step,

@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { HeddleEventType } from '@/core/event-types.js';
 import { ReviewDiffParser } from '@/core/review/index.js';
 import type {
   ApprovalEventView,
@@ -41,8 +42,9 @@ export class ControlPlaneChatTurnReviewPresenter {
           continue;
         }
 
-        if (type === 'tool.result') {
-          const tool = readString(event.tool) ?? 'unknown';
+        if (type === HeddleEventType.toolCompleted) {
+          const call = readObject(event.call);
+          const tool = readString(call?.tool) ?? 'unknown';
           const result = readObject(event.result);
           if (tool === 'edit_file' && readBoolean(result?.ok) === true) {
             const output = readObject(result?.output);
@@ -82,7 +84,7 @@ export class ControlPlaneChatTurnReviewPresenter {
           continue;
         }
 
-        if (type === 'tool.call') {
+        if (type === HeddleEventType.toolCalling) {
           const call = readObject(event.call);
           const tool = readString(call?.tool);
           if (tool !== 'edit_file') {
@@ -98,7 +100,7 @@ export class ControlPlaneChatTurnReviewPresenter {
           continue;
         }
 
-        if (type === 'tool.approval_resolved') {
+        if (type === HeddleEventType.toolApprovalResolved) {
           const call = readObject(event.call);
           const tool = readString(call?.tool);
           if (!tool) {
@@ -116,7 +118,7 @@ export class ControlPlaneChatTurnReviewPresenter {
           continue;
         }
 
-        if (type === 'run.finished') {
+        if (type === HeddleEventType.runFinished) {
           finalSummary = readString(event.summary) ?? finalSummary;
         }
       }

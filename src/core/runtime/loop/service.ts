@@ -1,7 +1,9 @@
 import { resolve } from 'node:path';
 import { ProviderCredentialRepository } from '@/core/auth/index.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
+import { HeddleEventType } from '@/core/event-types.js';
 import { AgentRunService } from '@/core/agent/index.js';
+import type { AgentRunEvent } from '@/core/agent/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
 import type { LlmAdapter, ReasoningEffort } from '@/core/llm/types.js';
 import type { ToolDefinition } from '@/core/types.js';
@@ -55,7 +57,8 @@ export class AgentLoopRuntimeService {
     const resumeMetadata = AgentLoopCheckpointService.resolveResumeMetadata(options.resumeFrom);
 
     options.onEvent?.({
-      type: 'loop.started',
+      source: 'agent-loop',
+      type: HeddleEventType.loopStarted,
       runId,
       goal: options.goal,
       model,
@@ -67,7 +70,7 @@ export class AgentLoopRuntimeService {
 
     if (resumeMetadata) {
       options.onEvent?.({
-        type: 'loop.resumed',
+        type: HeddleEventType.loopResumed,
         runId,
         fromCheckpoint: resumeMetadata.checkpointRunId,
         priorTraceEvents: resumeMetadata.priorTraceEvents,
@@ -84,42 +87,8 @@ export class AgentLoopRuntimeService {
       logger,
       history: AgentLoopCheckpointService.resolveHistory(options),
       systemContext: options.systemContext,
-      onAssistantStream: (update) => {
-        options.onEvent?.({
-          type: 'assistant.stream',
-          runId,
-          ...update,
-          timestamp: now(),
-        });
-        options.onAssistantStream?.(update);
-      },
       onEvent: (event) => {
-        options.onEvent?.({ type: 'trace', runId, event, timestamp: now() });
-        options.onTraceEvent?.(event);
-      },
-      onToolCalling: (call, step, toolDef) => {
-        options.onEvent?.({
-          type: 'tool.calling',
-          runId,
-          step,
-          tool: call.tool,
-          toolCallId: call.id,
-          input: call.input,
-          requiresApproval: toolDef.requiresApproval ?? false,
-          timestamp: now(),
-        });
-      },
-      onToolCompleted: (call, result, step, durationMs) => {
-        options.onEvent?.({
-          type: 'tool.completed',
-          runId,
-          step,
-          tool: call.tool,
-          toolCallId: call.id,
-          result: { ok: result.ok, output: result.output, error: result.error },
-          durationMs,
-          timestamp: now(),
-        });
+        AgentLoopRuntimeService.emitAgentRunEvent({ event, runId, now, options });
       },
       approvalPolicies: options.approvalPolicies,
       approveToolCall: options.approveToolCall,
@@ -140,7 +109,8 @@ export class AgentLoopRuntimeService {
     });
 
     options.onEvent?.({
-      type: 'loop.finished',
+      source: 'agent-loop',
+      type: HeddleEventType.loopFinished,
       runId,
       outcome: result.outcome,
       summary: result.summary,
@@ -156,6 +126,22 @@ export class AgentLoopRuntimeService {
       workspaceRoot,
       state,
     };
+  }
+
+  private static emitAgentRunEvent(args: {
+    event: AgentRunEvent;
+    runId: string;
+    now: () => string;
+    options: RunAgentLoopOptions;
+  }): void {
+    const { event, runId, now, options } = args;
+    if (event.type === HeddleEventType.trace) {
+      options.onEvent?.({ type: HeddleEventType.trace, runId, event: event.event, timestamp: now() });
+      options.onTraceEvent?.(event.event);
+      return;
+    }
+
+    options.onEvent?.({ source: 'agent-loop', ...event, runId, timestamp: now() });
   }
 
   private static resolveCredentialStorePath(args: {

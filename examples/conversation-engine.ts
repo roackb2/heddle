@@ -60,6 +60,7 @@ async function main() {
   console.log(`Starting session ${session.id} with model ${model} (${provider})`);
   console.log(`workspaceRoot=${workspaceRoot}`);
   console.log(`stateRoot=${stateRoot}`);
+  let streamedAssistantText = '';
 
   const result = await engine.turns.submit({
     sessionId: session.id,
@@ -68,16 +69,16 @@ async function main() {
     host: {
       events: {
         onActivity(activity) {
+          if (activity.type === 'assistant.stream') {
+            process.stdout.write(activity.text.slice(streamedAssistantText.length));
+            streamedAssistantText = activity.text;
+            return;
+          }
           console.log(formatActivity(activity));
         },
       },
       approvals: {
         requestToolApproval: requestExampleToolApproval,
-      },
-      assistant: {
-        onText(text) {
-          process.stdout.write(text);
-        },
       },
       trace: {
         onEvent(event) {
@@ -111,20 +112,18 @@ const requestExampleToolApproval = async (request: ToolApprovalPolicyContext) =>
 
 function formatActivity(activity: ConversationActivity): string {
   switch (activity.type) {
-    case 'run.started':
-      return `[activity] run.started run=${activity.correlation.runId ?? 'unknown'}`;
+    case 'loop.started':
+      return `[activity] loop.started goal=${activity.goal}`;
     case 'assistant.stream':
-      return activity.event.done
-        ? `[activity] assistant.stream done chars=${activity.event.text.length}`
-        : `[activity] assistant.stream chunk chars=${activity.event.text.length}`;
+      return activity.done
+        ? `[activity] assistant.stream done chars=${activity.text.length}`
+        : `[activity] assistant.stream chunk chars=${activity.text.length}`;
     case 'tool.calling':
-      return `[activity] tool.calling tool=${activity.event.tool} step=${activity.correlation.step ?? 'n/a'}`;
+      return `[activity] tool.calling tool=${activity.tool} step=${activity.step}`;
     case 'tool.approval_requested':
-      return `[activity] tool.approval_requested tool=${activity.event.call.tool} step=${activity.correlation.step ?? 'n/a'}`;
-    case 'memory.maintenance_started':
-      return `[activity] memory.maintenance_started candidates=${activity.event.candidateIds.length}`;
-    case 'run.finished':
-      return `[activity] run.finished outcome=${activity.event.outcome}`;
+      return `[activity] tool.approval_requested tool=${activity.call.tool} step=${activity.step}`;
+    case 'loop.finished':
+      return `[activity] loop.finished outcome=${activity.outcome}`;
     default:
       return `[activity] ${activity.type}`;
   }
@@ -143,7 +142,6 @@ function formatCompactionStatus(event: ConversationCompactionStatus): string {
     case 'failed':
       return event.error ? `failed error=${event.error}` : 'failed';
   }
-  return event.status;
 }
 
 main().catch((error) => {

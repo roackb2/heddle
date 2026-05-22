@@ -45,8 +45,8 @@ async function main() {
       if (event.type === 'loop.started') {
         console.log(`[event] heartbeat.started model=${event.model} provider=${event.provider}`);
       }
-      if (event.type === 'trace' && event.event.type === 'tool.call') {
-        console.log(`[trace] tool.call step=${event.event.step} tool=${event.event.call.tool}`);
+      if (event.type === 'trace' && event.event.type === 'tool.calling') {
+        console.log(`[trace] tool.calling step=${event.event.step} tool=${event.event.call.tool}`);
       }
       if (event.type === 'loop.finished') {
         console.log(`[event] heartbeat.finished outcome=${event.outcome} trace=${event.state.trace.length}`);

@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { ToolRegistry } from '@/core/tools/index.js';
 import { TraceRecorder } from '@/core/trace/index.js';
+import { HeddleEventType } from '@/core/event-types.js';
 import { buildSystemPrompt } from '@/core/prompts/system-prompt.js';
 import { logger as defaultLogger } from '@/core/utils/logger.js';
 import { DEFAULT_MAX_STEPS } from '../constants.js';
@@ -37,17 +38,24 @@ export class AgentRunContextBuilder {
         history: options.history,
       }),
       trace,
-      record: (event) => {
-        trace.record(event);
-        options.onEvent?.(event);
+      live: {
+        trace: (event) => {
+          trace.record(event);
+          options.onEvent?.({ type: HeddleEventType.trace, event });
+        },
+        activity: (activity) => {
+          options.onEvent?.(activity);
+        },
+        traceActivity: ({ trace: traceEvent, activity }) => {
+          trace.record(traceEvent);
+          options.onEvent?.({ type: HeddleEventType.trace, event: traceEvent });
+          options.onEvent?.(activity);
+        },
       },
       now,
       budget: new AgentStepBudget(maxSteps),
       seenToolCalls: new Map<string, number>(),
       mutation: AgentMutationTracker.createState(),
-      onAssistantStream: options.onAssistantStream,
-      onToolCalling: options.onToolCalling,
-      onToolCompleted: options.onToolCompleted,
       approvalPolicies: options.approvalPolicies ?? [],
       approveToolCall: options.approveToolCall,
       shouldStop: options.shouldStop,

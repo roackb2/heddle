@@ -10,8 +10,8 @@ describe('control-plane turn review', () => {
   it('projects edit_file tool diffs as structured changed files', () => {
     const { engineArgs, sessionId, turnId } = createSessionWithTrace([
       {
-        type: 'tool.result',
-        tool: 'edit_file',
+        type: 'tool.completed',
+        call: { id: 'call-1', tool: 'edit_file', input: {} },
         step: 1,
         timestamp: '2026-04-26T00:00:00.000Z',
         result: {
@@ -72,8 +72,8 @@ describe('control-plane turn review', () => {
     ].join('\n');
     const { engineArgs, sessionId, turnId } = createSessionWithTrace([
       {
-        type: 'tool.result',
-        tool: 'run_shell_inspect',
+        type: 'tool.completed',
+        call: { id: 'call-1', tool: 'run_shell_inspect', input: {} },
         step: 1,
         timestamp: '2026-04-26T00:00:00.000Z',
         result: {
@@ -117,8 +117,8 @@ describe('control-plane turn review', () => {
     ].join('\n');
     const { engineArgs, sessionId, turnId } = createSessionWithTrace([
       {
-        type: 'tool.result',
-        tool: 'run_shell_inspect',
+        type: 'tool.completed',
+        call: { id: 'call-1', tool: 'run_shell_inspect', input: {} },
         step: 1,
         timestamp: '2026-04-26T00:00:00.000Z',
         result: {
@@ -144,8 +144,8 @@ describe('control-plane turn review', () => {
   it('keeps git diff stat as command evidence without pretending it is a file patch', () => {
     const { engineArgs, sessionId, turnId } = createSessionWithTrace([
       {
-        type: 'tool.result',
-        tool: 'run_shell_inspect',
+        type: 'tool.completed',
+        call: { id: 'call-1', tool: 'run_shell_inspect', input: {} },
         step: 1,
         timestamp: '2026-04-26T00:00:00.000Z',
         result: {

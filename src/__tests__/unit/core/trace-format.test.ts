@@ -99,8 +99,8 @@ describe('TraceConsoleFormatter', () => {
   it('renders structured tool outputs readably instead of object coercions', () => {
     const output = TraceConsoleFormatter.format([
       {
-        type: 'tool.result',
-        tool: 'run_shell_inspect',
+        type: 'tool.completed',
+        call: { id: 'call-1', tool: 'run_shell_inspect', input: { command: 'pwd' } },
         result: {
           ok: true,
           output: {

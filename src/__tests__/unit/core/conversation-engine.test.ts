@@ -346,9 +346,8 @@ describe('createConversationEngine', () => {
     });
     const session = engine.sessions.create({ id: 'session-1', name: 'Alpha' });
     const onActivity = vi.fn();
-    const onAgentLoopEvent = vi.fn();
+    const onEvent = vi.fn();
     const onTraceEvent = vi.fn();
-    const onAssistantText = vi.fn();
     const onCompactionStatus = vi.fn();
     const requestToolApproval = vi.fn(async () => ({ approved: true, reason: 'ok' }));
     const overridePolicies = [vi.fn()];
@@ -364,16 +363,13 @@ describe('createConversationEngine', () => {
       host: {
         events: {
           onActivity,
-          onAgentLoopEvent,
+          onEvent,
         },
         approvals: {
           requestToolApproval,
         },
         compaction: {
           onStatus: onCompactionStatus,
-        },
-        assistant: {
-          onText: onAssistantText,
         },
         trace: {
           onEvent: onTraceEvent,
@@ -397,48 +393,44 @@ describe('createConversationEngine', () => {
       approvalPolicies: overridePolicies,
       traceSummarizerRegistry: overrideRegistry,
     }));
-    expect(typeof args.onAssistantStream).toBe('function');
     expect(typeof args.onTraceEvent).toBe('function');
     expect(args.traceDir).toBe(join(stateRoot, 'traces'));
     expect(args.host).toBeTruthy();
     expect(typeof args.host.approveToolCall).toBe('function');
 
     const loopEvent: AgentLoopEvent = {
+      source: 'agent-loop',
       type: 'assistant.stream',
       runId: 'run-1',
+      step: 1,
       text: 'partial',
       done: false,
       timestamp: '2026-05-03T00:00:00.000Z',
     };
-    args.host.onAgentLoopEvent(loopEvent);
-    expect(onAgentLoopEvent).toHaveBeenCalledWith(loopEvent);
-    expect(onActivity).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'assistant.stream',
-      event: loopEvent,
-    }));
-
-    args.onAssistantStream({ text: 'hello' });
-    expect(onAssistantText).toHaveBeenCalledWith('hello');
+    args.host.onEvent(loopEvent);
+    expect(onEvent).toHaveBeenCalledWith(loopEvent);
+    expect(onActivity).toHaveBeenCalledWith(loopEvent);
 
     const traceEvent: TraceEvent = {
-      type: 'tool.call',
+      type: 'tool.calling',
       step: 1,
       timestamp: '2026-05-03T00:00:01.000Z',
       call: { id: 'call-1', tool: 'read_file', input: { path: 'README.md' } },
+      requiresApproval: false,
     };
     args.onTraceEvent(traceEvent);
     expect(onTraceEvent).toHaveBeenCalledWith(traceEvent);
-    expect(onActivity).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'tool.call',
-      event: traceEvent,
-    }));
+    expect(onActivity).toHaveBeenCalledTimes(1);
 
-    args.host.onCompactionStatus({ status: 'finished', summaryPath: '/tmp/summary.md' }, 'final');
-    expect(onCompactionStatus).toHaveBeenCalledWith({ status: 'finished', summaryPath: '/tmp/summary.md' });
-    expect(onActivity.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({
-      type: 'compaction.finished',
-      event: { status: 'finished', summaryPath: '/tmp/summary.md' },
-    }));
+    const compactionActivity = {
+      source: 'compaction' as const,
+      type: 'compaction.finished' as const,
+      status: 'finished' as const,
+      summaryPath: '/tmp/summary.md',
+    };
+    args.host.onCompactionStatus(compactionActivity, 'final');
+    expect(onCompactionStatus).toHaveBeenCalledWith(compactionActivity);
+    expect(onActivity.mock.calls.at(-1)?.[0]).toEqual(compactionActivity);
   });
 
   it('continues from the persisted lastContinuePrompt and errors clearly when missing', async () => {

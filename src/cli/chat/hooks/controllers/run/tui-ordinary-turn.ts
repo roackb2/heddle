@@ -94,16 +94,13 @@ export async function executeTuiOrdinaryTurn(args: {
     searchIgnoreDirs: runtime.searchIgnoreDirs,
     host: {
       events: {
-        onAgentLoopEvent: (event) => {
+        onEvent: (event) => {
           driftObserver?.observer.handleEvent(event);
         },
         onActivity: runLoopEvents.onActivity,
       },
       compaction: compactionPort,
       approvals: approvalPort,
-      assistant: {
-        onStream: runLoopEvents.onAssistantStream,
-      },
       trace: {
         onEvent: runLoopEvents.onTraceEvent,
       },

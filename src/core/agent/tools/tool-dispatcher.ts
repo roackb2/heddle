@@ -1,10 +1,12 @@
 import type { Logger } from 'pino';
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
 import { ToolApprovalPolicies, ToolApprovalService } from '@/core/approvals/index.js';
+import { HeddleEventType } from '@/core/event-types.js';
+import { ToolActivitySummarizer } from '@/core/live/index.js';
 import { ToolExecutionService, type ToolRegistry } from '@/core/tools/index.js';
-import type { ToolCall, ToolDefinition, TraceEvent } from '@/core/types.js';
+import type { ToolCall, ToolDefinition } from '@/core/types.js';
 import { normalizeToolInput, stableSerialize } from '@/core/agent/utils/index.js';
-import type { RunAgentOptions } from '../types.js';
+import type { AgentRunLiveRecorder, RunAgentOptions } from '../types.js';
 
 /**
  * Owns tool approval, execution, deduplication, and inspect-to-mutate fallback.
@@ -21,10 +23,10 @@ export class AgentToolDispatcher {
     approvalPolicies?: ToolApprovalPolicy[];
     approveToolCall: RunAgentOptions['approveToolCall'];
     workspaceRoot?: string;
-    record: (event: TraceEvent) => void;
+    live: AgentRunLiveRecorder;
     log: Logger;
   }): Promise<{ ok: false; error: string } | undefined> {
-    const { call, tool, step, now, approveToolCall, record, log } = args;
+    const { call, tool, step, now, approveToolCall, live, log } = args;
     if (!tool) {
       return undefined;
     }
@@ -37,15 +39,39 @@ export class AgentToolDispatcher {
         workspaceRoot: args.workspaceRoot,
       },
       requestHumanApproval: approveToolCall ? async () => {
-        record({ type: 'tool.approval_requested', call, step, timestamp: now() });
+        live.traceActivity({
+          trace: { type: HeddleEventType.toolApprovalRequested, call, step, timestamp: now() },
+          activity: {
+            type: HeddleEventType.toolApprovalRequested,
+            call,
+            step,
+            derived: {
+              kind: 'tool-summary',
+              summary: ToolActivitySummarizer.summarizeCall(call),
+            },
+          },
+        });
         const humanDecision = await approveToolCall(call, tool);
-        record({
-          type: 'tool.approval_resolved',
-          call,
-          approved: humanDecision.approved,
-          reason: humanDecision.reason,
-          step,
-          timestamp: now(),
+        live.traceActivity({
+          trace: {
+            type: HeddleEventType.toolApprovalResolved,
+            call,
+            approved: humanDecision.approved,
+            reason: humanDecision.reason,
+            step,
+            timestamp: now(),
+          },
+          activity: {
+            type: HeddleEventType.toolApprovalResolved,
+            call,
+            approved: humanDecision.approved,
+            reason: humanDecision.reason,
+            step,
+            derived: {
+              kind: 'tool-summary',
+              summary: ToolActivitySummarizer.summarizeCall(call),
+            },
+          },
         });
         return humanDecision;
       } : undefined,
@@ -61,7 +87,17 @@ export class AgentToolDispatcher {
         : `Approval denied for ${call.tool}`,
     };
     log.warn({ step, tool: call.tool, reason: approval.reason }, 'Tool execution denied by approval policy');
-    record({ type: 'tool.result', tool: call.tool, result, step, timestamp: now() });
+    live.traceActivity({
+      trace: { type: HeddleEventType.toolCompleted, call, result, durationMs: 0, step, timestamp: now() },
+      activity: {
+        type: HeddleEventType.toolCompleted,
+        step,
+        tool: call.tool,
+        toolCallId: call.id,
+        result,
+        durationMs: 0,
+      },
+    });
     return result;
   }
 
@@ -74,7 +110,7 @@ export class AgentToolDispatcher {
     approvalPolicies?: ToolApprovalPolicy[];
     approveToolCall: RunAgentOptions['approveToolCall'];
     workspaceRoot?: string;
-    record: (event: TraceEvent) => void;
+    live: AgentRunLiveRecorder;
     log: Logger;
   }): Promise<{ effectiveCall: ToolCall; result: Awaited<ReturnType<typeof ToolExecutionService.execute>> }> {
     const primary = await AgentToolDispatcher.executeRecordedToolCall(args.call, args);
@@ -93,13 +129,27 @@ export class AgentToolDispatcher {
       tool: 'run_shell_mutate',
       input: args.call.input,
     };
-    args.record({
-      type: 'tool.fallback',
-      fromCall: args.call,
-      toCall: mutateCall,
-      reason: fallbackReason,
-      step: args.step,
-      timestamp: args.now(),
+    args.live.traceActivity({
+      trace: {
+        type: HeddleEventType.toolFallback,
+        fromCall: args.call,
+        toCall: mutateCall,
+        reason: fallbackReason,
+        step: args.step,
+        timestamp: args.now(),
+      },
+      activity: {
+        type: HeddleEventType.toolFallback,
+        fromCall: args.call,
+        toCall: mutateCall,
+        reason: fallbackReason,
+        step: args.step,
+        derived: {
+          kind: 'tool-fallback-summary',
+          fromSummary: ToolActivitySummarizer.summarizeCall(args.call),
+          toSummary: ToolActivitySummarizer.summarizeCall(mutateCall),
+        },
+      },
     });
     const approvalDeniedResult = await AgentToolDispatcher.maybeDenyToolCall({
       call: mutateCall,
@@ -109,7 +159,7 @@ export class AgentToolDispatcher {
       approveToolCall: args.approveToolCall,
       approvalPolicies: args.approvalPolicies,
       workspaceRoot: args.workspaceRoot,
-      record: args.record,
+      live: args.live,
       log: args.log,
     });
     if (approvalDeniedResult) {
@@ -130,13 +180,29 @@ export class AgentToolDispatcher {
       now: () => string;
       registry: ToolRegistry;
       seenToolCalls: Map<string, number>;
-      record: (event: TraceEvent) => void;
+      live: AgentRunLiveRecorder;
       log: Logger;
     },
   ): Promise<{ effectiveCall: ToolCall; result: Awaited<ReturnType<typeof ToolExecutionService.execute>> }> {
-    const { step, now, registry, seenToolCalls, record, log } = args;
+    const { step, now, registry, seenToolCalls, live, log } = args;
     log.info({ step, tool: call.tool }, 'Executing tool');
-    record({ type: 'tool.call', call, step, timestamp: now() });
+    const tool = registry.get(call.tool);
+    const requiresApproval = tool?.requiresApproval ?? false;
+    live.traceActivity({
+      trace: { type: HeddleEventType.toolCalling, call, requiresApproval, step, timestamp: now() },
+      activity: {
+        type: HeddleEventType.toolCalling,
+        step,
+        tool: call.tool,
+        toolCallId: call.id,
+        input: call.input,
+        requiresApproval,
+        derived: {
+          kind: 'tool-summary',
+          summary: ToolActivitySummarizer.summarizeCall(call),
+        },
+      },
+    });
 
     const signature = `${call.tool}:${stableSerialize(normalizeToolInput(call.tool, call.input))}`;
     const seenCount = seenToolCalls.get(signature) ?? 0;
@@ -147,10 +213,22 @@ export class AgentToolDispatcher {
       );
     }
 
+    const startedAt = Date.now();
     const result = await ToolExecutionService.execute(registry, call);
+    const durationMs = Date.now() - startedAt;
     seenToolCalls.set(signature, seenCount + 1);
     log.debug({ step, tool: call.tool, ok: result.ok }, 'Tool result');
-    record({ type: 'tool.result', tool: call.tool, result, step, timestamp: now() });
+    live.traceActivity({
+      trace: { type: HeddleEventType.toolCompleted, call, result, durationMs, step, timestamp: now() },
+      activity: {
+        type: HeddleEventType.toolCompleted,
+        step,
+        tool: call.tool,
+        toolCallId: call.id,
+        result,
+        durationMs,
+      },
+    });
     return { effectiveCall: call, result };
   }
 

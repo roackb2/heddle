@@ -46,7 +46,13 @@ describe('analyzeTrace', () => {
           { id: 'test-2', tool: 'run_shell_inspect', input: { command: 'npm test -- --runInBand' } },
         ],
       },
-      { type: 'tool.result', tool: 'run_shell_mutate', result: { ok: true, output: { exitCode: 0 } }, step: 3, timestamp: '2026-05-01T00:00:04.000Z' },
+      {
+        type: 'tool.completed',
+        call: { id: 'test-3', tool: 'run_shell_mutate', input: { command: 'yarn test' } },
+        result: { ok: true, output: { exitCode: 0 } },
+        step: 3,
+        timestamp: '2026-05-01T00:00:04.000Z',
+      },
       { type: 'run.finished', outcome: 'done', summary: 'Fixed and verified.', step: 4, timestamp: '2026-05-01T00:00:05.000Z' },
     ];
 

@@ -1,12 +1,11 @@
 import type { TraceEvent } from '../../../../../index.js';
 import type { ConversationSessionService } from '../../../../../core/chat/engine/types.js';
-import type { ConversationActivity } from '@/core/chat/engine/live/index.js';
+import type { ConversationActivity } from '@/core/live/index.js';
+import { HeddleEventType } from '@/core/event-types.js';
 import { previewEditFileInput } from '../../../../../core/tools/toolkits/coding-files/edit-file.js';
 import { formatTuiConversationActivity } from '../../../adapters/conversation-activity-format.js';
 import { formatEditPreviewHistoryMessage, formatPlanHistoryMessage } from '../../../utils/format.js';
 import type { ActionState } from '../useAgentRunController.js';
-
-export type TuiAssistantStreamUpdate = { step: number; text: string; done: boolean };
 
 type PlanStateParser = (output: unknown) => ActionState extends { setCurrentPlan: (value: infer T) => void } ? T : never;
 
@@ -23,25 +22,24 @@ export function createTuiRunLoopEventAdapter(args: {
   const streamingBuffers = new Map<number, string>();
 
   return {
-    onAssistantStream(update: TuiAssistantStreamUpdate) {
-      streamingBuffers.set(update.step, update.text);
-      state.setCurrentAssistantText(update.text || undefined);
-      if (update.done) {
-        streamingBuffers.delete(update.step);
-      }
-    },
-
     onActivity(activity: ConversationActivity) {
+      if (activity.type === HeddleEventType.assistantStream) {
+        streamingBuffers.set(activity.step, activity.text);
+        state.setCurrentAssistantText(activity.text || undefined);
+        if (activity.done) {
+          streamingBuffers.delete(activity.step);
+        }
+      }
       appendLiveEvents(state, [formatTuiConversationActivity(activity)].filter((text): text is string => Boolean(text)));
     },
 
     onTraceEvent(event: TraceEvent) {
-      if (event.type === 'assistant.turn' && event.content.trim()) {
+      if (event.type === HeddleEventType.assistantTurn && event.content.trim()) {
         streamingBuffers.delete(event.step);
         state.setCurrentAssistantText(event.content);
       }
 
-      if (event.type === 'tool.call' && event.call.tool === 'edit_file') {
+      if (event.type === HeddleEventType.toolCalling && event.call.tool === 'edit_file') {
         void previewEditFileInput(event.call.input).then((preview) => {
           if (!preview || appendedEditPreviewIds.has(event.call.id)) {
             return;
@@ -58,7 +56,7 @@ export function createTuiRunLoopEventAdapter(args: {
         });
       }
 
-      if (event.type === 'tool.result' && event.tool === 'update_plan') {
+      if (event.type === HeddleEventType.toolCompleted && event.call.tool === 'update_plan') {
         state.setCurrentPlan(parsePlanState(event.result.output));
 
         if (!appendedPlanSteps.has(event.step)) {

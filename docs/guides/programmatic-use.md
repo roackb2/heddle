@@ -128,28 +128,23 @@ The current host surface is organized around:
 
 - `events.onActivity`
 - `approvals.requestToolApproval`
-- `assistant.onText`
 - `trace.onEvent`
 - `compaction.onStatus`
-- `events.onAgentLoopEvent` as a lower-level escape hatch
+- `events.onEvent` as a lower-level runtime event escape hatch
 
 ### `events.onActivity`
 
 `events.onActivity` receives semantic `ConversationActivity` records projected from runtime events, trace events, and compaction status updates.
 
 Use this when you want a UI timeline or host-visible progress without parsing raw loop or trace internals yourself.
+Assistant response streaming is delivered here as `assistant.stream` activity.
+Runtime and compaction activities use the same top-level fields that UI hosts consume; raw trace-derived activities keep their original `event` payload for evidence-oriented details.
 
 ### `approvals.requestToolApproval`
 
 `approvals.requestToolApproval` is the host approval surface for approval-gated tools.
 
 Use this when your host wants to review and allow/deny tool calls such as shell mutation or file edits.
-
-### `assistant.onText`
-
-`assistant.onText` receives streamed assistant text chunks during the turn.
-
-Use this when you want streaming output in a custom UI or transport.
 
 ### `trace.onEvent`
 
@@ -217,12 +212,18 @@ const session = engine.sessions.create({
   name: 'Programmatic conversation example',
 })
 
+let streamedAssistantText = ''
 const result = await engine.turns.submit({
   sessionId: session.id,
   prompt: 'Summarize this repository and list the main verification commands.',
   host: {
     events: {
       onActivity(activity) {
+        if (activity.type === 'assistant.stream') {
+          process.stdout.write(activity.text.slice(streamedAssistantText.length))
+          streamedAssistantText = activity.text
+          return
+        }
         console.log('[activity]', activity.type)
       },
     },
@@ -230,11 +231,6 @@ const result = await engine.turns.submit({
       async requestToolApproval(request) {
         console.log('[approval]', request.call.tool)
         return { approved: false, reason: 'Denied by example host policy.' }
-      },
-    },
-    assistant: {
-      onText(text) {
-        process.stdout.write(text)
       },
     },
     trace: {

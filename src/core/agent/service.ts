@@ -2,6 +2,7 @@ import { AgentRunContextBuilder } from './context/index.js';
 import { AgentModelTurnService } from './model/index.js';
 import { AgentToolTurnService } from './tools/index.js';
 import { AgentRunFinisher } from './finish/index.js';
+import { HeddleEventType } from '@/core/event-types.js';
 import type { RunResult } from '@/core/types.js';
 import type { RunAgentOptions, AgentRunContext } from './types.js';
 
@@ -13,7 +14,7 @@ export class AgentRunService {
     const context = AgentRunContextBuilder.create(options);
 
     context.log.info({ goal: options.goal, maxSteps: context.maxSteps, tools: context.registry.names() }, 'Agent run started');
-    context.record({ type: 'run.started', goal: options.goal, timestamp: context.now() });
+    context.live.trace({ type: HeddleEventType.runStarted, goal: options.goal, timestamp: context.now() });
 
     while (!context.budget.exhausted()) {
       const interrupted = AgentRunFinisher.maybeInterrupted(context, 'Agent run interrupted before next step');

@@ -10,6 +10,8 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
 - Streaming assistant content to host callbacks.
 - Executing model-requested tools through a registry.
 - Recording low-level `TraceEvent` evidence.
+- Emitting user-facing `ConversationActivity` for inner-loop moments that
+  interfaces should render live.
 - Applying tool approval callbacks supplied by outer domains.
 - Tracking mutation and memory-checkpoint signals inside a run.
 - Stopping on completion, max steps, error, or host interruption.
@@ -47,12 +49,16 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
   not by importing host state.
 - Add tool execution behavior through `ToolDefinition` and the tool registry.
 - Add trace detail by emitting typed `TraceEvent` values and updating the
-  observability summarizer/projection path.
+  observability summarizer/projection path. If the same moment is also
+  user-facing, use the live recorder helper to emit trace and activity together
+  with the same canonical event name.
 
 ## Common Changes
 
 - To add a new trace event from the inner loop, update `TraceEvent`, record it in
-  the owning service class, and add tests for trace ordering.
+  the owning service class, and add tests for trace ordering. If it should be
+  shown live to users, update `ConversationActivity` too and emit both from the
+  origin instead of adding a trace-to-activity mapper.
 - To change tool fallback behavior, keep fallback rules pure and covered by
   integration tests in `run-agent.test.ts`.
 - To change approval behavior, prefer the approval domain. The agent loop should

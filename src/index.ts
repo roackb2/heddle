@@ -287,7 +287,7 @@ export type {
 } from './core/review/index.js';
 export {
   ToolActivitySummarizer,
-} from './core/chat/engine/index.js';
+} from './core/live/index.js';
 export {
   DEFAULT_TRACE_SUMMARIZERS,
   TraceSummaryService,

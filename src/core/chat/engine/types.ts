@@ -2,7 +2,7 @@ import type { ToolApprovalPolicy, ToolApprovalSurface } from '../../approvals/ty
 import type {
   ConversationActivity,
   ConversationCompactionStatus,
-} from '@/core/chat/engine/live/index.js';
+} from '@/core/live/index.js';
 import type {
   TraceSummaryService,
 } from '@/core/observability/index.js';
@@ -166,7 +166,7 @@ export type SubmitConversationTurnResult = {
 export type ConversationEngineHost = {
   events?: {
     onActivity?: (activity: ConversationActivity) => void;
-    onAgentLoopEvent?: (event: AgentLoopEvent) => void;
+    onEvent?: (event: AgentLoopEvent) => void;
   };
   approvals?: {
     requestToolApproval?: ToolApprovalSurface;
@@ -176,10 +176,6 @@ export type ConversationEngineHost = {
     onPreflightCompactionStatus?: (event: ConversationCompactionStatus) => void;
     onFinalCompactionStatus?: (event: ConversationCompactionStatus) => void;
   };
-  assistant?: {
-    onStream?: RunAgentLoopOptions['onAssistantStream'];
-    onText?: (text: string) => void;
-  };
   trace?: {
     onEvent?: (event: TraceEvent) => void;
   };
@@ -187,6 +183,5 @@ export type ConversationEngineHost = {
 
 export type NormalizedConversationEngineHost = {
   turnHost?: ChatTurnHostPort;
-  onAssistantStream?: RunAgentLoopOptions['onAssistantStream'];
   onTraceEvent?: RunAgentLoopOptions['onTraceEvent'];
 };

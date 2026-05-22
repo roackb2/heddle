@@ -115,10 +115,10 @@ function formatTraceEvent(event: TraceEvent): string {
       return `[trace] tool.approval_resolved step=${event.step} tool=${event.call.tool} approved=${event.approved}`;
     case 'tool.fallback':
       return `[trace] tool.fallback step=${event.step} from=${event.fromCall.tool} to=${event.toCall.tool} reason=${JSON.stringify(shorten(event.reason))}`;
-    case 'tool.call':
-      return `[trace] tool.call step=${event.step} tool=${event.call.tool} input=${JSON.stringify(event.call.input)}`;
-    case 'tool.result':
-      return `[trace] tool.result step=${event.step} tool=${event.tool} ok=${event.result.ok} output=${JSON.stringify(formatUnknown(event.result.output ?? event.result.error ?? ''))}`;
+    case 'tool.calling':
+      return `[trace] tool.calling step=${event.step} tool=${event.call.tool} input=${JSON.stringify(event.call.input)}`;
+    case 'tool.completed':
+      return `[trace] tool.completed step=${event.step} tool=${event.call.tool} ok=${event.result.ok} output=${JSON.stringify(formatUnknown(event.result.output ?? event.result.error ?? ''))}`;
     case 'memory.candidate_recorded':
       return `[trace] memory.candidate_recorded step=${event.step} candidate=${event.candidateId}`;
     case 'memory.checkpoint_skipped':

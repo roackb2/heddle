@@ -309,15 +309,16 @@ export function eventToRuntimeFrame(
     };
   }
 
-  if (event.type === 'trace' && event.event.type === 'tool.result') {
+  if (event.type === 'trace' && event.event.type === 'tool.completed') {
     return {
       runId,
       step: event.event.step,
       kind: 'tool',
       goal,
-      text: formatTraceToolResultText(event.event.tool, event.event.result),
+      text: formatTraceToolResultText(event.event.call.tool, event.event.result),
       timestamp: event.timestamp,
-      tool: event.event.tool,
+      tool: event.event.call.tool,
+      toolCallId: event.event.call.id,
       ok: event.event.result.ok,
       rawEvent: event,
     };

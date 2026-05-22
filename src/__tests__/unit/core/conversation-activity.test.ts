@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ToolActivitySummarizer } from '@/core/chat/engine/live/index.js';
-import { ConversationEngineActivityAdapter } from '@/core/chat/engine/turns/host/conversation-activity-adapter.js';
-import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
-import type { TraceEvent } from '../../../core/types.js';
+import { ToolActivitySummarizer } from '@/core/live/index.js';
+import type { ConversationActivity } from '@/core/live/index.js';
 
-describe('conversation engine activity adapter', () => {
-  it('creates assistant stream activities from agent loop events', () => {
-    const event: AgentLoopEvent = {
+describe('conversation activity', () => {
+  it('uses runtime-origin activity as the final conversation activity shape', () => {
+    const activity: ConversationActivity = {
+      source: 'agent-loop',
       type: 'assistant.stream',
       runId: 'run-1',
       step: 1,
@@ -15,173 +14,88 @@ describe('conversation engine activity adapter', () => {
       timestamp: '2026-05-02T00:00:00.000Z',
     };
 
-    expect(ConversationEngineActivityAdapter.fromAgentLoopEvent(event)).toEqual([
-      expect.objectContaining({
-        source: 'agent-loop',
-        type: 'assistant.stream',
-        event,
-        correlation: expect.objectContaining({ runId: 'run-1', step: 1 }),
-      }),
-    ]);
-  });
-
-  it('projects loop started and finished events', () => {
-    const started: AgentLoopEvent = {
-      type: 'loop.started',
+    expect(activity).toEqual({
+      source: 'agent-loop',
+      type: 'assistant.stream',
       runId: 'run-1',
-      goal: 'answer',
-      model: 'gpt-5.4',
-      provider: 'openai',
-      workspaceRoot: '/repo',
+      step: 1,
+      text: 'Working',
+      done: false,
       timestamp: '2026-05-02T00:00:00.000Z',
-    };
-    const finishedTrace: TraceEvent = {
-      type: 'run.finished',
-      outcome: 'max_steps',
-      summary: 'Stopped.',
-      step: 5,
-      timestamp: '2026-05-02T00:00:01.000Z',
-    };
-
-    expect(ConversationEngineActivityAdapter.fromAgentLoopEvent(started)).toEqual([expect.objectContaining({
-      type: 'loop.started',
-      event: started,
-      correlation: expect.objectContaining({ runId: 'run-1' }),
-    })]);
-    expect(ConversationEngineActivityAdapter.fromTraceEvent(finishedTrace)).toEqual([
-      expect.objectContaining({
-        type: 'run.finished',
-        event: finishedTrace,
-        correlation: expect.objectContaining({ step: 5 }),
-      }),
-    ]);
+    });
   });
 
-  it('projects tool calling and completion events from the agent loop', () => {
-    const calling: AgentLoopEvent = {
-      type: 'tool.calling',
-      runId: 'run-1',
-      step: 2,
-      tool: 'read_file',
-      toolCallId: 'call-1',
-      input: { path: 'README.md' },
-      requiresApproval: false,
-      timestamp: '2026-05-02T00:00:00.000Z',
+  it('keeps compaction activity in the final conversation activity shape', () => {
+    const running: ConversationActivity = {
+      source: 'compaction',
+      type: 'compaction.running',
+      status: 'running',
+      archivePath: '.heddle/chat-sessions/session-1/archive.jsonl',
     };
-    const completed: AgentLoopEvent = {
-      type: 'tool.completed',
-      runId: 'run-1',
-      step: 2,
-      tool: 'read_file',
-      toolCallId: 'call-1',
-      result: { ok: true, output: 'contents' },
-      durationMs: 12.4,
-      timestamp: '2026-05-02T00:00:01.000Z',
+    const failed: ConversationActivity = {
+      source: 'compaction',
+      type: 'compaction.failed',
+      status: 'failed',
+      error: 'summary failed',
     };
 
-    expect(ConversationEngineActivityAdapter.fromAgentLoopEvent(calling)).toEqual([
-      expect.objectContaining({
-        type: 'tool.calling',
-        event: calling,
-        correlation: expect.objectContaining({ step: 2, runId: 'run-1' }),
-        derived: { kind: 'tool-summary', summary: 'read_file (README.md)' },
-      }),
-    ]);
-    expect(ConversationEngineActivityAdapter.fromAgentLoopEvent(completed)).toEqual([
-      expect.objectContaining({
-        type: 'tool.completed',
-        event: completed,
-        correlation: expect.objectContaining({ step: 2, runId: 'run-1' }),
-      }),
-    ]);
+    expect(running).toEqual({
+      source: 'compaction',
+      type: 'compaction.running',
+      status: 'running',
+      archivePath: '.heddle/chat-sessions/session-1/archive.jsonl',
+    });
+    expect(failed).toEqual({
+      source: 'compaction',
+      type: 'compaction.failed',
+      status: 'failed',
+      error: 'summary failed',
+    });
   });
 
-  it('projects trace approval and fallback activities with reusable tool summaries', () => {
-    const approval: TraceEvent = {
+  it('keeps approval and fallback activity in the final conversation activity shape', () => {
+    const approval: ConversationActivity = {
+      source: 'agent-loop',
       type: 'tool.approval_requested',
+      runId: 'run-1',
       call: { id: 'call-1', tool: 'run_shell_mutate', input: { command: 'yarn test' } },
       step: 3,
       timestamp: '2026-05-02T00:00:00.000Z',
+      derived: { kind: 'tool-summary', summary: 'run_shell_mutate (yarn test)' },
     };
-    const fallback: TraceEvent = {
+    const fallback: ConversationActivity = {
+      source: 'agent-loop',
       type: 'tool.fallback',
+      runId: 'run-1',
       fromCall: { id: 'call-2', tool: 'run_shell_inspect', input: { command: 'git status --short' } },
       toCall: { id: 'call-3', tool: 'run_shell_mutate', input: { command: 'git status --short' } },
       reason: 'inspect policy rejected the command',
       step: 4,
       timestamp: '2026-05-02T00:00:01.000Z',
+      derived: {
+        kind: 'tool-fallback-summary',
+        fromSummary: 'run_shell_inspect (git status --short)',
+        toSummary: 'run_shell_mutate (git status --short)',
+      },
     };
 
-    expect(ConversationEngineActivityAdapter.fromTraceEvent(approval)).toEqual([
+    expect(approval).toEqual(
       expect.objectContaining({
         type: 'tool.approval_requested',
-        event: approval,
+        call: expect.objectContaining({ tool: 'run_shell_mutate' }),
         derived: { kind: 'tool-summary', summary: 'run_shell_mutate (yarn test)' },
-        correlation: expect.objectContaining({ step: 3 }),
       }),
-    ]);
-    expect(ConversationEngineActivityAdapter.fromTraceEvent(fallback)).toEqual([
+    );
+    expect(fallback).toEqual(
       expect.objectContaining({
         type: 'tool.fallback',
-        event: fallback,
         derived: {
           kind: 'tool-fallback-summary',
           fromSummary: 'run_shell_inspect (git status --short)',
           toSummary: 'run_shell_mutate (git status --short)',
         },
-        correlation: expect.objectContaining({ step: 4 }),
       }),
-    ]);
-  });
-
-  it('projects memory trace activities used by host adapters', () => {
-    const started: TraceEvent = {
-      type: 'memory.maintenance_started',
-      runId: 'memory-1',
-      candidateIds: ['candidate-1', 'candidate-2'],
-      step: 5,
-      timestamp: '2026-05-02T00:00:00.000Z',
-    };
-    const finished: TraceEvent = {
-      type: 'memory.maintenance_finished',
-      runId: 'memory-1',
-      outcome: 'completed',
-      summary: 'Stored project context.',
-      processedCandidateIds: ['candidate-1'],
-      failedCandidateIds: [],
-      step: 5,
-      timestamp: '2026-05-02T00:00:01.000Z',
-    };
-
-    expect(ConversationEngineActivityAdapter.fromTraceEvent(started)).toEqual([
-      expect.objectContaining({
-        type: 'memory.maintenance_started',
-        event: started,
-        correlation: expect.objectContaining({ runId: 'memory-1', step: 5 }),
-      }),
-    ]);
-    expect(ConversationEngineActivityAdapter.fromTraceEvent(finished)).toEqual([
-      expect.objectContaining({
-        type: 'memory.maintenance_finished',
-        event: finished,
-        correlation: expect.objectContaining({ runId: 'memory-1', step: 5 }),
-      }),
-    ]);
-  });
-
-  it('projects compaction status activities', () => {
-    expect(ConversationEngineActivityAdapter.fromCompactionStatus({
-      status: 'running',
-      archivePath: '.heddle/chat-sessions/session-1/archive.jsonl',
-    })).toEqual([
-      { source: 'compaction', type: 'compaction.running', event: { status: 'running', archivePath: '.heddle/chat-sessions/session-1/archive.jsonl' } },
-    ]);
-    expect(ConversationEngineActivityAdapter.fromCompactionStatus({
-      status: 'failed',
-      error: 'summary failed',
-    })).toEqual([
-      { source: 'compaction', type: 'compaction.failed', event: { status: 'failed', error: 'summary failed' } },
-    ]);
+    );
   });
 
   it('preserves TUI tool call summary details in the shared core helper', () => {
@@ -201,28 +115,5 @@ describe('conversation engine activity adapter', () => {
     expect(ToolActivitySummarizer.summarizeResult({ tool: 'delete_file', result: { ok: true, output: { path: 'tmp/generated-report.md' } } })).toBe(
       'delete_file (tmp/generated-report.md)',
     );
-  });
-
-  it('routes nested trace loop events through the trace projector', () => {
-    const trace: TraceEvent = {
-      type: 'tool.call',
-      call: { id: 'call-1', tool: 'read_file', input: { path: 'README.md' } },
-      step: 2,
-      timestamp: '2026-05-02T00:00:00.000Z',
-    };
-    const event: AgentLoopEvent = {
-      type: 'trace',
-      runId: 'run-1',
-      event: trace,
-      timestamp: '2026-05-02T00:00:01.000Z',
-    };
-
-    expect(ConversationEngineActivityAdapter.fromAgentLoopEvent(event)).toEqual([
-      expect.objectContaining({
-        type: 'tool.call',
-        derived: { kind: 'tool-summary', summary: 'read_file (README.md)' },
-        correlation: expect.objectContaining({ runId: 'run-1', step: 2 }),
-      }),
-    ]);
   });
 });

@@ -1,5 +1,7 @@
 import type { ConversationEngineHost } from '@/core/chat/engine/types.js';
-import { ConversationEngineActivityAdapter } from './conversation-activity-adapter.js';
+import type { ConversationAgentLoopActivity } from '@/core/live/index.js';
+import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
+import { HeddleEventType } from '@/core/event-types.js';
 import type { ChatTurnHostPort, ConversationEngineHostAdapterResult } from './types.js';
 
 /**
@@ -8,15 +10,15 @@ import type { ChatTurnHostPort, ConversationEngineHostAdapterResult } from './ty
 export class ConversationEngineHostNormalizer {
   static normalize(host?: ConversationEngineHost): ConversationEngineHostAdapterResult {
     const onActivity = host?.events?.onActivity;
-    const onAgentLoopEvent = host?.events?.onAgentLoopEvent;
+    const onEvent = host?.events?.onEvent;
     const onTraceEvent = host?.trace?.onEvent;
     const requestToolApproval = host?.approvals?.requestToolApproval;
 
     const turnHost: ChatTurnHostPort = {
-      onAgentLoopEvent: (event) => {
-        onAgentLoopEvent?.(event);
-        for (const activity of ConversationEngineActivityAdapter.fromAgentLoopEvent(event)) {
-          onActivity?.(activity);
+      onEvent: (event) => {
+        onEvent?.(event);
+        if (ConversationEngineHostNormalizer.isConversationActivity(event)) {
+          onActivity?.(event);
         }
       },
       approveToolCall: requestToolApproval
@@ -29,26 +31,21 @@ export class ConversationEngineHostNormalizer {
         } else {
           host?.compaction?.onFinalCompactionStatus?.(event);
         }
-        for (const activity of ConversationEngineActivityAdapter.fromCompactionStatus(event)) {
-          onActivity?.(activity);
-        }
+        onActivity?.(event);
       },
     };
 
     return {
       turnHost,
-      onAssistantStream: host?.assistant?.onStream
-        ?? (host?.assistant?.onText
-          ? ((update) => {
-              host.assistant?.onText?.(update.text);
-            })
-          : undefined),
       onTraceEvent: (event) => {
         onTraceEvent?.(event);
-        for (const activity of ConversationEngineActivityAdapter.fromTraceEvent(event)) {
-          onActivity?.(activity);
-        }
       },
     };
+  }
+
+  private static isConversationActivity(event: AgentLoopEvent): event is Extract<AgentLoopEvent, ConversationAgentLoopActivity> {
+    return event.type !== HeddleEventType.trace
+      && event.type !== HeddleEventType.loopResumed
+      && event.type !== HeddleEventType.checkpointSaved;
   }
 }

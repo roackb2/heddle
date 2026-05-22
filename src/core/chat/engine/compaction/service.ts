@@ -101,7 +101,12 @@ export class ConversationCompactionService {
 
     const archiveId = FileChatArchiveRepository.createArchiveId();
     const archivePath = archiveRepository.writeMessagesJsonl(archiveId, archivedMessages);
-    options.onStatusChange?.({ status: 'running', archivePath });
+    options.onStatusChange?.({
+      source: 'compaction',
+      type: 'compaction.running',
+      status: 'running',
+      archivePath,
+    });
 
     try {
       const summarizer = ConversationArchiveSummarizer.resolve(options);
@@ -140,6 +145,8 @@ export class ConversationCompactionService {
       ];
 
       options.onStatusChange?.({
+        source: 'compaction',
+        type: 'compaction.finished',
         status: 'finished',
         archivePath: archiveRecord.path,
         summaryPath: archiveRecord.summaryPath,
@@ -157,7 +164,13 @@ export class ConversationCompactionService {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      options.onStatusChange?.({ status: 'failed', archivePath, error: message });
+      options.onStatusChange?.({
+        source: 'compaction',
+        type: 'compaction.failed',
+        status: 'failed',
+        archivePath,
+        error: message,
+      });
       return ConversationCompactionService.buildFailedResult({
         options,
         message,

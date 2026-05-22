@@ -1,4 +1,5 @@
 import type { TraceEvent } from '@/core/types.js';
+import { HeddleEventType } from '@/core/event-types.js';
 import type { CreateAgentMemoryCheckpointStateArgs, TrackAgentMemoryToolResultArgs } from './types.js';
 import type { AgentRunContext, AgentMemoryCheckpointState } from '../types.js';
 
@@ -48,8 +49,8 @@ export class AgentMemoryCheckpointTracker {
       return;
     }
 
-    context.record({
-      type: 'memory.candidate_recorded',
+    context.live.trace({
+      type: HeddleEventType.memoryCandidateRecorded,
       candidateId,
       path,
       step: context.state.step,
@@ -75,8 +76,8 @@ export class AgentMemoryCheckpointTracker {
       return;
     }
 
-    context.record({
-      type: 'memory.checkpoint_skipped',
+    context.live.trace({
+      type: HeddleEventType.memoryCheckpointSkipped,
       rationale,
       step: context.state.step,
       timestamp: context.now(),

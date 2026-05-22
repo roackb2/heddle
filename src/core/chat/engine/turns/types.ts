@@ -1,5 +1,5 @@
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
-import type { ConversationCompactionStatus } from '@/core/chat/engine/live/index.js';
+import type { ConversationCompactionStatus } from '@/core/live/index.js';
 import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { RunAgentLoopOptions } from '@/core/runtime/loop/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
@@ -25,7 +25,6 @@ export type RunConversationTurnArgs = {
   approvalPolicies?: ToolApprovalPolicy[];
   traceSummarizerRegistry?: TraceSummaryService;
   onCompactionStatus?: (event: ConversationCompactionStatus) => void;
-  onAssistantStream?: RunAgentLoopOptions['onAssistantStream'];
   onTraceEvent?: RunAgentLoopOptions['onTraceEvent'];
   shouldStop?: RunAgentLoopOptions['shouldStop'];
   abortSignal?: AbortSignal;
@@ -60,7 +59,7 @@ export type TurnSubmitInput = Pick<
 
 export type TurnHostInput = Pick<
   RunConversationTurnArgs,
-  'host' | 'onAssistantStream' | 'onTraceEvent' | 'shouldStop'
+  'host' | 'onTraceEvent' | 'shouldStop'
 >;
 
 export type TurnPreflightInput = Pick<
@@ -70,7 +69,7 @@ export type TurnPreflightInput = Pick<
 
 export type AgentLoopTurnInput = Pick<
   RunConversationTurnArgs,
-  'prompt' | 'maxSteps' | 'workspaceRoot' | 'stateRoot' | 'onAssistantStream' | 'onTraceEvent' | 'approvalPolicies' | 'shouldStop' | 'abortSignal'
+  'prompt' | 'maxSteps' | 'workspaceRoot' | 'stateRoot' | 'onTraceEvent' | 'approvalPolicies' | 'shouldStop' | 'abortSignal'
 >;
 
 export type TurnPersistenceInput = Pick<

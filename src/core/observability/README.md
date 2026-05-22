@@ -15,8 +15,8 @@ summaries, and debugging evidence contracts.
 - Low-level event emission inside the agent loop.
 - UI rendering of activity.
 - User-facing live conversation activity contracts. Those belong to
-  `src/core/chat/engine/live/` because TUI, web, and programmatic chat hosts all
-  consume them.
+  `src/core/live/` because TUI, web, and programmatic chat hosts all consume
+  them.
 - Storage of chat sessions.
 - Logger configuration unrelated to trace/event contracts.
 
@@ -30,7 +30,7 @@ Observability behavior currently exists in these places:
 - `src/core/chat/engine/turns/trace/` for persisted chat trace files.
 - `src/core/observability/summaries/` for turn summary evidence.
 - `src/core/observability/semantics/` for shared trace names.
-- `src/core/chat/engine/live/` for shared host activity projection, typed
+- `src/core/live/` for shared host activity projection, typed
   activity handlers, and tool call/result activity summaries.
 - `src/cli/chat/hooks/controllers/run/tui-run-loop-events.ts` for TUI activity rendering.
 - `src/web/features/control-plane/hooks/sessions-screen/useSessionDetailSubscription.ts` for web activity rendering.

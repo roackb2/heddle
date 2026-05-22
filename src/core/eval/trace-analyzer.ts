@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { HeddleEventType } from '@/core/event-types.js';
 import type { TraceEvent } from '../types.js';
 import type { EvalTraceMetrics } from './schema.js';
 
@@ -53,22 +54,22 @@ export function analyzeTrace(trace: TraceEvent[]): EvalTraceMetrics {
       continue;
     }
 
-    if (event.type === 'tool.result') {
+    if (event.type === HeddleEventType.toolCompleted) {
       toolResults++;
       if (!event.result.ok) {
         toolErrors++;
       }
     }
 
-    if (event.type === 'tool.approval_requested') {
+    if (event.type === HeddleEventType.toolApprovalRequested) {
       approvalsRequested++;
     }
 
-    if (event.type === 'tool.approval_resolved') {
+    if (event.type === HeddleEventType.toolApprovalResolved) {
       approvalsResolved++;
     }
 
-    if (event.type === 'run.finished') {
+    if (event.type === HeddleEventType.runFinished) {
       outcome = event.outcome;
       summary = event.summary;
     }

@@ -10,25 +10,24 @@ session after every model delta or tool event.
 
 The shared rule is:
 
-- the conversation engine owns the live event vocabulary;
+- `src/core/live` owns the shared live event vocabulary;
 - server/control-plane code owns transport fanout;
 - interfaces own presentation state only.
 
 If the same live behavior is needed by TUI, web-v1, web-v2, or a future
-programmatic host, the behavior should move toward the engine event contract
+programmatic host, the behavior should move toward the shared live event contract
 instead of being duplicated per interface.
 
 ## Vocabulary
 
 The shared user-facing event contract is `ConversationActivity` in
-`src/core/chat/engine/live/types.ts`.
+`src/core/live/types.ts`.
 
 Current activity sources are:
 
-- `agent-loop`: run lifecycle and assistant streaming events such as
-  `loop.started`, `assistant.stream`, `loop.finished`, and `run.finished`.
-- `trace`: tool and trace-derived events such as `tool.calling`,
-  `tool.completed`, `tool.approval_requested`, and related tool outcomes.
+- `agent-loop`: run lifecycle, assistant streaming, and tool progress events
+  such as `loop.started`, `assistant.stream`, `tool.calling`,
+  `tool.approval_requested`, `tool.completed`, and `loop.finished`.
 - `compaction`: compaction lifecycle events such as `compaction.running`,
   `compaction.finished`, and `compaction.failed`.
 
@@ -37,17 +36,51 @@ render an appropriate view. Backend code should not decide display strings for
 all clients. Web desktop, mobile, TUI, and programmatic consumers may present
 the same activity differently.
 
+The lower execution layers keep their own event contracts, but each layer has
+one event lane:
+
+- LLM adapters use provider stream events through `onStreamEvent`.
+- `src/core/agent` emits `AgentRunEvent` through `RunAgentOptions.onEvent`.
+- `src/core/runtime/loop` emits `AgentLoopEvent` through
+  `RunAgentLoopOptions.onEvent`.
+- `src/core/chat/engine` forwards `ConversationActivity` through
+  `ConversationEngineHost.events.onActivity`.
+
+Do not add parallel callback lanes for behavior that already belongs to the
+event lane at that layer.
+
+## Trace vs Activity
+
+`TraceEvent` and `ConversationActivity` are intentionally different contracts:
+
+- `TraceEvent` is durable observability evidence. It is written to run traces and
+  supports debugging, evals, summaries, and system inspection.
+- `ConversationActivity` is live user-facing information. It is structured for
+  interfaces and programmatic hosts to render current progress without inferring
+  meaning from trace internals.
+
+Some execution moments need both. For those, the owning origin should emit both
+through the agent live recorder helper, not by relying on a later mapper. For
+example, tool execution records a `tool.calling` trace event and emits a
+`tool.calling` conversation activity with the same canonical event name. The
+only enrichment done by the runtime boundary is adding run-scoped fields such as
+`runId`, `source`, and `timestamp`.
+
+Do not introduce parallel names such as `tool.call` versus `tool.calling` for
+the same moment. Shared event names live in `src/core/event-types.ts`.
+
 ## Flow
 
 ```mermaid
 flowchart TD
-  LLM["LLM provider stream"] --> Agent["src/core/agent<br/>model/tool execution"]
+  LLM["LLM provider stream<br/>onStreamEvent"] --> Agent["src/core/agent<br/>AgentRunEvent"]
   Tools["Tool calls and results"] --> Agent
-  Compaction["Compaction service"] --> HostBoundary["conversation engine host boundary<br/>src/core/chat/engine/turns/host"]
+  Compaction["Compaction service<br/>ConversationActivity"] --> HostBoundary["conversation engine host boundary<br/>src/core/chat/engine/turns/host"]
   Agent --> Runtime["src/core/runtime/loop<br/>AgentLoopEvent"]
   Runtime --> HostBoundary
-  Trace["TraceEvent"] --> HostBoundary
-  HostBoundary --> Activity["ConversationActivity<br/>src/core/chat/engine/live/types.ts"]
+  HostBoundary --> Activity["ConversationActivity<br/>src/core/live/types.ts"]
+  Agent --> Trace["TraceEvent<br/>durable observability"]
+  Runtime --> Trace
   Activity --> Publisher["ControlPlaneChatSessionEventsController<br/>publishActivity / publishActivities"]
   Publisher --> Bus["EventEmitter keyed by sessionId"]
   Bus --> Queue["ControlPlaneSessionEventQueue<br/>AsyncIterable adapter"]
@@ -63,7 +96,8 @@ flowchart TD
 
 ```text
 LLM / tools / compaction
-  -> core runtime and trace events
+  -> agent events
+  -> runtime loop activities, compaction activities, and durable trace evidence
   -> conversation engine host boundary
   -> ConversationActivity
   -> control-plane session publisher
@@ -74,11 +108,16 @@ LLM / tools / compaction
 
 The main implementation path is:
 
+- `src/core/agent/context/run-context-builder.ts` builds the live recorder that
+  records trace evidence, emits activity, or does both for the same origin.
 - `src/core/agent/model/model-turn-service.ts` receives LLM stream deltas and
-  emits `assistant.stream` through runtime callbacks.
-- `src/core/runtime/loop/service.ts` exposes runtime loop events.
-- `src/core/chat/engine/turns/host/` adapts raw runtime, trace, and compaction
-  events into `ConversationActivity`.
+  emits `assistant.stream` activity through the agent event lane.
+- `src/core/agent/tools/tool-dispatcher.ts` emits tool trace and tool activity
+  from the same origin so trace and activity use one vocabulary.
+- `src/core/runtime/loop/service.ts` adds run-level fields and exposes runtime
+  loop events.
+- `src/core/chat/engine/turns/host/` forwards runtime and compaction
+  activities directly. It should not infer user-facing activity from trace.
 - `src/server/features/control-plane/controllers/chat-session-events.ts`
   publishes activity batches for one session.
 - `src/server/features/control-plane/controllers/chat-sessions-controller.ts`
@@ -107,7 +146,7 @@ non-streaming.
 
 ## Event Examples
 
-These examples show the actual nesting shape so readers do not need to mentally
+These examples show the actual event shape so readers do not need to mentally
 expand the TypeScript unions before changing a consumer.
 
 Assistant streaming is delivered as a `session.event` envelope containing an
@@ -122,19 +161,11 @@ Assistant streaming is delivered as a `session.event` envelope containing an
     {
       "source": "agent-loop",
       "type": "assistant.stream",
-      "event": {
-        "type": "assistant.stream",
-        "runId": "run-123",
-        "step": 1,
-        "text": "I am checking the session loader now...",
-        "done": false,
-        "timestamp": "2026-05-22T01:20:00.000Z"
-      },
-      "correlation": {
-        "runId": "run-123",
-        "step": 1,
-        "timestamp": "2026-05-22T01:20:00.000Z"
-      }
+      "runId": "run-123",
+      "step": 1,
+      "text": "I am checking the session loader now...",
+      "done": false,
+      "timestamp": "2026-05-22T01:20:00.000Z"
     }
   ]
 }
@@ -149,27 +180,58 @@ A tool status update keeps raw tool details available to each interface:
   "timestamp": "2026-05-22T01:20:03.000Z",
   "activities": [
     {
-      "source": "trace",
+      "source": "agent-loop",
       "type": "tool.calling",
-      "event": {
-        "type": "tool.calling",
-        "tool": "read_file",
-        "input": {
-          "path": "src/web-v2/hooks/useControlPlaneSessionLoader.ts"
-        },
-        "timestamp": "2026-05-22T01:20:03.000Z"
+      "runId": "run-123",
+      "step": 1,
+      "tool": "read_file",
+      "toolCallId": "call-abc",
+      "input": {
+        "path": "src/web-v2/hooks/useControlPlaneSessionLoader.ts"
       },
-      "correlation": {
-        "runId": "run-123",
-        "step": 1,
-        "timestamp": "2026-05-22T01:20:03.000Z"
-      },
-      "derived": {
-        "kind": "tool-summary",
-        "summary": "read_file src/web-v2/hooks/useControlPlaneSessionLoader.ts"
-      }
+      "requiresApproval": false,
+      "timestamp": "2026-05-22T01:20:03.000Z"
     }
   ]
+}
+```
+
+The matching durable trace event uses the same event name. It does not include
+interface-only source fields:
+
+```json
+{
+  "type": "tool.calling",
+  "call": {
+    "id": "call-abc",
+    "tool": "read_file",
+    "input": {
+      "path": "src/web-v2/hooks/useControlPlaneSessionLoader.ts"
+    }
+  },
+  "requiresApproval": false,
+  "step": 1,
+  "timestamp": "2026-05-22T01:20:03.000Z"
+}
+```
+
+Approval activity is user-facing because the client needs to show that the run
+is waiting for an operator decision:
+
+```json
+{
+  "source": "agent-loop",
+  "type": "tool.approval_requested",
+  "runId": "run-123",
+  "step": 1,
+  "call": {
+    "id": "call-def",
+    "tool": "run_shell_mutate",
+    "input": {
+      "command": "yarn test"
+    }
+  },
+  "timestamp": "2026-05-22T01:20:04.000Z"
 }
 ```
 
@@ -242,9 +304,10 @@ guesswork.
 When adding a new live behavior:
 
 1. Decide whether it is shared conversation behavior or interface-only state.
-2. If shared, add or extend `ConversationActivity` in
-   `src/core/chat/engine/live/types.ts`.
-3. Emit the activity at the owning engine or host boundary.
+2. If shared, add or extend `ConversationActivity` in `src/core/live/types.ts`.
+3. Emit the activity at the owning runtime, engine, agent, or compaction
+   boundary in that final shape. If the same moment also needs durable evidence,
+   use the origin's trace+activity helper and keep the event name identical.
 4. Publish through `ControlPlaneChatSessionEventsController` without remapping
    fields unless there is real transport work.
 5. Add focused UI handling in the consuming interface.

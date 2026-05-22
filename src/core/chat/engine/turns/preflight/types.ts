@@ -1,5 +1,6 @@
 import type { ChatMessage } from '@/core/llm/types.js';
 import type { ChatSession } from '@/core/chat/types.js';
+import type { ConversationCompactionStatus } from '@/core/live/index.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import type { ChatTurnHostPort } from '../host/index.js';
 import type {
@@ -7,12 +8,7 @@ import type {
   ConversationCompactionOptions,
 } from '@/core/chat/engine/compaction/index.js';
 
-export type ChatTurnPreflightCompactionStatus = {
-  status: 'running' | 'finished' | 'failed';
-  archivePath?: string;
-  summaryPath?: string;
-  error?: string;
-};
+export type ChatTurnPreflightCompactionStatus = ConversationCompactionStatus;
 
 export type PrepareChatSessionTurnArgs = {
   sessionStoragePath: string;

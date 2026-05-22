@@ -96,7 +96,7 @@ describe('AgentLoopRuntimeService.run', () => {
       provider: 'openai',
       workspaceRoot,
     });
-    expect(events.some((event) => event.type === 'trace' && event.event.type === 'tool.call')).toBe(true);
+    expect(events.some((event) => event.type === 'trace' && event.event.type === 'tool.calling')).toBe(true);
     expect(events.at(-1)).toMatchObject({
       type: 'loop.finished',
       outcome: 'done',

@@ -411,19 +411,11 @@ export class ControlPlaneChatSessionsController {
     publisher.publishActivity({
       source: 'agent-loop',
       type: 'assistant.stream',
-      event: {
-        type: 'assistant.stream',
-        runId,
-        step: 1,
-        text: assistantText.slice(0, 'Mocked browser integration agent response'.length),
-        done: false,
-        timestamp,
-      },
-      correlation: {
-        runId,
-        step: 1,
-        timestamp,
-      },
+      runId,
+      step: 1,
+      text: assistantText.slice(0, 'Mocked browser integration agent response'.length),
+      done: false,
+      timestamp,
     });
 
     await new Promise((resolve) => {

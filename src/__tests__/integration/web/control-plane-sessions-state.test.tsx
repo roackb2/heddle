@@ -129,18 +129,11 @@ describe('useSessionsScreenState', () => {
         activities: [{
           source: 'agent-loop',
           type: 'assistant.stream',
-          event: {
-            type: 'assistant.stream',
-            runId: 'run-1',
-            step: 1,
-            text: 'Inspecting the repo…',
-            done: false,
-            timestamp: new Date().toISOString(),
-          },
-          correlation: {
-            runId: 'run-1',
-            step: 1,
-          },
+          runId: 'run-1',
+          step: 1,
+          text: 'Inspecting the repo…',
+          done: false,
+          timestamp: new Date().toISOString(),
         }],
       });
     });

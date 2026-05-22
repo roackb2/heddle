@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import { AgentRunService } from '../../../core/agent/index.js';
+import type { AgentRunEvent } from '../../../core/agent/index.js';
 import type { ChatMessage, LlmAdapter, LlmResponse } from '../../../core/llm/types.js';
 import type { ToolDefinition } from '../../../core/types.js';
 import { createLogger } from '../../../core/utils/logger.js';
@@ -71,8 +72,8 @@ describe('AgentRunService.run', () => {
     expect(result.trace.map((event) => event.type)).toEqual([
       'run.started',
       'assistant.turn',
-      'tool.call',
-      'tool.result',
+      'tool.calling',
+      'tool.completed',
       'assistant.turn',
       'run.finished',
     ]);
@@ -237,8 +238,8 @@ describe('AgentRunService.run', () => {
     });
   });
 
-  it('delivers streamed assistant updates through the dedicated stream callback', async () => {
-    const streamUpdates: Array<{ step: number; text: string; done: boolean }> = [];
+  it('delivers streamed assistant updates through the agent event lane', async () => {
+    const events: AgentRunEvent[] = [];
     const fakeLlm: LlmAdapter = {
       async chat(_messages, _tools, _signal, onStreamEvent): Promise<LlmResponse> {
         onStreamEvent?.({ type: 'content.delta', delta: 'Hello' });
@@ -256,12 +257,11 @@ describe('AgentRunService.run', () => {
       tools: [],
       maxSteps: 1,
       logger: silentLogger,
-      onAssistantStream: (update) => {
-        streamUpdates.push(update);
-      },
+      onEvent: (event) => events.push(event),
     });
 
     expect(result.outcome).toBe('done');
+    const streamUpdates = events.filter((event) => event.type === 'assistant.stream');
     expect(streamUpdates.length).toBeGreaterThanOrEqual(2);
     expect(streamUpdates.some((update) => update.done === false)).toBe(true);
     expect(streamUpdates.at(-1)).toMatchObject({
@@ -320,8 +320,8 @@ describe('AgentRunService.run', () => {
       toolCallId: 'call-3',
     });
     expect(result.trace[9]).toMatchObject({
-      type: 'tool.result',
-      tool: 'list_files',
+      type: 'tool.completed',
+      call: { tool: 'list_files' },
       result: {
         ok: true,
         output: 'README.md\nsrc/',
@@ -693,16 +693,16 @@ describe('AgentRunService.run', () => {
     expect(result.outcome).toBe('done');
     expect(approveToolCall).not.toHaveBeenCalled();
     expect(result.trace.map((event) => event.type)).not.toContain('tool.approval_requested');
-    expect(result.trace).toContainEqual({
-      type: 'tool.result',
-      tool: 'run_shell_mutate',
+    expect(result.trace).toContainEqual(expect.objectContaining({
+      type: 'tool.completed',
+      call: { id: 'call-1', tool: 'run_shell_mutate', input: { command: 'yarn test' } },
       result: {
         ok: true,
         output: { command: 'yarn test', exitCode: 0, stdout: '', stderr: '' },
       },
       step: 1,
       timestamp: expect.any(String),
-    });
+    }));
   });
 
   it('requires approval before reading a file outside the workspace root', async () => {
@@ -754,16 +754,16 @@ describe('AgentRunService.run', () => {
       step: 1,
       timestamp: expect.any(String),
     });
-    expect(result.trace).toContainEqual({
-      type: 'tool.result',
-      tool: 'read_file',
+    expect(result.trace).toContainEqual(expect.objectContaining({
+      type: 'tool.completed',
+      call: { id: 'call-1', tool: 'read_file', input: { path: externalFile } },
       result: {
         ok: false,
         error: 'Approval denied for read_file: Outside workspace read denied in test',
       },
       step: 1,
       timestamp: expect.any(String),
-    });
+    }));
   });
 
   it('does not require approval before reading a file inside the workspace root', async () => {
@@ -854,16 +854,16 @@ describe('AgentRunService.run', () => {
 
     expect(result.outcome).toBe('done');
     expect(result.trace.map((event) => event.type)).toContain('tool.approval_requested');
-    expect(result.trace).toContainEqual({
-      type: 'tool.result',
-      tool: 'edit_file',
+    expect(result.trace).toContainEqual(expect.objectContaining({
+      type: 'tool.completed',
+      call: { id: 'call-1', tool: 'edit_file', input: { path: externalFile, content: 'hello\n', createIfMissing: true } },
       result: {
         ok: false,
         error: 'Approval denied for edit_file: External edit denied in test',
       },
       step: 1,
       timestamp: expect.any(String),
-    });
+    }));
   });
 
   it('records an explicit fallback event when inspect retries through mutate', async () => {
@@ -930,13 +930,13 @@ describe('AgentRunService.run', () => {
     expect(result.trace.map((event) => event.type)).toEqual([
       'run.started',
       'assistant.turn',
-      'tool.call',
-      'tool.result',
+      'tool.calling',
+      'tool.completed',
       'tool.fallback',
       'tool.approval_requested',
       'tool.approval_resolved',
-      'tool.call',
-      'tool.result',
+      'tool.calling',
+      'tool.completed',
       'assistant.turn',
       'run.finished',
     ]);

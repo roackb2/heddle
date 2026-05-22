@@ -1,4 +1,5 @@
 import type { TraceEvent } from '@/core/types.js';
+import { HeddleEventType } from '@/core/event-types.js';
 
 export const TRACE_EVENT_DOMAINS = {
   run: 'run',
@@ -10,21 +11,21 @@ export const TRACE_EVENT_DOMAINS = {
 } as const;
 
 export const TRACE_EVENT_TYPES = {
-  runStarted: 'run.started',
-  runFinished: 'run.finished',
-  assistantTurn: 'assistant.turn',
-  hostWarning: 'host.warning',
-  toolApprovalRequested: 'tool.approval_requested',
-  toolApprovalResolved: 'tool.approval_resolved',
-  toolFallback: 'tool.fallback',
-  toolCall: 'tool.call',
-  toolResult: 'tool.result',
-  memoryCandidateRecorded: 'memory.candidate_recorded',
-  memoryCheckpointSkipped: 'memory.checkpoint_skipped',
-  memoryMaintenanceStarted: 'memory.maintenance_started',
-  memoryMaintenanceFinished: 'memory.maintenance_finished',
-  memoryMaintenanceFailed: 'memory.maintenance_failed',
-  cyberloopAnnotation: 'cyberloop.annotation',
+  runStarted: HeddleEventType.runStarted,
+  runFinished: HeddleEventType.runFinished,
+  assistantTurn: HeddleEventType.assistantTurn,
+  hostWarning: HeddleEventType.hostWarning,
+  toolApprovalRequested: HeddleEventType.toolApprovalRequested,
+  toolApprovalResolved: HeddleEventType.toolApprovalResolved,
+  toolFallback: HeddleEventType.toolFallback,
+  toolCalling: HeddleEventType.toolCalling,
+  toolCompleted: HeddleEventType.toolCompleted,
+  memoryCandidateRecorded: HeddleEventType.memoryCandidateRecorded,
+  memoryCheckpointSkipped: HeddleEventType.memoryCheckpointSkipped,
+  memoryMaintenanceStarted: HeddleEventType.memoryMaintenanceStarted,
+  memoryMaintenanceFinished: HeddleEventType.memoryMaintenanceFinished,
+  memoryMaintenanceFailed: HeddleEventType.memoryMaintenanceFailed,
+  cyberloopAnnotation: HeddleEventType.cyberloopAnnotation,
 } as const satisfies Record<string, TraceEvent['type']>;
 
 export const TRACE_CORRELATION_FIELDS = {
