@@ -51,12 +51,7 @@ export type ToolApprovalRequest = {
   };
 };
 
-export type RequestPendingToolApprovalArgs = {
-  request: ToolApprovalRequest;
-  storePending?: (pending: { request: ToolApprovalRequest; resolve: (decision: ToolApprovalUserDecision) => void }) => void;
-};
-
 export type RequestToolApprovalThroughServiceArgs = ToolApprovalPolicyContext & {
   reason?: string;
-  storePending?: RequestPendingToolApprovalArgs['storePending'];
+  storePending?: (pending: { request: ToolApprovalRequest; resolve: (decision: ToolApprovalUserDecision) => void }) => void;
 };

@@ -18,6 +18,7 @@ import { join } from 'node:path';
 import {
   ToolApprovalPolicies,
   ToolApprovalService,
+  type ToolApprovalRequest,
   type ToolApprovalUserDecision,
 } from '@/core/approvals/index.js';
 import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
@@ -43,7 +44,6 @@ import type {
   ChatSessionDetail,
   ChatSessionView,
   ChatTurnReview,
-  ControlPlanePendingApproval,
   ControlPlaneSessionEventEnvelope,
   ControlPlaneSessionLiveEvent,
 } from '../types.js';
@@ -79,7 +79,7 @@ type ControlPlaneTurnPublisher = ReturnType<typeof ControlPlaneChatSessionEvents
 export class ControlPlaneChatSessionsController {
   private readonly sessionEventBus = new EventEmitter();
   private readonly pendingApprovals = new Map<string, {
-    approval: ControlPlanePendingApproval;
+    approval: ToolApprovalRequest;
     resolve: (decision: ToolApprovalUserDecision) => void;
   }>();
   private readonly inFlightRuns = new Map<string, AbortController>();
@@ -226,7 +226,7 @@ export class ControlPlaneChatSessionsController {
     }
   }
 
-  getPendingApproval(sessionId: string): ControlPlanePendingApproval | undefined {
+  getPendingApproval(sessionId: string): ToolApprovalRequest | undefined {
     return this.pendingApprovals.get(sessionId)?.approval;
   }
 

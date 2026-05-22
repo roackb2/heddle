@@ -7,7 +7,6 @@ import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.
 import type { ReasoningEffort } from '@/core/llm/types.js';
 import type { ChatSessionRetention } from '@/core/chat/types.js';
 import type { ConversationActivity } from '@/core/live/index.js';
-import type { ToolApprovalRequest } from '@/core/approvals/index.js';
 
 export type ChatSessionView = {
   id: string;
@@ -149,8 +148,6 @@ export type ChatSessionDetail = ChatSessionView & {
   turns: ChatTurnView[];
   lastContinuePrompt?: string;
 };
-
-export type ControlPlanePendingApproval = ToolApprovalRequest;
 
 export type ControlPlaneSessionLiveEvent = {
   sessionId: string;

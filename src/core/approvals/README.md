@@ -25,7 +25,6 @@ Approval behavior currently exists in these places:
 - `src/core/agent/tools/tool-dispatcher.ts`
 - `src/core/approvals/service.ts`
 - `src/core/approvals/policies.ts`
-- `src/core/approvals/pending-approval.ts`
 - `src/core/approvals/remembered-rules/`
 - `src/cli/chat/hooks/controllers/run/tui-tool-approval.ts`
 - `src/server/features/control-plane/controllers/chat-sessions-controller.ts`
@@ -39,8 +38,6 @@ Approval behavior currently exists in these places:
   edit previews, and remembered project approval rule application.
 - `policies.ts`: `ToolApprovalPolicies` built-in tool, workspace-boundary,
   remembered-rule, and human-surface policy constructors.
-- `pending-approval.ts`: `PendingToolApprovalRequests` host-neutral pending
-  approval promise primitive used by `ToolApprovalService`.
 - `remembered-rules/`: project approval rule service, repository, codec,
   schemas, and types. The repository is an internal storage boundary for
   `ToolApprovalService`; host/controller code must not import it directly.
@@ -149,7 +146,7 @@ state from event fragments.
 - Interface adapters may store host-local pending state and resolve a pending
   approval promise.
 - Interface adapters must not import approval repositories, remembered-rule
-  services, edit-preview helpers, or pending-approval primitives directly.
+  services, or edit-preview helpers directly.
 - `ToolApprovalService` is the boundary that calls approval repositories and
   lower-level approval helpers.
 - `ProjectApprovalRules` owns remembered-rule semantics. It should stay below

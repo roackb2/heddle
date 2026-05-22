@@ -7,7 +7,6 @@ import type {
   ToolApprovalPolicyDecision,
   ToolApprovalUserDecision,
 } from './types.js';
-import { PendingToolApprovalRequests } from './pending-approval.js';
 import {
   FileProjectApprovalRuleRepository,
   ProjectApprovalRules,
@@ -83,9 +82,8 @@ export class ToolApprovalService {
     // Pending approval is an in-memory promise handoff. The service creates the
     // request payload, then waits until the host/controller resolves it with a
     // user decision.
-    const decision = await PendingToolApprovalRequests.request({
-      request,
-      storePending: args.storePending,
+    const decision = await new Promise<ToolApprovalUserDecision>((resolve) => {
+      args.storePending?.({ request, resolve });
     });
     return this.resolveUserDecision({
       context: args,
