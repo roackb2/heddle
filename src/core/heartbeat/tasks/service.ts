@@ -1,11 +1,12 @@
 import { resolve } from 'node:path';
-import { HeartbeatViewsPresenter } from '../views/index.js';
 import { FileHeartbeatTaskRepository } from './repository.js';
 import type {
   FileHeartbeatTaskRepositoryOptions,
   HeartbeatTask,
+  HeartbeatTaskRunRecordEntry,
   HeartbeatTaskStore,
 } from './types.js';
+import type { HeartbeatRunView, HeartbeatTaskView } from '../views/index.js';
 
 export type FileHeartbeatTaskServiceOptions =
   | { stateRoot: string }
@@ -73,11 +74,12 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
   }
 
   async listTaskViews() {
-    return await HeartbeatViewsPresenter.listTaskViews(this);
+    return (await this.listTasks()).map((task) => FileHeartbeatTaskService.projectTaskView(task));
   }
 
   async listRunViews(options: { taskId?: string; limit?: number } = {}) {
-    return await HeartbeatViewsPresenter.listRunViews(this, options);
+    const runs = await this.listRunRecords(options);
+    return runs.map((run) => FileHeartbeatTaskService.projectRunView(run));
   }
 
   async createTask(input: CreateHeartbeatTaskInput) {
@@ -114,7 +116,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
     };
 
     await this.saveTask(task);
-    return HeartbeatViewsPresenter.projectTask(task);
+    return FileHeartbeatTaskService.projectTaskView(task);
   }
 
   async readTask(taskId: string, options: { runLimit?: number } = {}) {
@@ -125,14 +127,21 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
     });
 
     return {
-      task: HeartbeatViewsPresenter.projectTask(task),
+      task: FileHeartbeatTaskService.projectTaskView(task),
       runs,
     };
   }
 
   async readRun(taskId: string, runId: string) {
     await this.requireTask(taskId);
-    return await HeartbeatViewsPresenter.loadRunView(this, runId, { taskId });
+    const run =
+      runId === 'latest' ?
+        (await this.listRunRecords({ taskId, limit: 1 }))[0]
+      : await this.loadRunRecord(runId);
+    if (!run || run.taskId !== taskId) {
+      return undefined;
+    }
+    return FileHeartbeatTaskService.projectRunView(run);
   }
 
   async setTaskEnabled(taskId: string, enabled: boolean) {
@@ -156,7 +165,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       },
     };
     await this.saveTask(nextTask);
-    return HeartbeatViewsPresenter.projectTask(nextTask);
+    return FileHeartbeatTaskService.projectTaskView(nextTask);
   }
 
   async triggerTaskRun(taskId: string) {
@@ -184,7 +193,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       },
     };
     await this.saveTask(nextTask);
-    return HeartbeatViewsPresenter.projectTask(nextTask);
+    return FileHeartbeatTaskService.projectTaskView(nextTask);
   }
 
   async requireTask(taskId: string): Promise<HeartbeatTask> {
@@ -194,6 +203,47 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       throw new Error(`Heartbeat task not found: ${taskId}`);
     }
     return task;
+  }
+
+  projectTaskView(task: HeartbeatTask): HeartbeatTaskView {
+    return FileHeartbeatTaskService.projectTaskView(task);
+  }
+
+  projectRunView(run: HeartbeatTaskRunRecordEntry): HeartbeatRunView {
+    return FileHeartbeatTaskService.projectRunView(run);
+  }
+
+  private static projectTaskView(task: HeartbeatTask): HeartbeatTaskView {
+    const result = task.state?.result;
+    return {
+      ...task,
+      ...task.schedule,
+      ...task.runtime,
+      ...task.state,
+      taskId: task.id,
+      status: task.state?.status ?? 'idle',
+      lastRunAt: task.state?.runAt,
+      lastRunId: task.state?.runId,
+      decision: result?.decision,
+      summary: result?.summary,
+      outcome: result?.state.outcome,
+      usage: result?.state.usage,
+    };
+  }
+
+  private static projectRunView(run: HeartbeatTaskRunRecordEntry): HeartbeatRunView {
+    return {
+      ...FileHeartbeatTaskService.projectTaskView(run.record.task),
+      ...run,
+      id: run.id,
+      taskId: run.taskId,
+      runId: run.runId,
+      decision: run.record.result.decision,
+      summary: run.record.result.summary,
+      outcome: run.record.result.state.outcome,
+      loadedCheckpoint: run.record.loadedCheckpoint,
+      usage: run.record.result.state.usage,
+    };
   }
 
   private static resolveHeartbeatRoot(options: FileHeartbeatTaskServiceOptions): string {

@@ -1,5 +1,5 @@
 import type { AgentLoopCheckpoint, AgentLoopState } from '@/core/runtime/loop/index.js';
-import type { AgentHeartbeatResult, RunAgentHeartbeatOptions } from '../wake/index.js';
+import type { AgentHeartbeatResult, RunAgentHeartbeatOptions } from '../agent/index.js';
 import type { HeartbeatTask, HeartbeatTaskRunRecord, HeartbeatTaskStatus, HeartbeatTaskStore } from '../tasks/index.js';
 
 export type HeartbeatSchedulerEvent =
@@ -35,10 +35,25 @@ export type HeartbeatTaskRunner = (
   checkpoint: AgentLoopState | AgentLoopCheckpoint | undefined,
 ) => Promise<AgentHeartbeatResult>;
 
+export type HeartbeatTaskRunnerRuntimeOptions = {
+  workspaceRoot?: string;
+  stateDir?: string;
+  apiKey?: string;
+  apiKeyProvider?: 'explicit' | 'openai' | 'anthropic';
+  preferApiKey?: boolean;
+  model?: string;
+  maxSteps?: number;
+  tools?: RunAgentHeartbeatOptions['tools'];
+  includeDefaultTools?: RunAgentHeartbeatOptions['includeDefaultTools'];
+  searchIgnoreDirs?: string[];
+  systemContext?: string;
+  onAgentEvent?: RunAgentHeartbeatOptions['onEvent'];
+};
+
 export type RunDueHeartbeatTasksOptions = {
   store: HeartbeatTaskStore;
   runner?: HeartbeatTaskRunner;
-  heartbeat?: Omit<RunAgentHeartbeatOptions, 'task' | 'checkpoint'>;
+  runtime?: HeartbeatTaskRunnerRuntimeOptions;
   now?: () => Date;
   onEvent?: (event: HeartbeatSchedulerEvent) => void;
   failureRetryMs?: number;
@@ -73,11 +88,4 @@ export type StartHeartbeatSchedulerOptions = {
   pollIntervalMs?: number;
   onEvent?: (event: HeartbeatSchedulerEvent) => void;
   onError?: (error: unknown) => void;
-};
-
-export type RunWorkspaceHeartbeatSchedulerOnceOptions = Omit<StartHeartbeatSchedulerOptions, 'pollIntervalMs'>;
-
-export type RunWorkspaceHeartbeatSchedulerLoopOptions = StartHeartbeatSchedulerOptions & {
-  signal?: AbortSignal;
-  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 };

@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import {
+  FileHeartbeatTaskService,
   HeartbeatSchedulerService,
   type HeartbeatTask,
 } from '@/core/heartbeat/index.js';
@@ -23,19 +24,23 @@ export async function runHeartbeatWorkerCli(
 ) {
   const workspaceRoot = options.workspaceRoot ?? process.cwd();
   const stateRoot = resolve(workspaceRoot, options.stateDir ?? '.heddle');
-  const scheduler = {
+  const store = new FileHeartbeatTaskService({ stateRoot });
+  const runtime = {
     workspaceRoot,
-    stateRoot,
+    stateDir: stateRoot,
     model: stringFlag(parsed.flags, 'model') ?? options.model,
     maxSteps: parsePositiveInt(stringFlag(parsed.flags, 'max-steps')) ?? options.maxSteps,
     searchIgnoreDirs: options.searchIgnoreDirs,
     systemContext: options.systemContext,
     onAgentEvent: printAgentLoopEvent,
-    onEvent: printSchedulerEvent,
   };
 
   if (booleanFlag(parsed.flags, 'once')) {
-    const result = await HeartbeatSchedulerService.runDueWorkspaceTasks(scheduler);
+    const result = await HeartbeatSchedulerService.runDueTasks({
+      store,
+      runtime,
+      onEvent: printSchedulerEvent,
+    });
     process.stdout.write(`checked=${result.checked} ran=${result.ran} failed=${result.failed}\n`);
     return;
   }
@@ -43,10 +48,12 @@ export async function runHeartbeatWorkerCli(
   const controller = new AbortController();
   process.on('SIGINT', () => controller.abort());
   process.on('SIGTERM', () => controller.abort());
-  await HeartbeatSchedulerService.runWorkspaceLoop({
-    ...scheduler,
+  await HeartbeatSchedulerService.runLoop({
+    store,
+    runtime,
     pollIntervalMs: parseDurationMs(stringFlag(parsed.flags, 'poll') ?? '60s'),
     signal: controller.signal,
+    onEvent: printSchedulerEvent,
   });
 }
 

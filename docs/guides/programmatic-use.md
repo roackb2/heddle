@@ -52,14 +52,14 @@ This is the right choice when you want:
 It is the host-facing runtime wrapper over the lower-level agent run loop that
 the conversation engine builds on.
 
-### Use heartbeat APIs for scheduled or background wake cycles
+### Use heartbeat APIs for scheduled or background runner cycles
 
-Use `HeartbeatWakeService.run`, `StoredHeartbeatService.run`, `HeartbeatSchedulerService.runDueTasks`, and `HeartbeatSchedulerService.runLoop` when you want bounded autonomous work that wakes up from durable task/checkpoint state.
+Use `HeartbeatRunnerAgent.run`, `StoredHeartbeatService.run`, `HeartbeatSchedulerService.runDueTasks`, and `HeartbeatSchedulerService.runLoop` when you want bounded autonomous work that runs from durable task/checkpoint state.
 
 Use heartbeat APIs when you want:
 
 - scheduled maintenance or monitoring tasks
-- repeated wake cycles around a durable task definition
+- repeated runner cycles around a durable task definition
 - host-managed task/run stores and review views
 - escalation-oriented background workflows
 
@@ -294,25 +294,25 @@ Persist `result.state` directly, or wrap it with `createAgentLoopCheckpoint(resu
 
 ## Heartbeat APIs
 
-For bounded autonomous background work, use `HeartbeatWakeService.run` and the scheduler/task repository:
+For bounded autonomous background work, use `HeartbeatRunnerAgent.run` and the scheduler/task repository:
 
 ```ts
-import { HeartbeatWakeService } from '@roackb2/heddle'
+import { HeartbeatRunnerAgent } from '@roackb2/heddle'
 
-const heartbeat = await HeartbeatWakeService.run({
+const heartbeat = await HeartbeatRunnerAgent.run({
   task: 'Check whether there is safe maintenance work to do for this project',
   checkpoint,
   maxSteps: 8,
 })
 ```
 
-The scheduler path stores the wake result as one `AgentHeartbeatResult`.
+The scheduler path stores the runner-agent result as one `AgentHeartbeatResult`.
 Task state keeps that result under `state.result`, and run history persists the
 same result inside each run record. That means hosts can use the same shape for
 the latest task status, saved run history, and `heartbeat.task.finished` events
 instead of maintaining separate flattened copies.
 
-For repeated local or hosted wake cycles, Heddle also exports:
+For repeated local or hosted runner cycles, Heddle also exports:
 
 - `HeartbeatSchedulerService.runDueTasks`
 - `HeartbeatSchedulerService.runLoop`
@@ -320,9 +320,9 @@ For repeated local or hosted wake cycles, Heddle also exports:
 - `FileHeartbeatCheckpointRepository`
 - `StoredHeartbeatService.run`
 - `HeartbeatDecisionPolicy.suggestNextDelayMs`
-- `HeartbeatViewsPresenter.listTaskViews`
-- `HeartbeatViewsPresenter.listRunViews`
-- `HeartbeatViewsPresenter.loadRunView`
+- `FileHeartbeatTaskService.listTaskViews`
+- `FileHeartbeatTaskService.listRunViews`
+- `FileHeartbeatTaskService.readRun`
 
 These are useful when you want to provide your own surrounding host, queue, cron, service manager, or control surface.
 

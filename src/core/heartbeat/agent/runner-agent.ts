@@ -1,23 +1,23 @@
 /**
- * Heartbeat wake service.
+ * Heartbeat runner agent.
  *
- * Runs one autonomous heartbeat wake cycle on top of the generic runtime loop.
- * It owns heartbeat-specific prompt context and heartbeat lifecycle events, but
- * delegates model/tool stepping to `AgentLoopRuntimeService`.
+ * Runs one autonomous heartbeat task through the generic runtime loop. It owns
+ * heartbeat-specific prompt context and lifecycle events, but delegates
+ * model/tool stepping to `AgentLoopRuntimeService`.
  */
 import { resolve } from 'node:path';
 import { MemoryCatalogService } from '@/core/memory/catalog.js';
 import { AgentLoopCheckpointService, AgentLoopRuntimeService } from '@/core/runtime/loop/index.js';
 import type { RunAgentLoopOptions } from '@/core/runtime/loop/index.js';
 import { HeartbeatDecisionPolicy } from './decision.js';
-import { HeartbeatWakePrompt } from './prompt.js';
+import { HeartbeatRunnerAgentPrompt } from './prompt.js';
 import type { AgentHeartbeatResult, RunAgentHeartbeatOptions } from './types.js';
 
 const DEFAULT_HEARTBEAT_MAX_STEPS = 80;
 
-export class HeartbeatWakeService {
+export class HeartbeatRunnerAgent {
   static async run(options: RunAgentHeartbeatOptions): Promise<AgentHeartbeatResult> {
-    const runtime = HeartbeatWakeService.toRuntimeOptions(options);
+    const runtime = HeartbeatRunnerAgent.toRuntimeOptions(options);
     const result = await AgentLoopRuntimeService.run(runtime);
     const decision = HeartbeatDecisionPolicy.infer(result.summary, result.outcome);
     const runId = result.state.runId;
@@ -74,13 +74,13 @@ export class HeartbeatWakeService {
       ...runtimeOptions
     } = options;
     const memoryDir = providedMemoryDir ?? resolve(workspaceRoot ?? process.cwd(), stateDir ?? '.heddle', 'memory');
-    const systemContext = HeartbeatWakePrompt.appendSystemContext(new MemoryCatalogService(memoryDir).appendCatalogSystemContext({
+    const systemContext = HeartbeatRunnerAgentPrompt.appendSystemContext(new MemoryCatalogService(memoryDir).appendCatalogSystemContext({
       systemContext: providedSystemContext,
     }));
 
     return {
       ...runtimeOptions,
-      goal: HeartbeatWakePrompt.buildGoal(task),
+      goal: HeartbeatRunnerAgentPrompt.buildGoal(task),
       maxSteps: maxSteps ?? DEFAULT_HEARTBEAT_MAX_STEPS,
       workspaceRoot,
       stateDir,

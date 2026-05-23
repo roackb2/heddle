@@ -59,7 +59,7 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
 - `src/core/runtime/` owns host-facing runtime boundaries, default tool
   assembly, credentials, workspace catalogs, daemon discovery, and evented
   single-run execution over `src/core/agent/`.
-- `src/core/heartbeat/` owns autonomous wake cycles, heartbeat scheduling,
+- `src/core/heartbeat/` owns autonomous runner cycles, heartbeat scheduling,
   checkpoint reuse, and heartbeat task/run views.
 - `src/core/chat/engine/` owns persisted conversation sessions, turns,
   compaction, leases, approvals, traces, user-facing conversation activities,

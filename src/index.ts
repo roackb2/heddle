@@ -7,7 +7,7 @@ export { AgentRunService } from './core/agent/index.js';
 export type { RunAgentOptions } from './core/agent/index.js';
 export { AgentLoopCheckpointService, AgentLoopRuntimeService } from './core/runtime/loop/index.js';
 export type { AgentLoopCheckpoint, AgentLoopEvent, AgentLoopResult, AgentLoopState, AgentLoopStatus, RunAgentLoopOptions } from './core/runtime/loop/index.js';
-export { HeartbeatWakeService } from './core/heartbeat/wake/index.js';
+export { HeartbeatRunnerAgent } from './core/heartbeat/agent/index.js';
 export type {
   AgentHeartbeatEvent,
   AgentHeartbeatResult,
@@ -15,7 +15,7 @@ export type {
   HeartbeatDecisionEvent,
   HeartbeatEscalationEvent,
   RunAgentHeartbeatOptions,
-} from './core/heartbeat/wake/index.js';
+} from './core/heartbeat/agent/index.js';
 export {
   FileHeartbeatCheckpointRepository,
   StoredHeartbeatService,
@@ -40,15 +40,15 @@ export {
   HeartbeatSchedulerService,
 } from './core/heartbeat/scheduler/index.js';
 export type {
+  HeartbeatSchedulerHandle,
   HeartbeatSchedulerEvent,
   HeartbeatTaskRunner,
+  HeartbeatTaskRunnerRuntimeOptions,
   RunDueHeartbeatTasksOptions,
   RunDueHeartbeatTasksResult,
   RunHeartbeatSchedulerOptions,
+  StartHeartbeatSchedulerOptions,
 } from './core/heartbeat/scheduler/index.js';
-export {
-  HeartbeatViewsPresenter,
-} from './core/heartbeat/views/index.js';
 export type {
   HeartbeatRunView,
   HeartbeatTaskView,

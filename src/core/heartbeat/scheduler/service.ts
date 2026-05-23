@@ -1,36 +1,42 @@
 /**
  * Heartbeat scheduler service.
  *
- * Owns due-task selection, scheduler lifecycle events, checkpoint persistence,
- * task state projection, and run-record persistence.
+ * Owns scheduler lifecycle, periodic polling, and due-task selection. It does
+ * not execute tasks directly; selected task execution is delegated to
+ * `HeartbeatTaskRunnerService`.
  */
-import { HeartbeatTaskStateProjector } from '../tasks/index.js';
 import { FileHeartbeatTaskService, type HeartbeatTask, type HeartbeatTaskRunRecord } from '../tasks/index.js';
-import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
-import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
-import type { AgentLoopCheckpoint, AgentLoopState } from '@/core/runtime/loop/index.js';
-import { HeartbeatAutonomousApprovalPolicy } from './approval.js';
 import { HeartbeatTaskRunnerService } from './runner.js';
 import type {
   HeartbeatSchedulerHandle,
-  HeartbeatTaskRunner,
   RunDueHeartbeatTasksOptions,
   RunDueHeartbeatTasksResult,
   RunHeartbeatSchedulerOptions,
-  RunWorkspaceHeartbeatSchedulerOnceOptions,
-  RunWorkspaceHeartbeatSchedulerLoopOptions,
   StartHeartbeatSchedulerOptions,
 } from './types.js';
 
-const DEFAULT_FAILURE_RETRY_MS = 5 * 60_000;
 const DEFAULT_SCHEDULER_POLL_INTERVAL_MS = 60_000;
 
 export class HeartbeatSchedulerService {
+  // Starts a background scheduler loop for one workspace and returns a handle the host can stop.
   static start(options: StartHeartbeatSchedulerOptions): HeartbeatSchedulerHandle {
     const controller = new AbortController();
-    void HeartbeatSchedulerService.runWorkspaceLoop({
-      ...options,
+    const store = new FileHeartbeatTaskService({ stateRoot: options.stateRoot });
+    void HeartbeatSchedulerService.runLoop({
+      store,
+      runtime: {
+        workspaceRoot: options.workspaceRoot,
+        stateDir: options.stateRoot,
+        preferApiKey: options.preferApiKey,
+        model: options.model,
+        maxSteps: options.maxSteps,
+        searchIgnoreDirs: options.searchIgnoreDirs,
+        systemContext: options.systemContext,
+        onAgentEvent: options.onAgentEvent,
+      },
+      pollIntervalMs: options.pollIntervalMs ?? DEFAULT_SCHEDULER_POLL_INTERVAL_MS,
       signal: controller.signal,
+      onEvent: options.onEvent,
     }).catch((error: unknown) => {
       options.onError?.(error);
     });
@@ -40,25 +46,7 @@ export class HeartbeatSchedulerService {
     };
   }
 
-  static async runWorkspaceLoop(options: RunWorkspaceHeartbeatSchedulerLoopOptions): Promise<void> {
-    await HeartbeatSchedulerService.runLoop({
-      store: new FileHeartbeatTaskService({ stateRoot: options.stateRoot }),
-      runner: HeartbeatSchedulerService.createWorkspaceTaskRunner(options),
-      pollIntervalMs: options.pollIntervalMs ?? DEFAULT_SCHEDULER_POLL_INTERVAL_MS,
-      signal: options.signal,
-      sleep: options.sleep,
-      onEvent: options.onEvent,
-    });
-  }
-
-  static async runDueWorkspaceTasks(options: RunWorkspaceHeartbeatSchedulerOnceOptions): Promise<RunDueHeartbeatTasksResult> {
-    return await HeartbeatSchedulerService.runDueTasks({
-      store: new FileHeartbeatTaskService({ stateRoot: options.stateRoot }),
-      runner: HeartbeatSchedulerService.createWorkspaceTaskRunner(options),
-      onEvent: options.onEvent,
-    });
-  }
-
+  // Checks all stored tasks once, picks enabled tasks whose nextRunAt is due, and delegates each selected task to the runner service.
   static async runDueTasks(options: RunDueHeartbeatTasksOptions): Promise<RunDueHeartbeatTasksResult> {
     const now = options.now?.() ?? new Date();
     const tasks = await options.store.listTasks();
@@ -67,7 +55,8 @@ export class HeartbeatSchedulerService {
     let failed = 0;
 
     for (const task of dueTasks) {
-      const result = await HeartbeatSchedulerService.runTask({ ...options, task, runAt: now });
+      options.onEvent?.({ type: 'heartbeat.task.due', taskId: task.id, timestamp: now.toISOString() });
+      const result = await HeartbeatTaskRunnerService.runTask({ ...options, task, runAt: now });
       if (result.record) {
         records.push(result.record);
       }
@@ -84,32 +73,13 @@ export class HeartbeatSchedulerService {
     };
   }
 
-  static async runTaskNow(options: RunDueHeartbeatTasksOptions & { taskId: string }): Promise<RunDueHeartbeatTasksResult> {
-    const now = options.now?.() ?? new Date();
-    const tasks = await options.store.listTasks();
-    const task = tasks.find((candidate) => candidate.id === options.taskId);
-    if (!task) {
-      throw new Error(`Heartbeat task not found: ${options.taskId}`);
-    }
-    if (!task.enabled) {
-      throw new Error(`Heartbeat task ${options.taskId} is disabled. Enable it before running.`);
-    }
-
-    const result = await HeartbeatSchedulerService.runTask({ ...options, task, runAt: now });
-    return {
-      checked: 1,
-      ran: result.record ? 1 : 0,
-      failed: result.failed ? 1 : 0,
-      records: result.record ? [result.record] : [],
-    };
-  }
-
+  // Repeats due-task checks until the host aborts the loop.
   static async runLoop(options: RunHeartbeatSchedulerOptions): Promise<void> {
     options.onEvent?.({ type: 'heartbeat.scheduler.started', timestamp: (options.now?.() ?? new Date()).toISOString() });
     try {
       while (!options.signal?.aborted) {
         await HeartbeatSchedulerService.runDueTasks(options);
-        await (options.sleep ?? HeartbeatSchedulerService.sleep)(options.pollIntervalMs ?? 60_000, options.signal);
+        await (options.sleep ?? HeartbeatSchedulerService.sleep)(options.pollIntervalMs ?? DEFAULT_SCHEDULER_POLL_INTERVAL_MS, options.signal);
       }
       options.onEvent?.({ type: 'heartbeat.scheduler.stopped', reason: 'aborted', timestamp: (options.now?.() ?? new Date()).toISOString() });
     } catch (error) {
@@ -123,6 +93,7 @@ export class HeartbeatSchedulerService {
     }
   }
 
+  // Decides whether a task should be selected by the scheduler at the current time.
   private static isTaskDue(task: HeartbeatTask, now: Date): boolean {
     if (!task.enabled) {
       return false;
@@ -136,104 +107,7 @@ export class HeartbeatSchedulerService {
     return Number.isFinite(nextRunAt) && nextRunAt <= now.getTime();
   }
 
-  private static createWorkspaceTaskRunner(options: RunWorkspaceHeartbeatSchedulerOnceOptions): HeartbeatTaskRunner {
-    return async (
-      task: HeartbeatTask,
-      checkpoint: AgentLoopState | AgentLoopCheckpoint | undefined,
-    ) => {
-      const model = task.runtime?.model ?? options.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
-      const credentialOptions = { preferApiKey: options.preferApiKey };
-      if (!RuntimeCredentialService.hasCredentialForModel(model, credentialOptions)) {
-        throw new Error(RuntimeCredentialService.formatMissingCredentialMessage(model));
-      }
-
-      const apiKey = RuntimeCredentialService.resolveApiKeyForModel(model, credentialOptions);
-      return await HeartbeatTaskRunnerService.run({
-        task,
-        checkpoint,
-        heartbeat: {
-          model,
-          apiKey,
-          maxSteps: options.maxSteps,
-          workspaceRoot: options.workspaceRoot,
-          stateDir: options.stateRoot,
-          searchIgnoreDirs: options.searchIgnoreDirs,
-          systemContext: options.systemContext,
-          onEvent: options.onAgentEvent,
-          approveToolCall: HeartbeatAutonomousApprovalPolicy.denyInteractiveToolCall,
-        },
-      });
-    };
-  }
-
-  private static async runTask(
-    options: RunDueHeartbeatTasksOptions & {
-      task: HeartbeatTask;
-      runAt: Date;
-    },
-  ): Promise<{ record?: HeartbeatTaskRunRecord; failed: boolean }> {
-    const { task, runAt } = options;
-    const timestamp = runAt.toISOString();
-    options.onEvent?.({ type: 'heartbeat.task.due', taskId: task.id, timestamp });
-    try {
-      const checkpoint = await options.store.loadCheckpoint(task);
-      const loadedCheckpoint = Boolean(checkpoint);
-      const runningTask = HeartbeatTaskStateProjector.markRunning({
-        task,
-        now: runAt,
-        loadedCheckpoint,
-      });
-      await options.store.saveTask(runningTask);
-      options.onEvent?.({
-        type: 'heartbeat.task.started',
-        taskId: task.id,
-        loadedCheckpoint,
-        status: runningTask.state?.status ?? 'running',
-        progress: runningTask.state?.progress ?? '',
-        timestamp,
-      });
-
-      const result = options.runner ?
-        await options.runner(task, checkpoint)
-      : await HeartbeatTaskRunnerService.run({ task, checkpoint, heartbeat: options.heartbeat });
-      await options.store.saveCheckpoint(task, result.checkpoint);
-      const nextTask = HeartbeatTaskStateProjector.afterResult({
-        task,
-        result,
-        now: runAt,
-        loadedCheckpoint,
-      });
-      await options.store.saveTask(nextTask);
-      const record = { task: nextTask, result, loadedCheckpoint };
-      await options.store.saveRunRecord?.(record);
-      options.onEvent?.({
-        type: 'heartbeat.task.finished',
-        taskId: task.id,
-        record,
-        timestamp,
-      });
-      return { record, failed: false };
-    } catch (error) {
-      const nextTask = HeartbeatTaskStateProjector.afterFailure({
-        task,
-        error,
-        now: runAt,
-        retryMs: options.failureRetryMs ?? DEFAULT_FAILURE_RETRY_MS,
-      });
-      await options.store.saveTask(nextTask);
-      options.onEvent?.({
-        type: 'heartbeat.task.failed',
-        taskId: task.id,
-        error: error instanceof Error ? error.message : String(error),
-        status: nextTask.state?.status ?? 'failed',
-        progress: nextTask.state?.progress ?? '',
-        nextRunAt: nextTask.schedule.nextRunAt,
-        timestamp,
-      });
-      return { failed: true };
-    }
-  }
-
+  // Sleeps between polling cycles and resolves early when the host aborts the scheduler.
   private static sleep(ms: number, signal?: AbortSignal): Promise<void> {
     if (signal?.aborted) {
       return Promise.resolve();

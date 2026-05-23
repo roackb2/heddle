@@ -1,16 +1,19 @@
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  HeartbeatViewsPresenter,
+  FileHeartbeatTaskService,
   type AgentHeartbeatResult,
   type AgentLoopState,
   type HeartbeatTask,
   type HeartbeatTaskRunRecordEntry,
-  type HeartbeatTaskStore,
 } from '../../../index.js';
 
-describe('heartbeat views', () => {
+describe('heartbeat task service views', () => {
   it('projects heartbeat task state into a host-facing view', () => {
-    const view = HeartbeatViewsPresenter.projectTask({
+    const service = new FileHeartbeatTaskService({ dir: '/tmp/heddle-heartbeat-view-test' });
+    const view = service.projectTaskView({
       id: 'repo-check',
       workspaceId: 'workspace-1',
       task: 'Inspect repo state',
@@ -25,7 +28,7 @@ describe('heartbeat views', () => {
         runId: 'run_1',
         loadedCheckpoint: true,
         resumable: true,
-        progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+        progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
         result: createHeartbeatResult(),
       },
       runtime: {
@@ -41,7 +44,7 @@ describe('heartbeat views', () => {
       status: 'waiting',
       decision: 'continue',
       outcome: 'done',
-      progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+      progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
       summary: 'Repository check complete.',
       nextRunAt: '2026-04-14T00:01:00.000Z',
       lastRunAt: '2026-04-14T00:00:00.000Z',
@@ -60,7 +63,8 @@ describe('heartbeat views', () => {
   });
 
   it('projects heartbeat runs into a host-facing view', () => {
-    const view = HeartbeatViewsPresenter.projectRun(createRunEntry());
+    const service = new FileHeartbeatTaskService({ dir: '/tmp/heddle-heartbeat-view-test' });
+    const view = service.projectRunView(createRunEntry());
 
     expect(view).toMatchObject({
       id: '2026-04-14T00-00-00.000Z-repo-check',
@@ -73,7 +77,7 @@ describe('heartbeat views', () => {
       status: 'waiting',
       decision: 'continue',
       outcome: 'done',
-      progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+      progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
       summary: 'Repository check complete.',
       loadedCheckpoint: true,
       resumable: true,
@@ -88,41 +92,23 @@ describe('heartbeat views', () => {
 
   it('lists and loads projected views from a store', async () => {
     const task = createTask();
-    const run = createRunEntry();
-    const store: HeartbeatTaskStore = {
-      async listTasks() {
-        return [task];
-      },
-      async saveTask() {
-        return undefined;
-      },
-      async loadCheckpoint() {
-        return undefined;
-      },
-      async saveCheckpoint() {
-        return undefined;
-      },
-      async listRunRecords() {
-        return [run];
-      },
-      async loadRunRecord(id) {
-        return id === 'latest' ? undefined : run;
-      },
-    };
+    const service = new FileHeartbeatTaskService({ dir: await mkdtemp(join(tmpdir(), 'heddle-heartbeat-views-')) });
+    await service.saveTask(task);
+    await service.saveRunRecord(createRunEntry().record);
 
-    await expect(HeartbeatViewsPresenter.listTaskViews(store)).resolves.toMatchObject([
+    await expect(service.listTaskViews()).resolves.toMatchObject([
       {
         taskId: 'repo-check',
         status: 'waiting',
       },
     ]);
-    await expect(HeartbeatViewsPresenter.listRunViews(store, { taskId: 'repo-check', limit: 1 })).resolves.toMatchObject([
+    await expect(service.listRunViews({ taskId: 'repo-check', limit: 1 })).resolves.toMatchObject([
       {
         taskId: 'repo-check',
         runId: 'run_1',
       },
     ]);
-    await expect(HeartbeatViewsPresenter.loadRunView(store, 'latest', { taskId: 'repo-check' })).resolves.toMatchObject({
+    await expect(service.readRun('repo-check', 'latest')).resolves.toMatchObject({
       taskId: 'repo-check',
       runId: 'run_1',
     });
@@ -145,7 +131,7 @@ function createTask(): HeartbeatTask {
       runId: 'run_1',
       loadedCheckpoint: true,
       resumable: true,
-      progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+      progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
       result: createHeartbeatResult(),
     },
     runtime: {
@@ -174,7 +160,7 @@ function createHeartbeatResult(): AgentHeartbeatResult {
   const state: AgentLoopState = {
     status: 'finished',
     runId: 'run_1',
-    goal: 'Heartbeat wake cycle',
+    goal: 'Heartbeat runner cycle',
     model: 'gpt-5.1-codex-mini',
     provider: 'openai',
     workspaceRoot: '/tmp/workspace',

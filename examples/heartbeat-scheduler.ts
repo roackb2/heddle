@@ -9,7 +9,7 @@
 //
 // This demonstrates Heddle's local-first scheduler API. It creates or updates
 // one durable heartbeat task under .heddle/examples/heartbeat-scheduler/, runs
-// due tasks once, and persists task/checkpoint/run state for the next wake.
+// due tasks once, and persists task/checkpoint/run state for the next run.
 // ---------------------------------------------------------------------------
 
 import { join } from 'node:path';
@@ -44,8 +44,9 @@ async function main() {
   const result = await HeartbeatSchedulerService.runDueTasks({
     store,
     now: () => new Date(),
-    heartbeat: {
+    runtime: {
       apiKey,
+      apiKeyProvider: 'explicit',
       tools: [],
       includeDefaultTools: false,
       workspaceRoot: process.cwd(),

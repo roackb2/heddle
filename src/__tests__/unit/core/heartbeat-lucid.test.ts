@@ -39,7 +39,7 @@ describe('heartbeat Lucid adapter', () => {
         data: {
           progress: {
             agent_id: 'agent:repo-check',
-            progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+            progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
             timestamp: '2026-04-14T00:00:00.000Z',
           },
         },
@@ -76,7 +76,7 @@ describe('heartbeat Lucid adapter', () => {
         data: {
           progress: {
             agent_id: 'repo-check',
-            progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+            progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
             timestamp: '2026-04-14T00:00:00.000Z',
           },
         },
@@ -100,7 +100,7 @@ describe('heartbeat Lucid adapter', () => {
       taskId: 'repo-check',
       loadedCheckpoint: true,
       status: 'running',
-      progress: 'Resuming heartbeat wake from the last checkpoint.',
+      progress: 'Resuming heartbeat runner from the last checkpoint.',
       timestamp: '2026-04-14T00:00:00.000Z',
     });
 
@@ -120,7 +120,7 @@ describe('heartbeat Lucid adapter', () => {
         data: {
           progress: {
             agent_id: 'repo-check',
-            progress: 'Resuming heartbeat wake from the last checkpoint.',
+            progress: 'Resuming heartbeat runner from the last checkpoint.',
             timestamp: '2026-04-14T00:00:00.000Z',
           },
         },
@@ -150,7 +150,7 @@ describe('heartbeat Lucid adapter', () => {
       taskId: 'repo-check',
       error: 'temporary failure',
       status: 'failed',
-      progress: 'Heartbeat wake failed and will retry later.',
+      progress: 'Heartbeat runner failed and will retry later.',
       nextRunAt: '2026-04-14T00:05:00.000Z',
       timestamp: '2026-04-14T00:00:00.000Z',
     });
@@ -171,7 +171,7 @@ describe('heartbeat Lucid adapter', () => {
         data: {
           progress: {
             agent_id: 'repo-check',
-            progress: 'Heartbeat wake failed and will retry later.',
+            progress: 'Heartbeat runner failed and will retry later.',
             timestamp: '2026-04-14T00:00:00.000Z',
           },
         },
@@ -201,7 +201,7 @@ function createTaskView(): HeartbeatTaskView {
     },
     state: {
       status: 'waiting',
-      progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+      progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
       runAt: '2026-04-14T00:00:00.000Z',
       runId: 'run_1',
       loadedCheckpoint: true,
@@ -211,7 +211,7 @@ function createTaskView(): HeartbeatTaskView {
     status: 'waiting',
     decision: 'continue',
     outcome: 'done',
-    progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+    progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
     summary: 'Repository check complete.',
     nextRunAt: '2026-04-14T00:01:00.000Z',
     lastRunAt: '2026-04-14T00:00:00.000Z',
@@ -241,7 +241,7 @@ function createRunView(): HeartbeatRunView {
     status: 'waiting',
     decision: 'continue',
     outcome: 'done',
-    progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+    progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
     summary: 'Repository check complete.',
     loadedCheckpoint: true,
     resumable: true,
@@ -260,7 +260,7 @@ function createFinishedRecord(): Extract<HeartbeatSchedulerEvent, { type: 'heart
       },
       state: {
         status: 'waiting',
-        progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+        progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
         runAt: '2026-04-14T00:00:00.000Z',
         runId: 'run_1',
         loadedCheckpoint: true,
@@ -277,7 +277,7 @@ function createHeartbeatResult(): AgentHeartbeatResult {
   const state: AgentLoopState = {
     status: 'finished',
     runId: 'run_1',
-    goal: 'Heartbeat wake cycle',
+    goal: 'Heartbeat runner cycle',
     model: 'gpt-5.1-codex-mini',
     provider: 'openai',
     workspaceRoot: '/tmp/workspace',

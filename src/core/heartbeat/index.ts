@@ -5,16 +5,15 @@ export type {
   RunStoredHeartbeatOptions,
   StoredHeartbeatResult,
 } from './checkpoint/index.js';
-export { HeartbeatAutonomousApprovalPolicy, HeartbeatSchedulerService, HeartbeatTaskRunnerService } from './scheduler/index.js';
+export { HeartbeatSchedulerService, HeartbeatTaskRunnerService } from './scheduler/index.js';
 export type {
   HeartbeatSchedulerEvent,
   HeartbeatSchedulerHandle,
   HeartbeatTaskRunner,
+  HeartbeatTaskRunnerRuntimeOptions,
   RunDueHeartbeatTasksOptions,
   RunDueHeartbeatTasksResult,
   RunHeartbeatSchedulerOptions,
-  RunWorkspaceHeartbeatSchedulerOnceOptions,
-  RunWorkspaceHeartbeatSchedulerLoopOptions,
   StartHeartbeatSchedulerOptions,
 } from './scheduler/index.js';
 export { FileHeartbeatTaskService, HeartbeatTaskStateProjector } from './tasks/index.js';
@@ -27,7 +26,7 @@ export type {
   HeartbeatTaskStatus,
   HeartbeatTaskStore,
 } from './tasks/index.js';
-export { HeartbeatDecisionPolicy, HeartbeatWakePrompt, HeartbeatWakeService } from './wake/index.js';
+export { HeartbeatDecisionPolicy, HeartbeatRunnerAgent, HeartbeatRunnerAgentPrompt } from './agent/index.js';
 export type {
   AgentHeartbeatEvent,
   AgentHeartbeatResult,
@@ -35,8 +34,8 @@ export type {
   HeartbeatDecisionEvent,
   HeartbeatEscalationEvent,
   RunAgentHeartbeatOptions,
-} from './wake/index.js';
-export { HeartbeatLucidPresenter, HeartbeatViewsPresenter } from './views/index.js';
+} from './agent/index.js';
+export { HeartbeatLucidPresenter } from './views/index.js';
 export type {
   HeartbeatRunView,
   HeartbeatTaskView,

@@ -32,7 +32,7 @@ function testHeartbeatRun(overrides: Partial<HeartbeatTaskRunRecordEntry> = {}):
     id: 'repo-check',
     state: {
       status: 'waiting',
-      progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+      progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
       resumable: true,
     },
   });
@@ -55,7 +55,7 @@ function testHeartbeatRun(overrides: Partial<HeartbeatTaskRunRecordEntry> = {}):
           state: {
             status: 'finished',
             runId: 'run_heartbeat_1',
-            goal: 'Heartbeat wake cycle',
+            goal: 'Heartbeat runner cycle',
             model: 'gpt-5.4',
             provider: 'openai',
             workspaceRoot: '/tmp/workspace',
@@ -70,7 +70,7 @@ function testHeartbeatRun(overrides: Partial<HeartbeatTaskRunRecordEntry> = {}):
         state: {
           status: 'finished',
           runId: 'run_heartbeat_1',
-          goal: 'Heartbeat wake cycle',
+          goal: 'Heartbeat runner cycle',
           model: 'gpt-5.4',
           provider: 'openai',
           workspaceRoot: '/tmp/workspace',
@@ -290,7 +290,7 @@ describe('core slash command modules', () => {
       state: {
         status: 'waiting',
         decision: 'continue',
-        progress: 'Heartbeat wake finished.',
+        progress: 'Heartbeat runner finished.',
         resumable: true,
       },
     });
@@ -330,7 +330,7 @@ describe('core slash command modules', () => {
     const prompt = buildHeartbeatContinuationPrompt(testHeartbeatRun());
 
     expect(prompt).toContain('Heartbeat run id: run_heartbeat_1');
-    expect(prompt).toContain('Task progress: Heartbeat wake finished.');
+    expect(prompt).toContain('Task progress: Heartbeat runner finished.');
     expect(prompt).toContain('Checked the repository and found one safe next step.');
     expect(prompt).not.toContain('HEARTBEAT_DECISION');
   });

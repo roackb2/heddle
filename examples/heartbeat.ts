@@ -7,8 +7,8 @@
 // Optional:
 //   HEDDLE_EXAMPLE_MODEL=claude-3-5-haiku-latest ANTHROPIC_API_KEY=sk-ant-... yarn example:heartbeat
 //
-// This demonstrates one scheduler-style heartbeat wake cycle. It loads a local
-// checkpoint if one exists, wakes the agent without a chat message, lets it work
+// This demonstrates one scheduler-style heartbeat runner cycle. It loads a local
+// checkpoint if one exists, runs the agent without a chat message, lets it work
 // within a small step budget, then persists the next checkpoint.
 // ---------------------------------------------------------------------------
 
@@ -35,7 +35,7 @@ async function main() {
   const result = await StoredHeartbeatService.run({
     store,
     task:
-      'Check whether there is useful autonomous work to do for this demo. No tools are available in this demo wake cycle. If no external task is available, explain that this wake cycle should pause.',
+      'Check whether there is useful autonomous work to do for this demo. No tools are available in this demo runner cycle. If no external task is available, explain that this runner cycle should pause.',
     model,
     apiKey,
     tools: [],

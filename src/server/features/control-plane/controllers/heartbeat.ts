@@ -1,12 +1,8 @@
 import {
-  HeartbeatAutonomousApprovalPolicy,
-  HeartbeatSchedulerService,
-  HeartbeatViewsPresenter,
   FileHeartbeatTaskService,
+  HeartbeatTaskRunnerService,
   type HeartbeatTaskRunner,
 } from '@/core/heartbeat/index.js';
-import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
-import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 
 type CreateHeartbeatTaskArgs = {
   workspaceId?: string;
@@ -89,29 +85,20 @@ export class ControlPlaneHeartbeatController {
     args: RunHeartbeatTaskNowArgs,
   ) {
     const tasks = new FileHeartbeatTaskService({ stateRoot });
-    const task = await tasks.requireTask(args.taskId);
-    const model = args.model ?? task.runtime?.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
-    const runtimeCredential = args.apiKey ?
-      { apiKey: args.apiKey, apiKeyProvider: 'explicit' as const, preferApiKey: args.preferApiKey }
-    : { preferApiKey: args.preferApiKey };
-    if (!args.runner && !RuntimeCredentialService.hasCredentialForModel(model, runtimeCredential)) {
-      throw new Error(RuntimeCredentialService.formatMissingCredentialMessage(model));
-    }
-
-    const apiKey = RuntimeCredentialService.resolveApiKeyForModel(model, runtimeCredential);
-    const result = await HeartbeatSchedulerService.runTaskNow({
+    const result = await HeartbeatTaskRunnerService.runTaskById({
       store: tasks,
       taskId: args.taskId,
       runner: args.runner,
-      heartbeat: args.runner ? undefined : {
-        model,
-        apiKey,
+      runtime: args.runner ? undefined : {
+        apiKey: args.apiKey,
+        apiKeyProvider: args.apiKey ? 'explicit' : undefined,
+        model: args.model,
         maxSteps: args.maxSteps,
         workspaceRoot: args.workspaceRoot,
-        stateDir: args.stateDir,
+        stateDir: args.stateDir ?? stateRoot,
         searchIgnoreDirs: args.searchIgnoreDirs,
         systemContext: args.systemContext,
-        approveToolCall: HeartbeatAutonomousApprovalPolicy.denyInteractiveToolCall,
+        preferApiKey: args.preferApiKey,
       },
     });
     const [run] = await tasks.listRunViews({
@@ -120,7 +107,7 @@ export class ControlPlaneHeartbeatController {
     });
     return {
       ...result,
-      task: HeartbeatViewsPresenter.projectTask(await tasks.requireTask(args.taskId)),
+      task: tasks.projectTaskView(await tasks.requireTask(args.taskId)),
       run: run ?? null,
     };
   }
