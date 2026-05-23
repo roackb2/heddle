@@ -76,6 +76,14 @@ The next-generation local control plane is a browser-based workspace for session
 
 ![Heddle web-v2 control plane work in progress](docs/images/control-plane-v2.png)
 
+The same web-v2 control plane is also being shaped for mobile, with the session list, workbench, and diff preview exposed as focused panels:
+
+<p>
+  <img src="docs/images/control-plane-v2-session-list.PNG" alt="Heddle web-v2 mobile session list" width="220">
+  <img src="docs/images/control-plane-v2-workbench.PNG" alt="Heddle web-v2 mobile workbench" width="220">
+  <img src="docs/images/control-plane-v2-diff-view.PNG" alt="Heddle web-v2 mobile diff preview" width="220">
+</p>
+
 ### Browser session review
 
 Saved session review in the control plane, with conversation history in the center and current change review on the right. Review starts from the current Git working tree, then separates historical turn diffs and command/approval evidence so you can focus on the change you need to inspect now:

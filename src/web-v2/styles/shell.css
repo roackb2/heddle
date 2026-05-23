@@ -1,14 +1,40 @@
+@layer base {
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100dvw;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  html,
+  body {
+    background: var(--color-card);
+  }
+
+  #root {
+    background: var(--color-background);
+  }
+}
+
 @layer components {
   .v2-shell {
     width: 100%;
     max-width: 100dvw;
-    overflow-x: hidden;
-    overscroll-behavior-x: none;
+    overflow: hidden;
+    overscroll-behavior: none;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     font-optical-sizing: auto;
     font-synthesis-weight: none;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+  }
+
+  .v2-workbench-frame {
+    overflow: hidden;
+    overscroll-behavior: none;
   }
 
   .v2-panel-surface {

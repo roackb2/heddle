@@ -1,4 +1,9 @@
 @layer components {
+  .v2-conversation-scroll {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .v2-message-row {
     display: flex;
     width: 100%;

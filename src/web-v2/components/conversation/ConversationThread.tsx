@@ -77,7 +77,7 @@ export function ConversationThread({
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <div className="v2-scrollbar-hidden min-h-0 flex-1 overflow-auto">
+      <div className="v2-conversation-scroll v2-scrollbar-hidden min-h-0 flex-1 overflow-auto">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-6 py-8">
           {loading ? (
             <div className="v2-type-panel-subtitle inline-flex items-center gap-2 text-muted-foreground">
