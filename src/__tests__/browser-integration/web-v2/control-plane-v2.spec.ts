@@ -41,6 +41,27 @@ test('collapses and expands the sidebar', async ({ page }) => {
   await expect(sidebar).not.toHaveCSS('width', '0px');
 });
 
+test('opens side panels as mobile overlays', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/sessions');
+  await expect.poll(async () => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+
+  await page.getByRole('button', { name: 'Expand sidebar' }).click();
+  const sidebarDialog = page.getByRole('dialog', { name: 'Primary navigation' });
+  await expect(sidebarDialog).toBeVisible();
+  await expect(sidebarDialog).toHaveCSS('position', 'fixed');
+  await expect(page.getByTestId('web-v2-surface-sessions')).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(sidebarDialog).not.toBeVisible();
+
+  await page.getByRole('button', { name: 'Expand context inspector' }).click();
+  const inspectorDialog = page.getByRole('dialog', { name: 'Context inspector' });
+  await expect(inspectorDialog).toBeVisible();
+  await expect(inspectorDialog).toHaveCSS('position', 'fixed');
+  await expect(page.getByTestId('web-v2-surface-sessions')).toBeVisible();
+});
+
 test('navigates primary and settings routes without hash routing', async ({ page }) => {
   await page.goto('/sessions');
 

@@ -18,7 +18,7 @@
   }
 
   .v2-composer-textarea {
-    min-height: 3.125rem;
+    min-height: 1.75rem;
     max-height: 11rem;
     padding: 0.15rem 0.25rem;
     font-size: 0.9375rem;
@@ -46,10 +46,30 @@
 
   .v2-composer-select {
     height: 2rem;
+    width: auto;
+    max-width: 8rem;
+    min-width: 0;
     border-color: transparent;
     background: transparent;
     color: var(--color-muted-foreground);
     box-shadow: none;
+  }
+
+  .v2-composer-select > span {
+    min-width: 0;
+    max-width: 5.75rem;
+  }
+
+  .v2-composer-select svg {
+    margin-left: 0.25rem;
+  }
+
+  .v2-composer-model-select {
+    max-width: 6.75rem;
+  }
+
+  .v2-composer-reasoning-select {
+    max-width: 6.25rem;
   }
 
   .v2-composer-select:hover {

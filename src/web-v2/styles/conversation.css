@@ -30,6 +30,8 @@
 
   .v2-assistant-markdown {
     max-width: 100%;
+    min-width: 0;
+    overflow-wrap: break-word;
   }
 
   .v2-assistant-markdown > :last-child {
@@ -91,6 +93,8 @@
   }
 
   .v2-assistant-markdown code {
+    white-space: normal;
+    overflow-wrap: anywhere;
     border-radius: var(--radius-sm);
     background: color-mix(in oklab, var(--color-muted) 88%, var(--color-background));
     padding: 0.1rem 0.28rem;
@@ -107,6 +111,8 @@
   }
 
   .v2-assistant-markdown pre code {
+    white-space: pre;
+    overflow-wrap: normal;
     border-radius: 0;
     background: transparent;
     padding: 0;

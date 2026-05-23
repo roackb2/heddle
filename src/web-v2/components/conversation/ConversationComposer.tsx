@@ -14,7 +14,7 @@ import type { ControlPlaneReasoningEffortSelection } from '@web/hooks/useControl
 import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
 
-const composerTextareaMinHeight = 50;
+const composerTextareaMinHeight = 28;
 const composerTextareaMaxHeight = 176;
 
 const reasoningEfforts = [
@@ -92,7 +92,7 @@ export function ConversationComposer({
         className="v2-composer-textarea"
         disabled={disabled || submitting}
         placeholder={t('composer.placeholder')}
-        rows={2}
+        rows={1}
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
@@ -164,7 +164,7 @@ function ModelSelect({ value, options, disabled, onValueChange, ariaLabel }: Mod
 
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled || (!value && !groups.length)}>
-      <SelectTrigger className="v2-composer-select w-[8rem]" aria-label={ariaLabel}>
+      <SelectTrigger className="v2-composer-select v2-composer-model-select" aria-label={ariaLabel}>
         <SelectValue placeholder={ariaLabel} />
       </SelectTrigger>
       <SelectContent align="end" side="top" className="max-h-80 w-72">
@@ -200,7 +200,7 @@ function ReasoningEffortSelect({ value, disabled, onValueChange, ariaLabel }: Re
       onValueChange={(nextValue) => onValueChange(nextValue as ControlPlaneReasoningEffortSelection)}
       disabled={disabled}
     >
-      <SelectTrigger className="v2-composer-select w-[7.5rem]" aria-label={ariaLabel}>
+      <SelectTrigger className="v2-composer-select v2-composer-reasoning-select" aria-label={ariaLabel}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent align="end" side="top" className="max-h-80 w-48">

@@ -1,5 +1,9 @@
 @layer components {
   .v2-shell {
+    width: 100%;
+    max-width: 100dvw;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     font-optical-sizing: auto;
     font-synthesis-weight: none;
