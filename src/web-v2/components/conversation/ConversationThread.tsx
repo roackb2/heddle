@@ -1,5 +1,7 @@
+import type { ControlPlaneModelOptions } from '@web/api/client';
 import type {
   ControlPlaneApprovalDecision,
+  ControlPlaneReasoningEffortSelection,
   ControlPlanePendingApproval,
   ControlPlaneSessionDetail,
 } from '@web/hooks/useControlPlaneSessionDetail';
@@ -16,8 +18,13 @@ interface ConversationThreadProps {
   pendingApproval: ControlPlanePendingApproval;
   approvalResolving: boolean;
   approvalError?: string;
+  modelOptions?: ControlPlaneModelOptions;
+  settingsUpdating: boolean;
+  settingsError?: string;
   emptyTitle: string;
   onSubmitPrompt: (prompt: string) => Promise<void>;
+  onUpdateModel: (model: string) => Promise<void>;
+  onUpdateReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
   onResolveApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
 }
 
@@ -30,8 +37,13 @@ export function ConversationThread({
   pendingApproval,
   approvalResolving,
   approvalError,
+  modelOptions,
+  settingsUpdating,
+  settingsError,
   emptyTitle,
   onSubmitPrompt,
+  onUpdateModel,
+  onUpdateReasoningEffort,
   onResolveApproval,
 }: ConversationThreadProps) {
   if (loading && !session) {
@@ -43,7 +55,7 @@ export function ConversationThread({
             <span>{emptyTitle}</span>
           </div>
         </div>
-        <div className="v2-composer-region">
+      <div className="v2-composer-region">
           <ConversationComposer disabled onSubmitPrompt={onSubmitPrompt} />
         </div>
       </div>
@@ -92,8 +104,15 @@ export function ConversationThread({
       <div className="v2-composer-region">
         <ConversationComposer
           disabled={Boolean(pendingApproval)}
+          model={session.model}
+          modelOptions={modelOptions}
+          reasoningEffort={session.reasoningEffort}
+          settingsUpdating={settingsUpdating}
+          settingsError={settingsError}
           submitting={submitting}
           onSubmitPrompt={onSubmitPrompt}
+          onUpdateModel={onUpdateModel}
+          onUpdateReasoningEffort={onUpdateReasoningEffort}
         />
       </div>
     </div>

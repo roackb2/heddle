@@ -62,7 +62,9 @@ export class SessionMessageController {
 
     const nextMessageIds = new Set(next.messages.map((message) => message.id));
     const transientMessages = current.messages.filter((message) => (
-      message.id.startsWith('live-') && !nextMessageIds.has(message.id)
+      message.id.startsWith('live-') &&
+      !nextMessageIds.has(message.id) &&
+      !next.messages.some((persisted) => persisted.role === message.role && persisted.text === message.text)
     ));
 
     return transientMessages.length ? {

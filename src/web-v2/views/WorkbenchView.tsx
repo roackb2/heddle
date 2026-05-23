@@ -1,6 +1,8 @@
 import { ConversationThread } from '@web/components/conversation';
+import type { ControlPlaneModelOptions } from '@web/api/client';
 import type {
   ControlPlaneApprovalDecision,
+  ControlPlaneReasoningEffortSelection,
   ControlPlanePendingApproval,
   ControlPlaneSessionDetail,
 } from '@web/hooks/useControlPlaneSessionDetail';
@@ -18,8 +20,13 @@ interface WorkbenchViewProps {
   selectedSessionPendingApproval: ControlPlanePendingApproval;
   selectedSessionApprovalResolving: boolean;
   selectedSessionApprovalError?: string;
+  selectedSessionModelOptions?: ControlPlaneModelOptions;
+  selectedSessionSettingsUpdating: boolean;
+  selectedSessionSettingsError?: string;
   settingsOpen: boolean;
   onSubmitSessionPrompt: (prompt: string) => Promise<void>;
+  onUpdateSessionModel: (model: string) => Promise<void>;
+  onUpdateSessionReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
   onResolveSessionApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
 }
 
@@ -46,8 +53,13 @@ export function WorkbenchView({
   selectedSessionPendingApproval,
   selectedSessionApprovalResolving,
   selectedSessionApprovalError,
+  selectedSessionModelOptions,
+  selectedSessionSettingsUpdating,
+  selectedSessionSettingsError,
   settingsOpen,
   onSubmitSessionPrompt,
+  onUpdateSessionModel,
+  onUpdateSessionReasoningEffort,
   onResolveSessionApproval,
 }: WorkbenchViewProps) {
   const { t } = useI18n();
@@ -77,9 +89,14 @@ export function WorkbenchView({
             pendingApproval={selectedSessionPendingApproval}
             approvalResolving={selectedSessionApprovalResolving}
             approvalError={selectedSessionApprovalError}
+            modelOptions={selectedSessionModelOptions}
+            settingsUpdating={selectedSessionSettingsUpdating}
+            settingsError={selectedSessionSettingsError}
             session={selectedSession}
             submitting={selectedSessionSubmitting}
             onSubmitPrompt={onSubmitSessionPrompt}
+            onUpdateModel={onUpdateSessionModel}
+            onUpdateReasoningEffort={onUpdateSessionReasoningEffort}
             onResolveApproval={onResolveSessionApproval}
           />
         ) : null}

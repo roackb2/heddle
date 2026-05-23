@@ -20,6 +20,13 @@
     "model": "模型",
     "placeholder": "送出後續訊息",
     "promptAriaLabel": "訊息",
+    "reasoning": {
+      "default": "預設",
+      "high": "高",
+      "low": "低",
+      "medium": "中",
+      "ultrahigh": "超高"
+    },
     "reasoningEffort": "推理強度",
     "send": "送出"
   },

@@ -66,7 +66,12 @@ export function App() {
         selectedSessionPendingApproval={selectedSession.pendingApproval}
         selectedSessionApprovalResolving={selectedSession.approvalResolving}
         selectedSessionApprovalError={selectedSession.approvalError}
+        selectedSessionModelOptions={selectedSession.modelOptions}
+        selectedSessionSettingsUpdating={selectedSession.settingsUpdating}
+        selectedSessionSettingsError={selectedSession.settingsError}
         onSubmitSessionPrompt={selectedSession.submitPrompt}
+        onUpdateSessionModel={selectedSession.updateModel}
+        onUpdateSessionReasoningEffort={selectedSession.updateReasoningEffort}
         onResolveSessionApproval={selectedSession.resolvePendingApproval}
       />
     </AppFrame>

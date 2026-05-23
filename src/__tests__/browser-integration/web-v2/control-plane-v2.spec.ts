@@ -84,3 +84,31 @@ test('submits a prompt and renders the mocked session response', async ({ page }
   await expect(page.getByText('Mocked browser integration agent response: Run the web v2 submit smoke', { exact: true })).toBeVisible();
   await expect(page.getByTestId('web-v2-workbench-title')).toHaveText(session.name);
 });
+
+test('updates session model and reasoning settings from the composer controls', async ({ page }) => {
+  const session = await trpc.controlPlane.sessionCreate.mutate({
+    name: 'Web v2 settings smoke',
+    model: 'gpt-5.4',
+  });
+
+  await page.goto('/sessions');
+  await page.getByRole('button', { name: /Web v2 settings smoke/ }).click();
+
+  await page.getByRole('combobox', { name: 'Model' }).click();
+  await page.getByRole('option', { name: /^gpt-5\.5$/ }).click();
+  await expect.poll(async () => (
+    (await trpc.controlPlane.session.query({ id: session.id }))?.model
+  )).toBe('gpt-5.5');
+
+  await page.getByRole('combobox', { name: 'Reasoning effort' }).click();
+  await page.getByRole('option', { name: 'High', exact: true }).click();
+  await expect.poll(async () => (
+    (await trpc.controlPlane.session.query({ id: session.id }))?.reasoningEffort
+  )).toBe('high');
+
+  await page.getByRole('combobox', { name: 'Reasoning effort' }).click();
+  await page.getByRole('option', { name: 'Default' }).click();
+  await expect.poll(async () => (
+    (await trpc.controlPlane.session.query({ id: session.id }))?.reasoningEffort
+  )).toBeUndefined();
+});

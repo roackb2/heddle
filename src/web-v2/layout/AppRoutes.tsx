@@ -6,9 +6,11 @@ import {
 } from '@web/layout/routes';
 import type {
   ControlPlaneApprovalDecision,
+  ControlPlaneReasoningEffortSelection,
   ControlPlanePendingApproval,
   ControlPlaneSessionDetail,
 } from '@web/hooks/useControlPlaneSessionDetail';
+import type { ControlPlaneModelOptions } from '@web/api/client';
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
 import { WorkbenchView } from '@web/views/WorkbenchView';
 
@@ -22,7 +24,12 @@ interface AppRoutesProps {
   selectedSessionPendingApproval: ControlPlanePendingApproval;
   selectedSessionApprovalResolving: boolean;
   selectedSessionApprovalError?: string;
+  selectedSessionModelOptions?: ControlPlaneModelOptions;
+  selectedSessionSettingsUpdating: boolean;
+  selectedSessionSettingsError?: string;
   onSubmitSessionPrompt: (prompt: string) => Promise<void>;
+  onUpdateSessionModel: (model: string) => Promise<void>;
+  onUpdateSessionReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
   onResolveSessionApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
 }
 
@@ -38,7 +45,12 @@ export function AppRoutes({
   selectedSessionPendingApproval,
   selectedSessionApprovalResolving,
   selectedSessionApprovalError,
+  selectedSessionModelOptions,
+  selectedSessionSettingsUpdating,
+  selectedSessionSettingsError,
   onSubmitSessionPrompt,
+  onUpdateSessionModel,
+  onUpdateSessionReasoningEffort,
   onResolveSessionApproval,
 }: AppRoutesProps) {
   return (
@@ -59,8 +71,13 @@ export function AppRoutes({
               selectedSessionPendingApproval={selectedSessionPendingApproval}
               selectedSessionApprovalResolving={selectedSessionApprovalResolving}
               selectedSessionApprovalError={selectedSessionApprovalError}
+              selectedSessionModelOptions={selectedSessionModelOptions}
+              selectedSessionSettingsUpdating={selectedSessionSettingsUpdating}
+              selectedSessionSettingsError={selectedSessionSettingsError}
               settingsOpen={false}
               onSubmitSessionPrompt={onSubmitSessionPrompt}
+              onUpdateSessionModel={onUpdateSessionModel}
+              onUpdateSessionReasoningEffort={onUpdateSessionReasoningEffort}
               onResolveSessionApproval={onResolveSessionApproval}
             />
           )}
@@ -81,8 +98,13 @@ export function AppRoutes({
               selectedSessionPendingApproval={selectedSessionPendingApproval}
               selectedSessionApprovalResolving={selectedSessionApprovalResolving}
               selectedSessionApprovalError={selectedSessionApprovalError}
+              selectedSessionModelOptions={selectedSessionModelOptions}
+              selectedSessionSettingsUpdating={selectedSessionSettingsUpdating}
+              selectedSessionSettingsError={selectedSessionSettingsError}
               settingsOpen
               onSubmitSessionPrompt={onSubmitSessionPrompt}
+              onUpdateSessionModel={onUpdateSessionModel}
+              onUpdateSessionReasoningEffort={onUpdateSessionReasoningEffort}
               onResolveSessionApproval={onResolveSessionApproval}
             />
           )}
