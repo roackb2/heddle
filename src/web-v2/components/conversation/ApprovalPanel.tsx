@@ -27,17 +27,37 @@ export function ApprovalPanel({ approval, resolving, error, onResolve }: Approva
         <div className="v2-approval-header">
           <ShieldAlert aria-hidden="true" className="size-4" />
           <div className="min-w-0">
-            <h2 className="v2-type-panel-title text-balance text-foreground">{t('approval.title')}</h2>
-            <p className="v2-type-panel-subtitle truncate text-muted-foreground">{approval.summary}</p>
+            <h2 className="v2-approval-title text-foreground">
+              <span>{t('approval.title')}</span>
+              <span className="font-mono text-muted-foreground">{approval.tool}</span>
+            </h2>
           </div>
         </div>
 
         <dl className="v2-approval-details">
-          <ApprovalMeta label={t('approval.tool')} value={approval.tool} />
           {detail ? <ApprovalMeta label={detail.label} value={detail.value} monospace /> : null}
           {approval.reason ? <ApprovalMeta label={t('approval.reason')} value={approval.reason} /> : null}
         </dl>
       </div>
+
+      {approval.editPreview ? (
+        <details className="v2-approval-disclosure">
+          <summary>
+            {approval.editPreview.action}: {approval.editPreview.path}
+            {approval.editPreview.truncated ? ` (${t('approval.truncated')})` : ''}
+          </summary>
+          <pre className="v2-approval-code">{approval.editPreview.diff}</pre>
+        </details>
+      ) : null}
+
+      {rawPayload ? (
+        <details className="v2-approval-disclosure">
+          <summary>{t('approval.payload')}</summary>
+          <pre className="v2-approval-code">{rawPayload}</pre>
+        </details>
+      ) : null}
+
+      {error ? <p className="v2-approval-error" role="alert">{error}</p> : null}
 
       <div className="v2-approval-actions">
         <Button
@@ -75,25 +95,6 @@ export function ApprovalPanel({ approval, resolving, error, onResolve }: Approva
           {t('approval.deny')}
         </Button>
       </div>
-
-      {approval.editPreview ? (
-        <details className="v2-approval-disclosure">
-          <summary>
-            {approval.editPreview.action}: {approval.editPreview.path}
-            {approval.editPreview.truncated ? ` (${t('approval.truncated')})` : ''}
-          </summary>
-          <pre className="v2-approval-code">{approval.editPreview.diff}</pre>
-        </details>
-      ) : null}
-
-      {rawPayload ? (
-        <details className="v2-approval-disclosure">
-          <summary>{t('approval.payload')}</summary>
-          <pre className="v2-approval-code">{rawPayload}</pre>
-        </details>
-      ) : null}
-
-      {error ? <p className="v2-approval-error" role="alert">{error}</p> : null}
     </section>
   );
 }

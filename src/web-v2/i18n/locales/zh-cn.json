@@ -20,6 +20,13 @@
     "model": "模型",
     "placeholder": "发送后续消息",
     "promptAriaLabel": "消息",
+    "reasoning": {
+      "default": "默认",
+      "high": "高",
+      "low": "低",
+      "medium": "中",
+      "ultrahigh": "超高"
+    },
     "reasoningEffort": "推理强度",
     "send": "发送"
   },

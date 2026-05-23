@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { ArrowUp, Plus } from 'lucide-react';
+import type { ControlPlaneModelOptions } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
 import {
   Select,
@@ -9,45 +10,49 @@ import {
   SelectValue,
 } from '@web/components/ui/select';
 import { Textarea } from '@web/components/ui/textarea';
+import type { ControlPlaneReasoningEffortSelection } from '@web/hooks/useControlPlaneSessionDetail';
+import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
 
-const mockModels = [
-  { value: 'gpt-5.5', label: 'GPT-5.5' },
-  { value: 'codex-5.3', label: 'Codex 5.3' },
-  { value: 'gpt-5.4', label: 'GPT-5.4' },
-  { value: 'sonnet-4.6', label: 'Sonnet 4.6' },
-  { value: 'opus-4.7', label: 'Opus 4.7' },
-] as const;
-
-const mockReasoningEfforts = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'extra-high', label: 'Extra High' },
-] as const;
-
-type MockModelValue = (typeof mockModels)[number]['value'];
-type MockReasoningEffortValue = (typeof mockReasoningEfforts)[number]['value'];
-
-const composerTextareaMinHeight = 50;
+const composerTextareaMinHeight = 28;
 const composerTextareaMaxHeight = 176;
 
-// ConversationComposer owns the prompt draft and visual controls. Model and
-// reasoning options stay local mocks until v2 wires them to control-plane APIs.
+const reasoningEfforts = [
+  { value: 'default', labelKey: 'composer.reasoning.default' },
+  { value: 'low', labelKey: 'composer.reasoning.low' },
+  { value: 'medium', labelKey: 'composer.reasoning.medium' },
+  { value: 'high', labelKey: 'composer.reasoning.high' },
+  { value: 'ultrahigh', labelKey: 'composer.reasoning.ultrahigh' },
+] satisfies Array<{ value: ControlPlaneReasoningEffortSelection; labelKey: I18nMessageKey }>;
+
+// ConversationComposer owns the prompt draft and visual controls. Session
+// settings are API-backed by the parent session workflow.
 export function ConversationComposer({
   disabled,
+  model,
+  modelOptions,
+  reasoningEffort,
+  settingsUpdating,
+  settingsError,
   submitting,
   onSubmitPrompt,
+  onUpdateModel,
+  onUpdateReasoningEffort,
 }: {
   disabled?: boolean;
+  model?: string;
+  modelOptions?: ControlPlaneModelOptions;
+  reasoningEffort?: Exclude<ControlPlaneReasoningEffortSelection, 'default'>;
+  settingsUpdating?: boolean;
+  settingsError?: string;
   submitting?: boolean;
   onSubmitPrompt: (prompt: string) => Promise<void>;
+  onUpdateModel?: (model: string) => Promise<void>;
+  onUpdateReasoningEffort?: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
 }) {
   const { t } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState('');
-  const [model, setModel] = useState<MockModelValue>('gpt-5.5');
-  const [reasoningEffort, setReasoningEffort] = useState<MockReasoningEffortValue>('medium');
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
@@ -86,8 +91,14 @@ export function ConversationComposer({
         aria-label={t('composer.promptAriaLabel')}
         className="v2-composer-textarea"
         disabled={disabled || submitting}
+        autoCapitalize="sentences"
+        autoComplete="off"
+        autoCorrect="on"
+        enterKeyHint="send"
+        inputMode="text"
         placeholder={t('composer.placeholder')}
-        rows={2}
+        rows={1}
+        spellCheck
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
@@ -108,11 +119,22 @@ export function ConversationComposer({
           <Plus aria-hidden="true" />
         </Button>
         <div className="ml-auto flex min-w-0 items-center gap-1.5">
-          <ModelSelect value={model} onValueChange={setModel} ariaLabel={t('composer.model')} />
+          <ModelSelect
+            ariaLabel={t('composer.model')}
+            disabled={disabled || settingsUpdating || !onUpdateModel}
+            options={modelOptions}
+            value={model}
+            onValueChange={(value) => {
+              void onUpdateModel?.(value);
+            }}
+          />
           <ReasoningEffortSelect
-            value={reasoningEffort}
-            onValueChange={setReasoningEffort}
             ariaLabel={t('composer.reasoningEffort')}
+            disabled={disabled || settingsUpdating || !onUpdateReasoningEffort}
+            value={reasoningEffort ?? 'default'}
+            onValueChange={(value) => {
+              void onUpdateReasoningEffort?.(value);
+            }}
           />
           <Button
             type="submit"
@@ -125,27 +147,43 @@ export function ConversationComposer({
           </Button>
         </div>
       </div>
+      {settingsError ? <p className="v2-composer-error text-pretty">{settingsError}</p> : null}
     </form>
   );
 }
 
 interface ModelSelectProps {
-  value: MockModelValue;
-  onValueChange: (value: MockModelValue) => void;
+  value?: string;
+  options?: ControlPlaneModelOptions;
+  disabled?: boolean;
+  onValueChange: (value: string) => void;
   ariaLabel: string;
 }
 
-function ModelSelect({ value, onValueChange, ariaLabel }: ModelSelectProps) {
+function ModelSelect({ value, options, disabled, onValueChange, ariaLabel }: ModelSelectProps) {
+  const groups = options?.groups ?? [];
+  const fallbackOptions = value ? [{
+    label: undefined,
+    models: [value],
+    options: [{ id: value, label: undefined, disabled: false, disabledReason: undefined }],
+  }] : [];
+
   return (
-    <Select value={value} onValueChange={(nextValue) => onValueChange(nextValue as MockModelValue)}>
-      <SelectTrigger className="v2-composer-select w-[7.5rem]" aria-label={ariaLabel}>
-        <SelectValue />
+    <Select value={value} onValueChange={onValueChange} disabled={disabled || (!value && !groups.length)}>
+      <SelectTrigger className="v2-composer-select v2-composer-model-select" aria-label={ariaLabel}>
+        <SelectValue placeholder={ariaLabel} />
       </SelectTrigger>
-      <SelectContent align="end" className="w-56">
-        {mockModels.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
+      <SelectContent align="end" side="top" className="max-h-80 w-72">
+        {(groups.length ? groups : fallbackOptions).map((group) => (
+          <div key={group.label ?? group.models.join(',')}>
+            {group.label ? <div className="v2-composer-select-group-label">{group.label}</div> : null}
+            {group.options.map((option) => (
+              <SelectItem key={option.id} value={option.id} disabled={option.disabled}>
+                {option.label ?? option.id}
+                {option.disabledReason ? <span className="ml-2 text-muted-foreground">{option.disabledReason}</span> : null}
+              </SelectItem>
+            ))}
+          </div>
         ))}
       </SelectContent>
     </Select>
@@ -153,21 +191,28 @@ function ModelSelect({ value, onValueChange, ariaLabel }: ModelSelectProps) {
 }
 
 interface ReasoningEffortSelectProps {
-  value: MockReasoningEffortValue;
-  onValueChange: (value: MockReasoningEffortValue) => void;
+  value: ControlPlaneReasoningEffortSelection;
+  disabled?: boolean;
+  onValueChange: (value: ControlPlaneReasoningEffortSelection) => void;
   ariaLabel: string;
 }
 
-function ReasoningEffortSelect({ value, onValueChange, ariaLabel }: ReasoningEffortSelectProps) {
+function ReasoningEffortSelect({ value, disabled, onValueChange, ariaLabel }: ReasoningEffortSelectProps) {
+  const { t } = useI18n();
+
   return (
-    <Select value={value} onValueChange={(nextValue) => onValueChange(nextValue as MockReasoningEffortValue)}>
-      <SelectTrigger className="v2-composer-select w-[7rem]" aria-label={ariaLabel}>
+    <Select
+      value={value}
+      onValueChange={(nextValue) => onValueChange(nextValue as ControlPlaneReasoningEffortSelection)}
+      disabled={disabled}
+    >
+      <SelectTrigger className="v2-composer-select v2-composer-reasoning-select" aria-label={ariaLabel}>
         <SelectValue />
       </SelectTrigger>
-      <SelectContent align="end" className="w-44">
-        {mockReasoningEfforts.map((option) => (
+      <SelectContent align="end" side="top" className="max-h-80 w-48">
+        {reasoningEfforts.map((option) => (
           <SelectItem key={option.value} value={option.value}>
-            {option.label}
+            {t(option.labelKey)}
           </SelectItem>
         ))}
       </SelectContent>

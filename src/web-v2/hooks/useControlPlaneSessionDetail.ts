@@ -4,8 +4,10 @@ import { useControlPlaneSessionEvents } from './useControlPlaneSessionEvents';
 import { useControlPlaneSessionLoader } from './useControlPlaneSessionLoader';
 import { useControlPlanePendingApproval } from './useControlPlanePendingApproval';
 import { useControlPlaneSessionPromptSubmit } from './useControlPlaneSessionPromptSubmit';
+import { useControlPlaneSessionSettings } from './useControlPlaneSessionSettings';
 
 export type { ControlPlaneApprovalDecision, ControlPlanePendingApproval, ControlPlaneSessionDetail } from '@web/api/client';
+export type { ControlPlaneReasoningEffortSelection } from './useControlPlaneSessionSettings';
 
 type ControlPlaneSessionDetailState = {
   session: ControlPlaneSessionDetail;
@@ -17,7 +19,12 @@ type ControlPlaneSessionDetailState = {
   pendingApproval: ReturnType<typeof useControlPlanePendingApproval>['pendingApproval'];
   approvalResolving: boolean;
   approvalError?: string;
+  modelOptions: ReturnType<typeof useControlPlaneSessionSettings>['modelOptions'];
+  settingsUpdating: boolean;
+  settingsError?: string;
   submitPrompt: (prompt: string) => Promise<void>;
+  updateModel: ReturnType<typeof useControlPlaneSessionSettings>['updateModel'];
+  updateReasoningEffort: ReturnType<typeof useControlPlaneSessionSettings>['updateReasoningEffort'];
   resolvePendingApproval: ReturnType<typeof useControlPlanePendingApproval>['resolvePendingApproval'];
 };
 
@@ -46,6 +53,11 @@ export function useControlPlaneSessionDetail(sessionId: string | undefined): Con
     setError: loader.setError,
     setLiveStatus,
   });
+  const settings = useControlPlaneSessionSettings({
+    sessionId,
+    setSession: loader.setSession,
+    setError: loader.setError,
+  });
 
   return useMemo(() => ({
     session: loader.session,
@@ -57,7 +69,12 @@ export function useControlPlaneSessionDetail(sessionId: string | undefined): Con
     pendingApproval: approval.pendingApproval,
     approvalResolving: approval.approvalResolving,
     approvalError: approval.approvalError,
+    modelOptions: settings.modelOptions,
+    settingsUpdating: settings.settingsUpdating,
+    settingsError: settings.settingsError,
     submitPrompt: promptSubmit.submitPrompt,
+    updateModel: settings.updateModel,
+    updateReasoningEffort: settings.updateReasoningEffort,
     resolvePendingApproval: approval.resolvePendingApproval,
   }), [
     approval.approvalError,
@@ -71,5 +88,10 @@ export function useControlPlaneSessionDetail(sessionId: string | undefined): Con
     promptSubmit.submitting,
     promptSubmit.submitPrompt,
     running,
+    settings.modelOptions,
+    settings.settingsError,
+    settings.settingsUpdating,
+    settings.updateModel,
+    settings.updateReasoningEffort,
   ]);
 }

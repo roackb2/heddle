@@ -41,6 +41,27 @@ test('collapses and expands the sidebar', async ({ page }) => {
   await expect(sidebar).not.toHaveCSS('width', '0px');
 });
 
+test('opens side panels as mobile overlays', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/sessions');
+  await expect.poll(async () => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+
+  await page.getByRole('button', { name: 'Expand sidebar' }).click();
+  const sidebarDialog = page.getByRole('dialog', { name: 'Primary navigation' });
+  await expect(sidebarDialog).toBeVisible();
+  await expect(sidebarDialog).toHaveCSS('position', 'fixed');
+  await expect(page.getByTestId('web-v2-surface-sessions')).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(sidebarDialog).not.toBeVisible();
+
+  await page.getByRole('button', { name: 'Expand context inspector' }).click();
+  const inspectorDialog = page.getByRole('dialog', { name: 'Context inspector' });
+  await expect(inspectorDialog).toBeVisible();
+  await expect(inspectorDialog).toHaveCSS('position', 'fixed');
+  await expect(page.getByTestId('web-v2-surface-sessions')).toBeVisible();
+});
+
 test('navigates primary and settings routes without hash routing', async ({ page }) => {
   await page.goto('/sessions');
 
@@ -63,7 +84,7 @@ test('navigates primary and settings routes without hash routing', async ({ page
   await expect(page.getByTestId('web-v2-workbench-title')).toHaveText('Memory Status');
 
   await page.getByRole('button', { name: 'Back to App' }).click();
-  await expect(page).toHaveURL(/\/sessions$/);
+  await expect(page).toHaveURL(/\/sessions(\/[^/]+)?$/);
   await expect(page.getByTestId('web-v2-surface-sessions')).toBeVisible();
 });
 
@@ -73,6 +94,7 @@ test('submits a prompt and renders the mocked session response', async ({ page }
   await page.goto('/sessions');
   const sessionListItem = page.getByRole('button', { name: /Web v2 submit smoke/ });
   await sessionListItem.click();
+  await expect(page).toHaveURL(new RegExp(`/sessions/${session.id}$`));
   await expect(sessionListItem).toHaveAttribute('aria-current', 'true');
   await expect(sessionListItem).toHaveClass(/bg-sidebar-accent/);
   await page.getByRole('textbox', { name: 'Message' }).fill('Run the web v2 submit smoke');
@@ -83,4 +105,33 @@ test('submits a prompt and renders the mocked session response', async ({ page }
   await expect(page.getByTestId('web-v2-live-status')).toHaveText('Receiving assistant response...');
   await expect(page.getByText('Mocked browser integration agent response: Run the web v2 submit smoke', { exact: true })).toBeVisible();
   await expect(page.getByTestId('web-v2-workbench-title')).toHaveText(session.name);
+});
+
+test('updates session model and reasoning settings from the composer controls', async ({ page }) => {
+  const session = await trpc.controlPlane.sessionCreate.mutate({
+    name: 'Web v2 settings smoke',
+    model: 'gpt-5.4',
+  });
+
+  await page.goto('/sessions');
+  await page.getByRole('button', { name: /Web v2 settings smoke/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/sessions/${session.id}$`));
+
+  await page.getByRole('combobox', { name: 'Model' }).click();
+  await page.getByRole('option', { name: /^gpt-5\.5$/ }).click();
+  await expect.poll(async () => (
+    (await trpc.controlPlane.session.query({ id: session.id }))?.model
+  )).toBe('gpt-5.5');
+
+  await page.getByRole('combobox', { name: 'Reasoning effort' }).click();
+  await page.getByRole('option', { name: 'High', exact: true }).click();
+  await expect.poll(async () => (
+    (await trpc.controlPlane.session.query({ id: session.id }))?.reasoningEffort
+  )).toBe('high');
+
+  await page.getByRole('combobox', { name: 'Reasoning effort' }).click();
+  await page.getByRole('option', { name: 'Default' }).click();
+  await expect.poll(async () => (
+    (await trpc.controlPlane.session.query({ id: session.id }))?.reasoningEffort
+  )).toBeUndefined();
 });

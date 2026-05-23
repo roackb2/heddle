@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { trpcReact } from '@web/api/client';
 import { useControlPlaneErrorToasts } from '@web/hooks/useControlPlaneErrorToasts';
 import { useControlPlaneSessionDetail } from '@web/hooks/useControlPlaneSessionDetail';
@@ -20,7 +20,7 @@ export function App() {
     () => stateQuery.data?.heartbeat.tasks ?? [],
     [stateQuery.data?.heartbeat.tasks],
   );
-  const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>();
+  const selectedSessionId = navigation.selectedSessionId;
   const selectedSession = useControlPlaneSessionDetail(selectedSessionId);
   useControlPlaneErrorToasts({
     stateError: stateQuery.error,
@@ -28,16 +28,16 @@ export function App() {
   });
 
   useEffect(() => {
-    if (selectedSessionId || sidebarSessions.length === 0) {
+    if (selectedSessionId || navigation.settingsOpen || navigation.activeSurfaceId !== 'sessions' || sidebarSessions.length === 0) {
       return;
     }
 
-    setSelectedSessionId(sidebarSessions[0]?.id);
-  }, [selectedSessionId, sidebarSessions]);
+    navigation.selectSession(sidebarSessions[0]!.id, { replace: true });
+  }, [navigation, selectedSessionId, sidebarSessions]);
 
   async function createSession() {
     const session = await createSessionMutation.mutateAsync();
-    setSelectedSessionId(session.id);
+    navigation.selectSession(session.id);
     await utils.controlPlane.state.invalidate();
   }
 
@@ -54,7 +54,7 @@ export function App() {
       onOpenSettings={navigation.openSettings}
       onCloseSettings={navigation.closeSettings}
       onCreateSession={createSession}
-      onSelectSession={setSelectedSessionId}
+      onSelectSession={navigation.selectSession}
     >
       <AppRoutes
         activeSurfaceId={navigation.activeSurfaceId}
@@ -66,7 +66,12 @@ export function App() {
         selectedSessionPendingApproval={selectedSession.pendingApproval}
         selectedSessionApprovalResolving={selectedSession.approvalResolving}
         selectedSessionApprovalError={selectedSession.approvalError}
+        selectedSessionModelOptions={selectedSession.modelOptions}
+        selectedSessionSettingsUpdating={selectedSession.settingsUpdating}
+        selectedSessionSettingsError={selectedSession.settingsError}
         onSubmitSessionPrompt={selectedSession.submitPrompt}
+        onUpdateSessionModel={selectedSession.updateModel}
+        onUpdateSessionReasoningEffort={selectedSession.updateReasoningEffort}
         onResolveSessionApproval={selectedSession.resolvePendingApproval}
       />
     </AppFrame>

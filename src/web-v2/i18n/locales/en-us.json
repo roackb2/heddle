@@ -20,6 +20,13 @@
     "model": "Model",
     "placeholder": "Send follow-up",
     "promptAriaLabel": "Message",
+    "reasoning": {
+      "default": "Default",
+      "high": "High",
+      "low": "Low",
+      "medium": "Medium",
+      "ultrahigh": "Ultra high"
+    },
     "reasoningEffort": "Reasoning effort",
     "send": "Send"
   },

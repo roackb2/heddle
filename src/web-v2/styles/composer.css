@@ -18,7 +18,7 @@
   }
 
   .v2-composer-textarea {
-    min-height: 3.125rem;
+    min-height: 1.75rem;
     max-height: 11rem;
     padding: 0.15rem 0.25rem;
     font-size: 0.9375rem;
@@ -46,16 +46,50 @@
 
   .v2-composer-select {
     height: 2rem;
+    width: auto;
+    max-width: 8rem;
+    min-width: 0;
     border-color: transparent;
     background: transparent;
     color: var(--color-muted-foreground);
     box-shadow: none;
   }
 
+  .v2-composer-select > span {
+    min-width: 0;
+    max-width: 5.75rem;
+  }
+
+  .v2-composer-select svg {
+    margin-left: 0.25rem;
+  }
+
+  .v2-composer-model-select {
+    max-width: 6.75rem;
+  }
+
+  .v2-composer-reasoning-select {
+    max-width: 6.25rem;
+  }
+
   .v2-composer-select:hover {
     border-color: transparent;
     background: color-mix(in oklab, var(--color-accent) 58%, transparent);
     color: var(--color-foreground);
+  }
+
+  .v2-composer-select-group-label {
+    padding: 0.375rem 0.5rem 0.25rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-composer-error {
+    padding: 0 0.25rem;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    color: var(--color-destructive);
   }
 
   .v2-composer-send-button {

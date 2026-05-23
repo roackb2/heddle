@@ -77,7 +77,11 @@ export function useControlPlaneSessionLoader(sessionId: string | undefined): Con
     const querySession = sessionQuery.data;
     setSession((current) => {
       if (latestRefreshMode.current === 'silent' && current?.id === querySession.id) {
-        return current;
+        return SessionMessageController.mergeTransientMessages(current, querySession);
+      }
+
+      if (current?.id === querySession.id) {
+        return SessionMessageController.mergeTransientMessages(current, querySession);
       }
 
       return querySession;
