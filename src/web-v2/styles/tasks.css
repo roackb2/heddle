@@ -1,0 +1,29 @@
+@layer components {
+  .v2-task-workbench {
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+  }
+
+  .v2-task-header {
+    border-bottom: 1px solid color-mix(in oklab, var(--color-border) 62%, transparent);
+    padding-bottom: 1.25rem;
+  }
+
+  .v2-task-run-row {
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in oklab, var(--color-border) 54%, transparent);
+    background: color-mix(in oklab, var(--color-card) 68%, var(--color-background));
+    padding: 0.75rem 0.875rem;
+  }
+
+  .v2-task-empty {
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in oklab, var(--color-border) 54%, transparent);
+    padding: 1rem;
+  }
+
+  @media (max-width: 767px) {
+    .v2-task-workbench {
+      padding: 1.5rem 1.25rem max(1.5rem, env(safe-area-inset-bottom));
+    }
+  }
+}

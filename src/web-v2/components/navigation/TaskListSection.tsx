@@ -1,13 +1,21 @@
 import type { ControlPlaneState } from '@web/api/client';
+import { cn } from '@web/lib/utils';
 
 interface TaskListSectionProps {
+  selectedTaskId?: string;
   tasks: ControlPlaneState['heartbeat']['tasks'];
   title: string;
+  onSelectTask: (taskId: string) => void;
 }
 
 // TaskListSection renders heartbeat task views using the same shape exposed by
 // the control-plane state tRPC endpoint.
-export function TaskListSection({ tasks, title }: TaskListSectionProps) {
+export function TaskListSection({
+  selectedTaskId,
+  tasks,
+  title,
+  onSelectTask,
+}: TaskListSectionProps) {
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-1 px-2 py-2" aria-label={title}>
       <div
@@ -20,7 +28,12 @@ export function TaskListSection({ tasks, title }: TaskListSectionProps) {
           <button
             key={task.taskId}
             type="button"
-            className="group flex w-full min-w-0 flex-col rounded-md px-2 py-1.5 text-left outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+            aria-current={task.taskId === selectedTaskId}
+            className={cn(
+              'group flex w-full min-w-0 flex-col rounded-md px-2 py-1.5 text-left outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring',
+              task.taskId === selectedTaskId && 'bg-sidebar-accent text-sidebar-accent-foreground',
+            )}
+            onClick={() => onSelectTask(task.taskId)}
           >
             <span className="flex w-full min-w-0 items-center gap-2">
               <span className="v2-type-nav-primary truncate text-sidebar-foreground group-hover:text-sidebar-accent-foreground">

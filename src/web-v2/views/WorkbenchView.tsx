@@ -1,5 +1,6 @@
 import { ConversationThread } from '@web/components/conversation';
-import type { ControlPlaneModelOptions } from '@web/api/client';
+import type { ControlPlaneHeartbeatRunView, ControlPlaneHeartbeatTask, ControlPlaneModelOptions } from '@web/api/client';
+import type { ReactNode } from 'react';
 import type {
   ControlPlaneApprovalDecision,
   ControlPlaneReasoningEffortSelection,
@@ -9,6 +10,7 @@ import type {
 import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
+import { TasksWorkbenchView } from './TasksWorkbenchView';
 
 interface WorkbenchViewProps {
   activeSurfaceId: AppSurfaceId;
@@ -23,11 +25,17 @@ interface WorkbenchViewProps {
   selectedSessionModelOptions?: ControlPlaneModelOptions;
   selectedSessionSettingsUpdating: boolean;
   selectedSessionSettingsError?: string;
+  selectedTask: ControlPlaneHeartbeatTask['task'] | undefined;
+  selectedTaskRuns: ControlPlaneHeartbeatRunView[];
+  selectedTaskRunId?: string;
+  selectedTaskLoading: boolean;
+  selectedTaskError?: string;
   settingsOpen: boolean;
   onSubmitSessionPrompt: (prompt: string) => Promise<void>;
   onUpdateSessionModel: (model: string) => Promise<void>;
   onUpdateSessionReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
   onResolveSessionApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
+  onSelectTaskRun: (runId: string) => void;
 }
 
 const appSurfaceLabelKeys = {
@@ -56,17 +64,24 @@ export function WorkbenchView({
   selectedSessionModelOptions,
   selectedSessionSettingsUpdating,
   selectedSessionSettingsError,
+  selectedTask,
+  selectedTaskRuns,
+  selectedTaskRunId,
+  selectedTaskLoading,
+  selectedTaskError,
   settingsOpen,
   onSubmitSessionPrompt,
   onUpdateSessionModel,
   onUpdateSessionReasoningEffort,
   onResolveSessionApproval,
+  onSelectTaskRun,
 }: WorkbenchViewProps) {
   const { t } = useI18n();
-  const title =
-    !settingsOpen && activeSurfaceId === 'sessions' && selectedSession ?
-      selectedSession.name
-    : t(settingsOpen ? settingsSectionLabelKeys[activeSettingsSectionId] : appSurfaceLabelKeys[activeSurfaceId]);
+  const surfaceTitles = {
+    sessions: selectedSession?.name ?? t(appSurfaceLabelKeys.sessions),
+    tasks: selectedTask?.name ?? selectedTask?.task ?? t(appSurfaceLabelKeys.tasks),
+  } satisfies Record<AppSurfaceId, string>;
+  const title = settingsOpen ? t(settingsSectionLabelKeys[activeSettingsSectionId]) : surfaceTitles[activeSurfaceId];
 
   const testId =
     settingsOpen ? `web-v2-settings-${activeSettingsSectionId}` : `web-v2-surface-${activeSurfaceId}`;
@@ -81,26 +96,76 @@ export function WorkbenchView({
         aria-label={`${title} ${t('workbench.workspaceAriaLabel')}`}
         data-testid="web-v2-workbench-body"
       >
-        {!settingsOpen && activeSurfaceId === 'sessions' ? (
-          <ConversationThread
-            emptyTitle={t('workbench.emptyConversation')}
-            liveStatus={selectedSessionLiveStatus}
-            loading={selectedSessionLoading}
-            pendingApproval={selectedSessionPendingApproval}
-            approvalResolving={selectedSessionApprovalResolving}
-            approvalError={selectedSessionApprovalError}
-            modelOptions={selectedSessionModelOptions}
-            settingsUpdating={selectedSessionSettingsUpdating}
-            settingsError={selectedSessionSettingsError}
-            session={selectedSession}
-            submitting={selectedSessionSubmitting}
-            onSubmitPrompt={onSubmitSessionPrompt}
-            onUpdateModel={onUpdateSessionModel}
-            onUpdateReasoningEffort={onUpdateSessionReasoningEffort}
-            onResolveApproval={onResolveSessionApproval}
-          />
-        ) : null}
+        {renderWorkbenchSurface({
+          activeSurfaceId,
+          selectedSession,
+          selectedSessionLoading,
+          selectedSessionSubmitting,
+          selectedSessionLiveStatus,
+          selectedSessionPendingApproval,
+          selectedSessionApprovalResolving,
+          selectedSessionApprovalError,
+          selectedSessionModelOptions,
+          selectedSessionSettingsUpdating,
+          selectedSessionSettingsError,
+          selectedTask,
+          selectedTaskRuns,
+          selectedTaskRunId,
+          selectedTaskLoading,
+          selectedTaskError,
+          settingsOpen,
+          t,
+          onSubmitSessionPrompt,
+          onUpdateSessionModel,
+          onUpdateSessionReasoningEffort,
+          onResolveSessionApproval,
+          onSelectTaskRun,
+        })}
       </div>
     </section>
   );
+}
+
+type RenderWorkbenchSurfaceArgs = Omit<WorkbenchViewProps, 'activeSettingsSectionId'> & {
+  t: ReturnType<typeof useI18n>['t'];
+};
+
+function renderWorkbenchSurface(args: RenderWorkbenchSurfaceArgs): ReactNode {
+  if (args.settingsOpen) {
+    return null;
+  }
+
+  const renderers = {
+    sessions: () => (
+      <ConversationThread
+        emptyTitle={args.t('workbench.emptyConversation')}
+        liveStatus={args.selectedSessionLiveStatus}
+        loading={args.selectedSessionLoading}
+        pendingApproval={args.selectedSessionPendingApproval}
+        approvalResolving={args.selectedSessionApprovalResolving}
+        approvalError={args.selectedSessionApprovalError}
+        modelOptions={args.selectedSessionModelOptions}
+        settingsUpdating={args.selectedSessionSettingsUpdating}
+        settingsError={args.selectedSessionSettingsError}
+        session={args.selectedSession}
+        submitting={args.selectedSessionSubmitting}
+        onSubmitPrompt={args.onSubmitSessionPrompt}
+        onUpdateModel={args.onUpdateSessionModel}
+        onUpdateReasoningEffort={args.onUpdateSessionReasoningEffort}
+        onResolveApproval={args.onResolveSessionApproval}
+      />
+    ),
+    tasks: () => (
+      <TasksWorkbenchView
+        error={args.selectedTaskError}
+        loading={args.selectedTaskLoading}
+        runs={args.selectedTaskRuns}
+        selectedRunId={args.selectedTaskRunId}
+        task={args.selectedTask}
+        onSelectRun={args.onSelectTaskRun}
+      />
+    ),
+  } satisfies Record<AppSurfaceId, () => ReactNode>;
+
+  return renderers[args.activeSurfaceId]();
 }

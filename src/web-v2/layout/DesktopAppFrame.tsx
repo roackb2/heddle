@@ -22,7 +22,7 @@ import {
 import { useI18n } from '@web/i18n';
 
 export function DesktopAppFrame(props: AppFrameLayoutProps) {
-  const { children } = props;
+  const { children, rightPanel, rightPanelAriaLabel } = props;
   const { t } = useI18n();
   const { setOpen: setSidebarOpen } = useSidebar();
   const sidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
@@ -97,25 +97,29 @@ export function DesktopAppFrame(props: AppFrameLayoutProps) {
         <ResizablePanel className="h-full min-h-0 overflow-hidden" defaultSize="58%" minSize="32rem">
           <SidebarInset className="h-full min-h-0 overflow-hidden">
             <SidebarToggleButton collapsed={sidebarCollapsed} onClick={toggleSidebarPanel} />
-            <InspectorToggleButton collapsed={inspectorCollapsed} onClick={toggleInspectorPanel} />
+            {rightPanel ? <InspectorToggleButton collapsed={inspectorCollapsed} onClick={toggleInspectorPanel} /> : null}
             <AppFrameWorkbench>{children}</AppFrameWorkbench>
           </SidebarInset>
         </ResizablePanel>
 
-        <ResizableHandle />
+        {rightPanel ? <ResizableHandle /> : null}
 
-        <ResizablePanel
-          collapsible
-          className="h-full min-h-0 overflow-hidden"
-          collapsedSize={0}
-          defaultSize="22rem"
-          minSize="14rem"
-          maxSize="36rem"
-          panelRef={inspectorPanelRef}
-          onResize={syncInspectorCollapsed}
-        >
-          <AppFrameInspector />
-        </ResizablePanel>
+        {rightPanel ? (
+          <ResizablePanel
+            collapsible
+            className="h-full min-h-0 overflow-hidden"
+            collapsedSize={0}
+            defaultSize="22rem"
+            minSize="14rem"
+            maxSize="36rem"
+            panelRef={inspectorPanelRef}
+            onResize={syncInspectorCollapsed}
+          >
+            <AppFrameInspector ariaLabel={rightPanelAriaLabel ?? t('inspector.contextAriaLabel')}>
+              {rightPanel}
+            </AppFrameInspector>
+          </ResizablePanel>
+        ) : null}
       </ResizablePanelGroup>
     </>
   );

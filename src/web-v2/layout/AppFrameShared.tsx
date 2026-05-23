@@ -1,8 +1,8 @@
-import type { PropsWithChildren } from 'react';
+import type { PropsWithChildren, ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import type { ControlPlaneState } from '@web/api/client';
-import { ContextInspector, ConversationWorkspace, SessionSidebar } from '@web/components/panels';
+import { ConversationWorkspace, SessionSidebar } from '@web/components/panels';
 import { Button } from '@web/components/ui/button';
 import { useI18n } from '@web/i18n';
 import type { AppRoute, SettingsRoute } from '@web/layout/routes';
@@ -15,12 +15,16 @@ export interface AppFrameProps {
   settingsNavigationItems: readonly SettingsRoute[];
   settingsOpen: boolean;
   selectedSessionId?: string;
+  selectedTaskId?: string;
   sessions: ControlPlaneState['sessions'];
   tasks: ControlPlaneState['heartbeat']['tasks'];
+  rightPanel?: ReactNode;
+  rightPanelAriaLabel?: string;
   onOpenSettings: () => void;
   onCloseSettings: () => void;
   onCreateSession: () => Promise<void>;
   onSelectSession: (sessionId: string) => void;
+  onSelectTask: (taskId: string) => void;
 }
 
 export type AppFrameLayoutProps = PropsWithChildren<AppFrameProps>;
@@ -42,12 +46,14 @@ export function AppFrameSidebar({
   settingsNavigationItems,
   settingsOpen,
   selectedSessionId,
+  selectedTaskId,
   sessions,
   tasks,
   onOpenSettings,
   onCloseSettings,
   onCreateSession,
   onSelectSession,
+  onSelectTask,
 }: AppFrameProps) {
   return (
     <SessionSidebar
@@ -57,18 +63,31 @@ export function AppFrameSidebar({
       settingsNavigationItems={settingsNavigationItems}
       settingsOpen={settingsOpen}
       selectedSessionId={selectedSessionId}
+      selectedTaskId={selectedTaskId}
       sessions={sessions}
       tasks={tasks}
       onOpenSettings={onOpenSettings}
       onCloseSettings={onCloseSettings}
       onCreateSession={onCreateSession}
       onSelectSession={onSelectSession}
+      onSelectTask={onSelectTask}
     />
   );
 }
 
-export function AppFrameInspector() {
-  return <ContextInspector />;
+export function AppFrameInspector({
+  ariaLabel,
+  children,
+}: PropsWithChildren<{ ariaLabel: string }>) {
+  if (!children) {
+    return null;
+  }
+
+  return (
+    <aside className="v2-panel-surface h-full min-w-0 overflow-hidden" aria-label={ariaLabel}>
+      {children}
+    </aside>
+  );
 }
 
 export function SidebarToggleButton({

@@ -10,7 +10,11 @@ import type {
   ControlPlanePendingApproval,
   ControlPlaneSessionDetail,
 } from '@web/hooks/useControlPlaneSessionDetail';
-import type { ControlPlaneModelOptions } from '@web/api/client';
+import type {
+  ControlPlaneHeartbeatRunView,
+  ControlPlaneHeartbeatTask,
+  ControlPlaneModelOptions,
+} from '@web/api/client';
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
 import { WorkbenchView } from '@web/views/WorkbenchView';
 
@@ -27,11 +31,29 @@ interface AppRoutesProps {
   selectedSessionModelOptions?: ControlPlaneModelOptions;
   selectedSessionSettingsUpdating: boolean;
   selectedSessionSettingsError?: string;
+  selectedTask: ControlPlaneHeartbeatTask['task'] | undefined;
+  selectedTaskRuns: ControlPlaneHeartbeatRunView[];
+  selectedTaskRunId?: string;
+  selectedTaskLoading: boolean;
+  selectedTaskError?: string;
   onSubmitSessionPrompt: (prompt: string) => Promise<void>;
   onUpdateSessionModel: (model: string) => Promise<void>;
   onUpdateSessionReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
   onResolveSessionApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
+  onSelectTaskRun: (runId: string) => void;
 }
+
+const routePathBySurface = {
+  sessions: (href: string) => [`${href}/:sessionId?`],
+  tasks: (href: string) => [href, `${href}/:taskId`, `${href}/:taskId/runs/:runId`],
+} satisfies Record<AppSurfaceId, (href: string) => string[]>;
+
+const appRoutePaths = APP_ROUTES.flatMap((route) => (
+  routePathBySurface[route.id](route.href).map((path) => ({
+    path,
+    surfaceId: route.id,
+  }))
+));
 
 // AppRoutes renders route config into v2 workbench views. Keep route inventory
 // and route rendering here so App remains only shell composition.
@@ -48,37 +70,53 @@ export function AppRoutes({
   selectedSessionModelOptions,
   selectedSessionSettingsUpdating,
   selectedSessionSettingsError,
+  selectedTask,
+  selectedTaskRuns,
+  selectedTaskRunId,
+  selectedTaskLoading,
+  selectedTaskError,
   onSubmitSessionPrompt,
   onUpdateSessionModel,
   onUpdateSessionReasoningEffort,
   onResolveSessionApproval,
+  onSelectTaskRun,
 }: AppRoutesProps) {
+  const sharedWorkbenchProps = {
+    activeSettingsSectionId,
+    selectedSession,
+    selectedSessionLoading,
+    selectedSessionSubmitting,
+    selectedSessionLiveStatus,
+    selectedSessionPendingApproval,
+    selectedSessionApprovalResolving,
+    selectedSessionApprovalError,
+    selectedSessionModelOptions,
+    selectedSessionSettingsUpdating,
+    selectedSessionSettingsError,
+    selectedTask,
+    selectedTaskRuns,
+    selectedTaskRunId,
+    selectedTaskLoading,
+    selectedTaskError,
+    onSubmitSessionPrompt,
+    onUpdateSessionModel,
+    onUpdateSessionReasoningEffort,
+    onResolveSessionApproval,
+    onSelectTaskRun,
+  };
+
   return (
     <Routes>
       <Route path="/" element={<Navigate to={DEFAULT_APP_ROUTE} replace />} />
-      {APP_ROUTES.map((route) => (
+      {appRoutePaths.map((route) => (
         <Route
-          key={route.id}
-          path={route.id === 'sessions' ? `${route.href}/:sessionId?` : route.href}
+          key={route.path}
+          path={route.path}
           element={(
             <WorkbenchView
-              activeSurfaceId={route.id}
-              activeSettingsSectionId={activeSettingsSectionId}
-              selectedSession={selectedSession}
-              selectedSessionLoading={selectedSessionLoading}
-              selectedSessionSubmitting={selectedSessionSubmitting}
-              selectedSessionLiveStatus={selectedSessionLiveStatus}
-              selectedSessionPendingApproval={selectedSessionPendingApproval}
-              selectedSessionApprovalResolving={selectedSessionApprovalResolving}
-              selectedSessionApprovalError={selectedSessionApprovalError}
-              selectedSessionModelOptions={selectedSessionModelOptions}
-              selectedSessionSettingsUpdating={selectedSessionSettingsUpdating}
-              selectedSessionSettingsError={selectedSessionSettingsError}
+              {...sharedWorkbenchProps}
+              activeSurfaceId={route.surfaceId}
               settingsOpen={false}
-              onSubmitSessionPrompt={onSubmitSessionPrompt}
-              onUpdateSessionModel={onUpdateSessionModel}
-              onUpdateSessionReasoningEffort={onUpdateSessionReasoningEffort}
-              onResolveSessionApproval={onResolveSessionApproval}
             />
           )}
         />
@@ -89,23 +127,10 @@ export function AppRoutes({
           path={route.href}
           element={(
             <WorkbenchView
+              {...sharedWorkbenchProps}
               activeSurfaceId={activeSurfaceId}
               activeSettingsSectionId={route.id}
-              selectedSession={selectedSession}
-              selectedSessionLoading={selectedSessionLoading}
-              selectedSessionSubmitting={selectedSessionSubmitting}
-              selectedSessionLiveStatus={selectedSessionLiveStatus}
-              selectedSessionPendingApproval={selectedSessionPendingApproval}
-              selectedSessionApprovalResolving={selectedSessionApprovalResolving}
-              selectedSessionApprovalError={selectedSessionApprovalError}
-              selectedSessionModelOptions={selectedSessionModelOptions}
-              selectedSessionSettingsUpdating={selectedSessionSettingsUpdating}
-              selectedSessionSettingsError={selectedSessionSettingsError}
               settingsOpen
-              onSubmitSessionPrompt={onSubmitSessionPrompt}
-              onUpdateSessionModel={onUpdateSessionModel}
-              onUpdateSessionReasoningEffort={onUpdateSessionReasoningEffort}
-              onResolveSessionApproval={onResolveSessionApproval}
             />
           )}
         />

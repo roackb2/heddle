@@ -66,10 +66,10 @@ test('navigates primary and settings routes without hash routing', async ({ page
   await page.goto('/sessions');
 
   await page.getByRole('link', { name: 'Tasks' }).click();
-  await expect(page).toHaveURL(/\/tasks$/);
+  await expect(page).toHaveURL(/\/tasks(\/browser-heartbeat)?$/);
   await expect(page).not.toHaveURL(/#/);
   await expect(page.getByTestId('web-v2-surface-tasks')).toBeVisible();
-  await expect(page.getByTestId('web-v2-workbench-title')).toHaveText('Tasks');
+  await expect(page.getByTestId('web-v2-workbench-title')).toContainText(/Tasks|Browser heartbeat/);
   await expect(page.getByRole('link', { name: 'Tasks' })).toHaveAttribute('aria-current', 'page');
 
   await page.getByRole('button', { name: 'Settings' }).click();
@@ -86,6 +86,19 @@ test('navigates primary and settings routes without hash routing', async ({ page
   await page.getByRole('button', { name: 'Back to App' }).click();
   await expect(page).toHaveURL(/\/sessions(\/[^/]+)?$/);
   await expect(page.getByTestId('web-v2-surface-sessions')).toBeVisible();
+});
+
+test('shows task run workbench and run details', async ({ page }) => {
+  await trpc.controlPlane.workspaceSetActive.mutate({ workspaceId: 'default' });
+  await page.goto('/tasks');
+
+  await expect(page).toHaveURL(/\/tasks\/browser-heartbeat$/);
+  await expect(page.getByRole('button', { name: /Browser heartbeat/ })).toHaveAttribute('aria-current', 'true');
+  await expect(page.getByTestId('web-v2-surface-tasks')).toBeVisible();
+  await expect(page.getByText('Check browser integration heartbeat state.').first()).toBeVisible();
+  await expect(page.getByText('Browser heartbeat completed.').first()).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Task run details' })).toBeVisible();
+  await expect(page.getByText('Run details')).toBeVisible();
 });
 
 test('submits a prompt and renders the mocked session response', async ({ page }) => {

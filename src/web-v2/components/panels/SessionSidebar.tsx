@@ -10,12 +10,14 @@ interface SessionSidebarProps {
   settingsNavigationItems: readonly SettingsRoute[];
   settingsOpen: boolean;
   selectedSessionId?: string;
+  selectedTaskId?: string;
   sessions: ControlPlaneState['sessions'];
   tasks: ControlPlaneState['heartbeat']['tasks'];
   onOpenSettings: () => void;
   onCloseSettings: () => void;
   onCreateSession: () => Promise<void>;
   onSelectSession: (sessionId: string) => void;
+  onSelectTask: (taskId: string) => void;
 }
 
 // SessionSidebar owns the primary agent workbench rail: app navigation,
@@ -27,12 +29,14 @@ export function SessionSidebar({
   settingsNavigationItems,
   settingsOpen,
   selectedSessionId,
+  selectedTaskId,
   sessions,
   tasks,
   onOpenSettings,
   onCloseSettings,
   onCreateSession,
   onSelectSession,
+  onSelectTask,
 }: SessionSidebarProps) {
   return (
     <div className="flex h-full min-w-0 flex-col">
@@ -47,11 +51,13 @@ export function SessionSidebar({
           activeItemId={activeSurfaceId}
           items={appNavigationItems}
           selectedSessionId={selectedSessionId}
+          selectedTaskId={selectedTaskId}
           sessions={sessions}
           tasks={tasks}
           onOpenSettings={onOpenSettings}
           onCreateSession={onCreateSession}
           onSelectSession={onSelectSession}
+          onSelectTask={onSelectTask}
         />
       )}
     </div>

@@ -26,10 +26,15 @@ export type WorkspaceFileDiff = RouterOutputs['controlPlane']['workspaceFileDiff
 export type ModelOptions = RouterOutputs['controlPlane']['modelOptions'];
 export type SavedLayoutSnapshot = RouterOutputs['controlPlane']['layoutSnapshotSave'];
 export type HeartbeatTaskMutationResult = RouterOutputs['controlPlane']['heartbeatTaskEnable'];
+export type HeartbeatRuns = RouterOutputs['controlPlane']['heartbeatRuns'];
 export type WorkspaceMutationResult = RouterOutputs['controlPlane']['workspaceSetActive'];
 
 export async function fetchControlPlaneState(): Promise<ControlPlaneState> {
   return await trpc.controlPlane.state.query();
+}
+
+export async function fetchHeartbeatRuns(input?: { taskId?: string; limit?: number }): Promise<HeartbeatRuns> {
+  return await trpc.controlPlane.heartbeatRuns.query(input);
 }
 
 export async function fetchChatSessionDetail(sessionId: string): Promise<ChatSessionDetail> {

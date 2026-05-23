@@ -88,6 +88,9 @@
     "sessions": "Sessions",
     "tasks": "Tasks"
   },
+  "tasks": {
+    "runDetailsAriaLabel": "Task run details"
+  },
   "workbench": {
     "emptyConversation": "Select a session to view the conversation.",
     "workspaceAriaLabel": "workspace"

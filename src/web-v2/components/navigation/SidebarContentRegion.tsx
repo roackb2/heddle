@@ -7,12 +7,14 @@ interface SidebarContentRegionProps {
   ariaLabel: string;
   activeSurfaceId: AppSurfaceId;
   selectedSessionId?: string;
+  selectedTaskId?: string;
   sessionListTitle: string;
   taskListTitle: string;
   sessions: ControlPlaneState['sessions'];
   tasks: ControlPlaneState['heartbeat']['tasks'];
   onCreateSession: () => Promise<void>;
   onSelectSession: (sessionId: string) => void;
+  onSelectTask: (taskId: string) => void;
 }
 
 // SidebarContentRegion owns the scrollable content area below primary
@@ -21,12 +23,14 @@ export function SidebarContentRegion({
   ariaLabel,
   activeSurfaceId,
   selectedSessionId,
+  selectedTaskId,
   sessionListTitle,
   taskListTitle,
   sessions,
   tasks,
   onCreateSession,
   onSelectSession,
+  onSelectTask,
 }: SidebarContentRegionProps) {
   return (
     <div
@@ -34,7 +38,12 @@ export function SidebarContentRegion({
       aria-label={ariaLabel}
     >
       {activeSurfaceId === 'tasks' ? (
-        <TaskListSection tasks={tasks} title={taskListTitle} />
+        <TaskListSection
+          selectedTaskId={selectedTaskId}
+          tasks={tasks}
+          title={taskListTitle}
+          onSelectTask={onSelectTask}
+        />
       ) : (
         <SessionListSection
           selectedSessionId={selectedSessionId}

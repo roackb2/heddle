@@ -20,10 +20,13 @@ import { useI18n } from '@web/i18n';
 export function MobileAppFrame(props: AppFrameLayoutProps) {
   const {
     children,
+    rightPanel,
+    rightPanelAriaLabel,
     onOpenSettings,
     onCloseSettings,
     onCreateSession,
     onSelectSession,
+    onSelectTask,
   } = props;
   const { t } = useI18n();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -36,6 +39,11 @@ export function MobileAppFrame(props: AppFrameLayoutProps) {
 
   function selectSession(sessionId: string) {
     onSelectSession(sessionId);
+    setSidebarOpen(false);
+  }
+
+  function selectTask(taskId: string) {
+    onSelectTask(taskId);
     setSidebarOpen(false);
   }
 
@@ -54,7 +62,7 @@ export function MobileAppFrame(props: AppFrameLayoutProps) {
       <AppFrameSkipLink />
       <div className="relative h-full min-h-0 w-full max-w-[100dvw] overflow-hidden">
         <SidebarToggleButton collapsed={!sidebarOpen} onClick={() => setSidebarOpen(true)} />
-        <InspectorToggleButton collapsed={!inspectorOpen} onClick={() => setInspectorOpen(true)} />
+        {rightPanel ? <InspectorToggleButton collapsed={!inspectorOpen} onClick={() => setInspectorOpen(true)} /> : null}
         <AppFrameWorkbench>{children}</AppFrameWorkbench>
       </div>
 
@@ -73,22 +81,27 @@ export function MobileAppFrame(props: AppFrameLayoutProps) {
             onCloseSettings={closeSettings}
             onCreateSession={createSession}
             onSelectSession={selectSession}
+            onSelectTask={selectTask}
           />
         </SheetContent>
       </Sheet>
 
-      <Sheet open={inspectorOpen} onOpenChange={setInspectorOpen}>
-        <SheetContent
-          side="right"
-          className="v2-panel-divider w-[24rem] max-w-[92dvw] border-l bg-card p-0"
-        >
-          <SheetHeader className="sr-only">
-            <SheetTitle>{t('inspector.contextAriaLabel')}</SheetTitle>
-            <SheetDescription>{t('inspector.contextAriaLabel')}</SheetDescription>
-          </SheetHeader>
-          <AppFrameInspector />
-        </SheetContent>
-      </Sheet>
+      {rightPanel ? (
+        <Sheet open={inspectorOpen} onOpenChange={setInspectorOpen}>
+          <SheetContent
+            side="right"
+            className="v2-panel-divider w-[24rem] max-w-[92dvw] border-l bg-card p-0"
+          >
+            <SheetHeader className="sr-only">
+              <SheetTitle>{rightPanelAriaLabel ?? t('inspector.contextAriaLabel')}</SheetTitle>
+              <SheetDescription>{rightPanelAriaLabel ?? t('inspector.contextAriaLabel')}</SheetDescription>
+            </SheetHeader>
+            <AppFrameInspector ariaLabel={rightPanelAriaLabel ?? t('inspector.contextAriaLabel')}>
+              {rightPanel}
+            </AppFrameInspector>
+          </SheetContent>
+        </Sheet>
+      ) : null}
     </>
   );
 }

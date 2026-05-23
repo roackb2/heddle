@@ -94,6 +94,16 @@ const heartbeatTaskInputSchema = z.object({
   taskId: z.string().min(1),
 });
 
+const heartbeatTaskDetailInputSchema = z.object({
+  taskId: z.string().min(1),
+  runLimit: z.number().int().min(1).max(100).optional(),
+});
+
+const heartbeatRunInputSchema = z.object({
+  taskId: z.string().min(1),
+  runId: z.string().min(1),
+});
+
 const fileSearchInputSchema = z.object({
   query: z.string().max(200).optional(),
   limit: z.number().int().min(1).max(50).optional(),
@@ -275,12 +285,22 @@ export const controlPlaneRouter = router({
       tasks: await ControlPlaneHeartbeatController.listTasks(ctx.activeWorkspace.stateRoot),
     };
   }),
+  heartbeatTask: procedure.input(heartbeatTaskDetailInputSchema).query(async ({ ctx, input }) => {
+    return await ControlPlaneHeartbeatController.readTask(ctx.activeWorkspace.stateRoot, input.taskId, {
+      runLimit: input.runLimit,
+    });
+  }),
   heartbeatRuns: procedure.input(heartbeatRunsInputSchema).query(async ({ ctx, input }) => {
     return {
       runs: await ControlPlaneHeartbeatController.listRuns(ctx.activeWorkspace.stateRoot, {
         taskId: input?.taskId,
         limit: input?.limit ?? 20,
       }),
+    };
+  }),
+  heartbeatRun: procedure.input(heartbeatRunInputSchema).query(async ({ ctx, input }) => {
+    return {
+      run: await ControlPlaneHeartbeatController.readRun(ctx.activeWorkspace.stateRoot, input.taskId, input.runId) ?? null,
     };
   }),
   memoryStatus: procedure.query(async ({ ctx }) => {

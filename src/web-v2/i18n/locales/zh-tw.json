@@ -88,6 +88,9 @@
     "sessions": "對話",
     "tasks": "任務"
   },
+  "tasks": {
+    "runDetailsAriaLabel": "任務執行詳情"
+  },
   "workbench": {
     "emptyConversation": "選擇一個對話以查看內容。",
     "workspaceAriaLabel": "工作區"

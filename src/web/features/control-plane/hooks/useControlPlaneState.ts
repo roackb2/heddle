@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createWorkspace as createWorkspaceRequest,
   fetchControlPlaneState,
+  fetchHeartbeatRuns,
   renameWorkspace as renameWorkspaceRequest,
   setActiveWorkspace as setActiveWorkspaceRequest,
   type ControlPlaneState,
@@ -14,7 +15,17 @@ export function useControlPlaneState() {
 
   const refresh = useCallback(async () => {
     try {
-      const next = await fetchControlPlaneState();
+      const [stateSnapshot, recentHeartbeatRuns] = await Promise.all([
+        fetchControlPlaneState(),
+        fetchHeartbeatRuns({ limit: 20 }),
+      ]);
+      const next = {
+        ...stateSnapshot,
+        heartbeat: {
+          ...stateSnapshot.heartbeat,
+          runs: recentHeartbeatRuns.runs,
+        },
+      };
       const snapshot = JSON.stringify(next);
       if (lastSnapshotRef.current !== snapshot) {
         lastSnapshotRef.current = snapshot;

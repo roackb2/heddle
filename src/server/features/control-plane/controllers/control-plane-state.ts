@@ -11,9 +11,8 @@ export class ControlPlaneStateController {
   static async load(context: HeddleServerContext): Promise<ControlPlaneState> {
     const workspaceRoot = context.activeWorkspace.anchorRoot;
     const stateRoot = context.activeWorkspace.stateRoot;
-    const [tasks, runs, memory] = await Promise.all([
+    const [tasks, memory] = await Promise.all([
       ControlPlaneHeartbeatController.listTasks(stateRoot),
-      ControlPlaneHeartbeatController.listRuns(stateRoot, { limit: 20 }),
       ControlPlaneMemoryController.readStatus(stateRoot),
     ]);
 
@@ -39,7 +38,7 @@ export class ControlPlaneStateController {
       }),
       heartbeat: {
         tasks,
-        runs,
+        runs: [],
       },
       memory,
     };

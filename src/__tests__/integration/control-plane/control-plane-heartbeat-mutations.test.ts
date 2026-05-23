@@ -94,4 +94,83 @@ describe('control-plane heartbeat mutations', () => {
     const triggered = await caller.heartbeatTaskTrigger({ taskId: 'repo-check' });
     expect(triggered.task).toMatchObject({ taskId: 'repo-check', enabled: true, status: 'waiting' });
   });
+
+  it('exposes task detail and run detail through dedicated router procedures', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-detail-workspace-'));
+    const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-detail-router-'));
+    const store = new FileHeartbeatTaskRepository({ dir: join(stateRoot, 'heartbeat') });
+    const task = createTask({
+      state: {
+        status: 'complete',
+        runAt: '2026-04-14T00:00:00.000Z',
+        runId: 'run_heartbeat_1',
+        resumable: true,
+      },
+    });
+    await store.saveTask(task);
+    await store.saveRunRecord({
+      task,
+      loadedCheckpoint: true,
+      result: {
+        decision: 'continue',
+        summary: 'Heartbeat detail completed.',
+        checkpoint: {
+          version: 1,
+          runId: 'run_heartbeat_1',
+          createdAt: '2026-04-14T00:00:00.000Z',
+          state: {
+            status: 'finished',
+            runId: 'run_heartbeat_1',
+            goal: 'Heartbeat detail',
+            model: 'gpt-5.4',
+            provider: 'openai',
+            workspaceRoot,
+            startedAt: '2026-04-13T23:59:00.000Z',
+            finishedAt: '2026-04-14T00:00:00.000Z',
+            outcome: 'done',
+            summary: 'Heartbeat detail completed.',
+            transcript: [],
+            trace: [],
+          },
+        },
+        state: {
+          status: 'finished',
+          runId: 'run_heartbeat_1',
+          goal: 'Heartbeat detail',
+          model: 'gpt-5.4',
+          provider: 'openai',
+          workspaceRoot,
+          startedAt: '2026-04-13T23:59:00.000Z',
+          finishedAt: '2026-04-14T00:00:00.000Z',
+          outcome: 'done',
+          summary: 'Heartbeat detail completed.',
+          transcript: [],
+          trace: [],
+        },
+      },
+    });
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
+    const activeWorkspace = catalog.workspaces[0];
+    if (!activeWorkspace) {
+      throw new Error('expected default workspace');
+    }
+
+    const caller = controlPlaneRouter.createCaller({
+      workspaceRoot,
+      stateRoot,
+      activeWorkspaceId: activeWorkspace.id,
+      activeWorkspace,
+      workspaces: catalog.workspaces,
+      runtimeHost: null,
+      logger: pino({ level: 'silent' }),
+    });
+
+    const taskDetail = await caller.heartbeatTask({ taskId: 'repo-check' });
+    expect(taskDetail.task).toMatchObject({ taskId: 'repo-check', status: 'complete' });
+    expect(taskDetail.runs).toHaveLength(1);
+    expect(taskDetail.runs[0]).toMatchObject({ runId: 'run_heartbeat_1', summary: 'Heartbeat detail completed.' });
+
+    const runDetail = await caller.heartbeatRun({ taskId: 'repo-check', runId: 'run_heartbeat_1' });
+    expect(runDetail.run).toMatchObject({ taskId: 'repo-check', runId: 'run_heartbeat_1', loadedCheckpoint: true });
+  });
 });

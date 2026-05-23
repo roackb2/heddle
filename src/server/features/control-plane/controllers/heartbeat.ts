@@ -22,6 +22,34 @@ export class ControlPlaneHeartbeatController {
     return await HeartbeatViewsPresenter.listRunViews(ControlPlaneHeartbeatController.createStore(stateRoot), options);
   }
 
+  static async readTask(
+    stateRoot: string,
+    taskId: string,
+    options: { runLimit?: number } = {},
+  ) {
+    const store = ControlPlaneHeartbeatController.createStore(stateRoot);
+    const task = await ControlPlaneHeartbeatController.loadTaskById(store, taskId);
+    const runs = await HeartbeatViewsPresenter.listRunViews(store, {
+      taskId,
+      limit: options.runLimit ?? 50,
+    });
+
+    return {
+      task: HeartbeatViewsPresenter.projectTask(task),
+      runs,
+    };
+  }
+
+  static async readRun(
+    stateRoot: string,
+    taskId: string,
+    runId: string,
+  ) {
+    const store = ControlPlaneHeartbeatController.createStore(stateRoot);
+    await ControlPlaneHeartbeatController.loadTaskById(store, taskId);
+    return await HeartbeatViewsPresenter.loadRunView(store, runId, { taskId });
+  }
+
   static async setTaskEnabled(
     stateRoot: string,
     taskId: string,
