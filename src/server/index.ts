@@ -6,6 +6,7 @@ import { createHeddleServerApp } from './app.js';
 import { createServerLogger } from './logger.js';
 import { assertWebAssetsBuilt } from './static.js';
 import type { HeddleServerListenOptions } from './types.js';
+import { HeartbeatSchedulerService, type HeartbeatSchedulerEvent } from '@/core/heartbeat/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 
@@ -60,6 +61,13 @@ export async function listenHeddleDaemon(options: HeddleServerListenOptions): Pr
   };
 
   registerDaemon(startedAt);
+  const heartbeatScheduler = HeartbeatSchedulerService.start({
+    workspaceRoot: options.workspaceRoot,
+    stateRoot: options.stateRoot,
+    preferApiKey: options.preferApiKey,
+    onEvent: (event) => logDaemonHeartbeatSchedulerEvent(logger, event),
+    onError: (error) => logger.error({ error }, 'Daemon heartbeat scheduler stopped unexpectedly'),
+  });
 
   const app = createHeddleServerApp({
     ...options,
@@ -106,6 +114,7 @@ export async function listenHeddleDaemon(options: HeddleServerListenOptions): Pr
 
     shuttingDown = true;
     clearInterval(heartbeat);
+    heartbeatScheduler.stop();
     cleanup();
 
     if (!server) {
@@ -130,6 +139,7 @@ export async function listenHeddleDaemon(options: HeddleServerListenOptions): Pr
       listeningServer.off('error', rejectListen);
       listeningServer.once('close', () => {
         clearInterval(heartbeat);
+        heartbeatScheduler.stop();
         cleanup();
       });
       logger.info({
@@ -151,6 +161,7 @@ export async function listenHeddleDaemon(options: HeddleServerListenOptions): Pr
     server = listeningServer;
     listeningServer.once('error', (error) => {
       clearInterval(heartbeat);
+      heartbeatScheduler.stop();
       cleanup();
       logger.error({ error }, 'Heddle server failed');
       rejectListen(error);
@@ -159,6 +170,27 @@ export async function listenHeddleDaemon(options: HeddleServerListenOptions): Pr
 }
 
 export const listenHeddleServer = listenHeddleDaemon;
+
+function logDaemonHeartbeatSchedulerEvent(
+  logger: ReturnType<typeof createServerLogger>,
+  event: HeartbeatSchedulerEvent,
+) {
+  const messages = {
+    'heartbeat.scheduler.started': 'Daemon heartbeat scheduler started',
+    'heartbeat.scheduler.stopped': 'Daemon heartbeat scheduler stopped',
+    'heartbeat.task.due': 'Heartbeat task due',
+    'heartbeat.task.started': 'Heartbeat task started',
+    'heartbeat.task.finished': 'Heartbeat task finished',
+    'heartbeat.task.failed': 'Heartbeat task failed',
+  } satisfies Record<HeartbeatSchedulerEvent['type'], string>;
+
+  if (event.type === 'heartbeat.task.failed') {
+    logger.warn({ event }, messages[event.type]);
+    return;
+  }
+
+  logger.info({ event }, messages[event.type]);
+}
 
 function resolveDefaultAssetsDir(): string {
   if (process.env.HEDDLE_WEB_DIST) {

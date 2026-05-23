@@ -68,6 +68,7 @@
     "expandSidebar": "展开侧边栏",
     "mainAriaLabel": "主应用导航",
     "newChat": "新建会话",
+    "newTask": "新建任务",
     "openSettings": "打开设置",
     "primaryAriaLabel": "主导航",
     "sessionListAriaLabel": "会话列表",
@@ -89,6 +90,29 @@
     "tasks": "任务"
   },
   "tasks": {
+    "create": {
+      "cancel": "取消",
+      "create": "创建",
+      "createAndRun": "创建并运行",
+      "defaultModel": "默认模型",
+      "description": "为此工作区创建一个定期 heartbeat 任务。",
+      "maxSteps": "最大步数",
+      "maxStepsPlaceholder": "默认",
+      "model": "模型",
+      "modelDescription": "保留默认值以使用 daemon 的模型选择。",
+      "name": "名称",
+      "namePlaceholder": "检查当前仓库变更",
+      "schedule": "计划",
+      "scheduleEvery15Minutes": "每 15 分钟",
+      "scheduleEvery30Minutes": "每 30 分钟",
+      "scheduleEveryHour": "每小时",
+      "scheduleEverySixHours": "每 6 小时",
+      "scheduleEveryDay": "每天",
+      "task": "任务",
+      "taskPlaceholder": "总结最近仓库变更，并指出需要 review 的内容。",
+      "title": "新建任务"
+    },
+    "runNow": "立即运行",
     "runDetailsAriaLabel": "任务运行详情"
   },
   "workbench": {

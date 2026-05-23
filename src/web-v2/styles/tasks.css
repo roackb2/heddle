@@ -21,6 +21,34 @@
     padding: 1rem;
   }
 
+  .v2-task-create-dialog {
+    max-height: min(42rem, calc(100dvh - 2rem));
+    overflow-y: auto;
+  }
+
+  .v2-task-result-markdown {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+
+  .v2-task-result-markdown .v2-assistant-markdown p,
+  .v2-task-result-markdown .v2-assistant-markdown ul,
+  .v2-task-result-markdown .v2-assistant-markdown ol,
+  .v2-task-result-markdown .v2-assistant-markdown pre,
+  .v2-task-result-markdown .v2-assistant-markdown blockquote,
+  .v2-task-result-markdown .v2-assistant-markdown table {
+    margin-bottom: 0.65rem;
+  }
+
+  .v2-task-result-markdown .v2-assistant-markdown h1,
+  .v2-task-result-markdown .v2-assistant-markdown h2,
+  .v2-task-result-markdown .v2-assistant-markdown h3,
+  .v2-task-result-markdown .v2-assistant-markdown h4 {
+    margin-top: 0.9rem;
+    margin-bottom: 0.35rem;
+    font-size: 0.875rem;
+  }
+
   @media (max-width: 767px) {
     .v2-task-workbench {
       padding: 1.5rem 1.25rem max(1.5rem, env(safe-area-inset-bottom));

@@ -7,6 +7,8 @@ interface TasksWorkbenchViewProps {
   selectedRunId?: string;
   loading: boolean;
   error?: string;
+  running: boolean;
+  onRunNow: () => Promise<void>;
   onSelectRun: (runId: string) => void;
 }
 
@@ -16,6 +18,8 @@ export function TasksWorkbenchView({
   selectedRunId,
   loading,
   error,
+  running,
+  onRunNow,
   onSelectRun,
 }: TasksWorkbenchViewProps) {
   if (loading) {
@@ -33,7 +37,7 @@ export function TasksWorkbenchView({
   return (
     <div className="v2-scrollbar-hidden h-full min-w-0 overflow-auto">
       <div className="v2-task-workbench mx-auto flex w-full max-w-4xl flex-col gap-5 px-8 py-8">
-        <TaskWorkbenchHeader task={task} />
+        <TaskWorkbenchHeader task={task} running={running} onRunNow={onRunNow} />
         <section className="min-w-0">
           <h2 className="v2-type-section-label mb-2 text-muted-foreground">Runs</h2>
           <TaskRunList runs={runs} selectedRunId={selectedRunId} onSelectRun={onSelectRun} />

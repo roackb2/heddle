@@ -27,18 +27,18 @@ export const HeartbeatTaskSchema = z.object({
   enabled: z.boolean().describe('Whether the scheduler may run this task.'),
   checkpointPath: z.string().optional().describe('Optional custom checkpoint file path.'),
   schedule: z.object({
-    intervalMs: z.number().describe('Default interval between heartbeat wake cycles.'),
-    nextRunAt: z.string().optional().describe('Timestamp when this task should next wake.'),
-  }).describe('Scheduler-owned cadence and wake timing.'),
+    intervalMs: z.number().describe('Default interval between heartbeat runner cycles.'),
+    nextRunAt: z.string().optional().describe('Timestamp when this task should next run.'),
+  }).describe('Scheduler-owned cadence and run timing.'),
   runtime: z.object({
     model: z.string().optional().describe('Model override for this task.'),
-    maxSteps: z.number().optional().describe('Maximum runtime steps for one wake cycle.'),
+    maxSteps: z.number().optional().describe('Maximum runtime steps for one runner cycle.'),
     workspaceRoot: z.string().optional().describe('Workspace root override for this task.'),
     stateDir: z.string().optional().describe('State directory override for this task.'),
     memoryDir: z.string().optional().describe('Memory directory override for this task.'),
     searchIgnoreDirs: z.array(z.string()).optional().describe('Search ignore directory overrides.'),
     systemContext: z.string().optional().describe('Additional system context for this task.'),
-  }).optional().describe('Task-specific runtime overrides passed to the wake service.'),
+  }).optional().describe('Task-specific runtime overrides passed to the runner agent.'),
   state: z.object({
     status: HeartbeatTaskStatusSchema.describe('Current scheduler-facing task status.'),
     progress: z.string().optional().describe('Latest human-readable task progress.'),
@@ -46,8 +46,8 @@ export const HeartbeatTaskSchema = z.object({
     runAt: z.string().optional().describe('Timestamp when the latest run started or finished.'),
     loadedCheckpoint: z.boolean().optional().describe('Whether the latest run loaded a checkpoint.'),
     resumable: z.boolean().describe('Whether this task should be treated as resumable.'),
-    result: z.lazy(() => AgentHeartbeatResultSchema).optional().describe('Latest heartbeat wake result.'),
-    error: z.string().optional().describe('Latest scheduler or wake error.'),
+    result: z.lazy(() => AgentHeartbeatResultSchema).optional().describe('Latest heartbeat runner result.'),
+    error: z.string().optional().describe('Latest scheduler or runner error.'),
     updatedAt: z.string().optional().describe('Timestamp when this task record was last updated.'),
   }).optional().describe('Latest scheduler/result state for this heartbeat task.'),
 });
@@ -78,6 +78,6 @@ const AgentHeartbeatResultSchema = z.object({
 
 export const HeartbeatTaskRunRecordSchema = z.object({
   task: HeartbeatTaskSchema.describe('Task state captured after this run.'),
-  result: AgentHeartbeatResultSchema.describe('Heartbeat wake result.'),
+  result: AgentHeartbeatResultSchema.describe('Heartbeat runner result.'),
   loadedCheckpoint: z.boolean().describe('Whether this run resumed from a stored checkpoint.'),
 });

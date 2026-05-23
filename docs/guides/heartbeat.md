@@ -1,12 +1,12 @@
 # Heartbeat
 
-Heddle exposes `HeartbeatWakeService.run` for autonomous, scheduler-driven agent work.
+Heddle exposes `HeartbeatRunnerAgent.run` for autonomous, scheduler-driven agent work.
 
-Heartbeat is not interactive chat mode. It is a host/runtime primitive for systems that want to wake an agent periodically, let it work within budget and approval limits, checkpoint the result, and decide what should happen next.
+Heartbeat is not interactive chat mode. It is a host/runtime primitive for systems that want to run an agent periodically, let it work within budget and approval limits, checkpoint the result, and decide what should happen next.
 
-## Heartbeat Wake Cycle
+## Heartbeat Runner Cycle
 
-A heartbeat wake cycle:
+A heartbeat runner cycle:
 
 - loads a durable task plus an optional checkpoint
 - resumes prior transcript state if available
@@ -14,7 +14,7 @@ A heartbeat wake cycle:
 - checkpoints the new state
 - returns a decision: `continue`, `pause`, `complete`, or `escalate`
 
-Scheduler state keeps the latest wake result as one nested result object instead
+Scheduler state keeps the latest runner result as one nested result object instead
 of copying decision, outcome, summary, and usage into separate task fields. Run
 history stores the same result in a durable run record, so CLI, control-plane,
 and host integrations read the same source of truth.
@@ -44,16 +44,17 @@ heddle heartbeat task disable repo-gardener
 
 ## Programmatic Scheduler Pieces
 
-For repeated wake cycles, Heddle also exposes a local-first scheduler core:
+For repeated runner cycles, Heddle also exposes a local-first scheduler core:
 
 - `HeartbeatSchedulerService.runDueTasks`
 - `HeartbeatSchedulerService.runLoop`
-- `FileHeartbeatTaskRepository`
+- `FileHeartbeatTaskService`
 
 `HeartbeatSchedulerService.runDueTasks` returns durable run records, and
 `heartbeat.task.finished` events include the same run record. If you need a
 compact display shape for a UI or service integration, use
-`HeartbeatViewsPresenter` instead of flattening task state yourself.
+`FileHeartbeatTaskService` task/run view methods instead of flattening task
+state yourself.
 
 Cron, launchd, systemd, hosted queues, and Lucid-style services should be treated as hosts around this API, not as Heddle's internal scheduler model.
 
@@ -75,7 +76,7 @@ yarn example:heartbeat-scheduler
 
 ## Host Notes
 
-Heartbeat uses a larger default step budget than ordinary short chat runs so a wake cycle has room to inspect, act, and checkpoint. Hosts can still pass `maxSteps` when they need stricter control.
+Heartbeat uses a larger default step budget than ordinary short chat runs so a runner cycle has room to inspect, act, and checkpoint. Hosts can still pass `maxSteps` when they need stricter control.
 
 The built-in CLI heartbeat runner is intentionally conservative: it has no live approval UI, so approval-gated file edits and mutation shell commands are denied with a clear blocker. It is useful today for recurring inspection, summaries, memory-note updates, and escalation reports.
 

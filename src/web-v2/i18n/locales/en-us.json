@@ -68,6 +68,7 @@
     "expandSidebar": "Expand sidebar",
     "mainAriaLabel": "Main app navigation",
     "newChat": "New chat",
+    "newTask": "New task",
     "openSettings": "Open settings",
     "primaryAriaLabel": "Primary navigation",
     "sessionListAriaLabel": "Session list",
@@ -89,6 +90,29 @@
     "tasks": "Tasks"
   },
   "tasks": {
+    "create": {
+      "cancel": "Cancel",
+      "create": "Create",
+      "createAndRun": "Create and run",
+      "defaultModel": "Default model",
+      "description": "Create a recurring heartbeat task for this workspace.",
+      "maxSteps": "Max steps",
+      "maxStepsPlaceholder": "Default",
+      "model": "Model",
+      "modelDescription": "Leave default to use the daemon model selection.",
+      "name": "Name",
+      "namePlaceholder": "Review current repo changes",
+      "schedule": "Schedule",
+      "scheduleEvery15Minutes": "Every 15 minutes",
+      "scheduleEvery30Minutes": "Every 30 minutes",
+      "scheduleEveryHour": "Every hour",
+      "scheduleEverySixHours": "Every 6 hours",
+      "scheduleEveryDay": "Every day",
+      "task": "Task",
+      "taskPlaceholder": "Summarize recent repo changes and call out anything that needs review.",
+      "title": "New task"
+    },
+    "runNow": "Run now",
     "runDetailsAriaLabel": "Task run details"
   },
   "workbench": {

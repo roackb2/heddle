@@ -1,14 +1,11 @@
 import { AuthCliController } from '../../auth.js';
-import { FileHeartbeatTaskRepository } from '@/core/heartbeat/index.js';
+import { FileHeartbeatTaskService } from '@/core/heartbeat/index.js';
 import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
 import type { SlashCommandExecutionContext } from '../../../core/commands/slash/modules/context.js';
 import type { LocalCommandArgs } from '../state/local-commands.js';
-import { join } from 'node:path';
 
 export function createTuiSlashCommandContext(args: LocalCommandArgs): SlashCommandExecutionContext {
-  const heartbeatStore = new FileHeartbeatTaskRepository({
-    dir: join(args.stateRoot, 'heartbeat'),
-  });
+  const heartbeatTasks = new FileHeartbeatTaskService({ stateRoot: args.stateRoot });
 
   return {
     model: {
@@ -46,9 +43,9 @@ export function createTuiSlashCommandContext(args: LocalCommandArgs): SlashComma
       summarize: ChatSessionRecords.summarize,
     },
     heartbeat: {
-      listTasks: async () => await heartbeatStore.listTasks(),
-      listRunRecords: async (options) => await heartbeatStore.listRunRecords(options),
-      loadRunRecord: async (id) => await heartbeatStore.loadRunRecord(id),
+      listTasks: async () => await heartbeatTasks.listTasks(),
+      listRunRecords: async (options) => await heartbeatTasks.listRunRecords(options),
+      loadRunRecord: async (id) => await heartbeatTasks.loadRunRecord(id),
     },
   };
 }

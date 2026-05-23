@@ -30,11 +30,13 @@ interface WorkbenchViewProps {
   selectedTaskRunId?: string;
   selectedTaskLoading: boolean;
   selectedTaskError?: string;
+  selectedTaskRunSubmitting: boolean;
   settingsOpen: boolean;
   onSubmitSessionPrompt: (prompt: string) => Promise<void>;
   onUpdateSessionModel: (model: string) => Promise<void>;
   onUpdateSessionReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
   onResolveSessionApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
+  onRunTaskNow: () => Promise<void>;
   onSelectTaskRun: (runId: string) => void;
 }
 
@@ -69,11 +71,13 @@ export function WorkbenchView({
   selectedTaskRunId,
   selectedTaskLoading,
   selectedTaskError,
+  selectedTaskRunSubmitting,
   settingsOpen,
   onSubmitSessionPrompt,
   onUpdateSessionModel,
   onUpdateSessionReasoningEffort,
   onResolveSessionApproval,
+  onRunTaskNow,
   onSelectTaskRun,
 }: WorkbenchViewProps) {
   const { t } = useI18n();
@@ -113,12 +117,14 @@ export function WorkbenchView({
           selectedTaskRunId,
           selectedTaskLoading,
           selectedTaskError,
+          selectedTaskRunSubmitting,
           settingsOpen,
           t,
           onSubmitSessionPrompt,
           onUpdateSessionModel,
           onUpdateSessionReasoningEffort,
           onResolveSessionApproval,
+          onRunTaskNow,
           onSelectTaskRun,
         })}
       </div>
@@ -161,7 +167,9 @@ function renderWorkbenchSurface(args: RenderWorkbenchSurfaceArgs): ReactNode {
         loading={args.selectedTaskLoading}
         runs={args.selectedTaskRuns}
         selectedRunId={args.selectedTaskRunId}
+        running={args.selectedTaskRunSubmitting}
         task={args.selectedTask}
+        onRunNow={args.onRunTaskNow}
         onSelectRun={args.onSelectTaskRun}
       />
     ),

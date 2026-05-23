@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  FileHeartbeatTaskRepository,
+  FileHeartbeatTaskService,
   HeartbeatSchedulerService,
   type HeartbeatSchedulerEvent,
   type HeartbeatTask,
@@ -15,7 +15,7 @@ import { AgentLoopCheckpointService, type AgentLoopCheckpoint } from '@/core/run
 const NOW = new Date('2026-04-13T00:00:00.000Z');
 
 describe('heartbeat scheduler', () => {
-  it('runs due enabled tasks, persists checkpoints, and schedules the next wake', async () => {
+  it('runs due enabled tasks, persists checkpoints, and schedules the next run', async () => {
     const events: HeartbeatSchedulerEvent[] = [];
     const task: HeartbeatTask = {
       id: 'project-maintenance',
@@ -60,7 +60,7 @@ describe('heartbeat scheduler', () => {
       },
       state: {
         status: 'waiting',
-        progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 5s.',
+        progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 5s.',
         runId: 'run-continue',
         loadedCheckpoint: false,
         resumable: true,
@@ -79,7 +79,7 @@ describe('heartbeat scheduler', () => {
     ]);
   });
 
-  it('disables terminal complete and escalate tasks after the wake cycle', async () => {
+  it('disables terminal complete and escalate tasks after the runner cycle', async () => {
     const task: HeartbeatTask = {
       id: 'done-task',
       task: 'Finish this task.',
@@ -144,7 +144,7 @@ describe('heartbeat scheduler', () => {
       },
       state: {
         status: 'failed',
-        progress: 'Heartbeat wake failed and will retry later.',
+        progress: 'Heartbeat runner failed and will retry later.',
         error: 'temporary failure',
       },
     });
@@ -187,7 +187,7 @@ describe('heartbeat scheduler', () => {
         task: {
           state: {
             status: 'waiting',
-            progress: 'Heartbeat paused. Waiting 15m before the next wake.',
+            progress: 'Heartbeat paused. Waiting 15m before the next run.',
           },
         },
       },
@@ -196,7 +196,7 @@ describe('heartbeat scheduler', () => {
 
   it('stores tasks and checkpoints in a local heartbeat directory', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'heddle-heartbeat-scheduler-'));
-    const store = new FileHeartbeatTaskRepository({ dir });
+    const store = new FileHeartbeatTaskService({ dir });
     const task: HeartbeatTask = {
       id: 'local-task',
       task: 'Local task.',
@@ -219,7 +219,7 @@ describe('heartbeat scheduler', () => {
 
   it('lists stored heartbeat run records newest first', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'heddle-heartbeat-runs-'));
-    const store = new FileHeartbeatTaskRepository({ dir });
+    const store = new FileHeartbeatTaskService({ dir });
     const task: HeartbeatTask = {
       id: 'local-task',
       task: 'Local task.',
@@ -307,7 +307,7 @@ function createHeartbeatResult(decision: AgentHeartbeatResult['decision']): Agen
   const state = {
     status: 'finished' as const,
     runId: `run-${decision}`,
-    goal: 'Heartbeat wake cycle.',
+    goal: 'Heartbeat runner cycle.',
     model: 'gpt-test',
     provider: 'openai' as const,
     workspaceRoot: '/tmp/project',

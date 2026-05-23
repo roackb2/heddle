@@ -1,7 +1,10 @@
-export { FileHeartbeatTaskRepository } from './repository.js';
+export { FileHeartbeatTaskService } from './service.js';
 export { HeartbeatTaskStateProjector } from './task-state.js';
 export type {
-  FileHeartbeatTaskRepositoryOptions,
+  CreateHeartbeatTaskInput,
+  FileHeartbeatTaskServiceOptions,
+} from './service.js';
+export type {
   HeartbeatTask,
   HeartbeatTaskRunRecord,
   HeartbeatTaskRunRecordEntry,

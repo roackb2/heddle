@@ -36,10 +36,12 @@ interface AppRoutesProps {
   selectedTaskRunId?: string;
   selectedTaskLoading: boolean;
   selectedTaskError?: string;
+  selectedTaskRunSubmitting: boolean;
   onSubmitSessionPrompt: (prompt: string) => Promise<void>;
   onUpdateSessionModel: (model: string) => Promise<void>;
   onUpdateSessionReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
   onResolveSessionApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
+  onRunTaskNow: () => Promise<void>;
   onSelectTaskRun: (runId: string) => void;
 }
 
@@ -75,10 +77,12 @@ export function AppRoutes({
   selectedTaskRunId,
   selectedTaskLoading,
   selectedTaskError,
+  selectedTaskRunSubmitting,
   onSubmitSessionPrompt,
   onUpdateSessionModel,
   onUpdateSessionReasoningEffort,
   onResolveSessionApproval,
+  onRunTaskNow,
   onSelectTaskRun,
 }: AppRoutesProps) {
   const sharedWorkbenchProps = {
@@ -98,10 +102,12 @@ export function AppRoutes({
     selectedTaskRunId,
     selectedTaskLoading,
     selectedTaskError,
+    selectedTaskRunSubmitting,
     onSubmitSessionPrompt,
     onUpdateSessionModel,
     onUpdateSessionReasoningEffort,
     onResolveSessionApproval,
+    onRunTaskNow,
     onSelectTaskRun,
   };
 

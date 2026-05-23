@@ -155,7 +155,7 @@ state from event fragments.
 ## Extension Points
 
 - Add a runtime approval rule by passing `approvalPolicies` into `AgentRunService.run`,
-  `AgentLoopRuntimeService.run`, `HeartbeatWakeService.run`, or `createConversationEngine(...).turns`.
+  `AgentLoopRuntimeService.run`, `HeartbeatRunnerAgent.run`, or `createConversationEngine(...).turns`.
 - Add host UI by instantiating `ToolApprovalService` in the host controller and
   passing its request payload to the host presentation layer.
 - Add remembered approval storage by extending `ToolApprovalService` and the

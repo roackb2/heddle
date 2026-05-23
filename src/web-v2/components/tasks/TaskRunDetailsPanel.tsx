@@ -1,4 +1,5 @@
 import type { ControlPlaneHeartbeatRun } from '@web/api/client';
+import { AssistantMarkdown } from '@web/components/conversation/AssistantMarkdown';
 import { formatTaskTimestamp, formatUsage } from './task-format';
 
 interface TaskRunDetailsPanelProps {
@@ -37,7 +38,7 @@ export function TaskRunDetailsPanel({
                 ['checkpoint', run.loadedCheckpoint ? 'loaded' : 'not loaded'],
               ]}
             />
-            <TaskDetailBlock title="Summary" body={run.summary} />
+            <TaskMarkdownBlock title="Task result" body={run.summary} />
             {run.progress ? <TaskDetailBlock title="Progress" body={run.progress} /> : null}
             {run.error ? <TaskDetailBlock title="Error" body={run.error} /> : null}
           </div>
@@ -73,6 +74,23 @@ function TaskDetailBlock({
     <section className="min-w-0">
       <h3 className="v2-type-panel-title text-foreground">{title}</h3>
       <p className="v2-type-panel-subtitle mt-1 text-pretty text-muted-foreground">{body}</p>
+    </section>
+  );
+}
+
+function TaskMarkdownBlock({
+  title,
+  body,
+}: {
+  title: string;
+  body: string;
+}) {
+  return (
+    <section className="min-w-0">
+      <h3 className="v2-type-panel-title text-foreground">{title}</h3>
+      <div className="v2-task-result-markdown mt-1 text-muted-foreground">
+        <AssistantMarkdown markdown={body} />
+      </div>
     </section>
   );
 }

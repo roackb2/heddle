@@ -1,6 +1,6 @@
 # Heartbeat
 
-Heartbeat owns bounded autonomous wake cycles.
+Heartbeat owns bounded autonomous runner-agent cycles.
 
 This domain sits beside `src/core/runtime` instead of inside it. Runtime owns the
 generic agent-loop host API; heartbeat owns scheduled/background task semantics,
@@ -9,20 +9,28 @@ operator-facing heartbeat views.
 
 ## Owns
 
-- `wake/`: `HeartbeatWakeService` owns one heartbeat wake cycle on top of
+- `agent/`: `HeartbeatRunnerAgent` owns one autonomous runner-agent cycle on top of
   `AgentLoopRuntimeService.run`, with prompt and decision policy classes kept
   beside it.
 - `checkpoint/`: `StoredHeartbeatService` and
   `FileHeartbeatCheckpointRepository` own checkpoint-backed one-off heartbeat
   execution.
-- `tasks/`: `FileHeartbeatTaskRepository` owns durable task/checkpoint/run
-  storage through zod-backed schemas; `HeartbeatTaskStateProjector` owns task
-  state transitions after success or failure.
+- `tasks/`: `FileHeartbeatTaskService` is the persistence boundary for durable
+  task/checkpoint/run storage and task/run projections. It is the only
+  non-repository service that should instantiate `FileHeartbeatTaskRepository`.
+  `HeartbeatTaskStateProjector` owns task state transitions after success or
+  failure.
 - `scheduler/`: `HeartbeatSchedulerService` owns due-task selection and the
-  scheduler loop; `HeartbeatTaskRunnerService` is the narrow task-to-wake
-  translation boundary.
-- `views/`: `HeartbeatViewsPresenter` and `HeartbeatLucidPresenter` own
-  operator-facing heartbeat projections.
+  periodic scheduler loop. It delegates execution to
+  `HeartbeatTaskRunnerService` instead of running tasks itself. Daemon, CLI,
+  and future hosts should start or run the scheduler through this service
+  instead of constructing task repositories or duplicating loop logic.
+- `scheduler/runner.ts`: `HeartbeatTaskRunnerService` owns one task execution:
+  checkpoint loading, runner-agent invocation, checkpoint persistence, task
+  state transitions, and run history persistence.
+- `views/`: `HeartbeatLucidPresenter` owns Lucid-specific adapter messages.
+  Generic task/run view projection belongs to `FileHeartbeatTaskService`,
+  because that service owns the task persistence boundary.
 
 ## Does Not Own
 

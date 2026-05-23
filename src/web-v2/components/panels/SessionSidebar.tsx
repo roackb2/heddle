@@ -16,6 +16,7 @@ interface SessionSidebarProps {
   onOpenSettings: () => void;
   onCloseSettings: () => void;
   onCreateSession: () => Promise<void>;
+  onCreateTask: () => void;
   onSelectSession: (sessionId: string) => void;
   onSelectTask: (taskId: string) => void;
 }
@@ -35,6 +36,7 @@ export function SessionSidebar({
   onOpenSettings,
   onCloseSettings,
   onCreateSession,
+  onCreateTask,
   onSelectSession,
   onSelectTask,
 }: SessionSidebarProps) {
@@ -56,6 +58,7 @@ export function SessionSidebar({
           tasks={tasks}
           onOpenSettings={onOpenSettings}
           onCreateSession={onCreateSession}
+          onCreateTask={onCreateTask}
           onSelectSession={onSelectSession}
           onSelectTask={onSelectTask}
         />

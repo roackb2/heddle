@@ -1,7 +1,9 @@
 import { resolve } from 'node:path';
-import { HeartbeatSchedulerService, type HeartbeatTask } from '@/core/heartbeat/index.js';
-import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
-import type { ToolCall, ToolDefinition } from '@/core/types.js';
+import {
+  FileHeartbeatTaskService,
+  HeartbeatSchedulerService,
+  type HeartbeatTask,
+} from '@/core/heartbeat/index.js';
 import type { ParsedHeartbeatArgs } from './args.js';
 import { booleanFlag, parsePositiveInt, stringFlag } from './args.js';
 import { formatDurationMs, parseDurationMs } from './duration.js';
@@ -9,7 +11,6 @@ import { printAgentLoopEvent, printSchedulerEvent } from './output.js';
 import type { HeartbeatCliOptions, HeartbeatCliStore } from './types.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 
-const DEFAULT_MODEL = 'gpt-5.1-codex-mini';
 const DEFAULT_HEARTBEAT_TASK_ID = 'default';
 const DEFAULT_HEARTBEAT_TASK = [
   'Run a periodic autonomous heartbeat for this workspace.',
@@ -18,31 +19,26 @@ const DEFAULT_HEARTBEAT_TASK = [
 
 export async function runHeartbeatWorkerCli(
   parsed: ParsedHeartbeatArgs,
-  store: HeartbeatCliStore,
+  _store: HeartbeatCliStore,
   options: HeartbeatCliOptions,
 ) {
-  const model = stringFlag(parsed.flags, 'model') ?? options.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL;
-  const apiKey = RuntimeCredentialService.resolveApiKeyForModel(model);
-  if (!RuntimeCredentialService.hasCredentialForModel(model)) {
-    throw new Error(RuntimeCredentialService.formatMissingCredentialMessage(model));
-  }
-
-  const heartbeat = {
-    model,
-    apiKey,
+  const workspaceRoot = options.workspaceRoot ?? process.cwd();
+  const stateRoot = resolve(workspaceRoot, options.stateDir ?? '.heddle');
+  const store = new FileHeartbeatTaskService({ stateRoot });
+  const runtime = {
+    workspaceRoot,
+    stateDir: stateRoot,
+    model: stringFlag(parsed.flags, 'model') ?? options.model,
     maxSteps: parsePositiveInt(stringFlag(parsed.flags, 'max-steps')) ?? options.maxSteps,
-    workspaceRoot: options.workspaceRoot,
-    stateDir: options.stateDir,
     searchIgnoreDirs: options.searchIgnoreDirs,
     systemContext: options.systemContext,
-    onEvent: printAgentLoopEvent,
-    approveToolCall: approveAutonomousHeartbeatToolCall,
+    onAgentEvent: printAgentLoopEvent,
   };
 
   if (booleanFlag(parsed.flags, 'once')) {
     const result = await HeartbeatSchedulerService.runDueTasks({
       store,
-      heartbeat,
+      runtime,
       onEvent: printSchedulerEvent,
     });
     process.stdout.write(`checked=${result.checked} ran=${result.ran} failed=${result.failed}\n`);
@@ -54,7 +50,7 @@ export async function runHeartbeatWorkerCli(
   process.on('SIGTERM', () => controller.abort());
   await HeartbeatSchedulerService.runLoop({
     store,
-    heartbeat,
+    runtime,
     pollIntervalMs: parseDurationMs(stringFlag(parsed.flags, 'poll') ?? '60s'),
     signal: controller.signal,
     onEvent: printSchedulerEvent,
@@ -115,17 +111,4 @@ export async function startHeartbeatCli(
       poll: formatDurationMs(pollIntervalMs),
     },
   }, store, options);
-}
-
-async function approveAutonomousHeartbeatToolCall(
-  call: ToolCall,
-  _toolDef: ToolDefinition,
-): Promise<{ approved: boolean; reason?: string }> {
-  return {
-    approved: false,
-    reason:
-      call.tool === 'edit_file' || call.tool === 'run_shell_mutate' ?
-        'The heartbeat CLI has no live approval UI. Use read-only tools, memory notes, or run the task in chat for approved workspace changes.'
-      : 'The heartbeat CLI cannot approve this tool call interactively.',
-  };
 }

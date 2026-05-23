@@ -25,6 +25,7 @@ export function MobileAppFrame(props: AppFrameLayoutProps) {
     onOpenSettings,
     onCloseSettings,
     onCreateSession,
+    onCreateTask,
     onSelectSession,
     onSelectTask,
   } = props;
@@ -44,6 +45,11 @@ export function MobileAppFrame(props: AppFrameLayoutProps) {
 
   function selectTask(taskId: string) {
     onSelectTask(taskId);
+    setSidebarOpen(false);
+  }
+
+  function createTask() {
+    onCreateTask();
     setSidebarOpen(false);
   }
 
@@ -80,6 +86,7 @@ export function MobileAppFrame(props: AppFrameLayoutProps) {
             onOpenSettings={openSettings}
             onCloseSettings={closeSettings}
             onCreateSession={createSession}
+            onCreateTask={createTask}
             onSelectSession={selectSession}
             onSelectTask={selectTask}
           />

@@ -94,9 +94,32 @@ const heartbeatTaskInputSchema = z.object({
   taskId: z.string().min(1),
 });
 
+const heartbeatTaskCreateInputSchema = z.object({
+  id: z.string().min(1).regex(/^[a-zA-Z0-9._-]+$/).optional(),
+  name: z.string().min(1).optional(),
+  task: z.string().min(1),
+  enabled: z.boolean().optional(),
+  intervalMs: z.number().int().min(1_000).max(365 * 24 * 60 * 60_000).optional(),
+  defer: z.boolean().optional(),
+  model: z.string().min(1).optional(),
+  maxSteps: z.number().int().min(1).max(500).optional(),
+  searchIgnoreDirs: z.array(z.string().min(1)).optional(),
+  systemContext: z.string().min(1).optional(),
+});
+
 const heartbeatTaskDetailInputSchema = z.object({
   taskId: z.string().min(1),
   runLimit: z.number().int().min(1).max(100).optional(),
+});
+
+const heartbeatTaskRunNowInputSchema = z.object({
+  taskId: z.string().min(1),
+  model: z.string().min(1).optional(),
+  maxSteps: z.number().int().min(1).max(500).optional(),
+  apiKey: z.string().min(1).optional(),
+  preferApiKey: z.boolean().optional(),
+  searchIgnoreDirs: z.array(z.string().min(1)).optional(),
+  systemContext: z.string().min(1).optional(),
 });
 
 const heartbeatRunInputSchema = z.object({
@@ -285,6 +308,16 @@ export const controlPlaneRouter = router({
       tasks: await ControlPlaneHeartbeatController.listTasks(ctx.activeWorkspace.stateRoot),
     };
   }),
+  heartbeatTaskCreate: procedure.input(heartbeatTaskCreateInputSchema).mutation(async ({ ctx, input }) => {
+    return {
+      task: await ControlPlaneHeartbeatController.createTask(ctx.activeWorkspace.stateRoot, {
+        ...input,
+        workspaceId: ctx.activeWorkspace.id,
+        workspaceRoot: ctx.activeWorkspace.anchorRoot,
+        stateDir: ctx.activeWorkspace.stateRoot,
+      }),
+    };
+  }),
   heartbeatTask: procedure.input(heartbeatTaskDetailInputSchema).query(async ({ ctx, input }) => {
     return await ControlPlaneHeartbeatController.readTask(ctx.activeWorkspace.stateRoot, input.taskId, {
       runLimit: input.runLimit,
@@ -335,6 +368,14 @@ export const controlPlaneRouter = router({
     return {
       task: await ControlPlaneHeartbeatController.triggerTaskRun(ctx.activeWorkspace.stateRoot, input.taskId),
     };
+  }),
+  heartbeatTaskRunNow: procedure.input(heartbeatTaskRunNowInputSchema).mutation(async ({ ctx, input }) => {
+    return await ControlPlaneHeartbeatController.runTaskNow(ctx.activeWorkspace.stateRoot, {
+      ...input,
+      workspaceRoot: ctx.activeWorkspace.anchorRoot,
+      stateDir: ctx.activeWorkspace.stateRoot,
+      preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
+    });
   }),
   workspaceFileSearch: procedure.input(fileSearchInputSchema).query(async ({ ctx, input }) => {
     return {

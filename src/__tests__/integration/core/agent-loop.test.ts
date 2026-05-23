@@ -10,7 +10,7 @@ import type { AgentHeartbeatEvent, AgentLoopEvent, ToolDefinition } from '../../
 import { createLogger } from '../../../core/utils/logger.js';
 import {
   HeartbeatDecisionPolicy,
-  HeartbeatWakeService,
+  HeartbeatRunnerAgent,
   StoredHeartbeatService,
   type HeartbeatCheckpointStore,
 } from '@/core/heartbeat/index.js';
@@ -407,8 +407,8 @@ describe('ToolBundleComposer', () => {
   });
 });
 
-describe('HeartbeatWakeService.run', () => {
-  it('runs an autonomous wake cycle and returns a checkpoint with the parsed decision', async () => {
+describe('HeartbeatRunnerAgent.run', () => {
+  it('runs an autonomous runner cycle and returns a checkpoint with the parsed decision', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {
       info: {
@@ -429,7 +429,7 @@ describe('HeartbeatWakeService.run', () => {
       },
     };
 
-    const result = await HeartbeatWakeService.run({
+    const result = await HeartbeatRunnerAgent.run({
       task: 'Keep watching for useful project maintenance work.',
       llm: fakeLlm,
       tools: [],
@@ -440,14 +440,14 @@ describe('HeartbeatWakeService.run', () => {
 
     expect(result.decision).toBe('continue');
     expect(result.checkpoint.version).toBe(1);
-    expect(result.state.goal).toContain('Heartbeat wake cycle.');
+    expect(result.state.goal).toContain('# Heartbeat Run');
     expect(seenMessages[0][0]).toMatchObject({
       role: 'system',
     });
     expect(seenMessages[0][0].content).toContain('Heartbeat Mode');
     expect(seenMessages[0].at(-1)).toMatchObject({
       role: 'user',
-      content: expect.stringContaining('Durable task:'),
+      content: expect.stringContaining('## Durable Task'),
     });
   });
 
@@ -472,7 +472,7 @@ describe('HeartbeatWakeService.run', () => {
       },
     };
 
-    const first = await HeartbeatWakeService.run({
+    const first = await HeartbeatRunnerAgent.run({
       task: 'Maintain background task.',
       llm: fakeLlm,
       tools: [],
@@ -481,7 +481,7 @@ describe('HeartbeatWakeService.run', () => {
       logger: silentLogger,
     });
 
-    await HeartbeatWakeService.run({
+    await HeartbeatRunnerAgent.run({
       task: 'Maintain background task.',
       checkpoint: first.checkpoint,
       llm: fakeLlm,
@@ -493,13 +493,13 @@ describe('HeartbeatWakeService.run', () => {
 
     expect(seenMessages[1]).toEqual(expect.arrayContaining([
       expect.objectContaining({ role: 'assistant', content: expect.stringContaining('heartbeat-1') }),
-      expect.objectContaining({ role: 'user', content: expect.stringContaining('Heartbeat wake cycle.') }),
+      expect.objectContaining({ role: 'user', content: expect.stringContaining('# Heartbeat Run') }),
     ]));
   });
 });
 
 describe('StoredHeartbeatService.run', () => {
-  it('loads, saves, and returns scheduling hints for checkpoint-backed wake cycles', async () => {
+  it('loads, saves, and returns scheduling hints for checkpoint-backed runner cycles', async () => {
     let stored: unknown;
     const store: HeartbeatCheckpointStore = {
       async load() {
@@ -703,7 +703,7 @@ describe('AgentLoopEvent contracts', () => {
       },
     };
 
-    await HeartbeatWakeService.run({
+    await HeartbeatRunnerAgent.run({
       task: 'Background work.',
       llm: fakeLlm,
       tools: [],
@@ -757,7 +757,7 @@ describe('AgentLoopEvent contracts', () => {
       },
     };
 
-    await HeartbeatWakeService.run({
+    await HeartbeatRunnerAgent.run({
       task: 'Risky work.',
       llm: fakeLlm,
       tools: [],

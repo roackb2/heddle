@@ -1,6 +1,6 @@
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { trpcReact } from '@web/api/client';
-import { TaskRunDetailsPanel } from '@web/components/tasks';
+import { TaskCreateDialog, TaskRunDetailsPanel, type TaskCreateInput } from '@web/components/tasks';
 import { ContextInspector } from '@web/components/panels';
 import { useControlPlaneErrorToasts } from '@web/hooks/useControlPlaneErrorToasts';
 import { useControlPlaneSessionDetail } from '@web/hooks/useControlPlaneSessionDetail';
@@ -19,7 +19,12 @@ export function App() {
   const utils = trpcReact.useUtils();
   const stateQuery = trpcReact.controlPlane.state.useQuery();
   const tasksQuery = trpcReact.controlPlane.heartbeatTasks.useQuery();
+  const modelOptionsQuery = trpcReact.controlPlane.modelOptions.useQuery();
   const createSessionMutation = trpcReact.controlPlane.sessionCreate.useMutation();
+  const createTaskMutation = trpcReact.controlPlane.heartbeatTaskCreate.useMutation();
+  const runTaskNowMutation = trpcReact.controlPlane.heartbeatTaskRunNow.useMutation();
+  const [taskCreateOpen, setTaskCreateOpen] = useState(false);
+  const [taskCreateError, setTaskCreateError] = useState<string | undefined>();
   const sidebarSessions = useMemo(
     () => stateQuery.data?.sessions ?? [],
     [stateQuery.data?.sessions],
@@ -83,6 +88,48 @@ export function App() {
     await utils.controlPlane.state.invalidate();
   }
 
+  async function createTask(input: TaskCreateInput, options: { runNow: boolean }) {
+    setTaskCreateError(undefined);
+    try {
+      const created = await createTaskMutation.mutateAsync(input);
+      navigation.selectTask(created.task.taskId);
+      await utils.controlPlane.heartbeatTasks.invalidate();
+      await utils.controlPlane.state.invalidate();
+      if (options.runNow) {
+        const runResult = await runTaskNowMutation.mutateAsync({ taskId: created.task.taskId });
+        await invalidateTaskViews(created.task.taskId);
+        if (runResult.run) {
+          navigation.selectTaskRun(created.task.taskId, runResult.run.runId);
+        }
+      }
+      setTaskCreateOpen(false);
+    } catch (error) {
+      setTaskCreateError(error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  async function runSelectedTaskNow() {
+    if (!navigation.selectedTaskId) {
+      return;
+    }
+
+    const taskId = navigation.selectedTaskId;
+    const runResult = await runTaskNowMutation.mutateAsync({ taskId });
+    await invalidateTaskViews(taskId);
+    if (runResult.run) {
+      navigation.selectTaskRun(taskId, runResult.run.runId);
+    }
+  }
+
+  async function invalidateTaskViews(taskId: string) {
+    await Promise.all([
+      utils.controlPlane.heartbeatTasks.invalidate(),
+      utils.controlPlane.heartbeatTask.invalidate({ taskId }),
+      utils.controlPlane.state.invalidate(),
+    ]);
+  }
+
   function selectTaskRun(runId: string) {
     if (!navigation.selectedTaskId) {
       return;
@@ -107,6 +154,10 @@ export function App() {
       onOpenSettings={navigation.openSettings}
       onCloseSettings={navigation.closeSettings}
       onCreateSession={createSession}
+      onCreateTask={() => {
+        setTaskCreateError(undefined);
+        setTaskCreateOpen(true);
+      }}
       onSelectSession={navigation.selectSession}
       onSelectTask={navigation.selectTask}
     >
@@ -128,11 +179,21 @@ export function App() {
         selectedTaskRunId={selectedTaskRunId}
         selectedTaskLoading={selectedTask.loading}
         selectedTaskError={selectedTask.error}
+        selectedTaskRunSubmitting={runTaskNowMutation.isPending}
         onSubmitSessionPrompt={selectedSession.submitPrompt}
         onUpdateSessionModel={selectedSession.updateModel}
         onUpdateSessionReasoningEffort={selectedSession.updateReasoningEffort}
         onResolveSessionApproval={selectedSession.resolvePendingApproval}
+        onRunTaskNow={runSelectedTaskNow}
         onSelectTaskRun={selectTaskRun}
+      />
+      <TaskCreateDialog
+        error={taskCreateError}
+        modelOptions={modelOptionsQuery.data}
+        open={taskCreateOpen}
+        submitting={createTaskMutation.isPending || runTaskNowMutation.isPending}
+        onOpenChange={setTaskCreateOpen}
+        onSubmit={createTask}
       />
     </AppFrame>
   );

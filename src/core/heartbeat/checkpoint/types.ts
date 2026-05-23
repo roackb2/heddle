@@ -1,5 +1,5 @@
 import type { AgentLoopCheckpoint } from '@/core/runtime/loop/index.js';
-import type { AgentHeartbeatResult, RunAgentHeartbeatOptions } from '../wake/index.js';
+import type { AgentHeartbeatResult, RunAgentHeartbeatOptions } from '../agent/index.js';
 
 export type HeartbeatCheckpointStore = {
   load: () => Promise<AgentLoopCheckpoint | undefined>;

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { autocompleteLocalCommand, getLocalCommandHints, isLikelyLocalCommand, runLocalCommand } from '../../../cli/chat/state/local-commands.js';
 import { ProviderCredentialRepository } from '../../../core/auth/index.js';
-import { FileHeartbeatTaskRepository } from '@/core/heartbeat/index.js';
+import { FileHeartbeatTaskService } from '@/core/heartbeat/index.js';
 
 const absoluteScreenshotFixturePath = join(process.cwd(), 'src/__tests__/fixtures/screenshot.png');
 
@@ -736,7 +736,7 @@ describe('runLocalCommand', () => {
     mkdirSync(workspaceRoot, { recursive: true });
     const stateRoot = join(workspaceRoot, '.heddle');
     const heartbeatRoot = join(stateRoot, 'heartbeat');
-    const heartbeatStore = new FileHeartbeatTaskRepository({ dir: heartbeatRoot });
+    const heartbeatStore = new FileHeartbeatTaskService({ dir: heartbeatRoot });
 
     const task = {
       id: 'repo-check',
@@ -749,7 +749,7 @@ describe('runLocalCommand', () => {
       state: {
         status: 'waiting',
         decision: 'continue',
-        progress: 'Heartbeat wake finished. Waiting until the next scheduled run in 1m.',
+        progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
         runId: 'run_heartbeat_1',
         loadedCheckpoint: true,
         resumable: true,
@@ -775,7 +775,7 @@ describe('runLocalCommand', () => {
           state: {
             status: 'finished',
             runId: 'run_heartbeat_1',
-            goal: 'Heartbeat wake cycle',
+            goal: 'Heartbeat runner cycle',
             model: 'gpt-5.1-codex-mini',
             provider: 'openai',
             workspaceRoot,
@@ -790,7 +790,7 @@ describe('runLocalCommand', () => {
         state: {
           status: 'finished',
           runId: 'run_heartbeat_1',
-          goal: 'Heartbeat wake cycle',
+          goal: 'Heartbeat runner cycle',
           model: 'gpt-5.1-codex-mini',
           provider: 'openai',
           workspaceRoot,
@@ -821,7 +821,7 @@ describe('runLocalCommand', () => {
     }
     expect(tasksResult.message).toContain('enabled repo-check');
     expect(tasksResult.message).toContain('status=waiting');
-    expect(tasksResult.message).toContain('progress=Heartbeat wake finished.');
+    expect(tasksResult.message).toContain('progress=Heartbeat runner finished.');
 
     const continueResult = await runLocalCommand(createCommandArgs({
       prompt: '/heartbeat continue repo-check latest',
@@ -833,7 +833,7 @@ describe('runLocalCommand', () => {
       throw new Error('expected /heartbeat continue to return an execute result');
     }
     expect(continueResult.prompt).toContain('Heartbeat task id: repo-check');
-    expect(continueResult.prompt).toContain('Task progress: Heartbeat wake finished. Waiting until the next scheduled run in 1m.');
+    expect(continueResult.prompt).toContain('Task progress: Heartbeat runner finished. Waiting until the next scheduled run in 1m.');
     expect(continueResult.prompt).toContain('Checked the repository and found one safe next step.');
   });
 });

@@ -79,7 +79,7 @@ export function describeHeartbeatExecution(task: {
     return {
       label: 'running now',
       tone: 'good',
-      detail: 'The task is actively executing a heartbeat wake cycle.',
+      detail: 'The task is actively executing a heartbeat runner cycle.',
     };
   }
 
@@ -111,7 +111,7 @@ export function describeHeartbeatExecution(task: {
     return {
       label: 'failed',
       tone: 'bad',
-      detail: 'The last wake failed. It will retry according to the next run schedule.',
+      detail: 'The last runner failed. It will retry according to the next run schedule.',
     };
   }
 
@@ -128,7 +128,7 @@ export function describeHeartbeatExecution(task: {
     return {
       label: 'scheduled',
       tone: 'good',
-      detail: 'The task is waiting for its next scheduled wake time.',
+      detail: 'The task is waiting for its next scheduled run time.',
     };
   }
 

@@ -1,5 +1,5 @@
 import type { LlmUsage } from '@/core/llm/types.js';
-import type { HeartbeatDecision } from '../wake/index.js';
+import type { HeartbeatDecision } from '../agent/index.js';
 import type { HeartbeatTask, HeartbeatTaskRuntime, HeartbeatTaskSchedule, HeartbeatTaskState, HeartbeatTaskStatus } from '../tasks/index.js';
 
 export type HeartbeatTaskView = HeartbeatTask & HeartbeatTaskSchedule & HeartbeatTaskRuntime & HeartbeatTaskState & {
