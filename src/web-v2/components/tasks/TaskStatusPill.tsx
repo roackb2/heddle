@@ -3,7 +3,7 @@ import { cn } from '@web/lib/utils';
 import { TASK_STATUS_TONE } from './task-format';
 
 interface TaskStatusPillProps {
-  status: ControlPlaneHeartbeatTaskView['status'];
+  status: ControlPlaneHeartbeatTaskView['state']['status'];
 }
 
 const toneClasses = {

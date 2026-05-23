@@ -42,7 +42,7 @@ export const TaskListButton = memo(function TaskListButton({
     <button className={className('list-button', active && 'active')} type="button" onClick={onClick}>
       <div className="list-button-header">
         <strong>{task.name || task.taskId}</strong>
-        <span>{formatShortDate(task.nextRunAt)}</span>
+        <span>{formatShortDate(task.schedule.nextRunAt)}</span>
       </div>
       <div className="pills compact-pills">
         <Pill tone={task.enabled ? 'good' : undefined}>{task.enabled ? 'enabled' : 'disabled'}</Pill>
@@ -69,10 +69,10 @@ export const RunListButton = memo(function RunListButton({
         <span>{formatShortDate(run.createdAt)}</span>
       </div>
       <div className="pills compact-pills">
-        <Pill tone={toneFor(run.status)}>{run.status}</Pill>
-        <Pill tone={toneFor(run.decision)}>{run.decision}</Pill>
+        <Pill tone={toneFor(run.task.state.status)}>{run.task.state.status}</Pill>
+        <Pill tone={toneFor(run.result.decision)}>{run.result.decision}</Pill>
       </div>
-      <p className="button-copy muted-copy">{short(run.summary, 96)}</p>
+      <p className="button-copy muted-copy">{short(run.result.summary, 96)}</p>
     </button>
   );
 });

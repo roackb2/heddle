@@ -71,11 +71,17 @@ export function formatUsage(value: unknown): string | undefined {
 }
 
 export function describeHeartbeatExecution(task: {
-  status?: string;
   enabled: boolean;
-  nextRunAt?: string;
+  schedule: {
+    nextRunAt?: string;
+  };
+  state: {
+    status?: string;
+  };
 }): { label: string; tone: 'good' | 'warn' | 'bad' | undefined; detail: string } {
-  if (task.status === 'running') {
+  const status = task.state.status;
+
+  if (status === 'running') {
     return {
       label: 'running now',
       tone: 'good',
@@ -91,7 +97,7 @@ export function describeHeartbeatExecution(task: {
     };
   }
 
-  if (task.status === 'complete') {
+  if (status === 'complete') {
     return {
       label: 'finished',
       tone: 'good',
@@ -99,7 +105,7 @@ export function describeHeartbeatExecution(task: {
     };
   }
 
-  if (task.status === 'blocked') {
+  if (status === 'blocked') {
     return {
       label: 'blocked',
       tone: 'warn',
@@ -107,7 +113,7 @@ export function describeHeartbeatExecution(task: {
     };
   }
 
-  if (task.status === 'failed') {
+  if (status === 'failed') {
     return {
       label: 'failed',
       tone: 'bad',
@@ -115,8 +121,8 @@ export function describeHeartbeatExecution(task: {
     };
   }
 
-  if (task.status === 'waiting') {
-    const nextRunAt = task.nextRunAt ? Date.parse(task.nextRunAt) : Number.NaN;
+  if (status === 'waiting') {
+    const nextRunAt = task.schedule.nextRunAt ? Date.parse(task.schedule.nextRunAt) : Number.NaN;
     if (Number.isFinite(nextRunAt) && nextRunAt <= Date.now() + 1_000) {
       return {
         label: 'queued',
@@ -133,8 +139,8 @@ export function describeHeartbeatExecution(task: {
   }
 
   return {
-    label: task.status ?? 'idle',
-    tone: toneFor(task.status),
+    label: status ?? 'idle',
+    tone: toneFor(status),
     detail: 'The task is currently idle.',
   };
 }

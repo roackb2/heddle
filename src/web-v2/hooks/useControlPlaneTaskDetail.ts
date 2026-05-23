@@ -27,10 +27,10 @@ export function useControlPlaneTaskDetail(
       task: taskQuery.data?.task,
       runs,
       selectedRun: resolveSelectedRun(runs, selectedRunId),
-      loading: taskQuery.isLoading || taskQuery.isFetching,
+      loading: taskQuery.isLoading,
       error: taskQuery.error instanceof Error ? taskQuery.error.message : undefined,
     };
-  }, [selectedRunId, taskQuery.data?.runs, taskQuery.data?.task, taskQuery.error, taskQuery.isFetching, taskQuery.isLoading]);
+  }, [selectedRunId, taskQuery.data?.runs, taskQuery.data?.task, taskQuery.error, taskQuery.isLoading]);
 }
 
 function resolveSelectedRun(

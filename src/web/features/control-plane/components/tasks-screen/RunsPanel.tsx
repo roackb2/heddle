@@ -46,26 +46,26 @@ export function RunsPanel({
               <div className="detail-card">
                 <p className="card-title">{selectedRun.id}</p>
                 <div className="pills">
-                  <Pill tone={toneFor(selectedRun.status)}>{selectedRun.status}</Pill>
-                  <Pill tone={toneFor(selectedRun.decision)}>{selectedRun.decision}</Pill>
-                  <Pill tone={toneFor(selectedRun.outcome)}>{selectedRun.outcome}</Pill>
+                  <Pill tone={toneFor(selectedRun.task.state.status)}>{selectedRun.task.state.status}</Pill>
+                  <Pill tone={toneFor(selectedRun.result.decision)}>{selectedRun.result.decision}</Pill>
+                  <Pill tone={toneFor(selectedRun.result.outcome)}>{selectedRun.result.outcome}</Pill>
                 </div>
-                <p className="summary">{selectedRun.summary}</p>
+                <p className="summary">{selectedRun.result.summary}</p>
               </div>
 
               <div className="detail-card">
                 <div className="kv-list">
                   <div><span className="kv-key">created</span><span className="kv-value">{formatDate(selectedRun.createdAt)}</span></div>
                   <div><span className="kv-key">task</span><span className="kv-value">{selectedRun.taskId}</span></div>
-                  <div><span className="kv-key">usage</span><span className="kv-value">{formatUsage(selectedRun.usage) ?? 'none'}</span></div>
+                  <div><span className="kv-key">usage</span><span className="kv-value">{formatUsage(selectedRun.result.usage) ?? 'none'}</span></div>
                   <div><span className="kv-key">checkpoint</span><span className="kv-value">{selectedRun.loadedCheckpoint ? 'loaded' : 'fresh'}</span></div>
                 </div>
               </div>
 
-              {selectedRun.progress ?
+              {selectedRun.task.state.progress ?
                 <div className="detail-card">
                   <p className="section-label">Progress</p>
-                  <p className="summary">{selectedRun.progress}</p>
+                  <p className="summary">{selectedRun.task.state.progress}</p>
                 </div>
               : null}
             </div>

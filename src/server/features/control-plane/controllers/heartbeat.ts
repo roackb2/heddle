@@ -21,6 +21,17 @@ type CreateHeartbeatTaskArgs = {
   systemContext?: string;
 };
 
+type UpdateHeartbeatTaskArgs = {
+  name?: string;
+  task?: string;
+  enabled?: boolean;
+  intervalMs?: number;
+  model?: string | null;
+  maxSteps?: number | null;
+  searchIgnoreDirs?: string[];
+  systemContext?: string;
+};
+
 type RunHeartbeatTaskNowArgs = {
   taskId: string;
   workspaceRoot: string;
@@ -52,6 +63,14 @@ export class ControlPlaneHeartbeatController {
     args: CreateHeartbeatTaskArgs,
   ) {
     return await new FileHeartbeatTaskService({ stateRoot }).createTask(args);
+  }
+
+  static async updateTask(
+    stateRoot: string,
+    taskId: string,
+    args: UpdateHeartbeatTaskArgs,
+  ) {
+    return await new FileHeartbeatTaskService({ stateRoot }).updateTask(taskId, args);
   }
 
   static async readTask(

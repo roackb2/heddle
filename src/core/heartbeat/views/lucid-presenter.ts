@@ -36,17 +36,17 @@ export class HeartbeatLucidPresenter {
     options: LucidAdapterOptions = {},
   ): LucidAgentMessage[] {
     const agentId = HeartbeatLucidPresenter.resolveAgentId(task.taskId, options);
-    const timestamp = task.lastRunAt ?? task.nextRunAt ?? new Date().toISOString();
+    const timestamp = task.state.runAt ?? task.schedule.nextRunAt ?? new Date().toISOString();
     const messages: LucidAgentMessage[] = [
-      HeartbeatLucidPresenter.statusMessage(agentId, HeartbeatLucidPresenter.taskStatusToLucidStatus(task.status), timestamp),
+      HeartbeatLucidPresenter.statusMessage(agentId, HeartbeatLucidPresenter.taskStatusToLucidStatus(task.state.status), timestamp),
     ];
 
-    if (task.progress) {
-      messages.push(HeartbeatLucidPresenter.progressMessage(agentId, task.progress, timestamp));
+    if (task.state.progress) {
+      messages.push(HeartbeatLucidPresenter.progressMessage(agentId, task.state.progress, timestamp));
     }
 
-    if (task.summary) {
-      messages.push(HeartbeatLucidPresenter.responseMessage(agentId, task.summary, timestamp));
+    if (task.state.result?.summary) {
+      messages.push(HeartbeatLucidPresenter.responseMessage(agentId, task.state.result.summary, timestamp));
     }
 
     return messages;
@@ -59,14 +59,14 @@ export class HeartbeatLucidPresenter {
     const agentId = HeartbeatLucidPresenter.resolveAgentId(run.taskId, options);
     const timestamp = run.createdAt;
     const messages: LucidAgentMessage[] = [
-      HeartbeatLucidPresenter.statusMessage(agentId, HeartbeatLucidPresenter.taskStatusToLucidStatus(run.status), timestamp),
+      HeartbeatLucidPresenter.statusMessage(agentId, HeartbeatLucidPresenter.taskStatusToLucidStatus(run.task.state.status), timestamp),
     ];
 
-    if (run.progress) {
-      messages.push(HeartbeatLucidPresenter.progressMessage(agentId, run.progress, timestamp));
+    if (run.task.state.progress) {
+      messages.push(HeartbeatLucidPresenter.progressMessage(agentId, run.task.state.progress, timestamp));
     }
 
-    messages.push(HeartbeatLucidPresenter.responseMessage(agentId, run.summary, timestamp));
+    messages.push(HeartbeatLucidPresenter.responseMessage(agentId, run.result.summary, timestamp));
     return messages;
   }
 

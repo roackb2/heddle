@@ -3,7 +3,7 @@ import { trpcReact, type ControlPlaneHeartbeatEventEnvelope, type ControlPlaneHe
 
 export type ControlPlaneLiveTaskState = {
   taskId: string;
-  status: ControlPlaneHeartbeatTaskView['status'];
+  status: ControlPlaneHeartbeatTaskView['state']['status'];
   progress: string;
   runId?: string;
   updatedAt: string;
@@ -25,17 +25,20 @@ export function useControlPlaneHeartbeatEvents() {
 
     setLiveTasks((current) => applyHeartbeatEvent(current, event));
 
-    if (event.type === 'heartbeat.task.started' || event.type === 'heartbeat.task.finished' || event.type === 'heartbeat.task.failed') {
+    if (event.type === 'heartbeat.task.finished') {
       void utils.controlPlane.heartbeatTasks.invalidate();
       void utils.controlPlane.heartbeatTask.invalidate({ taskId: event.taskId });
       void utils.controlPlane.state.invalidate();
-    }
-
-    if (event.type === 'heartbeat.task.finished') {
       void utils.controlPlane.heartbeatRun.invalidate({
         taskId: event.taskId,
-        runId: event.record.result.state.runId,
+        runId: event.record.runId,
       });
+    }
+
+    if (event.type === 'heartbeat.task.failed') {
+      void utils.controlPlane.heartbeatTasks.invalidate();
+      void utils.controlPlane.heartbeatTask.invalidate({ taskId: event.taskId });
+      void utils.controlPlane.state.invalidate();
     }
   }, [utils]);
 
@@ -95,9 +98,9 @@ function applyHeartbeatEvent(
     }),
     'heartbeat.task.finished': () => ({
       ...base,
-      status: event.record.task.state?.status ?? 'waiting',
-      progress: event.record.task.state?.progress ?? 'Heartbeat runner finished.',
-      runId: event.record.result.state.runId,
+      status: event.record.task.state.status,
+      progress: event.record.task.state.progress ?? 'Heartbeat runner finished.',
+      runId: event.record.runId,
     }),
     'heartbeat.task.failed': () => ({
       ...base,

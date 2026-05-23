@@ -15,7 +15,7 @@ export function TaskRunDetailsPanel({
   loading,
   error,
 }: TaskRunDetailsPanelProps) {
-  const showLiveTask = liveTask?.status === 'running' || liveTask?.progress?.startsWith('Task queued');
+  const showLiveTask = liveTask?.state.status === 'running' || liveTask?.state.progress?.startsWith('Task queued');
   return (
     <div className="v2-task-inspector flex h-full min-w-0 flex-col">
       <header className="v2-panel-divider border-b px-4 py-3">
@@ -25,7 +25,7 @@ export function TaskRunDetailsPanel({
       <div className="v2-scrollbar-hidden min-h-0 flex-1 overflow-auto px-4 py-4">
         {showLiveTask ? (
           <div className="mb-5">
-            <TaskDetailBlock title={liveTask.status === 'running' ? 'Running now' : 'Latest task status'} body={liveTask.progress ?? liveTask.status} />
+            <TaskDetailBlock title={liveTask.state.status === 'running' ? 'Running now' : 'Latest task status'} body={liveTask.state.progress ?? liveTask.state.status} />
           </div>
         ) : null}
         {loading ? (
@@ -40,14 +40,14 @@ export function TaskRunDetailsPanel({
             </section>
             <TaskDetailRows
               rows={[
-                ['decision', run.decision],
-                ['outcome', run.outcome],
-                ['usage', formatUsage(run.usage)],
+                ['decision', run.result.decision],
+                ['outcome', run.result.outcome],
+                ['usage', formatUsage(run.result.usage)],
                 ['checkpoint', run.loadedCheckpoint ? 'loaded' : 'not loaded'],
               ]}
             />
-            <TaskMarkdownBlock title="Task result" body={run.summary} />
-            {run.progress ? <TaskDetailBlock title="Progress" body={run.progress} /> : null}
+            <TaskMarkdownBlock title="Task result" body={run.result.summary} />
+            {run.task.state.progress ? <TaskDetailBlock title="Progress" body={run.task.state.progress} /> : null}
             {run.error ? <TaskDetailBlock title="Error" body={run.error} /> : null}
           </div>
         ) : (

@@ -25,6 +25,7 @@ export type {
   HeartbeatTaskRunRecordEntry,
   HeartbeatTaskStatus,
   HeartbeatTaskStore,
+  UpdateHeartbeatTaskInput,
 } from './tasks/index.js';
 export { HeartbeatDecisionPolicy, HeartbeatRunnerAgent, HeartbeatRunnerAgentPrompt } from './agent/index.js';
 export type {

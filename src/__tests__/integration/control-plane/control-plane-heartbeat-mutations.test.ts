@@ -48,9 +48,15 @@ describe('control-plane heartbeat mutations', () => {
       name: 'Recent repo changes',
       task: 'Show me recent repo changes.',
       enabled: true,
-      status: 'waiting',
-      intervalMs: 60_000,
-      model: 'gpt-5.4',
+      schedule: {
+        intervalMs: 60_000,
+      },
+      runtime: {
+        model: 'gpt-5.4',
+      },
+      state: {
+        status: 'waiting',
+      },
     });
   });
 
@@ -78,13 +84,19 @@ describe('control-plane heartbeat mutations', () => {
       failed: 0,
       task: {
         taskId: 'repo-check',
-        status: 'waiting',
-        summary: 'Run now completed.',
+        state: {
+          status: 'waiting',
+          result: {
+            summary: 'Run now completed.',
+          },
+        },
       },
       run: {
         taskId: 'repo-check',
         runId: 'run_now_1',
-        summary: 'Run now completed.',
+        result: {
+          summary: 'Run now completed.',
+        },
       },
     });
     expect(await store.listRunRecords({ taskId: 'repo-check' })).toHaveLength(1);
@@ -96,12 +108,12 @@ describe('control-plane heartbeat mutations', () => {
     await store.saveTask(createTask());
 
     const disabled = await ControlPlaneHeartbeatController.setTaskEnabled(stateRoot, 'repo-check', false);
-    expect(disabled).toMatchObject({ taskId: 'repo-check', enabled: false, status: 'idle' });
-    expect(disabled.nextRunAt).toBeUndefined();
+    expect(disabled).toMatchObject({ taskId: 'repo-check', enabled: false, state: { status: 'idle' } });
+    expect(disabled.schedule.nextRunAt).toBeUndefined();
 
     const enabled = await ControlPlaneHeartbeatController.setTaskEnabled(stateRoot, 'repo-check', true);
     expect(enabled).toMatchObject({ taskId: 'repo-check', enabled: true });
-    expect(enabled.nextRunAt).toBeTruthy();
+    expect(enabled.schedule.nextRunAt).toBeTruthy();
 
     const views = await ControlPlaneHeartbeatController.listTasks(stateRoot);
     expect(views[0]).toMatchObject({ taskId: 'repo-check', enabled: true });
@@ -120,8 +132,8 @@ describe('control-plane heartbeat mutations', () => {
 
     await ControlPlaneHeartbeatController.setTaskEnabled(stateRoot, 'repo-check', true);
     const triggered = await ControlPlaneHeartbeatController.triggerTaskRun(stateRoot, 'repo-check');
-    expect(triggered).toMatchObject({ taskId: 'repo-check', enabled: true, status: 'waiting' });
-    expect(triggered.nextRunAt).toBeTruthy();
+    expect(triggered).toMatchObject({ taskId: 'repo-check', enabled: true, state: { status: 'waiting' } });
+    expect(triggered.schedule.nextRunAt).toBeTruthy();
 
     const task = (await store.listTasks())[0];
     expect(task?.schedule.nextRunAt).toBeTruthy();
@@ -156,7 +168,7 @@ describe('control-plane heartbeat mutations', () => {
     expect(resumed.task).toMatchObject({ taskId: 'repo-check', enabled: true });
 
     const triggered = await caller.heartbeatTaskTrigger({ taskId: 'repo-check' });
-    expect(triggered.task).toMatchObject({ taskId: 'repo-check', enabled: true, status: 'waiting' });
+    expect(triggered.task).toMatchObject({ taskId: 'repo-check', enabled: true, state: { status: 'waiting' } });
 
     const created = await caller.heartbeatTaskCreate({
       id: 'router-created',
@@ -238,9 +250,14 @@ describe('control-plane heartbeat mutations', () => {
     });
 
     const taskDetail = await caller.heartbeatTask({ taskId: 'repo-check' });
-    expect(taskDetail.task).toMatchObject({ taskId: 'repo-check', status: 'complete' });
+    expect(taskDetail.task).toMatchObject({ taskId: 'repo-check', state: { status: 'complete' } });
     expect(taskDetail.runs).toHaveLength(1);
-    expect(taskDetail.runs[0]).toMatchObject({ runId: 'run_heartbeat_1', summary: 'Heartbeat detail completed.' });
+    expect(taskDetail.runs[0]).toMatchObject({
+      runId: 'run_heartbeat_1',
+      result: {
+        summary: 'Heartbeat detail completed.',
+      },
+    });
 
     const runDetail = await caller.heartbeatRun({ taskId: 'repo-check', runId: 'run_heartbeat_1' });
     expect(runDetail.run).toMatchObject({ taskId: 'repo-check', runId: 'run_heartbeat_1', loadedCheckpoint: true });

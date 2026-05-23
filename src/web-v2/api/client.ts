@@ -43,6 +43,7 @@ export type ControlPlaneSessionSettingsInput = RouterInputs['controlPlane']['ses
 export type ControlPlaneHeartbeatTasks = RouterOutputs['controlPlane']['heartbeatTasks'];
 export type ControlPlaneHeartbeatTask = RouterOutputs['controlPlane']['heartbeatTask'];
 export type ControlPlaneHeartbeatTaskCreate = RouterOutputs['controlPlane']['heartbeatTaskCreate'];
+export type ControlPlaneHeartbeatTaskUpdate = RouterOutputs['controlPlane']['heartbeatTaskUpdate'];
 export type ControlPlaneHeartbeatTaskView = ControlPlaneHeartbeatTasks['tasks'][number];
 export type ControlPlaneHeartbeatRunView = ControlPlaneHeartbeatTask['runs'][number];
 export type ControlPlaneHeartbeatRun = RouterOutputs['controlPlane']['heartbeatRun'];

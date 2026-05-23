@@ -64,11 +64,11 @@ export function OverviewRunItem({
           <p className="mt-1 text-sm text-muted-foreground">{formatShortDate(run.createdAt)}</p>
         </div>
         <div className="flex min-w-0 flex-wrap gap-2 sm:max-w-[48%] sm:justify-end">
-          <ToneBadge value={run.status} />
-          <ToneBadge value={run.decision} />
+          <ToneBadge value={run.task.state.status} />
+          <ToneBadge value={run.result.decision} />
         </div>
       </div>
-      <p className="mt-3 text-sm text-muted-foreground">{short(run.summary, 132)}</p>
+      <p className="mt-3 text-sm text-muted-foreground">{short(run.result.summary, 132)}</p>
     </article>
   );
 }

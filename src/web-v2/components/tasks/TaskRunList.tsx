@@ -1,19 +1,23 @@
-import type { ControlPlaneHeartbeatRunView } from '@web/api/client';
+import type { ControlPlaneHeartbeatRunView, ControlPlaneHeartbeatTaskView } from '@web/api/client';
 import { cn } from '@web/lib/utils';
 import { formatTaskTimestamp, runDisplaySummary } from './task-format';
 
 interface TaskRunListProps {
   runs: ControlPlaneHeartbeatRunView[];
+  liveTask?: ControlPlaneHeartbeatTaskView;
   selectedRunId?: string;
   onSelectRun: (runId: string) => void;
 }
 
 export function TaskRunList({
   runs,
+  liveTask,
   selectedRunId,
   onSelectRun,
 }: TaskRunListProps) {
-  if (runs.length === 0) {
+  const showLiveRun = liveTask?.state.status === 'running' || liveTask?.state.progress?.startsWith('Task queued');
+
+  if (runs.length === 0 && !showLiveRun) {
     return (
       <div className="v2-task-empty">
         <p className="v2-type-body-strong text-foreground">No runs yet</p>
@@ -24,6 +28,9 @@ export function TaskRunList({
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
+      {showLiveRun ? (
+        <TaskLiveRunListItem task={liveTask} />
+      ) : null}
       {runs.map((run) => (
         <TaskRunListItem
           key={run.id}
@@ -32,6 +39,27 @@ export function TaskRunList({
           onSelectRun={onSelectRun}
         />
       ))}
+    </div>
+  );
+}
+
+function TaskLiveRunListItem({ task }: { task: ControlPlaneHeartbeatTaskView }) {
+  return (
+    <div className="v2-task-run-row min-w-0 bg-accent/40 text-left">
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="v2-type-nav-primary truncate text-foreground">
+          {task.state.runId ? `Run ${task.state.runId}` : 'Running now'}
+        </span>
+        <span className="v2-type-caption ml-auto shrink-0 text-muted-foreground">live</span>
+      </span>
+      <span className="mt-1 flex min-w-0 items-center gap-2">
+        <span className="v2-type-caption shrink-0 rounded-sm border border-border bg-muted/20 px-1.5 py-0.5 text-muted-foreground">
+          running
+        </span>
+        <span className="v2-type-nav-secondary truncate text-muted-foreground">
+          {task.state.progress ?? 'Heartbeat runner is working...'}
+        </span>
+      </span>
     </div>
   );
 }
@@ -61,7 +89,7 @@ function TaskRunListItem({
       </span>
       <span className="mt-1 flex min-w-0 items-center gap-2">
         <span className="v2-type-caption shrink-0 rounded-sm border border-border bg-muted/20 px-1.5 py-0.5 text-muted-foreground">
-          {run.decision}
+          {run.result.decision}
         </span>
         <span className="v2-type-nav-secondary truncate text-muted-foreground">{runDisplaySummary(run)}</span>
       </span>

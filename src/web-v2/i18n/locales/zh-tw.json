@@ -112,6 +112,12 @@
       "taskPlaceholder": "總結最近 repo 變更，並指出需要 review 的內容。",
       "title": "新增任務"
     },
+    "edit": {
+      "description": "更新任務說明、排程和執行設定。",
+      "open": "編輯任務",
+      "save": "儲存變更",
+      "title": "編輯任務"
+    },
     "runNow": "立即執行",
     "runDetailsAriaLabel": "任務執行詳情"
   },

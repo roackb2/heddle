@@ -79,12 +79,12 @@ export function MobileTasksScreen({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="m-0 line-clamp-2 text-sm font-semibold text-foreground">{task.name || task.taskId}</p>
-                    <p className="m-0 shrink-0 text-[11px] text-muted-foreground">{formatDate(task.nextRunAt)}</p>
+                    <p className="m-0 shrink-0 text-[11px] text-muted-foreground">{formatDate(task.schedule.nextRunAt)}</p>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1">
                     <Badge variant={task.enabled ? 'secondary' : 'outline'}>{task.enabled ? 'enabled' : 'disabled'}</Badge>
                     <Badge variant="outline">{execution.label}</Badge>
-                    {task.decision ? <Badge variant="outline">{task.decision}</Badge> : null}
+                    {task.state.result?.decision ? <Badge variant="outline">{task.state.result.decision}</Badge> : null}
                   </div>
                   <p className="m-0 mt-2 text-xs text-muted-foreground">{task.task}</p>
                 </button>
@@ -133,9 +133,9 @@ export function MobileTasksScreen({
                         <p className="m-0 shrink-0 text-[11px] text-muted-foreground">{formatDate(run.createdAt)}</p>
                       </div>
                       <div className="mt-1 flex flex-wrap gap-1">
-                        <Badge variant="outline">{run.status}</Badge>
-                        <Badge variant="outline">{run.decision}</Badge>
-                        <Badge variant="outline">{run.outcome}</Badge>
+                        <Badge variant="outline">{run.task.state.status}</Badge>
+                        <Badge variant="outline">{run.result.decision}</Badge>
+                        <Badge variant="outline">{run.result.outcome}</Badge>
                       </div>
                     </button>
                   ))}
@@ -147,12 +147,12 @@ export function MobileTasksScreen({
               {selectedRun ?
                 <div className="space-y-2 text-xs">
                   <p className="m-0 text-sm font-semibold text-foreground">{selectedRun.id}</p>
-                  <p className="m-0 text-muted-foreground">{selectedRun.summary}</p>
+                  <p className="m-0 text-muted-foreground">{selectedRun.result.summary}</p>
                   <SummaryRow label="created" value={formatDate(selectedRun.createdAt)} />
                   <SummaryRow label="task" value={selectedRun.taskId} />
-                  <SummaryRow label="usage" value={formatUsage(selectedRun.usage) ?? 'none'} />
+                  <SummaryRow label="usage" value={formatUsage(selectedRun.result.usage) ?? 'none'} />
                   <SummaryRow label="checkpoint" value={selectedRun.loadedCheckpoint ? 'loaded' : 'fresh'} />
-                  {selectedRun.progress ? <SummaryRow label="progress" value={selectedRun.progress} /> : null}
+                  {selectedRun.task.state.progress ? <SummaryRow label="progress" value={selectedRun.task.state.progress} /> : null}
                 </div>
               : <MobileEmptyState title="No run selected" body="Select a run to inspect the latest heartbeat result." />}
             </MobileCard>
@@ -181,8 +181,8 @@ export function MobileTasksScreen({
             <MobileCard title={selectedTask.name || selectedTask.taskId}>
               <div className="flex flex-wrap gap-1">
                 <Badge variant={selectedTask.enabled ? 'secondary' : 'outline'}>{selectedTask.enabled ? 'enabled' : 'disabled'}</Badge>
-                <Badge variant={selectedTaskExecution?.tone === 'good' ? 'secondary' : 'outline'}>{selectedTaskExecution?.label ?? selectedTask.status}</Badge>
-                {selectedTask.decision ? <Badge variant="outline">{selectedTask.decision}</Badge> : null}
+                <Badge variant={selectedTaskExecution?.tone === 'good' ? 'secondary' : 'outline'}>{selectedTaskExecution?.label ?? selectedTask.state.status}</Badge>
+                {selectedTask.state.result?.decision ? <Badge variant="outline">{selectedTask.state.result.decision}</Badge> : null}
               </div>
               <p className="m-0 mt-2 text-xs text-muted-foreground">{selectedTask.taskId}</p>
               <p className="m-0 mt-2 text-sm text-foreground">{selectedTask.task}</p>
@@ -227,30 +227,30 @@ export function MobileTasksScreen({
             </MobileCard>
 
             <MobileCard title="Runtime status">
-              <SummaryRow label="execution" value={selectedTaskExecution?.label ?? selectedTask.status} />
-              <SummaryRow label="model" value={selectedTask.model ?? 'unset'} />
-              <SummaryRow label="interval" value={formatInterval(selectedTask.intervalMs)} />
-              <SummaryRow label="last run" value={formatDate(selectedTask.lastRunAt)} />
-              <SummaryRow label="next run" value={formatDate(selectedTask.nextRunAt)} />
-              <SummaryRow label="checkpoint" value={selectedTask.loadedCheckpoint ? 'loaded' : selectedTask.resumable ? 'resumable' : 'none'} />
-              <SummaryRow label="usage" value={formatUsage(selectedTask.usage) ?? 'none'} />
+              <SummaryRow label="execution" value={selectedTaskExecution?.label ?? selectedTask.state.status} />
+              <SummaryRow label="model" value={selectedTask.runtime?.model ?? 'unset'} />
+              <SummaryRow label="interval" value={formatInterval(selectedTask.schedule.intervalMs)} />
+              <SummaryRow label="last run" value={formatDate(selectedTask.state.runAt)} />
+              <SummaryRow label="next run" value={formatDate(selectedTask.schedule.nextRunAt)} />
+              <SummaryRow label="checkpoint" value={selectedTask.state.loadedCheckpoint ? 'loaded' : selectedTask.state.resumable ? 'resumable' : 'none'} />
+              <SummaryRow label="usage" value={formatUsage(selectedTask.state.result?.usage) ?? 'none'} />
             </MobileCard>
 
-            {selectedTask.summary ?
+            {selectedTask.state.result?.summary ?
               <MobileCard title="Latest summary">
-                <p className="m-0 text-sm text-foreground">{selectedTask.summary}</p>
+                <p className="m-0 text-sm text-foreground">{selectedTask.state.result.summary}</p>
               </MobileCard>
             : null}
 
-            {selectedTask.progress ?
+            {selectedTask.state.progress ?
               <MobileCard title="Progress">
-                <p className="m-0 text-sm text-foreground">{selectedTask.progress}</p>
+                <p className="m-0 text-sm text-foreground">{selectedTask.state.progress}</p>
               </MobileCard>
             : null}
 
-            {selectedTask.error ?
+            {selectedTask.state.error ?
               <MobileCard title="Error">
-                <p className="m-0 text-sm text-destructive">{selectedTask.error}</p>
+                <p className="m-0 text-sm text-destructive">{selectedTask.state.error}</p>
               </MobileCard>
             : null}
           </div>

@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import type { ControlPlaneModelOptions, RouterInputs } from '@web/api/client';
+import type { ControlPlaneHeartbeatTaskView, ControlPlaneModelOptions, RouterInputs } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
 import {
   Dialog,
@@ -56,6 +57,8 @@ type TaskCreateSubmitOptions = {
 
 interface TaskCreateDialogProps {
   error?: string;
+  initialTask?: ControlPlaneHeartbeatTaskView;
+  mode?: 'create' | 'edit';
   modelOptions?: ControlPlaneModelOptions;
   open: boolean;
   submitting: boolean;
@@ -73,6 +76,8 @@ const intervalOptions = [
 
 export function TaskCreateDialog({
   error,
+  initialTask,
+  mode = 'create',
   modelOptions,
   open,
   submitting,
@@ -90,6 +95,15 @@ export function TaskCreateDialog({
       maxSteps: '',
     },
   });
+  const editing = mode === 'edit';
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    form.reset(taskToDialogValues(initialTask));
+  }, [form, initialTask, open]);
 
   async function submit(values: TaskCreateDialogValues, options: TaskCreateSubmitOptions) {
     const input = normalizeTaskCreateInput(values);
@@ -110,8 +124,8 @@ export function TaskCreateDialog({
     <Dialog open={open} onOpenChange={updateOpen}>
       <DialogContent className="v2-task-create-dialog">
         <DialogHeader>
-          <DialogTitle>{t('tasks.create.title')}</DialogTitle>
-          <DialogDescription>{t('tasks.create.description')}</DialogDescription>
+          <DialogTitle>{t(editing ? 'tasks.edit.title' : 'tasks.create.title')}</DialogTitle>
+          <DialogDescription>{t(editing ? 'tasks.edit.description' : 'tasks.create.description')}</DialogDescription>
         </DialogHeader>
 
         <form className="min-w-0" onSubmit={form.handleSubmit((values) => submit(values, { runNow: false }))}>
@@ -207,21 +221,33 @@ export function TaskCreateDialog({
             <Button type="button" variant="ghost" disabled={submitting} onClick={() => updateOpen(false)}>
               {t('tasks.create.cancel')}
             </Button>
-            <Button type="submit" variant="secondary" disabled={submitting}>
-              {t('tasks.create.create')}
+            <Button type="submit" variant={editing ? 'default' : 'secondary'} disabled={submitting}>
+              {t(editing ? 'tasks.edit.save' : 'tasks.create.create')}
             </Button>
-            <Button
-              type="button"
-              disabled={submitting}
-              onClick={form.handleSubmit((values) => submit(values, { runNow: true }))}
-            >
-              {t('tasks.create.createAndRun')}
-            </Button>
+            {editing ? null : (
+              <Button
+                type="button"
+                disabled={submitting}
+                onClick={form.handleSubmit((values) => submit(values, { runNow: true }))}
+              >
+                {t('tasks.create.createAndRun')}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
+}
+
+function taskToDialogValues(task: ControlPlaneHeartbeatTaskView | undefined): TaskCreateDialogValues {
+  return {
+    name: task?.name ?? '',
+    task: task?.task ?? '',
+    intervalMs: String(task?.schedule.intervalMs ?? 3600000),
+    model: task?.runtime?.model ?? DEFAULT_MODEL_VALUE,
+    maxSteps: task?.runtime?.maxSteps ? String(task.runtime.maxSteps) : '',
+  };
 }
 
 function normalizeTaskCreateInput(values: TaskCreateDialogValues): TaskCreateInput {

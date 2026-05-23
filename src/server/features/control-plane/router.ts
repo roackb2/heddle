@@ -108,6 +108,16 @@ const heartbeatTaskCreateInputSchema = z.object({
   systemContext: z.string().min(1).optional(),
 });
 
+const heartbeatTaskUpdateInputSchema = heartbeatTaskCreateInputSchema
+  .omit({ id: true, defer: true })
+  .extend({
+    taskId: z.string().min(1),
+    name: z.string().min(1).optional(),
+    task: z.string().min(1).optional(),
+    model: z.string().min(1).optional().nullable(),
+    maxSteps: z.number().int().min(1).max(500).optional().nullable(),
+  });
+
 const heartbeatTaskDetailInputSchema = z.object({
   taskId: z.string().min(1),
   runLimit: z.number().int().min(1).max(100).optional(),
@@ -317,6 +327,11 @@ export const controlPlaneRouter = router({
         workspaceRoot: ctx.activeWorkspace.anchorRoot,
         stateDir: ctx.activeWorkspace.stateRoot,
       }),
+    };
+  }),
+  heartbeatTaskUpdate: procedure.input(heartbeatTaskUpdateInputSchema).mutation(async ({ ctx, input }) => {
+    return {
+      task: await ControlPlaneHeartbeatController.updateTask(ctx.activeWorkspace.stateRoot, input.taskId, input),
     };
   }),
   heartbeatTask: procedure.input(heartbeatTaskDetailInputSchema).query(async ({ ctx, input }) => {

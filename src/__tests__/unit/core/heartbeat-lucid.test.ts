@@ -192,6 +192,7 @@ describe('heartbeat Lucid adapter', () => {
 
 function createTaskView(): HeartbeatTaskView {
   return {
+    id: 'repo-check',
     taskId: 'repo-check',
     task: 'Inspect repo state',
     enabled: true,
@@ -208,18 +209,6 @@ function createTaskView(): HeartbeatTaskView {
       resumable: true,
       result: createHeartbeatResult(),
     },
-    status: 'waiting',
-    decision: 'continue',
-    outcome: 'done',
-    progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
-    summary: 'Repository check complete.',
-    nextRunAt: '2026-04-14T00:01:00.000Z',
-    lastRunAt: '2026-04-14T00:00:00.000Z',
-    lastRunId: 'run_1',
-    loadedCheckpoint: true,
-    resumable: true,
-    intervalMs: 60_000,
-    id: 'repo-check',
   };
 }
 
@@ -229,22 +218,19 @@ function createRunView(): HeartbeatRunView {
     taskId: 'repo-check',
     runId: 'run_1',
     createdAt: '2026-04-14T00:00:00.000Z',
-    task: 'Inspect repo state',
-    enabled: true,
-    schedule: {
-      intervalMs: 60_000,
+    task: createTaskView(),
+    result: {
+      decision: 'continue',
+      summary: 'Repository check complete.',
+      outcome: 'done',
+      usage: {
+        inputTokens: 100,
+        outputTokens: 20,
+        totalTokens: 120,
+        requests: 1,
+      },
     },
-    state: {
-      status: 'waiting',
-      resumable: true,
-    },
-    status: 'waiting',
-    decision: 'continue',
-    outcome: 'done',
-    progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
-    summary: 'Repository check complete.',
     loadedCheckpoint: true,
-    resumable: true,
   };
 }
 

@@ -6,8 +6,8 @@
  * stays behind the heartbeat task service.
  */
 import { EventEmitter } from 'node:events';
-import type { HeartbeatSchedulerEvent } from '@/core/heartbeat/index.js';
-import type { ControlPlaneHeartbeatEventEnvelope } from '../types.js';
+import { FileHeartbeatTaskService, type AgentHeartbeatEvent, type HeartbeatSchedulerEvent } from '@/core/heartbeat/index.js';
+import type { ControlPlaneHeartbeatAgentEvent, ControlPlaneHeartbeatEvent, ControlPlaneHeartbeatEventEnvelope } from '../types.js';
 
 export class ControlPlaneHeartbeatEventsController {
   private readonly eventBus = new EventEmitter();
@@ -16,11 +16,12 @@ export class ControlPlaneHeartbeatEventsController {
     workspaceId: string;
     event: HeartbeatSchedulerEvent;
   }): void {
+    const event = ControlPlaneHeartbeatEventsController.projectEvent(args.event);
     this.eventBus.emit(args.workspaceId, {
       type: 'heartbeat.event',
       workspaceId: args.workspaceId,
-      timestamp: ControlPlaneHeartbeatEventsController.resolveEventTimestamp(args.event),
-      event: args.event,
+      timestamp: ControlPlaneHeartbeatEventsController.resolveEventTimestamp(event),
+      event,
     } satisfies ControlPlaneHeartbeatEventEnvelope);
   }
 
@@ -62,7 +63,64 @@ export class ControlPlaneHeartbeatEventsController {
     }
   }
 
-  private static resolveEventTimestamp(event: HeartbeatSchedulerEvent): string {
+  private static projectEvent(event: HeartbeatSchedulerEvent): ControlPlaneHeartbeatEvent {
+    if (event.type === 'heartbeat.task.finished') {
+      return {
+        ...event,
+        record: FileHeartbeatTaskService.projectRunRecordView(event.record),
+      };
+    }
+
+    if (event.type === 'heartbeat.task.agent_event') {
+      return {
+        ...event,
+        event: ControlPlaneHeartbeatEventsController.projectAgentEvent(event.event),
+      };
+    }
+
+    return event;
+  }
+
+  private static projectAgentEvent(event: AgentHeartbeatEvent): ControlPlaneHeartbeatAgentEvent {
+    const base = {
+      type: event.type,
+      timestamp: 'timestamp' in event && typeof event.timestamp === 'string' ? event.timestamp : undefined,
+      runId: 'runId' in event && typeof event.runId === 'string' ? event.runId : undefined,
+    };
+
+    const projectors: Record<string, () => ControlPlaneHeartbeatAgentEvent> = {
+      'tool.calling': () => ({
+        ...base,
+        tool: 'tool' in event && typeof event.tool === 'string' ? event.tool : undefined,
+      }),
+      'tool.completed': () => ({
+        ...base,
+        tool: 'tool' in event && typeof event.tool === 'string' ? event.tool : undefined,
+      }),
+      'assistant.stream': () => ({
+        ...base,
+        done: 'done' in event && event.done === true,
+      }),
+      'heartbeat.decision': () => ({
+        ...base,
+        decision: 'decision' in event ? event.decision : undefined,
+        outcome: 'outcome' in event ? event.outcome : undefined,
+      }),
+      'escalation.required': () => ({
+        ...base,
+        outcome: 'outcome' in event ? event.outcome : undefined,
+        step: 'step' in event ? event.step : undefined,
+      }),
+      'checkpoint.saved': () => ({
+        ...base,
+        step: 'step' in event ? event.step : undefined,
+      }),
+    };
+
+    return projectors[event.type]?.() ?? base;
+  }
+
+  private static resolveEventTimestamp(event: ControlPlaneHeartbeatEvent): string {
     return 'timestamp' in event && typeof event.timestamp === 'string' ? event.timestamp : new Date().toISOString();
   }
 }

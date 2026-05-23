@@ -8,7 +8,7 @@ export const TASK_STATUS_TONE = {
   blocked: 'warning',
   complete: 'success',
   failed: 'danger',
-} as const satisfies Record<ControlPlaneHeartbeatTaskView['status'], 'active' | 'danger' | 'muted' | 'success' | 'warning'>;
+} as const satisfies Record<ControlPlaneHeartbeatTaskView['state']['status'], 'active' | 'danger' | 'muted' | 'success' | 'warning'>;
 
 export function taskDisplayName(task: Pick<ControlPlaneHeartbeatTaskView, 'name' | 'task'>): string {
   return task.name ?? task.task;
@@ -33,10 +33,10 @@ export function formatTaskTimestamp(value: string | undefined): string {
 }
 
 export function runDisplaySummary(run: ControlPlaneHeartbeatRunView): string {
-  return run.summary || run.outcome || run.progress || run.decision;
+  return run.result.summary || run.result.outcome || run.task.state.progress || run.result.decision;
 }
 
-export function formatUsage(usage: ControlPlaneHeartbeatRunView['usage']): string {
+export function formatUsage(usage: ControlPlaneHeartbeatRunView['result']['usage']): string {
   if (!usage) {
     return 'none';
   }

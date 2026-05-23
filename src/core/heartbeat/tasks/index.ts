@@ -3,6 +3,7 @@ export { HeartbeatTaskStateProjector } from './task-state.js';
 export type {
   CreateHeartbeatTaskInput,
   FileHeartbeatTaskServiceOptions,
+  UpdateHeartbeatTaskInput,
 } from './service.js';
 export type {
   HeartbeatTask,

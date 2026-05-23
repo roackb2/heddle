@@ -23,10 +23,13 @@ export function App() {
   const modelOptionsQuery = trpcReact.controlPlane.modelOptions.useQuery();
   const createSessionMutation = trpcReact.controlPlane.sessionCreate.useMutation();
   const createTaskMutation = trpcReact.controlPlane.heartbeatTaskCreate.useMutation();
+  const updateTaskMutation = trpcReact.controlPlane.heartbeatTaskUpdate.useMutation();
   const runTaskNowMutation = trpcReact.controlPlane.heartbeatTaskRunNow.useMutation();
   const taskEvents = useControlPlaneHeartbeatEvents();
   const [taskCreateOpen, setTaskCreateOpen] = useState(false);
   const [taskCreateError, setTaskCreateError] = useState<string | undefined>();
+  const [taskEditOpen, setTaskEditOpen] = useState(false);
+  const [taskEditError, setTaskEditError] = useState<string | undefined>();
   const sidebarSessions = useMemo(
     () => stateQuery.data?.sessions ?? [],
     [stateQuery.data?.sessions],
@@ -102,11 +105,33 @@ export function App() {
       if (options.runNow) {
         taskEvents.markTaskRunQueued(created.task.taskId);
         await runTaskNowMutation.mutateAsync({ taskId: created.task.taskId });
-        await invalidateTaskViews(created.task.taskId);
       }
       setTaskCreateOpen(false);
     } catch (error) {
       setTaskCreateError(error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  async function updateSelectedTask(input: TaskCreateInput) {
+    if (!navigation.selectedTaskId) {
+      return;
+    }
+
+    setTaskEditError(undefined);
+    try {
+      const updated = await updateTaskMutation.mutateAsync({
+        taskId: navigation.selectedTaskId,
+        name: input.name,
+        task: input.task,
+        intervalMs: input.intervalMs,
+        model: input.model ?? null,
+        maxSteps: input.maxSteps ?? null,
+      });
+      await invalidateTaskViews(updated.task.taskId);
+      setTaskEditOpen(false);
+    } catch (error) {
+      setTaskEditError(error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
@@ -119,7 +144,6 @@ export function App() {
     const taskId = navigation.selectedTaskId;
     taskEvents.markTaskRunQueued(taskId);
     await runTaskNowMutation.mutateAsync({ taskId });
-    await invalidateTaskViews(taskId);
   }
 
   async function invalidateTaskViews(taskId: string) {
@@ -179,11 +203,15 @@ export function App() {
         selectedTaskRunId={selectedTaskRunId}
         selectedTaskLoading={selectedTask.loading}
         selectedTaskError={selectedTask.error}
-        selectedTaskRunSubmitting={runTaskNowMutation.isPending || selectedTaskView?.status === 'running'}
+        selectedTaskRunSubmitting={runTaskNowMutation.isPending || selectedTaskView?.state.status === 'running'}
         onSubmitSessionPrompt={selectedSession.submitPrompt}
         onUpdateSessionModel={selectedSession.updateModel}
         onUpdateSessionReasoningEffort={selectedSession.updateReasoningEffort}
         onResolveSessionApproval={selectedSession.resolvePendingApproval}
+        onEditTask={() => {
+          setTaskEditError(undefined);
+          setTaskEditOpen(true);
+        }}
         onRunTaskNow={runSelectedTaskNow}
         onSelectTaskRun={selectTaskRun}
       />
@@ -194,6 +222,16 @@ export function App() {
         submitting={createTaskMutation.isPending || runTaskNowMutation.isPending}
         onOpenChange={setTaskCreateOpen}
         onSubmit={createTask}
+      />
+      <TaskCreateDialog
+        error={taskEditError}
+        initialTask={selectedTaskView}
+        mode="edit"
+        modelOptions={modelOptionsQuery.data}
+        open={taskEditOpen}
+        submitting={updateTaskMutation.isPending}
+        onOpenChange={setTaskEditOpen}
+        onSubmit={(input) => updateSelectedTask(input)}
       />
     </AppFrame>
   );
@@ -209,10 +247,12 @@ function applyLiveTaskState(
 
   return {
     ...task,
-    status: live.status,
-    progress: live.progress,
-    updatedAt: live.updatedAt,
-    runId: live.runId ?? task.runId,
-    lastRunId: live.runId ?? task.lastRunId,
+    state: {
+      ...task.state,
+      status: live.status,
+      progress: live.progress,
+      updatedAt: live.updatedAt,
+      runId: live.runId ?? task.state.runId,
+    },
   };
 }

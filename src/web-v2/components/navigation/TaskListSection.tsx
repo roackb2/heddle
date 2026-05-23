@@ -57,11 +57,11 @@ export function TaskListSection({
                 {task.name ?? task.task}
               </span>
               <span className="v2-type-caption ml-auto shrink-0 text-muted-foreground">
-                {task.status}
+                {task.state.status}
               </span>
             </span>
             <span className="v2-type-nav-secondary w-full truncate text-muted-foreground">
-              {task.summary ?? task.progress ?? task.task}
+              {task.state.result?.summary ?? task.state.progress ?? task.task}
             </span>
           </button>
         ))}

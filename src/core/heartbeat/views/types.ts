@@ -1,27 +1,31 @@
 import type { LlmUsage } from '@/core/llm/types.js';
 import type { HeartbeatDecision } from '../agent/index.js';
-import type { HeartbeatTask, HeartbeatTaskRuntime, HeartbeatTaskSchedule, HeartbeatTaskState, HeartbeatTaskStatus } from '../tasks/index.js';
+import type { HeartbeatTask, HeartbeatTaskState, HeartbeatTaskStatus } from '../tasks/index.js';
 
-export type HeartbeatTaskView = HeartbeatTask & HeartbeatTaskSchedule & HeartbeatTaskRuntime & HeartbeatTaskState & {
-  taskId: string;
-  status: HeartbeatTaskStatus;
-  lastRunAt?: string;
-  lastRunId?: string;
-  decision?: HeartbeatDecision;
-  summary?: string;
-  outcome?: string;
+export type HeartbeatTaskResultView = {
+  decision: HeartbeatDecision;
+  summary: string;
+  outcome: string;
   usage?: LlmUsage;
 };
 
-export type HeartbeatRunView = HeartbeatTaskView & {
+export type HeartbeatTaskView = Omit<HeartbeatTask, 'state'> & {
+  taskId: string;
+  state: Omit<HeartbeatTaskState, 'result'> & {
+    status: HeartbeatTaskStatus;
+    result?: HeartbeatTaskResultView;
+  };
+};
+
+export type HeartbeatRunView = {
   id: string;
+  taskId: string;
+  workspaceId?: string;
   runId: string;
   createdAt: string;
-  decision: HeartbeatDecision;
-  outcome: string;
-  summary: string;
+  task: HeartbeatTaskView;
+  result: HeartbeatTaskResultView;
   loadedCheckpoint: boolean;
-  usage?: LlmUsage;
 };
 
 export type LucidAgentStatus = 'running' | 'paused' | 'asleep' | 'terminated' | 'blocked' | 'failed';

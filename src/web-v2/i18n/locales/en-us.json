@@ -112,6 +112,12 @@
       "taskPlaceholder": "Summarize recent repo changes and call out anything that needs review.",
       "title": "New task"
     },
+    "edit": {
+      "description": "Update task instructions, schedule, and runtime settings.",
+      "open": "Edit task",
+      "save": "Save changes",
+      "title": "Edit task"
+    },
     "runNow": "Run now",
     "runDetailsAriaLabel": "Task run details"
   },

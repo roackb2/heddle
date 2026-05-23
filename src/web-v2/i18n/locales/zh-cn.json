@@ -112,6 +112,12 @@
       "taskPlaceholder": "总结最近仓库变更，并指出需要 review 的内容。",
       "title": "新建任务"
     },
+    "edit": {
+      "description": "更新任务说明、计划和运行设置。",
+      "open": "编辑任务",
+      "save": "保存更改",
+      "title": "编辑任务"
+    },
     "runNow": "立即运行",
     "runDetailsAriaLabel": "任务运行详情"
   },
