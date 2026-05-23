@@ -91,8 +91,14 @@ export function ConversationComposer({
         aria-label={t('composer.promptAriaLabel')}
         className="v2-composer-textarea"
         disabled={disabled || submitting}
+        autoCapitalize="sentences"
+        autoComplete="off"
+        autoCorrect="on"
+        enterKeyHint="send"
+        inputMode="text"
         placeholder={t('composer.placeholder')}
         rows={1}
+        spellCheck
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
