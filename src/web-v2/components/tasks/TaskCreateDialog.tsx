@@ -36,6 +36,7 @@ const DEFAULT_MODEL_VALUE = '__default__';
 const taskCreateSchema = z.object({
   name: z.string().trim().min(1, 'Task name is required.'),
   task: z.string().trim().min(1, 'Task instruction is required.'),
+  continuationMode: z.enum(['operator', 'agent']),
   intervalMs: z.string().min(1, 'Schedule is required.'),
   model: z.string().optional(),
   maxSteps: z.string().trim().optional().refine((value) => {
@@ -90,12 +91,14 @@ export function TaskCreateDialog({
     defaultValues: {
       name: '',
       task: '',
+      continuationMode: 'operator',
       intervalMs: '3600000',
       model: DEFAULT_MODEL_VALUE,
       maxSteps: '',
     },
   });
   const intervalMs = useWatch({ control: form.control, name: 'intervalMs' });
+  const continuationMode = useWatch({ control: form.control, name: 'continuationMode' });
   const model = useWatch({ control: form.control, name: 'model' });
   const editing = mode === 'edit';
 
@@ -157,6 +160,23 @@ export function TaskCreateDialog({
             </Field>
 
             <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field data-invalid={Boolean(form.formState.errors.continuationMode)}>
+                <FieldLabel>{t('tasks.create.continuation')}</FieldLabel>
+                <Select
+                  value={continuationMode}
+                  onValueChange={(value) => form.setValue('continuationMode', value as TaskCreateDialogValues['continuationMode'], { shouldDirty: true, shouldValidate: true })}
+                >
+                  <SelectTrigger aria-invalid={Boolean(form.formState.errors.continuationMode)}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="operator">{t('tasks.continuation.operator')}</SelectItem>
+                    <SelectItem value="agent">{t('tasks.continuation.agent')}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FieldError>{form.formState.errors.continuationMode?.message}</FieldError>
+              </Field>
+
               <Field data-invalid={Boolean(form.formState.errors.intervalMs)}>
                 <FieldLabel>{t('tasks.create.schedule')}</FieldLabel>
                 <Select
@@ -246,6 +266,7 @@ function taskToDialogValues(task: ControlPlaneHeartbeatTaskView | undefined): Ta
   return {
     name: task?.name ?? '',
     task: task?.task ?? '',
+    continuationMode: task?.continuationMode ?? 'operator',
     intervalMs: String(task?.schedule.intervalMs ?? 3600000),
     model: task?.runtime?.model ?? DEFAULT_MODEL_VALUE,
     maxSteps: task?.runtime?.maxSteps ? String(task.runtime.maxSteps) : '',
@@ -258,6 +279,7 @@ function normalizeTaskCreateInput(values: TaskCreateDialogValues): TaskCreateInp
   return {
     name: values.name.trim(),
     task: values.task.trim(),
+    continuationMode: values.continuationMode,
     intervalMs: Number(values.intervalMs),
     model,
     maxSteps,

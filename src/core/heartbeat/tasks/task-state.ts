@@ -9,7 +9,7 @@ import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration.js';
 import type { AgentHeartbeatResult } from '../agent/index.js';
 import { HeartbeatDecisionPolicy } from '../agent/index.js';
-import type { HeartbeatTask, HeartbeatTaskState, HeartbeatTaskStatus } from './types.js';
+import type { HeartbeatTask, HeartbeatTaskContinuationMode, HeartbeatTaskState, HeartbeatTaskStatus } from './types.js';
 
 dayjs.extend(duration);
 
@@ -17,6 +17,7 @@ export class HeartbeatTaskStateProjector {
   static normalize(task: HeartbeatTask): HeartbeatTask {
     return {
       ...task,
+      continuationMode: task.continuationMode ?? 'operator',
       schedule: {
         ...task.schedule,
         intervalMs: Math.max(1, Math.trunc(task.schedule.intervalMs)),
@@ -52,11 +53,14 @@ export class HeartbeatTaskStateProjector {
     now: Date;
     loadedCheckpoint: boolean;
   }): HeartbeatTask {
-    const terminal = args.result.decision === 'complete' || args.result.decision === 'escalate';
-    const delayMs =
-      terminal ? undefined
-      : args.result.decision === 'continue' ? args.task.schedule.intervalMs
-      : HeartbeatDecisionPolicy.suggestNextDelayMs(args.result.decision) ?? args.task.schedule.intervalMs;
+    const continuationMode = args.task.continuationMode ?? 'operator';
+    const terminal = HeartbeatTaskStateProjector.isTerminalDecision(args.result.decision, continuationMode);
+    const delayMs = HeartbeatTaskStateProjector.nextDelayMs({
+      decision: args.result.decision,
+      intervalMs: args.task.schedule.intervalMs,
+      continuationMode,
+      terminal,
+    });
     const projection = HeartbeatTaskStateProjector.projectResult(args.result, delayMs);
 
     return HeartbeatTaskStateProjector.normalize({
@@ -72,7 +76,7 @@ export class HeartbeatTaskStateProjector {
         runAt: dayjs(args.now).toISOString(),
         runId: args.result.state.runId,
         loadedCheckpoint: args.loadedCheckpoint,
-        resumable: args.result.decision !== 'complete',
+        resumable: args.result.decision !== 'complete' || continuationMode === 'operator',
         result: args.result,
         error: undefined,
         updatedAt: dayjs(args.now).toISOString(),
@@ -133,6 +137,13 @@ export class HeartbeatTaskStateProjector {
             : `Heartbeat paused. Waiting ${HeartbeatTaskStateProjector.formatDelay(delayMs)} before the next run.`,
         };
       case 'complete':
+        if (delayMs !== undefined) {
+          return {
+            status: 'waiting',
+            progress: `Heartbeat runner reported completion. Waiting until the next scheduled run in ${HeartbeatTaskStateProjector.formatDelay(delayMs)}.`,
+          };
+        }
+
         return {
           status: 'complete',
           progress: 'Heartbeat task completed and will not run again.',
@@ -143,6 +154,32 @@ export class HeartbeatTaskStateProjector {
           progress: 'Heartbeat escalated for user input and is waiting for follow-up.',
         };
     }
+  }
+
+  private static isTerminalDecision(
+    decision: AgentHeartbeatResult['decision'],
+    continuationMode: HeartbeatTaskContinuationMode,
+  ): boolean {
+    return decision === 'escalate' || (continuationMode === 'agent' && decision === 'complete');
+  }
+
+  private static nextDelayMs(args: {
+    decision: AgentHeartbeatResult['decision'];
+    intervalMs: number;
+    continuationMode: HeartbeatTaskContinuationMode;
+    terminal: boolean;
+  }): number | undefined {
+    if (args.terminal) {
+      return undefined;
+    }
+
+    if (args.continuationMode === 'operator') {
+      return args.intervalMs;
+    }
+
+    return args.decision === 'continue' ?
+      args.intervalMs
+    : HeartbeatDecisionPolicy.suggestNextDelayMs(args.decision) ?? args.intervalMs;
   }
 
   private static formatDelay(ms: number): string {

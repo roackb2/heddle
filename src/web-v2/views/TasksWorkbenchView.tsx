@@ -12,6 +12,7 @@ interface TasksWorkbenchViewProps {
   onDeleteTask: () => void;
   onRunNow: () => Promise<void>;
   onResumeTask: () => Promise<void>;
+  onSetTaskEnabled: (enabled: boolean) => Promise<void>;
   onSelectRun: (runId: string) => void;
 }
 
@@ -26,6 +27,7 @@ export function TasksWorkbenchView({
   onDeleteTask,
   onRunNow,
   onResumeTask,
+  onSetTaskEnabled,
   onSelectRun,
 }: TasksWorkbenchViewProps) {
   if (loading) {
@@ -50,6 +52,7 @@ export function TasksWorkbenchView({
           onDelete={onDeleteTask}
           onRunNow={onRunNow}
           onResume={onResumeTask}
+          onSetEnabled={onSetTaskEnabled}
         />
         <section className="min-w-0">
           <h2 className="v2-type-section-label mb-2 text-muted-foreground">Runs</h2>

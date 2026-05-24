@@ -25,6 +25,7 @@ export type CreateHeartbeatTaskInput = {
   name?: string;
   task: string;
   enabled?: boolean;
+  continuationMode?: HeartbeatTask['continuationMode'];
   intervalMs?: number;
   defer?: boolean;
   model?: string;
@@ -39,6 +40,7 @@ export type UpdateHeartbeatTaskInput = {
   name?: string;
   task?: string;
   enabled?: boolean;
+  continuationMode?: HeartbeatTask['continuationMode'];
   intervalMs?: number;
   model?: string | null;
   maxSteps?: number | null;
@@ -118,6 +120,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       name: input.name,
       task: input.task.trim(),
       enabled: input.enabled ?? true,
+      continuationMode: input.continuationMode ?? 'operator',
       schedule: {
         intervalMs,
         nextRunAt: (input.defer === false ? now.subtract(1, 'second') : now.add(intervalMs, 'millisecond')).toISOString(),
@@ -150,6 +153,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       name: input.name ?? task.name,
       task: input.task?.trim() ?? task.task,
       enabled: input.enabled ?? task.enabled,
+      continuationMode: input.continuationMode ?? task.continuationMode ?? 'operator',
       schedule: {
         ...task.schedule,
         intervalMs,
@@ -239,7 +243,12 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
   async setTaskEnabled(taskId: string, enabled: boolean) {
     const task = await this.requireTask(taskId);
     const now = dayjs();
-    const status = enabled ? (task.state?.status ?? 'waiting') : (task.state?.status === 'running' ? 'running' : 'idle');
+    if (enabled && task.state?.status === 'blocked') {
+      throw new Error(`Heartbeat task ${taskId} is blocked. Use resume to unblock it.`);
+    }
+
+    const status = FileHeartbeatTaskService.resolveTaskEnabledStatus(task, enabled);
+    const progress = FileHeartbeatTaskService.resolveTaskEnabledProgress(task, enabled);
     const nextTask: HeartbeatTask = {
       ...task,
       enabled,
@@ -253,6 +262,8 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       state: {
         ...task.state,
         status,
+        progress,
+        resumable: enabled ? true : task.state?.resumable,
         updatedAt: now.toISOString(),
       },
     };
@@ -356,6 +367,25 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
   private static taskLastRunTime(task: HeartbeatTaskView): number {
     const runAt = task.state.runAt ? dayjs(task.state.runAt) : undefined;
     return runAt?.isValid() ? runAt.valueOf() : 0;
+  }
+
+  private static resolveTaskEnabledStatus(task: HeartbeatTask, enabled: boolean): NonNullable<HeartbeatTaskState['status']> {
+    if (task.state?.status === 'running') {
+      return 'running';
+    }
+    if (!enabled && task.state?.status === 'blocked') {
+      return 'blocked';
+    }
+    return enabled ? 'waiting' : 'idle';
+  }
+
+  private static resolveTaskEnabledProgress(task: HeartbeatTask, enabled: boolean): string | undefined {
+    if (task.state?.status === 'running' || task.state?.status === 'blocked') {
+      return task.state.progress;
+    }
+    return enabled ?
+      'Heartbeat task enabled. Waiting for the next scheduled run.'
+    : 'Heartbeat task paused by operator.';
   }
 
   private static resolveHeartbeatRoot(options: FileHeartbeatTaskServiceOptions): string {

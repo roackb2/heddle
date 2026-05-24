@@ -14,6 +14,8 @@ export type HeartbeatTaskSchedule = {
   nextRunAt?: string;
 };
 
+export type HeartbeatTaskContinuationMode = 'operator' | 'agent';
+
 export type HeartbeatTaskRuntime = Pick<
   RunAgentHeartbeatOptions,
   | 'model'
@@ -43,6 +45,7 @@ export type HeartbeatTask = {
   task: string;
   name?: string;
   enabled: boolean;
+  continuationMode?: HeartbeatTaskContinuationMode;
   checkpointPath?: string;
   schedule: HeartbeatTaskSchedule;
   runtime?: HeartbeatTaskRuntime;

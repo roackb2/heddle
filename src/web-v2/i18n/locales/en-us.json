@@ -90,8 +90,16 @@
     "tasks": "Tasks"
   },
   "tasks": {
+    "continuation": {
+      "agent": "Agent controlled",
+      "agentDescription": "The agent decision controls future runs. Complete stops the task until you enable or run it again.",
+      "operator": "Operator controlled",
+      "operatorDescription": "The schedule controls future runs. Agent decisions are recorded, but complete does not stop the task.",
+      "tooltipLabel": "Continuation mode details"
+    },
     "create": {
       "cancel": "Cancel",
+      "continuation": "Continuation",
       "create": "Create",
       "createAndRun": "Create and run",
       "defaultModel": "Default model",
@@ -112,6 +120,9 @@
       "taskPlaceholder": "Summarize recent repo changes and call out anything that needs review.",
       "title": "New task"
     },
+    "disable": "Disable task",
+    "enable": "Enable task",
+    "enabled": "enabled",
     "edit": {
       "description": "Update task instructions, schedule, and runtime settings.",
       "open": "Edit task",
@@ -125,6 +136,7 @@
       "open": "Delete task",
       "title": "Delete task"
     },
+    "paused": "paused",
     "resume": "Resume",
     "runNow": "Run now",
     "runDetailsAriaLabel": "Task run details"

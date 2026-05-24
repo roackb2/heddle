@@ -53,8 +53,15 @@ The required final decision line is: \`HEARTBEAT_DECISION: continue | pause | co
 
 - Current date time: ${context.currentDateTime}
 - Run interval: ${HeartbeatRunnerAgentPrompt.formatInterval(context.intervalMs)}
+- Continuation control: ${HeartbeatRunnerAgentPrompt.formatContinuationMode(context.continuationMode)}
 - Previous run: ${context.previousRunAt ?? 'none'}${context.previousRunId ? ` (${context.previousRunId})` : ''}
 - Next scheduled run: ${context.nextRunAt ?? 'not scheduled'}`;
+  }
+
+  private static formatContinuationMode(mode: HeartbeatRunnerAgentRunContext['continuationMode']): string {
+    return mode === 'agent' ?
+      'agent-controlled; your final decision can stop or delay future runs'
+    : 'operator-controlled; your final decision is recorded, but the operator schedule controls future runs';
   }
 
   private static formatInterval(intervalMs: number): string {

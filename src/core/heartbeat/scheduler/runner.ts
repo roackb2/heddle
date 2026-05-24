@@ -143,6 +143,7 @@ export class HeartbeatTaskRunnerService {
       runContext: {
         currentDateTime: dayjs(args.runAt).toISOString(),
         intervalMs: args.task.schedule.intervalMs,
+        continuationMode: args.task.continuationMode ?? 'operator',
         nextRunAt: args.task.schedule.nextRunAt,
         previousRunAt: args.task.state?.runAt,
         previousRunId: args.task.state?.runId,

@@ -21,6 +21,7 @@ export type {
   CreateHeartbeatTaskInput,
   FileHeartbeatTaskServiceOptions,
   HeartbeatTask,
+  HeartbeatTaskContinuationMode,
   HeartbeatTaskRunRecord,
   HeartbeatTaskRunRecordEntry,
   HeartbeatTaskStatus,

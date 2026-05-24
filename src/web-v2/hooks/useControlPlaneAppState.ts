@@ -91,6 +91,7 @@ export function useControlPlaneAppState() {
         onDeleteTask: taskActions.openDeleteDialog,
         onRunNow: taskActions.runSelectedTaskNow,
         onResumeTask: taskActions.resumeSelectedTask,
+        onSetTaskEnabled: taskActions.setSelectedTaskEnabled,
         onSelectRun: taskSelection.selectRun,
       },
     },

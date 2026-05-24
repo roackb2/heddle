@@ -101,6 +101,7 @@ const heartbeatTaskCreateInputSchema = z.object({
   name: z.string().min(1).optional(),
   task: z.string().min(1),
   enabled: z.boolean().optional(),
+  continuationMode: z.enum(['operator', 'agent']).optional(),
   intervalMs: z.number().int().min(1_000).max(365 * 24 * 60 * 60_000).optional(),
   defer: z.boolean().optional(),
   model: z.string().min(1).optional(),
