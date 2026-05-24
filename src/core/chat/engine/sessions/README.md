@@ -42,7 +42,8 @@ The intended structure is class-based by responsibility:
 - `archives/` owns file-backed archived transcript and rolling-summary
   persistence for compacted chat history.
 - session title prompting lives under `records/` as session metadata behavior;
-  host auto-rename timing stays in the host.
+  first-message auto-rename policy lives on the session service so TUI and
+  control-plane hosts share it.
 - `types.ts` at this folder root describes the main session service contract
   and config shape.
 - each meaningful subfolder exposes a `types.ts` contract so callers can see

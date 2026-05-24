@@ -15,9 +15,7 @@ import {
   RuntimeCredentialService,
 } from '@/core/runtime/credentials/index.js';
 import { ToolApprovalService } from '@/core/approvals/index.js';
-import { ChatSessionRecords, ChatSessionTitles } from '@/core/chat/engine/sessions/records/index.js';
 import type { ConversationSessionService } from '@/core/chat/engine/types.js';
-import { normalizeSessionTitle } from '../../utils/format.js';
 import type { ApprovalChoice, ChatSession, LiveEvent, PendingApproval } from '../../state/types.js';
 import type { ChatRuntimeConfig } from '../../utils/runtime.js';
 import {
@@ -189,25 +187,18 @@ export function useAgentRunController(args: UseAgentRunArgs) {
   );
 
   const maybeAutoNameSession = (sessionId: string, prompt: string, responseText: string) => {
-    const session = sessions.find((candidate) => candidate.id === sessionId);
-    if (!session || !ChatSessionRecords.isGenericName(session.name) || titleCredentialSource.type === 'missing') {
+    if (!sessions.some((candidate) => candidate.id === sessionId) || titleCredentialSource.type === 'missing') {
       return;
     }
 
     void (async () => {
       try {
-        const title = await ChatSessionTitles.generate({
+        const result = await sessionService.autoRenameAfterFirstUserMessage(sessionId, {
           llm: titleLlm,
           prompt,
           responseText,
-          normalize: normalizeSessionTitle,
         });
-        if (!title) {
-          return;
-        }
-
-        if (ChatSessionRecords.isGenericName(sessionService.require(sessionId).name)) {
-          sessionService.rename(sessionId, title);
+        if (result.renamed) {
           refreshSessions();
         }
       } catch (titleError) {

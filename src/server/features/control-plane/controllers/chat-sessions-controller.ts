@@ -15,6 +15,7 @@
 import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
 import { join } from 'node:path';
+import type { Logger } from 'pino';
 import {
   ToolApprovalPolicies,
   ToolApprovalService,
@@ -46,6 +47,7 @@ import type {
   ChatTurnReview,
   ControlPlaneSessionEventEnvelope,
   ControlPlaneSessionLiveEvent,
+  ControlPlaneSessionsEventEnvelope,
 } from '../types.js';
 
 type ControlPlaneSessionReadArgs = Omit<ConversationEngineConfig, 'model'> & {
@@ -70,6 +72,7 @@ type SubmitChatPromptArgs = ControlPlaneSessionReadArgs & {
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
   leaseOwner: ChatSessionLeaseOwner;
+  logger?: Pick<Logger, 'debug'>;
 };
 
 type ContinueChatPromptArgs = Omit<SubmitChatPromptArgs, 'prompt'>;
@@ -120,7 +123,7 @@ export class ControlPlaneChatSessionsController {
       return await this.runFakeBrowserIntegrationSessionPrompt(args);
     }
 
-    return await this.runEngineTurn(args, async ({ engine, host, abortSignal }) => {
+    const result = await this.runEngineTurn(args, async ({ engine, host, abortSignal }) => {
       return await engine.turns.submit({
         sessionId: args.sessionId,
         prompt: args.prompt,
@@ -132,6 +135,11 @@ export class ControlPlaneChatSessionsController {
         leaseOwner: args.leaseOwner,
       });
     });
+    this.scheduleAutoRenameAfterFirstUserMessage(args, {
+      responseText: result.summary,
+      sessionModel: result.session?.model,
+    });
+    return result;
   }
 
   async continuePrompt(args: ContinueChatPromptArgs) {
@@ -172,7 +180,7 @@ export class ControlPlaneChatSessionsController {
     sessionId: string;
     signal?: AbortSignal;
   }): AsyncGenerator<ControlPlaneSessionEventEnvelope> {
-    const queue = new ControlPlaneSessionEventQueue();
+    const queue = new ControlPlaneEventQueue<ControlPlaneSessionEventEnvelope>();
 
     // Live LLM/tool/compaction updates arrive through the in-memory event bus.
     // This is the path that streams assistant text to the client during a run;
@@ -220,6 +228,40 @@ export class ControlPlaneChatSessionsController {
       }
     } finally {
       unsubscribe();
+      watcher?.close();
+      args.signal?.removeEventListener('abort', abort);
+      queue.close();
+    }
+  }
+
+  async *subscribeSessionListEvents(args: {
+    stateRoot: string;
+    signal?: AbortSignal;
+  }): AsyncGenerator<ControlPlaneSessionsEventEnvelope> {
+    const queue = new ControlPlaneEventQueue<ControlPlaneSessionsEventEnvelope>();
+    const abort = () => queue.close();
+    args.signal?.addEventListener('abort', abort, { once: true });
+
+    let watcher: ReturnType<typeof watch> | undefined;
+    try {
+      watcher = watch(join(args.stateRoot, 'chat-sessions.catalog.json'), { persistent: false }, () => {
+        queue.push({
+          type: 'sessions.updated',
+          timestamp: new Date().toISOString(),
+        });
+      });
+    } catch {
+      queue.push({
+        type: 'waiting',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    try {
+      for await (const event of queue) {
+        yield event;
+      }
+    } finally {
       watcher?.close();
       args.signal?.removeEventListener('abort', abort);
       queue.close();
@@ -319,6 +361,55 @@ export class ControlPlaneChatSessionsController {
       this.pendingApprovals.delete(args.sessionId);
       this.inFlightRuns.delete(args.sessionId);
     }
+  }
+
+  private scheduleAutoRenameAfterFirstUserMessage(
+    args: SubmitChatPromptArgs,
+    input: { responseText: string; sessionModel?: string },
+  ): void {
+    const titleLlm = this.createSessionTitleLlm(args, input.sessionModel);
+    if (!titleLlm) {
+      return;
+    }
+
+    void this.createEngine(args).sessions.autoRenameAfterFirstUserMessage(args.sessionId, {
+      llm: titleLlm,
+      prompt: args.prompt,
+      responseText: input.responseText,
+    }).catch((error: unknown) => {
+      args.logger?.debug(
+        { error: error instanceof Error ? error.message : String(error), sessionId: args.sessionId },
+        'Session auto-title failed',
+      );
+    });
+  }
+
+  private createSessionTitleLlm(
+    args: Pick<ControlPlaneSessionReadArgs, 'preferApiKey' | 'credentialStorePath' | 'model'>,
+    sessionModel: string | undefined,
+  ) {
+    const activeModel = sessionModel ?? args.model ?? DEFAULT_OPENAI_MODEL;
+    const credentialMode = ModelPolicyService.credentialModeFromSource(
+      RuntimeCredentialService.resolveCredentialSourceForModel(activeModel, args),
+    );
+    const titleModel = ModelPolicyService.resolveSystemSelectedModel({
+      purpose: 'session-title',
+      provider: 'openai',
+      activeModel,
+      credentialMode,
+    });
+    const titleCredentialSource = RuntimeCredentialService.resolveCredentialSourceForModel(titleModel, args);
+    if (titleCredentialSource.type === 'missing') {
+      return undefined;
+    }
+
+    return LlmAdapterService.create({
+      model: titleModel,
+      credentials: {
+        apiKey: RuntimeCredentialService.resolveApiKeyForModel(titleModel, args),
+        credentialStorePath: args.credentialStorePath,
+      },
+    });
   }
 
   private createEngine(args: ControlPlaneSessionReadArgs): ConversationEngine {
@@ -475,24 +566,21 @@ export class ControlPlaneChatSessionsController {
 export const controlPlaneChatSessionsController = new ControlPlaneChatSessionsController();
 
 /**
- * Per-subscription delivery queue for control-plane session events.
+ * Per-subscription delivery queue for control-plane events.
  *
- * The controller uses EventEmitter for in-process fanout, while tRPC
- * subscriptions consume an AsyncIterable. This queue is the transport adapter
- * between those two shapes: it buffers events when the browser is not awaiting
- * the next item yet, wakes pending readers when an event arrives, and closes
- * cleanly when the subscription is aborted.
+ * Some controller sources use EventEmitter and others use file watchers, while
+ * tRPC subscriptions consume an AsyncIterable. This queue is the transport
+ * adapter between push callbacks and subscription iteration.
  *
  * Boundary: this class must stay transport/infrastructure-only. It should not
- * inspect or transform conversation activities; event vocabulary belongs to the
- * conversation engine and control-plane event publisher.
+ * inspect or transform event payloads.
  */
-class ControlPlaneSessionEventQueue implements AsyncIterable<ControlPlaneSessionEventEnvelope> {
-  private readonly events: ControlPlaneSessionEventEnvelope[] = [];
-  private readonly waiters: Array<(event: ControlPlaneSessionEventEnvelope | undefined) => void> = [];
+class ControlPlaneEventQueue<Event> implements AsyncIterable<Event> {
+  private readonly events: Event[] = [];
+  private readonly waiters: Array<(event: Event | undefined) => void> = [];
   private closed = false;
 
-  push(event: ControlPlaneSessionEventEnvelope): void {
+  push(event: Event): void {
     if (this.closed) {
       return;
     }
@@ -515,9 +603,9 @@ class ControlPlaneSessionEventQueue implements AsyncIterable<ControlPlaneSession
     this.waiters.splice(0).forEach((waiter) => waiter(undefined));
   }
 
-  async *[Symbol.asyncIterator](): AsyncIterator<ControlPlaneSessionEventEnvelope> {
+  async *[Symbol.asyncIterator](): AsyncIterator<Event> {
     while (!this.closed || this.events.length > 0) {
-      const event = this.events.shift() ?? await new Promise<ControlPlaneSessionEventEnvelope | undefined>((resolve) => {
+      const event = this.events.shift() ?? await new Promise<Event | undefined>((resolve) => {
         this.waiters.push(resolve);
       });
       if (!event) {

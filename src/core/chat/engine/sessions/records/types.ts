@@ -17,7 +17,6 @@ export type CreateChatSessionRecordOptions = {
 export type GenerateChatSessionTitleInput = {
   prompt: string;
   responseText: string;
-  normalize: (value: string | undefined) => string | undefined;
 };
 
 export type BuildChatTurnSummaryInput = {

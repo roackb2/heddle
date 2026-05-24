@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { trpcReact } from '@web/api/client';
+import { trpcReact, type ControlPlaneSessionsEventEnvelope } from '@web/api/client';
 import type { useWorkbenchNavigation } from '../useWorkbenchNavigation';
 import { applyLiveTaskState } from '../tasks/useControlPlaneTaskLiveState';
 import type { useControlPlaneHeartbeatEvents } from '../tasks/useControlPlaneHeartbeatEvents';
@@ -15,11 +15,12 @@ export function useControlPlaneSidebarData({
   taskEvents: HeartbeatEvents;
 }) {
   const stateQuery = trpcReact.controlPlane.state.useQuery();
+  const sessionsQuery = trpcReact.controlPlane.sessions.useQuery();
   const tasksQuery = trpcReact.controlPlane.heartbeatTasks.useQuery();
 
   const sessions = useMemo(
-    () => stateQuery.data?.sessions ?? [],
-    [stateQuery.data?.sessions],
+    () => sessionsQuery.data?.sessions ?? stateQuery.data?.sessions ?? [],
+    [sessionsQuery.data?.sessions, stateQuery.data?.sessions],
   );
   const tasks = useMemo(
     () => (tasksQuery.data?.tasks ?? []).map((task) => applyLiveTaskState(task, taskEvents.liveTasks[task.taskId])),
@@ -42,8 +43,19 @@ export function useControlPlaneSidebarData({
     navigation.selectTask(tasks[0]!.taskId, { replace: true });
   }, [navigation, tasks]);
 
+  trpcReact.controlPlane.sessionsEvents.useSubscription(undefined, {
+    onData: (event: ControlPlaneSessionsEventEnvelope) => {
+      if (event.type !== 'sessions.updated') {
+        return;
+      }
+
+      void sessionsQuery.refetch();
+    },
+  });
+
   return {
     stateQuery,
+    sessionsQuery,
     tasksQuery,
     sessions,
     tasks,

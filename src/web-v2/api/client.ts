@@ -33,6 +33,7 @@ type AsyncIterableValue<T> = T extends AsyncIterable<infer Value> ? Value : T;
 export type ControlPlaneState = RouterOutputs['controlPlane']['state'];
 export type ControlPlaneSessionDetail = RouterOutputs['controlPlane']['session'];
 export type ControlPlaneSessionEventEnvelope = AsyncIterableValue<RouterOutputs['controlPlane']['sessionEvents']>;
+export type ControlPlaneSessionsEventEnvelope = AsyncIterableValue<RouterOutputs['controlPlane']['sessionsEvents']>;
 export type ControlPlaneHeartbeatEventEnvelope = AsyncIterableValue<RouterOutputs['controlPlane']['heartbeatEvents']>;
 export type ControlPlaneSessionMessage = NonNullable<ControlPlaneSessionDetail>['messages'][number];
 export type ControlPlanePendingApproval = RouterOutputs['controlPlane']['sessionPendingApproval'];

@@ -83,7 +83,7 @@ flowchart TD
   Runtime --> Trace
   Activity --> Publisher["ControlPlaneChatSessionEventsController<br/>publishActivity / publishActivities"]
   Publisher --> Bus["EventEmitter keyed by sessionId"]
-  Bus --> Queue["ControlPlaneSessionEventQueue<br/>AsyncIterable adapter"]
+  Bus --> Queue["ControlPlaneEventQueue<br/>AsyncIterable adapter"]
   Queue --> TRPC["tRPC subscription<br/>controlPlane.sessionEvents"]
   Bus --> SSE["SSE endpoint<br/>/control-plane/sessions/:id/events"]
   TRPC --> WebV2["web-v2 hook<br/>useControlPlaneSessionEvents"]
@@ -143,6 +143,11 @@ The server sends `ControlPlaneSessionEventEnvelope` values to browser clients:
 durable persisted state. Do not replace streaming with repeated full-session
 refreshes; that tends to wipe transient UI state and makes the interface feel
 non-streaming.
+
+Session-list metadata changes use the separate `controlPlane.sessionsEvents`
+tRPC subscription. That stream emits `sessions.updated` when the session catalog
+changes, so clients can refresh sidebars without subscribing to every individual
+session.
 
 ## Event Examples
 
@@ -262,8 +267,8 @@ cannot be watched yet:
 The control-plane controller uses an in-process `EventEmitter` keyed by
 `sessionId`. This keeps a live run scoped to the session that produced it.
 
-For tRPC subscriptions, `ControlPlaneSessionEventQueue` adapts EventEmitter
-callbacks into an `AsyncIterable`. It is transport infrastructure only:
+For tRPC subscriptions, `ControlPlaneEventQueue` adapts callbacks into an
+`AsyncIterable`. It is transport infrastructure only:
 
 - buffer events when the browser is not awaiting the next item yet;
 - wake pending readers when an event arrives;

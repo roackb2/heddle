@@ -105,4 +105,9 @@ export class ChatSessionRecords {
   static isGenericName(name: string): boolean {
     return /^Session \d+$/.test(name.trim());
   }
+
+  static canAutoRenameAfterFirstUserMessage(session: ChatSession): boolean {
+    return ChatSessionRecords.isGenericName(session.name)
+      && session.history.filter((message) => message.role === 'user').length === 1;
+  }
 }

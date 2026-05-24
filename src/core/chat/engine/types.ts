@@ -7,7 +7,7 @@ import type {
   TraceSummaryService,
 } from '@/core/observability/index.js';
 import type { AgentLoopEvent, RunAgentLoopOptions } from '../../runtime/loop/index.js';
-import type { ChatMessage, ReasoningEffort } from '../../llm/types.js';
+import type { ChatMessage, LlmAdapter, ReasoningEffort } from '../../llm/types.js';
 import type { TraceEvent } from '../../types.js';
 import type { ChatSessionLeaseOwner } from './sessions/leases/index.js';
 import type { ChatSession, ChatSessionRetention } from '../types.js';
@@ -51,6 +51,7 @@ export type ConversationSessionService = {
   create(input?: CreateConversationSessionInput): ChatSession;
   createOneOff(input?: CreateConversationSessionInput): ChatSession;
   rename(id: string, name: string): ChatSession;
+  autoRenameAfterFirstUserMessage(id: string, input: AutoRenameConversationSessionInput): Promise<AutoRenameConversationSessionResult>;
   delete(id: string): boolean;
 
   // Generic mutation escape hatch
@@ -87,6 +88,17 @@ export type CreateConversationSessionInput = {
   workspaceId?: string;
   apiKeyPresent?: boolean;
   retention?: ChatSessionRetention;
+};
+
+export type AutoRenameConversationSessionInput = {
+  llm: LlmAdapter;
+  prompt: string;
+  responseText: string;
+};
+
+export type AutoRenameConversationSessionResult = {
+  renamed: boolean;
+  session?: ChatSession;
 };
 
 export type UpdateConversationSessionSettingsInput = {

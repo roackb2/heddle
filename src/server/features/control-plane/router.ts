@@ -200,6 +200,12 @@ export const controlPlaneRouter = router({
       sessions: controlPlaneChatSessionsController.readViews(controlPlaneSessionEngineArgs(ctx)),
     };
   }),
+  sessionsEvents: procedure.subscription(({ ctx, signal }) => {
+    return controlPlaneChatSessionsController.subscribeSessionListEvents({
+      stateRoot: ctx.activeWorkspace.stateRoot,
+      signal,
+    });
+  }),
   sessionCreate: procedure.input(createSessionInputSchema).mutation(({ ctx, input }) => {
     return controlPlaneChatSessionsController.createSession({
       ...controlPlaneSessionEngineArgs(ctx),
@@ -279,6 +285,7 @@ export const controlPlaneRouter = router({
       includePlanTool: input.includePlanTool,
       apiKey: input.apiKey,
       preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
+      logger: ctx.logger,
       systemContext: input.systemContext,
       memoryMaintenanceMode: input.memoryMaintenanceMode,
       leaseOwner: {

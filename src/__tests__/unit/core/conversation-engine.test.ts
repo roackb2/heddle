@@ -9,6 +9,7 @@ import type { TraceEvent } from '../../../core/types.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
 import { TraceSummaryService } from '@/core/observability/index.js';
+import type { LlmAdapter } from '@/core/llm/types.js';
 
 describe('createConversationEngine', () => {
   beforeEach(() => {
@@ -145,6 +146,112 @@ describe('createConversationEngine', () => {
     expect(() => engine.sessions.updateSettings('missing', { driftEnabled: false })).toThrow(
       'Chat session not found: missing',
     );
+  });
+
+  it('auto-renames generic sessions after the first user message', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+    });
+    const session = engine.sessions.create({ id: 'session-1', name: 'Session 1' });
+    engine.sessions.update(session.id, (current) => ({
+      ...current,
+      history: [
+        { role: 'user', content: 'Inspect the architecture docs' },
+        { role: 'assistant', content: 'The architecture docs place shared chat policy in core.' },
+      ],
+    }));
+
+    const result = await engine.sessions.autoRenameAfterFirstUserMessage(session.id, {
+      llm: fakeTitleLlm('Architecture Docs Review!!!'),
+      prompt: 'Inspect the architecture docs',
+      responseText: 'Shared chat policy belongs in core.',
+    });
+
+    expect(result.renamed).toBe(true);
+    expect(engine.sessions.require(session.id).name).toBe('Architecture Docs Review!!!');
+  });
+
+  it('does not auto-rename custom sessions or later multi-message sessions', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+    });
+    const custom = engine.sessions.create({ id: 'custom-session', name: 'Manual Investigation' });
+    const later = engine.sessions.create({ id: 'later-session', name: 'Session 42' });
+    engine.sessions.update(custom.id, (session) => ({
+      ...session,
+      history: [
+        { role: 'user', content: 'first' },
+        { role: 'assistant', content: 'done' },
+      ],
+    }));
+    engine.sessions.update(later.id, (session) => ({
+      ...session,
+      history: [
+        { role: 'user', content: 'first' },
+        { role: 'assistant', content: 'done' },
+        { role: 'user', content: 'second' },
+        { role: 'assistant', content: 'done again' },
+      ],
+    }));
+    const llm = fakeTitleLlm('Generated Title');
+
+    await expect(engine.sessions.autoRenameAfterFirstUserMessage(custom.id, {
+      llm,
+      prompt: 'first',
+      responseText: 'done',
+    })).resolves.toEqual({ renamed: false, session: expect.objectContaining({ name: 'Manual Investigation' }) });
+    await expect(engine.sessions.autoRenameAfterFirstUserMessage(later.id, {
+      llm,
+      prompt: 'second',
+      responseText: 'done again',
+    })).resolves.toEqual({ renamed: false, session: expect.objectContaining({ name: 'Session 42' }) });
+    expect(llm.chat).not.toHaveBeenCalled();
+  });
+
+  it('does not overwrite a manual rename while title generation is running', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+    });
+    const session = engine.sessions.create({ id: 'session-1', name: 'Session 1' });
+    engine.sessions.update(session.id, (current) => ({
+      ...current,
+      history: [
+        { role: 'user', content: 'first' },
+        { role: 'assistant', content: 'done' },
+      ],
+    }));
+    let resolveTitle: (value: { content: string }) => void = () => undefined;
+    const llm: LlmAdapter = {
+      chat: vi.fn(() => new Promise((resolve) => {
+        resolveTitle = resolve;
+      })),
+    };
+
+    const pending = engine.sessions.autoRenameAfterFirstUserMessage(session.id, {
+      llm,
+      prompt: 'first',
+      responseText: 'done',
+    });
+    engine.sessions.rename(session.id, 'Manual Rename');
+    resolveTitle({ content: 'Generated Rename' });
+
+    await expect(pending).resolves.toEqual({ renamed: false, session: expect.objectContaining({ name: 'Manual Rename' }) });
+    expect(engine.sessions.require(session.id).name).toBe('Manual Rename');
   });
 
   it('owns persisted conversation message, reset, continue prompt, and drift mutations', () => {
@@ -500,3 +607,9 @@ describe('createConversationEngine', () => {
     expect(sessionRepository.read('session-1', true)?.lease).toBeUndefined();
   });
 });
+
+function fakeTitleLlm(title: string): LlmAdapter {
+  return {
+    chat: vi.fn(async () => ({ content: title })),
+  };
+}

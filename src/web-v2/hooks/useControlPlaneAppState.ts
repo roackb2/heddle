@@ -42,7 +42,10 @@ export function useControlPlaneAppState() {
   async function createSession() {
     const session = await createSessionMutation.mutateAsync();
     navigation.selectSession(session.id);
-    await utils.controlPlane.state.invalidate();
+    await Promise.all([
+      utils.controlPlane.state.invalidate(),
+      utils.controlPlane.sessions.invalidate(),
+    ]);
   }
 
   return {

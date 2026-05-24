@@ -329,23 +329,6 @@ function buildApprovalEffects(options: {
   return effects;
 }
 
-export function normalizeSessionTitle(value: string | undefined): string | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  const normalized = value
-    .replace(/[\r\n]+/g, ' ')
-    .replace(/["'`]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (!normalized) {
-    return undefined;
-  }
-
-  return truncate(normalized, 48);
-}
-
 function describePathAwareToolEffect(tool: string, path: string): string {
   switch (tool) {
     case 'list_files':

@@ -19,11 +19,13 @@ import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repositor
 import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/types.js';
 import { ChatSessionLeases, type ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
-import { ChatSessionRecords, ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
+import { ChatSessionRecords, ChatSessionTitles, ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { NormalizedConversationEngineConfig } from '../config.js';
 import type {
   AppendConversationMessageInput,
+  AutoRenameConversationSessionInput,
+  AutoRenameConversationSessionResult,
   ApplyConversationCompactionResultInput,
   ConversationSessionService,
   CreateConversationSessionInput,
@@ -215,6 +217,31 @@ export class FileConversationSessionService implements ConversationSessionServic
       ...session,
       name,
     }));
+  }
+
+  async autoRenameAfterFirstUserMessage(
+    id: string,
+    input: AutoRenameConversationSessionInput,
+  ): Promise<AutoRenameConversationSessionResult> {
+    const session = this.read(id);
+    if (!session || !ChatSessionRecords.canAutoRenameAfterFirstUserMessage(session)) {
+      return { renamed: false, session };
+    }
+
+    const title = await ChatSessionTitles.generate(input);
+    if (!title) {
+      return { renamed: false, session };
+    }
+
+    const latest = this.require(id);
+    if (!ChatSessionRecords.canAutoRenameAfterFirstUserMessage(latest)) {
+      return { renamed: false, session: latest };
+    }
+
+    return {
+      renamed: true,
+      session: this.rename(id, title),
+    };
   }
 
   delete(id: string): boolean {
