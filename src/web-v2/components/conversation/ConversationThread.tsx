@@ -5,6 +5,7 @@ import type {
   ControlPlanePendingApproval,
   ControlPlaneSessionDetail,
 } from '@web/hooks/sessions/useControlPlaneSessionDetail';
+import { useConversationAutoScroll } from '@web/hooks/conversation/useConversationAutoScroll';
 import { ApprovalPanel } from './ApprovalPanel';
 import { ConversationComposer } from './ConversationComposer';
 import { ConversationMessage } from './ConversationMessage';
@@ -23,6 +24,7 @@ interface ConversationThreadProps {
   settingsError?: string;
   emptyTitle: string;
   onSubmitPrompt: (prompt: string) => Promise<void>;
+  onUpdateDriftEnabled: (enabled: boolean) => Promise<void>;
   onUpdateModel: (model: string) => Promise<void>;
   onUpdateReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
   onResolveApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
@@ -42,10 +44,18 @@ export function ConversationThread({
   settingsError,
   emptyTitle,
   onSubmitPrompt,
+  onUpdateDriftEnabled,
   onUpdateModel,
   onUpdateReasoningEffort,
   onResolveApproval,
 }: ConversationThreadProps) {
+  const conversationAutoScroll = useConversationAutoScroll({
+    liveStatus,
+    messages: session?.messages ?? [],
+    sessionId: session?.id,
+    submitting,
+  });
+
   if (loading && !session) {
     return (
       <div className="flex h-full min-w-0 flex-col">
@@ -55,7 +65,7 @@ export function ConversationThread({
             <span>{emptyTitle}</span>
           </div>
         </div>
-      <div className="v2-composer-region">
+        <div className="v2-composer-region">
           <ConversationComposer disabled onSubmitPrompt={onSubmitPrompt} />
         </div>
       </div>
@@ -77,7 +87,11 @@ export function ConversationThread({
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <div className="v2-conversation-scroll v2-scrollbar-hidden min-h-0 flex-1 overflow-auto">
+      <div
+        ref={conversationAutoScroll.scrollContainerRef}
+        className="v2-conversation-scroll v2-scrollbar-hidden min-h-0 flex-1 overflow-auto"
+        {...conversationAutoScroll.scrollContainerProps}
+      >
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-6 py-8">
           {loading ? (
             <div className="v2-type-panel-subtitle inline-flex items-center gap-2 text-muted-foreground">
@@ -104,6 +118,8 @@ export function ConversationThread({
       <div className="v2-composer-region">
         <ConversationComposer
           disabled={Boolean(pendingApproval)}
+          driftEnabled={session.driftEnabled ?? false}
+          driftLevel={session.driftLevel}
           model={session.model}
           modelOptions={modelOptions}
           reasoningEffort={session.reasoningEffort}
@@ -111,6 +127,7 @@ export function ConversationThread({
           settingsError={settingsError}
           submitting={submitting}
           onSubmitPrompt={onSubmitPrompt}
+          onUpdateDriftEnabled={onUpdateDriftEnabled}
           onUpdateModel={onUpdateModel}
           onUpdateReasoningEffort={onUpdateReasoningEffort}
         />

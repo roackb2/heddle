@@ -17,6 +17,33 @@
   },
   "composer": {
     "addContext": "Add context",
+    "contextMenu": "Context",
+    "drift": {
+      "ariaLabel": "Semantic drift",
+      "disabled": "Drift off",
+      "disableAction": "Turn drift off",
+      "enabled": "Drift on",
+      "enableAction": "Observe drift",
+      "note": "Uses Platform API embeddings when enabled.",
+      "signal": "Signal",
+      "signalHigh": "Drift high",
+      "signalLow": "Drift low",
+      "signalMedium": "Drift medium",
+      "signalUnknown": "Drift unknown",
+      "title": "Semantic drift",
+      "updating": "Updating"
+    },
+    "executionMenu": "Execution settings",
+    "fileMentions": {
+      "empty": "No files found for",
+      "listboxLabel": "File suggestions",
+      "match": "match",
+      "matches": "matches",
+      "searching": "Searching",
+      "searchingWorkspace": "Searching workspace files...",
+      "title": "@ file",
+      "unavailable": "File search unavailable. Restart the Heddle daemon if this route was just added."
+    },
     "model": "Model",
     "placeholder": "Send follow-up",
     "promptAriaLabel": "Message",
@@ -28,6 +55,8 @@
       "ultrahigh": "Ultra high"
     },
     "reasoningEffort": "Reasoning effort",
+    "noModelMatches": "No matching models",
+    "searchModels": "Search models",
     "send": "Send"
   },
   "diffPreview": {

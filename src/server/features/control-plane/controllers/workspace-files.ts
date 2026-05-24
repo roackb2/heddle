@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { access, readdir } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -22,7 +24,10 @@ export type WorkspaceDirectoryListing = {
 };
 
 const IGNORED_DIRS = new Set(['.git', '.heddle', 'coverage', 'dist', 'local', 'node_modules']);
+const PROTECTED_FILE_SUGGESTION_DIRS = ['.git', '.heddle'];
 const MAX_SCANNED_ENTRIES = 5000;
+const GIT_COMMAND_TIMEOUT_MS = 5000;
+const GIT_COMMAND_MAX_BUFFER = 8 * 1024 * 1024;
 
 type WorkspaceDirent = {
   name: string;
@@ -38,6 +43,16 @@ export class ControlPlaneWorkspaceFilesController {
   }): Promise<WorkspaceFileSuggestion[]> {
     const query = ControlPlaneWorkspaceFilesController.normalizeQuery(args.query);
     const limit = Math.max(1, Math.min(args.limit ?? 20, 50));
+    const candidates = ControlPlaneWorkspaceFilesController.listGitWorkspaceFiles(args.workspaceRoot)
+      ?? await ControlPlaneWorkspaceFilesController.listFilesystemWorkspaceFiles(args.workspaceRoot);
+
+    return ControlPlaneWorkspaceFilesController.rankMatches(
+      candidates.filter((candidate) => ControlPlaneWorkspaceFilesController.matchesQuery(candidate.path, query)),
+      query,
+    ).slice(0, limit);
+  }
+
+  private static async listFilesystemWorkspaceFiles(workspaceRoot: string): Promise<WorkspaceFileSuggestion[]> {
     const candidates: WorkspaceFileSuggestion[] = [];
     let scanned = 0;
 
@@ -64,7 +79,7 @@ export class ControlPlaneWorkspaceFilesController {
 
         scanned++;
         const fullPath = join(dir, entry.name);
-        const relPath = ControlPlaneWorkspaceFilesController.toWorkspacePath(args.workspaceRoot, fullPath);
+        const relPath = ControlPlaneWorkspaceFilesController.toWorkspacePath(workspaceRoot, fullPath);
         if (!relPath || relPath.startsWith('../')) {
           continue;
         }
@@ -79,11 +94,68 @@ export class ControlPlaneWorkspaceFilesController {
       }
     };
 
-    await visit(args.workspaceRoot);
-    return ControlPlaneWorkspaceFilesController.rankMatches(
-      candidates.filter((candidate) => ControlPlaneWorkspaceFilesController.matchesQuery(candidate.path, query)),
-      query,
-    ).slice(0, limit);
+    await visit(workspaceRoot);
+    return candidates;
+  }
+
+  private static listGitWorkspaceFiles(workspaceRoot: string): WorkspaceFileSuggestion[] | undefined {
+    const repoRoot = ControlPlaneWorkspaceFilesController.findGitRepoRoot(workspaceRoot);
+    if (!repoRoot) {
+      return undefined;
+    }
+
+    try {
+      const normalizedWorkspaceRoot = realpathSync(workspaceRoot);
+      const pathspec = ControlPlaneWorkspaceFilesController.gitPathspec(repoRoot, normalizedWorkspaceRoot);
+      const output = execFileSync(
+        'git',
+        ['-C', repoRoot, 'ls-files', '-co', '--exclude-standard', '--', pathspec],
+        {
+          encoding: 'utf-8',
+          timeout: GIT_COMMAND_TIMEOUT_MS,
+          maxBuffer: GIT_COMMAND_MAX_BUFFER,
+          stdio: ['ignore', 'pipe', 'ignore'],
+        },
+      );
+
+      return output
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((path) => ControlPlaneWorkspaceFilesController.toWorkspacePath(normalizedWorkspaceRoot, join(repoRoot, path)))
+        .filter((path) => path && !path.startsWith('../'))
+        .filter((path) => PROTECTED_FILE_SUGGESTION_DIRS.every((dirName) => !ControlPlaneWorkspaceFilesController.pathContainsDir(path, dirName)))
+        .map((path) => ({ path }));
+    } catch {
+      return [];
+    }
+  }
+
+  private static findGitRepoRoot(workspaceRoot: string): string | undefined {
+    try {
+      const output = execFileSync(
+        'git',
+        ['-C', workspaceRoot, 'rev-parse', '--show-toplevel'],
+        {
+          encoding: 'utf-8',
+          timeout: GIT_COMMAND_TIMEOUT_MS,
+          maxBuffer: GIT_COMMAND_MAX_BUFFER,
+          stdio: ['ignore', 'pipe', 'ignore'],
+        },
+      ).trim();
+      return output ? realpathSync(output) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private static gitPathspec(repoRoot: string, workspaceRoot: string): string {
+    const pathspec = relative(realpathSync(repoRoot), realpathSync(workspaceRoot)).replace(/\\/g, '/');
+    return pathspec ? `${pathspec}/` : '.';
+  }
+
+  private static pathContainsDir(path: string, dirName: string): boolean {
+    return path.split(/[/\\]+/).filter(Boolean).includes(dirName);
   }
 
   static async browseDirectories(args: {

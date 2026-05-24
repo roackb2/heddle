@@ -23,6 +23,7 @@ type ControlPlaneSessionDetailState = {
   settingsUpdating: boolean;
   settingsError?: string;
   submitPrompt: (prompt: string) => Promise<void>;
+  updateDriftEnabled: ReturnType<typeof useControlPlaneSessionSettings>['updateDriftEnabled'];
   updateModel: ReturnType<typeof useControlPlaneSessionSettings>['updateModel'];
   updateReasoningEffort: ReturnType<typeof useControlPlaneSessionSettings>['updateReasoningEffort'];
   resolvePendingApproval: ReturnType<typeof useControlPlanePendingApproval>['resolvePendingApproval'];
@@ -73,6 +74,7 @@ export function useControlPlaneSessionDetail(sessionId: string | undefined): Con
     settingsUpdating: settings.settingsUpdating,
     settingsError: settings.settingsError,
     submitPrompt: promptSubmit.submitPrompt,
+    updateDriftEnabled: settings.updateDriftEnabled,
     updateModel: settings.updateModel,
     updateReasoningEffort: settings.updateReasoningEffort,
     resolvePendingApproval: approval.resolvePendingApproval,
@@ -91,6 +93,7 @@ export function useControlPlaneSessionDetail(sessionId: string | undefined): Con
     settings.modelOptions,
     settings.settingsError,
     settings.settingsUpdating,
+    settings.updateDriftEnabled,
     settings.updateModel,
     settings.updateReasoningEffort,
   ]);

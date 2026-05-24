@@ -76,6 +76,7 @@ export function useControlPlaneAppState() {
         settingsUpdating: selectedSession.settingsUpdating,
         settingsError: selectedSession.settingsError,
         onSubmitPrompt: selectedSession.submitPrompt,
+        onUpdateDriftEnabled: selectedSession.updateDriftEnabled,
         onUpdateModel: selectedSession.updateModel,
         onUpdateReasoningEffort: selectedSession.updateReasoningEffort,
         onResolveApproval: selectedSession.resolvePendingApproval,
