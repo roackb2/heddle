@@ -2,6 +2,11 @@ import { useCallback, useState } from 'react';
 import dayjs from 'dayjs';
 import { trpcReact, type ControlPlaneHeartbeatEventEnvelope, type ControlPlaneHeartbeatTaskView } from '@web/api/client';
 
+type HeartbeatEventEnvelope = Extract<ControlPlaneHeartbeatEventEnvelope, { type: 'heartbeat.event' }>;
+type HeartbeatEvent = HeartbeatEventEnvelope['event'];
+type HeartbeatTaskEvent = Extract<HeartbeatEvent, { taskId: string }>;
+type HeartbeatAgentEvent = Extract<HeartbeatTaskEvent, { type: 'heartbeat.task.agent_event' }>['event'];
+
 export type ControlPlaneLiveTaskState = {
   taskId: string;
   status: ControlPlaneHeartbeatTaskView['state']['status'];
@@ -20,7 +25,7 @@ export function useControlPlaneHeartbeatEvents() {
     }
 
     const event = envelope.event;
-    if (!('taskId' in event)) {
+    if (!hasTaskId(event)) {
       return;
     }
 
@@ -68,7 +73,7 @@ export function useControlPlaneHeartbeatEvents() {
 
 function applyHeartbeatEvent(
   current: Record<string, ControlPlaneLiveTaskState>,
-  event: Extract<ControlPlaneHeartbeatEventEnvelope, { type: 'heartbeat.event' }>['event'],
+  event: HeartbeatTaskEvent,
 ): Record<string, ControlPlaneLiveTaskState> {
   const currentTask = current[event.taskId];
   const timestamp = 'timestamp' in event && typeof event.timestamp === 'string' ? event.timestamp : dayjs().toISOString();
@@ -80,43 +85,59 @@ function applyHeartbeatEvent(
     updatedAt: timestamp,
   } satisfies ControlPlaneLiveTaskState;
 
-  const eventViews = {
-    'heartbeat.task.due': () => ({
-      ...base,
-      status: 'waiting',
-      progress: 'Task is due. Waiting for the heartbeat runner...',
-    }),
-    'heartbeat.task.started': () => ({
-      ...base,
-      status: 'running',
-      progress: event.progress || 'Heartbeat runner started.',
-    }),
-    'heartbeat.task.agent_event': () => ({
-      ...base,
-      status: 'running',
-      progress: describeAgentEvent(event.event),
-      runId: 'runId' in event.event && typeof event.event.runId === 'string' ? event.event.runId : base.runId,
-    }),
-    'heartbeat.task.finished': () => ({
-      ...base,
-      status: event.record.task.state.status,
-      progress: event.record.task.state.progress ?? 'Heartbeat runner finished.',
-      runId: event.record.runId,
-    }),
-    'heartbeat.task.failed': () => ({
-      ...base,
-      status: 'failed',
-      progress: event.error,
-    }),
-  } satisfies Record<typeof event.type, () => ControlPlaneLiveTaskState>;
+  const next = projectHeartbeatTaskEvent(event, base);
 
   return {
     ...current,
-    [event.taskId]: eventViews[event.type](),
+    [event.taskId]: next,
   };
 }
 
-function describeAgentEvent(event: Extract<ControlPlaneHeartbeatEventEnvelope, { type: 'heartbeat.event' }>['event'] extends { event: infer AgentEvent } ? AgentEvent : never): string {
+function projectHeartbeatTaskEvent(
+  event: HeartbeatTaskEvent,
+  base: ControlPlaneLiveTaskState,
+): ControlPlaneLiveTaskState {
+  switch (event.type) {
+    case 'heartbeat.task.due':
+      return {
+        ...base,
+        status: 'waiting',
+        progress: 'Task is due. Waiting for the heartbeat runner...',
+      };
+    case 'heartbeat.task.started':
+      return {
+        ...base,
+        status: 'running',
+        progress: event.progress || 'Heartbeat runner started.',
+      };
+    case 'heartbeat.task.agent_event':
+      return {
+        ...base,
+        status: 'running',
+        progress: describeAgentEvent(event.event),
+        runId: 'runId' in event.event && typeof event.event.runId === 'string' ? event.event.runId : base.runId,
+      };
+    case 'heartbeat.task.finished':
+      return {
+        ...base,
+        status: event.record.task.state.status,
+        progress: event.record.task.state.progress ?? 'Heartbeat runner finished.',
+        runId: event.record.runId,
+      };
+    case 'heartbeat.task.failed':
+      return {
+        ...base,
+        status: 'failed',
+        progress: event.error,
+      };
+  }
+}
+
+function hasTaskId(event: HeartbeatEvent): event is HeartbeatTaskEvent {
+  return 'taskId' in event;
+}
+
+function describeAgentEvent(event: HeartbeatAgentEvent): string {
   if (!event || typeof event !== 'object' || !('type' in event)) {
     return 'Heartbeat runner is working...';
   }

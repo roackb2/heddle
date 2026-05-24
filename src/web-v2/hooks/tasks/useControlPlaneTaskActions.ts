@@ -23,6 +23,8 @@ export function useControlPlaneTaskActions({
   const createTaskMutation = trpcReact.controlPlane.heartbeatTaskCreate.useMutation();
   const updateTaskMutation = trpcReact.controlPlane.heartbeatTaskUpdate.useMutation();
   const deleteTaskMutation = trpcReact.controlPlane.heartbeatTaskDelete.useMutation();
+  const enableTaskMutation = trpcReact.controlPlane.heartbeatTaskEnable.useMutation();
+  const disableTaskMutation = trpcReact.controlPlane.heartbeatTaskDisable.useMutation();
   const resumeTaskMutation = trpcReact.controlPlane.heartbeatTaskResume.useMutation();
   const runTaskNowMutation = trpcReact.controlPlane.heartbeatTaskRunNow.useMutation();
   const [createOpen, setCreateOpen] = useState(false);
@@ -116,6 +118,20 @@ export function useControlPlaneTaskActions({
     await invalidateTaskViews(taskId);
   }
 
+  async function setSelectedTaskEnabled(enabled: boolean) {
+    if (!navigation.selectedTaskId) {
+      return;
+    }
+
+    const taskId = navigation.selectedTaskId;
+    if (enabled) {
+      await enableTaskMutation.mutateAsync({ taskId });
+    } else {
+      await disableTaskMutation.mutateAsync({ taskId });
+    }
+    await invalidateTaskViews(taskId);
+  }
+
   async function invalidateTaskViews(taskId: string) {
     await Promise.all([
       utils.controlPlane.heartbeatTasks.invalidate(),
@@ -165,6 +181,12 @@ export function useControlPlaneTaskActions({
     },
     resumeSelectedTask,
     runSelectedTaskNow,
-    taskSubmitting: runTaskNowMutation.isPending || resumeTaskMutation.isPending || selectedTask?.state.status === 'running',
+    setSelectedTaskEnabled,
+    taskSubmitting:
+      runTaskNowMutation.isPending ||
+      resumeTaskMutation.isPending ||
+      enableTaskMutation.isPending ||
+      disableTaskMutation.isPending ||
+      selectedTask?.state.status === 'running',
   };
 }

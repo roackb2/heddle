@@ -27,6 +27,7 @@ export type AgentHeartbeatEvent = AgentLoopEvent | HeartbeatDecisionEvent | Hear
 export type HeartbeatRunnerAgentRunContext = {
   currentDateTime: string;
   intervalMs: number;
+  continuationMode?: 'operator' | 'agent';
   nextRunAt?: string;
   previousRunAt?: string;
   previousRunId?: string;

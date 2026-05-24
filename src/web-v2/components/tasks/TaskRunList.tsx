@@ -17,7 +17,7 @@ export function TaskRunList({
   selectedRunId,
   onSelectRun,
 }: TaskRunListProps) {
-  const showLiveRun = liveTask?.state.status === 'running' || liveTask?.state.progress?.startsWith('Task queued');
+  const showLiveRun = Boolean(liveTask && (liveTask.state.status === 'running' || liveTask.state.progress?.startsWith('Task queued')));
 
   if (runs.length === 0 && !showLiveRun) {
     return (
@@ -30,7 +30,7 @@ export function TaskRunList({
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      {showLiveRun ? (
+      {showLiveRun && liveTask ? (
         <TaskLiveRunListItem
           task={liveTask}
           selected={selectedRunId === LIVE_TASK_RUN_ID}

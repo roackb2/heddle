@@ -79,11 +79,47 @@ describe('heartbeat scheduler', () => {
     ]);
   });
 
-  it('disables terminal complete and escalate tasks after the runner cycle', async () => {
+  it('keeps operator-controlled complete tasks scheduled after the runner cycle', async () => {
+    const task: HeartbeatTask = {
+      id: 'operator-task',
+      task: 'Review this task.',
+      enabled: true,
+      continuationMode: 'operator',
+      schedule: { intervalMs: 60_000 },
+    };
+    let savedTask: HeartbeatTask | undefined;
+
+    await HeartbeatSchedulerService.runDueTasks({
+      store: createMemoryTaskStore({
+        tasks: [task],
+        saveTask: (nextTask) => {
+          savedTask = nextTask;
+        },
+      }),
+      now: () => NOW,
+      runner: async () => createHeartbeatResult('complete'),
+    });
+
+    expect(savedTask).toMatchObject({
+      enabled: true,
+      continuationMode: 'operator',
+      schedule: { nextRunAt: '2026-04-13T00:01:00.000Z' },
+      state: {
+        status: 'waiting',
+        resumable: true,
+        result: {
+          decision: 'complete',
+        },
+      },
+    });
+  });
+
+  it('lets agent-controlled complete tasks stop after the runner cycle', async () => {
     const task: HeartbeatTask = {
       id: 'done-task',
       task: 'Finish this task.',
       enabled: true,
+      continuationMode: 'agent',
       schedule: { intervalMs: 60_000 },
     };
     let savedTask: HeartbeatTask | undefined;
@@ -195,6 +231,7 @@ describe('heartbeat scheduler', () => {
           id: 'summary-task',
           task: 'Summarize work.',
           enabled: true,
+          continuationMode: 'agent',
           schedule: { intervalMs: 60_000 },
         }],
       }),
@@ -240,7 +277,7 @@ describe('heartbeat scheduler', () => {
     await store.saveTask(task);
     await store.saveCheckpoint(task, checkpoint);
 
-    await expect(store.listTasks()).resolves.toEqual([task]);
+    await expect(store.listTasks()).resolves.toEqual([{ ...task, continuationMode: 'operator' }]);
     await expect(store.loadCheckpoint(task)).resolves.toMatchObject({
       version: 1,
       runId: checkpoint.runId,

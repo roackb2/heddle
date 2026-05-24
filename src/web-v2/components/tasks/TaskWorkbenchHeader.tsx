@@ -1,6 +1,9 @@
-import { Pencil, Play, RotateCcw, Trash2 } from 'lucide-react';
+import { Info, Pencil, Play, RotateCcw, Trash2 } from 'lucide-react';
 import type { ControlPlaneHeartbeatTaskView } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
+import { Switch } from '@web/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@web/components/ui/tooltip';
+import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
 import { formatTaskInterval, formatTaskTimestamp, taskDisplayName } from './task-format';
 import { TaskStatusPill } from './TaskStatusPill';
@@ -12,31 +15,71 @@ interface TaskWorkbenchHeaderProps {
   onDelete: () => void;
   onRunNow: () => Promise<void>;
   onResume: () => Promise<void>;
+  onSetEnabled: (enabled: boolean) => Promise<void>;
 }
 
-export function TaskWorkbenchHeader({ running, task, onEdit, onDelete, onRunNow, onResume }: TaskWorkbenchHeaderProps) {
+const continuationLabelKeys = {
+  operator: 'tasks.continuation.operator',
+  agent: 'tasks.continuation.agent',
+} satisfies Record<NonNullable<ControlPlaneHeartbeatTaskView['continuationMode']>, I18nMessageKey>;
+
+const continuationDescriptionKeys = {
+  operator: 'tasks.continuation.operatorDescription',
+  agent: 'tasks.continuation.agentDescription',
+} satisfies Record<NonNullable<ControlPlaneHeartbeatTaskView['continuationMode']>, I18nMessageKey>;
+
+export function TaskWorkbenchHeader({ running, task, onEdit, onDelete, onRunNow, onResume, onSetEnabled }: TaskWorkbenchHeaderProps) {
   const { t } = useI18n();
   const runDisabled = running || !task.enabled || task.state.status === 'running';
   const blocked = task.state.status === 'blocked';
+  const continuationMode = task.continuationMode ?? 'operator';
+  const toggleDisabled = running || task.state.status === 'running' || blocked;
 
   return (
     <section className="v2-task-header">
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2 className="v2-type-body-strong min-w-0 truncate text-balance text-foreground">{taskDisplayName(task)}</h2>
             <TaskStatusPill status={task.state.status} />
-            <span className="v2-type-caption rounded-sm border border-border bg-muted/20 px-1.5 py-0.5 text-muted-foreground">
-              {task.enabled ? 'enabled' : 'paused'}
-            </span>
           </div>
-          <div className="v2-type-caption mt-2 flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+          <div className="v2-type-caption mt-3 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 text-muted-foreground">
+            <label className="flex min-w-0 items-center gap-2">
+              <Switch
+                checked={task.enabled}
+                disabled={toggleDisabled}
+                aria-label={task.enabled ? t('tasks.disable') : t('tasks.enable')}
+                onCheckedChange={(enabled) => void onSetEnabled(enabled)}
+              />
+              <span>{task.enabled ? t('tasks.enabled') : t('tasks.paused')}</span>
+            </label>
+            <span className="inline-flex min-w-0 items-center gap-1 rounded-sm border border-border bg-muted/20 px-1.5 py-0.5 text-muted-foreground">
+              <span className="truncate">{t(continuationLabelKeys[continuationMode])}</span>
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="none"
+                      className="h-4 w-4 rounded-full p-0 text-muted-foreground hover:text-foreground"
+                      aria-label={t('tasks.continuation.tooltipLabel')}
+                    >
+                      <Info aria-hidden="true" className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" align="start" className="max-w-64">
+                    {t(continuationDescriptionKeys[continuationMode])}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </span>
             <span>{formatTaskInterval(task.schedule.intervalMs)}</span>
             <span>last {formatTaskTimestamp(task.state.runAt)}</span>
             <span>next {formatTaskTimestamp(task.schedule.nextRunAt)}</span>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="ghost"

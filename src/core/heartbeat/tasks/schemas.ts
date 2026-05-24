@@ -9,6 +9,7 @@ import { z } from 'zod';
 
 export const HeartbeatTaskStatusSchema = z.enum(['idle', 'running', 'waiting', 'blocked', 'complete', 'failed']);
 export const HeartbeatDecisionSchema = z.enum(['continue', 'pause', 'complete', 'escalate']);
+export const HeartbeatTaskContinuationModeSchema = z.enum(['operator', 'agent']);
 
 const LlmUsageSchema = z.object({
   inputTokens: z.number().describe('Prompt tokens reported for the heartbeat run.'),
@@ -25,6 +26,7 @@ export const HeartbeatTaskSchema = z.object({
   task: z.string().describe('Durable task instruction the heartbeat should pursue.'),
   name: z.string().optional().describe('Human-facing task label.'),
   enabled: z.boolean().describe('Whether the scheduler may run this task.'),
+  continuationMode: HeartbeatTaskContinuationModeSchema.default('operator').describe('Whether recurrence is controlled by the operator schedule or the agent decision.'),
   checkpointPath: z.string().optional().describe('Optional custom checkpoint file path.'),
   schedule: z.object({
     intervalMs: z.number().describe('Default interval between heartbeat runner cycles.'),

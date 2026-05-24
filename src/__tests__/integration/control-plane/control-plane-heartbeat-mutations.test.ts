@@ -48,6 +48,7 @@ describe('control-plane heartbeat mutations', () => {
       name: 'Recent repo changes',
       task: 'Show me recent repo changes.',
       enabled: true,
+      continuationMode: 'operator',
       schedule: {
         intervalMs: 60_000,
       },
@@ -57,6 +58,21 @@ describe('control-plane heartbeat mutations', () => {
       state: {
         status: 'waiting',
       },
+    });
+  });
+
+  it('updates heartbeat task continuation mode through the controller', async () => {
+    const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-continuation-'));
+    const store = new FileHeartbeatTaskService({ dir: join(stateRoot, 'heartbeat') });
+    await store.saveTask(createTask());
+
+    const updated = await ControlPlaneHeartbeatController.updateTask(stateRoot, 'repo-check', {
+      continuationMode: 'agent',
+    });
+
+    expect(updated).toMatchObject({
+      taskId: 'repo-check',
+      continuationMode: 'agent',
     });
   });
 
@@ -117,6 +133,21 @@ describe('control-plane heartbeat mutations', () => {
 
     const views = await ControlPlaneHeartbeatController.listTasks(stateRoot);
     expect(views[0]).toMatchObject({ taskId: 'repo-check', enabled: true });
+  });
+
+  it('keeps blocked tasks behind explicit resume instead of enable', async () => {
+    const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-blocked-enable-'));
+    const store = new FileHeartbeatTaskService({ dir: join(stateRoot, 'heartbeat') });
+    await store.saveTask(createTask({
+      enabled: false,
+      schedule: { intervalMs: 60_000, nextRunAt: undefined },
+      state: { status: 'blocked', resumable: true },
+    }));
+
+    await expect(ControlPlaneHeartbeatController.setTaskEnabled(stateRoot, 'repo-check', true)).rejects.toThrow(/blocked/i);
+
+    const resumed = await ControlPlaneHeartbeatController.resumeTask(stateRoot, 'repo-check');
+    expect(resumed).toMatchObject({ taskId: 'repo-check', enabled: true, state: { status: 'waiting' } });
   });
 
   it('queues run-now when enabled and rejects trigger while disabled', async () => {
@@ -207,9 +238,10 @@ describe('control-plane heartbeat mutations', () => {
       id: 'router-created',
       name: 'Router created',
       task: 'Run from router.',
+      continuationMode: 'agent',
       intervalMs: 60_000,
     });
-    expect(created.task).toMatchObject({ taskId: 'router-created', task: 'Run from router.', enabled: true });
+    expect(created.task).toMatchObject({ taskId: 'router-created', task: 'Run from router.', enabled: true, continuationMode: 'agent' });
   });
 
   it('exposes task detail and run detail through dedicated router procedures', async () => {

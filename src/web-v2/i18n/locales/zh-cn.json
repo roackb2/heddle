@@ -90,8 +90,16 @@
     "tasks": "任务"
   },
   "tasks": {
+    "continuation": {
+      "agent": "Agent 控制",
+      "agentDescription": "Agent 决策会控制后续运行。complete 会停止任务，直到你再次启用或运行。",
+      "operator": "Operator 控制",
+      "operatorDescription": "计划会控制后续运行。Agent 决策会被记录，但 complete 不会停止任务。",
+      "tooltipLabel": "延续模式说明"
+    },
     "create": {
       "cancel": "取消",
+      "continuation": "延续方式",
       "create": "创建",
       "createAndRun": "创建并运行",
       "defaultModel": "默认模型",
@@ -112,6 +120,9 @@
       "taskPlaceholder": "总结最近仓库变更，并指出需要 review 的内容。",
       "title": "新建任务"
     },
+    "disable": "停用任务",
+    "enable": "启用任务",
+    "enabled": "已启用",
     "edit": {
       "description": "更新任务说明、计划和运行设置。",
       "open": "编辑任务",
@@ -125,6 +136,7 @@
       "open": "删除任务",
       "title": "删除任务"
     },
+    "paused": "已暂停",
     "resume": "恢复",
     "runNow": "立即运行",
     "runDetailsAriaLabel": "任务运行详情"

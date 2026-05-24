@@ -17,7 +17,7 @@ export function TaskRunDetailsPanel({
   error,
   showingLiveRun = false,
 }: TaskRunDetailsPanelProps) {
-  const showLiveTask = liveTask?.state.status === 'running' || liveTask?.state.progress?.startsWith('Task queued');
+  const showLiveTask = Boolean(liveTask && (liveTask.state.status === 'running' || liveTask.state.progress?.startsWith('Task queued')));
   return (
     <div className="v2-task-inspector flex h-full min-w-0 flex-col">
       <header className="v2-panel-divider border-b px-4 py-3">
@@ -25,7 +25,7 @@ export function TaskRunDetailsPanel({
         <p className="v2-type-panel-subtitle text-muted-foreground">Selected task run</p>
       </header>
       <div className="v2-scrollbar-hidden min-h-0 flex-1 overflow-auto px-4 py-4">
-        {showLiveTask && !showingLiveRun ? (
+        {showLiveTask && liveTask && !showingLiveRun ? (
           <div className="mb-5">
             <TaskDetailBlock title={liveTask.state.status === 'running' ? 'Running now' : 'Latest task status'} body={liveTask.state.progress ?? liveTask.state.status} />
           </div>
@@ -64,7 +64,7 @@ export function TaskRunDetailsPanel({
             />
             <TaskMarkdownBlock title="Task result" body={run.result.summary} />
             {run.task.state.progress ? <TaskDetailBlock title="Progress" body={run.task.state.progress} /> : null}
-            {run.error ? <TaskDetailBlock title="Error" body={run.error} /> : null}
+            {run.task.state.error ? <TaskDetailBlock title="Error" body={run.task.state.error} /> : null}
           </div>
         ) : (
           <TaskInspectorEmpty title="No run selected" body="Select a run from the task workbench." />

@@ -11,6 +11,7 @@ type CreateHeartbeatTaskArgs = {
   name?: string;
   task: string;
   enabled?: boolean;
+  continuationMode?: 'operator' | 'agent';
   intervalMs?: number;
   defer?: boolean;
   model?: string;
@@ -25,6 +26,7 @@ type UpdateHeartbeatTaskArgs = {
   name?: string;
   task?: string;
   enabled?: boolean;
+  continuationMode?: 'operator' | 'agent';
   intervalMs?: number;
   model?: string | null;
   maxSteps?: number | null;

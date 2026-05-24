@@ -57,7 +57,7 @@ export function TaskListSection({
                 {task.name ?? task.task}
               </span>
               <span className="v2-type-caption ml-auto shrink-0 text-muted-foreground">
-                {task.state.status}
+                {task.state.status === 'blocked' || task.enabled ? task.state.status : t('tasks.paused')}
               </span>
             </span>
             <span className="v2-type-nav-secondary w-full truncate text-muted-foreground">

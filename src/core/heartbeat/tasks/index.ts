@@ -7,6 +7,7 @@ export type {
 } from './service.js';
 export type {
   HeartbeatTask,
+  HeartbeatTaskContinuationMode,
   HeartbeatTaskRunRecord,
   HeartbeatTaskRunRecordEntry,
   HeartbeatTaskRuntime,
