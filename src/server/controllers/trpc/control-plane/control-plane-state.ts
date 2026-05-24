@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
-import type { HeddleServerContext } from '../../../types.js';
-import type { ControlPlaneState } from '../types.js';
+import type { HeddleServerContext } from '@/server/types.js';
+import type { ControlPlaneState } from '@/server/control-plane-types.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { controlPlaneChatSessionsController } from './chat-sessions-controller.js';

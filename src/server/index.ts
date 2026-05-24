@@ -3,7 +3,7 @@ import type { Server } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHeddleServerApp } from './app.js';
-import { controlPlaneHeartbeatEventsController } from './features/control-plane/controllers/heartbeat-events.js';
+import { controlPlaneHeartbeatEventsController } from './controllers/trpc/control-plane/heartbeat-events.js';
 import { HeddleHeartbeatSchedulerHost } from './heartbeat-scheduler-host.js';
 import { createServerLogger } from './logger.js';
 import { assertWebAssetsBuilt } from './static.js';
@@ -17,7 +17,7 @@ export type { HeddleServerListenOptions, HeddleServerOptions } from './types.js'
 export { appRouter, type AppRouter } from './router.js';
 export { createHeddleServerApp } from './app.js';
 export { createServerLogger } from './logger.js';
-export { ControlPlaneChatSessionPresenter } from './features/control-plane/controllers/chat-session-presenter.js';
+export { ControlPlaneChatSessionPresenter } from './controllers/trpc/control-plane/chat-session-presenter.js';
 
 export async function listenHeddleDaemon(options: HeddleServerListenOptions): Promise<void> {
   const serveAssets = options.serveAssets !== false;

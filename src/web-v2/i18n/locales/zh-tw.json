@@ -44,6 +44,17 @@
       "title": "@ 檔案",
       "unavailable": "檔案搜尋無法使用。如果這個路由剛加入，請重新啟動 Heddle daemon。"
     },
+    "images": {
+      "attachmentsLabel": "圖片附件",
+      "fileInputLabel": "選擇圖片檔案",
+      "imageOnly": "只能加入圖片檔案。",
+      "remove": "移除圖片",
+      "someSkipped": "已加入圖片檔案，其他檔案已略過。",
+      "uploadAction": "上傳圖片",
+      "uploadDescription": "加入一張或多張圖片",
+      "uploadFailed": "圖片上傳失敗。",
+      "uploading": "上傳中"
+    },
     "model": "模型",
     "placeholder": "送出後續訊息",
     "promptAriaLabel": "訊息",

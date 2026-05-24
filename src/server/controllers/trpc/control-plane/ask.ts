@@ -8,7 +8,7 @@ import {
   AgentLoopRuntimeService,
   RuntimeCredentialService,
   type RunResult,
-} from '../../../../index.js';
+} from '@/index.js';
 import { MemoryCatalogService } from '@/core/memory/catalog.js';
 import { MemoryMaintenanceIntegrationService } from '@/core/memory/maintenance-integration.js';
 

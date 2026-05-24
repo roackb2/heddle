@@ -21,8 +21,15 @@ import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../../../config.j
 import { RuntimeCredentialService, type ProviderCredentialSource } from '../../../runtime/credentials/index.js';
 
 type ViewImageInput = {
-  path: string;
+  path?: string;
+  paths?: string[];
   prompt?: string;
+};
+
+type ImageViewFile = {
+  path: string;
+  mediaType: string;
+  data: Buffer;
 };
 
 export type ViewImageToolOptions = {
@@ -36,6 +43,7 @@ export type ViewImageToolOptions = {
 
 const DEFAULT_IMAGE_PROMPT =
   'Describe the image for a coding assistant. Focus on UI text, error messages, filenames, commands, code, diagrams, and any details relevant to software work.';
+const MAX_IMAGE_VIEW_FILES = 10;
 
 export const viewImageTool: ToolDefinition = createViewImageTool();
 
@@ -43,7 +51,7 @@ export function createViewImageTool(options: ViewImageToolOptions = {}): ToolDef
   return {
     name: 'view_image',
     description:
-      'Inspect a local image file when the user references a screenshot, diagram, or other visual file path and the image contents are actually needed. Use this only after the user has provided or implied a concrete image path. Input example: { "path": "/absolute/path/to/screenshot.png" }. Optional field: prompt for a more specific visual question. Returns a concise text description of the image contents.',
+      'Inspect one or more local image files when the user references screenshots, diagrams, or other visual file paths and the image contents are actually needed. Use this only after the user has provided or implied concrete image paths. Input examples: { "path": "/absolute/path/to/screenshot.png" } or { "paths": ["/absolute/path/to/a.png", "/absolute/path/to/b.png"] }. Optional field: prompt for a more specific visual question. Returns a concise text description of the image contents.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -52,43 +60,67 @@ export function createViewImageTool(options: ViewImageToolOptions = {}): ToolDef
           type: 'string',
           description: 'Path to the local image file.',
         },
+        paths: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Paths to local image files.',
+        },
         prompt: {
           type: 'string',
           description: 'Optional focused instruction for what to extract from the image.',
         },
       },
-      required: ['path'],
     },
     async execute(raw: unknown): Promise<ToolResult> {
       if (!isViewImageInput(raw)) {
         return {
           ok: false,
-          error: 'Invalid input for view_image. Required field: path. Optional field: prompt.',
+          error: 'Invalid input for view_image. Required field: path or paths. Optional field: prompt.',
         };
       }
 
       const input = raw as ViewImageInput;
       const workspaceRoot = options.workspaceRoot ?? process.cwd();
-      const filePath = resolve(workspaceRoot, input.path);
-      const mediaType = detectMediaType(filePath);
-      if (!mediaType) {
+      const paths = normalizeImagePaths(input);
+      if (paths.length > MAX_IMAGE_VIEW_FILES) {
+        return {
+          ok: false,
+          error: `view_image supports at most ${MAX_IMAGE_VIEW_FILES} images per call.`,
+        };
+      }
+
+      const provider = options.provider ?? LlmAdapterService.inferProvider(options.model ?? DEFAULT_OPENAI_MODEL);
+      const prompt = input.prompt?.trim() || DEFAULT_IMAGE_PROMPT;
+      const fileInputs = paths.flatMap((path) => {
+        const filePath = resolve(workspaceRoot, path);
+        const mediaType = detectMediaType(filePath);
+        if (!mediaType) {
+          return [];
+        }
+
+        return [{ filePath, mediaType }];
+      });
+      if (fileInputs.length !== paths.length) {
         return {
           ok: false,
           error: 'view_image supports .png, .jpg, .jpeg, .gif, and .webp files.',
         };
       }
 
-      const provider = options.provider ?? LlmAdapterService.inferProvider(options.model ?? DEFAULT_OPENAI_MODEL);
-      const prompt = input.prompt?.trim() || DEFAULT_IMAGE_PROMPT;
-
       try {
-        const data = await readFile(filePath);
+        const files = await Promise.all(fileInputs.map(async (file) => {
+          return {
+            path: file.filePath,
+            mediaType: file.mediaType,
+            data: await readFile(file.filePath),
+          } satisfies ImageViewFile;
+        }));
 
         switch (provider) {
           case 'openai':
-            return await executeOpenAiImageView({ filePath, mediaType, data, prompt, options });
+            return await executeOpenAiImageView({ files, prompt, options });
           case 'anthropic':
-            return await executeAnthropicImageView({ filePath, mediaType, data, prompt, options });
+            return await executeAnthropicImageView({ files, prompt, options });
           case 'google':
             return {
               ok: false,
@@ -112,9 +144,7 @@ export function createViewImageTool(options: ViewImageToolOptions = {}): ToolDef
 }
 
 async function executeOpenAiImageView(args: {
-  filePath: string;
-  mediaType: string;
-  data: Buffer;
+  files: ImageViewFile[];
   prompt: string;
   options: ViewImageToolOptions;
 }): Promise<ToolResult> {
@@ -159,7 +189,10 @@ async function executeOpenAiImageView(args: {
     apiKey: oauthCredential ? 'heddle-oauth-placeholder' : apiKey,
     fetch: oauthFetch,
   });
-  const imageBase64 = args.data.toString('base64');
+  const inputImages = args.files.map((file) => ({
+    file,
+    imageUrl: `data:${file.mediaType};base64,${file.data.toString('base64')}`,
+  }));
   const candidateModels = oauthCredential ? ModelPolicyService.resolveOpenAiOAuthImageCandidateModels(model) : [model];
   let lastError: unknown;
 
@@ -171,7 +204,7 @@ async function executeOpenAiImageView(args: {
           accountId: oauthCredential.accountId,
           model: candidateModel,
           prompt: args.prompt,
-          imageUrl: `data:${args.mediaType};base64,${imageBase64}`,
+          imageUrls: inputImages.map((image) => image.imageUrl),
         })
       : await client.responses.create({
           model: candidateModel,
@@ -179,11 +212,11 @@ async function executeOpenAiImageView(args: {
             role: 'user',
             content: [
               { type: 'input_text', text: args.prompt } satisfies ResponseInputText,
-              {
+              ...inputImages.map((image) => ({
                 type: 'input_image',
                 detail: 'auto',
-                image_url: `data:${args.mediaType};base64,${imageBase64}`,
-              } satisfies ResponseInputImage,
+                image_url: image.imageUrl,
+              } satisfies ResponseInputImage)),
             ],
           }],
         });
@@ -193,7 +226,7 @@ async function executeOpenAiImageView(args: {
         output: {
           provider: 'openai',
           model: response.model,
-          path: args.filePath,
+          ...formatImageOutputPaths(args.files),
           summary: response.output_text?.trim() || 'No image description returned.',
         },
       };
@@ -219,7 +252,7 @@ async function executeOpenAiOAuthImageStream(args: {
   accountId?: string;
   model: string;
   prompt: string;
-  imageUrl: string;
+  imageUrls: string[];
 }): Promise<{ model: string; output_text?: string }> {
   if (!args.oauthFetch) {
     throw new Error('Missing OAuth fetch implementation for OpenAI image inspection.');
@@ -238,11 +271,11 @@ async function executeOpenAiOAuthImageStream(args: {
         role: 'user',
         content: [
           { type: 'input_text', text: args.prompt } satisfies ResponseInputText,
-          {
+          ...args.imageUrls.map((imageUrl) => ({
             type: 'input_image',
             detail: 'auto',
-            image_url: args.imageUrl,
-          } satisfies ResponseInputImage,
+            image_url: imageUrl,
+          } satisfies ResponseInputImage)),
         ],
       }],
     },
@@ -256,9 +289,7 @@ async function executeOpenAiOAuthImageStream(args: {
 }
 
 async function executeAnthropicImageView(args: {
-  filePath: string;
-  mediaType: string;
-  data: Buffer;
+  files: ImageViewFile[];
   prompt: string;
   options: ViewImageToolOptions;
 }): Promise<ToolResult> {
@@ -270,8 +301,22 @@ async function executeAnthropicImageView(args: {
     };
   }
 
-  const anthropicMediaType = toAnthropicMediaType(args.mediaType);
-  if (!anthropicMediaType) {
+  const imageBlocks = args.files.map((file): ImageBlockParam | undefined => {
+    const anthropicMediaType = toAnthropicMediaType(file.mediaType);
+    if (!anthropicMediaType) {
+      return undefined;
+    }
+
+    return {
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: anthropicMediaType,
+        data: file.data.toString('base64'),
+      },
+    };
+  });
+  if (imageBlocks.some((block) => !block)) {
     return {
       ok: false,
       error: 'Anthropic image viewing supports jpeg, png, gif, and webp.',
@@ -286,14 +331,7 @@ async function executeAnthropicImageView(args: {
     messages: [{
       role: 'user',
       content: [
-        {
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: anthropicMediaType,
-            data: args.data.toString('base64'),
-          },
-        } satisfies ImageBlockParam,
+        ...imageBlocks.filter((block): block is ImageBlockParam => Boolean(block)),
         {
           type: 'text',
           text: args.prompt,
@@ -307,7 +345,7 @@ async function executeAnthropicImageView(args: {
     output: {
       provider: 'anthropic',
       model: response.model,
-      path: args.filePath,
+      ...formatImageOutputPaths(args.files),
       summary:
         response.content
           .flatMap((block) => (block.type === 'text' ? [block.text] : []))
@@ -324,15 +362,31 @@ function isViewImageInput(raw: unknown): raw is ViewImageInput {
 
   const input = raw as Record<string, unknown>;
   const keys = Object.keys(input);
-  if (keys.some((key) => key !== 'path' && key !== 'prompt')) {
+  if (keys.some((key) => key !== 'path' && key !== 'paths' && key !== 'prompt')) {
     return false;
   }
 
-  if (typeof input.path !== 'string' || input.path.trim().length === 0) {
+  const hasPath = typeof input.path === 'string' && input.path.trim().length > 0;
+  const hasPaths = Array.isArray(input.paths)
+    && input.paths.length > 0
+    && input.paths.every((path) => typeof path === 'string' && path.trim().length > 0);
+  if (!hasPath && !hasPaths) {
     return false;
   }
 
   return input.prompt === undefined || typeof input.prompt === 'string';
+}
+
+function normalizeImagePaths(input: ViewImageInput): string[] {
+  return [
+    ...(typeof input.path === 'string' ? [input.path] : []),
+    ...(input.paths ?? []),
+  ].map((path) => path.trim());
+}
+
+function formatImageOutputPaths(files: ImageViewFile[]) {
+  const paths = files.map((file) => file.path);
+  return paths.length === 1 ? { path: paths[0] } : { paths };
 }
 
 function detectMediaType(filePath: string): string | undefined {

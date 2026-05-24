@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { MemoryVisibilityService } from '../../../../core/memory/visibility.js';
+import { MemoryVisibilityService } from '@/core/memory/visibility.js';
 
 export class ControlPlaneMemoryController {
   static async readStatus(stateRoot: string) {

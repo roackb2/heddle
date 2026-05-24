@@ -2,19 +2,19 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { executeAgentTurn } from '../../../cli/chat/hooks/controllers/useAgentRunController.js';
-import type { ChatSession } from '../../../cli/chat/state/types.js';
-import { resolveApiKeyForModel, resolveChatRuntimeConfig, resolveProviderCredentialSourceForModel } from '../../../cli/chat/utils/runtime.js';
-import { createLogger } from '../../../core/utils/logger.js';
-import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '../../../index.js';
-import { ProviderCredentialRepository } from '../../../core/auth/index.js';
-import { EngineConversationTurnService } from '../../../core/chat/engine/turns/service.js';
-import { FileConversationSessionService } from '../../../core/chat/engine/sessions/service.js';
-import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
-import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
+import { executeAgentTurn } from '@/cli/chat/hooks/controllers/useAgentRunController.js';
+import type { ChatSession } from '@/cli/chat/state/types.js';
+import { resolveApiKeyForModel, resolveChatRuntimeConfig, resolveProviderCredentialSourceForModel } from '@/cli/chat/utils/runtime.js';
+import { createLogger } from '@/core/utils/logger.js';
+import type { LlmAdapter, RunResult, ToolCall, ToolDefinition } from '@/index.js';
+import { ProviderCredentialRepository } from '@/core/auth/index.js';
+import { EngineConversationTurnService } from '@/core/chat/engine/turns/service.js';
+import { FileConversationSessionService } from '@/core/chat/engine/sessions/service.js';
+import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
+import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import * as agentLoopModule from '@/core/runtime/loop/index.js';
-import type { ToolApprovalPolicy } from '../../../core/approvals/types.js';
-import { controlPlaneChatSessionsController } from '../../../server/features/control-plane/controllers/chat-sessions-controller.js';
+import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
+import { controlPlaneChatSessionsController } from '@/server/controllers/trpc/control-plane/chat-sessions-controller.js';
 
 describe('resolveChatRuntimeConfig', () => {
   afterEach(() => {

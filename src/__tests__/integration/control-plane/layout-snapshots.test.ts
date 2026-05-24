@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ControlPlaneLayoutSnapshotsController } from '../../../server/features/control-plane/controllers/layout-snapshots.js';
+import { ControlPlaneLayoutSnapshotsController } from '@/server/controllers/trpc/control-plane/layout-snapshots.js';
 
 describe('control-plane layout snapshots', () => {
   it('persists snapshot JSON under the debug snapshot directory', async () => {

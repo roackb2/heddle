@@ -132,8 +132,9 @@ scope.
 - Shell and approvals: `src/core/tools/toolkits/shell-process/`,
   `src/core/approvals/`.
 - TUI approvals and chat: `src/cli/chat/`.
-- Control plane: `src/server/features/control-plane/`,
-  `src/web/features/control-plane/`.
+- Control plane: `src/server/routes/`, `src/server/controllers/`,
+  `src/server/services/`, `src/web/features/control-plane/`, and
+  `src/web-v2/`.
 - Memory: `src/core/tools/toolkits/knowledge/`, `src/core/memory/`.
 - Architecture boundaries: `docs/architecture/core-layering.md`,
   `docs/architecture/chat-layering.md`.

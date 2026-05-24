@@ -1,14 +1,10 @@
-import { watch } from 'node:fs';
 import express from 'express';
-import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { createServerLogger } from './logger.js';
 import { createRequestLoggingMiddleware } from './middleware/request-logging.js';
-import { appRouter } from './router.js';
+import { createTrpcExpressRouter } from './routes/trpc/trpc.js';
 import { installWebStaticRoutes } from './static.js';
 import type { HeddleRuntimeHostDescriptor, HeddleServerContext } from './types.js';
-import { controlPlaneChatSessionsController } from './features/control-plane/controllers/chat-sessions-controller.js';
-import { RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
-import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
+import { createControlPlaneApiRouter } from './routes/control-plane-apis.js';
 
 export function createHeddleServerApp(
   options: Pick<HeddleServerContext, 'workspaceRoot' | 'stateRoot'>
@@ -19,103 +15,22 @@ export function createHeddleServerApp(
 ): express.Express {
   const logger = options.logger ?? createServerLogger({ stateRoot: options.stateRoot });
   const app = express();
+  const controlPlaneApis = createControlPlaneApiRouter({
+    workspaceRoot: options.workspaceRoot,
+    stateRoot: options.stateRoot,
+  });
+  const trpcHandler = createTrpcExpressRouter({
+    logger,
+    preferApiKey: options.preferApiKey,
+    runtimeHost: options.runtimeHost,
+    workspaceRoot: options.workspaceRoot,
+    stateRoot: options.stateRoot,
+  });
+
   app.disable('x-powered-by');
   app.use(createRequestLoggingMiddleware(logger));
-
-  app.use('/trpc', createExpressMiddleware({
-    router: appRouter,
-    createContext: () => {
-      const workspaceContext = RuntimeWorkspaceService.resolveContext({
-        workspaceRoot: options.workspaceRoot,
-        stateRoot: options.stateRoot,
-      });
-      const workspaceOwner =
-        options.runtimeHost ?
-          RuntimeDaemonRegistryService.readWorkspaceRegistration(
-            options.runtimeHost.registryPath,
-            workspaceContext.activeWorkspaceId,
-            workspaceContext.activeWorkspace.stateRoot,
-          )?.owner ?? null
-        : null;
-      return {
-        workspaceRoot: options.workspaceRoot,
-        stateRoot: options.stateRoot,
-        preferApiKey: Boolean(options.preferApiKey),
-        activeWorkspaceId: workspaceContext.activeWorkspaceId,
-        activeWorkspace: workspaceContext.activeWorkspace,
-        workspaces: workspaceContext.workspaces,
-        runtimeHost:
-          options.runtimeHost ?
-            {
-              ...options.runtimeHost,
-              workspaceOwner,
-            }
-          : null,
-        logger,
-      };
-    },
-    onError: ({ error, path, type }) => {
-      logger.error({
-        error: {
-          message: error.message,
-          code: error.code,
-          stack: error.stack,
-        },
-        path,
-        type,
-      }, 'tRPC request failed');
-    },
-  }));
-
-  app.get('/control-plane/sessions/:sessionId/events', (request, response) => {
-    const sessionId = typeof request.params.sessionId === 'string' ? request.params.sessionId.trim() : '';
-    if (!sessionId) {
-      response.status(400).json({ error: 'Missing sessionId' });
-      return;
-    }
-
-    const workspaceContext = RuntimeWorkspaceService.resolveContext({
-      workspaceRoot: options.workspaceRoot,
-      stateRoot: options.stateRoot,
-    });
-    const sessionFilePath = controlPlaneChatSessionsController.resolveFilePath(workspaceContext.activeWorkspace.stateRoot, sessionId);
-    response.setHeader('Content-Type', 'text/event-stream');
-    response.setHeader('Cache-Control', 'no-cache, no-transform');
-    response.setHeader('Connection', 'keep-alive');
-    response.setHeader('X-Accel-Buffering', 'no');
-    response.flushHeaders?.();
-
-    const send = (event: string, data: Record<string, unknown>) => {
-      response.write(`event: ${event}\n`);
-      response.write(`data: ${JSON.stringify(data)}\n\n`);
-      (response as typeof response & { flush?: () => void }).flush?.();
-    };
-
-    send('ready', { sessionId });
-    const heartbeat = setInterval(() => {
-      send('heartbeat', { sessionId, timestamp: new Date().toISOString() });
-    }, 15000);
-
-    const unsubscribe = controlPlaneChatSessionsController.subscribeToEvents(sessionId, (payload) => {
-      send('session.event', payload);
-    });
-
-    let watcher: ReturnType<typeof watch> | undefined;
-    try {
-      watcher = watch(sessionFilePath, { persistent: false }, () => {
-        send('session.updated', { sessionId, timestamp: new Date().toISOString() });
-      });
-    } catch {
-      send('waiting', { sessionId, timestamp: new Date().toISOString() });
-    }
-
-    request.on('close', () => {
-      clearInterval(heartbeat);
-      unsubscribe();
-      watcher?.close();
-      response.end();
-    });
-  });
+  app.use(controlPlaneApis);
+  app.use(trpcHandler);
 
   if (options.serveAssets !== false && options.assetsDir) {
     installWebStaticRoutes(app, options.assetsDir);

@@ -17,6 +17,11 @@
     box-shadow: 0 18px 42px hsl(235 18% 3% / 0.26);
   }
 
+  .v2-composer-shell[data-drag-active="true"] {
+    border-color: color-mix(in oklab, var(--color-ring) 78%, var(--color-border));
+    background: color-mix(in oklab, var(--color-accent) 34%, var(--color-card));
+  }
+
   .v2-composer-textarea {
     min-height: 1.75rem;
     max-height: 11rem;
@@ -227,6 +232,91 @@
     color: var(--color-muted-foreground);
   }
 
+  .v2-composer-image-strip {
+    display: flex;
+    min-width: 0;
+    gap: 0.375rem;
+    overflow-x: auto;
+    padding: 0.125rem 0.125rem 0.25rem;
+  }
+
+  .v2-composer-image-chip {
+    display: inline-flex;
+    width: min(13rem, 72vw);
+    min-width: 9rem;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in oklab, var(--color-border) 72%, transparent);
+    background: color-mix(in oklab, var(--color-muted) 38%, var(--color-card));
+    padding: 0.25rem;
+  }
+
+  .v2-composer-image-chip[data-status="error"] {
+    border-color: color-mix(in oklab, var(--color-destructive) 58%, var(--color-border));
+  }
+
+  .v2-composer-image-preview {
+    height: 2.5rem;
+    width: 2.5rem;
+    flex-shrink: 0;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    background: var(--color-muted);
+  }
+
+  .v2-composer-image-meta {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.0625rem;
+  }
+
+  .v2-composer-image-name {
+    min-width: 0;
+    font-size: 0.8125rem;
+    line-height: 1rem;
+    color: var(--color-foreground);
+  }
+
+  .v2-composer-image-status {
+    min-width: 0;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-composer-image-chip[data-status="error"] .v2-composer-image-status {
+    color: var(--color-destructive);
+  }
+
+  .v2-composer-image-spinner {
+    height: 1rem;
+    width: 1rem;
+    flex-shrink: 0;
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-composer-image-remove {
+    height: 1.625rem;
+    width: 1.625rem;
+    min-width: 1.625rem;
+    border-radius: 999px;
+    padding: 0;
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-composer-image-remove:hover {
+    background: color-mix(in oklab, var(--color-accent) 72%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .v2-composer-image-remove svg {
+    height: 0.875rem;
+    width: 0.875rem;
+  }
+
   .v2-composer-error {
     padding: 0 0.25rem;
     font-size: 0.8125rem;
@@ -279,6 +369,41 @@
     min-width: 0;
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .v2-upload-menu-section {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+  }
+
+  .v2-upload-menu-section + .v2-drift-menu-section {
+    border-top: 1px solid color-mix(in oklab, var(--color-border) 72%, transparent);
+    margin-top: 0.375rem;
+    padding-top: 0.375rem;
+  }
+
+  .v2-upload-menu-row {
+    display: flex;
+    min-height: 2.75rem;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.625rem;
+    border-radius: var(--radius-sm);
+    padding: 0.375rem 0.25rem;
+    color: var(--color-popover-foreground);
+    text-align: left;
+  }
+
+  .v2-upload-menu-row:hover {
+    background: color-mix(in oklab, var(--color-accent) 72%, transparent);
+    color: var(--color-accent-foreground);
+  }
+
+  .v2-upload-menu-row:disabled {
+    opacity: 0.55;
   }
 
   .v2-drift-menu-row {

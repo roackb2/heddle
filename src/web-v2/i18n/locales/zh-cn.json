@@ -44,6 +44,17 @@
       "title": "@ 文件",
       "unavailable": "文件搜索不可用。如果这个路由刚添加，请重新启动 Heddle daemon。"
     },
+    "images": {
+      "attachmentsLabel": "图片附件",
+      "fileInputLabel": "选择图片文件",
+      "imageOnly": "只能添加图片文件。",
+      "remove": "移除图片",
+      "someSkipped": "已添加图片文件，其他文件已跳过。",
+      "uploadAction": "上传图片",
+      "uploadDescription": "添加一张或多张图片",
+      "uploadFailed": "图片上传失败。",
+      "uploading": "上传中"
+    },
     "model": "模型",
     "placeholder": "发送后续消息",
     "promptAriaLabel": "消息",

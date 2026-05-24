@@ -44,6 +44,17 @@
       "title": "@ file",
       "unavailable": "File search unavailable. Restart the Heddle daemon if this route was just added."
     },
+    "images": {
+      "attachmentsLabel": "Image attachments",
+      "fileInputLabel": "Choose image files",
+      "imageOnly": "Only image files can be attached.",
+      "remove": "Remove image",
+      "someSkipped": "Only image files were attached; other files were skipped.",
+      "uploadAction": "Upload image",
+      "uploadDescription": "Attach one or more images",
+      "uploadFailed": "Image upload failed.",
+      "uploading": "Uploading"
+    },
     "model": "Model",
     "placeholder": "Send follow-up",
     "promptAriaLabel": "Message",

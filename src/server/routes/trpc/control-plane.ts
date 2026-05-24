@@ -1,195 +1,48 @@
 import { resolve } from 'node:path';
 import dayjs from 'dayjs';
-import { z } from 'zod';
-import { BUILT_IN_MODEL_GROUPS, ModelPolicyService } from '../../../core/llm/models/index.js';
-import { LlmAdapterService } from '../../../core/llm/index.js';
+import { BUILT_IN_MODEL_GROUPS, ModelPolicyService } from '@/core/llm/models/index.js';
+import { LlmAdapterService } from '@/core/llm/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
-import { procedure, router } from '../../trpc.js';
-import type { HeddleServerContext } from '../../types.js';
-import { controlPlaneChatSessionsController } from './controllers/chat-sessions-controller.js';
-import { ControlPlaneAskController } from './controllers/ask.js';
-import { ControlPlaneStateController } from './controllers/control-plane-state.js';
-import { ControlPlaneHeartbeatController } from './controllers/heartbeat.js';
-import { controlPlaneHeartbeatEventsController } from './controllers/heartbeat-events.js';
-import { ControlPlaneMemoryController } from './controllers/memory.js';
-import { ControlPlaneLayoutSnapshotsController } from './controllers/layout-snapshots.js';
-import { ControlPlaneWorkspaceFilesController } from './controllers/workspace-files.js';
-import { ControlPlaneWorkspaceDiffController } from './controllers/workspace-diff.js';
+import { procedure, router } from '@/server/trpc.js';
+import type { HeddleServerContext } from '@/server/types.js';
+import { controlPlaneChatSessionsController } from '@/server/controllers/trpc/control-plane/chat-sessions-controller.js';
+import { ControlPlaneAskController } from '@/server/controllers/trpc/control-plane/ask.js';
+import { ControlPlaneStateController } from '@/server/controllers/trpc/control-plane/control-plane-state.js';
+import { ControlPlaneHeartbeatController } from '@/server/controllers/trpc/control-plane/heartbeat.js';
+import { controlPlaneHeartbeatEventsController } from '@/server/controllers/trpc/control-plane/heartbeat-events.js';
+import { ControlPlaneMemoryController } from '@/server/controllers/trpc/control-plane/memory.js';
+import { ControlPlaneLayoutSnapshotsController } from '@/server/controllers/trpc/control-plane/layout-snapshots.js';
+import { ControlPlaneWorkspaceFilesController } from '@/server/controllers/trpc/control-plane/workspace-files.js';
+import { ControlPlaneWorkspaceDiffController } from '@/server/controllers/trpc/control-plane/workspace-diff.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
-
-const sessionInputSchema = z.object({
-  id: z.string().min(1),
-  apiKey: z.string().min(1).optional(),
-  preferApiKey: z.boolean().optional(),
-});
-
-const createSessionInputSchema = z.object({
-  name: z.string().min(1).optional(),
-  model: z.string().min(1).optional(),
-  retention: z.enum(['reusable', 'one_off']).optional(),
-  apiKeyPresent: z.boolean().optional(),
-}).optional();
-
-const sessionMessageInputSchema = z.object({
-  sessionId: z.string().min(1),
-  prompt: z.string().min(1),
-  maxSteps: z.number().int().min(1).max(500).optional(),
-  searchIgnoreDirs: z.array(z.string().min(1)).optional(),
-  includePlanTool: z.boolean().optional(),
-  apiKey: z.string().min(1).optional(),
-  preferApiKey: z.boolean().optional(),
-  systemContext: z.string().min(1).optional(),
-  memoryMaintenanceMode: z.enum(['background', 'inline', 'none']).optional(),
-});
-
-const sessionEventsInputSchema = z.object({
-  sessionId: z.string().min(1),
-});
-
-const agentAskInputSchema = z.object({
-  goal: z.string().min(1),
-  model: z.string().min(1).optional(),
-  maxSteps: z.number().int().min(1).max(500).optional(),
-  apiKey: z.string().min(1).optional(),
-  preferApiKey: z.boolean().optional(),
-  searchIgnoreDirs: z.array(z.string().min(1)).optional(),
-  systemContext: z.string().min(1).optional(),
-});
-
-const turnReviewInputSchema = z.object({
-  sessionId: z.string().min(1),
-  turnId: z.string().min(1),
-});
-
-const sessionApprovalDecisionSchema = z.object({
-  sessionId: z.string().min(1),
-  decision: z.discriminatedUnion('type', [
-    z.object({
-      type: z.literal('approve'),
-      reason: z.string().optional(),
-    }),
-    z.object({
-      type: z.literal('deny'),
-      reason: z.string().optional(),
-    }),
-    z.object({
-      type: z.literal('approve_and_remember_project'),
-      reason: z.string().optional(),
-    }),
-  ]),
-});
-
-const sessionSettingsInputSchema = z.object({
-  id: z.string().min(1),
-  model: z.string().min(1).optional(),
-  reasoningEffort: z.enum(['low', 'medium', 'high', 'ultrahigh']).optional().nullable(),
-  driftEnabled: z.boolean().optional(),
-});
-
-const heartbeatRunsInputSchema = z.object({
-  taskId: z.string().min(1).optional(),
-  limit: z.number().int().min(1).max(100).optional(),
-}).optional();
-
-const heartbeatTaskInputSchema = z.object({
-  taskId: z.string().min(1),
-});
-
-const heartbeatTaskCreateInputSchema = z.object({
-  id: z.string().min(1).regex(/^[a-zA-Z0-9._-]+$/).optional(),
-  name: z.string().min(1).optional(),
-  task: z.string().min(1),
-  enabled: z.boolean().optional(),
-  continuationMode: z.enum(['operator', 'agent']).optional(),
-  intervalMs: z.number().int().min(1_000).max(365 * 24 * 60 * 60_000).optional(),
-  defer: z.boolean().optional(),
-  model: z.string().min(1).optional(),
-  maxSteps: z.number().int().min(1).max(500).optional(),
-  searchIgnoreDirs: z.array(z.string().min(1)).optional(),
-  systemContext: z.string().min(1).optional(),
-});
-
-const heartbeatTaskUpdateInputSchema = heartbeatTaskCreateInputSchema
-  .omit({ id: true, defer: true })
-  .extend({
-    taskId: z.string().min(1),
-    name: z.string().min(1).optional(),
-    task: z.string().min(1).optional(),
-    model: z.string().min(1).optional().nullable(),
-    maxSteps: z.number().int().min(1).max(500).optional().nullable(),
-  });
-
-const heartbeatTaskDetailInputSchema = z.object({
-  taskId: z.string().min(1),
-  runLimit: z.number().int().min(1).max(100).optional(),
-});
-
-const heartbeatTaskRunNowInputSchema = z.object({
-  taskId: z.string().min(1),
-  model: z.string().min(1).optional(),
-  maxSteps: z.number().int().min(1).max(500).optional(),
-  apiKey: z.string().min(1).optional(),
-  preferApiKey: z.boolean().optional(),
-  searchIgnoreDirs: z.array(z.string().min(1)).optional(),
-  systemContext: z.string().min(1).optional(),
-});
-
-const heartbeatRunInputSchema = z.object({
-  taskId: z.string().min(1),
-  runId: z.string().min(1),
-});
-
-const fileSearchInputSchema = z.object({
-  query: z.string().max(200).optional(),
-  limit: z.number().int().min(1).max(50).optional(),
-}).optional();
-
-const workspaceBrowseInputSchema = z.object({
-  path: z.string().min(1).optional(),
-  limit: z.number().int().min(1).max(300).optional(),
-  includeHidden: z.boolean().optional(),
-}).optional();
-
-const workspaceFileDiffInputSchema = z.object({
-  path: z.string().min(1),
-});
-
-const memoryListInputSchema = z.object({
-  path: z.string().min(1).optional(),
-}).optional();
-
-const memoryReadInputSchema = z.object({
-  path: z.string().min(1),
-  offset: z.number().int().min(0).optional(),
-  maxLines: z.number().int().min(1).max(1000).optional(),
-});
-
-const memorySearchInputSchema = z.object({
-  query: z.string().min(1).max(200),
-  path: z.string().min(1).optional(),
-  maxResults: z.number().int().min(1).max(200).optional(),
-});
-
-const layoutSnapshotInputSchema = z.object({
-  snapshot: z.unknown(),
-});
-
-const workspaceSetActiveInputSchema = z.object({
-  workspaceId: z.string().min(1),
-});
-
-const workspaceCreateInputSchema = z.object({
-  name: z.string().min(1),
-  anchorRoot: z.string().min(1),
-  repoRoots: z.array(z.string().min(1)).optional(),
-  setActive: z.boolean().optional(),
-});
-
-const workspaceRenameInputSchema = z.object({
-  workspaceId: z.string().min(1),
-  name: z.string().min(1),
-});
+import {
+  agentAskInputSchema,
+  createSessionInputSchema,
+  fileSearchInputSchema,
+  heartbeatRunInputSchema,
+  heartbeatRunsInputSchema,
+  heartbeatTaskCreateInputSchema,
+  heartbeatTaskDetailInputSchema,
+  heartbeatTaskInputSchema,
+  heartbeatTaskRunNowInputSchema,
+  heartbeatTaskUpdateInputSchema,
+  layoutSnapshotInputSchema,
+  memoryListInputSchema,
+  memoryReadInputSchema,
+  memorySearchInputSchema,
+  sessionApprovalDecisionSchema,
+  sessionEventsInputSchema,
+  sessionInputSchema,
+  sessionMessageInputSchema,
+  sessionSettingsInputSchema,
+  turnReviewInputSchema,
+  workspaceBrowseInputSchema,
+  workspaceCreateInputSchema,
+  workspaceFileDiffInputSchema,
+  workspaceRenameInputSchema,
+  workspaceSetActiveInputSchema,
+} from './schema.js';
 
 export const controlPlaneRouter = router({
   state: procedure.query(async ({ ctx }) => {

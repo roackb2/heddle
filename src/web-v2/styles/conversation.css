@@ -20,7 +20,10 @@
 
   .v2-user-message-card {
     max-width: min(42rem, 78%);
+    min-width: 0;
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     border-radius: var(--radius-xl);
     background: color-mix(in oklab, var(--color-accent) 82%, var(--color-background));
     padding: 0.75rem 0.875rem;

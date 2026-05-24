@@ -3,10 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
-import { FileHeartbeatTaskService, type HeartbeatTask } from '../../../index.js';
+import { FileHeartbeatTaskService, type HeartbeatTask } from '@/index.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
-import { controlPlaneRouter } from '../../../server/features/control-plane/router.js';
-import { ControlPlaneHeartbeatController } from '../../../server/features/control-plane/controllers/heartbeat.js';
+import { controlPlaneRouter } from '@/server/routes/trpc/control-plane.js';
+import { ControlPlaneHeartbeatController } from '@/server/controllers/trpc/control-plane/heartbeat.js';
 import type { AgentHeartbeatResult } from '@/core/heartbeat/index.js';
 
 function createTask(partial: Partial<HeartbeatTask> = {}): HeartbeatTask {

@@ -9,7 +9,7 @@ import {
   RuntimeWorkspaceService,
 } from '@/core/runtime/workspaces/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
-import { controlPlaneRouter } from '../../../server/features/control-plane/router.js';
+import { controlPlaneRouter } from '@/server/routes/trpc/control-plane.js';
 
 describe('workspace catalog', () => {
   it('bootstraps a default workspace descriptor under the state root', () => {

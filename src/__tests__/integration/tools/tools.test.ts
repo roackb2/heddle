@@ -126,8 +126,9 @@ describe('tool input validation', () => {
     expect(webSearchTool.description).toContain('Search the public web');
     expect(webSearchTool.description).toContain("active model provider's hosted web search");
     expect(webSearchTool.description).toContain('{ "query": "OpenAI Responses API web search tool" }');
-    expect(viewImageTool.description).toContain('Inspect a local image file');
+    expect(viewImageTool.description).toContain('Inspect one or more local image files');
     expect(viewImageTool.description).toContain('{ "path": "/absolute/path/to/screenshot.png" }');
+    expect(viewImageTool.description).toContain('{ "paths": ["/absolute/path/to/a.png", "/absolute/path/to/b.png"] }');
     const listMemoryTool = createListMemoryNotesTool();
     const readMemoryTool = createReadMemoryNoteTool();
     const searchMemoryTool = createSearchMemoryNotesTool();
@@ -734,7 +735,7 @@ describe('viewImageTool', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: 'Invalid input for view_image. Required field: path. Optional field: prompt.',
+      error: 'Invalid input for view_image. Required field: path or paths. Optional field: prompt.',
     });
   });
 
@@ -900,6 +901,74 @@ describe('viewImageTool', () => {
     expect(body.input?.[0]?.content?.[0]).toEqual({ type: 'input_text', text: 'Summarize the screenshot.' });
     expect(body.input?.[0]?.content?.[1]?.type).toBe('input_image');
     expect(body.input?.[0]?.content?.[1]?.image_url).toContain('data:image/png;base64,');
+  });
+
+  it('sends multiple images in one OpenAI image inspection request', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-view-image-multiple-'));
+    const firstImagePath = join(root, 'first.png');
+    const secondImagePath = join(root, 'second.webp');
+    const credentialStorePath = join(root, 'auth.json');
+    await writeFile(firstImagePath, 'first-image-data');
+    await writeFile(secondImagePath, 'second-image-data');
+    writeFileSync(credentialStorePath, '{}\n');
+    new ProviderCredentialRepository({ storePath: credentialStorePath }).set({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAt: Date.now() + 120_000,
+      accountId: 'account-123',
+      createdAt: '2026-04-27T00:00:00.000Z',
+      updatedAt: '2026-04-27T00:00:00.000Z',
+    });
+
+    const requests: Array<{ body: string }> = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      requests.push({ body: String(init?.body ?? '') });
+      const body = [
+        'event: response.output_text.done',
+        'data: {"type":"response.output_text.done","text":"Two screenshots.","content_index":0,"item_id":"msg_1","output_index":0,"sequence_number":1}',
+        '',
+        'event: response.completed',
+        'data: {"type":"response.completed","response":{"id":"resp_1","status":"completed","model":"gpt-5.4","output_text":"Two screenshots.","output":[]}}',
+        '',
+      ].join('\n');
+      return new Response(body, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      });
+    }));
+
+    const result = await createViewImageTool({
+      model: 'gpt-5.4',
+      providerCredentialSource: {
+        type: 'oauth',
+        provider: 'openai',
+        accountId: 'account-123',
+        expiresAt: Date.now() + 60_000,
+      },
+      credentialStorePath,
+    }).execute({ paths: [firstImagePath, secondImagePath], prompt: 'Compare them.' });
+
+    expect(result).toEqual({
+      ok: true,
+      output: {
+        provider: 'openai',
+        model: 'gpt-5.4',
+        paths: [firstImagePath, secondImagePath],
+        summary: 'Two screenshots.',
+      },
+    });
+    const body = JSON.parse(requests[0]?.body ?? '{}') as {
+      input?: Array<{ content?: Array<{ type?: string; image_url?: string }> }>;
+    };
+    expect(body.input?.[0]?.content?.map((part) => part.type)).toEqual([
+      'input_text',
+      'input_image',
+      'input_image',
+    ]);
+    expect(body.input?.[0]?.content?.[1]?.image_url).toContain('data:image/png;base64,');
+    expect(body.input?.[0]?.content?.[2]?.image_url).toContain('data:image/webp;base64,');
   });
 
   it('returns richer OAuth failure diagnostics including attempted models', async () => {

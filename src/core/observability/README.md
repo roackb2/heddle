@@ -34,7 +34,7 @@ Observability behavior currently exists in these places:
   activity handlers, and tool call/result activity summaries.
 - `src/cli/chat/hooks/controllers/run/tui-run-loop-events.ts` for TUI activity rendering.
 - `src/web/features/control-plane/hooks/sessions-screen/useSessionDetailSubscription.ts` for web activity rendering.
-- `src/server/features/control-plane/controllers/chat-session-events.ts`.
+- `src/server/controllers/trpc/control-plane/chat-session-events.ts`.
 
 ## Public Entry Points
 

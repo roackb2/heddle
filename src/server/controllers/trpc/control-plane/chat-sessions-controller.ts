@@ -49,7 +49,7 @@ import type {
   ControlPlaneSessionEventEnvelope,
   ControlPlaneSessionLiveEvent,
   ControlPlaneSessionsEventEnvelope,
-} from '../types.js';
+} from '@/server/control-plane-types.js';
 
 type ControlPlaneSessionReadArgs = Omit<ConversationEngineConfig, 'model'> & {
   model?: string;

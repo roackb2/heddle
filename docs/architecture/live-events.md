@@ -118,12 +118,12 @@ The main implementation path is:
   loop events.
 - `src/core/chat/engine/turns/host/` forwards runtime and compaction
   activities directly. It should not infer user-facing activity from trace.
-- `src/server/features/control-plane/controllers/chat-session-events.ts`
+- `src/server/controllers/trpc/control-plane/chat-session-events.ts`
   publishes activity batches for one session.
-- `src/server/features/control-plane/controllers/chat-sessions-controller.ts`
+- `src/server/controllers/trpc/control-plane/chat-sessions-controller.ts`
   owns in-process fanout, run cancellation state, pending approval state, and
   subscription delivery.
-- `src/server/features/control-plane/router.ts` exposes
+- `src/server/routes/trpc/control-plane.ts` exposes
   `controlPlane.sessionEvents` as a tRPC subscription.
 - `src/web-v2/hooks/useControlPlaneSessionEvents.ts` consumes subscription
   events and updates web-v2 UI state.

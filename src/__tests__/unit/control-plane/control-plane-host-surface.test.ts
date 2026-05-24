@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { projectRuntimeHostSurface } from '../../../web/features/control-plane/host-surface.js';
-import type { ControlPlaneState } from '../../../server/features/control-plane/types.js';
+import type { ControlPlaneState } from '@/server/control-plane-types.js';
 
 describe('projectRuntimeHostSurface', () => {
   afterEach(() => {

@@ -2,9 +2,9 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
-import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
-import { controlPlaneChatSessionsController } from '../../../server/features/control-plane/controllers/chat-sessions-controller.js';
+import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
+import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
+import { controlPlaneChatSessionsController } from '@/server/controllers/trpc/control-plane/chat-sessions-controller.js';
 
 describe('control-plane turn review', () => {
   it('projects edit_file tool diffs as structured changed files', () => {
