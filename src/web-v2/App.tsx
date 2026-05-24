@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { trpcReact } from '@web/api/client';
-import { TaskCreateDialog, TaskRunDetailsPanel, type TaskCreateInput } from '@web/components/tasks';
+import { TaskCreateDialog, TaskDeleteDialog, TaskRunDetailsPanel, type TaskCreateInput } from '@web/components/tasks';
 import { ContextInspector } from '@web/components/panels';
 import { useControlPlaneErrorToasts } from '@web/hooks/useControlPlaneErrorToasts';
 import { useControlPlaneHeartbeatEvents } from '@web/hooks/useControlPlaneHeartbeatEvents';
@@ -24,12 +24,15 @@ export function App() {
   const createSessionMutation = trpcReact.controlPlane.sessionCreate.useMutation();
   const createTaskMutation = trpcReact.controlPlane.heartbeatTaskCreate.useMutation();
   const updateTaskMutation = trpcReact.controlPlane.heartbeatTaskUpdate.useMutation();
+  const deleteTaskMutation = trpcReact.controlPlane.heartbeatTaskDelete.useMutation();
   const runTaskNowMutation = trpcReact.controlPlane.heartbeatTaskRunNow.useMutation();
   const taskEvents = useControlPlaneHeartbeatEvents();
   const [taskCreateOpen, setTaskCreateOpen] = useState(false);
   const [taskCreateError, setTaskCreateError] = useState<string | undefined>();
   const [taskEditOpen, setTaskEditOpen] = useState(false);
   const [taskEditError, setTaskEditError] = useState<string | undefined>();
+  const [taskDeleteOpen, setTaskDeleteOpen] = useState(false);
+  const [taskDeleteError, setTaskDeleteError] = useState<string | undefined>();
   const sidebarSessions = useMemo(
     () => stateQuery.data?.sessions ?? [],
     [stateQuery.data?.sessions],
@@ -136,6 +139,29 @@ export function App() {
     }
   }
 
+  async function deleteSelectedTask() {
+    if (!navigation.selectedTaskId) {
+      return;
+    }
+
+    const taskId = navigation.selectedTaskId;
+    setTaskDeleteError(undefined);
+    try {
+      await deleteTaskMutation.mutateAsync({ taskId });
+      setTaskDeleteOpen(false);
+      const nextTask = sidebarTasks.find((task) => task.taskId !== taskId);
+      if (nextTask) {
+        navigation.selectTask(nextTask.taskId, { replace: true });
+      } else {
+        navigation.selectSurface('tasks', { replace: true });
+      }
+      await invalidateTaskViews(taskId);
+    } catch (error) {
+      setTaskDeleteError(error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
   async function runSelectedTaskNow() {
     if (!navigation.selectedTaskId) {
       return;
@@ -212,6 +238,10 @@ export function App() {
           setTaskEditError(undefined);
           setTaskEditOpen(true);
         }}
+        onDeleteTask={() => {
+          setTaskDeleteError(undefined);
+          setTaskDeleteOpen(true);
+        }}
         onRunTaskNow={runSelectedTaskNow}
         onSelectTaskRun={selectTaskRun}
       />
@@ -232,6 +262,14 @@ export function App() {
         submitting={updateTaskMutation.isPending}
         onOpenChange={setTaskEditOpen}
         onSubmit={(input) => updateSelectedTask(input)}
+      />
+      <TaskDeleteDialog
+        error={taskDeleteError}
+        open={taskDeleteOpen}
+        submitting={deleteTaskMutation.isPending}
+        task={selectedTaskView}
+        onOpenChange={setTaskDeleteOpen}
+        onConfirm={deleteSelectedTask}
       />
     </AppFrame>
   );

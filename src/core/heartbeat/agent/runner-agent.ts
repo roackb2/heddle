@@ -65,6 +65,7 @@ export class HeartbeatRunnerAgent {
     const {
       task,
       checkpoint,
+      runContext,
       maxSteps,
       memoryDir: providedMemoryDir,
       stateDir,
@@ -80,7 +81,7 @@ export class HeartbeatRunnerAgent {
 
     return {
       ...runtimeOptions,
-      goal: HeartbeatRunnerAgentPrompt.buildGoal(task),
+      goal: HeartbeatRunnerAgentPrompt.buildGoal(task, runContext),
       maxSteps: maxSteps ?? DEFAULT_HEARTBEAT_MAX_STEPS,
       workspaceRoot,
       stateDir,

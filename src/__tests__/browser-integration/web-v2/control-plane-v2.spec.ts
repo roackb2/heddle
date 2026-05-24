@@ -102,6 +102,20 @@ test('shows task run workbench and run details', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Edit task' }).click();
   await expect(page.getByRole('dialog', { name: 'Edit task' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Edit task' })).not.toBeVisible();
+
+  const deleteSmoke = await trpc.controlPlane.heartbeatTaskCreate.mutate({
+    id: `delete-smoke-${Date.now()}`,
+    name: 'Delete smoke task',
+    task: 'Task used to verify the delete confirmation dialog.',
+    intervalMs: 60_000,
+    defer: true,
+  });
+  await page.goto(`/tasks/${deleteSmoke.task.taskId}`);
+  await page.getByRole('button', { name: 'Delete task' }).click();
+  await expect(page.getByRole('dialog', { name: 'Delete task' })).toBeVisible();
+  await expect(page.getByText('Delete this task, its checkpoint, and recorded runs. This cannot be undone.')).toBeVisible();
 });
 
 test('submits a prompt and renders the mocked session response', async ({ page }) => {

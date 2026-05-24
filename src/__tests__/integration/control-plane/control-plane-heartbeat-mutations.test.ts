@@ -140,6 +140,39 @@ describe('control-plane heartbeat mutations', () => {
     expect(Date.parse(task?.schedule.nextRunAt ?? '')).toBeLessThanOrEqual(Date.now());
   });
 
+  it('deletes heartbeat tasks through the control-plane router', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-delete-workspace-'));
+    const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-delete-router-'));
+    const store = new FileHeartbeatTaskService({ dir: join(stateRoot, 'heartbeat') });
+    const task = createTask();
+    await store.saveTask(task);
+    await store.saveRunRecord({
+      task,
+      loadedCheckpoint: false,
+      result: createHeartbeatResult(workspaceRoot, 'run_delete_1', 'Run before delete.'),
+    });
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
+    const activeWorkspace = catalog.workspaces[0];
+    if (!activeWorkspace) {
+      throw new Error('expected default workspace');
+    }
+
+    const caller = controlPlaneRouter.createCaller({
+      workspaceRoot,
+      stateRoot,
+      activeWorkspaceId: activeWorkspace.id,
+      activeWorkspace,
+      workspaces: catalog.workspaces,
+      runtimeHost: null,
+      logger: pino({ level: 'silent' }),
+    });
+
+    const deleted = await caller.heartbeatTaskDelete({ taskId: 'repo-check' });
+    expect(deleted.task).toMatchObject({ taskId: 'repo-check' });
+    expect(await store.listTasks()).toHaveLength(0);
+    expect(await store.listRunRecords({ taskId: 'repo-check' })).toHaveLength(0);
+  });
+
   it('exposes heartbeat mutation procedures on the control-plane router', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-workspace-'));
     const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-router-'));

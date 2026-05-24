@@ -47,6 +47,7 @@ export class HeartbeatTaskRunnerService {
       const result = await HeartbeatTaskRunnerService.runAgent({
         task,
         checkpoint,
+        runAt,
         runner: options.runner,
         runtime: options.runtime,
         onEvent: options.onEvent,
@@ -105,6 +106,7 @@ export class HeartbeatTaskRunnerService {
   private static async runAgent(args: {
     task: HeartbeatTask;
     checkpoint: AgentLoopState | AgentLoopCheckpoint | undefined;
+    runAt: Date;
     runner?: HeartbeatTaskRunner;
     runtime?: HeartbeatTaskRunnerRuntimeOptions;
     onEvent?: (event: HeartbeatSchedulerEvent) => void;
@@ -117,6 +119,7 @@ export class HeartbeatTaskRunnerService {
   private static resolveRunnerAgentOptions(args: {
     task: HeartbeatTask;
     checkpoint: AgentLoopState | AgentLoopCheckpoint | undefined;
+    runAt: Date;
     runtime?: HeartbeatTaskRunnerRuntimeOptions;
     onEvent?: (event: HeartbeatSchedulerEvent) => void;
   }): RunAgentHeartbeatOptions {
@@ -135,6 +138,13 @@ export class HeartbeatTaskRunnerService {
       ...args.task.runtime,
       task: args.task.task,
       checkpoint: args.checkpoint,
+      runContext: {
+        currentDateTime: args.runAt.toISOString(),
+        intervalMs: args.task.schedule.intervalMs,
+        nextRunAt: args.task.schedule.nextRunAt,
+        previousRunAt: args.task.state?.runAt,
+        previousRunId: args.task.state?.runId,
+      },
       model,
       apiKey: RuntimeCredentialService.resolveApiKeyForModel(model, credentialOptions),
       stateDir: args.task.runtime?.stateDir ?? args.runtime?.stateDir,

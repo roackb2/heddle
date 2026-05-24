@@ -64,7 +64,7 @@ export function OverviewRunItem({
           <p className="mt-1 text-sm text-muted-foreground">{formatShortDate(run.createdAt)}</p>
         </div>
         <div className="flex min-w-0 flex-wrap gap-2 sm:max-w-[48%] sm:justify-end">
-          <ToneBadge value={run.task.state.status} />
+          <ToneBadge value={run.task.state?.status} />
           <ToneBadge value={run.result.decision} />
         </div>
       </div>

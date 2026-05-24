@@ -118,6 +118,13 @@
       "save": "Save changes",
       "title": "Edit task"
     },
+    "delete": {
+      "cancel": "Cancel",
+      "confirm": "Delete task",
+      "description": "Delete this task, its checkpoint, and recorded runs. This cannot be undone.",
+      "open": "Delete task",
+      "title": "Delete task"
+    },
     "runNow": "Run now",
     "runDetailsAriaLabel": "Task run details"
   },

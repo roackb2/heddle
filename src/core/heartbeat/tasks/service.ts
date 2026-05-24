@@ -52,7 +52,7 @@ export type UpdateHeartbeatTaskInput = {
  * service, not the file repository.
  */
 export class FileHeartbeatTaskService implements HeartbeatTaskStore {
-  private readonly repository: HeartbeatTaskStore;
+  private readonly repository: FileHeartbeatTaskRepository;
 
   constructor(options: FileHeartbeatTaskServiceOptions) {
     this.repository = new FileHeartbeatTaskRepository({
@@ -164,6 +164,16 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
 
     await this.saveTask(nextTask);
     return FileHeartbeatTaskService.projectTaskView(nextTask);
+  }
+
+  async deleteTask(taskId: string) {
+    const task = await this.requireTask(taskId);
+    if (task.state?.status === 'running') {
+      throw new Error(`Heartbeat task ${taskId} is running. Wait for the run to finish before deleting it.`);
+    }
+
+    await this.repository.deleteTask(task);
+    return FileHeartbeatTaskService.projectTaskView(task);
   }
 
   async readTask(taskId: string, options: { runLimit?: number } = {}) {

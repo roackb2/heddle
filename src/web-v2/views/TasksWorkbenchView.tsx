@@ -9,6 +9,7 @@ interface TasksWorkbenchViewProps {
   error?: string;
   running: boolean;
   onEditTask: () => void;
+  onDeleteTask: () => void;
   onRunNow: () => Promise<void>;
   onSelectRun: (runId: string) => void;
 }
@@ -21,6 +22,7 @@ export function TasksWorkbenchView({
   error,
   running,
   onEditTask,
+  onDeleteTask,
   onRunNow,
   onSelectRun,
 }: TasksWorkbenchViewProps) {
@@ -39,7 +41,13 @@ export function TasksWorkbenchView({
   return (
     <div className="v2-scrollbar-hidden h-full min-w-0 overflow-auto">
       <div className="v2-task-workbench mx-auto flex w-full max-w-4xl flex-col gap-5 px-8 py-8">
-        <TaskWorkbenchHeader task={task} running={running} onEdit={onEditTask} onRunNow={onRunNow} />
+        <TaskWorkbenchHeader
+          task={task}
+          running={running}
+          onEdit={onEditTask}
+          onDelete={onDeleteTask}
+          onRunNow={onRunNow}
+        />
         <section className="min-w-0">
           <h2 className="v2-type-section-label mb-2 text-muted-foreground">Runs</h2>
           <TaskRunList liveTask={task} runs={runs} selectedRunId={selectedRunId} onSelectRun={onSelectRun} />

@@ -1,4 +1,4 @@
-import { Pencil, Play } from 'lucide-react';
+import { Pencil, Play, Trash2 } from 'lucide-react';
 import type { ControlPlaneHeartbeatTaskView } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
 import { useI18n } from '@web/i18n';
@@ -9,10 +9,11 @@ interface TaskWorkbenchHeaderProps {
   running: boolean;
   task: ControlPlaneHeartbeatTaskView;
   onEdit: () => void;
+  onDelete: () => void;
   onRunNow: () => Promise<void>;
 }
 
-export function TaskWorkbenchHeader({ running, task, onEdit, onRunNow }: TaskWorkbenchHeaderProps) {
+export function TaskWorkbenchHeader({ running, task, onEdit, onDelete, onRunNow }: TaskWorkbenchHeaderProps) {
   const { t } = useI18n();
   const runDisabled = running || !task.enabled || task.state.status === 'running';
 
@@ -42,6 +43,16 @@ export function TaskWorkbenchHeader({ running, task, onEdit, onRunNow }: TaskWor
             onClick={onEdit}
           >
             <Pencil aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            disabled={task.state.status === 'running'}
+            aria-label={t('tasks.delete.open')}
+            onClick={onDelete}
+          >
+            <Trash2 aria-hidden="true" />
           </Button>
           <Button
             type="button"

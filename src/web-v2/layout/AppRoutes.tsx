@@ -42,6 +42,7 @@ interface AppRoutesProps {
   onUpdateSessionReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
   onResolveSessionApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
   onEditTask: () => void;
+  onDeleteTask: () => void;
   onRunTaskNow: () => Promise<void>;
   onSelectTaskRun: (runId: string) => void;
 }
@@ -84,6 +85,7 @@ export function AppRoutes({
   onUpdateSessionReasoningEffort,
   onResolveSessionApproval,
   onEditTask,
+  onDeleteTask,
   onRunTaskNow,
   onSelectTaskRun,
 }: AppRoutesProps) {
@@ -110,6 +112,7 @@ export function AppRoutes({
     onUpdateSessionReasoningEffort,
     onResolveSessionApproval,
     onEditTask,
+    onDeleteTask,
     onRunTaskNow,
     onSelectTaskRun,
   };

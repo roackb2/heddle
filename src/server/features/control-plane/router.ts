@@ -16,6 +16,7 @@ import { ControlPlaneWorkspaceFilesController } from './controllers/workspace-fi
 import { ControlPlaneWorkspaceDiffController } from './controllers/workspace-diff.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
+import { FileHeartbeatTaskService } from '@/core/heartbeat/index.js';
 
 const sessionInputSchema = z.object({
   id: z.string().min(1),
@@ -332,6 +333,11 @@ export const controlPlaneRouter = router({
   heartbeatTaskUpdate: procedure.input(heartbeatTaskUpdateInputSchema).mutation(async ({ ctx, input }) => {
     return {
       task: await ControlPlaneHeartbeatController.updateTask(ctx.activeWorkspace.stateRoot, input.taskId, input),
+    };
+  }),
+  heartbeatTaskDelete: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
+    return {
+      task: await new FileHeartbeatTaskService({ stateRoot: ctx.activeWorkspace.stateRoot }).deleteTask(input.taskId),
     };
   }),
   heartbeatTask: procedure.input(heartbeatTaskDetailInputSchema).query(async ({ ctx, input }) => {

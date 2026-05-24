@@ -37,6 +37,7 @@ interface WorkbenchViewProps {
   onUpdateSessionReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
   onResolveSessionApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
   onEditTask: () => void;
+  onDeleteTask: () => void;
   onRunTaskNow: () => Promise<void>;
   onSelectTaskRun: (runId: string) => void;
 }
@@ -79,6 +80,7 @@ export function WorkbenchView({
   onUpdateSessionReasoningEffort,
   onResolveSessionApproval,
   onEditTask,
+  onDeleteTask,
   onRunTaskNow,
   onSelectTaskRun,
 }: WorkbenchViewProps) {
@@ -127,6 +129,7 @@ export function WorkbenchView({
           onUpdateSessionReasoningEffort,
           onResolveSessionApproval,
           onEditTask,
+          onDeleteTask,
           onRunTaskNow,
           onSelectTaskRun,
         })}
@@ -173,6 +176,7 @@ function renderWorkbenchSurface(args: RenderWorkbenchSurfaceArgs): ReactNode {
         running={args.selectedTaskRunSubmitting}
         task={args.selectedTask}
         onEditTask={args.onEditTask}
+        onDeleteTask={args.onDeleteTask}
         onRunNow={args.onRunTaskNow}
         onSelectRun={args.onSelectTaskRun}
       />

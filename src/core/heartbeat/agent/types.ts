@@ -24,9 +24,18 @@ export type HeartbeatEscalationEvent = {
 
 export type AgentHeartbeatEvent = AgentLoopEvent | HeartbeatDecisionEvent | HeartbeatEscalationEvent;
 
+export type HeartbeatRunnerAgentRunContext = {
+  currentDateTime: string;
+  intervalMs: number;
+  nextRunAt?: string;
+  previousRunAt?: string;
+  previousRunId?: string;
+};
+
 export type RunAgentHeartbeatOptions = Omit<RunAgentLoopOptions, 'goal' | 'resumeFrom' | 'onEvent'> & {
   task: string;
   checkpoint?: AgentLoopState | AgentLoopCheckpoint;
+  runContext?: HeartbeatRunnerAgentRunContext;
   onEvent?: (event: AgentHeartbeatEvent) => void;
 };
 

@@ -41,24 +41,32 @@ describe('heartbeat task service views', () => {
       workspaceId: 'workspace-1',
       task: 'Inspect repo state',
       enabled: true,
-      status: 'waiting',
-      decision: 'continue',
-      outcome: 'done',
-      progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
-      summary: 'Repository check complete.',
-      nextRunAt: '2026-04-14T00:01:00.000Z',
-      lastRunAt: '2026-04-14T00:00:00.000Z',
-      lastRunId: 'run_1',
-      loadedCheckpoint: true,
-      resumable: true,
-      usage: {
-        inputTokens: 100,
-        outputTokens: 20,
-        totalTokens: 120,
-        requests: 1,
+      schedule: {
+        intervalMs: 60_000,
+        nextRunAt: '2026-04-14T00:01:00.000Z',
       },
-      intervalMs: 60_000,
-      model: 'gpt-5.1-codex-mini',
+      runtime: {
+        model: 'gpt-5.1-codex-mini',
+      },
+      state: {
+        status: 'waiting',
+        progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
+        runAt: '2026-04-14T00:00:00.000Z',
+        runId: 'run_1',
+        loadedCheckpoint: true,
+        resumable: true,
+        result: {
+          decision: 'continue',
+          outcome: 'done',
+          summary: 'Repository check complete.',
+          usage: {
+            inputTokens: 100,
+            outputTokens: 20,
+            totalTokens: 120,
+            requests: 1,
+          },
+        },
+      },
     });
   });
 
@@ -67,25 +75,32 @@ describe('heartbeat task service views', () => {
     const view = service.projectRunView(createRunEntry());
 
     expect(view).toMatchObject({
-      id: '2026-04-14T00-00-00.000Z-repo-check',
+      id: 'run_1',
       taskId: 'repo-check',
       workspaceId: 'workspace-1',
       runId: 'run_1',
       createdAt: '2026-04-14T00:00:00.000Z',
-      task: 'Inspect repo state',
-      enabled: true,
-      status: 'waiting',
-      decision: 'continue',
-      outcome: 'done',
-      progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
-      summary: 'Repository check complete.',
       loadedCheckpoint: true,
-      resumable: true,
-      usage: {
-        inputTokens: 100,
-        outputTokens: 20,
-        totalTokens: 120,
-        requests: 1,
+      task: {
+        taskId: 'repo-check',
+        task: 'Inspect repo state',
+        enabled: true,
+        state: {
+          status: 'waiting',
+          progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',
+          resumable: true,
+        },
+      },
+      result: {
+        decision: 'continue',
+        outcome: 'done',
+        summary: 'Repository check complete.',
+        usage: {
+          inputTokens: 100,
+          outputTokens: 20,
+          totalTokens: 120,
+          requests: 1,
+        },
       },
     });
   });
@@ -99,7 +114,9 @@ describe('heartbeat task service views', () => {
     await expect(service.listTaskViews()).resolves.toMatchObject([
       {
         taskId: 'repo-check',
-        status: 'waiting',
+        state: {
+          status: 'waiting',
+        },
       },
     ]);
     await expect(service.listRunViews({ taskId: 'repo-check', limit: 1 })).resolves.toMatchObject([

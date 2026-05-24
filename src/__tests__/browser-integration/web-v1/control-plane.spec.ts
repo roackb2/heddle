@@ -42,7 +42,7 @@ test('shows heartbeat task and run history in the browser', async ({ page }) => 
   await expect(page.getByRole('button', { name: /^Browser heartbeat\b/ })).toBeVisible();
   await expect(page.getByText('Check browser integration heartbeat state.').first()).toBeVisible();
   await expect(page.getByText('Browser heartbeat completed.').first()).toBeVisible();
-  await expect(page.getByText('2026-04-14T00-00-00.000Z-browser-heartbeat').first()).toBeVisible();
+  await expect(page.getByText('browser-run-1').first()).toBeVisible();
   await expect(page.getByText('in 12 • out 6 • total 18').first()).toBeVisible();
 });
 

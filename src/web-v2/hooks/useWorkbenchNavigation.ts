@@ -40,6 +40,9 @@ export function useWorkbenchNavigation() {
     openSettings() {
       navigate(routeForSettingsSection(activeSettingsSectionId));
     },
+    selectSurface(surfaceId: AppSurfaceId, options?: { replace?: boolean }) {
+      navigate(routeForAppSurface(surfaceId), { replace: options?.replace ?? false });
+    },
     selectSession(sessionId: string, options?: { replace?: boolean }) {
       navigate(routeForSession(sessionId), { replace: options?.replace ?? false });
     },

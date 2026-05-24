@@ -118,6 +118,13 @@
       "save": "保存更改",
       "title": "编辑任务"
     },
+    "delete": {
+      "cancel": "取消",
+      "confirm": "删除任务",
+      "description": "删除此任务、checkpoint 和已记录的运行。此操作无法撤销。",
+      "open": "删除任务",
+      "title": "删除任务"
+    },
     "runNow": "立即运行",
     "runDetailsAriaLabel": "任务运行详情"
   },

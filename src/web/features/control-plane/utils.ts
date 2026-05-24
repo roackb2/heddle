@@ -75,11 +75,11 @@ export function describeHeartbeatExecution(task: {
   schedule: {
     nextRunAt?: string;
   };
-  state: {
+  state?: {
     status?: string;
   };
 }): { label: string; tone: 'good' | 'warn' | 'bad' | undefined; detail: string } {
-  const status = task.state.status;
+  const status = task.state?.status;
 
   if (status === 'running') {
     return {

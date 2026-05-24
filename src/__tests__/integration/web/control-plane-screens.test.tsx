@@ -222,91 +222,12 @@ function createControlPlaneState(): ControlPlaneState {
       createSession('session-four', undefined, 0),
     ],
     heartbeat: {
-      tasks: [
-        {
-          taskId: 'task-1',
-          workspaceId: 'primary',
-          name: 'Sync memory',
-          task: 'Summarize workspace state',
-          enabled: true,
-          status: 'waiting',
-          decision: 'continue',
-          outcome: 'done',
-          progress: 'Progress update',
-          summary: 'Latest task summary',
-          nextRunAt: '2026-04-02T01:00:00.000Z',
-          lastRunAt: '2026-04-02T00:30:00.000Z',
-          lastRunId: 'run-1',
-          loadedCheckpoint: true,
-          resumable: true,
-          usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
-          intervalMs: 60_000,
-          model: 'gpt-5.4',
-        },
-      ],
+      tasks: [createHeartbeatTaskView()],
       runs: [
-        {
-          id: 'run-1',
-          taskId: 'task-1',
-          workspaceId: 'primary',
-          runId: 'agent-run-1',
-          createdAt: '2026-04-02T00:30:00.000Z',
-          task: 'Summarize workspace state',
-          enabled: true,
-          status: 'complete',
-          decision: 'continue',
-          outcome: 'done',
-          progress: 'Run progress',
-          summary: 'Heartbeat completed',
-          loadedCheckpoint: true,
-          resumable: true,
-          usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
-        },
-        {
-          id: 'run-2',
-          taskId: 'task-1',
-          workspaceId: 'primary',
-          runId: 'agent-run-2',
-          createdAt: '2026-04-02T00:20:00.000Z',
-          task: 'Summarize workspace state',
-          enabled: true,
-          status: 'complete',
-          decision: 'continue',
-          outcome: 'done',
-          summary: 'Previous heartbeat completed',
-          loadedCheckpoint: false,
-          resumable: true,
-        },
-        {
-          id: 'run-3',
-          taskId: 'task-1',
-          workspaceId: 'primary',
-          runId: 'agent-run-3',
-          createdAt: '2026-04-02T00:10:00.000Z',
-          task: 'Summarize workspace state',
-          enabled: true,
-          status: 'complete',
-          decision: 'continue',
-          outcome: 'done',
-          summary: 'Older heartbeat completed',
-          loadedCheckpoint: false,
-          resumable: true,
-        },
-        {
-          id: 'run-4',
-          taskId: 'task-1',
-          workspaceId: 'primary',
-          runId: 'agent-run-4',
-          createdAt: '2026-04-02T00:00:00.000Z',
-          task: 'Summarize workspace state',
-          enabled: true,
-          status: 'complete',
-          decision: 'continue',
-          outcome: 'done',
-          summary: 'Oldest heartbeat completed',
-          loadedCheckpoint: false,
-          resumable: true,
-        },
+        createHeartbeatRunView('run-1', 'agent-run-1', '2026-04-02T00:30:00.000Z', 'Heartbeat completed', true),
+        createHeartbeatRunView('run-2', 'agent-run-2', '2026-04-02T00:20:00.000Z', 'Previous heartbeat completed', false),
+        createHeartbeatRunView('run-3', 'agent-run-3', '2026-04-02T00:10:00.000Z', 'Older heartbeat completed', false),
+        createHeartbeatRunView('run-4', 'agent-run-4', '2026-04-02T00:00:00.000Z', 'Oldest heartbeat completed', false),
       ],
     },
     memory: {
@@ -345,6 +266,70 @@ function createSession(id: string, model: string | undefined, turnCount: number)
     messageCount: turnCount + 1,
     turnCount,
     lastSummary: `${id} summary`,
+  };
+}
+
+function createHeartbeatTaskView(): ControlPlaneState['heartbeat']['tasks'][number] {
+  return {
+    id: 'task-1',
+    taskId: 'task-1',
+    workspaceId: 'primary',
+    name: 'Sync memory',
+    task: 'Summarize workspace state',
+    enabled: true,
+    schedule: {
+      intervalMs: 60_000,
+      nextRunAt: '2026-04-02T01:00:00.000Z',
+    },
+    runtime: {
+      model: 'gpt-5.4',
+    },
+    state: {
+      status: 'waiting',
+      progress: 'Progress update',
+      runAt: '2026-04-02T00:30:00.000Z',
+      runId: 'run-1',
+      loadedCheckpoint: true,
+      resumable: true,
+      result: {
+        decision: 'continue',
+        outcome: 'done',
+        summary: 'Latest task summary',
+        usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
+      },
+    },
+  };
+}
+
+function createHeartbeatRunView(
+  id: string,
+  runId: string,
+  createdAt: string,
+  summary: string,
+  loadedCheckpoint: boolean,
+): ControlPlaneState['heartbeat']['runs'][number] {
+  const task = createHeartbeatTaskView();
+  return {
+    id,
+    taskId: 'task-1',
+    workspaceId: 'primary',
+    runId,
+    createdAt,
+    task: {
+      ...task,
+      state: {
+        ...task.state,
+        status: 'complete',
+        progress: id === 'run-1' ? 'Run progress' : undefined,
+      },
+    },
+    result: {
+      decision: 'continue',
+      outcome: 'done',
+      summary,
+      usage: id === 'run-1' ? { inputTokens: 100, outputTokens: 20, totalTokens: 120 } : undefined,
+    },
+    loadedCheckpoint,
   };
 }
 
