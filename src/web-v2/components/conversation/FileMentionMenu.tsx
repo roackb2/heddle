@@ -1,7 +1,7 @@
 import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
 import { cn } from '@web/lib/utils';
-import type { FileMentionSuggestion } from './useFileMentionAutocomplete';
+import type { FileMentionSuggestion } from '@web/hooks/conversation/useFileMentionAutocomplete';
 
 const fileMentionI18n = {
   listboxLabel: 'composer.fileMentions.listboxLabel' as I18nMessageKey,

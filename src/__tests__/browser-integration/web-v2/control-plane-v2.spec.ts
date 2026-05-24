@@ -91,9 +91,10 @@ test('navigates primary and settings routes without hash routing', async ({ page
 test('shows task run workbench and run details', async ({ page }) => {
   await trpc.controlPlane.workspaceSetActive.mutate({ workspaceId: 'default' });
   await page.goto('/tasks');
+  const taskList = page.getByRole('region', { name: 'Tasks' });
 
   await expect(page).toHaveURL(/\/tasks\/browser-heartbeat$/);
-  await expect(page.getByRole('button', { name: /Browser heartbeat/ })).toHaveAttribute('aria-current', 'true');
+  await expect(taskList.getByRole('button', { name: /Browser heartbeat/ })).toHaveAttribute('aria-current', 'true');
   await expect(page.getByTestId('web-v2-surface-tasks')).toBeVisible();
   await expect(page.getByText('Check browser integration heartbeat state.').first()).toBeVisible();
   await expect(page.getByText('Browser heartbeat completed.').first()).toBeVisible();
@@ -133,10 +134,12 @@ test('shows task run workbench and run details', async ({ page }) => {
 });
 
 test('submits a prompt and renders the mocked session response', async ({ page }) => {
-  const session = await trpc.controlPlane.sessionCreate.mutate({ name: 'Web v2 submit smoke' });
+  const sessionName = `Web v2 submit smoke ${Date.now()}`;
+  const session = await trpc.controlPlane.sessionCreate.mutate({ name: sessionName });
 
   await page.goto('/sessions');
-  const sessionListItem = page.getByRole('button', { name: /Web v2 submit smoke/ });
+  const sessionList = page.getByRole('region', { name: 'Recent sessions' });
+  const sessionListItem = sessionList.getByRole('button', { name: new RegExp(sessionName) });
   await sessionListItem.click();
   await expect(page).toHaveURL(new RegExp(`/sessions/${session.id}$`));
   await expect(sessionListItem).toHaveAttribute('aria-current', 'true');
@@ -152,30 +155,29 @@ test('submits a prompt and renders the mocked session response', async ({ page }
 });
 
 test('updates session model and reasoning settings from the composer controls', async ({ page }) => {
+  const sessionName = `Web v2 settings smoke ${Date.now()}`;
   const session = await trpc.controlPlane.sessionCreate.mutate({
-    name: 'Web v2 settings smoke',
+    name: sessionName,
     model: 'gpt-5.4',
   });
 
   await page.goto('/sessions');
-  await page.getByRole('button', { name: /Web v2 settings smoke/ }).click();
+  await page.getByRole('region', { name: 'Recent sessions' }).getByRole('button', { name: new RegExp(sessionName) }).click();
   await expect(page).toHaveURL(new RegExp(`/sessions/${session.id}$`));
 
-  await page.getByRole('combobox', { name: 'Model' }).click();
-  await page.getByRole('option', { name: /^gpt-5\.5$/ }).click();
+  await page.getByRole('button', { name: /Execution settings/ }).click();
+  await page.getByRole('menuitemradio', { name: /^gpt-5\.5$/ }).click();
   await expect.poll(async () => (
     (await trpc.controlPlane.session.query({ id: session.id }))?.model
   )).toBe('gpt-5.5');
 
-  await page.getByRole('combobox', { name: 'Reasoning effort' }).click();
-  await page.getByRole('option', { name: 'High', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: 'High', exact: true }).click();
   await expect.poll(async () => (
     (await trpc.controlPlane.session.query({ id: session.id }))?.reasoningEffort
   )).toBe('high');
 
-  await page.getByRole('combobox', { name: 'Reasoning effort' }).click();
-  await page.getByRole('option', { name: 'Default' }).click();
+  await page.getByRole('menuitemradio', { name: 'Medium', exact: true }).click();
   await expect.poll(async () => (
     (await trpc.controlPlane.session.query({ id: session.id }))?.reasoningEffort
-  )).toBeUndefined();
+  )).toBe('medium');
 });
