@@ -36,6 +36,12 @@
     line-height: 1.125rem;
   }
 
+  .v2-type-control-option {
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.25rem;
+  }
+
   .v2-type-body {
     font-size: 0.9375rem;
     font-weight: 400;
