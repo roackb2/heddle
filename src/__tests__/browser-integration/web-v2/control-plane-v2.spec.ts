@@ -99,6 +99,9 @@ test('shows task run workbench and run details', async ({ page }) => {
   await expect(page.getByText('Browser heartbeat completed.').first()).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Task run details' })).toBeVisible();
   await expect(page.getByText('Run details')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Edit task' }).click();
+  await expect(page.getByRole('dialog', { name: 'Edit task' })).toBeVisible();
 });
 
 test('submits a prompt and renders the mocked session response', async ({ page }) => {

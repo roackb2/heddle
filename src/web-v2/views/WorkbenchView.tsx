@@ -126,6 +126,7 @@ export function WorkbenchView({
           onUpdateSessionModel,
           onUpdateSessionReasoningEffort,
           onResolveSessionApproval,
+          onEditTask,
           onRunTaskNow,
           onSelectTaskRun,
         })}
