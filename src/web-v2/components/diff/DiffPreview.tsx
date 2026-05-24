@@ -1,6 +1,6 @@
 import { skipToken } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   trpcReact,
   type ControlPlaneWorkspaceChangedFile,
@@ -16,7 +16,7 @@ export function DiffPreview() {
     refetchOnWindowFocus: true,
   });
   const [expandedPaths, setExpandedPaths] = useState<string[]>([]);
-  const files = changesQuery.data?.files ?? [];
+  const files = useMemo(() => changesQuery.data?.files ?? [], [changesQuery.data?.files]);
 
   useEffect(() => {
     if (!changesQuery.data) {

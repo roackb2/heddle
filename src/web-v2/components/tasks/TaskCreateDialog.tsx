@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import type { ControlPlaneHeartbeatTaskView, ControlPlaneModelOptions, RouterInputs } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
@@ -95,6 +95,8 @@ export function TaskCreateDialog({
       maxSteps: '',
     },
   });
+  const intervalMs = useWatch({ control: form.control, name: 'intervalMs' });
+  const model = useWatch({ control: form.control, name: 'model' });
   const editing = mode === 'edit';
 
   useEffect(() => {
@@ -158,7 +160,7 @@ export function TaskCreateDialog({
               <Field data-invalid={Boolean(form.formState.errors.intervalMs)}>
                 <FieldLabel>{t('tasks.create.schedule')}</FieldLabel>
                 <Select
-                  value={form.watch('intervalMs')}
+                  value={intervalMs}
                   onValueChange={(value) => form.setValue('intervalMs', value, { shouldDirty: true, shouldValidate: true })}
                 >
                   <SelectTrigger aria-invalid={Boolean(form.formState.errors.intervalMs)}>
@@ -191,7 +193,7 @@ export function TaskCreateDialog({
             <Field>
               <FieldLabel>{t('tasks.create.model')}</FieldLabel>
               <Select
-                value={form.watch('model')}
+                value={model}
                 onValueChange={(value) => form.setValue('model', value, { shouldDirty: true })}
               >
                 <SelectTrigger>

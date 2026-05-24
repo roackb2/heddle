@@ -76,6 +76,10 @@ The next-generation local control plane is a browser-based workspace for session
 
 ![Heddle web-v2 control plane work in progress](docs/images/control-plane-v2.png)
 
+Web-v2 also includes a task workbench for recurring heartbeat tasks, live run state, and run result review:
+
+![Heddle web-v2 heartbeat task workbench](docs/images/control-plane-v2-heartbeat-task.png)
+
 The same web-v2 control plane is also being shaped for mobile, with the session list, workbench, and diff preview exposed as focused panels:
 
 <p>
