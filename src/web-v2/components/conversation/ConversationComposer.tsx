@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowUp, Plus } from 'lucide-react';
 import type { ControlPlaneModelOptions } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
@@ -13,6 +13,9 @@ import { Textarea } from '@web/components/ui/textarea';
 import type { ControlPlaneReasoningEffortSelection } from '@web/hooks/sessions/useControlPlaneSessionDetail';
 import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
+import { FileMentionMenu } from './FileMentionMenu';
+import { SessionDriftControl, type SessionDriftLevel } from './SessionDriftControl';
+import { useFileMentionAutocomplete } from './useFileMentionAutocomplete';
 
 const composerTextareaMinHeight = 28;
 const composerTextareaMaxHeight = 176;
@@ -29,6 +32,8 @@ const reasoningEfforts = [
 // settings are API-backed by the parent session workflow.
 export function ConversationComposer({
   disabled,
+  driftEnabled,
+  driftLevel,
   model,
   modelOptions,
   reasoningEffort,
@@ -36,10 +41,13 @@ export function ConversationComposer({
   settingsError,
   submitting,
   onSubmitPrompt,
+  onUpdateDriftEnabled,
   onUpdateModel,
   onUpdateReasoningEffort,
 }: {
   disabled?: boolean;
+  driftEnabled?: boolean;
+  driftLevel?: SessionDriftLevel;
   model?: string;
   modelOptions?: ControlPlaneModelOptions;
   reasoningEffort?: Exclude<ControlPlaneReasoningEffortSelection, 'default'>;
@@ -47,12 +55,30 @@ export function ConversationComposer({
   settingsError?: string;
   submitting?: boolean;
   onSubmitPrompt: (prompt: string) => Promise<void>;
+  onUpdateDriftEnabled?: (enabled: boolean) => Promise<void>;
   onUpdateModel?: (model: string) => Promise<void>;
   onUpdateReasoningEffort?: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
 }) {
   const { t } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState('');
+  const sendDisabled = disabled || submitting || !draft.trim();
+  const handleSubmit = useCallback(async () => {
+    const prompt = draft.trim();
+    if (!prompt || sendDisabled) {
+      return;
+    }
+
+    setDraft('');
+    await onSubmitPrompt(prompt);
+  }, [draft, onSubmitPrompt, sendDisabled]);
+  const fileMentions = useFileMentionAutocomplete({
+    value: draft,
+    onValueChange: setDraft,
+    textareaRef,
+    disabled: disabled || submitting,
+    onSubmit: handleSubmit,
+  });
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
@@ -66,18 +92,6 @@ export function ConversationComposer({
     textarea.style.overflowY = textarea.scrollHeight > composerTextareaMaxHeight ? 'auto' : 'hidden';
   }, [draft]);
 
-  const sendDisabled = disabled || submitting || !draft.trim();
-
-  async function handleSubmit() {
-    const prompt = draft.trim();
-    if (!prompt || sendDisabled) {
-      return;
-    }
-
-    setDraft('');
-    await onSubmitPrompt(prompt);
-  }
-
   return (
     <form
       className="v2-composer-shell"
@@ -87,8 +101,12 @@ export function ConversationComposer({
       }}
     >
       <Textarea
-        ref={textareaRef}
+        ref={fileMentions.textareaRef}
         aria-label={t('composer.promptAriaLabel')}
+        aria-activedescendant={fileMentions.textareaProps['aria-activedescendant']}
+        aria-autocomplete={fileMentions.textareaProps['aria-autocomplete']}
+        aria-controls={fileMentions.textareaProps['aria-controls']}
+        aria-expanded={fileMentions.textareaProps['aria-expanded']}
         className="v2-composer-textarea"
         disabled={disabled || submitting}
         autoCapitalize="sentences"
@@ -100,14 +118,12 @@ export function ConversationComposer({
         rows={1}
         spellCheck
         value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.shiftKey && !event.altKey && !event.metaKey) {
-            event.preventDefault();
-            void handleSubmit();
-          }
-        }}
+        onChange={fileMentions.textareaProps.onChange}
+        onClick={fileMentions.textareaProps.onClick}
+        onKeyDown={fileMentions.textareaProps.onKeyDown}
+        onSelect={fileMentions.textareaProps.onSelect}
       />
+      {fileMentions.isOpen ? <FileMentionMenu {...fileMentions.menuProps} /> : null}
       <div className="v2-composer-toolbar">
         <Button
           type="button"
@@ -118,7 +134,16 @@ export function ConversationComposer({
         >
           <Plus aria-hidden="true" />
         </Button>
-        <div className="ml-auto flex min-w-0 items-center gap-1.5">
+        {onUpdateDriftEnabled ? (
+          <SessionDriftControl
+            disabled={disabled || settingsUpdating}
+            driftEnabled={driftEnabled ?? false}
+            driftLevel={driftLevel}
+            updating={settingsUpdating}
+            onUpdateDriftEnabled={onUpdateDriftEnabled}
+          />
+        ) : null}
+        <div className="v2-composer-toolbar-controls">
           <ModelSelect
             ariaLabel={t('composer.model')}
             disabled={disabled || settingsUpdating || !onUpdateModel}

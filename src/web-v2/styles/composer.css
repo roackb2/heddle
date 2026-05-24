@@ -28,8 +28,17 @@
   .v2-composer-toolbar {
     display: flex;
     min-width: 0;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .v2-composer-toolbar-controls {
+    margin-left: auto;
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.375rem;
   }
 
   .v2-composer-icon-button {
@@ -111,5 +120,157 @@
     background: color-mix(in oklab, var(--color-muted) 86%, var(--color-background));
     color: var(--color-muted-foreground);
     opacity: 1;
+  }
+
+  .v2-drift-control {
+    display: inline-flex;
+    height: 2rem;
+    max-width: 7.25rem;
+    min-width: 0;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: transparent;
+    padding-inline: 0.625rem;
+    color: var(--color-muted-foreground);
+    font-size: 0.8125rem;
+    line-height: 1rem;
+    box-shadow: none;
+  }
+
+  .v2-drift-control:hover {
+    background: color-mix(in oklab, var(--color-accent) 58%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .v2-drift-control svg {
+    height: 0.875rem;
+    width: 0.875rem;
+    flex-shrink: 0;
+  }
+
+  .v2-drift-control-enabled {
+    border-color: color-mix(in oklab, var(--color-border) 72%, transparent);
+    background: color-mix(in oklab, var(--color-muted) 44%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .v2-drift-control-medium {
+    border-color: color-mix(in oklab, var(--color-warning) 42%, var(--color-border));
+    color: color-mix(in oklab, var(--color-warning) 68%, var(--color-foreground));
+  }
+
+  .v2-drift-control-high {
+    border-color: color-mix(in oklab, var(--color-destructive) 46%, var(--color-border));
+    color: color-mix(in oklab, var(--color-destructive) 72%, var(--color-foreground));
+  }
+
+  .v2-file-mention-menu {
+    width: min(24rem, calc(100vw - 2rem));
+    max-height: 18rem;
+    overflow-y: auto;
+    border-radius: var(--radius-lg);
+    border: 1px solid color-mix(in oklab, var(--color-border) 76%, transparent);
+    background: var(--color-popover);
+    padding: 0.25rem;
+    box-shadow: 0 12px 28px hsl(235 18% 3% / 0.32);
+  }
+
+  .v2-file-mention-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.375rem 0.5rem;
+  }
+
+  .v2-file-mention-title,
+  .v2-file-mention-count,
+  .v2-file-mention-empty,
+  .v2-file-mention-path {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .v2-file-mention-title,
+  .v2-file-mention-count,
+  .v2-file-mention-empty {
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-file-mention-count {
+    flex-shrink: 0;
+  }
+
+  .v2-file-mention-option {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+    border-radius: var(--radius-sm);
+    padding: 0.5rem;
+    text-align: left;
+    color: var(--color-popover-foreground);
+  }
+
+  .v2-file-mention-option-active,
+  .v2-file-mention-option:hover {
+    background: color-mix(in oklab, var(--color-accent) 72%, transparent);
+    color: var(--color-accent-foreground);
+  }
+
+  .v2-file-mention-path {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+  }
+
+  .v2-file-mention-empty {
+    padding: 0.5rem;
+  }
+
+  .v2-file-mention-query {
+    font-family: var(--font-mono);
+    color: var(--color-popover-foreground);
+  }
+
+  @media (max-width: 38rem) {
+    .v2-composer-region {
+      padding: 0 1rem 1rem;
+    }
+
+    .v2-composer-shell {
+      border-radius: 1.25rem;
+      padding: 0.55rem;
+    }
+
+    .v2-composer-toolbar {
+      gap: 0.375rem;
+    }
+
+    .v2-composer-toolbar-controls {
+      flex: 1 1 auto;
+      justify-content: flex-end;
+    }
+
+    .v2-drift-control {
+      max-width: 6.5rem;
+      padding-inline: 0.5rem;
+    }
+
+    .v2-file-mention-menu {
+      max-height: 14rem;
+    }
+
+    .v2-composer-model-select {
+      max-width: 6rem;
+    }
+
+    .v2-composer-reasoning-select {
+      max-width: 5.75rem;
+    }
   }
 }

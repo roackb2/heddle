@@ -23,6 +23,7 @@ interface ConversationThreadProps {
   settingsError?: string;
   emptyTitle: string;
   onSubmitPrompt: (prompt: string) => Promise<void>;
+  onUpdateDriftEnabled: (enabled: boolean) => Promise<void>;
   onUpdateModel: (model: string) => Promise<void>;
   onUpdateReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
   onResolveApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
@@ -42,6 +43,7 @@ export function ConversationThread({
   settingsError,
   emptyTitle,
   onSubmitPrompt,
+  onUpdateDriftEnabled,
   onUpdateModel,
   onUpdateReasoningEffort,
   onResolveApproval,
@@ -104,6 +106,8 @@ export function ConversationThread({
       <div className="v2-composer-region">
         <ConversationComposer
           disabled={Boolean(pendingApproval)}
+          driftEnabled={session.driftEnabled ?? false}
+          driftLevel={session.driftLevel}
           model={session.model}
           modelOptions={modelOptions}
           reasoningEffort={session.reasoningEffort}
@@ -111,6 +115,7 @@ export function ConversationThread({
           settingsError={settingsError}
           submitting={submitting}
           onSubmitPrompt={onSubmitPrompt}
+          onUpdateDriftEnabled={onUpdateDriftEnabled}
           onUpdateModel={onUpdateModel}
           onUpdateReasoningEffort={onUpdateReasoningEffort}
         />

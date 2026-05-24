@@ -19,6 +19,7 @@ export type ControlPlaneSessionSettingsState = {
   modelOptions?: ControlPlaneModelOptions;
   settingsUpdating: boolean;
   settingsError?: string;
+  updateDriftEnabled: (enabled: boolean) => Promise<void>;
   updateModel: (model: string) => Promise<void>;
   updateReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
 };
@@ -66,6 +67,7 @@ export function useControlPlaneSessionSettings({
     modelOptions: modelOptionsQuery.data,
     settingsUpdating: updateSettingsMutation.isPending,
     settingsError: updateSettingsMutation.error instanceof Error ? updateSettingsMutation.error.message : undefined,
+    updateDriftEnabled: (enabled: boolean) => updateSettings({ driftEnabled: enabled }),
     updateModel: (model: string) => updateSettings({ model }),
     updateReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => updateSettings({
       reasoningEffort: value === 'default' ? null : value,

@@ -17,6 +17,31 @@
   },
   "composer": {
     "addContext": "加入脈絡",
+    "drift": {
+      "ariaLabel": "語意漂移",
+      "disabled": "漂移關閉",
+      "disableAction": "關閉漂移觀測",
+      "enabled": "漂移開啟",
+      "enableAction": "觀測漂移",
+      "note": "啟用後會使用 Platform API embeddings。",
+      "signal": "訊號",
+      "signalHigh": "漂移高",
+      "signalLow": "漂移低",
+      "signalMedium": "漂移中",
+      "signalUnknown": "漂移未知",
+      "title": "語意漂移",
+      "updating": "更新中"
+    },
+    "fileMentions": {
+      "empty": "找不到檔案：",
+      "listboxLabel": "檔案建議",
+      "match": "個符合",
+      "matches": "個符合",
+      "searching": "搜尋中",
+      "searchingWorkspace": "正在搜尋工作區檔案...",
+      "title": "@ 檔案",
+      "unavailable": "檔案搜尋無法使用。如果這個路由剛加入，請重新啟動 Heddle daemon。"
+    },
     "model": "模型",
     "placeholder": "送出後續訊息",
     "promptAriaLabel": "訊息",
