@@ -125,6 +125,7 @@
       "open": "Delete task",
       "title": "Delete task"
     },
+    "resume": "Resume",
     "runNow": "Run now",
     "runDetailsAriaLabel": "Task run details"
   },

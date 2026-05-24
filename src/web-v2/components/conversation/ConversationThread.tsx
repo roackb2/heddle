@@ -4,7 +4,7 @@ import type {
   ControlPlaneReasoningEffortSelection,
   ControlPlanePendingApproval,
   ControlPlaneSessionDetail,
-} from '@web/hooks/useControlPlaneSessionDetail';
+} from '@web/hooks/sessions/useControlPlaneSessionDetail';
 import { ApprovalPanel } from './ApprovalPanel';
 import { ConversationComposer } from './ConversationComposer';
 import { ConversationMessage } from './ConversationMessage';

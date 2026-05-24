@@ -182,6 +182,35 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
     return FileHeartbeatTaskService.projectTaskView(task);
   }
 
+  async resumeTask(taskId: string) {
+    const task = await this.requireTask(taskId);
+    if (task.state?.status === 'running') {
+      throw new Error(`Heartbeat task ${taskId} is already running.`);
+    }
+    if (task.state?.resumable === false) {
+      throw new Error(`Heartbeat task ${taskId} cannot be resumed.`);
+    }
+
+    const now = dayjs();
+    const nextTask: HeartbeatTask = {
+      ...task,
+      enabled: true,
+      schedule: {
+        ...task.schedule,
+        nextRunAt: now.subtract(1, 'second').toISOString(),
+      },
+      state: {
+        ...omit(task.state, ['error']),
+        status: 'waiting',
+        progress: 'Heartbeat task resumed. Waiting for the next scheduler poll.',
+        updatedAt: now.toISOString(),
+      },
+    };
+
+    await this.saveTask(nextTask);
+    return FileHeartbeatTaskService.projectTaskView(nextTask);
+  }
+
   async readTask(taskId: string, options: { runLimit?: number } = {}) {
     const task = await this.requireTask(taskId);
     const runs = await this.listRunViews({

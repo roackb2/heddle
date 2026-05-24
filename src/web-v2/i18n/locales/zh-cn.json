@@ -125,6 +125,7 @@
       "open": "删除任务",
       "title": "删除任务"
     },
+    "resume": "恢复",
     "runNow": "立即运行",
     "runDetailsAriaLabel": "任务运行详情"
   },

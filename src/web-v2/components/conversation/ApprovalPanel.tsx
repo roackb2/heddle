@@ -1,5 +1,5 @@
 import { BookmarkCheck, Check, ShieldAlert, XCircle } from 'lucide-react';
-import type { ControlPlaneApprovalDecision, ControlPlanePendingApproval } from '@web/hooks/useControlPlaneSessionDetail';
+import type { ControlPlaneApprovalDecision, ControlPlanePendingApproval } from '@web/hooks/sessions/useControlPlaneSessionDetail';
 import { Button } from '@web/components/ui/button';
 import { useI18n } from '@web/i18n';
 
