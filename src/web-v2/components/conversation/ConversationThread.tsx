@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent } from 'react';
 import type { ControlPlaneModelOptions } from '@web/api/client';
 import type {
   ControlPlaneApprovalDecision,
@@ -9,6 +10,16 @@ import { ApprovalPanel } from './ApprovalPanel';
 import { ConversationComposer } from './ConversationComposer';
 import { ConversationMessage } from './ConversationMessage';
 import { Loader2 } from 'lucide-react';
+
+const userScrollKeys = new Set([
+  'ArrowDown',
+  'ArrowUp',
+  'End',
+  'Home',
+  'PageDown',
+  'PageUp',
+  ' ',
+]);
 
 interface ConversationThreadProps {
   session: ControlPlaneSessionDetail;
@@ -48,6 +59,107 @@ export function ConversationThread({
   onUpdateReasoningEffort,
   onResolveApproval,
 }: ConversationThreadProps) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const autoScrollEnabledRef = useRef(true);
+  const userScrollIntentRef = useRef(false);
+  const previousResponseActiveRef = useRef(false);
+  const programmaticScrollFrameRef = useRef<number | undefined>(undefined);
+  const responseActive = Boolean(
+    submitting ||
+    liveStatus ||
+    session?.messages.some((message) => message.isStreaming || message.isPending),
+  );
+  const conversationScrollKey = useMemo(() => {
+    if (!session) {
+      return '';
+    }
+
+    const lastMessage = session.messages.at(-1);
+    return [
+      session.id,
+      session.messages.length,
+      lastMessage?.id,
+      lastMessage?.text.length,
+      lastMessage?.isStreaming,
+      lastMessage?.isPending,
+      liveStatus,
+    ].join(':');
+  }, [liveStatus, session]);
+  const scrollToBottom = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    if (programmaticScrollFrameRef.current) {
+      window.cancelAnimationFrame(programmaticScrollFrameRef.current);
+    }
+
+    userScrollIntentRef.current = false;
+    container.dataset.programmaticScroll = 'true';
+    container.scrollTop = container.scrollHeight;
+    programmaticScrollFrameRef.current = window.requestAnimationFrame(() => {
+      delete container.dataset.programmaticScroll;
+      programmaticScrollFrameRef.current = undefined;
+    });
+  }, []);
+  const handleUserScrollIntent = useCallback(() => {
+    if (responseActive) {
+      userScrollIntentRef.current = true;
+    }
+  }, [responseActive]);
+  const handleScrollKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
+    if (userScrollKeys.has(event.key)) {
+      handleUserScrollIntent();
+    }
+  }, [handleUserScrollIntent]);
+  const handleConversationScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container || container.dataset.programmaticScroll === 'true') {
+      return;
+    }
+
+    if (responseActive && userScrollIntentRef.current) {
+      autoScrollEnabledRef.current = false;
+    }
+  }, [responseActive]);
+
+  useEffect(() => () => {
+    if (programmaticScrollFrameRef.current) {
+      window.cancelAnimationFrame(programmaticScrollFrameRef.current);
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!session?.id) {
+      return;
+    }
+
+    autoScrollEnabledRef.current = true;
+    userScrollIntentRef.current = false;
+    scrollToBottom();
+  }, [scrollToBottom, session?.id]);
+
+  useEffect(() => {
+    if (responseActive && !previousResponseActiveRef.current) {
+      autoScrollEnabledRef.current = true;
+      userScrollIntentRef.current = false;
+      scrollToBottom();
+    }
+
+    if (!responseActive) {
+      userScrollIntentRef.current = false;
+    }
+
+    previousResponseActiveRef.current = responseActive;
+  }, [responseActive, scrollToBottom]);
+
+  useLayoutEffect(() => {
+    if (autoScrollEnabledRef.current) {
+      scrollToBottom();
+    }
+  }, [conversationScrollKey, scrollToBottom]);
+
   if (loading && !session) {
     return (
       <div className="flex h-full min-w-0 flex-col">
@@ -57,7 +169,7 @@ export function ConversationThread({
             <span>{emptyTitle}</span>
           </div>
         </div>
-      <div className="v2-composer-region">
+        <div className="v2-composer-region">
           <ConversationComposer disabled onSubmitPrompt={onSubmitPrompt} />
         </div>
       </div>
@@ -79,7 +191,15 @@ export function ConversationThread({
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <div className="v2-conversation-scroll v2-scrollbar-hidden min-h-0 flex-1 overflow-auto">
+      <div
+        ref={scrollContainerRef}
+        className="v2-conversation-scroll v2-scrollbar-hidden min-h-0 flex-1 overflow-auto"
+        onKeyDown={handleScrollKeyDown}
+        onPointerDown={handleUserScrollIntent}
+        onScroll={handleConversationScroll}
+        onTouchStart={handleUserScrollIntent}
+        onWheel={handleUserScrollIntent}
+      >
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-6 py-8">
           {loading ? (
             <div className="v2-type-panel-subtitle inline-flex items-center gap-2 text-muted-foreground">
