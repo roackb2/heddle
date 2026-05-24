@@ -8,6 +8,7 @@
 import { EventEmitter } from 'node:events';
 import dayjs from 'dayjs';
 import { FileHeartbeatTaskService, type AgentHeartbeatEvent, type HeartbeatSchedulerEvent } from '@/core/heartbeat/index.js';
+import { RuntimeSubscriptionStream } from '@/core/runtime/subscriptions/index.js';
 import type { ControlPlaneHeartbeatAgentEvent, ControlPlaneHeartbeatEvent, ControlPlaneHeartbeatEventEnvelope } from '../types.js';
 
 export class ControlPlaneHeartbeatEventsController {
@@ -30,38 +31,36 @@ export class ControlPlaneHeartbeatEventsController {
     workspaceId: string;
     signal?: AbortSignal;
   }): AsyncGenerator<ControlPlaneHeartbeatEventEnvelope> {
-    const queue = new ControlPlaneHeartbeatEventQueue();
-    const listener = (event: ControlPlaneHeartbeatEventEnvelope) => queue.push(event);
-    this.eventBus.on(args.workspaceId, listener);
+    const stream = RuntimeSubscriptionStream.fromSources<ControlPlaneHeartbeatEventEnvelope>({
+      signal: args.signal,
+      sources: [
+        (sink) => {
+          const listener = (event: ControlPlaneHeartbeatEventEnvelope) => sink.push(event);
+          this.eventBus.on(args.workspaceId, listener);
+          return () => this.eventBus.off(args.workspaceId, listener);
+        },
+        (sink) => {
+          const heartbeat = setInterval(() => {
+            sink.push({
+              type: 'heartbeat',
+              workspaceId: args.workspaceId,
+              timestamp: dayjs().toISOString(),
+            });
+          }, 15000);
+          heartbeat.unref?.();
 
-    const heartbeat = setInterval(() => {
-      queue.push({
-        type: 'heartbeat',
-        workspaceId: args.workspaceId,
-        timestamp: dayjs().toISOString(),
-      });
-    }, 15000);
-    heartbeat.unref?.();
+          sink.push({
+            type: 'ready',
+            workspaceId: args.workspaceId,
+            timestamp: dayjs().toISOString(),
+          });
 
-    const abort = () => queue.close();
-    args.signal?.addEventListener('abort', abort, { once: true });
-
-    queue.push({
-      type: 'ready',
-      workspaceId: args.workspaceId,
-      timestamp: dayjs().toISOString(),
+          return () => clearInterval(heartbeat);
+        },
+      ],
     });
 
-    try {
-      for await (const event of queue) {
-        yield event;
-      }
-    } finally {
-      clearInterval(heartbeat);
-      this.eventBus.off(args.workspaceId, listener);
-      args.signal?.removeEventListener('abort', abort);
-      queue.close();
-    }
+    yield* stream;
   }
 
   private static projectEvent(event: HeartbeatSchedulerEvent): ControlPlaneHeartbeatEvent {
@@ -123,48 +122,6 @@ export class ControlPlaneHeartbeatEventsController {
 
   private static resolveEventTimestamp(event: ControlPlaneHeartbeatEvent): string {
     return 'timestamp' in event && typeof event.timestamp === 'string' ? event.timestamp : dayjs().toISOString();
-  }
-}
-
-class ControlPlaneHeartbeatEventQueue implements AsyncIterable<ControlPlaneHeartbeatEventEnvelope> {
-  private readonly events: ControlPlaneHeartbeatEventEnvelope[] = [];
-  private readonly waiters: Array<(event: ControlPlaneHeartbeatEventEnvelope | undefined) => void> = [];
-  private closed = false;
-
-  push(event: ControlPlaneHeartbeatEventEnvelope): void {
-    if (this.closed) {
-      return;
-    }
-
-    const waiter = this.waiters.shift();
-    if (waiter) {
-      waiter(event);
-      return;
-    }
-
-    this.events.push(event);
-  }
-
-  close(): void {
-    if (this.closed) {
-      return;
-    }
-
-    this.closed = true;
-    this.waiters.splice(0).forEach((waiter) => waiter(undefined));
-  }
-
-  async *[Symbol.asyncIterator](): AsyncIterator<ControlPlaneHeartbeatEventEnvelope> {
-    while (!this.closed || this.events.length > 0) {
-      const event = this.events.shift() ?? await new Promise<ControlPlaneHeartbeatEventEnvelope | undefined>((resolve) => {
-        this.waiters.push(resolve);
-      });
-      if (!event) {
-        break;
-      }
-
-      yield event;
-    }
   }
 }
 

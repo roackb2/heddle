@@ -1,5 +1,5 @@
 import {
-  httpBatchLink,
+  httpLink,
   httpSubscriptionLink,
   splitLink,
 } from '@trpc/client';
@@ -13,7 +13,7 @@ const trpcLinks = [
     true: httpSubscriptionLink({
       url: '/trpc',
     }),
-    false: httpBatchLink({
+    false: httpLink({
       url: '/trpc',
     }),
   }),

@@ -83,7 +83,7 @@ flowchart TD
   Runtime --> Trace
   Activity --> Publisher["ControlPlaneChatSessionEventsController<br/>publishActivity / publishActivities"]
   Publisher --> Bus["EventEmitter keyed by sessionId"]
-  Bus --> Queue["ControlPlaneEventQueue<br/>AsyncIterable adapter"]
+  Bus --> Queue["RuntimeSubscriptionStream<br/>AsyncIterable adapter"]
   Queue --> TRPC["tRPC subscription<br/>controlPlane.sessionEvents"]
   Bus --> SSE["SSE endpoint<br/>/control-plane/sessions/:id/events"]
   TRPC --> WebV2["web-v2 hook<br/>useControlPlaneSessionEvents"]
@@ -267,12 +267,13 @@ cannot be watched yet:
 The control-plane controller uses an in-process `EventEmitter` keyed by
 `sessionId`. This keeps a live run scoped to the session that produced it.
 
-For tRPC subscriptions, `ControlPlaneEventQueue` adapts callbacks into an
-`AsyncIterable`. It is transport infrastructure only:
+For tRPC subscriptions, `RuntimeSubscriptionStream` in
+`src/core/runtime/subscriptions` adapts callbacks into an `AsyncIterable`. It is
+transport infrastructure only:
 
 - buffer events when the browser is not awaiting the next item yet;
 - wake pending readers when an event arrives;
-- close cleanly when the subscription aborts.
+- run source cleanup and close cleanly when the subscription aborts.
 
 It must not inspect or transform conversation activities. Event vocabulary
 belongs to the conversation engine and the session event publisher.

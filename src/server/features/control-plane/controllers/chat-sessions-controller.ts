@@ -37,6 +37,7 @@ import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import { ModelPolicyService } from '@/core/llm/models/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
+import { RuntimeSubscriptionStream } from '@/core/runtime/subscriptions/index.js';
 import type { ToolCall, ToolDefinition } from '@/core/types.js';
 import { ControlPlaneChatSessionEventsController } from './chat-session-events.js';
 import { ControlPlaneChatSessionPresenter } from './chat-session-presenter.js';
@@ -180,92 +181,74 @@ export class ControlPlaneChatSessionsController {
     sessionId: string;
     signal?: AbortSignal;
   }): AsyncGenerator<ControlPlaneSessionEventEnvelope> {
-    const queue = new ControlPlaneEventQueue<ControlPlaneSessionEventEnvelope>();
-
-    // Live LLM/tool/compaction updates arrive through the in-memory event bus.
-    // This is the path that streams assistant text to the client during a run;
-    // it does not touch the session file for each model delta.
-    const unsubscribe = this.subscribeToEvents(args.sessionId, (event) => {
-      queue.push({
-        ...event,
-        type: 'session.event',
-      });
+    const stream = RuntimeSubscriptionStream.fromSources<ControlPlaneSessionEventEnvelope>({
+      signal: args.signal,
+      sources: [
+        // Live LLM/tool/compaction updates arrive through the in-memory event
+        // bus. This path streams assistant text without touching the session
+        // file for each model delta.
+        (sink) => this.subscribeToEvents(args.sessionId, (event) => {
+          sink.push({
+            ...event,
+            type: 'session.event',
+          });
+        }),
+        (sink) => {
+          try {
+            // File changes represent durable session persistence, usually
+            // after a turn finishes or settings/session metadata are saved.
+            const watcher = watch(this.resolveFilePath(args.stateRoot, args.sessionId), { persistent: false }, () => {
+              sink.push({
+                type: 'session.updated',
+                sessionId: args.sessionId,
+                timestamp: new Date().toISOString(),
+              });
+            });
+            return () => watcher.close();
+          } catch {
+            // A newly selected or newly created session may not have a
+            // watchable file yet. Keep the subscription alive so later live
+            // events can still flow.
+            sink.push({
+              type: 'waiting',
+              sessionId: args.sessionId,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        },
+      ],
     });
 
-    // Closing the browser subscription closes the queue, which lets the async
-    // iterator below exit and release the EventEmitter listener/file watcher.
-    const abort = () => queue.close();
-    args.signal?.addEventListener('abort', abort, { once: true });
-
-    let watcher: ReturnType<typeof watch> | undefined;
-    try {
-      // File changes represent durable session persistence, usually after a
-      // turn finishes or settings/session metadata are saved. They are not the
-      // source of token streaming; they only tell the client to refetch the
-      // persisted session snapshot.
-      watcher = watch(this.resolveFilePath(args.stateRoot, args.sessionId), { persistent: false }, () => {
-        queue.push({
-          type: 'session.updated',
-          sessionId: args.sessionId,
-          timestamp: new Date().toISOString(),
-        });
-      });
-    } catch {
-      // A newly selected or newly created session may not have a watchable file
-      // yet. Keep the subscription alive so later live events can still flow.
-      queue.push({
-        type: 'waiting',
-        sessionId: args.sessionId,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    try {
-      // tRPC consumes this AsyncGenerator and forwards each envelope to the
-      // browser as a subscription payload.
-      for await (const event of queue) {
-        yield event;
-      }
-    } finally {
-      unsubscribe();
-      watcher?.close();
-      args.signal?.removeEventListener('abort', abort);
-      queue.close();
-    }
+    yield* stream;
   }
 
   async *subscribeSessionListEvents(args: {
     stateRoot: string;
     signal?: AbortSignal;
   }): AsyncGenerator<ControlPlaneSessionsEventEnvelope> {
-    const queue = new ControlPlaneEventQueue<ControlPlaneSessionsEventEnvelope>();
-    const abort = () => queue.close();
-    args.signal?.addEventListener('abort', abort, { once: true });
+    const stream = RuntimeSubscriptionStream.fromSources<ControlPlaneSessionsEventEnvelope>({
+      signal: args.signal,
+      sources: [
+        (sink) => {
+          try {
+            const watcher = watch(join(args.stateRoot, 'chat-sessions.catalog.json'), { persistent: false }, () => {
+              sink.push({
+                type: 'sessions.updated',
+                timestamp: new Date().toISOString(),
+              });
+            });
+            return () => watcher.close();
+          } catch {
+            sink.push({
+              type: 'waiting',
+              timestamp: new Date().toISOString(),
+            });
+          }
+        },
+      ],
+    });
 
-    let watcher: ReturnType<typeof watch> | undefined;
-    try {
-      watcher = watch(join(args.stateRoot, 'chat-sessions.catalog.json'), { persistent: false }, () => {
-        queue.push({
-          type: 'sessions.updated',
-          timestamp: new Date().toISOString(),
-        });
-      });
-    } catch {
-      queue.push({
-        type: 'waiting',
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    try {
-      for await (const event of queue) {
-        yield event;
-      }
-    } finally {
-      watcher?.close();
-      args.signal?.removeEventListener('abort', abort);
-      queue.close();
-    }
+    yield* stream;
   }
 
   getPendingApproval(sessionId: string): ToolApprovalRequest | undefined {
@@ -564,55 +547,3 @@ export class ControlPlaneChatSessionsController {
 }
 
 export const controlPlaneChatSessionsController = new ControlPlaneChatSessionsController();
-
-/**
- * Per-subscription delivery queue for control-plane events.
- *
- * Some controller sources use EventEmitter and others use file watchers, while
- * tRPC subscriptions consume an AsyncIterable. This queue is the transport
- * adapter between push callbacks and subscription iteration.
- *
- * Boundary: this class must stay transport/infrastructure-only. It should not
- * inspect or transform event payloads.
- */
-class ControlPlaneEventQueue<Event> implements AsyncIterable<Event> {
-  private readonly events: Event[] = [];
-  private readonly waiters: Array<(event: Event | undefined) => void> = [];
-  private closed = false;
-
-  push(event: Event): void {
-    if (this.closed) {
-      return;
-    }
-
-    const waiter = this.waiters.shift();
-    if (waiter) {
-      waiter(event);
-      return;
-    }
-
-    this.events.push(event);
-  }
-
-  close(): void {
-    if (this.closed) {
-      return;
-    }
-
-    this.closed = true;
-    this.waiters.splice(0).forEach((waiter) => waiter(undefined));
-  }
-
-  async *[Symbol.asyncIterator](): AsyncIterator<Event> {
-    while (!this.closed || this.events.length > 0) {
-      const event = this.events.shift() ?? await new Promise<Event | undefined>((resolve) => {
-        this.waiters.push(resolve);
-      });
-      if (!event) {
-        break;
-      }
-
-      yield event;
-    }
-  }
-}

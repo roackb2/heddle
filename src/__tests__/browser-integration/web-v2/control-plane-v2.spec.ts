@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
+import { createTRPCProxyClient, httpLink } from '@trpc/client';
 import type { AppRouter } from '../../../server/router';
 
 const serverPort = process.env.HEDDLE_BROWSER_INTEGRATION_SERVER_PORT ?? '19876';
 const trpc = createTRPCProxyClient<AppRouter>({
   links: [
-    httpBatchLink({
+    httpLink({
       url: `http://127.0.0.1:${serverPort}/trpc`,
     }),
   ],
