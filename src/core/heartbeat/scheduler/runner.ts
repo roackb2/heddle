@@ -6,6 +6,7 @@
  * history persistence. The scheduler decides when a task is due; this service
  * decides how that task is executed and recorded.
  */
+import dayjs from 'dayjs';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import type { AgentLoopCheckpoint, AgentLoopState } from '@/core/runtime/loop/index.js';
@@ -32,7 +33,7 @@ export class HeartbeatTaskRunnerService {
     },
   ): Promise<{ record?: HeartbeatTaskRunRecord; failed: boolean }> {
     const { task, runAt } = options;
-    const timestamp = runAt.toISOString();
+    const timestamp = dayjs(runAt).toISOString();
     try {
       const checkpoint = await options.store.loadCheckpoint(task);
       const loadedCheckpoint = Boolean(checkpoint);
@@ -84,7 +85,7 @@ export class HeartbeatTaskRunnerService {
 
   // Runs one task by id for operator-triggered paths such as web-v2 "Run now".
   static async runTaskById(options: RunDueHeartbeatTasksOptions & { taskId: string }): Promise<RunDueHeartbeatTasksResult> {
-    const now = options.now?.() ?? new Date();
+    const now = options.now?.() ?? dayjs().toDate();
     const tasks = await options.store.listTasks();
     const task = tasks.find((candidate) => candidate.id === options.taskId);
     if (!task) {
@@ -139,7 +140,7 @@ export class HeartbeatTaskRunnerService {
       task: args.task.task,
       checkpoint: args.checkpoint,
       runContext: {
-        currentDateTime: args.runAt.toISOString(),
+        currentDateTime: dayjs(args.runAt).toISOString(),
         intervalMs: args.task.schedule.intervalMs,
         nextRunAt: args.task.schedule.nextRunAt,
         previousRunAt: args.task.state?.runAt,
@@ -155,7 +156,7 @@ export class HeartbeatTaskRunnerService {
           type: 'heartbeat.task.agent_event',
           taskId: args.task.id,
           event,
-          timestamp: 'timestamp' in event && typeof event.timestamp === 'string' ? event.timestamp : new Date().toISOString(),
+          timestamp: 'timestamp' in event && typeof event.timestamp === 'string' ? event.timestamp : dayjs().toISOString(),
         });
       },
     };

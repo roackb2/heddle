@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import dayjs from 'dayjs';
 import { trpcReact, type ControlPlaneHeartbeatEventEnvelope, type ControlPlaneHeartbeatTaskView } from '@web/api/client';
 
 export type ControlPlaneLiveTaskState = {
@@ -47,7 +48,7 @@ export function useControlPlaneHeartbeatEvents() {
   });
 
   const markTaskRunQueued = useCallback((taskId: string) => {
-    const timestamp = new Date().toISOString();
+    const timestamp = dayjs().toISOString();
     setLiveTasks((current) => ({
       ...current,
       [taskId]: {
@@ -70,7 +71,7 @@ function applyHeartbeatEvent(
   event: Extract<ControlPlaneHeartbeatEventEnvelope, { type: 'heartbeat.event' }>['event'],
 ): Record<string, ControlPlaneLiveTaskState> {
   const currentTask = current[event.taskId];
-  const timestamp = 'timestamp' in event && typeof event.timestamp === 'string' ? event.timestamp : new Date().toISOString();
+  const timestamp = 'timestamp' in event && typeof event.timestamp === 'string' ? event.timestamp : dayjs().toISOString();
   const base = {
     taskId: event.taskId,
     status: currentTask?.status ?? 'waiting',

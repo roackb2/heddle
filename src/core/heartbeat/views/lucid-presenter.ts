@@ -4,6 +4,7 @@
  * Adapts heartbeat task, run, and scheduler projections into Lucid-style agent
  * notifications. This is an integration projection, not scheduler policy.
  */
+import dayjs from 'dayjs';
 import type { HeartbeatSchedulerEvent } from '../scheduler/index.js';
 import type { HeartbeatTaskStatus } from '../tasks/index.js';
 import type {
@@ -36,7 +37,7 @@ export class HeartbeatLucidPresenter {
     options: LucidAdapterOptions = {},
   ): LucidAgentMessage[] {
     const agentId = HeartbeatLucidPresenter.resolveAgentId(task.taskId, options);
-    const timestamp = task.state.runAt ?? task.schedule.nextRunAt ?? new Date().toISOString();
+    const timestamp = task.state.runAt ?? task.schedule.nextRunAt ?? dayjs().toISOString();
     const messages: LucidAgentMessage[] = [
       HeartbeatLucidPresenter.statusMessage(agentId, HeartbeatLucidPresenter.taskStatusToLucidStatus(task.state.status), timestamp),
     ];

@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import dayjs from 'dayjs';
 import { z } from 'zod';
 import { BUILT_IN_MODEL_GROUPS, ModelPolicyService } from '../../../core/llm/models/index.js';
 import { LlmAdapterService } from '../../../core/llm/index.js';
@@ -404,7 +405,7 @@ export const controlPlaneRouter = router({
       event: {
         type: 'heartbeat.task.due',
         taskId: input.taskId,
-        timestamp: new Date().toISOString(),
+        timestamp: dayjs().toISOString(),
       },
     });
 

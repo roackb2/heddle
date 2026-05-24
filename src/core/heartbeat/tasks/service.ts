@@ -1,5 +1,7 @@
 import { resolve } from 'node:path';
+import dayjs from 'dayjs';
 import omit from 'lodash/omit.js';
+import orderBy from 'lodash/orderBy.js';
 import { FileHeartbeatTaskRepository } from './repository.js';
 import type {
   FileHeartbeatTaskRepositoryOptions,
@@ -89,7 +91,11 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
   }
 
   async listTaskViews() {
-    return (await this.listTasks()).map((task) => FileHeartbeatTaskService.projectTaskView(task));
+    return orderBy(
+      (await this.listTasks()).map((task) => FileHeartbeatTaskService.projectTaskView(task)),
+      [(task) => FileHeartbeatTaskService.taskLastRunTime(task)],
+      ['desc'],
+    );
   }
 
   async listRunViews(options: { taskId?: string; limit?: number } = {}) {
@@ -99,7 +105,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
 
   async createTask(input: CreateHeartbeatTaskInput) {
     const tasks = await this.listTasks();
-    const now = new Date();
+    const now = dayjs();
     const id = input.id ?? FileHeartbeatTaskService.createTaskId(input.name ?? input.task, tasks.map((task) => task.id));
     if (tasks.some((task) => task.id === id)) {
       throw new Error(`Heartbeat task already exists: ${id}`);
@@ -114,7 +120,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       enabled: input.enabled ?? true,
       schedule: {
         intervalMs,
-        nextRunAt: input.defer === false ? new Date(now.getTime() - 1_000).toISOString() : new Date(now.getTime() + intervalMs).toISOString(),
+        nextRunAt: (input.defer === false ? now.subtract(1, 'second') : now.add(intervalMs, 'millisecond')).toISOString(),
       },
       runtime: {
         model: input.model,
@@ -136,7 +142,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
 
   async updateTask(taskId: string, input: UpdateHeartbeatTaskInput) {
     const task = await this.requireTask(taskId);
-    const now = new Date();
+    const now = dayjs();
     const intervalMs = input.intervalMs ?? task.schedule.intervalMs;
     const running = task.state?.status === 'running';
     const nextTask: HeartbeatTask = {
@@ -147,7 +153,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       schedule: {
         ...task.schedule,
         intervalMs,
-        nextRunAt: running ? task.schedule.nextRunAt : new Date(now.getTime() + intervalMs).toISOString(),
+        nextRunAt: running ? task.schedule.nextRunAt : now.add(intervalMs, 'millisecond').toISOString(),
       },
       runtime: {
         ...task.runtime,
@@ -203,7 +209,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
 
   async setTaskEnabled(taskId: string, enabled: boolean) {
     const task = await this.requireTask(taskId);
-    const now = new Date();
+    const now = dayjs();
     const status = enabled ? (task.state?.status ?? 'waiting') : (task.state?.status === 'running' ? 'running' : 'idle');
     const nextTask: HeartbeatTask = {
       ...task,
@@ -212,7 +218,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
         ...task.schedule,
         nextRunAt:
           enabled ?
-            task.schedule.nextRunAt ?? new Date(now.getTime() - 1_000).toISOString()
+            task.schedule.nextRunAt ?? now.subtract(1, 'second').toISOString()
           : undefined,
       },
       state: {
@@ -231,13 +237,13 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       throw new Error(`Heartbeat task ${taskId} is disabled. Enable it before triggering a run.`);
     }
 
-    const now = new Date();
+    const now = dayjs();
     const status = task.state?.status === 'running' ? 'running' : 'waiting';
     const nextTask: HeartbeatTask = {
       ...task,
       schedule: {
         ...task.schedule,
-        nextRunAt: new Date(now.getTime() - 1_000).toISOString(),
+        nextRunAt: now.subtract(1, 'second').toISOString(),
       },
       state: {
         ...task.state,
@@ -316,6 +322,11 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       outcome: result.state.outcome,
       usage: result.state.usage,
     };
+  }
+
+  private static taskLastRunTime(task: HeartbeatTaskView): number {
+    const runAt = task.state.runAt ? dayjs(task.state.runAt) : undefined;
+    return runAt?.isValid() ? runAt.valueOf() : 0;
   }
 
   private static resolveHeartbeatRoot(options: FileHeartbeatTaskServiceOptions): string {

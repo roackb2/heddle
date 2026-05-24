@@ -5,6 +5,8 @@
  * not execute tasks directly; selected task execution is delegated to
  * `HeartbeatTaskRunnerService`.
  */
+import dayjs from 'dayjs';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore.js';
 import { FileHeartbeatTaskService, type HeartbeatTask, type HeartbeatTaskRunRecord } from '../tasks/index.js';
 import { HeartbeatTaskRunnerService } from './runner.js';
 import type {
@@ -16,6 +18,8 @@ import type {
 } from './types.js';
 
 const DEFAULT_SCHEDULER_POLL_INTERVAL_MS = 60_000;
+
+dayjs.extend(isSameOrBefore);
 
 export class HeartbeatSchedulerService {
   // Starts a background scheduler loop for one workspace and returns a handle the host can stop.
@@ -48,14 +52,15 @@ export class HeartbeatSchedulerService {
 
   // Scans stored tasks once, picks enabled tasks whose nextRunAt is due, and delegates each selected task to the runner service.
   static async runDueTasks(options: RunDueHeartbeatTasksOptions): Promise<RunDueHeartbeatTasksResult> {
-    const now = options.now?.() ?? new Date();
+    const now = options.now?.() ?? dayjs().toDate();
+    const timestamp = dayjs(now).toISOString();
     const tasks = await options.store.listTasks();
     const dueTasks = tasks.filter((task) => HeartbeatSchedulerService.isTaskDue(task, now));
     const records: HeartbeatTaskRunRecord[] = [];
     let failed = 0;
 
     for (const task of dueTasks) {
-      options.onEvent?.({ type: 'heartbeat.task.due', taskId: task.id, timestamp: now.toISOString() });
+      options.onEvent?.({ type: 'heartbeat.task.due', taskId: task.id, timestamp });
       const result = await HeartbeatTaskRunnerService.runTask({ ...options, task, runAt: now });
       if (result.record) {
         records.push(result.record);
@@ -75,20 +80,20 @@ export class HeartbeatSchedulerService {
 
   // Repeats due-task checks until the host aborts the loop.
   static async runLoop(options: RunHeartbeatSchedulerOptions): Promise<void> {
-    options.onEvent?.({ type: 'heartbeat.scheduler.started', timestamp: (options.now?.() ?? new Date()).toISOString() });
+    options.onEvent?.({ type: 'heartbeat.scheduler.started', timestamp: HeartbeatSchedulerService.resolveNowIso(options) });
     try {
       while (!options.signal?.aborted) {
         await HeartbeatSchedulerService.runDueTasks(options);
         await (options.sleep ?? HeartbeatSchedulerService.sleep)(options.pollIntervalMs ?? DEFAULT_SCHEDULER_POLL_INTERVAL_MS, options.signal);
       }
-      options.onEvent?.({ type: 'heartbeat.scheduler.stopped', reason: 'aborted', timestamp: (options.now?.() ?? new Date()).toISOString() });
+      options.onEvent?.({ type: 'heartbeat.scheduler.stopped', reason: 'aborted', timestamp: HeartbeatSchedulerService.resolveNowIso(options) });
     } catch (error) {
       if (options.signal?.aborted) {
-        options.onEvent?.({ type: 'heartbeat.scheduler.stopped', reason: 'aborted', timestamp: (options.now?.() ?? new Date()).toISOString() });
+        options.onEvent?.({ type: 'heartbeat.scheduler.stopped', reason: 'aborted', timestamp: HeartbeatSchedulerService.resolveNowIso(options) });
         return;
       }
 
-      options.onEvent?.({ type: 'heartbeat.scheduler.stopped', reason: 'error', timestamp: (options.now?.() ?? new Date()).toISOString() });
+      options.onEvent?.({ type: 'heartbeat.scheduler.stopped', reason: 'error', timestamp: HeartbeatSchedulerService.resolveNowIso(options) });
       throw error;
     }
   }
@@ -106,8 +111,12 @@ export class HeartbeatSchedulerService {
       return true;
     }
 
-    const nextRunAt = Date.parse(task.schedule.nextRunAt);
-    return Number.isFinite(nextRunAt) && nextRunAt <= now.getTime();
+    const nextRunAt = dayjs(task.schedule.nextRunAt);
+    return nextRunAt.isValid() && nextRunAt.isSameOrBefore(dayjs(now));
+  }
+
+  private static resolveNowIso(options: Pick<RunDueHeartbeatTasksOptions, 'now'>): string {
+    return dayjs(options.now?.() ?? dayjs()).toISOString();
   }
 
   // Sleeps between polling cycles and resolves early when the host aborts the scheduler.

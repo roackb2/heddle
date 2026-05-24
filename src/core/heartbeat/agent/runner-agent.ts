@@ -6,6 +6,7 @@
  * model/tool stepping to `AgentLoopRuntimeService`.
  */
 import { resolve } from 'node:path';
+import dayjs from 'dayjs';
 import { MemoryCatalogService } from '@/core/memory/catalog.js';
 import { AgentLoopCheckpointService, AgentLoopRuntimeService } from '@/core/runtime/loop/index.js';
 import type { RunAgentLoopOptions } from '@/core/runtime/loop/index.js';
@@ -22,7 +23,7 @@ export class HeartbeatRunnerAgent {
     const decision = HeartbeatDecisionPolicy.infer(result.summary, result.outcome);
     const runId = result.state.runId;
     const checkpoint = AgentLoopCheckpointService.createCheckpoint(result.state);
-    const now = () => new Date().toISOString();
+    const now = () => dayjs().toISOString();
 
     options.onEvent?.({
       type: 'heartbeat.decision',

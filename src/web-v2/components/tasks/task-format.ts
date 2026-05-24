@@ -1,5 +1,8 @@
 import dayjs from 'dayjs';
+import duration from 'dayjs/plugin/duration.js';
 import type { ControlPlaneHeartbeatRunView, ControlPlaneHeartbeatTaskView } from '@web/api/client';
+
+dayjs.extend(duration);
 
 export const TASK_STATUS_TONE = {
   idle: 'muted',
@@ -19,12 +22,13 @@ export function formatTaskInterval(intervalMs: number | undefined): string {
     return 'not scheduled';
   }
 
-  const minutes = Math.round(intervalMs / 60_000);
+  const interval = dayjs.duration(intervalMs);
+  const minutes = Math.round(interval.asMinutes());
   if (minutes < 60) {
     return `every ${minutes}m`;
   }
 
-  const hours = Math.round(minutes / 60);
+  const hours = Math.round(dayjs.duration(minutes, 'minutes').asHours());
   return `every ${hours}h`;
 }
 

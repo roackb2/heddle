@@ -130,11 +130,25 @@ describe('heartbeat task service views', () => {
       runId: 'run_1',
     });
   });
+
+  it('lists task views newest last run first', async () => {
+    const service = new FileHeartbeatTaskService({ dir: await mkdtemp(join(tmpdir(), 'heddle-heartbeat-task-order-')) });
+    await service.saveTask(createTask({ id: 'older', runAt: '2026-04-14T00:00:00.000Z' }));
+    await service.saveTask(createTask({ id: 'newer', runAt: '2026-04-14T00:10:00.000Z' }));
+    await service.saveTask(createTask({ id: 'never-run', runAt: undefined }));
+
+    await expect(service.listTaskViews()).resolves.toMatchObject([
+      { taskId: 'newer' },
+      { taskId: 'older' },
+      { taskId: 'never-run' },
+    ]);
+  });
 });
 
-function createTask(): HeartbeatTask {
+function createTask(options: { id?: string; runAt?: string } = {}): HeartbeatTask {
+  const runAt = Object.hasOwn(options, 'runAt') ? options.runAt : '2026-04-14T00:00:00.000Z';
   return {
-    id: 'repo-check',
+    id: options.id ?? 'repo-check',
     workspaceId: 'workspace-1',
     task: 'Inspect repo state',
     enabled: true,
@@ -144,8 +158,8 @@ function createTask(): HeartbeatTask {
     },
     state: {
       status: 'waiting',
-      runAt: '2026-04-14T00:00:00.000Z',
-      runId: 'run_1',
+      runAt,
+      runId: runAt === undefined ? undefined : 'run_1',
       loadedCheckpoint: true,
       resumable: true,
       progress: 'Heartbeat runner finished. Waiting until the next scheduled run in 1m.',

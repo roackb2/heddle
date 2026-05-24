@@ -7,6 +7,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
+import dayjs from 'dayjs';
 import type { AgentLoopCheckpoint } from '@/core/runtime/loop/index.js';
 import { AgentLoopCheckpointSchema, HeartbeatTaskRunRecordSchema, HeartbeatTaskSchema } from './schemas.js';
 import { HeartbeatTaskStateProjector } from './task-state.js';
@@ -74,7 +75,7 @@ export class FileHeartbeatTaskRepository implements HeartbeatTaskStore {
   }
 
   async saveRunRecord(record: HeartbeatTaskRunRecord): Promise<void> {
-    const timestamp = new Date().toISOString().replaceAll(':', '-');
+    const timestamp = dayjs().toISOString().replaceAll(':', '-');
     const path = join(this.runsDir, `${timestamp}-${FileHeartbeatTaskRepository.safeTaskFileName(record.task.id)}.json`);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, `${JSON.stringify(HeartbeatTaskRunRecordSchema.parse(record), null, 2)}\n`);

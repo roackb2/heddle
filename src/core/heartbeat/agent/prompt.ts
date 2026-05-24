@@ -4,7 +4,11 @@
  * Owns the autonomous heartbeat instructions that are added around a durable
  * task before it is handed to the generic runtime loop.
  */
+import dayjs from 'dayjs';
+import duration from 'dayjs/plugin/duration.js';
 import type { HeartbeatRunnerAgentRunContext } from './types.js';
+
+dayjs.extend(duration);
 
 export class HeartbeatRunnerAgentPrompt {
   static buildGoal(task: string, runContext?: HeartbeatRunnerAgentRunContext): string {
@@ -54,13 +58,15 @@ The required final decision line is: \`HEARTBEAT_DECISION: continue | pause | co
   }
 
   private static formatInterval(intervalMs: number): string {
-    const totalMinutes = Math.max(1, Math.round(intervalMs / 60_000));
-    if (totalMinutes < 60) {
-      return `${totalMinutes}m`;
+    const interval = dayjs.duration(Math.max(1, intervalMs));
+    const totalMinutes = dayjs.duration(interval.asMilliseconds()).asMinutes();
+    const roundedMinutes = Math.max(1, Math.round(totalMinutes));
+    if (roundedMinutes < 60) {
+      return `${roundedMinutes}m`;
     }
 
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
+    const hours = Math.floor(dayjs.duration(roundedMinutes, 'minutes').asHours());
+    const minutes = roundedMinutes % 60;
     return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
   }
 }

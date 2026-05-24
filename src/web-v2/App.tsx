@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import dayjs from 'dayjs';
 import { trpcReact } from '@web/api/client';
 import { LIVE_TASK_RUN_ID, TaskCreateDialog, TaskDeleteDialog, TaskRunDetailsPanel, type TaskCreateInput } from '@web/components/tasks';
 import { ContextInspector } from '@web/components/panels';
@@ -307,12 +308,12 @@ function isStaleLiveTaskState(
   task: NonNullable<ReturnType<typeof useControlPlaneTaskDetail>['task']>,
   live: ReturnType<typeof useControlPlaneHeartbeatEvents>['liveTasks'][string],
 ) {
-  const taskUpdatedAt = Date.parse(task.state.updatedAt ?? '');
-  const liveUpdatedAt = Date.parse(live.updatedAt);
+  const taskUpdatedAt = dayjs(task.state.updatedAt);
+  const liveUpdatedAt = dayjs(live.updatedAt);
   return (
     live.status !== 'running' &&
-    Number.isFinite(taskUpdatedAt) &&
-    Number.isFinite(liveUpdatedAt) &&
-    taskUpdatedAt > liveUpdatedAt
+    taskUpdatedAt.isValid() &&
+    liveUpdatedAt.isValid() &&
+    taskUpdatedAt.isAfter(liveUpdatedAt)
   );
 }

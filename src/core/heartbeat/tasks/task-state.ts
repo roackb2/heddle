@@ -5,9 +5,13 @@
  * state. This keeps status/progress text out of CLI, server, and scheduler
  * loops.
  */
+import dayjs from 'dayjs';
+import duration from 'dayjs/plugin/duration.js';
 import type { AgentHeartbeatResult } from '../agent/index.js';
 import { HeartbeatDecisionPolicy } from '../agent/index.js';
 import type { HeartbeatTask, HeartbeatTaskState, HeartbeatTaskStatus } from './types.js';
+
+dayjs.extend(duration);
 
 export class HeartbeatTaskStateProjector {
   static normalize(task: HeartbeatTask): HeartbeatTask {
@@ -37,7 +41,7 @@ export class HeartbeatTaskStateProjector {
           : 'Starting a new heartbeat runner cycle.',
         loadedCheckpoint: args.loadedCheckpoint,
         error: undefined,
-        updatedAt: args.now.toISOString(),
+        updatedAt: dayjs(args.now).toISOString(),
       },
     });
   }
@@ -60,18 +64,18 @@ export class HeartbeatTaskStateProjector {
       enabled: terminal ? false : args.task.enabled,
       schedule: {
         ...args.task.schedule,
-        nextRunAt: delayMs === undefined ? undefined : new Date(args.now.getTime() + delayMs).toISOString(),
+        nextRunAt: delayMs === undefined ? undefined : dayjs(args.now).add(delayMs, 'millisecond').toISOString(),
       },
       state: {
         status: projection.status,
         progress: projection.progress,
-        runAt: args.now.toISOString(),
+        runAt: dayjs(args.now).toISOString(),
         runId: args.result.state.runId,
         loadedCheckpoint: args.loadedCheckpoint,
         resumable: args.result.decision !== 'complete',
         result: args.result,
         error: undefined,
-        updatedAt: args.now.toISOString(),
+        updatedAt: dayjs(args.now).toISOString(),
       },
     });
   }
@@ -86,15 +90,15 @@ export class HeartbeatTaskStateProjector {
       ...args.task,
       schedule: {
         ...args.task.schedule,
-        nextRunAt: new Date(args.now.getTime() + args.retryMs).toISOString(),
+        nextRunAt: dayjs(args.now).add(args.retryMs, 'millisecond').toISOString(),
       },
       state: {
         ...args.task.state,
         status: 'failed',
         progress: 'Heartbeat runner failed and will retry later.',
-        runAt: args.now.toISOString(),
+        runAt: dayjs(args.now).toISOString(),
         error: args.error instanceof Error ? args.error.message : String(args.error),
-        updatedAt: args.now.toISOString(),
+        updatedAt: dayjs(args.now).toISOString(),
       },
     });
   }
@@ -142,17 +146,18 @@ export class HeartbeatTaskStateProjector {
   }
 
   private static formatDelay(ms: number): string {
-    if (ms % (24 * 60 * 60_000) === 0) {
-      return `${ms / (24 * 60 * 60_000)}d`;
+    const delay = dayjs.duration(ms);
+    if (delay.asMilliseconds() % dayjs.duration(1, 'day').asMilliseconds() === 0) {
+      return `${delay.asDays()}d`;
     }
-    if (ms % (60 * 60_000) === 0) {
-      return `${ms / (60 * 60_000)}h`;
+    if (delay.asMilliseconds() % dayjs.duration(1, 'hour').asMilliseconds() === 0) {
+      return `${delay.asHours()}h`;
     }
-    if (ms % 60_000 === 0) {
-      return `${ms / 60_000}m`;
+    if (delay.asMilliseconds() % dayjs.duration(1, 'minute').asMilliseconds() === 0) {
+      return `${delay.asMinutes()}m`;
     }
-    if (ms % 1_000 === 0) {
-      return `${ms / 1_000}s`;
+    if (delay.asMilliseconds() % dayjs.duration(1, 'second').asMilliseconds() === 0) {
+      return `${delay.asSeconds()}s`;
     }
     return `${ms}ms`;
   }

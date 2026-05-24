@@ -6,6 +6,7 @@
  * stays behind the heartbeat task service.
  */
 import { EventEmitter } from 'node:events';
+import dayjs from 'dayjs';
 import { FileHeartbeatTaskService, type AgentHeartbeatEvent, type HeartbeatSchedulerEvent } from '@/core/heartbeat/index.js';
 import type { ControlPlaneHeartbeatAgentEvent, ControlPlaneHeartbeatEvent, ControlPlaneHeartbeatEventEnvelope } from '../types.js';
 
@@ -37,7 +38,7 @@ export class ControlPlaneHeartbeatEventsController {
       queue.push({
         type: 'heartbeat',
         workspaceId: args.workspaceId,
-        timestamp: new Date().toISOString(),
+        timestamp: dayjs().toISOString(),
       });
     }, 15000);
     heartbeat.unref?.();
@@ -48,7 +49,7 @@ export class ControlPlaneHeartbeatEventsController {
     queue.push({
       type: 'ready',
       workspaceId: args.workspaceId,
-      timestamp: new Date().toISOString(),
+      timestamp: dayjs().toISOString(),
     });
 
     try {
@@ -121,7 +122,7 @@ export class ControlPlaneHeartbeatEventsController {
   }
 
   private static resolveEventTimestamp(event: ControlPlaneHeartbeatEvent): string {
-    return 'timestamp' in event && typeof event.timestamp === 'string' ? event.timestamp : new Date().toISOString();
+    return 'timestamp' in event && typeof event.timestamp === 'string' ? event.timestamp : dayjs().toISOString();
   }
 }
 
