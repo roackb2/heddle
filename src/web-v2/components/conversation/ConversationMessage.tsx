@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import type { ControlPlaneSessionDetail } from '@web/hooks/useControlPlaneSessionDetail';
+import type { ControlPlaneSessionDetail } from '@web/hooks/sessions/useControlPlaneSessionDetail';
 import { AssistantMarkdown } from './AssistantMarkdown';
 
 type ConversationMessageView = NonNullable<ControlPlaneSessionDetail>['messages'][number];

@@ -17,7 +17,6 @@ import { ControlPlaneWorkspaceFilesController } from './controllers/workspace-fi
 import { ControlPlaneWorkspaceDiffController } from './controllers/workspace-diff.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
-import { FileHeartbeatTaskService } from '@/core/heartbeat/index.js';
 
 const sessionInputSchema = z.object({
   id: z.string().min(1),
@@ -338,7 +337,7 @@ export const controlPlaneRouter = router({
   }),
   heartbeatTaskDelete: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
     return {
-      task: await new FileHeartbeatTaskService({ stateRoot: ctx.activeWorkspace.stateRoot }).deleteTask(input.taskId),
+      task: await ControlPlaneHeartbeatController.deleteTask(ctx.activeWorkspace.stateRoot, input.taskId),
     };
   }),
   heartbeatTask: procedure.input(heartbeatTaskDetailInputSchema).query(async ({ ctx, input }) => {
@@ -392,6 +391,18 @@ export const controlPlaneRouter = router({
     return {
       task: await ControlPlaneHeartbeatController.setTaskEnabled(ctx.activeWorkspace.stateRoot, input.taskId, false),
     };
+  }),
+  heartbeatTaskResume: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
+    const task = await ControlPlaneHeartbeatController.resumeTask(ctx.activeWorkspace.stateRoot, input.taskId);
+    controlPlaneHeartbeatEventsController.publish({
+      workspaceId: ctx.activeWorkspace.id,
+      event: {
+        type: 'heartbeat.task.due',
+        taskId: input.taskId,
+        timestamp: dayjs().toISOString(),
+      },
+    });
+    return { task };
   }),
   heartbeatTaskTrigger: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
     return {

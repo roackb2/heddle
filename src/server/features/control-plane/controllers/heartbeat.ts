@@ -73,6 +73,10 @@ export class ControlPlaneHeartbeatController {
     return await new FileHeartbeatTaskService({ stateRoot }).updateTask(taskId, args);
   }
 
+  static async deleteTask(stateRoot: string, taskId: string) {
+    return await new FileHeartbeatTaskService({ stateRoot }).deleteTask(taskId);
+  }
+
   static async readTask(
     stateRoot: string,
     taskId: string,
@@ -95,6 +99,10 @@ export class ControlPlaneHeartbeatController {
     enabled: boolean,
   ) {
     return await new FileHeartbeatTaskService({ stateRoot }).setTaskEnabled(taskId, enabled);
+  }
+
+  static async resumeTask(stateRoot: string, taskId: string) {
+    return await new FileHeartbeatTaskService({ stateRoot }).resumeTask(taskId);
   }
 
   static async triggerTaskRun(stateRoot: string, taskId: string) {

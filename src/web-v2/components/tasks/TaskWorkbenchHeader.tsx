@@ -1,4 +1,4 @@
-import { Pencil, Play, Trash2 } from 'lucide-react';
+import { Pencil, Play, RotateCcw, Trash2 } from 'lucide-react';
 import type { ControlPlaneHeartbeatTaskView } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
 import { useI18n } from '@web/i18n';
@@ -11,11 +11,13 @@ interface TaskWorkbenchHeaderProps {
   onEdit: () => void;
   onDelete: () => void;
   onRunNow: () => Promise<void>;
+  onResume: () => Promise<void>;
 }
 
-export function TaskWorkbenchHeader({ running, task, onEdit, onDelete, onRunNow }: TaskWorkbenchHeaderProps) {
+export function TaskWorkbenchHeader({ running, task, onEdit, onDelete, onRunNow, onResume }: TaskWorkbenchHeaderProps) {
   const { t } = useI18n();
   const runDisabled = running || !task.enabled || task.state.status === 'running';
+  const blocked = task.state.status === 'blocked';
 
   return (
     <section className="v2-task-header">
@@ -55,16 +57,27 @@ export function TaskWorkbenchHeader({ running, task, onEdit, onDelete, onRunNow 
           >
             <Trash2 aria-hidden="true" />
           </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={runDisabled}
-            onClick={() => void onRunNow()}
-          >
-            <Play aria-hidden="true" />
-            {t('tasks.runNow')}
-          </Button>
+          {blocked ?
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={running}
+              onClick={() => void onResume()}
+            >
+              <RotateCcw aria-hidden="true" />
+              {t('tasks.resume')}
+            </Button>
+          : <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={runDisabled}
+              onClick={() => void onRunNow()}
+            >
+              <Play aria-hidden="true" />
+              {t('tasks.runNow')}
+            </Button>}
         </div>
       </div>
       <p className="v2-type-panel-subtitle mt-4 text-pretty text-muted-foreground">{task.task}</p>

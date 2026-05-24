@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@web/components/ui/select';
 import { Textarea } from '@web/components/ui/textarea';
-import type { ControlPlaneReasoningEffortSelection } from '@web/hooks/useControlPlaneSessionDetail';
+import type { ControlPlaneReasoningEffortSelection } from '@web/hooks/sessions/useControlPlaneSessionDetail';
 import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
 

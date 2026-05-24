@@ -4,47 +4,14 @@ import {
   DEFAULT_APP_ROUTE,
   SETTINGS_ROUTES,
 } from '@web/layout/routes';
-import type {
-  ControlPlaneApprovalDecision,
-  ControlPlaneReasoningEffortSelection,
-  ControlPlanePendingApproval,
-  ControlPlaneSessionDetail,
-} from '@web/hooks/useControlPlaneSessionDetail';
-import type {
-  ControlPlaneHeartbeatRunView,
-  ControlPlaneHeartbeatTask,
-  ControlPlaneModelOptions,
-} from '@web/api/client';
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
-import { WorkbenchView } from '@web/views/WorkbenchView';
+import { WorkbenchView, type SessionWorkbenchViewProps, type TaskWorkbenchViewProps } from '@web/views/WorkbenchView';
 
 interface AppRoutesProps {
   activeSurfaceId: AppSurfaceId;
   activeSettingsSectionId: SettingsSectionId;
-  selectedSession: ControlPlaneSessionDetail;
-  selectedSessionLoading: boolean;
-  selectedSessionSubmitting: boolean;
-  selectedSessionLiveStatus?: string;
-  selectedSessionPendingApproval: ControlPlanePendingApproval;
-  selectedSessionApprovalResolving: boolean;
-  selectedSessionApprovalError?: string;
-  selectedSessionModelOptions?: ControlPlaneModelOptions;
-  selectedSessionSettingsUpdating: boolean;
-  selectedSessionSettingsError?: string;
-  selectedTask: ControlPlaneHeartbeatTask['task'] | undefined;
-  selectedTaskRuns: ControlPlaneHeartbeatRunView[];
-  selectedTaskRunId?: string;
-  selectedTaskLoading: boolean;
-  selectedTaskError?: string;
-  selectedTaskRunSubmitting: boolean;
-  onSubmitSessionPrompt: (prompt: string) => Promise<void>;
-  onUpdateSessionModel: (model: string) => Promise<void>;
-  onUpdateSessionReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
-  onResolveSessionApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
-  onEditTask: () => void;
-  onDeleteTask: () => void;
-  onRunTaskNow: () => Promise<void>;
-  onSelectTaskRun: (runId: string) => void;
+  sessionView: SessionWorkbenchViewProps;
+  taskView: TaskWorkbenchViewProps;
 }
 
 const routePathBySurface = {
@@ -64,57 +31,13 @@ const appRoutePaths = APP_ROUTES.flatMap((route) => (
 export function AppRoutes({
   activeSurfaceId,
   activeSettingsSectionId,
-  selectedSession,
-  selectedSessionLoading,
-  selectedSessionSubmitting,
-  selectedSessionLiveStatus,
-  selectedSessionPendingApproval,
-  selectedSessionApprovalResolving,
-  selectedSessionApprovalError,
-  selectedSessionModelOptions,
-  selectedSessionSettingsUpdating,
-  selectedSessionSettingsError,
-  selectedTask,
-  selectedTaskRuns,
-  selectedTaskRunId,
-  selectedTaskLoading,
-  selectedTaskError,
-  selectedTaskRunSubmitting,
-  onSubmitSessionPrompt,
-  onUpdateSessionModel,
-  onUpdateSessionReasoningEffort,
-  onResolveSessionApproval,
-  onEditTask,
-  onDeleteTask,
-  onRunTaskNow,
-  onSelectTaskRun,
+  sessionView,
+  taskView,
 }: AppRoutesProps) {
   const sharedWorkbenchProps = {
     activeSettingsSectionId,
-    selectedSession,
-    selectedSessionLoading,
-    selectedSessionSubmitting,
-    selectedSessionLiveStatus,
-    selectedSessionPendingApproval,
-    selectedSessionApprovalResolving,
-    selectedSessionApprovalError,
-    selectedSessionModelOptions,
-    selectedSessionSettingsUpdating,
-    selectedSessionSettingsError,
-    selectedTask,
-    selectedTaskRuns,
-    selectedTaskRunId,
-    selectedTaskLoading,
-    selectedTaskError,
-    selectedTaskRunSubmitting,
-    onSubmitSessionPrompt,
-    onUpdateSessionModel,
-    onUpdateSessionReasoningEffort,
-    onResolveSessionApproval,
-    onEditTask,
-    onDeleteTask,
-    onRunTaskNow,
-    onSelectTaskRun,
+    sessionView,
+    taskView,
   };
 
   return (
