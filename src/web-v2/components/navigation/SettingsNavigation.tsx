@@ -1,3 +1,4 @@
+import { ArrowLeft } from 'lucide-react';
 import {
   SidebarContent,
   SidebarGroup,
@@ -36,6 +37,7 @@ export function SettingsNavigation({ activeItemId, items, onBack }: SettingsNavi
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton onClick={onBack}>
+                  <ArrowLeft aria-hidden="true" />
                   {t('navigation.backToApp')}
                 </SidebarMenuButton>
               </SidebarMenuItem>

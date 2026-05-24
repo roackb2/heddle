@@ -51,6 +51,7 @@ export type ControlPlaneHeartbeatTaskView = ControlPlaneHeartbeatTasks['tasks'][
 export type ControlPlaneHeartbeatRunView = ControlPlaneHeartbeatTask['runs'][number];
 export type ControlPlaneHeartbeatRun = RouterOutputs['controlPlane']['heartbeatRun'];
 export type ControlPlaneHeartbeatTaskRunNow = RouterOutputs['controlPlane']['heartbeatTaskRunNow'];
+export type ControlPlaneMemoryStatus = RouterOutputs['controlPlane']['memoryStatus'];
 export type ControlPlaneWorkspaceChanges = RouterOutputs['controlPlane']['workspaceChanges'];
 export type ControlPlaneWorkspaceChangedFile = ControlPlaneWorkspaceChanges['files'][number];
 export type ControlPlaneWorkspaceFileDiff = RouterOutputs['controlPlane']['workspaceFileDiff'];

@@ -5,11 +5,17 @@ import {
   SETTINGS_ROUTES,
 } from '@web/layout/routes';
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
-import { WorkbenchView, type SessionWorkbenchViewProps, type TaskWorkbenchViewProps } from '@web/views/WorkbenchView';
+import {
+  WorkbenchView,
+  type MemorySettingsViewProps,
+  type SessionWorkbenchViewProps,
+  type TaskWorkbenchViewProps,
+} from '@web/views/WorkbenchView';
 
 interface AppRoutesProps {
   activeSurfaceId: AppSurfaceId;
   activeSettingsSectionId: SettingsSectionId;
+  memorySettingsView: MemorySettingsViewProps;
   sessionView: SessionWorkbenchViewProps;
   taskView: TaskWorkbenchViewProps;
 }
@@ -31,11 +37,13 @@ const appRoutePaths = APP_ROUTES.flatMap((route) => (
 export function AppRoutes({
   activeSurfaceId,
   activeSettingsSectionId,
+  memorySettingsView,
   sessionView,
   taskView,
 }: AppRoutesProps) {
   const sharedWorkbenchProps = {
     activeSettingsSectionId,
+    memorySettingsView,
     sessionView,
     taskView,
   };

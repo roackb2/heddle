@@ -1,5 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { ConversationThread } from '@web/components/conversation';
+import { GeneralSettingsView, MemorySettingsView } from '@web/components/settings';
 import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
@@ -7,10 +8,12 @@ import { TasksWorkbenchView } from './TasksWorkbenchView';
 
 export type SessionWorkbenchViewProps = Omit<ComponentProps<typeof ConversationThread>, 'emptyTitle'>;
 export type TaskWorkbenchViewProps = ComponentProps<typeof TasksWorkbenchView>;
+export type MemorySettingsViewProps = ComponentProps<typeof MemorySettingsView>;
 
 interface WorkbenchViewProps {
   activeSurfaceId: AppSurfaceId;
   activeSettingsSectionId: SettingsSectionId;
+  memorySettingsView: MemorySettingsViewProps;
   sessionView: SessionWorkbenchViewProps;
   settingsOpen: boolean;
   taskView: TaskWorkbenchViewProps;
@@ -32,6 +35,7 @@ const settingsSectionLabelKeys = {
 export function WorkbenchView({
   activeSurfaceId,
   activeSettingsSectionId,
+  memorySettingsView,
   sessionView,
   settingsOpen,
   taskView,
@@ -47,6 +51,11 @@ export function WorkbenchView({
       content: <TasksWorkbenchView {...taskView} />,
     },
   } satisfies Record<AppSurfaceId, { title: string; content: ReactNode }>;
+  const settingsViews = {
+    general: <GeneralSettingsView />,
+    workspaces: null,
+    memory: <MemorySettingsView {...memorySettingsView} />,
+  } satisfies Record<SettingsSectionId, ReactNode>;
   const activeSurface = surfaceViews[activeSurfaceId];
   const title = settingsOpen ? t(settingsSectionLabelKeys[activeSettingsSectionId]) : activeSurface.title;
 
@@ -63,7 +72,7 @@ export function WorkbenchView({
         aria-label={`${title} ${t('workbench.workspaceAriaLabel')}`}
         data-testid="web-v2-workbench-body"
       >
-        {settingsOpen ? null : activeSurface.content}
+        {settingsOpen ? settingsViews[activeSettingsSectionId] : activeSurface.content}
       </div>
     </section>
   );

@@ -1,5 +1,4 @@
 export { AppNavigation } from './AppNavigation';
-export { LanguageSelect } from './LanguageSelect';
 export { MainNavigationSection } from './MainNavigationSection';
 export { SessionListSection } from './SessionListSection';
 export { SettingsMenu } from './SettingsMenu';

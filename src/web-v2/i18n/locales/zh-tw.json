@@ -80,6 +80,9 @@
     "subtitle": "目前工作區變更",
     "title": "差異預覽"
   },
+  "generalSettings": {
+    "languageDetail": "選擇 web v2 介面使用的語言。"
+  },
   "inspector": {
     "collapsePanel": "收合脈絡檢視器",
     "contextAriaLabel": "脈絡檢視器",
@@ -90,6 +93,27 @@
     "label": "語言",
     "zhCn": "簡體中文",
     "zhTw": "繁體中文"
+  },
+  "memorySettings": {
+    "catalog": "目錄",
+    "catalogHealthy": "健康",
+    "catalogIncomplete": "不完整",
+    "errorTitle": "無法讀取記憶狀態",
+    "healthTitle": "工作區記憶",
+    "latestRun": "最近執行",
+    "loadingBody": "正在讀取啟用工作區的記憶狀態。",
+    "loadingTitle": "正在載入記憶狀態",
+    "maintenanceTitle": "維護",
+    "noMissingCatalogs": "沒有缺少的目錄檔",
+    "noPendingDetail": "沒有待處理候選項目",
+    "noRuns": "沒有執行紀錄",
+    "noRunsDetail": "尚未記錄維護執行",
+    "notes": "筆記",
+    "notesDetail": "已索引的記憶筆記",
+    "pending": "待處理候選項目",
+    "pendingDetail": "等待維護",
+    "statusAttention": "需注意",
+    "statusOk": "正常"
   },
   "navigation": {
     "backToApp": "返回應用程式",

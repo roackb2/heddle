@@ -25,6 +25,9 @@ export function useControlPlaneAppState() {
   const createSessionMutation = trpcReact.controlPlane.sessionCreate.useMutation();
   const taskEvents = useControlPlaneHeartbeatEvents();
   const sidebar = useControlPlaneSidebarData({ navigation, taskEvents });
+  const memoryStatusQuery = trpcReact.controlPlane.memoryStatus.useQuery(undefined, {
+    enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'memory',
+  });
   const selectedSession = useControlPlaneSessionDetail(navigation.selectedSessionId);
   const taskSelection = useControlPlaneTaskSelection({ navigation, taskEvents });
   const taskActions = useControlPlaneTaskActions({
@@ -67,6 +70,11 @@ export function useControlPlaneAppState() {
     routeProps: {
       activeSurfaceId: navigation.activeSurfaceId,
       activeSettingsSectionId: navigation.activeSettingsSectionId,
+      memorySettingsView: {
+        status: memoryStatusQuery.data ?? sidebar.stateQuery.data?.memory,
+        loading: memoryStatusQuery.isLoading || sidebar.stateQuery.isLoading,
+        error: memoryStatusQuery.error instanceof Error ? memoryStatusQuery.error.message : undefined,
+      },
       sessionView: {
         session: selectedSession.session,
         loading: selectedSession.loading,

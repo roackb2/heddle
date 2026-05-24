@@ -80,6 +80,9 @@
     "subtitle": "当前工作区变更",
     "title": "差异预览"
   },
+  "generalSettings": {
+    "languageDetail": "选择 web v2 界面使用的语言。"
+  },
   "inspector": {
     "collapsePanel": "收起上下文检查器",
     "contextAriaLabel": "上下文检查器",
@@ -90,6 +93,27 @@
     "label": "语言",
     "zhCn": "简体中文",
     "zhTw": "繁体中文"
+  },
+  "memorySettings": {
+    "catalog": "目录",
+    "catalogHealthy": "健康",
+    "catalogIncomplete": "不完整",
+    "errorTitle": "无法读取记忆状态",
+    "healthTitle": "工作区记忆",
+    "latestRun": "最近执行",
+    "loadingBody": "正在读取启用工作区的记忆状态。",
+    "loadingTitle": "正在加载记忆状态",
+    "maintenanceTitle": "维护",
+    "noMissingCatalogs": "没有缺少的目录文件",
+    "noPendingDetail": "没有待处理候选项",
+    "noRuns": "没有执行记录",
+    "noRunsDetail": "尚未记录维护执行",
+    "notes": "笔记",
+    "notesDetail": "已索引的记忆笔记",
+    "pending": "待处理候选项",
+    "pendingDetail": "等待维护",
+    "statusAttention": "需注意",
+    "statusOk": "正常"
   },
   "navigation": {
     "backToApp": "返回应用",

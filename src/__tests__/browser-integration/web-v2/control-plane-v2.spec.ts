@@ -73,15 +73,22 @@ test('navigates primary and settings routes without hash routing', async ({ page
   await expect(page.getByRole('link', { name: 'Tasks' })).toHaveAttribute('aria-current', 'page');
 
   await page.getByRole('button', { name: 'Settings' }).click();
-  await page.getByRole('button', { name: 'Open settings' }).click();
   await expect(page).toHaveURL(/\/settings\/general$/);
   await expect(page.getByTestId('web-v2-settings-general')).toBeVisible();
   await expect(page.getByTestId('web-v2-workbench-title')).toHaveText('General');
+  await expect(page.getByLabel('Language')).toBeVisible();
 
   await page.getByRole('link', { name: 'Memory Status' }).click();
   await expect(page).toHaveURL(/\/settings\/memory$/);
   await expect(page.getByTestId('web-v2-settings-memory')).toBeVisible();
   await expect(page.getByTestId('web-v2-workbench-title')).toHaveText('Memory Status');
+  const memorySettings = page.getByTestId('web-v2-workbench-body');
+  await expect(memorySettings.getByText('Workspace memory')).toBeVisible();
+  await expect(memorySettings.getByText('Healthy')).toBeVisible();
+  await expect(memorySettings.getByText('10', { exact: true })).toBeVisible();
+  await expect(memorySettings.getByText('1', { exact: true })).toBeVisible();
+  await expect(memorySettings.getByText('memory-run-browser')).toBeVisible();
+  await expect(memorySettings.getByText('Browser memory maintenance completed.')).toBeVisible();
 
   await page.getByRole('button', { name: 'Back to App' }).click();
   await expect(page).toHaveURL(/\/sessions(\/[^/]+)?$/);
@@ -150,7 +157,10 @@ test('submits a prompt and renders the mocked session response', async ({ page }
   await expect(page.getByText('Run the web v2 submit smoke', { exact: true })).toBeVisible();
   await expect(page.getByText('Mocked browser integration agent response', { exact: true })).toBeVisible();
   await expect(page.getByTestId('web-v2-live-status')).toHaveText('Receiving assistant response...');
-  await expect(page.getByText('Mocked browser integration agent response: Run the web v2 submit smoke', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('web-v2-workbench-body').getByText(
+    'Mocked browser integration agent response: Run the web v2 submit smoke',
+    { exact: true },
+  )).toBeVisible();
   await expect(page.getByTestId('web-v2-workbench-title')).toHaveText(session.name);
 });
 

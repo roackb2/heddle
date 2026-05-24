@@ -80,6 +80,9 @@
     "subtitle": "Current workspace changes",
     "title": "Diff preview"
   },
+  "generalSettings": {
+    "languageDetail": "Choose the language used by the web v2 interface."
+  },
   "inspector": {
     "collapsePanel": "Collapse context inspector",
     "contextAriaLabel": "Context inspector",
@@ -90,6 +93,27 @@
     "label": "Language",
     "zhCn": "Simplified Chinese",
     "zhTw": "Traditional Chinese"
+  },
+  "memorySettings": {
+    "catalog": "Catalog",
+    "catalogHealthy": "Healthy",
+    "catalogIncomplete": "Incomplete",
+    "errorTitle": "Memory status unavailable",
+    "healthTitle": "Workspace memory",
+    "latestRun": "Latest run",
+    "loadingBody": "Reading memory status from the active workspace.",
+    "loadingTitle": "Loading memory status",
+    "maintenanceTitle": "Maintenance",
+    "noMissingCatalogs": "No missing catalog files",
+    "noPendingDetail": "No pending candidates",
+    "noRuns": "No runs",
+    "noRunsDetail": "No maintenance runs recorded",
+    "notes": "Notes",
+    "notesDetail": "Indexed memory notes",
+    "pending": "Pending candidates",
+    "pendingDetail": "Waiting for maintenance",
+    "statusAttention": "attention",
+    "statusOk": "ok"
   },
   "navigation": {
     "backToApp": "Back to App",

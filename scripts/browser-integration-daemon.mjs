@@ -17,6 +17,7 @@ prepareFixtureWorkspace(primaryWorkspace, {
   extraReadmeLine: 'This line is an uncommitted browser integration change.',
 });
 seedHeartbeatFixture(primaryWorkspace);
+seedMemoryFixture(primaryWorkspace);
 prepareFixtureWorkspace(secondaryWorkspace, {
   name: 'Secondary Browser Integration Workspace',
 });
@@ -141,6 +142,70 @@ function seedHeartbeatFixture(workspaceRoot) {
       result: createHeartbeatResult(),
       loadedCheckpoint: true,
     }, null, 2)}\n`,
+    'utf8',
+  );
+}
+
+function seedMemoryFixture(workspaceRoot) {
+  const memoryRoot = join(workspaceRoot, '.heddle', 'memory');
+  const maintenanceRoot = join(memoryRoot, '_maintenance');
+  const categories = [
+    'current-state',
+    'workflows',
+    'preferences',
+    'domain',
+    'operations',
+    'relationships',
+    'history',
+  ];
+
+  mkdirSync(maintenanceRoot, { recursive: true });
+  writeFileSync(
+    join(memoryRoot, 'README.md'),
+    '# Workspace Memory\n\n- [Current State](current-state/README.md): Browser integration memory fixture.\n',
+    'utf8',
+  );
+
+  for (const category of categories) {
+    mkdirSync(join(memoryRoot, category), { recursive: true });
+    writeFileSync(join(memoryRoot, category, 'README.md'), `# ${category}\n\nFixture catalog.\n`, 'utf8');
+  }
+
+  writeFileSync(
+    join(memoryRoot, 'current-state', 'browser-memory.md'),
+    '# Browser Memory\n\nThis note makes the memory settings page deterministic.\n',
+    'utf8',
+  );
+  writeFileSync(
+    join(memoryRoot, 'operations', 'verification.md'),
+    '# Verification\n\nBrowser integration verifies memory status.\n',
+    'utf8',
+  );
+  writeFileSync(
+    join(maintenanceRoot, 'candidates.jsonl'),
+    `${JSON.stringify({
+      id: 'browser-memory-candidate',
+      recordedAt: '2026-04-14T00:00:00.000Z',
+      status: 'pending',
+      summary: 'Browser memory candidate.',
+    })}\n`,
+    'utf8',
+  );
+  writeFileSync(
+    join(maintenanceRoot, 'runs.jsonl'),
+    `${JSON.stringify({
+      id: 'memory-run-browser',
+      startedAt: '2026-04-14T00:00:00.000Z',
+      finishedAt: '2026-04-14T00:00:01.000Z',
+      source: 'browser-integration',
+      outcome: 'done',
+      summary: 'Browser memory maintenance completed.',
+      candidateIds: ['browser-memory-candidate'],
+      processedCandidateIds: ['browser-memory-candidate'],
+      failedCandidateIds: [],
+      catalogValid: true,
+      catalogMissing: [],
+    })}\n`,
     'utf8',
   );
 }
