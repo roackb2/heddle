@@ -47,8 +47,8 @@ import {
 } from './schema.js';
 
 export const controlPlaneRouter = router({
-  state: procedure.query(async ({ ctx }) => {
-    return await ControlPlaneStateController.load(ctx);
+  state: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
+    return await ControlPlaneStateController.load(ctx, ctx.requestWorkspace.workspace);
   }),
   sessions: controlPlaneWorkspaceProcedure.input(sessionsInputSchema).query(({ ctx }) => {
     const requestWorkspace = ctx.requestWorkspace;

@@ -40,6 +40,13 @@ export function useControlPlaneSessionLoader({
     },
   );
 
+  useEffect(() => {
+    latestRefreshMode.current = null;
+    setSession(null);
+    setManualLoading(false);
+    setError(undefined);
+  }, [sessionId, workspaceId]);
+
   const refresh = useCallback<RefreshControlPlaneSession>(async (id, options = {}) => {
     if (!id || id !== sessionId) {
       return;
@@ -58,7 +65,9 @@ export function useControlPlaneSessionLoader({
       }
 
       setSession((current) => (
-        options.silent ? SessionMessageController.mergeTransientMessages(current, next) : next
+        options.silent && isSameSessionAddress(current, next)
+          ? SessionMessageController.mergeTransientMessages(current, next)
+          : next
       ));
       setError(undefined);
     } catch (loadError) {
@@ -84,11 +93,11 @@ export function useControlPlaneSessionLoader({
 
     const querySession = sessionQuery.data;
     setSession((current) => {
-      if (latestRefreshMode.current === 'silent' && current?.id === querySession.id) {
+      if (latestRefreshMode.current === 'silent' && isSameSessionAddress(current, querySession)) {
         return SessionMessageController.mergeTransientMessages(current, querySession);
       }
 
-      if (current?.id === querySession.id) {
+      if (isSameSessionAddress(current, querySession)) {
         return SessionMessageController.mergeTransientMessages(current, querySession);
       }
 
@@ -111,4 +120,11 @@ export function useControlPlaneSessionLoader({
     setError,
     refresh,
   };
+}
+
+function isSameSessionAddress(
+  current: ControlPlaneSessionDetail,
+  next: NonNullable<ControlPlaneSessionDetail>,
+): boolean {
+  return current?.id === next.id && current.workspaceId === next.workspaceId;
 }

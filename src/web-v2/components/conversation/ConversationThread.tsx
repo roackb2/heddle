@@ -125,6 +125,7 @@ export function ConversationThread({
       ) : null}
       <div className="v2-composer-region">
         <ConversationComposer
+          key={`${workspaceId ?? 'workspace'}:${session.id}`}
           sessionId={session.id}
           workspaceId={workspaceId}
           disabled={Boolean(pendingApproval)}

@@ -17,7 +17,9 @@ export function useControlPlaneSidebarData({
   navigation: WorkbenchNavigation;
   taskEvents: HeartbeatEvents;
 }) {
-  const stateQuery = trpcReact.controlPlane.state.useQuery();
+  const stateQuery = trpcReact.controlPlane.state.useQuery(
+    navigation.selectedWorkspaceId ? { workspaceId: navigation.selectedWorkspaceId } : undefined,
+  );
   const workspaceId = navigation.selectedWorkspaceId ?? stateQuery.data?.activeWorkspaceId;
   const workspaceKnown = Boolean(workspaceId && stateQuery.data?.workspaces.some((workspace) => workspace.id === workspaceId));
   const [loadedSessions, setLoadedSessions] = useState<{

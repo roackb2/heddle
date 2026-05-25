@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { skipToken } from '@tanstack/react-query';
 import {
   trpcReact,
@@ -35,11 +35,16 @@ export function useControlPlaneSessionEvents({
 }: UseControlPlaneSessionEventsArgs): ControlPlaneSessionEventsState {
   const utils = trpcReact.useUtils();
   const [streamConnected, setStreamConnected] = useState(false);
+  const activeAddressRef = useRef<SessionAddress>({ workspaceId, sessionId });
   const invalidateWorkspaceDiff = useCallback(() => {
     void utils.controlPlane.workspaceChanges.invalidate(workspaceId ? { workspaceId } : undefined);
     void utils.controlPlane.workspaceFileDiff.invalidate();
   }, [utils, workspaceId]);
   const applySessionEvent = useCallback((event: ControlPlaneSessionEventEnvelope) => {
+    if (!isActiveSessionAddress(activeAddressRef.current, { workspaceId, sessionId: event.sessionId })) {
+      return;
+    }
+
     if (event.type === 'waiting') {
       setLiveStatus('Waiting for the session event stream...');
       return;
@@ -63,7 +68,7 @@ export function useControlPlaneSessionEvents({
       setRunning,
       setSession,
     }));
-  }, [invalidateWorkspaceDiff, refresh, refreshPendingApproval, setLiveStatus, setRunning, setSession]);
+  }, [invalidateWorkspaceDiff, refresh, refreshPendingApproval, setLiveStatus, setRunning, setSession, workspaceId]);
 
   const subscription = trpcReact.controlPlane.sessionEvents.useSubscription(
     sessionId && workspaceId ? { sessionId, workspaceId } : skipToken,
@@ -83,6 +88,7 @@ export function useControlPlaneSessionEvents({
   );
 
   useEffect(() => {
+    activeAddressRef.current = { workspaceId, sessionId };
     if (!sessionId || !workspaceId) {
       setRunning(false);
       setLiveStatus(undefined);
@@ -99,6 +105,20 @@ export function useControlPlaneSessionEvents({
   }, [subscription.status]);
 
   return { streamConnected };
+}
+
+type SessionAddress = {
+  workspaceId?: string;
+  sessionId?: string;
+};
+
+function isActiveSessionAddress(active: SessionAddress, event: SessionAddress): boolean {
+  return Boolean(
+    active.workspaceId
+    && active.sessionId
+    && active.workspaceId === event.workspaceId
+    && active.sessionId === event.sessionId,
+  );
 }
 
 type SessionActivityContext = {

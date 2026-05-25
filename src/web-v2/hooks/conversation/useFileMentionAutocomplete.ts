@@ -104,8 +104,15 @@ export function useFileMentionAutocomplete({
   );
 
   const suggestions = useMemo(
-    () => queryIsCurrent && !fileSearchQuery.isFetching ? fileSearchQuery.data?.files ?? [] : [],
-    [fileSearchQuery.data?.files, fileSearchQuery.isFetching, queryIsCurrent],
+    () => {
+      const data = fileSearchQuery.data;
+      if (!queryIsCurrent || fileSearchQuery.isFetching || !data || data.workspaceId !== workspaceId) {
+        return [];
+      }
+
+      return data.files;
+    },
+    [fileSearchQuery.data, fileSearchQuery.isFetching, queryIsCurrent, workspaceId],
   );
   const activeOptionId = mentionToken && suggestions[activeIndex] ? `${optionIdPrefix}-${activeIndex}` : undefined;
   const loading = Boolean(mentionToken) && (!queryIsCurrent || fileSearchQuery.isFetching);

@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import type { Request } from 'express';
 import { RuntimeWorkspaceService, type WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
 import { controlPlaneChatSessionsController } from '@/server/controllers/trpc/control-plane/chat-sessions-controller.js';
+import { getWorkspaceOperationLogger } from '@/server/workspace-operation-logger.js';
 
 export const CHAT_SESSION_IMAGE_UPLOAD_LIMITS = {
   maxFiles: 10,
@@ -94,8 +95,17 @@ export class ChatSessionImageUploadService {
     }
 
     const uploadRoot = resolve(workspace.stateRoot, 'uploads', 'sessions', sessionId);
+    const uploads = files.map((file) => this.projectUploadedFile(uploadRoot, file));
+    getWorkspaceOperationLogger(workspace.stateRoot).info({
+      sessionId,
+      uploadCount: uploads.length,
+      workspaceId: workspace.id,
+      workspaceRoot: workspace.workspaceRoot,
+      stateRoot: workspace.stateRoot,
+    }, 'Control-plane session images uploaded');
+
     return {
-      uploads: files.map((file) => this.projectUploadedFile(uploadRoot, file)),
+      uploads,
     };
   }
 

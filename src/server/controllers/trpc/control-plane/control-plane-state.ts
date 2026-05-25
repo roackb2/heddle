@@ -2,15 +2,19 @@ import { resolve } from 'node:path';
 import type { HeddleServerContext } from '@/server/types.js';
 import type { ControlPlaneState } from '@/server/control-plane-types.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
+import type { WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { controlPlaneChatSessionsController } from './chat-sessions-controller.js';
 import { ControlPlaneHeartbeatController } from './heartbeat.js';
 import { ControlPlaneMemoryController } from './memory.js';
 
 export class ControlPlaneStateController {
-  static async load(context: HeddleServerContext): Promise<ControlPlaneState> {
-    const workspaceRoot = context.activeWorkspace.workspaceRoot;
-    const stateRoot = context.activeWorkspace.stateRoot;
+  static async load(
+    context: HeddleServerContext,
+    workspace: WorkspaceDescriptor = context.activeWorkspace,
+  ): Promise<ControlPlaneState> {
+    const workspaceRoot = workspace.workspaceRoot;
+    const stateRoot = workspace.stateRoot;
     const [tasks, memory] = await Promise.all([
       ControlPlaneHeartbeatController.listTasks(stateRoot),
       ControlPlaneMemoryController.readStatus(stateRoot),
@@ -24,8 +28,8 @@ export class ControlPlaneStateController {
         openai: RuntimeCredentialService.resolveCredentialSourceForModel('gpt-5.4', { preferApiKey: context.preferApiKey }),
         anthropic: RuntimeCredentialService.resolveCredentialSourceForModel('claude-sonnet-4-6', { preferApiKey: context.preferApiKey }),
       },
-      activeWorkspaceId: context.activeWorkspaceId,
-      workspace: context.activeWorkspace,
+      activeWorkspaceId: workspace.id,
+      workspace,
       workspaces: context.workspaces,
       knownWorkspaces: ControlPlaneStateController.readKnownWorkspaces(context),
       runtimeHost: context.runtimeHost,
@@ -34,7 +38,7 @@ export class ControlPlaneStateController {
         stateRoot,
         sessionStoragePath: resolve(stateRoot, 'chat-sessions.catalog.json'),
         preferApiKey: context.preferApiKey,
-        workspaceId: context.activeWorkspace.id,
+        workspaceId: workspace.id,
       }),
       heartbeat: {
         tasks,

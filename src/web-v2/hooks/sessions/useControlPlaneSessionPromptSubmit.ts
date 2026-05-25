@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { trpcReact, type ControlPlaneSessionDetail } from '@web/api/client';
 import { SessionMessageController } from '@web/controllers/session-messages';
 
@@ -17,6 +17,12 @@ export type ControlPlaneSessionPromptSubmitState = {
   submitPrompt: (prompt: string) => Promise<void>;
 };
 
+type PromptSubmission = {
+  id: number;
+  workspaceId: string;
+  sessionId: string;
+};
+
 // Owns prompt mutation state and optimistic conversation updates for web-v2.
 export function useControlPlaneSessionPromptSubmit({
   workspaceId,
@@ -28,17 +34,39 @@ export function useControlPlaneSessionPromptSubmit({
   setLiveStatus,
 }: UseControlPlaneSessionPromptSubmitArgs): ControlPlaneSessionPromptSubmitState {
   const [submitting, setSubmitting] = useState(false);
+  const activeSubmissionRef = useRef<PromptSubmission | null>(null);
+  const submissionSequenceRef = useRef(0);
+  const utils = trpcReact.useUtils();
   const sessionSendPromptMutation = trpcReact.controlPlane.sessionSendPrompt.useMutation();
 
   useEffect(() => {
+    activeSubmissionRef.current = null;
     setSubmitting(false);
-  }, [sessionId]);
+  }, [sessionId, workspaceId]);
 
   const submitPrompt = useCallback(async (prompt: string) => {
     const trimmed = prompt.trim();
     if (!workspaceId || !sessionId || !trimmed || submitting) {
       return;
     }
+
+    const submission = {
+      id: submissionSequenceRef.current + 1,
+      workspaceId,
+      sessionId,
+    };
+    submissionSequenceRef.current = submission.id;
+    activeSubmissionRef.current = submission;
+
+    const isCurrentSubmission = () => {
+      const current = activeSubmissionRef.current;
+      return Boolean(
+        current
+        && current.id === submission.id
+        && current.workspaceId === submission.workspaceId
+        && current.sessionId === submission.sessionId,
+      );
+    };
 
     setSubmitting(true);
     setRunning(true);
@@ -48,15 +76,28 @@ export function useControlPlaneSessionPromptSubmit({
 
     try {
       const result = await sessionSendPromptMutation.mutateAsync({ workspaceId, sessionId, prompt: trimmed });
-      setSession(result.session);
-      setRunning(false);
-      setLiveStatus(undefined);
+      if (isCurrentSubmission()) {
+        setSession(result.session);
+        setRunning(false);
+        setLiveStatus(undefined);
+      }
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : String(submitError));
-      setRunning(false);
-      setLiveStatus(undefined);
+      if (isCurrentSubmission()) {
+        setError(submitError instanceof Error ? submitError.message : String(submitError));
+        setRunning(false);
+        setLiveStatus(undefined);
+      }
     } finally {
-      setSubmitting(false);
+      void Promise.all([
+        utils.controlPlane.sessions.invalidate({ workspaceId: submission.workspaceId }),
+        utils.controlPlane.session.invalidate({ id: submission.sessionId, workspaceId: submission.workspaceId }),
+        utils.controlPlane.sessionRunning.invalidate({ id: submission.sessionId, workspaceId: submission.workspaceId }),
+      ]).catch(() => undefined);
+
+      if (isCurrentSubmission()) {
+        activeSubmissionRef.current = null;
+        setSubmitting(false);
+      }
     }
   }, [
     sessionId,
@@ -68,6 +109,9 @@ export function useControlPlaneSessionPromptSubmit({
     streamConnected,
     submitting,
     sessionSendPromptMutation,
+    utils.controlPlane.session,
+    utils.controlPlane.sessionRunning,
+    utils.controlPlane.sessions,
   ]);
 
   return {

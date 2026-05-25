@@ -233,6 +233,21 @@ describe('workspace catalog', () => {
     const secondSessions = await caller.sessions({ workspaceId: secondWorkspace.id });
     expect(defaultSessions.sessions.map((session) => session.name)).toEqual(['Default workspace session']);
     expect(secondSessions.sessions.map((session) => session.name)).toEqual(['Second workspace session']);
+    await expect(caller.state({ workspaceId: secondWorkspace.id })).resolves.toMatchObject({
+      activeWorkspaceId: secondWorkspace.id,
+      workspace: {
+        id: secondWorkspace.id,
+        workspaceRoot: secondWorkspace.workspaceRoot,
+        stateRoot: secondWorkspace.stateRoot,
+      },
+      sessions: [
+        expect.objectContaining({
+          id: 'session-1',
+          name: 'Second workspace session',
+          workspaceId: secondWorkspace.id,
+        }),
+      ],
+    });
 
     await caller.sessionSettingsUpdate({
       workspaceId: secondWorkspace.id,
@@ -293,6 +308,10 @@ describe('workspace catalog', () => {
     })).resolves.toMatchObject({
       files: [{ path: 'second-only.md' }],
     });
+
+    const secondWorkspaceLog = await readLogUntil(join(secondWorkspace.stateRoot, 'logs', 'server.log'), 'workspaceFileSearch');
+    expect(secondWorkspaceLog).toContain(secondWorkspace.stateRoot);
+    expect(existsSync(join(activeWorkspace.stateRoot, 'logs', 'server.log'))).toBe(false);
   });
 
   it('repairs legacy workspace roots before routing file search', async () => {
@@ -441,3 +460,19 @@ describe('workspace catalog', () => {
     expect(listingWithHidden.entries.map((entry) => entry.name)).toContain('.hidden');
   });
 });
+
+async function readLogUntil(path: string, expectedText: string): Promise<string> {
+  const deadline = Date.now() + 1000;
+  while (Date.now() < deadline) {
+    if (existsSync(path)) {
+      const text = readFileSync(path, 'utf8');
+      if (text.includes(expectedText)) {
+        return text;
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  return existsSync(path) ? readFileSync(path, 'utf8') : '';
+}
