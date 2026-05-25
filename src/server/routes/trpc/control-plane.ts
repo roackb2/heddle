@@ -156,7 +156,7 @@ export const controlPlaneRouter = router({
     };
   }),
   sessionSendPrompt: controlPlaneWorkspaceProcedure.input(sessionMessageInputSchema).mutation(async ({ ctx, input }) => {
-    const { sessionEngineArgs } = ctx.requestWorkspace;
+    const { logger, sessionEngineArgs } = ctx.requestWorkspace;
     return await controlPlaneChatSessionsController.submitPrompt({
       ...sessionEngineArgs,
       sessionId: input.sessionId,
@@ -166,7 +166,7 @@ export const controlPlaneRouter = router({
       includePlanTool: input.includePlanTool,
       apiKey: input.apiKey,
       preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
-      logger: ctx.logger,
+      logger,
       systemContext: input.systemContext,
       memoryMaintenanceMode: input.memoryMaintenanceMode,
       leaseOwner: {
@@ -318,7 +318,7 @@ export const controlPlaneRouter = router({
     };
   }),
   heartbeatTaskRunNow: controlPlaneWorkspaceProcedure.input(heartbeatTaskRunNowInputSchema).mutation(async ({ ctx, input }) => {
-    const { workspace } = ctx.requestWorkspace;
+    const { logger, workspace } = ctx.requestWorkspace;
     const { workspaceId: _workspaceId, ...runInput } = input;
     const task = await ControlPlaneHeartbeatController.triggerTaskRun(workspace.stateRoot, input.taskId);
     controlPlaneHeartbeatEventsController.publish({
@@ -340,7 +340,7 @@ export const controlPlaneRouter = router({
         event,
       }),
     }).catch((error: unknown) => {
-      ctx.logger.error({ error, taskId: input.taskId }, 'Failed to run heartbeat task from control plane');
+      logger.error({ error, taskId: input.taskId }, 'Failed to run heartbeat task from control plane');
     });
 
     return {

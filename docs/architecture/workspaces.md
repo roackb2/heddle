@@ -38,7 +38,7 @@ the API boundary:
 ```text
 web-v2 selected workspaceId
   -> tRPC workspace middleware or upload service
-  -> RequestWorkspace { workspaceRoot, stateRoot, workspaceId }
+  -> RequestWorkspace { workspaceRoot, stateRoot, workspaceId, logger }
   -> controller
   -> core service
   -> persisted state under stateRoot
@@ -85,6 +85,10 @@ The daemon may still write process lifecycle and transport-level logs to the
 startup state root. Workspace operations should additionally write to the
 request workspace log so debugging evidence follows the same state root as the
 session, trace, and memory artifacts.
+
+Workspace loggers are cached per resolved workspace state root. Workspace-owned
+controllers should use the logger on the resolved request workspace instead of
+the daemon startup logger.
 
 ## Extension Rules
 

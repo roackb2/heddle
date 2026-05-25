@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import type { Logger } from 'pino';
 import type { WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
 import type { HeddleServerContext } from '@/server/types.js';
 import { procedure } from '@/server/trpc.js';
@@ -11,6 +12,7 @@ type WorkspaceScopedInput = {
 
 export type ControlPlaneRequestWorkspace = {
   workspace: WorkspaceDescriptor;
+  logger: Logger;
   sessionEngineArgs: {
     workspaceRoot: string;
     stateRoot: string;
@@ -35,7 +37,7 @@ export const controlPlaneWorkspaceProcedure = procedure
       },
     });
 
-    getWorkspaceOperationLogger(requestWorkspace.workspace.stateRoot).info({
+    requestWorkspace.logger.info({
       durationMs: Date.now() - startedAt,
       ok: result.ok,
       path,
@@ -64,8 +66,10 @@ export function resolveControlPlaneRequestWorkspace(
   input?: WorkspaceScopedInput,
 ): ControlPlaneRequestWorkspace {
   const workspace = resolveWorkspaceDescriptor(ctx, input?.workspaceId);
+  const logger = getWorkspaceOperationLogger(workspace.stateRoot);
   return {
     workspace,
+    logger,
     sessionEngineArgs: {
       workspaceRoot: workspace.workspaceRoot,
       stateRoot: workspace.stateRoot,
