@@ -84,7 +84,7 @@ Start the control plane:
 heddle daemon
 ```
 
-After the daemon starts, open the browser control plane to inspect sessions, review current Git workspace changes, inspect historical turn evidence, and use the `Workspaces` section to switch between local projects. For one-off CLI usage against another project, keep using `--cwd`.
+After the daemon starts, open the browser control plane to inspect sessions, review current Git workspace changes, inspect historical turn evidence, manage local workspaces, inspect memory status, and use the heartbeat task workbench. For one-off CLI usage against another project, keep using `--cwd`.
 
 Start the foreground heartbeat scheduler:
 
@@ -130,7 +130,7 @@ yarn typecheck
 - The installed command is `heddle`.
 - By default, commands operate on the current working directory unless `--cwd` is provided.
 - Workspace state is local to the project under `.heddle/`. Saved sessions use `.heddle/chat-sessions.catalog.json` plus per-session files under `.heddle/chat-sessions/`. The browser control plane can register and switch between local workspaces, but each workspace keeps its own sessions, traces, memory, and tasks.
-- Heartbeat scheduler commands are local-first; adding a task does not create a background OS service by itself.
+- Heartbeat scheduler commands are local-first; adding a task does not create a background OS service by itself. The browser control plane can operate the same local tasks and run records, including web-v2 create/edit/run/resume/delete flows.
 
 ## See Also
 

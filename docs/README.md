@@ -12,7 +12,8 @@ If you are new to Heddle, begin with:
 - [Runtime host model](guides/runtime-host-model.md) for how workspace ownership and daemon mode work
 - [Chat and sessions](guides/chat-and-sessions.md) for the core interactive workflow
 - [Knowledge persistence](guides/knowledge-persistence.md) for how Heddle learns durable workspace knowledge while it works
-- [Control plane](guides/control-plane.md) for the browser UI, workspace switching, and session review
+- [Control plane](guides/control-plane.md) for the browser UI, workspace switching, session review, task workbench, and browser composer
+- [Heartbeat](guides/heartbeat.md) for scheduled/background task workflows
 - [CLI reference](reference/cli.md) for command lookup
 
 ## Agent Reading Priority
@@ -99,6 +100,12 @@ Evaluation:
 2. [Control plane](guides/control-plane.md)
 3. [CLI reference](reference/cli.md)
 4. [Heartbeat](guides/heartbeat.md)
+
+### I want scheduled or background agent work
+
+1. [Heartbeat](guides/heartbeat.md)
+2. [Control plane](guides/control-plane.md)
+3. [Programmatic use](guides/programmatic-use.md)
 
 ### I want to switch between local projects
 

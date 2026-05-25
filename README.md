@@ -72,13 +72,15 @@ Terminal chat/dev workflow showing file edits, inline diff output, and verificat
 
 ### Browser control plane overview
 
-The next-generation local control plane is a browser-based workspace for sessions, tool approvals, and live diff review. This v2 interface is **work in progress and not yet released**; it shows the direction for the control plane rewrite, while the current released control plane remains the supported browser UI:
+The next-generation local control plane is a browser-based workspace for sessions, tool approvals, live diff review, heartbeat tasks, and workspace settings. This v2 interface is **work in progress and not yet released**; it shows the direction for the control plane rewrite, while the current released control plane remains the supported browser UI:
 
 ![Heddle web-v2 control plane work in progress](docs/images/control-plane-v2.png)
 
 Web-v2 also includes a task workbench for recurring heartbeat tasks, live run state, and run result review:
 
 ![Heddle web-v2 heartbeat task workbench](docs/images/control-plane-v2-heartbeat-task.png)
+
+Recent web-v2 work adds browser composer controls for drift, `@file` mentions, execution settings, and image attachments. Uploaded images are stored under the active workspace's `.heddle/` state and sent to the agent as local paths so the existing `view_image` workflow still owns inspection.
 
 The same web-v2 control plane is also being shaped for mobile, with the session list, workbench, and diff preview exposed as focused panels:
 
@@ -292,9 +294,11 @@ The `Workspaces` section lets you register local projects, switch the control pl
 
 The `Sessions` section supports a coding-review flow built around current work first. Review starts from the live Git working tree for the active workspace, with changed files, structured read-only diffs, and a larger full-diff viewer when the side panel is too tight. Historical turn diffs, review commands, verification commands, approvals, and trace events are still available, but they are separated from current review so old evidence does not distract from the task at hand.
 
-Session chat in the control plane renders assistant markdown, receives per-session live updates for assistant streaming, tool progress, approvals, and saved-session refreshes, and keeps model/reasoning controls aligned with the terminal workflow.
+Session chat in the control plane renders assistant markdown, receives per-session live updates for assistant streaming, tool progress, approvals, and saved-session refreshes, and keeps model/reasoning controls aligned with the terminal workflow. The web-v2 session composer also includes drift controls, `@file` mention suggestions, and image upload controls for attaching local screenshots or reference images to a prompt.
 
-This is useful if you want a more inspectable and operator-friendly workflow than a plain CLI transcript. The layout adapts for phone use as well, with mobile-native navigation for Overview, Sessions, Tasks, and Workspaces, plus a focused Chat/Review session workflow.
+The task surface has also moved beyond passive visibility in web-v2: operators can create, edit, enable, disable, run, resume, and delete heartbeat tasks, inspect live run state, and review saved run records from the browser. Settings now include workspace and memory status views, so memory catalog health and maintenance history are visible without dropping back to terminal commands.
+
+This is useful if you want a more inspectable and operator-friendly workflow than a plain CLI transcript. The layout adapts for phone use as well, with mobile-native navigation for Sessions, Tasks, and Settings, plus focused Chat/Review and task-run workflows.
 
 More: [Control plane guide](docs/guides/control-plane.md)
 
@@ -322,9 +326,11 @@ Heartbeat is Heddle's model for bounded autonomous wake cycles.
 
 Instead of only running when a human types a prompt, a heartbeat task lets Heddle wake up on a schedule, do a limited amount of work, checkpoint the result, and decide whether to continue, pause, complete, or escalate.
 
-Heartbeat keeps the latest wake result and saved run history in the same
+Heartbeat keeps the latest runner result and saved run history in the same
 record shape, so terminal commands and the browser control plane show the same
-decision, summary, outcome, and usage data.
+decision, summary, outcome, and usage data. Tasks can use operator-controlled
+continuation or agent-selected continuation depending on how much autonomy the
+host should allow.
 
 Example commands:
 
@@ -359,7 +365,7 @@ More: [Semantic drift](docs/guides/semantic-drift.md)
 
 ### Programmatic runtime APIs
 
-Heddle is not only a CLI. The npm package also exposes runtime primitives such as `AgentLoopRuntimeService.run(...)` and `HeartbeatWakeService.run` so other hosts can build on top of it.
+Heddle is not only a CLI. The npm package also exposes runtime primitives such as `createConversationEngine`, `AgentLoopRuntimeService.run(...)`, `HeartbeatRunnerAgent.run`, `HeartbeatSchedulerService.runDueTasks`, and `FileHeartbeatTaskService` so other hosts can build on top of it.
 
 This is for people building their own agent hosts, schedulers, or control surfaces rather than only using the packaged CLI.
 

@@ -61,6 +61,7 @@ Use heartbeat APIs when you want:
 - scheduled maintenance or monitoring tasks
 - repeated runner cycles around a durable task definition
 - host-managed task/run stores and review views
+- explicit operator-controlled or agent-selected continuation policy for recurring work
 - escalation-oriented background workflows
 
 Heartbeat is for task scheduling and bounded background work, not for ordinary interactive persisted chat sessions.
@@ -312,6 +313,11 @@ same result inside each run record. That means hosts can use the same shape for
 the latest task status, saved run history, and `heartbeat.task.finished` events
 instead of maintaining separate flattened copies.
 
+`FileHeartbeatTaskService` owns durable task operations such as create, update,
+enable, disable, delete, resume, list views, and read saved runs. Use it when a
+host needs the same task semantics as the CLI and browser control plane instead
+of maintaining a parallel task store.
+
 For repeated local or hosted runner cycles, Heddle also exports:
 
 - `HeartbeatSchedulerService.runDueTasks`
@@ -319,7 +325,6 @@ For repeated local or hosted runner cycles, Heddle also exports:
 - `FileHeartbeatTaskService`
 - `FileHeartbeatCheckpointRepository`
 - `StoredHeartbeatService.run`
-- `HeartbeatDecisionPolicy.suggestNextDelayMs`
 - `FileHeartbeatTaskService.listTaskViews`
 - `FileHeartbeatTaskService.listRunViews`
 - `FileHeartbeatTaskService.readRun`
@@ -328,7 +333,9 @@ These are useful when you want to provide your own surrounding host, queue, cron
 
 ## Host Adapters And Observer Utilities
 
-The package also exports compact heartbeat views plus a thin status/progress/response adapter layer for hosts that do not want to consume the full task/run record shape directly.
+The package also exports compact heartbeat task/run views and the Lucid
+presenter for hosts that do not want to consume the full task/run record shape
+directly.
 
 For passive semantic-drift experiments, `createCyberLoopObserver` can consume Heddle's event stream and run CyberLoop-compatible middleware over normalized runtime frames.
 

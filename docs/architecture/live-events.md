@@ -125,7 +125,7 @@ The main implementation path is:
   subscription delivery.
 - `src/server/routes/trpc/control-plane.ts` exposes
   `controlPlane.sessionEvents` as a tRPC subscription.
-- `src/web-v2/hooks/useControlPlaneSessionEvents.ts` consumes subscription
+- `src/web-v2/hooks/sessions/useControlPlaneSessionEvents.ts` consumes subscription
   events and updates web-v2 UI state.
 
 ## Control-Plane Envelopes

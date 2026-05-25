@@ -2,7 +2,7 @@
 
 Heddle includes a local browser control plane for workspace oversight when you want a browser UI in addition to terminal chat.
 
-The control plane is the main place to inspect saved sessions, review evidence, workspace memory health, heartbeat tasks, run history, and local workspace switching.
+The control plane is the main place to inspect saved sessions, review evidence, workspace memory health, heartbeat tasks, run history, and local workspace switching. The packaged daemon currently serves the supported browser client from `src/web`; `src/web-v2` is the next-generation control-plane client used for the newer sessions, tasks, settings, and composer work.
 
 ## What The Control Plane Includes
 
@@ -14,7 +14,8 @@ Current stack:
 - `src/server/routes`, `src/server/controllers`, and `src/server/services`: control-plane server API routes, request controllers, and domain services
 - pino logs written locally for debugging
 
-The current browser UI surfaces:
+Across the supported browser client and the web-v2 development surface, the
+control plane includes:
 
 - active workspace and `.heddle/` state location
 - workspace management with registered workspaces, recent known workspaces, folder picking, switching, and renaming
@@ -24,12 +25,16 @@ The current browser UI surfaces:
 - a model selector and reasoning-effort control backed by the server-side built-in model catalog and session state, plus a drift toggle and latest trace-derived drift level
 - an auth status indicator in the session composer footer so you can see whether the selected model is using OAuth or API-key mode without spending header space
 - debounced `@file` mention suggestions in the composer, backed by a capped workspace file search endpoint
+- browser image attachments in the web-v2 composer, stored under the active workspace state root and appended to prompts as local paths for `view_image`
 - compact tool-result cards for saved tool outputs such as `list_files: {...}`
 - current workspace review backed by Git status and file patches, so generated or shell-made changes are visible even when they did not come from the edit tool
 - historical turn review for trace-backed file diffs, review commands, verification commands, approvals, and events
 - lightweight toast notifications for session/action success and failure
-- heartbeat task status, scheduling state, selected task detail, and run history
+- heartbeat task creation, editing, enabling, disabling, deletion, manual run, explicit resume, scheduling state, selected task detail, live run state, and run history
+- settings navigation for general preferences, workspace selection, and memory status
 - recent heartbeat run summaries and usage data
+
+Browser image uploads accept common image formats and keep the saved file path readable to the runtime. The browser sends those paths with the prompt instead of inventing a separate image-analysis path, so normal tool approval, trace, and `view_image` behavior still apply.
 
 Live session updates come from the daemon's per-session event stream. Web-v2
 uses the `controlPlane.sessionEvents` tRPC subscription for those updates; the
@@ -72,11 +77,31 @@ Conversation messages render GitHub-flavored markdown for headings, lists, task 
 
 This is still intentionally short of a full IDE file-review engine: Heddle does not edit patches in the browser and does not rely on OS file watching as the review truth. The practical review model is: Git shows what changed now; traces explain how the selected turn got there.
 
+## Tasks
+
+The Tasks surface exposes local heartbeat tasks and their saved runs. It is designed for operator-controlled background work rather than a hidden autonomous queue.
+
+In web-v2, the task workbench supports:
+
+- creating and editing durable tasks with a name, instruction, schedule, optional model, and optional step budget
+- choosing continuation mode, either operator-controlled continuation or agent-selected continuation
+- enabling, disabling, deleting, and manually running a task
+- explicitly resuming a blocked or paused task instead of treating every manual run as a resume
+- following live run state and then opening the saved run record for the final result
+
+Task state and run history come from the same heartbeat task service used by the CLI and programmatic scheduler APIs, so the browser does not maintain a separate task model.
+
+## Settings And Memory
+
+The web-v2 settings area separates configuration from the main agent workbench. Workspace settings keep local project selection visible, and memory settings show catalog health, note counts, pending memory candidates, and the latest maintenance run when available.
+
+Memory settings are read-oriented today. Use the CLI memory commands for detailed note inspection and validation when you need a deeper audit.
+
 ## Mobile Layout
 
 The control plane includes a mobile-native layout for phone and tablet access. It is designed around short navigation paths rather than shrinking the desktop workstation view into a narrow screen.
 
-On mobile, the UI uses:
+On mobile, the supported client uses:
 
 - bottom root navigation for Overview, Sessions, Tasks, and Workspaces
 - a dedicated session list for choosing saved conversations
@@ -84,6 +109,10 @@ On mobile, the UI uses:
 - a compact composer that keeps the latest conversation visible
 - current workspace diff review plus historical turn/evidence tabs without desktop sidebars
 - full-diff expansion for reviewing larger patches on small screens
+
+Web-v2 mobile work is moving the same control-plane model toward focused
+Sessions, Tasks, and Settings surfaces, with task detail and run detail screens
+for checking background work from a phone.
 
 Representative mobile views:
 
@@ -133,7 +162,11 @@ yarn client:dev
 
 `yarn daemon:dev` starts the real daemon runtime at `127.0.0.1:8765`, including daemon ownership registration, registry heartbeats, and the built web app from `dist/src/web`.
 
-`yarn client:dev` starts the Vite web client at `127.0.0.1:5173` and proxies `/trpc` and `/control-plane` requests to the backend server.
+`yarn client:dev` starts the Vite web client at `127.0.0.1:5173` and proxies `/trpc` and `/control-plane` requests to the backend server. For the web-v2 client, use:
+
+```bash
+yarn client:v2:dev
+```
 
 In other words:
 
