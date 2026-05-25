@@ -11,7 +11,7 @@ Current stack:
 - `src/server`: Express-hosted tRPC server
 - `src/web`: React/Vite web client
 - `src/web-v2`: React/Vite web-v2 client for new control-plane work
-- `src/server/features/control-plane`: control-plane-specific server feature logic
+- `src/server/routes`, `src/server/controllers`, and `src/server/services`: control-plane server API routes, request controllers, and domain services
 - pino logs written locally for debugging
 
 The current browser UI surfaces:

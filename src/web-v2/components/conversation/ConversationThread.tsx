@@ -117,6 +117,7 @@ export function ConversationThread({
       ) : null}
       <div className="v2-composer-region">
         <ConversationComposer
+          sessionId={session.id}
           disabled={Boolean(pendingApproval)}
           driftEnabled={session.driftEnabled ?? false}
           driftLevel={session.driftLevel}

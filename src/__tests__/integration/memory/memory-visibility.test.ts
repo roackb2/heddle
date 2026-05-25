@@ -7,7 +7,7 @@ import { MemoryCatalogService } from '../../../core/memory/catalog.js';
 import { MemoryValidationService } from '../../../core/memory/validation.js';
 import { MemoryVisibilityService } from '../../../core/memory/visibility.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
-import { controlPlaneRouter } from '../../../server/features/control-plane/router.js';
+import { controlPlaneRouter } from '@/server/routes/trpc/control-plane.js';
 
 describe('memory visibility', () => {
   it('loads memory status, lists notes, reads notes, and searches notes', async () => {

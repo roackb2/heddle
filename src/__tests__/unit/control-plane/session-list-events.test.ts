@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ControlPlaneChatSessionsController } from '@/server/features/control-plane/controllers/chat-sessions-controller.js';
-import type { ControlPlaneSessionsEventEnvelope } from '@/server/features/control-plane/types.js';
+import { ControlPlaneChatSessionsController } from '@/server/controllers/trpc/control-plane/chat-sessions-controller.js';
+import type { ControlPlaneSessionsEventEnvelope } from '@/server/control-plane-types.js';
 
 describe('ControlPlaneChatSessionsController session list events', () => {
   it('emits a sessions.updated event when the session catalog changes', async () => {

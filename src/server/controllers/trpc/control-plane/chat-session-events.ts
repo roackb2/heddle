@@ -1,6 +1,6 @@
 import type { EventEmitter } from 'node:events';
 import type { ConversationActivity } from '@/core/live/index.js';
-import type { ControlPlaneSessionLiveEvent } from '../types.js';
+import type { ControlPlaneSessionLiveEvent } from '@/server/control-plane-types.js';
 
 export class ControlPlaneChatSessionEventsController {
   static emitSessionActivities(args: {

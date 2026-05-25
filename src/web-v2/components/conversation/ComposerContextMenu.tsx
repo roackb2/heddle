@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { ImagePlus, Plus } from 'lucide-react';
 import { Button } from '@web/components/ui/button';
 import {
   Popover,
@@ -18,6 +18,8 @@ type ComposerContextMenuProps = {
   driftEnabled: boolean;
   driftLevel: SessionDriftLevel;
   settingsUpdating?: boolean;
+  uploadDisabled?: boolean;
+  onUploadImagesClick?: () => void;
   onUpdateDriftEnabled?: (enabled: boolean) => Promise<void>;
 };
 
@@ -33,6 +35,8 @@ export function ComposerContextMenu({
   driftEnabled,
   driftLevel,
   settingsUpdating,
+  uploadDisabled,
+  onUploadImagesClick,
   onUpdateDriftEnabled,
 }: ComposerContextMenuProps) {
   const { t } = useI18n();
@@ -69,6 +73,32 @@ export function ComposerContextMenu({
         className="v2-composer-menu v2-composer-context-menu"
         aria-label={t('composer.contextMenu')}
       >
+        {onUploadImagesClick ? (
+          <div className="v2-upload-menu-section">
+            <Button
+              type="button"
+              variant="ghost"
+              size="none"
+              className="v2-upload-menu-row"
+              disabled={disabled || uploadDisabled}
+              onClick={onUploadImagesClick}
+            >
+              <ImagePlus
+                aria-hidden="true"
+                data-icon="inline-start"
+                className="v2-drift-menu-icon"
+              />
+              <span className="v2-drift-menu-copy">
+                <span className="v2-drift-menu-title truncate">
+                  {t('composer.images.uploadAction')}
+                </span>
+                <span className="v2-drift-menu-status truncate">
+                  {t('composer.images.uploadDescription')}
+                </span>
+              </span>
+            </Button>
+          </div>
+        ) : null}
         {onUpdateDriftEnabled ? (
           <SessionDriftMenuSection
             disabled={disabled || settingsUpdating}

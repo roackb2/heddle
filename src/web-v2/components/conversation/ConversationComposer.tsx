@@ -5,8 +5,16 @@ import { Button } from '@web/components/ui/button';
 import { Textarea } from '@web/components/ui/textarea';
 import type { ControlPlaneReasoningEffortSelection } from '@web/hooks/sessions/useControlPlaneSessionDetail';
 import { useI18n } from '@web/i18n';
+import { appendUploadedImagePaths } from '@web/hooks/conversation/composerImagePrompt';
+import { useComposerImageAttachments } from '@web/hooks/conversation/useComposerImageAttachments';
+import { useComposerImageDrop } from '@web/hooks/conversation/useComposerImageDrop';
 import { useComposerTextareaAutosize } from '@web/hooks/conversation/useComposerTextareaAutosize';
+import { useComposerImageUploadToasts } from '@web/hooks/conversation/useComposerImageUploadToasts';
 import { useFileMentionAutocomplete } from '@web/hooks/conversation/useFileMentionAutocomplete';
+import {
+  ComposerImageUploadControls,
+  type ComposerImageUploadControlsHandle,
+} from './ComposerImageUploadControls';
 import { ComposerContextMenu } from './ComposerContextMenu';
 import {
   ComposerExecutionMenu,
@@ -18,6 +26,7 @@ import type { SessionDriftLevel } from './SessionDriftControl';
 // ConversationComposer owns the prompt draft and submit lifecycle. Context,
 // execution settings, file mentions, and textarea sizing live in focused peers.
 export function ConversationComposer({
+  sessionId,
   disabled,
   driftEnabled,
   driftLevel,
@@ -32,6 +41,7 @@ export function ConversationComposer({
   onUpdateModel,
   onUpdateReasoningEffort,
 }: {
+  sessionId?: string;
   disabled?: boolean;
   driftEnabled?: boolean;
   driftLevel?: SessionDriftLevel;
@@ -47,22 +57,45 @@ export function ConversationComposer({
   onUpdateReasoningEffort?: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
 }) {
   const { t } = useI18n();
+  const imageUploadControlsRef = useRef<ComposerImageUploadControlsHandle>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState('');
-  const sendDisabled = disabled || submitting || !draft.trim();
+  const {
+    attachments: imageUploadAttachments,
+    clearUploadedAttachments,
+    error: imageUploadError,
+    isUploading: imageUploading,
+    removeAttachment: removeImageAttachment,
+    uploadedPaths: uploadedImagePaths,
+    uploadImages,
+  } = useComposerImageAttachments({ sessionId });
+  const sendDisabled = disabled
+    || submitting
+    || imageUploading
+    || (!draft.trim() && !uploadedImagePaths.length);
   const effectiveDriftEnabled = driftEnabled ?? false;
   const effectiveDriftLevel = driftLevel ?? 'unknown';
   const effectiveReasoningEffort = reasoningEffort ?? 'medium';
+  const imageUploadDisabled = disabled || submitting || imageUploading || !sessionId;
+  const handleUploadImages = useCallback((files: FileList | File[]) => {
+    void uploadImages(files);
+  }, [uploadImages]);
+  const imageDrop = useComposerImageDrop({
+    disabled: imageUploadDisabled,
+    onUploadImages: handleUploadImages,
+  });
+  useComposerImageUploadToasts(imageUploadError);
 
   const handleSubmit = useCallback(async () => {
-    const prompt = draft.trim();
+    const prompt = appendUploadedImagePaths(draft.trim(), uploadedImagePaths);
     if (!prompt || sendDisabled) {
       return;
     }
 
     setDraft('');
+    clearUploadedAttachments();
     await onSubmitPrompt(prompt);
-  }, [draft, onSubmitPrompt, sendDisabled]);
+  }, [clearUploadedAttachments, draft, onSubmitPrompt, sendDisabled, uploadedImagePaths]);
   const fileMentions = useFileMentionAutocomplete({
     value: draft,
     onValueChange: setDraft,
@@ -75,6 +108,8 @@ export function ConversationComposer({
   return (
     <form
       className="v2-composer-shell"
+      data-drag-active={imageDrop.dragActive ? 'true' : undefined}
+      {...imageDrop.dropZoneProps}
       onSubmit={(event) => {
         event.preventDefault();
         void handleSubmit();
@@ -104,12 +139,21 @@ export function ConversationComposer({
         onSelect={fileMentions.textareaProps.onSelect}
       />
       {fileMentions.isOpen ? <FileMentionMenu {...fileMentions.menuProps} /> : null}
+      <ComposerImageUploadControls
+        ref={imageUploadControlsRef}
+        attachments={imageUploadAttachments}
+        disabled={imageUploadDisabled}
+        onRemoveAttachment={removeImageAttachment}
+        onUploadImages={handleUploadImages}
+      />
       <div className="v2-composer-toolbar">
         <ComposerContextMenu
           disabled={disabled}
           driftEnabled={effectiveDriftEnabled}
           driftLevel={effectiveDriftLevel}
           settingsUpdating={settingsUpdating}
+          uploadDisabled={imageUploadDisabled}
+          onUploadImagesClick={() => imageUploadControlsRef.current?.openFilePicker()}
           onUpdateDriftEnabled={onUpdateDriftEnabled}
         />
         <div className="v2-composer-toolbar-controls">

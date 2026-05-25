@@ -6,7 +6,7 @@ import type {
   WorkspaceChangedFileView,
   WorkspaceChangesView,
   WorkspaceFileDiffView,
-} from '../types.js';
+} from '@/server/control-plane-types.js';
 
 const MAX_PATCH_LENGTH = 120_000;
 

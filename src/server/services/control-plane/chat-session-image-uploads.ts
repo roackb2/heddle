@@ -1,0 +1,175 @@
+import { Buffer } from 'node:buffer';
+import { mkdir } from 'node:fs/promises';
+import { basename, extname, join, resolve } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import type { Request } from 'express';
+import { RuntimeWorkspaceService, type WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
+import { controlPlaneChatSessionsController } from '@/server/controllers/trpc/control-plane/chat-sessions-controller.js';
+
+export const CHAT_SESSION_IMAGE_UPLOAD_LIMITS = {
+  maxFiles: 10,
+  maxFileSizeBytes: 10 * 1024 * 1024,
+} as const;
+
+export type ChatSessionImageUpload = {
+  id: string;
+  path: string;
+  originalName: string;
+  mediaType: string;
+  sizeBytes: number;
+};
+
+export type ChatSessionImageUploadResult = {
+  uploads: ChatSessionImageUpload[];
+};
+
+type ChatSessionImageUploadServiceOptions = {
+  workspaceRoot: string;
+  stateRoot: string;
+};
+
+const SUPPORTED_IMAGE_TYPES = {
+  '.gif': 'image/gif',
+  '.jpeg': 'image/jpeg',
+  '.jpg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+} as const;
+
+/**
+ * Owns browser-uploaded session image storage for the local control plane.
+ *
+ * Images are persisted under the active workspace state root so the runtime can
+ * later inspect them through the existing filesystem-backed view_image tool.
+ */
+export class ChatSessionImageUploadService {
+  constructor(private readonly options: ChatSessionImageUploadServiceOptions) {}
+
+  resolveActiveWorkspace(): WorkspaceDescriptor {
+    return RuntimeWorkspaceService.resolveContext({
+      workspaceRoot: this.options.workspaceRoot,
+      stateRoot: this.options.stateRoot,
+    }).activeWorkspace;
+  }
+
+  async resolveUploadDirectory(request: Request): Promise<string> {
+    const sessionId = this.readSessionId(request);
+    const activeWorkspace = this.resolveActiveWorkspace();
+    this.requireSession(activeWorkspace, sessionId);
+    const uploadDirectory = join(activeWorkspace.stateRoot, 'uploads', 'sessions', sessionId);
+    await mkdir(uploadDirectory, { recursive: true });
+    return uploadDirectory;
+  }
+
+  createStoredFilename(file: Pick<Express.Multer.File, 'mimetype' | 'originalname'>): string {
+    return `${randomUUID()}${this.resolveSupportedExtension(file)}`;
+  }
+
+  acceptsImageFile(file: Pick<Express.Multer.File, 'mimetype' | 'originalname'>): boolean {
+    return Boolean(this.resolveSupportedExtension(file));
+  }
+
+  completeUploads(request: Request): ChatSessionImageUploadResult {
+    const sessionId = this.readSessionId(request);
+    const activeWorkspace = this.resolveActiveWorkspace();
+    this.requireSession(activeWorkspace, sessionId);
+
+    const files = this.readUploadedFiles(request.files);
+    if (!files.length) {
+      throw new ChatSessionUploadError(400, 'Upload at least one image file.');
+    }
+
+    if (files.length > CHAT_SESSION_IMAGE_UPLOAD_LIMITS.maxFiles) {
+      throw new ChatSessionUploadError(400, `Upload at most ${CHAT_SESSION_IMAGE_UPLOAD_LIMITS.maxFiles} images at a time.`);
+    }
+
+    const uploadRoot = resolve(activeWorkspace.stateRoot, 'uploads', 'sessions', sessionId);
+    return {
+      uploads: files.map((file) => this.projectUploadedFile(uploadRoot, file)),
+    };
+  }
+
+  private requireSession(activeWorkspace: WorkspaceDescriptor, sessionId: string): void {
+    const session = controlPlaneChatSessionsController.readDetail({
+      workspaceRoot: activeWorkspace.anchorRoot,
+      stateRoot: activeWorkspace.stateRoot,
+      sessionStoragePath: resolve(activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
+    }, sessionId);
+    if (!session) {
+      throw new ChatSessionUploadError(404, `Chat session not found: ${sessionId}`);
+    }
+  }
+
+  private projectUploadedFile(uploadRoot: string, file: Express.Multer.File): ChatSessionImageUpload {
+    const resolvedPath = resolve(file.path);
+    if (!resolvedPath.startsWith(`${uploadRoot}/`)) {
+      throw new ChatSessionUploadError(400, 'Uploaded file was stored outside the session upload directory.');
+    }
+
+    return {
+      id: basename(file.filename, extname(file.filename)),
+      path: resolvedPath,
+      originalName: this.decodeOriginalFilename(file.originalname),
+      mediaType: file.mimetype,
+      sizeBytes: file.size,
+    };
+  }
+
+  private readUploadedFiles(files: Request['files']): Express.Multer.File[] {
+    if (Array.isArray(files)) {
+      return files;
+    }
+
+    if (!files || typeof files !== 'object') {
+      return [];
+    }
+
+    return Object.values(files).flat();
+  }
+
+  private resolveSupportedExtension(file: Pick<Express.Multer.File, 'mimetype' | 'originalname'>): keyof typeof SUPPORTED_IMAGE_TYPES | undefined {
+    const extension = extname(file.originalname).toLowerCase() as keyof typeof SUPPORTED_IMAGE_TYPES;
+    const expectedMediaType = SUPPORTED_IMAGE_TYPES[extension];
+    if (!expectedMediaType) {
+      return undefined;
+    }
+
+    return !file.mimetype || file.mimetype === expectedMediaType ? extension : undefined;
+  }
+
+  private readSessionId(request: Request): string {
+    const sessionId = typeof request.params.sessionId === 'string' ? request.params.sessionId.trim() : '';
+    if (!sessionId) {
+      throw new ChatSessionUploadError(400, 'Missing sessionId.');
+    }
+
+    return sessionId;
+  }
+
+  private decodeOriginalFilename(originalName: string): string {
+    if (!looksLikeMojibake(originalName)) {
+      return originalName;
+    }
+
+    const decoded = Buffer.from(originalName, 'latin1').toString('utf8');
+    return decoded.includes('\uFFFD') ? originalName : decoded;
+  }
+}
+
+function looksLikeMojibake(value: string): boolean {
+  return /[ÃÂâÆæÅå]/.test(value);
+}
+
+export class ChatSessionUploadError extends Error {
+  constructor(
+    readonly statusCode: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ChatSessionUploadError';
+  }
+}
+
+export function isChatSessionUploadError(error: unknown): error is ChatSessionUploadError {
+  return error instanceof ChatSessionUploadError;
+}

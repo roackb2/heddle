@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ControlPlaneWorkspaceFilesController } from '../../../server/features/control-plane/controllers/workspace-files.js';
+import { ControlPlaneWorkspaceFilesController } from '@/server/controllers/trpc/control-plane/workspace-files.js';
 
 describe('control-plane workspace file suggestions', () => {
   it('uses git ignore rules for file mention suggestions', async () => {

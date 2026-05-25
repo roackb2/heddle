@@ -1,5 +1,5 @@
 import { procedure, router } from './trpc.js';
-import { controlPlaneRouter } from './features/control-plane/router.js';
+import { controlPlaneRouter } from './routes/trpc/control-plane.js';
 
 export const appRouter = router({
   health: procedure.query(({ ctx }) => {

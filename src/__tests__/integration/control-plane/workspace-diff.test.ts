@@ -5,8 +5,8 @@ import { join } from 'node:path';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
-import { controlPlaneRouter } from '../../../server/features/control-plane/router.js';
-import { ControlPlaneWorkspaceDiffController } from '../../../server/features/control-plane/controllers/workspace-diff.js';
+import { controlPlaneRouter } from '@/server/routes/trpc/control-plane.js';
+import { ControlPlaneWorkspaceDiffController } from '@/server/controllers/trpc/control-plane/workspace-diff.js';
 
 describe('workspace diff review', () => {
   it('returns an empty non-git result outside a git workspace', async () => {

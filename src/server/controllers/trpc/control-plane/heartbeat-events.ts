@@ -9,7 +9,7 @@ import { EventEmitter } from 'node:events';
 import dayjs from 'dayjs';
 import { FileHeartbeatTaskService, type AgentHeartbeatEvent, type HeartbeatSchedulerEvent } from '@/core/heartbeat/index.js';
 import { RuntimeSubscriptionStream } from '@/core/runtime/subscriptions/index.js';
-import type { ControlPlaneHeartbeatAgentEvent, ControlPlaneHeartbeatEvent, ControlPlaneHeartbeatEventEnvelope } from '../types.js';
+import type { ControlPlaneHeartbeatAgentEvent, ControlPlaneHeartbeatEvent, ControlPlaneHeartbeatEventEnvelope } from '@/server/control-plane-types.js';
 
 export class ControlPlaneHeartbeatEventsController {
   private readonly eventBus = new EventEmitter();
