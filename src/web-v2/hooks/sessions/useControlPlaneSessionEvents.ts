@@ -64,11 +64,19 @@ export function useControlPlaneSessionEvents({
       refresh,
       refreshPendingApproval,
       invalidateWorkspaceDiff,
+      updateSession: (updater) => {
+        setSession(updater);
+        if (workspaceId) {
+          utils.controlPlane.session.setData(
+            { id: event.sessionId, workspaceId },
+            (current) => applySessionUpdate(current ?? null, updater),
+          );
+        }
+      },
       setLiveStatus,
       setRunning,
-      setSession,
     }));
-  }, [invalidateWorkspaceDiff, refresh, refreshPendingApproval, setLiveStatus, setRunning, setSession, workspaceId]);
+  }, [invalidateWorkspaceDiff, refresh, refreshPendingApproval, setLiveStatus, setRunning, setSession, utils.controlPlane.session, workspaceId]);
 
   const subscription = trpcReact.controlPlane.sessionEvents.useSubscription(
     sessionId && workspaceId ? { sessionId, workspaceId } : skipToken,
@@ -121,12 +129,19 @@ function isActiveSessionAddress(active: SessionAddress, event: SessionAddress): 
   );
 }
 
+function applySessionUpdate(
+  current: ControlPlaneSessionDetail,
+  updater: SetStateAction<ControlPlaneSessionDetail>,
+): ControlPlaneSessionDetail {
+  return typeof updater === 'function' ? updater(current) : updater;
+}
+
 type SessionActivityContext = {
   sessionId: string;
   refresh: RefreshControlPlaneSession;
   refreshPendingApproval: (sessionId: string) => void;
   invalidateWorkspaceDiff: () => void;
-  setSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
+  updateSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
   setRunning: Dispatch<SetStateAction<boolean>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
 };
@@ -140,8 +155,8 @@ type SessionActivityHandlerMap = {
 };
 
 const sessionActivityHandlers: SessionActivityHandlerMap = {
-  'assistant.stream': (activity, { setSession, setLiveStatus }) => {
-    setSession((current) => (
+  'assistant.stream': (activity, { updateSession, setLiveStatus }) => {
+    updateSession((current) => (
       SessionMessageController.upsertLiveAssistantMessage(
         current,
         activity.text,

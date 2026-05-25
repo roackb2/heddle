@@ -72,10 +72,18 @@ export function useControlPlaneSessionPromptSubmit({
     setRunning(true);
     setError(undefined);
     setLiveStatus(streamConnected ? 'Heddle is working...' : 'Heddle is working... reconnecting live stream if needed.');
+    utils.controlPlane.session.setData(
+      { id: sessionId, workspaceId },
+      (current) => SessionMessageController.appendOptimisticUserTurn(current ?? null, trimmed),
+    );
     setSession((current) => SessionMessageController.appendOptimisticUserTurn(current, trimmed));
 
     try {
       const result = await sessionSendPromptMutation.mutateAsync({ workspaceId, sessionId, prompt: trimmed });
+      utils.controlPlane.session.setData(
+        { id: submission.sessionId, workspaceId: submission.workspaceId },
+        result.session,
+      );
       if (isCurrentSubmission()) {
         setSession(result.session);
         setRunning(false);
