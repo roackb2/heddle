@@ -1,11 +1,18 @@
 import { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 
+type PromptActivity = {
+  text: string;
+  color: 'blue' | 'green' | 'yellow' | 'red';
+};
+
 export function PromptInput({
+  activity,
   disabled,
   placeholder,
   onSubmit,
 }: {
+  activity?: PromptActivity;
   disabled: boolean;
   placeholder: string;
   onSubmit: (value: string) => void;
@@ -35,9 +42,12 @@ export function PromptInput({
   }, { isActive: !disabled });
 
   return (
-    <Box>
-      <Text color="cyan">› </Text>
-      <Text>{value || <Text dimColor>{placeholder}</Text>}</Text>
+    <Box flexDirection="column">
+      {activity ? <Text color={activity.color}>{activity.text}</Text> : null}
+      <Box>
+        <Text color="cyan">› </Text>
+        <Text>{value || <Text dimColor>{placeholder}</Text>}</Text>
+      </Box>
     </Box>
   );
 }

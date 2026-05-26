@@ -41,6 +41,13 @@ export function App({
 
   const status = snapshot.error ?? snapshot.liveStatus;
   const latestUpdateText = formatLatestUpdate(snapshot.latestUpdate);
+  const activity = snapshot.error
+    ? { text: `Error: ${snapshot.error}`, color: 'red' as const }
+    : latestUpdateText
+      ? { text: latestUpdateText, color: getLatestUpdateColor(snapshot.latestUpdate) }
+      : status
+        ? { text: `Status: ${status}`, color: 'yellow' as const }
+        : undefined;
 
   return (
     <Box flexDirection="column" paddingX={1}>
@@ -53,18 +60,11 @@ export function App({
         {snapshot.activeSession ? ` · ${snapshot.activeSession.name}` : ''}
       </Text>
       <ConversationPanel session={snapshot.activeSession} />
-      <Box flexDirection="column" marginBottom={1}>
-        {status ? <Text color={snapshot.error ? 'red' : 'yellow'}>Status: {status}</Text> : null}
-        {latestUpdateText ? (
-          <Text color={getLatestUpdateColor(snapshot.latestUpdate)}>
-            {latestUpdateText}
-          </Text>
-        ) : null}
-      </Box>
       {snapshot.pendingApproval ? (
         <Text color="yellow">Approval requested. Approval controls are part of the next cli-v2 slice.</Text>
       ) : null}
       <PromptInput
+        activity={activity}
         disabled={snapshot.loading || snapshot.submitting || snapshot.running || snapshot.cancelling}
         placeholder={snapshot.loading ? 'Loading session...' : 'Type a prompt'}
         onSubmit={submitPrompt}
