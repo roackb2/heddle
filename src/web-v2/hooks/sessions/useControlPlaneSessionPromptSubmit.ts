@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { trpcReact, type ControlPlaneSessionDetail } from '@web/api/client';
-import { SessionMessageController } from '@web/controllers/session-messages';
+import { ClientSharedSessionMessageController } from '@/client-shared/controllers/session-messages';
 
 type UseControlPlaneSessionPromptSubmitArgs = {
   workspaceId?: string;
@@ -74,9 +74,9 @@ export function useControlPlaneSessionPromptSubmit({
     setLiveStatus(streamConnected ? 'Heddle is working...' : 'Heddle is working... reconnecting live stream if needed.');
     utils.controlPlane.session.setData(
       { id: sessionId, workspaceId },
-      (current) => SessionMessageController.appendOptimisticUserTurn(current ?? null, trimmed),
+      (current) => ClientSharedSessionMessageController.appendOptimisticUserTurn(current ?? null, trimmed),
     );
-    setSession((current) => SessionMessageController.appendOptimisticUserTurn(current, trimmed));
+    setSession((current) => ClientSharedSessionMessageController.appendOptimisticUserTurn(current, trimmed));
 
     try {
       const result = await sessionSendPromptMutation.mutateAsync({ workspaceId, sessionId, prompt: trimmed });

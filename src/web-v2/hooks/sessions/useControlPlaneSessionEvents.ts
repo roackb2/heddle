@@ -5,7 +5,7 @@ import {
   type ControlPlaneSessionDetail,
   type ControlPlaneSessionEventEnvelope,
 } from '@web/api/client';
-import { SessionMessageController } from '@web/controllers/session-messages';
+import { ClientSharedSessionMessageController } from '@/client-shared/controllers/session-messages';
 import type { RefreshControlPlaneSession } from './useControlPlaneSessionLoader';
 
 type UseControlPlaneSessionEventsArgs = {
@@ -157,7 +157,7 @@ type SessionActivityHandlerMap = {
 const sessionActivityHandlers: SessionActivityHandlerMap = {
   'assistant.stream': (activity, { updateSession, setLiveStatus }) => {
     updateSession((current) => (
-      SessionMessageController.upsertLiveAssistantMessage(
+      ClientSharedSessionMessageController.upsertLiveAssistantMessage(
         current,
         activity.text,
         activity.done,

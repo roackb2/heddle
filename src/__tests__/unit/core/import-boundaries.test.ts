@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SOURCE_ROOT = join(process.cwd(), 'src');
@@ -52,6 +52,24 @@ describe('core import boundaries', () => {
     const violations = findImportViolations(
       sourceFiles.filter((file) => toSourcePath(file).startsWith('core/commands/')),
       [/^react$/, /^ink$/, /react/, /ink/],
+    );
+
+    expect(violations).toEqual([]);
+  });
+
+  it('keeps cli-v2 independent from the old TUI implementation', () => {
+    const violations = findResolvedImportViolations(
+      sourceFiles.filter((file) => toSourcePath(file).startsWith('cli-v2/')),
+      (resolvedPath) => resolvedPath.startsWith('cli/chat/'),
+    );
+
+    expect(violations).toEqual([]);
+  });
+
+  it('keeps cli-v2 on the shared client API boundary', () => {
+    const violations = findResolvedImportViolations(
+      sourceFiles.filter((file) => toSourcePath(file).startsWith('cli-v2/')),
+      (resolvedPath) => resolvedPath.startsWith('core/') || resolvedPath.startsWith('server/'),
     );
 
     expect(violations).toEqual([]);
@@ -140,6 +158,20 @@ function findImportViolations(files: string[], disallowed: RegExp[]): string[] {
   });
 }
 
+function findResolvedImportViolations(files: string[], isDisallowed: (resolvedPath: string) => boolean): string[] {
+  return files.flatMap((file) => {
+    const imports = readImports(file)
+      .map((specifier) => ({
+        specifier,
+        resolvedPath: resolveImportSpecifier(file, specifier),
+      }))
+      .filter((entry): entry is { specifier: string; resolvedPath: string } => Boolean(entry.resolvedPath))
+      .filter((entry) => isDisallowed(entry.resolvedPath));
+
+    return imports.map((entry) => `${toSourcePath(file)} imports ${entry.specifier}`);
+  });
+}
+
 function findRemovedPathImportViolations(files: string[], removedPrefixes: string[]): string[] {
   return files.flatMap((file) => {
     const imports = readImports(file)
@@ -168,6 +200,19 @@ function normalizeImportSpecifier(specifier: string): string {
     .replace(/^\.\//, '')
     .replace(/\.js$/, '')
     .replace(/\\/g, '/');
+}
+
+function resolveImportSpecifier(file: string, specifier: string): string | undefined {
+  const normalizedSpecifier = normalizeImportSpecifier(specifier);
+  if (normalizedSpecifier.startsWith('@/')) {
+    return normalizedSpecifier.slice(2);
+  }
+
+  if (!normalizedSpecifier.startsWith('.')) {
+    return undefined;
+  }
+
+  return relative(SOURCE_ROOT, join(dirname(file), normalizedSpecifier)).split(sep).join('/');
 }
 
 function isProductionSource(file: string): boolean {

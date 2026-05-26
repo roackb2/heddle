@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { ControlPlaneSessionDetail } from '../../../web-v2/api/client.js';
-import { SessionMessageController } from '../../../web-v2/controllers/session-messages/session-message-controller.js';
+import type { ControlPlaneSessionDetail } from '../../../client-shared/api/types.js';
+import { ClientSharedSessionMessageController } from '../../../client-shared/controllers/session-messages/session-message-controller.js';
 
-describe('SessionMessageController', () => {
+describe('ClientSharedSessionMessageController', () => {
   it('preserves optimistic user messages across stale persisted snapshots', () => {
     const current = sessionWithMessages([
       { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
@@ -12,7 +12,7 @@ describe('SessionMessageController', () => {
       { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
     ]);
 
-    expect(SessionMessageController.mergeTransientMessages(current, stale)?.messages).toEqual([
+    expect(ClientSharedSessionMessageController.mergeTransientMessages(current, stale)?.messages).toEqual([
       { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
       { id: 'live-user', role: 'user', text: 'What is this project about?' },
     ]);
@@ -27,7 +27,7 @@ describe('SessionMessageController', () => {
       { id: 'persisted-assistant', role: 'assistant', text: 'Heddle is a coding agent runtime.' },
     ]);
 
-    expect(SessionMessageController.mergeTransientMessages(current, persisted)?.messages).toEqual([
+    expect(ClientSharedSessionMessageController.mergeTransientMessages(current, persisted)?.messages).toEqual([
       { id: 'persisted-user', role: 'user', text: 'What is this project about?' },
       { id: 'persisted-assistant', role: 'assistant', text: 'Heddle is a coding agent runtime.' },
     ]);
@@ -41,7 +41,7 @@ describe('SessionMessageController', () => {
       { id: 'persisted-assistant', role: 'assistant', text: 'Different workspace.' },
     ], 'workspace-2');
 
-    expect(SessionMessageController.mergeTransientMessages(current, next)?.messages).toEqual([
+    expect(ClientSharedSessionMessageController.mergeTransientMessages(current, next)?.messages).toEqual([
       { id: 'persisted-assistant', role: 'assistant', text: 'Different workspace.' },
     ]);
   });

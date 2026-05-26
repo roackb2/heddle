@@ -10,6 +10,8 @@ export type RouterOutputs = inferRouterOutputs<AppRouter>;
 type AsyncIterableValue<T> = T extends AsyncIterable<infer Value> ? Value : T;
 
 export type ControlPlaneState = RouterOutputs['controlPlane']['state'];
+export type ControlPlaneSessions = RouterOutputs['controlPlane']['sessions'];
+export type ControlPlaneSessionView = ControlPlaneSessions['sessions'][number];
 export type ControlPlaneSessionDetail = RouterOutputs['controlPlane']['session'];
 export type ControlPlaneSessionEventEnvelope = AsyncIterableValue<RouterOutputs['controlPlane']['sessionEvents']>;
 export type ControlPlaneSessionsEventEnvelope = AsyncIterableValue<RouterOutputs['controlPlane']['sessionsEvents']>;

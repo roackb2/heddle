@@ -14,6 +14,7 @@ import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { AuthCliController } from './auth.js';
 import { AskCliHost } from './ask.js';
 import { startChatCli } from './chat/index.js';
+import { startChatCliV2 } from '@/cli-v2/index.js';
 import { runDaemonCli } from './daemon.js';
 import { runEvalCli } from './eval/index.js';
 import { parseHeartbeatArgs, runHeartbeatCli } from './heartbeat.js';
@@ -77,6 +78,27 @@ async function main() {
       startChatCli({
         ...resolved,
         runtimeHost: resolved.forceOwnerConflict ? undefined : resolved.runtimeHost,
+      });
+    });
+
+  program
+    .command('chat-v2')
+    .description('start the API-backed interactive chat UI rewrite')
+    .action(async () => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      chdir(resolved.workspaceRoot);
+      if (resolved.runtimeHost.kind !== 'daemon' || resolved.forceOwnerConflict) {
+        throw new Error('chat-v2 requires a running Heddle daemon because it only consumes the shared control-plane API.');
+      }
+      writeRuntimeHostNotice('chat-v2', resolved.runtimeHost);
+      startChatCliV2({
+        trpcUrl: `http://${resolved.runtimeHost.endpoint.host}:${resolved.runtimeHost.endpoint.port}/trpc`,
+        workspaceId: resolved.runtimeHost.workspaceId,
+        model: resolved.model,
+        maxSteps: resolved.maxSteps,
+        searchIgnoreDirs: resolved.searchIgnoreDirs,
+        systemContext: resolved.systemContext,
+        preferApiKey: resolved.preferApiKey,
       });
     });
 

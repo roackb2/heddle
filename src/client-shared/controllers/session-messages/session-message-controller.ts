@@ -1,10 +1,11 @@
-import type { ControlPlaneSessionDetail, ControlPlaneSessionMessage } from '@web/api/client';
+import type { ControlPlaneSessionDetail, ControlPlaneSessionMessage } from '../../api/types.js';
 
 /**
- * Shapes transient browser-only session messages around persisted session
- * detail from the control-plane API.
+ * Shapes transient client-side session messages around persisted control-plane
+ * session detail. This is shared by browser and terminal clients because the
+ * behavior belongs to API-consumer state, not to a specific UI renderer.
  */
-export class SessionMessageController {
+export class ClientSharedSessionMessageController {
   static appendOptimisticUserTurn(session: ControlPlaneSessionDetail, prompt: string): ControlPlaneSessionDetail {
     if (!session) {
       return session;
@@ -36,7 +37,8 @@ export class SessionMessageController {
     const lastMessage = messages.at(-1);
     if (lastMessage?.id === 'live-assistant' && lastMessage.role === 'assistant') {
       const nextMessages = [...messages];
-      nextMessages[nextMessages.length - 1] = SessionMessageController.createLiveAssistantMessage(text, done);
+      nextMessages[nextMessages.length - 1] =
+        ClientSharedSessionMessageController.createLiveAssistantMessage(text, done);
       return {
         ...session,
         messages: nextMessages,
@@ -47,7 +49,7 @@ export class SessionMessageController {
       ...session,
       messages: [
         ...messages,
-        SessionMessageController.createLiveAssistantMessage(text, done),
+        ClientSharedSessionMessageController.createLiveAssistantMessage(text, done),
       ],
     };
   }
