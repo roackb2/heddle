@@ -67,7 +67,7 @@ Common use cases:
 - search official docs or current external references with provider-backed `web_search`
 - mention important repo files with `@path/to/file`
 - reference a local screenshot path and have the agent inspect it with `view_image`
-- attach images from the web-v2 browser composer, which stores uploads as local workspace paths for `view_image`
+- attach images from the browser composer, which stores uploads as local workspace paths for `view_image`
 - clean up or rename workspace files directly with `delete_file` and `move_file`
 - run direct shell commands from chat with `!<command>`
 

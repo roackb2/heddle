@@ -7,7 +7,7 @@ const controlPlaneV2Url = process.env.HEDDLE_BROWSER_INTEGRATION_V2_BASE_URL ?? 
 const serverPort = process.env.HEDDLE_BROWSER_INTEGRATION_SERVER_PORT ?? '19876';
 const serverUrl = `http://127.0.0.1:${serverPort}`;
 const target = process.env.HEDDLE_BROWSER_INTEGRATION_TARGET;
-const runWebV1 = target !== 'web-v2';
+const runWebV1 = target === 'web-v1';
 const runWebV2 = target !== 'web-v1';
 
 const webServers = [
@@ -21,7 +21,7 @@ const webServers = [
     },
   },
   ...(runWebV1 ? [{
-    command: `yarn client:dev --host 127.0.0.1 --port ${clientPort}`,
+    command: `yarn client:dev:v1 --host 127.0.0.1 --port ${clientPort}`,
     url: controlPlaneUrl,
     reuseExistingServer: false,
     timeout: 30_000,
@@ -30,7 +30,7 @@ const webServers = [
     },
   }] : []),
   ...(runWebV2 ? [{
-    command: `yarn client:v2:dev --host 127.0.0.1 --port ${clientV2Port}`,
+    command: `yarn client:dev --host 127.0.0.1 --port ${clientV2Port}`,
     url: controlPlaneV2Url,
     reuseExistingServer: false,
     timeout: 30_000,

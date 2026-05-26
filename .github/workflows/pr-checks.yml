@@ -111,8 +111,11 @@ jobs:
       - name: Install Playwright Chromium
         run: yarn test:browser-integration:install --with-deps
 
-      - name: Run web v1 browser integration tests
-        run: yarn test:browser-integration:v1
+      - name: Build default control plane assets
+        run: yarn build
 
-      - name: Run web v2 browser integration tests
-        run: yarn test:browser-integration:v2
+      - name: Run default control plane browser integration tests
+        run: yarn test:browser-integration
+
+      - name: Run default control plane static daemon smoke
+        run: yarn test:browser-integration:static

@@ -4,6 +4,8 @@ Heddle is an open-source AI coding agent runtime and terminal-first workspace fo
 
 Official website: [heddleagent.com](https://heddleagent.com)
 
+> **New web and mobile control plane is out.** Run `heddle daemon` to try the new browser UI for sessions, tasks, workspace switching, memory status, and mobile review. [See the browser control plane](#browser-control-plane-overview).
+
 It is designed for workflows where an agent needs to inspect a live repository, make bounded changes, verify results, keep continuity across sessions, and stay observable to the operator. Heddle supports OpenAI and Anthropic models, stores local workspace state under `.heddle/`, includes both a terminal chat experience and a browser control plane, learns durable workspace knowledge while it works, and gives users a review path for file diffs, commands, approvals, and traces.
 
 In plain terms: Heddle is for people who want an AI coding assistant that can work inside actual projects, learn each project's operating knowledge over time, switch between local workspaces, and remain inspectable instead of acting like a black box.
@@ -72,49 +74,29 @@ Terminal chat/dev workflow showing file edits, inline diff output, and verificat
 
 ### Browser control plane overview
 
-The next-generation local control plane is a browser-based workspace for sessions, tool approvals, live diff review, heartbeat tasks, and workspace settings. This v2 interface is **work in progress and not yet released**; it shows the direction for the control plane rewrite, while the current released control plane remains the supported browser UI:
+The default local control plane is the web-v2 browser client served by `heddle daemon`. It is the oversight surface for coding sessions, workspace state, current changes, heartbeat tasks, and settings:
 
-![Heddle web-v2 control plane work in progress](docs/images/control-plane-v2.png)
+![Heddle web-v2 control plane](docs/images/control-plane-v2.png)
 
-Web-v2 also includes a task workbench for recurring heartbeat tasks, live run state, and run result review:
+The web-v2 client includes:
+
+- `Sessions`: saved conversations, live assistant streaming, tool progress, approvals, and current workspace diff review.
+- `Composer controls`: model and reasoning settings, semantic drift controls, `@file` mentions, and image attachments saved as local paths for `view_image`.
+- `Workspace switching`: sidebar workspace selection plus `Settings > Workspace` for registering, renaming, and switching local projects.
+- `Tasks`: heartbeat task creation, edit, enable/disable, run, resume, delete, live run state, and saved run records.
+- `Settings`: language preferences, workspace management, and memory status with catalog health, note counts, pending candidates, and latest maintenance run.
+- `Mobile`: focused panels for session list, conversation workbench, task detail, settings, and diff review.
+
+The task workbench covers recurring heartbeat tasks, live run state, and run result review:
 
 ![Heddle web-v2 heartbeat task workbench](docs/images/control-plane-v2-heartbeat-task.png)
 
-Recent web-v2 work adds browser composer controls for drift, `@file` mentions, execution settings, and image attachments. Uploaded images are stored under the active workspace's `.heddle/` state and sent to the agent as local paths so the existing `view_image` workflow still owns inspection.
-
-The same web-v2 control plane is also being shaped for mobile, with the session list, workbench, and diff preview exposed as focused panels:
+The same control plane supports mobile layouts, with the session list, workbench, and diff preview exposed as focused panels:
 
 <p>
   <img src="docs/images/control-plane-v2-session-list.PNG" alt="Heddle web-v2 mobile session list" width="220">
   <img src="docs/images/control-plane-v2-workbench.PNG" alt="Heddle web-v2 mobile workbench" width="220">
   <img src="docs/images/control-plane-v2-diff-view.PNG" alt="Heddle web-v2 mobile diff preview" width="220">
-</p>
-
-### Browser session review
-
-Saved session review in the control plane, with conversation history in the center and current change review on the right. Review starts from the current Git working tree, then separates historical turn diffs and command/approval evidence so you can focus on the change you need to inspect now:
-
-![Heddle control plane expanded diff review](docs/images/control-plane-expanded-diff-review.png)
-
-### Workspace and task management
-
-The Workspaces view lets you switch between local projects, register additional workspace roots, rename attached workspaces, and keep sessions tied to the workspace state under `.heddle/`:
-
-![Heddle control plane workspace management](docs/images/control-plane-workspace-management.png)
-
-Heartbeat tasks expose scheduled/background maintenance runs with durable run history and operator escalation state:
-
-![Heddle control plane heartbeat tasks](docs/images/control-plane-heartbeat-tasks.png)
-
-### Mobile control plane
-
-The control plane also has a phone-oriented layout for checking sessions, reading the latest conversation, switching between workspace sections, and reviewing current diffs from another device:
-
-<p>
-  <img src="docs/images/mobile-control-plane-overview-current.png" alt="Heddle mobile overview" width="240">
-  <img src="docs/images/mobile-control-plane-session-chat.png" alt="Heddle mobile chat view" width="240">
-  <img src="docs/images/mobile-control-plane-session-review-current-diff.png" alt="Heddle mobile current diff review" width="240">
-  <img src="docs/images/mobile-control-plane-workspaces-current.png" alt="Heddle mobile workspace management" width="240">
 </p>
 
 ## 2-Minute Try-It Path
@@ -179,7 +161,7 @@ Summarize this repository, show me the main build/test commands, and point out t
 heddle daemon
 ```
 
-Open the browser control plane from the daemon output. From there you can use `Overview`, `Sessions`, `Tasks`, and `Workspaces` to inspect the active workspace, continue saved sessions, review changes, and switch to another local project.
+Open the browser control plane from the daemon output. From there you can use `Sessions`, `Tasks`, and `Settings` to inspect the active workspace, continue saved sessions, review changes, inspect memory status, and switch to another local project.
 
 If you prefer a one-shot CLI run instead of interactive chat, use:
 
@@ -290,13 +272,13 @@ It gives you a browser-based view into workspaces, sessions, run state, heartbea
 
 If terminal chat is the execution surface, the control plane is the oversight surface.
 
-The `Workspaces` section lets you register local projects, switch the control plane between them, rename workspace entries, and pick a project folder from the browser UI. Heddle also keeps a user-level workspace registry so projects you have opened from the CLI or daemon can be rediscovered later.
+The workspace switcher and `Settings > Workspace` page let you register local projects, switch the control plane between them, rename workspace entries, and pick a project folder from the browser UI. Heddle also keeps a user-level workspace registry so projects you have opened from the CLI or daemon can be rediscovered later.
 
 The `Sessions` section supports a coding-review flow built around current work first. Review starts from the live Git working tree for the active workspace, with changed files, structured read-only diffs, and a larger full-diff viewer when the side panel is too tight. Historical turn diffs, review commands, verification commands, approvals, and trace events are still available, but they are separated from current review so old evidence does not distract from the task at hand.
 
-Session chat in the control plane renders assistant markdown, receives per-session live updates for assistant streaming, tool progress, approvals, and saved-session refreshes, and keeps model/reasoning controls aligned with the terminal workflow. The web-v2 session composer also includes drift controls, `@file` mention suggestions, and image upload controls for attaching local screenshots or reference images to a prompt.
+Session chat in the control plane renders assistant markdown, receives per-session live updates for assistant streaming, tool progress, approvals, and saved-session refreshes, and keeps model/reasoning controls aligned with the terminal workflow. The session composer also includes drift controls, `@file` mention suggestions, and image upload controls for attaching local screenshots or reference images to a prompt.
 
-The task surface has also moved beyond passive visibility in web-v2: operators can create, edit, enable, disable, run, resume, and delete heartbeat tasks, inspect live run state, and review saved run records from the browser. Settings now include workspace and memory status views, so memory catalog health and maintenance history are visible without dropping back to terminal commands.
+The task surface has also moved beyond passive visibility: operators can create, edit, enable, disable, run, resume, and delete heartbeat tasks, inspect live run state, and review saved run records from the browser. Settings now include workspace and memory status views, so memory catalog health and maintenance history are visible without dropping back to terminal commands.
 
 This is useful if you want a more inspectable and operator-friendly workflow than a plain CLI transcript. The layout adapts for phone use as well, with mobile-native navigation for Sessions, Tasks, and Settings, plus focused Chat/Review and task-run workflows.
 
