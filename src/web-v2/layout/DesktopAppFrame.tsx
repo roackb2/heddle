@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels';
 import {
   ResizableHandle,
@@ -21,35 +21,20 @@ import {
 } from '@web/layout/AppFrameShared';
 import { useI18n } from '@web/i18n';
 
-const appSidebarSize = {
+const sidebarSize = {
   default: '256px',
-  min: '224px',
-  max: '384px',
-};
-
-const settingsSidebarSize = {
-  default: '224px',
-  min: '184px',
-  max: '224px',
+  min: '256px',
+  max: '256px',
 };
 
 export function DesktopAppFrame(props: AppFrameLayoutProps) {
-  const { children, rightPanel, rightPanelAriaLabel, settingsOpen } = props;
+  const { children, rightPanel, rightPanelAriaLabel } = props;
   const { t } = useI18n();
   const { setOpen: setSidebarOpen } = useSidebar();
   const sidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
   const inspectorPanelRef = useRef<PanelImperativeHandle | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
-  const sidebarSize = settingsOpen ? settingsSidebarSize : appSidebarSize;
-
-  useEffect(() => {
-    if (sidebarCollapsed) {
-      return;
-    }
-
-    sidebarPanelRef.current?.resize(sidebarSize.default);
-  }, [sidebarCollapsed, sidebarSize.default]);
 
   function toggleSidebarPanel() {
     if (sidebarCollapsed) {
