@@ -19,7 +19,8 @@ the `ControlPlane*` types exported from `api/types.ts`.
 - `ClientSharedApiLinkService` for shared tRPC link construction;
 - `ClientSharedProxyApiService` for non-React proxy clients used by CLI/TUI/ask
   callers;
-- `ClientSharedReactApiService` for React Query tRPC exports used by web-v2.
+- `trpcReact` and `useControlPlaneTrpcClient` for React Query tRPC usage in
+  React interfaces.
 
 ## Does Not Own
 
