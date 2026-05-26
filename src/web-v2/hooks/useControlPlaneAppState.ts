@@ -1,5 +1,6 @@
 import type { ControlPlaneHeartbeatTaskView } from '@web/api/client';
 import { trpcReact } from '@web/api/client';
+import type { WorkspaceCreateInput } from '@web/components/settings';
 import { useControlPlaneErrorToasts } from './useControlPlaneErrorToasts';
 import { useControlPlaneHeartbeatEvents } from './tasks/useControlPlaneHeartbeatEvents';
 import { useControlPlaneSessionDetail } from './sessions/useControlPlaneSessionDetail';
@@ -24,6 +25,9 @@ export function useControlPlaneAppState() {
   const navigation = useWorkbenchNavigation();
   const utils = trpcReact.useUtils();
   const createSessionMutation = trpcReact.controlPlane.sessionCreate.useMutation();
+  const workspaceCreateMutation = trpcReact.controlPlane.workspaceCreate.useMutation();
+  const workspaceRenameMutation = trpcReact.controlPlane.workspaceRename.useMutation();
+  const workspaceSetActiveMutation = trpcReact.controlPlane.workspaceSetActive.useMutation();
   const taskEvents = useControlPlaneHeartbeatEvents(navigation.selectedWorkspaceId);
   const sidebar = useControlPlaneSidebarData({ navigation, taskEvents });
   const memoryStatusQuery = trpcReact.controlPlane.memoryStatus.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
@@ -64,6 +68,33 @@ export function useControlPlaneAppState() {
     );
   }
 
+  async function switchWorkspace(workspaceId: string) {
+    const result = await workspaceSetActiveMutation.mutateAsync({ workspaceId });
+    navigation.selectWorkspace(workspaceId);
+    await utils.controlPlane.state.invalidate();
+    await Promise.all([
+      utils.controlPlane.sessions.invalidate({ workspaceId: result.activeWorkspaceId }),
+      utils.controlPlane.heartbeatTasks.invalidate({ workspaceId: result.activeWorkspaceId }),
+    ]);
+  }
+
+  async function createWorkspace(input: WorkspaceCreateInput) {
+    const result = await workspaceCreateMutation.mutateAsync(input);
+    await utils.controlPlane.state.invalidate();
+    if (input.setActive) {
+      navigation.selectWorkspace(result.workspace.id);
+      await Promise.all([
+        utils.controlPlane.sessions.invalidate({ workspaceId: result.workspace.id }),
+        utils.controlPlane.heartbeatTasks.invalidate({ workspaceId: result.workspace.id }),
+      ]);
+    }
+  }
+
+  async function renameWorkspace(workspaceId: string, name: string) {
+    await workspaceRenameMutation.mutateAsync({ workspaceId, name });
+    await utils.controlPlane.state.invalidate();
+  }
+
   return {
     frameProps: {
       activeSurfaceId: navigation.activeSurfaceId,
@@ -80,7 +111,7 @@ export function useControlPlaneAppState() {
       onCloseSettings: navigation.closeSettings,
       onCreateSession: createSession,
       onCreateTask: taskActions.openCreateDialog,
-      onSelectWorkspace: navigation.selectWorkspace,
+      onSelectWorkspace: (workspaceId: string) => void switchWorkspace(workspaceId),
       onSelectSession: navigation.selectSession,
       onSelectTask: navigation.selectTask,
     },
@@ -91,6 +122,16 @@ export function useControlPlaneAppState() {
         status: memoryStatusQuery.data ?? stateMemoryStatus,
         loading: memoryStatusQuery.isLoading || sidebar.stateQuery.isLoading,
         error: memoryStatusQuery.error instanceof Error ? memoryStatusQuery.error.message : undefined,
+      },
+      workspaceSettingsView: {
+        state,
+        selectedWorkspaceId: sidebar.workspaceId,
+        loading: sidebar.stateQuery.isLoading,
+        error: sidebar.stateQuery.error instanceof Error ? sidebar.stateQuery.error.message : undefined,
+        updating: workspaceCreateMutation.isPending || workspaceRenameMutation.isPending || workspaceSetActiveMutation.isPending,
+        onCreateWorkspace: createWorkspace,
+        onRenameWorkspace: renameWorkspace,
+        onSwitchWorkspace: switchWorkspace,
       },
       sessionView: {
         workspaceId: sidebar.workspaceId,

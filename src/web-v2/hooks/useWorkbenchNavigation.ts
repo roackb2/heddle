@@ -48,7 +48,10 @@ export function useWorkbenchNavigation() {
       navigate(routeForAppSurface(surfaceId, selectedWorkspaceId), { replace: options?.replace ?? false });
     },
     selectWorkspace(workspaceId: string, options?: { replace?: boolean }) {
-      navigate(routeForAppSurface(activeSurfaceId, workspaceId), { replace: options?.replace ?? false });
+      const route = settingsOpen
+        ? routeForSettingsSection(activeSettingsSectionId, workspaceId)
+        : routeForAppSurface(activeSurfaceId, workspaceId);
+      navigate(route, { replace: options?.replace ?? false });
     },
     selectSession(sessionId: string, options?: { workspaceId?: string; replace?: boolean }) {
       navigate(routeForSession(options?.workspaceId ?? selectedWorkspaceId, sessionId), { replace: options?.replace ?? false });
