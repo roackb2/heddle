@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { skipToken } from '@tanstack/react-query';
 import {
   trpcReact,
@@ -9,6 +9,7 @@ import { SessionMessageController } from '@web/controllers/session-messages';
 import type { RefreshControlPlaneSession } from './useControlPlaneSessionLoader';
 
 type UseControlPlaneSessionEventsArgs = {
+  workspaceId?: string;
   sessionId?: string;
   refresh: RefreshControlPlaneSession;
   refreshPendingApproval: (sessionId: string) => void;
@@ -24,6 +25,7 @@ export type ControlPlaneSessionEventsState = {
 // Subscribes to the selected session's live event stream and applies only the
 // web-v2 conversation state transitions that this interface currently renders.
 export function useControlPlaneSessionEvents({
+  workspaceId,
   sessionId,
   refresh,
   refreshPendingApproval,
@@ -33,11 +35,16 @@ export function useControlPlaneSessionEvents({
 }: UseControlPlaneSessionEventsArgs): ControlPlaneSessionEventsState {
   const utils = trpcReact.useUtils();
   const [streamConnected, setStreamConnected] = useState(false);
+  const activeAddressRef = useRef<SessionAddress>({ workspaceId, sessionId });
   const invalidateWorkspaceDiff = useCallback(() => {
-    void utils.controlPlane.workspaceChanges.invalidate();
+    void utils.controlPlane.workspaceChanges.invalidate(workspaceId ? { workspaceId } : undefined);
     void utils.controlPlane.workspaceFileDiff.invalidate();
-  }, [utils]);
+  }, [utils, workspaceId]);
   const applySessionEvent = useCallback((event: ControlPlaneSessionEventEnvelope) => {
+    if (!isActiveSessionAddress(activeAddressRef.current, { workspaceId, sessionId: event.sessionId })) {
+      return;
+    }
+
     if (event.type === 'waiting') {
       setLiveStatus('Waiting for the session event stream...');
       return;
@@ -57,14 +64,22 @@ export function useControlPlaneSessionEvents({
       refresh,
       refreshPendingApproval,
       invalidateWorkspaceDiff,
+      updateSession: (updater) => {
+        setSession(updater);
+        if (workspaceId) {
+          utils.controlPlane.session.setData(
+            { id: event.sessionId, workspaceId },
+            (current) => applySessionUpdate(current ?? null, updater),
+          );
+        }
+      },
       setLiveStatus,
       setRunning,
-      setSession,
     }));
-  }, [invalidateWorkspaceDiff, refresh, refreshPendingApproval, setLiveStatus, setRunning, setSession]);
+  }, [invalidateWorkspaceDiff, refresh, refreshPendingApproval, setLiveStatus, setRunning, setSession, utils.controlPlane.session, workspaceId]);
 
   const subscription = trpcReact.controlPlane.sessionEvents.useSubscription(
-    sessionId ? { sessionId } : skipToken,
+    sessionId && workspaceId ? { sessionId, workspaceId } : skipToken,
     {
       onStarted: () => {
         setStreamConnected(true);
@@ -81,7 +96,8 @@ export function useControlPlaneSessionEvents({
   );
 
   useEffect(() => {
-    if (!sessionId) {
+    activeAddressRef.current = { workspaceId, sessionId };
+    if (!sessionId || !workspaceId) {
       setRunning(false);
       setLiveStatus(undefined);
       setStreamConnected(false);
@@ -90,7 +106,7 @@ export function useControlPlaneSessionEvents({
 
     setRunning(false);
     setLiveStatus(undefined);
-  }, [sessionId, setLiveStatus, setRunning]);
+  }, [sessionId, setLiveStatus, setRunning, workspaceId]);
 
   useEffect(() => {
     setStreamConnected(subscription.status === 'pending');
@@ -99,12 +115,33 @@ export function useControlPlaneSessionEvents({
   return { streamConnected };
 }
 
+type SessionAddress = {
+  workspaceId?: string;
+  sessionId?: string;
+};
+
+function isActiveSessionAddress(active: SessionAddress, event: SessionAddress): boolean {
+  return Boolean(
+    active.workspaceId
+    && active.sessionId
+    && active.workspaceId === event.workspaceId
+    && active.sessionId === event.sessionId,
+  );
+}
+
+function applySessionUpdate(
+  current: ControlPlaneSessionDetail,
+  updater: SetStateAction<ControlPlaneSessionDetail>,
+): ControlPlaneSessionDetail {
+  return typeof updater === 'function' ? updater(current) : updater;
+}
+
 type SessionActivityContext = {
   sessionId: string;
   refresh: RefreshControlPlaneSession;
   refreshPendingApproval: (sessionId: string) => void;
   invalidateWorkspaceDiff: () => void;
-  setSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
+  updateSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
   setRunning: Dispatch<SetStateAction<boolean>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
 };
@@ -118,8 +155,8 @@ type SessionActivityHandlerMap = {
 };
 
 const sessionActivityHandlers: SessionActivityHandlerMap = {
-  'assistant.stream': (activity, { setSession, setLiveStatus }) => {
-    setSession((current) => (
+  'assistant.stream': (activity, { updateSession, setLiveStatus }) => {
+    updateSession((current) => (
       SessionMessageController.upsertLiveAssistantMessage(
         current,
         activity.text,

@@ -150,7 +150,9 @@ export class HeartbeatTaskRunnerService {
       },
       model,
       apiKey: RuntimeCredentialService.resolveApiKeyForModel(model, credentialOptions),
-      stateDir: args.task.runtime?.stateDir ?? args.runtime?.stateDir,
+      workspaceRoot: args.runtime?.workspaceRoot ?? args.task.runtime?.workspaceRoot,
+      stateDir: args.runtime?.stateDir ?? args.task.runtime?.stateDir,
+      memoryDir: args.runtime?.memoryDir ?? args.task.runtime?.memoryDir,
       approvalPolicies: [
         ToolApprovalPolicies.unattendedLocalAutomation(),
         ...(args.runtime?.approvalPolicies ?? []),

@@ -9,6 +9,7 @@ import {
   RuntimeWorkspaceService,
 } from '@/core/runtime/workspaces/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
+import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
 import { controlPlaneRouter } from '@/server/routes/trpc/control-plane.js';
 
 describe('workspace catalog', () => {
@@ -27,14 +28,14 @@ describe('workspace catalog', () => {
     expect(catalog.workspaces).toHaveLength(1);
     expect(catalog.workspaces[0]).toMatchObject({
       id: DEFAULT_WORKSPACE_ID,
-      anchorRoot: workspaceRoot,
+      workspaceRoot,
       repoRoots: [workspaceRoot],
       stateRoot,
     });
 
     const saved = JSON.parse(readFileSync(catalogPath, 'utf8')) as typeof catalog;
     expect(saved.activeWorkspaceId).toBe(DEFAULT_WORKSPACE_ID);
-    expect(saved.workspaces[0]?.anchorRoot).toBe(workspaceRoot);
+    expect(saved.workspaces[0]?.workspaceRoot).toBe(workspaceRoot);
   });
 
   it('exposes the active workspace in control-plane state', async () => {
@@ -68,7 +69,7 @@ describe('workspace catalog', () => {
     expect(state.activeWorkspaceId).toBe(DEFAULT_WORKSPACE_ID);
     expect(state.workspace).toMatchObject({
       id: DEFAULT_WORKSPACE_ID,
-      anchorRoot: workspaceRoot,
+      workspaceRoot,
       stateRoot,
     });
     expect(state.workspaces).toHaveLength(1);
@@ -95,7 +96,7 @@ describe('workspace catalog', () => {
       workspaceRoot,
       stateRoot,
       name: 'Second workspace',
-      anchorRoot: join(workspaceRoot, 'nested'),
+      newWorkspaceRoot: join(workspaceRoot, 'nested'),
       setActive: false,
       nextId: 'workspace-2',
     });
@@ -113,7 +114,7 @@ describe('workspace catalog', () => {
     expect(switched.activeWorkspace).toMatchObject({
       id: 'workspace-2',
       name: 'Second workspace',
-      anchorRoot: join(workspaceRoot, 'nested'),
+      workspaceRoot: join(workspaceRoot, 'nested'),
       stateRoot: join(workspaceRoot, 'nested', '.heddle'),
     });
   });
@@ -163,13 +164,13 @@ describe('workspace catalog', () => {
 
     const created = await caller.workspaceCreate({
       name: 'Second workspace',
-      anchorRoot: join(workspaceRoot, 'second'),
+      workspaceRoot: join(workspaceRoot, 'second'),
       setActive: true,
     });
     expect(created.activeWorkspaceId).not.toBe(DEFAULT_WORKSPACE_ID);
     expect(created.workspace).toMatchObject({
       name: 'Second workspace',
-      anchorRoot: join(workspaceRoot, 'second'),
+      workspaceRoot: join(workspaceRoot, 'second'),
       stateRoot: join(workspaceRoot, 'second', '.heddle'),
     });
 
@@ -183,6 +184,205 @@ describe('workspace catalog', () => {
     const registeredStateRoots = RuntimeDaemonRegistryService.read(registryPath).workspaces.map((record) => record.workspace.stateRoot);
     expect(registeredStateRoots).toContain(stateRoot);
     expect(registeredStateRoots).toContain(join(workspaceRoot, 'second', '.heddle'));
+  });
+
+  it('routes session APIs through the requested workspace state root without switching active workspace', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-session-routing-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
+    const resolved = RuntimeWorkspaceService.createDescriptor({
+      workspaceRoot,
+      stateRoot,
+      name: 'Second workspace',
+      newWorkspaceRoot: join(workspaceRoot, 'second'),
+      setActive: false,
+      nextId: 'workspace-2',
+    });
+    const activeWorkspace = resolved.workspaces.find((workspace) => workspace.id === DEFAULT_WORKSPACE_ID);
+    const secondWorkspace = resolved.workspaces.find((workspace) => workspace.id === 'workspace-2');
+    if (!activeWorkspace || !secondWorkspace) {
+      throw new Error('expected both workspaces');
+    }
+
+    createConversationEngine({
+      workspaceRoot: activeWorkspace.workspaceRoot,
+      stateRoot: activeWorkspace.stateRoot,
+      model: 'gpt-5.4',
+      workspaceId: activeWorkspace.id,
+      apiKeyPresent: true,
+    }).sessions.create({ id: 'session-1', name: 'Default workspace session' });
+    createConversationEngine({
+      workspaceRoot: secondWorkspace.workspaceRoot,
+      stateRoot: secondWorkspace.stateRoot,
+      model: 'gpt-5.4',
+      workspaceId: secondWorkspace.id,
+      apiKeyPresent: true,
+    }).sessions.create({ id: 'session-1', name: 'Second workspace session' });
+
+    const caller = controlPlaneRouter.createCaller({
+      workspaceRoot,
+      stateRoot,
+      activeWorkspaceId: activeWorkspace.id,
+      activeWorkspace,
+      workspaces: resolved.workspaces,
+      runtimeHost: null,
+      logger: pino({ level: 'silent' }),
+    });
+
+    const defaultSessions = await caller.sessions({ workspaceId: activeWorkspace.id });
+    const secondSessions = await caller.sessions({ workspaceId: secondWorkspace.id });
+    expect(defaultSessions.sessions.map((session) => session.name)).toEqual(['Default workspace session']);
+    expect(secondSessions.sessions.map((session) => session.name)).toEqual(['Second workspace session']);
+    await expect(caller.state({ workspaceId: secondWorkspace.id })).resolves.toMatchObject({
+      activeWorkspaceId: secondWorkspace.id,
+      workspace: {
+        id: secondWorkspace.id,
+        workspaceRoot: secondWorkspace.workspaceRoot,
+        stateRoot: secondWorkspace.stateRoot,
+      },
+      sessions: [
+        expect.objectContaining({
+          id: 'session-1',
+          name: 'Second workspace session',
+          workspaceId: secondWorkspace.id,
+        }),
+      ],
+    });
+
+    await caller.sessionSettingsUpdate({
+      workspaceId: secondWorkspace.id,
+      id: 'session-1',
+      model: 'gpt-5.5',
+    });
+
+    await expect(caller.session({ workspaceId: activeWorkspace.id, id: 'session-1' })).resolves.toMatchObject({
+      id: 'session-1',
+      name: 'Default workspace session',
+      model: 'gpt-5.4',
+      workspaceId: activeWorkspace.id,
+    });
+    await expect(caller.session({ workspaceId: secondWorkspace.id, id: 'session-1' })).resolves.toMatchObject({
+      id: 'session-1',
+      name: 'Second workspace session',
+      model: 'gpt-5.5',
+      workspaceId: secondWorkspace.id,
+    });
+  });
+
+  it('routes workspace file search through the requested workspace root', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-file-routing-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
+    const resolved = RuntimeWorkspaceService.createDescriptor({
+      workspaceRoot,
+      stateRoot,
+      name: 'Second workspace',
+      newWorkspaceRoot: join(workspaceRoot, 'second'),
+      setActive: false,
+      nextId: 'workspace-2',
+    });
+    const activeWorkspace = resolved.workspaces.find((workspace) => workspace.id === DEFAULT_WORKSPACE_ID);
+    const secondWorkspace = resolved.workspaces.find((workspace) => workspace.id === 'workspace-2');
+    if (!activeWorkspace || !secondWorkspace) {
+      throw new Error('expected both workspaces');
+    }
+
+    mkdirSync(activeWorkspace.workspaceRoot, { recursive: true });
+    mkdirSync(secondWorkspace.workspaceRoot, { recursive: true });
+    writeFileSync(join(activeWorkspace.workspaceRoot, 'active-only.md'), 'active\n');
+    writeFileSync(join(secondWorkspace.workspaceRoot, 'second-only.md'), 'second\n');
+
+    const caller = controlPlaneRouter.createCaller({
+      workspaceRoot,
+      stateRoot,
+      activeWorkspaceId: activeWorkspace.id,
+      activeWorkspace,
+      workspaces: resolved.workspaces,
+      runtimeHost: null,
+      logger: pino({ level: 'silent' }),
+    });
+
+    await expect(caller.workspaceFileSearch({
+      workspaceId: secondWorkspace.id,
+      query: 'only',
+    })).resolves.toMatchObject({
+      files: [{ path: 'second-only.md' }],
+    });
+
+    const secondWorkspaceLog = await readLogUntil(join(secondWorkspace.stateRoot, 'logs', 'server.log'), 'workspaceFileSearch');
+    expect(secondWorkspaceLog).toContain(secondWorkspace.stateRoot);
+    expect(existsSync(join(activeWorkspace.stateRoot, 'logs', 'server.log'))).toBe(false);
+  });
+
+  it('repairs legacy workspace roots before routing file search', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-repair-default-'));
+    const secondRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-repair-second-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const secondStateRoot = join(secondRoot, '.heddle');
+    mkdirSync(stateRoot, { recursive: true });
+    mkdirSync(secondRoot, { recursive: true });
+    writeFileSync(join(workspaceRoot, 'default-only.md'), 'default\n');
+    writeFileSync(join(secondRoot, 'second-only.md'), 'second\n');
+    const timestamp = '2026-05-25T00:00:00.000Z';
+    writeFileSync(FileWorkspaceRepository.resolveCatalogPath(stateRoot), JSON.stringify({
+      version: 1,
+      activeWorkspaceId: 'workspace-2',
+      workspaces: [
+        {
+          id: DEFAULT_WORKSPACE_ID,
+          name: 'Default workspace',
+          workspaceRoot,
+          repoRoots: [workspaceRoot],
+          stateRoot,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+        {
+          id: 'workspace-2',
+          name: 'Second workspace',
+          workspaceRoot,
+          repoRoots: [workspaceRoot],
+          stateRoot: secondStateRoot,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+    }, null, 2));
+
+    const resolved = RuntimeWorkspaceService.resolveContext({ workspaceRoot, stateRoot });
+    const secondWorkspace = resolved.workspaces.find((workspace) => workspace.id === 'workspace-2');
+    if (!secondWorkspace) {
+      throw new Error('expected repaired second workspace');
+    }
+    expect(secondWorkspace).toMatchObject({
+      workspaceRoot: secondRoot,
+      repoRoots: [secondRoot],
+      stateRoot: secondStateRoot,
+    });
+
+    const saved = JSON.parse(readFileSync(FileWorkspaceRepository.resolveCatalogPath(stateRoot), 'utf8')) as typeof resolved.catalog;
+    expect(saved.workspaces.find((workspace) => workspace.id === 'workspace-2')).toMatchObject({
+      workspaceRoot: secondRoot,
+      repoRoots: [secondRoot],
+      stateRoot: secondStateRoot,
+    });
+
+    const caller = controlPlaneRouter.createCaller({
+      workspaceRoot,
+      stateRoot,
+      activeWorkspaceId: resolved.activeWorkspaceId,
+      activeWorkspace: resolved.activeWorkspace,
+      workspaces: resolved.workspaces,
+      runtimeHost: null,
+      logger: pino({ level: 'silent' }),
+    });
+
+    await expect(caller.workspaceFileSearch({
+      workspaceId: secondWorkspace.id,
+      query: 'only',
+    })).resolves.toMatchObject({
+      files: [{ path: 'second-only.md' }],
+    });
   });
 
   it('exposes known workspaces from the user-level registry', async () => {
@@ -217,7 +417,7 @@ describe('workspace catalog', () => {
     });
 
     const state = await caller.state();
-    expect(state.knownWorkspaces.map((workspace) => workspace.anchorRoot)).toEqual([otherRoot]);
+    expect(state.knownWorkspaces.map((workspace) => workspace.workspaceRoot)).toEqual([otherRoot]);
   });
 
   it('can browse local directories for workspace selection', async () => {
@@ -260,3 +460,19 @@ describe('workspace catalog', () => {
     expect(listingWithHidden.entries.map((entry) => entry.name)).toContain('.hidden');
   });
 });
+
+async function readLogUntil(path: string, expectedText: string): Promise<string> {
+  const deadline = Date.now() + 1000;
+  while (Date.now() < deadline) {
+    if (existsSync(path)) {
+      const text = readFileSync(path, 'utf8');
+      if (text.includes(expectedText)) {
+        return text;
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  return existsSync(path) ? readFileSync(path, 'utf8') : '';
+}

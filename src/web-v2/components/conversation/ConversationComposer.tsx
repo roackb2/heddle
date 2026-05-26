@@ -27,6 +27,7 @@ import type { SessionDriftLevel } from './SessionDriftControl';
 // execution settings, file mentions, and textarea sizing live in focused peers.
 export function ConversationComposer({
   sessionId,
+  workspaceId,
   disabled,
   driftEnabled,
   driftLevel,
@@ -45,6 +46,7 @@ export function ConversationComposer({
   onUpdateReasoningEffort,
 }: {
   sessionId?: string;
+  workspaceId?: string;
   disabled?: boolean;
   driftEnabled?: boolean;
   driftLevel?: SessionDriftLevel;
@@ -74,7 +76,7 @@ export function ConversationComposer({
     removeAttachment: removeImageAttachment,
     uploadedPaths: uploadedImagePaths,
     uploadImages,
-  } = useComposerImageAttachments({ sessionId });
+  } = useComposerImageAttachments({ workspaceId, sessionId });
   const turnActive = Boolean(submitting || running || cancelling);
   const controlsDisabled = disabled || turnActive;
   const sendDisabled = disabled
@@ -84,7 +86,7 @@ export function ConversationComposer({
   const effectiveDriftEnabled = driftEnabled ?? false;
   const effectiveDriftLevel = driftLevel ?? 'unknown';
   const effectiveReasoningEffort = reasoningEffort ?? 'medium';
-  const imageUploadDisabled = controlsDisabled || imageUploading || !sessionId;
+  const imageUploadDisabled = controlsDisabled || imageUploading || !workspaceId || !sessionId;
   const handleUploadImages = useCallback((files: FileList | File[]) => {
     void uploadImages(files);
   }, [uploadImages]);
@@ -105,6 +107,7 @@ export function ConversationComposer({
     await onSubmitPrompt(prompt);
   }, [clearUploadedAttachments, draft, onSubmitPrompt, sendDisabled, uploadedImagePaths]);
   const fileMentions = useFileMentionAutocomplete({
+    workspaceId,
     value: draft,
     onValueChange: setDraft,
     textareaRef,

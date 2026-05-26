@@ -21,8 +21,8 @@ interface AppRoutesProps {
 }
 
 const routePathBySurface = {
-  sessions: (href: string) => [`${href}/:sessionId?`],
-  tasks: (href: string) => [href, `${href}/:taskId`, `${href}/:taskId/runs/:runId`],
+  sessions: (href: string) => [`${href}/:sessionId?`, `/workspaces/:workspaceId${href}/:sessionId?`],
+  tasks: (href: string) => [href, `${href}/:taskId`, `${href}/:taskId/runs/:runId`, `/workspaces/:workspaceId${href}`, `/workspaces/:workspaceId${href}/:taskId`, `/workspaces/:workspaceId${href}/:taskId/runs/:runId`],
 } satisfies Record<AppSurfaceId, (href: string) => string[]>;
 
 const appRoutePaths = APP_ROUTES.flatMap((route) => (
@@ -65,18 +65,20 @@ export function AppRoutes({
         />
       ))}
       {SETTINGS_ROUTES.map((route) => (
-        <Route
-          key={route.id}
-          path={route.href}
-          element={(
-            <WorkbenchView
-              {...sharedWorkbenchProps}
-              activeSurfaceId={activeSurfaceId}
-              activeSettingsSectionId={route.id}
-              settingsOpen
-            />
-          )}
-        />
+        [route.href, `/workspaces/:workspaceId${route.href}`].map((path) => (
+          <Route
+            key={path}
+            path={path}
+            element={(
+              <WorkbenchView
+                {...sharedWorkbenchProps}
+                activeSurfaceId={activeSurfaceId}
+                activeSettingsSectionId={route.id}
+                settingsOpen
+              />
+            )}
+          />
+        ))
       ))}
       <Route path="*" element={<Navigate to={DEFAULT_APP_ROUTE} replace />} />
     </Routes>

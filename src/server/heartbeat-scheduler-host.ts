@@ -67,7 +67,7 @@ export class HeddleHeartbeatSchedulerHost {
 
   private startWorkspaceScheduler(workspace: WorkspaceDescriptor): HeartbeatSchedulerHandle {
     return HeartbeatSchedulerService.start({
-      workspaceRoot: workspace.anchorRoot,
+      workspaceRoot: workspace.workspaceRoot,
       stateRoot: workspace.stateRoot,
       preferApiKey: this.options.preferApiKey,
       pollIntervalMs: this.options.pollIntervalMs,

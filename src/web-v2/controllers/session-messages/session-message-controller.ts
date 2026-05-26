@@ -56,7 +56,7 @@ export class SessionMessageController {
     current: ControlPlaneSessionDetail,
     next: ControlPlaneSessionDetail,
   ): ControlPlaneSessionDetail {
-    if (!current || !next || current.id !== next.id) {
+    if (!current || !next || current.id !== next.id || current.workspaceId !== next.workspaceId) {
       return next;
     }
 

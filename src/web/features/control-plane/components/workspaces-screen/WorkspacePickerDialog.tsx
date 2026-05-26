@@ -100,7 +100,7 @@ export function WorkspacePickerDialog({
                     type="button"
                     className="rounded-lg border border-border bg-card px-3 py-2 text-left hover:border-primary"
                     onClick={() => {
-                      onSelectPath(workspace.anchorRoot);
+                      onSelectPath(workspace.workspaceRoot);
                       onOpenChange(false);
                     }}
                   >
@@ -108,7 +108,7 @@ export function WorkspacePickerDialog({
                       <span className="block truncate text-sm font-semibold text-foreground">{workspace.name}</span>
                       <Badge variant="outline">{workspace.relation}</Badge>
                     </span>
-                    <span className="mt-1 block truncate text-xs text-muted-foreground">{workspace.anchorRoot}</span>
+                    <span className="mt-1 block truncate text-xs text-muted-foreground">{workspace.workspaceRoot}</span>
                   </button>
                 ))}
               </div>

@@ -3,7 +3,7 @@ export const DEFAULT_WORKSPACE_ID = 'default';
 export type WorkspaceDescriptor = {
   id: string;
   name: string;
-  anchorRoot: string;
+  workspaceRoot: string;
   repoRoots: string[];
   stateRoot: string;
   createdAt: string;
@@ -31,7 +31,7 @@ export type WorkspaceRootConfig = {
 
 export type CreateWorkspaceDescriptorInput = WorkspaceRootConfig & {
   name: string;
-  anchorRoot: string;
+  newWorkspaceRoot: string;
   repoRoots?: string[];
   nextId?: string;
   setActive?: boolean;

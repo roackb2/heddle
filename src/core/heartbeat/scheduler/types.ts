@@ -44,6 +44,7 @@ export type HeartbeatTaskRunner = (
 export type HeartbeatTaskRunnerRuntimeOptions = {
   workspaceRoot?: string;
   stateDir?: string;
+  memoryDir?: string;
   apiKey?: string;
   apiKeyProvider?: 'explicit' | 'openai' | 'anthropic';
   preferApiKey?: boolean;

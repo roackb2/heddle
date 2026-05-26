@@ -14,16 +14,20 @@ export interface AppFrameProps {
   appNavigationItems: readonly AppRoute[];
   settingsNavigationItems: readonly SettingsRoute[];
   settingsOpen: boolean;
+  selectedWorkspaceId?: string;
   selectedSessionId?: string;
   selectedTaskId?: string;
   sessions: ControlPlaneState['sessions'];
   tasks: ControlPlaneState['heartbeat']['tasks'];
+  workspaces: ControlPlaneState['workspaces'];
   rightPanel?: ReactNode;
   rightPanelAriaLabel?: string;
   onOpenSettings: () => void;
+  onOpenWorkspaceSettings: () => void;
   onCloseSettings: () => void;
   onCreateSession: () => Promise<void>;
   onCreateTask: () => void;
+  onSelectWorkspace: (workspaceId: string) => void;
   onSelectSession: (sessionId: string) => void;
   onSelectTask: (taskId: string) => void;
 }
@@ -46,14 +50,18 @@ export function AppFrameSidebar({
   appNavigationItems,
   settingsNavigationItems,
   settingsOpen,
+  selectedWorkspaceId,
   selectedSessionId,
   selectedTaskId,
   sessions,
   tasks,
+  workspaces,
   onOpenSettings,
+  onOpenWorkspaceSettings,
   onCloseSettings,
   onCreateSession,
   onCreateTask,
+  onSelectWorkspace,
   onSelectSession,
   onSelectTask,
 }: AppFrameProps) {
@@ -64,14 +72,18 @@ export function AppFrameSidebar({
       appNavigationItems={appNavigationItems}
       settingsNavigationItems={settingsNavigationItems}
       settingsOpen={settingsOpen}
+      selectedWorkspaceId={selectedWorkspaceId}
       selectedSessionId={selectedSessionId}
       selectedTaskId={selectedTaskId}
       sessions={sessions}
       tasks={tasks}
+      workspaces={workspaces}
       onOpenSettings={onOpenSettings}
+      onOpenWorkspaceSettings={onOpenWorkspaceSettings}
       onCloseSettings={onCloseSettings}
       onCreateSession={onCreateSession}
       onCreateTask={onCreateTask}
+      onSelectWorkspace={onSelectWorkspace}
       onSelectSession={onSelectSession}
       onSelectTask={onSelectTask}
     />

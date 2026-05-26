@@ -159,7 +159,7 @@ export async function setActiveWorkspace(workspaceId: string): Promise<Workspace
 
 export async function createWorkspace(input: {
   name: string;
-  anchorRoot: string;
+  workspaceRoot: string;
   repoRoots?: string[];
   setActive?: boolean;
 }): Promise<WorkspaceMutationResult> {

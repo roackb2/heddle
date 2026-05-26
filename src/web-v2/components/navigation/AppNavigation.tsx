@@ -12,17 +12,22 @@ import type { AppSurfaceId } from '@web/layout/types';
 import { MainNavigationSection } from './MainNavigationSection';
 import { SidebarContentRegion } from './SidebarContentRegion';
 import { SidebarSettingsEntry } from './SidebarSettingsEntry';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 interface AppNavigationProps {
   activeItemId: AppSurfaceId;
   items: readonly AppRoute[];
+  selectedWorkspaceId?: string;
   selectedSessionId?: string;
   selectedTaskId?: string;
   sessions: ControlPlaneState['sessions'];
   tasks: ControlPlaneState['heartbeat']['tasks'];
+  workspaces: ControlPlaneState['workspaces'];
   onOpenSettings: () => void;
+  onOpenWorkspaceSettings: () => void;
   onCreateSession: () => Promise<void>;
   onCreateTask: () => void;
+  onSelectWorkspace: (workspaceId: string) => void;
   onSelectSession: (sessionId: string) => void;
   onSelectTask: (taskId: string) => void;
 }
@@ -32,13 +37,17 @@ interface AppNavigationProps {
 export function AppNavigation({
   activeItemId,
   items,
+  selectedWorkspaceId,
   selectedSessionId,
   selectedTaskId,
   sessions,
   tasks,
+  workspaces,
   onOpenSettings,
+  onOpenWorkspaceSettings,
   onCreateSession,
   onCreateTask,
+  onSelectWorkspace,
   onSelectSession,
   onSelectTask,
 }: AppNavigationProps) {
@@ -46,12 +55,18 @@ export function AppNavigation({
 
   return (
     <>
-      <SidebarHeader className="v2-panel-divider h-12 justify-center border-b px-2 py-0">
-        <div className="flex items-center gap-2">
+      <SidebarHeader className="v2-panel-divider border-b px-2 py-2">
+        <div className="mb-1 flex h-6 items-center gap-2 px-1.5">
           <span className="v2-type-app-title text-foreground">Heddle</span>
         </div>
+        <WorkspaceSwitcher
+          selectedWorkspaceId={selectedWorkspaceId}
+          workspaces={workspaces}
+          onOpenWorkspaceSettings={onOpenWorkspaceSettings}
+          onSelectWorkspace={onSelectWorkspace}
+        />
       </SidebarHeader>
-      <MainNavigationSection activeItemId={activeItemId} items={items} />
+      <MainNavigationSection activeItemId={activeItemId} items={items} workspaceId={selectedWorkspaceId} />
       <SidebarContent>
         <SidebarContentRegion
           ariaLabel={activeItemId === 'tasks' ? t('navigation.taskListAriaLabel') : t('navigation.sessionListAriaLabel')}

@@ -10,20 +10,22 @@ import { MonacoDiffViewer } from '@web/components/diff/MonacoDiffViewer';
 import { useI18n } from '@web/i18n';
 import { cn } from '@web/lib/utils';
 
-export function DiffPreview() {
+export function DiffPreview({ workspaceId }: { workspaceId?: string }) {
   const { t } = useI18n();
-  const changesQuery = trpcReact.controlPlane.workspaceChanges.useQuery(undefined, {
+  const changesQuery = trpcReact.controlPlane.workspaceChanges.useQuery(workspaceId ? { workspaceId } : undefined, {
+    enabled: Boolean(workspaceId),
     refetchOnWindowFocus: true,
   });
   const [expandedPaths, setExpandedPaths] = useState<string[]>([]);
-  const files = useMemo(() => changesQuery.data?.files ?? [], [changesQuery.data?.files]);
+  const changes = changesQuery.data?.workspaceId === workspaceId ? changesQuery.data : undefined;
+  const files = useMemo(() => changes?.files ?? [], [changes?.files]);
 
   useEffect(() => {
-    if (!changesQuery.data) {
+    if (!changes) {
       return;
     }
     setExpandedPaths(files.map((file) => file.path));
-  }, [changesQuery.data, files]);
+  }, [changes, files]);
 
   function togglePath(path: string) {
     setExpandedPaths((current) => (
@@ -41,12 +43,12 @@ export function DiffPreview() {
       </header>
 
       <div className="v2-scrollbar-hidden min-h-0 flex-1 overflow-y-auto">
-        {changesQuery.isLoading ?
+        {!changes && changesQuery.isFetching ?
           <DiffPreviewEmpty title={t('diffPreview.loadingTitle')} body={t('diffPreview.loadingBody')} />
         : changesQuery.error ?
           <DiffPreviewEmpty title={t('diffPreview.failedTitle')} body={changesQuery.error.message} tone="danger" />
-        : changesQuery.data?.vcs === 'none' ?
-          <DiffPreviewEmpty title={t('diffPreview.noGitTitle')} body={changesQuery.data.error ?? t('diffPreview.noGitBody')} />
+        : changes?.vcs === 'none' ?
+          <DiffPreviewEmpty title={t('diffPreview.noGitTitle')} body={changes.error ?? t('diffPreview.noGitBody')} />
         : files.length ?
           <div className="grid">
             {files.map((file) => (
@@ -54,6 +56,7 @@ export function DiffPreview() {
                 key={file.path}
                 expanded={expandedPaths.includes(file.path)}
                 file={file}
+                workspaceId={workspaceId}
                 onToggle={() => togglePath(file.path)}
               />
             ))}
@@ -67,19 +70,22 @@ export function DiffPreview() {
 function DiffPreviewFile({
   expanded,
   file,
+  workspaceId,
   onToggle,
 }: {
   expanded: boolean;
   file: ControlPlaneWorkspaceChangedFile;
+  workspaceId?: string;
   onToggle: () => void;
 }) {
   const { t } = useI18n();
   const fileDiffQuery = trpcReact.controlPlane.workspaceFileDiff.useQuery(
-    expanded ? { path: file.path } : skipToken,
+    expanded && workspaceId ? { workspaceId, path: file.path } : skipToken,
     {
-      enabled: expanded,
+      enabled: expanded && Boolean(workspaceId),
     },
   );
+  const fileDiff = fileDiffQuery.data?.workspaceId === workspaceId ? fileDiffQuery.data : undefined;
 
   return (
     <article className={cn('v2-diff-file', expanded && 'v2-diff-file-expanded')}>
@@ -112,9 +118,9 @@ function DiffPreviewFile({
             <DiffPreviewEmpty title={t('diffPreview.loadingFileTitle')} body={t('diffPreview.loadingFileBody')} compact />
           : fileDiffQuery.error ?
             <DiffPreviewEmpty title={t('diffPreview.fileFailedTitle')} body={fileDiffQuery.error.message} tone="danger" compact />
-          : fileDiffQuery.data?.error ?
-            <DiffPreviewEmpty title={t('diffPreview.fileUnavailableTitle')} body={fileDiffQuery.data.error} compact />
-          : <FileDiffContent fileDiff={fileDiffQuery.data} />}
+          : fileDiff?.error ?
+            <DiffPreviewEmpty title={t('diffPreview.fileUnavailableTitle')} body={fileDiff.error} compact />
+          : <FileDiffContent fileDiff={fileDiff} />}
         </div>
       : null}
     </article>

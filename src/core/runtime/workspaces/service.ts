@@ -5,7 +5,7 @@
  * normalization, active workspace selection, creation, and renaming. Host code
  * should call this service instead of touching workspace catalog files.
  */
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { FileWorkspaceRepository } from './repository.js';
 import { WorkspaceCatalogReadSchema } from './schemas.js';
 import {
@@ -93,10 +93,10 @@ export class RuntimeWorkspaceService {
   static createDescriptor(input: CreateWorkspaceDescriptorInput): ResolvedWorkspaceContext {
     const resolved = RuntimeWorkspaceService.resolveContext(input);
     const now = new Date().toISOString();
-    const anchorRoot = resolve(input.anchorRoot);
-    const workspaceStateRoot = resolve(input.workspaceStateRoot ?? join(anchorRoot, basename(input.stateRoot)));
+    const workspaceRoot = resolve(input.newWorkspaceRoot);
+    const workspaceStateRoot = resolve(input.workspaceStateRoot ?? join(workspaceRoot, basename(input.stateRoot)));
     const existing = resolved.workspaces.find((workspace) => (
-      resolve(workspace.stateRoot) === workspaceStateRoot || resolve(workspace.anchorRoot) === anchorRoot
+      resolve(workspace.stateRoot) === workspaceStateRoot || resolve(workspace.workspaceRoot) === workspaceRoot
     ));
 
     if (existing) {
@@ -111,11 +111,11 @@ export class RuntimeWorkspaceService {
     const repoRoots =
       input.repoRoots && input.repoRoots.length > 0 ?
         input.repoRoots.map((root) => resolve(root))
-      : [anchorRoot];
+      : [workspaceRoot];
     const nextWorkspace: WorkspaceDescriptor = {
       id: input.nextId ?? `workspace-${Date.now()}`,
-      name: input.name.trim() || RuntimeWorkspaceService.deriveDefaultWorkspaceName(anchorRoot),
-      anchorRoot,
+      name: input.name.trim() || RuntimeWorkspaceService.deriveDefaultWorkspaceName(workspaceRoot),
+      workspaceRoot,
       repoRoots,
       stateRoot: workspaceStateRoot,
       createdAt: now,
@@ -151,7 +151,7 @@ export class RuntimeWorkspaceService {
         {
           id: DEFAULT_WORKSPACE_ID,
           name: RuntimeWorkspaceService.deriveDefaultWorkspaceName(config.workspaceRoot),
-          anchorRoot: config.workspaceRoot,
+          workspaceRoot: config.workspaceRoot,
           repoRoots: [config.workspaceRoot],
           stateRoot: config.stateRoot,
           createdAt: now,
@@ -202,17 +202,24 @@ export class RuntimeWorkspaceService {
     options: { fallbackId: string; workspaceRoot: string; stateRoot: string },
   ): WorkspaceDescriptor {
     const now = new Date().toISOString();
-    const anchorRoot = resolve(workspace.anchorRoot ?? options.workspaceRoot);
-    const stateRoot = resolve(workspace.stateRoot ?? join(anchorRoot, basename(options.stateRoot)));
+    const rawWorkspaceRoot = workspace.workspaceRoot
+      // Legacy catalog compatibility: anchorRoot is normalized away when the
+      // catalog is next saved.
+      ?? (workspace as { anchorRoot?: string }).anchorRoot;
+    const stateDirName = basename(options.stateRoot);
+    const fallbackWorkspaceRoot = resolve(rawWorkspaceRoot ?? options.workspaceRoot);
+    const stateRoot = resolve(workspace.stateRoot ?? join(fallbackWorkspaceRoot, stateDirName));
+    const workspaceRoot = basename(stateRoot) === stateDirName ? dirname(stateRoot) : fallbackWorkspaceRoot;
+    const savedRepoRoots = workspace.repoRoots?.map((root) => resolve(root)) ?? [];
     const repoRoots =
-      workspace.repoRoots && workspace.repoRoots.length > 0 ?
-        workspace.repoRoots.map((root) => resolve(root))
-      : [anchorRoot];
+      savedRepoRoots.length > 0 ?
+        savedRepoRoots.map((root) => (root === fallbackWorkspaceRoot ? workspaceRoot : root))
+      : [workspaceRoot];
 
     return {
       id: workspace.id?.trim() || options.fallbackId,
-      name: workspace.name?.trim() || RuntimeWorkspaceService.deriveDefaultWorkspaceName(anchorRoot),
-      anchorRoot,
+      name: workspace.name?.trim() || RuntimeWorkspaceService.deriveDefaultWorkspaceName(workspaceRoot),
+      workspaceRoot,
       repoRoots,
       stateRoot,
       createdAt: workspace.createdAt ?? now,

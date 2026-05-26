@@ -5,6 +5,7 @@ import type { ControlPlaneSessionLiveEvent } from '@/server/control-plane-types.
 export class ControlPlaneChatSessionEventsController {
   static emitSessionActivities(args: {
     eventBus: EventEmitter;
+    workspaceId: string;
     sessionId: string;
     activities: ConversationActivity[];
   }) {
@@ -12,7 +13,7 @@ export class ControlPlaneChatSessionEventsController {
       return;
     }
 
-    args.eventBus.emit(args.sessionId, {
+    args.eventBus.emit(ControlPlaneChatSessionEventsController.sessionAddressKey(args), {
       sessionId: args.sessionId,
       timestamp: new Date().toISOString(),
       activities: args.activities,
@@ -21,11 +22,13 @@ export class ControlPlaneChatSessionEventsController {
 
   static createSessionEventPublisher(args: {
     eventBus: EventEmitter;
+    workspaceId: string;
     sessionId: string;
   }) {
     const publishActivities = (activities: ConversationActivity[]) => {
       ControlPlaneChatSessionEventsController.emitSessionActivities({
         eventBus: args.eventBus,
+        workspaceId: args.workspaceId,
         sessionId: args.sessionId,
         activities,
       });
@@ -40,5 +43,9 @@ export class ControlPlaneChatSessionEventsController {
     };
 
     return publisher;
+  }
+
+  private static sessionAddressKey(address: { workspaceId: string; sessionId: string }): string {
+    return `${address.workspaceId}:${address.sessionId}`;
   }
 }

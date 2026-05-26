@@ -10,6 +10,7 @@ export type ControlPlaneReasoningEffort = NonNullable<Exclude<ControlPlaneSessio
 export type ControlPlaneReasoningEffortSelection = ControlPlaneReasoningEffort | 'default';
 
 type UseControlPlaneSessionSettingsArgs = {
+  workspaceId?: string;
   sessionId?: string;
   setSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
   setError: Dispatch<SetStateAction<string | undefined>>;
@@ -27,6 +28,7 @@ export type ControlPlaneSessionSettingsState = {
 // Owns web-v2 session setting mutations. The composer renders controls, while
 // this hook keeps API writes and cache invalidation at the session workflow layer.
 export function useControlPlaneSessionSettings({
+  workspaceId,
   sessionId,
   setSession,
   setError,
@@ -35,21 +37,23 @@ export function useControlPlaneSessionSettings({
   const modelOptionsQuery = trpcReact.controlPlane.modelOptions.useQuery();
   const updateSettingsMutation = trpcReact.controlPlane.sessionSettingsUpdate.useMutation();
 
-  const updateSettings = useCallback(async (settings: Omit<ControlPlaneSessionSettingsInput, 'id'>) => {
-    if (!sessionId) {
+  const updateSettings = useCallback(async (settings: Omit<ControlPlaneSessionSettingsInput, 'id' | 'workspaceId'>) => {
+    if (!sessionId || !workspaceId) {
       return;
     }
 
     try {
       const updated = await updateSettingsMutation.mutateAsync({
         id: sessionId,
+        workspaceId,
         ...settings,
       });
       setSession(updated);
       setError(undefined);
       await Promise.all([
         utils.controlPlane.state.invalidate(),
-        utils.controlPlane.session.invalidate({ id: sessionId }),
+        utils.controlPlane.sessions.invalidate({ workspaceId }),
+        utils.controlPlane.session.invalidate({ id: sessionId, workspaceId }),
       ]);
     } catch (settingsError) {
       setError(settingsError instanceof Error ? settingsError.message : String(settingsError));
@@ -60,7 +64,9 @@ export function useControlPlaneSessionSettings({
     setSession,
     updateSettingsMutation,
     utils.controlPlane.session,
+    utils.controlPlane.sessions,
     utils.controlPlane.state,
+    workspaceId,
   ]);
 
   return useMemo(() => ({

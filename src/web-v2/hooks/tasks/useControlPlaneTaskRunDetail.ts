@@ -2,6 +2,7 @@ import { skipToken } from '@tanstack/react-query';
 import { trpcReact, type ControlPlaneHeartbeatRun } from '@web/api/client';
 
 export function useControlPlaneTaskRunDetail(
+  workspaceId: string | undefined,
   taskId: string | undefined,
   runId: string | undefined,
 ): {
@@ -10,9 +11,9 @@ export function useControlPlaneTaskRunDetail(
   error?: string;
 } {
   const runQuery = trpcReact.controlPlane.heartbeatRun.useQuery(
-    taskId && runId ? { taskId, runId } : skipToken,
+    workspaceId && taskId && runId ? { workspaceId, taskId, runId } : skipToken,
     {
-      enabled: Boolean(taskId && runId),
+      enabled: Boolean(workspaceId && taskId && runId),
     },
   );
 

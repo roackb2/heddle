@@ -31,7 +31,7 @@ describe('daemon registry', () => {
     expect(registry.workspaces[0]).toMatchObject({
       workspace: {
         id: 'default',
-        anchorRoot: workspaceRoot,
+        workspaceRoot,
       },
       owner: {
         ownerId: 'daemon-1',
@@ -92,7 +92,7 @@ describe('daemon registry', () => {
     const registry = RuntimeDaemonRegistryService.registerKnownWorkspaces({ registryPath, workspaces: secondCatalog.workspaces });
 
     expect(registry.workspaces).toHaveLength(2);
-    expect(RuntimeDaemonRegistryService.readWorkspaceRegistration(registryPath, 'default', join(firstRoot, '.heddle'))?.workspace.anchorRoot).toBe(firstRoot);
-    expect(RuntimeDaemonRegistryService.readWorkspaceRegistration(registryPath, 'default', join(secondRoot, '.heddle'))?.workspace.anchorRoot).toBe(secondRoot);
+    expect(RuntimeDaemonRegistryService.readWorkspaceRegistration(registryPath, 'default', join(firstRoot, '.heddle'))?.workspace.workspaceRoot).toBe(firstRoot);
+    expect(RuntimeDaemonRegistryService.readWorkspaceRegistration(registryPath, 'default', join(secondRoot, '.heddle'))?.workspace.workspaceRoot).toBe(secondRoot);
   });
 });

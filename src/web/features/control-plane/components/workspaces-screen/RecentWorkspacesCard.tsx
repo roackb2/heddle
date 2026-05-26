@@ -42,7 +42,7 @@ export function RecentWorkspacesCard({
                   } else {
                     void onCreateWorkspace?.({
                       name: workspace.name,
-                      anchorRoot: workspace.anchorRoot,
+                      workspaceRoot: workspace.workspaceRoot,
                       setActive: true,
                     });
                   }
@@ -53,7 +53,7 @@ export function RecentWorkspacesCard({
                   {active ? <Badge variant="secondary">active</Badge> : null}
                   <Badge variant="outline">{attached ? 'attached' : 'known'}</Badge>
                 </span>
-                <span className="mt-1 block truncate text-xs text-muted-foreground">{workspace.anchorRoot}</span>
+                <span className="mt-1 block truncate text-xs text-muted-foreground">{workspace.workspaceRoot}</span>
                 <span className="mt-2 block text-[11px] text-muted-foreground">{shortPath(workspace.stateRoot)}</span>
               </button>
             );

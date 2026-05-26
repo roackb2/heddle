@@ -1,4 +1,3 @@
-import { resolve } from 'node:path';
 import dayjs from 'dayjs';
 import { BUILT_IN_MODEL_GROUPS, ModelPolicyService } from '@/core/llm/models/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
@@ -16,6 +15,7 @@ import { ControlPlaneWorkspaceFilesController } from '@/server/controllers/trpc/
 import { ControlPlaneWorkspaceDiffController } from '@/server/controllers/trpc/control-plane/workspace-diff.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
+import { controlPlaneWorkspaceProcedure } from './control-plane-workspace.js';
 import {
   agentAskInputSchema,
   createSessionInputSchema,
@@ -35,6 +35,8 @@ import {
   sessionEventsInputSchema,
   sessionInputSchema,
   sessionMessageInputSchema,
+  sessionsEventsInputSchema,
+  sessionsInputSchema,
   sessionSettingsInputSchema,
   turnReviewInputSchema,
   workspaceBrowseInputSchema,
@@ -45,37 +47,44 @@ import {
 } from './schema.js';
 
 export const controlPlaneRouter = router({
-  state: procedure.query(async ({ ctx }) => {
-    return await ControlPlaneStateController.load(ctx);
+  state: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
+    return await ControlPlaneStateController.load(ctx, ctx.requestWorkspace.workspace);
   }),
-  sessions: procedure.query(({ ctx }) => {
+  sessions: controlPlaneWorkspaceProcedure.input(sessionsInputSchema).query(({ ctx }) => {
+    const requestWorkspace = ctx.requestWorkspace;
     return {
-      sessions: controlPlaneChatSessionsController.readViews(controlPlaneSessionEngineArgs(ctx)),
+      workspaceId: requestWorkspace.workspace.id,
+      sessions: controlPlaneChatSessionsController.readViews(requestWorkspace.sessionEngineArgs),
     };
   }),
-  sessionsEvents: procedure.subscription(({ ctx, signal }) => {
+  sessionsEvents: controlPlaneWorkspaceProcedure.input(sessionsEventsInputSchema).subscription(({ ctx, signal }) => {
+    const { workspace } = ctx.requestWorkspace;
     return controlPlaneChatSessionsController.subscribeSessionListEvents({
-      stateRoot: ctx.activeWorkspace.stateRoot,
+      stateRoot: workspace.stateRoot,
       signal,
     });
   }),
-  sessionCreate: procedure.input(createSessionInputSchema).mutation(({ ctx, input }) => {
+  sessionCreate: controlPlaneWorkspaceProcedure.input(createSessionInputSchema).mutation(({ ctx, input }) => {
+    const { workspace, sessionEngineArgs } = ctx.requestWorkspace;
     return controlPlaneChatSessionsController.createSession({
-      ...controlPlaneSessionEngineArgs(ctx),
+      ...sessionEngineArgs,
       suggestedName: input?.name,
-      workspaceId: ctx.activeWorkspace.id,
+      workspaceId: workspace.id,
       model: input?.model,
       retention: input?.retention,
       apiKeyPresent: input?.apiKeyPresent,
       preferApiKey: ctx.preferApiKey,
     });
   }),
-  session: procedure.input(sessionInputSchema).query(({ ctx, input }) => {
-    return controlPlaneChatSessionsController.readDetail(controlPlaneSessionEngineArgs(ctx), input.id) ?? null;
+  session: controlPlaneWorkspaceProcedure.input(sessionInputSchema).query(({ ctx, input }) => {
+    const { sessionEngineArgs } = ctx.requestWorkspace;
+    return controlPlaneChatSessionsController.readDetail(sessionEngineArgs, input.id) ?? null;
   }),
-  sessionEvents: procedure.input(sessionEventsInputSchema).subscription(({ ctx, input, signal }) => {
+  sessionEvents: controlPlaneWorkspaceProcedure.input(sessionEventsInputSchema).subscription(({ ctx, input, signal }) => {
+    const { workspace } = ctx.requestWorkspace;
     return controlPlaneChatSessionsController.subscribeLiveEvents({
-      stateRoot: ctx.activeWorkspace.stateRoot,
+      workspaceId: workspace.id,
+      stateRoot: workspace.stateRoot,
       sessionId: input.sessionId,
       signal,
     });
@@ -96,9 +105,10 @@ export const controlPlaneRouter = router({
       })),
     };
   }),
-  sessionSettingsUpdate: procedure.input(sessionSettingsInputSchema).mutation(({ ctx, input }) => {
+  sessionSettingsUpdate: controlPlaneWorkspaceProcedure.input(sessionSettingsInputSchema).mutation(({ ctx, input }) => {
+    const { sessionEngineArgs } = ctx.requestWorkspace;
     return controlPlaneChatSessionsController.updateSettings({
-      ...controlPlaneSessionEngineArgs(ctx),
+      ...sessionEngineArgs,
       sessionId: input.id,
       settings: {
         model: input.model,
@@ -107,30 +117,48 @@ export const controlPlaneRouter = router({
       },
     });
   }),
-  sessionTurnReview: procedure.input(turnReviewInputSchema).query(({ ctx, input }) => {
-    return controlPlaneChatSessionsController.readTurnReview(controlPlaneSessionEngineArgs(ctx), input.sessionId, input.turnId) ?? null;
+  sessionTurnReview: controlPlaneWorkspaceProcedure.input(turnReviewInputSchema).query(({ ctx, input }) => {
+    const { sessionEngineArgs } = ctx.requestWorkspace;
+    return controlPlaneChatSessionsController.readTurnReview(sessionEngineArgs, input.sessionId, input.turnId) ?? null;
   }),
-  sessionPendingApproval: procedure.input(sessionInputSchema).query(({ input }) => {
-    return controlPlaneChatSessionsController.getPendingApproval(input.id) ?? null;
+  sessionPendingApproval: controlPlaneWorkspaceProcedure.input(sessionInputSchema).query(({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return controlPlaneChatSessionsController.getPendingApproval({
+      workspaceId: workspace.id,
+      sessionId: input.id,
+    }) ?? null;
   }),
-  sessionRunning: procedure.input(sessionInputSchema).query(({ input }) => {
-    return { running: controlPlaneChatSessionsController.isRunning(input.id) };
-  }),
-  sessionResolveApproval: procedure.input(sessionApprovalDecisionSchema).mutation(({ input }) => {
+  sessionRunning: controlPlaneWorkspaceProcedure.input(sessionInputSchema).query(({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
     return {
-      resolved: controlPlaneChatSessionsController.resolvePendingApproval(input.sessionId, input.decision),
+      running: controlPlaneChatSessionsController.isRunning({
+        workspaceId: workspace.id,
+        sessionId: input.id,
+      }),
     };
   }),
-  sessionCancel: procedure.input(sessionInputSchema).mutation(({ input }) => {
+  sessionResolveApproval: controlPlaneWorkspaceProcedure.input(sessionApprovalDecisionSchema).mutation(({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
     return {
-      cancelled: controlPlaneChatSessionsController.cancelRun(input.id),
+      resolved: controlPlaneChatSessionsController.resolvePendingApproval({
+        workspaceId: workspace.id,
+        sessionId: input.sessionId,
+      }, input.decision),
     };
   }),
-  sessionSendPrompt: procedure.input(sessionMessageInputSchema).mutation(async ({ ctx, input }) => {
+  sessionCancel: controlPlaneWorkspaceProcedure.input(sessionInputSchema).mutation(({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return {
+      cancelled: controlPlaneChatSessionsController.cancelRun({
+        workspaceId: workspace.id,
+        sessionId: input.id,
+      }),
+    };
+  }),
+  sessionSendPrompt: controlPlaneWorkspaceProcedure.input(sessionMessageInputSchema).mutation(async ({ ctx, input }) => {
+    const { logger, sessionEngineArgs } = ctx.requestWorkspace;
     return await controlPlaneChatSessionsController.submitPrompt({
-      workspaceRoot: ctx.activeWorkspace.anchorRoot,
-      stateRoot: ctx.activeWorkspace.stateRoot,
-      sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
+      ...sessionEngineArgs,
       sessionId: input.sessionId,
       prompt: input.prompt,
       maxSteps: input.maxSteps,
@@ -138,7 +166,7 @@ export const controlPlaneRouter = router({
       includePlanTool: input.includePlanTool,
       apiKey: input.apiKey,
       preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
-      logger: ctx.logger,
+      logger,
       systemContext: input.systemContext,
       memoryMaintenanceMode: input.memoryMaintenanceMode,
       leaseOwner: {
@@ -148,11 +176,10 @@ export const controlPlaneRouter = router({
       },
     });
   }),
-  sessionContinue: procedure.input(sessionInputSchema).mutation(async ({ ctx, input }) => {
+  sessionContinue: controlPlaneWorkspaceProcedure.input(sessionInputSchema).mutation(async ({ ctx, input }) => {
+    const { sessionEngineArgs } = ctx.requestWorkspace;
     return await controlPlaneChatSessionsController.continuePrompt({
-      workspaceRoot: ctx.activeWorkspace.anchorRoot,
-      stateRoot: ctx.activeWorkspace.stateRoot,
-      sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
+      ...sessionEngineArgs,
       sessionId: input.id,
       apiKey: input.apiKey,
       preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
@@ -163,11 +190,12 @@ export const controlPlaneRouter = router({
       },
     });
   }),
-  agentAsk: procedure.input(agentAskInputSchema).mutation(async ({ ctx, input }) => {
+  agentAsk: controlPlaneWorkspaceProcedure.input(agentAskInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
     return await ControlPlaneAskController.run({
       goal: input.goal,
-      workspaceRoot: ctx.activeWorkspace.anchorRoot,
-      stateRoot: ctx.activeWorkspace.stateRoot,
+      workspaceRoot: workspace.workspaceRoot,
+      stateRoot: workspace.stateRoot,
       model: input.model,
       maxSteps: input.maxSteps,
       apiKey: input.apiKey,
@@ -176,87 +204,105 @@ export const controlPlaneRouter = router({
       systemContext: input.systemContext,
     });
   }),
-  heartbeatTasks: procedure.query(async ({ ctx }) => {
+  heartbeatTasks: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
+    const { workspace } = ctx.requestWorkspace;
     return {
-      tasks: await ControlPlaneHeartbeatController.listTasks(ctx.activeWorkspace.stateRoot),
+      workspaceId: workspace.id,
+      tasks: await ControlPlaneHeartbeatController.listTasks(workspace.stateRoot),
     };
   }),
-  heartbeatTaskCreate: procedure.input(heartbeatTaskCreateInputSchema).mutation(async ({ ctx, input }) => {
+  heartbeatTaskCreate: controlPlaneWorkspaceProcedure.input(heartbeatTaskCreateInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    const { workspaceId: _workspaceId, ...taskInput } = input;
     return {
-      task: await ControlPlaneHeartbeatController.createTask(ctx.activeWorkspace.stateRoot, {
-        ...input,
-        workspaceId: ctx.activeWorkspace.id,
-        workspaceRoot: ctx.activeWorkspace.anchorRoot,
-        stateDir: ctx.activeWorkspace.stateRoot,
+      task: await ControlPlaneHeartbeatController.createTask(workspace.stateRoot, {
+        ...taskInput,
+        workspaceId: workspace.id,
+        workspaceRoot: workspace.workspaceRoot,
+        stateDir: workspace.stateRoot,
       }),
     };
   }),
-  heartbeatTaskUpdate: procedure.input(heartbeatTaskUpdateInputSchema).mutation(async ({ ctx, input }) => {
+  heartbeatTaskUpdate: controlPlaneWorkspaceProcedure.input(heartbeatTaskUpdateInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    const { workspaceId: _workspaceId, taskId: _taskId, ...taskInput } = input;
     return {
-      task: await ControlPlaneHeartbeatController.updateTask(ctx.activeWorkspace.stateRoot, input.taskId, input),
+      task: await ControlPlaneHeartbeatController.updateTask(workspace.stateRoot, input.taskId, taskInput),
     };
   }),
-  heartbeatTaskDelete: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
+  heartbeatTaskDelete: controlPlaneWorkspaceProcedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
     return {
-      task: await ControlPlaneHeartbeatController.deleteTask(ctx.activeWorkspace.stateRoot, input.taskId),
+      task: await ControlPlaneHeartbeatController.deleteTask(workspace.stateRoot, input.taskId),
     };
   }),
-  heartbeatTask: procedure.input(heartbeatTaskDetailInputSchema).query(async ({ ctx, input }) => {
-    return await ControlPlaneHeartbeatController.readTask(ctx.activeWorkspace.stateRoot, input.taskId, {
+  heartbeatTask: controlPlaneWorkspaceProcedure.input(heartbeatTaskDetailInputSchema).query(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneHeartbeatController.readTask(workspace.stateRoot, input.taskId, {
       runLimit: input.runLimit,
     });
   }),
-  heartbeatEvents: procedure.subscription(({ ctx, signal }) => {
+  heartbeatEvents: controlPlaneWorkspaceProcedure.subscription(({ ctx, signal }) => {
+    const { workspace } = ctx.requestWorkspace;
     return controlPlaneHeartbeatEventsController.subscribe({
-      workspaceId: ctx.activeWorkspace.id,
+      workspaceId: workspace.id,
       signal,
     });
   }),
-  heartbeatRuns: procedure.input(heartbeatRunsInputSchema).query(async ({ ctx, input }) => {
+  heartbeatRuns: controlPlaneWorkspaceProcedure.input(heartbeatRunsInputSchema).query(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
     return {
-      runs: await ControlPlaneHeartbeatController.listRuns(ctx.activeWorkspace.stateRoot, {
+      runs: await ControlPlaneHeartbeatController.listRuns(workspace.stateRoot, {
         taskId: input?.taskId,
         limit: input?.limit ?? 20,
       }),
     };
   }),
-  heartbeatRun: procedure.input(heartbeatRunInputSchema).query(async ({ ctx, input }) => {
+  heartbeatRun: controlPlaneWorkspaceProcedure.input(heartbeatRunInputSchema).query(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
     return {
-      run: await ControlPlaneHeartbeatController.readRun(ctx.activeWorkspace.stateRoot, input.taskId, input.runId) ?? null,
+      run: await ControlPlaneHeartbeatController.readRun(workspace.stateRoot, input.taskId, input.runId) ?? null,
     };
   }),
-  memoryStatus: procedure.query(async ({ ctx }) => {
-    return await ControlPlaneMemoryController.readStatus(ctx.activeWorkspace.stateRoot);
+  memoryStatus: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneMemoryController.readStatus(workspace.stateRoot);
   }),
-  memoryList: procedure.input(memoryListInputSchema).query(async ({ ctx, input }) => {
-    return await ControlPlaneMemoryController.listNotes(ctx.activeWorkspace.stateRoot, input?.path);
+  memoryList: controlPlaneWorkspaceProcedure.input(memoryListInputSchema).query(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneMemoryController.listNotes(workspace.stateRoot, input?.path);
   }),
-  memoryRead: procedure.input(memoryReadInputSchema).query(async ({ ctx, input }) => {
-    return await ControlPlaneMemoryController.readNote(ctx.activeWorkspace.stateRoot, input.path, {
+  memoryRead: controlPlaneWorkspaceProcedure.input(memoryReadInputSchema).query(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneMemoryController.readNote(workspace.stateRoot, input.path, {
       offset: input.offset,
       maxLines: input.maxLines,
     });
   }),
-  memorySearch: procedure.input(memorySearchInputSchema).query(async ({ ctx, input }) => {
-    return await ControlPlaneMemoryController.searchNotes(ctx.activeWorkspace.stateRoot, input.query, {
+  memorySearch: controlPlaneWorkspaceProcedure.input(memorySearchInputSchema).query(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneMemoryController.searchNotes(workspace.stateRoot, input.query, {
       path: input.path,
       maxResults: input.maxResults,
     });
   }),
-  heartbeatTaskEnable: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
+  heartbeatTaskEnable: controlPlaneWorkspaceProcedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
     return {
-      task: await ControlPlaneHeartbeatController.setTaskEnabled(ctx.activeWorkspace.stateRoot, input.taskId, true),
+      task: await ControlPlaneHeartbeatController.setTaskEnabled(workspace.stateRoot, input.taskId, true),
     };
   }),
-  heartbeatTaskDisable: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
+  heartbeatTaskDisable: controlPlaneWorkspaceProcedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
     return {
-      task: await ControlPlaneHeartbeatController.setTaskEnabled(ctx.activeWorkspace.stateRoot, input.taskId, false),
+      task: await ControlPlaneHeartbeatController.setTaskEnabled(workspace.stateRoot, input.taskId, false),
     };
   }),
-  heartbeatTaskResume: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
-    const task = await ControlPlaneHeartbeatController.resumeTask(ctx.activeWorkspace.stateRoot, input.taskId);
+  heartbeatTaskResume: controlPlaneWorkspaceProcedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    const task = await ControlPlaneHeartbeatController.resumeTask(workspace.stateRoot, input.taskId);
     controlPlaneHeartbeatEventsController.publish({
-      workspaceId: ctx.activeWorkspace.id,
+      workspaceId: workspace.id,
       event: {
         type: 'heartbeat.task.due',
         taskId: input.taskId,
@@ -265,15 +311,18 @@ export const controlPlaneRouter = router({
     });
     return { task };
   }),
-  heartbeatTaskTrigger: procedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
+  heartbeatTaskTrigger: controlPlaneWorkspaceProcedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
     return {
-      task: await ControlPlaneHeartbeatController.triggerTaskRun(ctx.activeWorkspace.stateRoot, input.taskId),
+      task: await ControlPlaneHeartbeatController.triggerTaskRun(workspace.stateRoot, input.taskId),
     };
   }),
-  heartbeatTaskRunNow: procedure.input(heartbeatTaskRunNowInputSchema).mutation(async ({ ctx, input }) => {
-    const task = await ControlPlaneHeartbeatController.triggerTaskRun(ctx.activeWorkspace.stateRoot, input.taskId);
+  heartbeatTaskRunNow: controlPlaneWorkspaceProcedure.input(heartbeatTaskRunNowInputSchema).mutation(async ({ ctx, input }) => {
+    const { logger, workspace } = ctx.requestWorkspace;
+    const { workspaceId: _workspaceId, ...runInput } = input;
+    const task = await ControlPlaneHeartbeatController.triggerTaskRun(workspace.stateRoot, input.taskId);
     controlPlaneHeartbeatEventsController.publish({
-      workspaceId: ctx.activeWorkspace.id,
+      workspaceId: workspace.id,
       event: {
         type: 'heartbeat.task.due',
         taskId: input.taskId,
@@ -281,17 +330,17 @@ export const controlPlaneRouter = router({
       },
     });
 
-    void ControlPlaneHeartbeatController.runTaskNow(ctx.activeWorkspace.stateRoot, {
-      ...input,
-      workspaceRoot: ctx.activeWorkspace.anchorRoot,
-      stateDir: ctx.activeWorkspace.stateRoot,
+    void ControlPlaneHeartbeatController.runTaskNow(workspace.stateRoot, {
+      ...runInput,
+      workspaceRoot: workspace.workspaceRoot,
+      stateDir: workspace.stateRoot,
       preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
       onEvent: (event) => controlPlaneHeartbeatEventsController.publish({
-        workspaceId: ctx.activeWorkspace.id,
+        workspaceId: workspace.id,
         event,
       }),
     }).catch((error: unknown) => {
-      ctx.logger.error({ error, taskId: input.taskId }, 'Failed to run heartbeat task from control plane');
+      logger.error({ error, taskId: input.taskId }, 'Failed to run heartbeat task from control plane');
     });
 
     return {
@@ -300,10 +349,12 @@ export const controlPlaneRouter = router({
       run: null,
     };
   }),
-  workspaceFileSearch: procedure.input(fileSearchInputSchema).query(async ({ ctx, input }) => {
+  workspaceFileSearch: controlPlaneWorkspaceProcedure.input(fileSearchInputSchema).query(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
     return {
+      workspaceId: workspace.id,
       files: await ControlPlaneWorkspaceFilesController.searchFiles({
-        workspaceRoot: ctx.activeWorkspace.anchorRoot,
+        workspaceRoot: workspace.workspaceRoot,
         query: input?.query ?? '',
         limit: input?.limit ?? 20,
       }),
@@ -316,11 +367,19 @@ export const controlPlaneRouter = router({
       includeHidden: input?.includeHidden ?? false,
     });
   }),
-  workspaceChanges: procedure.query(async ({ ctx }) => {
-    return await ControlPlaneWorkspaceDiffController.readChanges(ctx.activeWorkspace.anchorRoot);
+  workspaceChanges: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return {
+      workspaceId: workspace.id,
+      ...await ControlPlaneWorkspaceDiffController.readChanges(workspace.workspaceRoot),
+    };
   }),
-  workspaceFileDiff: procedure.input(workspaceFileDiffInputSchema).query(async ({ ctx, input }) => {
-    return await ControlPlaneWorkspaceDiffController.readFileDiff(ctx.activeWorkspace.anchorRoot, input.path);
+  workspaceFileDiff: controlPlaneWorkspaceProcedure.input(workspaceFileDiffInputSchema).query(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return {
+      workspaceId: workspace.id,
+      ...await ControlPlaneWorkspaceDiffController.readFileDiff(workspace.workspaceRoot, input.path),
+    };
   }),
   workspaceSetActive: procedure.input(workspaceSetActiveInputSchema).mutation(({ ctx, input }) => {
     const resolved = RuntimeWorkspaceService.setActive({
@@ -340,7 +399,7 @@ export const controlPlaneRouter = router({
       workspaceRoot: ctx.workspaceRoot,
       stateRoot: ctx.stateRoot,
       name: input.name,
-      anchorRoot: input.anchorRoot,
+      newWorkspaceRoot: input.workspaceRoot,
       repoRoots: input.repoRoots,
       setActive: input.setActive,
     });
@@ -365,20 +424,11 @@ export const controlPlaneRouter = router({
       workspaces: resolved.workspaces,
     };
   }),
-  layoutSnapshotSave: procedure.input(layoutSnapshotInputSchema).mutation(async ({ ctx, input }) => {
-    return await ControlPlaneLayoutSnapshotsController.save(ctx.activeWorkspace.stateRoot, input.snapshot);
+  layoutSnapshotSave: controlPlaneWorkspaceProcedure.input(layoutSnapshotInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneLayoutSnapshotsController.save(workspace.stateRoot, input.snapshot);
   }),
 });
-
-function controlPlaneSessionEngineArgs(ctx: HeddleServerContext) {
-  return {
-    workspaceRoot: ctx.activeWorkspace.anchorRoot,
-    stateRoot: ctx.activeWorkspace.stateRoot,
-    sessionStoragePath: resolve(ctx.activeWorkspace.stateRoot, 'chat-sessions.catalog.json'),
-    preferApiKey: ctx.preferApiKey,
-    workspaceId: ctx.activeWorkspace.id,
-  };
-}
 
 function registerControlPlaneWorkspaces(
   ctx: HeddleServerContext,

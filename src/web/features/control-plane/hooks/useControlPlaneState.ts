@@ -44,7 +44,7 @@ export function useControlPlaneState() {
 
   const createWorkspace = useCallback(async (input: {
     name: string;
-    anchorRoot: string;
+    workspaceRoot: string;
     repoRoots?: string[];
     setActive?: boolean;
   }) => {

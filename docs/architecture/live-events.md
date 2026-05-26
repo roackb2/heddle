@@ -82,7 +82,7 @@ flowchart TD
   Agent --> Trace["TraceEvent<br/>durable observability"]
   Runtime --> Trace
   Activity --> Publisher["ControlPlaneChatSessionEventsController<br/>publishActivity / publishActivities"]
-  Publisher --> Bus["EventEmitter keyed by sessionId"]
+  Publisher --> Bus["EventEmitter keyed by workspaceId + sessionId"]
   Bus --> Queue["RuntimeSubscriptionStream<br/>AsyncIterable adapter"]
   Queue --> TRPC["tRPC subscription<br/>controlPlane.sessionEvents"]
   Bus --> SSE["SSE endpoint<br/>/control-plane/sessions/:id/events"]
@@ -265,7 +265,9 @@ cannot be watched yet:
 ## Delivery Mechanics
 
 The control-plane controller uses an in-process `EventEmitter` keyed by
-`sessionId`. This keeps a live run scoped to the session that produced it.
+`workspaceId` and `sessionId`. This keeps a live run scoped to the session and
+workspace state root that produced it, even when different workspaces contain
+the same session id.
 
 For tRPC subscriptions, `RuntimeSubscriptionStream` in
 `src/core/runtime/subscriptions` adapts callbacks into an `AsyncIterable`. It is

@@ -15,7 +15,7 @@ export type ControlPlaneLiveTaskState = {
   updatedAt: string;
 };
 
-export function useControlPlaneHeartbeatEvents() {
+export function useControlPlaneHeartbeatEvents(workspaceId?: string) {
   const utils = trpcReact.useUtils();
   const [liveTasks, setLiveTasks] = useState<Record<string, ControlPlaneLiveTaskState>>({});
 
@@ -32,23 +32,24 @@ export function useControlPlaneHeartbeatEvents() {
     setLiveTasks((current) => applyHeartbeatEvent(current, event));
 
     if (event.type === 'heartbeat.task.finished') {
-      void utils.controlPlane.heartbeatTasks.invalidate();
-      void utils.controlPlane.heartbeatTask.invalidate({ taskId: event.taskId });
+      void utils.controlPlane.heartbeatTasks.invalidate(workspaceId ? { workspaceId } : undefined);
+      void utils.controlPlane.heartbeatTask.invalidate(workspaceId ? { workspaceId, taskId: event.taskId } : { taskId: event.taskId });
       void utils.controlPlane.state.invalidate();
       void utils.controlPlane.heartbeatRun.invalidate({
+        workspaceId,
         taskId: event.taskId,
         runId: event.record.runId,
       });
     }
 
     if (event.type === 'heartbeat.task.failed') {
-      void utils.controlPlane.heartbeatTasks.invalidate();
-      void utils.controlPlane.heartbeatTask.invalidate({ taskId: event.taskId });
+      void utils.controlPlane.heartbeatTasks.invalidate(workspaceId ? { workspaceId } : undefined);
+      void utils.controlPlane.heartbeatTask.invalidate(workspaceId ? { workspaceId, taskId: event.taskId } : { taskId: event.taskId });
       void utils.controlPlane.state.invalidate();
     }
-  }, [utils]);
+  }, [utils, workspaceId]);
 
-  trpcReact.controlPlane.heartbeatEvents.useSubscription(undefined, {
+  trpcReact.controlPlane.heartbeatEvents.useSubscription(workspaceId ? { workspaceId } : undefined, {
     onData: applyHeartbeatEnvelope,
   });
 

@@ -11,13 +11,14 @@ type ControlPlaneTaskDetailState = {
 };
 
 export function useControlPlaneTaskDetail(
+  workspaceId: string | undefined,
   taskId: string | undefined,
   selectedRunId: string | undefined,
 ): ControlPlaneTaskDetailState {
   const taskQuery = trpcReact.controlPlane.heartbeatTask.useQuery(
-    taskId ? { taskId, runLimit: 50 } : skipToken,
+    taskId && workspaceId ? { workspaceId, taskId, runLimit: 50 } : skipToken,
     {
-      enabled: Boolean(taskId),
+      enabled: Boolean(taskId && workspaceId),
     },
   );
 

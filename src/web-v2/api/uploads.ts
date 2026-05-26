@@ -9,19 +9,25 @@ export type ControlPlaneSessionImageUpload = {
 };
 
 export type UploadControlPlaneSessionImagesInput = {
+  workspaceId?: string;
   sessionId: string;
   files: File[];
 };
 
 export async function uploadControlPlaneSessionImages(
-  { sessionId, files }: UploadControlPlaneSessionImagesInput,
+  { workspaceId, sessionId, files }: UploadControlPlaneSessionImagesInput,
 ): Promise<ControlPlaneSessionImageUpload[]> {
   const formData = new FormData();
   files.forEach((file) => {
     formData.append('images', file, file.name);
   });
 
-  const response = await fetch(`/control-plane/sessions/${encodeURIComponent(sessionId)}/uploads`, {
+  const searchParams = new URLSearchParams();
+  if (workspaceId) {
+    searchParams.set('workspaceId', workspaceId);
+  }
+  const queryString = searchParams.toString();
+  const response = await fetch(`/control-plane/sessions/${encodeURIComponent(sessionId)}/uploads${queryString ? `?${queryString}` : ''}`, {
     method: 'POST',
     body: formData,
   });

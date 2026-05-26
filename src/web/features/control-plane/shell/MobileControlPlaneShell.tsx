@@ -53,7 +53,7 @@ export function MobileControlPlaneShell({
               <span className="text-xs font-semibold tracking-normal text-foreground">Heddle</span>
             </div>
             <p className="m-0 truncate text-xs leading-5 text-muted-foreground">
-              {state ? `${state.workspace.name} · ${shortPath(state.workspace.anchorRoot)}` : 'Reading workspace state'}
+              {state ? `${state.workspace.name} · ${shortPath(state.workspace.workspaceRoot)}` : 'Reading workspace state'}
             </p>
             {state && state.workspaces.length > 1 && onSetActiveWorkspace ?
               <label className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">

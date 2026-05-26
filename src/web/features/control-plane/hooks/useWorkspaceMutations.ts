@@ -11,7 +11,7 @@ export function useWorkspaceMutations({
 }: {
   state?: ControlPlaneState;
   setActiveWorkspace: (workspaceId: string) => Promise<void>;
-  createWorkspace: (input: { name: string; anchorRoot: string; setActive?: boolean }) => Promise<void>;
+  createWorkspace: (input: { name: string; workspaceRoot: string; setActive?: boolean }) => Promise<void>;
   renameWorkspace: (workspaceId: string, name: string) => Promise<void>;
   notify: (toast: ToastInput) => void;
 }) {
@@ -37,7 +37,7 @@ export function useWorkspaceMutations({
 
   const handleCreateWorkspace = useCallback(async (input: {
     name: string;
-    anchorRoot: string;
+    workspaceRoot: string;
     setActive: boolean;
   }) => {
     setCreatingWorkspace(true);

@@ -132,8 +132,10 @@
     "collapseSidebar": "收合側邊欄",
     "expandSidebar": "展開側邊欄",
     "mainAriaLabel": "主要應用導覽",
+    "manageWorkspaces": "管理工作區",
     "newChat": "新增對話",
     "newTask": "新增任務",
+    "noWorkspaces": "找不到工作區",
     "openSettings": "開啟設定",
     "primaryAriaLabel": "主要導覽",
     "sessionListAriaLabel": "對話清單",
@@ -142,8 +144,10 @@
     "settingsAriaLabel": "設定導覽",
     "settingsMenuAriaLabel": "設定選單",
     "skipToMain": "跳到主要內容",
+    "switchWorkspace": "切換工作區",
     "taskListAriaLabel": "任務清單",
-    "taskListTitle": "任務"
+    "taskListTitle": "任務",
+    "workspaceSwitcher": "工作區"
   },
   "settings": {
     "general": "一般",

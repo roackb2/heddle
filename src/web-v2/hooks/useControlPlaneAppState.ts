@@ -10,6 +10,7 @@ import { useWorkbenchNavigation } from './useWorkbenchNavigation';
 
 export type ControlPlaneRightPanelProps = {
   activeRouteMode: ReturnType<typeof useWorkbenchNavigation>['activeRouteMode'];
+  workspaceId?: string;
   taskRun: {
     error?: string;
     liveTask?: ControlPlaneHeartbeatTaskView;
@@ -23,19 +24,29 @@ export function useControlPlaneAppState() {
   const navigation = useWorkbenchNavigation();
   const utils = trpcReact.useUtils();
   const createSessionMutation = trpcReact.controlPlane.sessionCreate.useMutation();
-  const taskEvents = useControlPlaneHeartbeatEvents();
+  const taskEvents = useControlPlaneHeartbeatEvents(navigation.selectedWorkspaceId);
   const sidebar = useControlPlaneSidebarData({ navigation, taskEvents });
-  const memoryStatusQuery = trpcReact.controlPlane.memoryStatus.useQuery(undefined, {
+  const memoryStatusQuery = trpcReact.controlPlane.memoryStatus.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
     enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'memory',
   });
-  const selectedSession = useControlPlaneSessionDetail(navigation.selectedSessionId);
-  const taskSelection = useControlPlaneTaskSelection({ navigation, taskEvents });
+  const selectedSession = useControlPlaneSessionDetail({
+    workspaceId: sidebar.workspaceId,
+    sessionId: navigation.selectedSessionId,
+  });
+  const taskSelection = useControlPlaneTaskSelection({
+    navigation,
+    taskEvents,
+    workspaceId: sidebar.workspaceId,
+  });
   const taskActions = useControlPlaneTaskActions({
     navigation,
     selectedTask: taskSelection.task,
     sidebarTasks: sidebar.tasks,
     taskEvents,
+    workspaceId: sidebar.workspaceId,
   });
+  const state = sidebar.stateQuery.data;
+  const stateMemoryStatus = state && state.activeWorkspaceId === sidebar.workspaceId ? state.memory : undefined;
 
   useControlPlaneErrorToasts({
     stateError: sidebar.stateQuery.error,
@@ -43,12 +54,14 @@ export function useControlPlaneAppState() {
   });
 
   async function createSession() {
-    const session = await createSessionMutation.mutateAsync();
-    navigation.selectSession(session.id);
-    await Promise.all([
-      utils.controlPlane.state.invalidate(),
-      utils.controlPlane.sessions.invalidate(),
-    ]);
+    const session = await createSessionMutation.mutateAsync(
+      sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined,
+    );
+    navigation.selectSession(session.id, { workspaceId: sidebar.workspaceId });
+    await utils.controlPlane.state.invalidate();
+    await utils.controlPlane.sessions.invalidate(
+      sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined,
+    );
   }
 
   return {
@@ -56,14 +69,18 @@ export function useControlPlaneAppState() {
       activeSurfaceId: navigation.activeSurfaceId,
       activeSettingsSectionId: navigation.activeSettingsSectionId,
       settingsOpen: navigation.settingsOpen,
+      selectedWorkspaceId: sidebar.workspaceId,
       selectedSessionId: navigation.selectedSessionId,
       selectedTaskId: navigation.selectedTaskId,
+      workspaces: sidebar.stateQuery.data?.workspaces ?? [],
       sessions: sidebar.sessions,
       tasks: sidebar.tasks,
       onOpenSettings: navigation.openSettings,
+      onOpenWorkspaceSettings: () => navigation.openSettings('workspaces'),
       onCloseSettings: navigation.closeSettings,
       onCreateSession: createSession,
       onCreateTask: taskActions.openCreateDialog,
+      onSelectWorkspace: navigation.selectWorkspace,
       onSelectSession: navigation.selectSession,
       onSelectTask: navigation.selectTask,
     },
@@ -71,11 +88,12 @@ export function useControlPlaneAppState() {
       activeSurfaceId: navigation.activeSurfaceId,
       activeSettingsSectionId: navigation.activeSettingsSectionId,
       memorySettingsView: {
-        status: memoryStatusQuery.data ?? sidebar.stateQuery.data?.memory,
+        status: memoryStatusQuery.data ?? stateMemoryStatus,
         loading: memoryStatusQuery.isLoading || sidebar.stateQuery.isLoading,
         error: memoryStatusQuery.error instanceof Error ? memoryStatusQuery.error.message : undefined,
       },
       sessionView: {
+        workspaceId: sidebar.workspaceId,
         session: selectedSession.session,
         loading: selectedSession.loading,
         submitting: selectedSession.submitting,
@@ -112,6 +130,7 @@ export function useControlPlaneAppState() {
     },
     rightPanelProps: {
       activeRouteMode: navigation.activeRouteMode,
+      workspaceId: sidebar.workspaceId,
       taskRun: {
         error: taskSelection.runDetail.error,
         liveTask: taskSelection.task,

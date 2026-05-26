@@ -31,7 +31,7 @@ export function OverviewScreen({
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Active workspace</p>
               <h2 className="text-xl font-semibold text-foreground">{state.workspace.name}</h2>
-              <p className="text-sm text-muted-foreground">{shortPath(state.workspace.anchorRoot)}</p>
+              <p className="text-sm text-muted-foreground">{shortPath(state.workspace.workspaceRoot)}</p>
             </div>
             <Badge variant="secondary" className="w-fit max-w-full truncate">{state.workspace.id}</Badge>
           </div>
@@ -43,7 +43,7 @@ export function OverviewScreen({
           </div>
 
           <dl className="mt-4 grid gap-3 text-sm">
-            <MetaRow label="Workspace path">{state.workspace.anchorRoot}</MetaRow>
+            <MetaRow label="Workspace path">{state.workspace.workspaceRoot}</MetaRow>
             <MetaRow label="State path">{state.workspace.stateRoot}</MetaRow>
           </dl>
         </OverviewCard>

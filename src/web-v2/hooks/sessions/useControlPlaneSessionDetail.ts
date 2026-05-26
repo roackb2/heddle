@@ -33,20 +33,30 @@ type ControlPlaneSessionDetailState = {
   resolvePendingApproval: ReturnType<typeof useControlPlanePendingApproval>['resolvePendingApproval'];
 };
 
+type UseControlPlaneSessionDetailArgs = {
+  workspaceId?: string;
+  sessionId?: string;
+};
+
 // Composes the web-v2 session detail workflow from focused hooks: persisted
 // detail loading, live event subscription, and prompt submission.
-export function useControlPlaneSessionDetail(sessionId: string | undefined): ControlPlaneSessionDetailState {
+export function useControlPlaneSessionDetail({
+  workspaceId,
+  sessionId,
+}: UseControlPlaneSessionDetailArgs): ControlPlaneSessionDetailState {
   const [liveStatus, setLiveStatus] = useState<string | undefined>();
-  const loader = useControlPlaneSessionLoader(sessionId);
+  const loader = useControlPlaneSessionLoader({ workspaceId, sessionId });
   const runControl = useControlPlaneSessionRunControl({
+    workspaceId,
     sessionId,
     setLiveStatus,
     setError: loader.setError,
   });
-  const approval = useControlPlanePendingApproval(sessionId, {
+  const approval = useControlPlanePendingApproval({ workspaceId, sessionId }, {
     pollingEnabled: runControl.running,
   });
   const events = useControlPlaneSessionEvents({
+    workspaceId,
     sessionId,
     refresh: loader.refresh,
     refreshPendingApproval: approval.refreshPendingApproval,
@@ -55,6 +65,7 @@ export function useControlPlaneSessionDetail(sessionId: string | undefined): Con
     setLiveStatus,
   });
   const promptSubmit = useControlPlaneSessionPromptSubmit({
+    workspaceId,
     sessionId,
     streamConnected: events.streamConnected,
     setSession: loader.setSession,
@@ -63,6 +74,7 @@ export function useControlPlaneSessionDetail(sessionId: string | undefined): Con
     setLiveStatus,
   });
   const settings = useControlPlaneSessionSettings({
+    workspaceId,
     sessionId,
     setSession: loader.setSession,
     setError: loader.setError,

@@ -18,12 +18,13 @@ export type ComposerImageAttachment = {
 };
 
 type UseComposerImageAttachmentsArgs = {
+  workspaceId?: string;
   sessionId?: string;
 };
 
 const imageMediaTypePrefix = 'image/';
 
-export function useComposerImageAttachments({ sessionId }: UseComposerImageAttachmentsArgs) {
+export function useComposerImageAttachments({ workspaceId, sessionId }: UseComposerImageAttachmentsArgs) {
   const [attachments, setAttachments] = useState<ComposerImageAttachment[]>([]);
   const [validationError, setValidationError] = useState<I18nMessageKey | undefined>();
   const attachmentsRef = useRef<ComposerImageAttachment[]>([]);
@@ -61,7 +62,7 @@ export function useComposerImageAttachments({ sessionId }: UseComposerImageAttac
   }, []);
 
   const uploadImages = useCallback(async (fileList: FileList | File[]) => {
-    if (!sessionId || uploadPending) {
+    if (!workspaceId || !sessionId || uploadPending) {
       return;
     }
 
@@ -86,7 +87,7 @@ export function useComposerImageAttachments({ sessionId }: UseComposerImageAttac
     setAttachments((current) => [...current, ...pendingAttachments]);
 
     try {
-      const uploads = await uploadImageFiles({ sessionId, files: imageFiles });
+      const uploads = await uploadImageFiles({ workspaceId, sessionId, files: imageFiles });
       const uploadsById = new Map(
         pendingAttachments.map((attachment, index) => [attachment.localId, uploads[index]]),
       );
@@ -116,7 +117,7 @@ export function useComposerImageAttachments({ sessionId }: UseComposerImageAttac
         ? { ...attachment, status: 'error' as const, error: message }
         : attachment));
     }
-  }, [sessionId, uploadImageFiles, uploadPending, resetUploadImages]);
+  }, [sessionId, uploadImageFiles, uploadPending, resetUploadImages, workspaceId]);
 
   const uploadedPaths = useMemo(() => attachments
     .map((attachment) => attachment.upload?.path)

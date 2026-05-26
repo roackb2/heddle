@@ -14,20 +14,25 @@ export type ControlPlanePendingApprovalState = {
   resolvePendingApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
 };
 
+type SessionAddress = {
+  workspaceId?: string;
+  sessionId?: string;
+};
+
 type UseControlPlanePendingApprovalOptions = {
   pollingEnabled?: boolean;
 };
 
 export function useControlPlanePendingApproval(
-  sessionId: string | undefined,
+  { workspaceId, sessionId }: SessionAddress,
   options: UseControlPlanePendingApprovalOptions = {},
 ): ControlPlanePendingApprovalState {
   const utils = trpcReact.useUtils();
   const [approvalError, setApprovalError] = useState<string | undefined>();
   const pendingApprovalQuery = trpcReact.controlPlane.sessionPendingApproval.useQuery(
-    sessionId ? { id: sessionId } : skipToken,
+    sessionId && workspaceId ? { id: sessionId, workspaceId } : skipToken,
     {
-      enabled: Boolean(sessionId),
+      enabled: Boolean(sessionId && workspaceId),
       // The live stream is only a notification channel. Poll while a run is
       // active so a prompt submitted during subscription setup still discovers
       // server-held approval requests.
@@ -42,28 +47,33 @@ export function useControlPlanePendingApproval(
   }, [sessionId]);
 
   const refreshPendingApproval = useCallback((targetSessionId: string) => {
-    void utils.controlPlane.sessionPendingApproval.invalidate({ id: targetSessionId });
-  }, [utils]);
+    if (!workspaceId) {
+      return;
+    }
+
+    void utils.controlPlane.sessionPendingApproval.invalidate({ id: targetSessionId, workspaceId });
+  }, [utils, workspaceId]);
 
   const resolvePendingApproval = useCallback(async (decision: ControlPlaneApprovalDecision) => {
-    if (!sessionId) {
+    if (!sessionId || !workspaceId) {
       return;
     }
 
     setApprovalError(undefined);
     try {
       const result = await resolveApprovalMutation.mutateAsync({
+        workspaceId,
         sessionId,
         decision,
       });
       if (!result.resolved) {
         throw new Error('No pending approval found for this session.');
       }
-      await utils.controlPlane.sessionPendingApproval.invalidate({ id: sessionId });
+      await utils.controlPlane.sessionPendingApproval.invalidate({ id: sessionId, workspaceId });
     } catch (error) {
       setApprovalError(error instanceof Error ? error.message : String(error));
     }
-  }, [resolveApprovalMutation, sessionId, utils]);
+  }, [resolveApprovalMutation, sessionId, utils, workspaceId]);
 
   return {
     pendingApproval: pendingApprovalQuery.data ?? null,

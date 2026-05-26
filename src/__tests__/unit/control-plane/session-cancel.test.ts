@@ -34,19 +34,21 @@ describe('ControlPlaneChatSessionsController run cancellation', () => {
     const internals = controller as unknown as ControllerInternals;
     const abortController = new AbortController();
     const decisions: ToolApprovalUserDecision[] = [];
+    const workspaceId = 'workspace-cancel';
     const sessionId = 'session-cancel-approval';
+    const sessionKey = `${workspaceId}:${sessionId}`;
 
-    internals.inFlightRuns.set(sessionId, { controller: abortController });
-    internals.pendingApprovals.set(sessionId, {
+    internals.inFlightRuns.set(sessionKey, { controller: abortController });
+    internals.pendingApprovals.set(sessionKey, {
       approval: createApprovalRequest(),
       resolve: (decision) => {
         decisions.push(decision);
       },
     });
 
-    expect(controller.cancelRun(sessionId)).toBe(true);
+    expect(controller.cancelRun({ workspaceId, sessionId })).toBe(true);
     expect(abortController.signal.aborted).toBe(true);
-    expect(internals.pendingApprovals.has(sessionId)).toBe(false);
+    expect(internals.pendingApprovals.has(sessionKey)).toBe(false);
     expect(decisions).toEqual([{
       type: 'deny',
       reason: 'Cancelled by user',
@@ -56,12 +58,13 @@ describe('ControlPlaneChatSessionsController run cancellation', () => {
   it('returns false when no run is active', () => {
     const controller = new ControlPlaneChatSessionsController();
 
-    expect(controller.cancelRun('missing-session')).toBe(false);
+    expect(controller.cancelRun({ workspaceId: 'workspace-missing', sessionId: 'missing-session' })).toBe(false);
   });
 
   it('passes shouldStop from the active abort controller into the engine turn', async () => {
     const controller = new ControlPlaneChatSessionsController();
     const internals = controller as unknown as ControllerInternals;
+    const workspaceId = 'workspace-should-stop';
     const sessionId = 'session-cancel-should-stop';
     const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-control-plane-cancel-'));
     const session = ChatSessionRecords.create({
@@ -73,6 +76,7 @@ describe('ControlPlaneChatSessionsController run cancellation', () => {
     const observedShouldStop: boolean[] = [];
 
     await internals.runEngineTurn({
+      workspaceId,
       workspaceRoot: stateRoot,
       stateRoot,
       sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
@@ -85,7 +89,7 @@ describe('ControlPlaneChatSessionsController run cancellation', () => {
       },
     }, async ({ shouldStop }) => {
       observedShouldStop.push(shouldStop());
-      expect(controller.cancelRun(sessionId)).toBe(true);
+      expect(controller.cancelRun({ workspaceId, sessionId })).toBe(true);
       observedShouldStop.push(shouldStop());
       return {
         outcome: 'interrupted',
@@ -95,7 +99,7 @@ describe('ControlPlaneChatSessionsController run cancellation', () => {
     });
 
     expect(observedShouldStop).toEqual([false, true]);
-    expect(controller.isRunning(sessionId)).toBe(false);
+    expect(controller.isRunning({ workspaceId, sessionId })).toBe(false);
   });
 });
 

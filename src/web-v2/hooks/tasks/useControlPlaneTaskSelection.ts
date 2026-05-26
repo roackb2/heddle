@@ -11,14 +11,17 @@ type HeartbeatEvents = ReturnType<typeof useControlPlaneHeartbeatEvents>;
 export function useControlPlaneTaskSelection({
   navigation,
   taskEvents,
+  workspaceId,
 }: {
   navigation: WorkbenchNavigation;
   taskEvents: HeartbeatEvents;
+  workspaceId?: string;
 }) {
-  const detail = useControlPlaneTaskDetail(navigation.selectedTaskId, navigation.selectedTaskRunId);
+  const detail = useControlPlaneTaskDetail(workspaceId, navigation.selectedTaskId, navigation.selectedTaskRunId);
   const task = detail.task ? applyLiveTaskState(detail.task, taskEvents.liveTasks[detail.task.taskId]) : undefined;
   const selectedRunId = navigation.selectedTaskRunId ?? detail.selectedRun?.runId;
   const runDetail = useControlPlaneTaskRunDetail(
+    workspaceId,
     navigation.selectedTaskId,
     selectedRunId === LIVE_TASK_RUN_ID ? undefined : selectedRunId,
   );

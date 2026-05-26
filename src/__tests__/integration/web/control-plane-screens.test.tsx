@@ -129,7 +129,7 @@ describe('control-plane screens', () => {
     await waitFor(() => {
       expect(onCreateWorkspace).toHaveBeenCalledWith({
         name: 'Fresh',
-        anchorRoot: '/Users/example/fresh',
+        workspaceRoot: '/Users/example/fresh',
         setActive: true,
       });
     });
@@ -137,7 +137,7 @@ describe('control-plane screens', () => {
     fireEvent.click(screen.getByRole('button', { name: /Archived/ }));
     expect(onCreateWorkspace).toHaveBeenLastCalledWith({
       name: 'Archived',
-      anchorRoot: '/Users/example/archived',
+      workspaceRoot: '/Users/example/archived',
       setActive: true,
     });
 
@@ -170,7 +170,7 @@ function createControlPlaneState(): ControlPlaneState {
     workspace: {
       id: 'primary',
       name: 'Primary',
-      anchorRoot: '/Users/example/primary',
+      workspaceRoot: '/Users/example/primary',
       repoRoots: ['/Users/example/primary'],
       stateRoot: '/Users/example/primary/.heddle',
       createdAt: '2026-04-01T00:00:00.000Z',
@@ -180,7 +180,7 @@ function createControlPlaneState(): ControlPlaneState {
       {
         id: 'primary',
         name: 'Primary',
-        anchorRoot: '/Users/example/primary',
+        workspaceRoot: '/Users/example/primary',
         repoRoots: ['/Users/example/primary'],
         stateRoot: '/Users/example/primary/.heddle',
         createdAt: '2026-04-01T00:00:00.000Z',
@@ -189,7 +189,7 @@ function createControlPlaneState(): ControlPlaneState {
       {
         id: 'secondary',
         name: 'Secondary',
-        anchorRoot: '/Users/example/secondary',
+        workspaceRoot: '/Users/example/secondary',
         repoRoots: ['/Users/example/secondary'],
         stateRoot: '/Users/example/secondary/.heddle',
         createdAt: '2026-04-01T00:00:00.000Z',
@@ -200,7 +200,7 @@ function createControlPlaneState(): ControlPlaneState {
       {
         id: 'archived',
         name: 'Archived',
-        anchorRoot: '/Users/example/archived',
+        workspaceRoot: '/Users/example/archived',
         repoRoots: ['/Users/example/archived'],
         stateRoot: '/Users/example/archived/.heddle',
         createdAt: '2026-03-01T00:00:00.000Z',

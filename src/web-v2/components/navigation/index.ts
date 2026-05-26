@@ -6,3 +6,4 @@ export { SettingsNavigation } from './SettingsNavigation';
 export { SidebarContentRegion } from './SidebarContentRegion';
 export { SidebarSettingsEntry } from './SidebarSettingsEntry';
 export { TaskListSection } from './TaskListSection';
+export { WorkspaceSwitcher } from './WorkspaceSwitcher';

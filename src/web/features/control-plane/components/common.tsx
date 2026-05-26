@@ -151,7 +151,7 @@ export function WorkspacePathLabel({ state }: { state?: ControlPlaneState }) {
   return (
     <span className="workspace-path-label">
       {state.workspace.name}
-      <span className="muted"> · {shortPath(state.workspace.anchorRoot)}</span>
+      <span className="muted"> · {shortPath(state.workspace.workspaceRoot)}</span>
     </span>
   );
 }

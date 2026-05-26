@@ -8,11 +8,17 @@ import { z } from 'zod';
 export const WorkspaceDescriptorSchema = z.object({
   id: z.string().describe('Stable workspace identifier used by host surfaces and daemon registration.'),
   name: z.string().describe('Human-facing workspace name shown in control-plane workspace lists.'),
-  anchorRoot: z.string().describe('Primary filesystem root represented by this workspace.'),
+  workspaceRoot: z.string().describe('Filesystem root where this workspace stores its .heddle state directory.'),
   repoRoots: z.array(z.string()).describe('Repository roots grouped into this workspace.'),
   stateRoot: z.string().describe('Heddle state directory for this workspace.'),
   createdAt: z.string().describe('Timestamp when this workspace descriptor was created.'),
   updatedAt: z.string().describe('Timestamp when this workspace descriptor was last changed.'),
+});
+
+const WorkspaceDescriptorReadSchema = WorkspaceDescriptorSchema.partial().extend({
+  // Legacy catalog field retained only so existing v1 catalogs normalize into
+  // the workspaceRoot vocabulary on the next save.
+  anchorRoot: z.string().optional().catch(undefined),
 });
 
 export const WorkspaceCatalogSchema = z.object({
@@ -24,5 +30,5 @@ export const WorkspaceCatalogSchema = z.object({
 export const WorkspaceCatalogReadSchema = z.object({
   version: z.literal(1).optional().catch(1),
   activeWorkspaceId: z.string().optional().catch(undefined),
-  workspaces: z.array(WorkspaceDescriptorSchema.partial()).optional().catch(undefined),
+  workspaces: z.array(WorkspaceDescriptorReadSchema).optional().catch(undefined),
 });

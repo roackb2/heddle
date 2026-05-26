@@ -12,6 +12,7 @@ import { ConversationMessage } from './ConversationMessage';
 import { Loader2 } from 'lucide-react';
 
 interface ConversationThreadProps {
+  workspaceId?: string;
   session: ControlPlaneSessionDetail;
   loading: boolean;
   submitting: boolean;
@@ -35,6 +36,7 @@ interface ConversationThreadProps {
 
 // ConversationThread renders the selected session in the central work area.
 export function ConversationThread({
+  workspaceId,
   session,
   loading,
   submitting,
@@ -72,7 +74,7 @@ export function ConversationThread({
           </div>
         </div>
         <div className="v2-composer-region">
-          <ConversationComposer disabled onSubmitPrompt={onSubmitPrompt} />
+          <ConversationComposer disabled workspaceId={workspaceId} onSubmitPrompt={onSubmitPrompt} />
         </div>
       </div>
     );
@@ -85,7 +87,7 @@ export function ConversationThread({
           {emptyTitle}
         </div>
         <div className="v2-composer-region">
-          <ConversationComposer disabled onSubmitPrompt={onSubmitPrompt} />
+          <ConversationComposer disabled workspaceId={workspaceId} onSubmitPrompt={onSubmitPrompt} />
         </div>
       </div>
     );
@@ -123,7 +125,9 @@ export function ConversationThread({
       ) : null}
       <div className="v2-composer-region">
         <ConversationComposer
+          key={`${workspaceId ?? 'workspace'}:${session.id}`}
           sessionId={session.id}
+          workspaceId={workspaceId}
           disabled={Boolean(pendingApproval)}
           driftEnabled={session.driftEnabled ?? false}
           driftLevel={session.driftLevel}

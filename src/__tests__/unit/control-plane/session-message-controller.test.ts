@@ -32,12 +32,29 @@ describe('SessionMessageController', () => {
       { id: 'persisted-assistant', role: 'assistant', text: 'Heddle is a coding agent runtime.' },
     ]);
   });
+
+  it('does not preserve transient messages across workspaces with colliding session ids', () => {
+    const current = sessionWithMessages([
+      { id: 'live-user', role: 'user', text: 'Old workspace prompt' },
+    ], 'workspace-1');
+    const next = sessionWithMessages([
+      { id: 'persisted-assistant', role: 'assistant', text: 'Different workspace.' },
+    ], 'workspace-2');
+
+    expect(SessionMessageController.mergeTransientMessages(current, next)?.messages).toEqual([
+      { id: 'persisted-assistant', role: 'assistant', text: 'Different workspace.' },
+    ]);
+  });
 });
 
-function sessionWithMessages(messages: NonNullable<ControlPlaneSessionDetail>['messages']): ControlPlaneSessionDetail {
+function sessionWithMessages(
+  messages: NonNullable<ControlPlaneSessionDetail>['messages'],
+  workspaceId?: string,
+): ControlPlaneSessionDetail {
   return {
     id: 'session-1',
     name: 'Session 1',
+    workspaceId,
     messageCount: messages.length,
     turnCount: 0,
     messages,

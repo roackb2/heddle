@@ -9,11 +9,12 @@ export function getControlPlaneRightPanel({
   activeRouteMode,
   t,
   taskRun,
+  workspaceId,
 }: ControlPlaneRightPanelProps & { t: (key: I18nMessageKey) => string }) {
   const panels = {
     sessions: {
       ariaLabel: t('inspector.contextAriaLabel'),
-      content: <ContextInspector />,
+      content: <ContextInspector workspaceId={workspaceId} />,
     },
     tasks: {
       ariaLabel: t('tasks.runDetailsAriaLabel'),

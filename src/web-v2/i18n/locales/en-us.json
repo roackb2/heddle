@@ -132,8 +132,10 @@
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
     "mainAriaLabel": "Main app navigation",
+    "manageWorkspaces": "Manage workspaces",
     "newChat": "New chat",
     "newTask": "New task",
+    "noWorkspaces": "No workspaces found",
     "openSettings": "Open settings",
     "primaryAriaLabel": "Primary navigation",
     "sessionListAriaLabel": "Session list",
@@ -142,8 +144,10 @@
     "settingsAriaLabel": "Settings navigation",
     "settingsMenuAriaLabel": "Settings menu",
     "skipToMain": "Skip to Main Content",
+    "switchWorkspace": "Switch workspace",
     "taskListAriaLabel": "Task list",
-    "taskListTitle": "Tasks"
+    "taskListTitle": "Tasks",
+    "workspaceSwitcher": "Workspace"
   },
   "settings": {
     "general": "General",

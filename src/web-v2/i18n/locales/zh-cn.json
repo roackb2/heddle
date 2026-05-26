@@ -132,8 +132,10 @@
     "collapseSidebar": "收起侧边栏",
     "expandSidebar": "展开侧边栏",
     "mainAriaLabel": "主应用导航",
+    "manageWorkspaces": "管理工作区",
     "newChat": "新建会话",
     "newTask": "新建任务",
+    "noWorkspaces": "未找到工作区",
     "openSettings": "打开设置",
     "primaryAriaLabel": "主导航",
     "sessionListAriaLabel": "会话列表",
@@ -142,8 +144,10 @@
     "settingsAriaLabel": "设置导航",
     "settingsMenuAriaLabel": "设置菜单",
     "skipToMain": "跳到主要内容",
+    "switchWorkspace": "切换工作区",
     "taskListAriaLabel": "任务列表",
-    "taskListTitle": "任务"
+    "taskListTitle": "任务",
+    "workspaceSwitcher": "工作区"
   },
   "settings": {
     "general": "通用",

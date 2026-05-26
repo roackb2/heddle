@@ -15,7 +15,7 @@ export function AddWorkspaceCard({
   recentWorkspaces?: WorkspaceListItem[];
 }) {
   const [name, setName] = useState('');
-  const [anchorRoot, setAnchorRoot] = useState('');
+  const [workspaceRoot, setWorkspaceRoot] = useState('');
   const [setActive, setSetActive] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -32,17 +32,17 @@ export function AddWorkspaceCard({
         className="mt-4 space-y-4"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!onCreateWorkspace || !name.trim() || !anchorRoot.trim()) {
+          if (!onCreateWorkspace || !name.trim() || !workspaceRoot.trim()) {
             return;
           }
 
           void onCreateWorkspace({
             name: name.trim(),
-            anchorRoot: anchorRoot.trim(),
+            workspaceRoot: workspaceRoot.trim(),
             setActive,
           }).then(() => {
             setName('');
-            setAnchorRoot('');
+            setWorkspaceRoot('');
             setSetActive(true);
           });
         }}
@@ -64,8 +64,8 @@ export function AddWorkspaceCard({
           <div className="flex gap-2">
             <input
               className="h-11 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
-              value={anchorRoot}
-              onChange={(event) => setAnchorRoot(event.target.value)}
+              value={workspaceRoot}
+              onChange={(event) => setWorkspaceRoot(event.target.value)}
               placeholder="/absolute/path/to/workspace"
               disabled={creatingWorkspace}
               data-testid="workspace-create-path"
@@ -96,7 +96,7 @@ export function AddWorkspaceCard({
           type="submit"
           variant="secondary"
           className="w-full"
-          disabled={creatingWorkspace || !name.trim() || !anchorRoot.trim()}
+          disabled={creatingWorkspace || !name.trim() || !workspaceRoot.trim()}
           data-testid="workspace-create-submit"
         >
           {creatingWorkspace ? 'Creating…' : 'Create workspace'}
@@ -104,11 +104,11 @@ export function AddWorkspaceCard({
       </form>
       <WorkspacePickerDialog
         open={pickerOpen}
-        selectedPath={anchorRoot}
+        selectedPath={workspaceRoot}
         recentWorkspaces={recentWorkspaces}
         onOpenChange={setPickerOpen}
         onSelectPath={(path) => {
-          setAnchorRoot(path);
+          setWorkspaceRoot(path);
           if (!name.trim()) {
             setName(workspaceNameFromPath(path));
           }

@@ -22,8 +22,17 @@ export class ChatSessionEventsRestController {
       workspaceRoot: this.options.workspaceRoot,
       stateRoot: this.options.stateRoot,
     });
+    const workspaceId = this.readWorkspaceId(request);
+    const workspace = workspaceId
+      ? workspaceContext.workspaces.find((candidate) => candidate.id === workspaceId)
+      : workspaceContext.activeWorkspace;
+    if (!workspace) {
+      response.status(404).json({ error: `Workspace not found: ${workspaceId}` });
+      return;
+    }
+
     const sessionFilePath = controlPlaneChatSessionsController.resolveFilePath(
-      workspaceContext.activeWorkspace.stateRoot,
+      workspace.stateRoot,
       sessionId,
     );
     response.setHeader('Content-Type', 'text/event-stream');
@@ -38,22 +47,25 @@ export class ChatSessionEventsRestController {
       (response as typeof response & { flush?: () => void }).flush?.();
     };
 
-    send('ready', { sessionId });
+    send('ready', { sessionId, workspaceId: workspace.id });
     const heartbeat = setInterval(() => {
-      send('heartbeat', { sessionId, timestamp: new Date().toISOString() });
+      send('heartbeat', { sessionId, workspaceId: workspace.id, timestamp: new Date().toISOString() });
     }, 15000);
 
-    const unsubscribe = controlPlaneChatSessionsController.subscribeToEvents(sessionId, (payload) => {
+    const unsubscribe = controlPlaneChatSessionsController.subscribeToEvents({
+      workspaceId: workspace.id,
+      sessionId,
+    }, (payload) => {
       send('session.event', payload);
     });
 
     let watcher: ReturnType<typeof watch> | undefined;
     try {
       watcher = watch(sessionFilePath, { persistent: false }, () => {
-        send('session.updated', { sessionId, timestamp: new Date().toISOString() });
+        send('session.updated', { sessionId, workspaceId: workspace.id, timestamp: new Date().toISOString() });
       });
     } catch {
-      send('waiting', { sessionId, timestamp: new Date().toISOString() });
+      send('waiting', { sessionId, workspaceId: workspace.id, timestamp: new Date().toISOString() });
     }
 
     request.on('close', () => {
@@ -63,4 +75,10 @@ export class ChatSessionEventsRestController {
       response.end();
     });
   };
+
+  private readWorkspaceId(request: Request): string | undefined {
+    const rawWorkspaceId = request.query.workspaceId;
+    const workspaceId = typeof rawWorkspaceId === 'string' ? rawWorkspaceId.trim() : '';
+    return workspaceId || undefined;
+  }
 }

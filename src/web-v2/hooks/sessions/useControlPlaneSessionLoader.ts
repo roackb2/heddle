@@ -17,20 +17,35 @@ export type ControlPlaneSessionLoaderState = {
   refresh: RefreshControlPlaneSession;
 };
 
+type UseControlPlaneSessionLoaderArgs = {
+  workspaceId?: string;
+  sessionId?: string;
+};
+
 // Loads persisted session detail through React Query and preserves browser-only
 // transient messages during silent refreshes.
-export function useControlPlaneSessionLoader(sessionId: string | undefined): ControlPlaneSessionLoaderState {
+export function useControlPlaneSessionLoader({
+  workspaceId,
+  sessionId,
+}: UseControlPlaneSessionLoaderArgs): ControlPlaneSessionLoaderState {
   const [session, setSession] = useState<ControlPlaneSessionDetail>(null);
   const [manualLoading, setManualLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const latestRefreshMode = useRef<'normal' | 'silent' | null>(null);
 
   const sessionQuery = trpcReact.controlPlane.session.useQuery(
-    sessionId ? { id: sessionId } : skipToken,
+    sessionId && workspaceId ? { id: sessionId, workspaceId } : skipToken,
     {
-      enabled: Boolean(sessionId),
+      enabled: Boolean(sessionId && workspaceId),
     },
   );
+
+  useEffect(() => {
+    latestRefreshMode.current = null;
+    setSession(null);
+    setManualLoading(false);
+    setError(undefined);
+  }, [sessionId, workspaceId]);
 
   const refresh = useCallback<RefreshControlPlaneSession>(async (id, options = {}) => {
     if (!id || id !== sessionId) {
@@ -50,7 +65,9 @@ export function useControlPlaneSessionLoader(sessionId: string | undefined): Con
       }
 
       setSession((current) => (
-        options.silent ? SessionMessageController.mergeTransientMessages(current, next) : next
+        options.silent && isSameSessionAddress(current, next)
+          ? SessionMessageController.mergeTransientMessages(current, next)
+          : next
       ));
       setError(undefined);
     } catch (loadError) {
@@ -63,7 +80,7 @@ export function useControlPlaneSessionLoader(sessionId: string | undefined): Con
   }, [sessionId, sessionQuery]);
 
   useEffect(() => {
-    if (!sessionId) {
+    if (!sessionId || !workspaceId) {
       setSession(null);
       setManualLoading(false);
       setError(undefined);
@@ -76,18 +93,18 @@ export function useControlPlaneSessionLoader(sessionId: string | undefined): Con
 
     const querySession = sessionQuery.data;
     setSession((current) => {
-      if (latestRefreshMode.current === 'silent' && current?.id === querySession.id) {
+      if (latestRefreshMode.current === 'silent' && isSameSessionAddress(current, querySession)) {
         return SessionMessageController.mergeTransientMessages(current, querySession);
       }
 
-      if (current?.id === querySession.id) {
+      if (isSameSessionAddress(current, querySession)) {
         return SessionMessageController.mergeTransientMessages(current, querySession);
       }
 
       return querySession;
     });
     latestRefreshMode.current = null;
-  }, [sessionId, sessionQuery.data]);
+  }, [sessionId, sessionQuery.data, workspaceId]);
 
   useEffect(() => {
     if (sessionQuery.error) {
@@ -103,4 +120,11 @@ export function useControlPlaneSessionLoader(sessionId: string | undefined): Con
     setError,
     refresh,
   };
+}
+
+function isSameSessionAddress(
+  current: ControlPlaneSessionDetail,
+  next: NonNullable<ControlPlaneSessionDetail>,
+): boolean {
+  return current?.id === next.id && current.workspaceId === next.workspaceId;
 }

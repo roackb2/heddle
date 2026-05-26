@@ -43,7 +43,7 @@ export function AttachedWorkspacesCard({
                   <Badge variant="outline">{workspace.id}</Badge>
                 </div>
                 <dl className="mt-3 grid gap-2 text-sm">
-                  <WorkspaceMeta label="Workspace path">{workspace.anchorRoot}</WorkspaceMeta>
+                  <WorkspaceMeta label="Workspace path">{workspace.workspaceRoot}</WorkspaceMeta>
                   <WorkspaceMeta label="State path">{workspace.stateRoot}</WorkspaceMeta>
                   <WorkspaceMeta label="Repo roots">{workspace.repoRoots.join(', ')}</WorkspaceMeta>
                 </dl>

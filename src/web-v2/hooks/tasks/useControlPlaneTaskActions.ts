@@ -12,11 +12,13 @@ export function useControlPlaneTaskActions({
   selectedTask,
   sidebarTasks,
   taskEvents,
+  workspaceId,
 }: {
   navigation: WorkbenchNavigation;
   selectedTask: ControlPlaneHeartbeatTaskView | undefined;
   sidebarTasks: ControlPlaneHeartbeatTaskView[];
   taskEvents: HeartbeatEvents;
+  workspaceId?: string;
 }) {
   const utils = trpcReact.useUtils();
   const modelOptionsQuery = trpcReact.controlPlane.modelOptions.useQuery();
@@ -35,14 +37,18 @@ export function useControlPlaneTaskActions({
   const [deleteError, setDeleteError] = useState<string | undefined>();
 
   async function createTask(input: TaskCreateInput, options: { runNow: boolean }) {
+    if (!workspaceId) {
+      return;
+    }
+
     setCreateError(undefined);
     try {
-      const created = await createTaskMutation.mutateAsync(input);
-      navigation.selectTask(created.task.taskId);
+      const created = await createTaskMutation.mutateAsync({ ...input, workspaceId });
+      navigation.selectTask(created.task.taskId, { workspaceId });
       await invalidateTaskViews(created.task.taskId);
       if (options.runNow) {
         taskEvents.markTaskRunQueued(created.task.taskId);
-        await runTaskNowMutation.mutateAsync({ taskId: created.task.taskId });
+        await runTaskNowMutation.mutateAsync({ workspaceId, taskId: created.task.taskId });
       }
       setCreateOpen(false);
     } catch (error) {
@@ -52,13 +58,14 @@ export function useControlPlaneTaskActions({
   }
 
   async function updateSelectedTask(input: TaskCreateInput) {
-    if (!navigation.selectedTaskId) {
+    if (!navigation.selectedTaskId || !workspaceId) {
       return;
     }
 
     setEditError(undefined);
     try {
       const updated = await updateTaskMutation.mutateAsync({
+        workspaceId,
         taskId: navigation.selectedTaskId,
         ...input,
         model: input.model ?? null,
@@ -73,18 +80,18 @@ export function useControlPlaneTaskActions({
   }
 
   async function deleteSelectedTask() {
-    if (!navigation.selectedTaskId) {
+    if (!navigation.selectedTaskId || !workspaceId) {
       return;
     }
 
     const taskId = navigation.selectedTaskId;
     setDeleteError(undefined);
     try {
-      await deleteTaskMutation.mutateAsync({ taskId });
+      await deleteTaskMutation.mutateAsync({ workspaceId, taskId });
       setDeleteOpen(false);
       const nextTask = sidebarTasks.find((task) => task.taskId !== taskId);
       if (nextTask) {
-        navigation.selectTask(nextTask.taskId, { replace: true });
+        navigation.selectTask(nextTask.taskId, { workspaceId, replace: true });
       } else {
         navigation.selectSurface('tasks', { replace: true });
       }
@@ -96,46 +103,46 @@ export function useControlPlaneTaskActions({
   }
 
   async function runSelectedTaskNow() {
-    if (!navigation.selectedTaskId) {
+    if (!navigation.selectedTaskId || !workspaceId) {
       return;
     }
 
     const taskId = navigation.selectedTaskId;
     taskEvents.markTaskRunQueued(taskId);
-    navigation.selectTaskRun(taskId, LIVE_TASK_RUN_ID, { replace: true });
-    await runTaskNowMutation.mutateAsync({ taskId });
+    navigation.selectTaskRun(taskId, LIVE_TASK_RUN_ID, { workspaceId, replace: true });
+    await runTaskNowMutation.mutateAsync({ workspaceId, taskId });
   }
 
   async function resumeSelectedTask() {
-    if (!navigation.selectedTaskId) {
+    if (!navigation.selectedTaskId || !workspaceId) {
       return;
     }
 
     const taskId = navigation.selectedTaskId;
     taskEvents.markTaskRunQueued(taskId);
-    navigation.selectTaskRun(taskId, LIVE_TASK_RUN_ID, { replace: true });
-    await resumeTaskMutation.mutateAsync({ taskId });
+    navigation.selectTaskRun(taskId, LIVE_TASK_RUN_ID, { workspaceId, replace: true });
+    await resumeTaskMutation.mutateAsync({ workspaceId, taskId });
     await invalidateTaskViews(taskId);
   }
 
   async function setSelectedTaskEnabled(enabled: boolean) {
-    if (!navigation.selectedTaskId) {
+    if (!navigation.selectedTaskId || !workspaceId) {
       return;
     }
 
     const taskId = navigation.selectedTaskId;
     if (enabled) {
-      await enableTaskMutation.mutateAsync({ taskId });
+      await enableTaskMutation.mutateAsync({ workspaceId, taskId });
     } else {
-      await disableTaskMutation.mutateAsync({ taskId });
+      await disableTaskMutation.mutateAsync({ workspaceId, taskId });
     }
     await invalidateTaskViews(taskId);
   }
 
   async function invalidateTaskViews(taskId: string) {
     await Promise.all([
-      utils.controlPlane.heartbeatTasks.invalidate(),
-      utils.controlPlane.heartbeatTask.invalidate({ taskId }),
+      utils.controlPlane.heartbeatTasks.invalidate(workspaceId ? { workspaceId } : undefined),
+      utils.controlPlane.heartbeatTask.invalidate(workspaceId ? { workspaceId, taskId } : { taskId }),
       utils.controlPlane.state.invalidate(),
     ]);
   }

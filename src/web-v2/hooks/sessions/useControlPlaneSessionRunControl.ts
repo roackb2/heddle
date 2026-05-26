@@ -11,6 +11,7 @@ export type ControlPlaneSessionRunControlState = {
 };
 
 type UseControlPlaneSessionRunControlArgs = {
+  workspaceId?: string;
   sessionId?: string;
   setLiveStatus: (status: string | undefined) => void;
   setError: (error: string | undefined) => void;
@@ -19,6 +20,7 @@ type UseControlPlaneSessionRunControlArgs = {
 // Owns web-v2 run-control state that has to reconcile optimistic local turn
 // state, server-held in-flight runs, and user-requested cancellation.
 export function useControlPlaneSessionRunControl({
+  workspaceId,
   sessionId,
   setLiveStatus,
   setError,
@@ -29,9 +31,9 @@ export function useControlPlaneSessionRunControl({
   const [cancelError, setCancelError] = useState<string | undefined>();
   const serverConfirmedRunningRef = useRef(false);
   const sessionRunningQuery = trpcReact.controlPlane.sessionRunning.useQuery(
-    sessionId ? { id: sessionId } : skipToken,
+    sessionId && workspaceId ? { id: sessionId, workspaceId } : skipToken,
     {
-      enabled: Boolean(sessionId),
+      enabled: Boolean(sessionId && workspaceId),
       refetchInterval: running || cancelling ? 1000 : false,
       refetchOnWindowFocus: false,
     },
@@ -43,7 +45,7 @@ export function useControlPlaneSessionRunControl({
     setCancelling(false);
     setCancelError(undefined);
     serverConfirmedRunningRef.current = false;
-  }, [sessionId]);
+  }, [sessionId, workspaceId]);
 
   useEffect(() => {
     const serverRunning = sessionRunningQuery.data?.running;
@@ -53,13 +55,13 @@ export function useControlPlaneSessionRunControl({
       return;
     }
 
-    if (serverRunning === false && (cancelling || serverConfirmedRunningRef.current)) {
+    if (serverRunning === false && (running || cancelling || serverConfirmedRunningRef.current)) {
       serverConfirmedRunningRef.current = false;
       setRunningState(false);
       setCancelling(false);
       setLiveStatus(undefined);
     }
-  }, [cancelling, sessionRunningQuery.data?.running, setLiveStatus]);
+  }, [cancelling, running, sessionRunningQuery.data?.running, setLiveStatus]);
 
   const setRunning = useCallback<Dispatch<SetStateAction<boolean>>>((nextRunning) => {
     setRunningState((current) => (
@@ -73,7 +75,7 @@ export function useControlPlaneSessionRunControl({
   }, []);
 
   const cancelRun = useCallback(async () => {
-    if (!sessionId || cancelMutation.isPending) {
+    if (!sessionId || !workspaceId || cancelMutation.isPending) {
       return;
     }
 
@@ -82,9 +84,9 @@ export function useControlPlaneSessionRunControl({
     setLiveStatus('Stop requested. Waiting for the current step to settle...');
 
     try {
-      const result = await cancelMutation.mutateAsync({ id: sessionId });
-      await utils.controlPlane.sessionPendingApproval.invalidate({ id: sessionId });
-      await utils.controlPlane.sessionRunning.invalidate({ id: sessionId });
+      const result = await cancelMutation.mutateAsync({ id: sessionId, workspaceId });
+      await utils.controlPlane.sessionPendingApproval.invalidate({ id: sessionId, workspaceId });
+      await utils.controlPlane.sessionRunning.invalidate({ id: sessionId, workspaceId });
       if (!result.cancelled) {
         setRunningState(false);
         setCancelling(false);
@@ -97,7 +99,7 @@ export function useControlPlaneSessionRunControl({
       setCancelling(false);
       setLiveStatus(undefined);
     }
-  }, [cancelMutation, sessionId, setError, setLiveStatus, utils]);
+  }, [cancelMutation, sessionId, setError, setLiveStatus, utils, workspaceId]);
 
   return {
     running,

@@ -51,9 +51,10 @@ import type {
   ControlPlaneSessionsEventEnvelope,
 } from '@/server/control-plane-types.js';
 
-type ControlPlaneSessionReadArgs = Omit<ConversationEngineConfig, 'model'> & {
+type ControlPlaneSessionReadArgs = Omit<ConversationEngineConfig, 'model' | 'workspaceId'> & {
   model?: string;
   sessionStoragePath: string;
+  workspaceId: string;
 };
 
 type CreateControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & {
@@ -175,16 +176,18 @@ export class ControlPlaneChatSessionsController {
   }
 
   subscribeToEvents(
-    sessionId: string,
+    sessionAddress: ControlPlaneSessionAddress,
     listener: (event: ControlPlaneSessionLiveEvent) => void,
   ): () => void {
-    this.sessionEventBus.on(sessionId, listener);
+    const key = ControlPlaneChatSessionsController.sessionAddressKey(sessionAddress);
+    this.sessionEventBus.on(key, listener);
     return () => {
-      this.sessionEventBus.off(sessionId, listener);
+      this.sessionEventBus.off(key, listener);
     };
   }
 
   async *subscribeLiveEvents(args: {
+    workspaceId: string;
     stateRoot: string;
     sessionId: string;
     signal?: AbortSignal;
@@ -195,7 +198,7 @@ export class ControlPlaneChatSessionsController {
         // Live LLM/tool/compaction updates arrive through the in-memory event
         // bus. This path streams assistant text without touching the session
         // file for each model delta.
-        (sink) => this.subscribeToEvents(args.sessionId, (event) => {
+        (sink) => this.subscribeToEvents(args, (event) => {
           sink.push({
             ...event,
             type: 'session.event',
@@ -259,24 +262,25 @@ export class ControlPlaneChatSessionsController {
     yield* stream;
   }
 
-  getPendingApproval(sessionId: string): ToolApprovalRequest | undefined {
-    return this.pendingApprovals.get(sessionId)?.approval;
+  getPendingApproval(sessionAddress: ControlPlaneSessionAddress): ToolApprovalRequest | undefined {
+    return this.pendingApprovals.get(ControlPlaneChatSessionsController.sessionAddressKey(sessionAddress))?.approval;
   }
 
-  isRunning(sessionId: string): boolean {
-    return this.inFlightRuns.has(sessionId);
+  isRunning(sessionAddress: ControlPlaneSessionAddress): boolean {
+    return this.inFlightRuns.has(ControlPlaneChatSessionsController.sessionAddressKey(sessionAddress));
   }
 
-  cancelRun(sessionId: string): boolean {
-    const run = this.inFlightRuns.get(sessionId);
+  cancelRun(sessionAddress: ControlPlaneSessionAddress): boolean {
+    const key = ControlPlaneChatSessionsController.sessionAddressKey(sessionAddress);
+    const run = this.inFlightRuns.get(key);
     if (!run) {
       return false;
     }
 
     run.controller.abort();
-    const pending = this.pendingApprovals.get(sessionId);
+    const pending = this.pendingApprovals.get(key);
     if (pending) {
-      this.pendingApprovals.delete(sessionId);
+      this.pendingApprovals.delete(key);
       pending.resolve({
         type: 'deny',
         reason: 'Cancelled by user',
@@ -286,15 +290,16 @@ export class ControlPlaneChatSessionsController {
   }
 
   resolvePendingApproval(
-    sessionId: string,
+    sessionAddress: ControlPlaneSessionAddress,
     decision: ToolApprovalUserDecision,
   ): boolean {
-    const pending = this.pendingApprovals.get(sessionId);
+    const key = ControlPlaneChatSessionsController.sessionAddressKey(sessionAddress);
+    const pending = this.pendingApprovals.get(key);
     if (!pending) {
       return false;
     }
 
-    this.pendingApprovals.delete(sessionId);
+    this.pendingApprovals.delete(key);
     // This resolves the promise created by ToolApprovalService.requestHumanApproval.
     // The paused agent turn resumes immediately after this call returns.
     pending.resolve(decision);
@@ -335,14 +340,16 @@ export class ControlPlaneChatSessionsController {
       shouldStop: () => boolean;
     }) => ReturnType<ConversationEngine['turns']['submit']>,
   ) {
-    if (this.inFlightRuns.has(args.sessionId)) {
+    const sessionKey = ControlPlaneChatSessionsController.sessionAddressKey(args);
+    if (this.inFlightRuns.has(sessionKey)) {
       throw new Error('A run is already in progress for this session.');
     }
 
     const controller = new AbortController();
-    this.inFlightRuns.set(args.sessionId, { controller });
+    this.inFlightRuns.set(sessionKey, { controller });
     const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
       eventBus: this.sessionEventBus,
+      workspaceId: args.workspaceId,
       sessionId: args.sessionId,
     });
 
@@ -358,8 +365,8 @@ export class ControlPlaneChatSessionsController {
         session: ControlPlaneChatSessionPresenter.projectDetail(result.session)[0] ?? null,
       };
     } finally {
-      this.pendingApprovals.delete(args.sessionId);
-      this.inFlightRuns.delete(args.sessionId);
+      this.pendingApprovals.delete(sessionKey);
+      this.inFlightRuns.delete(sessionKey);
     }
   }
 
@@ -426,8 +433,8 @@ export class ControlPlaneChatSessionsController {
     });
   }
 
-  private createEngineHost(args: ControlPlaneSessionReadArgs & { sessionId: string }, publisher: ControlPlaneTurnPublisher): ConversationEngineHost {
-    const sessionId = args.sessionId;
+  private createEngineHost(args: ControlPlaneSessionReadArgs & ControlPlaneSessionAddress, publisher: ControlPlaneTurnPublisher): ConversationEngineHost {
+    const sessionKey = ControlPlaneChatSessionsController.sessionAddressKey(args);
     const approvalService = this.createApprovalService(args);
 
     return {
@@ -443,13 +450,13 @@ export class ControlPlaneChatSessionsController {
             storePending: ({ request, resolve }) => {
               // Keep the resolver in memory while the browser renders the
               // request. sessionResolveApproval later calls this resolver.
-              this.pendingApprovals.set(sessionId, {
+              this.pendingApprovals.set(sessionKey, {
                 approval: request,
                 resolve,
               });
             },
           });
-          this.pendingApprovals.delete(sessionId);
+          this.pendingApprovals.delete(sessionKey);
           return decision;
         },
       },
@@ -475,7 +482,7 @@ export class ControlPlaneChatSessionsController {
 
     const timestamp = new Date().toISOString();
     const assistantText = `Mocked browser integration agent response: ${args.prompt}`;
-    await this.emitBrowserIntegrationStreamPreview(args.sessionId, assistantText);
+    await this.emitBrowserIntegrationStreamPreview(args, assistantText);
     const nextHistory = [
       ...session.history,
       { role: 'user' as const, content: args.prompt },
@@ -514,12 +521,13 @@ export class ControlPlaneChatSessionsController {
     };
   }
 
-  private async emitBrowserIntegrationStreamPreview(sessionId: string, assistantText: string): Promise<void> {
+  private async emitBrowserIntegrationStreamPreview(sessionAddress: ControlPlaneSessionAddress, assistantText: string): Promise<void> {
     // The browser-integration fake has to emit a real live activity before its
     // final mutation result so web-v2 can regression-test incremental streaming.
     const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
       eventBus: this.sessionEventBus,
-      sessionId,
+      workspaceId: sessionAddress.workspaceId,
+      sessionId: sessionAddress.sessionId,
     });
     const runId = `browser-integration-run-${Date.now()}`;
     const timestamp = new Date().toISOString();
@@ -561,6 +569,15 @@ export class ControlPlaneChatSessionsController {
   private firstNonEmpty(...values: Array<string | undefined>): string | undefined {
     return values.find((value) => typeof value === 'string' && value.trim().length > 0);
   }
+
+  static sessionAddressKey(address: ControlPlaneSessionAddress): string {
+    return `${address.workspaceId}:${address.sessionId}`;
+  }
 }
+
+type ControlPlaneSessionAddress = {
+  workspaceId: string;
+  sessionId: string;
+};
 
 export const controlPlaneChatSessionsController = new ControlPlaneChatSessionsController();

@@ -1,8 +1,10 @@
 import { useLocation, useNavigate } from 'react-router';
 import {
   resolveAppSurface,
+  isSettingsRoute,
   resolveRouteSessionId,
   resolveRouteTaskSelection,
+  resolveRouteWorkspaceId,
   resolveSettingsSection,
   routeForAppSurface,
   routeForSettingsSection,
@@ -10,7 +12,7 @@ import {
   routeForTask,
   routeForTaskRun,
 } from '@web/layout/routes';
-import type { AppSurfaceId } from '@web/layout/types';
+import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
 
 export type WorkbenchRouteMode = AppSurfaceId | 'settings';
 
@@ -19,7 +21,8 @@ export type WorkbenchRouteMode = AppSurfaceId | 'settings';
 export function useWorkbenchNavigation() {
   const location = useLocation();
   const navigate = useNavigate();
-  const settingsOpen = location.pathname.startsWith('/settings');
+  const selectedWorkspaceId = resolveRouteWorkspaceId(location.pathname);
+  const settingsOpen = isSettingsRoute(location.pathname);
   const activeSurfaceId = resolveAppSurface(location.pathname);
   const activeSettingsSectionId = resolveSettingsSection(location.pathname);
   const selectedSessionId = resolveRouteSessionId(location.pathname);
@@ -30,27 +33,31 @@ export function useWorkbenchNavigation() {
     activeRouteMode,
     activeSurfaceId,
     activeSettingsSectionId,
+    selectedWorkspaceId,
     selectedSessionId,
     selectedTaskId: taskSelection.taskId,
     selectedTaskRunId: taskSelection.runId,
     settingsOpen,
     closeSettings() {
-      navigate(routeForAppSurface(activeSurfaceId));
+      navigate(routeForAppSurface(activeSurfaceId, selectedWorkspaceId));
     },
-    openSettings() {
-      navigate(routeForSettingsSection(activeSettingsSectionId));
+    openSettings(sectionId: SettingsSectionId = activeSettingsSectionId) {
+      navigate(routeForSettingsSection(sectionId, selectedWorkspaceId));
     },
     selectSurface(surfaceId: AppSurfaceId, options?: { replace?: boolean }) {
-      navigate(routeForAppSurface(surfaceId), { replace: options?.replace ?? false });
+      navigate(routeForAppSurface(surfaceId, selectedWorkspaceId), { replace: options?.replace ?? false });
     },
-    selectSession(sessionId: string, options?: { replace?: boolean }) {
-      navigate(routeForSession(sessionId), { replace: options?.replace ?? false });
+    selectWorkspace(workspaceId: string, options?: { replace?: boolean }) {
+      navigate(routeForAppSurface(activeSurfaceId, workspaceId), { replace: options?.replace ?? false });
     },
-    selectTask(taskId: string, options?: { replace?: boolean }) {
-      navigate(routeForTask(taskId), { replace: options?.replace ?? false });
+    selectSession(sessionId: string, options?: { workspaceId?: string; replace?: boolean }) {
+      navigate(routeForSession(options?.workspaceId ?? selectedWorkspaceId, sessionId), { replace: options?.replace ?? false });
     },
-    selectTaskRun(taskId: string, runId: string, options?: { replace?: boolean }) {
-      navigate(routeForTaskRun(taskId, runId), { replace: options?.replace ?? false });
+    selectTask(taskId: string, options?: { workspaceId?: string; replace?: boolean }) {
+      navigate(routeForTask(options?.workspaceId ?? selectedWorkspaceId, taskId), { replace: options?.replace ?? false });
+    },
+    selectTaskRun(taskId: string, runId: string, options?: { workspaceId?: string; replace?: boolean }) {
+      navigate(routeForTaskRun(options?.workspaceId ?? selectedWorkspaceId, taskId, runId), { replace: options?.replace ?? false });
     },
   };
 }
