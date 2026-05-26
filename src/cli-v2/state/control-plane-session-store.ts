@@ -226,6 +226,23 @@ export class ControlPlaneSessionStore {
       await this.refreshSessions();
       await this.refreshPendingApproval(sessionId);
     } catch (error) {
+      if (isRunAlreadyInProgressError(error)) {
+        this.setSnapshot({
+          error: undefined,
+          running: true,
+          submitting: false,
+          liveStatus: this.snapshotValue.streamConnected
+            ? 'A run is already in progress for this session.'
+            : 'A run is already in progress for this session. Reconnecting live stream if needed.',
+          latestUpdate: {
+            label: 'Run already in progress',
+            detail: 'waiting for current run to finish',
+            tone: 'warning',
+          },
+        });
+        return;
+      }
+
       this.setSnapshot({
         error: formatError(error),
         running: false,
@@ -664,6 +681,10 @@ function formatStepDetail(step: number | undefined): string | undefined {
 
 function formatPendingApprovalLabel(approval: NonNullable<ControlPlanePendingApproval>): string | undefined {
   return approval.tool;
+}
+
+function isRunAlreadyInProgressError(error: unknown): boolean {
+  return formatError(error).includes('A run is already in progress for this session.');
 }
 
 function formatError(error: unknown): string {

@@ -61,6 +61,27 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('treats an in-progress submit rejection as active run state', async () => {
+    const fixture = createClientFixture();
+    fixture.calls.sessionSendPromptMutate.mockRejectedValueOnce(new Error('A run is already in progress for this session.'));
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await store.submitPrompt('Next prompt');
+
+    expect(store.getSnapshot()).toMatchObject({
+      error: undefined,
+      running: true,
+      submitting: false,
+      latestUpdate: {
+        label: 'Run already in progress',
+        detail: 'waiting for current run to finish',
+        tone: 'warning',
+      },
+    });
+    store.dispose();
+  });
+
   it('applies live assistant stream events from the session subscription', async () => {
     const fixture = createClientFixture();
     const store = new ControlPlaneSessionStore({ client: fixture.client });
