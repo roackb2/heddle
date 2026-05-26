@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import type { Request } from 'express';
 import { RuntimeWorkspaceService, type WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
 import { controlPlaneChatSessionsController } from '@/server/controllers/trpc/control-plane/chat-sessions-controller.js';
-import { getWorkspaceOperationLogger } from '@/server/workspace-operation-logger.js';
+import { getWorkspaceOperationLogger } from '@/server/logging/workspace-operation-logger.js';
 
 export const CHAT_SESSION_IMAGE_UPLOAD_LIMITS = {
   maxFiles: 10,

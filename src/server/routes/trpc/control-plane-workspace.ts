@@ -1,9 +1,9 @@
 import { resolve } from 'node:path';
 import type { Logger } from 'pino';
 import type { WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
+import { getWorkspaceOperationLogger } from '@/server/logging/workspace-operation-logger.js';
 import type { HeddleServerContext } from '@/server/types.js';
 import { procedure } from '@/server/trpc.js';
-import { getWorkspaceOperationLogger } from '@/server/workspace-operation-logger.js';
 import { workspaceScopedInputSchema } from './schema.js';
 
 type WorkspaceScopedInput = {

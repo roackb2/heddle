@@ -1,6 +1,6 @@
 import express from 'express';
-import { createServerLogger } from './logger.js';
-import { createRequestLoggingMiddleware } from './middleware/request-logging.js';
+import { createServerLogger } from './logging/server-logger.js';
+import { createWorkspaceRequestLoggingMiddleware } from './middleware/workspace-request-logging.js';
 import { createTrpcExpressRouter } from './routes/trpc/trpc.js';
 import { installWebStaticRoutes } from './static.js';
 import type { HeddleRuntimeHostDescriptor, HeddleServerContext } from './types.js';
@@ -28,7 +28,11 @@ export function createHeddleServerApp(
   });
 
   app.disable('x-powered-by');
-  app.use(createRequestLoggingMiddleware(logger));
+  app.use(createWorkspaceRequestLoggingMiddleware({
+    logger,
+    workspaceRoot: options.workspaceRoot,
+    stateRoot: options.stateRoot,
+  }));
   app.use(controlPlaneApis);
   app.use(trpcHandler);
 

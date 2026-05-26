@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { listenHeddleDaemon } from './index.js';
-import { createServerLogger } from './logger.js';
+import { createServerLogger } from './logging/server-logger.js';
 
 const host = process.env.HEDDLE_SERVER_HOST ?? '127.0.0.1';
 const port = parsePort(process.env.HEDDLE_SERVER_PORT) ?? 8765;

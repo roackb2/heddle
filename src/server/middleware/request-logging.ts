@@ -1,11 +1,20 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { Logger } from 'pino';
 
-export function createRequestLoggingMiddleware(logger: Logger) {
+type RequestLoggingOptions = {
+  logger: Logger;
+  resolveLogger?: (request: Request) => Logger;
+};
+
+export function createRequestLoggingMiddleware(options: Logger | RequestLoggingOptions) {
+  const defaultLogger = isRequestLoggingOptions(options) ? options.logger : options;
+  const resolveLogger = isRequestLoggingOptions(options) ? options.resolveLogger : undefined;
+
   return (request: Request, response: Response, next: NextFunction) => {
     const startedAt = Date.now();
+    const requestLogger = resolveLogger?.(request) ?? defaultLogger;
     response.once('finish', () => {
-      logger.info({
+      requestLogger.info({
         method: request.method,
         path: request.originalUrl,
         statusCode: response.statusCode,
@@ -14,4 +23,8 @@ export function createRequestLoggingMiddleware(logger: Logger) {
     });
     next();
   };
+}
+
+function isRequestLoggingOptions(options: Logger | RequestLoggingOptions): options is RequestLoggingOptions {
+  return 'logger' in options;
 }

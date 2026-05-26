@@ -1,6 +1,6 @@
 import type { Logger } from 'pino';
 import { resolve } from 'node:path';
-import { createServerLogger } from './logger.js';
+import { createServerLogger } from './server-logger.js';
 
 const workspaceLoggers = new Map<string, Logger>();
 

@@ -144,9 +144,13 @@ describe('control-plane session image uploads', () => {
       expect(body.uploads?.[0]?.path).not.toContain(join(stateRoot, 'uploads', 'sessions', sessionId));
       const secondLog = await readLogUntil(join(secondWorkspace.stateRoot, 'logs', 'server.log'), 'Control-plane session images uploaded');
       expect(secondLog).toContain(secondWorkspace.id);
+      const uploadRequestPath = `/control-plane/sessions/${sessionId}/uploads?workspaceId=${secondWorkspace.id}`;
+      const secondHttpLog = await readLogUntil(join(secondWorkspace.stateRoot, 'logs', 'server.log'), 'HTTP request');
+      expect(secondHttpLog).toContain(uploadRequestPath);
       const defaultLogPath = join(stateRoot, 'logs', 'server.log');
       const defaultLog = existsSync(defaultLogPath) ? readFileSync(defaultLogPath, 'utf8') : '';
       expect(defaultLog).not.toContain('Control-plane session images uploaded');
+      expect(defaultLog).not.toContain(uploadRequestPath);
     } finally {
       await closeServer(server);
     }

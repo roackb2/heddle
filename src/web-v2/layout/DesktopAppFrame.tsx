@@ -21,6 +21,12 @@ import {
 } from '@web/layout/AppFrameShared';
 import { useI18n } from '@web/i18n';
 
+const sidebarSize = {
+  default: '256px',
+  min: '256px',
+  max: '256px',
+};
+
 export function DesktopAppFrame(props: AppFrameLayoutProps) {
   const { children, rightPanel, rightPanelAriaLabel } = props;
   const { t } = useI18n();
@@ -77,9 +83,9 @@ export function DesktopAppFrame(props: AppFrameLayoutProps) {
           collapsible
           className="h-full min-h-0 overflow-hidden"
           collapsedSize={0}
-          defaultSize="17rem"
-          minSize="14rem"
-          maxSize="24rem"
+          defaultSize={sidebarSize.default}
+          minSize={sidebarSize.min}
+          maxSize={sidebarSize.max}
           panelRef={sidebarPanelRef}
           onResize={syncSidebarCollapsed}
         >

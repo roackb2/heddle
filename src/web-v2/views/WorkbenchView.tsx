@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { ConversationThread } from '@web/components/conversation';
-import { GeneralSettingsView, MemorySettingsView } from '@web/components/settings';
+import { GeneralSettingsView, MemorySettingsView, WorkspaceSettingsView } from '@web/components/settings';
 import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
@@ -9,6 +9,7 @@ import { TasksWorkbenchView } from './TasksWorkbenchView';
 export type SessionWorkbenchViewProps = Omit<ComponentProps<typeof ConversationThread>, 'emptyTitle'>;
 export type TaskWorkbenchViewProps = ComponentProps<typeof TasksWorkbenchView>;
 export type MemorySettingsViewProps = ComponentProps<typeof MemorySettingsView>;
+export type WorkspaceSettingsViewProps = ComponentProps<typeof WorkspaceSettingsView>;
 
 interface WorkbenchViewProps {
   activeSurfaceId: AppSurfaceId;
@@ -17,6 +18,7 @@ interface WorkbenchViewProps {
   sessionView: SessionWorkbenchViewProps;
   settingsOpen: boolean;
   taskView: TaskWorkbenchViewProps;
+  workspaceSettingsView: WorkspaceSettingsViewProps;
 }
 
 const appSurfaceLabelKeys = {
@@ -39,6 +41,7 @@ export function WorkbenchView({
   sessionView,
   settingsOpen,
   taskView,
+  workspaceSettingsView,
 }: WorkbenchViewProps) {
   const { t } = useI18n();
   const surfaceViews = {
@@ -53,7 +56,7 @@ export function WorkbenchView({
   } satisfies Record<AppSurfaceId, { title: string; content: ReactNode }>;
   const settingsViews = {
     general: <GeneralSettingsView />,
-    workspaces: null,
+    workspaces: <WorkspaceSettingsView {...workspaceSettingsView} />,
     memory: <MemorySettingsView {...memorySettingsView} />,
   } satisfies Record<SettingsSectionId, ReactNode>;
   const activeSurface = surfaceViews[activeSurfaceId];

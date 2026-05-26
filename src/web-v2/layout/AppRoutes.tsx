@@ -10,6 +10,7 @@ import {
   type MemorySettingsViewProps,
   type SessionWorkbenchViewProps,
   type TaskWorkbenchViewProps,
+  type WorkspaceSettingsViewProps,
 } from '@web/views/WorkbenchView';
 
 interface AppRoutesProps {
@@ -18,6 +19,7 @@ interface AppRoutesProps {
   memorySettingsView: MemorySettingsViewProps;
   sessionView: SessionWorkbenchViewProps;
   taskView: TaskWorkbenchViewProps;
+  workspaceSettingsView: WorkspaceSettingsViewProps;
 }
 
 const routePathBySurface = {
@@ -40,12 +42,14 @@ export function AppRoutes({
   memorySettingsView,
   sessionView,
   taskView,
+  workspaceSettingsView,
 }: AppRoutesProps) {
   const sharedWorkbenchProps = {
     activeSettingsSectionId,
     memorySettingsView,
     sessionView,
     taskView,
+    workspaceSettingsView,
   };
 
   return (

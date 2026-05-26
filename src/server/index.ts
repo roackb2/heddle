@@ -2,10 +2,12 @@ import { existsSync } from 'node:fs';
 import type { Server } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Logger } from 'pino';
 import { createHeddleServerApp } from './app.js';
 import { controlPlaneHeartbeatEventsController } from './controllers/trpc/control-plane/heartbeat-events.js';
 import { HeddleHeartbeatSchedulerHost } from './heartbeat-scheduler-host.js';
-import { createServerLogger } from './logger.js';
+import { createServerLogger } from './logging/server-logger.js';
+import { getWorkspaceOperationLogger } from './logging/workspace-operation-logger.js';
 import { assertWebAssetsBuilt } from './static.js';
 import type { HeddleServerListenOptions } from './types.js';
 import type { HeartbeatSchedulerEvent } from '@/core/heartbeat/index.js';
@@ -16,7 +18,7 @@ import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 export type { HeddleServerListenOptions, HeddleServerOptions } from './types.js';
 export { appRouter, type AppRouter } from './router.js';
 export { createHeddleServerApp } from './app.js';
-export { createServerLogger } from './logger.js';
+export { createServerLogger } from './logging/server-logger.js';
 export { ControlPlaneChatSessionPresenter } from './controllers/trpc/control-plane/chat-session-presenter.js';
 
 export async function listenHeddleDaemon(options: HeddleServerListenOptions): Promise<void> {
@@ -69,13 +71,15 @@ export async function listenHeddleDaemon(options: HeddleServerListenOptions): Pr
     stateRoot: options.stateRoot,
     preferApiKey: options.preferApiKey,
     onEvent: (workspace, event) => {
-      logDaemonHeartbeatSchedulerEvent(logger, workspace, event);
+      logDaemonHeartbeatSchedulerEvent(getWorkspaceOperationLogger(workspace.stateRoot), workspace, event);
       controlPlaneHeartbeatEventsController.publish({
         workspaceId: workspace.id,
         event,
       });
     },
-    onError: (workspace, error) => logger.error({ error, workspace }, 'Daemon heartbeat scheduler stopped unexpectedly'),
+    onError: (workspace, error) => {
+      getWorkspaceOperationLogger(workspace.stateRoot).error({ error, workspace }, 'Daemon heartbeat scheduler stopped unexpectedly');
+    },
   });
   heartbeatSchedulerHost.start();
 
@@ -183,7 +187,7 @@ export async function listenHeddleDaemon(options: HeddleServerListenOptions): Pr
 export const listenHeddleServer = listenHeddleDaemon;
 
 function logDaemonHeartbeatSchedulerEvent(
-  logger: ReturnType<typeof createServerLogger>,
+  logger: Logger,
   workspace: WorkspaceDescriptor,
   event: HeartbeatSchedulerEvent,
 ) {
