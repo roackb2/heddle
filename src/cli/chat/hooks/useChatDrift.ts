@@ -7,10 +7,12 @@ import { driftFooterColor, formatDriftFooter } from '../utils/drift-footer.js';
 export function useChatDrift({
   activeSession,
   sessionService,
+  setSessionDriftEnabled,
   refreshSessions,
 }: {
   activeSession?: ChatSession;
   sessionService: ConversationSessionService;
+  setSessionDriftEnabled?: (id: string, enabled: boolean) => Promise<void> | void;
   refreshSessions: () => void;
 }) {
   const [enabled, setEnabledState] = useState(true);
@@ -35,9 +37,17 @@ export function useChatDrift({
       return;
     }
 
+    if (setSessionDriftEnabled) {
+      void Promise.resolve(setSessionDriftEnabled(activeSession.id, nextEnabled)).catch((caught: unknown) => {
+        setEnabledState(!nextEnabled);
+        setError(caught instanceof Error ? caught.message : String(caught));
+      });
+      return;
+    }
+
     sessionService.setDriftEnabled(activeSession.id, nextEnabled);
     refreshSessions();
-  }, [activeSession, refreshSessions, sessionService]);
+  }, [activeSession, refreshSessions, sessionService, setSessionDriftEnabled]);
 
   const observer = useMemo(() => ({
     enabled,

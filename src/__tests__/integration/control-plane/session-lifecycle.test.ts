@@ -37,6 +37,26 @@ describe('control-plane session lifecycle API', () => {
     });
   });
 
+  it('creates sessions with reasoning effort through the API', async () => {
+    const { caller } = createControlPlaneCaller();
+
+    const session = await caller.sessionCreate({
+      name: 'Reasoning session',
+      model: 'gpt-5.4',
+      reasoningEffort: 'high',
+    });
+
+    expect(session).toMatchObject({
+      name: 'Reasoning session',
+      model: 'gpt-5.4',
+      reasoningEffort: 'high',
+    });
+    await expect(caller.session({ id: session.id })).resolves.toMatchObject({
+      id: session.id,
+      reasoningEffort: 'high',
+    });
+  });
+
   it('scopes lifecycle mutations to the requested workspace', async () => {
     const { caller, secondaryWorkspace, createEngineForWorkspace } = createControlPlaneCaller();
     const defaultEngine = createEngineForWorkspace(DEFAULT_WORKSPACE_ID);

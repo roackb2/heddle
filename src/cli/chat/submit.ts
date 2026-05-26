@@ -1,4 +1,6 @@
 import { runLocalCommand } from './state/local-commands.js';
+import type { ControlPlaneProxyClient } from '@/client-shared/api/proxy.js';
+import type { RouterInputs } from '@/client-shared/api/types.js';
 import { ConversationCompactionService } from './state/compaction.js';
 import type { ConversationCompactionResult } from './state/compaction.js';
 import type { ConversationSessionService } from '../../core/chat/engine/types.js';
@@ -24,11 +26,14 @@ type SubmitChatPromptArgs = {
   nextLocalId: () => string;
   setStatus: (value: string) => void;
   switchSession: (id: string) => void;
-  closeSession: (id: string) => void;
+  closeSession: (id: string) => Promise<void> | void;
   sessionService: ConversationSessionService;
   refreshSessions: () => void;
-  createSession: (name?: string) => ChatSession;
-  renameSession: (name: string) => void;
+  resetSession: (id: string) => Promise<void>;
+  controlPlaneClient?: ControlPlaneProxyClient;
+  workspaceId?: string;
+  createSession: (name?: string) => Promise<ChatSession> | ChatSession;
+  renameSession: (name: string) => Promise<void> | void;
   listRecentSessionsMessage: string[];
   driftEnabled: boolean;
   driftError?: string;
@@ -67,14 +72,32 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
     createSession: args.createSession,
     renameSession: args.renameSession,
     removeSession: args.closeSession,
-    clearConversation: () => {
-      args.sessionService.resetConversation(args.activeSessionId, { apiKeyPresent: args.apiKeyPresent });
-      args.refreshSessions();
-    },
+    clearConversation: async () => await args.resetSession(args.activeSessionId),
     compactConversation: () => {
       const session = args.activeSession ?? args.sessions.find((candidate) => candidate.id === args.activeSessionId);
       if (!session) {
         return 'No active session is available to compact.';
+      }
+
+      if (args.controlPlaneClient) {
+        args.setStatus('Compacting');
+        return args.controlPlaneClient.controlPlane.sessionCompact.mutate({
+          id: session.id,
+          workspaceId: args.workspaceId,
+          force: true,
+        } satisfies RouterInputs['controlPlane']['sessionCompact']).then((compacted) => {
+          args.refreshSessions();
+          args.setStatus('Idle');
+          return compacted.context?.compaction?.compactedMessages && compacted.context.archive?.lastArchivePath ?
+              `Compacted earlier session history into a rolling summary and archived ${compacted.context.compaction.compactedMessages} messages.\nArchive: ${compacted.context.archive.lastArchivePath}`
+            : compacted.context?.compaction?.error ?
+              `Compaction skipped. ${compacted.context.compaction.error}`
+            : 'Current session history is already compact enough.';
+        }).catch((error: unknown) => {
+          args.refreshSessions();
+          args.setStatus('Idle');
+          return error instanceof Error ? `Compaction failed. ${error.message}` : `Compaction failed. ${String(error)}`;
+        });
       }
 
       args.setStatus('Compacting');

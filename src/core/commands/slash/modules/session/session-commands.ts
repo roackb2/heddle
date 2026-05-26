@@ -32,8 +32,8 @@ export function createSessionSlashCommandModule(): SlashCommandModule<SlashComma
         syntax: '/clear',
         description: 'reset the current session transcript',
         match: SlashCommandParser.matchesExact('/clear'),
-        run: (context) => {
-          context.session.clear();
+        run: async (context) => {
+          await context.session.clear();
           return slashMessageResult('Cleared the current chat transcript.');
         },
       },
@@ -114,11 +114,11 @@ export function resolveSessionReference(args: {
   return Number.isFinite(numericIndex) && numericIndex > 0 ? args.recentSessions[numericIndex - 1] : undefined;
 }
 
-function createSession(
+async function createSession(
   context: SlashCommandExecutionContext,
   name: string,
-): SlashCommandResult {
-  const session = context.session.create(name || undefined);
+): Promise<SlashCommandResult> {
+  const session = await context.session.create(name || undefined);
   return slashMessageResult(`Created and switched to ${session.id} (${session.name}).`, session.id);
 }
 
@@ -152,28 +152,28 @@ function continueSession(
   };
 }
 
-function renameSession(
+async function renameSession(
   context: SlashCommandExecutionContext,
   name: string,
-): SlashCommandResult {
+): Promise<SlashCommandResult> {
   if (!name) {
     return slashMessageResult('Usage: /session rename <name>');
   }
 
-  context.session.rename(name);
+  await context.session.rename(name);
   return slashMessageResult(`Renamed current session to ${name}.`);
 }
 
-function closeSession(
+async function closeSession(
   context: SlashCommandExecutionContext,
   value: string,
-): SlashCommandResult {
+): Promise<SlashCommandResult> {
   const session = findSession(context, value);
   if (!session) {
     return slashMessageResult(`Unknown session: ${value}.\nUse /session list to inspect available sessions.`);
   }
 
-  context.session.remove(session.id);
+  await context.session.remove(session.id);
   return slashMessageResult(`Closed ${session.id} (${session.name}).`);
 }
 

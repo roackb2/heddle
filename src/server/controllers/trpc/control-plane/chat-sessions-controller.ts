@@ -61,6 +61,7 @@ type ControlPlaneSessionReadArgs = Omit<ConversationEngineConfig, 'model' | 'wor
 type CreateControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & {
   suggestedName?: string;
   retention?: ChatSession['retention'];
+  reasoningEffort?: ChatSession['reasoningEffort'];
 };
 
 type UpdateControlPlaneChatSessionSettingsArgs = ControlPlaneSessionReadArgs & {
@@ -132,6 +133,7 @@ export class ControlPlaneChatSessionsController {
       name: suggestedName,
       apiKeyPresent,
       model,
+      reasoningEffort: args.reasoningEffort,
       workspaceId: args.workspaceId,
       retention: args.retention,
     });

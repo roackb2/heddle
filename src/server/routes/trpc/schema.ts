@@ -34,6 +34,7 @@ export const createSessionInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   name: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
+  reasoningEffort: z.enum(['low', 'medium', 'high', 'ultrahigh']).optional().nullable(),
   retention: z.enum(['reusable', 'one_off']).optional(),
   apiKeyPresent: z.boolean().optional(),
 }).optional();

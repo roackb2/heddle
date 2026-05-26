@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import type { RouterInputs } from '@/client-shared/api/types.js';
 import { ModelCatalogService, ModelPolicyService } from '../../../../core/llm/models/index.js';
 import {
   resolveNewSessionExecutionPreferences,
   resolveStoredSessionExecutionPreferences,
 } from '../../../../core/chat/engine/sessions/preferences/service.js';
+import { createDaemonControlPlaneClient } from '../../../remote/control-plane-client.js';
 import { ConversationCompactionService } from '../../state/compaction.js';
 import { useChatSessions } from '../useChatSessions.js';
 import {
@@ -18,10 +20,18 @@ export function useChatAppController({
   runtime: ChatRuntimeConfig;
   setStatus: (value: string) => void;
 }) {
+  const controlPlaneClient = useMemo(
+    () =>
+      runtime.runtimeHost?.kind === 'daemon' && !runtime.runtimeHost.stale ?
+        createDaemonControlPlaneClient(runtime.runtimeHost)
+      : undefined,
+    [runtime.runtimeHost],
+  );
   const {
     sessions,
     sessionService,
     refreshSessions,
+    workspaceId,
     activeSessionId,
     setActiveSessionId,
     activeSession,
@@ -30,6 +40,8 @@ export function useChatAppController({
     updateSessionById,
     updateActiveSession,
     setSessionPreferences,
+    resetSession,
+    setSessionDriftEnabled,
     createSession: createSessionWithDefaultModel,
     renameSession,
     removeSession,
@@ -39,6 +51,7 @@ export function useChatAppController({
     defaultModel: runtime.model,
     workspaceRoot: runtime.workspaceRoot,
     stateRoot: runtime.stateRoot,
+    controlPlaneClient,
   });
 
   const storedActivePreferences = useMemo(
@@ -107,12 +120,12 @@ export function useChatAppController({
   );
 
   const applyActiveModel = useCallback(
-    (model: string) => {
+    async (model: string) => {
       if (!activeSession) {
         return;
       }
 
-      setSessionPreferences(activeSession.id, {
+      await setSessionPreferences(activeSession.id, {
         model,
         reasoningEffort: activeSession.reasoningEffort,
       });
@@ -121,12 +134,12 @@ export function useChatAppController({
   );
 
   const applyActiveReasoningEffort = useCallback(
-    (reasoningEffort: typeof activeReasoningEffort) => {
+    async (reasoningEffort: typeof activeReasoningEffort) => {
       if (!activeSession) {
         return;
       }
 
-      setSessionPreferences(activeSession.id, {
+      await setSessionPreferences(activeSession.id, {
         model: activeSession.model ?? runtime.model,
         reasoningEffort,
       });
@@ -143,7 +156,7 @@ export function useChatAppController({
       return;
     }
 
-    setSessionPreferences(activeSession.id, {
+    void setSessionPreferences(activeSession.id, {
       model: activeModel,
       reasoningEffort: activeSession.reasoningEffort,
     });
@@ -180,6 +193,24 @@ export function useChatAppController({
     const previousArchives = activeSession.archives;
 
     setStatus('Compacting');
+    if (controlPlaneClient) {
+      void controlPlaneClient.controlPlane.sessionCompact.mutate({
+        id: sessionId,
+        workspaceId,
+        force: true,
+        systemContext: runtime.systemContext,
+      } satisfies RouterInputs['controlPlane']['sessionCompact'])
+        .then(() => {
+          refreshSessions();
+          setStatus('Idle');
+        })
+        .catch(() => {
+          refreshSessions();
+          setStatus('Idle');
+        });
+      return;
+    }
+
     sessionService.markCompactionRunning(sessionId, { sourceHistory: sessionHistory });
     refreshSessions();
 
@@ -217,6 +248,8 @@ export function useChatAppController({
     runtime.systemContext,
     setStatus,
     sessionService,
+    controlPlaneClient,
+    workspaceId,
     refreshSessions,
   ]);
 
@@ -224,6 +257,10 @@ export function useChatAppController({
     sessions,
     sessionService,
     refreshSessions,
+    resetSession,
+    setSessionDriftEnabled,
+    controlPlaneClient,
+    workspaceId,
     activeSessionId,
     setActiveSessionId,
     activeSession,

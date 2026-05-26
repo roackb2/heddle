@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { ControlPlaneProxyClient } from '@/client-shared/api/proxy.js';
 import type { CredentialAwareModelOption } from '../../../../core/llm/models/index.js';
 import type { ReasoningEffort } from '../../../../core/llm/types.js';
 import type { ConversationSessionService } from '../../../../core/chat/engine/types.js';
@@ -27,6 +28,9 @@ export function usePromptSubmissionController({
   closeSession,
   sessionService,
   refreshSessions,
+  resetSession,
+  controlPlaneClient,
+  workspaceId,
   updateActiveSession,
   createSession,
   renameSession,
@@ -49,8 +53,8 @@ export function usePromptSubmissionController({
   runtime: ChatRuntimeConfig;
   activeModel: string;
   activeReasoningEffort?: ReasoningEffort;
-  setActiveModel: (model: string) => void;
-  setActiveReasoningEffort: (effort: ReasoningEffort | undefined) => void;
+  setActiveModel: (model: string) => Promise<void> | void;
+  setActiveReasoningEffort: (effort: ReasoningEffort | undefined) => Promise<void> | void;
   sessions: ChatSession[];
   recentSessions: ChatSession[];
   activeSessionId: string;
@@ -59,12 +63,15 @@ export function usePromptSubmissionController({
   nextLocalId: () => string;
   setStatus: (value: string) => void;
   switchSession: (id: string) => void;
-  closeSession: (id: string) => void;
+  closeSession: (id: string) => Promise<void> | void;
   sessionService: ConversationSessionService;
   refreshSessions: () => void;
+  resetSession: (id: string) => Promise<void>;
+  controlPlaneClient?: ControlPlaneProxyClient;
+  workspaceId?: string;
   updateActiveSession: ActiveSessionUpdater;
-  createSession: (name?: string) => ChatSession;
-  renameSession: (name: string) => void;
+  createSession: (name?: string) => Promise<ChatSession> | ChatSession;
+  renameSession: (name: string) => Promise<void> | void;
   listRecentSessionsMessage: string[];
   driftEnabled: boolean;
   driftError?: string;
@@ -176,6 +183,9 @@ export function usePromptSubmissionController({
       closeSession,
       sessionService,
       refreshSessions,
+      resetSession,
+      controlPlaneClient,
+      workspaceId,
       createSession,
       renameSession,
       listRecentSessionsMessage,
@@ -254,6 +264,9 @@ export function usePromptSubmissionController({
     closeSession,
     sessionService,
     refreshSessions,
+    resetSession,
+    controlPlaneClient,
+    workspaceId,
     updateActiveSession,
     createSession,
     renameSession,

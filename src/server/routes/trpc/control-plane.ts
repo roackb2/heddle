@@ -74,6 +74,7 @@ export const controlPlaneRouter = router({
       suggestedName: input?.name,
       workspaceId: workspace.id,
       model: input?.model,
+      reasoningEffort: input?.reasoningEffort ?? undefined,
       retention: input?.retention,
       apiKeyPresent: input?.apiKeyPresent,
       preferApiKey: ctx.preferApiKey,

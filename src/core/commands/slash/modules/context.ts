@@ -10,9 +10,9 @@ import type { SlashCommandResult } from '../result-types.js';
 export type SlashCommandExecutionContext = {
   model: {
     active: () => string;
-    setActive: (model: string) => void;
+    setActive: (model: string) => Promise<void> | void;
     activeReasoningEffort: () => ReasoningEffort | undefined;
-    setReasoningEffort: (effort: ReasoningEffort | undefined) => void;
+    setReasoningEffort: (effort: ReasoningEffort | undefined) => Promise<void> | void;
     credentialSource: () => ProviderCredentialSource | undefined;
   };
   auth: {
@@ -25,17 +25,17 @@ export type SlashCommandExecutionContext = {
   };
   drift: {
     status: () => { enabled: boolean; error?: string };
-    setEnabled: (enabled: boolean) => void;
+    setEnabled: (enabled: boolean) => Promise<void> | void;
   };
   session: {
     all: () => ChatSession[];
     recent: () => ChatSession[];
     recentListMessage: () => string[];
-    create: (name?: string) => ChatSession;
+    create: (name?: string) => Promise<ChatSession> | ChatSession;
     switch: (id: string) => void;
-    rename: (name: string) => void;
-    remove: (id: string) => void;
-    clear: () => void;
+    rename: (name: string) => Promise<void> | void;
+    remove: (id: string) => Promise<void> | void;
+    clear: () => Promise<void> | void;
     summarize: (session: ChatSession) => string;
   };
   heartbeat: {

@@ -116,6 +116,26 @@ describe('runLocalCommand', () => {
     });
   });
 
+  it('waits for asynchronous model updates before reporting success', async () => {
+    let resolved = false;
+    const setActiveModel = vi.fn(async () => {
+      await Promise.resolve();
+      resolved = true;
+    });
+
+    const result = await runLocalCommand(createCommandArgs({
+      prompt: '/model gpt-5.4-mini',
+      setActiveModel,
+    }));
+
+    expect(resolved).toBe(true);
+    expect(result).toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: 'Switched model to gpt-5.4-mini',
+    });
+  });
+
   it('does not treat /model set as a literal model name', async () => {
     const setActiveModel = vi.fn();
     const result = await runLocalCommand(createCommandArgs({
@@ -425,6 +445,25 @@ describe('runLocalCommand', () => {
     }
   });
 
+  it('waits for asynchronous drift updates before reporting success', async () => {
+    let resolved = false;
+    const setDriftEnabled = vi.fn(async () => {
+      await Promise.resolve();
+      resolved = true;
+    });
+
+    const result = await runLocalCommand(createCommandArgs({
+      prompt: '/drift on',
+      setDriftEnabled,
+    }));
+
+    expect(resolved).toBe(true);
+    expect(result).toMatchObject({
+      handled: true,
+      kind: 'message',
+    });
+  });
+
   it('shows auth status and supports OpenAI OAuth login from chat', async () => {
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-chat-auth-')), 'auth.json');
 
@@ -583,6 +622,27 @@ describe('runLocalCommand', () => {
       message: 'Set reasoning effort to medium for gpt-5.4.',
     });
     expect(setActiveReasoningEffort).toHaveBeenCalledWith('medium');
+  });
+
+  it('waits for asynchronous reasoning effort updates before reporting success', async () => {
+    let resolved = false;
+    const setActiveReasoningEffort = vi.fn(async () => {
+      await Promise.resolve();
+      resolved = true;
+    });
+
+    const result = await runLocalCommand(createCommandArgs({
+      prompt: '/reasoning medium',
+      activeModel: 'gpt-5.4',
+      setActiveReasoningEffort,
+    }));
+
+    expect(resolved).toBe(true);
+    expect(result).toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: 'Set reasoning effort to medium for gpt-5.4.',
+    });
   });
 
   it('rejects reserved ultrahigh reasoning effort before a run starts', async () => {

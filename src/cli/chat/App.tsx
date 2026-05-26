@@ -80,6 +80,10 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     sessions,
     sessionService,
     refreshSessions,
+    resetSession,
+    setSessionDriftEnabled,
+    controlPlaneClient,
+    workspaceId,
     activeSessionId,
     setActiveSessionId,
     activeSession,
@@ -112,6 +116,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   const drift = useChatDrift({
     activeSession,
     sessionService,
+    setSessionDriftEnabled,
     refreshSessions,
   });
 
@@ -237,8 +242,8 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     resetRunState({ abortInFlight: true });
   }, [clearDraft, resetRunState, setActiveSessionId]);
 
-  const closeSession = (id: string) => {
-    const removedActive = removeSession(id);
+  const closeSession = async (id: string) => {
+    const removedActive = await removeSession(id);
     if (removedActive) {
       clearDraft();
       clearPendingSubmittedPrompt();
@@ -281,6 +286,9 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
     closeSession,
     sessionService,
     refreshSessions,
+    resetSession,
+    controlPlaneClient,
+    workspaceId,
     updateActiveSession,
     createSession,
     renameSession,

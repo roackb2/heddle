@@ -24,10 +24,10 @@ export type LocalCommandArgs = {
   recentSessions: ChatSession[];
   activeSessionId: string;
   switchSession: (id: string) => void;
-  createSession: (name?: string) => ChatSession;
-  renameSession: (name: string) => void;
-  removeSession: (id: string) => void;
-  clearConversation: () => void;
+  createSession: (name?: string) => Promise<ChatSession> | ChatSession;
+  renameSession: (name: string) => Promise<void> | void;
+  removeSession: (id: string) => Promise<void> | void;
+  clearConversation: () => Promise<void> | void;
   compactConversation: () => Promise<string> | string;
   saveTuiSnapshot?: () => Promise<string> | string;
   driftEnabled: boolean;
