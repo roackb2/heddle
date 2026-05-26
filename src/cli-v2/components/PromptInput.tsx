@@ -38,7 +38,7 @@ export function PromptInput({
   }, { isActive: !disabled });
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" marginTop={1} marginBottom={1}>
       {activity ? <Text color={activity.color}>{activity.text}</Text> : null}
       <Box>
         <Text color="cyan">› </Text>
