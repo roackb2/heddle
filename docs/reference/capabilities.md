@@ -68,16 +68,16 @@ Beyond terminal chat, Heddle includes:
 - workspace memory health visibility
 - browser-side model selection and drift toggling
 - file mention suggestions in the browser composer
-- browser image attachment uploads in web-v2, stored as local workspace paths for `view_image`
-- heartbeat task create, edit, delete, run-now, resume, continuation-mode, and saved-run review controls in web-v2
-- memory status visibility in web-v2 settings
+- browser image attachment uploads, stored as local workspace paths for `view_image`
+- heartbeat task create, edit, delete, run-now, resume, continuation-mode, and saved-run review controls
+- memory status visibility in settings
 
 ## Notes And Limits
 
 - Heddle is a coding/workspace agent runtime, not a general-purpose autonomous system.
 - Knowledge persistence uses explicit local catalogs and maintainer runs, so users can audit what Heddle learned instead of relying on opaque retrieval.
 - The control plane review view is read-only. Current changes are Git-backed, while historical turn evidence is trace-backed; it is not yet an editable IDE-grade diff surface or live file watcher.
-- The image workflow is intentionally lightweight: terminal users can provide a local image path, and web-v2 browser uploads are saved back to local workspace state as readable image paths. In both cases, Heddle decides whether inspection is needed through `view_image`.
+- The image workflow is intentionally lightweight: terminal users can provide a local image path, and browser uploads are saved back to local workspace state as readable image paths. In both cases, Heddle decides whether inspection is needed through `view_image`.
 - OpenAI account sign-in can now drive `view_image` through the Codex OAuth transport. Hosted `web_search` and drift embeddings still require OpenAI Platform API-key mode today.
 - `@path/to/file` mentions prioritize file inspection; they do not blindly paste file contents into the prompt.
 - Web search is provider-backed rather than a general crawler maintained inside this repository.

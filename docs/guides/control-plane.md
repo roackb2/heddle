@@ -2,20 +2,19 @@
 
 Heddle includes a local browser control plane for workspace oversight when you want a browser UI in addition to terminal chat.
 
-The control plane is the main place to inspect saved sessions, review evidence, workspace memory health, heartbeat tasks, run history, and local workspace switching. The packaged daemon currently serves the supported browser client from `src/web`; `src/web-v2` is the next-generation control-plane client used for the newer sessions, tasks, settings, and composer work.
+The control plane is the main place to inspect saved sessions, review current changes, workspace memory health, heartbeat tasks, run history, and local workspace switching. The packaged daemon serves the supported browser client from `src/web-v2`; the older `src/web` client is legacy v1 and is available only through explicit development scripts or `--assets-dir`.
 
 ## What The Control Plane Includes
 
 Current stack:
 
 - `src/server`: Express-hosted tRPC server
-- `src/web`: React/Vite web client
-- `src/web-v2`: React/Vite web-v2 client for new control-plane work
+- `src/web-v2`: React/Vite default browser control plane
+- `src/web`: legacy React/Vite v1 client, kept as an explicit opt-in path
 - `src/server/routes`, `src/server/controllers`, and `src/server/services`: control-plane server API routes, request controllers, and domain services
 - pino logs written locally for debugging
 
-Across the supported browser client and the web-v2 development surface, the
-control plane includes:
+The default control plane includes:
 
 - active workspace and `.heddle/` state location
 - workspace management with registered workspaces, recent known workspaces, folder picking, switching, and renaming
@@ -25,7 +24,7 @@ control plane includes:
 - a model selector and reasoning-effort control backed by the server-side built-in model catalog and session state, plus a drift toggle and latest trace-derived drift level
 - an auth status indicator in the session composer footer so you can see whether the selected model is using OAuth or API-key mode without spending header space
 - debounced `@file` mention suggestions in the composer, backed by a capped workspace file search endpoint
-- browser image attachments in the web-v2 composer, stored under the active workspace state root and appended to prompts as local paths for `view_image`
+- browser image attachments in the composer, stored under the active workspace state root and appended to prompts as local paths for `view_image`
 - compact tool-result cards for saved tool outputs such as `list_files: {...}`
 - current workspace review backed by Git status and file patches, so generated or shell-made changes are visible even when they did not come from the edit tool
 - historical turn review for trace-backed file diffs, review commands, verification commands, approvals, and events
@@ -47,7 +46,7 @@ to refetch persisted session detail.
 
 A workspace is the project state Heddle is currently operating on. For users, the important rule is simple: a workspace is the local project plus its `.heddle/` state.
 
-The control plane exposes this as a top-level `Workspaces` section. From there you can:
+The control plane exposes this through the sidebar workspace switcher and `Settings > Workspace`. From there you can:
 
 - see workspaces attached to the current control-plane catalog
 - switch the UI to another workspace
@@ -55,7 +54,7 @@ The control plane exposes this as a top-level `Workspaces` section. From there y
 - add a workspace by typing a path or choosing a folder
 - reopen recently known workspaces discovered through the user-level registry
 
-The folder picker is meant for choosing project roots without restarting the daemon by hand. It lets you navigate up and down the local folder tree, hides dot-prefixed folders by default, and can select a folder as the workspace path.
+The workspace settings page is meant for choosing project roots without restarting the daemon by hand. It keeps the current workspace, attached workspaces, known workspaces, and the `.heddle/` state path visible in one settings-shaped surface.
 
 Heddle also maintains a small user-level registry of workspaces it has seen. This is why a project opened from the CLI can later appear as a known workspace in the browser UI. The registry is discovery metadata only; the authoritative project state remains in that workspace's `.heddle/` directory.
 
@@ -81,7 +80,7 @@ This is still intentionally short of a full IDE file-review engine: Heddle does 
 
 The Tasks surface exposes local heartbeat tasks and their saved runs. It is designed for operator-controlled background work rather than a hidden autonomous queue.
 
-In web-v2, the task workbench supports:
+The task workbench supports:
 
 - creating and editing durable tasks with a name, instruction, schedule, optional model, and optional step budget
 - choosing continuation mode, either operator-controlled continuation or agent-selected continuation
@@ -93,7 +92,7 @@ Task state and run history come from the same heartbeat task service used by the
 
 ## Settings And Memory
 
-The web-v2 settings area separates configuration from the main agent workbench. Workspace settings keep local project selection visible, and memory settings show catalog health, note counts, pending memory candidates, and the latest maintenance run when available.
+The settings area separates configuration from the main agent workbench. Workspace settings keep local project selection visible, and memory settings show catalog health, note counts, pending memory candidates, and the latest maintenance run when available.
 
 Memory settings are read-oriented today. Use the CLI memory commands for detailed note inspection and validation when you need a deeper audit.
 
@@ -101,26 +100,23 @@ Memory settings are read-oriented today. Use the CLI memory commands for detaile
 
 The control plane includes a mobile-native layout for phone and tablet access. It is designed around short navigation paths rather than shrinking the desktop workstation view into a narrow screen.
 
-On mobile, the supported client uses:
+On mobile, the default client uses:
 
-- bottom root navigation for Overview, Sessions, Tasks, and Workspaces
+- focused navigation for Sessions, Tasks, and Settings
 - a dedicated session list for choosing saved conversations
 - native-style session navigation for Chat and Review
 - a compact composer that keeps the latest conversation visible
-- current workspace diff review plus historical turn/evidence tabs without desktop sidebars
+- current workspace diff review without desktop sidebars
 - full-diff expansion for reviewing larger patches on small screens
 
-Web-v2 mobile work is moving the same control-plane model toward focused
-Sessions, Tasks, and Settings surfaces, with task detail and run detail screens
-for checking background work from a phone.
+Task detail and run detail screens are available from the same mobile layout for checking background work from a phone.
 
 Representative mobile views:
 
 <p>
-  <img src="../images/mobile-control-plane-overview-current.png" alt="Heddle mobile overview" width="240">
-  <img src="../images/mobile-control-plane-session-chat.png" alt="Heddle mobile chat view" width="240">
-  <img src="../images/mobile-control-plane-session-review-current-diff.png" alt="Heddle mobile current diff review" width="240">
-  <img src="../images/mobile-control-plane-workspaces-current.png" alt="Heddle mobile workspace management" width="240">
+  <img src="../images/control-plane-v2-session-list.PNG" alt="Heddle mobile session list" width="240">
+  <img src="../images/control-plane-v2-workbench.PNG" alt="Heddle mobile workbench" width="240">
+  <img src="../images/control-plane-v2-diff-view.PNG" alt="Heddle mobile diff preview" width="240">
 </p>
 
 ## Start The Daemon
@@ -160,13 +156,9 @@ yarn daemon:dev
 yarn client:dev
 ```
 
-`yarn daemon:dev` starts the real daemon runtime at `127.0.0.1:8765`, including daemon ownership registration, registry heartbeats, and the built web app from `dist/src/web`.
+`yarn daemon:dev` starts the real daemon runtime at `127.0.0.1:8765`, including daemon ownership registration, registry heartbeats, and the built web-v2 app from `dist/src/web-v2`.
 
-`yarn client:dev` starts the Vite web client at `127.0.0.1:5173` and proxies `/trpc` and `/control-plane` requests to the backend server. For the web-v2 client, use:
-
-```bash
-yarn client:v2:dev
-```
+`yarn client:dev` starts the default web-v2 Vite client at `127.0.0.1:5173` and proxies `/trpc` and `/control-plane` requests to the backend server. For the legacy v1 client, use `yarn client:dev:v1`, which defaults to `127.0.0.1:5174`.
 
 In other words:
 

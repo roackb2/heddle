@@ -1,8 +1,8 @@
 # Heddle Web V2
 
-`src/web-v2` is the parallel rebuild of the browser control plane. It exists so
-new frontend work can grow from a clean foundation while `src/web` remains the
-current user-facing UI.
+`src/web-v2` is the default browser control plane served by `heddle daemon`.
+It owns current frontend work while `src/web` remains available as the legacy
+v1 opt-in surface.
 
 ## Boundary
 

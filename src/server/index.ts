@@ -216,9 +216,9 @@ function resolveDefaultAssetsDir(): string {
 
   const moduleDir = dirname(fileURLToPath(import.meta.url));
   const candidates = [
-    resolve(moduleDir, '../web'),
-    resolve(moduleDir, '../../web'),
-    resolve(moduleDir, '../../../src/web'),
+    resolve(moduleDir, '../web-v2'),
+    resolve(moduleDir, '../../web-v2'),
+    resolve(moduleDir, '../../../src/web-v2'),
   ];
 
   for (const candidate of candidates) {

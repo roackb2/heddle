@@ -245,7 +245,7 @@ If you want a simple operational checklist:
 
 1. Start `heddle` or `heddle chat` when you want direct terminal interaction and no daemon owns that workspace.
 2. Start `heddle daemon` when you want the browser control plane or a stable background owner.
-3. Use the control plane `Workspaces` section to register, rename, and switch between local project workspaces.
+3. Use the control plane workspace switcher and `Settings > Workspace` to register, rename, and switch between local project workspaces.
 4. Treat the workspace as having one live owner at a time.
 5. Use `heddle ask` as a lightweight client when a daemon already owns the workspace.
 6. Do not assume the web UI, TUI, and daemon are separate runtimes operating independently on the same workspace.

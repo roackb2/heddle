@@ -84,7 +84,7 @@ Start the control plane:
 heddle daemon
 ```
 
-After the daemon starts, open the browser control plane to inspect sessions, review current Git workspace changes, inspect historical turn evidence, manage local workspaces, inspect memory status, and use the heartbeat task workbench. For one-off CLI usage against another project, keep using `--cwd`.
+After the daemon starts, open the browser control plane to inspect sessions, review current Git workspace changes, manage local workspaces, inspect memory status, and use the heartbeat task workbench. The default browser UI is web-v2; the legacy v1 UI is available only when you explicitly serve v1 assets, for example with `yarn client:build:v1` and `heddle daemon --assets-dir dist/src/web` in a repository checkout. For one-off CLI usage against another project, keep using `--cwd`.
 
 Start the foreground heartbeat scheduler:
 
@@ -117,9 +117,12 @@ Inside this repository, common development commands include:
 yarn cli:dev
 yarn chat:dev
 yarn daemon:dev
+yarn daemon:dev:v1
 yarn server:dev
 yarn client:dev
+yarn client:dev:v1
 yarn build
+yarn client:build:v1
 yarn test
 yarn eslint
 yarn typecheck
@@ -130,7 +133,7 @@ yarn typecheck
 - The installed command is `heddle`.
 - By default, commands operate on the current working directory unless `--cwd` is provided.
 - Workspace state is local to the project under `.heddle/`. Saved sessions use `.heddle/chat-sessions.catalog.json` plus per-session files under `.heddle/chat-sessions/`. The browser control plane can register and switch between local workspaces, but each workspace keeps its own sessions, traces, memory, and tasks.
-- Heartbeat scheduler commands are local-first; adding a task does not create a background OS service by itself. The browser control plane can operate the same local tasks and run records, including web-v2 create/edit/run/resume/delete flows.
+- Heartbeat scheduler commands are local-first; adding a task does not create a background OS service by itself. The browser control plane can operate the same local tasks and run records, including create/edit/run/resume/delete flows.
 
 ## See Also
 

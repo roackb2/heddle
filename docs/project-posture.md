@@ -77,7 +77,8 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
   diff parsing.
 - `src/cli/` owns terminal and TUI host surfaces.
 - `src/server/` owns the daemon/control-plane API.
-- `src/web/` owns the browser control plane.
+- `src/web-v2/` owns the default browser control plane.
+- `src/web/` owns the legacy v1 browser control plane while it remains available as an opt-in fallback.
 - `src/__tests__/unit/` and `src/__tests__/integration/` hold behavior locks
   for touched paths.
 - `docs/` is the public contributor source of truth.
