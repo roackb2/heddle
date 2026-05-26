@@ -5,7 +5,6 @@ import type { PromptActivityView } from '../helpers/activities/prompt-activity.j
 export function PromptInput({
   activity,
   disabled,
-  submitDisabled,
   placeholder,
   value,
   onChange,
@@ -13,7 +12,6 @@ export function PromptInput({
 }: {
   activity?: PromptActivityView;
   disabled: boolean;
-  submitDisabled: boolean;
   placeholder: string;
   value: string;
   onChange: Dispatch<SetStateAction<string>>;
@@ -25,9 +23,7 @@ export function PromptInput({
     }
 
     if (key.return) {
-      if (!submitDisabled) {
-        onSubmit(value);
-      }
+      onSubmit(value);
       return;
     }
 
