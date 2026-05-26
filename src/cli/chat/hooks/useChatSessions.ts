@@ -1,15 +1,12 @@
 /**
  * CLI host session hook.
  *
- * Boundary rule:
- * - this hook should be a React-facing adapter over core session services;
- * - it should not own session storage mechanics or session collection policy.
+ * TUI session state hook.
  *
- * Current compromise:
- * this hook still keeps React state for host rendering and local selection.
- * The intended long-term shape is for hosts to stay thin adapters over core
- * services while storage and session semantics remain behind the engine
- * boundary.
+ * Lifecycle rule:
+ * create, settings, rename, delete, reset, and drift writes go through the
+ * control-plane tRPC API. The local session service remains only as temporary
+ * read/hydration support for the not-yet-migrated turn loop.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ControlPlaneProxyClient } from '@/client-shared/api/proxy.js';
@@ -26,7 +23,7 @@ type UseChatSessionsArgs = {
   defaultModel: string;
   workspaceRoot: string;
   stateRoot: string;
-  controlPlaneClient?: ControlPlaneProxyClient;
+  controlPlaneClient: ControlPlaneProxyClient;
 };
 
 export function useChatSessions({
@@ -114,67 +111,48 @@ export function useChatSessions({
   }, [activeSessionId, updateSessionById]);
 
   const setSessionPreferences = useCallback(async (sessionId: string, preferences: SessionExecutionPreferences) => {
-    if (controlPlaneClient) {
-      await controlPlaneClient.controlPlane.sessionSettingsUpdate.mutate({
-        id: sessionId,
-        workspaceId,
-        model: preferences.model,
-        reasoningEffort: preferences.reasoningEffort,
-      } satisfies RouterInputs['controlPlane']['sessionSettingsUpdate']);
-    } else {
-      sessionService.updateSettings(sessionId, preferences);
-    }
+    await controlPlaneClient.controlPlane.sessionSettingsUpdate.mutate({
+      id: sessionId,
+      workspaceId,
+      model: preferences.model,
+      reasoningEffort: preferences.reasoningEffort,
+    } satisfies RouterInputs['controlPlane']['sessionSettingsUpdate']);
     refreshSessions();
-  }, [controlPlaneClient, refreshSessions, sessionService, workspaceId]);
+  }, [controlPlaneClient, refreshSessions, workspaceId]);
 
   const createSession = useCallback(async (name?: string, preferences?: SessionExecutionPreferences) => {
     const nextPreferences = resolveNewSessionExecutionPreferences({
       defaultModel,
       inherited: preferences,
     });
-    const nextSession =
-      controlPlaneClient ?
-        await controlPlaneClient.controlPlane.sessionCreate.mutate({
-          name,
-          apiKeyPresent,
-          workspaceId,
-          model: nextPreferences.model,
-          reasoningEffort: nextPreferences.reasoningEffort,
-        } satisfies RouterInputs['controlPlane']['sessionCreate']).then((created) => sessionService.require(created.id))
-      : sessionService.create({
-          id: `session-${Date.now()}`,
-          name,
-          apiKeyPresent,
-          ...nextPreferences,
-          workspaceId,
-        });
+    const created = await controlPlaneClient.controlPlane.sessionCreate.mutate({
+      name,
+      apiKeyPresent,
+      workspaceId,
+      model: nextPreferences.model,
+      reasoningEffort: nextPreferences.reasoningEffort,
+    } satisfies RouterInputs['controlPlane']['sessionCreate']);
+    const nextSession = sessionService.require(created.id);
     setSessions(sessionService.list().slice(0, 24));
     setActiveSessionId(nextSession.id);
     return nextSession;
   }, [apiKeyPresent, controlPlaneClient, defaultModel, sessionService, workspaceId]);
 
   const renameSession = useCallback(async (name: string) => {
-    if (controlPlaneClient) {
-      await controlPlaneClient.controlPlane.sessionRename.mutate({
-        id: activeSessionId,
-        workspaceId,
-        name,
-      } satisfies RouterInputs['controlPlane']['sessionRename']);
-    } else {
-      sessionService.rename(activeSessionId, name);
-    }
+    await controlPlaneClient.controlPlane.sessionRename.mutate({
+      id: activeSessionId,
+      workspaceId,
+      name,
+    } satisfies RouterInputs['controlPlane']['sessionRename']);
     refreshSessions();
-  }, [activeSessionId, controlPlaneClient, refreshSessions, sessionService, workspaceId]);
+  }, [activeSessionId, controlPlaneClient, refreshSessions, workspaceId]);
 
   const removeSession = useCallback(async (id: string) => {
     const removedActive = id === activeSessionId;
-    const deleted =
-      controlPlaneClient ?
-        (await controlPlaneClient.controlPlane.sessionDelete.mutate({
-          id,
-          workspaceId,
-        } satisfies RouterInputs['controlPlane']['sessionDelete'])).deleted
-      : sessionService.delete(id);
+    const deleted = (await controlPlaneClient.controlPlane.sessionDelete.mutate({
+      id,
+      workspaceId,
+    } satisfies RouterInputs['controlPlane']['sessionDelete'])).deleted;
     if (!deleted) {
       return false;
     }
@@ -189,29 +167,21 @@ export function useChatSessions({
   }, [activeSessionId, controlPlaneClient, sessionService, workspaceId]);
 
   const resetSession = useCallback(async (id: string) => {
-    if (controlPlaneClient) {
-      await controlPlaneClient.controlPlane.sessionReset.mutate({
-        id,
-        workspaceId,
-      } satisfies RouterInputs['controlPlane']['sessionReset']);
-    } else {
-      sessionService.resetConversation(id, { apiKeyPresent });
-    }
+    await controlPlaneClient.controlPlane.sessionReset.mutate({
+      id,
+      workspaceId,
+    } satisfies RouterInputs['controlPlane']['sessionReset']);
     refreshSessions();
-  }, [apiKeyPresent, controlPlaneClient, refreshSessions, sessionService, workspaceId]);
+  }, [controlPlaneClient, refreshSessions, workspaceId]);
 
   const setSessionDriftEnabled = useCallback(async (id: string, enabled: boolean) => {
-    if (controlPlaneClient) {
-      await controlPlaneClient.controlPlane.sessionSettingsUpdate.mutate({
-        id,
-        workspaceId,
-        driftEnabled: enabled,
-      } satisfies RouterInputs['controlPlane']['sessionSettingsUpdate']);
-    } else {
-      sessionService.setDriftEnabled(id, enabled);
-    }
+    await controlPlaneClient.controlPlane.sessionSettingsUpdate.mutate({
+      id,
+      workspaceId,
+      driftEnabled: enabled,
+    } satisfies RouterInputs['controlPlane']['sessionSettingsUpdate']);
     refreshSessions();
-  }, [controlPlaneClient, refreshSessions, sessionService, workspaceId]);
+  }, [controlPlaneClient, refreshSessions, workspaceId]);
 
   return {
     sessions,

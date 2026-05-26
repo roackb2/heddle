@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { RouterInputs } from '@/client-shared/api/types.js';
+import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 import { ModelCatalogService, ModelPolicyService } from '../../../../core/llm/models/index.js';
 import {
   resolveNewSessionExecutionPreferences,
   resolveStoredSessionExecutionPreferences,
 } from '../../../../core/chat/engine/sessions/preferences/service.js';
 import { createDaemonControlPlaneClient } from '../../../remote/control-plane-client.js';
-import { ConversationCompactionService } from '../../state/compaction.js';
 import { useChatSessions } from '../useChatSessions.js';
 import {
   resolveProviderCredentialSourceForModel,
@@ -20,12 +20,10 @@ export function useChatAppController({
   runtime: ChatRuntimeConfig;
   setStatus: (value: string) => void;
 }) {
+  const runtimeHost = runtime.runtimeHost;
   const controlPlaneClient = useMemo(
-    () =>
-      runtime.runtimeHost?.kind === 'daemon' && !runtime.runtimeHost.stale ?
-        createDaemonControlPlaneClient(runtime.runtimeHost)
-      : undefined,
-    [runtime.runtimeHost],
+    () => createDaemonControlPlaneClient(requireLiveDaemonHost(runtimeHost)),
+    [runtimeHost],
   );
   const {
     sessions,
@@ -188,66 +186,26 @@ export function useChatAppController({
     }
 
     const sessionId = activeSession.id;
-    const sessionHistory = activeSession.history;
-    const previousContext = activeSession.context;
-    const previousArchives = activeSession.archives;
-
     setStatus('Compacting');
-    if (controlPlaneClient) {
-      void controlPlaneClient.controlPlane.sessionCompact.mutate({
-        id: sessionId,
-        workspaceId,
-        force: true,
-        systemContext: runtime.systemContext,
-      } satisfies RouterInputs['controlPlane']['sessionCompact'])
-        .then(() => {
-          refreshSessions();
-          setStatus('Idle');
-        })
-        .catch(() => {
-          refreshSessions();
-          setStatus('Idle');
-        });
-      return;
-    }
-
-    sessionService.markCompactionRunning(sessionId, { sourceHistory: sessionHistory });
-    refreshSessions();
-
-    void ConversationCompactionService.compact({
-      history: sessionHistory,
-      runtime: {
-        model: activeModel,
-        stateRoot: runtime.stateRoot,
-        systemContext: runtime.systemContext,
-      },
-      session: activeSession,
-      request: {
-        goal: `Model switched from ${previousModel} to ${activeModel}`,
-      },
-      summarizer: { credentialSource: runtime.providerCredentialSource },
-    })
-      .then((compacted) => {
-        sessionService.applyCompactionResult(sessionId, compacted);
+    void controlPlaneClient.controlPlane.sessionCompact.mutate({
+      id: sessionId,
+      workspaceId,
+      force: true,
+      systemContext: runtime.systemContext,
+    } satisfies RouterInputs['controlPlane']['sessionCompact'])
+      .then(() => {
         refreshSessions();
         setStatus('Idle');
       })
       .catch(() => {
-        sessionService.restoreCompactionState(sessionId, {
-          context: previousContext,
-          archives: previousArchives,
-        });
         refreshSessions();
         setStatus('Idle');
       });
   }, [
     activeModel,
     activeSession,
-    runtime.providerCredentialSource,
-    runtime.stateRoot,
     runtime.systemContext,
     setStatus,
-    sessionService,
     controlPlaneClient,
     workspaceId,
     refreshSessions,
@@ -278,4 +236,12 @@ export function useChatAppController({
     applyActiveModel,
     applyActiveReasoningEffort,
   };
+}
+
+function requireLiveDaemonHost(runtimeHost: ChatRuntimeConfig['runtimeHost']): Extract<ResolvedRuntimeHost, { kind: 'daemon' }> {
+  if (runtimeHost?.kind === 'daemon' && !runtimeHost.stale) {
+    return runtimeHost;
+  }
+
+  throw new Error('TUI session lifecycle requires a live control-plane daemon.');
 }

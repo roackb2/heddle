@@ -8,6 +8,7 @@ import { act, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useChatSessions } from '../../../cli/chat/hooks/useChatSessions.js';
 import type { ControlPlaneProxyClient } from '@/client-shared/api/proxy.js';
+import { FileConversationSessionService } from '@/core/chat/engine/sessions/service.js';
 
 type HookSnapshot = ReturnType<typeof useChatSessions>;
 
@@ -15,7 +16,7 @@ function HookHarness(args: {
   sessionCatalogFile: string;
   workspaceRoot: string;
   stateRoot: string;
-  controlPlaneClient?: ControlPlaneProxyClient;
+  controlPlaneClient: ControlPlaneProxyClient;
   onReady: (value: HookSnapshot) => void;
 }) {
   const value = useChatSessions({
@@ -41,6 +42,11 @@ describe('useChatSessions', () => {
     const customStateRoot = join(workspaceRoot, '.heddle-embedded');
     const customCatalogFile = join(customStateRoot, 'custom-sessions.catalog.json');
     const defaultCatalogFile = join(stateRoot, 'chat-sessions.catalog.json');
+    const controlPlaneClient = createSessionLifecycleClient({
+      sessionCatalogFile: customCatalogFile,
+      workspaceRoot,
+      stateRoot,
+    });
 
     let latest: HookSnapshot | undefined;
 
@@ -49,6 +55,7 @@ describe('useChatSessions', () => {
         sessionCatalogFile={customCatalogFile}
         workspaceRoot={workspaceRoot}
         stateRoot={stateRoot}
+        controlPlaneClient={controlPlaneClient}
         onReady={(value) => {
           latest = value;
         }}
@@ -70,25 +77,11 @@ describe('useChatSessions', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-chat-sessions-api-hook-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const customCatalogFile = join(stateRoot, 'chat-sessions.catalog.json');
-    const controlPlaneClient = {
-      controlPlane: {
-        sessionCreate: {
-          mutate: vi.fn(async () => ({ id: 'session-1' })),
-        },
-        sessionRename: {
-          mutate: vi.fn(async () => ({ id: 'session-1' })),
-        },
-        sessionDelete: {
-          mutate: vi.fn(async () => ({ deleted: true })),
-        },
-        sessionReset: {
-          mutate: vi.fn(async () => ({ id: 'session-1' })),
-        },
-        sessionSettingsUpdate: {
-          mutate: vi.fn(async () => ({ id: 'session-1' })),
-        },
-      },
-    } as unknown as ControlPlaneProxyClient;
+    const controlPlaneClient = createSessionLifecycleClient({
+      sessionCatalogFile: customCatalogFile,
+      workspaceRoot,
+      stateRoot,
+    });
     let latest: HookSnapshot | undefined;
 
     render(
@@ -149,3 +142,51 @@ describe('useChatSessions', () => {
     });
   });
 });
+
+function createSessionLifecycleClient(args: {
+  sessionCatalogFile: string;
+  workspaceRoot: string;
+  stateRoot: string;
+}): ControlPlaneProxyClient {
+  const sessionService = new FileConversationSessionService({
+    workspaceRoot: args.workspaceRoot,
+    stateRoot: args.stateRoot,
+    sessionStoragePath: args.sessionCatalogFile,
+    model: 'gpt-5.4',
+    apiKeyPresent: true,
+    workspaceId: 'default',
+  });
+
+  return {
+    controlPlane: {
+      sessionCreate: {
+        mutate: vi.fn(async (input) =>
+          sessionService.create({
+            id: 'session-1',
+            name: input?.name,
+            apiKeyPresent: input?.apiKeyPresent,
+            model: input?.model,
+            reasoningEffort: input?.reasoningEffort ?? undefined,
+            workspaceId: input?.workspaceId,
+          }),
+        ),
+      },
+      sessionRename: {
+        mutate: vi.fn(async (input) => sessionService.rename(input.id, input.name)),
+      },
+      sessionDelete: {
+        mutate: vi.fn(async (input) => ({ deleted: sessionService.delete(input.id) })),
+      },
+      sessionReset: {
+        mutate: vi.fn(async (input) => sessionService.resetConversation(input.id, { apiKeyPresent: true })),
+      },
+      sessionSettingsUpdate: {
+        mutate: vi.fn(async (input) => sessionService.updateSettings(input.id, {
+          model: input.model,
+          reasoningEffort: input.reasoningEffort,
+          driftEnabled: input.driftEnabled,
+        })),
+      },
+    },
+  } as unknown as ControlPlaneProxyClient;
+}

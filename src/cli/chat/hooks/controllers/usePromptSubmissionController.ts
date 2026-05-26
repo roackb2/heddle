@@ -67,7 +67,7 @@ export function usePromptSubmissionController({
   sessionService: ConversationSessionService;
   refreshSessions: () => void;
   resetSession: (id: string) => Promise<void>;
-  controlPlaneClient?: ControlPlaneProxyClient;
+  controlPlaneClient: ControlPlaneProxyClient;
   workspaceId?: string;
   updateActiveSession: ActiveSessionUpdater;
   createSession: (name?: string) => Promise<ChatSession> | ChatSession;

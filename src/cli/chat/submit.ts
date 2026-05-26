@@ -1,8 +1,6 @@
 import { runLocalCommand } from './state/local-commands.js';
 import type { ControlPlaneProxyClient } from '@/client-shared/api/proxy.js';
 import type { RouterInputs } from '@/client-shared/api/types.js';
-import { ConversationCompactionService } from './state/compaction.js';
-import type { ConversationCompactionResult } from './state/compaction.js';
 import type { ConversationSessionService } from '../../core/chat/engine/types.js';
 import type { ReasoningEffort } from '../../core/llm/types.js';
 import type { ChatSession, ConversationLine } from './state/types.js';
@@ -30,7 +28,7 @@ type SubmitChatPromptArgs = {
   sessionService: ConversationSessionService;
   refreshSessions: () => void;
   resetSession: (id: string) => Promise<void>;
-  controlPlaneClient?: ControlPlaneProxyClient;
+  controlPlaneClient: ControlPlaneProxyClient;
   workspaceId?: string;
   createSession: (name?: string) => Promise<ChatSession> | ChatSession;
   renameSession: (name: string) => Promise<void> | void;
@@ -79,61 +77,21 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
         return 'No active session is available to compact.';
       }
 
-      if (args.controlPlaneClient) {
-        args.setStatus('Compacting');
-        return args.controlPlaneClient.controlPlane.sessionCompact.mutate({
-          id: session.id,
-          workspaceId: args.workspaceId,
-          force: true,
-        } satisfies RouterInputs['controlPlane']['sessionCompact']).then((compacted) => {
-          args.refreshSessions();
-          args.setStatus('Idle');
-          return compacted.context?.compaction?.compactedMessages && compacted.context.archive?.lastArchivePath ?
-              `Compacted earlier session history into a rolling summary and archived ${compacted.context.compaction.compactedMessages} messages.\nArchive: ${compacted.context.archive.lastArchivePath}`
-            : compacted.context?.compaction?.error ?
-              `Compaction skipped. ${compacted.context.compaction.error}`
-            : 'Current session history is already compact enough.';
-        }).catch((error: unknown) => {
-          args.refreshSessions();
-          args.setStatus('Idle');
-          return error instanceof Error ? `Compaction failed. ${error.message}` : `Compaction failed. ${String(error)}`;
-        });
-      }
-
       args.setStatus('Compacting');
-      args.sessionService.markCompactionRunning(session.id, { sourceHistory: session.history });
-      args.refreshSessions();
-
-      return ConversationCompactionService.compact({
-        history: session.history,
-        runtime: {
-          model: args.activeModel,
-          stateRoot: args.stateRoot,
-        },
-        session,
+      return args.controlPlaneClient.controlPlane.sessionCompact.mutate({
+        id: session.id,
+        workspaceId: args.workspaceId,
         force: true,
-        summarizer: { credentialSource: args.providerCredentialSource },
-      }).then((compacted: ConversationCompactionResult) => {
-        const changed =
-          compacted.history.length !== session.history.length
-          || compacted.context.compaction?.compactedMessages !== undefined
-          || compacted.archive.archives.length !== (session.archives?.length ?? 0);
-
-        if (!changed) {
-          args.setStatus('Idle');
-          return 'Current session history is already compact enough.';
-        }
-
-        args.sessionService.applyCompactionResult(session.id, compacted);
+      } satisfies RouterInputs['controlPlane']['sessionCompact']).then((compacted) => {
         args.refreshSessions();
         args.setStatus('Idle');
-
-        return compacted.context.compaction?.compactedMessages && compacted.context.archive?.lastArchivePath ?
-            `Compacted earlier session history into a rolling summary and archived ${compacted.context.compaction?.compactedMessages} messages.\nArchive: ${compacted.context.archive?.lastArchivePath}`
-          : compacted.context.compaction?.error ?
-            `Compaction skipped. ${compacted.context.compaction?.error}`
+        return compacted.context?.compaction?.compactedMessages && compacted.context.archive?.lastArchivePath ?
+            `Compacted earlier session history into a rolling summary and archived ${compacted.context.compaction.compactedMessages} messages.\nArchive: ${compacted.context.archive.lastArchivePath}`
+          : compacted.context?.compaction?.error ?
+            `Compaction skipped. ${compacted.context.compaction.error}`
           : 'Current session history is already compact enough.';
       }).catch((error: unknown) => {
+        args.refreshSessions();
         args.setStatus('Idle');
         return error instanceof Error ? `Compaction failed. ${error.message}` : `Compaction failed. ${String(error)}`;
       });

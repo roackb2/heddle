@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CyberLoopDriftLevel, CyberLoopObserverAnnotation } from '../../../index.js';
 import type { ChatSession } from '../state/types.js';
-import type { ConversationSessionService } from '../../../core/chat/engine/types.js';
 import { driftFooterColor, formatDriftFooter } from '../utils/drift-footer.js';
 
 export function useChatDrift({
   activeSession,
-  sessionService,
   setSessionDriftEnabled,
-  refreshSessions,
 }: {
   activeSession?: ChatSession;
-  sessionService: ConversationSessionService;
-  setSessionDriftEnabled?: (id: string, enabled: boolean) => Promise<void> | void;
-  refreshSessions: () => void;
+  setSessionDriftEnabled: (id: string, enabled: boolean) => Promise<void> | void;
 }) {
   const [enabled, setEnabledState] = useState(true);
   const [level, setLevel] = useState<CyberLoopDriftLevel>('unknown');
@@ -37,17 +32,11 @@ export function useChatDrift({
       return;
     }
 
-    if (setSessionDriftEnabled) {
-      void Promise.resolve(setSessionDriftEnabled(activeSession.id, nextEnabled)).catch((caught: unknown) => {
-        setEnabledState(!nextEnabled);
-        setError(caught instanceof Error ? caught.message : String(caught));
-      });
-      return;
-    }
-
-    sessionService.setDriftEnabled(activeSession.id, nextEnabled);
-    refreshSessions();
-  }, [activeSession, refreshSessions, sessionService, setSessionDriftEnabled]);
+    void Promise.resolve(setSessionDriftEnabled(activeSession.id, nextEnabled)).catch((caught: unknown) => {
+      setEnabledState(!nextEnabled);
+      setError(caught instanceof Error ? caught.message : String(caught));
+    });
+  }, [activeSession, setSessionDriftEnabled]);
 
   const observer = useMemo(() => ({
     enabled,

@@ -41,7 +41,26 @@ import { listMentionableFiles } from './utils/file-mentions.js';
 import { resolveProviderCredentialSourceForModel, type ChatRuntimeConfig } from './utils/runtime.js';
 
 export function App({ runtime }: { runtime: ChatRuntimeConfig }) {
+  if (runtime.runtimeHost?.kind !== 'daemon' || runtime.runtimeHost.stale) {
+    return <ControlPlaneApiRequired runtime={runtime} />;
+  }
+
   return <EmbeddedChatApp runtime={runtime} />;
+}
+
+function ControlPlaneApiRequired({ runtime }: { runtime: ChatRuntimeConfig }) {
+  const reason =
+    !runtime.runtimeHost || runtime.runtimeHost.kind === 'none' ? 'No live daemon was found for this workspace.'
+    : 'The registered daemon for this workspace is stale.';
+
+  return (
+    <Box flexDirection="column" padding={1}>
+      <Text bold>TUI requires the control-plane API</Text>
+      <Text>{reason}</Text>
+      <Text>Start `heddle daemon` for this workspace, then run `heddle chat` again.</Text>
+      <Text dimColor>The old direct TUI session lifecycle path has been removed.</Text>
+    </Box>
+  );
 }
 
 function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
@@ -115,9 +134,7 @@ function EmbeddedChatApp({ runtime }: { runtime: ChatRuntimeConfig }) {
   });
   const drift = useChatDrift({
     activeSession,
-    sessionService,
     setSessionDriftEnabled,
-    refreshSessions,
   });
 
   const messages = useMemo(() => activeSession?.messages ?? [], [activeSession?.messages]);
