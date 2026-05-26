@@ -3,7 +3,6 @@ import { Box, Text } from 'ink';
 import { ConversationPanel } from './components/ConversationPanel.js';
 import { PromptInput } from './components/PromptInput.js';
 import { useControlPlaneSessionStore } from './hooks/useControlPlaneSessionStore.js';
-import { usePromptDraft } from './hooks/usePromptDraft.js';
 import type {
   ControlPlaneSessionLatestUpdate,
   ControlPlaneSessionStore,
@@ -19,7 +18,6 @@ export function App({
 }) {
   const startedRef = useRef(false);
   const snapshot = useControlPlaneSessionStore(store);
-  const { draft, setDraft, clearDraft } = usePromptDraft();
 
   useEffect(() => {
     if (startedRef.current) {
@@ -38,9 +36,8 @@ export function App({
       return;
     }
 
-    clearDraft();
     void store.submitPrompt(value);
-  }, [clearDraft, store]);
+  }, [store]);
 
   const status = snapshot.error ?? snapshot.liveStatus;
   const latestUpdateText = formatLatestUpdate(snapshot.latestUpdate);
@@ -68,10 +65,8 @@ export function App({
         <Text color="yellow">Approval requested. Approval controls are part of the next cli-v2 slice.</Text>
       ) : null}
       <PromptInput
-        value={draft}
         disabled={snapshot.loading || snapshot.submitting || snapshot.running || snapshot.cancelling}
         placeholder={snapshot.loading ? 'Loading session...' : 'Type a prompt'}
-        onChange={setDraft}
         onSubmit={submitPrompt}
       />
     </Box>

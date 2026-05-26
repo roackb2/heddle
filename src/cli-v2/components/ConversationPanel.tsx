@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Box, Text } from 'ink';
 import type { ControlPlaneSessionDetail } from '@/client-shared/api/types.js';
 
-export function ConversationPanel({ session }: { session: ControlPlaneSessionDetail }) {
+export const ConversationPanel = memo(function ConversationPanel({ session }: { session: ControlPlaneSessionDetail }) {
   const messages = session?.messages.slice(-10) ?? [];
 
   return (
@@ -26,4 +26,4 @@ export function ConversationPanel({ session }: { session: ControlPlaneSessionDet
       ))}
     </Box>
   );
-}
+});
