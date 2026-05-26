@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import { BUILT_IN_MODEL_GROUPS, ModelPolicyService } from '@/core/llm/models/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
@@ -32,9 +33,11 @@ import {
   memoryReadInputSchema,
   memorySearchInputSchema,
   sessionApprovalDecisionSchema,
+  sessionCompactInputSchema,
   sessionEventsInputSchema,
   sessionInputSchema,
   sessionMessageInputSchema,
+  sessionRenameInputSchema,
   sessionsEventsInputSchema,
   sessionsInputSchema,
   sessionSettingsInputSchema,
@@ -117,9 +120,57 @@ export const controlPlaneRouter = router({
       },
     });
   }),
+  sessionRename: controlPlaneWorkspaceProcedure.input(sessionRenameInputSchema).mutation(({ ctx, input }) => {
+    const { sessionEngineArgs } = ctx.requestWorkspace;
+    return controlPlaneChatSessionsController.renameSession({
+      ...sessionEngineArgs,
+      sessionId: input.id,
+      name: input.name,
+    });
+  }),
+  sessionDelete: controlPlaneWorkspaceProcedure.input(sessionInputSchema).mutation(({ ctx, input }) => {
+    const { workspace, sessionEngineArgs } = ctx.requestWorkspace;
+    return controlPlaneChatSessionsController.deleteSession({
+      ...sessionEngineArgs,
+      workspaceId: workspace.id,
+      sessionId: input.id,
+      leaseOwner: resolveControlPlaneLeaseOwner(ctx),
+    });
+  }),
+  sessionReset: controlPlaneWorkspaceProcedure.input(sessionInputSchema).mutation(({ ctx, input }) => {
+    const { workspace, sessionEngineArgs } = ctx.requestWorkspace;
+    return controlPlaneChatSessionsController.resetSession({
+      ...sessionEngineArgs,
+      workspaceId: workspace.id,
+      sessionId: input.id,
+      apiKey: input.apiKey,
+      preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
+      leaseOwner: resolveControlPlaneLeaseOwner(ctx),
+    });
+  }),
+  sessionCompact: controlPlaneWorkspaceProcedure.input(sessionCompactInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace, sessionEngineArgs } = ctx.requestWorkspace;
+    return await controlPlaneChatSessionsController.compactSession({
+      ...sessionEngineArgs,
+      workspaceId: workspace.id,
+      sessionId: input.id,
+      force: input.force,
+      apiKey: input.apiKey,
+      preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
+      systemContext: input.systemContext,
+      leaseOwner: resolveControlPlaneLeaseOwner(ctx),
+    });
+  }),
   sessionTurnReview: controlPlaneWorkspaceProcedure.input(turnReviewInputSchema).query(({ ctx, input }) => {
     const { sessionEngineArgs } = ctx.requestWorkspace;
     return controlPlaneChatSessionsController.readTurnReview(sessionEngineArgs, input.sessionId, input.turnId) ?? null;
+  }),
+  sessionRunState: controlPlaneWorkspaceProcedure.input(sessionInputSchema).query(({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return controlPlaneChatSessionsController.readRunState({
+      workspaceId: workspace.id,
+      sessionId: input.id,
+    });
   }),
   sessionPendingApproval: controlPlaneWorkspaceProcedure.input(sessionInputSchema).query(({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;
@@ -169,11 +220,7 @@ export const controlPlaneRouter = router({
       logger,
       systemContext: input.systemContext,
       memoryMaintenanceMode: input.memoryMaintenanceMode,
-      leaseOwner: {
-        ownerKind: 'daemon',
-        ownerId: ctx.runtimeHost?.ownerId ?? `daemon-${process.pid}`,
-        clientLabel: 'control plane',
-      },
+      leaseOwner: resolveControlPlaneLeaseOwner(ctx),
     });
   }),
   sessionContinue: controlPlaneWorkspaceProcedure.input(sessionInputSchema).mutation(async ({ ctx, input }) => {
@@ -183,11 +230,7 @@ export const controlPlaneRouter = router({
       sessionId: input.id,
       apiKey: input.apiKey,
       preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
-      leaseOwner: {
-        ownerKind: 'daemon',
-        ownerId: ctx.runtimeHost?.ownerId ?? `daemon-${process.pid}`,
-        clientLabel: 'control plane',
-      },
+      leaseOwner: resolveControlPlaneLeaseOwner(ctx),
     });
   }),
   agentAsk: controlPlaneWorkspaceProcedure.input(agentAskInputSchema).mutation(async ({ ctx, input }) => {
@@ -429,6 +472,14 @@ export const controlPlaneRouter = router({
     return await ControlPlaneLayoutSnapshotsController.save(workspace.stateRoot, input.snapshot);
   }),
 });
+
+function resolveControlPlaneLeaseOwner(ctx: Pick<HeddleServerContext, 'runtimeHost'>): ChatSessionLeaseOwner {
+  return {
+    ownerKind: 'daemon',
+    ownerId: ctx.runtimeHost?.ownerId ?? `daemon-${process.pid}`,
+    clientLabel: 'control plane',
+  };
+}
 
 function registerControlPlaneWorkspaces(
   ctx: HeddleServerContext,

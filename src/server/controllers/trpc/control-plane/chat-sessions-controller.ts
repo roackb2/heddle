@@ -23,6 +23,7 @@ import {
   type ToolApprovalUserDecision,
 } from '@/core/approvals/index.js';
 import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
+import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type {
   ConversationEngine,
@@ -65,6 +66,24 @@ type CreateControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & {
 type UpdateControlPlaneChatSessionSettingsArgs = ControlPlaneSessionReadArgs & {
   sessionId: string;
   settings: UpdateConversationSessionSettingsInput;
+};
+
+type RenameControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & {
+  sessionId: string;
+  name: string;
+};
+
+type DeleteControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & ControlPlaneSessionAddress & {
+  leaseOwner: ChatSessionLeaseOwner;
+};
+
+type ResetControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & ControlPlaneSessionAddress & {
+  leaseOwner: ChatSessionLeaseOwner;
+};
+
+type CompactControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & ControlPlaneSessionAddress & {
+  force?: boolean;
+  leaseOwner: ChatSessionLeaseOwner;
 };
 
 type SubmitChatPromptArgs = ControlPlaneSessionReadArgs & {
@@ -124,6 +143,105 @@ export class ControlPlaneChatSessionsController {
     const { sessionId, settings, ...engineInput } = args;
     const updated = this.createEngine(engineInput).sessions.updateSettings(sessionId, settings);
     return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
+  }
+
+  renameSession(args: RenameControlPlaneChatSessionArgs): ChatSessionDetail {
+    const { sessionId, name, ...engineInput } = args;
+    const updated = this.createEngine(engineInput).sessions.rename(sessionId, name);
+    return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
+  }
+
+  deleteSession(args: DeleteControlPlaneChatSessionArgs): { deleted: boolean } {
+    this.assertNoActiveRun(args);
+    const { sessionId, leaseOwner, ...engineInput } = args;
+    const sessions = this.createEngine(engineInput).sessions;
+    this.assertNoLeaseConflict(sessions, sessionId, leaseOwner);
+    return {
+      deleted: sessions.delete(sessionId),
+    };
+  }
+
+  resetSession(args: ResetControlPlaneChatSessionArgs): ChatSessionDetail {
+    this.assertNoActiveRun(args);
+    const { sessionId, leaseOwner, ...engineInput } = args;
+    const sessions = this.createEngine(engineInput).sessions;
+    this.assertNoLeaseConflict(sessions, sessionId, leaseOwner);
+    const session = sessions.require(sessionId);
+    const model = session.model ?? args.model ?? DEFAULT_OPENAI_MODEL;
+    const updated = sessions.resetConversation(sessionId, {
+      apiKeyPresent: RuntimeCredentialService.hasCredentialForModel(model, {
+        apiKey: args.apiKey,
+        credentialStorePath: args.credentialStorePath,
+        preferApiKey: args.preferApiKey,
+      }),
+    });
+    return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
+  }
+
+  async compactSession(args: CompactControlPlaneChatSessionArgs): Promise<ChatSessionDetail> {
+    this.assertNoActiveRun(args);
+    const sessionKey = ControlPlaneChatSessionsController.sessionAddressKey(args);
+    const controller = new AbortController();
+    this.inFlightRuns.set(sessionKey, { controller });
+    const { sessionId, force = true, leaseOwner, ...engineInput } = args;
+    const sessions = this.createEngine(engineInput).sessions;
+    let leaseAcquired = false;
+    let previousCompactionState: Pick<ChatSession, 'context' | 'archives'> | undefined;
+
+    try {
+      this.assertNoLeaseConflict(sessions, sessionId, leaseOwner);
+      const session = sessions.acquireLease(sessionId, leaseOwner);
+      leaseAcquired = true;
+      const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
+        eventBus: this.sessionEventBus,
+        workspaceId: args.workspaceId,
+        sessionId,
+      });
+      previousCompactionState = {
+        context: session.context,
+        archives: session.archives,
+      };
+
+      sessions.markCompactionRunning(sessionId, { sourceHistory: session.history });
+      const model = session.model ?? args.model ?? DEFAULT_OPENAI_MODEL;
+      const compacted = await ConversationCompactionService.compact({
+        history: session.history,
+        runtime: {
+          model,
+          stateRoot: args.stateRoot,
+          systemContext: args.systemContext,
+        },
+        session,
+        force,
+        summarizer: {
+          credentialSource: RuntimeCredentialService.resolveCredentialSourceForModel(model, {
+            apiKey: args.apiKey,
+            credentialStorePath: args.credentialStorePath,
+            preferApiKey: args.preferApiKey,
+          }),
+        },
+        onStatusChange: publisher.publishActivity,
+      });
+      const updated = sessions.applyCompactionResult(sessionId, compacted);
+      return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
+    } catch (error) {
+      if (previousCompactionState) {
+        sessions.restoreCompactionState(sessionId, previousCompactionState);
+      }
+      throw error;
+    } finally {
+      if (leaseAcquired) {
+        sessions.releaseLease(sessionId, leaseOwner);
+      }
+      this.inFlightRuns.delete(sessionKey);
+    }
+  }
+
+  readRunState(sessionAddress: ControlPlaneSessionAddress) {
+    return {
+      running: this.isRunning(sessionAddress),
+      pendingApproval: this.getPendingApproval(sessionAddress) ?? null,
+    };
   }
 
   async submitPrompt(args: SubmitChatPromptArgs) {
@@ -468,6 +586,23 @@ export class ControlPlaneChatSessionsController {
       workspaceRoot: args.workspaceRoot,
       projectApprovalRulesFile: join(args.stateRoot, 'command-approvals.json'),
     });
+  }
+
+  private assertNoActiveRun(sessionAddress: ControlPlaneSessionAddress): void {
+    if (this.isRunning(sessionAddress)) {
+      throw new Error('A run is already in progress for this session.');
+    }
+  }
+
+  private assertNoLeaseConflict(
+    sessions: ConversationEngine['sessions'],
+    sessionId: string,
+    leaseOwner: ChatSessionLeaseOwner,
+  ): void {
+    const conflict = sessions.getLeaseConflict(sessionId, leaseOwner);
+    if (conflict) {
+      throw new Error(conflict);
+    }
   }
 
   private async runFakeBrowserIntegrationSessionPrompt(args: SubmitChatPromptArgs) {

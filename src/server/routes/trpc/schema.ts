@@ -7,6 +7,21 @@ export const sessionInputSchema = z.object({
   preferApiKey: z.boolean().optional(),
 });
 
+export const sessionRenameInputSchema = z.object({
+  id: z.string().min(1),
+  workspaceId: z.string().min(1).optional(),
+  name: z.string().min(1),
+});
+
+export const sessionCompactInputSchema = z.object({
+  id: z.string().min(1),
+  workspaceId: z.string().min(1).optional(),
+  force: z.boolean().optional(),
+  apiKey: z.string().min(1).optional(),
+  preferApiKey: z.boolean().optional(),
+  systemContext: z.string().min(1).optional(),
+});
+
 export const sessionsInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
 }).optional();
