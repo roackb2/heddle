@@ -1,10 +1,6 @@
 import { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-
-type PromptActivity = {
-  text: string;
-  color: 'blue' | 'green' | 'yellow' | 'red';
-};
+import type { PromptActivityView } from '../helpers/activities/prompt-activity.js';
 
 export function PromptInput({
   activity,
@@ -12,7 +8,7 @@ export function PromptInput({
   placeholder,
   onSubmit,
 }: {
-  activity?: PromptActivity;
+  activity?: PromptActivityView;
   disabled: boolean;
   placeholder: string;
   onSubmit: (value: string) => void;
