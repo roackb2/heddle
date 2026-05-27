@@ -45,6 +45,35 @@ describe('ClientSharedSessionMessageController', () => {
       { id: 'persisted-assistant', role: 'assistant', text: 'Different workspace.' },
     ]);
   });
+
+  it('adds a visible assistant message for terminal failed run results', () => {
+    const session = sessionWithMessages([
+      { id: 'persisted-user', role: 'user', text: 'Go on' },
+    ]);
+
+    expect(ClientSharedSessionMessageController.applyTerminalRunResult(session, {
+      outcome: 'error',
+      summary: 'Provider request failed.',
+    })?.messages).toEqual([
+      { id: 'persisted-user', role: 'user', text: 'Go on' },
+      {
+        id: 'live-run-error',
+        role: 'assistant',
+        text: 'Run failed before a final answer: Provider request failed.',
+      },
+    ]);
+  });
+
+  it('does not add terminal result messages for successful runs', () => {
+    const session = sessionWithMessages([
+      { id: 'persisted-assistant', role: 'assistant', text: 'Done.' },
+    ]);
+
+    expect(ClientSharedSessionMessageController.applyTerminalRunResult(session, {
+      outcome: 'done',
+      summary: 'Done.',
+    })).toEqual(session);
+  });
 });
 
 function sessionWithMessages(

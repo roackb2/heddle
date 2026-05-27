@@ -120,6 +120,45 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('renders failed run summaries when the persisted transcript has no assistant result message', async () => {
+    const fixture = createClientFixture();
+    fixture.calls.sessionSendPromptMutate.mockResolvedValueOnce({
+      session: {
+        id: 'session-1',
+        name: 'Session 1',
+        workspaceId: 'workspace-1',
+        messageCount: 1,
+        turnCount: 1,
+        messages: [
+          { id: 'persisted-user', role: 'user', text: 'Go on' },
+        ],
+        turns: [],
+      },
+      outcome: 'error',
+      summary: 'Provider request failed.',
+    });
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await store.submitPrompt('Go on');
+
+    expect(store.getSnapshot()).toMatchObject({
+      running: false,
+      submitting: false,
+      latestUpdate: {
+        label: 'Run finished',
+        detail: 'error',
+        tone: 'error',
+      },
+    });
+    expect(store.getSnapshot().activeSession?.messages.at(-1)).toEqual({
+      id: 'live-run-error',
+      role: 'assistant',
+      text: 'Run failed before a final answer: Provider request failed.',
+    });
+    store.dispose();
+  });
+
   it('resolves pending approvals through the shared control-plane API', async () => {
     const fixture = createClientFixture();
     const store = new ControlPlaneSessionStore({ client: fixture.client });

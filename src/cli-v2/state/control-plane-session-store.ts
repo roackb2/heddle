@@ -215,14 +215,14 @@ export class ControlPlaneSessionStore {
         prompt: trimmed,
       }));
       this.setSnapshot({
-        activeSession: result.session,
+        activeSession: ClientSharedSessionMessageController.applyTerminalRunResult(result.session, result),
         running: false,
         submitting: false,
         liveStatus: undefined,
         latestUpdate: {
           label: 'Run finished',
           detail: result.outcome,
-          tone: 'success',
+          tone: resolveRunOutcomeTone(result.outcome),
         },
       });
       await this.refreshSessions();
@@ -650,7 +650,7 @@ const latestUpdateHandlers: SessionActivityLatestUpdateHandlers = {
   'loop.finished': (activity) => ({
     label: 'Run finished',
     detail: activity.outcome,
-    tone: activity.outcome === 'done' ? 'success' : 'warning',
+    tone: resolveRunOutcomeTone(activity.outcome),
   }),
   'compaction.running': (activity) => ({
     label: 'Compacting history',
@@ -715,6 +715,14 @@ function formatStepDetail(step: number | undefined): string | undefined {
 
 function formatPendingApprovalLabel(approval: NonNullable<ControlPlanePendingApproval>): string | undefined {
   return approval.tool;
+}
+
+function resolveRunOutcomeTone(outcome: string): ControlPlaneSessionLatestUpdate['tone'] {
+  if (outcome === 'done' || outcome === 'completed') {
+    return 'success';
+  }
+
+  return outcome === 'error' ? 'error' : 'warning';
 }
 
 function isRunAlreadyInProgressError(error: unknown): boolean {
