@@ -4,6 +4,7 @@ import type {
   ControlPlanePendingApproval,
   ControlPlaneSessionDetail,
   ControlPlaneSessionEventEnvelope,
+  ControlPlaneSessionSendPromptResult,
   ControlPlaneSessionView,
   ControlPlaneSessionsEventEnvelope,
 } from '../../../client-shared/api/types.js';
@@ -61,6 +62,43 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('does not finalize a submitted prompt before the send mutation resolves', async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = createClientFixture();
+      const pendingSubmit = createDeferred<Awaited<ReturnType<typeof fixture.calls.sessionSendPromptMutate>>>();
+      fixture.calls.sessionSendPromptMutate.mockReturnValueOnce(pendingSubmit.promise);
+      const store = new ControlPlaneSessionStore({ client: fixture.client });
+      await store.start();
+
+      const submit = store.submitPrompt('Wait for the server result');
+      await vi.advanceTimersByTimeAsync(800);
+
+      expect(store.getSnapshot()).toMatchObject({
+        submitting: true,
+        latestUpdate: {
+          label: 'Finalizing response',
+          detail: 'waiting for server result',
+          tone: 'info',
+        },
+      });
+
+      pendingSubmit.resolve(createSubmitResult());
+      await submit;
+      expect(store.getSnapshot()).toMatchObject({
+        submitting: false,
+        latestUpdate: {
+          label: 'Run finished',
+          detail: 'completed',
+          tone: 'success',
+        },
+      });
+      store.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('treats an in-progress submit rejection as active run state', async () => {
     const fixture = createClientFixture();
     fixture.calls.sessionSendPromptMutate.mockRejectedValueOnce(new Error('A run is already in progress for this session.'));
@@ -77,6 +115,49 @@ describe('ControlPlaneSessionStore', () => {
         label: 'Run already in progress',
         detail: 'waiting for current run to finish',
         tone: 'warning',
+      },
+    });
+    store.dispose();
+  });
+
+  it('does not submit another prompt while the selected session is running', async () => {
+    const fixture = createClientFixture();
+    fixture.calls.sessionRunningQuery.mockResolvedValueOnce({ running: true });
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await store.submitPrompt('Next prompt');
+
+    expect(fixture.calls.sessionSendPromptMutate).not.toHaveBeenCalled();
+    expect(store.getSnapshot()).toMatchObject({
+      running: true,
+      latestUpdate: {
+        label: 'Run already in progress',
+        detail: 'waiting for current run to finish',
+        tone: 'warning',
+      },
+    });
+    store.dispose();
+  });
+
+  it('resolves pending approvals through the shared control-plane API', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await store.resolvePendingApproval({ type: 'approve', reason: 'Approved in test' });
+
+    expect(fixture.calls.sessionResolveApprovalMutate).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      decision: { type: 'approve', reason: 'Approved in test' },
+    });
+    expect(store.getSnapshot()).toMatchObject({
+      approvalResolving: false,
+      latestUpdate: {
+        label: 'Approval resolved',
+        detail: 'approve',
+        tone: 'info',
       },
     });
     store.dispose();
@@ -217,6 +298,7 @@ function createClientFixture() {
       outcome: 'completed',
       summary: 'Done.',
     })),
+    sessionResolveApprovalMutate: vi.fn(async () => ({ resolved: true })),
   };
   const client = {
     controlPlane: {
@@ -241,7 +323,7 @@ function createClientFixture() {
       sessionPendingApproval: { query: calls.sessionPendingApprovalQuery },
       sessionSendPrompt: { mutate: calls.sessionSendPromptMutate },
       sessionCancel: { mutate: vi.fn(async () => ({ cancelled: false })) },
-      sessionResolveApproval: { mutate: vi.fn(async () => ({ resolved: true })) },
+      sessionResolveApproval: { mutate: calls.sessionResolveApprovalMutate },
     },
   } as unknown as ControlPlaneProxyClient;
 
@@ -254,5 +336,34 @@ function createClientFixture() {
     get sessionsEvents() {
       return sessionsEvents;
     },
+  };
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
+
+function createSubmitResult(): ControlPlaneSessionSendPromptResult {
+  return {
+    session: {
+      id: 'session-1',
+      name: 'Session 1',
+      workspaceId: 'workspace-1',
+      messageCount: 1,
+      turnCount: 0,
+      messages: [
+        { id: 'message-1', role: 'assistant', text: 'Ready.' },
+        { id: 'message-2', role: 'assistant', text: 'Done.' },
+      ],
+      turns: [],
+    },
+    outcome: 'completed',
+    summary: 'Done.',
   };
 }

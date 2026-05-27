@@ -57,12 +57,14 @@ export class OpenAiCodec {
       return undefined;
     }
 
-    for (const item of response.output) {
+    const output = Array.isArray(response.output) ? response.output : [];
+    for (const item of output) {
       if (item.type !== 'message') {
         continue;
       }
 
-      const segment = item.content.find((part) => part.type === 'output_text');
+      const content = Array.isArray(item.content) ? item.content : [];
+      const segment = content.find((part) => part.type === 'output_text');
       if (segment?.text?.trim()) {
         return segment.text.trim();
       }
@@ -75,7 +77,8 @@ export class OpenAiCodec {
     response: OpenAiResponse,
     preferToolCalls: boolean,
   ): AssistantDiagnostics | undefined {
-    const reasoning = response.output.find((item): item is ResponseReasoningItem => item.type === 'reasoning');
+    const output = Array.isArray(response.output) ? response.output : [];
+    const reasoning = output.find((item): item is ResponseReasoningItem => item.type === 'reasoning');
     if (!reasoning || !Array.isArray(reasoning.summary)) {
       return undefined;
     }

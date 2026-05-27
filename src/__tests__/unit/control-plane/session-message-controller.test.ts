@@ -45,6 +45,7 @@ describe('ClientSharedSessionMessageController', () => {
       { id: 'persisted-assistant', role: 'assistant', text: 'Different workspace.' },
     ]);
   });
+
 });
 
 function sessionWithMessages(

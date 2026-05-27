@@ -4,6 +4,7 @@
 
 import OpenAI from 'openai';
 import type {
+  Response as OpenAiResponse,
   ResponseStreamEvent,
 } from 'openai/resources/responses/responses.js';
 import type { Fetch as OpenAiFetch } from 'openai/core.js';
@@ -93,80 +94,95 @@ export class OpenAiAdapter implements LlmAdapter {
 
     let streamedContent = '';
     const streamedToolCalls = new Map<string, { id: string; tool: string; argumentsText: string }>();
-    for await (const event of stream as AsyncIterable<ResponseStreamEvent>) {
-      if (event.type === 'response.output_text.delta' && event.delta) {
-        streamedContent += event.delta;
-        onStreamEvent?.({ type: 'content.delta', delta: event.delta });
-        continue;
-      }
-
-      if (event.type === 'response.output_text.done') {
-        streamedContent = event.text;
-        onStreamEvent?.({ type: 'content.done', content: event.text });
-        continue;
-      }
-
-      if (event.type === 'response.reasoning_summary_text.delta' && event.delta) {
-        onStreamEvent?.({ type: 'reasoning_summary.delta', delta: event.delta });
-        continue;
-      }
-
-      if (event.type === 'response.reasoning_summary_text.done') {
-        onStreamEvent?.({ type: 'reasoning_summary.done', text: event.text });
-        continue;
-      }
-
-      if (event.type === 'response.reasoning_summary.delta') {
-        const delta = OpenAiCodec.readReasoningSummaryDeltaText(event.delta);
-        if (delta) {
-          onStreamEvent?.({ type: 'reasoning_summary.delta', delta });
+    let completedResponse: OpenAiResponse | undefined;
+    try {
+      for await (const event of stream as AsyncIterable<ResponseStreamEvent>) {
+        if (event.type === 'response.output_text.delta' && event.delta) {
+          streamedContent += event.delta;
+          onStreamEvent?.({ type: 'content.delta', delta: event.delta });
+          continue;
         }
-        continue;
-      }
 
-      if (event.type === 'response.reasoning_summary.done') {
-        onStreamEvent?.({ type: 'reasoning_summary.done', text: event.text });
-        continue;
-      }
-
-      if (event.type === 'response.output_item.added' || event.type === 'response.output_item.done') {
-        const item = event.item;
-        if (
-          item.type === 'function_call'
-          && typeof item.id === 'string'
-          && typeof item.call_id === 'string'
-          && typeof item.name === 'string'
-        ) {
-          const existing = streamedToolCalls.get(item.id);
-          streamedToolCalls.set(item.id, {
-            id: item.call_id,
-            tool: item.name,
-            argumentsText:
-              typeof item.arguments === 'string' && item.arguments.length > 0 ? item.arguments
-              : existing?.argumentsText ?? '',
-          });
+        if (event.type === 'response.output_text.done') {
+          streamedContent = event.text;
+          onStreamEvent?.({ type: 'content.done', content: event.text });
+          continue;
         }
-        continue;
-      }
 
-      if (event.type === 'response.function_call_arguments.delta') {
-        const existing = streamedToolCalls.get(event.item_id);
-        if (existing) {
-          existing.argumentsText += event.delta;
+        if (event.type === 'response.reasoning_summary_text.delta' && event.delta) {
+          onStreamEvent?.({ type: 'reasoning_summary.delta', delta: event.delta });
+          continue;
         }
-        continue;
-      }
 
-      if (event.type === 'response.function_call_arguments.done') {
-        const existing = streamedToolCalls.get(event.item_id);
-        if (existing) {
-          existing.argumentsText = event.arguments;
+        if (event.type === 'response.reasoning_summary_text.done') {
+          onStreamEvent?.({ type: 'reasoning_summary.done', text: event.text });
+          continue;
         }
+
+        if (event.type === 'response.reasoning_summary.delta') {
+          const delta = OpenAiCodec.readReasoningSummaryDeltaText(event.delta);
+          if (delta) {
+            onStreamEvent?.({ type: 'reasoning_summary.delta', delta });
+          }
+          continue;
+        }
+
+        if (event.type === 'response.reasoning_summary.done') {
+          onStreamEvent?.({ type: 'reasoning_summary.done', text: event.text });
+          continue;
+        }
+
+        if (event.type === 'response.output_item.added' || event.type === 'response.output_item.done') {
+          const item = event.item;
+          if (
+            item.type === 'function_call'
+            && typeof item.id === 'string'
+            && typeof item.call_id === 'string'
+            && typeof item.name === 'string'
+          ) {
+            const existing = streamedToolCalls.get(item.id);
+            streamedToolCalls.set(item.id, {
+              id: item.call_id,
+              tool: item.name,
+              argumentsText:
+                typeof item.arguments === 'string' && item.arguments.length > 0 ? item.arguments
+                : existing?.argumentsText ?? '',
+            });
+          }
+          continue;
+        }
+
+        if (event.type === 'response.function_call_arguments.delta') {
+          const existing = streamedToolCalls.get(event.item_id);
+          if (existing) {
+            existing.argumentsText += event.delta;
+          }
+          continue;
+        }
+
+        if (event.type === 'response.function_call_arguments.done') {
+          const existing = streamedToolCalls.get(event.item_id);
+          if (existing) {
+            existing.argumentsText = event.arguments;
+          }
+          continue;
+        }
+
+        if (event.type === 'response.completed') {
+          completedResponse = event.response;
+        }
+      }
+    } catch (error) {
+      // Once the API has emitted a completed response, prefer that captured
+      // response over failing the turn on SDK-side stream finalization/parsing.
+      if (!completedResponse) {
+        throw error;
       }
     }
 
-    const response = await stream.finalResponse();
-    const finalResponseToolCalls = response.output.flatMap((item): ToolCall[] => {
+    const response = completedResponse ?? await stream.finalResponse();
+    const outputItems = Array.isArray(response.output) ? response.output : [];
+    const finalResponseToolCalls = outputItems.flatMap((item): ToolCall[] => {
       if (
         item.type !== 'function_call'
         || typeof (item as { call_id?: unknown }).call_id !== 'string'

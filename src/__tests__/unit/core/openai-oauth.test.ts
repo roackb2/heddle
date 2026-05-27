@@ -434,6 +434,44 @@ describe('OpenAI OAuth helpers', () => {
     ]);
     expect(result.content).toBe('Done.');
   });
+
+  it('uses the captured completed response when stream iteration fails after completion', async () => {
+    const adapter = createOpenAiTestAdapter({
+      model: 'gpt-5.4',
+      credential: {
+        type: 'oauth',
+        provider: 'openai',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresAt: Date.now() + 120_000,
+        accountId: 'account-123',
+        createdAt: '2026-04-27T00:00:00.000Z',
+        updatedAt: '2026-04-27T00:00:00.000Z',
+      },
+      fetchImpl: (async () => {
+        const body = [
+          'event: response.created',
+          'data: {"type":"response.created","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"in_progress","model":"gpt-5.4","output":[]}}',
+          '',
+          'event: response.output_text.done',
+          'data: {"type":"response.output_text.done","text":"Done.","content_index":0,"item_id":"msg_1","output_index":0,"sequence_number":2}',
+          '',
+          'event: response.completed',
+          'data: {"type":"response.completed","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"completed","completed_at":1777301835,"model":"gpt-5.4","output_text":"Done.","output":[{"id":"msg_1","type":"message","status":"completed","role":"assistant"}],"usage":{"input_tokens":10,"input_tokens_details":{"cached_tokens":0},"output_tokens":5,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":15}}}',
+          '',
+        ].join('\n');
+
+        return new Response(body, {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        });
+      }) as typeof fetch,
+    });
+
+    const result = await adapter.chat([{ role: 'user', content: 'hello' }], []);
+
+    expect(result.content).toBe('Done.');
+  });
 });
 
 function createJwt(payload: unknown): string {

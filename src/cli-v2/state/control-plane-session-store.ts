@@ -46,6 +46,7 @@ export type ControlPlaneSessionStoreSnapshot = {
   pendingApproval: ControlPlanePendingApproval;
   loading: boolean;
   submitting: boolean;
+  approvalResolving: boolean;
   running: boolean;
   cancelling: boolean;
   streamConnected: boolean;
@@ -60,6 +61,7 @@ const INITIAL_SNAPSHOT: ControlPlaneSessionStoreSnapshot = {
   pendingApproval: null,
   loading: false,
   submitting: false,
+  approvalResolving: false,
   running: false,
   cancelling: false,
   streamConnected: false,
@@ -189,6 +191,17 @@ export class ControlPlaneSessionStore {
       return;
     }
 
+    if (this.snapshotValue.running) {
+      this.setSnapshot({
+        latestUpdate: {
+          label: 'Run already in progress',
+          detail: 'waiting for current run to finish',
+          tone: 'warning',
+        },
+      });
+      return;
+    }
+
     const workspaceId = this.requireWorkspaceId();
     const sessionId = this.requireActiveSessionId();
     this.setSnapshot((current) => ({
@@ -220,7 +233,7 @@ export class ControlPlaneSessionStore {
         latestUpdate: {
           label: 'Run finished',
           detail: result.outcome,
-          tone: 'success',
+          tone: resolveRunOutcomeTone(result.outcome),
         },
       });
       await this.refreshSessions();
@@ -290,6 +303,15 @@ export class ControlPlaneSessionStore {
   async resolvePendingApproval(decision: ControlPlaneApprovalDecision): Promise<void> {
     const workspaceId = this.requireWorkspaceId();
     const sessionId = this.requireActiveSessionId();
+    this.setSnapshot({
+      approvalResolving: true,
+      error: undefined,
+      latestUpdate: {
+        label: 'Resolving approval',
+        tone: 'info',
+      },
+    });
+
     try {
       const result = await this.client.controlPlane.sessionResolveApproval.mutate({
         workspaceId,
@@ -300,8 +322,19 @@ export class ControlPlaneSessionStore {
         throw new Error('No pending approval found for this session.');
       }
       await this.refreshPendingApproval(sessionId);
+      this.setSnapshot({
+        approvalResolving: false,
+        latestUpdate: {
+          label: 'Approval resolved',
+          detail: decision.type,
+          tone: 'info',
+        },
+      });
     } catch (error) {
-      this.setSnapshot({ error: formatError(error) });
+      this.setSnapshot({
+        approvalResolving: false,
+        error: formatError(error),
+      });
     }
   }
 
@@ -540,6 +573,18 @@ export class ControlPlaneSessionStore {
       return;
     }
 
+    if (this.snapshotValue.submitting) {
+      this.setSnapshot({
+        liveStatus: 'Finalizing response...',
+        latestUpdate: {
+          label: 'Finalizing response',
+          detail: 'waiting for server result',
+          tone: 'info',
+        },
+      });
+      return;
+    }
+
     await this.refreshSession(sessionId, { silent: true });
     await this.refreshSessions();
     this.setSnapshot({
@@ -616,7 +661,7 @@ const latestUpdateHandlers: SessionActivityLatestUpdateHandlers = {
   'loop.finished': (activity) => ({
     label: 'Run finished',
     detail: activity.outcome,
-    tone: activity.outcome === 'done' ? 'success' : 'warning',
+    tone: resolveRunOutcomeTone(activity.outcome),
   }),
   'compaction.running': (activity) => ({
     label: 'Compacting history',
@@ -681,6 +726,14 @@ function formatStepDetail(step: number | undefined): string | undefined {
 
 function formatPendingApprovalLabel(approval: NonNullable<ControlPlanePendingApproval>): string | undefined {
   return approval.tool;
+}
+
+function resolveRunOutcomeTone(outcome: string): ControlPlaneSessionLatestUpdate['tone'] {
+  if (outcome === 'done' || outcome === 'completed') {
+    return 'success';
+  }
+
+  return outcome === 'error' ? 'error' : 'warning';
 }
 
 function isRunAlreadyInProgressError(error: unknown): boolean {
