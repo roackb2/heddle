@@ -9,7 +9,7 @@ Interface code may import API contracts and client utilities from this folder.
 Interface code must not import core services, repositories, runtime toolkits,
 server controllers, or copied backend DTOs directly.
 
-`AppRouter` type imports are isolated to this folder. UI and controller code
+`AppRouter` type imports are isolated to this folder. UI and service code
 should consume tRPC-derived aliases such as `RouterInputs`, `RouterOutputs`, and
 the `ControlPlane*` types exported from `api/types.ts`.
 
@@ -17,9 +17,11 @@ the `ControlPlane*` types exported from `api/types.ts`.
 
 - `api/`: tRPC contracts, link services, proxy services, and
   `trpc-react.ts`, which owns the typed `@trpc/react-query` hook object.
-- `controllers/`: client-side state and API-result shaping shared across
+- `services/`: client-side state and API-result shaping shared across
   frontends. These classes may consume tRPC-derived types, but must not import
-  core services, server controllers, or UI renderers.
+  core services, server controllers, or UI renderers. Shared services own
+  API-derived behavior such as transient session messages, session activity
+  effect dispatch, and approval input display metadata.
 - `hooks/`: React hooks. Files in this folder use `useXxx` naming and return
   hook-shaped values.
 
@@ -29,7 +31,8 @@ the `ControlPlane*` types exported from `api/types.ts`.
 - `ClientSharedApiLinkService` for shared tRPC link construction;
 - `ClientSharedProxyApiService` for non-React proxy clients used by CLI/TUI/ask
   callers;
-- shared API-consumer controllers such as transient conversation message
+- shared API-consumer services such as transient conversation message
+  shaping, session activity effect dispatch, and approval payload display
   shaping;
 - `trpcReact` for React Query tRPC usage in React interfaces;
 - `useControlPlaneTrpcClient` for provider-level React client state.

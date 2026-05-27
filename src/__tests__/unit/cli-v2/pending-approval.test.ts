@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  formatApprovalPayload,
-  resolveApprovalDecision,
-  resolveApprovalInputDetail,
-  resolveAvailableApprovalChoices,
+  PendingApprovalService,
   type PendingApproval,
-} from '../../../cli-v2/helpers/approvals/pending-approval.js';
+} from '../../../cli-v2/services/approvals/pending-approval-service.js';
 
-describe('pending approval helpers', () => {
+describe('PendingApprovalService', () => {
   it('exposes remember choice only when the API provides remember metadata', () => {
-    expect(resolveAvailableApprovalChoices(createApproval())).toEqual(['approve', 'deny']);
-    expect(resolveAvailableApprovalChoices(createApproval({
+    expect(PendingApprovalService.resolveAvailableChoices(createApproval())).toEqual(['approve', 'deny']);
+    expect(PendingApprovalService.resolveAvailableChoices(createApproval({
       rememberProjectApproval: {
         label: 'allow command for this project',
         rule: {
@@ -40,30 +37,30 @@ describe('pending approval helpers', () => {
       },
     });
 
-    expect(resolveApprovalDecision('approve', approval)).toEqual({
+    expect(PendingApprovalService.resolveDecision('approve', approval)).toEqual({
       type: 'approve',
       reason: 'Approved in cli-v2',
     });
-    expect(resolveApprovalDecision('allow_project', approval)).toEqual({
+    expect(PendingApprovalService.resolveDecision('allow_project', approval)).toEqual({
       type: 'approve_and_remember_project',
       reason: 'Approved and remembered for this project in cli-v2',
     });
-    expect(resolveApprovalDecision('deny', approval)).toEqual({
+    expect(PendingApprovalService.resolveDecision('deny', approval)).toEqual({
       type: 'deny',
       reason: 'Denied in cli-v2',
     });
   });
 
   it('projects common approval input details and raw payloads', () => {
-    expect(resolveApprovalInputDetail({ command: 'yarn test' })).toEqual({
+    expect(PendingApprovalService.resolveInputDetail({ command: 'yarn test' })).toEqual({
       label: 'command',
       value: 'yarn test',
     });
-    expect(resolveApprovalInputDetail({ path: 'src/index.ts' })).toEqual({
+    expect(PendingApprovalService.resolveInputDetail({ path: 'src/index.ts' })).toEqual({
       label: 'path',
       value: 'src/index.ts',
     });
-    expect(formatApprovalPayload({ extra: true })).toBe('{\n  "extra": true\n}');
+    expect(PendingApprovalService.formatPayload({ extra: true })).toBe('{\n  "extra": true\n}');
   });
 });
 

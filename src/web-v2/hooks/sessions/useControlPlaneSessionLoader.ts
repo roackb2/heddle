@@ -1,7 +1,7 @@
 import { skipToken } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { trpcReact, type ControlPlaneSessionDetail } from '@web/api/client';
-import { ClientSharedSessionMessageController } from '@/client-shared/controllers/session-messages';
+import { ClientSharedSessionMessageService } from '@/client-shared/services/session-messages';
 
 export type RefreshControlPlaneSession = (
   sessionId: string,
@@ -66,7 +66,7 @@ export function useControlPlaneSessionLoader({
 
       setSession((current) => (
         options.silent && isSameSessionAddress(current, next)
-          ? ClientSharedSessionMessageController.mergeTransientMessages(current, next)
+          ? ClientSharedSessionMessageService.mergeTransientMessages(current, next)
           : next
       ));
       setError(undefined);
@@ -94,11 +94,11 @@ export function useControlPlaneSessionLoader({
     const querySession = sessionQuery.data;
     setSession((current) => {
       if (latestRefreshMode.current === 'silent' && isSameSessionAddress(current, querySession)) {
-        return ClientSharedSessionMessageController.mergeTransientMessages(current, querySession);
+        return ClientSharedSessionMessageService.mergeTransientMessages(current, querySession);
       }
 
       if (isSameSessionAddress(current, querySession)) {
-        return ClientSharedSessionMessageController.mergeTransientMessages(current, querySession);
+        return ClientSharedSessionMessageService.mergeTransientMessages(current, querySession);
       }
 
       return querySession;

@@ -262,8 +262,12 @@ describe('AgentRunService.run', () => {
 
     expect(result.outcome).toBe('done');
     const streamUpdates = events.filter((event) => event.type === 'assistant.stream');
-    expect(streamUpdates.length).toBeGreaterThanOrEqual(2);
-    expect(streamUpdates.some((update) => update.done === false)).toBe(true);
+    expect(streamUpdates).toHaveLength(2);
+    expect(streamUpdates[0]).toMatchObject({
+      step: 1,
+      text: 'Hello',
+      done: false,
+    });
     expect(streamUpdates.at(-1)).toMatchObject({
       step: 1,
       text: 'Hello world',

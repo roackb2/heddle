@@ -4,12 +4,9 @@ import type {
   ControlPlanePendingApproval,
 } from '@/client-shared/api/types.js';
 import {
-  formatApprovalPayload,
-  resolveApprovalDecision,
-  resolveApprovalInputDetail,
-  resolveAvailableApprovalChoices,
+  PendingApprovalService,
   type ApprovalChoice,
-} from '../helpers/approvals/pending-approval.js';
+} from '../services/approvals/pending-approval-service.js';
 
 type ApprovalPanelProps = {
   approval: NonNullable<ControlPlanePendingApproval>;
@@ -18,9 +15,9 @@ type ApprovalPanelProps = {
 };
 
 export function ApprovalPanel({ approval, resolving, onResolve }: ApprovalPanelProps) {
-  const choices = resolveAvailableApprovalChoices(approval);
-  const detail = resolveApprovalInputDetail(approval.input);
-  const payload = detail ? undefined : formatApprovalPayload(approval.input);
+  const choices = PendingApprovalService.resolveAvailableChoices(approval);
+  const detail = PendingApprovalService.resolveInputDetail(approval.input);
+  const payload = detail ? undefined : PendingApprovalService.formatPayload(approval.input);
 
   useInput((input) => {
     if (resolving) {
@@ -32,7 +29,7 @@ export function ApprovalPanel({ approval, resolving, onResolve }: ApprovalPanelP
       return;
     }
 
-    onResolve(resolveApprovalDecision(choice, approval));
+    onResolve(PendingApprovalService.resolveDecision(choice, approval));
   }, { isActive: !resolving });
 
   return (

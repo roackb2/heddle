@@ -2,6 +2,7 @@ import { BookmarkCheck, Check, ShieldAlert, XCircle } from 'lucide-react';
 import type { ControlPlaneApprovalDecision, ControlPlanePendingApproval } from '@web/hooks/sessions/useControlPlaneSessionDetail';
 import { Button } from '@web/components/ui/button';
 import { useI18n } from '@web/i18n';
+import { ClientSharedApprovalDisplayService } from '@/client-shared/services/approvals';
 
 type PendingApproval = NonNullable<ControlPlanePendingApproval>;
 
@@ -14,11 +15,11 @@ type ApprovalPanelProps = {
 
 export function ApprovalPanel({ approval, resolving, error, onResolve }: ApprovalPanelProps) {
   const { t } = useI18n();
-  const detail = resolveApprovalDetail(approval.input, {
+  const detail = ClientSharedApprovalDisplayService.resolveInputDetail(approval.input, {
     command: t('approval.command'),
     path: t('approval.path'),
   });
-  const rawPayload = detail ? undefined : formatRawPayload(approval.input);
+  const rawPayload = detail ? undefined : ClientSharedApprovalDisplayService.formatPayload(approval.input, 1600);
   const rememberLabel = approval.rememberProjectApproval?.label;
 
   return (
@@ -106,33 +107,4 @@ function ApprovalMeta({ label, value, monospace }: { label: string; value: strin
       <dd className={monospace ? 'font-mono' : undefined}>{value}</dd>
     </div>
   );
-}
-
-function resolveApprovalDetail(
-  input: unknown,
-  labels: { command: string; path: string },
-): { label: string; value: string } | undefined {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    return undefined;
-  }
-
-  const record = input as Record<string, unknown>;
-  if (typeof record.command === 'string' && record.command.trim()) {
-    return { label: labels.command, value: record.command };
-  }
-
-  if (typeof record.path === 'string' && record.path.trim()) {
-    return { label: labels.path, value: record.path };
-  }
-
-  return undefined;
-}
-
-function formatRawPayload(input: unknown): string | undefined {
-  if (input === undefined || input === null) {
-    return undefined;
-  }
-
-  const serialized = typeof input === 'string' ? input : JSON.stringify(input, null, 2);
-  return serialized.length > 1600 ? `${serialized.slice(0, 1600)}...` : serialized;
 }

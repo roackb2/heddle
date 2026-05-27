@@ -205,6 +205,23 @@ describe('ControlPlaneSessionStore', () => {
       timestamp: new Date().toISOString(),
       activities: [
         {
+          source: 'agent-loop',
+          type: 'loop.started',
+          runId: 'run-1',
+          goal: 'Say hello.',
+          model: 'gpt-test',
+          provider: 'openai',
+          workspaceRoot: '/repo',
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    } as ControlPlaneSessionEventEnvelope);
+    fixture.sessionEvents?.onData?.({
+      type: 'session.event',
+      sessionId: 'session-1',
+      timestamp: new Date().toISOString(),
+      activities: [
+        {
           type: 'assistant.stream',
           text: 'Streaming response',
           done: false,
@@ -221,6 +238,78 @@ describe('ControlPlaneSessionStore', () => {
     });
     expect(store.getSnapshot().liveStatus).toBe('Receiving assistant response...');
     store.dispose();
+  });
+
+  it('coalesces rapid live assistant stream events to the newest text', async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = createClientFixture();
+      const store = new ControlPlaneSessionStore({ client: fixture.client });
+      await store.start();
+
+      fixture.sessionEvents?.onData?.({
+        type: 'session.event',
+        sessionId: 'session-1',
+        timestamp: new Date().toISOString(),
+        activities: [
+          {
+            source: 'agent-loop',
+            type: 'loop.started',
+            runId: 'run-1',
+            goal: 'Say hello.',
+            model: 'gpt-test',
+            provider: 'openai',
+            workspaceRoot: '/repo',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      } as ControlPlaneSessionEventEnvelope);
+
+      fixture.sessionEvents?.onData?.({
+        type: 'session.event',
+        sessionId: 'session-1',
+        timestamp: new Date().toISOString(),
+        activities: [
+          { type: 'assistant.stream', text: 'First chunk', done: false },
+        ],
+      } as ControlPlaneSessionEventEnvelope);
+      fixture.sessionEvents?.onData?.({
+        type: 'session.event',
+        sessionId: 'session-1',
+        timestamp: new Date().toISOString(),
+        activities: [
+          { type: 'assistant.stream', text: 'Second chunk', done: false },
+          { type: 'assistant.stream', text: 'Newest chunk', done: false },
+        ],
+      } as ControlPlaneSessionEventEnvelope);
+
+      expect(store.getSnapshot().activeSession?.messages.at(-1)?.text).toBe('First chunk');
+
+      await vi.advanceTimersByTimeAsync(75);
+
+      expect(store.getSnapshot().activeSession?.messages.at(-1)?.text).toBe('Newest chunk');
+
+      fixture.sessionEvents?.onData?.({
+        type: 'session.event',
+        sessionId: 'session-1',
+        timestamp: new Date().toISOString(),
+        activities: [
+          { type: 'assistant.stream', text: 'Final text', done: true },
+        ],
+      } as ControlPlaneSessionEventEnvelope);
+
+      expect(store.getSnapshot().activeSession?.messages.at(-1)).toEqual({
+        id: 'live-assistant',
+        role: 'assistant',
+        text: 'Final text',
+        isStreaming: false,
+        isPending: false,
+      });
+      expect(store.getSnapshot().liveStatus).toBeUndefined();
+      store.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('tracks the latest non-message activity from the session subscription', async () => {

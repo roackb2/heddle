@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { Box, Text, useInput } from 'ink';
-import type { PromptActivityView } from '../helpers/activities/prompt-activity.js';
+import type { PromptActivityView } from '../services/activities/prompt-activity-service.js';
 
 export function PromptInput({
   activity,

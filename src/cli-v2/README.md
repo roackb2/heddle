@@ -21,7 +21,8 @@ rewrite.
 - `state/`: class-based API-consumer state and live subscription ownership.
 - `hooks/`: React/Ink hooks only. Hook files keep `useXxx` naming and return
   hook-shaped values.
-- `helpers/`: TUI-specific pure projections and formatting helpers. Keep these
-  under a domain folder such as `activities/` or `approvals/`.
+- `services/`: TUI-specific domain services used by hooks and components.
+  Services are not hooks; they centralize terminal-only logic behind clear
+  class boundaries.
 - `components/`: terminal rendering components.
 - `index.tsx`: launch entrypoint that receives a tRPC URL from the outer CLI.

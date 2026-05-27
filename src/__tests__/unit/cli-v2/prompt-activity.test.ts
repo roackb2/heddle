@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildPromptActivity } from '../../../cli-v2/helpers/activities/prompt-activity.js';
+import { PromptActivityService } from '../../../cli-v2/services/activities/prompt-activity-service.js';
 import type { ControlPlaneSessionStoreSnapshot } from '../../../cli-v2/state/control-plane-session-store.js';
 
-describe('buildPromptActivity', () => {
+describe('PromptActivityService', () => {
   it('prefers errors over latest activity', () => {
-    expect(buildPromptActivity(createSnapshot({
+    expect(PromptActivityService.build(createSnapshot({
       error: 'Something failed',
       latestUpdate: {
         label: 'Run started',
@@ -17,7 +17,7 @@ describe('buildPromptActivity', () => {
   });
 
   it('uses the richer latest activity before falling back to live status', () => {
-    expect(buildPromptActivity(createSnapshot({
+    expect(PromptActivityService.build(createSnapshot({
       liveStatus: 'Run started...',
       latestUpdate: {
         label: 'Run started',
@@ -31,7 +31,7 @@ describe('buildPromptActivity', () => {
   });
 
   it('falls back to live status when no latest activity exists', () => {
-    expect(buildPromptActivity(createSnapshot({
+    expect(PromptActivityService.build(createSnapshot({
       liveStatus: 'Receiving assistant response...',
     }))).toEqual({
       text: 'Status: Receiving assistant response...',

@@ -1,21 +1,33 @@
 import type { ControlPlaneProxyClient } from '@/client-shared/api/proxy.js';
-import { ClientSharedSessionMessageController } from '@/client-shared/controllers/session-messages/index.js';
+import { ClientSharedSessionActivityService } from '@/client-shared/services/session-activities/index.js';
+import { ClientSharedSessionMessageService } from '@/client-shared/services/session-messages/index.js';
+import {
+  SessionActivityService,
+  type ControlPlaneSessionLatestUpdate,
+} from '../services/activities/session-activity-service.js';
+import {
+  ControlPlaneSessionApiService,
+  type ControlPlaneSessionCreateInput,
+} from '../services/sessions/control-plane-session-api-service.js';
+import { ControlPlaneSessionSubscriptionService } from '../services/sessions/control-plane-session-subscription-service.js';
+import {
+  AssistantStreamBufferService,
+  type AssistantStreamUpdate,
+} from '../services/sessions/assistant-stream-buffer-service.js';
+import {
+  SessionRunStatePollerService,
+  type SessionRunStatePollAddress,
+} from '../services/sessions/session-run-state-poller-service.js';
 import type {
   ControlPlaneApprovalDecision,
   ControlPlanePendingApproval,
   ControlPlaneSessionDetail,
   ControlPlaneSessionEventEnvelope,
   ControlPlaneSessionView,
-  ControlPlaneSessionsEventEnvelope,
-  RouterInputs,
 } from '@/client-shared/api/types.js';
 
-type SubscriptionHandle = {
-  unsubscribe: () => void;
-};
-
-type SessionCreateInput = Exclude<NonNullable<RouterInputs['controlPlane']['sessionCreate']>, void>;
-type SessionSendPromptInput = RouterInputs['controlPlane']['sessionSendPrompt'];
+const ASSISTANT_STREAM_RENDER_INTERVAL_MS = 75;
+const RUN_STATE_POLL_INTERVAL_MS = 750;
 
 export type ControlPlaneSessionStoreOptions = {
   client: ControlPlaneProxyClient;
@@ -30,12 +42,6 @@ export type ControlPlaneSessionStoreOptions = {
 export type ControlPlaneSessionStoreStartInput = {
   workspaceId?: string;
   sessionId?: string;
-};
-
-export type ControlPlaneSessionLatestUpdate = {
-  label: string;
-  detail?: string;
-  tone: 'info' | 'success' | 'warning' | 'error';
 };
 
 export type ControlPlaneSessionStoreSnapshot = {
@@ -75,26 +81,47 @@ const INITIAL_SNAPSHOT: ControlPlaneSessionStoreSnapshot = {
  * conversation messages coherent, and exposes terminal intent methods.
  */
 export class ControlPlaneSessionStore {
-  private readonly client: ControlPlaneProxyClient;
-  private readonly options: Omit<ControlPlaneSessionStoreOptions, 'client'>;
+  private readonly api: ControlPlaneSessionApiService;
   private readonly listeners = new Set<() => void>();
   private snapshotValue: ControlPlaneSessionStoreSnapshot = INITIAL_SNAPSHOT;
-  private sessionsSubscription?: SubscriptionHandle;
-  private sessionSubscription?: SubscriptionHandle;
-  private runStatePoll?: ReturnType<typeof setInterval>;
-  private runStatePollInFlight = false;
-  private subscriptionAddress?: { workspaceId: string; sessionId: string };
+  private readonly subscriptions: ControlPlaneSessionSubscriptionService;
+  private readonly assistantStreamBuffer: AssistantStreamBufferService;
+  private readonly runStatePoller: SessionRunStatePollerService;
 
   constructor(options: ControlPlaneSessionStoreOptions) {
-    this.client = options.client;
-    this.options = {
-      defaultModel: options.defaultModel,
-      maxSteps: options.maxSteps,
-      searchIgnoreDirs: options.searchIgnoreDirs,
-      systemContext: options.systemContext,
-      apiKey: options.apiKey,
-      preferApiKey: options.preferApiKey,
-    };
+    this.api = new ControlPlaneSessionApiService(options);
+    this.subscriptions = new ControlPlaneSessionSubscriptionService({
+      client: options.client,
+      onSessionsUpdated: () => {
+        void this.refreshSessions().catch((error) => this.setSnapshot({ error: formatError(error) }));
+      },
+      onSessionEvent: (workspaceId, event) => this.applySessionEvent(workspaceId, event),
+      onSessionListError: (error) => this.setSnapshot({ error: error.message }),
+      onSessionStreamError: (error) => {
+        this.setSnapshot({ streamConnected: false, liveStatus: error.message });
+      },
+      onSessionStreamStarted: () => {
+        this.setSnapshot({ streamConnected: true });
+      },
+      onSessionStreamComplete: () => {
+        this.setSnapshot({ streamConnected: false });
+      },
+    });
+    this.assistantStreamBuffer = new AssistantStreamBufferService({
+      renderIntervalMs: ASSISTANT_STREAM_RENDER_INTERVAL_MS,
+      canApply: (update) => (
+        this.isActiveSessionAddress(update.workspaceId, update.sessionId) &&
+        this.isRunAcceptingLiveAssistantStream()
+      ),
+      apply: (update) => this.applyAssistantStreamUpdate(update),
+    });
+    this.runStatePoller = new SessionRunStatePollerService({
+      intervalMs: RUN_STATE_POLL_INTERVAL_MS,
+      getAddress: () => this.resolveRunStatePollAddress(),
+      isEnabled: () => this.shouldPollRunState(),
+      poll: (address) => this.pollRunState(address),
+      onError: (error) => this.setSnapshot({ error: formatError(error) }),
+    });
   }
 
   getSnapshot = (): ControlPlaneSessionStoreSnapshot => this.snapshotValue;
@@ -109,14 +136,10 @@ export class ControlPlaneSessionStore {
   async start(input: ControlPlaneSessionStoreStartInput = {}): Promise<void> {
     this.setSnapshot({ loading: true, error: undefined });
     try {
-      const state = await this.client.controlPlane.state.query(input.workspaceId ? { workspaceId: input.workspaceId } : undefined);
-      const workspaceId = input.workspaceId ?? state.activeWorkspaceId;
-      if (!workspaceId) {
-        throw new Error('No active Heddle workspace is available from the control-plane API.');
-      }
+      const workspaceId = await this.api.resolveWorkspaceId(input.workspaceId);
 
       this.setSnapshot({ workspaceId });
-      this.subscribeToSessionList(workspaceId);
+      this.subscriptions.subscribeToSessionList(workspaceId);
       const sessions = await this.refreshSessions();
       const sessionId = input.sessionId ?? sessions[0]?.id ?? (await this.createSession()).id;
       await this.selectSession(sessionId);
@@ -126,39 +149,28 @@ export class ControlPlaneSessionStore {
   }
 
   dispose(): void {
-    this.sessionsSubscription?.unsubscribe();
-    this.sessionSubscription?.unsubscribe();
-    if (this.runStatePoll) {
-      clearInterval(this.runStatePoll);
-    }
-    this.sessionsSubscription = undefined;
-    this.sessionSubscription = undefined;
-    this.runStatePoll = undefined;
-    this.runStatePollInFlight = false;
-    this.subscriptionAddress = undefined;
+    this.subscriptions.dispose();
+    this.assistantStreamBuffer.dispose();
+    this.runStatePoller.dispose();
   }
 
   async refreshSessions(): Promise<ControlPlaneSessionView[]> {
     const workspaceId = this.requireWorkspaceId();
-    const result = await this.client.controlPlane.sessions.query({ workspaceId });
-    const sessions = result.workspaceId === workspaceId ? result.sessions : [];
+    const sessions = await this.api.listSessions(workspaceId);
     this.setSnapshot({ sessions });
     return sessions;
   }
 
-  async createSession(input: SessionCreateInput = {}): Promise<ControlPlaneSessionView> {
+  async createSession(input: ControlPlaneSessionCreateInput = {}): Promise<ControlPlaneSessionView> {
     const workspaceId = this.requireWorkspaceId();
-    const session = await this.client.controlPlane.sessionCreate.mutate({
-      ...input,
-      workspaceId,
-      model: input.model ?? this.options.defaultModel,
-    });
+    const session = await this.api.createSession(workspaceId, input);
     await this.refreshSessions();
     return session;
   }
 
   async selectSession(sessionId: string): Promise<void> {
     const workspaceId = this.requireWorkspaceId();
+    this.assistantStreamBuffer.reset();
     this.setSnapshot({
       activeSessionId: sessionId,
       activeSession: null,
@@ -171,15 +183,15 @@ export class ControlPlaneSessionStore {
     });
 
     try {
-      const session = await this.client.controlPlane.session.query({ id: sessionId, workspaceId });
-      const running = await this.client.controlPlane.sessionRunning.query({ id: sessionId, workspaceId });
+      const session = await this.api.getSession(workspaceId, sessionId);
+      const running = await this.api.getRunning(workspaceId, sessionId);
       this.setSnapshot({
         activeSession: session,
         running: running.running,
         loading: false,
       });
       await this.refreshPendingApproval(sessionId);
-      this.subscribeToSessionEvents(workspaceId, sessionId);
+      this.subscriptions.subscribeToSessionEvents(workspaceId, sessionId);
     } catch (error) {
       this.setSnapshot({ error: formatError(error), loading: false });
     }
@@ -216,15 +228,16 @@ export class ControlPlaneSessionStore {
         detail: 'waiting for model or tool activity',
         tone: 'info',
       },
-      activeSession: ClientSharedSessionMessageController.appendOptimisticUserTurn(current.activeSession, trimmed),
+      activeSession: ClientSharedSessionMessageService.appendOptimisticUserTurn(current.activeSession, trimmed),
     }));
 
     try {
-      const result = await this.client.controlPlane.sessionSendPrompt.mutate(this.buildPromptInput({
+      const result = await this.api.sendPrompt({
         workspaceId,
         sessionId,
         prompt: trimmed,
-      }));
+      });
+      this.assistantStreamBuffer.reset();
       this.setSnapshot({
         activeSession: result.session,
         running: false,
@@ -233,7 +246,7 @@ export class ControlPlaneSessionStore {
         latestUpdate: {
           label: 'Run finished',
           detail: result.outcome,
-          tone: resolveRunOutcomeTone(result.outcome),
+          tone: SessionActivityService.resolveRunOutcomeTone(result.outcome),
         },
       });
       await this.refreshSessions();
@@ -262,6 +275,7 @@ export class ControlPlaneSessionStore {
         submitting: false,
         liveStatus: undefined,
       });
+      this.assistantStreamBuffer.reset();
     }
   }
 
@@ -279,9 +293,9 @@ export class ControlPlaneSessionStore {
     });
 
     try {
-      const result = await this.client.controlPlane.sessionCancel.mutate({ id: sessionId, workspaceId });
+      const result = await this.api.cancelRun(workspaceId, sessionId);
       await this.refreshPendingApproval(sessionId);
-      const running = await this.client.controlPlane.sessionRunning.query({ id: sessionId, workspaceId });
+      const running = await this.api.getRunning(workspaceId, sessionId);
       this.setSnapshot({
         running: result.cancelled ? running.running : false,
         cancelling: false,
@@ -313,11 +327,7 @@ export class ControlPlaneSessionStore {
     });
 
     try {
-      const result = await this.client.controlPlane.sessionResolveApproval.mutate({
-        workspaceId,
-        sessionId,
-        decision,
-      });
+      const result = await this.api.resolvePendingApproval(workspaceId, sessionId, decision);
       if (!result.resolved) {
         throw new Error('No pending approval found for this session.');
       }
@@ -345,10 +355,10 @@ export class ControlPlaneSessionStore {
     }
 
     try {
-      const next = await this.client.controlPlane.session.query({ id: sessionId, workspaceId });
+      const next = await this.api.getSession(workspaceId, sessionId);
       this.setSnapshot((current) => ({
         activeSession: options.silent
-          ? ClientSharedSessionMessageController.mergeTransientMessages(current.activeSession, next)
+          ? ClientSharedSessionMessageService.mergeTransientMessages(current.activeSession, next)
           : next,
         loading: false,
       }));
@@ -359,48 +369,8 @@ export class ControlPlaneSessionStore {
 
   private async refreshPendingApproval(sessionId: string): Promise<void> {
     const workspaceId = this.requireWorkspaceId();
-    const pendingApproval = await this.client.controlPlane.sessionPendingApproval.query({ id: sessionId, workspaceId });
+    const pendingApproval = await this.api.getPendingApproval(workspaceId, sessionId);
     this.setSnapshot({ pendingApproval });
-  }
-
-  private subscribeToSessionList(workspaceId: string): void {
-    this.sessionsSubscription?.unsubscribe();
-    this.sessionsSubscription = this.client.controlPlane.sessionsEvents.subscribe({ workspaceId }, {
-      onData: (event: ControlPlaneSessionsEventEnvelope) => {
-        if (event.type === 'sessions.updated') {
-          void this.refreshSessions().catch((error) => this.setSnapshot({ error: formatError(error) }));
-        }
-      },
-      onError: (error) => {
-        this.setSnapshot({ error: error.message });
-      },
-    });
-  }
-
-  private subscribeToSessionEvents(workspaceId: string, sessionId: string): void {
-    if (
-      this.subscriptionAddress?.workspaceId === workspaceId &&
-      this.subscriptionAddress.sessionId === sessionId
-    ) {
-      return;
-    }
-
-    this.sessionSubscription?.unsubscribe();
-    this.subscriptionAddress = { workspaceId, sessionId };
-    this.sessionSubscription = this.client.controlPlane.sessionEvents.subscribe({ workspaceId, sessionId }, {
-      onStarted: () => {
-        this.setSnapshot({ streamConnected: true });
-      },
-      onData: (event: ControlPlaneSessionEventEnvelope) => {
-        this.applySessionEvent(workspaceId, event);
-      },
-      onError: (error) => {
-        this.setSnapshot({ streamConnected: false, liveStatus: error.message });
-      },
-      onComplete: () => {
-        this.setSnapshot({ streamConnected: false });
-      },
-    });
   }
 
   private applySessionEvent(workspaceId: string, event: ControlPlaneSessionEventEnvelope): void {
@@ -429,58 +399,67 @@ export class ControlPlaneSessionStore {
     }
 
     event.activities.forEach((activity) => {
-      if (activity.type === 'assistant.stream') {
-        this.setSnapshot((current) => ({
-          activeSession: ClientSharedSessionMessageController.upsertLiveAssistantMessage(
-            current.activeSession,
-            activity.text,
-            activity.done,
-          ),
-          liveStatus: activity.done ? undefined : 'Receiving assistant response...',
-        }));
-        return;
-      }
+      ClientSharedSessionActivityService.applyActivity(activity, {
+        onAssistantStream: (streamActivity) => {
+          this.assistantStreamBuffer.push({
+            workspaceId,
+            sessionId: event.sessionId,
+            text: streamActivity.text,
+            done: streamActivity.done,
+          });
+        },
+        onRunStarted: (runActivity, liveStatus) => {
+          this.setSnapshot({
+            running: true,
+            liveStatus,
+            latestUpdate: SessionActivityService.resolveLatestUpdate(runActivity),
+          });
+        },
+        onRunFinished: (runActivity) => {
+          this.assistantStreamBuffer.flush();
+          this.setSnapshot({
+            running: false,
+            liveStatus: undefined,
+            latestUpdate: SessionActivityService.resolveLatestUpdate(runActivity),
+          });
+          void this.refreshSession(event.sessionId, { silent: true });
+          void this.refreshSessions();
+        },
+        onPendingApprovalChanged: () => {
+          void this.refreshPendingApproval(event.sessionId);
+        },
+        onLiveStatus: (statusActivity, liveStatus) => {
+          const latestUpdate = SessionActivityService.resolveLatestUpdate(statusActivity);
+          if (liveStatus === undefined && latestUpdate === undefined) {
+            return;
+          }
 
-      const status = resolveLiveStatus(activity);
-      const latestUpdate = resolveLatestUpdate(activity);
-      if (activity.type === 'loop.started') {
-        this.setSnapshot({ running: true, liveStatus: status, latestUpdate });
-        return;
-      }
-
-      if (activity.type === 'loop.finished') {
-        this.setSnapshot({ running: false, liveStatus: undefined, latestUpdate });
-        void this.refreshSession(event.sessionId, { silent: true });
-        void this.refreshSessions();
-        return;
-      }
-
-      if (activity.type === 'tool.approval_requested' || activity.type === 'tool.approval_resolved') {
-        void this.refreshPendingApproval(event.sessionId);
-      }
-
-      if (status !== undefined || latestUpdate !== undefined) {
-        this.setSnapshot({
-          ...(status !== undefined ? { liveStatus: status } : {}),
-          ...(latestUpdate !== undefined ? { latestUpdate } : {}),
-        });
-      }
+          this.setSnapshot({
+            ...(liveStatus !== undefined ? { liveStatus } : {}),
+            ...(latestUpdate !== undefined ? { latestUpdate } : {}),
+          });
+        },
+      });
     });
   }
 
-  private buildPromptInput(input: Pick<SessionSendPromptInput, 'workspaceId' | 'sessionId' | 'prompt'>): SessionSendPromptInput {
-    return {
-      ...input,
-      maxSteps: this.options.maxSteps,
-      searchIgnoreDirs: this.options.searchIgnoreDirs,
-      apiKey: this.options.apiKey,
-      preferApiKey: this.options.preferApiKey,
-      systemContext: this.options.systemContext,
-    };
+  private applyAssistantStreamUpdate(update: AssistantStreamUpdate): void {
+    this.setSnapshot((current) => ({
+      activeSession: ClientSharedSessionMessageService.upsertLiveAssistantMessage(
+        current.activeSession,
+        update.text,
+        update.done,
+      ),
+      liveStatus: update.done ? undefined : 'Receiving assistant response...',
+    }));
   }
 
   private isActiveSessionAddress(workspaceId: string, sessionId: string): boolean {
     return this.snapshotValue.workspaceId === workspaceId && this.snapshotValue.activeSessionId === sessionId;
+  }
+
+  private isRunAcceptingLiveAssistantStream(): boolean {
+    return this.snapshotValue.running || this.snapshotValue.submitting;
   }
 
   private requireWorkspaceId(): string {
@@ -509,49 +488,21 @@ export class ControlPlaneSessionStore {
       ...this.snapshotValue,
       ...patch,
     };
-    this.syncRunStatePolling();
+    this.runStatePoller.sync();
     this.listeners.forEach((listener) => listener());
   }
 
-  private syncRunStatePolling(): void {
-    if (
-      (this.snapshotValue.running || this.snapshotValue.submitting || this.snapshotValue.cancelling) &&
-      this.snapshotValue.workspaceId &&
-      this.snapshotValue.activeSessionId
-    ) {
-      if (this.runStatePoll) {
-        return;
-      }
-
-      this.runStatePoll = setInterval(() => {
-        const sessionId = this.snapshotValue.activeSessionId;
-        const workspaceId = this.snapshotValue.workspaceId;
-        if (!sessionId || !workspaceId || this.runStatePollInFlight) {
-          return;
-        }
-
-        this.runStatePollInFlight = true;
-        void this.pollRunState({ workspaceId, sessionId })
-          .catch((error) => {
-            this.setSnapshot({ error: formatError(error) });
-          })
-          .finally(() => {
-            this.runStatePollInFlight = false;
-          });
-      }, 750);
-      return;
-    }
-
-    if (!this.runStatePoll) {
-      return;
-    }
-
-    clearInterval(this.runStatePoll);
-    this.runStatePoll = undefined;
+  private shouldPollRunState(): boolean {
+    return this.snapshotValue.running || this.snapshotValue.submitting || this.snapshotValue.cancelling;
   }
 
-  private async pollRunState({ workspaceId, sessionId }: { workspaceId: string; sessionId: string }): Promise<void> {
-    const runState = await this.client.controlPlane.sessionRunState.query({ id: sessionId, workspaceId });
+  private resolveRunStatePollAddress(): SessionRunStatePollAddress | undefined {
+    const { workspaceId, activeSessionId } = this.snapshotValue;
+    return workspaceId && activeSessionId ? { workspaceId, sessionId: activeSessionId } : undefined;
+  }
+
+  private async pollRunState({ workspaceId, sessionId }: SessionRunStatePollAddress): Promise<void> {
+    const runState = await this.api.getRunState(workspaceId, sessionId);
     if (!this.isActiveSessionAddress(workspaceId, sessionId)) {
       return;
     }
@@ -563,7 +514,7 @@ export class ControlPlaneSessionStore {
       latestUpdate: runState.pendingApproval
         ? {
           label: 'Approval requested',
-          detail: formatPendingApprovalLabel(runState.pendingApproval),
+          detail: SessionActivityService.formatPendingApprovalLabel(runState.pendingApproval),
           tone: 'warning',
         }
         : this.snapshotValue.latestUpdate,
@@ -596,144 +547,6 @@ export class ControlPlaneSessionStore {
       },
     });
   }
-}
-
-type ControlPlaneSessionActivity = Extract<ControlPlaneSessionEventEnvelope, { type: 'session.event' }>['activities'][number];
-type SessionActivityStatusHandlers = {
-  [ActivityType in ControlPlaneSessionActivity['type']]?: (
-    activity: Extract<ControlPlaneSessionActivity, { type: ActivityType }>,
-  ) => string | undefined;
-};
-type SessionActivityLatestUpdateHandlers = {
-  [ActivityType in ControlPlaneSessionActivity['type']]?: (
-    activity: Extract<ControlPlaneSessionActivity, { type: ActivityType }>,
-  ) => ControlPlaneSessionLatestUpdate | undefined;
-};
-
-const liveStatusHandlers: SessionActivityStatusHandlers = {
-  'loop.started': () => 'Run started...',
-  'tool.calling': (activity) => `Working... running ${formatToolLabel(activity)}${formatStep(activity.step)}`,
-  'tool.completed': (activity) => `${activity.tool} finished in ${Math.round(activity.durationMs)}ms`,
-  'tool.approval_requested': (activity) => `Approval requested for ${formatToolLabel(activity)}`,
-  'tool.approval_resolved': () => 'Approval resolved. Resuming...',
-  'compaction.running': (activity) => (
-    activity.archivePath ? `Compacting earlier history... ${activity.archivePath}` : 'Compacting earlier history...'
-  ),
-  'compaction.failed': (activity) => (
-    activity.error ? `Compaction failed: ${activity.error}` : 'Compaction failed.'
-  ),
-  'compaction.finished': (activity) => (
-    activity.summaryPath ? `Compaction finished. Summary: ${activity.summaryPath}` : 'Compaction finished.'
-  ),
-};
-
-const latestUpdateHandlers: SessionActivityLatestUpdateHandlers = {
-  'loop.started': (activity) => ({
-    label: 'Run started',
-    detail: `${activity.model} via ${activity.provider}`,
-    tone: 'info',
-  }),
-  'tool.calling': (activity) => ({
-    label: `Running ${formatToolLabel(activity)}`,
-    detail: formatStepDetail(activity.step),
-    tone: activity.requiresApproval ? 'warning' : 'info',
-  }),
-  'tool.completed': (activity) => ({
-    label: `${activity.tool} completed`,
-    detail: `${Math.round(activity.durationMs)}ms`,
-    tone: 'success',
-  }),
-  'tool.approval_requested': (activity) => ({
-    label: 'Approval requested',
-    detail: formatToolLabel(activity),
-    tone: 'warning',
-  }),
-  'tool.approval_resolved': (activity) => ({
-    label: activity.approved ? 'Approval granted' : 'Approval denied',
-    detail: activity.reason,
-    tone: activity.approved ? 'info' : 'warning',
-  }),
-  'tool.fallback': (activity) => ({
-    label: 'Tool fallback',
-    detail: formatToolFallbackLabel(activity),
-    tone: 'warning',
-  }),
-  'loop.finished': (activity) => ({
-    label: 'Run finished',
-    detail: activity.outcome,
-    tone: resolveRunOutcomeTone(activity.outcome),
-  }),
-  'compaction.running': (activity) => ({
-    label: 'Compacting history',
-    detail: activity.archivePath,
-    tone: 'info',
-  }),
-  'compaction.failed': (activity) => ({
-    label: 'Compaction failed',
-    detail: activity.error,
-    tone: 'error',
-  }),
-  'compaction.finished': (activity) => ({
-    label: 'Compaction finished',
-    detail: activity.summaryPath,
-    tone: 'success',
-  }),
-};
-
-function resolveLiveStatus(activity: ControlPlaneSessionActivity): string | undefined {
-  const handler = liveStatusHandlers[activity.type] as ((activity: ControlPlaneSessionActivity) => string | undefined) | undefined;
-  return handler?.(activity);
-}
-
-function resolveLatestUpdate(activity: ControlPlaneSessionActivity): ControlPlaneSessionLatestUpdate | undefined {
-  const handler = latestUpdateHandlers[activity.type] as (
-    (activity: ControlPlaneSessionActivity) => ControlPlaneSessionLatestUpdate | undefined
-  ) | undefined;
-  return handler?.(activity);
-}
-
-function formatToolLabel(activity: ControlPlaneSessionActivity): string {
-  if ('derived' in activity && activity.derived?.kind === 'tool-summary') {
-    return activity.derived.summary;
-  }
-
-  if ('tool' in activity && typeof activity.tool === 'string') {
-    return activity.tool;
-  }
-
-  if ('call' in activity && activity.call && 'tool' in activity.call && typeof activity.call.tool === 'string') {
-    return activity.call.tool;
-  }
-
-  return 'tool';
-}
-
-function formatToolFallbackLabel(activity: Extract<ControlPlaneSessionActivity, { type: 'tool.fallback' }>): string | undefined {
-  if (activity.derived?.kind === 'tool-fallback-summary') {
-    return `${activity.derived.fromSummary} -> ${activity.derived.toSummary}`;
-  }
-
-  return `${activity.fromCall.tool} -> ${activity.toCall.tool}`;
-}
-
-function formatStep(step: number | undefined): string {
-  return typeof step === 'number' ? ` (step ${step})` : '';
-}
-
-function formatStepDetail(step: number | undefined): string | undefined {
-  return typeof step === 'number' ? `step ${step}` : undefined;
-}
-
-function formatPendingApprovalLabel(approval: NonNullable<ControlPlanePendingApproval>): string | undefined {
-  return approval.tool;
-}
-
-function resolveRunOutcomeTone(outcome: string): ControlPlaneSessionLatestUpdate['tone'] {
-  if (outcome === 'done' || outcome === 'completed') {
-    return 'success';
-  }
-
-  return outcome === 'error' ? 'error' : 'warning';
 }
 
 function isRunAlreadyInProgressError(error: unknown): boolean {

@@ -5,7 +5,7 @@ import type { ControlPlaneSessionDetail, ControlPlaneSessionMessage } from '../.
  * session detail. This is shared by browser and terminal clients because the
  * behavior belongs to API-consumer state, not to a specific UI renderer.
  */
-export class ClientSharedSessionMessageController {
+export class ClientSharedSessionMessageService {
   static appendOptimisticUserTurn(session: ControlPlaneSessionDetail, prompt: string): ControlPlaneSessionDetail {
     if (!session) {
       return session;
@@ -33,23 +33,15 @@ export class ClientSharedSessionMessageController {
       return session;
     }
 
-    const messages = session.messages.filter((message) => message.id !== 'live-run-status');
-    const lastMessage = messages.at(-1);
-    if (lastMessage?.id === 'live-assistant' && lastMessage.role === 'assistant') {
-      const nextMessages = [...messages];
-      nextMessages[nextMessages.length - 1] =
-        ClientSharedSessionMessageController.createLiveAssistantMessage(text, done);
-      return {
-        ...session,
-        messages: nextMessages,
-      };
-    }
+    const messages = session.messages.filter((message) => (
+      message.id !== 'live-run-status' && message.id !== 'live-assistant'
+    ));
 
     return {
       ...session,
       messages: [
         ...messages,
-        ClientSharedSessionMessageController.createLiveAssistantMessage(text, done),
+        ClientSharedSessionMessageService.createLiveAssistantMessage(text, done),
       ],
     };
   }
@@ -68,12 +60,17 @@ export class ClientSharedSessionMessageController {
       !nextMessageIds.has(message.id) &&
       !next.messages.some((persisted) => persisted.role === message.role && persisted.text === message.text)
     ));
+    const orderedTransientMessages = [
+      transientMessages.find((message) => message.id === 'live-user'),
+      transientMessages.find((message) => message.id === 'live-assistant'),
+      ...transientMessages.filter((message) => message.id !== 'live-user' && message.id !== 'live-assistant'),
+    ].filter((message): message is ControlPlaneSessionMessage => Boolean(message));
 
-    return transientMessages.length ? {
+    return orderedTransientMessages.length ? {
       ...next,
       messages: [
         ...next.messages,
-        ...transientMessages,
+        ...orderedTransientMessages,
       ],
     } : next;
   }

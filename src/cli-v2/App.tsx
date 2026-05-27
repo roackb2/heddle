@@ -4,9 +4,9 @@ import { ApprovalPanel } from './components/ApprovalPanel.js';
 import { ConversationPanel } from './components/ConversationPanel.js';
 import { PromptInput } from './components/PromptInput.js';
 import { RunControls } from './components/RunControls.js';
-import { buildPromptActivity } from './helpers/activities/prompt-activity.js';
 import { useControlPlaneSessionStore } from './hooks/useControlPlaneSessionStore.js';
 import { usePromptDraft } from './hooks/usePromptDraft.js';
+import { PromptActivityService } from './services/activities/prompt-activity-service.js';
 import type { ControlPlaneApprovalDecision } from '@/client-shared/api/types.js';
 import type {
   ControlPlaneSessionStore,
@@ -83,7 +83,7 @@ export function App({
         onCancel={cancelRun}
       />
       <PromptInput
-        activity={buildPromptActivity(snapshot)}
+        activity={PromptActivityService.build(snapshot)}
         disabled={submitDisabled || Boolean(snapshot.pendingApproval)}
         placeholder={
           snapshot.loading ? 'Loading session...'

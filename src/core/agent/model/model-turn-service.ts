@@ -19,7 +19,7 @@ export class AgentModelTurnService {
       const streamState = {
         content: '',
         reasoningSummary: '',
-        lastRecordAt: 0,
+        lastStreamEmitAt: 0,
       };
       const response = await context.llm.chat(
         context.messages,
@@ -49,15 +49,15 @@ export class AgentModelTurnService {
     streamState: {
       content: string;
       reasoningSummary: string;
-      lastRecordAt: number;
+      lastStreamEmitAt: number;
     };
   }): void {
     const { context, event, streamState } = args;
     if (event.type === 'content.delta') {
       const nowMs = Date.now();
       streamState.content += event.delta;
-      if (nowMs - streamState.lastRecordAt >= STREAM_UPDATE_INTERVAL_MS) {
-        streamState.lastRecordAt = nowMs;
+      if (!AgentModelTurnService.shouldEmitStreamUpdate(streamState, nowMs)) {
+        return;
       }
       // Stream the accumulated assistant text through the live event path. This
       // is intentionally in-memory; durable session files are updated later by
@@ -68,26 +68,29 @@ export class AgentModelTurnService {
 
     if (event.type === 'content.done') {
       streamState.content = event.content;
+      streamState.lastStreamEmitAt = Date.now();
       context.live.activity({ type: HeddleEventType.assistantStream, step: context.state.step, text: streamState.content, done: true });
       return;
     }
 
     if (event.type === 'reasoning_summary.delta') {
       streamState.reasoningSummary += event.delta;
-      if (!streamState.content) {
-        context.live.activity({
-          type: HeddleEventType.assistantStream,
-          step: context.state.step,
-          text: AgentModelTurnService.formatReasoningSummary(streamState.reasoningSummary),
-          done: false,
-        });
+      if (streamState.content || !AgentModelTurnService.shouldEmitStreamUpdate(streamState, Date.now())) {
+        return;
       }
+      context.live.activity({
+        type: HeddleEventType.assistantStream,
+        step: context.state.step,
+        text: AgentModelTurnService.formatReasoningSummary(streamState.reasoningSummary),
+        done: false,
+      });
       return;
     }
 
     if (event.type === 'reasoning_summary.done') {
       streamState.reasoningSummary = event.text;
       if (!streamState.content) {
+        streamState.lastStreamEmitAt = Date.now();
         context.live.activity({
           type: HeddleEventType.assistantStream,
           step: context.state.step,
@@ -96,6 +99,18 @@ export class AgentModelTurnService {
         });
       }
     }
+  }
+
+  private static shouldEmitStreamUpdate(
+    streamState: { lastStreamEmitAt: number },
+    nowMs: number,
+  ): boolean {
+    if (streamState.lastStreamEmitAt && nowMs - streamState.lastStreamEmitAt < STREAM_UPDATE_INTERVAL_MS) {
+      return false;
+    }
+
+    streamState.lastStreamEmitAt = nowMs;
+    return true;
   }
 
   private static accumulateUsage(args: AccumulateAgentUsageArgs): LlmUsage | undefined {

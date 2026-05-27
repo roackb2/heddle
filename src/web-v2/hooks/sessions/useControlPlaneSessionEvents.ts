@@ -5,7 +5,8 @@ import {
   type ControlPlaneSessionDetail,
   type ControlPlaneSessionEventEnvelope,
 } from '@web/api/client';
-import { ClientSharedSessionMessageController } from '@/client-shared/controllers/session-messages';
+import { ClientSharedSessionActivityService } from '@/client-shared/services/session-activities';
+import { ClientSharedSessionMessageService } from '@/client-shared/services/session-messages';
 import type { RefreshControlPlaneSession } from './useControlPlaneSessionLoader';
 
 type UseControlPlaneSessionEventsArgs = {
@@ -147,65 +148,36 @@ type SessionActivityContext = {
 };
 
 type ControlPlaneSessionActivity = Extract<ControlPlaneSessionEventEnvelope, { type: 'session.event' }>['activities'][number];
-type SessionActivityHandlerMap = {
-  [ActivityType in ControlPlaneSessionActivity['type']]?: (
-    activity: Extract<ControlPlaneSessionActivity, { type: ActivityType }>,
-    context: SessionActivityContext,
-  ) => void;
-};
-
-const sessionActivityHandlers: SessionActivityHandlerMap = {
-  'assistant.stream': (activity, { updateSession, setLiveStatus }) => {
-    updateSession((current) => (
-      ClientSharedSessionMessageController.upsertLiveAssistantMessage(
-        current,
-        activity.text,
-        activity.done,
-      )
-    ));
-    setLiveStatus(activity.done ? undefined : 'Receiving assistant response...');
-  },
-  'loop.started': (_activity, { setRunning, setLiveStatus }) => {
-    setRunning(true);
-    setLiveStatus('Run started...');
-  },
-  'loop.finished': (_activity, { sessionId, refresh, invalidateWorkspaceDiff, setRunning, setLiveStatus }) => {
-    setRunning(false);
-    setLiveStatus(undefined);
-    void refresh(sessionId, { silent: true });
-    invalidateWorkspaceDiff();
-  },
-  'tool.calling': (activity, { setLiveStatus }) => {
-    setLiveStatus(`Working... running ${activity.derived?.kind === 'tool-summary' ? activity.derived.summary : activity.tool}${formatStep(activity.step)}`);
-  },
-  'tool.completed': (activity, { invalidateWorkspaceDiff, setLiveStatus }) => {
-    setLiveStatus(`${activity.tool} finished in ${Math.round(activity.durationMs)}ms`);
-    invalidateWorkspaceDiff();
-  },
-  'tool.approval_requested': (activity, { sessionId, refreshPendingApproval, setLiveStatus }) => {
-    refreshPendingApproval(sessionId);
-    setLiveStatus(`Approval requested for ${activity.derived?.kind === 'tool-summary' ? activity.derived.summary : activity.call.tool}`);
-  },
-  'tool.approval_resolved': (_activity, { sessionId, refreshPendingApproval, setLiveStatus }) => {
-    refreshPendingApproval(sessionId);
-    setLiveStatus('Approval resolved. Resuming...');
-  },
-  'compaction.running': (activity, { setLiveStatus }) => {
-    setLiveStatus(activity.archivePath ? `Compacting earlier history... ${activity.archivePath}` : 'Compacting earlier history...');
-  },
-  'compaction.failed': (activity, { setLiveStatus }) => {
-    setLiveStatus(activity.error ? `Compaction failed: ${activity.error}` : 'Compaction failed.');
-  },
-  'compaction.finished': (activity, { setLiveStatus }) => {
-    setLiveStatus(activity.summaryPath ? `Compaction finished. Summary: ${activity.summaryPath}` : 'Compaction finished.');
-  },
-};
 
 function applySessionActivity(activity: ControlPlaneSessionActivity, context: SessionActivityContext) {
-  const handler = sessionActivityHandlers[activity.type] as ((activity: ControlPlaneSessionActivity, context: SessionActivityContext) => void) | undefined;
-  handler?.(activity, context);
-}
-
-function formatStep(step: number | undefined): string {
-  return typeof step === 'number' ? ` (step ${step})` : '';
+  ClientSharedSessionActivityService.applyActivity(activity, {
+    onAssistantStream: (streamActivity, liveStatus) => {
+      context.updateSession((current) => (
+        ClientSharedSessionMessageService.upsertLiveAssistantMessage(
+          current,
+          streamActivity.text,
+          streamActivity.done,
+        )
+      ));
+      context.setLiveStatus(liveStatus);
+    },
+    onRunStarted: (_runActivity, liveStatus) => {
+      context.setRunning(true);
+      context.setLiveStatus(liveStatus);
+    },
+    onRunFinished: () => {
+      context.setRunning(false);
+      context.setLiveStatus(undefined);
+      void context.refresh(context.sessionId, { silent: true });
+    },
+    onLiveStatus: (_statusActivity, liveStatus) => {
+      context.setLiveStatus(liveStatus);
+    },
+    onPendingApprovalChanged: () => {
+      context.refreshPendingApproval(context.sessionId);
+    },
+    onWorkspaceChanged: () => {
+      context.invalidateWorkspaceDiff();
+    },
+  });
 }
