@@ -49,6 +49,7 @@ function createSnapshot(
     pendingApproval: null,
     loading: false,
     submitting: false,
+    approvalResolving: false,
     running: false,
     cancelling: false,
     streamConnected: false,

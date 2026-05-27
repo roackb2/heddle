@@ -82,6 +82,29 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('resolves pending approvals through the shared control-plane API', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await store.resolvePendingApproval({ type: 'approve', reason: 'Approved in test' });
+
+    expect(fixture.calls.sessionResolveApprovalMutate).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      decision: { type: 'approve', reason: 'Approved in test' },
+    });
+    expect(store.getSnapshot()).toMatchObject({
+      approvalResolving: false,
+      latestUpdate: {
+        label: 'Approval resolved',
+        detail: 'approve',
+        tone: 'info',
+      },
+    });
+    store.dispose();
+  });
+
   it('applies live assistant stream events from the session subscription', async () => {
     const fixture = createClientFixture();
     const store = new ControlPlaneSessionStore({ client: fixture.client });
@@ -217,6 +240,7 @@ function createClientFixture() {
       outcome: 'completed',
       summary: 'Done.',
     })),
+    sessionResolveApprovalMutate: vi.fn(async () => ({ resolved: true })),
   };
   const client = {
     controlPlane: {
@@ -241,7 +265,7 @@ function createClientFixture() {
       sessionPendingApproval: { query: calls.sessionPendingApprovalQuery },
       sessionSendPrompt: { mutate: calls.sessionSendPromptMutate },
       sessionCancel: { mutate: vi.fn(async () => ({ cancelled: false })) },
-      sessionResolveApproval: { mutate: vi.fn(async () => ({ resolved: true })) },
+      sessionResolveApproval: { mutate: calls.sessionResolveApprovalMutate },
     },
   } as unknown as ControlPlaneProxyClient;
 

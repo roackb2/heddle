@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
+import { ApprovalPanel } from './components/ApprovalPanel.js';
 import { ConversationPanel } from './components/ConversationPanel.js';
 import { PromptInput } from './components/PromptInput.js';
 import { buildPromptActivity } from './helpers/activities/prompt-activity.js';
 import { useControlPlaneSessionStore } from './hooks/useControlPlaneSessionStore.js';
 import { usePromptDraft } from './hooks/usePromptDraft.js';
+import type { ControlPlaneApprovalDecision } from '@/client-shared/api/types.js';
 import type {
   ControlPlaneSessionStore,
   ControlPlaneSessionStoreStartInput,
@@ -47,6 +49,10 @@ export function App({
     void store.submitPrompt(value);
   }, [clearDraft, store, submitDisabled]);
 
+  const resolveApproval = useCallback((decision: ControlPlaneApprovalDecision) => {
+    void store.resolvePendingApproval(decision);
+  }, [store]);
+
   return (
     <Box flexDirection="column" paddingX={1}>
       <Box marginBottom={1}>
@@ -59,11 +65,15 @@ export function App({
       </Text>
       <ConversationPanel session={snapshot.activeSession} />
       {snapshot.pendingApproval ? (
-        <Text color="yellow">Approval requested. Approval controls are part of the next cli-v2 slice.</Text>
+        <ApprovalPanel
+          approval={snapshot.pendingApproval}
+          resolving={snapshot.approvalResolving}
+          onResolve={resolveApproval}
+        />
       ) : null}
       <PromptInput
         activity={buildPromptActivity(snapshot)}
-        disabled={snapshot.loading}
+        disabled={snapshot.loading || Boolean(snapshot.pendingApproval)}
         placeholder={snapshot.loading ? 'Loading session...' : 'Type a prompt'}
         value={draft}
         onChange={setDraft}

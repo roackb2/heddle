@@ -46,6 +46,7 @@ export type ControlPlaneSessionStoreSnapshot = {
   pendingApproval: ControlPlanePendingApproval;
   loading: boolean;
   submitting: boolean;
+  approvalResolving: boolean;
   running: boolean;
   cancelling: boolean;
   streamConnected: boolean;
@@ -60,6 +61,7 @@ const INITIAL_SNAPSHOT: ControlPlaneSessionStoreSnapshot = {
   pendingApproval: null,
   loading: false,
   submitting: false,
+  approvalResolving: false,
   running: false,
   cancelling: false,
   streamConnected: false,
@@ -290,6 +292,15 @@ export class ControlPlaneSessionStore {
   async resolvePendingApproval(decision: ControlPlaneApprovalDecision): Promise<void> {
     const workspaceId = this.requireWorkspaceId();
     const sessionId = this.requireActiveSessionId();
+    this.setSnapshot({
+      approvalResolving: true,
+      error: undefined,
+      latestUpdate: {
+        label: 'Resolving approval',
+        tone: 'info',
+      },
+    });
+
     try {
       const result = await this.client.controlPlane.sessionResolveApproval.mutate({
         workspaceId,
@@ -300,8 +311,19 @@ export class ControlPlaneSessionStore {
         throw new Error('No pending approval found for this session.');
       }
       await this.refreshPendingApproval(sessionId);
+      this.setSnapshot({
+        approvalResolving: false,
+        latestUpdate: {
+          label: 'Approval resolved',
+          detail: decision.type,
+          tone: 'info',
+        },
+      });
     } catch (error) {
-      this.setSnapshot({ error: formatError(error) });
+      this.setSnapshot({
+        approvalResolving: false,
+        error: formatError(error),
+      });
     }
   }
 
