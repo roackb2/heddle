@@ -20,6 +20,7 @@ export type ControlPlaneSessionMessage = NonNullable<ControlPlaneSessionDetail>[
 export type ControlPlanePendingApproval = RouterOutputs['controlPlane']['sessionPendingApproval'];
 export type ControlPlaneApprovalDecision = RouterInputs['controlPlane']['sessionResolveApproval']['decision'];
 export type ControlPlaneSessionSendPromptResult = RouterOutputs['controlPlane']['sessionSendPrompt'];
+export type ControlPlaneSessionSendPromptAsyncResult = RouterOutputs['controlPlane']['sessionSendPromptAsync'];
 export type ControlPlaneModelOptions = RouterOutputs['controlPlane']['modelOptions'];
 export type ControlPlaneSessionSettingsInput = RouterInputs['controlPlane']['sessionSettingsUpdate'];
 export type ControlPlaneHeartbeatTasks = RouterOutputs['controlPlane']['heartbeatTasks'];

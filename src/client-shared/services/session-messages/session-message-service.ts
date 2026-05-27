@@ -1,29 +1,12 @@
 import type { ControlPlaneSessionDetail, ControlPlaneSessionMessage } from '../../api/types.js';
 
 /**
- * Shapes transient client-side session messages around persisted control-plane
- * session detail. This is shared by browser and terminal clients because the
- * behavior belongs to API-consumer state, not to a specific UI renderer.
+ * Shapes transient assistant stream messages around persisted control-plane
+ * session detail. Accepted user messages are server-owned and must arrive from
+ * the API snapshot, so this service intentionally does not preserve client-only
+ * user messages.
  */
 export class ClientSharedSessionMessageService {
-  static appendOptimisticUserTurn(session: ControlPlaneSessionDetail, prompt: string): ControlPlaneSessionDetail {
-    if (!session) {
-      return session;
-    }
-
-    return {
-      ...session,
-      messages: [
-        ...session.messages.filter((message) => !message.id.startsWith('live-')),
-        {
-          id: 'live-user',
-          role: 'user',
-          text: prompt,
-        },
-      ],
-    };
-  }
-
   static upsertLiveAssistantMessage(
     session: ControlPlaneSessionDetail,
     text: string,
@@ -56,21 +39,16 @@ export class ClientSharedSessionMessageService {
 
     const nextMessageIds = new Set(next.messages.map((message) => message.id));
     const transientMessages = current.messages.filter((message) => (
-      message.id.startsWith('live-') &&
+      message.id === 'live-assistant' &&
       !nextMessageIds.has(message.id) &&
       !next.messages.some((persisted) => persisted.role === message.role && persisted.text === message.text)
     ));
-    const orderedTransientMessages = [
-      transientMessages.find((message) => message.id === 'live-user'),
-      transientMessages.find((message) => message.id === 'live-assistant'),
-      ...transientMessages.filter((message) => message.id !== 'live-user' && message.id !== 'live-assistant'),
-    ].filter((message): message is ControlPlaneSessionMessage => Boolean(message));
 
-    return orderedTransientMessages.length ? {
+    return transientMessages.length ? {
       ...next,
       messages: [
         ...next.messages,
-        ...orderedTransientMessages,
+        ...transientMessages,
       ],
     } : next;
   }

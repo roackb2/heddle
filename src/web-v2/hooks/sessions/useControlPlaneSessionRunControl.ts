@@ -30,7 +30,8 @@ export function useControlPlaneSessionRunControl({
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | undefined>();
   const serverConfirmedRunningRef = useRef(false);
-  const sessionRunningQuery = trpcReact.controlPlane.sessionRunning.useQuery(
+  const runStateBaselineUpdatedAtRef = useRef(0);
+  const sessionRunStateQuery = trpcReact.controlPlane.sessionRunState.useQuery(
     sessionId && workspaceId ? { id: sessionId, workspaceId } : skipToken,
     {
       enabled: Boolean(sessionId && workspaceId),
@@ -45,34 +46,56 @@ export function useControlPlaneSessionRunControl({
     setCancelling(false);
     setCancelError(undefined);
     serverConfirmedRunningRef.current = false;
+    runStateBaselineUpdatedAtRef.current = 0;
   }, [sessionId, workspaceId]);
 
   useEffect(() => {
-    const serverRunning = sessionRunningQuery.data?.running;
+    const serverRunning = sessionRunStateQuery.data?.running;
+    const hasFreshRunState = sessionRunStateQuery.dataUpdatedAt > runStateBaselineUpdatedAtRef.current;
     if (serverRunning) {
       serverConfirmedRunningRef.current = true;
       setRunningState(true);
       return;
     }
 
-    if (serverRunning === false && (running || cancelling || serverConfirmedRunningRef.current)) {
+    if (serverRunning === false && (cancelling || serverConfirmedRunningRef.current || (running && hasFreshRunState))) {
       serverConfirmedRunningRef.current = false;
       setRunningState(false);
       setCancelling(false);
       setLiveStatus(undefined);
+      if (sessionId && workspaceId) {
+        void Promise.all([
+          utils.controlPlane.session.invalidate({ id: sessionId, workspaceId }),
+          utils.controlPlane.sessions.invalidate({ workspaceId }),
+          utils.controlPlane.sessionPendingApproval.invalidate({ id: sessionId, workspaceId }),
+        ]).catch(() => undefined);
+      }
     }
-  }, [cancelling, running, sessionRunningQuery.data?.running, setLiveStatus]);
+  }, [
+    cancelling,
+    running,
+    sessionId,
+    sessionRunStateQuery.data?.running,
+    sessionRunStateQuery.dataUpdatedAt,
+    setLiveStatus,
+    utils,
+    workspaceId,
+  ]);
 
   const setRunning = useCallback<Dispatch<SetStateAction<boolean>>>((nextRunning) => {
-    setRunningState((current) => (
-      typeof nextRunning === 'function' ? nextRunning(current) : nextRunning
-    ));
-    if (nextRunning === false) {
-      serverConfirmedRunningRef.current = false;
-    }
+    setRunningState((current) => {
+      const resolved = typeof nextRunning === 'function' ? nextRunning(current) : nextRunning;
+      if (resolved) {
+        runStateBaselineUpdatedAtRef.current = sessionRunStateQuery.dataUpdatedAt;
+      } else {
+        serverConfirmedRunningRef.current = false;
+      }
+
+      return resolved;
+    });
     setCancelling(false);
     setCancelError(undefined);
-  }, []);
+  }, [sessionRunStateQuery.dataUpdatedAt]);
 
   const cancelRun = useCallback(async () => {
     if (!sessionId || !workspaceId || cancelMutation.isPending) {
@@ -86,7 +109,7 @@ export function useControlPlaneSessionRunControl({
     try {
       const result = await cancelMutation.mutateAsync({ id: sessionId, workspaceId });
       await utils.controlPlane.sessionPendingApproval.invalidate({ id: sessionId, workspaceId });
-      await utils.controlPlane.sessionRunning.invalidate({ id: sessionId, workspaceId });
+      await utils.controlPlane.sessionRunState.invalidate({ id: sessionId, workspaceId });
       if (!result.cancelled) {
         setRunningState(false);
         setCancelling(false);

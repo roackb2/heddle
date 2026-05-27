@@ -24,6 +24,7 @@ export function App({
   const snapshot = useControlPlaneSessionStore(store);
   const { draft, setDraft, clearDraft } = usePromptDraft();
   const submitDisabled = snapshot.loading || snapshot.submitting || snapshot.running;
+  const inputDisabled = snapshot.loading;
 
   useEffect(() => {
     if (startedRef.current) {
@@ -84,7 +85,8 @@ export function App({
       />
       <PromptInput
         activity={PromptActivityService.build(snapshot)}
-        disabled={submitDisabled || Boolean(snapshot.pendingApproval)}
+        disabled={inputDisabled}
+        submitDisabled={submitDisabled || Boolean(snapshot.pendingApproval)}
         placeholder={
           snapshot.loading ? 'Loading session...'
           : snapshot.running ? 'Run in progress'

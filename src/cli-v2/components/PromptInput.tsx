@@ -6,6 +6,7 @@ export function PromptInput({
   activity,
   disabled,
   placeholder,
+  submitDisabled,
   value,
   onChange,
   onSubmit,
@@ -13,6 +14,7 @@ export function PromptInput({
   activity?: PromptActivityView;
   disabled: boolean;
   placeholder: string;
+  submitDisabled?: boolean;
   value: string;
   onChange: Dispatch<SetStateAction<string>>;
   onSubmit: (value: string) => void;
@@ -23,6 +25,10 @@ export function PromptInput({
     }
 
     if (key.return) {
+      if (submitDisabled) {
+        return;
+      }
+
       onSubmit(value);
       return;
     }

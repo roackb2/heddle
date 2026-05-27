@@ -149,6 +149,14 @@ export type ChatSessionDetail = ChatSessionView & {
   lastContinuePrompt?: string;
 };
 
+export type ControlPlaneAcceptedSessionRun = {
+  accepted: true;
+  workspaceId: string;
+  sessionId: string;
+  runId: string;
+  acceptedAt: string;
+};
+
 export type ControlPlaneSessionLiveEvent = {
   sessionId: string;
   timestamp: string;

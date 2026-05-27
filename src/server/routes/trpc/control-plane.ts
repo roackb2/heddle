@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import type { z } from 'zod';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import { BUILT_IN_MODEL_GROUPS, ModelPolicyService } from '@/core/llm/models/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
@@ -16,7 +17,7 @@ import { ControlPlaneWorkspaceFilesController } from '@/server/controllers/trpc/
 import { ControlPlaneWorkspaceDiffController } from '@/server/controllers/trpc/control-plane/workspace-diff.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
-import { controlPlaneWorkspaceProcedure } from './control-plane-workspace.js';
+import { controlPlaneWorkspaceProcedure, type ControlPlaneWorkspaceContext } from './control-plane-workspace.js';
 import {
   agentAskInputSchema,
   createSessionInputSchema,
@@ -207,21 +208,10 @@ export const controlPlaneRouter = router({
     };
   }),
   sessionSendPrompt: controlPlaneWorkspaceProcedure.input(sessionMessageInputSchema).mutation(async ({ ctx, input }) => {
-    const { logger, sessionEngineArgs } = ctx.requestWorkspace;
-    return await controlPlaneChatSessionsController.submitPrompt({
-      ...sessionEngineArgs,
-      sessionId: input.sessionId,
-      prompt: input.prompt,
-      maxSteps: input.maxSteps,
-      searchIgnoreDirs: input.searchIgnoreDirs,
-      includePlanTool: input.includePlanTool,
-      apiKey: input.apiKey,
-      preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
-      logger,
-      systemContext: input.systemContext,
-      memoryMaintenanceMode: input.memoryMaintenanceMode,
-      leaseOwner: resolveControlPlaneLeaseOwner(ctx),
-    });
+    return await controlPlaneChatSessionsController.submitPrompt(buildSubmitPromptArgs(ctx, input));
+  }),
+  sessionSendPromptAsync: controlPlaneWorkspaceProcedure.input(sessionMessageInputSchema).mutation(({ ctx, input }) => {
+    return controlPlaneChatSessionsController.submitPromptAsync(buildSubmitPromptArgs(ctx, input));
   }),
   sessionContinue: controlPlaneWorkspaceProcedure.input(sessionInputSchema).mutation(async ({ ctx, input }) => {
     const { sessionEngineArgs } = ctx.requestWorkspace;
@@ -472,6 +462,19 @@ export const controlPlaneRouter = router({
     return await ControlPlaneLayoutSnapshotsController.save(workspace.stateRoot, input.snapshot);
   }),
 });
+
+type SessionMessageInput = z.infer<typeof sessionMessageInputSchema>;
+
+function buildSubmitPromptArgs(ctx: ControlPlaneWorkspaceContext, input: SessionMessageInput) {
+  const { logger, sessionEngineArgs } = ctx.requestWorkspace;
+  return {
+    ...input,
+    ...sessionEngineArgs,
+    preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
+    logger,
+    leaseOwner: resolveControlPlaneLeaseOwner(ctx),
+  };
+}
 
 function resolveControlPlaneLeaseOwner(ctx: Pick<HeddleServerContext, 'runtimeHost'>): ChatSessionLeaseOwner {
   return {

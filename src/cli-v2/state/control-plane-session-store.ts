@@ -228,27 +228,28 @@ export class ControlPlaneSessionStore {
         detail: 'waiting for model or tool activity',
         tone: 'info',
       },
-      activeSession: ClientSharedSessionMessageService.appendOptimisticUserTurn(current.activeSession, trimmed),
     }));
 
     try {
-      const result = await this.api.sendPrompt({
+      const result = await this.api.sendPromptAsync({
         workspaceId,
         sessionId,
         prompt: trimmed,
       });
       this.assistantStreamBuffer.reset();
       this.setSnapshot({
-        activeSession: result.session,
-        running: false,
         submitting: false,
-        liveStatus: undefined,
+        running: true,
+        liveStatus: this.snapshotValue.streamConnected
+          ? 'Heddle is working...'
+          : 'Heddle is working... reconnecting live stream if needed.',
         latestUpdate: {
-          label: 'Run finished',
-          detail: result.outcome,
-          tone: SessionActivityService.resolveRunOutcomeTone(result.outcome),
+          label: 'Run accepted',
+          detail: result.runId,
+          tone: 'info',
         },
       });
+      await this.refreshSession(sessionId, { silent: true });
       await this.refreshSessions();
       await this.refreshPendingApproval(sessionId);
     } catch (error) {
@@ -275,6 +276,7 @@ export class ControlPlaneSessionStore {
         submitting: false,
         liveStatus: undefined,
       });
+      await this.refreshSession(sessionId, { silent: true }).catch(() => undefined);
       this.assistantStreamBuffer.reset();
     }
   }
@@ -526,10 +528,10 @@ export class ControlPlaneSessionStore {
 
     if (this.snapshotValue.submitting) {
       this.setSnapshot({
-        liveStatus: 'Finalizing response...',
+        liveStatus: 'Waiting for run acceptance...',
         latestUpdate: {
-          label: 'Finalizing response',
-          detail: 'waiting for server result',
+          label: 'Run starting',
+          detail: 'waiting for server acceptance',
           tone: 'info',
         },
       });

@@ -68,7 +68,6 @@ export function useControlPlaneSessionDetail({
     workspaceId,
     sessionId,
     streamConnected: events.streamConnected,
-    setSession: loader.setSession,
     setRunning: runControl.setRunning,
     setError: loader.setError,
     setLiveStatus,

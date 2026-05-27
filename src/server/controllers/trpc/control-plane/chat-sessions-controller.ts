@@ -47,10 +47,15 @@ import type {
   ChatSessionDetail,
   ChatSessionView,
   ChatTurnReview,
+  ControlPlaneAcceptedSessionRun,
   ControlPlaneSessionEventEnvelope,
   ControlPlaneSessionLiveEvent,
   ControlPlaneSessionsEventEnvelope,
 } from '@/server/control-plane-types.js';
+import {
+  ControlPlaneSessionRunService,
+  type ControlPlaneSessionRunContext,
+} from '@/server/services/control-plane/session-run-service.js';
 
 type ControlPlaneSessionReadArgs = Omit<ConversationEngineConfig, 'model' | 'workspaceId'> & {
   model?: string;
@@ -100,19 +105,9 @@ type ContinueChatPromptArgs = Omit<SubmitChatPromptArgs, 'prompt'>;
 
 type ControlPlaneTurnPublisher = ReturnType<typeof ControlPlaneChatSessionEventsController.createSessionEventPublisher>;
 
-type PendingControlPlaneApproval = {
-  approval: ToolApprovalRequest;
-  resolve: (decision: ToolApprovalUserDecision) => void;
-};
-
-type InFlightControlPlaneRun = {
-  controller: AbortController;
-};
-
 export class ControlPlaneChatSessionsController {
   private readonly sessionEventBus = new EventEmitter();
-  private readonly pendingApprovals = new Map<string, PendingControlPlaneApproval>();
-  private readonly inFlightRuns = new Map<string, InFlightControlPlaneRun>();
+  private readonly runService = new ControlPlaneSessionRunService();
 
   createSession(args: CreateControlPlaneChatSessionArgs): ChatSessionDetail {
     const { suggestedName, ...engineInput } = args;
@@ -179,62 +174,62 @@ export class ControlPlaneChatSessionsController {
   }
 
   async compactSession(args: CompactControlPlaneChatSessionArgs): Promise<ChatSessionDetail> {
-    this.assertNoActiveRun(args);
-    const sessionKey = ControlPlaneChatSessionsController.sessionAddressKey(args);
-    const controller = new AbortController();
-    this.inFlightRuns.set(sessionKey, { controller });
-    const { sessionId, force = true, leaseOwner, ...engineInput } = args;
-    const sessions = this.createEngine(engineInput).sessions;
-    let leaseAcquired = false;
-    let previousCompactionState: Pick<ChatSession, 'context' | 'archives'> | undefined;
+    return await this.runService.startAndWait({
+      address: args,
+      execute: async () => {
+        const { sessionId, force = true, leaseOwner, ...engineInput } = args;
+        const sessions = this.createEngine(engineInput).sessions;
+        let leaseAcquired = false;
+        let previousCompactionState: Pick<ChatSession, 'context' | 'archives'> | undefined;
 
-    try {
-      this.assertNoLeaseConflict(sessions, sessionId, leaseOwner);
-      const session = sessions.acquireLease(sessionId, leaseOwner);
-      leaseAcquired = true;
-      const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
-        eventBus: this.sessionEventBus,
-        workspaceId: args.workspaceId,
-        sessionId,
-      });
-      previousCompactionState = {
-        context: session.context,
-        archives: session.archives,
-      };
+        try {
+          this.assertNoLeaseConflict(sessions, sessionId, leaseOwner);
+          const session = sessions.acquireLease(sessionId, leaseOwner);
+          leaseAcquired = true;
+          const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
+            eventBus: this.sessionEventBus,
+            workspaceId: args.workspaceId,
+            sessionId,
+          });
+          previousCompactionState = {
+            context: session.context,
+            archives: session.archives,
+          };
 
-      sessions.markCompactionRunning(sessionId, { sourceHistory: session.history });
-      const model = session.model ?? args.model ?? DEFAULT_OPENAI_MODEL;
-      const compacted = await ConversationCompactionService.compact({
-        history: session.history,
-        runtime: {
-          model,
-          stateRoot: args.stateRoot,
-          systemContext: args.systemContext,
-        },
-        session,
-        force,
-        summarizer: {
-          credentialSource: RuntimeCredentialService.resolveCredentialSourceForModel(model, {
-            apiKey: args.apiKey,
-            credentialStorePath: args.credentialStorePath,
-            preferApiKey: args.preferApiKey,
-          }),
-        },
-        onStatusChange: publisher.publishActivity,
-      });
-      const updated = sessions.applyCompactionResult(sessionId, compacted);
-      return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
-    } catch (error) {
-      if (previousCompactionState) {
-        sessions.restoreCompactionState(sessionId, previousCompactionState);
-      }
-      throw error;
-    } finally {
-      if (leaseAcquired) {
-        sessions.releaseLease(sessionId, leaseOwner);
-      }
-      this.inFlightRuns.delete(sessionKey);
-    }
+          sessions.markCompactionRunning(sessionId, { sourceHistory: session.history });
+          const model = session.model ?? args.model ?? DEFAULT_OPENAI_MODEL;
+          const compacted = await ConversationCompactionService.compact({
+            history: session.history,
+            runtime: {
+              model,
+              stateRoot: args.stateRoot,
+              systemContext: args.systemContext,
+            },
+            session,
+            force,
+            summarizer: {
+              credentialSource: RuntimeCredentialService.resolveCredentialSourceForModel(model, {
+                apiKey: args.apiKey,
+                credentialStorePath: args.credentialStorePath,
+                preferApiKey: args.preferApiKey,
+              }),
+            },
+            onStatusChange: publisher.publishActivity,
+          });
+          const updated = sessions.applyCompactionResult(sessionId, compacted);
+          return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
+        } catch (error) {
+          if (previousCompactionState) {
+            sessions.restoreCompactionState(sessionId, previousCompactionState);
+          }
+          throw error;
+        } finally {
+          if (leaseAcquired) {
+            sessions.releaseLease(sessionId, leaseOwner);
+          }
+        }
+      },
+    });
   }
 
   readRunState(sessionAddress: ControlPlaneSessionAddress) {
@@ -245,52 +240,15 @@ export class ControlPlaneChatSessionsController {
   }
 
   async submitPrompt(args: SubmitChatPromptArgs) {
-    if (process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT === '1') {
-      return await this.runFakeBrowserIntegrationSessionPrompt(args);
-    }
+    return await this.runService.startAndWait(this.buildSubmitPromptRun(args));
+  }
 
-    const result = await this.runEngineTurn(args, async ({ engine, host, abortSignal, shouldStop }) => {
-      return await engine.turns.submit({
-        sessionId: args.sessionId,
-        prompt: args.prompt,
-        maxSteps: args.maxSteps,
-        searchIgnoreDirs: args.searchIgnoreDirs,
-        includePlanTool: args.includePlanTool,
-        host,
-        abortSignal,
-        shouldStop,
-        leaseOwner: args.leaseOwner,
-      });
-    });
-    this.scheduleAutoRenameAfterFirstUserMessage(args, {
-      responseText: result.summary,
-      sessionModel: result.session?.model,
-    });
-    return result;
+  submitPromptAsync(args: SubmitChatPromptArgs): ControlPlaneAcceptedSessionRun {
+    return this.runService.start(this.buildSubmitPromptRun(args));
   }
 
   async continuePrompt(args: ContinueChatPromptArgs) {
-    if (process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT === '1') {
-      const session = this.createEngine(args).sessions.require(args.sessionId);
-      if (!session.history.length || !session.lastContinuePrompt) {
-        throw new Error('There is no interrupted or prior run to continue yet.');
-      }
-
-      return await this.runFakeBrowserIntegrationSessionPrompt({
-        ...args,
-        prompt: session.lastContinuePrompt,
-      });
-    }
-
-    return await this.runEngineTurn(args, async ({ engine, host, abortSignal, shouldStop }) => {
-      return await engine.turns.continue({
-        sessionId: args.sessionId,
-        host,
-        abortSignal,
-        shouldStop,
-        leaseOwner: args.leaseOwner,
-      });
-    });
+    return await this.runService.startAndWait(this.buildContinuePromptRun(args));
   }
 
   subscribeToEvents(
@@ -381,47 +339,22 @@ export class ControlPlaneChatSessionsController {
   }
 
   getPendingApproval(sessionAddress: ControlPlaneSessionAddress): ToolApprovalRequest | undefined {
-    return this.pendingApprovals.get(ControlPlaneChatSessionsController.sessionAddressKey(sessionAddress))?.approval;
+    return this.runService.getPendingApproval(sessionAddress);
   }
 
   isRunning(sessionAddress: ControlPlaneSessionAddress): boolean {
-    return this.inFlightRuns.has(ControlPlaneChatSessionsController.sessionAddressKey(sessionAddress));
+    return this.runService.isRunning(sessionAddress);
   }
 
   cancelRun(sessionAddress: ControlPlaneSessionAddress): boolean {
-    const key = ControlPlaneChatSessionsController.sessionAddressKey(sessionAddress);
-    const run = this.inFlightRuns.get(key);
-    if (!run) {
-      return false;
-    }
-
-    run.controller.abort();
-    const pending = this.pendingApprovals.get(key);
-    if (pending) {
-      this.pendingApprovals.delete(key);
-      pending.resolve({
-        type: 'deny',
-        reason: 'Cancelled by user',
-      });
-    }
-    return true;
+    return this.runService.cancelRun(sessionAddress);
   }
 
   resolvePendingApproval(
     sessionAddress: ControlPlaneSessionAddress,
     decision: ToolApprovalUserDecision,
   ): boolean {
-    const key = ControlPlaneChatSessionsController.sessionAddressKey(sessionAddress);
-    const pending = this.pendingApprovals.get(key);
-    if (!pending) {
-      return false;
-    }
-
-    this.pendingApprovals.delete(key);
-    // This resolves the promise created by ToolApprovalService.requestHumanApproval.
-    // The paused agent turn resumes immediately after this call returns.
-    pending.resolve(decision);
-    return true;
+    return this.runService.resolvePendingApproval(sessionAddress, decision);
   }
 
   readViews(args: ControlPlaneSessionReadArgs): ChatSessionView[] {
@@ -449,8 +382,75 @@ export class ControlPlaneChatSessionsController {
     return join(stateRoot, 'chat-sessions', `${sessionId}.json`);
   }
 
+  private buildSubmitPromptRun(args: SubmitChatPromptArgs) {
+    return {
+      address: args,
+      onAccepted: (run: ControlPlaneSessionRunContext) => {
+        this.createEngine(args).sessions.acceptUserMessage(args.sessionId, {
+          runId: run.runId,
+          prompt: args.prompt,
+          leaseOwner: args.leaseOwner,
+        });
+      },
+      execute: async (run: ControlPlaneSessionRunContext) => {
+        const result = process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT === '1'
+          ? await this.runFakeBrowserIntegrationSessionPrompt(args)
+          : await this.runEngineTurn(args, run, async ({ engine, host, abortSignal, shouldStop }) => {
+            return await engine.turns.submit({
+              ...args,
+              host,
+              abortSignal,
+              shouldStop,
+            });
+          });
+
+        this.scheduleAutoRenameAfterFirstUserMessage(args, {
+          responseText: result.summary,
+          sessionModel: result.session?.model,
+        });
+        return result;
+      },
+      onError: (error: unknown, run: ControlPlaneSessionRunContext) => {
+        this.persistRunFailureMessage(args, run, error);
+      },
+    };
+  }
+
+  private buildContinuePromptRun(args: ContinueChatPromptArgs) {
+    return {
+      address: args,
+      execute: async (run: ControlPlaneSessionRunContext) => {
+        if (process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT === '1') {
+          const session = this.createEngine(args).sessions.require(args.sessionId);
+          if (!session.history.length || !session.lastContinuePrompt) {
+            throw new Error('There is no interrupted or prior run to continue yet.');
+          }
+
+          return await this.runFakeBrowserIntegrationSessionPrompt({
+            ...args,
+            prompt: session.lastContinuePrompt,
+          });
+        }
+
+        return await this.runEngineTurn(args, run, async ({ engine, host, abortSignal, shouldStop }) => {
+          return await engine.turns.continue({
+            sessionId: args.sessionId,
+            host,
+            abortSignal,
+            shouldStop,
+            leaseOwner: args.leaseOwner,
+          });
+        });
+      },
+      onError: (error: unknown, run: ControlPlaneSessionRunContext) => {
+        this.persistRunFailureMessage(args, run, error);
+      },
+    };
+  }
+
   private async runEngineTurn(
     args: ContinueChatPromptArgs,
+    runContext: ControlPlaneSessionRunContext,
     run: (input: {
       engine: ConversationEngine;
       host: ConversationEngineHost;
@@ -458,34 +458,38 @@ export class ControlPlaneChatSessionsController {
       shouldStop: () => boolean;
     }) => ReturnType<ConversationEngine['turns']['submit']>,
   ) {
-    const sessionKey = ControlPlaneChatSessionsController.sessionAddressKey(args);
-    if (this.inFlightRuns.has(sessionKey)) {
-      throw new Error('A run is already in progress for this session.');
-    }
-
-    const controller = new AbortController();
-    this.inFlightRuns.set(sessionKey, { controller });
     const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
       eventBus: this.sessionEventBus,
       workspaceId: args.workspaceId,
       sessionId: args.sessionId,
     });
 
-    try {
-      const result = await run({
-        engine: this.createEngine(args),
-        host: this.createEngineHost(args, publisher),
-        abortSignal: controller.signal,
-        shouldStop: () => controller.signal.aborted,
-      });
-      return {
-        ...result,
-        session: ControlPlaneChatSessionPresenter.projectDetail(result.session)[0] ?? null,
-      };
-    } finally {
-      this.pendingApprovals.delete(sessionKey);
-      this.inFlightRuns.delete(sessionKey);
-    }
+    const result = await run({
+      engine: this.createEngine(args),
+      host: this.createEngineHost(args, publisher),
+      abortSignal: runContext.controller.signal,
+      shouldStop: () => runContext.controller.signal.aborted,
+    });
+    return {
+      ...result,
+      session: ControlPlaneChatSessionPresenter.projectDetail(result.session)[0] ?? null,
+    };
+  }
+
+  private persistRunFailureMessage(
+    args: ContinueChatPromptArgs,
+    run: ControlPlaneSessionRunContext,
+    error: unknown,
+  ): void {
+    const message = error instanceof Error ? error.message : String(error);
+    this.createEngine(args).sessions.markAcceptedUserMessageFailed(args.sessionId, {
+      runId: run.runId,
+      failureMessage: {
+        id: `accepted-run-error-${run.runId}`,
+        role: 'assistant',
+        text: `Run failed before a final answer: ${message}`,
+      },
+    });
   }
 
   private scheduleAutoRenameAfterFirstUserMessage(
@@ -552,7 +556,6 @@ export class ControlPlaneChatSessionsController {
   }
 
   private createEngineHost(args: ControlPlaneSessionReadArgs & ControlPlaneSessionAddress, publisher: ControlPlaneTurnPublisher): ConversationEngineHost {
-    const sessionKey = ControlPlaneChatSessionsController.sessionAddressKey(args);
     const approvalService = this.createApprovalService(args);
 
     return {
@@ -568,13 +571,13 @@ export class ControlPlaneChatSessionsController {
             storePending: ({ request, resolve }) => {
               // Keep the resolver in memory while the browser renders the
               // request. sessionResolveApproval later calls this resolver.
-              this.pendingApprovals.set(sessionKey, {
+              this.runService.storePendingApproval(args, {
                 approval: request,
                 resolve,
               });
             },
           });
-          this.pendingApprovals.delete(sessionKey);
+          this.runService.clearPendingApproval(args);
           return decision;
         },
       },

@@ -78,7 +78,8 @@ export function ConversationComposer({
     uploadImages,
   } = useComposerImageAttachments({ workspaceId, sessionId });
   const turnActive = Boolean(submitting || running || cancelling);
-  const controlsDisabled = disabled || turnActive;
+  const inputDisabled = Boolean(disabled || submitting || cancelling);
+  const controlsDisabled = Boolean(disabled || submitting || cancelling);
   const sendDisabled = disabled
     || turnActive
     || imageUploading
@@ -102,16 +103,16 @@ export function ConversationComposer({
       return;
     }
 
+    await onSubmitPrompt(prompt);
     setDraft('');
     clearUploadedAttachments();
-    await onSubmitPrompt(prompt);
   }, [clearUploadedAttachments, draft, onSubmitPrompt, sendDisabled, uploadedImagePaths]);
   const fileMentions = useFileMentionAutocomplete({
     workspaceId,
     value: draft,
     onValueChange: setDraft,
     textareaRef,
-    disabled: controlsDisabled,
+    disabled: inputDisabled,
     onSubmit: handleSubmit,
   });
   useComposerTextareaAutosize(textareaRef, draft);
@@ -134,7 +135,7 @@ export function ConversationComposer({
         aria-controls={fileMentions.textareaProps['aria-controls']}
         aria-expanded={fileMentions.textareaProps['aria-expanded']}
         className="v2-composer-textarea"
-        disabled={controlsDisabled}
+        disabled={inputDisabled}
         autoCapitalize="sentences"
         autoComplete="off"
         autoCorrect="on"

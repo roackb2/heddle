@@ -54,7 +54,7 @@ export const ConversationLineSchema = z.object({
     .describe('Whether this visible line was still streaming when captured.')
     .optional(),
   isPending: z.boolean()
-    .describe('Whether this visible line represented pending local UI state.')
+    .describe('Whether this visible line represents an accepted but unfinished user/assistant update.')
     .optional(),
 });
 

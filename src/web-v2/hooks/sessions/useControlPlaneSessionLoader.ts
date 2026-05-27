@@ -23,7 +23,7 @@ type UseControlPlaneSessionLoaderArgs = {
 };
 
 // Loads persisted session detail through React Query and preserves browser-only
-// transient messages during silent refreshes.
+// assistant stream messages during silent refreshes.
 export function useControlPlaneSessionLoader({
   workspaceId,
   sessionId,

@@ -3,6 +3,10 @@
 This document explains how Heddle streams live conversation updates from the
 engine to user interfaces. It is a maintenance map, not a transport API spec.
 
+For the surrounding prompt submission flow, including accepted user-message
+persistence, sync vs async control-plane APIs, and run-state fallback polling,
+see `docs/architecture/control-plane-chat-submission.md`.
+
 ## Goal
 
 Live updates let interfaces show an in-progress run without polling the whole

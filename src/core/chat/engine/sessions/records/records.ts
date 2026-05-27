@@ -14,6 +14,8 @@ import type {
   ApplyCompletedChatSessionTurnInput,
   BuildChatTurnSummaryInput,
   CreateChatSessionRecordOptions,
+  MarkAcceptedConversationUserMessageFailedInput,
+  MarkAcceptedConversationUserMessageInput,
 } from './types.js';
 
 export class ChatSessionRecords {
@@ -84,12 +86,15 @@ export class ChatSessionRecords {
   }
 
   static applyCompactedHistory(input: ApplyCompactedChatSessionHistoryInput): ChatSession {
+    const messages = ConversationLines.fromHistory(input.compacted.history);
     return {
       ...input.session,
       history: input.compacted.history,
       context: input.compacted.context,
       archives: input.compacted.archive.archives,
-      messages: ConversationLines.fromHistory(input.compacted.history),
+      messages: input.preserveAcceptedUserMessages
+        ? ChatSessionRecords.withAcceptedUserMessages(messages, input.session.messages)
+        : messages,
     };
   }
 
@@ -102,6 +107,30 @@ export class ChatSessionRecords {
     });
   }
 
+  static markAcceptedUserMessage(
+    session: ChatSession,
+    input: MarkAcceptedConversationUserMessageInput,
+  ): ChatSession {
+    const message: ConversationLine = {
+      id: ChatSessionRecords.acceptedUserMessageId(input.runId),
+      role: 'user',
+      text: input.prompt,
+      isPending: true,
+    };
+
+    if (session.messages.some((candidate) => candidate.id === message.id)) {
+      return session;
+    }
+
+    return ChatSessionRecords.touch({
+      ...session,
+      messages: [
+        ...session.messages.filter((candidate) => !ChatSessionRecords.isLiveMessage(candidate)),
+        message,
+      ],
+    });
+  }
+
   static isGenericName(name: string): boolean {
     return /^Session \d+$/.test(name.trim());
   }
@@ -109,5 +138,52 @@ export class ChatSessionRecords {
   static canAutoRenameAfterFirstUserMessage(session: ChatSession): boolean {
     return ChatSessionRecords.isGenericName(session.name)
       && session.history.filter((message) => message.role === 'user').length === 1;
+  }
+
+  private static withAcceptedUserMessages(
+    messages: ConversationLine[],
+    currentMessages: ConversationLine[],
+  ): ConversationLine[] {
+    const acceptedMessages = currentMessages.filter((message) => (
+      ChatSessionRecords.isAcceptedUserMessage(message)
+      && !messages.some((candidate) => candidate.id === message.id)
+    ));
+
+    return acceptedMessages.length ? [...messages, ...acceptedMessages] : messages;
+  }
+
+  static markAcceptedUserMessageFailed(
+    session: ChatSession,
+    input: MarkAcceptedConversationUserMessageFailedInput,
+  ): ChatSession {
+    const acceptedId = ChatSessionRecords.acceptedUserMessageId(input.runId);
+    const failureId = input.failureMessage.id;
+    const messages = session.messages
+      .filter((message) => message.id !== failureId)
+      .map((message) => {
+        if (message.id !== acceptedId) {
+          return message;
+        }
+
+        const { isPending: _isPending, ...settledMessage } = message;
+        return settledMessage;
+      });
+
+    return ChatSessionRecords.touch({
+      ...session,
+      messages: [...messages, input.failureMessage],
+    });
+  }
+
+  private static acceptedUserMessageId(runId: string): string {
+    return `accepted-user-${runId}`;
+  }
+
+  private static isAcceptedUserMessage(message: ConversationLine): boolean {
+    return message.role === 'user' && message.isPending === true && message.id.startsWith('accepted-user-');
+  }
+
+  private static isLiveMessage(message: ConversationLine): boolean {
+    return message.id.startsWith('live-');
   }
 }

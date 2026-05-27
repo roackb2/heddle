@@ -3,9 +3,35 @@ import type { ControlPlaneSessionDetail } from '../../../client-shared/api/types
 import { ClientSharedSessionMessageService } from '../../../client-shared/services/session-messages/session-message-service.js';
 
 describe('ClientSharedSessionMessageService', () => {
-  it('preserves optimistic user messages across stale persisted snapshots', () => {
+  it('preserves live assistant messages across stale persisted snapshots', () => {
     const current = sessionWithMessages([
       { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
+      {
+        id: 'live-assistant',
+        role: 'assistant',
+        text: 'Thinking: Investigating project details',
+        isPending: true,
+        isStreaming: true,
+      },
+    ]);
+    const stale = sessionWithMessages([
+      { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
+    ]);
+
+    expect(ClientSharedSessionMessageService.mergeTransientMessages(current, stale)?.messages).toEqual([
+      { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
+      {
+        id: 'live-assistant',
+        role: 'assistant',
+        text: 'Thinking: Investigating project details',
+        isPending: true,
+        isStreaming: true,
+      },
+    ]);
+  });
+
+  it('drops transient user messages because accepted prompts are server-owned', () => {
+    const current = sessionWithMessages([
       { id: 'live-user', role: 'user', text: 'What is this project about?' },
     ]);
     const stale = sessionWithMessages([
@@ -14,30 +40,13 @@ describe('ClientSharedSessionMessageService', () => {
 
     expect(ClientSharedSessionMessageService.mergeTransientMessages(current, stale)?.messages).toEqual([
       { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
-      { id: 'live-user', role: 'user', text: 'What is this project about?' },
     ]);
   });
 
-  it('drops optimistic user messages once the persisted transcript contains the same turn', () => {
-    const current = sessionWithMessages([
-      { id: 'live-user', role: 'user', text: 'What is this project about?' },
-    ]);
-    const persisted = sessionWithMessages([
-      { id: 'persisted-user', role: 'user', text: 'What is this project about?' },
-      { id: 'persisted-assistant', role: 'assistant', text: 'Heddle is a coding agent runtime.' },
-    ]);
-
-    expect(ClientSharedSessionMessageService.mergeTransientMessages(current, persisted)?.messages).toEqual([
-      { id: 'persisted-user', role: 'user', text: 'What is this project about?' },
-      { id: 'persisted-assistant', role: 'assistant', text: 'Heddle is a coding agent runtime.' },
-    ]);
-  });
-
-  it('keeps live assistant stream idempotent and after the optimistic user turn', () => {
+  it('keeps live assistant stream idempotent after persisted messages', () => {
     const current = sessionWithMessages([
       { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
       { id: 'live-assistant', role: 'assistant', text: 'Thinking: Inspecting project details' },
-      { id: 'live-user', role: 'user', text: 'What is this project about?' },
     ]);
 
     expect(ClientSharedSessionMessageService.upsertLiveAssistantMessage(
@@ -46,7 +55,6 @@ describe('ClientSharedSessionMessageService', () => {
       false,
     )?.messages).toEqual([
       { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
-      { id: 'live-user', role: 'user', text: 'What is this project about?' },
       {
         id: 'live-assistant',
         role: 'assistant',
@@ -57,7 +65,7 @@ describe('ClientSharedSessionMessageService', () => {
     ]);
   });
 
-  it('keeps transient user before transient assistant during stale snapshot merges', () => {
+  it('does not preserve other transient message ids during stale snapshot merges', () => {
     const current = sessionWithMessages([
       { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
       {
@@ -68,6 +76,7 @@ describe('ClientSharedSessionMessageService', () => {
         isStreaming: true,
       },
       { id: 'live-user', role: 'user', text: 'What is this project about?' },
+      { id: 'live-run-status', role: 'assistant', text: 'Running...' },
     ]);
     const stale = sessionWithMessages([
       { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
@@ -75,7 +84,6 @@ describe('ClientSharedSessionMessageService', () => {
 
     expect(ClientSharedSessionMessageService.mergeTransientMessages(current, stale)?.messages).toEqual([
       { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
-      { id: 'live-user', role: 'user', text: 'What is this project about?' },
       {
         id: 'live-assistant',
         role: 'assistant',

@@ -73,6 +73,7 @@ export class ConversationTurnPreflightService {
     const preparedSession = ChatSessionRecords.touch(ChatSessionRecords.applyCompactedHistory({
       session: args.session,
       compacted: args.compacted,
+      preserveAcceptedUserMessages: true,
     }));
 
     new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })

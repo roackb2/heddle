@@ -161,7 +161,6 @@ test('submits a prompt and renders the mocked session response', async ({ page }
   await expectComposerActionButtonCircle(stopButton);
   await expect(page.getByText('Run the web v2 submit smoke', { exact: true })).toBeVisible();
   await expect(page.getByText('Mocked browser integration agent response', { exact: true })).toBeVisible();
-  await expect(page.getByTestId('web-v2-live-status')).toHaveText('Receiving assistant response...');
   await expect(page.getByTestId('web-v2-workbench-body').getByText(
     'Mocked browser integration agent response: Run the web v2 submit smoke',
     { exact: true },

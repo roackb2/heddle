@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
+import { AgentLoopRuntimeService } from '@/core/runtime/loop/index.js';
 import { DEFAULT_WORKSPACE_ID, RuntimeWorkspaceService, type WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
 import { controlPlaneRouter } from '@/server/routes/trpc/control-plane.js';
 import type { HeddleServerContext } from '@/server/types.js';
@@ -19,6 +20,7 @@ const EXTERNAL_TUI_LEASE_OWNER: ChatSessionLeaseOwner = {
 describe('control-plane session lifecycle API', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('renames sessions through the workspace-scoped API', async () => {
@@ -122,10 +124,15 @@ describe('control-plane session lifecycle API', () => {
     await expect(caller.sessionDelete({ id: session.id })).rejects.toThrow('already active');
     await expect(caller.sessionReset({ id: session.id })).rejects.toThrow('already active');
     await expect(caller.sessionCompact({ id: session.id, force: true })).rejects.toThrow('already active');
+    await expect(caller.sessionSendPromptAsync({
+      sessionId: session.id,
+      prompt: 'should not be accepted',
+    })).rejects.toThrow('already active');
     await expect(caller.sessionRunState({ id: session.id })).resolves.toEqual({
       running: false,
       pendingApproval: null,
     });
+    expect(engine.sessions.require(session.id).messages.map((message) => message.text)).not.toContain('should not be accepted');
   });
 
   it('compacts a session through the API without requiring clients to call compaction services', async () => {
@@ -198,7 +205,100 @@ describe('control-plane session lifecycle API', () => {
       pendingApproval: null,
     });
   });
+
+  it('accepts async prompt submits before the final session result is ready', async () => {
+    vi.useFakeTimers();
+    vi.stubEnv('HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT', '1');
+    try {
+      const { caller } = createControlPlaneCaller();
+      const session = await caller.sessionCreate({ name: 'Async submit session' });
+
+      const accepted = await caller.sessionSendPromptAsync({
+        sessionId: session.id,
+        prompt: 'Explain async submit',
+      });
+
+      expect(accepted).toMatchObject({
+        accepted: true,
+        sessionId: session.id,
+        workspaceId: DEFAULT_WORKSPACE_ID,
+      });
+      await expect(caller.sessionRunState({ id: session.id })).resolves.toMatchObject({
+        running: true,
+      });
+      await expect(caller.session({ id: session.id })).resolves.toMatchObject({
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            role: 'user',
+            text: 'Explain async submit',
+            isPending: true,
+          }),
+        ]),
+      });
+      await expect(caller.sessionSendPromptAsync({
+        sessionId: session.id,
+        prompt: 'Second prompt',
+      })).rejects.toThrow('A run is already in progress for this session.');
+
+      await vi.advanceTimersByTimeAsync(800);
+      await Promise.resolve();
+
+      await expect(caller.sessionRunState({ id: session.id })).resolves.toEqual({
+        running: false,
+        pendingApproval: null,
+      });
+      const completed = await caller.session({ id: session.id });
+      expect(completed?.messages.map((message) => message.text)).toEqual([
+        'Explain async submit',
+        'Mocked browser integration agent response: Explain async submit',
+      ]);
+      expect(completed?.messages.some((message) => message.isPending)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('settles the accepted user message when an async run fails before a final answer', async () => {
+    vi.spyOn(AgentLoopRuntimeService, 'run').mockRejectedValueOnce(new Error('loop failed'));
+    const { caller } = createControlPlaneCaller();
+    const session = await caller.sessionCreate({ name: 'Async failure session', apiKeyPresent: true });
+
+    await expect(caller.sessionSendPromptAsync({
+      sessionId: session.id,
+      prompt: 'This run will fail',
+      apiKey: 'test-api-key',
+    })).resolves.toMatchObject({
+      accepted: true,
+      sessionId: session.id,
+    });
+
+    await flushPromises();
+
+    await expect(caller.sessionRunState({ id: session.id })).resolves.toMatchObject({
+      running: false,
+    });
+    const failedSession = await caller.session({ id: session.id });
+    expect(failedSession?.messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: expect.stringMatching(/^accepted-user-/),
+        role: 'user',
+        text: 'This run will fail',
+        isPending: undefined,
+      }),
+      expect.objectContaining({
+        id: expect.stringMatching(/^accepted-run-error-/),
+        role: 'assistant',
+        text: 'Run failed before a final answer: loop failed',
+      }),
+    ]));
+  });
 });
+
+async function flushPromises(): Promise<void> {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
 
 function createControlPlaneCaller() {
   const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-session-lifecycle-'));

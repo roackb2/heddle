@@ -124,6 +124,63 @@ describe('chat turn persistence', () => {
     expect(stored?.turns[0]?.traceFile).toBe(persisted.traceFile);
     expect(stored?.lease).toBeUndefined();
   });
+
+  it('normalizes an accepted user message without duplicating it after completion', async () => {
+    const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-turn-persistence-accepted-'));
+    const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
+    const session = {
+      ...createSession(),
+      messages: [
+        {
+          id: 'accepted-user-run-1',
+          role: 'user' as const,
+          text: 'Persist this accepted prompt.',
+          isPending: true,
+        },
+      ],
+    };
+    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
+
+    const result: AgentLoopResult = {
+      outcome: 'done',
+      summary: 'Done.',
+      trace: [],
+      transcript: [
+        { role: 'user', content: 'Persist this accepted prompt.' },
+        { role: 'assistant', content: 'Done.' },
+      ],
+      model: 'gpt-5.4',
+      provider: 'openai',
+      workspaceRoot: stateRoot,
+    };
+
+    await ConversationTurnPersistenceService.persistCompleted({
+      result,
+      prompt: 'Persist this accepted prompt.',
+      session,
+      sessions: [session],
+      sessionStoragePath,
+      model: 'gpt-5.4',
+      stateRoot,
+      traceDir: join(stateRoot, 'traces'),
+      toolNames: [],
+      historyForTokenEstimate: session.history,
+      credentialSource: { type: 'explicit-api-key' },
+    });
+
+    const stored = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list(true)[0];
+    expect(stored?.messages).toEqual([
+      expect.objectContaining({
+        role: 'user',
+        text: 'Persist this accepted prompt.',
+      }),
+      expect.objectContaining({
+        role: 'assistant',
+        text: 'Done.',
+      }),
+    ]);
+    expect(stored?.messages[0]).not.toHaveProperty('isPending');
+  });
 });
 
 function createSession(): ChatSession {

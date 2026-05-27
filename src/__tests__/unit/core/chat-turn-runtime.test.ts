@@ -284,4 +284,94 @@ describe('chat turn preparation modules', () => {
     expect(persisted?.messages.map((message) => message.text)).toEqual(['Earlier prompt', 'Earlier answer']);
     expect(persisted?.context?.estimatedHistoryTokens).toBe(42);
   });
+
+  it('preserves accepted visible user messages through preflight persistence', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-turn-preflight-accepted-user-'));
+    const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
+    const session = ChatSessionRecords.markAcceptedUserMessage(ChatSessionRecords.create({
+      id: 'session-1',
+      name: 'Session 1',
+      apiKeyPresent: true,
+      model: 'gpt-5.4',
+    }), {
+      runId: 'run-1',
+      prompt: 'New prompt still running',
+    });
+    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
+
+    ConversationTurnPreflightService.persistPrepared({
+      sessionStoragePath,
+      sessions: [session],
+      session,
+      compacted: {
+        history: [
+          { role: 'user', content: 'Earlier prompt' },
+          { role: 'assistant', content: 'Earlier answer' },
+        ],
+        context: {
+          estimatedHistoryTokens: 42,
+        },
+        archive: {
+          archives: [],
+        },
+      },
+    });
+
+    const persisted = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list(true)[0];
+    expect(persisted?.messages).toEqual([
+      expect.objectContaining({ role: 'user', text: 'Earlier prompt' }),
+      expect.objectContaining({ role: 'assistant', text: 'Earlier answer' }),
+      expect.objectContaining({
+        id: 'accepted-user-run-1',
+        role: 'user',
+        text: 'New prompt still running',
+        isPending: true,
+      }),
+    ]);
+  });
+
+  it('preserves an accepted prompt even when the same text already exists in history', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-turn-preflight-repeated-prompt-'));
+    const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
+    const session = ChatSessionRecords.markAcceptedUserMessage(ChatSessionRecords.create({
+      id: 'session-1',
+      name: 'Session 1',
+      apiKeyPresent: true,
+      model: 'gpt-5.4',
+    }), {
+      runId: 'run-1',
+      prompt: 'Repeat this prompt',
+    });
+    new FileChatSessionRepository({ sessionStoragePath }).save([session]);
+
+    ConversationTurnPreflightService.persistPrepared({
+      sessionStoragePath,
+      sessions: [session],
+      session,
+      compacted: {
+        history: [
+          { role: 'user', content: 'Repeat this prompt' },
+          { role: 'assistant', content: 'Earlier answer' },
+        ],
+        context: {
+          estimatedHistoryTokens: 42,
+        },
+        archive: {
+          archives: [],
+        },
+      },
+    });
+
+    const persisted = new FileChatSessionRepository({ sessionStoragePath }).list(true)[0];
+    expect(persisted?.messages).toEqual([
+      expect.objectContaining({ role: 'user', text: 'Repeat this prompt' }),
+      expect.objectContaining({ role: 'assistant', text: 'Earlier answer' }),
+      expect.objectContaining({
+        id: 'accepted-user-run-1',
+        role: 'user',
+        text: 'Repeat this prompt',
+        isPending: true,
+      }),
+    ]);
+  });
 });

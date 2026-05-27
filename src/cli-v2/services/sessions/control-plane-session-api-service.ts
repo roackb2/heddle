@@ -6,6 +6,7 @@ import type {
 
 export type ControlPlaneSessionCreateInput = Exclude<NonNullable<RouterInputs['controlPlane']['sessionCreate']>, void>;
 type SessionSendPromptInput = RouterInputs['controlPlane']['sessionSendPrompt'];
+type SessionSendPromptAsyncInput = RouterInputs['controlPlane']['sessionSendPromptAsync'];
 
 export type ControlPlaneSessionApiServiceOptions = {
   client: ControlPlaneProxyClient;
@@ -77,6 +78,17 @@ export class ControlPlaneSessionApiService {
 
   async sendPrompt(input: Pick<SessionSendPromptInput, 'workspaceId' | 'sessionId' | 'prompt'>) {
     return this.client.controlPlane.sessionSendPrompt.mutate({
+      ...input,
+      maxSteps: this.defaults.maxSteps,
+      searchIgnoreDirs: this.defaults.searchIgnoreDirs,
+      apiKey: this.defaults.apiKey,
+      preferApiKey: this.defaults.preferApiKey,
+      systemContext: this.defaults.systemContext,
+    });
+  }
+
+  async sendPromptAsync(input: Pick<SessionSendPromptAsyncInput, 'workspaceId' | 'sessionId' | 'prompt'>) {
+    return this.client.controlPlane.sessionSendPromptAsync.mutate({
       ...input,
       maxSteps: this.defaults.maxSteps,
       searchIgnoreDirs: this.defaults.searchIgnoreDirs,

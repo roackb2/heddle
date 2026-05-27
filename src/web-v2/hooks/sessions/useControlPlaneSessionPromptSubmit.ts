@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { trpcReact, type ControlPlaneSessionDetail } from '@web/api/client';
-import { ClientSharedSessionMessageService } from '@/client-shared/services/session-messages';
+import { trpcReact } from '@web/api/client';
 
 type UseControlPlaneSessionPromptSubmitArgs = {
   workspaceId?: string;
   sessionId?: string;
   streamConnected: boolean;
-  setSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
   setRunning: Dispatch<SetStateAction<boolean>>;
   setError: Dispatch<SetStateAction<string | undefined>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
@@ -28,7 +26,6 @@ export function useControlPlaneSessionPromptSubmit({
   workspaceId,
   sessionId,
   streamConnected,
-  setSession,
   setRunning,
   setError,
   setLiveStatus,
@@ -37,7 +34,7 @@ export function useControlPlaneSessionPromptSubmit({
   const activeSubmissionRef = useRef<PromptSubmission | null>(null);
   const submissionSequenceRef = useRef(0);
   const utils = trpcReact.useUtils();
-  const sessionSendPromptMutation = trpcReact.controlPlane.sessionSendPrompt.useMutation();
+  const sessionSendPromptMutation = trpcReact.controlPlane.sessionSendPromptAsync.useMutation();
 
   useEffect(() => {
     activeSubmissionRef.current = null;
@@ -72,22 +69,14 @@ export function useControlPlaneSessionPromptSubmit({
     setRunning(true);
     setError(undefined);
     setLiveStatus(streamConnected ? 'Heddle is working...' : 'Heddle is working... reconnecting live stream if needed.');
-    utils.controlPlane.session.setData(
-      { id: sessionId, workspaceId },
-      (current) => ClientSharedSessionMessageService.appendOptimisticUserTurn(current ?? null, trimmed),
-    );
-    setSession((current) => ClientSharedSessionMessageService.appendOptimisticUserTurn(current, trimmed));
 
     try {
-      const result = await sessionSendPromptMutation.mutateAsync({ workspaceId, sessionId, prompt: trimmed });
-      utils.controlPlane.session.setData(
-        { id: submission.sessionId, workspaceId: submission.workspaceId },
-        result.session,
-      );
+      await sessionSendPromptMutation.mutateAsync({ workspaceId, sessionId, prompt: trimmed });
       if (isCurrentSubmission()) {
-        setSession(result.session);
-        setRunning(false);
-        setLiveStatus(undefined);
+        setRunning(true);
+        setLiveStatus((current) => (
+          current ?? (streamConnected ? 'Heddle is working...' : 'Heddle is working... reconnecting live stream if needed.')
+        ));
       }
     } catch (submitError) {
       if (isCurrentSubmission()) {
@@ -99,7 +88,7 @@ export function useControlPlaneSessionPromptSubmit({
       void Promise.all([
         utils.controlPlane.sessions.invalidate({ workspaceId: submission.workspaceId }),
         utils.controlPlane.session.invalidate({ id: submission.sessionId, workspaceId: submission.workspaceId }),
-        utils.controlPlane.sessionRunning.invalidate({ id: submission.sessionId, workspaceId: submission.workspaceId }),
+        utils.controlPlane.sessionRunState.invalidate({ id: submission.sessionId, workspaceId: submission.workspaceId }),
       ]).catch(() => undefined);
 
       if (isCurrentSubmission()) {
@@ -113,12 +102,11 @@ export function useControlPlaneSessionPromptSubmit({
     setError,
     setLiveStatus,
     setRunning,
-    setSession,
     streamConnected,
     submitting,
     sessionSendPromptMutation,
     utils.controlPlane.session,
-    utils.controlPlane.sessionRunning,
+    utils.controlPlane.sessionRunState,
     utils.controlPlane.sessions,
   ]);
 

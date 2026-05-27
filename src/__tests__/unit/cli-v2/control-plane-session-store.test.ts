@@ -4,7 +4,7 @@ import type {
   ControlPlanePendingApproval,
   ControlPlaneSessionDetail,
   ControlPlaneSessionEventEnvelope,
-  ControlPlaneSessionSendPromptResult,
+  ControlPlaneSessionSendPromptAsyncResult,
   ControlPlaneSessionView,
   ControlPlaneSessionsEventEnvelope,
 } from '../../../client-shared/api/types.js';
@@ -33,7 +33,7 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
-  it('submits prompts through sessionSendPrompt without a direct runtime fallback', async () => {
+  it('submits prompts through sessionSendPromptAsync without a direct runtime fallback', async () => {
     const fixture = createClientFixture();
     const store = new ControlPlaneSessionStore({
       client: fixture.client,
@@ -41,10 +41,22 @@ describe('ControlPlaneSessionStore', () => {
       searchIgnoreDirs: ['node_modules'],
     });
     await store.start();
+    fixture.calls.sessionQuery.mockResolvedValueOnce({
+      ...createSessionDetail(),
+      messages: [
+        ...createSessionDetail().messages,
+        {
+          id: 'accepted-user-run-1',
+          role: 'user',
+          text: 'Build the next slice',
+          isPending: true,
+        },
+      ],
+    });
 
     await store.submitPrompt('  Build the next slice  ');
 
-    expect(fixture.calls.sessionSendPromptMutate).toHaveBeenCalledWith({
+    expect(fixture.calls.sessionSendPromptAsyncMutate).toHaveBeenCalledWith({
       workspaceId: 'workspace-1',
       sessionId: 'session-1',
       prompt: 'Build the next slice',
@@ -55,9 +67,10 @@ describe('ControlPlaneSessionStore', () => {
       systemContext: undefined,
     });
     expect(store.getSnapshot().activeSession?.messages.at(-1)).toEqual({
-      id: 'message-2',
-      role: 'assistant',
-      text: 'Done.',
+      id: 'accepted-user-run-1',
+      role: 'user',
+      text: 'Build the next slice',
+      isPending: true,
     });
     store.dispose();
   });
@@ -66,8 +79,8 @@ describe('ControlPlaneSessionStore', () => {
     vi.useFakeTimers();
     try {
       const fixture = createClientFixture();
-      const pendingSubmit = createDeferred<Awaited<ReturnType<typeof fixture.calls.sessionSendPromptMutate>>>();
-      fixture.calls.sessionSendPromptMutate.mockReturnValueOnce(pendingSubmit.promise);
+      const pendingSubmit = createDeferred<Awaited<ReturnType<typeof fixture.calls.sessionSendPromptAsyncMutate>>>();
+      fixture.calls.sessionSendPromptAsyncMutate.mockReturnValueOnce(pendingSubmit.promise);
       const store = new ControlPlaneSessionStore({ client: fixture.client });
       await store.start();
 
@@ -77,20 +90,21 @@ describe('ControlPlaneSessionStore', () => {
       expect(store.getSnapshot()).toMatchObject({
         submitting: true,
         latestUpdate: {
-          label: 'Finalizing response',
-          detail: 'waiting for server result',
+          label: 'Run starting',
+          detail: 'waiting for server acceptance',
           tone: 'info',
         },
       });
 
-      pendingSubmit.resolve(createSubmitResult());
+      pendingSubmit.resolve(createAcceptedResult());
       await submit;
       expect(store.getSnapshot()).toMatchObject({
         submitting: false,
+        running: true,
         latestUpdate: {
-          label: 'Run finished',
-          detail: 'completed',
-          tone: 'success',
+          label: 'Run accepted',
+          detail: 'session-run-1',
+          tone: 'info',
         },
       });
       store.dispose();
@@ -101,7 +115,7 @@ describe('ControlPlaneSessionStore', () => {
 
   it('treats an in-progress submit rejection as active run state', async () => {
     const fixture = createClientFixture();
-    fixture.calls.sessionSendPromptMutate.mockRejectedValueOnce(new Error('A run is already in progress for this session.'));
+    fixture.calls.sessionSendPromptAsyncMutate.mockRejectedValueOnce(new Error('A run is already in progress for this session.'));
     const store = new ControlPlaneSessionStore({ client: fixture.client });
     await store.start();
 
@@ -128,7 +142,7 @@ describe('ControlPlaneSessionStore', () => {
 
     await store.submitPrompt('Next prompt');
 
-    expect(fixture.calls.sessionSendPromptMutate).not.toHaveBeenCalled();
+    expect(fixture.calls.sessionSendPromptAsyncMutate).not.toHaveBeenCalled();
     expect(store.getSnapshot()).toMatchObject({
       running: true,
       latestUpdate: {
@@ -142,8 +156,8 @@ describe('ControlPlaneSessionStore', () => {
 
   it('cancels the active run through sessionCancel', async () => {
     const fixture = createClientFixture();
-    const pendingSubmit = createDeferred<Awaited<ReturnType<typeof fixture.calls.sessionSendPromptMutate>>>();
-    fixture.calls.sessionSendPromptMutate.mockReturnValueOnce(pendingSubmit.promise);
+    const pendingSubmit = createDeferred<Awaited<ReturnType<typeof fixture.calls.sessionSendPromptAsyncMutate>>>();
+    fixture.calls.sessionSendPromptAsyncMutate.mockReturnValueOnce(pendingSubmit.promise);
     fixture.calls.sessionCancelMutate.mockResolvedValueOnce({ cancelled: true });
     fixture.calls.sessionRunningQuery
       .mockResolvedValueOnce({ running: false })
@@ -166,7 +180,7 @@ describe('ControlPlaneSessionStore', () => {
         tone: 'warning',
       },
     });
-    pendingSubmit.resolve(createSubmitResult());
+    pendingSubmit.resolve(createAcceptedResult());
     await submit;
     store.dispose();
   });
@@ -390,13 +404,7 @@ function createClientFixture() {
     messageCount: 1,
     turnCount: 0,
   };
-  const sessionDetail: NonNullable<ControlPlaneSessionDetail> = {
-    ...sessionView,
-    messages: [
-      { id: 'message-1', role: 'assistant', text: 'Ready.' },
-    ],
-    turns: [],
-  };
+  const sessionDetail = createSessionDetail();
   const pendingApproval: ControlPlanePendingApproval = null;
   let sessionEvents: SubscriptionOptions<ControlPlaneSessionEventEnvelope> | undefined;
   let sessionsEvents: SubscriptionOptions<ControlPlaneSessionsEventEnvelope> | undefined;
@@ -418,6 +426,7 @@ function createClientFixture() {
       outcome: 'completed',
       summary: 'Done.',
     })),
+    sessionSendPromptAsyncMutate: vi.fn(async () => createAcceptedResult()),
     sessionCancelMutate: vi.fn(async () => ({ cancelled: false })),
     sessionResolveApprovalMutate: vi.fn(async () => ({ resolved: true })),
   };
@@ -443,6 +452,7 @@ function createClientFixture() {
       sessionRunState: { query: calls.sessionRunStateQuery },
       sessionPendingApproval: { query: calls.sessionPendingApprovalQuery },
       sessionSendPrompt: { mutate: calls.sessionSendPromptMutate },
+      sessionSendPromptAsync: { mutate: calls.sessionSendPromptAsyncMutate },
       sessionCancel: { mutate: calls.sessionCancelMutate },
       sessionResolveApproval: { mutate: calls.sessionResolveApprovalMutate },
     },
@@ -470,21 +480,26 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
-function createSubmitResult(): ControlPlaneSessionSendPromptResult {
+function createSessionDetail(): NonNullable<ControlPlaneSessionDetail> {
   return {
-    session: {
-      id: 'session-1',
-      name: 'Session 1',
-      workspaceId: 'workspace-1',
-      messageCount: 1,
-      turnCount: 0,
-      messages: [
-        { id: 'message-1', role: 'assistant', text: 'Ready.' },
-        { id: 'message-2', role: 'assistant', text: 'Done.' },
-      ],
-      turns: [],
-    },
-    outcome: 'completed',
-    summary: 'Done.',
+    id: 'session-1',
+    name: 'Session 1',
+    workspaceId: 'workspace-1',
+    messageCount: 1,
+    turnCount: 0,
+    messages: [
+      { id: 'message-1', role: 'assistant', text: 'Ready.' },
+    ],
+    turns: [],
+  };
+}
+
+function createAcceptedResult(): ControlPlaneSessionSendPromptAsyncResult {
+  return {
+    accepted: true,
+    workspaceId: 'workspace-1',
+    sessionId: 'session-1',
+    runId: 'session-run-1',
+    acceptedAt: '2026-05-27T00:00:00.000Z',
   };
 }

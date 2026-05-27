@@ -6,6 +6,10 @@ The goal is to make the codebase easy to reason about in the same way mature
 frameworks make placement obvious: when a feature touches chat, a contributor
 should know where the code belongs before they start wiring it.
 
+For the concrete control-plane prompt submission flow, including sync vs async
+API usage, accepted user-message persistence, and streaming synchronization, see
+`docs/architecture/control-plane-chat-submission.md`.
+
 ## Terminology
 
 - **Host**: a concrete user interaction surface such as the TUI, web control

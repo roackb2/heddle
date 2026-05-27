@@ -24,11 +24,14 @@ import type { ChatSession } from '@/core/chat/types.js';
 import type { NormalizedConversationEngineConfig } from '../config.js';
 import type {
   AppendConversationMessageInput,
+  AcceptConversationUserMessageInput,
   AutoRenameConversationSessionInput,
   AutoRenameConversationSessionResult,
   ApplyConversationCompactionResultInput,
   ConversationSessionService,
   CreateConversationSessionInput,
+  MarkAcceptedConversationUserMessageFailedInput,
+  MarkAcceptedConversationUserMessageInput,
   MarkConversationCompactionRunningInput,
   ResetConversationSessionInput,
   RestoreConversationCompactionStateInput,
@@ -139,6 +142,32 @@ export class FileConversationSessionService implements ConversationSessionServic
       ...session,
       messages: [...session.messages, ...inputs],
     }));
+  }
+
+  markAcceptedUserMessage(id: string, input: MarkAcceptedConversationUserMessageInput): ChatSession {
+    return this.updateRequiredSession(id, (session) => (
+      ChatSessionRecords.markAcceptedUserMessage(session, input)
+    ));
+  }
+
+  acceptUserMessage(id: string, input: AcceptConversationUserMessageInput): ChatSession {
+    return this.updateRequiredSession(id, (session) => {
+      const conflict = ChatSessionLeases.conflict(session, input.leaseOwner);
+      if (conflict) {
+        throw new Error(conflict);
+      }
+
+      return ChatSessionRecords.markAcceptedUserMessage(
+        ChatSessionLeases.acquire(session, input.leaseOwner),
+        input,
+      );
+    });
+  }
+
+  markAcceptedUserMessageFailed(id: string, input: MarkAcceptedConversationUserMessageFailedInput): ChatSession {
+    return this.updateRequiredSession(id, (session) => (
+      ChatSessionRecords.markAcceptedUserMessageFailed(session, input)
+    ));
   }
 
   resetConversation(id: string, input: ResetConversationSessionInput): ChatSession {

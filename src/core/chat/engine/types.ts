@@ -64,6 +64,9 @@ export type ConversationSessionService = {
   // Messages
   appendMessage(id: string, input: AppendConversationMessageInput): ChatSession;
   appendMessages(id: string, inputs: AppendConversationMessageInput[]): ChatSession;
+  acceptUserMessage(id: string, input: AcceptConversationUserMessageInput): ChatSession;
+  markAcceptedUserMessage(id: string, input: MarkAcceptedConversationUserMessageInput): ChatSession;
+  markAcceptedUserMessageFailed(id: string, input: MarkAcceptedConversationUserMessageFailedInput): ChatSession;
 
   // Conversation state
   resetConversation(id: string, input: ResetConversationSessionInput): ChatSession;
@@ -113,6 +116,20 @@ export type AppendConversationMessageInput = {
   text: string;
   isStreaming?: boolean;
   isPending?: boolean;
+};
+
+export type MarkAcceptedConversationUserMessageInput = {
+  runId: string;
+  prompt: string;
+};
+
+export type AcceptConversationUserMessageInput = MarkAcceptedConversationUserMessageInput & {
+  leaseOwner: ChatSessionLeaseOwner;
+};
+
+export type MarkAcceptedConversationUserMessageFailedInput = {
+  runId: string;
+  failureMessage: AppendConversationMessageInput;
 };
 
 export type ResetConversationSessionInput = {
