@@ -1,8 +1,4 @@
-import type {
-  ControlPlaneSessionDetail,
-  ControlPlaneSessionMessage,
-  ControlPlaneSessionSendPromptResult,
-} from '../../api/types.js';
+import type { ControlPlaneSessionDetail, ControlPlaneSessionMessage } from '../../api/types.js';
 
 /**
  * Shapes transient client-side session messages around persisted control-plane
@@ -82,38 +78,6 @@ export class ClientSharedSessionMessageController {
     } : next;
   }
 
-  static applyTerminalRunResult(
-    session: ControlPlaneSessionDetail,
-    result: Pick<ControlPlaneSessionSendPromptResult, 'outcome' | 'summary'>,
-  ): ControlPlaneSessionDetail {
-    if (!session || ClientSharedSessionMessageController.isSuccessfulOutcome(result.outcome)) {
-      return session;
-    }
-
-    const summary = result.summary.trim();
-    const text = ClientSharedSessionMessageController.formatTerminalRunSummary(result.outcome, summary);
-    const alreadyVisible = session.messages.some((message) => (
-      message.role === 'assistant' && (message.text === summary || message.text === text)
-    ));
-    if (!summary || alreadyVisible) {
-      return session;
-    }
-
-    return {
-      ...session,
-      messages: [
-        ...session.messages.filter((message) => (
-          message.id !== 'live-assistant' && message.id !== `live-run-${result.outcome}`
-        )),
-        {
-          id: `live-run-${result.outcome}`,
-          role: 'assistant',
-          text,
-        },
-      ],
-    };
-  }
-
   private static createLiveAssistantMessage(text: string, done: boolean | undefined): ControlPlaneSessionMessage {
     return {
       id: 'live-assistant',
@@ -122,15 +86,5 @@ export class ClientSharedSessionMessageController {
       isStreaming: !done,
       isPending: !done,
     };
-  }
-
-  private static isSuccessfulOutcome(outcome: string): boolean {
-    return outcome === 'done' || outcome === 'completed';
-  }
-
-  private static formatTerminalRunSummary(outcome: string, summary: string): string {
-    return outcome === 'error'
-      ? `Run failed before a final answer: ${summary}`
-      : `Run stopped (${outcome}): ${summary}`;
   }
 }

@@ -120,41 +120,22 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
-  it('renders failed run summaries when the persisted transcript has no assistant result message', async () => {
+  it('does not submit another prompt while the selected session is running', async () => {
     const fixture = createClientFixture();
-    fixture.calls.sessionSendPromptMutate.mockResolvedValueOnce({
-      session: {
-        id: 'session-1',
-        name: 'Session 1',
-        workspaceId: 'workspace-1',
-        messageCount: 1,
-        turnCount: 1,
-        messages: [
-          { id: 'persisted-user', role: 'user', text: 'Go on' },
-        ],
-        turns: [],
-      },
-      outcome: 'error',
-      summary: 'Provider request failed.',
-    });
+    fixture.calls.sessionRunningQuery.mockResolvedValueOnce({ running: true });
     const store = new ControlPlaneSessionStore({ client: fixture.client });
     await store.start();
 
-    await store.submitPrompt('Go on');
+    await store.submitPrompt('Next prompt');
 
+    expect(fixture.calls.sessionSendPromptMutate).not.toHaveBeenCalled();
     expect(store.getSnapshot()).toMatchObject({
-      running: false,
-      submitting: false,
+      running: true,
       latestUpdate: {
-        label: 'Run finished',
-        detail: 'error',
-        tone: 'error',
+        label: 'Run already in progress',
+        detail: 'waiting for current run to finish',
+        tone: 'warning',
       },
-    });
-    expect(store.getSnapshot().activeSession?.messages.at(-1)).toEqual({
-      id: 'live-run-error',
-      role: 'assistant',
-      text: 'Run failed before a final answer: Provider request failed.',
     });
     store.dispose();
   });

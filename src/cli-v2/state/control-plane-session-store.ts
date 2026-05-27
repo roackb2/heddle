@@ -191,6 +191,17 @@ export class ControlPlaneSessionStore {
       return;
     }
 
+    if (this.snapshotValue.running) {
+      this.setSnapshot({
+        latestUpdate: {
+          label: 'Run already in progress',
+          detail: 'waiting for current run to finish',
+          tone: 'warning',
+        },
+      });
+      return;
+    }
+
     const workspaceId = this.requireWorkspaceId();
     const sessionId = this.requireActiveSessionId();
     this.setSnapshot((current) => ({
@@ -215,7 +226,7 @@ export class ControlPlaneSessionStore {
         prompt: trimmed,
       }));
       this.setSnapshot({
-        activeSession: ClientSharedSessionMessageController.applyTerminalRunResult(result.session, result),
+        activeSession: result.session,
         running: false,
         submitting: false,
         liveStatus: undefined,
