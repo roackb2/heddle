@@ -261,11 +261,12 @@ describe('control-plane session lifecycle API', () => {
   it('settles the accepted user message when an async run fails before a final answer', async () => {
     vi.spyOn(AgentLoopRuntimeService, 'run').mockRejectedValueOnce(new Error('loop failed'));
     const { caller } = createControlPlaneCaller();
-    const session = await caller.sessionCreate({ name: 'Async failure session' });
+    const session = await caller.sessionCreate({ name: 'Async failure session', apiKeyPresent: true });
 
     await expect(caller.sessionSendPromptAsync({
       sessionId: session.id,
       prompt: 'This run will fail',
+      apiKey: 'test-api-key',
     })).resolves.toMatchObject({
       accepted: true,
       sessionId: session.id,
