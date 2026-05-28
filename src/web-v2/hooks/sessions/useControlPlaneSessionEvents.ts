@@ -159,19 +159,25 @@ function applySessionActivity(activity: ControlPlaneSessionActivity, context: Se
           streamActivity.done,
         )
       ));
-      context.setLiveStatus(liveStatus);
+      if (liveStatus !== undefined) {
+        context.setLiveStatus(liveStatus);
+      }
     },
     onRunStarted: (_runActivity, liveStatus) => {
       context.setRunning(true);
       context.setLiveStatus(liveStatus);
     },
-    onRunFinished: () => {
+    onRunFinished: (_runActivity, liveStatus) => {
       context.setRunning(false);
-      context.setLiveStatus(undefined);
+      if (liveStatus !== undefined) {
+        context.setLiveStatus(liveStatus);
+      }
       void context.refresh(context.sessionId, { silent: true });
     },
     onLiveStatus: (_statusActivity, liveStatus) => {
-      context.setLiveStatus(liveStatus);
+      if (liveStatus !== undefined) {
+        context.setLiveStatus(liveStatus);
+      }
     },
     onPendingApprovalChanged: () => {
       context.refreshPendingApproval(context.sessionId);

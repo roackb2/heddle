@@ -52,11 +52,11 @@ describe('ClientSharedSessionActivityService', () => {
       summary: 'Done.',
       timestamp: new Date().toISOString(),
     } as ControlPlaneSessionActivity, {
-      onRunFinished: () => effects.push('finished'),
+      onRunFinished: (_activity, liveStatus) => effects.push(`finished:${liveStatus}`),
       onWorkspaceChanged: () => effects.push('workspace changed'),
     });
 
-    expect(effects).toEqual(['finished', 'workspace changed']);
+    expect(effects).toEqual(['finished:Run finished: done', 'workspace changed']);
   });
 
   it('uses derived tool labels when the API provides them', () => {

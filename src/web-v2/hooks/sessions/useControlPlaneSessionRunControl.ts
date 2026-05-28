@@ -31,6 +31,7 @@ export function useControlPlaneSessionRunControl({
   const [cancelError, setCancelError] = useState<string | undefined>();
   const serverConfirmedRunningRef = useRef(false);
   const runStateBaselineUpdatedAtRef = useRef(0);
+  const runStateDataUpdatedAtRef = useRef(0);
   const sessionRunStateQuery = trpcReact.controlPlane.sessionRunState.useQuery(
     sessionId && workspaceId ? { id: sessionId, workspaceId } : skipToken,
     {
@@ -40,6 +41,10 @@ export function useControlPlaneSessionRunControl({
     },
   );
   const cancelMutation = trpcReact.controlPlane.sessionCancel.useMutation();
+
+  useEffect(() => {
+    runStateDataUpdatedAtRef.current = sessionRunStateQuery.dataUpdatedAt;
+  }, [sessionRunStateQuery.dataUpdatedAt]);
 
   useEffect(() => {
     setRunningState(false);
@@ -62,7 +67,6 @@ export function useControlPlaneSessionRunControl({
       serverConfirmedRunningRef.current = false;
       setRunningState(false);
       setCancelling(false);
-      setLiveStatus(undefined);
       if (sessionId && workspaceId) {
         void Promise.all([
           utils.controlPlane.session.invalidate({ id: sessionId, workspaceId }),
@@ -86,7 +90,7 @@ export function useControlPlaneSessionRunControl({
     setRunningState((current) => {
       const resolved = typeof nextRunning === 'function' ? nextRunning(current) : nextRunning;
       if (resolved) {
-        runStateBaselineUpdatedAtRef.current = sessionRunStateQuery.dataUpdatedAt;
+        runStateBaselineUpdatedAtRef.current = runStateDataUpdatedAtRef.current;
       } else {
         serverConfirmedRunningRef.current = false;
       }
@@ -95,7 +99,7 @@ export function useControlPlaneSessionRunControl({
     });
     setCancelling(false);
     setCancelError(undefined);
-  }, [sessionRunStateQuery.dataUpdatedAt]);
+  }, []);
 
   const cancelRun = useCallback(async () => {
     if (!sessionId || !workspaceId || cancelMutation.isPending) {
