@@ -319,7 +319,7 @@ describe('ControlPlaneSessionStore', () => {
         isStreaming: false,
         isPending: false,
       });
-      expect(store.getSnapshot().liveStatus).toBeUndefined();
+      expect(store.getSnapshot().liveStatus).toBe('Receiving assistant response...');
       store.dispose();
     } finally {
       vi.useRealTimers();

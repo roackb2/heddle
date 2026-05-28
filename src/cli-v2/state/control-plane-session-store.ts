@@ -417,11 +417,11 @@ export class ControlPlaneSessionStore {
             latestUpdate: SessionActivityService.resolveLatestUpdate(runActivity),
           });
         },
-        onRunFinished: (runActivity) => {
+        onRunFinished: (runActivity, liveStatus) => {
           this.assistantStreamBuffer.flush();
           this.setSnapshot({
             running: false,
-            liveStatus: undefined,
+            ...(liveStatus !== undefined ? { liveStatus } : {}),
             latestUpdate: SessionActivityService.resolveLatestUpdate(runActivity),
           });
           void this.refreshSession(event.sessionId, { silent: true });
@@ -452,7 +452,7 @@ export class ControlPlaneSessionStore {
         update.text,
         update.done,
       ),
-      liveStatus: update.done ? undefined : 'Receiving assistant response...',
+      ...(!update.done ? { liveStatus: 'Receiving assistant response...' } : {}),
     }));
   }
 

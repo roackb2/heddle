@@ -23,7 +23,7 @@ type SessionActivityEffectHandlers = {
 export type ClientSharedSessionActivityEffects = {
   onAssistantStream?: (activity: ActivityOf<'assistant.stream'>, liveStatus: string | undefined) => void;
   onRunStarted?: (activity: ActivityOf<'loop.started'>, liveStatus: string | undefined) => void;
-  onRunFinished?: (activity: ActivityOf<'loop.finished'>) => void;
+  onRunFinished?: (activity: ActivityOf<'loop.finished'>, liveStatus: string | undefined) => void;
   onLiveStatus?: (activity: ClientSharedSessionActivity, liveStatus: string | undefined) => void;
   onPendingApprovalChanged?: (activity: PendingApprovalActivity) => void;
   onWorkspaceChanged?: (activity: WorkspaceChangedActivity) => void;
@@ -41,7 +41,7 @@ export class ClientSharedSessionActivityService {
       effects.onRunStarted?.(activity, ClientSharedSessionActivityService.formatLiveStatus(activity));
     },
     'loop.finished': (activity, effects) => {
-      effects.onRunFinished?.(activity);
+      effects.onRunFinished?.(activity, ClientSharedSessionActivityService.formatLiveStatus(activity));
       effects.onWorkspaceChanged?.(activity);
     },
     'tool.calling': (activity, effects) => {
@@ -72,6 +72,7 @@ export class ClientSharedSessionActivityService {
 
   private static readonly liveStatusHandlers: SessionActivityStatusHandlers = {
     'loop.started': () => 'Run started...',
+    'loop.finished': (activity) => `Run finished: ${activity.outcome}`,
     'tool.calling': (activity) => `Working... running ${ClientSharedSessionActivityService.formatToolLabel(activity)}${ClientSharedSessionActivityService.formatStep(activity.step)}`,
     'tool.completed': (activity) => `${activity.tool} finished in ${Math.round(activity.durationMs)}ms`,
     'tool.approval_requested': (activity) => `Approval requested for ${ClientSharedSessionActivityService.formatToolLabel(activity)}`,
