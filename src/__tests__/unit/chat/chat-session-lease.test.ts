@@ -92,6 +92,26 @@ describe('chat session leases', () => {
     })).toBeUndefined();
   });
 
+  it('recognizes restarted daemon leases as dead local process leases', () => {
+    const leased = ChatSessionLeases.acquire(createSession(), {
+      ownerKind: 'daemon',
+      ownerId: 'daemon-4686-1779894401584',
+      clientLabel: 'control plane',
+    }, {
+      now: Date.parse('2026-04-21T01:00:00.000Z'),
+    });
+
+    expect(ChatSessionLeases.isOwnedByDeadLocalProcess(leased.lease, { isProcessAlive: () => false })).toBe(true);
+    expect(ChatSessionLeases.conflict(leased, {
+      ownerKind: 'daemon',
+      ownerId: 'daemon-9999-1779894500000',
+      clientLabel: 'control plane',
+    }, {
+      now: Date.parse('2026-04-21T01:01:00.000Z'),
+      isProcessAlive: () => false,
+    })).toBeUndefined();
+  });
+
   it('still reports fresh local process leases when the owner is alive', () => {
     const leased = ChatSessionLeases.acquire(createSession(), {
       ownerKind: 'tui',
