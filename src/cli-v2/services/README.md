@@ -27,6 +27,7 @@ Current domains:
   rendering.
 - `approvals/`: terminal approval choices, decisions, and keyboard-specific
   behavior.
+- `commands/`: terminal prompt slash-command parsing and dispatch.
 - `sessions/`: terminal session lifecycle mechanics such as stream buffering
   API runtime defaults, subscriptions, and run-state polling that are specific
   to Ink rendering and cli-v2 store coordination.

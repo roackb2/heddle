@@ -18,6 +18,7 @@ import {
   SessionRunStatePollerService,
   type SessionRunStatePollAddress,
 } from '../services/sessions/session-run-state-poller-service.js';
+import { TerminalSlashCommandService } from '../services/commands/terminal-slash-command-service.js';
 import type {
   ControlPlaneApprovalDecision,
   ControlPlanePendingApproval,
@@ -87,6 +88,7 @@ export class ControlPlaneSessionStore {
   private readonly subscriptions: ControlPlaneSessionSubscriptionService;
   private readonly assistantStreamBuffer: AssistantStreamBufferService;
   private readonly runStatePoller: SessionRunStatePollerService;
+  private readonly slashCommands = new TerminalSlashCommandService();
 
   constructor(options: ControlPlaneSessionStoreOptions) {
     this.api = new ControlPlaneSessionApiService(options);
@@ -203,6 +205,11 @@ export class ControlPlaneSessionStore {
       return;
     }
 
+    if (this.slashCommands.isSlashCommand(trimmed)) {
+      await this.executeSlashCommand(trimmed);
+      return;
+    }
+
     if (this.snapshotValue.running) {
       this.setSnapshot({
         latestUpdate: {
@@ -278,6 +285,28 @@ export class ControlPlaneSessionStore {
       });
       await this.refreshSession(sessionId, { silent: true }).catch(() => undefined);
       this.assistantStreamBuffer.reset();
+    }
+  }
+
+  private async executeSlashCommand(prompt: string): Promise<void> {
+    try {
+      const result = await this.slashCommands.execute(prompt, {
+        activeSessionId: this.snapshotValue.activeSessionId,
+        isRunActive: this.snapshotValue.running || this.snapshotValue.submitting || this.snapshotValue.cancelling,
+        refreshSessions: () => this.refreshSessions(),
+        createSession: (input) => this.createSession(input),
+        selectSession: (sessionId) => this.selectSession(sessionId),
+      });
+
+      if (!result.handled) {
+        return;
+      }
+
+      this.setSnapshot(result.error
+        ? { error: result.error }
+        : { error: undefined, latestUpdate: result.status });
+    } catch (error) {
+      this.setSnapshot({ error: formatError(error) });
     }
   }
 

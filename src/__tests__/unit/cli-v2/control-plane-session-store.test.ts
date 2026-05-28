@@ -75,6 +75,75 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('handles /help without sending an agent prompt', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await store.submitPrompt('/help');
+
+    expect(fixture.calls.sessionSendPromptAsyncMutate).not.toHaveBeenCalled();
+    expect(store.getSnapshot()).toMatchObject({
+      error: undefined,
+      latestUpdate: {
+        label: 'CLI v2 commands',
+        tone: 'info',
+      },
+    });
+    expect(store.getSnapshot().latestUpdate?.detail).toContain('/new [name]');
+    store.dispose();
+  });
+
+  it('handles unknown slash commands without sending an agent prompt', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await store.submitPrompt('/whatever');
+
+    expect(fixture.calls.sessionSendPromptAsyncMutate).not.toHaveBeenCalled();
+    expect(store.getSnapshot()).toMatchObject({
+      error: 'Unknown cli-v2 slash command: /whatever. Use /help to inspect supported commands.',
+    });
+    store.dispose();
+  });
+
+  it('creates and selects a new session through the control-plane API for /new', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+    fixture.calls.sessionCreateMutate.mockResolvedValueOnce({
+      id: 'session-2',
+      name: 'Slash command slice',
+      workspaceId: 'workspace-1',
+      messageCount: 0,
+      turnCount: 0,
+    });
+    fixture.calls.sessionQuery.mockResolvedValueOnce(createSessionDetail('session-2', 'Slash command slice'));
+
+    await store.submitPrompt('/new Slash command slice');
+
+    expect(fixture.calls.sessionSendPromptAsyncMutate).not.toHaveBeenCalled();
+    expect(fixture.calls.sessionCreateMutate).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      name: 'Slash command slice',
+      model: undefined,
+    });
+    expect(fixture.calls.sessionQuery).toHaveBeenLastCalledWith({
+      id: 'session-2',
+      workspaceId: 'workspace-1',
+    });
+    expect(store.getSnapshot()).toMatchObject({
+      activeSessionId: 'session-2',
+      latestUpdate: {
+        label: 'Created new session',
+        detail: 'Slash command slice',
+        tone: 'success',
+      },
+    });
+    store.dispose();
+  });
+
   it('does not finalize a submitted prompt before the send mutation resolves', async () => {
     vi.useFakeTimers();
     try {
@@ -427,6 +496,13 @@ function createClientFixture() {
       summary: 'Done.',
     })),
     sessionSendPromptAsyncMutate: vi.fn(async () => createAcceptedResult()),
+    sessionCreateMutate: vi.fn(async () => ({
+      id: 'session-2',
+      name: 'Session 2',
+      workspaceId: 'workspace-1',
+      messageCount: 0,
+      turnCount: 0,
+    })),
     sessionCancelMutate: vi.fn(async () => ({ cancelled: false })),
     sessionResolveApprovalMutate: vi.fn(async () => ({ resolved: true })),
   };
@@ -440,7 +516,7 @@ function createClientFixture() {
           return { unsubscribe: vi.fn() };
         }),
       },
-      sessionCreate: { mutate: vi.fn() },
+      sessionCreate: { mutate: calls.sessionCreateMutate },
       session: { query: calls.sessionQuery },
       sessionEvents: {
         subscribe: vi.fn((_input, options) => {
@@ -480,10 +556,10 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
-function createSessionDetail(): NonNullable<ControlPlaneSessionDetail> {
+function createSessionDetail(id = 'session-1', name = 'Session 1'): NonNullable<ControlPlaneSessionDetail> {
   return {
-    id: 'session-1',
-    name: 'Session 1',
+    id,
+    name,
     workspaceId: 'workspace-1',
     messageCount: 1,
     turnCount: 0,
