@@ -15,6 +15,7 @@ import { ControlPlaneMemoryController } from '@/server/controllers/trpc/control-
 import { ControlPlaneLayoutSnapshotsController } from '@/server/controllers/trpc/control-plane/layout-snapshots.js';
 import { ControlPlaneWorkspaceFilesController } from '@/server/controllers/trpc/control-plane/workspace-files.js';
 import { ControlPlaneWorkspaceDiffController } from '@/server/controllers/trpc/control-plane/workspace-diff.js';
+import { controlPlaneSlashCommandsController } from '@/server/controllers/trpc/control-plane/slash-commands-controller.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import { controlPlaneWorkspaceProcedure, type ControlPlaneWorkspaceContext } from './control-plane-workspace.js';
@@ -39,6 +40,8 @@ import {
   sessionInputSchema,
   sessionMessageInputSchema,
   sessionRenameInputSchema,
+  slashCommandCatalogInputSchema,
+  slashCommandExecuteInputSchema,
   sessionsEventsInputSchema,
   sessionsInputSchema,
   sessionSettingsInputSchema,
@@ -212,6 +215,17 @@ export const controlPlaneRouter = router({
   }),
   sessionSendPromptAsync: controlPlaneWorkspaceProcedure.input(sessionMessageInputSchema).mutation(({ ctx, input }) => {
     return controlPlaneChatSessionsController.submitPromptAsync(buildSubmitPromptArgs(ctx, input));
+  }),
+  slashCommandCatalog: controlPlaneWorkspaceProcedure.input(slashCommandCatalogInputSchema).query(() => {
+    return controlPlaneSlashCommandsController.catalog();
+  }),
+  slashCommandExecute: controlPlaneWorkspaceProcedure.input(slashCommandExecuteInputSchema).mutation(async ({ ctx, input }) => {
+    return await controlPlaneSlashCommandsController.execute({
+      ...ctx.requestWorkspace.sessionEngineArgs,
+      sessionId: input.sessionId,
+      preferApiKey: ctx.preferApiKey,
+      leaseOwner: resolveControlPlaneLeaseOwner(ctx),
+    }, input.command);
   }),
   sessionContinue: controlPlaneWorkspaceProcedure.input(sessionInputSchema).mutation(async ({ ctx, input }) => {
     const { sessionEngineArgs } = ctx.requestWorkspace;

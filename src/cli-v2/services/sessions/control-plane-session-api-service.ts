@@ -7,6 +7,7 @@ import type {
 export type ControlPlaneSessionCreateInput = Exclude<NonNullable<RouterInputs['controlPlane']['sessionCreate']>, void>;
 type SessionSendPromptInput = RouterInputs['controlPlane']['sessionSendPrompt'];
 type SessionSendPromptAsyncInput = RouterInputs['controlPlane']['sessionSendPromptAsync'];
+type SlashCommandExecuteInput = RouterInputs['controlPlane']['slashCommandExecute'];
 
 export type ControlPlaneSessionApiServiceOptions = {
   client: ControlPlaneProxyClient;
@@ -76,6 +77,10 @@ export class ControlPlaneSessionApiService {
     return this.client.controlPlane.sessionPendingApproval.query({ id: sessionId, workspaceId });
   }
 
+  async getSlashCommandCatalog(workspaceId: string) {
+    return this.client.controlPlane.slashCommandCatalog.query({ workspaceId });
+  }
+
   async sendPrompt(input: Pick<SessionSendPromptInput, 'workspaceId' | 'sessionId' | 'prompt'>) {
     return this.client.controlPlane.sessionSendPrompt.mutate({
       ...input,
@@ -95,6 +100,19 @@ export class ControlPlaneSessionApiService {
       apiKey: this.defaults.apiKey,
       preferApiKey: this.defaults.preferApiKey,
       systemContext: this.defaults.systemContext,
+    });
+  }
+
+  async executeSlashCommand(input: Pick<SlashCommandExecuteInput, 'workspaceId' | 'sessionId' | 'command'>) {
+    return this.client.controlPlane.slashCommandExecute.mutate(input);
+  }
+
+  async continueSession(workspaceId: string, sessionId: string) {
+    return this.client.controlPlane.sessionContinue.mutate({
+      id: sessionId,
+      workspaceId,
+      apiKey: this.defaults.apiKey,
+      preferApiKey: this.defaults.preferApiKey,
     });
   }
 

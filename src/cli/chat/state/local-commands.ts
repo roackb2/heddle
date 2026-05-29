@@ -49,7 +49,7 @@ const LOCAL_COMMAND_HINTS: LocalCommandHint[] = [
 ];
 const HELP_HINTS: LocalCommandHint[] = [
   LOCAL_COMMAND_HINTS[0]!,
-  ...CORE_COMMAND_REGISTRY.hints(),
+  ...CORE_COMMAND_REGISTRY.hints().filter((hint) => hint.command !== '/help'),
   ...TUI_COMMAND_REGISTRY.hints(),
   ...LOCAL_COMMAND_HINTS.slice(1),
 ];

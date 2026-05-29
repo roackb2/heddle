@@ -18,6 +18,8 @@ describe('ControlPlaneSessionStore', () => {
     await store.start();
 
     expect(fixture.calls.stateQuery).toHaveBeenCalledWith(undefined);
+    expect(fixture.calls.slashCommandCatalogQuery).toHaveBeenCalledTimes(1);
+    expect(fixture.calls.slashCommandCatalogQuery).toHaveBeenCalledWith({ workspaceId: 'workspace-1' });
     expect(fixture.calls.sessionsQuery).toHaveBeenCalledWith({ workspaceId: 'workspace-1' });
     expect(fixture.calls.sessionQuery).toHaveBeenCalledWith({ id: 'session-1', workspaceId: 'workspace-1' });
     expect(store.getSnapshot()).toMatchObject({
@@ -71,6 +73,75 @@ describe('ControlPlaneSessionStore', () => {
       role: 'user',
       text: 'Build the next slice',
       isPending: true,
+    });
+    store.dispose();
+  });
+
+  it('filters slash command hints locally without querying the API per keystroke', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    expect(store.getSlashCommandHints('/se')).toEqual([
+      { command: '/session list', description: 'list local chat sessions' },
+      { command: '/session new [name]', description: 'create and switch to a new session' },
+    ]);
+    expect(store.getSlashCommandHints('/session l')).toEqual([
+      { command: '/session list', description: 'list local chat sessions' },
+    ]);
+
+    expect(fixture.calls.slashCommandCatalogQuery).toHaveBeenCalledTimes(1);
+    store.dispose();
+  });
+
+  it('completes slash command drafts from the cached catalog', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    expect(store.completeSlashCommandDraft('/sess')).toBe('/session ');
+    expect(fixture.calls.slashCommandCatalogQuery).toHaveBeenCalledTimes(1);
+    store.dispose();
+  });
+
+  it('runs slash commands through slashCommandExecute instead of prompt submission', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await store.submitPrompt('/model');
+
+    expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      command: '/model',
+    });
+    expect(fixture.calls.sessionSendPromptAsyncMutate).not.toHaveBeenCalled();
+    expect(store.getSnapshot().commandResults.at(-1)).toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'Current model: gpt-5.4',
+    });
+    store.dispose();
+  });
+
+  it('keeps unknown slash commands out of agent prompts', async () => {
+    const fixture = createClientFixture();
+    fixture.calls.slashCommandExecuteMutate.mockResolvedValueOnce({
+      handled: true,
+      kind: 'message',
+      message: 'Unknown command: /nope. Use the slash command hints to inspect available commands.',
+    });
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await store.submitPrompt('/nope');
+
+    expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenCalled();
+    expect(fixture.calls.sessionSendPromptAsyncMutate).not.toHaveBeenCalled();
+    expect(store.getSnapshot().commandResults.at(-1)).toMatchObject({
+      kind: 'message',
+      message: 'Unknown command: /nope. Use the slash command hints to inspect available commands.',
     });
     store.dispose();
   });
@@ -427,6 +498,40 @@ function createClientFixture() {
       summary: 'Done.',
     })),
     sessionSendPromptAsyncMutate: vi.fn(async () => createAcceptedResult()),
+    slashCommandCatalogQuery: vi.fn(async () => ({
+      commands: [
+        {
+          id: 'model.current',
+          syntax: '/model',
+          description: 'show the active model',
+        },
+        {
+          id: 'session.list',
+          syntax: '/session list',
+          description: 'list local chat sessions',
+        },
+        {
+          id: 'session.new',
+          syntax: '/session new [name]',
+          description: 'create and switch to a new session',
+        },
+      ],
+      hints: [
+        { command: '/model', description: 'show the active model' },
+        { command: '/session list', description: 'list local chat sessions' },
+        { command: '/session new [name]', description: 'create and switch to a new session' },
+      ],
+    })),
+    slashCommandExecuteMutate: vi.fn(async () => ({
+      handled: true,
+      kind: 'message',
+      message: 'Current model: gpt-5.4',
+    })),
+    sessionContinueMutate: vi.fn(async () => ({
+      outcome: 'done',
+      summary: 'Continued.',
+      session: sessionDetail,
+    })),
     sessionCancelMutate: vi.fn(async () => ({ cancelled: false })),
     sessionResolveApprovalMutate: vi.fn(async () => ({ resolved: true })),
   };
@@ -453,6 +558,9 @@ function createClientFixture() {
       sessionPendingApproval: { query: calls.sessionPendingApprovalQuery },
       sessionSendPrompt: { mutate: calls.sessionSendPromptMutate },
       sessionSendPromptAsync: { mutate: calls.sessionSendPromptAsyncMutate },
+      slashCommandCatalog: { query: calls.slashCommandCatalogQuery },
+      slashCommandExecute: { mutate: calls.slashCommandExecuteMutate },
+      sessionContinue: { mutate: calls.sessionContinueMutate },
       sessionCancel: { mutate: calls.sessionCancelMutate },
       sessionResolveApproval: { mutate: calls.sessionResolveApprovalMutate },
     },

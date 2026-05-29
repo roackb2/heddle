@@ -9,6 +9,7 @@ import {
   ControlPlaneSessionApiService,
   type ControlPlaneSessionCreateInput,
 } from '../services/sessions/control-plane-session-api-service.js';
+import { SlashCommandAutocompleteService } from '../services/slash-commands/index.js';
 import { ControlPlaneSessionSubscriptionService } from '../services/sessions/control-plane-session-subscription-service.js';
 import {
   AssistantStreamBufferService,
@@ -24,6 +25,9 @@ import type {
   ControlPlaneSessionDetail,
   ControlPlaneSessionEventEnvelope,
   ControlPlaneSessionView,
+  ControlPlaneSlashCommandCatalog,
+  ControlPlaneSlashCommandHint,
+  ControlPlaneSlashCommandResult,
 } from '@/client-shared/api/types.js';
 
 const ASSISTANT_STREAM_RENDER_INTERVAL_MS = 75;
@@ -58,6 +62,8 @@ export type ControlPlaneSessionStoreSnapshot = {
   streamConnected: boolean;
   liveStatus?: string;
   latestUpdate?: ControlPlaneSessionLatestUpdate;
+  slashCommandCatalog?: ControlPlaneSlashCommandCatalog;
+  commandResults: ControlPlaneSlashCommandResult[];
   error?: string;
 };
 
@@ -71,6 +77,7 @@ const INITIAL_SNAPSHOT: ControlPlaneSessionStoreSnapshot = {
   running: false,
   cancelling: false,
   streamConnected: false,
+  commandResults: [],
 };
 
 /**
@@ -139,6 +146,7 @@ export class ControlPlaneSessionStore {
       const workspaceId = await this.api.resolveWorkspaceId(input.workspaceId);
 
       this.setSnapshot({ workspaceId });
+      await this.refreshSlashCommandCatalog(workspaceId);
       this.subscriptions.subscribeToSessionList(workspaceId);
       const sessions = await this.refreshSessions();
       const sessionId = input.sessionId ?? sessions[0]?.id ?? (await this.createSession()).id;
@@ -200,6 +208,11 @@ export class ControlPlaneSessionStore {
   async submitPrompt(prompt: string): Promise<void> {
     const trimmed = prompt.trim();
     if (!trimmed || this.snapshotValue.submitting) {
+      return;
+    }
+
+    if (SlashCommandAutocompleteService.isSlashDraft(trimmed)) {
+      await this.executeSlashCommand(trimmed);
       return;
     }
 
@@ -279,6 +292,14 @@ export class ControlPlaneSessionStore {
       await this.refreshSession(sessionId, { silent: true }).catch(() => undefined);
       this.assistantStreamBuffer.reset();
     }
+  }
+
+  getSlashCommandHints(draft: string): ControlPlaneSlashCommandHint[] {
+    return SlashCommandAutocompleteService.filterHints(draft, this.snapshotValue.slashCommandCatalog?.hints ?? []);
+  }
+
+  completeSlashCommandDraft(draft: string): string | undefined {
+    return SlashCommandAutocompleteService.complete(draft, this.snapshotValue.slashCommandCatalog?.hints ?? []);
   }
 
   async cancelRun(): Promise<void> {
@@ -373,6 +394,98 @@ export class ControlPlaneSessionStore {
     const workspaceId = this.requireWorkspaceId();
     const pendingApproval = await this.api.getPendingApproval(workspaceId, sessionId);
     this.setSnapshot({ pendingApproval });
+  }
+
+  private async refreshSlashCommandCatalog(workspaceId: string): Promise<void> {
+    const slashCommandCatalog = await this.api.getSlashCommandCatalog(workspaceId);
+    this.setSnapshot({ slashCommandCatalog });
+  }
+
+  private async executeSlashCommand(command: string): Promise<void> {
+    if (this.snapshotValue.running) {
+      this.setSnapshot({
+        commandResults: this.appendCommandResult({
+          handled: true,
+          kind: 'message',
+          message: 'A run is already in progress. Wait for it to finish before running a slash command.',
+        }),
+      });
+      return;
+    }
+
+    const workspaceId = this.requireWorkspaceId();
+    const sessionId = this.requireActiveSessionId();
+    this.setSnapshot({ submitting: true, error: undefined });
+
+    try {
+      const result = await this.api.executeSlashCommand({ workspaceId, sessionId, command });
+      await this.applySlashCommandResult(workspaceId, result);
+    } catch (error) {
+      this.setSnapshot({ error: formatError(error) });
+    } finally {
+      this.setSnapshot({ submitting: false });
+    }
+  }
+
+  private async applySlashCommandResult(workspaceId: string, result: ControlPlaneSlashCommandResult): Promise<void> {
+    if (result.handled === false) {
+      return;
+    }
+
+    this.setSnapshot({
+      commandResults: this.appendCommandResult(result),
+    });
+
+    const resultSessionId = 'sessionId' in result ? result.sessionId : undefined;
+    if (resultSessionId && resultSessionId !== this.snapshotValue.activeSessionId) {
+      await this.refreshSessions();
+      await this.selectSession(resultSessionId);
+    } else if (this.snapshotValue.activeSessionId) {
+      const sessions = await this.refreshSessions();
+      if (sessions.some((session) => session.id === this.snapshotValue.activeSessionId)) {
+        await this.refreshSession(this.snapshotValue.activeSessionId, { silent: true });
+      } else {
+        await this.selectSession(sessions[0]?.id ?? (await this.createSession()).id);
+      }
+    }
+
+    if (result.kind === 'continue') {
+      const sessionId = resultSessionId ?? this.requireActiveSessionId();
+      await this.continueSession(workspaceId, sessionId);
+      return;
+    }
+
+    if (result.kind === 'execute') {
+      await this.submitAgentPrompt(result.prompt);
+    }
+  }
+
+  private async continueSession(workspaceId: string, sessionId: string): Promise<void> {
+    this.setSnapshot({
+      running: true,
+      liveStatus: 'Heddle is continuing from the current transcript...',
+    });
+    await this.api.continueSession(workspaceId, sessionId);
+    await this.refreshSession(sessionId, { silent: true });
+    await this.refreshSessions();
+  }
+
+  private async submitAgentPrompt(prompt: string): Promise<void> {
+    const workspaceId = this.requireWorkspaceId();
+    const sessionId = this.requireActiveSessionId();
+    await this.api.sendPromptAsync({ workspaceId, sessionId, prompt });
+    this.setSnapshot({
+      running: true,
+      liveStatus: this.snapshotValue.streamConnected
+        ? 'Heddle is working...'
+        : 'Heddle is working... reconnecting live stream if needed.',
+    });
+    await this.refreshSession(sessionId, { silent: true });
+    await this.refreshSessions();
+  }
+
+  private appendCommandResult(result: ControlPlaneSlashCommandResult): ControlPlaneSlashCommandResult[] {
+    return [...this.snapshotValue.commandResults, result].slice(-5);
   }
 
   private applySessionEvent(workspaceId: string, event: ControlPlaneSessionEventEnvelope): void {

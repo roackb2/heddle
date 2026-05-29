@@ -43,6 +43,9 @@ export type SlashCommandExecutionContext = {
     listRunRecords: (options?: { taskId?: string; limit?: number }) => Promise<HeartbeatTaskRunRecordEntry[]>;
     loadRunRecord: (id: string) => Promise<HeartbeatTaskRunRecordEntry | undefined>;
   };
+  help: {
+    message: () => string;
+  };
 };
 
 export type { SlashCommandResult };

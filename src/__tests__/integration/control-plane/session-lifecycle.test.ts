@@ -206,6 +206,71 @@ describe('control-plane session lifecycle API', () => {
     });
   });
 
+  it('returns core slash command catalog metadata through the control-plane API', async () => {
+    const { caller } = createControlPlaneCaller();
+
+    const catalog = await caller.slashCommandCatalog();
+
+    expect(catalog.commands).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'help.show',
+        syntax: '/help',
+        description: 'show available slash commands',
+      }),
+      expect.objectContaining({
+        id: 'model.current',
+        syntax: '/model',
+        description: 'show the active model',
+      }),
+    ]));
+    expect(catalog.hints).toEqual(expect.arrayContaining([
+      { command: '/help', description: 'show available slash commands' },
+      { command: '/session list', description: 'list local chat sessions' },
+    ]));
+  });
+
+  it('executes slash commands through core command semantics', async () => {
+    const { caller } = createControlPlaneCaller();
+    const session = await caller.sessionCreate({ name: 'Slash command session', model: 'gpt-5.4' });
+
+    await expect(caller.slashCommandExecute({
+      sessionId: session.id,
+      command: '/model',
+    })).resolves.toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'Current model: gpt-5.4',
+    });
+  });
+
+  it('returns visible errors for unknown slash commands', async () => {
+    const { caller } = createControlPlaneCaller();
+    const session = await caller.sessionCreate({ name: 'Unknown slash command session' });
+
+    await expect(caller.slashCommandExecute({
+      sessionId: session.id,
+      command: '/not-real',
+    })).resolves.toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'Unknown command: /not-real. Use the slash command hints to inspect available commands.',
+    });
+  });
+
+  it('executes help as a stable slash command result', async () => {
+    const { caller } = createControlPlaneCaller();
+    const session = await caller.sessionCreate({ name: 'Help slash command session' });
+
+    await expect(caller.slashCommandExecute({
+      sessionId: session.id,
+      command: '/help',
+    })).resolves.toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: expect.stringContaining('Slash commands\n\n/help\nShow available slash commands.'),
+    });
+  });
+
   it('accepts async prompt submits before the final session result is ready', async () => {
     vi.useFakeTimers();
     vi.stubEnv('HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT', '1');

@@ -133,6 +133,9 @@ function createContext(overrides: Partial<SlashCommandExecutionContext> = {}): S
       listRunRecords: async () => [],
       loadRunRecord: async () => undefined,
     },
+    help: {
+      message: () => 'Slash commands\n\n/help\nShow available slash commands.',
+    },
     ...overrides,
   };
 }
@@ -199,8 +202,18 @@ describe('core slash command modules', () => {
     });
   });
 
+  it('runs help through the host help message port', async () => {
+    const context = createContext();
+
+    await expect(registry.run(context, '/help')).resolves.toMatchObject({
+      kind: 'message',
+      message: 'Slash commands\n\n/help\nShow available slash commands.',
+    });
+  });
+
   it('publishes module-owned help hints for host command surfaces', () => {
     expect(registry.hints()).toEqual(expect.arrayContaining([
+      { command: '/help', description: 'show available slash commands' },
       { command: '/model <name>', description: 'switch the current model' },
       { command: '/auth login openai', description: 'sign in with OpenAI ChatGPT/Codex OAuth' },
       { command: '/compact', description: 'compact earlier session history for the next run' },

@@ -5,6 +5,7 @@ import { createAuthSlashCommandModule } from './auth/auth-commands.js';
 import { createCompactionSlashCommandModule } from './compaction/compaction-commands.js';
 import { createDriftSlashCommandModule } from './drift/drift-commands.js';
 import { createHeartbeatSlashCommandModule } from './heartbeat/heartbeat-commands.js';
+import { createHelpSlashCommandModule } from './help/help-commands.js';
 import { createModelSlashCommandModule, createReasoningSlashCommandModule } from './model/model-commands.js';
 import { createSessionSlashCommandModule } from './session/session-commands.js';
 
@@ -13,6 +14,7 @@ export function createCoreSlashCommandModules(): SlashCommandModule<
   SlashCommandExecutionContext
 >[] {
   return [
+    createHelpSlashCommandModule(),
     createModelSlashCommandModule(),
     createReasoningSlashCommandModule(),
     createAuthSlashCommandModule(),

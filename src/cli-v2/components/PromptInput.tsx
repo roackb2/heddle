@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text, useInput, useStdout } from 'ink';
 import type { PromptActivityView } from '../services/activities/prompt-activity-service.js';
 
 export function PromptInput({
@@ -10,6 +10,7 @@ export function PromptInput({
   value,
   onChange,
   onSubmit,
+  onComplete,
 }: {
   activity?: PromptActivityView;
   disabled: boolean;
@@ -18,7 +19,11 @@ export function PromptInput({
   value: string;
   onChange: Dispatch<SetStateAction<string>>;
   onSubmit: (value: string) => void;
+  onComplete?: (value: string) => string | undefined;
 }) {
+  const { stdout } = useStdout();
+  const separator = repeatSeparator((stdout.columns ?? 0) - 2);
+
   useInput((input, key) => {
     if (disabled) {
       return;
@@ -30,6 +35,14 @@ export function PromptInput({
       }
 
       onSubmit(value);
+      return;
+    }
+
+    if (key.tab) {
+      const completed = onComplete?.(value);
+      if (completed !== undefined) {
+        onChange(completed);
+      }
       return;
     }
 
@@ -45,11 +58,21 @@ export function PromptInput({
 
   return (
     <Box flexDirection="column" marginTop={1} marginBottom={1}>
+      <Box overflow="hidden">
+        <Text dimColor wrap="truncate-end">{separator}</Text>
+      </Box>
       {activity ? <Text color={activity.color}>{activity.text}</Text> : null}
       <Box>
         <Text color="cyan">› </Text>
         <Text>{value || <Text dimColor>{placeholder}</Text>}</Text>
       </Box>
+      <Box overflow="hidden">
+        <Text dimColor wrap="truncate-end">{separator}</Text>
+      </Box>
     </Box>
   );
+}
+
+function repeatSeparator(width: number): string {
+  return '─'.repeat(Math.max(0, width));
 }

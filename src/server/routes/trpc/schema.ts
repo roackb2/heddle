@@ -51,6 +51,16 @@ export const sessionMessageInputSchema = z.object({
   memoryMaintenanceMode: z.enum(['background', 'inline', 'none']).optional(),
 });
 
+export const slashCommandCatalogInputSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+}).optional();
+
+export const slashCommandExecuteInputSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+  sessionId: z.string().min(1),
+  command: z.string().min(1),
+});
+
 export const sessionEventsInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   sessionId: z.string().min(1),

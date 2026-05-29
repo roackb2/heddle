@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { ApprovalPanel } from './components/ApprovalPanel.js';
+import { CommandResultPanel } from './components/CommandResultPanel.js';
 import { ConversationPanel } from './components/ConversationPanel.js';
 import { PromptInput } from './components/PromptInput.js';
 import { RunControls } from './components/RunControls.js';
+import { SlashCommandHintPanel } from './components/SlashCommandHintPanel.js';
 import { useControlPlaneSessionStore } from './hooks/useControlPlaneSessionStore.js';
 import { usePromptDraft } from './hooks/usePromptDraft.js';
 import { PromptActivityService } from './services/activities/prompt-activity-service.js';
@@ -25,6 +27,7 @@ export function App({
   const { draft, setDraft, clearDraft } = usePromptDraft();
   const submitDisabled = snapshot.loading || snapshot.submitting || snapshot.running;
   const inputDisabled = snapshot.loading;
+  const slashCommandHints = store.getSlashCommandHints(draft);
 
   useEffect(() => {
     if (startedRef.current) {
@@ -71,6 +74,7 @@ export function App({
         {snapshot.activeSession ? ` · ${snapshot.activeSession.name}` : ''}
       </Text>
       <ConversationPanel session={snapshot.activeSession} />
+      <CommandResultPanel results={snapshot.commandResults} />
       {snapshot.pendingApproval ? (
         <ApprovalPanel
           approval={snapshot.pendingApproval}
@@ -83,6 +87,7 @@ export function App({
         cancelling={snapshot.cancelling}
         onCancel={cancelRun}
       />
+      <SlashCommandHintPanel hints={slashCommandHints} />
       <PromptInput
         activity={PromptActivityService.build(snapshot)}
         disabled={inputDisabled}
@@ -95,6 +100,7 @@ export function App({
         value={draft}
         onChange={setDraft}
         onSubmit={submitPrompt}
+        onComplete={(value) => store.completeSlashCommandDraft(value)}
       />
     </Box>
   );

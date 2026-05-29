@@ -47,5 +47,8 @@ export function createTuiSlashCommandContext(args: LocalCommandArgs): SlashComma
       listRunRecords: async (options) => await heartbeatTasks.listRunRecords(options),
       loadRunRecord: async (id) => await heartbeatTasks.loadRunRecord(id),
     },
+    help: {
+      message: () => 'Use /help for available local commands.',
+    },
   };
 }

@@ -14,6 +14,7 @@
  * flows still bypass the service and call the repository themselves. Those
  * flows should move inward to this service over time.
  */
+import { randomUUID } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/types.js';
@@ -88,7 +89,7 @@ export class FileConversationSessionService implements ConversationSessionServic
   create(input?: CreateConversationSessionInput): ChatSession {
     const existing = this.loadExistingSessions(input?.apiKeyPresent ?? this.config.apiKeyPresent);
     const session = ChatSessionRecords.create({
-      id: input?.id?.trim() || `session-${Date.now()}`,
+      id: input?.id?.trim() || `session-${randomUUID()}`,
       name: input?.name?.trim() || `Session ${FileConversationSessionService.getNextSessionNumber(existing)}`,
       apiKeyPresent: input?.apiKeyPresent ?? this.config.apiKeyPresent,
       model: input?.model ?? this.config.model,
