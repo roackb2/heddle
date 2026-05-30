@@ -100,6 +100,33 @@ When a companion notes repo is present, treat the live Heddle codebase as the im
 - For releases, use annotated tags such as `vX.Y.Z` and write release notes from
   the real git range since the previous tag.
 
+## Architecture Clarification Checkpoint
+
+Heddle is a coding agent runtime, and many changes touch shared runtime,
+workspace, session, control-plane, trace, live-event, tool, approval, memory, or
+interface boundaries. Do not force a working patch when ownership is unclear.
+
+Before non-trivial implementation, identify the module that should own the
+behavior and keep the change aligned with the existing architecture documents
+and nearby README files. If the change would duplicate policy, re-resolve
+defaults or fallbacks in another layer, add a thin wrapper, introduce a parallel
+data flow, cross a documented dependency boundary, or make host/UI code own
+core semantics, stop and ask the maintainer for direction before coding.
+
+When stopping, briefly explain:
+
+* what task you were implementing;
+* which modules could plausibly own the behavior;
+* what existing code or docs make the ownership unclear;
+* what risk you see, such as duplicated policy, thin wrapper, host-side domain
+  ownership, parallel event path, unclear persistence semantics, or boundary
+  violation;
+* one or two concrete implementation options and the tradeoff between them.
+
+Prefer a scoped migration that deletes or simplifies an old path over adding a
+new abstraction beside it.
+
+
 ## Public Source Of Truth
 
 For contributors who only have this repo:
