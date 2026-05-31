@@ -79,12 +79,14 @@ export function ConversationComposer({
     uploadImages,
   } = useComposerImageAttachments({ workspaceId, sessionId });
   const turnActive = Boolean(submitting || running || cancelling);
+  const hasSubmitContent = Boolean(draft.trim() || uploadedImagePaths.length);
   const inputDisabled = Boolean(disabled || submitting || cancelling);
   const controlsDisabled = Boolean(disabled || submitting || cancelling);
   const sendDisabled = disabled
-    || turnActive
+    || submitting
+    || cancelling
     || imageUploading
-    || (!draft.trim() && !uploadedImagePaths.length);
+    || !hasSubmitContent;
   const effectiveDriftEnabled = driftEnabled ?? false;
   const effectiveDriftLevel = driftLevel ?? 'unknown';
   const effectiveReasoningEffort = reasoningEffort ?? 'medium';
@@ -193,7 +195,7 @@ export function ConversationComposer({
             onUpdateModel={onUpdateModel}
             onUpdateReasoningEffort={onUpdateReasoningEffort}
           />
-          {turnActive ? (
+          {turnActive && !hasSubmitContent ? (
             <Button
               type="button"
               size="none"
@@ -212,7 +214,7 @@ export function ConversationComposer({
               type="submit"
               size="none"
               className="v2-composer-send-button size-8 min-w-8 max-w-8 rounded-full p-0"
-              aria-label={t('composer.send')}
+              aria-label={running ? 'Queue follow-up' : t('composer.send')}
               disabled={sendDisabled}
             >
               <ArrowUp aria-hidden="true" data-icon="inline-start" />

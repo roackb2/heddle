@@ -12,6 +12,7 @@ import { useControlPlaneSessionPromptSubmit } from './useControlPlaneSessionProm
 import { useControlPlaneSessionRunControl } from './useControlPlaneSessionRunControl';
 import { useControlPlaneSessionRuntimeContext } from './useControlPlaneSessionRuntimeContext';
 import { useControlPlaneSessionSettings } from './useControlPlaneSessionSettings';
+import { useControlPlaneQueuedPrompts } from './useControlPlaneQueuedPrompts';
 
 export type { ControlPlaneApprovalDecision, ControlPlanePendingApproval, ControlPlaneSessionDetail } from '@web/api/client';
 export type { ControlPlaneReasoningEffortSelection } from './useControlPlaneSessionSettings';
@@ -35,7 +36,10 @@ type ControlPlaneSessionDetailState = {
   modelOptions: ReturnType<typeof useControlPlaneSessionSettings>['modelOptions'];
   settingsUpdating: boolean;
   settingsError?: string;
+  queueUpdating: boolean;
   submitPrompt: (prompt: string) => Promise<void>;
+  updateQueuedPrompt: ReturnType<typeof useControlPlaneQueuedPrompts>['updateQueuedPrompt'];
+  deleteQueuedPrompt: ReturnType<typeof useControlPlaneQueuedPrompts>['deleteQueuedPrompt'];
   cancelRun: () => Promise<void>;
   updateDriftEnabled: ReturnType<typeof useControlPlaneSessionSettings>['updateDriftEnabled'];
   updateModel: ReturnType<typeof useControlPlaneSessionSettings>['updateModel'];
@@ -88,6 +92,7 @@ export function useControlPlaneSessionDetail({
   const promptSubmit = useControlPlaneSessionPromptSubmit({
     workspaceId,
     sessionId,
+    running: runControl.running,
     streamConnected: events.streamConnected,
     setRunning: runControl.setRunning,
     setError: loader.setError,
@@ -95,6 +100,12 @@ export function useControlPlaneSessionDetail({
     setCurrentActivity,
   });
   const settings = useControlPlaneSessionSettings({
+    workspaceId,
+    sessionId,
+    setSession: loader.setSession,
+    setError: loader.setError,
+  });
+  const queuedPrompts = useControlPlaneQueuedPrompts({
     workspaceId,
     sessionId,
     setSession: loader.setSession,
@@ -126,7 +137,10 @@ export function useControlPlaneSessionDetail({
     modelOptions: settings.modelOptions,
     settingsUpdating: settings.settingsUpdating,
     settingsError: settings.settingsError,
+    queueUpdating: queuedPrompts.queueUpdating,
     submitPrompt: promptSubmit.submitPrompt,
+    updateQueuedPrompt: queuedPrompts.updateQueuedPrompt,
+    deleteQueuedPrompt: queuedPrompts.deleteQueuedPrompt,
     cancelRun: runControl.cancelRun,
     updateDriftEnabled: settings.updateDriftEnabled,
     updateModel: settings.updateModel,
@@ -146,6 +160,9 @@ export function useControlPlaneSessionDetail({
     loader.session,
     promptSubmit.submitting,
     promptSubmit.submitPrompt,
+    queuedPrompts.deleteQueuedPrompt,
+    queuedPrompts.queueUpdating,
+    queuedPrompts.updateQueuedPrompt,
     runControl.cancelError,
     runControl.cancelRun,
     runControl.cancelling,

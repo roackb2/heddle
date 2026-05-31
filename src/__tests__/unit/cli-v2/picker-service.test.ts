@@ -27,8 +27,8 @@ describe('CliV2PickerService', () => {
 
   it('filters cached sessions for the /session choose picker', () => {
     const sessions: ControlPlaneSessionView[] = [
-      { id: 'session-1', name: 'Planning', messageCount: 0, turnCount: 0 },
-      { id: 'session-2', name: 'Implementation', messageCount: 0, turnCount: 0 },
+      { id: 'session-1', name: 'Planning', messageCount: 0, turnCount: 0, queuedPromptCount: 0 },
+      { id: 'session-2', name: 'Implementation', messageCount: 0, turnCount: 0, queuedPromptCount: 0 },
     ];
 
     const query = CliV2PickerService.sessionQuery('/session choose impl');

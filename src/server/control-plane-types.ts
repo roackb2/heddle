@@ -6,7 +6,7 @@ import type { ReviewDiffFile } from '@/core/review/index.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import type { ReasoningEffortOption } from '@/core/llm/models/index.js';
 import type { ReasoningEffort } from '@/core/llm/types.js';
-import type { ChatSessionRetention } from '@/core/chat/types.js';
+import type { ChatSessionRetention, QueuedConversationPrompt } from '@/core/chat/types.js';
 import type { ConversationActivity } from '@/core/live/index.js';
 
 export type ChatSessionView = {
@@ -60,6 +60,7 @@ export type ChatSessionView = {
     createdAt: string;
     summaryModel?: string;
   }>;
+  queuedPromptCount: number;
 };
 
 export type ChatSessionMessage = {
@@ -148,6 +149,7 @@ export type ChatSessionDetail = ChatSessionView & {
   messages: ChatSessionMessage[];
   turns: ChatTurnView[];
   lastContinuePrompt?: string;
+  queuedPrompts: QueuedConversationPrompt[];
 };
 
 export type ControlPlaneSessionWelcomeGuide = {
@@ -175,13 +177,22 @@ export type ControlPlaneSessionRuntimeContext = {
   welcomeGuide: ControlPlaneSessionWelcomeGuide;
 };
 
-export type ControlPlaneAcceptedSessionRun = {
-  accepted: true;
-  workspaceId: string;
-  sessionId: string;
-  runId: string;
-  acceptedAt: string;
-};
+export type ControlPlaneAcceptedSessionRun =
+  | {
+    accepted: true;
+    workspaceId: string;
+    sessionId: string;
+    runId: string;
+    acceptedAt: string;
+  }
+  | {
+    queued: true;
+    workspaceId: string;
+    sessionId: string;
+    queueItemId: string;
+    queuedAt: string;
+    position: number;
+  };
 
 export type ControlPlaneSessionLiveEvent = {
   sessionId: string;
@@ -195,6 +206,12 @@ export type ControlPlaneSessionEventEnvelope =
     type: 'session.approval.updated';
     sessionId: string;
     timestamp: string;
+  }
+  | {
+    type: 'session.queue.updated';
+    sessionId: string;
+    timestamp: string;
+    queuedPromptCount: number;
   }
   | {
     type: 'session.updated' | 'waiting';

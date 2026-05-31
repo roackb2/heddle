@@ -47,6 +47,7 @@ export class ChatSessionCodec {
       history: parsed.data.history ?? [],
       messages: ChatSessionCodec.resolveMessages(parsed.data.messages),
       turns: parsed.data.turns ?? [],
+      queuedPrompts: parsed.data.queuedPrompts ?? [],
     }];
   }
 

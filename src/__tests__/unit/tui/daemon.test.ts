@@ -62,6 +62,7 @@ describe('daemon CLI helpers', () => {
       driftEnabled: true,
       messageCount: 2,
       turnCount: 1,
+      queuedPromptCount: 0,
       lastPrompt: 'Inspect the repo',
       lastOutcome: 'done',
       lastSummary: 'Found the implementation area.',

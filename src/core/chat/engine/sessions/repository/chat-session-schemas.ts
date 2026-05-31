@@ -168,6 +168,19 @@ const ChatSessionLeaseSchema = z.object({
     .optional(),
 });
 
+const QueuedConversationPromptSchema = z.object({
+  id: z.string().describe('Stable identifier for this queued prompt.'),
+  prompt: z.string().describe('User prompt waiting for the current or earlier run to finish.'),
+  createdAt: z.string().describe('Timestamp when this prompt entered the session queue.'),
+  updatedAt: z.string().describe('Timestamp when this queued prompt was last edited.'),
+});
+
+const QueuedConversationPromptsSchema = z.array(z.unknown())
+  .transform((prompts) => prompts.flatMap((prompt) => {
+    const parsed = QueuedConversationPromptSchema.safeParse(prompt);
+    return parsed.success ? [parsed.data] : [];
+  }));
+
 export const CatalogEntryReadSchema = z.object({
   id: z.string().describe('Stable session identifier used by all host surfaces.'),
   name: z.string().describe('Human-facing session title shown in session lists.'),
@@ -258,6 +271,10 @@ export const SessionBodyReadSchema = z.object({
     .describe('Current session lease duplicated in the body for session reconstruction.')
     .optional()
     .catch(undefined),
+  queuedPrompts: QueuedConversationPromptsSchema
+    .describe('FIFO user prompts accepted while the session has earlier work to finish.')
+    .optional()
+    .catch([]),
 });
 
 export const SessionBodyWriteSchema = z.object({
@@ -277,6 +294,9 @@ export const SessionBodyWriteSchema = z.object({
   lease: ChatSessionLeaseSchema
     .describe('Current session lease duplicated in the body for session reconstruction.')
     .optional(),
+  queuedPrompts: z.array(QueuedConversationPromptSchema)
+    .describe('FIFO user prompts accepted while the session has earlier work to finish.')
+    .default([]),
 });
 
 export type CatalogEntryRead = z.infer<typeof CatalogEntryReadSchema>;

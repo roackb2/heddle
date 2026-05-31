@@ -40,6 +40,8 @@ import {
   sessionEventsInputSchema,
   sessionInputSchema,
   sessionMessageInputSchema,
+  sessionQueuedPromptInputSchema,
+  sessionQueuedPromptUpdateInputSchema,
   sessionRenameInputSchema,
   sessionRuntimeContextInputSchema,
   slashCommandCatalogInputSchema,
@@ -230,6 +232,23 @@ export const controlPlaneRouter = router({
   }),
   sessionSendPromptAsync: controlPlaneWorkspaceProcedure.input(sessionMessageInputSchema).mutation(({ ctx, input }) => {
     return controlPlaneChatSessionsController.submitPromptAsync(buildSubmitPromptArgs(ctx, input));
+  }),
+  sessionQueuedPromptUpdate: controlPlaneWorkspaceProcedure.input(sessionQueuedPromptUpdateInputSchema).mutation(({ ctx, input }) => {
+    return controlPlaneChatSessionsController.updateQueuedPrompt({
+      ...ctx.requestWorkspace.sessionEngineArgs,
+      workspaceId: ctx.requestWorkspace.workspace.id,
+      sessionId: input.sessionId,
+      queueItemId: input.queueItemId,
+      prompt: input.prompt,
+    });
+  }),
+  sessionQueuedPromptDelete: controlPlaneWorkspaceProcedure.input(sessionQueuedPromptInputSchema).mutation(({ ctx, input }) => {
+    return controlPlaneChatSessionsController.deleteQueuedPrompt({
+      ...ctx.requestWorkspace.sessionEngineArgs,
+      workspaceId: ctx.requestWorkspace.workspace.id,
+      sessionId: input.sessionId,
+      queueItemId: input.queueItemId,
+    });
   }),
   slashCommandCatalog: controlPlaneWorkspaceProcedure.input(slashCommandCatalogInputSchema).query(() => {
     return controlPlaneSlashCommandsController.catalog();

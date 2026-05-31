@@ -26,6 +26,7 @@ type StartControlPlaneSessionRunInput<Result> = {
   onAccepted?: (run: ControlPlaneSessionRunContext) => void;
   execute: (run: ControlPlaneSessionRunContext) => Promise<Result>;
   onError?: (error: unknown, run: ControlPlaneSessionRunContext) => void | Promise<void>;
+  onSettled?: (run: ControlPlaneSessionRunContext) => void | Promise<void>;
 };
 
 type InFlightControlPlaneRun<Result = unknown> = ControlPlaneSessionRunContext & {
@@ -75,6 +76,9 @@ export class ControlPlaneSessionRunService {
       .finally(() => {
         this.pendingApprovals.delete(key);
         this.inFlightRuns.delete(key);
+        if (accepted) {
+          void Promise.resolve(input.onSettled?.(run)).catch(() => undefined);
+        }
       });
 
     this.inFlightRuns.set(key, { ...run, result });
@@ -101,6 +105,9 @@ export class ControlPlaneSessionRunService {
 
   async startAndWait<Result>(input: StartControlPlaneSessionRunInput<Result>): Promise<Result> {
     const accepted = this.start(input);
+    if (!('accepted' in accepted)) {
+      throw new Error(`Expected accepted run for ${input.address.sessionId}.`);
+    }
     return await this.requireRun<Result>(input.address, accepted.runId).result;
   }
 

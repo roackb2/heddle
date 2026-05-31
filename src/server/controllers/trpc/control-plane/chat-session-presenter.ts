@@ -32,6 +32,7 @@ export class ControlPlaneChatSessionPresenter {
 
     const turns = Array.isArray(candidate.turns) ? candidate.turns : [];
     const messages = Array.isArray(candidate.messages) ? candidate.messages : [];
+    const queuedPrompts = Array.isArray(candidate.queuedPrompts) ? candidate.queuedPrompts : [];
     const lastTurn = readObject(turns.at(-1));
     const context = readObject(candidate.context);
     const request = readObject(context?.request);
@@ -121,6 +122,7 @@ export class ControlPlaneChatSessionPresenter {
       lastSummary: readString(lastTurn?.summary),
       context: contextView && Object.keys(contextView).length > 0 ? contextView : undefined,
       archives: archiveViews.length > 0 ? archiveViews : undefined,
+      queuedPromptCount: queuedPrompts.length,
     })];
   }
 
@@ -133,12 +135,38 @@ export class ControlPlaneChatSessionPresenter {
     const candidate = raw as Record<string, unknown>;
     const messages = Array.isArray(candidate.messages) ? candidate.messages.flatMap((message) => ControlPlaneChatSessionPresenter.projectMessage(message)) : [];
     const turns = Array.isArray(candidate.turns) ? candidate.turns.flatMap((turn) => ControlPlaneChatSessionPresenter.projectTurnView(turn)) : [];
+    const queuedPrompts = Array.isArray(candidate.queuedPrompts)
+      ? candidate.queuedPrompts.flatMap((item) => ControlPlaneChatSessionPresenter.projectQueuedPrompt(item))
+      : [];
 
     return [{
       ...base,
       messages,
       turns,
       lastContinuePrompt: readString(candidate.lastContinuePrompt),
+      queuedPrompts,
+    }];
+  }
+
+  private static projectQueuedPrompt(raw: unknown) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return [];
+    }
+
+    const candidate = raw as Record<string, unknown>;
+    const id = readString(candidate.id);
+    const prompt = readString(candidate.prompt);
+    const createdAt = readString(candidate.createdAt);
+    const updatedAt = readString(candidate.updatedAt);
+    if (!id || !prompt || !createdAt || !updatedAt) {
+      return [];
+    }
+
+    return [{
+      id,
+      prompt,
+      createdAt,
+      updatedAt,
     }];
   }
 

@@ -18,6 +18,7 @@ import { ApprovalPanel } from './ApprovalPanel';
 import { ConversationComposer } from './ConversationComposer';
 import { ConversationMessage } from './ConversationMessage';
 import { ConversationWelcomePanel } from './ConversationWelcomePanel';
+import { QueuedPromptStrip } from './QueuedPromptStrip';
 import { Loader2 } from 'lucide-react';
 
 interface ConversationThreadProps {
@@ -38,8 +39,11 @@ interface ConversationThreadProps {
   modelOptions?: ControlPlaneModelOptions;
   settingsUpdating: boolean;
   settingsError?: string;
+  queueUpdating: boolean;
   emptyTitle: string;
   onSubmitPrompt: (prompt: string) => Promise<void>;
+  onUpdateQueuedPrompt: (queueItemId: string, prompt: string) => Promise<void>;
+  onDeleteQueuedPrompt: (queueItemId: string) => Promise<void>;
   onCancelRun: () => Promise<void>;
   onUpdateDriftEnabled: (enabled: boolean) => Promise<void>;
   onUpdateModel: (model: string) => Promise<void>;
@@ -66,8 +70,11 @@ export function ConversationThread({
   modelOptions,
   settingsUpdating,
   settingsError,
+  queueUpdating,
   emptyTitle,
   onSubmitPrompt,
+  onUpdateQueuedPrompt,
+  onDeleteQueuedPrompt,
   onCancelRun,
   onUpdateDriftEnabled,
   onUpdateModel,
@@ -155,11 +162,17 @@ export function ConversationThread({
         </div>
       ) : null}
       <div className="v2-composer-region">
+        <QueuedPromptStrip
+          queuedPrompts={session.queuedPrompts}
+          updating={queueUpdating}
+          onUpdateQueuedPrompt={onUpdateQueuedPrompt}
+          onDeleteQueuedPrompt={onDeleteQueuedPrompt}
+        />
         <ConversationComposer
           key={`${workspaceId ?? 'workspace'}:${session.id}`}
           sessionId={session.id}
           workspaceId={workspaceId}
-          disabled={Boolean(pendingApproval)}
+          disabled={false}
           driftEnabled={session.driftEnabled ?? false}
           driftLevel={session.driftLevel}
           model={session.model}

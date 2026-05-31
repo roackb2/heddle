@@ -31,9 +31,20 @@ export class ConversationTurnPersistenceService {
       },
     });
 
-    new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
-      .save(args.sessions.map((candidate) => (candidate.id === args.session.id ? persisted.session : candidate)));
-    return persisted;
+    const repository = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath });
+    const latestSessions = repository.list();
+    const latestSession = latestSessions.find((candidate) => candidate.id === args.session.id);
+    const session = latestSession
+      ? {
+        ...persisted.session,
+        queuedPrompts: latestSession.queuedPrompts,
+      }
+      : persisted.session;
+    repository.save(latestSessions.map((candidate) => (candidate.id === args.session.id ? session : candidate)));
+    return {
+      ...persisted,
+      session,
+    };
   }
 
   static persistFinalCompactionRunningSeed(args: PersistFinalCompactionRunningSeedArgs) {

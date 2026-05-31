@@ -8,6 +8,7 @@ import {
 type UseControlPlaneSessionPromptSubmitArgs = {
   workspaceId?: string;
   sessionId?: string;
+  running: boolean;
   streamConnected: boolean;
   setRunning: Dispatch<SetStateAction<boolean>>;
   setError: Dispatch<SetStateAction<string | undefined>>;
@@ -30,6 +31,7 @@ type PromptSubmission = {
 export function useControlPlaneSessionPromptSubmit({
   workspaceId,
   sessionId,
+  running,
   streamConnected,
   setRunning,
   setError,
@@ -74,8 +76,10 @@ export function useControlPlaneSessionPromptSubmit({
     setSubmitting(true);
     setRunning(true);
     setError(undefined);
-    setLiveStatus(streamConnected ? 'Heddle is working...' : 'Heddle is working... reconnecting live stream if needed.');
-    setCurrentActivity(ClientSharedSessionActivityService.createThinkingStatus());
+    if (!running) {
+      setLiveStatus(streamConnected ? 'Heddle is working...' : 'Heddle is working... reconnecting live stream if needed.');
+      setCurrentActivity(ClientSharedSessionActivityService.createThinkingStatus());
+    }
 
     try {
       await sessionSendPromptMutation.mutateAsync({ workspaceId, sessionId, prompt: trimmed });
@@ -112,6 +116,7 @@ export function useControlPlaneSessionPromptSubmit({
     setLiveStatus,
     setCurrentActivity,
     setRunning,
+    running,
     streamConnected,
     submitting,
     sessionSendPromptMutation,

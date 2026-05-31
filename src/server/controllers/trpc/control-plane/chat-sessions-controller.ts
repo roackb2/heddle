@@ -105,6 +105,15 @@ type ContinueChatPromptArgs = Omit<SubmitChatPromptArgs, 'prompt'>;
 
 type ControlPlaneTurnPublisher = ReturnType<typeof ControlPlaneChatSessionEventsController.createSessionEventPublisher>;
 
+type UpdateQueuedChatPromptArgs = ControlPlaneSessionReadArgs & ControlPlaneSessionAddress & {
+  queueItemId: string;
+  prompt: string;
+};
+
+type DeleteQueuedChatPromptArgs = ControlPlaneSessionReadArgs & ControlPlaneSessionAddress & {
+  queueItemId: string;
+};
+
 export class ControlPlaneChatSessionsController {
   private readonly sessionEventBus = new EventEmitter();
   private readonly runService = new ControlPlaneSessionRunService();
@@ -229,7 +238,32 @@ export class ControlPlaneChatSessionsController {
   }
 
   submitPromptAsync(args: SubmitChatPromptArgs): ControlPlaneAcceptedSessionRun {
-    return this.runService.start(this.buildSubmitPromptRun(args));
+    if (this.isRunning(args) || this.hasQueuedPrompts(args)) {
+      const queued = this.enqueuePrompt(args);
+      if (!this.isRunning(args)) {
+        this.startNextQueuedPrompt(args);
+      }
+      return queued;
+    }
+
+    return this.startPromptRun(args);
+  }
+
+  updateQueuedPrompt(args: UpdateQueuedChatPromptArgs): ChatSessionDetail {
+    const updated = this.createEngine(args).sessions.updateQueuedPrompt(args.sessionId, {
+      queueItemId: args.queueItemId,
+      prompt: args.prompt,
+    });
+    this.publishQueueUpdated(args, updated);
+    return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
+  }
+
+  deleteQueuedPrompt(args: DeleteQueuedChatPromptArgs): ChatSessionDetail {
+    const updated = this.createEngine(args).sessions.deleteQueuedPrompt(args.sessionId, {
+      queueItemId: args.queueItemId,
+    });
+    this.publishQueueUpdated(args, updated);
+    return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
   }
 
   async continuePrompt(args: ContinueChatPromptArgs) {
@@ -372,6 +406,66 @@ export class ControlPlaneChatSessionsController {
     return join(stateRoot, 'chat-sessions', `${sessionId}.json`);
   }
 
+  private startPromptRun(args: SubmitChatPromptArgs): ControlPlaneAcceptedSessionRun {
+    return this.runService.start(this.buildSubmitPromptRun(args));
+  }
+
+  private enqueuePrompt(args: SubmitChatPromptArgs): ControlPlaneAcceptedSessionRun {
+    const queued = this.createEngine(args).sessions.enqueuePrompt(args.sessionId, {
+      prompt: args.prompt,
+    });
+    this.publishQueueUpdated(args, queued.session);
+
+    return {
+      queued: true,
+      workspaceId: args.workspaceId,
+      sessionId: args.sessionId,
+      queueItemId: queued.item.id,
+      queuedAt: queued.item.createdAt,
+      position: queued.position,
+    };
+  }
+
+  private hasQueuedPrompts(args: ControlPlaneSessionAddress & ControlPlaneSessionReadArgs): boolean {
+    return (this.createEngine(args).sessions.read(args.sessionId)?.queuedPrompts.length ?? 0) > 0;
+  }
+
+  private startNextQueuedPrompt(args: SubmitChatPromptArgs): void {
+    if (this.isRunning(args)) {
+      return;
+    }
+
+    const sessions = this.createEngine(args).sessions;
+    const dequeued = sessions.dequeueQueuedPrompt(args.sessionId);
+    if (!dequeued.item) {
+      return;
+    }
+
+    this.publishQueueUpdated(args, dequeued.session);
+    try {
+      this.startPromptRun({
+        ...args,
+        prompt: dequeued.item.prompt,
+      });
+    } catch (error) {
+      const restored = sessions.enqueuePrompt(args.sessionId, { prompt: dequeued.item.prompt });
+      this.publishQueueUpdated(args, restored.session);
+      args.logger?.debug(
+        { error: error instanceof Error ? error.message : String(error), sessionId: args.sessionId },
+        'Queued prompt drain failed',
+      );
+    }
+  }
+
+  private publishQueueUpdated(address: ControlPlaneSessionAddress, session: ChatSession): void {
+    const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
+      eventBus: this.sessionEventBus,
+      workspaceId: address.workspaceId,
+      sessionId: address.sessionId,
+    });
+    publisher.publishQueueUpdated(session.queuedPrompts.length);
+  }
+
   private buildSubmitPromptRun(args: SubmitChatPromptArgs) {
     return {
       address: args,
@@ -402,6 +496,9 @@ export class ControlPlaneChatSessionsController {
       },
       onError: (error: unknown, run: ControlPlaneSessionRunContext) => {
         this.persistRunFailureMessage(args, run, error);
+      },
+      onSettled: () => {
+        this.startNextQueuedPrompt(args);
       },
     };
   }
@@ -627,6 +724,7 @@ export class ControlPlaneChatSessionsController {
       traceFile: 'browser-integration-fake-trace.jsonl',
       events: ['Mocked browser integration session run completed.'],
     };
+    const latestSession = repository.read(args.sessionId) ?? session;
     const updatedSession: ChatSession = {
       ...session,
       history: nextHistory,
@@ -635,6 +733,7 @@ export class ControlPlaneChatSessionsController {
       updatedAt: timestamp,
       lastContinuePrompt: args.prompt,
       lease: undefined,
+      queuedPrompts: latestSession.queuedPrompts,
     };
 
     repository.save(

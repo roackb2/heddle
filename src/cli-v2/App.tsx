@@ -11,6 +11,7 @@ import { FileMentionPickerPanel } from './components/FileMentionPickerPanel.js';
 import { ModelPickerPanel } from './components/ModelPickerPanel.js';
 import { PromptInput } from './components/PromptInput.js';
 import { PromptStatusPanel } from './components/PromptStatusPanel.js';
+import { QueuedPromptPanel } from './components/QueuedPromptPanel.js';
 import { ReasoningEffortPickerPanel } from './components/ReasoningEffortPickerPanel.js';
 import { RunControls } from './components/RunControls.js';
 import { RuntimeStatusBar } from './components/RuntimeStatusBar.js';
@@ -47,7 +48,7 @@ export function App({
     undoPromptEdit,
     redoPromptEdit,
   } = usePromptDraft();
-  const submitDisabled = snapshot.loading || snapshot.submitting || snapshot.running;
+  const submitDisabled = snapshot.loading || snapshot.submitting;
   const inputDisabled = snapshot.loading;
   const slashCommandHints = store.getSlashCommandHints(draft);
   const pickers = usePromptPickers({
@@ -181,12 +182,13 @@ export function App({
         currentActivity={snapshot.currentActivity}
         latestActivity={PromptActivityService.build(snapshot)}
       />
+      <QueuedPromptPanel session={snapshot.activeSession} />
       <PromptInput
         disabled={inputDisabled}
-        submitDisabled={submitDisabled || Boolean(snapshot.pendingApproval)}
+        submitDisabled={submitDisabled}
         placeholder={
           snapshot.loading ? 'Loading session...'
-          : snapshot.running ? 'Run in progress'
+          : snapshot.running ? 'Queue a follow-up'
           : 'Type a prompt'
         }
         value={draft}

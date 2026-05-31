@@ -305,21 +305,26 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
-  it('does not submit another prompt while the selected session is running', async () => {
+  it('queues another prompt while the selected session is running', async () => {
     const fixture = createClientFixture();
     fixture.calls.sessionRunningQuery.mockResolvedValueOnce({ running: true });
+    fixture.calls.sessionSendPromptAsyncMutate.mockResolvedValueOnce(createQueuedResult());
     const store = new ControlPlaneSessionStore({ client: fixture.client });
     await store.start();
 
     await store.submitPrompt('Next prompt');
 
-    expect(fixture.calls.sessionSendPromptAsyncMutate).not.toHaveBeenCalled();
+    expect(fixture.calls.sessionSendPromptAsyncMutate).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      prompt: 'Next prompt',
+    }));
     expect(store.getSnapshot()).toMatchObject({
       running: true,
       latestUpdate: {
-        label: 'Run already in progress',
-        detail: 'waiting for current run to finish',
-        tone: 'warning',
+        label: 'Prompt queued',
+        detail: 'position 1',
+        tone: 'info',
       },
     });
     store.dispose();
@@ -654,6 +659,7 @@ function createClientFixture() {
     workspaceId: 'workspace-1',
     messageCount: 1,
     turnCount: 0,
+    queuedPromptCount: 0,
   };
   const sessionDetail = createSessionDetail();
   const pendingApproval: ControlPlanePendingApproval = null;
@@ -794,10 +800,12 @@ function createSessionDetail(): NonNullable<ControlPlaneSessionDetail> {
     workspaceId: 'workspace-1',
     messageCount: 1,
     turnCount: 0,
+    queuedPromptCount: 0,
     messages: [
       { id: 'message-1', role: 'assistant', text: 'Ready.' },
     ],
     turns: [],
+    queuedPrompts: [],
   };
 }
 
@@ -886,5 +894,16 @@ function createAcceptedResult(): ControlPlaneSessionSendPromptAsyncResult {
     sessionId: 'session-1',
     runId: 'session-run-1',
     acceptedAt: '2026-05-27T00:00:00.000Z',
+  };
+}
+
+function createQueuedResult(): ControlPlaneSessionSendPromptAsyncResult {
+  return {
+    queued: true,
+    workspaceId: 'workspace-1',
+    sessionId: 'session-1',
+    queueItemId: 'queued-prompt-1',
+    queuedAt: '2026-05-27T00:00:00.000Z',
+    position: 1,
   };
 }

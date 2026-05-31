@@ -48,6 +48,15 @@ export class ControlPlaneChatSessionEventsController {
           timestamp: new Date().toISOString(),
         } satisfies ControlPlaneSessionEventEnvelope);
       },
+
+      publishQueueUpdated(queuedPromptCount: number) {
+        args.eventBus.emit(ControlPlaneChatSessionEventsController.sessionAddressKey(args), {
+          type: 'session.queue.updated',
+          sessionId: args.sessionId,
+          timestamp: new Date().toISOString(),
+          queuedPromptCount,
+        } satisfies ControlPlaneSessionEventEnvelope);
+      },
     };
 
     return publisher;

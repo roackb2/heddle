@@ -243,17 +243,6 @@ export class ControlPlaneSessionStore {
       return;
     }
 
-    if (this.snapshotValue.running) {
-      this.setSnapshot({
-        latestUpdate: {
-          label: 'Run already in progress',
-          detail: 'waiting for current run to finish',
-          tone: 'warning',
-        },
-      });
-      return;
-    }
-
     const workspaceId = this.requireWorkspaceId();
     const sessionId = this.requireActiveSessionId();
     this.setSnapshot((current) => ({
@@ -278,6 +267,24 @@ export class ControlPlaneSessionStore {
         sessionId,
         prompt: trimmed,
       });
+      if ('queued' in result) {
+        this.setSnapshot({
+          submitting: false,
+          running: this.snapshotValue.running,
+          liveStatus: this.snapshotValue.running
+            ? this.snapshotValue.liveStatus
+            : 'Queued prompt will run when earlier work finishes.',
+          latestUpdate: {
+            label: 'Prompt queued',
+            detail: `position ${result.position}`,
+            tone: 'info',
+          },
+        });
+        await this.refreshSession(sessionId, { silent: true });
+        await this.refreshSessions();
+        return;
+      }
+
       this.assistantStreamBuffer.reset();
       this.setSnapshot({
         submitting: false,
@@ -556,7 +563,7 @@ export class ControlPlaneSessionStore {
       return;
     }
 
-    if (event.type === 'session.updated') {
+    if (event.type === 'session.updated' || event.type === 'session.queue.updated') {
       void this.refreshSession(event.sessionId, { silent: true });
       return;
     }

@@ -28,6 +28,9 @@ import type {
   AcceptConversationUserMessageInput,
   AutoRenameConversationSessionInput,
   AutoRenameConversationSessionResult,
+  DeleteQueuedConversationPromptInput,
+  DequeuedConversationPromptResult,
+  EnqueueConversationPromptInput,
   ApplyConversationCompactionResultInput,
   ConversationSessionService,
   CreateConversationSessionInput,
@@ -35,7 +38,9 @@ import type {
   MarkAcceptedConversationUserMessageInput,
   MarkConversationCompactionRunningInput,
   RestoreConversationCompactionStateInput,
+  QueuedConversationPromptResult,
   UpdateConversationSessionSettingsInput,
+  UpdateQueuedConversationPromptInput,
 } from '../types.js';
 import type {
   ConversationSessionServiceConfig,
@@ -169,6 +174,86 @@ export class FileConversationSessionService implements ConversationSessionServic
     ));
   }
 
+  enqueuePrompt(id: string, input: EnqueueConversationPromptInput): QueuedConversationPromptResult {
+    const prompt = input.prompt.trim();
+    if (!prompt) {
+      throw new Error('Queued prompt cannot be empty.');
+    }
+
+    const now = new Date().toISOString();
+    const item = {
+      id: `queued-prompt-${randomUUID()}`,
+      prompt,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const session = this.updateRequiredSession(id, (current) => ({
+      ...current,
+      queuedPrompts: [...current.queuedPrompts, item],
+    }));
+
+    return {
+      session,
+      item,
+      position: session.queuedPrompts.findIndex((candidate) => candidate.id === item.id) + 1,
+    };
+  }
+
+  updateQueuedPrompt(id: string, input: UpdateQueuedConversationPromptInput): ChatSession {
+    const prompt = input.prompt.trim();
+    if (!prompt) {
+      throw new Error('Queued prompt cannot be empty.');
+    }
+
+    return this.updateRequiredSession(id, (session) => {
+      if (!session.queuedPrompts.some((item) => item.id === input.queueItemId)) {
+        throw new Error(`Queued prompt not found: ${input.queueItemId}`);
+      }
+
+      return {
+        ...session,
+        queuedPrompts: session.queuedPrompts.map((item) => (
+          item.id === input.queueItemId
+            ? { ...item, prompt, updatedAt: new Date().toISOString() }
+            : item
+        )),
+      };
+    });
+  }
+
+  deleteQueuedPrompt(id: string, input: DeleteQueuedConversationPromptInput): ChatSession {
+    return this.updateRequiredSession(id, (session) => {
+      if (!session.queuedPrompts.some((item) => item.id === input.queueItemId)) {
+        return session;
+      }
+
+      return {
+        ...session,
+        queuedPrompts: session.queuedPrompts.filter((item) => item.id !== input.queueItemId),
+      };
+    });
+  }
+
+  dequeueQueuedPrompt(id: string): DequeuedConversationPromptResult {
+    let item: DequeuedConversationPromptResult['item'];
+    const session = this.updateRequiredSession(id, (current) => {
+      if (current.queuedPrompts.length === 0) {
+        return current;
+      }
+
+      item = current.queuedPrompts[0];
+      return {
+        ...current,
+        queuedPrompts: current.queuedPrompts.slice(1),
+      };
+    });
+
+    return {
+      session,
+      item,
+    };
+  }
+
   resetConversation(id: string): ChatSession {
     return this.updateRequiredSession(id, (session) => ({
       ...session,
@@ -176,6 +261,7 @@ export class FileConversationSessionService implements ConversationSessionServic
       turns: [],
       lastContinuePrompt: undefined,
       messages: [],
+      queuedPrompts: [],
     }));
   }
 

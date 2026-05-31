@@ -119,7 +119,9 @@ function sessionWithMessages(
     workspaceId,
     messageCount: messages.length,
     turnCount: 0,
+    queuedPromptCount: 0,
     messages,
     turns: [],
+    queuedPrompts: [],
   };
 }

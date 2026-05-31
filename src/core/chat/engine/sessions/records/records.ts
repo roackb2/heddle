@@ -38,6 +38,7 @@ export class ChatSessionRecords {
       context: undefined,
       archives: [],
       lease: undefined,
+      queuedPrompts: [],
     };
   }
 

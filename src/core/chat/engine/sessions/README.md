@@ -10,6 +10,8 @@ or future hosts, it belongs here rather than in host-side code.
 
 - Persisted session state shape and lifecycle.
 - Session preference semantics such as stored model and reasoning effort.
+- The persisted FIFO prompt queue used when a user submits follow-up work while
+  a session already has earlier work to finish.
 - New-session inheritance rules.
 - Session-level default resolution at the engine boundary.
 - File-backed session storage and migration behavior.
@@ -44,6 +46,9 @@ The intended structure is class-based by responsibility:
 - session title prompting lives under `records/` as session metadata behavior;
   first-message auto-rename policy lives on the session service so TUI and
   control-plane hosts share it.
+- queued prompt operations live on the session service. Hosts and control-plane
+  routes may enqueue, edit, delete, and dequeue through named service methods,
+  but must not keep a separate host-local queue as the source of truth.
 - `types.ts` at this folder root describes the main session service contract
   and config shape.
 - each meaningful subfolder exposes a `types.ts` contract so callers can see
@@ -81,3 +86,15 @@ Session semantics should be dead simple:
 - defaults are resolved once at the owning boundary;
 - derived effective state is derived once;
 - hosts consume concrete values instead of re-resolving policy.
+
+## Queued Prompt Invariants
+
+Queued prompts are persisted session facts, not UI state. A prompt accepted
+while earlier work is active is appended to `queuedPrompts`, streamed to all
+subscribed interfaces through the control plane, and later dequeued in FIFO
+order before it becomes the accepted user message for its own run.
+
+Interfaces may choose how to render queued prompts, including edit and delete
+controls, but the queue order and persistence policy belong here. Do not add a
+parallel browser-only or terminal-only queue; that would break cross-device
+sync and make one interface disagree with another.

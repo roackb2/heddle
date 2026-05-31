@@ -63,7 +63,7 @@ export function useControlPlaneSessionEvents({
       return;
     }
 
-    if (event.type === 'session.updated') {
+    if (event.type === 'session.updated' || event.type === 'session.queue.updated') {
       void refresh(event.sessionId, { silent: true });
       return;
     }

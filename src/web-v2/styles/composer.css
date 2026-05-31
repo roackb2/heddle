@@ -1,5 +1,8 @@
 @layer components {
   .v2-composer-region {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
     padding: 0 1.5rem 1.25rem;
   }
 
@@ -28,6 +31,82 @@
     padding: 0.15rem 0.25rem;
     font-size: 0.9375rem;
     line-height: 1.55;
+  }
+
+  .v2-queued-prompt-strip {
+    display: flex;
+    width: min(100%, 48rem);
+    min-width: 0;
+    margin-inline: auto;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 0.875rem;
+    border: 1px solid color-mix(in oklab, var(--color-border) 72%, transparent);
+    background: color-mix(in oklab, var(--color-card) 58%, var(--color-background));
+  }
+
+  .v2-queued-prompt-row {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    min-height: 2rem;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.1875rem 0.5rem 0.1875rem 0.625rem;
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-queued-prompt-row:not([data-first="true"]) {
+    border-top: 1px solid color-mix(in oklab, var(--color-border) 58%, transparent);
+  }
+
+  .v2-queued-prompt-text {
+    min-width: 0;
+    flex: 1;
+    color: color-mix(in oklab, var(--color-foreground) 78%, var(--color-muted-foreground));
+    font-size: 0.8125rem;
+    line-height: 1rem;
+  }
+
+  .v2-queued-prompt-input {
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: var(--color-foreground);
+    font-size: 0.8125rem;
+    line-height: 1rem;
+    outline: none;
+  }
+
+  .v2-queued-prompt-action.v2-queued-prompt-action {
+    height: 1.5rem;
+    width: 1.5rem;
+    min-width: 1.5rem;
+    border-radius: 999px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    color: var(--color-muted-foreground);
+  }
+
+  .v2-queued-prompt-action.v2-queued-prompt-action:hover,
+  .v2-queued-prompt-action.v2-queued-prompt-action:focus-visible,
+  .v2-queued-prompt-action.v2-queued-prompt-action:disabled {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .v2-queued-prompt-action.v2-queued-prompt-action:hover,
+  .v2-queued-prompt-action.v2-queued-prompt-action:focus-visible {
+    color: var(--color-foreground);
+  }
+
+  .v2-queued-prompt-action svg {
+    height: 0.75rem;
+    width: 0.75rem;
   }
 
   .v2-composer-toolbar {

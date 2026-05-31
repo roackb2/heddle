@@ -10,7 +10,7 @@ import type { AgentLoopEvent, RunAgentLoopOptions } from '../../runtime/loop/ind
 import type { ChatMessage, LlmAdapter, ReasoningEffort } from '../../llm/types.js';
 import type { TraceEvent } from '../../types.js';
 import type { ChatSessionLeaseOwner } from './sessions/leases/index.js';
-import type { ChatSession, ChatSessionRetention } from '../types.js';
+import type { ChatSession, ChatSessionRetention, QueuedConversationPrompt } from '../types.js';
 import type { ChatTurnHostPort } from './turns/host/index.js';
 import type { ConversationCompactionResult } from '@/core/chat/engine/compaction/index.js';
 
@@ -67,6 +67,10 @@ export type ConversationSessionService = {
   acceptUserMessage(id: string, input: AcceptConversationUserMessageInput): ChatSession;
   markAcceptedUserMessage(id: string, input: MarkAcceptedConversationUserMessageInput): ChatSession;
   markAcceptedUserMessageFailed(id: string, input: MarkAcceptedConversationUserMessageFailedInput): ChatSession;
+  enqueuePrompt(id: string, input: EnqueueConversationPromptInput): QueuedConversationPromptResult;
+  updateQueuedPrompt(id: string, input: UpdateQueuedConversationPromptInput): ChatSession;
+  deleteQueuedPrompt(id: string, input: DeleteQueuedConversationPromptInput): ChatSession;
+  dequeueQueuedPrompt(id: string): DequeuedConversationPromptResult;
 
   // Conversation state
   resetConversation(id: string): ChatSession;
@@ -129,6 +133,30 @@ export type AcceptConversationUserMessageInput = MarkAcceptedConversationUserMes
 export type MarkAcceptedConversationUserMessageFailedInput = {
   runId: string;
   failureMessage: AppendConversationMessageInput;
+};
+
+export type EnqueueConversationPromptInput = {
+  prompt: string;
+};
+
+export type UpdateQueuedConversationPromptInput = {
+  queueItemId: string;
+  prompt: string;
+};
+
+export type DeleteQueuedConversationPromptInput = {
+  queueItemId: string;
+};
+
+export type QueuedConversationPromptResult = {
+  session: ChatSession;
+  item: QueuedConversationPrompt;
+  position: number;
+};
+
+export type DequeuedConversationPromptResult = {
+  session: ChatSession;
+  item?: QueuedConversationPrompt;
 };
 
 export type MarkConversationCompactionRunningInput = {

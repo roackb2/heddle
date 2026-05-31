@@ -74,6 +74,13 @@ export type ChatSessionLease = {
 
 export type ChatSessionRetention = 'reusable' | 'one_off';
 
+export type QueuedConversationPrompt = {
+  id: string;
+  prompt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ChatSession = {
   id: string;
   name: string;
@@ -91,6 +98,7 @@ export type ChatSession = {
   context?: ChatContextStats;
   archives?: ChatArchiveRecord[];
   lease?: ChatSessionLease;
+  queuedPrompts: QueuedConversationPrompt[];
 };
 
 export type PendingApproval = {

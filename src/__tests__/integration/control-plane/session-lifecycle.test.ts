@@ -351,9 +351,23 @@ describe('control-plane session lifecycle API', () => {
       await expect(caller.sessionSendPromptAsync({
         sessionId: session.id,
         prompt: 'Second prompt',
-      })).rejects.toThrow('A run is already in progress for this session.');
+      })).resolves.toMatchObject({
+        queued: true,
+        sessionId: session.id,
+        position: 1,
+      });
+      await expect(caller.session({ id: session.id })).resolves.toMatchObject({
+        queuedPrompts: [
+          expect.objectContaining({
+            prompt: 'Second prompt',
+          }),
+        ],
+      });
 
       await vi.advanceTimersByTimeAsync(800);
+      await Promise.resolve();
+
+      await vi.advanceTimersByTimeAsync(1600);
       await Promise.resolve();
 
       await expect(caller.sessionRunState({ id: session.id })).resolves.toEqual({
@@ -364,8 +378,58 @@ describe('control-plane session lifecycle API', () => {
       expect(completed?.messages.map((message) => message.text)).toEqual([
         'Explain async submit',
         'Mocked browser integration agent response: Explain async submit',
+        'Second prompt',
+        'Mocked browser integration agent response: Second prompt',
       ]);
+      expect(completed?.queuedPrompts).toEqual([]);
       expect(completed?.messages.some((message) => message.isPending)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('updates and deletes queued prompts through the control-plane API', async () => {
+    vi.useFakeTimers();
+    vi.stubEnv('HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT', '1');
+    try {
+      const { caller } = createControlPlaneCaller();
+      const session = await caller.sessionCreate({ name: 'Queued edit session' });
+      await caller.sessionSendPromptAsync({
+        sessionId: session.id,
+        prompt: 'First prompt',
+      });
+      const queued = await caller.sessionSendPromptAsync({
+        sessionId: session.id,
+        prompt: 'Queued before edit',
+      });
+      if (!('queued' in queued)) {
+        throw new Error('Expected queued prompt result.');
+      }
+
+      await expect(caller.sessionQueuedPromptUpdate({
+        sessionId: session.id,
+        queueItemId: queued.queueItemId,
+        prompt: 'Queued after edit',
+      })).resolves.toMatchObject({
+        queuedPrompts: [
+          expect.objectContaining({ prompt: 'Queued after edit' }),
+        ],
+      });
+
+      await expect(caller.sessionQueuedPromptDelete({
+        sessionId: session.id,
+        queueItemId: queued.queueItemId,
+      })).resolves.toMatchObject({
+        queuedPrompts: [],
+      });
+
+      await vi.advanceTimersByTimeAsync(2400);
+      await Promise.resolve();
+      const completed = await caller.session({ id: session.id });
+      expect(completed?.messages.map((message) => message.text)).toEqual([
+        'First prompt',
+        'Mocked browser integration agent response: First prompt',
+      ]);
     } finally {
       vi.useRealTimers();
     }
