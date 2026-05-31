@@ -21,6 +21,7 @@ import {
 } from '../services/sessions/session-run-state-poller-service.js';
 import type {
   ControlPlaneApprovalDecision,
+  ControlPlaneModelOptions,
   ControlPlanePendingApproval,
   ControlPlaneSessionDetail,
   ControlPlaneSessionEventEnvelope,
@@ -55,6 +56,7 @@ export type ControlPlaneSessionStoreSnapshot = {
   activeSessionId?: string;
   activeSession: ControlPlaneSessionDetail;
   runtimeContext?: ControlPlaneSessionRuntimeContext;
+  modelOptions?: ControlPlaneModelOptions;
   pendingApproval: ControlPlanePendingApproval;
   loading: boolean;
   submitting: boolean;
@@ -73,6 +75,7 @@ const INITIAL_SNAPSHOT: ControlPlaneSessionStoreSnapshot = {
   sessions: [],
   activeSession: null,
   runtimeContext: undefined,
+  modelOptions: undefined,
   pendingApproval: null,
   loading: false,
   submitting: false,
@@ -147,8 +150,9 @@ export class ControlPlaneSessionStore {
     this.setSnapshot({ loading: true, error: undefined });
     try {
       const workspaceId = await this.api.resolveWorkspaceId(input.workspaceId);
+      const modelOptions = await this.api.getModelOptions();
 
-      this.setSnapshot({ workspaceId });
+      this.setSnapshot({ workspaceId, modelOptions });
       await this.refreshSlashCommandCatalog(workspaceId);
       this.subscriptions.subscribeToSessionList(workspaceId);
       const sessions = await this.refreshSessions();
@@ -306,6 +310,14 @@ export class ControlPlaneSessionStore {
 
   completeSlashCommandDraft(draft: string): string | undefined {
     return SlashCommandAutocompleteService.complete(draft, this.snapshotValue.slashCommandCatalog?.hints ?? []);
+  }
+
+  async selectModelFromPicker(modelId: string): Promise<void> {
+    await this.executeSlashCommand(`/model ${modelId}`);
+  }
+
+  async selectSessionFromPicker(sessionId: string): Promise<void> {
+    await this.executeSlashCommand(`/session switch ${sessionId}`);
   }
 
   async cancelRun(): Promise<void> {

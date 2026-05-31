@@ -53,6 +53,10 @@ export class ControlPlaneSessionApiService {
     return result.workspaceId === workspaceId ? result.sessions : [];
   }
 
+  async getModelOptions() {
+    return this.client.controlPlane.modelOptions.query();
+  }
+
   async createSession(workspaceId: string, input: ControlPlaneSessionCreateInput = {}) {
     return this.client.controlPlane.sessionCreate.mutate({
       ...input,

@@ -1,16 +1,20 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Text } from 'ink';
 import { ApprovalPanel } from './components/ApprovalPanel.js';
 import { CommandResultPanel } from './components/CommandResultPanel.js';
 import { ConversationPanel } from './components/ConversationPanel.js';
+import { ModelPickerPanel } from './components/ModelPickerPanel.js';
 import { PromptInput } from './components/PromptInput.js';
 import { RunControls } from './components/RunControls.js';
 import { RuntimeStatusBar } from './components/RuntimeStatusBar.js';
+import { SessionPickerPanel } from './components/SessionPickerPanel.js';
 import { SlashCommandHintPanel } from './components/SlashCommandHintPanel.js';
 import { useControlPlaneSessionStore } from './hooks/useControlPlaneSessionStore.js';
 import { usePromptDraft } from './hooks/usePromptDraft.js';
 import { PromptActivityService } from './services/activities/prompt-activity-service.js';
+import { CliV2PickerService } from './services/pickers/index.js';
 import type { ControlPlaneApprovalDecision } from '@/client-shared/api/types.js';
+import type { PromptInputKey } from './components/PromptInput.js';
 import type {
   ControlPlaneSessionStore,
   ControlPlaneSessionStoreStartInput,
@@ -29,6 +33,17 @@ export function App({
   const submitDisabled = snapshot.loading || snapshot.submitting || snapshot.running;
   const inputDisabled = snapshot.loading;
   const slashCommandHints = store.getSlashCommandHints(draft);
+  const [modelPickerIndex, setModelPickerIndex] = useState(0);
+  const [sessionPickerIndex, setSessionPickerIndex] = useState(0);
+  const modelPickerQuery = CliV2PickerService.modelQuery(draft);
+  const sessionPickerQuery = CliV2PickerService.sessionQuery(draft);
+  const modelPickerItems = CliV2PickerService.filterModels(snapshot.modelOptions, modelPickerQuery);
+  const sessionPickerItems = CliV2PickerService.filterSessions(snapshot.sessions, sessionPickerQuery);
+  const safeModelPickerIndex = CliV2PickerService.clampIndex(modelPickerIndex, modelPickerItems.length);
+  const safeSessionPickerIndex = CliV2PickerService.clampIndex(sessionPickerIndex, sessionPickerItems.length);
+  const highlightedModel = modelPickerItems[safeModelPickerIndex];
+  const highlightedSession = sessionPickerItems[safeSessionPickerIndex];
+  const pickerVisible = modelPickerQuery !== undefined || sessionPickerQuery !== undefined;
 
   useEffect(() => {
     if (startedRef.current) {
@@ -42,6 +57,14 @@ export function App({
     };
   }, [initialSelection, store]);
 
+  useEffect(() => {
+    setModelPickerIndex(0);
+  }, [modelPickerQuery]);
+
+  useEffect(() => {
+    setSessionPickerIndex(0);
+  }, [sessionPickerQuery]);
+
   const submitPrompt = useCallback((value: string) => {
     const trimmed = value.trim();
     if (!trimmed) {
@@ -52,9 +75,81 @@ export function App({
       return;
     }
 
+    if (modelPickerQuery !== undefined && highlightedModel) {
+      if (highlightedModel.disabled) {
+        return;
+      }
+
+      clearDraft();
+      setModelPickerIndex(0);
+      void store.selectModelFromPicker(highlightedModel.id);
+      return;
+    }
+
+    if (sessionPickerQuery !== undefined && highlightedSession) {
+      clearDraft();
+      setSessionPickerIndex(0);
+      void store.selectSessionFromPicker(highlightedSession.id);
+      return;
+    }
+
     clearDraft();
     void store.submitPrompt(value);
-  }, [clearDraft, store, submitDisabled]);
+  }, [
+    clearDraft,
+    highlightedModel,
+    highlightedSession,
+    modelPickerQuery,
+    sessionPickerQuery,
+    store,
+    submitDisabled,
+  ]);
+
+  const handleSpecialKey = useCallback((_input: string, key: PromptInputKey) => {
+    if (modelPickerQuery !== undefined) {
+      if ((key.upArrow || key.leftArrow) && modelPickerItems.length > 0) {
+        setModelPickerIndex((current) => CliV2PickerService.previousIndex(current, modelPickerItems.length));
+        return true;
+      }
+
+      if ((key.downArrow || key.rightArrow || key.tab) && modelPickerItems.length > 0) {
+        setModelPickerIndex((current) => CliV2PickerService.nextIndex(current, modelPickerItems.length));
+        return true;
+      }
+
+      if (key.escape) {
+        clearDraft();
+        setModelPickerIndex(0);
+        return true;
+      }
+    }
+
+    if (sessionPickerQuery !== undefined) {
+      if ((key.upArrow || key.leftArrow) && sessionPickerItems.length > 0) {
+        setSessionPickerIndex((current) => CliV2PickerService.previousIndex(current, sessionPickerItems.length));
+        return true;
+      }
+
+      if ((key.downArrow || key.rightArrow || key.tab) && sessionPickerItems.length > 0) {
+        setSessionPickerIndex((current) => CliV2PickerService.nextIndex(current, sessionPickerItems.length));
+        return true;
+      }
+
+      if (key.escape) {
+        clearDraft();
+        setSessionPickerIndex(0);
+        return true;
+      }
+    }
+
+    return false;
+  }, [
+    clearDraft,
+    modelPickerItems.length,
+    modelPickerQuery,
+    sessionPickerItems.length,
+    sessionPickerQuery,
+  ]);
 
   const resolveApproval = useCallback((decision: ControlPlaneApprovalDecision) => {
     void store.resolvePendingApproval(decision);
@@ -88,7 +183,23 @@ export function App({
         cancelling={snapshot.cancelling}
         onCancel={cancelRun}
       />
-      <SlashCommandHintPanel hints={slashCommandHints} />
+      {modelPickerQuery !== undefined ? (
+        <ModelPickerPanel
+          query={modelPickerQuery}
+          models={modelPickerItems}
+          activeModel={snapshot.runtimeContext?.model}
+          highlightedIndex={safeModelPickerIndex}
+        />
+      ) : null}
+      {sessionPickerQuery !== undefined ? (
+        <SessionPickerPanel
+          query={sessionPickerQuery}
+          sessions={sessionPickerItems}
+          activeSessionId={snapshot.activeSessionId}
+          highlightedIndex={safeSessionPickerIndex}
+        />
+      ) : null}
+      {!pickerVisible ? <SlashCommandHintPanel hints={slashCommandHints} /> : null}
       <PromptInput
         activity={PromptActivityService.build(snapshot)}
         disabled={inputDisabled}
@@ -102,6 +213,7 @@ export function App({
         onChange={setDraft}
         onSubmit={submitPrompt}
         onComplete={(value) => store.completeSlashCommandDraft(value)}
+        onSpecialKey={handleSpecialKey}
       />
       <RuntimeStatusBar snapshot={snapshot} />
     </Box>

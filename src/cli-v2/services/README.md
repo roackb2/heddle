@@ -27,6 +27,8 @@ Current domains:
   rendering.
 - `approvals/`: terminal approval choices, decisions, and keyboard-specific
   behavior.
+- `pickers/`: terminal picker filtering and keyboard index mechanics over
+  control-plane-provided model/session data.
 - `sessions/`: terminal session lifecycle mechanics such as stream buffering
   API runtime defaults, subscriptions, and run-state polling that are specific
   to Ink rendering and cli-v2 store coordination.
