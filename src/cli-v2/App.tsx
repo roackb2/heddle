@@ -1,3 +1,6 @@
+// Keep this root component thin: wire top-level app state and render surfaces
+// only. Put feature behavior in cli-v2 hooks, services, or focused components
+// instead of growing App.tsx directly.
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { ApprovalPanel } from './components/ApprovalPanel.js';
