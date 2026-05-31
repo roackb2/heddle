@@ -1,9 +1,12 @@
 import type {
   ControlPlaneModelOptions,
+  ControlPlaneSessionRuntimeContext,
   ControlPlaneSessionView,
 } from '@/client-shared/api/types.js';
 
 export type CliV2ModelPickerItem = ControlPlaneModelOptions['groups'][number]['options'][number];
+
+export type CliV2ReasoningPickerItem = ControlPlaneSessionRuntimeContext['reasoningOptions'][number];
 
 export type CliV2SessionPickerItem = Pick<ControlPlaneSessionView, 'id' | 'name'>;
 
@@ -14,6 +17,10 @@ export class CliV2PickerService {
 
   static sessionQuery(draft: string): string | undefined {
     return queryAfterPrefix(draft, '/session choose');
+  }
+
+  static reasoningQuery(draft: string): string | undefined {
+    return queryAfterPrefix(draft, '/reasoning set');
   }
 
   static filterModels(modelOptions: ControlPlaneModelOptions | undefined, query: string | undefined): CliV2ModelPickerItem[] {
@@ -49,6 +56,27 @@ export class CliV2PickerService {
         session.name.toLowerCase().includes(normalized)
       ))
       .map(({ id, name }) => ({ id, name }));
+  }
+
+  static filterReasoningOptions(
+    runtimeContext: ControlPlaneSessionRuntimeContext | undefined,
+    query: string | undefined,
+  ): CliV2ReasoningPickerItem[] {
+    if (query === undefined) {
+      return [];
+    }
+
+    const normalized = normalize(query);
+    const options = runtimeContext?.reasoningOptions ?? [];
+    if (!normalized) {
+      return options;
+    }
+
+    return options.filter((option) => (
+      option.id.toLowerCase().includes(normalized) ||
+      option.label.toLowerCase().includes(normalized) ||
+      option.description.toLowerCase().includes(normalized)
+    ));
   }
 
   static clampIndex(index: number, itemCount: number): number {

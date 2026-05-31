@@ -157,6 +157,13 @@ export type ControlPlaneSessionRuntimeContext = {
   reasoningEffort?: ReasoningEffort;
   effectiveReasoningEffort?: ReasoningEffort;
   reasoningSupported: boolean;
+  reasoningOptions: Array<{
+    id: 'default' | ReasoningEffort;
+    label: string;
+    description: string;
+    disabled: boolean;
+    disabledReason?: string;
+  }>;
   credentialSource: ProviderCredentialSource;
   contextWindow?: number;
   estimatedInputTokens?: number;

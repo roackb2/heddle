@@ -144,6 +144,8 @@ describe('ControlPlaneSessionStore', () => {
     await store.start();
 
     await store.selectModelFromPicker('gpt-5.4-mini');
+    await store.selectReasoningFromPicker('medium');
+    await store.selectReasoningFromPicker('default');
     await store.selectSessionFromPicker('session-2');
 
     expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenNthCalledWith(1, {
@@ -152,6 +154,16 @@ describe('ControlPlaneSessionStore', () => {
       command: '/model gpt-5.4-mini',
     });
     expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenNthCalledWith(2, {
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      command: '/reasoning medium',
+    });
+    expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenNthCalledWith(3, {
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      command: '/reasoning default',
+    });
+    expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenNthCalledWith(4, {
       workspaceId: 'workspace-1',
       sessionId: 'session-1',
       command: '/session switch session-2',
@@ -673,6 +685,39 @@ function createRuntimeContext(
     reasoningEffort: 'medium',
     effectiveReasoningEffort: 'medium',
     reasoningSupported: true,
+    reasoningOptions: [
+      {
+        id: 'default',
+        label: 'default',
+        description: 'Use gpt-5.4 default (medium)',
+        disabled: false,
+      },
+      {
+        id: 'low',
+        label: 'low',
+        description: 'Set explicit low effort',
+        disabled: false,
+      },
+      {
+        id: 'medium',
+        label: 'medium',
+        description: 'Set explicit medium effort',
+        disabled: false,
+      },
+      {
+        id: 'high',
+        label: 'high',
+        description: 'Set explicit high effort',
+        disabled: false,
+      },
+      {
+        id: 'ultrahigh',
+        label: 'ultrahigh',
+        description: 'Reserved; not accepted by current OpenAI requests',
+        disabled: true,
+        disabledReason: 'Reserved',
+      },
+    ],
     credentialSource: {
       type: 'oauth',
       provider: 'openai',

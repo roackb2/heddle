@@ -320,6 +320,10 @@ export class ControlPlaneSessionStore {
     await this.executeSlashCommand(`/session switch ${sessionId}`);
   }
 
+  async selectReasoningFromPicker(reasoningEffort: string): Promise<void> {
+    await this.executeSlashCommand(reasoningEffort === 'default' ? '/reasoning default' : `/reasoning ${reasoningEffort}`);
+  }
+
   async cancelRun(): Promise<void> {
     const workspaceId = this.requireWorkspaceId();
     const sessionId = this.requireActiveSessionId();

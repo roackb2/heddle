@@ -5,6 +5,7 @@ import { CommandResultPanel } from './components/CommandResultPanel.js';
 import { ConversationPanel } from './components/ConversationPanel.js';
 import { ModelPickerPanel } from './components/ModelPickerPanel.js';
 import { PromptInput } from './components/PromptInput.js';
+import { ReasoningEffortPickerPanel } from './components/ReasoningEffortPickerPanel.js';
 import { RunControls } from './components/RunControls.js';
 import { RuntimeStatusBar } from './components/RuntimeStatusBar.js';
 import { SessionPickerPanel } from './components/SessionPickerPanel.js';
@@ -34,16 +35,21 @@ export function App({
   const inputDisabled = snapshot.loading;
   const slashCommandHints = store.getSlashCommandHints(draft);
   const [modelPickerIndex, setModelPickerIndex] = useState(0);
+  const [reasoningPickerIndex, setReasoningPickerIndex] = useState(0);
   const [sessionPickerIndex, setSessionPickerIndex] = useState(0);
   const modelPickerQuery = CliV2PickerService.modelQuery(draft);
+  const reasoningPickerQuery = CliV2PickerService.reasoningQuery(draft);
   const sessionPickerQuery = CliV2PickerService.sessionQuery(draft);
   const modelPickerItems = CliV2PickerService.filterModels(snapshot.modelOptions, modelPickerQuery);
+  const reasoningPickerItems = CliV2PickerService.filterReasoningOptions(snapshot.runtimeContext, reasoningPickerQuery);
   const sessionPickerItems = CliV2PickerService.filterSessions(snapshot.sessions, sessionPickerQuery);
   const safeModelPickerIndex = CliV2PickerService.clampIndex(modelPickerIndex, modelPickerItems.length);
+  const safeReasoningPickerIndex = CliV2PickerService.clampIndex(reasoningPickerIndex, reasoningPickerItems.length);
   const safeSessionPickerIndex = CliV2PickerService.clampIndex(sessionPickerIndex, sessionPickerItems.length);
   const highlightedModel = modelPickerItems[safeModelPickerIndex];
+  const highlightedReasoning = reasoningPickerItems[safeReasoningPickerIndex];
   const highlightedSession = sessionPickerItems[safeSessionPickerIndex];
-  const pickerVisible = modelPickerQuery !== undefined || sessionPickerQuery !== undefined;
+  const pickerVisible = modelPickerQuery !== undefined || reasoningPickerQuery !== undefined || sessionPickerQuery !== undefined;
 
   useEffect(() => {
     if (startedRef.current) {
@@ -60,6 +66,10 @@ export function App({
   useEffect(() => {
     setModelPickerIndex(0);
   }, [modelPickerQuery]);
+
+  useEffect(() => {
+    setReasoningPickerIndex(0);
+  }, [reasoningPickerQuery]);
 
   useEffect(() => {
     setSessionPickerIndex(0);
@@ -86,6 +96,17 @@ export function App({
       return;
     }
 
+    if (reasoningPickerQuery !== undefined && highlightedReasoning) {
+      if (highlightedReasoning.disabled) {
+        return;
+      }
+
+      clearDraft();
+      setReasoningPickerIndex(0);
+      void store.selectReasoningFromPicker(highlightedReasoning.id);
+      return;
+    }
+
     if (sessionPickerQuery !== undefined && highlightedSession) {
       clearDraft();
       setSessionPickerIndex(0);
@@ -98,8 +119,10 @@ export function App({
   }, [
     clearDraft,
     highlightedModel,
+    highlightedReasoning,
     highlightedSession,
     modelPickerQuery,
+    reasoningPickerQuery,
     sessionPickerQuery,
     store,
     submitDisabled,
@@ -120,6 +143,24 @@ export function App({
       if (key.escape) {
         clearDraft();
         setModelPickerIndex(0);
+        return true;
+      }
+    }
+
+    if (reasoningPickerQuery !== undefined) {
+      if ((key.upArrow || key.leftArrow) && reasoningPickerItems.length > 0) {
+        setReasoningPickerIndex((current) => CliV2PickerService.previousIndex(current, reasoningPickerItems.length));
+        return true;
+      }
+
+      if ((key.downArrow || key.rightArrow || key.tab) && reasoningPickerItems.length > 0) {
+        setReasoningPickerIndex((current) => CliV2PickerService.nextIndex(current, reasoningPickerItems.length));
+        return true;
+      }
+
+      if (key.escape) {
+        clearDraft();
+        setReasoningPickerIndex(0);
         return true;
       }
     }
@@ -147,6 +188,8 @@ export function App({
     clearDraft,
     modelPickerItems.length,
     modelPickerQuery,
+    reasoningPickerItems.length,
+    reasoningPickerQuery,
     sessionPickerItems.length,
     sessionPickerQuery,
   ]);
@@ -189,6 +232,14 @@ export function App({
           models={modelPickerItems}
           activeModel={snapshot.runtimeContext?.model}
           highlightedIndex={safeModelPickerIndex}
+        />
+      ) : null}
+      {reasoningPickerQuery !== undefined ? (
+        <ReasoningEffortPickerPanel
+          query={reasoningPickerQuery}
+          options={reasoningPickerItems}
+          activeReasoningEffort={snapshot.runtimeContext?.reasoningEffort}
+          highlightedIndex={safeReasoningPickerIndex}
         />
       ) : null}
       {sessionPickerQuery !== undefined ? (

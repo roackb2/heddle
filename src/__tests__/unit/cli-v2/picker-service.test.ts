@@ -39,6 +39,38 @@ describe('CliV2PickerService', () => {
     ]);
   });
 
+  it('filters runtime reasoning options for the /reasoning set picker', () => {
+    const runtimeContext = {
+      reasoningOptions: [
+        {
+          id: 'default',
+          label: 'default',
+          description: 'Use model default',
+          disabled: false,
+        },
+        {
+          id: 'medium',
+          label: 'medium',
+          description: 'Set explicit medium effort',
+          disabled: false,
+        },
+      ],
+    } as const;
+
+    const query = CliV2PickerService.reasoningQuery('/reasoning set med');
+
+    expect(query).toBe('med');
+    expect(CliV2PickerService.filterReasoningOptions(runtimeContext, query)).toEqual([
+      {
+        id: 'medium',
+        label: 'medium',
+        description: 'Set explicit medium effort',
+        disabled: false,
+      },
+    ]);
+  });
+
+
   it('cycles picker indexes locally', () => {
     expect(CliV2PickerService.nextIndex(1, 2)).toBe(0);
     expect(CliV2PickerService.previousIndex(0, 2)).toBe(1);

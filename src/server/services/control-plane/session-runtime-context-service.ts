@@ -4,6 +4,7 @@ import { resolveEffectiveReasoningEffort } from '@/core/chat/engine/sessions/pre
 import type { ChatSession } from '@/core/chat/types.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import { ModelCatalogService, ModelPolicyService } from '@/core/llm/models/index.js';
+import type { ReasoningEffort } from '@/core/llm/types.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import type { ChatSessionView, ControlPlaneSessionRuntimeContext } from '@/server/control-plane-types.js';
 import { ControlPlaneSessionDriftService } from './session-drift-service.js';
@@ -68,6 +69,7 @@ export class ControlPlaneSessionRuntimeContextService {
           reasoningEffort: session.reasoningEffort,
         }),
         reasoningSupported: ModelPolicyService.supportsReasoningEffort(model),
+        reasoningOptions: this.buildReasoningOptions(model),
         credentialSource: RuntimeCredentialService.resolveCredentialSourceForModel(model, args),
         contextWindow: ModelCatalogService.estimateBuiltInContextWindow(model),
         estimatedInputTokens,
@@ -77,6 +79,39 @@ export class ControlPlaneSessionRuntimeContextService {
         running: options.running ?? false,
       },
     };
+  }
+
+  private buildReasoningOptions(model: string): ControlPlaneSessionRuntimeContext['reasoningOptions'] {
+    const requestSupported = ModelPolicyService.supportsOpenAiRequestReasoningEffort(model);
+    const reasoningSupported = ModelPolicyService.supportsReasoningEffort(model);
+    const defaultEffort = ModelPolicyService.resolveDefaultReasoningEffort(model);
+    const disabledReason =
+      reasoningSupported ?
+        'Not supported by request path'
+      : 'Not supported';
+
+    return [
+      {
+        id: 'default',
+        label: 'default',
+        description: defaultEffort ? `Use ${model} default (${defaultEffort})` : `Do not send reasoning effort for ${model}`,
+        disabled: false,
+      },
+      ...(['low', 'medium', 'high'] as const).map((effort) => ({
+        id: effort,
+        label: effort,
+        description: `Set explicit ${effort} effort`,
+        disabled: !requestSupported,
+        disabledReason: requestSupported ? undefined : disabledReason,
+      })),
+      {
+        id: 'ultrahigh' as ReasoningEffort,
+        label: 'ultrahigh',
+        description: 'Reserved; not accepted by current OpenAI requests',
+        disabled: true,
+        disabledReason: 'Reserved',
+      },
+    ];
   }
 }
 
