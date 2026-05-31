@@ -541,6 +541,11 @@ export class ControlPlaneSessionStore {
       return;
     }
 
+    if (event.type === 'session.approval.updated') {
+      void this.refreshPendingApproval(event.sessionId);
+      return;
+    }
+
     if (event.type !== 'session.event') {
       return;
     }

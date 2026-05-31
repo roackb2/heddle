@@ -1,10 +1,11 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { ToolApprovalRequest, ToolApprovalUserDecision } from '@/core/approvals/index.js';
+import type { ToolCall, ToolDefinition } from '@/core/types.js';
 import { ControlPlaneChatSessionsController } from '@/server/controllers/trpc/control-plane/chat-sessions-controller.js';
 import type {
   ControlPlaneSessionRunContext,
@@ -13,6 +14,17 @@ import type {
 
 type ControllerInternals = {
   runService: ControlPlaneSessionRunService;
+  createEngineHost: (
+    args: Record<string, unknown>,
+    publisher: {
+      publishActivity: (activity: unknown) => void;
+      publishApprovalUpdated: () => void;
+    },
+  ) => {
+    approvals?: {
+      requestToolApproval: (args: { call: ToolCall; tool: ToolDefinition }) => Promise<{ approved: boolean; reason?: string }>;
+    };
+  };
   runEngineTurn: (
     args: Record<string, unknown>,
     runContext: ControlPlaneSessionRunContext,
@@ -109,6 +121,57 @@ describe('ControlPlaneChatSessionsController run cancellation', () => {
 
     expect(observedShouldStop).toEqual([false, true]);
     expect(controller.isRunning({ workspaceId, sessionId })).toBe(false);
+  });
+
+  it('publishes approval state changes after pending approval storage is queryable', async () => {
+    const controller = new ControlPlaneChatSessionsController();
+    const internals = controller as unknown as ControllerInternals;
+    const workspaceId = 'workspace-approval-state';
+    const sessionId = 'session-approval-state';
+    const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-control-plane-approval-'));
+    const publisher = {
+      publishActivity: vi.fn(),
+      publishApprovalUpdated: vi.fn(),
+    };
+    const host = internals.createEngineHost({
+      workspaceId,
+      sessionId,
+      workspaceRoot: stateRoot,
+      stateRoot,
+    }, publisher);
+
+    const approval = host.approvals?.requestToolApproval({
+      call: {
+        id: 'call-approval-state',
+        tool: 'run_shell_mutate',
+        input: { command: 'touch approval-state.txt' },
+      },
+      tool: {
+        name: 'run_shell_mutate',
+        description: 'mutates workspace',
+        requiresApproval: true,
+        parameters: {},
+        execute: async () => ({ ok: true }),
+      },
+    });
+    await Promise.resolve();
+
+    expect(controller.getPendingApproval({ workspaceId, sessionId })).toEqual(expect.objectContaining({
+      callId: 'call-approval-state',
+      tool: 'run_shell_mutate',
+    }));
+    expect(publisher.publishApprovalUpdated).toHaveBeenCalledTimes(1);
+
+    expect(controller.resolvePendingApproval({ workspaceId, sessionId }, {
+      type: 'approve',
+      reason: 'Approved in test',
+    })).toBe(true);
+    await expect(approval).resolves.toEqual({
+      approved: true,
+      reason: 'Approved in test',
+    });
+    expect(controller.getPendingApproval({ workspaceId, sessionId })).toBeUndefined();
+    expect(publisher.publishApprovalUpdated).toHaveBeenCalledTimes(2);
   });
 });
 

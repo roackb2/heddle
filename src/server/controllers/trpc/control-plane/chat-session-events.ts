@@ -1,6 +1,6 @@
 import type { EventEmitter } from 'node:events';
 import type { ConversationActivity } from '@/core/live/index.js';
-import type { ControlPlaneSessionLiveEvent } from '@/server/control-plane-types.js';
+import type { ControlPlaneSessionEventEnvelope, ControlPlaneSessionLiveEvent } from '@/server/control-plane-types.js';
 
 export class ControlPlaneChatSessionEventsController {
   static emitSessionActivities(args: {
@@ -40,6 +40,14 @@ export class ControlPlaneChatSessionEventsController {
       },
 
       publishActivities,
+
+      publishApprovalUpdated() {
+        args.eventBus.emit(ControlPlaneChatSessionEventsController.sessionAddressKey(args), {
+          type: 'session.approval.updated',
+          sessionId: args.sessionId,
+          timestamp: new Date().toISOString(),
+        } satisfies ControlPlaneSessionEventEnvelope);
+      },
     };
 
     return publisher;

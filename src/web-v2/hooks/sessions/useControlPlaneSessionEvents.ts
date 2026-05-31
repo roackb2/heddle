@@ -60,6 +60,11 @@ export function useControlPlaneSessionEvents({
       return;
     }
 
+    if (event.type === 'session.approval.updated') {
+      refreshPendingApproval(event.sessionId);
+      return;
+    }
+
     if (event.type !== 'session.event') {
       return;
     }

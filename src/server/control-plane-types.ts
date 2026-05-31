@@ -185,6 +185,11 @@ export type ControlPlaneSessionLiveEvent = {
 export type ControlPlaneSessionEventEnvelope =
   | (ControlPlaneSessionLiveEvent & { type: 'session.event' })
   | {
+    type: 'session.approval.updated';
+    sessionId: string;
+    timestamp: string;
+  }
+  | {
     type: 'session.updated' | 'waiting';
     sessionId: string;
     timestamp: string;

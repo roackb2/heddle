@@ -253,7 +253,7 @@ export class ControlPlaneChatSessionsController {
 
   subscribeToEvents(
     sessionAddress: ControlPlaneSessionAddress,
-    listener: (event: ControlPlaneSessionLiveEvent) => void,
+    listener: (event: ControlPlaneSessionLiveEvent | Extract<ControlPlaneSessionEventEnvelope, { type: 'session.approval.updated' }>) => void,
   ): () => void {
     const key = ControlPlaneChatSessionsController.sessionAddressKey(sessionAddress);
     this.sessionEventBus.on(key, listener);
@@ -275,6 +275,11 @@ export class ControlPlaneChatSessionsController {
         // bus. This path streams assistant text without touching the session
         // file for each model delta.
         (sink) => this.subscribeToEvents(args, (event) => {
+          if ('type' in event) {
+            sink.push(event);
+            return;
+          }
+
           sink.push({
             ...event,
             type: 'session.event',
@@ -575,9 +580,11 @@ export class ControlPlaneChatSessionsController {
                 approval: request,
                 resolve,
               });
+              publisher.publishApprovalUpdated();
             },
           });
           this.runService.clearPendingApproval(args);
+          publisher.publishApprovalUpdated();
           return decision;
         },
       },

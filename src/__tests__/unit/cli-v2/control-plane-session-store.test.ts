@@ -347,6 +347,32 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('refreshes pending approval from control-plane approval state events', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+    fixture.calls.sessionPendingApprovalQuery.mockClear();
+    fixture.calls.sessionPendingApprovalQuery.mockResolvedValueOnce(createPendingApproval());
+
+    fixture.sessionEvents?.onData?.({
+      type: 'session.approval.updated',
+      sessionId: 'session-1',
+      timestamp: new Date().toISOString(),
+    });
+    await vi.waitFor(() => {
+      expect(store.getSnapshot().pendingApproval).toEqual(expect.objectContaining({
+        callId: 'call-1',
+        tool: 'run_shell_mutate',
+      }));
+    });
+
+    expect(fixture.calls.sessionPendingApprovalQuery).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      id: 'session-1',
+    });
+    store.dispose();
+  });
+
   it('applies live assistant stream events from the session subscription', async () => {
     const fixture = createClientFixture();
     const store = new ControlPlaneSessionStore({ client: fixture.client });
@@ -697,6 +723,16 @@ function createClientFixture() {
     get sessionsEvents() {
       return sessionsEvents;
     },
+  };
+}
+
+function createPendingApproval(): NonNullable<ControlPlanePendingApproval> {
+  return {
+    tool: 'run_shell_mutate',
+    callId: 'call-1',
+    input: { command: 'touch queued.txt' },
+    requestedAt: new Date().toISOString(),
+    summary: 'run shell command',
   };
 }
 
