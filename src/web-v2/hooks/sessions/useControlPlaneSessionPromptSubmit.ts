@@ -97,6 +97,7 @@ export function useControlPlaneSessionPromptSubmit({
         utils.controlPlane.sessions.invalidate({ workspaceId: submission.workspaceId }),
         utils.controlPlane.session.invalidate({ id: submission.sessionId, workspaceId: submission.workspaceId }),
         utils.controlPlane.sessionRunState.invalidate({ id: submission.sessionId, workspaceId: submission.workspaceId }),
+        utils.controlPlane.sessionRuntimeContext.invalidate({ sessionId: submission.sessionId, workspaceId: submission.workspaceId }),
       ]).catch(() => undefined);
 
       if (isCurrentSubmission()) {
@@ -116,6 +117,7 @@ export function useControlPlaneSessionPromptSubmit({
     sessionSendPromptMutation,
     utils.controlPlane.session,
     utils.controlPlane.sessionRunState,
+    utils.controlPlane.sessionRuntimeContext,
     utils.controlPlane.sessions,
   ]);
 

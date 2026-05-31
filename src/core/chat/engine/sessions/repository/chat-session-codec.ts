@@ -3,10 +3,10 @@
  *
  * The schema file owns the JSON contract. This class owns the read/write
  * behavior around that contract: graceful read degradation, strict write
- * validation, catalog projection, and fallback visible messages.
+ * validation, catalog projection, and compatibility cleanup for legacy visible
+ * welcome messages.
  */
 import type { ChatSession } from '@/core/chat/types.js';
-import { ChatSessionRecords } from '../records/index.js';
 import {
   CatalogEntryReadSchema,
   CatalogEntryWriteSchema,
@@ -34,7 +34,7 @@ export class ChatSessionCodec {
 
   static parseSessionBody(
     value: unknown,
-    args: { entry: ChatSessionCatalogEntry; apiKeyPresent: boolean },
+    args: { entry: ChatSessionCatalogEntry },
   ): ChatSession[] {
     const parsed = SessionBodyReadSchema.safeParse(value);
     if (!parsed.success) {
@@ -45,7 +45,7 @@ export class ChatSessionCodec {
       ...parsed.data,
       ...args.entry,
       history: parsed.data.history ?? [],
-      messages: ChatSessionCodec.resolveMessages(parsed.data.messages, args.apiKeyPresent),
+      messages: ChatSessionCodec.resolveMessages(parsed.data.messages),
       turns: parsed.data.turns ?? [],
     }];
   }
@@ -87,8 +87,7 @@ export class ChatSessionCodec {
 
   private static resolveMessages(
     messages: ConversationLineValue[] | undefined,
-    apiKeyPresent: boolean,
   ): ConversationLineValue[] {
-    return messages && messages.length > 0 ? messages : ChatSessionRecords.createInitialMessages(apiKeyPresent);
+    return (messages ?? []).filter((message) => message.id !== 'intro' && message.id !== 'missing-key');
   }
 }

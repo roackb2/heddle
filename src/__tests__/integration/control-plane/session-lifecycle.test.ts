@@ -265,6 +265,11 @@ describe('control-plane session lifecycle API', () => {
       contextWindow: 400000,
       driftEnabled: true,
       running: false,
+      welcomeGuide: {
+        mode: 'conversation',
+        hasProviderCredential: expect.any(Boolean),
+        carriesTranscriptAcrossTurns: true,
+      },
     });
   });
 

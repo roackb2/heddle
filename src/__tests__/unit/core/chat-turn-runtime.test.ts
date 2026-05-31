@@ -242,7 +242,7 @@ describe('chat turn preparation modules', () => {
       archivePath: '.heddle/chat-sessions/session-1/archives/archive-1.jsonl',
     });
 
-    const nextSession = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list(true)[0];
+    const nextSession = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list()[0];
     expect(nextSession?.context?.compaction?.status).toBe('running');
     expect(nextSession?.context?.archive?.lastArchivePath).toBe('.heddle/chat-sessions/session-1/archives/archive-1.jsonl');
     expect(nextSession?.lease).toEqual(leasedSession.lease);
@@ -278,7 +278,7 @@ describe('chat turn preparation modules', () => {
       },
     });
 
-    const persisted = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list(true)[0];
+    const persisted = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list()[0];
     expect(preparedSession.session.history).toHaveLength(2);
     expect(persisted?.history).toEqual(preparedSession.session.history);
     expect(persisted?.messages.map((message) => message.text)).toEqual(['Earlier prompt', 'Earlier answer']);
@@ -317,7 +317,7 @@ describe('chat turn preparation modules', () => {
       },
     });
 
-    const persisted = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list(true)[0];
+    const persisted = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list()[0];
     expect(persisted?.messages).toEqual([
       expect.objectContaining({ role: 'user', text: 'Earlier prompt' }),
       expect.objectContaining({ role: 'assistant', text: 'Earlier answer' }),
@@ -362,7 +362,7 @@ describe('chat turn preparation modules', () => {
       },
     });
 
-    const persisted = new FileChatSessionRepository({ sessionStoragePath }).list(true)[0];
+    const persisted = new FileChatSessionRepository({ sessionStoragePath }).list()[0];
     expect(persisted?.messages).toEqual([
       expect.objectContaining({ role: 'user', text: 'Repeat this prompt' }),
       expect.objectContaining({ role: 'assistant', text: 'Earlier answer' }),

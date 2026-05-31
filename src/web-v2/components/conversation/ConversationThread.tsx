@@ -5,6 +5,7 @@ import type {
   ControlPlanePendingApproval,
   ControlPlaneSessionDetail,
 } from '@web/hooks/sessions/useControlPlaneSessionDetail';
+import type { ControlPlaneSessionRuntimeContext } from '@web/api/client';
 import { useConversationAutoScroll } from '@web/hooks/conversation/useConversationAutoScroll';
 import type { ClientSharedSessionPlan } from '@/client-shared/services/session-activities';
 import type {
@@ -16,6 +17,7 @@ import { AgentPlanPanel } from './AgentPlanPanel';
 import { ApprovalPanel } from './ApprovalPanel';
 import { ConversationComposer } from './ConversationComposer';
 import { ConversationMessage } from './ConversationMessage';
+import { ConversationWelcomePanel } from './ConversationWelcomePanel';
 import { Loader2 } from 'lucide-react';
 
 interface ConversationThreadProps {
@@ -29,6 +31,7 @@ interface ConversationThreadProps {
   currentActivity?: ClientSharedAgentActivityStatus;
   latestUpdate?: ClientSharedSessionLatestUpdate;
   activePlan?: ClientSharedSessionPlan;
+  runtimeContext?: ControlPlaneSessionRuntimeContext;
   pendingApproval: ControlPlanePendingApproval;
   approvalResolving: boolean;
   approvalError?: string;
@@ -56,6 +59,7 @@ export function ConversationThread({
   currentActivity,
   latestUpdate,
   activePlan,
+  runtimeContext,
   pendingApproval,
   approvalResolving,
   approvalError,
@@ -70,6 +74,8 @@ export function ConversationThread({
   onUpdateReasoningEffort,
   onResolveApproval,
 }: ConversationThreadProps) {
+  const hasUserMessage = session?.messages.some((message) => message.role === 'user') ?? false;
+  const showWelcome = Boolean(runtimeContext?.welcomeGuide && !hasUserMessage && !submitting);
   const conversationAutoScroll = useConversationAutoScroll({
     liveStatus,
     messages: session?.messages ?? [],
@@ -113,12 +119,15 @@ export function ConversationThread({
         className="v2-conversation-scroll v2-scrollbar-hidden min-h-0 flex-1 overflow-auto"
         {...conversationAutoScroll.scrollContainerProps}
       >
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-6 py-8">
+        <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-5 px-6 py-8">
           {loading ? (
             <div className="v2-type-panel-subtitle inline-flex items-center gap-2 text-muted-foreground">
               <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
               Updating conversation...
             </div>
+          ) : null}
+          {showWelcome && runtimeContext?.welcomeGuide ? (
+            <ConversationWelcomePanel welcomeGuide={runtimeContext.welcomeGuide} />
           ) : null}
           {session.messages.map((message) => (
             <ConversationMessage key={message.id} message={message} />

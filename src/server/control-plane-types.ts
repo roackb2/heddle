@@ -150,6 +150,12 @@ export type ChatSessionDetail = ChatSessionView & {
   lastContinuePrompt?: string;
 };
 
+export type ControlPlaneSessionWelcomeGuide = {
+  mode: 'conversation';
+  hasProviderCredential: boolean;
+  carriesTranscriptAcrossTurns: boolean;
+};
+
 export type ControlPlaneSessionRuntimeContext = {
   workspaceId: string;
   sessionId: string;
@@ -166,6 +172,7 @@ export type ControlPlaneSessionRuntimeContext = {
   driftLevel?: ChatSessionView['driftLevel'];
   compactionStatus?: NonNullable<NonNullable<ChatSessionView['context']>['compaction']>['status'];
   running: boolean;
+  welcomeGuide: ControlPlaneSessionWelcomeGuide;
 };
 
 export type ControlPlaneAcceptedSessionRun = {

@@ -68,7 +68,7 @@ export async function submitChatPrompt(args: SubmitChatPromptArgs): Promise<void
     renameSession: args.renameSession,
     removeSession: args.closeSession,
     clearConversation: () => {
-      args.sessionService.resetConversation(args.activeSessionId, { apiKeyPresent: args.apiKeyPresent });
+      args.sessionService.resetConversation(args.activeSessionId);
       args.refreshSessions();
     },
     compactConversation: () => {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ControlPlaneSessionDetail } from '@web/api/client';
+import type { ControlPlaneSessionDetail, ControlPlaneSessionRuntimeContext } from '@web/api/client';
 import {
   type ClientSharedAgentActivityStatus,
   type ClientSharedSessionLatestUpdate,
@@ -10,6 +10,7 @@ import { useControlPlaneSessionLoader } from './useControlPlaneSessionLoader';
 import { useControlPlanePendingApproval } from './useControlPlanePendingApproval';
 import { useControlPlaneSessionPromptSubmit } from './useControlPlaneSessionPromptSubmit';
 import { useControlPlaneSessionRunControl } from './useControlPlaneSessionRunControl';
+import { useControlPlaneSessionRuntimeContext } from './useControlPlaneSessionRuntimeContext';
 import { useControlPlaneSessionSettings } from './useControlPlaneSessionSettings';
 
 export type { ControlPlaneApprovalDecision, ControlPlanePendingApproval, ControlPlaneSessionDetail } from '@web/api/client';
@@ -26,6 +27,7 @@ type ControlPlaneSessionDetailState = {
   currentActivity?: ClientSharedAgentActivityStatus;
   latestUpdate?: ClientSharedSessionLatestUpdate;
   activePlan?: ClientSharedSessionPlan;
+  runtimeContext?: ControlPlaneSessionRuntimeContext;
   cancelError?: string;
   pendingApproval: ReturnType<typeof useControlPlanePendingApproval>['pendingApproval'];
   approvalResolving: boolean;
@@ -62,6 +64,11 @@ export function useControlPlaneSessionDetail({
     sessionId,
     setLiveStatus,
     setError: loader.setError,
+  });
+  const runtimeContext = useControlPlaneSessionRuntimeContext({
+    workspaceId,
+    sessionId,
+    running: runControl.running,
   });
   const approval = useControlPlanePendingApproval({ workspaceId, sessionId }, {
     pollingEnabled: runControl.running,
@@ -111,6 +118,7 @@ export function useControlPlaneSessionDetail({
     currentActivity,
     latestUpdate,
     activePlan,
+    runtimeContext: runtimeContext.runtimeContext,
     cancelError: runControl.cancelError,
     pendingApproval: approval.pendingApproval,
     approvalResolving: approval.approvalResolving,
@@ -142,6 +150,7 @@ export function useControlPlaneSessionDetail({
     runControl.cancelRun,
     runControl.cancelling,
     runControl.running,
+    runtimeContext.runtimeContext,
     settings.modelOptions,
     settings.settingsError,
     settings.settingsUpdating,

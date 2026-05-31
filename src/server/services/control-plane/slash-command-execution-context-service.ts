@@ -77,9 +77,7 @@ export class ControlPlaneSlashCommandExecutionContextService {
           sessions.delete(id);
         },
         clear: () => {
-          sessions.resetConversation(args.sessionId, {
-            apiKeyPresent: runtimeContext.credentialSource.type !== 'missing',
-          });
+          sessions.resetConversation(args.sessionId);
         },
         summarize: ChatSessionRecords.summarize,
       },

@@ -165,7 +165,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
 
   static clearLeaseFromStorage(sessionStoragePath: string, sessionId: string, owner: ChatSessionLeaseOwner): void {
     const repository = new FileChatSessionRepository({ sessionStoragePath });
-    const sessions = repository.list(true);
+    const sessions = repository.list();
     const session = sessions.find((candidate) => candidate.id === sessionId);
     if (!session?.lease) {
       return;

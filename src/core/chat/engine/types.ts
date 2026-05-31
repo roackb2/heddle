@@ -69,7 +69,7 @@ export type ConversationSessionService = {
   markAcceptedUserMessageFailed(id: string, input: MarkAcceptedConversationUserMessageFailedInput): ChatSession;
 
   // Conversation state
-  resetConversation(id: string, input: ResetConversationSessionInput): ChatSession;
+  resetConversation(id: string): ChatSession;
   setLastContinuePrompt(id: string, prompt: string | undefined): ChatSession;
 
   // Compaction state
@@ -89,7 +89,6 @@ export type CreateConversationSessionInput = {
   model?: string;
   reasoningEffort?: ReasoningEffort;
   workspaceId?: string;
-  apiKeyPresent?: boolean;
   retention?: ChatSessionRetention;
 };
 
@@ -130,10 +129,6 @@ export type AcceptConversationUserMessageInput = MarkAcceptedConversationUserMes
 export type MarkAcceptedConversationUserMessageFailedInput = {
   runId: string;
   failureMessage: AppendConversationMessageInput;
-};
-
-export type ResetConversationSessionInput = {
-  apiKeyPresent: boolean;
 };
 
 export type MarkConversationCompactionRunningInput = {

@@ -62,7 +62,7 @@ describe('chat turn memory maintenance helpers', () => {
       'memory.candidate_recorded',
       'memory.maintenance_finished',
     ]);
-    expect(new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list(true)[0]?.turns[0]?.events).toEqual([
+    expect(new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list()[0]?.turns[0]?.events).toEqual([
       'memory candidate recorded: candidate-1',
       'memory maintenance finished: done',
     ]);

@@ -22,7 +22,6 @@ export type {
   ConversationTurnService,
   CreateConversationSessionInput,
   ContinueConversationTurnInput,
-  ResetConversationSessionInput,
   SubmitConversationTurnInput,
   SubmitConversationTurnResult,
   UpdateConversationSessionSettingsInput,

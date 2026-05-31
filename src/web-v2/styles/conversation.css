@@ -162,6 +162,50 @@
     color: color-mix(in oklab, var(--color-destructive) 82%, var(--color-foreground));
   }
 
+  .v2-conversation-welcome {
+    display: flex;
+    min-height: 18rem;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
+    padding-block: 2rem;
+  }
+
+  .v2-conversation-welcome-copy {
+    width: min(100%, 32rem);
+    text-align: center;
+  }
+
+  .v2-conversation-welcome-kicker {
+    margin-bottom: 0.45rem;
+    color: var(--color-muted-foreground);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .v2-conversation-welcome-title {
+    margin-bottom: 0.65rem;
+    color: var(--color-foreground);
+    font-size: 1.35rem;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  .v2-conversation-welcome-body,
+  .v2-conversation-welcome-note {
+    margin-inline: auto;
+    max-width: 28rem;
+    color: var(--color-muted-foreground);
+    font-size: 0.9375rem;
+    line-height: 1.55;
+  }
+
+  .v2-conversation-welcome-note {
+    margin-top: 0.85rem;
+    color: color-mix(in oklab, var(--color-warning, hsl(45 92% 70%)) 74%, var(--color-foreground));
+  }
+
   .v2-agent-activity-region {
     padding: 0 1.5rem 0.45rem;
   }

@@ -144,6 +144,7 @@ export function useControlPlaneAppState() {
         currentActivity: selectedSession.currentActivity,
         latestUpdate: selectedSession.latestUpdate,
         activePlan: selectedSession.activePlan,
+        runtimeContext: selectedSession.runtimeContext,
         pendingApproval: selectedSession.pendingApproval,
         approvalResolving: selectedSession.approvalResolving,
         approvalError: selectedSession.approvalError,

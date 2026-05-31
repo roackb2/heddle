@@ -35,7 +35,6 @@ export function useChatAppController({
     removeSession,
   } = useChatSessions({
     sessionCatalogFile: runtime.sessionCatalogFile,
-    apiKeyPresent: runtime.providerCredentialPresent,
     defaultModel: runtime.model,
     workspaceRoot: runtime.workspaceRoot,
     stateRoot: runtime.stateRoot,

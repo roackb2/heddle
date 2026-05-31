@@ -116,7 +116,7 @@ describe('chat turn persistence', () => {
       credentialSource: { type: 'explicit-api-key' },
     });
 
-    const stored = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list(true)[0];
+    const stored = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list()[0];
     expect(stored?.id).toBe(session.id);
     expect(stored?.lastContinuePrompt).toBe('Persist this turn.');
     expect(stored?.messages.map((message) => message.text)).toEqual(['Persist this turn.', 'Done.']);
@@ -168,7 +168,7 @@ describe('chat turn persistence', () => {
       credentialSource: { type: 'explicit-api-key' },
     });
 
-    const stored = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list(true)[0];
+    const stored = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list()[0];
     expect(stored?.messages).toEqual([
       expect.objectContaining({
         role: 'user',

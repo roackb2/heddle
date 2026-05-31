@@ -14,7 +14,7 @@ import type { ConversationTurnRuntimeConfig } from '../runtime/index.js';
  */
 export class ConversationTurnContextBuilder {
   static build(args: PrepareConversationTurnContextArgs): ConversationTurnContext {
-    const sessions = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath }).list(true);
+    const sessions = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath }).list();
     const session = sessions.find((candidate) => candidate.id === args.sessionId);
     if (!session) {
       throw new Error(`Chat session not found: ${args.sessionId}`);

@@ -28,9 +28,9 @@ export type SessionStoragePaths = {
 };
 
 export type ChatSessionRepository = {
-  list(apiKeyPresent: boolean): ChatSession[];
+  list(): ChatSession[];
   readCatalog(): ChatSessionCatalogEntry[];
-  read(sessionId: string, apiKeyPresent: boolean): ChatSession | undefined;
+  read(sessionId: string): ChatSession | undefined;
   save(sessions: ChatSession[]): void;
   deriveStoragePaths(): SessionStoragePaths;
 };

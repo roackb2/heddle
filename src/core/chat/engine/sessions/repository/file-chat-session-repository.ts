@@ -25,8 +25,8 @@ export class FileChatSessionRepository implements ChatSessionRepository {
     this.storagePaths = FileChatSessionRepository.deriveStoragePaths(args.sessionStoragePath);
   }
 
-  list(apiKeyPresent: boolean): ChatSession[] {
-    const resolved = this.loadFromCurrentStorage(apiKeyPresent);
+  list(): ChatSession[] {
+    const resolved = this.loadFromCurrentStorage();
     if (resolved.length > 0) {
       return resolved;
     }
@@ -35,7 +35,6 @@ export class FileChatSessionRepository implements ChatSessionRepository {
       ChatSessionRecords.create({
         id: 'session-1',
         name: 'Session 1',
-        apiKeyPresent,
       }),
     ];
   }
@@ -45,7 +44,7 @@ export class FileChatSessionRepository implements ChatSessionRepository {
     return catalog?.sessions.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)) ?? [];
   }
 
-  read(sessionId: string, apiKeyPresent: boolean): ChatSession | undefined {
+  read(sessionId: string): ChatSession | undefined {
     const paths = this.deriveStoragePaths();
     const catalog = FileChatSessionRepository.readCatalogFile(paths.catalogPath);
     const entry = catalog?.sessions.find((candidate) => candidate.id === sessionId);
@@ -53,7 +52,7 @@ export class FileChatSessionRepository implements ChatSessionRepository {
       return undefined;
     }
 
-    return FileChatSessionRepository.readSessionFile(paths.sessionsDir, entry, apiKeyPresent)[0];
+    return FileChatSessionRepository.readSessionFile(paths.sessionsDir, entry)[0];
   }
 
   save(sessions: ChatSession[]): void {
@@ -118,11 +117,11 @@ export class FileChatSessionRepository implements ChatSessionRepository {
     };
   }
 
-  private loadFromCurrentStorage(apiKeyPresent: boolean): ChatSession[] {
-    return this.loadSessionsFromCatalog(this.deriveStoragePaths(), apiKeyPresent);
+  private loadFromCurrentStorage(): ChatSession[] {
+    return this.loadSessionsFromCatalog(this.deriveStoragePaths());
   }
 
-  private loadSessionsFromCatalog(paths: SessionStoragePaths, apiKeyPresent: boolean): ChatSession[] {
+  private loadSessionsFromCatalog(paths: SessionStoragePaths): ChatSession[] {
     if (!existsSync(paths.catalogPath)) {
       return [];
     }
@@ -135,7 +134,7 @@ export class FileChatSessionRepository implements ChatSessionRepository {
       }
 
       const sessions = catalog.sessions.flatMap((entry) =>
-        FileChatSessionRepository.readSessionFile(paths.sessionsDir, entry, apiKeyPresent),
+        FileChatSessionRepository.readSessionFile(paths.sessionsDir, entry),
       );
       return sessions.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
     } catch (error) {
@@ -149,7 +148,6 @@ export class FileChatSessionRepository implements ChatSessionRepository {
   private static readSessionFile(
     sessionsDir: string,
     entry: ChatSessionCatalogEntry,
-    apiKeyPresent: boolean,
   ): ChatSession[] {
     const path = FileChatSessionRepository.sessionFilePath(sessionsDir, entry.id);
     if (!existsSync(path)) {
@@ -158,7 +156,7 @@ export class FileChatSessionRepository implements ChatSessionRepository {
 
     try {
       const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
-      return ChatSessionCodec.parseSessionBody(parsed, { entry, apiKeyPresent });
+      return ChatSessionCodec.parseSessionBody(parsed, { entry });
     } catch (error) {
       process.stderr.write(
         `Failed to load chat session file ${path}: ${error instanceof Error ? error.message : String(error)}\n`,

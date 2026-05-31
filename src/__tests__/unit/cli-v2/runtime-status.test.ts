@@ -49,6 +49,11 @@ function createSnapshot(overrides: Partial<ControlPlaneSessionStoreSnapshot> = {
       contextWindow: 400000,
       driftEnabled: false,
       running: false,
+      welcomeGuide: {
+        mode: 'conversation',
+        hasProviderCredential: true,
+        carriesTranscriptAcrossTurns: true,
+      },
     },
     pendingApproval: null,
     loading: false,

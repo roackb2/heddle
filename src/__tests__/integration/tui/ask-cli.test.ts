@@ -61,7 +61,7 @@ describe('AskCliHost.run', () => {
     const catalog = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).readCatalog();
     expect(catalog).toHaveLength(1);
     expect(catalog[0]?.retention).toBe('one_off');
-    const session = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(catalog[0]!.id, true);
+    const session = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(catalog[0]!.id);
     expect(session?.retention).toBe('one_off');
     expect(session?.history).toEqual(result.transcript);
     expect(session?.turns).toHaveLength(1);
@@ -103,7 +103,7 @@ describe('AskCliHost.run', () => {
     expect(catalog[0]?.name).toBe('Ask test session');
     expect(catalog[0]?.retention).toBe('reusable');
 
-    const session = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(catalog[0]!.id, true);
+    const session = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(catalog[0]!.id);
     expect(session?.retention).toBe('reusable');
     expect(session?.history).toEqual(result.transcript);
     expect(session?.turns).toHaveLength(1);
@@ -166,7 +166,7 @@ describe('AskCliHost.run', () => {
       sessionId: existingSession.id,
     });
 
-    const updated = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(existingSession.id, true);
+    const updated = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(existingSession.id);
     expect(runAgentLoopSpy).toHaveBeenCalledTimes(1);
     expect(updated?.history).toEqual(result.transcript);
     expect(updated?.turns).toHaveLength(1);
@@ -299,7 +299,7 @@ describe('AskCliHost.run', () => {
 
     expect(compactionSpy).toHaveBeenCalledTimes(2);
     expect(runAgentLoopSpy).toHaveBeenCalledTimes(1);
-    expect(new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(existingSession.id, true)?.archives).toHaveLength(1);
+    expect(new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(existingSession.id)?.archives).toHaveLength(1);
   });
 
   it('attaches default ask to a live daemon host through a persisted one-off session', async () => {
@@ -358,7 +358,7 @@ describe('AskCliHost.run', () => {
     const catalog = sessionRepository.readCatalog();
     expect(catalog).toHaveLength(1);
     expect(catalog[0]?.retention).toBe('one_off');
-    const session = sessionRepository.read(catalog[0]!.id, true);
+    const session = sessionRepository.read(catalog[0]!.id);
     expect(session?.history).toEqual(result.transcript);
     expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining(`Session: ${catalog[0]?.id}`));
     expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('Trace:'));

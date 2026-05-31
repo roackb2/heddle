@@ -18,7 +18,7 @@ describe('createConversationEngine', () => {
       outcome: 'done',
       summary: 'ok',
       session: new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
-        .read(args.sessionId, true) as ChatSession,
+        .read(args.sessionId) as ChatSession,
     }));
   });
 
@@ -57,10 +57,12 @@ describe('createConversationEngine', () => {
       model: 'gpt-5.4',
       workspaceId: 'workspace-1',
     }));
-    expect(sessionRepository.read(session.id, true)).toEqual(expect.objectContaining({
+    expect(sessionRepository.read(session.id)).toEqual(expect.objectContaining({
       id: session.id,
       model: 'gpt-5.4',
       workspaceId: 'workspace-1',
+      history: [],
+      messages: [],
     }));
   });
 
@@ -98,11 +100,11 @@ describe('createConversationEngine', () => {
     const sessionRepository = new FileChatSessionRepository({
       sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
     });
-    expect(sessionRepository.list(true).map((session) => session.id)).toEqual(['session-a']);
+    expect(sessionRepository.list().map((session) => session.id)).toEqual(['session-a']);
     expect(engine.sessions.delete(first.id)).toBe(true);
     expect(engine.sessions.delete('session-1')).toBe(true);
     expect(engine.sessions.delete('missing')).toBe(false);
-    expect(sessionRepository.list(true).map((session) => session.id)).toEqual(['session-1']);
+    expect(sessionRepository.list().map((session) => session.id)).toEqual(['session-1']);
   });
 
   it('updates shared session settings for TUI and control-plane clients', () => {
@@ -309,17 +311,14 @@ describe('createConversationEngine', () => {
     const withDrift = engine.sessions.setDriftEnabled(session.id, true);
     expect(withDrift.driftEnabled).toBe(true);
 
-    const reset = engine.sessions.resetConversation(session.id, { apiKeyPresent: false });
+    const reset = engine.sessions.resetConversation(session.id);
     expect(reset.history).toEqual([]);
     expect(reset.turns).toEqual([]);
     expect(reset.lastContinuePrompt).toBeUndefined();
-    expect(reset.messages.map((message) => message.id)).toEqual(['intro', 'missing-key']);
+    expect(reset.messages).toEqual([]);
     expect(engine.sessions.read(session.id)).toEqual(expect.objectContaining({
       driftEnabled: true,
-      messages: expect.arrayContaining([
-        expect.objectContaining({ id: 'intro' }),
-        expect.objectContaining({ id: 'missing-key' }),
-      ]),
+      messages: [],
     }));
   });
 
@@ -558,11 +557,11 @@ describe('createConversationEngine', () => {
     const sessionRepository = new FileChatSessionRepository({
       sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
     });
-    const stored = sessionRepository.read(session.id, true) as ChatSession;
+    const stored = sessionRepository.read(session.id) as ChatSession;
     stored.lastContinuePrompt = 'continue investigating';
     stored.history = [{ role: 'user', content: 'prior' }];
     stored.updatedAt = '2026-05-03T00:00:00.000Z';
-    const otherSessions = sessionRepository.list(true)
+    const otherSessions = sessionRepository.list()
       .filter((candidate) => candidate.id !== session.id);
     sessionRepository.save([stored, ...otherSessions]);
 
@@ -604,7 +603,7 @@ describe('createConversationEngine', () => {
     const sessionRepository = new FileChatSessionRepository({
       sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
     });
-    expect(sessionRepository.read('session-1', true)?.lease).toBeUndefined();
+    expect(sessionRepository.read('session-1')?.lease).toBeUndefined();
   });
 });
 

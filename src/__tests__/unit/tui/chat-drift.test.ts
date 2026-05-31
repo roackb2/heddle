@@ -30,7 +30,7 @@ describe('chat drift defaults and footer formatting', () => {
       updatedAt: '2026-04-13T00:00:00.000Z',
     }]));
 
-    const [session] = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).list(true);
+    const [session] = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).list();
 
     expect(session?.driftEnabled).toBe(false);
   });
@@ -49,7 +49,7 @@ describe('chat drift defaults and footer formatting', () => {
       driftEnabled: false,
     }]));
 
-    const [session] = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).list(true);
+    const [session] = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).list();
 
     expect(session?.driftEnabled).toBe(false);
   });

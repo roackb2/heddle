@@ -106,7 +106,7 @@ export function App({
         {snapshot.workspaceId ? `Workspace ${snapshot.workspaceId}` : 'Loading workspace...'}
         {snapshot.activeSession ? ` · ${snapshot.activeSession.name}` : ''}
       </Text>
-      <ConversationPanel session={snapshot.activeSession} />
+      <ConversationPanel runtimeContext={snapshot.runtimeContext} session={snapshot.activeSession} />
       <CommandResultPanel results={snapshot.commandResults} />
       {snapshot.pendingApproval ? (
         <ApprovalPanel

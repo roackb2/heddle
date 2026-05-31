@@ -255,7 +255,6 @@ export class AskCliHost {
       }).activeWorkspace;
       return options.engine.sessions.create({
         name: options.createSessionName.trim() || undefined,
-        apiKeyPresent: options.apiKeyPresent,
         model: options.model,
         workspaceId: workspace.id,
       });
@@ -279,7 +278,6 @@ export class AskCliHost {
     }).activeWorkspace;
     return options.engine.sessions.createOneOff({
       name: `Ask ${new Date().toISOString()}`,
-      apiKeyPresent: options.apiKeyPresent,
       model: options.model,
       workspaceId: workspace.id,
     });

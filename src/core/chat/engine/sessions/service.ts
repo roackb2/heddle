@@ -34,7 +34,6 @@ import type {
   MarkAcceptedConversationUserMessageFailedInput,
   MarkAcceptedConversationUserMessageInput,
   MarkConversationCompactionRunningInput,
-  ResetConversationSessionInput,
   RestoreConversationCompactionStateInput,
   UpdateConversationSessionSettingsInput,
 } from '../types.js';
@@ -87,11 +86,10 @@ export class FileConversationSessionService implements ConversationSessionServic
   }
 
   create(input?: CreateConversationSessionInput): ChatSession {
-    const existing = this.loadExistingSessions(input?.apiKeyPresent ?? this.config.apiKeyPresent);
+    const existing = this.loadExistingSessions();
     const session = ChatSessionRecords.create({
       id: input?.id?.trim() || `session-${randomUUID()}`,
       name: input?.name?.trim() || `Session ${FileConversationSessionService.getNextSessionNumber(existing)}`,
-      apiKeyPresent: input?.apiKeyPresent ?? this.config.apiKeyPresent,
       model: input?.model ?? this.config.model,
       reasoningEffort: input?.reasoningEffort ?? this.config.reasoningEffort,
       workspaceId: input?.workspaceId ?? this.config.workspaceId,
@@ -171,13 +169,13 @@ export class FileConversationSessionService implements ConversationSessionServic
     ));
   }
 
-  resetConversation(id: string, input: ResetConversationSessionInput): ChatSession {
+  resetConversation(id: string): ChatSession {
     return this.updateRequiredSession(id, (session) => ({
       ...session,
       history: [],
       turns: [],
       lastContinuePrompt: undefined,
-      messages: ChatSessionRecords.createInitialMessages(input.apiKeyPresent),
+      messages: [],
     }));
   }
 
@@ -290,21 +288,21 @@ export class FileConversationSessionService implements ConversationSessionServic
     return true;
   }
 
-  private loadSessions(apiKeyPresent = this.config.apiKeyPresent): ChatSession[] {
-    const sessions = this.repository.list(apiKeyPresent);
+  private loadSessions(): ChatSession[] {
+    const sessions = this.repository.list();
     if (this.repository.readCatalog().length === 0) {
-      const fallback = this.createFallbackSession(apiKeyPresent);
+      const fallback = this.createFallbackSession();
       this.repository.save([fallback]);
       return [fallback];
     }
     return sessions;
   }
 
-  private loadExistingSessions(apiKeyPresent = this.config.apiKeyPresent): ChatSession[] {
+  private loadExistingSessions(): ChatSession[] {
     const catalog = this.repository.readCatalog();
     if (catalog.length > 0) {
       return catalog
-        .map((entry) => this.repository.read(entry.id, apiKeyPresent))
+        .map((entry) => this.repository.read(entry.id))
         .filter((session): session is ChatSession => Boolean(session));
     }
 
@@ -323,11 +321,10 @@ export class FileConversationSessionService implements ConversationSessionServic
     return updated;
   }
 
-  private createFallbackSession(apiKeyPresent = this.config.apiKeyPresent): ChatSession {
+  private createFallbackSession(): ChatSession {
     return ChatSessionRecords.create({
       id: 'session-1',
       name: 'Session 1',
-      apiKeyPresent,
       model: this.config.model,
       reasoningEffort: this.config.reasoningEffort,
       workspaceId: this.config.workspaceId,
@@ -375,7 +372,6 @@ export class FileConversationSessionService implements ConversationSessionServic
       reasoningEffort: config.reasoningEffort,
       sessionStoragePath: resolve(config.sessionStoragePath ?? join(stateRoot, 'chat-sessions.catalog.json')),
       workspaceId: config.workspaceId,
-      apiKeyPresent: config.apiKeyPresent ?? false,
     };
   }
 

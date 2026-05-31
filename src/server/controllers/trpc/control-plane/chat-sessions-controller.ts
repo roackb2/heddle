@@ -112,20 +112,13 @@ export class ControlPlaneChatSessionsController {
   createSession(args: CreateControlPlaneChatSessionArgs): ChatSessionDetail {
     const { suggestedName, ...engineInput } = args;
     const model = this.resolveSessionCreationModel(args);
-    const credentialRuntime = {
-      preferApiKey: args.preferApiKey,
-      credentialStorePath: args.credentialStorePath,
-    };
-    const apiKeyPresent = args.apiKeyPresent ?? RuntimeCredentialService.hasCredentialForModel(model, credentialRuntime);
     const engine = createConversationEngine({
       ...engineInput,
       model,
-      apiKeyPresent,
     });
 
     const session = engine.sessions.create({
       name: suggestedName,
-      apiKeyPresent,
       model,
       workspaceId: args.workspaceId,
       retention: args.retention,
@@ -161,15 +154,7 @@ export class ControlPlaneChatSessionsController {
     const { sessionId, leaseOwner, ...engineInput } = args;
     const sessions = this.createEngine(engineInput).sessions;
     this.assertNoLeaseConflict(sessions, sessionId, leaseOwner);
-    const session = sessions.require(sessionId);
-    const model = session.model ?? args.model ?? DEFAULT_OPENAI_MODEL;
-    const updated = sessions.resetConversation(sessionId, {
-      apiKeyPresent: RuntimeCredentialService.hasCredentialForModel(model, {
-        apiKey: args.apiKey,
-        credentialStorePath: args.credentialStorePath,
-        preferApiKey: args.preferApiKey,
-      }),
-    });
+    const updated = sessions.resetConversation(sessionId);
     return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
   }
 
@@ -620,7 +605,7 @@ export class ControlPlaneChatSessionsController {
     // This is the only control-plane session path that should mutate the file
     // repository directly.
     const repository = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath });
-    const session = repository.read(args.sessionId, true);
+    const session = repository.read(args.sessionId);
     if (!session) {
       throw new Error(`Chat session not found: ${args.sessionId}`);
     }
@@ -654,7 +639,7 @@ export class ControlPlaneChatSessionsController {
 
     repository.save(
       repository.readCatalog()
-        .map((entry) => repository.read(entry.id, true))
+        .map((entry) => repository.read(entry.id))
         .filter((candidate): candidate is ChatSession => Boolean(candidate))
         .map((candidate) => candidate.id === session.id ? updatedSession : candidate),
     );

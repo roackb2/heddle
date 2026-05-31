@@ -20,13 +20,12 @@ import { FileConversationSessionService } from '../../../core/chat/engine/sessio
 
 type UseChatSessionsArgs = {
   sessionCatalogFile: string;
-  apiKeyPresent: boolean;
   defaultModel: string;
   workspaceRoot: string;
   stateRoot: string;
 };
 
-export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultModel, workspaceRoot, stateRoot }: UseChatSessionsArgs) {
+export function useChatSessions({ sessionCatalogFile, defaultModel, workspaceRoot, stateRoot }: UseChatSessionsArgs) {
   const workspaceId = useMemo(
     () => RuntimeWorkspaceService.resolveContext({ workspaceRoot, stateRoot }).activeWorkspace.id,
     [workspaceRoot, stateRoot],
@@ -42,10 +41,9 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
         stateRoot,
         sessionStoragePath: sessionCatalogFile,
         model: defaultModel,
-        apiKeyPresent,
         workspaceId,
       }),
-    [apiKeyPresent, defaultModel, sessionCatalogFile, stateRoot, workspaceId, workspaceRoot],
+    [defaultModel, sessionCatalogFile, stateRoot, workspaceId, workspaceRoot],
   );
   const initialSessions = useMemo(() => sessionService.list(), [sessionService]);
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions);
@@ -114,14 +112,13 @@ export function useChatSessions({ sessionCatalogFile, apiKeyPresent, defaultMode
     const nextSession = sessionService.create({
       id: `session-${Date.now()}`,
       name,
-      apiKeyPresent,
       ...nextPreferences,
       workspaceId,
     });
     setSessions(sessionService.list().slice(0, 24));
     setActiveSessionId(nextSession.id);
     return nextSession;
-  }, [apiKeyPresent, defaultModel, sessionService, workspaceId]);
+  }, [defaultModel, sessionService, workspaceId]);
 
   const renameSession = useCallback((name: string) => {
     sessionService.rename(activeSessionId, name);

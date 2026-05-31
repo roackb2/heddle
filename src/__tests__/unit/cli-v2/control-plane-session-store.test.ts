@@ -818,6 +818,11 @@ function createRuntimeContext(
     estimatedInputTokens: undefined,
     driftEnabled: false,
     running: false,
+    welcomeGuide: {
+      mode: 'conversation',
+      hasProviderCredential: true,
+      carriesTranscriptAcrossTurns: true,
+    },
     ...overrides,
   };
 }

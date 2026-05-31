@@ -54,6 +54,7 @@ export function useControlPlaneSessionSettings({
         utils.controlPlane.state.invalidate(),
         utils.controlPlane.sessions.invalidate({ workspaceId }),
         utils.controlPlane.session.invalidate({ id: sessionId, workspaceId }),
+        utils.controlPlane.sessionRuntimeContext.invalidate({ sessionId, workspaceId }),
       ]);
     } catch (settingsError) {
       setError(settingsError instanceof Error ? settingsError.message : String(settingsError));

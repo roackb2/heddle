@@ -656,7 +656,7 @@ describe('conversation turn lifecycle', () => {
       },
     })).rejects.toThrow('loop failed');
 
-    const persisted = new FileChatSessionRepository({ sessionStoragePath: storage.sessionStoragePath }).list(true)
+    const persisted = new FileChatSessionRepository({ sessionStoragePath: storage.sessionStoragePath }).list()
       .find((session) => session.id === storage.sessionId);
     expect(persisted?.lease).toBeUndefined();
     expect(persisted?.turns).toEqual([]);

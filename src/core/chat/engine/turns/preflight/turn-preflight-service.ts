@@ -18,7 +18,7 @@ import type {
 export class ConversationTurnPreflightService {
   static async prepare(args: PrepareChatSessionTurnArgs): Promise<PrepareChatSessionTurnResult> {
     const persistedSession = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
-      .read(args.sessionId, true);
+      .read(args.sessionId);
     const leaseConflict = persistedSession ? ChatSessionLeases.conflict(persistedSession, args.leaseOwner) : undefined;
     if (leaseConflict) {
       return {

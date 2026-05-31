@@ -29,7 +29,12 @@ export type ControlPlaneResolvedSessionRuntimeContext = {
 };
 
 /**
- * Resolves selected-session runtime facts once for API views and command ports.
+ * Owns selected-session runtime facts for control-plane consumers.
+ *
+ * Keep facts here when they describe the current executable session context
+ * rather than persisted transcript data: selected model, resolved credentials,
+ * model capabilities, context-window estimates, drift/run state, and empty
+ * session welcome facts. Interface layers decide how to render those facts.
  */
 export class ControlPlaneSessionRuntimeContextService {
   read(
@@ -51,6 +56,7 @@ export class ControlPlaneSessionRuntimeContextService {
     const session = sessions.require(args.sessionId);
     const model = session.model ?? args.model ?? DEFAULT_OPENAI_MODEL;
     const estimatedInputTokens = session.context?.request?.usage?.inputTokens ?? session.context?.request?.estimatedTokens;
+    const credentialSource = RuntimeCredentialService.resolveCredentialSourceForModel(model, args);
 
     return {
       args,
@@ -69,13 +75,18 @@ export class ControlPlaneSessionRuntimeContextService {
         }),
         reasoningSupported: ModelPolicyService.supportsReasoningEffort(model),
         reasoningOptions: ModelPolicyService.buildReasoningEffortOptions(model),
-        credentialSource: RuntimeCredentialService.resolveCredentialSourceForModel(model, args),
+        credentialSource,
         contextWindow: ModelCatalogService.estimateBuiltInContextWindow(model),
         estimatedInputTokens,
         driftEnabled: session.driftEnabled ?? false,
         driftLevel: options.driftLevel ?? ControlPlaneSessionDriftService.readLatestDriftLevel(session.turns),
         compactionStatus: session.context?.compaction?.status,
         running: options.running ?? false,
+        welcomeGuide: {
+          mode: 'conversation',
+          hasProviderCredential: credentialSource.type !== 'missing',
+          carriesTranscriptAcrossTurns: true,
+        },
       },
     };
   }

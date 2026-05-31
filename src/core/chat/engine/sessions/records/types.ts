@@ -7,7 +7,6 @@ import type { ChatSession, ChatSessionRetention, ConversationLine, TurnSummary }
 export type CreateChatSessionRecordOptions = {
   id: string;
   name: string;
-  apiKeyPresent: boolean;
   model?: string;
   reasoningEffort?: ReasoningEffort;
   workspaceId?: string;

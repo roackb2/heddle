@@ -14,7 +14,6 @@ describe('chat session storage layout', () => {
       ...ChatSessionRecords.create({
         id: 'session-1',
         name: 'Session 1',
-        apiKeyPresent: true,
         workspaceId: 'workspace-1',
       }),
       model: 'gpt-5.1-codex-mini',
@@ -40,7 +39,7 @@ describe('chat session storage layout', () => {
       sessions: Array<Record<string, unknown>>;
     };
     const storedCatalog = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).readCatalog();
-    const storedSession = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).read('session-1', true);
+    const storedSession = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).read('session-1');
 
     expect(catalog.version).toBe(1);
     expect(storedCatalog[0]).toEqual(expect.objectContaining({
@@ -112,7 +111,7 @@ describe('chat session storage layout', () => {
       ],
     }, null, 2));
 
-    const session = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).read('session-1', true);
+    const session = new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).read('session-1');
 
     expect(session).toEqual(expect.objectContaining({
       id: 'session-1',
@@ -132,6 +131,37 @@ describe('chat session storage layout', () => {
     }));
   });
 
+  it('drops legacy welcome assistant lines from visible session messages', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-legacy-welcome-'));
+    const sessionsFile = join(dir, 'chat-sessions.catalog.json');
+
+    writeFileSync(join(dir, 'chat-sessions.catalog.json'), JSON.stringify({
+      version: 1,
+      sessions: [{
+        id: 'session-1',
+        name: 'Session 1',
+        createdAt: '2026-04-13T00:00:00.000Z',
+        updatedAt: '2026-04-13T01:00:00.000Z',
+      }],
+    }, null, 2));
+    const sessionsDir = join(dir, 'chat-sessions');
+    mkdirSync(sessionsDir);
+    writeFileSync(join(sessionsDir, 'session-1.json'), JSON.stringify({
+      id: 'session-1',
+      history: [],
+      messages: [
+        { id: 'intro', role: 'assistant', text: 'Heddle conversational mode.' },
+        { id: 'missing-key', role: 'assistant', text: 'No provider credential detected.' },
+        { id: 'm1', role: 'assistant', text: 'real assistant output' },
+      ],
+      turns: [],
+    }, null, 2));
+
+    expect(new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).read('session-1')?.messages).toEqual([
+      { id: 'm1', role: 'assistant', text: 'real assistant output' },
+    ]);
+  });
+
   it('persists reasoning effort in catalog and per-session storage when configured', () => {
     const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-reasoning-'));
     const sessionsFile = join(dir, 'chat-sessions.catalog.json');
@@ -139,7 +169,6 @@ describe('chat session storage layout', () => {
       ...ChatSessionRecords.create({
         id: 'session-1',
         name: 'Session 1',
-        apiKeyPresent: true,
         workspaceId: 'workspace-1',
       }),
       model: 'gpt-5.5',
@@ -153,7 +182,7 @@ describe('chat session storage layout', () => {
       model: 'gpt-5.5',
       reasoningEffort: 'high',
     }));
-    expect(new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).read('session-1', true)).toEqual(expect.objectContaining({
+    expect(new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).read('session-1')).toEqual(expect.objectContaining({
       id: 'session-1',
       model: 'gpt-5.5',
       reasoningEffort: 'high',
@@ -166,7 +195,6 @@ describe('chat session storage layout', () => {
     const session = ChatSessionRecords.create({
       id: 'session-1',
       name: 'Session 1',
-      apiKeyPresent: true,
     });
 
     new FileChatSessionRepository({ sessionStoragePath: sessionsFile }).save([session]);

@@ -84,7 +84,7 @@ export class ConversationTurnMemoryMaintenance {
     writeFileSync(args.traceFile, `${JSON.stringify(nextTrace, null, 2)}\n`, 'utf8');
 
     const repository = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath });
-    const sessions = repository.list(true);
+    const sessions = repository.list();
     const nextSessions = sessions.map((session) => {
       if (session.id !== args.sessionId) {
         return session;
