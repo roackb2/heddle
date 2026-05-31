@@ -1,5 +1,6 @@
 export { AssistantMarkdown } from './AssistantMarkdown';
 export { AgentPlanPanel } from './AgentPlanPanel';
+export { AgentActivityStatus } from './AgentActivityStatus';
 export { ApprovalPanel } from './ApprovalPanel';
 export { ConversationComposer } from './ConversationComposer';
 export { ConversationMessage } from './ConversationMessage';

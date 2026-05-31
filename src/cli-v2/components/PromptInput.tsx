@@ -1,6 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
-import type { PromptActivityView } from '../services/activities/prompt-activity-service.js';
 
 export type PromptInputKey = {
   upArrow?: boolean;
@@ -17,7 +16,6 @@ export type PromptInputKey = {
 };
 
 export function PromptInput({
-  activity,
   disabled,
   placeholder,
   submitDisabled,
@@ -27,7 +25,6 @@ export function PromptInput({
   onComplete,
   onSpecialKey,
 }: {
-  activity?: PromptActivityView;
   disabled: boolean;
   placeholder: string;
   submitDisabled?: boolean;
@@ -81,7 +78,6 @@ export function PromptInput({
       <Box overflow="hidden">
         <Text dimColor wrap="truncate-end">{separator}</Text>
       </Box>
-      {activity ? <Text color={activity.color}>{activity.text}</Text> : null}
       <Box>
         <Text color="cyan">› </Text>
         <Text>{value || <Text dimColor>{placeholder}</Text>}</Text>

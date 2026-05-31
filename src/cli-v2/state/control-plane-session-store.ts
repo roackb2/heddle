@@ -1,6 +1,9 @@
 import type { ControlPlaneProxyClient } from '@/client-shared/api/proxy.js';
 import { ClientSharedSessionActivityService } from '@/client-shared/services/session-activities/index.js';
-import type { ClientSharedSessionPlan } from '@/client-shared/services/session-activities/index.js';
+import type {
+  ClientSharedAgentActivityStatus,
+  ClientSharedSessionPlan,
+} from '@/client-shared/services/session-activities/index.js';
 import { ClientSharedSessionMessageService } from '@/client-shared/services/session-messages/index.js';
 import {
   SessionActivityService,
@@ -66,6 +69,7 @@ export type ControlPlaneSessionStoreSnapshot = {
   cancelling: boolean;
   streamConnected: boolean;
   liveStatus?: string;
+  currentActivity?: ClientSharedAgentActivityStatus;
   activePlan?: ClientSharedSessionPlan;
   latestUpdate?: ControlPlaneSessionLatestUpdate;
   slashCommandCatalog?: ControlPlaneSlashCommandCatalog;
@@ -196,6 +200,7 @@ export class ControlPlaneSessionStore {
       runtimeContext: undefined,
       pendingApproval: null,
       liveStatus: undefined,
+      currentActivity: undefined,
       activePlan: undefined,
       latestUpdate: undefined,
       error: undefined,
@@ -249,6 +254,7 @@ export class ControlPlaneSessionStore {
       running: true,
       error: undefined,
       activePlan: undefined,
+      currentActivity: ClientSharedSessionActivityService.createThinkingStatus(),
       liveStatus: current.streamConnected
         ? 'Heddle is working...'
         : 'Heddle is working... reconnecting live stream if needed.',
@@ -272,6 +278,7 @@ export class ControlPlaneSessionStore {
         liveStatus: this.snapshotValue.streamConnected
           ? 'Heddle is working...'
           : 'Heddle is working... reconnecting live stream if needed.',
+        currentActivity: this.snapshotValue.currentActivity ?? ClientSharedSessionActivityService.createThinkingStatus(),
         latestUpdate: {
           label: 'Run accepted',
           detail: result.runId,
@@ -290,6 +297,7 @@ export class ControlPlaneSessionStore {
           liveStatus: this.snapshotValue.streamConnected
             ? 'A run is already in progress for this session.'
             : 'A run is already in progress for this session. Reconnecting live stream if needed.',
+          currentActivity: this.snapshotValue.currentActivity ?? ClientSharedSessionActivityService.createThinkingStatus(),
           latestUpdate: {
             label: 'Run already in progress',
             detail: 'waiting for current run to finish',
@@ -304,6 +312,7 @@ export class ControlPlaneSessionStore {
         running: false,
         submitting: false,
         liveStatus: undefined,
+        currentActivity: undefined,
       });
       await this.refreshSession(sessionId, { silent: true }).catch(() => undefined);
       this.assistantStreamBuffer.reset();
@@ -351,6 +360,7 @@ export class ControlPlaneSessionStore {
         running: result.cancelled ? running.running : false,
         cancelling: false,
         liveStatus: result.cancelled && running.running ? this.snapshotValue.liveStatus : undefined,
+        currentActivity: result.cancelled && running.running ? this.snapshotValue.currentActivity : undefined,
         latestUpdate: {
           label: result.cancelled ? 'Stop request accepted' : 'No active run to stop',
           tone: result.cancelled ? 'warning' : 'info',
@@ -361,6 +371,7 @@ export class ControlPlaneSessionStore {
         error: formatError(error),
         cancelling: false,
         liveStatus: undefined,
+        currentActivity: undefined,
       });
     }
   }
@@ -494,6 +505,7 @@ export class ControlPlaneSessionStore {
     this.setSnapshot({
       running: true,
       activePlan: undefined,
+      currentActivity: ClientSharedSessionActivityService.createThinkingStatus(),
       liveStatus: 'Heddle is continuing from the current transcript...',
     });
     await this.api.continueSession(workspaceId, sessionId);
@@ -508,6 +520,7 @@ export class ControlPlaneSessionStore {
     this.setSnapshot({
       running: true,
       activePlan: undefined,
+      currentActivity: ClientSharedSessionActivityService.createThinkingStatus(),
       liveStatus: this.snapshotValue.streamConnected
         ? 'Heddle is working...'
         : 'Heddle is working... reconnecting live stream if needed.',
@@ -564,6 +577,7 @@ export class ControlPlaneSessionStore {
           this.setSnapshot({
             running: true,
             liveStatus,
+            currentActivity: ClientSharedSessionActivityService.createThinkingStatus(runActivity.timestamp),
             latestUpdate: SessionActivityService.resolveLatestUpdate(runActivity),
           });
         },
@@ -572,6 +586,7 @@ export class ControlPlaneSessionStore {
           this.setSnapshot({
             running: false,
             ...(liveStatus !== undefined ? { liveStatus } : {}),
+            currentActivity: undefined,
             latestUpdate: SessionActivityService.resolveLatestUpdate(runActivity),
           });
           void this.refreshSession(event.sessionId, { silent: true });
@@ -585,6 +600,9 @@ export class ControlPlaneSessionStore {
         },
         onPlanCleared: () => {
           this.setSnapshot({ activePlan: undefined });
+        },
+        onCurrentActivityChanged: (currentActivity) => {
+          this.setSnapshot({ currentActivity });
         },
         onLiveStatus: (statusActivity, liveStatus) => {
           const latestUpdate = SessionActivityService.resolveLatestUpdate(statusActivity);
@@ -703,6 +721,7 @@ export class ControlPlaneSessionStore {
       submitting: false,
       liveStatus: undefined,
       activePlan: undefined,
+      currentActivity: undefined,
       latestUpdate: {
         label: 'Run finished',
         tone: 'success',

@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { trpcReact } from '@web/api/client';
+import {
+  ClientSharedSessionActivityService,
+  type ClientSharedAgentActivityStatus,
+} from '@/client-shared/services/session-activities';
 
 type UseControlPlaneSessionPromptSubmitArgs = {
   workspaceId?: string;
@@ -8,6 +12,7 @@ type UseControlPlaneSessionPromptSubmitArgs = {
   setRunning: Dispatch<SetStateAction<boolean>>;
   setError: Dispatch<SetStateAction<string | undefined>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
+  setCurrentActivity: Dispatch<SetStateAction<ClientSharedAgentActivityStatus | undefined>>;
 };
 
 export type ControlPlaneSessionPromptSubmitState = {
@@ -29,6 +34,7 @@ export function useControlPlaneSessionPromptSubmit({
   setRunning,
   setError,
   setLiveStatus,
+  setCurrentActivity,
 }: UseControlPlaneSessionPromptSubmitArgs): ControlPlaneSessionPromptSubmitState {
   const [submitting, setSubmitting] = useState(false);
   const activeSubmissionRef = useRef<PromptSubmission | null>(null);
@@ -69,6 +75,7 @@ export function useControlPlaneSessionPromptSubmit({
     setRunning(true);
     setError(undefined);
     setLiveStatus(streamConnected ? 'Heddle is working...' : 'Heddle is working... reconnecting live stream if needed.');
+    setCurrentActivity(ClientSharedSessionActivityService.createThinkingStatus());
 
     try {
       await sessionSendPromptMutation.mutateAsync({ workspaceId, sessionId, prompt: trimmed });
@@ -83,6 +90,7 @@ export function useControlPlaneSessionPromptSubmit({
         setError(submitError instanceof Error ? submitError.message : String(submitError));
         setRunning(false);
         setLiveStatus(undefined);
+        setCurrentActivity(undefined);
       }
     } finally {
       void Promise.all([
@@ -101,6 +109,7 @@ export function useControlPlaneSessionPromptSubmit({
     workspaceId,
     setError,
     setLiveStatus,
+    setCurrentActivity,
     setRunning,
     streamConnected,
     submitting,

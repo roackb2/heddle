@@ -9,6 +9,7 @@ import { CommandResultPanel } from './components/CommandResultPanel.js';
 import { ConversationPanel } from './components/ConversationPanel.js';
 import { ModelPickerPanel } from './components/ModelPickerPanel.js';
 import { PromptInput } from './components/PromptInput.js';
+import { PromptStatusPanel } from './components/PromptStatusPanel.js';
 import { ReasoningEffortPickerPanel } from './components/ReasoningEffortPickerPanel.js';
 import { RunControls } from './components/RunControls.js';
 import { RuntimeStatusBar } from './components/RuntimeStatusBar.js';
@@ -145,8 +146,11 @@ export function App({
         />
       ) : null}
       {!pickers.visible ? <SlashCommandHintPanel hints={slashCommandHints} /> : null}
+      <PromptStatusPanel
+        currentActivity={snapshot.currentActivity}
+        latestActivity={PromptActivityService.build(snapshot)}
+      />
       <PromptInput
-        activity={PromptActivityService.build(snapshot)}
         disabled={inputDisabled}
         submitDisabled={submitDisabled || Boolean(snapshot.pendingApproval)}
         placeholder={

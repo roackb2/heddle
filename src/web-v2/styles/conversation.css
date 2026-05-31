@@ -162,6 +162,63 @@
     color: color-mix(in oklab, var(--color-destructive) 82%, var(--color-foreground));
   }
 
+  .v2-agent-activity-region {
+    padding: 0 1.5rem 0.45rem;
+  }
+
+  .v2-agent-activity-stack {
+    margin-inline: auto;
+    display: flex;
+    width: min(100%, 48rem);
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .v2-agent-activity-status,
+  .v2-agent-latest-status {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--color-muted-foreground);
+    font-size: 0.8125rem;
+    line-height: 1.35;
+  }
+
+  .v2-agent-activity-status[data-tone="warning"] {
+    color: color-mix(in oklab, var(--color-warning, hsl(45 92% 70%)) 78%, var(--color-foreground));
+  }
+
+  .v2-agent-activity-spinner {
+    height: 0.875rem;
+    width: 0.875rem;
+    flex: 0 0 auto;
+  }
+
+  .v2-agent-activity-label {
+    flex: 0 0 auto;
+    color: var(--color-foreground);
+    font-weight: 500;
+  }
+
+  .v2-agent-latest-label {
+    flex: 0 0 auto;
+    font-weight: 500;
+  }
+
+  .v2-agent-activity-detail {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v2-agent-activity-elapsed {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+  }
+
   .v2-agent-plan-region {
     padding: 0 1.5rem 0.5rem;
   }

@@ -6,7 +6,11 @@ import {
   type ControlPlaneSessionEventEnvelope,
 } from '@web/api/client';
 import { ClientSharedSessionActivityService } from '@/client-shared/services/session-activities';
-import type { ClientSharedSessionPlan } from '@/client-shared/services/session-activities';
+import type {
+  ClientSharedAgentActivityStatus,
+  ClientSharedSessionLatestUpdate,
+  ClientSharedSessionPlan,
+} from '@/client-shared/services/session-activities';
 import { ClientSharedSessionMessageService } from '@/client-shared/services/session-messages';
 import type { RefreshControlPlaneSession } from './useControlPlaneSessionLoader';
 
@@ -19,6 +23,8 @@ type UseControlPlaneSessionEventsArgs = {
   setRunning: Dispatch<SetStateAction<boolean>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
   setActivePlan: Dispatch<SetStateAction<ClientSharedSessionPlan | undefined>>;
+  setCurrentActivity: Dispatch<SetStateAction<ClientSharedAgentActivityStatus | undefined>>;
+  setLatestUpdate: Dispatch<SetStateAction<ClientSharedSessionLatestUpdate | undefined>>;
 };
 
 export type ControlPlaneSessionEventsState = {
@@ -37,6 +43,8 @@ export function useControlPlaneSessionEvents({
   setRunning,
   setLiveStatus,
   setActivePlan,
+  setCurrentActivity,
+  setLatestUpdate,
 }: UseControlPlaneSessionEventsArgs): ControlPlaneSessionEventsState {
   const utils = trpcReact.useUtils();
   const [streamConnected, setStreamConnected] = useState(false);
@@ -85,9 +93,11 @@ export function useControlPlaneSessionEvents({
       },
       setLiveStatus,
       setActivePlan,
+      setCurrentActivity,
+      setLatestUpdate,
       setRunning,
     }));
-  }, [invalidateWorkspaceDiff, refresh, refreshPendingApproval, setActivePlan, setLiveStatus, setRunning, setSession, utils.controlPlane.session, workspaceId]);
+  }, [invalidateWorkspaceDiff, refresh, refreshPendingApproval, setActivePlan, setCurrentActivity, setLatestUpdate, setLiveStatus, setRunning, setSession, utils.controlPlane.session, workspaceId]);
 
   const subscription = trpcReact.controlPlane.sessionEvents.useSubscription(
     sessionId && workspaceId ? { sessionId, workspaceId } : skipToken,
@@ -112,6 +122,8 @@ export function useControlPlaneSessionEvents({
       setRunning(false);
       setLiveStatus(undefined);
       setActivePlan(undefined);
+      setCurrentActivity(undefined);
+      setLatestUpdate(undefined);
       setStreamConnected(false);
       return;
     }
@@ -119,7 +131,9 @@ export function useControlPlaneSessionEvents({
     setRunning(false);
     setLiveStatus(undefined);
     setActivePlan(undefined);
-  }, [sessionId, setActivePlan, setLiveStatus, setRunning, workspaceId]);
+    setCurrentActivity(undefined);
+    setLatestUpdate(undefined);
+  }, [sessionId, setActivePlan, setCurrentActivity, setLatestUpdate, setLiveStatus, setRunning, workspaceId]);
 
   useEffect(() => {
     setStreamConnected(subscription.status === 'pending');
@@ -158,11 +172,18 @@ type SessionActivityContext = {
   setRunning: Dispatch<SetStateAction<boolean>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
   setActivePlan: Dispatch<SetStateAction<ClientSharedSessionPlan | undefined>>;
+  setCurrentActivity: Dispatch<SetStateAction<ClientSharedAgentActivityStatus | undefined>>;
+  setLatestUpdate: Dispatch<SetStateAction<ClientSharedSessionLatestUpdate | undefined>>;
 };
 
 type ControlPlaneSessionActivity = Extract<ControlPlaneSessionEventEnvelope, { type: 'session.event' }>['activities'][number];
 
 function applySessionActivity(activity: ControlPlaneSessionActivity, context: SessionActivityContext) {
+  const latestUpdate = ClientSharedSessionActivityService.resolveLatestUpdate(activity);
+  if (latestUpdate) {
+    context.setLatestUpdate(latestUpdate);
+  }
+
   ClientSharedSessionActivityService.applyActivity(activity, {
     onAssistantStream: (streamActivity, liveStatus) => {
       context.updateSession((current) => (
@@ -192,6 +213,9 @@ function applySessionActivity(activity: ControlPlaneSessionActivity, context: Se
     },
     onPlanCleared: () => {
       context.setActivePlan(undefined);
+    },
+    onCurrentActivityChanged: (currentActivity) => {
+      context.setCurrentActivity(currentActivity);
     },
     onLiveStatus: (_statusActivity, liveStatus) => {
       if (liveStatus !== undefined) {

@@ -520,6 +520,10 @@ describe('ControlPlaneSessionStore', () => {
       detail: 'step 2',
       tone: 'info',
     });
+    expect(store.getSnapshot().currentActivity).toEqual(expect.objectContaining({
+      label: 'Running read_file',
+      detail: 'step 2',
+    }));
     expect(store.getSnapshot().liveStatus).toBe('Working... running read_file (step 2)');
     store.dispose();
   });

@@ -1,6 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ControlPlaneSessionDetail } from '@web/api/client';
-import type { ClientSharedSessionPlan } from '@/client-shared/services/session-activities';
+import {
+  type ClientSharedAgentActivityStatus,
+  type ClientSharedSessionLatestUpdate,
+  type ClientSharedSessionPlan,
+} from '@/client-shared/services/session-activities';
 import { useControlPlaneSessionEvents } from './useControlPlaneSessionEvents';
 import { useControlPlaneSessionLoader } from './useControlPlaneSessionLoader';
 import { useControlPlanePendingApproval } from './useControlPlanePendingApproval';
@@ -19,6 +23,8 @@ type ControlPlaneSessionDetailState = {
   cancelling: boolean;
   error?: string;
   liveStatus?: string;
+  currentActivity?: ClientSharedAgentActivityStatus;
+  latestUpdate?: ClientSharedSessionLatestUpdate;
   activePlan?: ClientSharedSessionPlan;
   cancelError?: string;
   pendingApproval: ReturnType<typeof useControlPlanePendingApproval>['pendingApproval'];
@@ -47,6 +53,8 @@ export function useControlPlaneSessionDetail({
   sessionId,
 }: UseControlPlaneSessionDetailArgs): ControlPlaneSessionDetailState {
   const [liveStatus, setLiveStatus] = useState<string | undefined>();
+  const [currentActivity, setCurrentActivity] = useState<ClientSharedAgentActivityStatus | undefined>();
+  const [latestUpdate, setLatestUpdate] = useState<ClientSharedSessionLatestUpdate | undefined>();
   const [activePlan, setActivePlan] = useState<ClientSharedSessionPlan | undefined>();
   const loader = useControlPlaneSessionLoader({ workspaceId, sessionId });
   const runControl = useControlPlaneSessionRunControl({
@@ -67,6 +75,8 @@ export function useControlPlaneSessionDetail({
     setRunning: runControl.setRunning,
     setLiveStatus,
     setActivePlan,
+    setCurrentActivity,
+    setLatestUpdate,
   });
   const promptSubmit = useControlPlaneSessionPromptSubmit({
     workspaceId,
@@ -75,6 +85,7 @@ export function useControlPlaneSessionDetail({
     setRunning: runControl.setRunning,
     setError: loader.setError,
     setLiveStatus,
+    setCurrentActivity,
   });
   const settings = useControlPlaneSessionSettings({
     workspaceId,
@@ -82,6 +93,12 @@ export function useControlPlaneSessionDetail({
     setSession: loader.setSession,
     setError: loader.setError,
   });
+
+  useEffect(() => {
+    if (!runControl.running && !promptSubmit.submitting) {
+      setCurrentActivity(undefined);
+    }
+  }, [promptSubmit.submitting, runControl.running]);
 
   return useMemo(() => ({
     session: loader.session,
@@ -91,6 +108,8 @@ export function useControlPlaneSessionDetail({
     cancelling: runControl.cancelling,
     error: loader.error,
     liveStatus,
+    currentActivity,
+    latestUpdate,
     activePlan,
     cancelError: runControl.cancelError,
     pendingApproval: approval.pendingApproval,
@@ -111,6 +130,8 @@ export function useControlPlaneSessionDetail({
     approval.pendingApproval,
     approval.resolvePendingApproval,
     activePlan,
+    currentActivity,
+    latestUpdate,
     liveStatus,
     loader.error,
     loader.loading,

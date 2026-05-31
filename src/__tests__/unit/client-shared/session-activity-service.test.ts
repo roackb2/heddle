@@ -99,4 +99,67 @@ describe('ClientSharedSessionActivityService', () => {
       timestamp: new Date().toISOString(),
     } as ControlPlaneSessionActivity)).toBe('yarn test');
   });
+
+  it('projects current agent activity and elapsed time from session events', () => {
+    const currentActivity: string[] = [];
+
+    ClientSharedSessionActivityService.applyActivity({
+      type: 'loop.started',
+      runId: 'run-1',
+      source: 'agent-loop',
+      goal: 'Inspect repo.',
+      model: 'gpt-5.4',
+      provider: 'openai',
+      workspaceRoot: '/repo',
+      timestamp: '2026-05-31T07:00:00.000Z',
+    } as ControlPlaneSessionActivity, {
+      onCurrentActivityChanged: (activity) => currentActivity.push(activity?.label ?? 'cleared'),
+    });
+    ClientSharedSessionActivityService.applyActivity({
+      type: 'tool.calling',
+      tool: 'read_file',
+      toolCallId: 'call-1',
+      input: { path: 'README.md' },
+      requiresApproval: false,
+      step: 2,
+      runId: 'run-1',
+      source: 'agent-loop',
+      timestamp: '2026-05-31T07:00:05.000Z',
+      derived: {
+        kind: 'tool-summary',
+        summary: 'read_file README.md',
+      },
+    } as ControlPlaneSessionActivity, {
+      onCurrentActivityChanged: (activity) => currentActivity.push(
+        activity?.detail ? `${activity.label}:${activity.detail}` : (activity?.label ?? 'cleared'),
+      ),
+    });
+    ClientSharedSessionActivityService.applyActivity({
+      type: 'assistant.stream',
+      runId: 'run-1',
+      source: 'agent-loop',
+      step: 2,
+      text: 'Final answer streaming',
+      done: false,
+      timestamp: '2026-05-31T07:00:07.000Z',
+    } as ControlPlaneSessionActivity, {
+      onCurrentActivityChanged: (activity) => currentActivity.push(activity?.label ?? 'cleared'),
+    });
+    ClientSharedSessionActivityService.applyActivity({
+      type: 'loop.finished',
+      outcome: 'done',
+      runId: 'run-1',
+      source: 'agent-loop',
+      summary: 'Done.',
+      timestamp: '2026-05-31T07:00:10.000Z',
+    } as ControlPlaneSessionActivity, {
+      onCurrentActivityChanged: (activity) => currentActivity.push(activity?.label ?? 'cleared'),
+    });
+
+    expect(currentActivity).toEqual(['Thinking', 'Running read_file:step 2', 'cleared', 'cleared']);
+    expect(ClientSharedSessionActivityService.formatElapsed(
+      '2026-05-31T07:00:05.000Z',
+      new Date('2026-05-31T07:01:09.000Z'),
+    )).toBe('1m 4s');
+  });
 });

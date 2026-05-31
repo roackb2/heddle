@@ -7,6 +7,11 @@ import type {
 } from '@web/hooks/sessions/useControlPlaneSessionDetail';
 import { useConversationAutoScroll } from '@web/hooks/conversation/useConversationAutoScroll';
 import type { ClientSharedSessionPlan } from '@/client-shared/services/session-activities';
+import type {
+  ClientSharedAgentActivityStatus,
+  ClientSharedSessionLatestUpdate,
+} from '@/client-shared/services/session-activities';
+import { AgentActivityStatus } from './AgentActivityStatus';
 import { AgentPlanPanel } from './AgentPlanPanel';
 import { ApprovalPanel } from './ApprovalPanel';
 import { ConversationComposer } from './ConversationComposer';
@@ -21,6 +26,8 @@ interface ConversationThreadProps {
   running: boolean;
   cancelling: boolean;
   liveStatus?: string;
+  currentActivity?: ClientSharedAgentActivityStatus;
+  latestUpdate?: ClientSharedSessionLatestUpdate;
   activePlan?: ClientSharedSessionPlan;
   pendingApproval: ControlPlanePendingApproval;
   approvalResolving: boolean;
@@ -46,6 +53,8 @@ export function ConversationThread({
   running,
   cancelling,
   liveStatus,
+  currentActivity,
+  latestUpdate,
   activePlan,
   pendingApproval,
   approvalResolving,
@@ -114,7 +123,6 @@ export function ConversationThread({
           {session.messages.map((message) => (
             <ConversationMessage key={message.id} message={message} />
           ))}
-          {liveStatus ? <p className="v2-live-status-line" data-testid="web-v2-live-status">{liveStatus}</p> : null}
         </div>
       </div>
       {pendingApproval ? (
@@ -130,6 +138,11 @@ export function ConversationThread({
       {activePlan ? (
         <div className="v2-agent-plan-region">
           <AgentPlanPanel plan={activePlan} />
+        </div>
+      ) : null}
+      {currentActivity || latestUpdate ? (
+        <div className="v2-agent-activity-region">
+          <AgentActivityStatus currentActivity={currentActivity} latestUpdate={latestUpdate} />
         </div>
       ) : null}
       <div className="v2-composer-region">
