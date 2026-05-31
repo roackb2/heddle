@@ -1,5 +1,6 @@
 import type { ControlPlaneProxyClient } from '@/client-shared/api/proxy.js';
 import { ClientSharedSessionActivityService } from '@/client-shared/services/session-activities/index.js';
+import type { ClientSharedSessionPlan } from '@/client-shared/services/session-activities/index.js';
 import { ClientSharedSessionMessageService } from '@/client-shared/services/session-messages/index.js';
 import {
   SessionActivityService,
@@ -65,6 +66,7 @@ export type ControlPlaneSessionStoreSnapshot = {
   cancelling: boolean;
   streamConnected: boolean;
   liveStatus?: string;
+  activePlan?: ClientSharedSessionPlan;
   latestUpdate?: ControlPlaneSessionLatestUpdate;
   slashCommandCatalog?: ControlPlaneSlashCommandCatalog;
   commandResults: ControlPlaneSlashCommandResult[];
@@ -92,6 +94,8 @@ const INITIAL_SNAPSHOT: ControlPlaneSessionStoreSnapshot = {
  * This is the non-React counterpart to web-v2's focused session hooks: it loads
  * the selected workspace/session, subscribes to live updates, keeps transient
  * conversation messages coherent, and exposes terminal intent methods.
+ * Shared activity policy stays in client-shared; this store owns only cli-v2
+ * state mutation and terminal workflow coordination.
  */
 export class ControlPlaneSessionStore {
   private readonly api: ControlPlaneSessionApiService;
@@ -192,6 +196,7 @@ export class ControlPlaneSessionStore {
       runtimeContext: undefined,
       pendingApproval: null,
       liveStatus: undefined,
+      activePlan: undefined,
       latestUpdate: undefined,
       error: undefined,
       loading: true,
@@ -243,6 +248,7 @@ export class ControlPlaneSessionStore {
       submitting: true,
       running: true,
       error: undefined,
+      activePlan: undefined,
       liveStatus: current.streamConnected
         ? 'Heddle is working...'
         : 'Heddle is working... reconnecting live stream if needed.',
@@ -487,6 +493,7 @@ export class ControlPlaneSessionStore {
   private async continueSession(workspaceId: string, sessionId: string): Promise<void> {
     this.setSnapshot({
       running: true,
+      activePlan: undefined,
       liveStatus: 'Heddle is continuing from the current transcript...',
     });
     await this.api.continueSession(workspaceId, sessionId);
@@ -500,6 +507,7 @@ export class ControlPlaneSessionStore {
     await this.api.sendPromptAsync({ workspaceId, sessionId, prompt });
     this.setSnapshot({
       running: true,
+      activePlan: undefined,
       liveStatus: this.snapshotValue.streamConnected
         ? 'Heddle is working...'
         : 'Heddle is working... reconnecting live stream if needed.',
@@ -566,6 +574,12 @@ export class ControlPlaneSessionStore {
         },
         onPendingApprovalChanged: () => {
           void this.refreshPendingApproval(event.sessionId);
+        },
+        onPlanUpdated: (plan) => {
+          this.setSnapshot({ activePlan: plan });
+        },
+        onPlanCleared: () => {
+          this.setSnapshot({ activePlan: undefined });
         },
         onLiveStatus: (statusActivity, liveStatus) => {
           const latestUpdate = SessionActivityService.resolveLatestUpdate(statusActivity);
@@ -683,6 +697,7 @@ export class ControlPlaneSessionStore {
     this.setSnapshot({
       submitting: false,
       liveStatus: undefined,
+      activePlan: undefined,
       latestUpdate: {
         label: 'Run finished',
         tone: 'success',

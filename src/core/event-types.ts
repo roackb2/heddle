@@ -14,6 +14,7 @@ export const HeddleEventType = {
   toolFallback: 'tool.fallback',
   toolCalling: 'tool.calling',
   toolCompleted: 'tool.completed',
+  planUpdated: 'plan.updated',
   memoryCandidateRecorded: 'memory.candidate_recorded',
   memoryCheckpointSkipped: 'memory.checkpoint_skipped',
   memoryMaintenanceStarted: 'memory.maintenance_started',

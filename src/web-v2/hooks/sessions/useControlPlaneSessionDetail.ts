@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ControlPlaneSessionDetail } from '@web/api/client';
+import type { ClientSharedSessionPlan } from '@/client-shared/services/session-activities';
 import { useControlPlaneSessionEvents } from './useControlPlaneSessionEvents';
 import { useControlPlaneSessionLoader } from './useControlPlaneSessionLoader';
 import { useControlPlanePendingApproval } from './useControlPlanePendingApproval';
@@ -18,6 +19,7 @@ type ControlPlaneSessionDetailState = {
   cancelling: boolean;
   error?: string;
   liveStatus?: string;
+  activePlan?: ClientSharedSessionPlan;
   cancelError?: string;
   pendingApproval: ReturnType<typeof useControlPlanePendingApproval>['pendingApproval'];
   approvalResolving: boolean;
@@ -45,6 +47,7 @@ export function useControlPlaneSessionDetail({
   sessionId,
 }: UseControlPlaneSessionDetailArgs): ControlPlaneSessionDetailState {
   const [liveStatus, setLiveStatus] = useState<string | undefined>();
+  const [activePlan, setActivePlan] = useState<ClientSharedSessionPlan | undefined>();
   const loader = useControlPlaneSessionLoader({ workspaceId, sessionId });
   const runControl = useControlPlaneSessionRunControl({
     workspaceId,
@@ -63,6 +66,7 @@ export function useControlPlaneSessionDetail({
     setSession: loader.setSession,
     setRunning: runControl.setRunning,
     setLiveStatus,
+    setActivePlan,
   });
   const promptSubmit = useControlPlaneSessionPromptSubmit({
     workspaceId,
@@ -87,6 +91,7 @@ export function useControlPlaneSessionDetail({
     cancelling: runControl.cancelling,
     error: loader.error,
     liveStatus,
+    activePlan,
     cancelError: runControl.cancelError,
     pendingApproval: approval.pendingApproval,
     approvalResolving: approval.approvalResolving,
@@ -105,6 +110,7 @@ export function useControlPlaneSessionDetail({
     approval.approvalResolving,
     approval.pendingApproval,
     approval.resolvePendingApproval,
+    activePlan,
     liveStatus,
     loader.error,
     loader.loading,

@@ -141,6 +141,7 @@ export function useControlPlaneAppState() {
         running: selectedSession.running,
         cancelling: selectedSession.cancelling,
         liveStatus: selectedSession.liveStatus,
+        activePlan: selectedSession.activePlan,
         pendingApproval: selectedSession.pendingApproval,
         approvalResolving: selectedSession.approvalResolving,
         approvalError: selectedSession.approvalError,

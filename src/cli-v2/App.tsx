@@ -4,6 +4,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { ApprovalPanel } from './components/ApprovalPanel.js';
+import { AgentPlanPanel } from './components/AgentPlanPanel.js';
 import { CommandResultPanel } from './components/CommandResultPanel.js';
 import { ConversationPanel } from './components/ConversationPanel.js';
 import { ModelPickerPanel } from './components/ModelPickerPanel.js';
@@ -118,6 +119,7 @@ export function App({
         cancelling={snapshot.cancelling}
         onCancel={cancelRun}
       />
+      <AgentPlanPanel plan={snapshot.activePlan} />
       {pickers.model.query !== undefined ? (
         <ModelPickerPanel
           query={pickers.model.query}

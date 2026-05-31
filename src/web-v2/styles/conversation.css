@@ -161,4 +161,116 @@
   .v2-live-error-line {
     color: color-mix(in oklab, var(--color-destructive) 82%, var(--color-foreground));
   }
+
+  .v2-agent-plan-region {
+    padding: 0 1.5rem 0.5rem;
+  }
+
+  .v2-agent-plan-panel {
+    margin-inline: auto;
+    width: min(100%, 48rem);
+    min-width: 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid color-mix(in oklab, var(--color-border) 70%, transparent);
+    background: color-mix(in oklab, var(--color-background) 90%, var(--color-muted));
+  }
+
+  .v2-agent-plan-summary {
+    display: flex;
+    min-width: 0;
+    cursor: pointer;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    list-style: none;
+  }
+
+  .v2-agent-plan-toggle {
+    height: 0.875rem;
+    width: 0.875rem;
+    flex: 0 0 auto;
+    color: var(--color-muted-foreground);
+    transition: transform 120ms ease;
+  }
+
+  .v2-agent-plan-panel[open] .v2-agent-plan-toggle {
+    transform: rotate(180deg);
+  }
+
+  .v2-agent-plan-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .v2-agent-plan-kicker {
+    flex: 0 0 auto;
+    color: var(--color-foreground);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .v2-agent-plan-current,
+  .v2-agent-plan-explanation,
+  .v2-agent-plan-item {
+    color: var(--color-muted-foreground);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+
+  .v2-agent-plan-current {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v2-agent-plan-explanation {
+    border-top: 1px solid color-mix(in oklab, var(--color-border) 58%, transparent);
+    padding: 0.5rem 0.75rem 0;
+  }
+
+  .v2-agent-plan-list {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.5rem 0.75rem 0.7rem;
+  }
+
+  .v2-agent-plan-item {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    gap: 0.45rem;
+  }
+
+  .v2-agent-plan-item svg {
+    margin-top: 0.1rem;
+    height: 0.875rem;
+    width: 0.875rem;
+    flex: 0 0 auto;
+  }
+
+  .v2-agent-plan-item span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .v2-agent-plan-item[data-status="in_progress"] {
+    color: var(--color-foreground);
+  }
+
+  .v2-agent-plan-item[data-status="completed"] {
+    color: color-mix(in oklab, var(--color-muted-foreground) 78%, var(--color-foreground));
+  }
+
+  @media (max-width: 38rem) {
+    .v2-agent-plan-region {
+      padding: 0 1rem 0.5rem;
+    }
+
+    .v2-agent-plan-panel:not([open]) .v2-agent-plan-summary {
+      padding-block: 0.45rem;
+    }
+  }
 }

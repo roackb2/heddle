@@ -10,6 +10,7 @@ import type {
   ConversationToolFallbackActivity,
   ConversationToolCallingActivity,
   ConversationToolCompletedActivity,
+  ConversationPlanUpdatedActivity,
 } from '@/core/live/index.js';
 import type { ChatMessage, LlmAdapter, LlmProvider, LlmUsage, ReasoningEffort } from '@/core/llm/types.js';
 import type { RunResult, StopReason, ToolCall, ToolDefinition, TraceEvent } from '@/core/types.js';
@@ -54,6 +55,7 @@ export type AgentLoopEvent =
   | ConversationToolFallbackActivity
   | ConversationToolCallingActivity
   | ConversationToolCompletedActivity
+  | ConversationPlanUpdatedActivity
   | {
       type: typeof HeddleEventType.trace;
       runId: string;

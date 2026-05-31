@@ -498,6 +498,56 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('tracks active plan updates until the run finishes', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    fixture.sessionEvents?.onData?.({
+      type: 'session.event',
+      sessionId: 'session-1',
+      timestamp: new Date().toISOString(),
+      activities: [
+        {
+          source: 'agent-loop',
+          type: 'plan.updated',
+          runId: 'run-1',
+          step: 1,
+          timestamp: new Date().toISOString(),
+          explanation: 'Tracking current work.',
+          items: [
+            { step: 'Inspect', status: 'completed' },
+            { step: 'Implement', status: 'in_progress' },
+          ],
+        },
+      ],
+    } as ControlPlaneSessionEventEnvelope);
+
+    expect(store.getSnapshot().activePlan?.items).toEqual([
+      { step: 'Inspect', status: 'completed' },
+      { step: 'Implement', status: 'in_progress' },
+    ]);
+
+    fixture.sessionEvents?.onData?.({
+      type: 'session.event',
+      sessionId: 'session-1',
+      timestamp: new Date().toISOString(),
+      activities: [
+        {
+          source: 'agent-loop',
+          type: 'loop.finished',
+          runId: 'run-1',
+          outcome: 'done',
+          summary: 'Done.',
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    } as ControlPlaneSessionEventEnvelope);
+
+    expect(store.getSnapshot().activePlan).toBeUndefined();
+    store.dispose();
+  });
+
   it('keeps the final run outcome visible after loop completion', async () => {
     const fixture = createClientFixture();
     const store = new ControlPlaneSessionStore({ client: fixture.client });

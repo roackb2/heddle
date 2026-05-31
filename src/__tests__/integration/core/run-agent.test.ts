@@ -1573,6 +1573,7 @@ describe('AgentRunService.run', () => {
 
   it('allows a final answer even when a recorded plan still has unfinished items', async () => {
     let stage = 0;
+    const events: AgentRunEvent[] = [];
     const fakeLlm: LlmAdapter = {
       async chat(): Promise<LlmResponse> {
         stage += 1;
@@ -1615,6 +1616,7 @@ describe('AgentRunService.run', () => {
       tools: [updatePlanTool],
       maxSteps: 2,
       logger: silentLogger,
+      onEvent: (event) => events.push(event),
     });
 
     expect(result.outcome).toBe('done');
@@ -1626,5 +1628,15 @@ describe('AgentRunService.run', () => {
           message.content.includes('you recorded a plan and it still has unfinished items'),
       ),
     ).toBe(false);
+    expect(events).toContainEqual({
+      type: 'plan.updated',
+      step: 1,
+      explanation: 'Tracking the implementation steps.',
+      items: [
+        { step: 'Inspect current implementation', status: 'completed' },
+        { step: 'Implement the next bounded change', status: 'in_progress' },
+        { step: 'Verify with tests', status: 'pending' },
+      ],
+    });
   });
 });

@@ -59,6 +59,28 @@ describe('ClientSharedSessionActivityService', () => {
     expect(effects).toEqual(['finished:Run finished: done', 'workspace changed']);
   });
 
+  it('applies plan update effects without changing live status', () => {
+    const effects: string[] = [];
+
+    ClientSharedSessionActivityService.applyActivity({
+      type: 'plan.updated',
+      runId: 'run-1',
+      source: 'agent-loop',
+      step: 1,
+      timestamp: new Date().toISOString(),
+      explanation: 'Tracking current work.',
+      items: [
+        { step: 'Inspect', status: 'completed' },
+        { step: 'Implement', status: 'in_progress' },
+      ],
+    } as ControlPlaneSessionActivity, {
+      onPlanUpdated: (plan) => effects.push(plan.items[1]?.step ?? ''),
+      onLiveStatus: () => effects.push('live status changed'),
+    });
+
+    expect(effects).toEqual(['Implement']);
+  });
+
   it('uses derived tool labels when the API provides them', () => {
     expect(ClientSharedSessionActivityService.formatToolLabel({
       type: 'tool.approval_requested',

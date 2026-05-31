@@ -6,6 +6,7 @@ import {
   type ControlPlaneSessionEventEnvelope,
 } from '@web/api/client';
 import { ClientSharedSessionActivityService } from '@/client-shared/services/session-activities';
+import type { ClientSharedSessionPlan } from '@/client-shared/services/session-activities';
 import { ClientSharedSessionMessageService } from '@/client-shared/services/session-messages';
 import type { RefreshControlPlaneSession } from './useControlPlaneSessionLoader';
 
@@ -17,14 +18,16 @@ type UseControlPlaneSessionEventsArgs = {
   setSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
   setRunning: Dispatch<SetStateAction<boolean>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
+  setActivePlan: Dispatch<SetStateAction<ClientSharedSessionPlan | undefined>>;
 };
 
 export type ControlPlaneSessionEventsState = {
   streamConnected: boolean;
 };
 
-// Subscribes to the selected session's live event stream and applies only the
-// web-v2 conversation state transitions that this interface currently renders.
+// Owns web-v2's selected-session subscription effects. Activity facts and
+// shared activity policies stay in core/client-shared; this hook only writes
+// React state and cache entries for the active conversation surface.
 export function useControlPlaneSessionEvents({
   workspaceId,
   sessionId,
@@ -33,6 +36,7 @@ export function useControlPlaneSessionEvents({
   setSession,
   setRunning,
   setLiveStatus,
+  setActivePlan,
 }: UseControlPlaneSessionEventsArgs): ControlPlaneSessionEventsState {
   const utils = trpcReact.useUtils();
   const [streamConnected, setStreamConnected] = useState(false);
@@ -75,9 +79,10 @@ export function useControlPlaneSessionEvents({
         }
       },
       setLiveStatus,
+      setActivePlan,
       setRunning,
     }));
-  }, [invalidateWorkspaceDiff, refresh, refreshPendingApproval, setLiveStatus, setRunning, setSession, utils.controlPlane.session, workspaceId]);
+  }, [invalidateWorkspaceDiff, refresh, refreshPendingApproval, setActivePlan, setLiveStatus, setRunning, setSession, utils.controlPlane.session, workspaceId]);
 
   const subscription = trpcReact.controlPlane.sessionEvents.useSubscription(
     sessionId && workspaceId ? { sessionId, workspaceId } : skipToken,
@@ -101,13 +106,15 @@ export function useControlPlaneSessionEvents({
     if (!sessionId || !workspaceId) {
       setRunning(false);
       setLiveStatus(undefined);
+      setActivePlan(undefined);
       setStreamConnected(false);
       return;
     }
 
     setRunning(false);
     setLiveStatus(undefined);
-  }, [sessionId, setLiveStatus, setRunning, workspaceId]);
+    setActivePlan(undefined);
+  }, [sessionId, setActivePlan, setLiveStatus, setRunning, workspaceId]);
 
   useEffect(() => {
     setStreamConnected(subscription.status === 'pending');
@@ -145,6 +152,7 @@ type SessionActivityContext = {
   updateSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
   setRunning: Dispatch<SetStateAction<boolean>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
+  setActivePlan: Dispatch<SetStateAction<ClientSharedSessionPlan | undefined>>;
 };
 
 type ControlPlaneSessionActivity = Extract<ControlPlaneSessionEventEnvelope, { type: 'session.event' }>['activities'][number];
@@ -173,6 +181,12 @@ function applySessionActivity(activity: ControlPlaneSessionActivity, context: Se
         context.setLiveStatus(liveStatus);
       }
       void context.refresh(context.sessionId, { silent: true });
+    },
+    onPlanUpdated: (plan) => {
+      context.setActivePlan(plan);
+    },
+    onPlanCleared: () => {
+      context.setActivePlan(undefined);
     },
     onLiveStatus: (_statusActivity, liveStatus) => {
       if (liveStatus !== undefined) {

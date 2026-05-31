@@ -6,6 +6,8 @@ import type {
   ControlPlaneSessionDetail,
 } from '@web/hooks/sessions/useControlPlaneSessionDetail';
 import { useConversationAutoScroll } from '@web/hooks/conversation/useConversationAutoScroll';
+import type { ClientSharedSessionPlan } from '@/client-shared/services/session-activities';
+import { AgentPlanPanel } from './AgentPlanPanel';
 import { ApprovalPanel } from './ApprovalPanel';
 import { ConversationComposer } from './ConversationComposer';
 import { ConversationMessage } from './ConversationMessage';
@@ -19,6 +21,7 @@ interface ConversationThreadProps {
   running: boolean;
   cancelling: boolean;
   liveStatus?: string;
+  activePlan?: ClientSharedSessionPlan;
   pendingApproval: ControlPlanePendingApproval;
   approvalResolving: boolean;
   approvalError?: string;
@@ -43,6 +46,7 @@ export function ConversationThread({
   running,
   cancelling,
   liveStatus,
+  activePlan,
   pendingApproval,
   approvalResolving,
   approvalError,
@@ -121,6 +125,11 @@ export function ConversationThread({
             resolving={approvalResolving}
             onResolve={onResolveApproval}
           />
+        </div>
+      ) : null}
+      {activePlan ? (
+        <div className="v2-agent-plan-region">
+          <AgentPlanPanel plan={activePlan} />
         </div>
       ) : null}
       <div className="v2-composer-region">

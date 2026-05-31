@@ -1,5 +1,6 @@
 import type { LlmProvider, LlmUsage } from '@/core/llm/types.js';
 import { HeddleEventType } from '@/core/event-types.js';
+import type { AgentPlanState } from '@/core/agent/planning/index.js';
 import type { StopReason, ToolCall, ToolResult } from '@/core/types.js';
 
 export type ConversationActivityCorrelation = {
@@ -110,6 +111,14 @@ export type ConversationToolCompletedActivity = {
   timestamp: string;
 };
 
+export type ConversationPlanUpdatedActivity = AgentPlanState & {
+  source: 'agent-loop';
+  type: typeof HeddleEventType.planUpdated;
+  runId: string;
+  step: number;
+  timestamp: string;
+};
+
 export type ConversationLoopFinishedActivity = {
   source: 'agent-loop';
   type: typeof HeddleEventType.loopFinished;
@@ -128,6 +137,7 @@ export type ConversationAgentLoopActivity =
   | ConversationToolFallbackActivity
   | ConversationToolCallingActivity
   | ConversationToolCompletedActivity
+  | ConversationPlanUpdatedActivity
   | ConversationLoopFinishedActivity;
 
 export type ConversationCompactionRunningActivity = {

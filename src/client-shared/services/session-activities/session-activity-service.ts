@@ -13,6 +13,7 @@ type SessionActivityStatusHandlers = {
 type ActivityOf<ActivityType extends ClientSharedSessionActivity['type']> = Extract<ClientSharedSessionActivity, { type: ActivityType }>;
 type PendingApprovalActivity = ActivityOf<'tool.approval_requested'> | ActivityOf<'tool.approval_resolved'>;
 type WorkspaceChangedActivity = ActivityOf<'loop.finished'> | ActivityOf<'tool.completed'>;
+export type ClientSharedSessionPlan = ActivityOf<'plan.updated'>;
 type SessionActivityEffectHandlers = {
   [ActivityType in ClientSharedSessionActivity['type']]?: (
     activity: Extract<ClientSharedSessionActivity, { type: ActivityType }>,
@@ -24,13 +25,20 @@ export type ClientSharedSessionActivityEffects = {
   onAssistantStream?: (activity: ActivityOf<'assistant.stream'>, liveStatus: string | undefined) => void;
   onRunStarted?: (activity: ActivityOf<'loop.started'>, liveStatus: string | undefined) => void;
   onRunFinished?: (activity: ActivityOf<'loop.finished'>, liveStatus: string | undefined) => void;
+  onPlanUpdated?: (activity: ClientSharedSessionPlan) => void;
+  onPlanCleared?: () => void;
   onLiveStatus?: (activity: ClientSharedSessionActivity, liveStatus: string | undefined) => void;
   onPendingApprovalChanged?: (activity: PendingApprovalActivity) => void;
   onWorkspaceChanged?: (activity: WorkspaceChangedActivity) => void;
 };
 
 /**
- * Applies control-plane session activity effects shared by frontend clients.
+ * Owns client-side effects derived from API-provided session activities.
+ *
+ * Core/live owns the activity vocabulary and facts. This service owns only the
+ * frontend-neutral consequences shared by web-v2 and cli-v2, including active
+ * plan lifetime: a plan is visible after `plan.updated` and cleared when a new
+ * run starts or the current run finishes.
  */
 export class ClientSharedSessionActivityService {
   private static readonly effectHandlers: SessionActivityEffectHandlers = {
@@ -38,9 +46,11 @@ export class ClientSharedSessionActivityService {
       effects.onAssistantStream?.(activity, activity.done ? undefined : 'Receiving assistant response...');
     },
     'loop.started': (activity, effects) => {
+      effects.onPlanCleared?.();
       effects.onRunStarted?.(activity, ClientSharedSessionActivityService.formatLiveStatus(activity));
     },
     'loop.finished': (activity, effects) => {
+      effects.onPlanCleared?.();
       effects.onRunFinished?.(activity, ClientSharedSessionActivityService.formatLiveStatus(activity));
       effects.onWorkspaceChanged?.(activity);
     },
@@ -50,6 +60,9 @@ export class ClientSharedSessionActivityService {
     'tool.completed': (activity, effects) => {
       ClientSharedSessionActivityService.applyLiveStatus(activity, effects);
       effects.onWorkspaceChanged?.(activity);
+    },
+    'plan.updated': (activity, effects) => {
+      effects.onPlanUpdated?.(activity);
     },
     'tool.approval_requested': (activity, effects) => {
       effects.onPendingApprovalChanged?.(activity);

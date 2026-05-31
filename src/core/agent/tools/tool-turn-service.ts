@@ -119,6 +119,13 @@ export class AgentToolTurnService {
       AgentMemoryCheckpointTracker.trackToolResult({ context, effectiveCall, result });
       if (effectiveCall.tool === 'update_plan') {
         context.state.activePlan = AgentPlanStateParser.parse({ output: result.output });
+        if (context.state.activePlan) {
+          context.live.activity({
+            type: HeddleEventType.planUpdated,
+            step: context.state.step,
+            ...context.state.activePlan,
+          });
+        }
       }
     }
 
