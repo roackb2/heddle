@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
 import { ClientSharedPromptInputService } from '@/client-shared/services/prompt-input/index.js';
 import type {
@@ -70,6 +70,16 @@ export function PromptInput({
     cursorRef.current = ClientSharedPromptInputService.clampCursor(valueRef.current, cursor);
   }, [cursor]);
 
+  const applyState = useCallback((nextState: ClientSharedPromptDraftState) => {
+    const normalized = {
+      value: nextState.value,
+      cursor: ClientSharedPromptInputService.clampCursor(nextState.value, nextState.cursor),
+    };
+    valueRef.current = normalized.value;
+    cursorRef.current = normalized.cursor;
+    onChange(normalized);
+  }, [onChange]);
+
   useInput((input, key) => {
     if (disabled) {
       return;
@@ -113,16 +123,6 @@ export function PromptInput({
 
     applyState(CliV2PromptLineEditorService.applyCommand(command, current));
   }, { isActive: !disabled });
-
-  function applyState(nextState: ClientSharedPromptDraftState) {
-    const normalized = {
-      value: nextState.value,
-      cursor: ClientSharedPromptInputService.clampCursor(nextState.value, nextState.cursor),
-    };
-    valueRef.current = normalized.value;
-    cursorRef.current = normalized.cursor;
-    onChange(normalized);
-  }
 
   return (
     <Box flexDirection="column" marginTop={1} marginBottom={1}>
