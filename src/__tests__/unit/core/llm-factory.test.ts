@@ -131,4 +131,16 @@ describe('llm adapter factory', () => {
       warning: 'Model gpt-5.4-pro is not supported with OpenAI account sign-in. Switched to gpt-5.4 for this session.',
     });
   });
+
+  it('owns per-model reasoning effort support', () => {
+    expect(ModelPolicyService.supportsOpenAiRequestReasoningEffortLevel('gpt-5.4', 'ultrahigh')).toBe(false);
+    expect(ModelPolicyService.supportsOpenAiRequestReasoningEffortLevel('gpt-5.5', 'ultrahigh')).toBe(true);
+    expect(ModelPolicyService.buildReasoningEffortOptions('gpt-5.5')).toContainEqual({
+      id: 'ultrahigh',
+      label: 'ultrahigh',
+      description: 'Set explicit ultrahigh effort',
+      disabled: false,
+      disabledReason: undefined,
+    });
+  });
 });

@@ -35,7 +35,7 @@ export class RuntimeStatusService {
       case 'env-api-key':
         return `auth=${source.provider}-key`;
       case 'oauth':
-        return source.accountId ? `auth=${source.provider}-oauth:${source.accountId.slice(0, 8)}` : `auth=${source.provider}-oauth`;
+        return `auth=${source.provider}-oauth`;
       case 'missing':
         return `auth=missing-${source.provider}`;
     }

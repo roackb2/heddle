@@ -17,5 +17,6 @@ export {
 export type {
   CredentialAwareModelOption,
   ModelCredentialMode,
+  ReasoningEffortOption,
   SystemModelPurpose,
 } from './model-policy-service.js';

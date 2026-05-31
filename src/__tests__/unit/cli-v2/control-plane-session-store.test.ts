@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ControlPlaneProxyClient } from '../../../client-shared/api/proxy.js';
 import type {
   ControlPlanePendingApproval,
+  ControlPlaneModelOptions,
   ControlPlaneSessionDetail,
   ControlPlaneSessionEventEnvelope,
   ControlPlaneSessionRuntimeContext,
@@ -19,6 +20,7 @@ describe('ControlPlaneSessionStore', () => {
     await store.start();
 
     expect(fixture.calls.stateQuery).toHaveBeenCalledWith(undefined);
+    expect(fixture.calls.modelOptionsQuery).toHaveBeenCalledTimes(1);
     expect(fixture.calls.slashCommandCatalogQuery).toHaveBeenCalledTimes(1);
     expect(fixture.calls.slashCommandCatalogQuery).toHaveBeenCalledWith({ workspaceId: 'workspace-1' });
     expect(fixture.calls.sessionsQuery).toHaveBeenCalledWith({ workspaceId: 'workspace-1' });
@@ -133,6 +135,40 @@ describe('ControlPlaneSessionStore', () => {
 
     expect(store.completeSlashCommandDraft('/sess')).toBe('/session ');
     expect(fixture.calls.slashCommandCatalogQuery).toHaveBeenCalledTimes(1);
+    store.dispose();
+  });
+
+  it('executes picker selections through slash commands', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await store.selectModelFromPicker('gpt-5.4-mini');
+    await store.selectReasoningFromPicker('medium');
+    await store.selectReasoningFromPicker('default');
+    await store.selectSessionFromPicker('session-2');
+
+    expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenNthCalledWith(1, {
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      command: '/model gpt-5.4-mini',
+    });
+    expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenNthCalledWith(2, {
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      command: '/reasoning medium',
+    });
+    expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenNthCalledWith(3, {
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      command: '/reasoning default',
+    });
+    expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenNthCalledWith(4, {
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      command: '/session switch session-2',
+    });
+    expect(fixture.calls.sessionSendPromptAsyncMutate).not.toHaveBeenCalled();
     store.dispose();
   });
 
@@ -518,6 +554,7 @@ function createClientFixture() {
     sessionRunningQuery: vi.fn(async () => ({ running: false })),
     sessionRunStateQuery: vi.fn(async () => ({ running: false, pendingApproval })),
     sessionRuntimeContextQuery: vi.fn(async () => createRuntimeContext()),
+    modelOptionsQuery: vi.fn(async () => createModelOptions()),
     sessionPendingApprovalQuery: vi.fn(async () => pendingApproval),
     sessionSendPromptMutate: vi.fn(async () => ({
       session: {
@@ -589,6 +626,7 @@ function createClientFixture() {
       sessionRunning: { query: calls.sessionRunningQuery },
       sessionRunState: { query: calls.sessionRunStateQuery },
       sessionRuntimeContext: { query: calls.sessionRuntimeContextQuery },
+      modelOptions: { query: calls.modelOptionsQuery },
       sessionPendingApproval: { query: calls.sessionPendingApprovalQuery },
       sessionSendPrompt: { mutate: calls.sessionSendPromptMutate },
       sessionSendPromptAsync: { mutate: calls.sessionSendPromptAsyncMutate },
@@ -647,6 +685,39 @@ function createRuntimeContext(
     reasoningEffort: 'medium',
     effectiveReasoningEffort: 'medium',
     reasoningSupported: true,
+    reasoningOptions: [
+      {
+        id: 'default',
+        label: 'default',
+        description: 'Use gpt-5.4 default (medium)',
+        disabled: false,
+      },
+      {
+        id: 'low',
+        label: 'low',
+        description: 'Set explicit low effort',
+        disabled: false,
+      },
+      {
+        id: 'medium',
+        label: 'medium',
+        description: 'Set explicit medium effort',
+        disabled: false,
+      },
+      {
+        id: 'high',
+        label: 'high',
+        description: 'Set explicit high effort',
+        disabled: false,
+      },
+      {
+        id: 'ultrahigh',
+        label: 'ultrahigh',
+        description: 'Set explicit ultrahigh effort',
+        disabled: true,
+        disabledReason: 'Not supported by request path',
+      },
+    ],
     credentialSource: {
       type: 'oauth',
       provider: 'openai',
@@ -658,6 +729,21 @@ function createRuntimeContext(
     driftEnabled: false,
     running: false,
     ...overrides,
+  };
+}
+
+function createModelOptions(): ControlPlaneModelOptions {
+  return {
+    groups: [
+      {
+        label: 'OpenAI',
+        models: ['gpt-5.4', 'gpt-5.4-mini'],
+        options: [
+          { id: 'gpt-5.4', disabled: false },
+          { id: 'gpt-5.4-mini', disabled: false },
+        ],
+      },
+    ],
   };
 }
 

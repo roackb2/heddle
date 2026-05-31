@@ -282,7 +282,7 @@ describe('OpenAI OAuth helpers', () => {
     expect(body.reasoning?.effort).toBe('medium');
   });
 
-  it('rejects ultrahigh reasoning effort instead of silently dropping it', async () => {
+  it('includes ultrahigh reasoning effort for models that support it', async () => {
     const requests: Array<{ url: string; body: string }> = [];
     const adapter = createOpenAiTestAdapter({
       model: 'gpt-5.5',
@@ -303,8 +303,9 @@ describe('OpenAI OAuth helpers', () => {
       }) as typeof fetch,
     });
 
-    await expect(adapter.chat([{ role: 'user', content: 'hello' }], [])).rejects.toThrow('ultrahigh');
-    expect(requests).toEqual([]);
+    await expect(adapter.chat([{ role: 'user', content: 'hello' }], [])).rejects.toThrow();
+    const body = JSON.parse(requests[0]?.body ?? '{}') as { reasoning?: { effort?: string } };
+    expect(body.reasoning?.effort).toBe('ultrahigh');
   });
 
   it('reconstructs tool calls from streamed Codex OAuth events when final response output is empty', async () => {

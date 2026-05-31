@@ -13,6 +13,14 @@ export type CredentialAwareModelOption = {
   disabledReason?: string;
 };
 
+export type ReasoningEffortOption = {
+  id: 'default' | ReasoningEffort;
+  label: string;
+  description: string;
+  disabled: boolean;
+  disabledReason?: string;
+};
+
 export const OPENAI_API_KEY_COMPACTION_MODEL = 'gpt-5.1-codex-mini';
 export const OPENAI_OAUTH_SYSTEM_MODEL = 'gpt-5.4';
 export const ANTHROPIC_COMPACTION_MODEL = 'claude-haiku-4-5';
@@ -35,6 +43,13 @@ const OPENAI_REQUEST_REASONING_EFFORT_COMPATIBLE_MODELS = [
   'gpt-5.5',
   'gpt-5.5-pro',
 ] as const;
+const OPENAI_REQUEST_REASONING_EFFORTS_BY_MODEL: Record<string, ReasoningEffort[]> = {
+  'gpt-5.4': ['low', 'medium', 'high'],
+  'gpt-5.4-pro': ['low', 'medium', 'high'],
+  'gpt-5.4-mini': ['low', 'medium', 'high'],
+  'gpt-5.5': ['low', 'medium', 'high', 'ultrahigh'],
+  'gpt-5.5-pro': ['low', 'medium', 'high', 'ultrahigh'],
+};
 const DEFAULT_OPENAI_REASONING_EFFORT: Record<string, ReasoningEffort> = {
   'gpt-5.4': 'medium',
   'gpt-5.4-pro': 'medium',
@@ -185,7 +200,45 @@ export class ModelPolicyService {
   }
 
   static supportsOpenAiRequestReasoningEffort(model: string): boolean {
-    return OPENAI_REQUEST_REASONING_EFFORT_COMPATIBLE_MODELS.includes(model as (typeof OPENAI_REQUEST_REASONING_EFFORT_COMPATIBLE_MODELS)[number]);
+    return ModelPolicyService.supportedOpenAiRequestReasoningEfforts(model).length > 0;
+  }
+
+  static supportsOpenAiRequestReasoningEffortLevel(model: string, effort: ReasoningEffort): boolean {
+    return ModelPolicyService.supportedOpenAiRequestReasoningEfforts(model).includes(effort);
+  }
+
+  static supportedOpenAiRequestReasoningEfforts(model: string): ReasoningEffort[] {
+    return OPENAI_REQUEST_REASONING_EFFORTS_BY_MODEL[model] ?? (
+      OPENAI_REQUEST_REASONING_EFFORT_COMPATIBLE_MODELS.includes(model as (typeof OPENAI_REQUEST_REASONING_EFFORT_COMPATIBLE_MODELS)[number]) ?
+        ['low', 'medium', 'high']
+      : []
+    );
+  }
+
+  static buildReasoningEffortOptions(model: string): ReasoningEffortOption[] {
+    const requestSupportedEfforts = new Set(ModelPolicyService.supportedOpenAiRequestReasoningEfforts(model));
+    const reasoningSupported = ModelPolicyService.supportsReasoningEffort(model);
+    const defaultEffort = ModelPolicyService.resolveDefaultReasoningEffort(model);
+    const disabledReason =
+      reasoningSupported ?
+        'Not supported by request path'
+      : 'Not supported';
+
+    return [
+      {
+        id: 'default',
+        label: 'default',
+        description: defaultEffort ? `Use ${model} default (${defaultEffort})` : `Do not send reasoning effort for ${model}`,
+        disabled: false,
+      },
+      ...(['low', 'medium', 'high', 'ultrahigh'] as const).map((effort) => ({
+        id: effort,
+        label: effort,
+        description: `Set explicit ${effort} effort`,
+        disabled: !requestSupportedEfforts.has(effort),
+        disabledReason: requestSupportedEfforts.has(effort) ? undefined : disabledReason,
+      })),
+    ];
   }
 
   static resolveDefaultReasoningEffort(model: string): ReasoningEffort | undefined {

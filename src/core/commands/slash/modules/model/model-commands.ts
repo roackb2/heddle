@@ -165,12 +165,8 @@ function setReasoningEffort(
     return slashMessageResult(`Reasoning effort is not supported for model ${context.model.active()}.`);
   }
 
-  if (selected === 'ultrahigh') {
-    return slashMessageResult('Reasoning effort "ultrahigh" is reserved but is not supported by the current OpenAI request path. Use low, medium, high, or default.');
-  }
-
-  if (!ModelPolicyService.supportsOpenAiRequestReasoningEffort(context.model.active())) {
-    return slashMessageResult(`Reasoning effort settings are not supported by the OpenAI request path for model ${context.model.active()}.`);
+  if (!ModelPolicyService.supportsOpenAiRequestReasoningEffortLevel(context.model.active(), selected)) {
+    return slashMessageResult(`Reasoning effort "${selected}" is not supported by the OpenAI request path for model ${context.model.active()}.`);
   }
 
   context.model.setReasoningEffort(selected);

@@ -185,6 +185,40 @@ describe('core slash command modules', () => {
     expect(setActive).not.toHaveBeenCalled();
   });
 
+  it('uses shared reasoning policy before setting reasoning effort', async () => {
+    const setReasoningEffort = vi.fn();
+    const context = createContext({
+      model: {
+        active: () => 'gpt-5.4',
+        activeReasoningEffort: () => undefined,
+        setActive: vi.fn(),
+        setReasoningEffort,
+        credentialSource: () => undefined,
+      },
+    });
+
+    await expect(registry.run(context, '/reasoning ultrahigh')).resolves.toMatchObject({
+      kind: 'message',
+      message: 'Reasoning effort "ultrahigh" is not supported by the OpenAI request path for model gpt-5.4.',
+    });
+    expect(setReasoningEffort).not.toHaveBeenCalled();
+
+    const supportedContext = createContext({
+      model: {
+        active: () => 'gpt-5.5',
+        activeReasoningEffort: () => undefined,
+        setActive: vi.fn(),
+        setReasoningEffort,
+        credentialSource: () => undefined,
+      },
+    });
+    await expect(registry.run(supportedContext, '/reasoning ultrahigh')).resolves.toMatchObject({
+      kind: 'message',
+      message: 'Set reasoning effort to ultrahigh for gpt-5.5.',
+    });
+    expect(setReasoningEffort).toHaveBeenCalledWith('ultrahigh');
+  });
+
   it('routes auth, compaction, and drift commands through host ports', async () => {
     const context = createContext();
 

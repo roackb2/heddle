@@ -68,6 +68,7 @@ export class ControlPlaneSessionRuntimeContextService {
           reasoningEffort: session.reasoningEffort,
         }),
         reasoningSupported: ModelPolicyService.supportsReasoningEffort(model),
+        reasoningOptions: ModelPolicyService.buildReasoningEffortOptions(model),
         credentialSource: RuntimeCredentialService.resolveCredentialSourceForModel(model, args),
         contextWindow: ModelCatalogService.estimateBuiltInContextWindow(model),
         estimatedInputTokens,
@@ -78,6 +79,7 @@ export class ControlPlaneSessionRuntimeContextService {
       },
     };
   }
+
 }
 
 export const controlPlaneSessionRuntimeContextService = new ControlPlaneSessionRuntimeContextService();

@@ -213,6 +213,14 @@ The terminal composer supports multiline prompts, prompt undo/redo, prompt histo
 
 More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
 
+### Terminal UI v2 status
+
+`cli-v2` is actively under development, but it is not released as the default terminal experience yet. The current work is intentionally architectural: the new TUI consumes the same local control-plane API as the browser UI and does not reach directly into core services.
+
+For users, the goal is one behavior model across interfaces. A saved conversation, selected model, reasoning setting, approval state, and live run status should be the same whether you are looking from the terminal, the browser control plane, or another device connected to the same local daemon. Conversation state is inherently synchronized because each interface is a client of the same session/control-plane path rather than a separate runtime.
+
+For contributors, the goal is a cleaner implementation path: TUI-specific rendering and keyboard behavior stay in `cli-v2`, shared semantics stay in core and server-owned control-plane APIs, and future advanced features can build on a maintainable API-first foundation instead of duplicating command/session logic in each interface.
+
 ### Project instructions
 
 Heddle can load a short project instruction file at startup so a fresh session starts with the repository's operating context. By default it loads the first non-empty file found in this order: `HEDDLE.md`, `AGENTS.md`, `CLAUDE.md`.

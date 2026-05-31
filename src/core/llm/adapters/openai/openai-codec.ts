@@ -164,9 +164,9 @@ export class OpenAiCodec {
       return undefined;
     }
 
-    if (!ModelPolicyService.supportsOpenAiRequestReasoningEffort(args.model)) {
+    if (!ModelPolicyService.supportsOpenAiRequestReasoningEffortLevel(args.model, effectiveEffort)) {
       if (args.explicitEffort) {
-        throw new Error(`Reasoning effort is not supported for OpenAI model ${args.model}.`);
+        throw new Error(`Reasoning effort "${effectiveEffort}" is not supported for OpenAI model ${args.model}.`);
       }
       return undefined;
     }
@@ -175,11 +175,7 @@ export class OpenAiCodec {
   }
 
   private static toOpenAiReasoningEffort(value: ReasoningEffort): OpenAiReasoningEffort {
-    if (value === 'low' || value === 'medium' || value === 'high') {
-      return value;
-    }
-
-    throw new Error('Reasoning effort "ultrahigh" is not supported by the current OpenAI Responses API. Use low, medium, high, or default.');
+    return value as OpenAiReasoningEffort;
   }
 
   private static toResponseInput(messages: ChatMessage[]): ResponseInputItem[] {

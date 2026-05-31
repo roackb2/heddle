@@ -585,7 +585,7 @@ describe('runLocalCommand', () => {
     expect(setActiveReasoningEffort).toHaveBeenCalledWith('medium');
   });
 
-  it('rejects reserved ultrahigh reasoning effort before a run starts', async () => {
+  it('rejects unsupported ultrahigh reasoning effort before a run starts', async () => {
     const setActiveReasoningEffort = vi.fn();
     const result = await runLocalCommand(createCommandArgs({
       prompt: '/reasoning ultrahigh',
@@ -599,6 +599,20 @@ describe('runLocalCommand', () => {
       message: expect.stringContaining('ultrahigh'),
     });
     expect(setActiveReasoningEffort).not.toHaveBeenCalled();
+  });
+
+  it('accepts ultrahigh reasoning effort for models that support it', async () => {
+    const setActiveReasoningEffort = vi.fn();
+    await expect(runLocalCommand(createCommandArgs({
+      prompt: '/reasoning ultrahigh',
+      activeModel: 'gpt-5.5',
+      setActiveReasoningEffort,
+    }))).resolves.toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'Set reasoning effort to ultrahigh for gpt-5.5.',
+    });
+    expect(setActiveReasoningEffort).toHaveBeenCalledWith('ultrahigh');
   });
 
   it('autocompletes shared prefixes while preserving leading whitespace', () => {
