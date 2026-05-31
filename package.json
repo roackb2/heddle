@@ -162,6 +162,7 @@
     "clsx": "^2.1.1",
     "commander": "^14.0.1",
     "dayjs": "^1.11.20",
+    "debounce": "^3.0.0",
     "eventsource": "4.1.0",
     "express": "^5.2.1",
     "gitdiff-parser": "^0.3.1",

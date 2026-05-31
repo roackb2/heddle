@@ -138,6 +138,23 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('searches file mention suggestions through the control-plane API', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await expect(store.searchWorkspaceFileMentions('src', 8)).resolves.toEqual([
+      { path: 'src/example.ts' },
+    ]);
+
+    expect(fixture.calls.workspaceFileSearchQuery).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      query: 'src',
+      limit: 8,
+    });
+    store.dispose();
+  });
+
   it('executes picker selections through slash commands', async () => {
     const fixture = createClientFixture();
     const store = new ControlPlaneSessionStore({ client: fixture.client });
@@ -677,6 +694,10 @@ function createClientFixture() {
       kind: 'message',
       message: 'Current model: gpt-5.4',
     })),
+    workspaceFileSearchQuery: vi.fn(async () => ({
+      workspaceId: 'workspace-1',
+      files: [{ path: 'src/example.ts' }],
+    })),
     sessionContinueMutate: vi.fn(async () => ({
       outcome: 'done',
       summary: 'Continued.',
@@ -712,6 +733,7 @@ function createClientFixture() {
       sessionSendPromptAsync: { mutate: calls.sessionSendPromptAsyncMutate },
       slashCommandCatalog: { query: calls.slashCommandCatalogQuery },
       slashCommandExecute: { mutate: calls.slashCommandExecuteMutate },
+      workspaceFileSearch: { query: calls.workspaceFileSearchQuery },
       sessionContinue: { mutate: calls.sessionContinueMutate },
       sessionCancel: { mutate: calls.sessionCancelMutate },
       sessionResolveApproval: { mutate: calls.sessionResolveApprovalMutate },

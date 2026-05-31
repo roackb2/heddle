@@ -8,6 +8,7 @@ export type ControlPlaneSessionCreateInput = Exclude<NonNullable<RouterInputs['c
 type SessionSendPromptInput = RouterInputs['controlPlane']['sessionSendPrompt'];
 type SessionSendPromptAsyncInput = RouterInputs['controlPlane']['sessionSendPromptAsync'];
 type SlashCommandExecuteInput = RouterInputs['controlPlane']['slashCommandExecute'];
+type WorkspaceFileSearchInput = RouterInputs['controlPlane']['workspaceFileSearch'];
 
 export type ControlPlaneSessionApiServiceOptions = {
   client: ControlPlaneProxyClient;
@@ -87,6 +88,10 @@ export class ControlPlaneSessionApiService {
 
   async getSlashCommandCatalog(workspaceId: string) {
     return this.client.controlPlane.slashCommandCatalog.query({ workspaceId });
+  }
+
+  async searchWorkspaceFiles(input: WorkspaceFileSearchInput) {
+    return this.client.controlPlane.workspaceFileSearch.query(input);
   }
 
   async sendPrompt(input: Pick<SessionSendPromptInput, 'workspaceId' | 'sessionId' | 'prompt'>) {

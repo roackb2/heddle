@@ -41,3 +41,5 @@ export type ControlPlaneMemoryStatus = RouterOutputs['controlPlane']['memoryStat
 export type ControlPlaneWorkspaceChanges = RouterOutputs['controlPlane']['workspaceChanges'];
 export type ControlPlaneWorkspaceChangedFile = ControlPlaneWorkspaceChanges['files'][number];
 export type ControlPlaneWorkspaceFileDiff = RouterOutputs['controlPlane']['workspaceFileDiff'];
+export type ControlPlaneWorkspaceFileSearch = RouterOutputs['controlPlane']['workspaceFileSearch'];
+export type ControlPlaneWorkspaceFileSuggestion = ControlPlaneWorkspaceFileSearch['files'][number];

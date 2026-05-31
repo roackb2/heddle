@@ -1,4 +1,5 @@
 import { skipToken } from '@tanstack/react-query';
+import debounce from 'debounce';
 import {
   useCallback,
   useEffect,
@@ -14,14 +15,9 @@ import type {
   SyntheticEvent,
 } from 'react';
 import { trpcReact, type RouterOutputs } from '@web/api/client';
+import { ClientSharedFileMentionService } from '@/client-shared/services/file-mentions/index.js';
 
 export type FileMentionSuggestion = RouterOutputs['controlPlane']['workspaceFileSearch']['files'][number];
-
-type FileMentionToken = {
-  query: string;
-  start: number;
-  end: number;
-};
 
 type TextareaRef = RefObject<HTMLTextAreaElement | null>;
 
@@ -51,38 +47,39 @@ export function useFileMentionAutocomplete({
   const listboxId = useId();
   const optionIdPrefix = `${listboxId}-option`;
   const cursorRef = useRef(value.length);
-  const [mentionToken, setMentionToken] = useState<FileMentionToken | null>(null);
-  const [debouncedMentionToken, setDebouncedMentionToken] = useState<FileMentionToken | null>(null);
+  const [mentionToken, setMentionToken] = useState(ClientSharedFileMentionService.findToken(value, value.length));
+  const [debouncedMentionToken, setDebouncedMentionToken] = useState(ClientSharedFileMentionService.findToken(value, value.length));
   const [activeIndex, setActiveIndex] = useState(0);
+  const debouncedTokenUpdate = useMemo(() => debounce(setDebouncedMentionToken, debounceMs), [debounceMs]);
 
   const updateMentionToken = useCallback((nextValue: string, cursor: number | null) => {
     const nextCursor = cursor ?? nextValue.length;
     cursorRef.current = nextCursor;
-    setMentionToken(findFileMentionToken(nextValue, nextCursor));
+    setMentionToken(ClientSharedFileMentionService.findToken(nextValue, nextCursor));
   }, []);
 
   useEffect(() => {
     if (disabled) {
       setMentionToken(null);
       setDebouncedMentionToken(null);
+      debouncedTokenUpdate.clear();
       return;
     }
 
     updateMentionToken(value, Math.min(cursorRef.current, value.length));
-  }, [disabled, updateMentionToken, value]);
+  }, [debouncedTokenUpdate, disabled, updateMentionToken, value]);
 
   useEffect(() => {
     if (!mentionToken || disabled) {
       setDebouncedMentionToken(null);
+      debouncedTokenUpdate.clear();
       return;
     }
 
-    const timeout = window.setTimeout(() => {
-      setDebouncedMentionToken(mentionToken);
-    }, debounceMs);
+    debouncedTokenUpdate(mentionToken);
 
-    return () => window.clearTimeout(timeout);
-  }, [debounceMs, disabled, mentionToken]);
+    return () => debouncedTokenUpdate.clear();
+  }, [debouncedTokenUpdate, disabled, mentionToken]);
 
   const queryInput = debouncedMentionToken && workspaceId ? {
     workspaceId,
@@ -141,17 +138,15 @@ export function useFileMentionAutocomplete({
       return;
     }
 
-    const insertedMention = `@${suggestion.path}`;
-    const nextValue = `${value.slice(0, mentionToken.start)}${insertedMention} ${value.slice(mentionToken.end)}`;
-    const nextCursor = mentionToken.start + insertedMention.length + 1;
+    const inserted = ClientSharedFileMentionService.insertSelection(value, mentionToken, suggestion.path);
 
-    onValueChange(nextValue);
+    onValueChange(inserted.value);
     close();
-    cursorRef.current = nextCursor;
+    cursorRef.current = inserted.cursor;
 
     window.requestAnimationFrame(() => {
       resolvedTextareaRef.current?.focus();
-      resolvedTextareaRef.current?.setSelectionRange(nextCursor, nextCursor);
+      resolvedTextareaRef.current?.setSelectionRange(inserted.cursor, inserted.cursor);
     });
   }, [close, disabled, mentionToken, onValueChange, resolvedTextareaRef, value]);
 
@@ -279,25 +274,4 @@ export function shouldSubmitFromKeyDown(event: KeyboardEvent<HTMLTextAreaElement
     !event.metaKey &&
     !event.ctrlKey
   );
-}
-
-function findFileMentionToken(value: string, cursor: number): FileMentionToken | null {
-  const beforeCursor = value.slice(0, cursor);
-  const match = beforeCursor.match(/(^|[\s([{"'`])@([^\s@]*)$/);
-  if (!match || match.index === undefined) {
-    return null;
-  }
-
-  const prefix = match[1] ?? '';
-  const start = match.index + prefix.length;
-  const previousCharacter = value[start - 1];
-  if (previousCharacter && /[\w.-]/.test(previousCharacter)) {
-    return null;
-  }
-
-  return {
-    query: match[2] ?? '',
-    start,
-    end: cursor,
-  };
 }

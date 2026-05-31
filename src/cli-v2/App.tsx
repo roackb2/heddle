@@ -7,6 +7,7 @@ import { ApprovalPanel } from './components/ApprovalPanel.js';
 import { AgentPlanPanel } from './components/AgentPlanPanel.js';
 import { CommandResultPanel } from './components/CommandResultPanel.js';
 import { ConversationPanel } from './components/ConversationPanel.js';
+import { FileMentionPickerPanel } from './components/FileMentionPickerPanel.js';
 import { ModelPickerPanel } from './components/ModelPickerPanel.js';
 import { PromptInput } from './components/PromptInput.js';
 import { PromptStatusPanel } from './components/PromptStatusPanel.js';
@@ -16,6 +17,7 @@ import { RuntimeStatusBar } from './components/RuntimeStatusBar.js';
 import { SessionPickerPanel } from './components/SessionPickerPanel.js';
 import { SlashCommandHintPanel } from './components/SlashCommandHintPanel.js';
 import { useControlPlaneSessionStore } from './hooks/useControlPlaneSessionStore.js';
+import { useFileMentionPicker } from './hooks/useFileMentionPicker.js';
 import { usePromptPickers } from './hooks/usePromptPickers.js';
 import { usePromptDraft } from './hooks/usePromptDraft.js';
 import { PromptActivityService } from './services/activities/prompt-activity-service.js';
@@ -51,6 +53,12 @@ export function App({
     onSelectSession: (sessionId) => {
       void store.selectSessionFromPicker(sessionId);
     },
+  });
+  const fileMentions = useFileMentionPicker({
+    draft,
+    setDraft,
+    snapshot,
+    store,
   });
 
   useEffect(() => {
@@ -145,7 +153,16 @@ export function App({
           highlightedIndex={pickers.session.highlightedIndex}
         />
       ) : null}
-      {!pickers.visible ? <SlashCommandHintPanel hints={slashCommandHints} /> : null}
+      {fileMentions.visible ? (
+        <FileMentionPickerPanel
+          query={fileMentions.query}
+          suggestions={fileMentions.suggestions}
+          highlightedIndex={fileMentions.highlightedIndex}
+          loading={fileMentions.loading}
+          error={fileMentions.error}
+        />
+      ) : null}
+      {!pickers.visible && !fileMentions.visible ? <SlashCommandHintPanel hints={slashCommandHints} /> : null}
       <PromptStatusPanel
         currentActivity={snapshot.currentActivity}
         latestActivity={PromptActivityService.build(snapshot)}
@@ -162,7 +179,7 @@ export function App({
         onChange={setDraft}
         onSubmit={submitPrompt}
         onComplete={(value) => store.completeSlashCommandDraft(value)}
-        onSpecialKey={pickers.handleSpecialKey}
+        onSpecialKey={(input, key) => fileMentions.handleSpecialKey(input, key) || pickers.handleSpecialKey(input, key)}
       />
       <RuntimeStatusBar snapshot={snapshot} />
     </Box>

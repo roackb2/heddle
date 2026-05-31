@@ -34,6 +34,7 @@ import type {
   ControlPlaneSlashCommandCatalog,
   ControlPlaneSlashCommandHint,
   ControlPlaneSlashCommandResult,
+  ControlPlaneWorkspaceFileSuggestion,
 } from '@/client-shared/api/types.js';
 
 const ASSISTANT_STREAM_RENDER_INTERVAL_MS = 75;
@@ -182,6 +183,12 @@ export class ControlPlaneSessionStore {
     const sessions = await this.api.listSessions(workspaceId);
     this.setSnapshot({ sessions });
     return sessions;
+  }
+
+  async searchWorkspaceFileMentions(query: string, limit = 20): Promise<ControlPlaneWorkspaceFileSuggestion[]> {
+    const workspaceId = this.requireWorkspaceId();
+    const result = await this.api.searchWorkspaceFiles({ workspaceId, query, limit });
+    return result.workspaceId === workspaceId ? result.files : [];
   }
 
   async createSession(input: ControlPlaneSessionCreateInput = {}): Promise<ControlPlaneSessionView> {
