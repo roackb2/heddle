@@ -11,6 +11,7 @@ import { useComposerImageDrop } from '@web/hooks/conversation/useComposerImageDr
 import { useComposerTextareaAutosize } from '@web/hooks/conversation/useComposerTextareaAutosize';
 import { useComposerImageUploadToasts } from '@web/hooks/conversation/useComposerImageUploadToasts';
 import { useFileMentionAutocomplete } from '@web/hooks/conversation/useFileMentionAutocomplete';
+import { usePromptHistoryNavigation } from '@web/hooks/conversation/usePromptHistoryNavigation';
 import {
   ComposerImageUploadControls,
   type ComposerImageUploadControlsHandle,
@@ -97,6 +98,13 @@ export function ConversationComposer({
   });
   useComposerImageUploadToasts(imageUploadError);
 
+  const promptHistory = usePromptHistoryNavigation({
+    value: draft,
+    onValueChange: setDraft,
+    textareaRef,
+    disabled: inputDisabled,
+  });
+  const { recordPrompt } = promptHistory;
   const handleSubmit = useCallback(async () => {
     const prompt = appendUploadedImagePaths(draft.trim(), uploadedImagePaths);
     if (!prompt || sendDisabled) {
@@ -104,9 +112,10 @@ export function ConversationComposer({
     }
 
     await onSubmitPrompt(prompt);
+    recordPrompt(prompt);
     setDraft('');
     clearUploadedAttachments();
-  }, [clearUploadedAttachments, draft, onSubmitPrompt, sendDisabled, uploadedImagePaths]);
+  }, [clearUploadedAttachments, draft, onSubmitPrompt, recordPrompt, sendDisabled, uploadedImagePaths]);
   const fileMentions = useFileMentionAutocomplete({
     workspaceId,
     value: draft,
@@ -147,7 +156,13 @@ export function ConversationComposer({
         value={draft}
         onChange={fileMentions.textareaProps.onChange}
         onClick={fileMentions.textareaProps.onClick}
-        onKeyDown={fileMentions.textareaProps.onKeyDown}
+        onKeyDown={(event) => {
+          if (fileMentions.handleKeyDown(event)) {
+            return;
+          }
+
+          promptHistory.handleKeyDown(event);
+        }}
         onSelect={fileMentions.textareaProps.onSelect}
       />
       {fileMentions.isOpen ? <FileMentionMenu {...fileMentions.menuProps} /> : null}

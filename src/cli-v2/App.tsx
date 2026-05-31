@@ -36,7 +36,15 @@ export function App({
 }) {
   const startedRef = useRef(false);
   const snapshot = useControlPlaneSessionStore(store);
-  const { draft, setDraft, clearDraft } = usePromptDraft();
+  const {
+    draft,
+    cursor,
+    setDraft,
+    setDraftState,
+    clearDraft,
+    recordSubmittedPrompt,
+    navigateHistory,
+  } = usePromptDraft();
   const submitDisabled = snapshot.loading || snapshot.submitting || snapshot.running;
   const inputDisabled = snapshot.loading;
   const slashCommandHints = store.getSlashCommandHints(draft);
@@ -88,10 +96,14 @@ export function App({
     }
 
     clearDraft();
+    if (!trimmed.startsWith('/')) {
+      recordSubmittedPrompt(trimmed);
+    }
     void store.submitPrompt(value);
   }, [
     clearDraft,
     pickers,
+    recordSubmittedPrompt,
     store,
     submitDisabled,
   ]);
@@ -176,9 +188,11 @@ export function App({
           : 'Type a prompt'
         }
         value={draft}
-        onChange={setDraft}
+        cursor={cursor}
+        onChange={setDraftState}
         onSubmit={submitPrompt}
         onComplete={(value) => store.completeSlashCommandDraft(value)}
+        onHistory={navigateHistory}
         onSpecialKey={(input, key) => fileMentions.handleSpecialKey(input, key) || pickers.handleSpecialKey(input, key)}
       />
       <RuntimeStatusBar snapshot={snapshot} />
