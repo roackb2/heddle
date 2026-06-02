@@ -66,7 +66,7 @@ export function MobileAppFrame(props: AppFrameLayoutProps) {
   return (
     <>
       <AppFrameSkipLink />
-      <div className="relative h-full min-h-0 w-full max-w-[100dvw] overflow-hidden">
+      <div className="v2-mobile-shell relative h-full min-h-0 w-full max-w-[100dvw] overflow-hidden">
         <SidebarToggleButton collapsed={!sidebarOpen} onClick={() => setSidebarOpen(true)} />
         {rightPanel ? <InspectorToggleButton collapsed={!inspectorOpen} onClick={() => setInspectorOpen(true)} /> : null}
         <AppFrameWorkbench>{children}</AppFrameWorkbench>

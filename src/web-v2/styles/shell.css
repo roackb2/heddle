@@ -59,6 +59,15 @@
     padding-left: 3rem;
   }
 
+  .v2-mobile-shell .v2-panel-header {
+    height: calc(3rem + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .v2-mobile-shell .v2-frame-toggle-button {
+    top: calc(0.5rem + env(safe-area-inset-top, 0px));
+  }
+
   .v2-control {
     border-radius: var(--radius-md);
     border: 1px solid color-mix(in oklab, var(--color-border) 72%, transparent);

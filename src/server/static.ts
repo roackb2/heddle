@@ -2,11 +2,15 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import express from 'express';
 
+export function isWebAssetsBuilt(assetsDir: string): boolean {
+  const resolvedAssetsDir = resolve(assetsDir);
+  return existsSync(join(resolvedAssetsDir, 'index.html')) && existsSync(join(resolvedAssetsDir, 'assets'));
+}
+
 export function assertWebAssetsBuilt(assetsDir: string) {
   const resolvedAssetsDir = resolve(assetsDir);
-  const indexPath = join(resolvedAssetsDir, 'index.html');
-  if (!existsSync(indexPath)) {
-    throw new Error(`Web assets not found at ${resolvedAssetsDir}. Run yarn build before starting heddle daemon.`);
+  if (!isWebAssetsBuilt(resolvedAssetsDir)) {
+    throw new Error(`Built web assets not found at ${resolvedAssetsDir}. Run yarn build before starting heddle daemon.`);
   }
 }
 

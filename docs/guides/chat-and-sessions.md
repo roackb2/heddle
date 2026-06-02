@@ -41,6 +41,13 @@ heddle --cwd /path/to/project
 heddle chat --model gpt-5.4-mini --max-steps 20
 ```
 
+`heddle` and `heddle chat` start the API-backed terminal UI. If you need the
+legacy terminal UI while the v2 transition settles, use:
+
+```bash
+heddle chat-v1
+```
+
 Heddle uses the current directory as the workspace root unless you pass `--cwd`.
 
 At startup, Heddle also looks for one project instruction file. The default priority is `HEDDLE.md`, then `AGENTS.md`, then `CLAUDE.md`; the first non-empty file is appended to the system prompt. Set `agentContextPaths` in `heddle.config.json` only when a project needs custom paths or multiple instruction files.

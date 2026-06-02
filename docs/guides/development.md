@@ -95,6 +95,13 @@ yarn chat:dev
 
 `yarn chat:dev` runs the same source CLI entry point as the packaged `heddle chat` command. The `examples/` directory is reserved for programmatic host/runtime examples rather than the main terminal chat UI.
 
+`yarn chat:dev` uses the API-backed terminal UI. The legacy terminal UI remains
+available as an explicit fallback:
+
+```bash
+yarn chat:dev:v1
+```
+
 If you prefer provider-specific local shortcuts, the repository also includes convenience scripts such as:
 
 ```bash
@@ -115,13 +122,13 @@ yarn client:dev
 
 The daemon-backed backend runs on `127.0.0.1:8765` and the Vite client runs on `127.0.0.1:5173`.
 
-`yarn daemon:dev` uses the real daemon path, including workspace ownership, daemon registry refreshes, and built default control-plane static assets from `dist/src/web-v2`. This is the closest development path to the shipped `heddle daemon` behavior.
+`yarn daemon:dev` uses the real daemon path, including live server registry refreshes and built default control-plane static assets from `dist/src/web-v2`. This is the closest development path to the shipped `heddle daemon` behavior.
 
 `yarn client:dev:v1` remains available for the legacy v1 control plane and defaults to `127.0.0.1:5174`.
 
 Because it serves built assets, run `yarn build` after frontend changes before relying on `yarn daemon:dev` for UI validation.
 
-`yarn server:dev` remains a lighter backend-only path for server work. It starts the Express/tRPC app directly and does not register daemon ownership, so the clients will read that path as a local control-plane session rather than a daemon-owned workspace.
+`yarn server:dev` remains a lighter backend-only path for server work. It starts the Express/tRPC app directly for API development rather than running the full daemon command wrapper.
 
 For a production-style local run of the built daemon:
 

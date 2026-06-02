@@ -40,6 +40,7 @@ Heddle can also use:
 Current runtime features include:
 
 - multi-turn chat sessions with saved history under `.heddle/`
+- API-backed terminal chat through the same control-plane session path as the browser UI
 - session management with create, switch, continue, rename, and close flows
 - automatic conversation compaction for longer chats
 - manual `/compact` support when an operator wants to shrink session history immediately

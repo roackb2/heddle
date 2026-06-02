@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { dirname, resolve } from 'node:path';
@@ -10,7 +9,7 @@ import { controlPlaneHeartbeatEventsController } from './controllers/trpc/contro
 import { HeddleHeartbeatSchedulerHost } from './heartbeat-scheduler-host.js';
 import { createServerLogger } from './logging/server-logger.js';
 import { getWorkspaceOperationLogger } from './logging/workspace-operation-logger.js';
-import { assertWebAssetsBuilt } from './static.js';
+import { assertWebAssetsBuilt, isWebAssetsBuilt } from './static.js';
 import type { HeddleControlPlaneServerHandle, HeddleControlPlaneServerOptions } from './types.js';
 import type { HeartbeatSchedulerEvent } from '@/core/heartbeat/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
@@ -242,21 +241,24 @@ function logHeartbeatSchedulerEvent(
   logger.info({ workspaceId: workspace.id, stateRoot: workspace.stateRoot, event }, messages[event.type]);
 }
 
-function resolveDefaultAssetsDir(): string {
-  if (process.env.HEDDLE_WEB_DIST) {
-    return resolve(process.env.HEDDLE_WEB_DIST);
+export function resolveDefaultAssetsDir(input: {
+  moduleDir?: string;
+  env?: Pick<NodeJS.ProcessEnv, 'HEDDLE_WEB_DIST'>;
+} = {}): string {
+  const webDistOverride = input.env?.HEDDLE_WEB_DIST ?? process.env.HEDDLE_WEB_DIST;
+  if (webDistOverride) {
+    return resolve(webDistOverride);
   }
 
-  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const moduleDir = input.moduleDir ?? dirname(fileURLToPath(import.meta.url));
   const candidates = [
+    resolve(moduleDir, '../../dist/src/web-v2'),
     resolve(moduleDir, '../web-v2'),
     resolve(moduleDir, '../../web-v2'),
-    resolve(moduleDir, '../../../src/web-v2'),
   ];
 
   for (const candidate of candidates) {
-    const indexPath = resolve(candidate, 'index.html');
-    if (existsSync(indexPath)) {
+    if (isWebAssetsBuilt(candidate)) {
       return candidate;
     }
   }

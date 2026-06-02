@@ -9,7 +9,7 @@ context first, then branch to deeper material only when needed.
 If you are new to Heddle, begin with:
 
 - [Root README](../README.md) for installation and product overview
-- [Runtime host model](guides/runtime-host-model.md) for how workspace ownership and daemon mode work
+- [Runtime host model](guides/runtime-host-model.md) for how terminal chat, daemon mode, workspace identity, and the shared control-plane server fit together
 - [Chat and sessions](guides/chat-and-sessions.md) for the core interactive workflow
 - [Knowledge persistence](guides/knowledge-persistence.md) for how Heddle learns durable workspace knowledge while it works
 - [Control plane](guides/control-plane.md) for the browser UI, workspace switching, session review, task workbench, and browser composer

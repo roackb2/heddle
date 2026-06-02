@@ -4,7 +4,7 @@ Heddle is an open-source AI coding agent runtime and terminal-first workspace fo
 
 Official website: [heddleagent.com](https://heddleagent.com)
 
-> **New web and mobile control plane is out.** Run `heddle daemon` to try the new browser UI for sessions, tasks, workspace switching, memory status, and mobile review. [See the browser control plane](#browser-control-plane-overview).
+> **Terminal UI v2 is now the default.** Run `heddle` or `heddle chat` to try the API-backed terminal experience. Messages, run events, and agent response streams now flow through the shared control-plane path, so terminal, browser, and mobile clients can follow the same work at the same time for smoother cross-device workflows. If you need the old terminal UI while the transition settles, run `heddle chat-v1`.
 
 It is designed for workflows where an agent needs to inspect a live repository, make bounded changes, verify results, keep continuity across sessions, and stay observable to the operator. Heddle supports OpenAI and Anthropic models, stores local workspace state under `.heddle/`, includes both a terminal chat experience and a browser control plane, learns durable workspace knowledge while it works, and gives users a review path for file diffs, commands, approvals, and traces.
 
@@ -213,11 +213,11 @@ The terminal composer supports multiline prompts, prompt undo/redo, prompt histo
 
 More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
 
-### Terminal UI v2 status
+### Terminal UI v2 is the default
 
-`cli-v2` is actively under development, but it is not released as the default terminal experience yet. The current work is intentionally architectural: the new TUI consumes the same local control-plane API as the browser UI and does not reach directly into core services.
+The default terminal chat is now the API-backed `cli-v2` experience. Run `heddle` or `heddle chat` from a project to start it. The legacy terminal UI remains available as an explicit fallback through `heddle chat-v1` while the transition settles.
 
-For users, the goal is one behavior model across interfaces. A saved conversation, selected model, reasoning setting, approval state, and live run status should be the same whether you are looking from the terminal, the browser control plane, or another device connected to the same local daemon. Conversation state is inherently synchronized because each interface is a client of the same session/control-plane path rather than a separate runtime.
+The v2 terminal UI consumes the same local control-plane API as the browser UI and does not reach directly into core services. For users, the goal is one behavior model across interfaces. A saved conversation, selected model, reasoning setting, approval state, and live run status should be the same whether you are looking from the terminal, the browser control plane, or another device connected to the same local control-plane server. Messages, tool events, approval waits, and streamed agent responses are delivered through the shared session event path, so multiple devices can observe and continue the same work simultaneously instead of waiting for one surface to finish or refresh.
 
 For contributors, the goal is a cleaner implementation path: TUI-specific rendering and keyboard behavior stay in `cli-v2`, shared semantics stay in core and server-owned control-plane APIs, and future advanced features can build on a maintainable API-first foundation instead of duplicating command/session logic in each interface.
 
@@ -298,13 +298,10 @@ Heddle is local-first, but it still has a runtime ownership model.
 
 The short version is:
 
-- the workspace is the project-level state and ownership unit
-- one workspace should have one live runtime owner at a time
-- that owner is either:
-  - the embedded CLI command you started
-  - or a background `heddle daemon`
-
-This is why Heddle stores state under the workspace’s `.heddle/`, why the browser control plane acts as a client of the daemon rather than a separate runtime, and why the UI treats workspace switching as choosing which local `.heddle/` state to inspect and operate.
+- Heddle uses one local control-plane server path for interactive chat and browser control.
+- `heddle` / `heddle chat` attach to a live control-plane server when one exists, or start an embedded one when needed.
+- `heddle daemon` starts the same server path as a standalone process for browser and longer-lived workflows.
+- Workspaces own their local `.heddle/` state, but the server does not own one global active workspace. Clients send workspace identity with workspace-scoped requests.
 
 If you want to understand how `chat`, `ask`, the daemon, the control plane, and workspace-local state fit together, read:
 

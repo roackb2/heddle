@@ -4,6 +4,12 @@ import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 import type { HeddleControlPlaneServerHandle } from '@/server/index.js';
 
 describe('chat-v2 runtime bootstrap', () => {
+  const logger = {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  };
+
   it('attaches to a fresh live control-plane server', async () => {
     const startServer = vi.fn();
     const runtime = await resolveChatV2Runtime({
@@ -12,7 +18,7 @@ describe('chat-v2 runtime bootstrap', () => {
       preferApiKey: false,
       forceOwnerConflict: false,
       runtimeHost: freshRuntimeHost,
-    }, { startServer });
+    }, { startServer, createLogger: () => logger as never });
 
     expect(startServer).not.toHaveBeenCalled();
     expect(runtime).toMatchObject({
@@ -41,7 +47,7 @@ describe('chat-v2 runtime bootstrap', () => {
         kind: 'none',
         registryPath: '/registry.json',
       },
-    }, { startServer });
+    }, { startServer, createLogger: () => logger as never });
 
     expect(startServer).toHaveBeenCalledWith(expect.objectContaining({
       mode: 'embedded-chat',
@@ -49,8 +55,8 @@ describe('chat-v2 runtime bootstrap', () => {
       stateRoot: '/repo/.heddle-test',
       preferApiKey: true,
       host: '127.0.0.1',
-      port: 0,
-      serveAssets: false,
+      port: 8765,
+      logger,
     }));
     expect(runtime).toMatchObject({
       kind: 'embedded',
@@ -59,6 +65,7 @@ describe('chat-v2 runtime bootstrap', () => {
     });
     await runtime.close();
     expect(close).toHaveBeenCalledTimes(1);
+    expect(formatChatV2RuntimeNotice(runtime)).toContain('browser=http://127.0.0.1:8123');
   });
 
   it('starts embedded when force-owner-conflict bypasses a live server', async () => {
@@ -74,7 +81,7 @@ describe('chat-v2 runtime bootstrap', () => {
       preferApiKey: false,
       forceOwnerConflict: true,
       runtimeHost: freshRuntimeHost,
-    }, { startServer });
+    }, { startServer, createLogger: () => logger as never });
 
     expect(startServer).toHaveBeenCalledTimes(1);
     expect(runtime.kind).toBe('embedded');

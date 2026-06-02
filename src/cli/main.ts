@@ -71,11 +71,20 @@ async function main() {
 
   program
     .command('chat')
-    .description('start the interactive chat UI')
+    .description('start the API-backed interactive chat UI')
     .action(async () => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      writeRuntimeHostNotice('chat', resolved.runtimeHost);
+      await runChatCliV2Command(resolved);
+    });
+
+  program
+    .command('chat-v1')
+    .description('start the legacy interactive chat UI')
+    .action(async () => {
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      chdir(resolved.workspaceRoot);
+      writeRuntimeHostNotice('chat-v1', resolved.runtimeHost);
       startChatCli({
         ...resolved,
         runtimeHost: resolved.forceOwnerConflict ? undefined : resolved.runtimeHost,
@@ -84,7 +93,7 @@ async function main() {
 
   program
     .command('chat-v2')
-    .description('start the API-backed interactive chat UI rewrite')
+    .description('start the API-backed interactive chat UI')
     .action(async () => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
@@ -277,11 +286,7 @@ async function main() {
     .action(async () => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      writeRuntimeHostNotice('chat', resolved.runtimeHost);
-      startChatCli({
-        ...resolved,
-        runtimeHost: resolved.forceOwnerConflict ? undefined : resolved.runtimeHost,
-      });
+      await runChatCliV2Command(resolved);
     });
 
   const argv = process.argv.slice(2);
@@ -306,7 +311,7 @@ async function main() {
 }
 
 function isKnownCommand(command: string): boolean {
-  return ['chat', 'chat-v2', 'ask', 'init', 'memory', 'auth', 'eval', 'heartbeat', 'daemon', 'help'].includes(command);
+  return ['chat', 'chat-v1', 'chat-v2', 'ask', 'init', 'memory', 'auth', 'eval', 'heartbeat', 'daemon', 'help'].includes(command);
 }
 
 async function runMemoryCli(

@@ -1,0 +1,19 @@
+{
+  "name": "Heddle Control Plane",
+  "short_name": "Heddle",
+  "description": "Terminal-first AI coding workspace with a shared browser and mobile control plane.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101018",
+  "theme_color": "#181821",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

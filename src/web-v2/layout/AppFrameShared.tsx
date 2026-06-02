@@ -173,7 +173,7 @@ function FrameToggleButton({
       size="icon"
       aria-expanded={!collapsed}
       aria-label={label}
-      className={`v2-icon-button absolute top-2 z-20 size-7 ${className}`}
+      className={`v2-frame-toggle-button v2-icon-button absolute top-2 z-20 size-7 ${className}`}
       onClick={onClick}
     >
       <Icon aria-hidden="true" />

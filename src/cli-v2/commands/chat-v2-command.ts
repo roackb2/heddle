@@ -1,11 +1,11 @@
 import { resolve } from 'node:path';
 import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 import type { HeddleControlPlaneServerHandle, HeddleControlPlaneServerOptions } from '@/server/index.js';
-import { startHeddleControlPlaneServer } from '@/server/index.js';
+import { createServerLogger, startHeddleControlPlaneServer } from '@/server/index.js';
 import { startChatCliV2 } from '../index.js';
 
 const DEFAULT_CONTROL_PLANE_HOST = '127.0.0.1';
-const EMBEDDED_CONTROL_PLANE_PORT = 0;
+const DEFAULT_CONTROL_PLANE_PORT = 8765;
 
 export type ChatCliV2CommandOptions = {
   workspaceRoot: string;
@@ -41,6 +41,7 @@ export type ChatV2Runtime = {
 
 type ChatV2RuntimeDependencies = {
   startServer?: (options: HeddleControlPlaneServerOptions) => Promise<HeddleControlPlaneServerHandle>;
+  createLogger?: (stateRoot: string) => HeddleControlPlaneServerOptions['logger'];
 };
 
 export async function runChatCliV2Command(options: ChatCliV2CommandOptions): Promise<void> {
@@ -80,14 +81,19 @@ export async function resolveChatV2Runtime(
   }
 
   const startServer = dependencies.startServer ?? startHeddleControlPlaneServer;
+  const stateRoot = resolve(input.workspaceRoot, input.stateDir);
+  const logger = dependencies.createLogger?.(stateRoot) ?? createServerLogger({
+    stateRoot,
+    console: false,
+  });
   const handle = await startServer({
     mode: 'embedded-chat',
     workspaceRoot: input.workspaceRoot,
-    stateRoot: resolve(input.workspaceRoot, input.stateDir),
+    stateRoot,
     preferApiKey: input.preferApiKey,
     host: DEFAULT_CONTROL_PLANE_HOST,
-    port: EMBEDDED_CONTROL_PLANE_PORT,
-    serveAssets: false,
+    port: DEFAULT_CONTROL_PLANE_PORT,
+    logger,
   });
 
   return {
@@ -111,6 +117,7 @@ export function formatChatV2RuntimeNotice(runtime: ChatV2Runtime): string {
   return [
     'Heddle notice: started embedded chat-v2 control-plane server.',
     `server=http://${runtime.endpoint.host}:${runtime.endpoint.port}`,
+    `browser=http://${runtime.endpoint.host}:${runtime.endpoint.port}`,
     `serverId=${runtime.serverId}`,
   ].join(' ');
 }
