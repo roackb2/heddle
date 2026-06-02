@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ControlPlaneChatSessionPresenter, parseDaemonArgs } from '../../../cli/daemon.js';
+import { ControlPlaneChatSessionPresenter, parseDaemonArgs, runDaemonCli } from '../../../cli/daemon.js';
+import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 
 describe('daemon CLI helpers', () => {
   it('parses default daemon host and port', () => {
@@ -24,6 +25,35 @@ describe('daemon CLI helpers', () => {
       port: 8765,
       serveAssets: false,
     });
+  });
+
+  it('prints the live server address and returns successfully when a daemon already exists', async () => {
+    const runtimeHost: ResolvedRuntimeHost = {
+      kind: 'server',
+      registryPath: '/tmp/heddle-daemon-registry.json',
+      serverId: 'server-1',
+      mode: 'daemon',
+      endpoint: {
+        host: '127.0.0.1',
+        port: 8765,
+      },
+      startedAt: '2026-06-02T00:00:00.000Z',
+      lastSeenAt: '2026-06-02T00:00:01.000Z',
+      stale: false,
+      ageMs: 100,
+    };
+    const output: string[] = [];
+
+    const result = await runDaemonCli([], {
+      runtimeHost,
+      stdout: {
+        write: (message) => output.push(message),
+      },
+    });
+
+    expect(result.kind).toBe('attached');
+    expect(output.join('')).toContain('Heddle control-plane server already running at http://127.0.0.1:8765');
+    expect(output.join('')).toContain('serverId=server-1');
   });
 
   it('projects chat sessions without exposing full transcript bodies', () => {
