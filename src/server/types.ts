@@ -12,10 +12,12 @@ export type HeddleServerOptions = {
   runtimeHost?: HeddleRuntimeHostDescriptor;
 };
 
-export type HeddleServerListenOptions = HeddleServerOptions & {
+export type HeddleControlPlaneServerOptions = Omit<HeddleServerOptions, 'runtimeHost'> & {
+  mode: ControlPlaneServerRecord['mode'];
   host: string;
   port: number;
   daemonRegistryPath?: string;
+  serverId?: string;
 };
 
 export type HeddleRuntimeHostDescriptor = {
@@ -30,6 +32,22 @@ export type HeddleRuntimeHostDescriptor = {
 };
 
 export type HeddleRuntimeHostInfo = HeddleRuntimeHostDescriptor;
+
+export type HeddleControlPlaneServerHandle = {
+  mode: ControlPlaneServerRecord['mode'];
+  serverId: string;
+  host: string;
+  port: number;
+  endpoint: {
+    host: string;
+    port: number;
+  };
+  registryPath: string;
+  workspaceRoot: string;
+  stateRoot: string;
+  startedAt: string;
+  close: () => Promise<void>;
+};
 
 export type HeddleServerContext = {
   workspaceRoot: string;

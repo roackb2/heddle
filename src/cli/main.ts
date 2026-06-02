@@ -282,7 +282,6 @@ async function main() {
     .action(async (args: string[]) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      enforceDaemonStartOwnership(resolved.runtimeHost, resolved.forceOwnerConflict);
       await runDaemonCli(args ?? [], resolved);
     });
 
@@ -533,17 +532,6 @@ function writeRuntimeHostNotice(command: string, runtimeHost: ResolvedRuntimeHos
   }
 
   process.stdout.write(`${notice}\n`);
-}
-
-function enforceDaemonStartOwnership(runtimeHost: ResolvedRuntimeHost, forceOwnerConflict: boolean) {
-  if (forceOwnerConflict) {
-    return;
-  }
-
-  const message = RuntimeHostMessages.daemonStartConflict(runtimeHost);
-  if (message) {
-    throw new Error(message);
-  }
 }
 
 function enforceHeartbeatOwnership(args: string[], runtimeHost: ResolvedRuntimeHost, forceOwnerConflict: boolean) {
