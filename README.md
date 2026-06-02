@@ -6,6 +6,20 @@ Official website: [heddleagent.com](https://heddleagent.com)
 
 > **Terminal UI v2 is now the default.** Run `heddle` or `heddle chat` to try the API-backed terminal experience. Messages, run events, and agent response streams now flow through the shared control-plane path, so terminal, browser, and mobile clients can follow the same work at the same time for smoother cross-device workflows. If you need the old terminal UI while the transition settles, run `heddle chat-v1`.
 
+## See Heddle In Action
+
+Terminal, browser, and mobile surfaces can observe the same live session at once:
+
+![Heddle streams the same session across terminal, browser, and mobile](docs/images/heddle-cross-device-stream.gif)
+
+Review and approve sensitive actions from the control plane while the agent run stays visible:
+
+![Heddle request approval flow in the browser control plane](docs/images/heddle-request-approval.gif)
+
+Inspect workspace diffs from browser and mobile while the same conversation continues:
+
+![Heddle diff review across browser and mobile](docs/images/heddle-diff-view.gif)
+
 It is designed for workflows where an agent needs to inspect a live repository, make bounded changes, verify results, keep continuity across sessions, and stay observable to the operator. Heddle supports OpenAI and Anthropic models, stores local workspace state under `.heddle/`, includes both a terminal chat experience and a browser control plane, learns durable workspace knowledge while it works, and gives users a review path for file diffs, commands, approvals, and traces.
 
 In plain terms: Heddle is for people who want an AI coding assistant that can work inside actual projects, learn each project's operating knowledge over time, switch between local workspaces, and remain inspectable instead of acting like a black box.
