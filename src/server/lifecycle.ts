@@ -61,7 +61,7 @@ export async function startHeddleControlPlaneServer(
   });
 
   let cleanedUp = false;
-  let heartbeat: NodeJS.Timeout | undefined;
+  const lifecycleTimers: { heartbeat?: NodeJS.Timeout } = {};
   const registerServer = (lastSeenAt?: string) => {
     const workspaceContext = RuntimeWorkspaceService.resolveContext({
       workspaceRoot: options.workspaceRoot,
@@ -90,8 +90,8 @@ export async function startHeddleControlPlaneServer(
     }
 
     cleanedUp = true;
-    if (heartbeat) {
-      clearInterval(heartbeat);
+    if (lifecycleTimers.heartbeat) {
+      clearInterval(lifecycleTimers.heartbeat);
     }
     heartbeatSchedulerHost.stop();
     RuntimeDaemonRegistryService.clearLiveServer({
@@ -117,7 +117,7 @@ export async function startHeddleControlPlaneServer(
     throw error;
   }
 
-  heartbeat = setInterval(() => {
+  lifecycleTimers.heartbeat = setInterval(() => {
     try {
       registerServer();
       heartbeatSchedulerHost.sync();
@@ -125,7 +125,7 @@ export async function startHeddleControlPlaneServer(
       logger.warn({ error }, 'Failed to refresh Heddle server registry heartbeat');
     }
   }, REGISTRY_HEARTBEAT_INTERVAL_MS);
-  heartbeat.unref?.();
+  lifecycleTimers.heartbeat.unref?.();
 
   let closePromise: Promise<void> | undefined;
   const close = () => {

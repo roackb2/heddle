@@ -65,6 +65,7 @@ export function useControlPlaneSessionSettings({
     setSession,
     updateSettingsMutation,
     utils.controlPlane.session,
+    utils.controlPlane.sessionRuntimeContext,
     utils.controlPlane.sessions,
     utils.controlPlane.state,
     workspaceId,
