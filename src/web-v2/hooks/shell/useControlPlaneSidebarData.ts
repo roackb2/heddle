@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { skipToken } from '@tanstack/react-query';
-import { trpcReact, type ControlPlaneSessionsEventEnvelope } from '@web/api/client';
+import { trpcReact } from '@web/api/client';
 import type { ControlPlaneState } from '@web/api/client';
 import type { useWorkbenchNavigation } from '../useWorkbenchNavigation';
 import { applyLiveTaskState } from '../tasks/useControlPlaneTaskLiveState';
@@ -30,6 +29,7 @@ export function useControlPlaneSidebarData({
     workspaceKnown && workspaceId ? { workspaceId } : undefined,
     {
       enabled: workspaceKnown,
+      refetchInterval: navigation.activeSurfaceId === 'sessions' ? 10_000 : false,
     },
   );
   const tasksQuery = trpcReact.controlPlane.heartbeatTasks.useQuery(
@@ -82,16 +82,6 @@ export function useControlPlaneSidebarData({
 
     navigation.selectTask(tasks[0]!.taskId, { replace: true });
   }, [navigation, tasks]);
-
-  trpcReact.controlPlane.sessionsEvents.useSubscription(workspaceId ? { workspaceId } : skipToken, {
-    onData: (event: ControlPlaneSessionsEventEnvelope) => {
-      if (event.type !== 'sessions.updated') {
-        return;
-      }
-
-      void sessionsQuery.refetch();
-    },
-  });
 
   return {
     stateQuery,

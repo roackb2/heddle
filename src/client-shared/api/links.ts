@@ -12,7 +12,10 @@ export type CreateControlPlaneTrpcLinksOptions = {
   url: string;
   batch?: boolean;
   eventSource?: typeof EventSource;
+  requestTimeoutMs?: number;
 };
+
+const DEFAULT_CONTROL_PLANE_REQUEST_TIMEOUT_MS = 30_000;
 
 /**
  * Shared tRPC link service for frontend API consumers.
@@ -25,8 +28,10 @@ export class ClientSharedApiLinkService {
     url,
     batch = false,
     eventSource,
+    requestTimeoutMs = DEFAULT_CONTROL_PLANE_REQUEST_TIMEOUT_MS,
   }: CreateControlPlaneTrpcLinksOptions): TRPCLink<AppRouter>[] {
-    const requestLink = batch ? httpBatchLink({ url }) : httpLink({ url });
+    const fetch = createControlPlaneRequestFetch({ timeoutMs: requestTimeoutMs });
+    const requestLink = batch ? httpBatchLink({ url, fetch }) : httpLink({ url, fetch });
 
     return [
       splitLink({
@@ -36,4 +41,43 @@ export class ClientSharedApiLinkService {
       }),
     ];
   }
+}
+
+export function createControlPlaneRequestFetch({
+  fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_CONTROL_PLANE_REQUEST_TIMEOUT_MS,
+}: {
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+} = {}): typeof fetch {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return fetchImpl;
+  }
+
+  return async (input, init) => {
+    const controller = new AbortController();
+    const upstreamSignal = init?.signal;
+    const timeoutId = setTimeout(() => {
+      controller.abort(new Error(`Control-plane request timed out after ${timeoutMs}ms.`));
+    }, timeoutMs);
+    const abortFromUpstream = () => {
+      controller.abort(upstreamSignal?.reason ?? new Error('Control-plane request aborted.'));
+    };
+
+    if (upstreamSignal?.aborted) {
+      abortFromUpstream();
+    } else {
+      upstreamSignal?.addEventListener('abort', abortFromUpstream, { once: true });
+    }
+
+    try {
+      return await fetchImpl(input, {
+        ...init,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+      upstreamSignal?.removeEventListener('abort', abortFromUpstream);
+    }
+  };
 }
