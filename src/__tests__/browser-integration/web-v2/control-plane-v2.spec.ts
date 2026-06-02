@@ -12,11 +12,20 @@ const trpc = createTRPCProxyClient<AppRouter>({
 });
 
 test('loads the web v2 shell sections', async ({ page }) => {
+  const eventStreams = new Set<string>();
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    const eventPath = url.pathname.match(/\/trpc\/(controlPlane\.[^,?/]*Events)/)?.[1];
+    if (eventPath) {
+      eventStreams.add(eventPath);
+    }
+  });
   const sessionEvents = page.waitForResponse((response) => (
     response.url().includes('/trpc/controlPlane.sessionEvents') && response.status() === 200
   ));
   await page.goto('/sessions');
   await sessionEvents;
+  await page.waitForTimeout(250);
 
   await expect(page.getByRole('complementary', { name: 'Primary navigation' })).toBeVisible();
   await expect(page.getByRole('main')).toBeVisible();
@@ -24,6 +33,7 @@ test('loads the web v2 shell sections', async ({ page }) => {
   await expect(page.getByTestId('web-v2-surface-sessions')).toBeVisible();
   await expect(page.getByTestId('web-v2-workbench-title')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Sessions' })).toHaveAttribute('aria-current', 'page');
+  expect([...eventStreams].sort()).toEqual(['controlPlane.sessionEvents']);
 });
 
 test('collapses and expands the sidebar', async ({ page }) => {

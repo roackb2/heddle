@@ -28,7 +28,10 @@ export function useControlPlaneAppState() {
   const workspaceCreateMutation = trpcReact.controlPlane.workspaceCreate.useMutation();
   const workspaceRenameMutation = trpcReact.controlPlane.workspaceRename.useMutation();
   const workspaceSetActiveMutation = trpcReact.controlPlane.workspaceSetActive.useMutation();
-  const taskEvents = useControlPlaneHeartbeatEvents(navigation.selectedWorkspaceId);
+  const taskEvents = useControlPlaneHeartbeatEvents({
+    enabled: navigation.activeSurfaceId === 'tasks',
+    workspaceId: navigation.selectedWorkspaceId,
+  });
   const sidebar = useControlPlaneSidebarData({ navigation, taskEvents });
   const memoryStatusQuery = trpcReact.controlPlane.memoryStatus.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
     enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'memory',

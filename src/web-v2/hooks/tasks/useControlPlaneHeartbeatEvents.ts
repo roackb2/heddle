@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { skipToken } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { trpcReact, type ControlPlaneHeartbeatEventEnvelope, type ControlPlaneHeartbeatTaskView } from '@web/api/client';
 
@@ -15,7 +16,13 @@ export type ControlPlaneLiveTaskState = {
   updatedAt: string;
 };
 
-export function useControlPlaneHeartbeatEvents(workspaceId?: string) {
+export function useControlPlaneHeartbeatEvents({
+  enabled,
+  workspaceId,
+}: {
+  enabled: boolean;
+  workspaceId?: string;
+}) {
   const utils = trpcReact.useUtils();
   const [liveTasks, setLiveTasks] = useState<Record<string, ControlPlaneLiveTaskState>>({});
 
@@ -49,7 +56,7 @@ export function useControlPlaneHeartbeatEvents(workspaceId?: string) {
     }
   }, [utils, workspaceId]);
 
-  trpcReact.controlPlane.heartbeatEvents.useSubscription(workspaceId ? { workspaceId } : undefined, {
+  trpcReact.controlPlane.heartbeatEvents.useSubscription(enabled && workspaceId ? { workspaceId } : skipToken, {
     onData: applyHeartbeatEnvelope,
   });
 
