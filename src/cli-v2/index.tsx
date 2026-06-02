@@ -31,7 +31,7 @@ export function startChatCliV2(options: ChatCliV2Options) {
     preferApiKey: options.preferApiKey,
   });
 
-  render(<App store={store} initialSelection={{
+  return render(<App store={store} initialSelection={{
     workspaceId: options.workspaceId,
     sessionId: options.sessionId,
   }} />);
