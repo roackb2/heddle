@@ -14,7 +14,7 @@ import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { AuthCliController } from './auth.js';
 import { AskCliHost } from './ask.js';
 import { startChatCli } from './chat/index.js';
-import { startChatCliV2 } from '@/cli-v2/index.js';
+import { runChatCliV2Command } from '@/cli-v2/commands/chat-v2-command.js';
 import { runDaemonCli } from './daemon.js';
 import { runEvalCli } from './eval/index.js';
 import { parseHeartbeatArgs, runHeartbeatCli } from './heartbeat.js';
@@ -88,19 +88,7 @@ async function main() {
     .action(async () => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      if (resolved.runtimeHost.kind !== 'server' || resolved.forceOwnerConflict) {
-        throw new Error('chat-v2 requires a running Heddle daemon because it only consumes the shared control-plane API.');
-      }
-      writeRuntimeHostNotice('chat-v2', resolved.runtimeHost);
-      startChatCliV2({
-        trpcUrl: `http://${resolved.runtimeHost.endpoint.host}:${resolved.runtimeHost.endpoint.port}/trpc`,
-        workspaceId: resolved.activeWorkspaceId,
-        model: resolved.model,
-        maxSteps: resolved.maxSteps,
-        searchIgnoreDirs: resolved.searchIgnoreDirs,
-        systemContext: resolved.systemContext,
-        preferApiKey: resolved.preferApiKey,
-      });
+      await runChatCliV2Command(resolved);
     });
 
   program

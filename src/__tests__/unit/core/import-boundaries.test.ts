@@ -66,9 +66,9 @@ describe('core import boundaries', () => {
     expect(violations).toEqual([]);
   });
 
-  it('keeps cli-v2 on the shared client API boundary', () => {
+  it('keeps cli-v2 TUI/client code on the shared client API boundary', () => {
     const violations = findResolvedImportViolations(
-      sourceFiles.filter((file) => toSourcePath(file).startsWith('cli-v2/')),
+      sourceFiles.filter((file) => isCliV2TuiClientSource(file)),
       (resolvedPath) => resolvedPath.startsWith('core/') || resolvedPath.startsWith('server/'),
     );
 
@@ -147,6 +147,11 @@ function listSourceFiles(dir: string): string[] {
 
     return /\.(?:ts|tsx)$/.test(name) ? [path] : [];
   });
+}
+
+function isCliV2TuiClientSource(file: string): boolean {
+  const sourcePath = toSourcePath(file);
+  return sourcePath.startsWith('cli-v2/') && !sourcePath.startsWith('cli-v2/commands/');
 }
 
 function findImportViolations(files: string[], disallowed: RegExp[]): string[] {
