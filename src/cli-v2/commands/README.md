@@ -47,16 +47,16 @@ domain should have:
 | `heddle chat-v1` | Explicit legacy fallback through `src/cli/chat`. | Keep only while CLI v1 remains available; delete during v1 retirement. |
 | `heddle ask` | `cli-v2` command adapter attaches/embeds the control-plane server, selects or creates a session, and submits through session APIs. | API-backed runtime command. Keep one-shot asks on the same session/run path as TUI and web. |
 | Unknown first argument fallback | Unknown command currently becomes `ask`. | Decide explicitly. Keep only if documented as shorthand; otherwise remove before v1 retirement. |
-| `heddle daemon` | Adapter over runtime discovery and `src/server` lifecycle. | Move command ownership here. Direct discovery/lifecycle calls remain acceptable because the command manages the server. |
+| `heddle daemon` | `cli-v2` command adapter over runtime discovery and `src/server` lifecycle. | Direct discovery/lifecycle calls remain acceptable because the command manages the server. |
 | `heddle auth` | `cli-v2` command adapter delegates credential status/login/logout semantics to `ProviderCredentialCommandService`; `src/cli/auth.ts` remains only as removable v1 compatibility. | Direct management adapter over the core auth command service. |
 | `heddle init` | `cli-v2` command adapter delegates `.heddle/config.json` path/default/template behavior to `ProjectConfigService`. | Direct management adapter over the core project-config service/schema contract. |
-| `heddle memory status/list/read/search` | Direct memory visibility/catalog service calls implemented inline in `src/cli/main.ts`. | Direct management adapter calling documented memory service contracts. |
-| `heddle memory init/validate/maintain` | Direct core memory services; maintenance resolves model/credentials locally. | Direct management adapter, once memory README/public methods explicitly cover validation, repair, backlog, and credential expectations. |
+| `heddle memory status/list/read/search` | `cli-v2` command adapter over documented memory catalog and visibility services. | Direct management adapter calling documented memory service contracts. |
+| `heddle memory init/validate/maintain` | `cli-v2` command adapter over documented memory validation and maintenance services. | Direct management adapter; command edge owns terminal formatting and explicit maintainer credential selection only. |
 | `heddle heartbeat task ...` | `cli-v2` command adapter attaches/embeds the control-plane server and calls heartbeat task API procedures. | API-backed management command; command code must not own task/schedule mutation policy. |
 | `heddle heartbeat runs ...` | `cli-v2` command adapter reads heartbeat run views through control-plane API procedures. | API-backed read command using the same run view shape as web-v2. |
 | `heddle heartbeat run` | `cli-v2` command adapter requests task execution or due-task execution through the live/embedded control-plane server. | Server-backed runtime command; no local CLI scheduler worker. |
 | `heddle heartbeat start` | `cli-v2` command adapter creates/updates a task through API and reports the server-backed scheduler. Embedded mode keeps the control-plane server alive until Ctrl+C. | Server-backed lifecycle command; do not run a separate CLI scheduler loop. |
-| `heddle eval` | Local eval harness adapter over core eval modules. | Direct dev/management adapter unless remote/API evals become a product goal. |
+| `heddle eval` | `cli-v2` command adapter over core eval harness modules. | Direct dev/management adapter unless remote/API evals become a product goal. |
 
 ## Migration Order
 

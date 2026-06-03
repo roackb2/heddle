@@ -48,6 +48,26 @@ guidance.
   safe missing-catalog repair.
 - `templates.ts`: pure memory note template helpers.
 
+## Command-Facing Service Contract
+
+Terminal command edges may call these public methods directly:
+
+- `MemoryCatalogService.bootstrap()`: create the required catalog/template shape.
+- `MemoryVisibilityService.loadStatus()`: build the status view for
+  `heddle memory status`.
+- `MemoryVisibilityService.listNotePaths/readNote/searchNotes`: expose
+  read-only note visibility. Command edges should not traverse memory files
+  themselves.
+- `MemoryValidationService.validate()` and `repairMissingCatalogs()`: validate
+  and safely repair missing catalog files.
+- `MemoryMaintenanceService.readPendingCandidates()` and `runBacklog()`: inspect
+  and process pending durable knowledge candidates.
+
+Command edges own only argument parsing, explicit provider credential selection
+for maintainer runs, and terminal formatting. They must not duplicate catalog
+shape checks, note path validation, pending-candidate filtering, lock handling,
+or maintainer semantics.
+
 ## Extension Points
 
 - Add durable memory policy by updating domain prompt, candidate validation, and
