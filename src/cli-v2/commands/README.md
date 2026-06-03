@@ -43,8 +43,8 @@ domain should have:
 | `heddle ask` | Hybrid path: local conversation engine when no server exists, session API when a live server exists. | API-backed runtime command. Attach/embed the control-plane server, then use session APIs so one-shot asks match TUI/web behavior. |
 | Unknown first argument fallback | Unknown command currently becomes `ask`. | Decide explicitly. Keep only if documented as shorthand; otherwise remove before v1 retirement. |
 | `heddle daemon` | Adapter over runtime discovery and `src/server` lifecycle. | Move command ownership here. Direct discovery/lifecycle calls remain acceptable because the command manages the server. |
-| `heddle auth` | Legacy CLI controller duplicates credential status/login/logout semantics. | Direct management adapter over the core auth command service. |
-| `heddle init` | Inline `heddle.config.json` template/default writing in `src/cli/main.ts`. | Direct management adapter over a small config service/schema contract. |
+| `heddle auth` | `cli-v2` command adapter delegates credential status/login/logout semantics to `ProviderCredentialCommandService`; `src/cli/auth.ts` remains only as removable v1 compatibility. | Direct management adapter over the core auth command service. |
+| `heddle init` | `cli-v2` command adapter delegates config path/default/template behavior to `ProjectConfigService`. | Direct management adapter over the core project-config service/schema contract. |
 | `heddle memory status/list/read/search` | Direct memory visibility/catalog service calls implemented inline in `src/cli/main.ts`. | Direct management adapter calling documented memory service contracts. |
 | `heddle memory init/validate/maintain` | Direct core memory services; maintenance resolves model/credentials locally. | Direct management adapter, once memory README/public methods explicitly cover validation, repair, backlog, and credential expectations. |
 | `heddle heartbeat task ...` | Legacy CLI constructs and mutates heartbeat task objects directly. | Use existing control-plane heartbeat APIs or explicit heartbeat service methods; command code must not own task/schedule mutation policy. |

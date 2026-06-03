@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { chdir } from 'node:process';
 import { Command } from 'commander';
@@ -11,16 +11,18 @@ import { MemoryValidationService } from '../core/memory/validation.js';
 import { MemoryVisibilityService } from '../core/memory/visibility.js';
 import type { MemoryValidationResult } from '../core/memory/types.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
-import { AuthCliController } from './auth.js';
+import { AuthCliController } from '@/cli-v2/commands/auth-command.js';
 import { AskCliHost } from './ask.js';
 import { startChatCli } from './chat/index.js';
 import { runChatCliV2Command } from '@/cli-v2/commands/chat-v2-command.js';
+import { runInitCliV2Command } from '@/cli-v2/commands/init-command.js';
 import { runDaemonCli } from './daemon.js';
 import { runEvalCli } from './eval/index.js';
 import { parseHeartbeatArgs, runHeartbeatCli } from './heartbeat.js';
 import { loadProjectAgentContext, resolveAgentContextPaths } from './project-agent-context.js';
 import { RuntimeHostMessages, RuntimeHostResolver, type ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
+import { ProjectConfigService } from '@/core/project-config/index.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 
 type RootCliOptions = {
@@ -29,15 +31,6 @@ type RootCliOptions = {
   maxSteps?: string;
   preferApiKey?: boolean;
   forceOwnerConflict?: boolean;
-};
-
-type HeddleProjectConfig = {
-  model?: string;
-  maxSteps?: number;
-  stateDir?: string;
-  directShellApproval?: 'always' | 'never';
-  searchIgnoreDirs?: string[];
-  agentContextPaths?: string[];
 };
 
 type ResolvedCliOptions = {
@@ -54,7 +47,6 @@ type ResolvedCliOptions = {
   forceOwnerConflict: boolean;
 };
 
-const DEFAULT_MODEL_FOR_CONFIG = 'gpt-5.4';
 const CLI_VERSION = readCliVersion();
 
 async function main() {
@@ -132,7 +124,7 @@ async function main() {
     .description('create a heddle.config.json template in the workspace')
     .action(() => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
-      initializeProjectConfig(resolved.workspaceRoot);
+      runInitCliV2Command({ workspaceRoot: resolved.workspaceRoot });
     });
 
   const memoryCommand = program
@@ -490,7 +482,7 @@ function writeMemoryValidation(result: MemoryValidationResult) {
 
 function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
   const workspaceRoot = resolve(flags.cwd ?? process.cwd());
-  const projectConfig = loadProjectConfig(workspaceRoot);
+  const projectConfig = ProjectConfigService.read(workspaceRoot);
   const stateRoot = resolve(workspaceRoot, projectConfig.stateDir ?? '.heddle');
   const workspaceContext = RuntimeWorkspaceService.resolveContext({
     workspaceRoot,
@@ -580,62 +572,6 @@ function resolveHeddleRepoRoot(): string {
     }
   }
   return resolve(import.meta.dirname, '../..');
-}
-
-function loadProjectConfig(workspaceRoot: string): HeddleProjectConfig {
-  const configPath = resolve(workspaceRoot, 'heddle.config.json');
-  if (!existsSync(configPath)) {
-    return {};
-  }
-
-  try {
-    const raw = readFileSync(configPath, 'utf8');
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return {};
-    }
-    const candidate = parsed as Record<string, unknown>;
-    return {
-      model: typeof candidate.model === 'string' ? candidate.model : undefined,
-      maxSteps:
-        typeof candidate.maxSteps === 'number' && Number.isFinite(candidate.maxSteps) && candidate.maxSteps > 0 ?
-          candidate.maxSteps
-        : undefined,
-      stateDir: typeof candidate.stateDir === 'string' ? candidate.stateDir : undefined,
-      directShellApproval:
-        candidate.directShellApproval === 'always' || candidate.directShellApproval === 'never' ?
-          candidate.directShellApproval
-        : undefined,
-      searchIgnoreDirs:
-        Array.isArray(candidate.searchIgnoreDirs) && candidate.searchIgnoreDirs.every((value) => typeof value === 'string') ?
-          candidate.searchIgnoreDirs
-        : undefined,
-      agentContextPaths:
-        Array.isArray(candidate.agentContextPaths) && candidate.agentContextPaths.every((value) => typeof value === 'string') ?
-          candidate.agentContextPaths
-        : undefined,
-    };
-  } catch {
-    return {};
-  }
-}
-
-function initializeProjectConfig(workspaceRoot: string) {
-  const configPath = resolve(workspaceRoot, 'heddle.config.json');
-  if (existsSync(configPath)) {
-    process.stdout.write(`heddle.config.json already exists at ${configPath}\n`);
-    return;
-  }
-
-  const template = {
-    model: DEFAULT_MODEL_FOR_CONFIG,
-    maxSteps: 100,
-    stateDir: '.heddle',
-    directShellApproval: 'never',
-    searchIgnoreDirs: ['.git', 'dist', 'node_modules', '.heddle'],
-  };
-  writeFileSync(configPath, `${JSON.stringify(template, null, 2)}\n`);
-  process.stdout.write(`Created ${configPath}\n`);
 }
 
 function parsePositiveInt(raw: string | undefined): number | undefined {

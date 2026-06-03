@@ -2,7 +2,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AuthCliController } from '../../../cli/auth.js';
+import { AuthCliController } from '../../../cli-v2/commands/auth-command.js';
 import { ProviderCredentialRepository } from '../../../core/auth/index.js';
 
 describe('AuthCliController', () => {

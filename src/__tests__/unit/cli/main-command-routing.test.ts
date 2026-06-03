@@ -17,4 +17,17 @@ describe('CLI command routing', () => {
 
     expect(source).toMatch(/return \[[^\]]*'chat-v1'[^\]]*'chat-v2'[^\]]*\]\.includes\(command\)/s);
   });
+
+  it('delegates auth and init command policy to cli-v2/core owners', () => {
+    const source = readFileSync(join(process.cwd(), 'src', 'cli', 'main.ts'), 'utf8');
+
+    expect(source).toContain("import { AuthCliController } from '@/cli-v2/commands/auth-command.js';");
+    expect(source).toContain("import { runInitCliV2Command } from '@/cli-v2/commands/init-command.js';");
+    expect(source).toContain("import { ProjectConfigService } from '@/core/project-config/index.js';");
+    expect(source).toContain('runInitCliV2Command({ workspaceRoot: resolved.workspaceRoot });');
+    expect(source).toContain('const projectConfig = ProjectConfigService.read(workspaceRoot);');
+    expect(source).not.toContain("from './auth.js'");
+    expect(source).not.toContain('function initializeProjectConfig');
+    expect(source).not.toContain('function loadProjectConfig');
+  });
 });
