@@ -6,10 +6,10 @@ describe('CLI command routing', () => {
   it('routes the default chat command to cli-v2 and keeps the v1 escape hatch', () => {
     const source = readFileSync(join(process.cwd(), 'src', 'cli', 'main.ts'), 'utf8');
 
-    expect(source).toMatch(/\.command\('chat'\)[\s\S]*?await runChatCliV2Command\(resolved\);/);
+    expect(source).toMatch(/\.command\('chat'\)[\s\S]*?await ChatCliV2CommandEdgeService\.run\(resolved\);/);
     expect(source).toMatch(/\.command\('chat-v1'\)[\s\S]*?startChatCli\(\{/);
     expect(source).toContain(".command('chat-v2')");
-    expect(source).toMatch(/program\s*\n\s*\.action\([\s\S]*?await runChatCliV2Command\(resolved\);/);
+    expect(source).toMatch(/program\s*\n\s*\.action\([\s\S]*?await ChatCliV2CommandEdgeService\.run\(resolved\);/);
   });
 
   it('keeps explicit chat commands out of the ask shortcut', () => {
@@ -21,13 +21,22 @@ describe('CLI command routing', () => {
   it('delegates auth and init command policy to cli-v2/core owners', () => {
     const source = readFileSync(join(process.cwd(), 'src', 'cli', 'main.ts'), 'utf8');
 
-    expect(source).toContain("import { AuthCliController } from '@/cli-v2/commands/auth-command.js';");
-    expect(source).toContain("import { runInitCliV2Command } from '@/cli-v2/commands/init-command.js';");
+    expect(source).toContain("import { AuthCliCommandEdgeService } from '@/cli-v2/commands/auth-command.js';");
+    expect(source).toContain("import { InitCliV2CommandEdgeService } from '@/cli-v2/commands/init-command.js';");
     expect(source).toContain("import { ProjectConfigService } from '@/core/project-config/index.js';");
-    expect(source).toContain('runInitCliV2Command({ workspaceRoot: resolved.workspaceRoot });');
+    expect(source).toContain('InitCliV2CommandEdgeService.run({ workspaceRoot: resolved.workspaceRoot });');
     expect(source).toContain('const projectConfig = ProjectConfigService.read(workspaceRoot);');
     expect(source).not.toContain("from './auth.js'");
     expect(source).not.toContain('function initializeProjectConfig');
     expect(source).not.toContain('function loadProjectConfig');
+  });
+
+  it('routes ask through the cli-v2 API-backed command owner', () => {
+    const source = readFileSync(join(process.cwd(), 'src', 'cli', 'main.ts'), 'utf8');
+
+    expect(source).toContain("import { AskCliV2CommandEdgeService } from '@/cli-v2/commands/ask-command.js';");
+    expect(source).toMatch(/\.command\('ask \[goal\.\.\.\]'\)[\s\S]*?await AskCliV2CommandEdgeService\.run\(goalParts\.join\(' '\)\.trim\(\), \{/);
+    expect(source).toMatch(/if \(knownCommand && !isKnownCommand\(knownCommand\)[\s\S]*?await AskCliV2CommandEdgeService\.run\(argv\.join\(' '\)\.trim\(\), \{/);
+    expect(source).not.toContain("from './ask.js'");
   });
 });

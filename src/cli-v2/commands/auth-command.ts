@@ -10,22 +10,27 @@ export type AuthCliOptions = ProviderCredentialCommandOptions;
 const SUPPORTED_PROVIDERS = new Set<LlmProvider>(['openai', 'anthropic', 'google']);
 
 /**
- * Terminal adapter for provider credential commands. Core auth owns status,
- * login, logout, and persistence semantics; this class owns CLI parsing and
- * terminal output.
+ * Command edge for `heddle auth`.
+ *
+ * Owns: terminal provider parsing, command selection, authorization URL output,
+ * and final status/login/logout messages.
+ *
+ * Does not own: credential storage, OAuth flow semantics, provider status
+ * calculation, or logout policy. Those belong to
+ * ProviderCredentialCommandService's public command-facing contract.
  */
-export class AuthCliController {
+export class AuthCliCommandEdgeService {
   static async run(command: AuthCliCommand, provider?: string, options: AuthCliOptions = {}) {
     if (command === 'status') {
-      process.stdout.write(AuthCliController.formatStatusMessage(options.storePath));
+      process.stdout.write(ProviderCredentialCommandService.formatStatusMessage(options.storePath));
       process.stdout.write('\n');
       return;
     }
 
-    const normalizedProvider = AuthCliController.parseProvider(provider);
+    const normalizedProvider = AuthCliCommandEdgeService.parseProvider(provider);
     if (command === 'login') {
       process.stdout.write('Starting OpenAI ChatGPT/Codex OAuth login...\n');
-      process.stdout.write(await AuthCliController.loginProviderWithOAuth(normalizedProvider, {
+      process.stdout.write(await ProviderCredentialCommandService.loginProviderWithOAuth(normalizedProvider, {
         ...options,
         onAuthorizeUrl: (url) => {
           process.stdout.write(`Open this URL to authorize Heddle:\n${url}\n`);
@@ -35,20 +40,8 @@ export class AuthCliController {
       return;
     }
 
-    process.stdout.write(AuthCliController.logoutProvider(normalizedProvider, options.storePath));
+    process.stdout.write(ProviderCredentialCommandService.logoutProvider(normalizedProvider, options.storePath));
     process.stdout.write('\n');
-  }
-
-  static formatStatusMessage(storePath?: string): string {
-    return ProviderCredentialCommandService.formatStatusMessage(storePath);
-  }
-
-  static loginProviderWithOAuth(provider: LlmProvider, options: AuthCliOptions = {}): Promise<string> {
-    return ProviderCredentialCommandService.loginProviderWithOAuth(provider, options);
-  }
-
-  static logoutProvider(provider: LlmProvider, storePath?: string): string {
-    return ProviderCredentialCommandService.logoutProvider(provider, storePath);
   }
 
   private static parseProvider(provider: string | undefined): LlmProvider {

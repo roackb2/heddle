@@ -2,8 +2,8 @@
 // entrypoint is retired and heartbeat is imported only from `src/cli-v2`.
 export {
   formatDurationMs,
+  HeartbeatCliCommandEdgeService,
   parseDurationMs,
   parseHeartbeatArgs,
-  runHeartbeatCli,
   type HeartbeatCliOptions,
 } from '@/cli-v2/commands/heartbeat-command.js';

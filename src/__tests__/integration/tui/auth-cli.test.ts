@@ -2,10 +2,10 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AuthCliController } from '../../../cli-v2/commands/auth-command.js';
+import { AuthCliCommandEdgeService } from '../../../cli-v2/commands/auth-command.js';
 import { ProviderCredentialRepository } from '../../../core/auth/index.js';
 
-describe('AuthCliController', () => {
+describe('AuthCliCommandEdgeService', () => {
   const writes: string[] = [];
   const originalWrite = process.stdout.write;
 
@@ -26,7 +26,7 @@ describe('AuthCliController', () => {
     captureStdout();
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-auth-cli-')), 'auth.json');
 
-    await AuthCliController.run('status', undefined, { storePath });
+    await AuthCliCommandEdgeService.run('status', undefined, { storePath });
 
     expect(writes.join('')).toContain(`Auth store: ${storePath}`);
     expect(writes.join('')).toContain('Stored credentials: none');
@@ -46,8 +46,8 @@ describe('AuthCliController', () => {
       updatedAt: '2026-04-27T00:00:00.000Z',
     });
 
-    await AuthCliController.run('status', undefined, { storePath });
-    await AuthCliController.run('logout', 'openai', { storePath });
+    await AuthCliCommandEdgeService.run('status', undefined, { storePath });
+    await AuthCliCommandEdgeService.run('logout', 'openai', { storePath });
 
     const output = writes.join('');
     expect(output).toContain('- openai: type=oauth account=account-123');
@@ -60,7 +60,7 @@ describe('AuthCliController', () => {
     captureStdout();
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-auth-cli-')), 'auth.json');
 
-    await AuthCliController.run('login', 'openai', {
+    await AuthCliCommandEdgeService.run('login', 'openai', {
       storePath,
       openAiLogin: async () => ({
         type: 'oauth',
@@ -74,7 +74,7 @@ describe('AuthCliController', () => {
         label: 'ChatGPT/Codex OAuth',
       }),
     });
-    await AuthCliController.run('status', undefined, { storePath });
+    await AuthCliCommandEdgeService.run('status', undefined, { storePath });
 
     const output = writes.join('');
     expect(output).toContain('Starting OpenAI ChatGPT/Codex OAuth login...');

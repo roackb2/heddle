@@ -96,7 +96,10 @@ export class ControlPlaneSessionApiService {
     return this.client.controlPlane.workspaceFileSearch.query(input);
   }
 
-  async sendPrompt(input: Pick<SessionSendPromptInput, 'workspaceId' | 'sessionId' | 'prompt'>) {
+  async sendPrompt(input: Pick<
+    SessionSendPromptInput,
+    'workspaceId' | 'sessionId' | 'prompt' | 'includePlanTool' | 'memoryMaintenanceMode'
+  >) {
     return this.client.controlPlane.sessionSendPrompt.mutate({
       ...input,
       maxSteps: this.defaults.maxSteps,
@@ -107,7 +110,10 @@ export class ControlPlaneSessionApiService {
     });
   }
 
-  async sendPromptAsync(input: Pick<SessionSendPromptAsyncInput, 'workspaceId' | 'sessionId' | 'prompt'>) {
+  async sendPromptAsync(input: Pick<
+    SessionSendPromptAsyncInput,
+    'workspaceId' | 'sessionId' | 'prompt' | 'includePlanTool' | 'memoryMaintenanceMode'
+  >) {
     return this.client.controlPlane.sessionSendPromptAsync.mutate({
       ...input,
       maxSteps: this.defaults.maxSteps,

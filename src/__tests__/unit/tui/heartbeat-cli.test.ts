@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ClientSharedProxyApiService } from '@/client-shared/api/proxy.js';
 import { ControlPlaneCommandRuntimeService } from '@/cli-v2/commands/control-plane-command-runtime.js';
-import { runHeartbeatCli } from '@/cli-v2/commands/heartbeat-command.js';
+import { HeartbeatCliCommandEdgeService } from '@/cli-v2/commands/heartbeat-command.js';
 import { formatDurationMs, parseDurationMs, parseHeartbeatArgs } from '../../../cli/heartbeat.js';
 
 describe('heartbeat CLI helpers', () => {
@@ -107,7 +107,7 @@ describe('heartbeat CLI helpers', () => {
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
     try {
-      await runHeartbeatCli(['task', 'list'], {
+      await HeartbeatCliCommandEdgeService.run(['task', 'list'], {
         workspaceRoot: '/repo',
         activeWorkspaceId: 'workspace-1',
         stateDir: '.heddle',
@@ -156,7 +156,7 @@ describe('heartbeat CLI helpers', () => {
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
     try {
-      await runHeartbeatCli(['start', '--id', 'repo-gardener', '--task', 'Maintain the repo', '--poll', '5s'], {
+      await HeartbeatCliCommandEdgeService.run(['start', '--id', 'repo-gardener', '--task', 'Maintain the repo', '--poll', '5s'], {
         workspaceRoot: '/repo',
         activeWorkspaceId: 'workspace-1',
         stateDir: '.heddle',
@@ -195,7 +195,7 @@ describe('heartbeat CLI helpers', () => {
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
     try {
-      await expect(runHeartbeatCli(['start', '--poll', '5s'], {
+      await expect(HeartbeatCliCommandEdgeService.run(['start', '--poll', '5s'], {
         workspaceRoot: '/repo',
         activeWorkspaceId: 'workspace-1',
         stateDir: '.heddle',

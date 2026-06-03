@@ -1,5 +1,5 @@
-import { AuthCliController } from '../../auth.js';
 import { FileHeartbeatTaskService } from '@/core/heartbeat/index.js';
+import { ProviderCredentialCommandService } from '@/core/auth/index.js';
 import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
 import type { SlashCommandExecutionContext } from '../../../core/commands/slash/modules/context.js';
 import type { LocalCommandArgs } from '../state/local-commands.js';
@@ -16,13 +16,15 @@ export function createTuiSlashCommandContext(args: LocalCommandArgs): SlashComma
       credentialSource: () => args.providerCredentialSource,
     },
     auth: {
-      status: () => AuthCliController.formatStatusMessage(args.credentialStorePath),
+      // v1 compatibility only: remove this direct auth service adapter when
+      // the legacy TUI slash-command path is retired.
+      status: () => ProviderCredentialCommandService.formatStatusMessage(args.credentialStorePath),
       login: (provider) =>
-        AuthCliController.loginProviderWithOAuth(provider, {
+        ProviderCredentialCommandService.loginProviderWithOAuth(provider, {
           storePath: args.credentialStorePath,
           openAiLogin: args.openAiLogin,
         }),
-      logout: (provider) => AuthCliController.logoutProvider(provider, args.credentialStorePath),
+      logout: (provider) => ProviderCredentialCommandService.logoutProvider(provider, args.credentialStorePath),
     },
     compaction: {
       compactActive: args.compactConversation,

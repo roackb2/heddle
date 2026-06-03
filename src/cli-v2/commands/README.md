@@ -21,6 +21,11 @@ commands out of the legacy `src/cli` tree before CLI v1 is removed.
   rules, validation semantics, workspace resolution, or domain policy.
 - Long-running runtime ownership belongs to the control-plane server lifecycle,
   not to terminal command handlers.
+- Command modules should expose a real `*CommandEdgeService` that owns parsing
+  orchestration and output behavior. The name is intentional: command edges are
+  client interaction adapters, not domain-policy owners. Do not add top-level
+  helper functions or one-line forwarding wrappers when an edge service can make
+  the boundary explicit.
 
 ## Direct Service Contract Checklist
 
@@ -40,7 +45,7 @@ domain should have:
 | --- | --- | --- |
 | `heddle`, `heddle chat`, `heddle chat-v2` | Already routed to `cli-v2`; attach to a live server or start an embedded control-plane server. | Keep as the reference API-backed runtime command pattern. |
 | `heddle chat-v1` | Explicit legacy fallback through `src/cli/chat`. | Keep only while CLI v1 remains available; delete during v1 retirement. |
-| `heddle ask` | Hybrid path: local conversation engine when no server exists, session API when a live server exists. | API-backed runtime command. Attach/embed the control-plane server, then use session APIs so one-shot asks match TUI/web behavior. |
+| `heddle ask` | `cli-v2` command adapter attaches/embeds the control-plane server, selects or creates a session, and submits through session APIs. | API-backed runtime command. Keep one-shot asks on the same session/run path as TUI and web. |
 | Unknown first argument fallback | Unknown command currently becomes `ask`. | Decide explicitly. Keep only if documented as shorthand; otherwise remove before v1 retirement. |
 | `heddle daemon` | Adapter over runtime discovery and `src/server` lifecycle. | Move command ownership here. Direct discovery/lifecycle calls remain acceptable because the command manages the server. |
 | `heddle auth` | `cli-v2` command adapter delegates credential status/login/logout semantics to `ProviderCredentialCommandService`; `src/cli/auth.ts` remains only as removable v1 compatibility. | Direct management adapter over the core auth command service. |
@@ -57,12 +62,11 @@ domain should have:
 
 1. Move command modules into `src/cli-v2/commands` while leaving
    `src/cli/main.ts` as a temporary delegating entrypoint.
-2. Convert `ask` to an API-backed runtime command.
-3. Move low-risk direct management adapters such as `auth`, `init`, `memory`,
+2. Move low-risk direct management adapters such as `auth`, `init`, `memory`,
    and `eval` behind documented service contracts.
-4. Move heartbeat task/run/start behavior behind server-backed heartbeat APIs or
+3. Move heartbeat task/run/start behavior behind server-backed heartbeat APIs or
    explicit heartbeat service contracts.
-5. Delete `chat-v1`, `src/cli/chat`, and legacy command tests/docs once no
+4. Delete `chat-v1`, `src/cli/chat`, and legacy command tests/docs once no
    production command depends on them.
 
 ## Import Boundary

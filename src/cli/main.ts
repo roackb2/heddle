@@ -11,12 +11,12 @@ import { MemoryValidationService } from '../core/memory/validation.js';
 import { MemoryVisibilityService } from '../core/memory/visibility.js';
 import type { MemoryValidationResult } from '../core/memory/types.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
-import { AuthCliController } from '@/cli-v2/commands/auth-command.js';
-import { AskCliHost } from './ask.js';
+import { AuthCliCommandEdgeService } from '@/cli-v2/commands/auth-command.js';
 import { startChatCli } from './chat/index.js';
-import { runChatCliV2Command } from '@/cli-v2/commands/chat-v2-command.js';
-import { runHeartbeatCli } from '@/cli-v2/commands/heartbeat-command.js';
-import { runInitCliV2Command } from '@/cli-v2/commands/init-command.js';
+import { AskCliV2CommandEdgeService } from '@/cli-v2/commands/ask-command.js';
+import { ChatCliV2CommandEdgeService } from '@/cli-v2/commands/chat-v2-command.js';
+import { HeartbeatCliCommandEdgeService } from '@/cli-v2/commands/heartbeat-command.js';
+import { InitCliV2CommandEdgeService } from '@/cli-v2/commands/init-command.js';
 import { runDaemonCli } from './daemon.js';
 import { runEvalCli } from './eval/index.js';
 import { loadProjectAgentContext, resolveAgentContextPaths } from './project-agent-context.js';
@@ -67,7 +67,7 @@ async function main() {
     .action(async () => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      await runChatCliV2Command(resolved);
+      await ChatCliV2CommandEdgeService.run(resolved);
     });
 
   program
@@ -89,7 +89,7 @@ async function main() {
     .action(async () => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      await runChatCliV2Command(resolved);
+      await ChatCliV2CommandEdgeService.run(resolved);
     });
 
   program
@@ -101,15 +101,17 @@ async function main() {
     .action(async (goalParts: string[], askOptions: { session?: string; latest?: boolean; newSession?: string | boolean }) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      await AskCliHost.run(goalParts.join(' ').trim(), {
+      await AskCliV2CommandEdgeService.run(goalParts.join(' ').trim(), {
         workspaceRoot: resolved.workspaceRoot,
+        activeWorkspaceId: resolved.activeWorkspaceId,
         model: resolved.model,
         maxSteps: resolved.maxSteps,
         preferApiKey: resolved.preferApiKey,
         stateDir: resolved.stateDir,
         searchIgnoreDirs: resolved.searchIgnoreDirs,
         systemContext: resolved.systemContext,
-        runtimeHost: resolved.forceOwnerConflict ? undefined : resolved.runtimeHost,
+        runtimeHost: resolved.runtimeHost,
+        forceOwnerConflict: resolved.forceOwnerConflict,
         sessionId: askOptions.session,
         latestSession: Boolean(askOptions.latest),
         createSessionName:
@@ -124,7 +126,7 @@ async function main() {
     .description('create a local .heddle/config.json template in the workspace')
     .action(() => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
-      runInitCliV2Command({ workspaceRoot: resolved.workspaceRoot });
+      InitCliV2CommandEdgeService.run({ workspaceRoot: resolved.workspaceRoot });
     });
 
   const memoryCommand = program
@@ -213,7 +215,7 @@ async function main() {
     .command('auth')
     .description('manage provider credentials')
     .action(async () => {
-      await AuthCliController.run('status');
+      await AuthCliCommandEdgeService.run('status');
     });
 
   authCommand
@@ -221,21 +223,21 @@ async function main() {
     .description('log in to a provider')
     .option('--no-browser', 'print the authorization URL without opening a browser')
     .action(async (provider: string, flags: { browser?: boolean }) => {
-      await AuthCliController.run('login', provider, { openBrowser: flags.browser });
+      await AuthCliCommandEdgeService.run('login', provider, { openBrowser: flags.browser });
     });
 
   authCommand
     .command('status')
     .description('show stored provider credentials')
     .action(async () => {
-      await AuthCliController.run('status');
+      await AuthCliCommandEdgeService.run('status');
     });
 
   authCommand
     .command('logout <provider>')
     .description('remove a stored provider credential')
     .action(async (provider: string) => {
-      await AuthCliController.run('logout', provider);
+      await AuthCliCommandEdgeService.run('logout', provider);
     });
 
   program
@@ -259,7 +261,7 @@ async function main() {
     .action(async (args: string[]) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      await runHeartbeatCli(args ?? [], resolved);
+      await HeartbeatCliCommandEdgeService.run(args ?? [], resolved);
     });
 
   program
@@ -276,7 +278,7 @@ async function main() {
     .action(async () => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      await runChatCliV2Command(resolved);
+      await ChatCliV2CommandEdgeService.run(resolved);
     });
 
   const argv = process.argv.slice(2);
@@ -284,14 +286,16 @@ async function main() {
   if (knownCommand && !isKnownCommand(knownCommand) && !knownCommand.startsWith('-')) {
     const resolved = resolveCliOptions(program.opts<RootCliOptions>());
     chdir(resolved.workspaceRoot);
-    await AskCliHost.run(argv.join(' ').trim(), {
+    await AskCliV2CommandEdgeService.run(argv.join(' ').trim(), {
       workspaceRoot: resolved.workspaceRoot,
+      activeWorkspaceId: resolved.activeWorkspaceId,
       model: resolved.model,
       maxSteps: resolved.maxSteps,
       stateDir: resolved.stateDir,
       searchIgnoreDirs: resolved.searchIgnoreDirs,
       systemContext: resolved.systemContext,
-      runtimeHost: resolved.forceOwnerConflict ? undefined : resolved.runtimeHost,
+      runtimeHost: resolved.runtimeHost,
+      forceOwnerConflict: resolved.forceOwnerConflict,
       preferApiKey: resolved.preferApiKey,
     });
     return;

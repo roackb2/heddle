@@ -1,431 +1,73 @@
-import { existsSync, mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AskCliHost } from '../../../cli/ask.js';
-import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
-import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
-import type { ChatSession } from '../../../core/chat/types.js';
-import * as agentLoopModule from '@/core/runtime/loop/index.js';
+import { AskCliV2CommandEdgeService } from '@/cli-v2/commands/ask-command.js';
+import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
-import type { RunResult } from '../../../index.js';
-import { createHeddleServerApp } from '../../../server/app.js';
+import { createHeddleServerApp } from '@/server/app.js';
 
-describe('AskCliHost.run', () => {
+describe('AskCliV2CommandEdgeService integration', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 
-  it('runs default ask through a persisted one-off session', async () => {
-    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-'));
-    const memoryRoot = join(workspaceRoot, '.heddle', 'memory');
-    const sessionStoragePath = join(workspaceRoot, '.heddle', 'chat-sessions.catalog.json');
-    mkdirSync(memoryRoot, { recursive: true });
-    writeFileSync(join(memoryRoot, 'README.md'), '# Workspace Memory\n\n- Ask uses memory context.\n', 'utf8');
-    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
-    const result: RunResult = {
-      outcome: 'done',
-      summary: 'Stateless answer.',
-      trace: [
-        {
-          type: 'assistant.turn',
-          content: 'Stateless answer.',
-          requestedTools: false,
-          step: 1,
-          timestamp: '2026-04-21T00:00:01.000Z',
-        },
-      ],
-      transcript: [
-        { role: 'user', content: 'what is this project' },
-        { role: 'assistant', content: 'Stateless answer.' },
-      ],
-    };
-    const runAgentLoopSpy = vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(result as never);
-
-    await AskCliHost.run('what is this project', {
-      workspaceRoot,
-      model: 'gpt-5.1-codex-mini',
-      maxSteps: 7,
-      apiKey: 'test-key',
-    });
-
-    expect(runAgentLoopSpy).toHaveBeenCalledTimes(1);
-    expect(runAgentLoopSpy).toHaveBeenCalledWith(expect.objectContaining({
-      maxSteps: 7,
-      includeDefaultTools: false,
-      systemContext: expect.stringContaining('- Ask uses memory context.'),
-    }));
-    expect(existsSync(join(workspaceRoot, '.heddle', 'traces'))).toBe(true);
-    const catalog = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).readCatalog();
-    expect(catalog).toHaveLength(1);
-    expect(catalog[0]?.retention).toBe('one_off');
-    const session = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(catalog[0]!.id);
-    expect(session?.retention).toBe('one_off');
-    expect(session?.history).toEqual(result.transcript);
-    expect(session?.turns).toHaveLength(1);
-    expect(stdoutSpy).toHaveBeenCalled();
-  });
-
-  it('creates a new session and persists the ask transcript when requested', async () => {
-    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-session-'));
-    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
-    const result: RunResult = {
-      outcome: 'done',
-      summary: 'Session-backed answer.',
-      trace: [
-        {
-          type: 'assistant.turn',
-          content: 'Session-backed answer.',
-          requestedTools: false,
-          step: 1,
-          timestamp: '2026-04-21T00:00:01.000Z',
-        },
-      ],
-      transcript: [
-        { role: 'user', content: 'inspect the repository' },
-        { role: 'assistant', content: 'Session-backed answer.' },
-      ],
-    };
-    vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(result as never);
-
-    await AskCliHost.run('inspect the repository', {
-      workspaceRoot,
-      model: 'gpt-5.1-codex-mini',
-      apiKey: 'test-key',
-      createSessionName: 'Ask test session',
-    });
-
-    const sessionStoragePath = join(workspaceRoot, '.heddle', 'chat-sessions.catalog.json');
-    const catalog = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).readCatalog();
-    expect(catalog).toHaveLength(1);
-    expect(catalog[0]?.name).toBe('Ask test session');
-    expect(catalog[0]?.retention).toBe('reusable');
-
-    const session = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(catalog[0]!.id);
-    expect(session?.retention).toBe('reusable');
-    expect(session?.history).toEqual(result.transcript);
-    expect(session?.turns).toHaveLength(1);
-    expect(session?.lastContinuePrompt).toBe('inspect the repository');
-    expect(session?.workspaceId).toBe(RuntimeWorkspaceService.resolveContext({
-      workspaceRoot,
-      stateRoot: join(workspaceRoot, '.heddle'),
-    }).activeWorkspace.id);
-    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining(`Session: ${catalog[0]!.id}`));
-  });
-
-  it('continues an existing session by id and reuses its history', async () => {
-    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-continue-'));
+  it('submits ask through an attached control-plane server and persists the shared session', async () => {
+    vi.stubEnv('HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT', '1');
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-v2-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
-    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
-    const existingSession: ChatSession = {
-      ...ChatSessionRecords.create({
-        id: 'session-existing',
-        name: 'Existing session',
-        apiKeyPresent: true,
-        model: 'gpt-5.1-codex-mini',
-      }),
-      history: [
-        { role: 'user', content: 'first question' },
-        { role: 'assistant', content: 'first answer' },
-      ],
-      messages: [
-        { id: 'user-1', role: 'user', text: 'first question' },
-        { id: 'assistant-1', role: 'assistant', text: 'first answer' },
-      ],
-    };
-    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([existingSession]);
-
-    const result: RunResult = {
-      outcome: 'done',
-      summary: 'Follow-up answer.',
-      trace: [
-        {
-          type: 'assistant.turn',
-          content: 'Follow-up answer.',
-          requestedTools: false,
-          step: 1,
-          timestamp: '2026-04-21T00:00:02.000Z',
-        },
-      ],
-      transcript: [
-        ...existingSession.history,
-        { role: 'user', content: 'follow up question' },
-        { role: 'assistant', content: 'Follow-up answer.' },
-      ],
-    };
-    const runAgentLoopSpy = vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockImplementation(async (options) => {
-      expect(options.history).toEqual(existingSession.history);
-      expect(options.goal).toBe('follow up question');
-      return result as never;
-    });
-
-    await AskCliHost.run('follow up question', {
+    const workspace = RuntimeWorkspaceService.resolveContext({
       workspaceRoot,
-      model: 'gpt-5.1-codex-mini',
-      apiKey: 'test-key',
-      sessionId: existingSession.id,
-    });
-
-    const updated = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(existingSession.id);
-    expect(runAgentLoopSpy).toHaveBeenCalledTimes(1);
-    expect(updated?.history).toEqual(result.transcript);
-    expect(updated?.turns).toHaveLength(1);
-    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining(`Session: ${existingSession.id}`));
-  });
-
-  it('does not materialize a fallback session for --latest on an empty catalog', async () => {
-    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-latest-empty-'));
-    const sessionStoragePath = join(workspaceRoot, '.heddle', 'chat-sessions.catalog.json');
-
-    await expect(AskCliHost.run('follow up question', {
-      workspaceRoot,
-      model: 'gpt-5.1-codex-mini',
-      apiKey: 'test-key',
-      latestSession: true,
-    })).rejects.toThrow('No saved chat sessions are available yet. Use --new-session to create one first.');
-    expect(new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).readCatalog()).toEqual([]);
-  });
-
-  it('preflight compacts an oversized session before ask-mode AgentLoopRuntimeService.run executes', async () => {
-    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-preflight-'));
-    const stateRoot = join(workspaceRoot, '.heddle');
-    const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
-    const existingSession: ChatSession = {
-      ...ChatSessionRecords.create({
-        id: 'session-preflight',
-        name: 'Preflight session',
-        apiKeyPresent: true,
-        model: 'gpt-5.1-codex-mini',
-      }),
-      history: [
-        { role: 'user', content: 'very large turn 1' },
-        { role: 'assistant', content: 'very large answer 1' },
-        { role: 'user', content: 'very large turn 2' },
-        { role: 'assistant', content: 'very large answer 2' },
-      ],
-      messages: [
-        { id: 'user-1', role: 'user', text: 'very large turn 1' },
-        { id: 'assistant-1', role: 'assistant', text: 'very large answer 1' },
-        { id: 'user-2', role: 'user', text: 'very large turn 2' },
-        { id: 'assistant-2', role: 'assistant', text: 'very large answer 2' },
-      ],
-    };
-    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([existingSession]);
-
-    const compactedHistory = [
-      { role: 'system' as const, content: 'Heddle compacted earlier conversation history.\n\nArchive root: .heddle/chat-sessions/session-preflight/archives' },
-      { role: 'user' as const, content: 'very large turn 2' },
-      { role: 'assistant' as const, content: 'very large answer 2' },
-    ];
-    const compactionModule = await import('@/core/chat/engine/compaction/index.js');
-    const compactionSpy = vi.spyOn(compactionModule.ConversationCompactionService, 'compact');
-    compactionSpy
-      .mockResolvedValueOnce({
-        history: compactedHistory,
-        context: {
-          estimatedHistoryTokens: 123,
-          compaction: { status: 'idle' },
-          archive: {
-            count: 1,
-            lastArchivePath: '.heddle/chat-sessions/session-preflight/archives/archive-1.jsonl',
-          },
-        },
-        archive: {
-          archives: [{
-            id: 'archive-1',
-            path: '.heddle/chat-sessions/session-preflight/archives/archive-1.jsonl',
-            summaryPath: '.heddle/chat-sessions/session-preflight/archives/archive-1.summary.md',
-            messageCount: 2,
-            createdAt: '2026-04-21T00:00:00.000Z',
-            summaryModel: 'gpt-5.1-codex-mini',
-          }],
-        },
-      })
-      .mockResolvedValueOnce({
-        history: [
-          ...compactedHistory,
-          { role: 'user' as const, content: 'follow up question' },
-          { role: 'assistant' as const, content: 'Follow-up answer.' },
-        ],
-        context: {
-          estimatedHistoryTokens: 150,
-          compaction: { status: 'idle' },
-          archive: {
-            count: 1,
-            lastArchivePath: '.heddle/chat-sessions/session-preflight/archives/archive-1.jsonl',
-          },
-        },
-        archive: {
-          archives: [{
-            id: 'archive-1',
-            path: '.heddle/chat-sessions/session-preflight/archives/archive-1.jsonl',
-            summaryPath: '.heddle/chat-sessions/session-preflight/archives/archive-1.summary.md',
-            messageCount: 2,
-            createdAt: '2026-04-21T00:00:00.000Z',
-            summaryModel: 'gpt-5.1-codex-mini',
-          }],
-        },
-      });
-
-    const result: RunResult = {
-      outcome: 'done',
-      summary: 'Follow-up answer.',
-      trace: [
-        {
-          type: 'assistant.turn',
-          content: 'Follow-up answer.',
-          requestedTools: false,
-          step: 1,
-          timestamp: '2026-04-21T00:00:02.000Z',
-        },
-      ],
-      transcript: [
-        ...compactedHistory,
-        { role: 'user', content: 'follow up question' },
-        { role: 'assistant', content: 'Follow-up answer.' },
-      ],
-    };
-    const runAgentLoopSpy = vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockImplementation(async (options) => {
-      expect(options.history).toEqual(compactedHistory);
-      return result as never;
-    });
-
-    await AskCliHost.run('follow up question', {
-      workspaceRoot,
-      model: 'gpt-5.1-codex-mini',
-      apiKey: 'test-key',
-      sessionId: existingSession.id,
-    });
-
-    expect(compactionSpy).toHaveBeenCalledTimes(2);
-    expect(runAgentLoopSpy).toHaveBeenCalledTimes(1);
-    expect(new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).read(existingSession.id)?.archives).toHaveLength(1);
-  });
-
-  it('attaches default ask to a live daemon host through a persisted one-off session', async () => {
-    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-remote-stateless-'));
-    const stateRoot = join(workspaceRoot, '.heddle');
-    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
-    const result: RunResult = {
-      outcome: 'done',
-      summary: 'Remote stateless answer.',
-      trace: [
-        {
-          type: 'assistant.turn',
-          content: 'Remote stateless answer.',
-          requestedTools: false,
-          step: 1,
-          timestamp: '2026-04-21T00:00:03.000Z',
-        },
-      ],
-      transcript: [
-        { role: 'user', content: 'daemon stateless ask' },
-        { role: 'assistant', content: 'Remote stateless answer.' },
-      ],
-    };
-    vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(result as never);
-
+      stateRoot,
+    }).activeWorkspace;
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const server = createHeddleServerApp({ workspaceRoot, stateRoot }).listen(0, '127.0.0.1');
     await onceListening(server);
     const address = server.address() as AddressInfo;
     const runtimeHost: ResolvedRuntimeHost = {
       kind: 'server',
       registryPath: join(workspaceRoot, 'daemon-registry.json'),
-      serverId: 'daemon-owner',
+      serverId: 'server-ask-test',
       mode: 'daemon',
       endpoint: { host: '127.0.0.1', port: address.port },
-      startedAt: '2026-04-21T00:00:00.000Z',
-      lastSeenAt: '2026-04-21T00:00:00.000Z',
+      startedAt: '2026-06-03T00:00:00.000Z',
+      lastSeenAt: '2026-06-03T00:00:01.000Z',
       stale: false,
-      ageMs: 0,
+      ageMs: 100,
     };
 
     try {
-      await AskCliHost.run('daemon stateless ask', {
+      await AskCliV2CommandEdgeService.run('describe this workspace', {
         workspaceRoot,
-        model: 'gpt-5.1-codex-mini',
-        apiKey: 'test-key',
+        activeWorkspaceId: workspace.id,
+        model: 'gpt-5.4',
+        maxSteps: 7,
+        preferApiKey: false,
+        stateDir: '.heddle',
         runtimeHost,
       });
     } finally {
       await closeServer(server);
     }
 
-    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('attaching ask to daemon'));
-    const sessionRepository = new FileChatSessionRepository({
+    const sessions = new FileChatSessionRepository({
       sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
+    }).list();
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]).toMatchObject({
+      retention: 'one_off',
+      workspaceId: workspace.id,
+      lastContinuePrompt: 'describe this workspace',
     });
-    const catalog = sessionRepository.readCatalog();
-    expect(catalog).toHaveLength(1);
-    expect(catalog[0]?.retention).toBe('one_off');
-    const session = sessionRepository.read(catalog[0]!.id);
-    expect(session?.history).toEqual(result.transcript);
-    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining(`Session: ${catalog[0]?.id}`));
-    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('Trace:'));
-  });
-
-  it('attaches session-backed ask to a live daemon host', async () => {
-    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-remote-session-'));
-    const stateRoot = join(workspaceRoot, '.heddle');
-    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
-    const result: RunResult = {
-      outcome: 'done',
-      summary: 'Remote session answer.',
-      trace: [
-        {
-          type: 'assistant.turn',
-          content: 'Remote session answer.',
-          requestedTools: false,
-          step: 1,
-          timestamp: '2026-04-21T00:00:04.000Z',
-        },
-      ],
-      transcript: [
-        { role: 'user', content: 'remote session ask' },
-        { role: 'assistant', content: 'Remote session answer.' },
-      ],
-    };
-    vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(result as never);
-
-    const server = createHeddleServerApp({ workspaceRoot, stateRoot }).listen(0, '127.0.0.1');
-    await onceListening(server);
-    const address = server.address() as AddressInfo;
-    const runtimeHost: ResolvedRuntimeHost = {
-      kind: 'server',
-      registryPath: join(workspaceRoot, 'daemon-registry.json'),
-      serverId: 'daemon-owner',
-      mode: 'daemon',
-      endpoint: { host: '127.0.0.1', port: address.port },
-      startedAt: '2026-04-21T00:00:00.000Z',
-      lastSeenAt: '2026-04-21T00:00:00.000Z',
-      stale: false,
-      ageMs: 0,
-    };
-
-    try {
-      await AskCliHost.run('remote session ask', {
-        workspaceRoot,
-        model: 'gpt-5.1-codex-mini',
-        apiKey: 'test-key',
-        runtimeHost,
-        createSessionName: 'Remote ask session',
-      });
-    } finally {
-      await closeServer(server);
-    }
-
-    const sessionRepository = new FileChatSessionRepository({
-      sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
+    expect(sessions[0]?.history.at(-1)).toMatchObject({
+      role: 'assistant',
+      content: 'Mocked browser integration agent response: describe this workspace',
     });
-    const catalog = sessionRepository.readCatalog();
-    expect(catalog).toHaveLength(1);
-    expect(catalog[0]?.name).toBe('Remote ask session');
-    expect(catalog[0]?.retention).toBe('reusable');
-    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining(`Session: ${catalog[0]?.id}`));
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining(`Session: ${sessions[0]?.id}`));
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining('Outcome: done'));
   });
 });
 
@@ -433,6 +75,7 @@ async function onceListening(server: { once: (event: 'listening', listener: () =
   if (server.listening) {
     return;
   }
+
   await new Promise<void>((resolve) => {
     server.once('listening', resolve);
   });

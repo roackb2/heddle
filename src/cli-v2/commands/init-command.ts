@@ -4,11 +4,22 @@ export type InitCliV2CommandOptions = {
   workspaceRoot: string;
 };
 
-export function runInitCliV2Command(options: InitCliV2CommandOptions) {
-  const result = ProjectConfigService.initialize(options.workspaceRoot);
-  process.stdout.write(
-    result.created ?
-      `Created ${result.configPath}\n`
-    : `.heddle/config.json already exists at ${result.configPath}\n`,
-  );
+/**
+ * Command edge for `heddle init`.
+ *
+ * Owns: terminal output for project initialization.
+ *
+ * Does not own: config path policy, schema defaults, or legacy config
+ * compatibility. Those belong to ProjectConfigService's public command-facing
+ * contract.
+ */
+export class InitCliV2CommandEdgeService {
+  static run(options: InitCliV2CommandOptions) {
+    const result = ProjectConfigService.initialize(options.workspaceRoot);
+    process.stdout.write(
+      result.created ?
+        `Created ${result.configPath}\n`
+      : `.heddle/config.json already exists at ${result.configPath}\n`,
+    );
+  }
 }
