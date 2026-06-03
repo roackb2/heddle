@@ -14,6 +14,8 @@ type ControlPlaneLiveEventReducerOptions = {
   refreshPendingApproval: (sessionId: string) => Promise<void>;
 };
 
+const MAX_RECENT_EDIT_DIFFS = 5;
+
 /**
  * Owns cli-v2 reduction of control-plane live events into render state.
  *
@@ -70,8 +72,17 @@ export class ControlPlaneLiveEventReducer {
             running: true,
             liveStatus,
             currentActivity: ClientSharedSessionActivityService.createThinkingStatus(runActivity.timestamp),
+            recentEditDiffs: [],
             latestUpdate: SessionActivityService.resolveLatestUpdate(runActivity),
           });
+        },
+        onRecentEditDiff: (diff) => {
+          this.options.state.patch((current) => ({
+            recentEditDiffs: [
+              ...current.recentEditDiffs.filter((candidate) => candidate.id !== diff.id),
+              diff,
+            ].slice(-MAX_RECENT_EDIT_DIFFS),
+          }));
         },
         onRunFinished: (runActivity, liveStatus) => {
           this.options.assistantStreamBuffer.flush();

@@ -4,6 +4,9 @@ import type {
 } from '../../api/types.js';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration.js';
+import isBoolean from 'lodash/isBoolean.js';
+import isPlainObject from 'lodash/isPlainObject.js';
+import isString from 'lodash/isString.js';
 
 dayjs.extend(duration);
 
@@ -18,6 +21,17 @@ export type ClientSharedSessionLatestUpdate = {
   label: string;
   detail?: string;
   tone: 'info' | 'success' | 'warning' | 'error';
+};
+export type ClientSharedRecentEditDiff = {
+  id: string;
+  runId: string;
+  step?: number;
+  toolCallId: string;
+  path: string;
+  action?: string;
+  patch: string;
+  truncated: boolean;
+  timestamp: string;
 };
 
 type SessionActivityStatusHandlers = {
@@ -45,6 +59,7 @@ export type ClientSharedSessionActivityEffects = {
   onAssistantStream?: (activity: ActivityOf<'assistant.stream'>, liveStatus: string | undefined) => void;
   onRunStarted?: (activity: ActivityOf<'loop.started'> | ActivityOf<'direct_shell.started'>, liveStatus: string | undefined) => void;
   onRunFinished?: (activity: ActivityOf<'loop.finished'> | ActivityOf<'direct_shell.completed'>, liveStatus: string | undefined) => void;
+  onRecentEditDiff?: (diff: ClientSharedRecentEditDiff, activity: ActivityOf<'tool.completed'>) => void;
   onPlanUpdated?: (activity: ClientSharedSessionPlan) => void;
   onPlanCleared?: () => void;
   onLiveStatus?: (activity: ClientSharedSessionActivity, liveStatus: string | undefined) => void;
@@ -95,6 +110,10 @@ export class ClientSharedSessionActivityService {
     'tool.completed': (activity, effects) => {
       effects.onCurrentActivityChanged?.(ClientSharedSessionActivityService.createThinkingStatus(activity.timestamp));
       ClientSharedSessionActivityService.applyLiveStatus(activity, effects);
+      const recentEditDiff = ClientSharedSessionActivityService.projectRecentEditDiff(activity);
+      if (recentEditDiff) {
+        effects.onRecentEditDiff?.(recentEditDiff, activity);
+      }
       effects.onWorkspaceChanged?.(activity);
     },
     'plan.updated': (activity, effects) => {
@@ -241,6 +260,41 @@ export class ClientSharedSessionActivityService {
       (activity: ClientSharedSessionActivity) => ClientSharedSessionLatestUpdate | undefined
     ) | undefined;
     return handler?.(activity);
+  }
+
+  static projectRecentEditDiff(activity: ActivityOf<'tool.completed'>): ClientSharedRecentEditDiff | undefined {
+    if (activity.tool !== 'edit_file' || activity.result?.ok !== true) {
+      return undefined;
+    }
+
+    const output = isPlainObject(activity.result.output)
+      ? activity.result.output as Record<string, unknown>
+      : undefined;
+    const diff = output && isPlainObject(output.diff)
+      ? output.diff as Record<string, unknown>
+      : undefined;
+    if (!output || !diff) {
+      return undefined;
+    }
+
+    const path = output && isString(output.path) && output.path.length > 0 ? output.path : undefined;
+    const patch = diff && isString(diff.diff) && diff.diff.length > 0 ? diff.diff : undefined;
+    if (!path || !patch) {
+      return undefined;
+    }
+
+    const action = isString(output.action) && output.action.length > 0 ? output.action : undefined;
+    return {
+      id: `${activity.runId}:${activity.toolCallId}`,
+      runId: activity.runId,
+      ...(typeof activity.step === 'number' ? { step: activity.step } : {}),
+      toolCallId: activity.toolCallId,
+      path,
+      ...(action ? { action } : {}),
+      patch,
+      truncated: isBoolean(diff.truncated) ? diff.truncated : false,
+      timestamp: activity.timestamp,
+    };
   }
 
   private static formatLiveStatus(activity: ClientSharedSessionActivity): string | undefined {

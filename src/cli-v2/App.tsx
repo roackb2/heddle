@@ -14,6 +14,7 @@ import { ModelPickerPanel } from './components/ModelPickerPanel.js';
 import { PromptInput } from './components/PromptInput.js';
 import { PromptStatusPanel } from './components/PromptStatusPanel.js';
 import { QueuedPromptPanel } from './components/QueuedPromptPanel.js';
+import { RecentEditDiffPanel } from './components/RecentEditDiffPanel.js';
 import { ReasoningEffortPickerPanel } from './components/ReasoningEffortPickerPanel.js';
 import { RunControls } from './components/RunControls.js';
 import { RuntimeStatusBar } from './components/RuntimeStatusBar.js';
@@ -138,6 +139,7 @@ export function App({
         {snapshot.activeSession ? ` · ${snapshot.activeSession.name}` : ''}
       </Text>
       <ConversationPanel runtimeContext={snapshot.runtimeContext} session={snapshot.activeSession} />
+      <RecentEditDiffPanel diffs={snapshot.recentEditDiffs} />
       <CommandResultPanel results={snapshot.commandResults} />
       {snapshot.pendingApproval ? (
         <ApprovalPanel

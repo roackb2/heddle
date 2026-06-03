@@ -1,5 +1,6 @@
 import type {
   ClientSharedAgentActivityStatus,
+  ClientSharedRecentEditDiff,
   ClientSharedSessionPlan,
 } from '@/client-shared/services/session-activities/index.js';
 import type { ControlPlaneProxyClient } from '@/client-shared/api/proxy.js';
@@ -49,6 +50,7 @@ export type ControlPlaneSessionStoreSnapshot = {
   liveStatus?: string;
   currentActivity?: ClientSharedAgentActivityStatus;
   activePlan?: ClientSharedSessionPlan;
+  recentEditDiffs: ClientSharedRecentEditDiff[];
   latestUpdate?: ControlPlaneSessionLatestUpdate;
   slashCommandCatalog?: ControlPlaneSlashCommandCatalog;
   commandResults: ControlPlaneSlashCommandResult[];
@@ -72,6 +74,7 @@ export const INITIAL_CONTROL_PLANE_SESSION_SNAPSHOT: ControlPlaneSessionStoreSna
   running: false,
   cancelling: false,
   streamConnected: false,
+  recentEditDiffs: [],
   commandResults: [],
 };
 

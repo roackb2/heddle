@@ -120,6 +120,84 @@ describe('ClientSharedSessionActivityService', () => {
     expect(effects).toEqual(['Implement']);
   });
 
+  it('projects recent edit diffs from successful edit_file completions', () => {
+    const diffs: string[] = [];
+
+    ClientSharedSessionActivityService.applyActivity({
+      type: 'tool.completed',
+      tool: 'edit_file',
+      toolCallId: 'call-1',
+      result: {
+        ok: true,
+        output: {
+          path: 'src/example.ts',
+          action: 'replace',
+          diff: {
+            diff: [
+              '--- a/src/example.ts',
+              '+++ b/src/example.ts',
+              '@@ -1 +1 @@',
+              '-old',
+              '+new',
+            ].join('\n'),
+            truncated: false,
+          },
+        },
+      },
+      durationMs: 4,
+      step: 3,
+      runId: 'run-1',
+      source: 'agent-loop',
+      timestamp: '2026-06-03T00:00:00.000Z',
+    } as ControlPlaneSessionActivity, {
+      onRecentEditDiff: (diff) => diffs.push(`${diff.id}:${diff.path}:${diff.action}:${diff.step}:${diff.patch}`),
+    });
+
+    expect(diffs).toEqual([
+      `run-1:call-1:src/example.ts:replace:3:${[
+        '--- a/src/example.ts',
+        '+++ b/src/example.ts',
+        '@@ -1 +1 @@',
+        '-old',
+        '+new',
+      ].join('\n')}`,
+    ]);
+  });
+
+  it('does not project recent edit diffs from shell or failed edit_file completions', () => {
+    const diffs: string[] = [];
+
+    ClientSharedSessionActivityService.applyActivity({
+      type: 'tool.completed',
+      tool: 'run_shell',
+      toolCallId: 'call-1',
+      result: { ok: true },
+      durationMs: 4,
+      step: 1,
+      runId: 'run-1',
+      source: 'agent-loop',
+      timestamp: '2026-06-03T00:00:00.000Z',
+    } as ControlPlaneSessionActivity, {
+      onRecentEditDiff: (diff) => diffs.push(diff.path),
+    });
+
+    ClientSharedSessionActivityService.applyActivity({
+      type: 'tool.completed',
+      tool: 'edit_file',
+      toolCallId: 'call-2',
+      result: { ok: false },
+      durationMs: 4,
+      step: 2,
+      runId: 'run-1',
+      source: 'agent-loop',
+      timestamp: '2026-06-03T00:00:01.000Z',
+    } as ControlPlaneSessionActivity, {
+      onRecentEditDiff: (diff) => diffs.push(diff.path),
+    });
+
+    expect(diffs).toEqual([]);
+  });
+
   it('uses derived tool labels when the API provides them', () => {
     expect(ClientSharedSessionActivityService.formatToolLabel({
       type: 'tool.approval_requested',

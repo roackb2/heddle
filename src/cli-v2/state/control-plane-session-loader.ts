@@ -56,6 +56,7 @@ export class ControlPlaneSessionLoader {
       liveStatus: undefined,
       currentActivity: undefined,
       activePlan: undefined,
+      recentEditDiffs: [],
       latestUpdate: undefined,
       error: undefined,
       loading: true,
