@@ -38,7 +38,7 @@ OpenAI account sign-in is experimental and user-selected. It is not official Ope
 
 ### Project setup
 
-- `heddle init`: create a `heddle.config.json` template in the current project
+- `heddle init`: create a local `.heddle/config.json` template in the current project
 
 ## Common Flags
 

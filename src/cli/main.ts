@@ -121,7 +121,7 @@ async function main() {
 
   program
     .command('init')
-    .description('create a heddle.config.json template in the workspace')
+    .description('create a local .heddle/config.json template in the workspace')
     .action(() => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       runInitCliV2Command({ workspaceRoot: resolved.workspaceRoot });

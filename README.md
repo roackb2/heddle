@@ -239,7 +239,7 @@ For contributors, the goal is a cleaner implementation path: TUI-specific render
 
 Heddle can load a short project instruction file at startup so a fresh session starts with the repository's operating context. By default it loads the first non-empty file found in this order: `HEDDLE.md`, `AGENTS.md`, `CLAUDE.md`.
 
-Only one default file is loaded to preserve context space. If a project needs a different path or intentionally wants multiple files, set `agentContextPaths` in `heddle.config.json`.
+Only one default file is loaded to preserve context space. If a project needs a different path or intentionally wants multiple files, set `agentContextPaths` in `.heddle/config.json`.
 
 More: [Project config](docs/reference/config.md)
 

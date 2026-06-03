@@ -9,6 +9,6 @@ export function runInitCliV2Command(options: InitCliV2CommandOptions) {
   process.stdout.write(
     result.created ?
       `Created ${result.configPath}\n`
-    : `heddle.config.json already exists at ${result.configPath}\n`,
+    : `.heddle/config.json already exists at ${result.configPath}\n`,
   );
 }
