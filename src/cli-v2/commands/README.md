@@ -47,10 +47,10 @@ domain should have:
 | `heddle init` | `cli-v2` command adapter delegates `.heddle/config.json` path/default/template behavior to `ProjectConfigService`. | Direct management adapter over the core project-config service/schema contract. |
 | `heddle memory status/list/read/search` | Direct memory visibility/catalog service calls implemented inline in `src/cli/main.ts`. | Direct management adapter calling documented memory service contracts. |
 | `heddle memory init/validate/maintain` | Direct core memory services; maintenance resolves model/credentials locally. | Direct management adapter, once memory README/public methods explicitly cover validation, repair, backlog, and credential expectations. |
-| `heddle heartbeat task ...` | Legacy CLI constructs and mutates heartbeat task objects directly. | Use existing control-plane heartbeat APIs or explicit heartbeat service methods; command code must not own task/schedule mutation policy. |
-| `heddle heartbeat runs ...` | Legacy CLI reads run records through heartbeat store abstractions. | Read through the same API/service shape as web-v2. |
-| `heddle heartbeat run` | Legacy CLI worker executes due tasks locally. | Server-backed runtime command. CLI requests execution from the live/embedded control-plane server. |
-| `heddle heartbeat start` | Legacy CLI starts a long-running scheduler loop. | Server-backed lifecycle command. Start/attach to the control-plane server and report scheduler status; do not run a separate CLI scheduler loop. |
+| `heddle heartbeat task ...` | `cli-v2` command adapter attaches/embeds the control-plane server and calls heartbeat task API procedures. | API-backed management command; command code must not own task/schedule mutation policy. |
+| `heddle heartbeat runs ...` | `cli-v2` command adapter reads heartbeat run views through control-plane API procedures. | API-backed read command using the same run view shape as web-v2. |
+| `heddle heartbeat run` | `cli-v2` command adapter requests task execution or due-task execution through the live/embedded control-plane server. | Server-backed runtime command; no local CLI scheduler worker. |
+| `heddle heartbeat start` | `cli-v2` command adapter creates/updates a task through API and reports the server-backed scheduler. Embedded mode keeps the control-plane server alive until Ctrl+C. | Server-backed lifecycle command; do not run a separate CLI scheduler loop. |
 | `heddle eval` | Local eval harness adapter over core eval modules. | Direct dev/management adapter unless remote/API evals become a product goal. |
 
 ## Migration Order

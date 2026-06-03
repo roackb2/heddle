@@ -1,4 +1,4 @@
-import { truncate } from '../../core/utils/text.js';
+import { truncate } from '@/core/utils/text.js';
 
 export function stripHeartbeatDecisionLine(summary: string): string {
   return summary.replace(/\n?\s*HEARTBEAT_DECISION:\s*(continue|pause|complete|escalate)\s*$/i, '');

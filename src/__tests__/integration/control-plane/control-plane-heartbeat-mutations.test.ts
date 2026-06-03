@@ -327,6 +327,49 @@ describe('control-plane heartbeat mutations', () => {
     const runDetail = await caller.heartbeatRun({ taskId: 'repo-check', runId: 'run_heartbeat_1' });
     expect(runDetail.run).toMatchObject({ taskId: 'repo-check', runId: 'run_heartbeat_1', loadedCheckpoint: true });
   });
+
+  it('exposes due-task execution through the control-plane router', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-due-workspace-'));
+    const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-cp-heartbeat-due-router-'));
+    const store = new FileHeartbeatTaskService({ dir: join(stateRoot, 'heartbeat') });
+    await store.saveTask(createTask({
+      enabled: false,
+      schedule: {
+        intervalMs: 60_000,
+        nextRunAt: undefined,
+      },
+      state: {
+        status: 'idle',
+      },
+    }));
+    const catalog = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot });
+    const activeWorkspace = catalog.workspaces[0];
+    if (!activeWorkspace) {
+      throw new Error('expected default workspace');
+    }
+
+    const caller = controlPlaneRouter.createCaller({
+      workspaceRoot,
+      stateRoot,
+      activeWorkspaceId: activeWorkspace.id,
+      activeWorkspace,
+      workspaces: catalog.workspaces,
+      runtimeHost: null,
+      logger: pino({ level: 'silent' }),
+    });
+
+    const result = await caller.heartbeatRunDueTasks({
+      workspaceId: activeWorkspace.id,
+      model: 'gpt-5.4',
+    });
+
+    expect(result).toMatchObject({
+      checked: 0,
+      ran: 0,
+      failed: 0,
+      records: [],
+    });
+  });
 });
 
 function createHeartbeatResult(

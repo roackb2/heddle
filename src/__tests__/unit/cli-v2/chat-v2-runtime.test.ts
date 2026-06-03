@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { formatChatV2RuntimeNotice, resolveChatV2Runtime } from '@/cli-v2/commands/chat-v2-command.js';
+import { ControlPlaneCommandRuntimeService } from '@/cli-v2/commands/control-plane-command-runtime.js';
 import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 import type { HeddleControlPlaneServerHandle } from '@/server/index.js';
 
@@ -12,7 +12,7 @@ describe('chat-v2 runtime bootstrap', () => {
 
   it('attaches to a fresh live control-plane server', async () => {
     const startServer = vi.fn();
-    const runtime = await resolveChatV2Runtime({
+    const runtime = await ControlPlaneCommandRuntimeService.resolve({
       workspaceRoot: '/repo',
       stateDir: '.heddle',
       preferApiKey: false,
@@ -26,7 +26,7 @@ describe('chat-v2 runtime bootstrap', () => {
       trpcUrl: 'http://127.0.0.1:8765/trpc',
       serverId: 'server-1',
     });
-    expect(formatChatV2RuntimeNotice(runtime)).toContain('attaching chat-v2');
+    expect(ControlPlaneCommandRuntimeService.formatNotice(runtime, 'chat-v2')).toContain('attaching chat-v2');
   });
 
   it('starts an embedded control-plane server when no live server exists', async () => {
@@ -38,7 +38,7 @@ describe('chat-v2 runtime bootstrap', () => {
       close,
     }));
 
-    const runtime = await resolveChatV2Runtime({
+    const runtime = await ControlPlaneCommandRuntimeService.resolve({
       workspaceRoot: '/repo',
       stateDir: '.heddle-test',
       preferApiKey: true,
@@ -65,7 +65,7 @@ describe('chat-v2 runtime bootstrap', () => {
     });
     await runtime.close();
     expect(close).toHaveBeenCalledTimes(1);
-    expect(formatChatV2RuntimeNotice(runtime)).toContain('browser=http://127.0.0.1:8123');
+    expect(ControlPlaneCommandRuntimeService.formatNotice(runtime, 'chat-v2')).toContain('browser=http://127.0.0.1:8123');
   });
 
   it('starts embedded when force-owner-conflict bypasses a live server', async () => {
@@ -75,7 +75,7 @@ describe('chat-v2 runtime bootstrap', () => {
       port: 8765,
     }));
 
-    const runtime = await resolveChatV2Runtime({
+    const runtime = await ControlPlaneCommandRuntimeService.resolve({
       workspaceRoot: '/repo',
       stateDir: '.heddle',
       preferApiKey: false,

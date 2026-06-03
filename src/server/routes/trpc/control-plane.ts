@@ -25,6 +25,7 @@ import {
   createSessionInputSchema,
   fileSearchInputSchema,
   heartbeatRunInputSchema,
+  heartbeatRunDueTasksInputSchema,
   heartbeatRunsInputSchema,
   heartbeatTaskCreateInputSchema,
   heartbeatTaskDetailInputSchema,
@@ -458,6 +459,24 @@ export const controlPlaneRouter = router({
       task,
       run: null,
     };
+  }),
+  heartbeatRunDueTasks: controlPlaneWorkspaceProcedure.input(heartbeatRunDueTasksInputSchema).mutation(async ({ ctx, input }) => {
+    const { logger, workspace } = ctx.requestWorkspace;
+    try {
+      return await ControlPlaneHeartbeatController.runDueTasks(workspace.stateRoot, {
+        ...(input ?? {}),
+        workspaceRoot: workspace.workspaceRoot,
+        stateDir: workspace.stateRoot,
+        preferApiKey: input?.preferApiKey ?? ctx.preferApiKey,
+        onEvent: (event) => controlPlaneHeartbeatEventsController.publish({
+          workspaceId: workspace.id,
+          event,
+        }),
+      });
+    } catch (error) {
+      logger.error({ error }, 'Failed to run due heartbeat tasks from control plane');
+      throw error;
+    }
   }),
   workspaceFileSearch: controlPlaneWorkspaceProcedure.input(fileSearchInputSchema).query(async ({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;

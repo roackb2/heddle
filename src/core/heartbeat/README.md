@@ -46,6 +46,14 @@ operator-facing heartbeat views.
 - Keep scheduler/task persistence concerns here, not in runtime.
 - Heartbeat may depend on runtime's public `AgentLoopRuntimeService.run` and checkpoint types.
   Runtime should not import heartbeat.
+- Interface adapters should use `FileHeartbeatTaskService` methods or the
+  control-plane heartbeat API as the public task/run contract. Terminal command
+  code should not construct `HeartbeatTask` objects, write heartbeat JSON, or run
+  its own scheduler loop.
+- `heddle heartbeat run` and `heddle heartbeat start` are server-backed command
+  paths. The control-plane server owns recurring scheduler lifetime; CLI
+  commands may request due-task execution or keep an embedded server alive, but
+  should not own recurring heartbeat execution policy.
 - When this domain is refactored further, follow the `src/core/chat/engine`
   pattern: class-backed owning services/repositories, local `types.ts` contracts,
   schema-owned persistence validation, and no compatibility wrappers.

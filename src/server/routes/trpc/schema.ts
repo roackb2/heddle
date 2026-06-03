@@ -194,6 +194,16 @@ export const heartbeatTaskRunNowInputSchema = z.object({
   systemContext: z.string().min(1).optional(),
 });
 
+export const heartbeatRunDueTasksInputSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+  model: z.string().min(1).optional(),
+  maxSteps: z.number().int().min(1).max(500).optional(),
+  apiKey: z.string().min(1).optional(),
+  preferApiKey: z.boolean().optional(),
+  searchIgnoreDirs: z.array(z.string().min(1)).optional(),
+  systemContext: z.string().min(1).optional(),
+}).optional();
+
 export const heartbeatRunInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   taskId: z.string().min(1),

@@ -1,5 +1,6 @@
 import {
   FileHeartbeatTaskService,
+  HeartbeatSchedulerService,
   HeartbeatTaskRunnerService,
   type HeartbeatSchedulerEvent,
   type HeartbeatTaskRunner,
@@ -47,6 +48,8 @@ type RunHeartbeatTaskNowArgs = {
   runner?: HeartbeatTaskRunner;
   onEvent?: (event: HeartbeatSchedulerEvent) => void;
 };
+
+type RunDueHeartbeatTasksArgs = Omit<RunHeartbeatTaskNowArgs, 'taskId' | 'runner'>;
 
 export class ControlPlaneHeartbeatController {
   static async listTasks(stateRoot: string) {
@@ -142,5 +145,26 @@ export class ControlPlaneHeartbeatController {
       task: tasks.projectTaskView(await tasks.requireTask(args.taskId)),
       run: run ?? null,
     };
+  }
+
+  static async runDueTasks(
+    stateRoot: string,
+    args: RunDueHeartbeatTasksArgs,
+  ) {
+    return await HeartbeatSchedulerService.runDueTasks({
+      store: new FileHeartbeatTaskService({ stateRoot }),
+      runtime: {
+        apiKey: args.apiKey,
+        apiKeyProvider: args.apiKey ? 'explicit' : undefined,
+        model: args.model,
+        maxSteps: args.maxSteps,
+        workspaceRoot: args.workspaceRoot,
+        stateDir: args.stateDir ?? stateRoot,
+        searchIgnoreDirs: args.searchIgnoreDirs,
+        systemContext: args.systemContext,
+        preferApiKey: args.preferApiKey,
+      },
+      onEvent: args.onEvent,
+    });
   }
 }

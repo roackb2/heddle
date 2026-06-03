@@ -15,10 +15,10 @@ import { AuthCliController } from '@/cli-v2/commands/auth-command.js';
 import { AskCliHost } from './ask.js';
 import { startChatCli } from './chat/index.js';
 import { runChatCliV2Command } from '@/cli-v2/commands/chat-v2-command.js';
+import { runHeartbeatCli } from '@/cli-v2/commands/heartbeat-command.js';
 import { runInitCliV2Command } from '@/cli-v2/commands/init-command.js';
 import { runDaemonCli } from './daemon.js';
 import { runEvalCli } from './eval/index.js';
-import { parseHeartbeatArgs, runHeartbeatCli } from './heartbeat.js';
 import { loadProjectAgentContext, resolveAgentContextPaths } from './project-agent-context.js';
 import { RuntimeHostMessages, RuntimeHostResolver, type ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
@@ -259,8 +259,6 @@ async function main() {
     .action(async (args: string[]) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      enforceHeartbeatOwnership(args ?? [], resolved.runtimeHost, resolved.forceOwnerConflict);
-      writeRuntimeHostNotice('heartbeat', resolved.runtimeHost);
       await runHeartbeatCli(args ?? [], resolved);
     });
 
@@ -517,25 +515,6 @@ function writeRuntimeHostNotice(command: string, runtimeHost: ResolvedRuntimeHos
   }
 
   process.stdout.write(`${notice}\n`);
-}
-
-function enforceHeartbeatOwnership(args: string[], runtimeHost: ResolvedRuntimeHost, forceOwnerConflict: boolean) {
-  if (forceOwnerConflict) {
-    return;
-  }
-
-  const parsed = parseHeartbeatArgs(args);
-  if (parsed.command === 'help' || parsed.command === 'runs') {
-    return;
-  }
-  if (parsed.command === 'task' && (parsed.subcommand === 'list' || parsed.subcommand === 'show')) {
-    return;
-  }
-
-  const message = RuntimeHostMessages.embeddedCommandConflict('heartbeat', runtimeHost);
-  if (message) {
-    throw new Error(message);
-  }
 }
 
 function readCliVersion(): string {

@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { ClientSharedProxyApiService } from '@/client-shared/api/proxy.js';
+import { ControlPlaneCommandRuntimeService } from '@/cli-v2/commands/control-plane-command-runtime.js';
+import { runHeartbeatCli } from '@/cli-v2/commands/heartbeat-command.js';
 import { formatDurationMs, parseDurationMs, parseHeartbeatArgs } from '../../../cli/heartbeat.js';
 
 describe('heartbeat CLI helpers', () => {
@@ -79,5 +82,48 @@ describe('heartbeat CLI helpers', () => {
   it('rejects invalid scheduler durations', () => {
     expect(() => parseDurationMs('soon')).toThrow('Invalid duration');
     expect(() => parseDurationMs('0s')).toThrow('Invalid duration');
+  });
+
+  it('routes heartbeat task listing through the control-plane API', async () => {
+    const query = vi.fn(async () => ({ workspaceId: 'workspace-1', tasks: [] }));
+    const runtime = {
+      kind: 'attached' as const,
+      trpcUrl: 'http://127.0.0.1:8765/trpc',
+      endpoint: {
+        host: '127.0.0.1',
+        port: 8765,
+      },
+      serverId: 'server-1',
+      close: vi.fn(async () => undefined),
+    };
+    const resolve = vi.spyOn(ControlPlaneCommandRuntimeService, 'resolve').mockResolvedValue(runtime);
+    const createClient = vi.spyOn(ClientSharedProxyApiService, 'createClient').mockReturnValue({
+      controlPlane: {
+        heartbeatTasks: {
+          query,
+        },
+      },
+    } as never);
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    try {
+      await runHeartbeatCli(['task', 'list'], {
+        workspaceRoot: '/repo',
+        activeWorkspaceId: 'workspace-1',
+        stateDir: '.heddle',
+        preferApiKey: true,
+        runtimeHost: {
+          kind: 'none',
+          registryPath: '/registry.json',
+        },
+      });
+    } finally {
+      resolve.mockRestore();
+      createClient.mockRestore();
+      stdout.mockRestore();
+    }
+
+    expect(query).toHaveBeenCalledWith({ workspaceId: 'workspace-1' });
+    expect(runtime.close).toHaveBeenCalledTimes(1);
   });
 });
