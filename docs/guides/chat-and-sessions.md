@@ -50,7 +50,7 @@ heddle chat-v1
 
 Heddle uses the current directory as the workspace root unless you pass `--cwd`.
 
-At startup, Heddle also looks for one project instruction file. The default priority is `HEDDLE.md`, then `AGENTS.md`, then `CLAUDE.md`; the first non-empty file is appended to the system prompt. Set `agentContextPaths` in `heddle.config.json` only when a project needs custom paths or multiple instruction files.
+At startup, Heddle also looks for one project instruction file. The default priority is `HEDDLE.md`, then `AGENTS.md`, then `CLAUDE.md`; the first non-empty file is appended to the system prompt. Set `agentContextPaths` in `.heddle/config.json` only when a project needs custom paths or multiple instruction files.
 
 If you keep both OpenAI OAuth and an API key configured, Heddle prefers OAuth by default. For explicit API-key testing, start a run with:
 

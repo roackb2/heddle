@@ -1,9 +1,14 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import type { ProjectConfig, ProjectConfigInitializeResult } from './types.js';
 
-const CONFIG_FILE_NAME = 'heddle.config.json';
+const LOCAL_CONFIG_DIR_NAME = '.heddle';
+const CONFIG_FILE_NAME = 'config.json';
+// Legacy-only fallback for workspaces initialized before config moved under
+// `.heddle/`. Remove this constant together with `resolveReadablePath` once
+// root-level `heddle.config.json` compatibility is no longer supported.
+const LEGACY_ROOT_CONFIG_FILE_NAME = 'heddle.config.json';
 const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   model: 'gpt-5.4',
   maxSteps: 100,
@@ -22,17 +27,17 @@ const projectConfigSchema = z.object({
 }).strip();
 
 /**
- * Owns `heddle.config.json` path resolution, parsing, defaults, and template
+ * Owns `.heddle/config.json` path resolution, parsing, defaults, and template
  * initialization. Command adapters may call the public methods here; they
  * should not duplicate config defaults or validation policy.
  */
 export class ProjectConfigService {
   static resolvePath(workspaceRoot: string): string {
-    return resolve(workspaceRoot, CONFIG_FILE_NAME);
+    return resolve(workspaceRoot, LOCAL_CONFIG_DIR_NAME, CONFIG_FILE_NAME);
   }
 
   static read(workspaceRoot: string): ProjectConfig {
-    const configPath = ProjectConfigService.resolvePath(workspaceRoot);
+    const configPath = ProjectConfigService.resolveReadablePath(workspaceRoot);
     if (!existsSync(configPath)) {
       return {};
     }
@@ -54,12 +59,26 @@ export class ProjectConfigService {
       };
     }
 
-    writeFileSync(configPath, `${JSON.stringify(DEFAULT_PROJECT_CONFIG, null, 2)}\n`);
+    // Legacy-only migration: if an old root-level `heddle.config.json` exists,
+    // copy its supported values into the new local `.heddle/config.json`.
+    // Remove this read-based migration when legacy root config support is
+    // retired.
+    const config = ProjectConfigService.read(workspaceRoot);
+    const template = Object.keys(config).length > 0 ? config : DEFAULT_PROJECT_CONFIG;
+    mkdirSync(resolve(workspaceRoot, LOCAL_CONFIG_DIR_NAME), { recursive: true });
+    writeFileSync(configPath, `${JSON.stringify(template, null, 2)}\n`);
     return {
       created: true,
       configPath,
-      config: DEFAULT_PROJECT_CONFIG,
+      config: template,
     };
+  }
+
+  private static resolveReadablePath(workspaceRoot: string): string {
+    const configPath = ProjectConfigService.resolvePath(workspaceRoot);
+    // Legacy-only fallback for old workspaces that still have root-level
+    // `heddle.config.json`. New writes must use `resolvePath`.
+    return existsSync(configPath) ? configPath : resolve(workspaceRoot, LEGACY_ROOT_CONFIG_FILE_NAME);
   }
 
   private static parse(raw: string): ProjectConfig {

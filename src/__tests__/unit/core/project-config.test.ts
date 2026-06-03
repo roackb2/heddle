@@ -11,7 +11,7 @@ describe('ProjectConfigService', () => {
     const result = ProjectConfigService.initialize(workspaceRoot);
 
     expect(result.created).toBe(true);
-    expect(result.configPath).toBe(join(workspaceRoot, 'heddle.config.json'));
+    expect(result.configPath).toBe(join(workspaceRoot, '.heddle', 'config.json'));
     expect(existsSync(result.configPath)).toBe(true);
     expect(JSON.parse(readFileSync(result.configPath, 'utf8'))).toEqual({
       model: 'gpt-5.4',
@@ -24,7 +24,8 @@ describe('ProjectConfigService', () => {
 
   it('does not overwrite an existing heddle config', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-project-config-'));
-    const configPath = join(workspaceRoot, 'heddle.config.json');
+    const initResult = ProjectConfigService.initialize(workspaceRoot);
+    const configPath = initResult.configPath;
     writeFileSync(configPath, `${JSON.stringify({ model: 'custom-model' })}\n`);
 
     const result = ProjectConfigService.initialize(workspaceRoot);
@@ -36,7 +37,8 @@ describe('ProjectConfigService', () => {
 
   it('reads supported fields and ignores unsupported or invalid config fields', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-project-config-'));
-    writeFileSync(join(workspaceRoot, 'heddle.config.json'), `${JSON.stringify({
+    const initResult = ProjectConfigService.initialize(workspaceRoot);
+    writeFileSync(initResult.configPath, `${JSON.stringify({
       model: 'gpt-5.4',
       maxSteps: -1,
       stateDir: '.state',
@@ -54,10 +56,27 @@ describe('ProjectConfigService', () => {
     });
   });
 
+  it('reads legacy root config only when local config is absent', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-project-config-'));
+    // Legacy-only fixture: root-level config existed before config moved under
+    // `.heddle/`. Delete this test when that fallback is removed.
+    writeFileSync(join(workspaceRoot, 'heddle.config.json'), `${JSON.stringify({ model: 'legacy-model' })}\n`);
+
+    expect(ProjectConfigService.read(workspaceRoot)).toEqual({ model: 'legacy-model' });
+
+    const initResult = ProjectConfigService.initialize(workspaceRoot);
+    expect(initResult.config).toEqual({ model: 'legacy-model' });
+    expect(JSON.parse(readFileSync(initResult.configPath, 'utf8'))).toEqual({ model: 'legacy-model' });
+    writeFileSync(initResult.configPath, `${JSON.stringify({ model: 'local-model' })}\n`);
+
+    expect(ProjectConfigService.read(workspaceRoot)).toEqual({ model: 'local-model' });
+  });
+
   it('returns an empty config when the file is missing or invalid', () => {
     const missingWorkspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-project-config-'));
     const invalidWorkspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-project-config-'));
-    writeFileSync(join(invalidWorkspaceRoot, 'heddle.config.json'), '{');
+    const initResult = ProjectConfigService.initialize(invalidWorkspaceRoot);
+    writeFileSync(initResult.configPath, '{');
 
     expect(ProjectConfigService.read(missingWorkspaceRoot)).toEqual({});
     expect(ProjectConfigService.read(invalidWorkspaceRoot)).toEqual({});
