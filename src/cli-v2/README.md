@@ -24,7 +24,8 @@ rewrite.
 ## Shape
 
 - `commands/`: terminal command bootstrap and process lifecycle around the
-  API-backed v2 clients.
+  API-backed v2 clients. See [`commands/README.md`](./commands/README.md) for
+  the migration classification of remaining terminal commands.
 - `state/`: class-based API-consumer state and live subscription ownership.
 - `hooks/`: React/Ink hooks only. Hook files keep `useXxx` naming and return
   hook-shaped values.
