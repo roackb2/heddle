@@ -3,6 +3,7 @@ import {
   ControlPlaneChatSessionPresenter,
   DaemonCliV2CommandEdgeService,
   parseDaemonArgs,
+  renderDaemonHelp,
 } from '@/cli-v2/commands/daemon-command.js';
 import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 
@@ -29,6 +30,16 @@ describe('daemon CLI helpers', () => {
       port: 8765,
       serveAssets: false,
     });
+  });
+
+  it('renders daemon command help with daemon-specific options', () => {
+    const help = renderDaemonHelp();
+
+    expect(help).toContain('Usage: heddle daemon [options]');
+    expect(help).toContain('--host <host>');
+    expect(help).toContain('--port <port>');
+    expect(help).toContain('--assets-dir <path>');
+    expect(help).toContain('--no-assets');
   });
 
   it('prints the live server address and returns successfully when a daemon already exists', async () => {

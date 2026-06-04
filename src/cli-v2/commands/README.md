@@ -21,6 +21,10 @@ tree is retired.
   rules, validation semantics, workspace resolution, or domain policy.
 - Long-running runtime ownership belongs to the control-plane server lifecycle,
   not to terminal command handlers.
+- User-facing command edges should use Commander for option parsing and help
+  text. Commands with subcommands must expose child-specific help such as
+  `heddle heartbeat task --help` or `heddle eval agent --help`; do not hand-roll
+  bespoke help tables or token parsers for public command shapes.
 - Command modules should expose a real `*CommandEdgeService` that owns parsing
   orchestration and output behavior. The name is intentional: command edges are
   client interaction adapters, not domain-policy owners. Do not add top-level
@@ -60,11 +64,9 @@ domain should have:
 
 ## Migration Order
 
-1. Keep `src/cli/main.ts` as the package bin entrypoint while `cli-v2`
-   continues to own terminal behavior.
-2. Keep direct management adapters such as `auth`, `init`, `memory`, and
+1. Keep direct management adapters such as `auth`, `init`, `memory`, and
    `eval` behind documented service contracts.
-3. Keep heartbeat task/run/start behavior on server-backed heartbeat APIs or
+2. Keep heartbeat task/run/start behavior on server-backed heartbeat APIs or
    explicit heartbeat service contracts.
 
 ## Import Boundary

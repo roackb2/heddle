@@ -28,4 +28,6 @@
   Services are not hooks; they centralize terminal-only logic behind clear
   class boundaries.
 - `components/`: terminal rendering components.
-- `index.tsx`: launch entrypoint that receives a tRPC URL from the outer CLI.
+- `main.ts`: public terminal bootstrap and command routing.
+- `index.tsx`: interactive TUI entrypoint that receives a tRPC URL from
+  `main.ts` or another terminal host bootstrap.

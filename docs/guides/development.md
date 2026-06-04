@@ -129,7 +129,7 @@ For a production-style local run of the built daemon:
 
 ```bash
 yarn build
-node dist/src/cli/main.js daemon --host 127.0.0.1 --port 8765
+node dist/src/cli-v2/main.js daemon --host 127.0.0.1 --port 8765
 ```
 
 ### Examples
@@ -151,7 +151,7 @@ These are useful both as smoke tests and as reference code for embedding Heddle 
 
 High-level areas:
 
-- `src/cli/`: CLI entrypoints and interactive chat flows
+- `src/cli-v2/`: CLI entrypoints, command edges, and interactive chat flows
 - `src/server/`: daemon server and control-plane backend
 - `src/web-v2/`: default browser control plane frontend
 - `src/web/`: legacy v1 browser control plane frontend, available through explicit v1 scripts

@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { Command } from 'commander';
 import dayjs from 'dayjs';
 import { cleanupEvalResults } from '@/core/eval/cleanup.js';
 import { loadEvalCases } from '@/core/eval/case-loader.js';
@@ -25,25 +26,22 @@ type EvalArgs = {
   fixtureRef?: string;
   timeoutMs?: number;
   before?: Date;
+  helpText?: string;
   yes: boolean;
   dryRun: boolean;
 };
 
 type EvalCommand = EvalArgs['command'];
-type EvalCommandParser = (rawArgs: string[]) => EvalArgs;
 type EvalCommandRunner = (args: EvalArgs, options: EvalCliOptions) => Promise<void> | void;
 
 const DEFAULT_CASES_DIR = 'evals/cases/coding/smoke';
 
-const evalCommandParsers: Partial<Record<EvalCommand, EvalCommandParser>> = {
-  agent: parseAgentEvalArgs,
-  clean: parseCleanEvalArgs,
-};
-
 const evalCommandRunners: Partial<Record<EvalCommand, EvalCommandRunner>> = {
   agent: runAgentEval,
   clean: runCleanEval,
-  help: () => writeEvalHelp(),
+  help: (args) => {
+    process.stdout.write(`${args.helpText ?? renderEvalHelp([])}\n`);
+  },
 };
 
 /**
@@ -121,75 +119,126 @@ function runCleanEval(args: EvalArgs) {
 }
 
 export function parseEvalArgs(rawArgs: string[]): EvalArgs {
-  const [command = 'help', ...rest] = rawArgs;
-  return evalCommandParsers[command as EvalCommand]?.(rest) ?? defaultEvalArgs('help');
+  const commandName = rawArgs[0];
+  if (rawArgs.length === 0 || hasHelpFlag(rawArgs) || !isEvalSubcommand(commandName)) {
+    return {
+      ...defaultEvalArgs('help'),
+      helpText: renderEvalHelp(rawArgs),
+    };
+  }
+
+  let parsed: EvalArgs | undefined;
+  const root = buildEvalCommand((args) => {
+    parsed = args;
+  });
+
+  try {
+    root.parse(rawArgs, { from: 'user' });
+  } catch (error) {
+    if (isUnknownCommandError(error)) {
+      return {
+        ...defaultEvalArgs('help'),
+        helpText: renderEvalHelp([]),
+      };
+    }
+    throw error;
+  }
+
+  if (!parsed) {
+    return {
+      ...defaultEvalArgs('help'),
+      helpText: renderEvalHelp(rawArgs),
+    };
+  }
+
+  return parsed;
 }
 
-function parseAgentEvalArgs(rawArgs: string[]): EvalArgs {
-  const args = defaultEvalArgs('agent');
+type EvalCommandBuilder = (args: EvalArgs) => void;
 
-  for (let index = 0; index < rawArgs.length; index++) {
-    const token = rawArgs[index];
-    switch (token) {
-      case '--cases-dir':
-        args.casesDir = resolve(requireValue(rawArgs, ++index, token));
-        break;
-      case '--case':
-        args.caseIds.push(requireValue(rawArgs, ++index, token));
-        break;
-      case '--output':
-        args.outputDir = resolve(requireValue(rawArgs, ++index, token));
-        break;
-      case '--work-root':
-        args.workRoot = resolve(requireValue(rawArgs, ++index, token));
-        break;
-      case '--target':
-        args.target = requireValue(rawArgs, ++index, token);
-        break;
-      case '--fixture-ref':
-        args.fixtureRef = requireValue(rawArgs, ++index, token);
-        break;
-      case '--timeout-ms':
-        args.timeoutMs = parsePositiveInt(requireValue(rawArgs, ++index, token), token);
-        break;
-      case '--dry-run':
-        args.dryRun = true;
-        break;
-      default:
-        throw new Error(`Unknown eval option: ${token}`);
-    }
-  }
+function buildEvalCommand(onParsed: EvalCommandBuilder): Command {
+  const root = new Command();
+  root
+    .name('heddle eval')
+    .description('Run Heddle evaluation harnesses')
+    .exitOverride()
+    .showHelpAfterError()
+    .addHelpCommand('help [command]', 'display help for command')
+    .action(() => onParsed({
+      ...defaultEvalArgs('help'),
+      helpText: root.helpInformation().trimEnd(),
+    }));
 
-  if (!existsSync(args.casesDir)) {
-    throw new Error(`Eval cases directory does not exist: ${args.casesDir}`);
-  }
-  return args;
+  root
+    .command('agent')
+    .description('run JSON-defined agent eval cases')
+    .option('--cases-dir <path>', 'directory containing JSON eval cases', DEFAULT_CASES_DIR)
+    .option('--case <id>', 'run one case id; repeat to select multiple', collectOption, [])
+    .option('--output <path>', 'results directory')
+    .option('--work-root <path>', 'parent directory for disposable workspaces')
+    .option('--target <name>', 'label for this run', 'current')
+    .option('--fixture-ref <ref>', 'override git-worktree fixture ref for target workspace code')
+    .option('--timeout-ms <n>', 'agent subprocess timeout', (value) => parsePositiveInt(value, '--timeout-ms'))
+    .option('--dry-run', 'prepare workspaces and reports without calling the model')
+    .action((flags: AgentEvalCommandFlags) => {
+      const args = {
+        ...defaultEvalArgs('agent'),
+        casesDir: resolve(flags.casesDir),
+        caseIds: flags.case,
+        outputDir: resolve(flags.output ?? join('evals/results', defaultRunDirName('agent'))),
+        workRoot: flags.workRoot ? resolve(flags.workRoot) : undefined,
+        target: flags.target,
+        fixtureRef: flags.fixtureRef,
+        timeoutMs: flags.timeoutMs,
+        dryRun: Boolean(flags.dryRun),
+      };
+      if (!existsSync(args.casesDir)) {
+        throw new Error(`Eval cases directory does not exist: ${args.casesDir}`);
+      }
+      onParsed(args);
+    });
+
+  root
+    .command('clean')
+    .description('prune generated eval result directories')
+    .option('--results-dir <path>', 'results directory', 'evals/results')
+    .option('--before <datetime>', 'only clean result directories modified before this datetime', (value) => parseDate(value, '--before'))
+    .option('--yes', 'actually delete matching result directories')
+    .option('--dry-run', 'preview matching result directories without deleting')
+    .action((flags: CleanEvalCommandFlags) => {
+      onParsed({
+        ...defaultEvalArgs('clean'),
+        resultsDir: resolve(flags.resultsDir),
+        before: flags.before,
+        yes: Boolean(flags.yes) && !flags.dryRun,
+        dryRun: Boolean(flags.dryRun),
+      });
+    });
+
+  return root;
 }
 
-function parseCleanEvalArgs(rawArgs: string[]): EvalArgs {
-  const args = defaultEvalArgs('clean');
+type AgentEvalCommandFlags = {
+  casesDir: string;
+  case: string[];
+  output?: string;
+  workRoot?: string;
+  target: string;
+  fixtureRef?: string;
+  timeoutMs?: number;
+  dryRun?: boolean;
+};
 
-  for (let index = 0; index < rawArgs.length; index++) {
-    const token = rawArgs[index];
-    switch (token) {
-      case '--results-dir':
-        args.resultsDir = resolve(requireValue(rawArgs, ++index, token));
-        break;
-      case '--before':
-        args.before = parseDate(requireValue(rawArgs, ++index, token), token);
-        break;
-      case '--yes':
-        args.yes = true;
-        break;
-      case '--dry-run':
-        args.yes = false;
-        break;
-      default:
-        throw new Error(`Unknown eval clean option: ${token}`);
-    }
-  }
+type CleanEvalCommandFlags = {
+  resultsDir: string;
+  before?: Date;
+  yes?: boolean;
+  dryRun?: boolean;
+};
 
-  return args;
+export function renderEvalHelp(rawArgs: string[]): string {
+  const root = buildEvalCommand(() => {});
+  return resolveHelpCommand(root, normalizeHelpArgs(rawArgs)).helpInformation().trimEnd();
 }
 
 function defaultEvalArgs(command: EvalCommand): EvalArgs {
@@ -203,31 +252,6 @@ function defaultEvalArgs(command: EvalCommand): EvalArgs {
     yes: false,
     dryRun: false,
   };
-}
-
-function writeEvalHelp() {
-  process.stdout.write([
-    'Usage:',
-    '  heddle eval agent [options]',
-    '  heddle eval clean [options]',
-    '',
-    'Agent options:',
-    '  --cases-dir <path>   Directory containing JSON eval cases; defaults to evals/cases/coding/smoke',
-    '  --case <id>          Run one case id; repeat to select multiple',
-    '  --output <path>      Results directory; defaults to evals/results/agent-YYYY-MM-DD-HHMMSS',
-    '  --work-root <path>   Parent directory for disposable workspaces; defaults to <output>/workspaces',
-    '  --target <name>      Label for this run, default current',
-    '  --fixture-ref <ref>  Override git-worktree fixture ref for target workspace code',
-    '  --timeout-ms <n>     Agent subprocess timeout',
-    '  --dry-run            Prepare workspaces and reports without calling the model',
-    '',
-    'Clean options:',
-    '  --results-dir <path> Results directory; defaults to evals/results',
-    '  --before <datetime>  Only clean result directories modified before this datetime',
-    '  --yes                Actually delete matching result directories',
-    '  --dry-run            Preview matching result directories without deleting; default behavior',
-    '',
-  ].join('\n'));
 }
 
 function overrideFixtureRef(
@@ -265,14 +289,6 @@ function writeCleanupResult(result: ReturnType<typeof cleanupEvalResults>) {
   process.stdout.write(`Deleted: ${result.removed.length}\n`);
 }
 
-function requireValue(values: string[], index: number, flag: string): string {
-  const value = values[index];
-  if (!value || value.startsWith('--')) {
-    throw new Error(`Missing value for ${flag}`);
-  }
-  return value;
-}
-
 function parsePositiveInt(raw: string, flag: string): number {
   const value = Number.parseInt(raw, 10);
   if (!Number.isFinite(value) || value <= 0) {
@@ -291,4 +307,45 @@ function parseDate(raw: string, flag: string): Date {
 
 function defaultRunDirName(prefix: string): string {
   return `${prefix}-${dayjs().format('YYYY-MM-DD-HHmmss')}`;
+}
+
+function hasHelpFlag(rawArgs: string[]): boolean {
+  return rawArgs.some((arg) => arg === '--help' || arg === '-h');
+}
+
+function isEvalSubcommand(commandName: string | undefined): commandName is 'agent' | 'clean' {
+  return commandName === 'agent' || commandName === 'clean';
+}
+
+function collectOption(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}
+
+function normalizeHelpArgs(rawArgs: string[]): string[] {
+  const args = rawArgs.filter((arg) => arg !== '--help' && arg !== '-h');
+  return args[0] === 'help' ? args.slice(1) : args;
+}
+
+function resolveHelpCommand(root: Command, args: string[]): Command {
+  let current = root;
+  for (let index = 0; index < args.length; index++) {
+    const token = args[index];
+    if (token.startsWith('-')) {
+      if (!token.includes('=')) {
+        index++;
+      }
+      continue;
+    }
+
+    const child = current.commands.find((command) => command.name() === token || command.aliases().includes(token));
+    if (!child) {
+      break;
+    }
+    current = child;
+  }
+  return current;
+}
+
+function isUnknownCommandError(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith('error: unknown command');
 }

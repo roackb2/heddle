@@ -181,7 +181,7 @@ For built/local operator usage inside this repository, run:
 
 ```bash
 yarn build
-node dist/src/cli/main.js daemon --host 127.0.0.1 --port 8765
+node dist/src/cli-v2/main.js daemon --host 127.0.0.1 --port 8765
 ```
 
 If you add or change control-plane tRPC routes, restart the daemon or backend server process. Vite hot reload updates the browser bundle only; a still-running daemon will not know about new procedures and may return `No procedure found on path ...`.
@@ -200,7 +200,7 @@ Tailscale lets you keep Heddle running on your workstation while reaching it fro
 
 ```bash
 yarn build
-node dist/src/cli/main.js daemon --host 127.0.0.1 --port 8765
+node dist/src/cli-v2/main.js daemon --host 127.0.0.1 --port 8765
 ```
 
 2. Put Tailscale Serve in front of it:
@@ -230,7 +230,7 @@ You should see an HTTPS `*.ts.net` URL that proxies to `http://127.0.0.1:8765`.
 
 ```bash
 yarn build
-node dist/src/cli/main.js daemon --host 127.0.0.1 --port 8765
+node dist/src/cli-v2/main.js daemon --host 127.0.0.1 --port 8765
 tailscale serve --bg http://127.0.0.1:8765
 tailscale serve status
 ```

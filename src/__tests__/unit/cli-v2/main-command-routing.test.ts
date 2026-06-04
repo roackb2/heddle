@@ -2,9 +2,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+const CLI_MAIN_PATH = join(process.cwd(), 'src', 'cli-v2', 'main.ts');
+
 describe('CLI command routing', () => {
   it('routes the default chat command to cli-v2 and blocks the removed v1 escape hatch', () => {
-    const source = readFileSync(join(process.cwd(), 'src', 'cli', 'main.ts'), 'utf8');
+    const source = readFileSync(CLI_MAIN_PATH, 'utf8');
 
     expect(source).toMatch(/\.command\('chat'\)[\s\S]*?await ChatCliV2CommandEdgeService\.run\(resolved\);/);
     expect(source).toContain(".command('chat-v2')");
@@ -16,11 +18,15 @@ describe('CLI command routing', () => {
   });
 
   it('keeps explicit chat commands out of the ask shortcut', () => {
-    const source = readFileSync(join(process.cwd(), 'src', 'cli', 'main.ts'), 'utf8');
+    const source = readFileSync(CLI_MAIN_PATH, 'utf8');
+    const knownCommandsLine = source
+      .split('\n')
+      .find((line) => line.includes('const KNOWN_COMMANDS = new Set('));
 
     expect(source).toMatch(/const removedCommandMessage = knownCommand \? REMOVED_COMMAND_MESSAGES\.get\(knownCommand\) : undefined;/);
-    expect(source).toMatch(/return \[[^\]]*'chat'[^\]]*'chat-v2'[^\]]*\]\.includes\(command\)/s);
-    expect(source).not.toMatch(/return \[[^\]]*'chat-v1'[\s\S]*\]\.includes\(command\)/s);
+    expect(source).toContain("const KNOWN_COMMANDS = new Set(['chat', 'chat-v2', 'ask', 'init', 'memory', 'auth', 'eval', 'heartbeat', 'daemon', 'help']);");
+    expect(source).toContain('return KNOWN_COMMANDS.has(command);');
+    expect(knownCommandsLine).not.toContain("'chat-v1'");
   });
 
   it('removes repo development scripts for the legacy terminal UI route', () => {
@@ -31,7 +37,7 @@ describe('CLI command routing', () => {
   });
 
   it('delegates auth and init command policy to cli-v2/core owners', () => {
-    const source = readFileSync(join(process.cwd(), 'src', 'cli', 'main.ts'), 'utf8');
+    const source = readFileSync(CLI_MAIN_PATH, 'utf8');
 
     expect(source).toContain("import { AuthCliCommandEdgeService } from '@/cli-v2/commands/auth-command.js';");
     expect(source).toContain("import { InitCliV2CommandEdgeService } from '@/cli-v2/commands/init-command.js';");
@@ -44,7 +50,7 @@ describe('CLI command routing', () => {
   });
 
   it('routes ask through the cli-v2 API-backed command owner', () => {
-    const source = readFileSync(join(process.cwd(), 'src', 'cli', 'main.ts'), 'utf8');
+    const source = readFileSync(CLI_MAIN_PATH, 'utf8');
 
     expect(source).toContain("import { AskCliV2CommandEdgeService } from '@/cli-v2/commands/ask-command.js';");
     expect(source).toMatch(/\.command\('ask \[goal\.\.\.\]'\)[\s\S]*?await AskCliV2CommandEdgeService\.run\(goalParts\.join\(' '\)\.trim\(\), \{/);
@@ -53,9 +59,11 @@ describe('CLI command routing', () => {
   });
 
   it('shows discovery help for command groups with subcommands', () => {
-    const source = readFileSync(join(process.cwd(), 'src', 'cli', 'main.ts'), 'utf8');
+    const source = readFileSync(CLI_MAIN_PATH, 'utf8');
 
-    expect(source).toMatch(/const memoryCommand = program[\s\S]*?\.command\('memory'\)[\s\S]*?\.addHelpCommand\('help \[command\]'[\s\S]*?\.action\(\(_, command\) => \{\s*command\.outputHelp\(\);\s*\}\);/);
+    expect(source).toMatch(/const memoryCommand = program[\s\S]*?\.command\('memory'\)[\s\S]*?\.addHelpCommand\('help \[command\]'[\s\S]*?\.action\(\(\) => \{\s*memoryCommand\.outputHelp\(\);\s*\}\);/);
     expect(source).toMatch(/memoryCommand\s*\n\s*\.command\('status'\)[\s\S]*?await MemoryCliV2CommandEdgeService\.run\('status', resolved\);/);
+    expect(source).toMatch(/const authCommand = program[\s\S]*?\.command\('auth'\)[\s\S]*?\.action\(\(\) => \{\s*authCommand\.outputHelp\(\);\s*\}\);/);
+    expect(source).toMatch(/authCommand\s*\n\s*\.command\('status'\)[\s\S]*?await AuthCliCommandEdgeService\.run\('status'\);/);
   });
 });

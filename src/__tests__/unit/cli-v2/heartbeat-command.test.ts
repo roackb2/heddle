@@ -6,6 +6,7 @@ import {
   formatDurationMs,
   parseDurationMs,
   parseHeartbeatArgs,
+  renderHeartbeatHelp,
 } from '@/cli-v2/commands/heartbeat-command.js';
 
 describe('heartbeat CLI helpers', () => {
@@ -16,6 +17,22 @@ describe('heartbeat CLI helpers', () => {
       rest: [],
       flags: {},
     });
+  });
+
+  it('renders task subcommand help with child commands', () => {
+    const help = renderHeartbeatHelp(['task', '--help']);
+
+    expect(help).toContain('Usage: heddle heartbeat task');
+    expect(help).toContain('add [options] [rest...]');
+    expect(help).toContain('list');
+    expect(help).toContain('show [options] [rest...]');
+  });
+
+  it('renders task add help with add-specific usage', () => {
+    const help = renderHeartbeatHelp(['task', 'add', '--help']);
+
+    expect(help).toContain('Usage: heddle heartbeat task add [options] [rest...]');
+    expect(help).toContain('create a heartbeat task');
   });
 
   it('parses heartbeat subcommands and flags', () => {
