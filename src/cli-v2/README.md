@@ -1,12 +1,11 @@
 # CLI V2 Boundary
 
-`src/cli-v2` is the clean terminal UI rewrite. It is intentionally
-self-contained while it is being built next to the existing TUI.
+`src/cli-v2` is the terminal UI implementation.
 
 ## Import Rule
 
 - `cli-v2` may import shared API-consumer code from `src/client-shared`.
-- `cli-v2` must not import from `src/cli/chat`.
+- `cli-v2` must not import from retired legacy TUI code.
 - `cli-v2` TUI/client code must not import core services, server controllers,
   or backend DTOs directly. It consumes tRPC-derived types and the shared proxy
   client.
@@ -14,12 +13,8 @@ self-contained while it is being built next to the existing TUI.
   local control-plane server when needed, then command behavior should continue
   through the shared control-plane API instead of calling core services
   directly.
-- If terminal rendering code is worth preserving from the old TUI, copy it into
-  this folder and make it consume `cli-v2` view/state types.
-
-The old `src/cli/chat` tree is no longer a public CLI route. It remains only
-until the v1 retirement PR can delete legacy tests and verification harnesses.
-It is not a dependency boundary for this rewrite.
+- If terminal rendering code is worth preserving, it must live here and consume
+  `cli-v2` view/state types directly.
 
 ## Shape
 

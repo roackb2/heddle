@@ -10,7 +10,7 @@ inside `cli-v2` by hooks and components.
   state/view types. Shared browser/TUI API-result projections should live in
   `src/client-shared`, with cli-v2 services adding only terminal behavior on
   top.
-- Services must not import from `src/cli/chat`, core services, server
+- Services must not import retired legacy TUI code, core services, server
   controllers, or backend DTO modules.
 - Services are not React or Ink hooks. Do not use `useXxx` naming here.
 - Hooks and components may call public service methods, including static

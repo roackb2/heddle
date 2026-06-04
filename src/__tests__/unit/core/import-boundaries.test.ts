@@ -3,6 +3,8 @@ import { dirname, join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SOURCE_ROOT = join(process.cwd(), 'src');
+const SCRIPT_ROOT = join(process.cwd(), 'scripts');
+const TEST_ROOT = join(process.cwd(), 'src', '__tests__');
 const ENGINE_ROOT = 'core/chat/engine/';
 const REMOVED_CHAT_PATH_PREFIXES = [
   'core/chat/session-submit',
@@ -29,6 +31,8 @@ const PUBLIC_EXPORT_EXPECTATIONS = [
 
 describe('core import boundaries', () => {
   const sourceFiles = listSourceFiles(SOURCE_ROOT);
+  const scriptFiles = listSourceFiles(SCRIPT_ROOT);
+  const testFiles = listSourceFiles(TEST_ROOT);
 
   it('keeps core modules independent from host adapters', () => {
     const violations = findImportViolations(
@@ -60,6 +64,15 @@ describe('core import boundaries', () => {
   it('keeps cli-v2 independent from the old TUI implementation', () => {
     const violations = findResolvedImportViolations(
       sourceFiles.filter((file) => toSourcePath(file).startsWith('cli-v2/')),
+      (resolvedPath) => resolvedPath.startsWith('cli/chat/'),
+    );
+
+    expect(violations).toEqual([]);
+  });
+
+  it('does not reintroduce retired cli/chat imports in sources, scripts, or tests', () => {
+    const violations = findResolvedImportViolations(
+      [...new Set([...sourceFiles, ...scriptFiles, ...testFiles])],
       (resolvedPath) => resolvedPath.startsWith('cli/chat/'),
     );
 

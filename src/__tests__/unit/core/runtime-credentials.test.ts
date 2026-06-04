@@ -1,0 +1,87 @@
+import { join } from 'node:path';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ProviderCredentialRepository } from '@/core/auth/index.js';
+import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
+
+describe('RuntimeCredentialService', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('does not fall back to OpenAI keys for Anthropic models', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'openai-key');
+    vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
+    vi.stubEnv('ANTHROPIC_API_KEY', '');
+    vi.stubEnv('PERSONAL_ANTHROPIC_API_KEY', '');
+
+    expect(RuntimeCredentialService.resolveApiKeyForModel('claude-sonnet-4-6')).toBeUndefined();
+    expect(RuntimeCredentialService.resolveCredentialSourceForModel('claude-sonnet-4-6')).toEqual({
+      type: 'missing',
+      provider: 'anthropic',
+    });
+  });
+
+  it('uses Anthropic keys for Anthropic models', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'openai-key');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'anthropic-key');
+
+    expect(RuntimeCredentialService.resolveApiKeyForModel('claude-sonnet-4-6')).toBe('anthropic-key');
+    expect(RuntimeCredentialService.resolveCredentialSourceForModel('claude-sonnet-4-6')).toEqual({
+      type: 'env-api-key',
+      provider: 'anthropic',
+    });
+  });
+
+  it('resolves the provider-specific key for the requested model', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'openai-key');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'anthropic-key');
+    const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-runtime-credential-provider-')), 'auth.json');
+
+    expect(RuntimeCredentialService.resolveApiKeyForModel('gpt-5.4', {
+      apiKey: 'openai-key',
+      apiKeyProvider: 'openai',
+      credentialStorePath: storePath,
+    })).toBe('openai-key');
+    expect(RuntimeCredentialService.resolveApiKeyForModel('claude-sonnet-4-6', {
+      apiKey: 'openai-key',
+      apiKeyProvider: 'openai',
+      credentialStorePath: storePath,
+    })).toBe('anthropic-key');
+  });
+
+  it('prefers stored OAuth over environment API keys unless preferApiKey is enabled', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'openai-key');
+    vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
+
+    const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-runtime-credential-oauth-')), 'auth.json');
+    new ProviderCredentialRepository({ storePath }).set({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAt: Date.parse('2026-06-04T01:00:00.000Z'),
+      accountId: 'account-123',
+      createdAt: '2026-06-04T00:00:00.000Z',
+      updatedAt: '2026-06-04T00:00:00.000Z',
+    });
+
+    expect(RuntimeCredentialService.resolveCredentialSourceForModel('gpt-5.4', {
+      credentialStorePath: storePath,
+    })).toEqual({
+      type: 'oauth',
+      provider: 'openai',
+      accountId: 'account-123',
+      expiresAt: Date.parse('2026-06-04T01:00:00.000Z'),
+    });
+
+    expect(RuntimeCredentialService.resolveCredentialSourceForModel('gpt-5.4', {
+      credentialStorePath: storePath,
+      preferApiKey: true,
+    })).toEqual({
+      type: 'env-api-key',
+      provider: 'openai',
+    });
+  });
+});
