@@ -2,8 +2,8 @@ import { resolve } from 'node:path';
 import {
   ControlPlaneChatSessionPresenter,
   startHeddleControlPlaneServer,
-} from '../server/index.js';
-import type { HeddleControlPlaneServerHandle, HeddleControlPlaneServerOptions } from '../server/index.js';
+} from '@/server/index.js';
+import type { HeddleControlPlaneServerHandle, HeddleControlPlaneServerOptions } from '@/server/index.js';
 import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 import { RuntimeHostResolver } from '@/core/runtime/daemon/index.js';
 
@@ -30,40 +30,52 @@ const DEFAULT_PORT = 8765;
 
 export { ControlPlaneChatSessionPresenter };
 
-export async function runDaemonCli(
-  args: string[],
-  options: DaemonCliOptions = {},
-): Promise<{ kind: 'attached'; host: ResolvedRuntimeHost } | { kind: 'started'; handle: HeddleControlPlaneServerHandle }> {
-  const parsed = parseDaemonArgs(args);
-  const runtimeHost = options.runtimeHost ?? RuntimeHostResolver.resolveLiveServer();
-  if (!options.forceOwnerConflict && runtimeHost.kind === 'server' && !runtimeHost.stale) {
-    writeExistingServerNotice(runtimeHost, options.stdout ?? process.stdout);
+/**
+ * Command edge for `heddle daemon`.
+ *
+ * Owns: terminal daemon argument parsing, live-server attach behavior, CLI
+ * notices, and process signal handling for a standalone daemon process.
+ *
+ * Does not own: reusable HTTP server lifecycle, registry persistence, workspace
+ * identity, or heartbeat scheduler semantics. Those belong to `src/server` and
+ * `src/core/runtime/daemon`.
+ */
+export class DaemonCliV2CommandEdgeService {
+  static async run(
+    args: string[],
+    options: DaemonCliOptions = {},
+  ): Promise<{ kind: 'attached'; host: ResolvedRuntimeHost } | { kind: 'started'; handle: HeddleControlPlaneServerHandle }> {
+    const parsed = parseDaemonArgs(args);
+    const runtimeHost = options.runtimeHost ?? RuntimeHostResolver.resolveLiveServer();
+    if (!options.forceOwnerConflict && runtimeHost.kind === 'server' && !runtimeHost.stale) {
+      writeExistingServerNotice(runtimeHost, options.stdout ?? process.stdout);
+      return {
+        kind: 'attached',
+        host: runtimeHost,
+      };
+    }
+
+    const workspaceRoot = options.workspaceRoot ?? process.cwd();
+    const stateDir = options.stateDir ?? '.heddle';
+    const listenOptions: HeddleControlPlaneServerOptions = {
+      mode: 'daemon',
+      workspaceRoot,
+      stateRoot: resolve(workspaceRoot, stateDir),
+      preferApiKey: Boolean(options.preferApiKey),
+      host: parsed.host,
+      port: parsed.port,
+      assetsDir: parsed.assetsDir,
+      serveAssets: parsed.serveAssets,
+    };
+
+    const handle = await startHeddleControlPlaneServer(listenOptions);
+    installDaemonShutdownHandlers(handle);
+    writeStartedServerNotice(handle, options.stdout ?? process.stdout);
     return {
-      kind: 'attached',
-      host: runtimeHost,
+      kind: 'started',
+      handle,
     };
   }
-
-  const workspaceRoot = options.workspaceRoot ?? process.cwd();
-  const stateDir = options.stateDir ?? '.heddle';
-  const listenOptions: HeddleControlPlaneServerOptions = {
-    mode: 'daemon',
-    workspaceRoot,
-    stateRoot: resolve(workspaceRoot, stateDir),
-    preferApiKey: Boolean(options.preferApiKey),
-    host: parsed.host,
-    port: parsed.port,
-    assetsDir: parsed.assetsDir,
-    serveAssets: parsed.serveAssets,
-  };
-
-  const handle = await startHeddleControlPlaneServer(listenOptions);
-  installDaemonShutdownHandlers(handle);
-  writeStartedServerNotice(handle, options.stdout ?? process.stdout);
-  return {
-    kind: 'started',
-    handle,
-  };
 }
 
 function writeExistingServerNotice(

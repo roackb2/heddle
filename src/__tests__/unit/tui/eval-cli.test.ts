@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseEvalArgs } from '../../../cli/eval/index.js';
+import { parseEvalArgs } from '@/cli-v2/commands/eval-command.js';
 
 describe('parseEvalArgs', () => {
   it('parses agent eval options', () => {

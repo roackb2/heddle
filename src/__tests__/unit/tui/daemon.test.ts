@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { ControlPlaneChatSessionPresenter, parseDaemonArgs, runDaemonCli } from '../../../cli/daemon.js';
+import {
+  ControlPlaneChatSessionPresenter,
+  DaemonCliV2CommandEdgeService,
+  parseDaemonArgs,
+} from '@/cli-v2/commands/daemon-command.js';
 import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 
 describe('daemon CLI helpers', () => {
@@ -44,7 +48,7 @@ describe('daemon CLI helpers', () => {
     };
     const output: string[] = [];
 
-    const result = await runDaemonCli([], {
+    const result = await DaemonCliV2CommandEdgeService.run([], {
       runtimeHost,
       stdout: {
         write: (message) => output.push(message),

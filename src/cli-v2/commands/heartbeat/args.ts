@@ -73,9 +73,9 @@ export function buildHeartbeatCommand(onParsed?: (parsed: ParsedHeartbeatArgs) =
 }
 
 export function parseHeartbeatArgs(args: string[]): ParsedHeartbeatArgs {
-  if (args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
+  if (args.length === 0 || args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
     return {
-      command: args[0],
+      command: args[0] ?? 'help',
       subcommand: undefined,
       rest: args.slice(1),
       flags: {},

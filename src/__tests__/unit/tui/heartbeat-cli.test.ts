@@ -5,6 +5,15 @@ import { HeartbeatCliCommandEdgeService } from '@/cli-v2/commands/heartbeat-comm
 import { formatDurationMs, parseDurationMs, parseHeartbeatArgs } from '../../../cli/heartbeat.js';
 
 describe('heartbeat CLI helpers', () => {
+  it('treats a bare heartbeat command as discovery help', () => {
+    expect(parseHeartbeatArgs([])).toEqual({
+      command: 'help',
+      subcommand: undefined,
+      rest: [],
+      flags: {},
+    });
+  });
+
   it('parses heartbeat subcommands and flags', () => {
     expect(parseHeartbeatArgs([
       'task',

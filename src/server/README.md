@@ -18,8 +18,8 @@ The lifecycle handle returns server facts such as `serverId`, endpoint, registry
 path, workspace bootstrap roots, and `close()`.
 
 CLI-only behavior stays outside this module. Command adapters such as
-`src/cli/daemon.ts` decide whether to attach to an existing live server, print
-messages, install signal handlers, and call `process.exit()`.
+`src/cli-v2/commands/daemon-command.ts` decide whether to attach to an existing
+live server, print messages, install signal handlers, and call `process.exit()`.
 
 Embedded hosts such as future `chat-v2` startup should use the same lifecycle
 path instead of inventing a TUI-only server path.

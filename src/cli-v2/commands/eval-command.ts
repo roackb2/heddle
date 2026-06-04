@@ -1,10 +1,11 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { cleanupEvalResults } from '../../core/eval/cleanup.js';
-import { loadEvalCases } from '../../core/eval/case-loader.js';
-import { runAgentEvalCase } from '../../core/eval/agent-runner.js';
-import { writeEvalSuiteReport } from '../../core/eval/report-writer.js';
-import type { EvalCase, EvalSuiteReport } from '../../core/eval/schema.js';
+import dayjs from 'dayjs';
+import { cleanupEvalResults } from '@/core/eval/cleanup.js';
+import { loadEvalCases } from '@/core/eval/case-loader.js';
+import { runAgentEvalCase } from '@/core/eval/agent-runner.js';
+import { writeEvalSuiteReport } from '@/core/eval/report-writer.js';
+import type { EvalCase, EvalSuiteReport } from '@/core/eval/schema.js';
 
 export type EvalCliOptions = {
   repoRoot: string;
@@ -45,13 +46,25 @@ const evalCommandRunners: Partial<Record<EvalCommand, EvalCommandRunner>> = {
   help: () => writeEvalHelp(),
 };
 
-export async function runEvalCli(rawArgs: string[], options: EvalCliOptions) {
-  const args = parseEvalArgs(rawArgs);
-  await evalCommandRunners[args.command]?.(args, options);
+/**
+ * Command edge for `heddle eval`.
+ *
+ * Owns: terminal eval argument parsing, command dispatch, progress/report
+ * output, and dev-harness defaults.
+ *
+ * Does not own: eval case schemas, workspace fixture setup, agent subprocess
+ * execution, cleanup selection semantics, or report generation. Those stay in
+ * `src/core/eval` public harness services.
+ */
+export class EvalCliV2CommandEdgeService {
+  static async run(rawArgs: string[], options: EvalCliOptions): Promise<void> {
+    const args = parseEvalArgs(rawArgs);
+    await evalCommandRunners[args.command]?.(args, options);
+  }
 }
 
 async function runAgentEval(args: EvalArgs, options: EvalCliOptions) {
-  const startedAt = new Date().toISOString();
+  const startedAt = dayjs().toISOString();
   const loadedCases = loadEvalCases({
     casesDir: args.casesDir,
     ids: args.caseIds.length ? args.caseIds : undefined,
@@ -89,7 +102,7 @@ async function runAgentEval(args: EvalArgs, options: EvalCliOptions) {
     target: args.target,
     repoRoot: options.repoRoot,
     startedAt,
-    finishedAt: new Date().toISOString(),
+    finishedAt: dayjs().toISOString(),
     resultsDir: args.outputDir,
     results,
   };
@@ -269,17 +282,13 @@ function parsePositiveInt(raw: string, flag: string): number {
 }
 
 function parseDate(raw: string, flag: string): Date {
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) {
+  const date = dayjs(raw);
+  if (!date.isValid()) {
     throw new Error(`Invalid datetime for ${flag}: ${raw}`);
   }
-  return date;
+  return date.toDate();
 }
 
 function defaultRunDirName(prefix: string): string {
-  const timestamp = new Date().toISOString()
-    .replace('T', '-')
-    .replace(/\.\d{3}Z$/, '')
-    .replaceAll(':', '');
-  return `${prefix}-${timestamp}`;
+  return `${prefix}-${dayjs().format('YYYY-MM-DD-HHmmss')}`;
 }
