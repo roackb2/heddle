@@ -4,7 +4,7 @@ Heddle is an open-source AI coding agent runtime and terminal-first workspace fo
 
 Official website: [heddleagent.com](https://heddleagent.com)
 
-> **Terminal UI v2 is now the default.** Run `heddle` or `heddle chat` to try the API-backed terminal experience. Messages, run events, and agent response streams now flow through the shared control-plane path, so terminal, browser, and mobile clients can follow the same work at the same time for smoother cross-device workflows. If you need the old terminal UI while the transition settles, run `heddle chat-v1`.
+> **Terminal UI v2 is now the default.** Run `heddle` or `heddle chat` to use the API-backed terminal experience. Messages, run events, and agent response streams now flow through the shared control-plane path, so terminal, browser, and mobile clients can follow the same work at the same time for smoother cross-device workflows.
 
 ## See Heddle In Action
 
@@ -229,7 +229,7 @@ More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
 
 ### Terminal UI v2 is the default
 
-The default terminal chat is now the API-backed `cli-v2` experience. Run `heddle` or `heddle chat` from a project to start it. The legacy terminal UI remains available as an explicit fallback through `heddle chat-v1` while the transition settles.
+The default terminal chat is now the API-backed `cli-v2` experience. Run `heddle` or `heddle chat` from a project to start it.
 
 The v2 terminal UI consumes the same local control-plane API as the browser UI and does not reach directly into core services. For users, the goal is one behavior model across interfaces. A saved conversation, selected model, reasoning setting, approval state, and live run status should be the same whether you are looking from the terminal, the browser control plane, or another device connected to the same local control-plane server. Messages, tool events, approval waits, and streamed agent responses are delivered through the shared session event path, so multiple devices can observe and continue the same work simultaneously instead of waiting for one surface to finish or refresh.
 

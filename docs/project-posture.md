@@ -132,7 +132,7 @@ scope.
 - Review projections: `src/core/review/`.
 - Shell and approvals: `src/core/tools/toolkits/shell-process/`,
   `src/core/approvals/`.
-- TUI approvals and chat: `src/cli/chat/`.
+- Terminal UI and command edges: `src/cli-v2/`.
 - Control plane: `src/server/routes/`, `src/server/controllers/`,
   `src/server/services/`, `src/web/features/control-plane/`, and
   `src/web-v2/`.

@@ -17,9 +17,9 @@ self-contained while it is being built next to the existing TUI.
 - If terminal rendering code is worth preserving from the old TUI, copy it into
   this folder and make it consume `cli-v2` view/state types.
 
-The old `src/cli/chat` tree remains available only as the current production
-fallback until `cli-v2` reaches parity. It is not a dependency boundary for this
-rewrite.
+The old `src/cli/chat` tree is no longer a public CLI route. It remains only
+until the v1 retirement PR can delete legacy tests and verification harnesses.
+It is not a dependency boundary for this rewrite.
 
 ## Shape
 

@@ -42,14 +42,6 @@ When chat starts, it checks for a live local control-plane server:
   same process;
 - either way, the TUI talks to the shared control-plane API after bootstrap.
 
-The legacy terminal UI remains available as an explicit fallback:
-
-```bash
-heddle chat-v1
-```
-
-Use that only when you need to compare behavior during the v2 transition.
-
 ## Daemon Mode
 
 The daemon starts the same control-plane server path as a standalone process:
@@ -166,14 +158,13 @@ logic, or workspace resolution in command-specific code.
 If you want a simple operational checklist:
 
 1. Start `heddle` or `heddle chat` for the default API-backed terminal UI.
-2. Use `heddle chat-v1` only as a temporary legacy fallback.
-3. Start `heddle daemon` when you want the browser control plane or a
+2. Start `heddle daemon` when you want the browser control plane or a
    longer-lived local server.
-4. Use the browser workspace switcher and `Settings > Workspace` to register,
+3. Use the browser workspace switcher and `Settings > Workspace` to register,
    rename, and switch local project workspaces.
-5. Treat workspace state as local to `.heddle/`, even when several clients are
+4. Treat workspace state as local to `.heddle/`, even when several clients are
    attached to the same local control-plane server.
-6. Do not assume the web UI, TUI, and daemon are separate runtimes operating
+5. Do not assume the web UI, TUI, and daemon are separate runtimes operating
    independently on the same workspace.
 
 ## Current Product Boundary
@@ -184,8 +175,7 @@ For normal use, the current model should be understood this way:
 - `heddle daemon` gives you the browser control plane and a stable local server;
 - browser and terminal clients use the same control-plane/session path;
 - workspace switching chooses which local workspace state a client is operating
-  on;
-- the legacy terminal UI is an explicit fallback, not the default path.
+  on.
 
 Host-action controls such as takeover or force-embed are intentionally limited
 while the workspace-agnostic server model continues to settle.

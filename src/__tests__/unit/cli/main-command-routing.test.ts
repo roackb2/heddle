@@ -3,19 +3,31 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('CLI command routing', () => {
-  it('routes the default chat command to cli-v2 and keeps the v1 escape hatch', () => {
+  it('routes the default chat command to cli-v2 and blocks the removed v1 escape hatch', () => {
     const source = readFileSync(join(process.cwd(), 'src', 'cli', 'main.ts'), 'utf8');
 
     expect(source).toMatch(/\.command\('chat'\)[\s\S]*?await ChatCliV2CommandEdgeService\.run\(resolved\);/);
-    expect(source).toMatch(/\.command\('chat-v1'\)[\s\S]*?startChatCli\(\{/);
     expect(source).toContain(".command('chat-v2')");
     expect(source).toMatch(/program\s*\n\s*\.action\([\s\S]*?await ChatCliV2CommandEdgeService\.run\(resolved\);/);
+    expect(source).toContain("['chat-v1', 'heddle chat-v1 has been removed from the public CLI.");
+    expect(source).not.toContain("from './chat/index.js'");
+    expect(source).not.toContain(".command('chat-v1')");
+    expect(source).not.toContain('startChatCli');
   });
 
   it('keeps explicit chat commands out of the ask shortcut', () => {
     const source = readFileSync(join(process.cwd(), 'src', 'cli', 'main.ts'), 'utf8');
 
-    expect(source).toMatch(/return \[[^\]]*'chat-v1'[^\]]*'chat-v2'[^\]]*\]\.includes\(command\)/s);
+    expect(source).toMatch(/const removedCommandMessage = knownCommand \? REMOVED_COMMAND_MESSAGES\.get\(knownCommand\) : undefined;/);
+    expect(source).toMatch(/return \[[^\]]*'chat'[^\]]*'chat-v2'[^\]]*\]\.includes\(command\)/s);
+    expect(source).not.toMatch(/return \[[^\]]*'chat-v1'[\s\S]*\]\.includes\(command\)/s);
+  });
+
+  it('removes repo development scripts for the legacy terminal UI route', () => {
+    const packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { scripts: Record<string, string> };
+
+    expect(Object.keys(packageJson.scripts).filter((name) => name.startsWith('chat:dev:v1'))).toEqual([]);
+    expect(Object.values(packageJson.scripts).filter((script) => script.includes('chat-v1'))).toEqual([]);
   });
 
   it('delegates auth and init command policy to cli-v2/core owners', () => {

@@ -41,12 +41,7 @@ heddle --cwd /path/to/project
 heddle chat --model gpt-5.4-mini --max-steps 20
 ```
 
-`heddle` and `heddle chat` start the API-backed terminal UI. If you need the
-legacy terminal UI while the v2 transition settles, use:
-
-```bash
-heddle chat-v1
-```
+`heddle` and `heddle chat` start the API-backed terminal UI.
 
 Heddle uses the current directory as the workspace root unless you pass `--cwd`.
 

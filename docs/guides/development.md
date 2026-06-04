@@ -95,12 +95,7 @@ yarn chat:dev
 
 `yarn chat:dev` runs the same source CLI entry point as the packaged `heddle chat` command. The `examples/` directory is reserved for programmatic host/runtime examples rather than the main terminal chat UI.
 
-`yarn chat:dev` uses the API-backed terminal UI. The legacy terminal UI remains
-available as an explicit fallback:
-
-```bash
-yarn chat:dev:v1
-```
+`yarn chat:dev` uses the API-backed terminal UI.
 
 If you prefer provider-specific local shortcuts, the repository also includes convenience scripts such as:
 

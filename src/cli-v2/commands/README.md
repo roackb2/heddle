@@ -44,9 +44,9 @@ domain should have:
 | Command | Current implementation | Target boundary |
 | --- | --- | --- |
 | `heddle`, `heddle chat`, `heddle chat-v2` | Already routed to `cli-v2`; attach to a live server or start an embedded control-plane server. | Keep as the reference API-backed runtime command pattern. |
-| `heddle chat-v1` | Explicit legacy fallback through `src/cli/chat`. | Keep only while CLI v1 remains available; delete during v1 retirement. |
+| `heddle chat-v1` | Removed from the public CLI route; the command edge reports a migration error instead of falling through to `ask`. | Delete `src/cli/chat` and legacy tests/harnesses during v1 retirement. |
 | `heddle ask` | `cli-v2` command adapter attaches/embeds the control-plane server, selects or creates a session, and submits through session APIs. | API-backed runtime command. Keep one-shot asks on the same session/run path as TUI and web. |
-| Unknown first argument fallback | Unknown command currently becomes `ask`. | Decide explicitly. Keep only if documented as shorthand; otherwise remove before v1 retirement. |
+| Unknown first argument fallback | Unknown non-command text becomes `ask`; removed command names are blocked explicitly. | Keep only if documented as shorthand; do not let retired command names become prompts. |
 | `heddle daemon` | `cli-v2` command adapter over runtime discovery and `src/server` lifecycle. | Direct discovery/lifecycle calls remain acceptable because the command manages the server. |
 | `heddle auth` | `cli-v2` command adapter delegates credential status/login/logout semantics to `ProviderCredentialCommandService`; `src/cli/auth.ts` remains only as removable v1 compatibility. | Direct management adapter over the core auth command service. |
 | `heddle init` | `cli-v2` command adapter delegates `.heddle/config.json` path/default/template behavior to `ProjectConfigService`. | Direct management adapter over the core project-config service/schema contract. |
@@ -66,8 +66,8 @@ domain should have:
    and `eval` behind documented service contracts.
 3. Move heartbeat task/run/start behavior behind server-backed heartbeat APIs or
    explicit heartbeat service contracts.
-4. Delete `chat-v1`, `src/cli/chat`, and legacy command tests/docs once no
-   production command depends on them.
+4. Delete `src/cli/chat` and legacy command tests/harnesses once no production
+   command depends on them.
 
 ## Import Boundary
 

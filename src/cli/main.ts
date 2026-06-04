@@ -5,7 +5,6 @@ import { dirname, resolve } from 'node:path';
 import { chdir } from 'node:process';
 import { Command } from 'commander';
 import { AuthCliCommandEdgeService } from '@/cli-v2/commands/auth-command.js';
-import { startChatCli } from './chat/index.js';
 import { AskCliV2CommandEdgeService } from '@/cli-v2/commands/ask-command.js';
 import { ChatCliV2CommandEdgeService } from '@/cli-v2/commands/chat-v2-command.js';
 import { DaemonCliV2CommandEdgeService } from '@/cli-v2/commands/daemon-command.js';
@@ -15,7 +14,7 @@ import { InitCliV2CommandEdgeService } from '@/cli-v2/commands/init-command.js';
 import { MemoryCliV2CommandEdgeService } from '@/cli-v2/commands/memory-command.js';
 import type { CliV2CommandEdgeOptions } from '@/cli-v2/commands/types.js';
 import { loadProjectAgentContext, resolveAgentContextPaths } from './project-agent-context.js';
-import { RuntimeHostMessages, RuntimeHostResolver, type ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
+import { RuntimeHostResolver } from '@/core/runtime/daemon/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
@@ -31,6 +30,9 @@ type RootCliOptions = {
 type ResolvedCliOptions = CliV2CommandEdgeOptions;
 
 const CLI_VERSION = readCliVersion();
+const REMOVED_COMMAND_MESSAGES = new Map<string, string>([
+  ['chat-v1', 'heddle chat-v1 has been removed from the public CLI. Use `heddle` or `heddle chat` for the supported terminal UI.'],
+]);
 
 async function main() {
   const program = new Command();
@@ -51,19 +53,6 @@ async function main() {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
       await ChatCliV2CommandEdgeService.run(resolved);
-    });
-
-  program
-    .command('chat-v1')
-    .description('start the legacy interactive chat UI')
-    .action(async () => {
-      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
-      chdir(resolved.workspaceRoot);
-      writeRuntimeHostNotice('chat-v1', resolved.runtimeHost);
-      startChatCli({
-        ...resolved,
-        runtimeHost: resolved.forceOwnerConflict ? undefined : resolved.runtimeHost,
-      });
     });
 
   program
@@ -270,6 +259,11 @@ async function main() {
 
   const argv = process.argv.slice(2);
   const knownCommand = argv[0];
+  const removedCommandMessage = knownCommand ? REMOVED_COMMAND_MESSAGES.get(knownCommand) : undefined;
+  if (removedCommandMessage) {
+    throw new Error(removedCommandMessage);
+  }
+
   if (knownCommand && !isKnownCommand(knownCommand) && !knownCommand.startsWith('-')) {
     const resolved = resolveCliOptions(program.opts<RootCliOptions>());
     chdir(resolved.workspaceRoot);
@@ -292,7 +286,7 @@ async function main() {
 }
 
 function isKnownCommand(command: string): boolean {
-  return ['chat', 'chat-v1', 'chat-v2', 'ask', 'init', 'memory', 'auth', 'eval', 'heartbeat', 'daemon', 'help'].includes(command);
+  return ['chat', 'chat-v2', 'ask', 'init', 'memory', 'auth', 'eval', 'heartbeat', 'daemon', 'help'].includes(command);
 }
 
 function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
@@ -323,15 +317,6 @@ function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
     runtimeHost: RuntimeHostResolver.resolveLiveServer(),
     forceOwnerConflict: Boolean(flags.forceOwnerConflict),
   };
-}
-
-function writeRuntimeHostNotice(command: string, runtimeHost: ResolvedRuntimeHost) {
-  const notice = RuntimeHostMessages.formatNotice(command, runtimeHost);
-  if (!notice) {
-    return;
-  }
-
-  process.stdout.write(`${notice}\n`);
 }
 
 function readCliVersion(): string {

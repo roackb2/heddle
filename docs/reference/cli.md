@@ -7,7 +7,6 @@ This page is a command lookup for the current Heddle CLI surface.
 ### Chat and one-shot use
 
 - `heddle` or `heddle chat`: start interactive chat mode in the current workspace
-- `heddle chat-v1`: start the legacy terminal UI fallback
 - `heddle ask "<goal>"`: run a single prompt and exit, backed by a one-off saved session
 
 ### Control plane
@@ -95,8 +94,7 @@ heddle heartbeat start --every 30m
 
 ## Interactive Chat Commands
 
-`heddle` and `heddle chat` start the API-backed terminal UI. The legacy
-terminal UI remains available as an explicit fallback through `heddle chat-v1`.
+`heddle` and `heddle chat` start the API-backed terminal UI.
 
 Inside `heddle` / `heddle chat`, the most-used local commands are:
 
@@ -120,7 +118,6 @@ Inside this repository, common development commands include:
 ```bash
 yarn cli:dev
 yarn chat:dev
-yarn chat:dev:v1
 yarn daemon:dev
 yarn daemon:dev:v1
 yarn server:dev
