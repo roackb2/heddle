@@ -115,9 +115,10 @@ async function main() {
   const memoryCommand = program
     .command('memory')
     .description('manage workspace memory catalogs')
-    .action(async () => {
-      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
-      await MemoryCliV2CommandEdgeService.run('status', resolved);
+    .addHelpCommand('help [command]', 'display help for command')
+    .addHelpText('after', ['', 'Examples:', '  heddle memory status', '  heddle memory list workflows', '  heddle memory read workflows/release.md', '  heddle memory search "release checklist"', ''].join('\n'))
+    .action((_, command) => {
+      command.outputHelp();
     });
 
   memoryCommand
@@ -139,6 +140,7 @@ async function main() {
   memoryCommand
     .command('list [path]')
     .description('list markdown notes under workspace memory')
+    .addHelpText('after', ['', 'Examples:', '  heddle memory list', '  heddle memory list workflows', ''].join('\n'))
     .action(async (path?: string) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       await MemoryCliV2CommandEdgeService.run('list', resolved, { path });
@@ -149,6 +151,7 @@ async function main() {
     .description('read a memory note')
     .option('--offset <n>', '0-based line offset')
     .option('--max-lines <n>', 'maximum lines to print')
+    .addHelpText('after', ['', 'Examples:', '  heddle memory read workflows/release.md', '  heddle memory read workflows/release.md --offset 20 --max-lines 40', ''].join('\n'))
     .action(async (path: string | undefined, flags: { offset?: string; maxLines?: string }) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       await MemoryCliV2CommandEdgeService.run('read', resolved, {
@@ -163,6 +166,7 @@ async function main() {
     .description('search memory notes')
     .option('--path <path>', 'memory-relative path to search under')
     .option('--max-results <n>', 'maximum matching lines to print')
+    .addHelpText('after', ['', 'Examples:', '  heddle memory search "release checklist"', '  heddle memory search "daemon registry" --path architecture --max-results 10', ''].join('\n'))
     .action(async (query: string | undefined, flags: { path?: string; maxResults?: string }) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       await MemoryCliV2CommandEdgeService.run('search', resolved, {
@@ -176,6 +180,7 @@ async function main() {
     .command('validate')
     .description('validate memory catalog quality')
     .option('--repair', 'repair safe missing catalog issues')
+    .addHelpText('after', ['', 'Examples:', '  heddle memory validate', '  heddle memory validate --repair', ''].join('\n'))
     .action(async (flags: { repair?: boolean }) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       await MemoryCliV2CommandEdgeService.run('validate', resolved, { repair: Boolean(flags.repair) });
@@ -186,6 +191,7 @@ async function main() {
     .description('process pending memory candidates into cataloged notes')
     .option('--dry-run', 'show pending candidates without running the maintainer')
     .option('--reconcile', 'repair safe catalog issues before maintenance and report validation after')
+    .addHelpText('after', ['', 'Examples:', '  heddle memory maintain --dry-run', '  heddle memory maintain --reconcile', ''].join('\n'))
     .action(async (options: { dryRun?: boolean; reconcile?: boolean }) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       await MemoryCliV2CommandEdgeService.run('maintain', resolved, {

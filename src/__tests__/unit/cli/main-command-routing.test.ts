@@ -39,4 +39,11 @@ describe('CLI command routing', () => {
     expect(source).toMatch(/if \(knownCommand && !isKnownCommand\(knownCommand\)[\s\S]*?await AskCliV2CommandEdgeService\.run\(argv\.join\(' '\)\.trim\(\), \{/);
     expect(source).not.toContain("from './ask.js'");
   });
+
+  it('shows discovery help for command groups with subcommands', () => {
+    const source = readFileSync(join(process.cwd(), 'src', 'cli', 'main.ts'), 'utf8');
+
+    expect(source).toMatch(/const memoryCommand = program[\s\S]*?\.command\('memory'\)[\s\S]*?\.addHelpCommand\('help \[command\]'[\s\S]*?\.action\(\(_, command\) => \{\s*command\.outputHelp\(\);\s*\}\);/);
+    expect(source).toMatch(/memoryCommand\s*\n\s*\.command\('status'\)[\s\S]*?await MemoryCliV2CommandEdgeService\.run\('status', resolved\);/);
+  });
 });
