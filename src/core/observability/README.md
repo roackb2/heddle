@@ -32,7 +32,8 @@ Observability behavior currently exists in these places:
 - `src/core/observability/semantics/` for shared trace names.
 - `src/core/live/` for shared host activity projection, typed
   activity handlers, and tool call/result activity summaries.
-- `src/cli/chat/hooks/controllers/run/tui-run-loop-events.ts` for TUI activity rendering.
+- `src/client-shared/services/session-activities/` for shared host activity projection.
+- `src/cli-v2/services/activities/` for terminal-specific activity presentation.
 - `src/web/features/control-plane/hooks/sessions-screen/useSessionDetailSubscription.ts` for web activity rendering.
 - `src/server/controllers/trpc/control-plane/chat-session-events.ts`.
 
@@ -66,9 +67,9 @@ additive: consumers should ignore fields they do not use.
 ## Tests
 
 - `src/__tests__/unit/core/trace-format.test.ts`
-- `src/__tests__/unit/tui/chat-activity-format.test.ts`
+- `src/__tests__/unit/core/conversation-activity.test.ts`
+- `src/__tests__/unit/client-shared/session-activity-service.test.ts`
 - `src/__tests__/integration/web/control-plane-sessions-state.test.tsx`
-- `src/__tests__/integration/chat/chat-runtime.test.ts`
 
 ## Notes For Coding Agents
 

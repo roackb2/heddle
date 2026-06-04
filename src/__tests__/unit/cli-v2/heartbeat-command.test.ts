@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ClientSharedProxyApiService } from '@/client-shared/api/proxy.js';
 import { ControlPlaneCommandRuntimeService } from '@/cli-v2/commands/control-plane-command-runtime.js';
-import { HeartbeatCliCommandEdgeService } from '@/cli-v2/commands/heartbeat-command.js';
-import { formatDurationMs, parseDurationMs, parseHeartbeatArgs } from '../../../cli/heartbeat.js';
+import {
+  HeartbeatCliCommandEdgeService,
+  formatDurationMs,
+  parseDurationMs,
+  parseHeartbeatArgs,
+} from '@/cli-v2/commands/heartbeat-command.js';
 
 describe('heartbeat CLI helpers', () => {
   it('treats a bare heartbeat command as discovery help', () => {

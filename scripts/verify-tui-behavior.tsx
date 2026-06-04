@@ -1,61 +1,26 @@
 /**
- * Reusable maintainer verification harness pattern for TUI behavior.
+ * Lightweight maintainer verification harness for cli-v2 terminal behavior.
  *
- * This is intentionally not a production module. It exists so maintainers and
- * coding agents can verify host-side TUI behavior without driving the full Ink
- * UI manually.
+ * This script intentionally verifies only host-side cli-v2 behavior over the
+ * shared control-plane API contract. It is not a replacement for domain tests
+ * or browser/TUI integration suites.
  *
- * Current concrete coverage:
- * - new-session inheritance from the active session
- * - switching between stored sessions without clobbering model/reasoning state
- * - persisted catalog values after host-side changes
- * - runtime-provided session catalog paths are honored instead of rebuilding
- *   a default stateRoot path
- * - TUI host state refreshes after named ConversationSessionService mutations
- *
- * Direction:
- * - keep this script as the first concrete example of a lightweight TUI
- *   verification harness;
- * - if more host-side behaviors need this style of testing, evolve the pattern
- *   into a small shared harness instead of copying one-off scripts;
- * - do not move domain assertions here when the same behavior should already be
- *   locked by smaller unit or integration tests.
+ * Covered scenarios:
+ * - store bootstrap loads sessions, detail, and runtime context through the
+ *   shared control-plane API
+ * - creating and selecting sessions updates the active cli-v2 snapshot
+ * - prompt submission stays on the async control-plane API path
  */
-import React, { useEffect } from 'react';
-import { act } from 'react';
-import { render, cleanup } from '@testing-library/react';
-import { JSDOM } from 'jsdom';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
-import { useChatSessions } from '../src/cli/chat/hooks/useChatSessions.js';
-import { resolveNewSessionExecutionPreferences } from '../src/core/chat/engine/sessions/preferences/service.js';
-import type { ChatSession } from '../src/core/chat/types.js';
-
-const dom = new JSDOM('<!doctype html><html><body></body></html>');
-Object.defineProperty(globalThis, 'window', { value: dom.window, configurable: true, writable: true });
-Object.defineProperty(globalThis, 'document', { value: dom.window.document, configurable: true, writable: true });
-Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, configurable: true, writable: true });
-Object.defineProperty(globalThis, 'HTMLElement', { value: dom.window.HTMLElement, configurable: true, writable: true });
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
-type HarnessApi = ReturnType<typeof useChatSessions>;
-let api: HarnessApi | undefined;
-
-function Harness(props: {
-  sessionCatalogFile: string;
-  apiKeyPresent: boolean;
-  defaultModel: string;
-  workspaceRoot: string;
-  stateRoot: string;
-}) {
-  const value = useChatSessions(props);
-  useEffect(() => {
-    api = value;
-  }, [value]);
-  return null;
-}
+import { ControlPlaneSessionStore } from '../src/cli-v2/state/control-plane-session-store.js';
+import type { ControlPlaneProxyClient } from '../src/client-shared/api/proxy.js';
+import type {
+  ControlPlaneModelOptions,
+  ControlPlanePendingApproval,
+  ControlPlaneSessionDetail,
+  ControlPlaneSessionRuntimeContext,
+  ControlPlaneSessionSendPromptAsyncResult,
+  ControlPlaneSessionView,
+} from '../src/client-shared/api/types.js';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -63,260 +28,393 @@ function assert(condition: unknown, message: string): asserts condition {
   }
 }
 
-function requireApi(): HarnessApi {
-  assert(api, 'Harness API not initialized');
-  return api;
-}
+function createHarnessFixture() {
+  const sessions: ControlPlaneSessionView[] = [
+    {
+      id: 'session-1',
+      name: 'Session 1',
+      workspaceId: 'workspace-1',
+      messageCount: 1,
+      turnCount: 0,
+      queuedPromptCount: 0,
+    },
+  ];
 
-function getActiveSession(message = 'Missing active session'): ChatSession {
-  const session = requireApi().activeSession;
-  assert(session, message);
-  return session;
-}
+  const sessionDetails = new Map<string, NonNullable<ControlPlaneSessionDetail>>([
+    ['session-1', createSessionDetail({ id: 'session-1', name: 'Session 1' })],
+  ]);
+  const runtimeContexts = new Map<string, ControlPlaneSessionRuntimeContext>([
+    ['session-1', createRuntimeContext({ sessionId: 'session-1', sessionName: 'Session 1' })],
+  ]);
 
-async function flush() {
-  await act(async () => {
-    await Promise.resolve();
-  });
-}
+  const calls = {
+    sessionsQuery: 0,
+    sessionQuery: 0,
+    sessionRuntimeContextQuery: 0,
+    sessionCreateMutate: 0,
+    sessionSendPromptAsyncMutate: 0,
+  };
 
-function renderHarness(args: {
-  sessionCatalogFile: string;
-  workspaceRoot: string;
-  stateRoot: string;
-}) {
-  render(
-    <Harness
-      sessionCatalogFile={args.sessionCatalogFile}
-      apiKeyPresent={true}
-      defaultModel="gpt-5.4"
-      workspaceRoot={args.workspaceRoot}
-      stateRoot={args.stateRoot}
-    />,
-  );
-}
+  const pendingApproval: ControlPlanePendingApproval = null;
+  let createdCount = 1;
 
-async function verifySessionSwitchScenario() {
-  api = undefined;
-  const root = mkdtempSync(join(tmpdir(), 'heddle-session-switch-'));
-  const workspaceRoot = join(root, 'workspace');
-  const stateRoot = join(root, '.heddle');
-  mkdirSync(workspaceRoot, { recursive: true });
-  mkdirSync(stateRoot, { recursive: true });
-  const sessionCatalogFile = join(stateRoot, 'chat-sessions.catalog.json');
-
-  renderHarness({ sessionCatalogFile, workspaceRoot, stateRoot });
-  await flush();
-
-  const firstSession = getActiveSession('Missing initial active session');
-  const firstId = firstSession.id;
-
-  await act(async () => {
-    api!.setSessionPreferences(firstId, {
-      model: 'gpt-5.5',
-      reasoningEffort: 'low',
-    });
-  });
-  await flush();
-  assert(getActiveSession().model === 'gpt-5.5', 'Initial session model did not persist');
-  assert(getActiveSession().reasoningEffort === 'low', 'Initial session reasoning did not persist');
-
-  let secondSessionId = '';
-  await act(async () => {
-    const next = api!.createSession(
-      'Second Session',
-      resolveNewSessionExecutionPreferences({
-        defaultModel: 'gpt-5.4',
-        inherited: {
-          model: getActiveSession().model ?? 'gpt-5.4',
-          reasoningEffort: getActiveSession().reasoningEffort,
+  const client = {
+    controlPlane: {
+      state: {
+        query: async () => ({ activeWorkspaceId: 'workspace-1', workspaces: [] }),
+      },
+      sessions: {
+        query: async () => {
+          calls.sessionsQuery += 1;
+          return {
+            workspaceId: 'workspace-1',
+            sessions: sessions.map((session) => ({ ...session })),
+          };
         },
-      }),
-    );
-    secondSessionId = next.id;
-  });
-  await flush();
+      },
+      sessionsEvents: {
+        subscribe: () => ({ unsubscribe: () => undefined }),
+      },
+      session: {
+        query: async ({ id }: { id: string }) => {
+          calls.sessionQuery += 1;
+          const detail = sessionDetails.get(id);
+          assert(detail, `Missing session detail for ${id}`);
+          return detail;
+        },
+      },
+      sessionEvents: {
+        subscribe: () => ({ unsubscribe: () => undefined }),
+      },
+      sessionRunning: {
+        query: async () => ({ running: false }),
+      },
+      sessionRunState: {
+        query: async () => ({ running: false, pendingApproval }),
+      },
+      sessionRuntimeContext: {
+        query: async ({ sessionId }: { sessionId: string }) => {
+          calls.sessionRuntimeContextQuery += 1;
+          const context = runtimeContexts.get(sessionId);
+          assert(context, `Missing runtime context for ${sessionId}`);
+          return context;
+        },
+      },
+      modelOptions: {
+        query: async () => createModelOptions(),
+      },
+      sessionPendingApproval: {
+        query: async () => pendingApproval,
+      },
+      sessionCreate: {
+        mutate: async ({
+          suggestedName,
+          workspaceId,
+        }: {
+          suggestedName?: string;
+          workspaceId: string;
+        }) => {
+          calls.sessionCreateMutate += 1;
+          createdCount += 1;
+          const id = `session-${createdCount}`;
+          const name = suggestedName?.trim() || `Session ${createdCount}`;
+          const session: ControlPlaneSessionView = {
+            id,
+            name,
+            workspaceId,
+            messageCount: 0,
+            turnCount: 0,
+            queuedPromptCount: 0,
+          };
 
-  assert(getActiveSession().id === secondSessionId, 'New session was not activated');
-  assert(getActiveSession().model === 'gpt-5.5', 'New session did not inherit active model');
-  assert(getActiveSession().reasoningEffort === 'low', 'New session did not inherit active reasoning effort');
+          sessions.unshift(session);
+          sessionDetails.set(id, createSessionDetail({
+            id,
+            name,
+            messages: [],
+            messageCount: 0,
+          }));
+          runtimeContexts.set(id, createRuntimeContext({
+            sessionId: id,
+            sessionName: name,
+            model: 'gpt-5.4-mini',
+          }));
 
-  await act(async () => {
-    api!.setSessionPreferences(secondSessionId, {
-      model: 'gpt-5.4',
-      reasoningEffort: 'medium',
-    });
-  });
-  await flush();
-  assert(getActiveSession().model === 'gpt-5.4', 'Second session model update failed');
-  assert(getActiveSession().reasoningEffort === 'medium', 'Second session reasoning update failed');
+          return session;
+        },
+      },
+      sessionSendPrompt: {
+        mutate: async () => {
+          throw new Error('verify-tui-behavior should use sessionSendPromptAsync, not sessionSendPrompt');
+        },
+      },
+      sessionSendPromptAsync: {
+        mutate: async ({
+          workspaceId,
+          sessionId,
+          prompt,
+        }: {
+          workspaceId: string;
+          sessionId: string;
+          prompt: string;
+        }): Promise<ControlPlaneSessionSendPromptAsyncResult> => {
+          calls.sessionSendPromptAsyncMutate += 1;
+          const current = sessionDetails.get(sessionId);
+          assert(current, `Missing session detail for prompt submit ${sessionId}`);
 
-  await act(async () => {
-    api!.setActiveSessionId(firstId);
-  });
-  await flush();
-  assert(getActiveSession().id === firstId, 'Failed to switch back to first session');
-  assert(getActiveSession().model === 'gpt-5.5', 'Switching back clobbered first session model');
-  assert(getActiveSession().reasoningEffort === 'low', 'Switching back clobbered first session reasoning');
+          const queuedMessage = {
+            id: `queued-user-${calls.sessionSendPromptAsyncMutate}`,
+            role: 'user' as const,
+            text: prompt,
+            isPending: true,
+          };
 
-  await act(async () => {
-    api!.setActiveSessionId(secondSessionId);
-  });
-  await flush();
-  assert(getActiveSession().id === secondSessionId, 'Failed to switch to second session');
-  assert(getActiveSession().model === 'gpt-5.4', 'Switching to second session clobbered second session model');
-  assert(getActiveSession().reasoningEffort === 'medium', 'Switching to second session clobbered second session reasoning');
+          sessionDetails.set(sessionId, {
+            ...current,
+            messageCount: current.messageCount + 1,
+            queuedPromptCount: 1,
+            messages: [...current.messages, queuedMessage],
+          });
 
-  const catalogPath = join(stateRoot, 'chat-sessions.catalog.json');
-  const catalog = JSON.parse(readFileSync(catalogPath, 'utf8')) as { sessions: Array<{ id: string; model?: string; reasoningEffort?: string }> };
-  const firstStored = catalog.sessions.find((entry) => entry.id === firstId);
-  const secondStored = catalog.sessions.find((entry) => entry.id === secondSessionId);
-  assert(firstStored?.model === 'gpt-5.5', 'Persisted first session model is wrong');
-  assert(firstStored?.reasoningEffort === 'low', 'Persisted first session reasoning is wrong');
-  assert(secondStored?.model === 'gpt-5.4', 'Persisted second session model is wrong');
-  assert(secondStored?.reasoningEffort === 'medium', 'Persisted second session reasoning is wrong');
+          const sessionIndex = sessions.findIndex((entry) => entry.id === sessionId);
+          if (sessionIndex >= 0) {
+            sessions[sessionIndex] = {
+              ...sessions[sessionIndex]!,
+              messageCount: current.messageCount + 1,
+              queuedPromptCount: 1,
+            };
+          }
 
-  const activeSessionId = getActiveSession().id;
-  cleanup();
+          return {
+            accepted: true,
+            workspaceId,
+            sessionId,
+            runId: `run-${calls.sessionSendPromptAsyncMutate}`,
+            acceptedAt: '2026-06-04T00:00:00.000Z',
+          };
+        },
+      },
+      sessionDirectShellPreflight: {
+        query: async () => ({
+          command: 'echo hello',
+          risk: 'safe',
+          tool: 'run_shell_inspect',
+          reason: 'simple shell inspection',
+        }),
+      },
+      sessionDirectShellAsync: {
+        mutate: async () => {
+          throw new Error('verify-tui-behavior should not route these scenarios through direct shell');
+        },
+      },
+      slashCommandCatalog: {
+        query: async () => ({
+          commands: [
+            {
+              id: 'model.current',
+              syntax: '/model',
+              description: 'show the active model',
+            },
+            {
+              id: 'session.list',
+              syntax: '/session list',
+              description: 'list local chat sessions',
+            },
+          ],
+          hints: [
+            { command: '/model', description: 'show the active model' },
+            { command: '/session list', description: 'list local chat sessions' },
+          ],
+        }),
+      },
+      slashCommandExecute: {
+        mutate: async () => ({ handled: true, kind: 'message', message: 'ok' }),
+      },
+      workspaceFileSearch: {
+        query: async () => ({ workspaceId: 'workspace-1', files: [] }),
+      },
+      sessionContinue: {
+        mutate: async () => ({ outcome: 'done', summary: 'Continued.', session: sessionDetails.get('session-1') }),
+      },
+      sessionCancel: {
+        mutate: async () => ({ cancelled: false }),
+      },
+      sessionResolveApproval: {
+        mutate: async () => ({ resolved: true }),
+      },
+    },
+  } as unknown as ControlPlaneProxyClient;
 
+  return { client, calls };
+}
+
+async function verifyStoreBootstrap() {
+  const fixture = createHarnessFixture();
+  const store = new ControlPlaneSessionStore({ client: fixture.client });
+
+  try {
+    await store.start();
+
+    const snapshot = store.getSnapshot();
+    assert(snapshot.workspaceId === 'workspace-1', 'cli-v2 store did not resolve workspace id');
+    assert(snapshot.activeSessionId === 'session-1', 'cli-v2 store did not select the initial session');
+    assert(snapshot.activeSession?.messages.at(0)?.text === 'Ready.', 'cli-v2 store did not load initial session detail');
+    assert(snapshot.runtimeContext?.sessionId === 'session-1', 'cli-v2 store did not load runtime context');
+    assert(fixture.calls.sessionsQuery >= 1, 'cli-v2 store did not query session list');
+    assert(fixture.calls.sessionQuery >= 1, 'cli-v2 store did not query session detail');
+    assert(fixture.calls.sessionRuntimeContextQuery >= 1, 'cli-v2 store did not query runtime context');
+
+    return {
+      workspaceId: snapshot.workspaceId,
+      activeSessionId: snapshot.activeSessionId,
+      messageCount: snapshot.activeSession?.messages.length ?? 0,
+      message: 'store-bootstrap verification passed',
+    };
+  } finally {
+    store.dispose();
+  }
+}
+
+async function verifySessionCreateAndSwitch() {
+  const fixture = createHarnessFixture();
+  const store = new ControlPlaneSessionStore({ client: fixture.client });
+
+  try {
+    await store.start();
+    const created = await store.createSession({ suggestedName: 'Second Session' });
+    await store.selectSession(created.id);
+
+    const snapshot = store.getSnapshot();
+    assert(created.name === 'Second Session', 'cli-v2 did not preserve suggested session name');
+    assert(snapshot.activeSessionId === created.id, 'cli-v2 did not switch to created session');
+    assert(snapshot.activeSession?.name === 'Second Session', 'cli-v2 active session detail is stale after switch');
+    assert(snapshot.runtimeContext?.sessionId === created.id, 'cli-v2 runtime context did not follow session switch');
+    assert(snapshot.runtimeContext?.model === 'gpt-5.4-mini', 'cli-v2 runtime context did not refresh for the new session');
+
+    return {
+      createdSessionId: created.id,
+      activeSessionId: snapshot.activeSessionId,
+      model: snapshot.runtimeContext?.model,
+      message: 'session-switch verification passed',
+    };
+  } finally {
+    store.dispose();
+  }
+}
+
+async function verifyPromptSubmission() {
+  const fixture = createHarnessFixture();
+  const store = new ControlPlaneSessionStore({ client: fixture.client });
+
+  try {
+    await store.start();
+    await store.submitPrompt('  Verify cli-v2 prompt submit  ');
+
+    const snapshot = store.getSnapshot();
+    assert(fixture.calls.sessionSendPromptAsyncMutate === 1, 'cli-v2 did not use sessionSendPromptAsync');
+    assert(snapshot.activeSession?.messages.at(-1)?.text === 'Verify cli-v2 prompt submit', 'cli-v2 did not append the accepted queued user prompt');
+    assert(snapshot.activeSession?.messages.at(-1)?.isPending === true, 'cli-v2 did not preserve queued prompt state');
+
+    return {
+      activeSessionId: snapshot.activeSessionId,
+      lastMessage: snapshot.activeSession?.messages.at(-1)?.text,
+      queuedPromptCount: snapshot.activeSession?.queuedPromptCount ?? 0,
+      message: 'prompt-submit verification passed',
+    };
+  } finally {
+    store.dispose();
+  }
+}
+
+function createSessionDetail(overrides: Partial<NonNullable<ControlPlaneSessionDetail>>): NonNullable<ControlPlaneSessionDetail> {
   return {
-    firstSession: firstStored,
-    secondSession: secondStored,
-    activeSessionId,
-    message: 'session-switch verification passed',
+    id: 'session-1',
+    name: 'Session 1',
+    workspaceId: 'workspace-1',
+    messageCount: 1,
+    turnCount: 0,
+    queuedPromptCount: 0,
+    messages: [
+      { id: 'message-1', role: 'assistant', text: 'Ready.' },
+    ],
+    turns: [],
+    queuedPrompts: [],
+    ...overrides,
   };
 }
 
-async function verifySessionBoundaryScenario() {
-  api = undefined;
-  const root = mkdtempSync(join(tmpdir(), 'heddle-session-boundary-'));
-  const workspaceRoot = join(root, 'workspace');
-  const stateRoot = join(root, '.heddle');
-  mkdirSync(workspaceRoot, { recursive: true });
-  mkdirSync(stateRoot, { recursive: true });
-  const sessionCatalogFile = join(stateRoot, 'chat-sessions.catalog.json');
-
-  renderHarness({ sessionCatalogFile, workspaceRoot, stateRoot });
-  await flush();
-
-  const sessionId = getActiveSession('Missing initial active session for session boundary scenario').id;
-
-  await act(async () => {
-    api!.sessionService.appendMessages(sessionId, [
-      { id: 'verify-user-message', role: 'user', text: 'Verify visible user append' },
-      { id: 'verify-assistant-message', role: 'assistant', text: 'Verify visible assistant append' },
-    ]);
-    api!.sessionService.setLastContinuePrompt(sessionId, 'continue this verification');
-    api!.sessionService.acquireLease(sessionId, {
-      ownerKind: 'tui',
-      ownerId: 'verify-session-boundary',
-      clientLabel: 'verification harness',
-    });
-    api!.refreshSessions();
-  });
-  await flush();
-
-  assert(getActiveSession().messages.at(-2)?.text === 'Verify visible user append', 'Service append did not refresh visible user message');
-  assert(getActiveSession().messages.at(-1)?.text === 'Verify visible assistant append', 'Service append did not refresh visible assistant message');
-  assert(getActiveSession().lastContinuePrompt === 'continue this verification', 'Continue prompt did not refresh through service');
-  assert(getActiveSession().lease?.ownerId === 'verify-session-boundary', 'Lease acquire did not refresh through service');
-
-  await act(async () => {
-    api!.sessionService.markCompactionRunning(sessionId, {
-      sourceHistory: [
-        { role: 'user', content: 'Verbose prompt before compaction' },
-        { role: 'assistant', content: 'Verbose answer before compaction' },
-      ],
-      archivePath: join(stateRoot, 'archives', 'verify.jsonl'),
-    });
-    api!.refreshSessions();
-  });
-  await flush();
-
-  assert(getActiveSession().context?.compaction?.status === 'running', 'Compaction running state did not refresh through service');
-  assert(getActiveSession().context?.archive?.lastArchivePath?.endsWith('verify.jsonl'), 'Compaction archive path was not stored');
-
-  await act(async () => {
-    api!.sessionService.applyCompactionResult(sessionId, {
-      history: [
-        { role: 'user', content: 'Compact prompt' },
-        { role: 'assistant', content: 'Compact answer' },
-      ],
-      context: { estimatedHistoryTokens: 2, compaction: { status: 'idle' } },
-      archive: { archives: [] },
-    });
-    api!.sessionService.releaseLease(sessionId, { ownerId: 'verify-session-boundary' });
-    api!.refreshSessions();
-  });
-  await flush();
-
-  assert(getActiveSession().messages.at(-2)?.text === 'Compact prompt', 'Compaction result did not rebuild visible user message');
-  assert(getActiveSession().messages.at(-1)?.text === 'Compact answer', 'Compaction result did not rebuild visible assistant message');
-  assert(getActiveSession().context?.compaction?.status === 'idle', 'Compaction result did not refresh idle status');
-  assert(getActiveSession().lease === undefined, 'Lease release did not refresh through service');
-
-  const messages = getActiveSession().messages.map((message) => `${message.role}:${message.text}`);
-  const compactionStatus = getActiveSession().context?.compaction?.status;
-  cleanup();
-
+function createRuntimeContext(
+  overrides: Partial<ControlPlaneSessionRuntimeContext> = {},
+): ControlPlaneSessionRuntimeContext {
   return {
-    sessionId,
-    messages,
-    compactionStatus,
-    message: 'session-boundary verification passed',
+    workspaceId: 'workspace-1',
+    sessionId: 'session-1',
+    sessionName: 'Session 1',
+    model: 'gpt-5.4',
+    reasoningEffort: 'medium',
+    effectiveReasoningEffort: 'medium',
+    reasoningSupported: true,
+    reasoningOptions: [
+      {
+        id: 'default',
+        label: 'default',
+        description: 'Use gpt-5.4 default (medium)',
+        disabled: false,
+      },
+      {
+        id: 'medium',
+        label: 'medium',
+        description: 'Set explicit medium effort',
+        disabled: false,
+      },
+    ],
+    credentialSource: {
+      type: 'oauth',
+      provider: 'openai',
+      accountId: 'acct-test',
+      expiresAt: Date.now() + 60_000,
+    },
+    contextWindow: 400000,
+    estimatedInputTokens: undefined,
+    driftEnabled: false,
+    running: false,
+    welcomeGuide: {
+      mode: 'conversation',
+      hasProviderCredential: true,
+      carriesTranscriptAcrossTurns: true,
+    },
+    ...overrides,
   };
 }
 
-async function verifyCustomCatalogScenario() {
-  api = undefined;
-  const root = mkdtempSync(join(tmpdir(), 'heddle-custom-catalog-'));
-  const workspaceRoot = join(root, 'workspace');
-  const stateRoot = join(root, '.heddle');
-  const customStateRoot = join(root, '.heddle-embedded');
-  mkdirSync(workspaceRoot, { recursive: true });
-  mkdirSync(stateRoot, { recursive: true });
-  mkdirSync(customStateRoot, { recursive: true });
-
-  const customCatalogFile = join(customStateRoot, 'embedded-sessions.catalog.json');
-  const defaultCatalogFile = join(stateRoot, 'chat-sessions.catalog.json');
-
-  renderHarness({ sessionCatalogFile: customCatalogFile, workspaceRoot, stateRoot });
-  await flush();
-  requireApi();
-
-  await act(async () => {
-    api!.createSession('Embedded Session');
-  });
-  await flush();
-
-  assert(existsSync(customCatalogFile), 'Custom catalog path was not written');
-  assert(!existsSync(defaultCatalogFile), 'Default catalog path should not be written for embedded runtimes');
-
-  cleanup();
-
+function createModelOptions(): ControlPlaneModelOptions {
   return {
-    customCatalogFile,
-    defaultCatalogFile,
-    message: 'custom-catalog verification passed',
+    groups: [
+      {
+        label: 'OpenAI',
+        models: ['gpt-5.4', 'gpt-5.4-mini'],
+        options: [
+          { id: 'gpt-5.4', disabled: false },
+          { id: 'gpt-5.4-mini', disabled: false },
+        ],
+      },
+    ],
   };
 }
 
 async function main() {
-  const sessionSwitch = await verifySessionSwitchScenario();
-  const sessionBoundary = await verifySessionBoundaryScenario();
-  const customCatalog = await verifyCustomCatalogScenario();
+  const storeBootstrap = await verifyStoreBootstrap();
+  const sessionSwitch = await verifySessionCreateAndSwitch();
+  const promptSubmit = await verifyPromptSubmission();
 
   console.log(JSON.stringify({
+    storeBootstrap,
     sessionSwitch,
-    sessionBoundary,
-    customCatalog,
+    promptSubmit,
   }, null, 2));
-
-  cleanup();
 }
 
 main().catch((error) => {
   console.error(error);
-  cleanup();
   process.exitCode = 1;
 });
