@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const cliEntry = resolve(repoRoot, 'dist/src/cli/main.js');
+const cliEntry = resolve(repoRoot, 'dist/src/cli-v2/main.js');
 const webV2Index = resolve(repoRoot, 'dist/src/web-v2/index.html');
 const fixtureRoot = resolve(repoRoot, '.browser-integration-static');
 const homeRoot = join(fixtureRoot, 'home');

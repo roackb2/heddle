@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseEvalArgs } from '@/cli-v2/commands/eval-command.js';
+import { parseEvalArgs, renderEvalHelp } from '@/cli-v2/commands/eval-command.js';
 
 describe('parseEvalArgs', () => {
   it('parses agent eval options', () => {
@@ -34,6 +34,13 @@ describe('parseEvalArgs', () => {
 
   it('returns help for unknown eval subcommands', () => {
     expect(parseEvalArgs(['other']).command).toBe('help');
+  });
+
+  it('returns child-specific help for nested eval help requests', () => {
+    expect(parseEvalArgs(['agent', '--help']).command).toBe('help');
+    expect(parseEvalArgs(['clean', '-h']).command).toBe('help');
+    expect(renderEvalHelp(['agent', '--help'])).toContain('Usage: heddle eval agent [options]');
+    expect(renderEvalHelp(['clean', '-h'])).toContain('Usage: heddle eval clean [options]');
   });
 
   it('parses clean eval options', () => {

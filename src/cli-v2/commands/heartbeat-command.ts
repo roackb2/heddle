@@ -1,5 +1,5 @@
 import type { ParsedHeartbeatArgs } from './heartbeat/args.js';
-import { buildHeartbeatCommand, parseHeartbeatArgs, stringFlag } from './heartbeat/args.js';
+import { parseHeartbeatArgs, renderHeartbeatHelp, stringFlag } from './heartbeat/args.js';
 import { parseDurationMs } from './heartbeat/duration.js';
 import { runHeartbeatRunsCli } from './heartbeat/run-commands.js';
 import { runHeartbeatTaskCli } from './heartbeat/task-commands.js';
@@ -9,7 +9,7 @@ import { ClientSharedProxyApiService } from '@/client-shared/api/proxy.js';
 import { ControlPlaneCommandRuntimeService } from './control-plane-command-runtime.js';
 
 export type { HeartbeatCliOptions } from './heartbeat/types.js';
-export { parseHeartbeatArgs } from './heartbeat/args.js';
+export { parseHeartbeatArgs, renderHeartbeatHelp } from './heartbeat/args.js';
 export { formatDurationMs, parseDurationMs } from './heartbeat/duration.js';
 
 /**
@@ -25,13 +25,12 @@ export { formatDurationMs, parseDurationMs } from './heartbeat/duration.js';
  */
 export class HeartbeatCliCommandEdgeService {
   static async run(args: string[], options: HeartbeatCliOptions = {}) {
-    const parsed = parseHeartbeatArgs(args);
-
-    if (!parsed.command || parsed.command === 'help' || parsed.command === '--help' || parsed.command === '-h') {
-      process.stdout.write(`${buildHeartbeatCommand().helpInformation()}\n`);
+    if (shouldRenderHeartbeatHelp(args)) {
+      process.stdout.write(`${renderHeartbeatHelp(args)}\n`);
       return;
     }
 
+    const parsed = parseHeartbeatArgs(args);
     const heartbeatScheduler = HeartbeatCliCommandEdgeService.resolveHeartbeatScheduler(parsed);
     const runtime = await ControlPlaneCommandRuntimeService.resolve({
       workspaceRoot: options.workspaceRoot ?? process.cwd(),
@@ -101,4 +100,8 @@ export class HeartbeatCliCommandEdgeService {
       pollIntervalMs: poll ? parseDurationMs(poll) : undefined,
     };
   }
+}
+
+function shouldRenderHeartbeatHelp(args: string[]): boolean {
+  return !args.length || args[0] === 'help' || args.some((arg) => arg === '--help' || arg === '-h');
 }

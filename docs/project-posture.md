@@ -75,7 +75,8 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
   debugging evidence contracts.
 - `src/core/review/` owns reusable review projections such as structured Git
   diff parsing.
-- `src/cli/` owns terminal and TUI host surfaces.
+- `src/cli-v2/` owns terminal and TUI host surfaces, including the public
+  command bootstrap.
 - `src/server/` owns the daemon/control-plane API.
 - `src/web-v2/` owns the default browser control plane.
 - `src/web/` owns the legacy v1 browser control plane while it remains available as an opt-in fallback.

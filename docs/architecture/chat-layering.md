@@ -141,7 +141,7 @@ src/
 
 ## Current vs Target
 
-Today, some interface code still lives under paths like `src/cli/` and
+Today, some interface code still lives under paths like `src/cli-v2/` and
 `src/web/`. That is current structure, not the desired final shape.
 
 When future refactors touch these areas:

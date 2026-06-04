@@ -13,7 +13,7 @@ import { HeartbeatCliCommandEdgeService } from '@/cli-v2/commands/heartbeat-comm
 import { InitCliV2CommandEdgeService } from '@/cli-v2/commands/init-command.js';
 import { MemoryCliV2CommandEdgeService } from '@/cli-v2/commands/memory-command.js';
 import type { CliV2CommandEdgeOptions } from '@/cli-v2/commands/types.js';
-import { loadProjectAgentContext, resolveAgentContextPaths } from './project-agent-context.js';
+import { CliV2ProjectAgentContextService } from './services/project-agent-context-service.js';
 import { RuntimeHostResolver } from '@/core/runtime/daemon/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
@@ -30,10 +30,19 @@ type RootCliOptions = {
 type ResolvedCliOptions = CliV2CommandEdgeOptions;
 
 const CLI_VERSION = readCliVersion();
+const KNOWN_COMMANDS = new Set(['chat', 'chat-v2', 'ask', 'init', 'memory', 'auth', 'eval', 'heartbeat', 'daemon', 'help']);
 const REMOVED_COMMAND_MESSAGES = new Map<string, string>([
   ['chat-v1', 'heddle chat-v1 has been removed from the public CLI. Use `heddle` or `heddle chat` for the supported terminal UI.'],
 ]);
 
+/**
+ * Owns the public Heddle terminal host bootstrap.
+ *
+ * This entrypoint resolves workspace-scoped host context and delegates command
+ * execution to `cli-v2` command edge services. It must not absorb runtime
+ * domain policy that belongs to shared APIs, server lifecycle, or core
+ * services.
+ */
 async function main() {
   const program = new Command();
   program
@@ -106,8 +115,8 @@ async function main() {
     .description('manage workspace memory catalogs')
     .addHelpCommand('help [command]', 'display help for command')
     .addHelpText('after', ['', 'Examples:', '  heddle memory status', '  heddle memory list workflows', '  heddle memory read workflows/release.md', '  heddle memory search "release checklist"', ''].join('\n'))
-    .action((_, command) => {
-      command.outputHelp();
+    .action(() => {
+      memoryCommand.outputHelp();
     });
 
   memoryCommand
@@ -192,8 +201,8 @@ async function main() {
   const authCommand = program
     .command('auth')
     .description('manage provider credentials')
-    .action(async () => {
-      await AuthCliCommandEdgeService.run('status');
+    .action(() => {
+      authCommand.outputHelp();
     });
 
   authCommand
@@ -222,9 +231,19 @@ async function main() {
     .command('eval [args...]')
     .description('run Heddle evaluation harnesses')
     .allowUnknownOption(true)
-    .action(async (args: string[]) => {
+    .helpOption(false)
+    .option('-h, --help', 'display help for command')
+    .action(async (...handlerArgs: unknown[]) => {
+      const forwardedArgs = resolveCommandEdgeArgs(handlerArgs);
+      if (hasHelpArg(forwardedArgs)) {
+        await EvalCliV2CommandEdgeService.run(forwardedArgs, {
+          repoRoot: resolveHeddleRepoRoot(),
+        });
+        return;
+      }
+
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
-      await EvalCliV2CommandEdgeService.run(args ?? [], {
+      await EvalCliV2CommandEdgeService.run(forwardedArgs, {
         ...resolved,
         repoRoot: resolveHeddleRepoRoot(),
       });
@@ -234,20 +253,36 @@ async function main() {
     .command('heartbeat [args...]')
     .description('manage and run heartbeat tasks')
     .allowUnknownOption(true)
-    .action(async (args: string[]) => {
+    .helpOption(false)
+    .option('-h, --help', 'display help for command')
+    .action(async (...handlerArgs: unknown[]) => {
+      const forwardedArgs = resolveCommandEdgeArgs(handlerArgs);
+      if (hasHelpArg(forwardedArgs)) {
+        await HeartbeatCliCommandEdgeService.run(forwardedArgs);
+        return;
+      }
+
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      await HeartbeatCliCommandEdgeService.run(args ?? [], resolved);
+      await HeartbeatCliCommandEdgeService.run(forwardedArgs, resolved);
     });
 
   program
     .command('daemon [args...]')
     .description('start the local Heddle daemon and control plane')
     .allowUnknownOption(true)
-    .action(async (args: string[]) => {
+    .helpOption(false)
+    .option('-h, --help', 'display help for command')
+    .action(async (...handlerArgs: unknown[]) => {
+      const forwardedArgs = resolveCommandEdgeArgs(handlerArgs);
+      if (hasHelpArg(forwardedArgs)) {
+        await DaemonCliV2CommandEdgeService.run(forwardedArgs);
+        return;
+      }
+
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      await DaemonCliV2CommandEdgeService.run(args ?? [], resolved);
+      await DaemonCliV2CommandEdgeService.run(forwardedArgs, resolved);
     });
 
   program
@@ -286,7 +321,7 @@ async function main() {
 }
 
 function isKnownCommand(command: string): boolean {
-  return ['chat', 'chat-v2', 'ask', 'init', 'memory', 'auth', 'eval', 'heartbeat', 'daemon', 'help'].includes(command);
+  return KNOWN_COMMANDS.has(command);
 }
 
 function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
@@ -310,9 +345,9 @@ function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
     stateDir: projectConfig.stateDir ?? '.heddle',
     directShellApproval: projectConfig.directShellApproval ?? 'never',
     searchIgnoreDirs: projectConfig.searchIgnoreDirs ?? [],
-    systemContext: loadProjectAgentContext(
+    systemContext: CliV2ProjectAgentContextService.load(
       workspaceRoot,
-      resolveAgentContextPaths(workspaceRoot, projectConfig.agentContextPaths)
+      CliV2ProjectAgentContextService.resolvePaths(workspaceRoot, projectConfig.agentContextPaths)
     ),
     runtimeHost: RuntimeHostResolver.resolveLiveServer(),
     forceOwnerConflict: Boolean(flags.forceOwnerConflict),
@@ -353,6 +388,24 @@ function resolveHeddleRepoRoot(): string {
     }
   }
   return resolve(import.meta.dirname, '../..');
+}
+
+function resolveCommandEdgeArgs(handlerArgs: unknown[]): string[] {
+  const command = handlerArgs.at(-1);
+  const rawArgs = Array.isArray(handlerArgs[0]) ? handlerArgs[0] : [];
+  if (!(command instanceof Command)) {
+    return rawArgs;
+  }
+
+  if (rawArgs.some((arg) => arg === '--help' || arg === '-h')) {
+    return rawArgs;
+  }
+
+  return command.opts<{ help?: boolean }>().help ? [...rawArgs, '--help'] : rawArgs;
+}
+
+function hasHelpArg(args: string[]): boolean {
+  return args.some((arg) => arg === '--help' || arg === '-h');
 }
 
 function parsePositiveInt(raw: string | undefined): number | undefined {

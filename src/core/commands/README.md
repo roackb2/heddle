@@ -56,8 +56,9 @@ registries and render the command results.
 - Core command modules:
   `src/__tests__/unit/core/slash-command-modules.test.ts`
 - TUI behavior lock:
-  `src/__tests__/unit/tui/local-commands.test.ts`
-- TUI command integration: `src/__tests__/integration/tui/session-cli.test.ts`
+  `src/__tests__/unit/cli-v2/slash-command-runtime.test.ts`
+- TUI command integration:
+  `scripts/verify-tui-behavior.tsx`
 
 ## Notes For Coding Agents
 

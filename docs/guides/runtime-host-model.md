@@ -142,9 +142,8 @@ approvals, workspace identity, or persistence.
 
 Not every command needs to be an API client.
 
-Local management commands such as memory, auth, init, heartbeat management, and
-eval may call documented core/domain service contracts directly when they are
-true adapters:
+Local management commands such as memory, auth, init, and eval may call
+documented core/domain service contracts directly when they are true adapters:
 
 - parse flags;
 - call a public service contract;
@@ -152,6 +151,11 @@ true adapters:
 
 They should not duplicate core policy, storage semantics, validation, fallback
 logic, or workspace resolution in command-specific code.
+
+Runtime-backed commands such as chat, ask, and heartbeat attach to a live
+control-plane server or start an embedded server, then use the shared
+control-plane API. Heartbeat is intentionally in this group so terminal and
+browser clients share task mutation, scheduler, and run-record behavior.
 
 ## Practical Rules
 

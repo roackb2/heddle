@@ -24,20 +24,24 @@ OpenAI account sign-in is experimental and user-selected. It is not official Ope
 
 ### Heartbeat and scheduling
 
-- `heddle heartbeat start [--every 30m] [--task "<durable task>"]`: create or enable the default heartbeat task and run the foreground scheduler
+- `heddle heartbeat start [--every 30m] [--task "<durable task>"] [--poll 60s] [--once]`: create or update a task and keep the server-backed scheduler running, or run once with `--once`
 - `heddle heartbeat task add --id <id> --task "<durable task>" [--every 15m]`: create or update a scheduled heartbeat task
 - `heddle heartbeat task list`: list local heartbeat tasks
 - `heddle heartbeat task show <id>`: show a task's schedule, last decision, and last run summary
 - `heddle heartbeat task enable <id>`: enable a heartbeat task
 - `heddle heartbeat task disable <id>`: disable a heartbeat task
-- `heddle heartbeat run --once`: run due heartbeat tasks once
-- `heddle heartbeat run [--poll 60s]`: run the foreground heartbeat scheduler until interrupted
+- `heddle heartbeat run [--task <id>]`: ask the control-plane server to run due heartbeat tasks, or one task when `--task` is provided
 - `heddle heartbeat runs list [--task <id>] [--limit 10]`: list saved heartbeat run records
 - `heddle heartbeat runs show <run-id|latest> [--task <id>]`: show the final agent output for a saved heartbeat run
 
 ### Project setup
 
 - `heddle init`: create a local `.heddle/config.json` template in the current project
+
+### Evaluation harness
+
+- `heddle eval agent [--cases-dir <path>] [--case <id>] [--output <path>] [--dry-run]`: run JSON-defined agent eval cases
+- `heddle eval clean [--results-dir <path>] [--before <datetime>] [--yes]`: prune generated eval result directories
 
 ## Common Flags
 
@@ -86,10 +90,16 @@ heddle daemon
 
 After the daemon starts, open the browser control plane to inspect sessions, review current Git workspace changes, manage local workspaces, inspect memory status, and use the heartbeat task workbench. The default browser UI is web-v2; the legacy v1 UI is available only when you explicitly serve v1 assets, for example with `yarn client:build:v1` and `heddle daemon --assets-dir dist/src/web` in a repository checkout. For one-off CLI usage against another project, keep using `--cwd`.
 
-Start the foreground heartbeat scheduler:
+Start the server-backed heartbeat scheduler:
 
 ```bash
 heddle heartbeat start --every 30m
+```
+
+Run due heartbeat tasks once:
+
+```bash
+heddle heartbeat run
 ```
 
 ## Interactive Chat Commands
@@ -135,7 +145,7 @@ yarn typecheck
 - The installed command is `heddle`.
 - By default, commands operate on the current working directory unless `--cwd` is provided.
 - Workspace state is local to the project under `.heddle/`. Saved sessions use `.heddle/chat-sessions.catalog.json` plus per-session files under `.heddle/chat-sessions/`. The browser control plane can register and switch between local workspaces, but each workspace keeps its own sessions, traces, memory, and tasks.
-- Heartbeat scheduler commands are local-first; adding a task does not create a background OS service by itself. The browser control plane can operate the same local tasks and run records, including create/edit/run/resume/delete flows.
+- Heartbeat task state is local-first, but heartbeat command execution is control-plane backed. Task and run commands attach to a live server or start an embedded server so terminal and browser clients use the same heartbeat API and run-record shapes.
 
 ## See Also
 

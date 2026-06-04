@@ -36,15 +36,18 @@ heddle heartbeat task add --id repo-gardener --task "Check for safe maintenance 
 heddle heartbeat task list
 heddle heartbeat task show repo-gardener
 heddle heartbeat task enable repo-gardener
-heddle heartbeat run --once
-heddle heartbeat run --poll 60s
+heddle heartbeat run
+heddle heartbeat start --poll 60s
+heddle heartbeat start --once --id repo-gardener
 heddle heartbeat runs list --task repo-gardener
 heddle heartbeat runs show latest --task repo-gardener
 ```
 
-For an OpenClaw-like local experience, `heartbeat start` creates or enables a default periodic task and runs the foreground scheduler in one command. It prints the agent's final summary and decision after each run. Stop it with `Ctrl+C`.
+For an OpenClaw-like local experience, `heartbeat start` creates or updates a periodic task and keeps the server-backed scheduler running in one command. It attaches to a live control-plane server when one exists, or starts an embedded server when needed. Stop the command with `Ctrl+C`.
 
-Adding a task only saves scheduler state; it does not start a background process. Stop a foreground scheduler with `Ctrl+C`, or pause a task with:
+`heartbeat run` asks the control-plane server to run due tasks now. Use `heartbeat start --once` when you want the start command to create or update a task and immediately run once.
+
+Adding a task only saves scheduler state; it does not create an OS background service. Stop an embedded scheduler host with `Ctrl+C`, or pause a task with:
 
 ```bash
 heddle heartbeat task disable repo-gardener
@@ -96,7 +99,7 @@ yarn example:heartbeat-scheduler
 
 Heartbeat uses a larger default step budget than ordinary short chat runs so a runner cycle has room to inspect, act, and checkpoint. Hosts can still pass `maxSteps` when they need stricter control.
 
-The built-in CLI heartbeat runner is intentionally conservative: it has no live approval UI, so approval-gated file edits and mutation shell commands are denied with a clear blocker. It is useful today for recurring inspection, summaries, memory-note updates, and escalation reports.
+The built-in heartbeat command edge uses the same control-plane heartbeat APIs as the browser workbench. It should not own its own scheduler loop, task mutation policy, or task/run storage logic.
 
 ## See Also
 

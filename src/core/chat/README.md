@@ -18,7 +18,8 @@ must not accumulate here unless it is genuinely boundary-level.
 
 Use a simple MVC-like split:
 
-- **View**: TUI/web presentation surfaces under `src/cli/` and `src/web/`.
+- **View**: TUI/web presentation surfaces under `src/cli-v2/`, `src/web-v2/`,
+  and legacy `src/web/` while web v1 remains available.
 - **Application/controller**: host-specific orchestration that adapts user
   actions into engine/runtime calls.
 - **Domain/engine**: `src/core/chat/engine/` owns persisted chat semantics and

@@ -164,7 +164,9 @@ function listSourceFiles(dir: string): string[] {
 
 function isCliV2TuiClientSource(file: string): boolean {
   const sourcePath = toSourcePath(file);
-  return sourcePath.startsWith('cli-v2/') && !sourcePath.startsWith('cli-v2/commands/');
+  return sourcePath.startsWith('cli-v2/')
+    && !sourcePath.startsWith('cli-v2/commands/')
+    && sourcePath !== 'cli-v2/main.ts';
 }
 
 function findImportViolations(files: string[], disallowed: RegExp[]): string[] {

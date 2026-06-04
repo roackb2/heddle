@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { Command } from 'commander';
 import {
   ControlPlaneChatSessionPresenter,
   startHeddleControlPlaneServer,
@@ -44,7 +45,18 @@ export class DaemonCliV2CommandEdgeService {
   static async run(
     args: string[],
     options: DaemonCliOptions = {},
-  ): Promise<{ kind: 'attached'; host: ResolvedRuntimeHost } | { kind: 'started'; handle: HeddleControlPlaneServerHandle }> {
+  ): Promise<
+    | { kind: 'help' }
+    | { kind: 'attached'; host: ResolvedRuntimeHost }
+    | { kind: 'started'; handle: HeddleControlPlaneServerHandle }
+  > {
+    if (hasHelpFlag(args)) {
+      (options.stdout ?? process.stdout).write(`${renderDaemonHelp()}\n`);
+      return {
+        kind: 'help',
+      };
+    }
+
     const parsed = parseDaemonArgs(args);
     const runtimeHost = options.runtimeHost ?? RuntimeHostResolver.resolveLiveServer();
     if (!options.forceOwnerConflict && runtimeHost.kind === 'server' && !runtimeHost.stale) {
@@ -119,55 +131,61 @@ function installDaemonShutdownHandlers(handle: HeddleControlPlaneServerHandle) {
 }
 
 export function parseDaemonArgs(args: string[]): DaemonArgs {
-  const flags = parseFlags(args);
+  let parsed: DaemonArgs | undefined;
+  buildDaemonCommand((args) => {
+    parsed = args;
+  }).parse(args, { from: 'user' });
+
+  return parsed ?? defaultDaemonArgs();
+}
+
+export function renderDaemonHelp(): string {
+  return buildDaemonCommand(() => {}).helpInformation().trimEnd();
+}
+
+function buildDaemonCommand(onParsed: (args: DaemonArgs) => void): Command {
+  return new Command()
+    .name('heddle daemon')
+    .description('Start the local Heddle daemon and browser control plane')
+    .exitOverride()
+    .showHelpAfterError()
+    .option('--host <host>', 'host to bind', DEFAULT_HOST)
+    .option('--port <port>', 'port to bind', (value) => parsePort(value), DEFAULT_PORT)
+    .option('--assets-dir <path>', 'serve browser assets from this directory')
+    .option('--no-assets', 'disable static browser asset serving')
+    .action((flags: DaemonCommandFlags) => {
+      onParsed({
+        host: flags.host,
+        port: flags.port,
+        assetsDir: flags.assetsDir ? resolve(flags.assetsDir) : undefined,
+        serveAssets: flags.assets !== false,
+      });
+    });
+}
+
+type DaemonCommandFlags = {
+  host: string;
+  port: number;
+  assetsDir?: string;
+  assets?: boolean;
+};
+
+function defaultDaemonArgs(): DaemonArgs {
   return {
-    host: stringFlag(flags, 'host') ?? DEFAULT_HOST,
-    port: parsePort(stringFlag(flags, 'port')) ?? DEFAULT_PORT,
-    assetsDir: stringFlag(flags, 'assets-dir') ? resolve(stringFlag(flags, 'assets-dir')!) : undefined,
-    serveAssets: !booleanFlag(flags, 'no-assets'),
+    host: DEFAULT_HOST,
+    port: DEFAULT_PORT,
+    serveAssets: true,
   };
 }
 
-function parseFlags(args: string[]): Record<string, string | boolean> {
-  const flags: Record<string, string | boolean> = {};
-  for (let index = 0; index < args.length; index++) {
-    const arg = args[index] ?? '';
-    if (!arg.startsWith('--')) {
-      continue;
-    }
-
-    const eqIndex = arg.indexOf('=');
-    if (eqIndex > 0) {
-      flags[arg.slice(2, eqIndex)] = arg.slice(eqIndex + 1);
-      continue;
-    }
-
-    const name = arg.slice(2);
-    const next = args[index + 1];
-    if (!next || next.startsWith('--')) {
-      flags[name] = true;
-      continue;
-    }
-
-    flags[name] = next;
-    index++;
-  }
-  return flags;
-}
-
-function stringFlag(flags: Record<string, string | boolean>, name: string): string | undefined {
-  const value = flags[name];
-  return typeof value === 'string' ? value : undefined;
-}
-
-function booleanFlag(flags: Record<string, string | boolean>, name: string): boolean {
-  return flags[name] === true;
-}
-
-function parsePort(raw: string | undefined): number | undefined {
-  if (!raw) {
-    return undefined;
-  }
+function parsePort(raw: string): number {
   const value = Number.parseInt(raw, 10);
-  return Number.isFinite(value) && value > 0 && value <= 65_535 ? value : undefined;
+  if (!Number.isFinite(value) || value <= 0 || value > 65_535) {
+    throw new Error(`Invalid daemon port: ${raw}`);
+  }
+  return value;
+}
+
+function hasHelpFlag(args: string[]): boolean {
+  return args.some((arg) => arg === '--help' || arg === '-h');
 }
