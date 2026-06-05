@@ -13,11 +13,13 @@ import type {
   ClientSharedAgentActivityStatus,
   ClientSharedSessionLatestUpdate,
 } from '@/client-shared/services/session-activities';
+import { ClientSharedSessionTurnPresentationService } from '@/client-shared/services/session-turn-presentation';
 import { AgentActivityStatus } from './AgentActivityStatus';
 import { AgentPlanPanel } from './AgentPlanPanel';
 import { ApprovalPanel } from './ApprovalPanel';
 import { ConversationComposer } from './ConversationComposer';
 import { ConversationMessage } from './ConversationMessage';
+import { ConversationTurnActivityGroup } from './ConversationTurnActivity';
 import { ConversationWelcomePanel } from './ConversationWelcomePanel';
 import { DirectShellConfirmDialog } from './DirectShellConfirmDialog';
 import { QueuedPromptStrip } from './QueuedPromptStrip';
@@ -91,6 +93,7 @@ export function ConversationThread({
 }: ConversationThreadProps) {
   const hasUserMessage = session?.messages.some((message) => message.role === 'user') ?? false;
   const showWelcome = Boolean(runtimeContext?.welcomeGuide && !hasUserMessage && !submitting);
+  const conversationTimeline = ClientSharedSessionTurnPresentationService.projectConversationTimeline(session);
   const conversationAutoScroll = useConversationAutoScroll({
     liveStatus,
     messages: session?.messages ?? [],
@@ -144,8 +147,12 @@ export function ConversationThread({
           {showWelcome && runtimeContext?.welcomeGuide ? (
             <ConversationWelcomePanel welcomeGuide={runtimeContext.welcomeGuide} />
           ) : null}
-          {session.messages.map((message) => (
-            <ConversationMessage key={message.id} message={message} />
+          {conversationTimeline.map((item) => (
+            item.type === 'message' ? (
+              <ConversationMessage key={item.id} message={item.message} />
+            ) : (
+              <ConversationTurnActivityGroup key={item.id} item={item} />
+            )
           ))}
         </div>
       </div>

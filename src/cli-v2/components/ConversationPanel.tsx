@@ -1,37 +1,80 @@
 import React, { memo } from 'react';
 import { Box, Text } from 'ink';
 import type { ControlPlaneSessionDetail, ControlPlaneSessionRuntimeContext } from '@/client-shared/api/types.js';
+import { ClientSharedSessionTurnPresentationService } from '@/client-shared/services/session-turn-presentation/index.js';
+import type { ClientSharedConversationTimelineItem } from '@/client-shared/services/session-turn-presentation/index.js';
 import { AssistantMarkdown } from './AssistantMarkdown.js';
+import { ConversationTurnActivityBlock } from './ConversationTurnActivityBlock.js';
 
 type ConversationMessage = NonNullable<ControlPlaneSessionDetail>['messages'][number];
+const MAX_VISIBLE_TIMELINE_ITEMS = 14;
 
 export const ConversationPanel = memo(function ConversationPanel({
+  activityExpanded = false,
   runtimeContext,
   session,
 }: {
+  activityExpanded?: boolean;
   runtimeContext?: ControlPlaneSessionRuntimeContext;
   session: ControlPlaneSessionDetail;
 }) {
-  const messages = session?.messages.slice(-10) ?? [];
+  const timelineItems = ClientSharedSessionTurnPresentationService
+    .projectConversationTimeline(session)
+    .slice(-MAX_VISIBLE_TIMELINE_ITEMS);
   const showWelcome = Boolean(session && runtimeContext?.welcomeGuide && !session.messages.some((message) => message.role === 'user'));
 
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Text bold>Conversation</Text>
       <WelcomeGuideSlot show={showWelcome} runtimeContext={runtimeContext} />
-      <EmptyConversationSlot show={messages.length === 0 && !showWelcome} />
-      {messages.map((message, index) => (
-        <Box key={message.id} flexDirection="column" marginBottom={1}>
-          <Text dimColor>{resolveMessageLabel(message)}</Text>
-          <Box paddingLeft={2} flexDirection="column">
-            <MessageBody message={message} />
-          </Box>
-          <Text dimColor>{index === messages.length - 1 ? '└' : '└────────────────────────────────────────────────────────'}</Text>
-        </Box>
+      <EmptyConversationSlot show={timelineItems.length === 0 && !showWelcome} />
+      {timelineItems.map((item, index) => (
+        <ConversationTimelineItemView
+          activityExpanded={activityExpanded}
+          key={item.id}
+          item={item}
+          last={index === timelineItems.length - 1}
+        />
       ))}
     </Box>
   );
 });
+
+function ConversationTimelineItemView({
+  activityExpanded,
+  item,
+  last,
+}: {
+  activityExpanded: boolean;
+  item: ClientSharedConversationTimelineItem;
+  last: boolean;
+}) {
+  if (item.type === 'turn_activity_group') {
+    return (
+      <Box flexDirection="column" marginBottom={1}>
+        <Text dimColor>┌ Activity</Text>
+        <Box paddingLeft={2} flexDirection="column">
+          <ConversationTurnActivityBlock expanded={activityExpanded} item={item} />
+        </Box>
+        <TimelineFooter last={last} />
+      </Box>
+    );
+  }
+
+  return (
+    <Box flexDirection="column" marginBottom={1}>
+      <Text dimColor>{resolveMessageLabel(item.message)}</Text>
+      <Box paddingLeft={2} flexDirection="column">
+        <MessageBody message={item.message} />
+      </Box>
+      <TimelineFooter last={last} />
+    </Box>
+  );
+}
+
+function TimelineFooter({ last }: { last: boolean }) {
+  return <Text dimColor>{last ? '└' : '└────────────────────────────────────────────────────────'}</Text>;
+}
 
 function WelcomeGuideSlot({
   runtimeContext,
@@ -56,7 +99,7 @@ function resolveMessageLabel(message: ConversationMessage): string {
     return '┌ Heddle';
   }
 
-  return message.isPending ? '┌ You (queued)' : '┌ You';
+  return '┌ You';
 }
 
 function MessageBody({ message }: { message: ConversationMessage }) {

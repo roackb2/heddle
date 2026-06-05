@@ -31,7 +31,7 @@ describe('cli-v2 ConversationPanel', () => {
     expect(view.container.textContent).toContain('No provider credential detected.');
   });
 
-  it('renders queued user turns and direct shell results from the active session detail', () => {
+  it('renders user turns and direct shell results from the active session detail', () => {
     const view = render(
       <ConversationPanel
         session={createSessionDetail({
@@ -57,7 +57,8 @@ describe('cli-v2 ConversationPanel', () => {
       />,
     );
 
-    expect(view.container.textContent).toContain('You (queued)');
+    expect(view.container.textContent).toContain('You');
+    expect(view.container.textContent).not.toContain('You (queued)');
     expect(view.container.textContent).toContain('What changed?');
     expect(view.container.textContent).toContain('done shell git status --short');
     expect(view.container.textContent).toContain('local workspace inspection');
@@ -85,6 +86,95 @@ describe('cli-v2 ConversationPanel', () => {
     expect(view.container.textContent).toContain('* Ready to run');
     expect(view.container.textContent).toContain('const ok = true;');
     expect(view.container.textContent).not.toContain('```ts');
+  });
+
+  it('renders persisted turn activity groups collapsed by default', () => {
+    const view = render(
+      <ConversationPanel
+        session={createSessionDetail({
+          messages: [
+            { id: 'message-1', role: 'user', text: 'Update docs' },
+            { id: 'message-2', role: 'assistant', text: 'Done.' },
+          ],
+          turns: [
+            {
+              id: 'turn-1',
+              prompt: 'Update docs',
+              outcome: 'done',
+              summary: 'Updated docs',
+              steps: 2,
+              traceFile: '/tmp/trace.json',
+              events: [],
+              presentation: {
+                timelineItems: [
+                  {
+                    type: 'edit_diff',
+                    id: 'turn-1:edit:call-1',
+                    toolCallId: 'call-1',
+                    path: 'docs/index.md',
+                    action: 'replace',
+                    patch: '@@ -1 +1 @@\n-old\n+new',
+                    truncated: false,
+                  },
+                ],
+              },
+            },
+          ],
+        })}
+        runtimeContext={createRuntimeContext()}
+      />,
+    );
+
+    expect(view.container.textContent).toContain('Activity');
+    expect(view.container.textContent).toContain('Agent tool activities');
+    expect(view.container.textContent).toContain('1 item');
+    expect(view.container.textContent).toContain('press a to expand');
+    expect(view.container.textContent).not.toContain('docs/index.md');
+    expect(view.container.textContent).not.toContain('+new');
+  });
+
+  it('renders persisted turn activity details when expanded', () => {
+    const view = render(
+      <ConversationPanel
+        activityExpanded
+        session={createSessionDetail({
+          messages: [
+            { id: 'message-1', role: 'user', text: 'Update docs' },
+            { id: 'message-2', role: 'assistant', text: 'Done.' },
+          ],
+          turns: [
+            {
+              id: 'turn-1',
+              prompt: 'Update docs',
+              outcome: 'done',
+              summary: 'Updated docs',
+              steps: 2,
+              traceFile: '/tmp/trace.json',
+              events: [],
+              presentation: {
+                timelineItems: [
+                  {
+                    type: 'edit_diff',
+                    id: 'turn-1:edit:call-1',
+                    toolCallId: 'call-1',
+                    path: 'docs/index.md',
+                    action: 'replace',
+                    patch: '@@ -1 +1 @@\n-old\n+new',
+                    truncated: false,
+                  },
+                ],
+              },
+            },
+          ],
+        })}
+        runtimeContext={createRuntimeContext()}
+      />,
+    );
+
+    expect(view.container.textContent).toContain('press a to collapse');
+    expect(view.container.textContent).toContain('Edit diff');
+    expect(view.container.textContent).toContain('docs/index.md');
+    expect(view.container.textContent).toContain('+new');
   });
 });
 

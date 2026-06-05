@@ -36,6 +36,142 @@
     color: color-mix(in oklab, var(--color-foreground) 94%, transparent);
   }
 
+  .v2-turn-activity-group {
+    width: min(100%, 46rem);
+    min-width: 0;
+    color: color-mix(in oklab, var(--color-foreground) 92%, transparent);
+  }
+
+  .v2-turn-activity-summary-row {
+    display: inline-flex;
+    min-width: 0;
+    cursor: pointer;
+    list-style: none;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--color-muted-foreground);
+    padding: 0;
+  }
+
+  .v2-turn-activity-summary-row::-webkit-details-marker {
+    display: none;
+  }
+
+  .v2-turn-activity-summary-row::before {
+    content: "›";
+    color: var(--color-muted-foreground);
+    font-size: 0.9rem;
+    line-height: 1;
+    transition: transform 120ms ease;
+  }
+
+  .v2-turn-activity-group[open] .v2-turn-activity-summary-row::before {
+    transform: rotate(90deg);
+  }
+
+  .v2-turn-activity-details {
+    display: grid;
+    gap: 0.7rem;
+    padding: 0.75rem 0 0 1.25rem;
+  }
+
+  .v2-turn-activity-detail {
+    min-width: 0;
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in oklab, var(--color-border) 48%, transparent);
+    background: color-mix(in oklab, var(--color-background) 74%, var(--color-muted));
+    padding: 0.75rem;
+  }
+
+  .v2-turn-activity-detail[data-activity-status="approved"] {
+    border-color: color-mix(in oklab, hsl(145 42% 48%) 22%, var(--color-border));
+  }
+
+  .v2-turn-activity-detail[data-activity-status="denied"] {
+    border-color: color-mix(in oklab, var(--color-destructive) 32%, var(--color-border));
+  }
+
+  .v2-turn-activity-detail[data-activity-status="requested"] {
+    border-color: color-mix(in oklab, var(--color-warning, hsl(45 92% 70%)) 28%, var(--color-border));
+  }
+
+  .v2-turn-activity-header {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .v2-turn-activity-title {
+    color: var(--color-foreground);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .v2-turn-activity-meta,
+  .v2-turn-activity-muted {
+    color: var(--color-muted-foreground);
+    font-size: 0.75rem;
+    line-height: 1.45;
+  }
+
+  .v2-turn-activity-copy {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+
+  .v2-turn-activity-command,
+  .v2-turn-activity-diff {
+    overflow: auto;
+    margin-top: 0.55rem;
+    border-radius: var(--radius-md);
+    background: color-mix(in oklab, var(--color-background) 88%, black);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.45;
+  }
+
+  .v2-turn-activity-command {
+    margin-bottom: 0;
+    padding: 0.55rem 0.65rem;
+    white-space: pre-wrap;
+  }
+
+  .v2-turn-activity-path {
+    margin-top: 0.2rem;
+    color: color-mix(in oklab, hsl(190 90% 70%) 82%, var(--color-foreground));
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+
+  .v2-turn-activity-diff {
+    margin-bottom: 0;
+    padding: 0.65rem;
+    white-space: pre;
+  }
+
+  .v2-turn-activity-diff-line {
+    color: color-mix(in oklab, var(--color-foreground) 82%, transparent);
+  }
+
+  .v2-turn-activity-diff-line-hunk {
+    color: color-mix(in oklab, hsl(190 90% 70%) 84%, var(--color-foreground));
+  }
+
+  .v2-turn-activity-diff-line-added {
+    color: color-mix(in oklab, hsl(145 72% 58%) 84%, var(--color-foreground));
+  }
+
+  .v2-turn-activity-diff-line-removed {
+    color: color-mix(in oklab, var(--color-destructive) 72%, var(--color-foreground));
+  }
+
   .v2-assistant-markdown {
     max-width: 100%;
     min-width: 0;
