@@ -6,6 +6,7 @@
  */
 import { z } from 'zod';
 import { ConversationDirectShellLineResultSchema } from '@/core/chat/engine/direct-shell/result-schema.js';
+import { ConversationTurnPresentationSchema } from '@/core/chat/engine/turns/presentation/index.js';
 
 const ReasoningEffortSchema = z.enum(['low', 'medium', 'high', 'ultrahigh']);
 const ChatSessionRetentionSchema = z.enum(['reusable', 'one_off']);
@@ -74,6 +75,10 @@ const TurnSummarySchema = z.object({
   steps: z.number().describe('Number of assistant loop steps executed in the turn.'),
   traceFile: z.string().describe('Path to the persisted trace file for this turn.'),
   events: z.array(z.string()).describe('Compact event summaries extracted from the turn trace.'),
+  presentation: ConversationTurnPresentationSchema
+    .describe('Compact non-transcript tool activity metadata for conversation timeline presentation.')
+    .optional()
+    .catch(undefined),
 });
 
 const TurnSummariesSchema = z.array(z.unknown())

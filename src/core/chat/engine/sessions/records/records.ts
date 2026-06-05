@@ -8,6 +8,7 @@
 import { truncate } from '@/core/utils/text.js';
 import type { ChatSession, ConversationLine } from '@/core/chat/types.js';
 import { TraceSummaryService } from '@/core/observability/index.js';
+import { ConversationTurnPresentationService } from '@/core/chat/engine/turns/presentation/index.js';
 import { ConversationLines } from './conversation-lines.js';
 import type {
   ApplyCompactedChatSessionHistoryInput,
@@ -64,6 +65,10 @@ export class ChatSessionRecords {
         typeof input.traceSummarizerRegistry?.summarizeTrace === 'function'
           ? input.traceSummarizerRegistry.summarizeTrace(input.result.trace)
           : TraceSummaryService.default().summarizeTrace(input.result.trace),
+      presentation: ConversationTurnPresentationService.project({
+        turnId: input.id,
+        trace: input.result.trace,
+      }),
     };
   }
 

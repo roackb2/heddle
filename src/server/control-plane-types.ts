@@ -6,7 +6,12 @@ import type { ReviewDiffFile } from '@/core/review/index.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import type { ReasoningEffortOption } from '@/core/llm/models/index.js';
 import type { ReasoningEffort } from '@/core/llm/types.js';
-import type { ChatSessionRetention, ConversationDirectShellLineResult, QueuedConversationPrompt } from '@/core/chat/types.js';
+import type {
+  ChatSessionRetention,
+  ConversationDirectShellLineResult,
+  ConversationTurnPresentation,
+  QueuedConversationPrompt,
+} from '@/core/chat/types.js';
 import type { ConversationActivity } from '@/core/live/index.js';
 
 export type ChatSessionView = {
@@ -80,6 +85,7 @@ export type ChatTurnView = {
   steps: number;
   traceFile: string;
   events: string[];
+  presentation?: ConversationTurnPresentation;
 };
 
 export type CommandEvidenceView = {
