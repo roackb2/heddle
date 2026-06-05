@@ -78,9 +78,14 @@ describe('ClientSharedSessionTurnPresentationService', () => {
 
     expect(ClientSharedSessionTurnPresentationService.projectConversationTimeline(session).map((item) => item.id)).toEqual([
       'message-1',
-      'turn-1:edit:call-1',
+      'turn-1:activity-group',
       'message-2',
     ]);
+
+    const activityGroup = ClientSharedSessionTurnPresentationService
+      .projectConversationTimeline(session)
+      .find((item) => item.type === 'turn_activity_group');
+    expect(activityGroup?.activities).toHaveLength(1);
   });
 
   it('keeps unmatched turn activities visible at the end of the timeline', () => {
@@ -108,7 +113,7 @@ describe('ClientSharedSessionTurnPresentationService', () => {
 
     expect(ClientSharedSessionTurnPresentationService.projectConversationTimeline(session).map((item) => item.id)).toEqual([
       'message-1',
-      'turn-1:approval:call-1',
+      'turn-1:activity-group',
     ]);
   });
 });

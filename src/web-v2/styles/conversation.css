@@ -36,26 +36,67 @@
     color: color-mix(in oklab, var(--color-foreground) 94%, transparent);
   }
 
-  .v2-turn-activity-card {
+  .v2-turn-activity-group {
     width: min(100%, 46rem);
     min-width: 0;
-    border: 1px solid color-mix(in oklab, var(--color-border) 72%, transparent);
     border-radius: var(--radius-lg);
-    background: color-mix(in oklab, var(--color-muted) 42%, var(--color-background));
-    padding: 0.85rem;
+    background: color-mix(in oklab, var(--color-muted) 32%, var(--color-background));
     color: color-mix(in oklab, var(--color-foreground) 92%, transparent);
   }
 
-  .v2-turn-activity-card[data-activity-status="approved"] {
-    border-color: color-mix(in oklab, hsl(145 72% 52%) 34%, var(--color-border));
+  .v2-turn-activity-summary-row {
+    display: flex;
+    min-width: 0;
+    cursor: pointer;
+    list-style: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid color-mix(in oklab, var(--color-border) 58%, transparent);
+    padding: 0.65rem 0.75rem;
   }
 
-  .v2-turn-activity-card[data-activity-status="denied"] {
-    border-color: color-mix(in oklab, var(--color-destructive) 46%, var(--color-border));
+  .v2-turn-activity-summary-row::-webkit-details-marker {
+    display: none;
   }
 
-  .v2-turn-activity-card[data-activity-status="requested"] {
-    border-color: color-mix(in oklab, var(--color-warning, hsl(45 92% 70%)) 42%, var(--color-border));
+  .v2-turn-activity-summary-row::before {
+    content: "›";
+    color: var(--color-muted-foreground);
+    font-size: 0.9rem;
+    line-height: 1;
+    transition: transform 120ms ease;
+  }
+
+  .v2-turn-activity-group[open] .v2-turn-activity-summary-row::before {
+    transform: rotate(90deg);
+  }
+
+  .v2-turn-activity-details {
+    display: grid;
+    gap: 0.7rem;
+    padding: 0.75rem 0 0;
+  }
+
+  .v2-turn-activity-detail {
+    min-width: 0;
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in oklab, var(--color-border) 48%, transparent);
+    background: color-mix(in oklab, var(--color-background) 74%, var(--color-muted));
+    padding: 0.75rem;
+  }
+
+  .v2-turn-activity-detail[data-activity-status="approved"] {
+    border-color: color-mix(in oklab, hsl(145 42% 48%) 22%, var(--color-border));
+  }
+
+  .v2-turn-activity-detail[data-activity-status="denied"] {
+    border-color: color-mix(in oklab, var(--color-destructive) 32%, var(--color-border));
+  }
+
+  .v2-turn-activity-detail[data-activity-status="requested"] {
+    border-color: color-mix(in oklab, var(--color-warning, hsl(45 92% 70%)) 28%, var(--color-border));
   }
 
   .v2-turn-activity-header {
@@ -81,7 +122,7 @@
     line-height: 1.45;
   }
 
-  .v2-turn-activity-summary {
+  .v2-turn-activity-copy {
     margin: 0;
     font-size: 0.8125rem;
     line-height: 1.45;

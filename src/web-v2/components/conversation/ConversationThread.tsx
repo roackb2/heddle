@@ -19,7 +19,7 @@ import { AgentPlanPanel } from './AgentPlanPanel';
 import { ApprovalPanel } from './ApprovalPanel';
 import { ConversationComposer } from './ConversationComposer';
 import { ConversationMessage } from './ConversationMessage';
-import { ConversationTurnActivity } from './ConversationTurnActivity';
+import { ConversationTurnActivityGroup } from './ConversationTurnActivity';
 import { ConversationWelcomePanel } from './ConversationWelcomePanel';
 import { DirectShellConfirmDialog } from './DirectShellConfirmDialog';
 import { QueuedPromptStrip } from './QueuedPromptStrip';
@@ -151,7 +151,7 @@ export function ConversationThread({
             item.type === 'message' ? (
               <ConversationMessage key={item.id} message={item.message} />
             ) : (
-              <ConversationTurnActivity key={item.id} item={item} />
+              <ConversationTurnActivityGroup key={item.id} item={item} />
             )
           ))}
         </div>

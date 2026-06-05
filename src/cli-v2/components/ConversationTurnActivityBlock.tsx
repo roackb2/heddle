@@ -1,9 +1,10 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { ClientSharedConversationTimelineActivityItem } from '@/client-shared/services/session-turn-presentation/index.js';
+import type { ClientSharedConversationTimelineActivityGroupItem } from '@/client-shared/services/session-turn-presentation/index.js';
 import { DiffPatchBlock } from './DiffPatchBlock.js';
 
 const INLINE_DIFF_MAX_VISIBLE_LINES = 80;
+type ConversationTurnActivity = ClientSharedConversationTimelineActivityGroupItem['activities'][number];
 
 const approvalStatusColors: Record<string, string> = {
   approved: 'green',
@@ -21,65 +22,94 @@ const editActionLabels: Record<string, string> = {
 // Owns cli-v2 presentation for persisted turn activity blocks. The activity
 // facts come from core/API metadata; this component only chooses terminal
 // labels, colors, and inline diff limits.
-export function ConversationTurnActivityBlock({ item }: { item: ClientSharedConversationTimelineActivityItem }) {
-  if (item.activity.type === 'approval') {
-    return <ApprovalActivityBlock item={item} />;
-  }
-
-  return <EditDiffActivityBlock item={item} />;
+export function ConversationTurnActivityBlock({
+  expanded,
+  item,
+}: {
+  expanded: boolean;
+  item: ClientSharedConversationTimelineActivityGroupItem;
+}) {
+  return (
+    <Box flexDirection="column">
+      <Text>
+        <Text color="cyan">Agent tool activities</Text>
+        <Text dimColor> · {formatActivityCount(item.activities.length)}</Text>
+        <Text dimColor>{expanded ? ' · press a to collapse' : ' · press a to expand'}</Text>
+      </Text>
+      {expanded ? (
+        <Box flexDirection="column" marginTop={1} paddingLeft={2}>
+          {item.activities.map((activity) => (
+            <ActivityBlock key={activity.id} activity={activity} />
+          ))}
+        </Box>
+      ) : null}
+    </Box>
+  );
 }
 
-function ApprovalActivityBlock({ item }: { item: ClientSharedConversationTimelineActivityItem }) {
-  if (item.activity.type !== 'approval') {
+function ActivityBlock({ activity }: { activity: ConversationTurnActivity }) {
+  if (activity.type === 'approval') {
+    return <ApprovalActivityBlock activity={activity} />;
+  }
+
+  return <EditDiffActivityBlock activity={activity} />;
+}
+
+function ApprovalActivityBlock({ activity }: { activity: ConversationTurnActivity }) {
+  if (activity.type !== 'approval') {
     return null;
   }
 
   return (
-    <Box flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1}>
+    <Box flexDirection="column" marginBottom={1}>
       <Text>
         <Text bold>Approval</Text>
         <Text dimColor> · </Text>
-        <Text color={approvalStatusColors[item.activity.status]}>{item.activity.status}</Text>
-        <ActivityStep step={item.activity.step} />
+        <Text color={approvalStatusColors[activity.status]}>{activity.status}</Text>
+        <ActivityStep step={activity.step} />
       </Text>
       <Text>
         <Text dimColor>tool </Text>
-        <Text>{item.activity.tool}</Text>
+        <Text>{activity.tool}</Text>
       </Text>
-      <Text>{item.activity.summary}</Text>
-      {item.activity.command ? (
+      <Text>{activity.summary}</Text>
+      {activity.command ? (
         <Text>
           <Text dimColor>command </Text>
-          <Text>{item.activity.command}</Text>
+          <Text>{activity.command}</Text>
         </Text>
       ) : null}
-      {item.activity.reason ? <Text dimColor>{item.activity.reason}</Text> : null}
+      {activity.reason ? <Text dimColor>{activity.reason}</Text> : null}
     </Box>
   );
 }
 
-function EditDiffActivityBlock({ item }: { item: ClientSharedConversationTimelineActivityItem }) {
-  if (item.activity.type !== 'edit_diff') {
+function EditDiffActivityBlock({ activity }: { activity: ConversationTurnActivity }) {
+  if (activity.type !== 'edit_diff') {
     return null;
   }
 
   return (
-    <Box flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1}>
+    <Box flexDirection="column" marginBottom={1}>
       <Text>
         <Text bold>Edit diff</Text>
         <Text dimColor> · </Text>
-        <Text color="cyan">{item.activity.path}</Text>
-        <Text dimColor>{formatEditMeta(item.activity.action)}</Text>
-        <ActivityStep step={item.activity.step} />
+        <Text color="cyan">{activity.path}</Text>
+        <Text dimColor>{formatEditMeta(activity.action)}</Text>
+        <ActivityStep step={activity.step} />
       </Text>
       <DiffPatchBlock
-        id={item.activity.id}
+        id={activity.id}
         maxVisibleLines={INLINE_DIFF_MAX_VISIBLE_LINES}
-        patch={item.activity.patch ?? ''}
-        truncated={item.activity.truncated}
+        patch={activity.patch ?? ''}
+        truncated={activity.truncated}
       />
     </Box>
   );
+}
+
+function formatActivityCount(count: number): string {
+  return count === 1 ? '1 item' : `${count} items`;
 }
 
 function ActivityStep({ step }: { step?: number }) {

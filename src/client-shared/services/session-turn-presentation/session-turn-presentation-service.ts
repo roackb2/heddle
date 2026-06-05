@@ -18,17 +18,17 @@ export type ClientSharedConversationTimelineMessageItem = {
   message: ControlPlaneSessionMessage;
 };
 
-export type ClientSharedConversationTimelineActivityItem = {
-  type: 'turn_activity';
+export type ClientSharedConversationTimelineActivityGroupItem = {
+  type: 'turn_activity_group';
   id: string;
   turnId: string;
   turnPrompt: string;
-  activity: ConversationTurnPresentationTimelineItem;
+  activities: ConversationTurnPresentationTimelineItem[];
 };
 
 export type ClientSharedConversationTimelineItem =
   | ClientSharedConversationTimelineMessageItem
-  | ClientSharedConversationTimelineActivityItem;
+  | ClientSharedConversationTimelineActivityGroupItem;
 
 /**
  * Owns frontend-neutral projection of persisted turn presentation metadata.
@@ -70,7 +70,7 @@ export class ClientSharedSessionTurnPresentationService {
       placedTurnIds.add(turn.id);
       return [
         messageItem,
-        ...ClientSharedSessionTurnPresentationService.projectConversationActivityItems(turn),
+        ...ClientSharedSessionTurnPresentationService.projectConversationActivityGroup(turn),
       ];
     });
 
@@ -78,7 +78,7 @@ export class ClientSharedSessionTurnPresentationService {
       ...timeline,
       ...session.turns
         .filter((turn) => !placedTurnIds.has(turn.id))
-        .flatMap((turn) => ClientSharedSessionTurnPresentationService.projectConversationActivityItems(turn)),
+        .flatMap((turn) => ClientSharedSessionTurnPresentationService.projectConversationActivityGroup(turn)),
     ];
   }
 
@@ -99,11 +99,19 @@ export class ClientSharedSessionTurnPresentationService {
     })) ?? [];
   }
 
-  private static projectConversationActivityItems(turn: ControlPlaneSessionTurn): ClientSharedConversationTimelineActivityItem[] {
-    return ClientSharedSessionTurnPresentationService.projectTurnActivityItems(turn).map((item) => ({
-      ...item,
-      type: 'turn_activity' as const,
-    }));
+  private static projectConversationActivityGroup(turn: ControlPlaneSessionTurn): ClientSharedConversationTimelineActivityGroupItem[] {
+    const activities = turn.presentation?.timelineItems ?? [];
+    if (activities.length === 0) {
+      return [];
+    }
+
+    return [{
+      type: 'turn_activity_group',
+      id: `${turn.id}:activity-group`,
+      turnId: turn.id,
+      turnPrompt: turn.prompt,
+      activities,
+    }];
   }
 
   private static findUnplacedTurnForPrompt({

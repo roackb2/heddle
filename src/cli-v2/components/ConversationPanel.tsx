@@ -10,9 +10,11 @@ type ConversationMessage = NonNullable<ControlPlaneSessionDetail>['messages'][nu
 const MAX_VISIBLE_TIMELINE_ITEMS = 14;
 
 export const ConversationPanel = memo(function ConversationPanel({
+  activityExpanded = false,
   runtimeContext,
   session,
 }: {
+  activityExpanded?: boolean;
   runtimeContext?: ControlPlaneSessionRuntimeContext;
   session: ControlPlaneSessionDetail;
 }) {
@@ -28,6 +30,7 @@ export const ConversationPanel = memo(function ConversationPanel({
       <EmptyConversationSlot show={timelineItems.length === 0 && !showWelcome} />
       {timelineItems.map((item, index) => (
         <ConversationTimelineItemView
+          activityExpanded={activityExpanded}
           key={item.id}
           item={item}
           last={index === timelineItems.length - 1}
@@ -38,18 +41,20 @@ export const ConversationPanel = memo(function ConversationPanel({
 });
 
 function ConversationTimelineItemView({
+  activityExpanded,
   item,
   last,
 }: {
+  activityExpanded: boolean;
   item: ClientSharedConversationTimelineItem;
   last: boolean;
 }) {
-  if (item.type === 'turn_activity') {
+  if (item.type === 'turn_activity_group') {
     return (
       <Box flexDirection="column" marginBottom={1}>
         <Text dimColor>┌ Activity</Text>
         <Box paddingLeft={2} flexDirection="column">
-          <ConversationTurnActivityBlock item={item} />
+          <ConversationTurnActivityBlock expanded={activityExpanded} item={item} />
         </Box>
         <TimelineFooter last={last} />
       </Box>
@@ -94,7 +99,7 @@ function resolveMessageLabel(message: ConversationMessage): string {
     return '┌ Heddle';
   }
 
-  return message.isPending ? '┌ You (queued)' : '┌ You';
+  return '┌ You';
 }
 
 function MessageBody({ message }: { message: ConversationMessage }) {

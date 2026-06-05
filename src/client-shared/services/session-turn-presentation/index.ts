@@ -1,6 +1,6 @@
 export {
   ClientSharedSessionTurnPresentationService,
-  type ClientSharedConversationTimelineActivityItem,
+  type ClientSharedConversationTimelineActivityGroupItem,
   type ClientSharedConversationTimelineItem,
   type ClientSharedConversationTimelineMessageItem,
   type ClientSharedSessionTurnPresentationItem,
