@@ -86,6 +86,49 @@ describe('cli-v2 ConversationPanel', () => {
     expect(view.container.textContent).toContain('const ok = true;');
     expect(view.container.textContent).not.toContain('```ts');
   });
+
+  it('renders persisted turn activities inline with the conversation', () => {
+    const view = render(
+      <ConversationPanel
+        session={createSessionDetail({
+          messages: [
+            { id: 'message-1', role: 'user', text: 'Update docs' },
+            { id: 'message-2', role: 'assistant', text: 'Done.' },
+          ],
+          turns: [
+            {
+              id: 'turn-1',
+              prompt: 'Update docs',
+              outcome: 'done',
+              summary: 'Updated docs',
+              steps: 2,
+              traceFile: '/tmp/trace.json',
+              events: [],
+              presentation: {
+                timelineItems: [
+                  {
+                    type: 'edit_diff',
+                    id: 'turn-1:edit:call-1',
+                    toolCallId: 'call-1',
+                    path: 'docs/index.md',
+                    action: 'replace',
+                    patch: '@@ -1 +1 @@\n-old\n+new',
+                    truncated: false,
+                  },
+                ],
+              },
+            },
+          ],
+        })}
+        runtimeContext={createRuntimeContext()}
+      />,
+    );
+
+    expect(view.container.textContent).toContain('Activity');
+    expect(view.container.textContent).toContain('Edit diff');
+    expect(view.container.textContent).toContain('docs/index.md');
+    expect(view.container.textContent).toContain('+new');
+  });
 });
 
 function createSessionDetail(

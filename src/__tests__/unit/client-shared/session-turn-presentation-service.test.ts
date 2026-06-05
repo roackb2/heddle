@@ -48,4 +48,98 @@ describe('ClientSharedSessionTurnPresentationService', () => {
       },
     ]);
   });
+
+  it('projects turn activities into the conversation timeline after the matching prompt', () => {
+    const session = createSessionDetail({
+      messages: [
+        { id: 'message-1', role: 'user', text: 'Update docs' },
+        { id: 'message-2', role: 'assistant', text: 'Done.' },
+      ],
+      turns: [
+        createTurn({
+          id: 'turn-1',
+          prompt: 'Update docs',
+          presentation: {
+            timelineItems: [
+              {
+                type: 'edit_diff',
+                id: 'turn-1:edit:call-1',
+                toolCallId: 'call-1',
+                path: 'docs/index.md',
+                action: 'replace',
+                patch: '@@ -1 +1 @@\n-old\n+new',
+                truncated: false,
+              },
+            ],
+          },
+        }),
+      ],
+    });
+
+    expect(ClientSharedSessionTurnPresentationService.projectConversationTimeline(session).map((item) => item.id)).toEqual([
+      'message-1',
+      'turn-1:edit:call-1',
+      'message-2',
+    ]);
+  });
+
+  it('keeps unmatched turn activities visible at the end of the timeline', () => {
+    const session = createSessionDetail({
+      messages: [{ id: 'message-1', role: 'assistant', text: 'Done.' }],
+      turns: [
+        createTurn({
+          id: 'turn-1',
+          prompt: 'Update docs',
+          presentation: {
+            timelineItems: [
+              {
+                type: 'approval',
+                id: 'turn-1:approval:call-1',
+                toolCallId: 'call-1',
+                tool: 'run_shell_mutate',
+                summary: 'run_shell_mutate (npm run build)',
+                status: 'approved',
+              },
+            ],
+          },
+        }),
+      ],
+    });
+
+    expect(ClientSharedSessionTurnPresentationService.projectConversationTimeline(session).map((item) => item.id)).toEqual([
+      'message-1',
+      'turn-1:approval:call-1',
+    ]);
+  });
 });
+
+function createSessionDetail(
+  overrides: Partial<NonNullable<ControlPlaneSessionDetail>> = {},
+): NonNullable<ControlPlaneSessionDetail> {
+  return {
+    id: 'session-1',
+    name: 'Session 1',
+    messageCount: 0,
+    turnCount: 0,
+    queuedPromptCount: 0,
+    messages: [],
+    queuedPrompts: [],
+    turns: [],
+    ...overrides,
+  };
+}
+
+function createTurn(
+  overrides: Partial<NonNullable<ControlPlaneSessionDetail>['turns'][number]> = {},
+): NonNullable<ControlPlaneSessionDetail>['turns'][number] {
+  return {
+    id: 'turn-1',
+    prompt: 'Update docs',
+    outcome: 'done',
+    summary: 'Updated docs',
+    steps: 2,
+    traceFile: '/tmp/trace.json',
+    events: [],
+    ...overrides,
+  };
+}

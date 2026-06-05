@@ -3,9 +3,7 @@ import { Box, Text } from 'ink';
 import uniqBy from 'lodash/uniqBy.js';
 import type { ClientSharedRecentEditDiff } from '@/client-shared/services/session-activities/index.js';
 import type { RecentEditDiffReviewState } from '../hooks/useRecentEditDiffReview.js';
-
-const MAX_VISIBLE_LINES = 120;
-const MAX_LINE_LENGTH = 160;
+import { DiffPatchBlock } from './DiffPatchBlock.js';
 
 const actionLabels: Record<string, string> = {
   create: 'created',
@@ -18,11 +16,6 @@ type RecentEditDiffPanelProps = {
   diffs: ClientSharedRecentEditDiff[];
   review: RecentEditDiffReviewState;
   running: boolean;
-};
-
-type RenderedDiff = {
-  lines: string[];
-  truncated: boolean;
 };
 
 export function RecentEditDiffPanel({ diffs, review, running }: RecentEditDiffPanelProps) {
@@ -81,7 +74,7 @@ function RecentEditDiffReviewPanel({
           <Text color="cyan">{diff.path}</Text>
           <Text dimColor>{formatEditMeta(diff)}</Text>
         </Text>
-        {renderPatch(diff)}
+        <DiffPatchBlock id={diff.id} patch={diff.patch} truncated={diff.truncated} />
       </Box>
       <Text dimColor>j/k or arrows move · n/p file · esc back</Text>
     </Box>
@@ -98,55 +91,4 @@ function formatEditMeta(diff: ClientSharedRecentEditDiff): string {
   const action = diff.action ? actionLabels[diff.action] ?? diff.action : undefined;
   const step = typeof diff.step === 'number' ? `step ${diff.step}` : undefined;
   return [action, step].filter(Boolean).map((value) => ` · ${value}`).join('');
-}
-
-function renderPatch(diff: ClientSharedRecentEditDiff) {
-  const { lines, truncated } = preparePatchLines(diff.patch);
-  return (
-    <>
-      {lines.map((line, index) => (
-        <Text key={`${diff.id}:${index}`} color={resolveDiffLineColor(line)} dimColor={isDiffHeaderLine(line)}>
-          {line}
-        </Text>
-      ))}
-      {diff.truncated || truncated ? <Text color="yellow">Diff preview truncated.</Text> : null}
-    </>
-  );
-}
-
-function preparePatchLines(patch: string): RenderedDiff {
-  const rawLines = patch.split('\n');
-  const visibleLines = rawLines.slice(0, MAX_VISIBLE_LINES).map(truncateLine);
-  return {
-    lines: visibleLines,
-    truncated: rawLines.length > visibleLines.length,
-  };
-}
-
-function truncateLine(line: string): string {
-  if (line.length <= MAX_LINE_LENGTH) {
-    return line;
-  }
-
-  return `${line.slice(0, MAX_LINE_LENGTH - 3)}...`;
-}
-
-function resolveDiffLineColor(line: string): string | undefined {
-  if (line.startsWith('@@')) {
-    return 'cyan';
-  }
-
-  if (line.startsWith('+') && !line.startsWith('+++')) {
-    return 'green';
-  }
-
-  if (line.startsWith('-') && !line.startsWith('---')) {
-    return 'red';
-  }
-
-  return undefined;
-}
-
-function isDiffHeaderLine(line: string): boolean {
-  return line.startsWith('diff --git') || line.startsWith('index ') || line.startsWith('---') || line.startsWith('+++');
 }

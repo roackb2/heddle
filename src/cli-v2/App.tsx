@@ -73,11 +73,13 @@ export function App({
         {snapshot.activeSession ? ` · ${snapshot.activeSession.name}` : ''}
       </Text>
       <ConversationPanel runtimeContext={snapshot.runtimeContext} session={snapshot.activeSession} />
-      <RecentEditDiffPanel
-        diffs={snapshot.recentEditDiffs}
-        review={recentEditDiffReview}
-        running={snapshot.running}
-      />
+      {snapshot.running ? (
+        <RecentEditDiffPanel
+          diffs={snapshot.recentEditDiffs}
+          review={recentEditDiffReview}
+          running={snapshot.running}
+        />
+      ) : null}
       <CommandResultPanel results={snapshot.commandResults} />
       {snapshot.pendingApproval ? (
         <ApprovalPanel
