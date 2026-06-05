@@ -61,6 +61,7 @@ export function PromptInput({
   const separator = repeatSeparator((stdout.columns ?? 0) - 2);
   const valueRef = useRef(value);
   const cursorRef = useRef(cursor);
+  const pendingLocalStateRef = useRef<ClientSharedPromptDraftState | undefined>(undefined);
   const renderWidth = resolvePromptInputRenderWidth(stdout.columns);
   const lines = useMemo(
     () => buildPromptRenderLines(value, cursor, MAX_VISIBLE_INPUT_LINES, renderWidth),
@@ -68,18 +69,28 @@ export function PromptInput({
   );
 
   useEffect(() => {
-    valueRef.current = value;
-  }, [value]);
+    const incoming = normalizePromptInputState({ value, cursor });
+    const current = normalizePromptInputState({
+      value: valueRef.current,
+      cursor: cursorRef.current,
+    });
 
-  useEffect(() => {
-    cursorRef.current = ClientSharedPromptInputService.clampCursor(valueRef.current, cursor);
-  }, [cursor]);
+    if (shouldKeepOptimisticPromptInputState({
+      current,
+      incoming,
+      pending: pendingLocalStateRef.current,
+    })) {
+      return;
+    }
+
+    pendingLocalStateRef.current = undefined;
+    valueRef.current = incoming.value;
+    cursorRef.current = incoming.cursor;
+  }, [cursor, value]);
 
   const applyState = useCallback((nextState: ClientSharedPromptDraftState) => {
-    const normalized = {
-      value: nextState.value,
-      cursor: ClientSharedPromptInputService.clampCursor(nextState.value, nextState.cursor),
-    };
+    const normalized = normalizePromptInputState(nextState);
+    pendingLocalStateRef.current = normalized;
     valueRef.current = normalized.value;
     cursorRef.current = normalized.cursor;
     onChange(normalized);
@@ -91,6 +102,7 @@ export function PromptInput({
     }
 
     if (onSpecialKey?.(input, key)) {
+      pendingLocalStateRef.current = undefined;
       return;
     }
 
@@ -109,7 +121,12 @@ export function PromptInput({
 
     if (command.kind === 'submit') {
       if (!submitDisabled) {
-        onSubmit(valueRef.current);
+        const submittedValue = valueRef.current;
+        const cleared = normalizePromptInputState({ value: '', cursor: 0 });
+        pendingLocalStateRef.current = cleared;
+        valueRef.current = cleared.value;
+        cursorRef.current = cleared.cursor;
+        onSubmit(submittedValue);
       }
       return;
     }
@@ -121,17 +138,20 @@ export function PromptInput({
 
     if (command.kind === 'history') {
       if (ClientSharedPromptInputService.canNavigateHistory(command.direction, current)) {
+        pendingLocalStateRef.current = undefined;
         onHistory?.(command.direction);
       }
       return;
     }
 
     if (command.kind === 'undo') {
+      pendingLocalStateRef.current = undefined;
       onUndo?.();
       return;
     }
 
     if (command.kind === 'redo') {
+      pendingLocalStateRef.current = undefined;
       onRedo?.();
       return;
     }
@@ -170,6 +190,37 @@ export function PromptInput({
       </Box>
     </Box>
   );
+}
+
+export function shouldKeepOptimisticPromptInputState({
+  current,
+  incoming,
+  pending,
+}: {
+  current: ClientSharedPromptDraftState;
+  incoming: ClientSharedPromptDraftState;
+  pending?: ClientSharedPromptDraftState;
+}): boolean {
+  if (!pending) {
+    return false;
+  }
+
+  if (isSamePromptInputState(incoming, pending)) {
+    return false;
+  }
+
+  return isSamePromptInputState(current, pending);
+}
+
+function normalizePromptInputState(state: ClientSharedPromptDraftState): ClientSharedPromptDraftState {
+  return {
+    value: state.value,
+    cursor: ClientSharedPromptInputService.clampCursor(state.value, state.cursor),
+  };
+}
+
+function isSamePromptInputState(left: ClientSharedPromptDraftState, right: ClientSharedPromptDraftState): boolean {
+  return left.value === right.value && left.cursor === right.cursor;
 }
 
 export type PromptRenderLine = {
