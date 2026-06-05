@@ -14,10 +14,13 @@ import type {
   ControlPlaneSessionStore,
   ControlPlaneSessionStoreSnapshot,
 } from '../state/control-plane-session-store.js';
+import type { PromptInputKey } from './PromptInput.js';
 
 type ComposerPanelProps = {
   store: ControlPlaneSessionStore;
   snapshot: ControlPlaneSessionStoreSnapshot;
+  keyboardDisabled?: boolean;
+  onSpecialKey?: (input: string, key: PromptInputKey, draft: string) => boolean;
 };
 
 /**
@@ -31,6 +34,8 @@ type ComposerPanelProps = {
 export const ComposerPanel = React.memo(function ComposerPanel({
   store,
   snapshot,
+  keyboardDisabled = false,
+  onSpecialKey,
 }: ComposerPanelProps) {
   const {
     draft,
@@ -135,8 +140,8 @@ export const ComposerPanel = React.memo(function ComposerPanel({
         <DirectShellModeHintPanel command={directShellDraft.command} />
       ) : null}
       <PromptInput
-        disabled={inputDisabled}
-        submitDisabled={submitDisabled}
+        disabled={inputDisabled || keyboardDisabled}
+        submitDisabled={submitDisabled || keyboardDisabled}
         placeholder={resolvePromptPlaceholder(snapshot)}
         value={draft}
         cursor={cursor}
@@ -146,7 +151,11 @@ export const ComposerPanel = React.memo(function ComposerPanel({
         onHistory={navigateHistory}
         onUndo={undoPromptEdit}
         onRedo={redoPromptEdit}
-        onSpecialKey={(input, key) => fileMentions.handleSpecialKey(input, key) || pickers.handleSpecialKey(input, key)}
+        onSpecialKey={(input, key) => (
+          onSpecialKey?.(input, key, draft) ||
+          fileMentions.handleSpecialKey(input, key) ||
+          pickers.handleSpecialKey(input, key)
+        )}
       />
     </>
   );

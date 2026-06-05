@@ -2,7 +2,7 @@
 // only. Put feature behavior in cli-v2 hooks, services, or focused components
 // instead of growing App.tsx directly.
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import { ApprovalPanel } from './components/ApprovalPanel.js';
 import { AgentPlanPanel } from './components/AgentPlanPanel.js';
 import { ComposerPanel } from './components/ComposerPanel.js';
@@ -15,6 +15,7 @@ import { RecentEditDiffPanel } from './components/RecentEditDiffPanel.js';
 import { RunControls } from './components/RunControls.js';
 import { RuntimeStatusBar } from './components/RuntimeStatusBar.js';
 import { useControlPlaneSessionStore } from './hooks/useControlPlaneSessionStore.js';
+import { useRecentEditDiffReview } from './hooks/useRecentEditDiffReview.js';
 import { PromptActivityService } from './services/activities/prompt-activity-service.js';
 import type { ControlPlaneApprovalDecision } from '@/client-shared/api/types.js';
 import type {
@@ -31,6 +32,7 @@ export function App({
 }) {
   const startedRef = useRef(false);
   const snapshot = useControlPlaneSessionStore(store);
+  const recentEditDiffReview = useRecentEditDiffReview(snapshot.recentEditDiffs);
 
   useEffect(() => {
     if (startedRef.current) {
@@ -56,6 +58,10 @@ export function App({
     void store.cancelRun();
   }, [store]);
 
+  useInput((input, key) => {
+    recentEditDiffReview.handleReviewKey(input, key);
+  }, { isActive: recentEditDiffReview.mode === 'review' });
+
   return (
     <Box flexDirection="column" paddingX={1}>
       <Box marginBottom={1}>
@@ -67,7 +73,11 @@ export function App({
         {snapshot.activeSession ? ` · ${snapshot.activeSession.name}` : ''}
       </Text>
       <ConversationPanel runtimeContext={snapshot.runtimeContext} session={snapshot.activeSession} />
-      <RecentEditDiffPanel diffs={snapshot.recentEditDiffs} />
+      <RecentEditDiffPanel
+        diffs={snapshot.recentEditDiffs}
+        review={recentEditDiffReview}
+        running={snapshot.running}
+      />
       <CommandResultPanel results={snapshot.commandResults} />
       {snapshot.pendingApproval ? (
         <ApprovalPanel
@@ -85,6 +95,7 @@ export function App({
       <RunControls
         running={snapshot.running}
         cancelling={snapshot.cancelling}
+        keyboardDisabled={recentEditDiffReview.mode === 'review'}
         onCancel={cancelRun}
       />
       <AgentPlanPanel plan={snapshot.activePlan} />
@@ -93,7 +104,12 @@ export function App({
         latestActivity={PromptActivityService.build(snapshot)}
       />
       <QueuedPromptPanel session={snapshot.activeSession} />
-      <ComposerPanel store={store} snapshot={snapshot} />
+      <ComposerPanel
+        store={store}
+        snapshot={snapshot}
+        keyboardDisabled={recentEditDiffReview.mode === 'review'}
+        onSpecialKey={recentEditDiffReview.handlePromptSpecialKey}
+      />
       <RuntimeStatusBar snapshot={snapshot} />
     </Box>
   );
