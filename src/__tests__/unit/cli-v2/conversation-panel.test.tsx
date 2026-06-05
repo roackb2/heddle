@@ -64,6 +64,28 @@ describe('cli-v2 ConversationPanel', () => {
     expect(view.container.textContent).toContain('stdout');
     expect(view.container.textContent).toContain('M src/index.ts');
   });
+
+  it('renders assistant markdown for terminal output', () => {
+    const view = render(
+      <ConversationPanel
+        session={createSessionDetail({
+          messages: [
+            {
+              id: 'message-1',
+              role: 'assistant',
+              text: '## Current status\n\n- **Ready** to run\n\n```ts\nconst ok = true;\n```',
+            },
+          ],
+        })}
+        runtimeContext={createRuntimeContext()}
+      />,
+    );
+
+    expect(view.container.textContent).toContain('## Current status');
+    expect(view.container.textContent).toContain('* Ready to run');
+    expect(view.container.textContent).toContain('const ok = true;');
+    expect(view.container.textContent).not.toContain('```ts');
+  });
 });
 
 function createSessionDetail(

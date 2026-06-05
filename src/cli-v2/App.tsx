@@ -53,7 +53,7 @@ export function App({
     redoPromptEdit,
   } = usePromptDraft();
   const submitDisabled = snapshot.loading || snapshot.submitting || Boolean(snapshot.pendingDirectShellConfirmation);
-  const inputDisabled = snapshot.loading || Boolean(snapshot.pendingDirectShellConfirmation);
+  const inputDisabled = snapshot.loading || Boolean(snapshot.pendingDirectShellConfirmation) || Boolean(snapshot.pendingApproval);
   const slashCommandHints = store.getSlashCommandHints(draft);
   const directShellDraft = ClientSharedPromptInputService.parseDirectShellDraft(draft);
   const pickers = usePromptPickers({
@@ -205,11 +205,7 @@ export function App({
       <PromptInput
         disabled={inputDisabled}
         submitDisabled={submitDisabled}
-        placeholder={
-          snapshot.loading ? 'Loading session...'
-          : snapshot.running ? 'Queue a follow-up'
-          : 'Type a prompt'
-        }
+        placeholder={resolvePromptPlaceholder(snapshot)}
         value={draft}
         cursor={cursor}
         onChange={setDraftState}
@@ -223,4 +219,20 @@ export function App({
       <RuntimeStatusBar snapshot={snapshot} />
     </Box>
   );
+}
+
+function resolvePromptPlaceholder(snapshot: ReturnType<typeof useControlPlaneSessionStore>): string {
+  if (snapshot.loading) {
+    return 'Loading session...';
+  }
+
+  if (snapshot.pendingApproval) {
+    return 'Waiting for approval';
+  }
+
+  if (snapshot.running) {
+    return 'Queue a follow-up';
+  }
+
+  return 'Type a prompt';
 }

@@ -1,6 +1,9 @@
 import React, { memo } from 'react';
 import { Box, Text } from 'ink';
 import type { ControlPlaneSessionDetail, ControlPlaneSessionRuntimeContext } from '@/client-shared/api/types.js';
+import { AssistantMarkdown } from './AssistantMarkdown.js';
+
+type ConversationMessage = NonNullable<ControlPlaneSessionDetail>['messages'][number];
 
 export const ConversationPanel = memo(function ConversationPanel({
   runtimeContext,
@@ -15,23 +18,13 @@ export const ConversationPanel = memo(function ConversationPanel({
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Text bold>Conversation</Text>
-      {showWelcome && runtimeContext?.welcomeGuide ? <WelcomeGuide runtimeContext={runtimeContext} /> : null}
-      {messages.length === 0 && !showWelcome ? <Text dimColor>No messages yet.</Text> : null}
+      <WelcomeGuideSlot show={showWelcome} runtimeContext={runtimeContext} />
+      <EmptyConversationSlot show={messages.length === 0 && !showWelcome} />
       {messages.map((message, index) => (
         <Box key={message.id} flexDirection="column" marginBottom={1}>
-          <Text dimColor>
-            {message.role === 'user' ? `┌ You${message.isPending ? ' (queued)' : ''}` : '┌ Heddle'}
-          </Text>
+          <Text dimColor>{resolveMessageLabel(message)}</Text>
           <Box paddingLeft={2} flexDirection="column">
-            {message.directShellResult ? (
-              <DirectShellResult result={message.directShellResult} />
-            ) : (
-              message.text.split(/\r?\n/).map((line, lineIndex) => (
-                <Text key={`${message.id}-${lineIndex}`} color={message.role === 'user' ? 'cyan' : undefined}>
-                  {line || ' '}
-                </Text>
-              ))
-            )}
+            <MessageBody message={message} />
           </Box>
           <Text dimColor>{index === messages.length - 1 ? '└' : '└────────────────────────────────────────────────────────'}</Text>
         </Box>
@@ -39,6 +32,48 @@ export const ConversationPanel = memo(function ConversationPanel({
     </Box>
   );
 });
+
+function WelcomeGuideSlot({
+  runtimeContext,
+  show,
+}: {
+  runtimeContext?: ControlPlaneSessionRuntimeContext;
+  show: boolean;
+}) {
+  if (!show || !runtimeContext?.welcomeGuide) {
+    return null;
+  }
+
+  return <WelcomeGuide runtimeContext={runtimeContext} />;
+}
+
+function EmptyConversationSlot({ show }: { show: boolean }) {
+  return show ? <Text dimColor>No messages yet.</Text> : null;
+}
+
+function resolveMessageLabel(message: ConversationMessage): string {
+  if (message.role !== 'user') {
+    return '┌ Heddle';
+  }
+
+  return message.isPending ? '┌ You (queued)' : '┌ You';
+}
+
+function MessageBody({ message }: { message: ConversationMessage }) {
+  if (message.directShellResult) {
+    return <DirectShellResult result={message.directShellResult} />;
+  }
+
+  if (message.role === 'assistant') {
+    return <AssistantMarkdown>{message.text}</AssistantMarkdown>;
+  }
+
+  return message.text.split(/\r?\n/).map((line, lineIndex) => (
+    <Text key={`${message.id}-${lineIndex}`} color="cyan">
+      {line || ' '}
+    </Text>
+  ));
+}
 
 type DirectShellResultView = NonNullable<NonNullable<ControlPlaneSessionDetail>['messages'][number]['directShellResult']>;
 
@@ -77,14 +112,22 @@ function WelcomeGuide({ runtimeContext }: { runtimeContext: ControlPlaneSessionR
         <Text>Heddle conversational mode.</Text>
         <Text> </Text>
         <Text>Ask a question about this workspace.</Text>
-        {runtimeContext.welcomeGuide.carriesTranscriptAcrossTurns ? (
-          <Text>Each turn runs the current agent loop and carries the transcript into the next turn.</Text>
-        ) : null}
-        {!runtimeContext.welcomeGuide.hasProviderCredential ? (
-          <Text color="yellow">No provider credential detected. Use /auth login openai or set a provider API key.</Text>
-        ) : null}
+        <WelcomeTranscriptHint runtimeContext={runtimeContext} />
+        <WelcomeCredentialWarning runtimeContext={runtimeContext} />
       </Box>
       <Text dimColor>└────────────────────────────────────────────────────────</Text>
     </Box>
+  );
+}
+
+function WelcomeTranscriptHint({ runtimeContext }: { runtimeContext: ControlPlaneSessionRuntimeContext }) {
+  return runtimeContext.welcomeGuide.carriesTranscriptAcrossTurns ? (
+    <Text>Each turn runs the current agent loop and carries the transcript into the next turn.</Text>
+  ) : null;
+}
+
+function WelcomeCredentialWarning({ runtimeContext }: { runtimeContext: ControlPlaneSessionRuntimeContext }) {
+  return runtimeContext.welcomeGuide.hasProviderCredential ? null : (
+    <Text color="yellow">No provider credential detected. Use /auth login openai or set a provider API key.</Text>
   );
 }
