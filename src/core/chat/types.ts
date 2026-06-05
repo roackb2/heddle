@@ -11,6 +11,40 @@ export type TurnSummary = {
   steps: number;
   traceFile: string;
   events: string[];
+  presentation?: ConversationTurnPresentation;
+};
+
+export type ConversationTurnPresentation = {
+  timelineItems: ConversationTurnPresentationTimelineItem[];
+};
+
+export type ConversationTurnPresentationTimelineItem =
+  | ConversationTurnApprovalTimelineItem
+  | ConversationTurnEditDiffTimelineItem;
+
+export type ConversationTurnApprovalTimelineItem = {
+  type: 'approval';
+  id: string;
+  toolCallId: string;
+  tool: string;
+  summary: string;
+  status: 'requested' | 'approved' | 'denied';
+  command?: string;
+  reason?: string;
+  step?: number;
+  timestamp: string;
+};
+
+export type ConversationTurnEditDiffTimelineItem = {
+  type: 'edit_diff';
+  id: string;
+  toolCallId: string;
+  path: string;
+  action?: string;
+  patch: string;
+  truncated: boolean;
+  step?: number;
+  timestamp: string;
 };
 
 export type ConversationLine = {

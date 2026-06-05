@@ -19,6 +19,7 @@ export type ControlPlaneHeartbeatEventEnvelope = AsyncIterableValue<RouterOutput
 export type ControlPlaneSessionMessage = NonNullable<ControlPlaneSessionDetail>['messages'][number];
 export type ControlPlaneSessionRuntimeContext = RouterOutputs['controlPlane']['sessionRuntimeContext'];
 export type ControlPlanePendingApproval = RouterOutputs['controlPlane']['sessionPendingApproval'];
+export type ControlPlaneSessionTurn = NonNullable<ControlPlaneSessionDetail>['turns'][number];
 export type ControlPlaneApprovalDecision = RouterInputs['controlPlane']['sessionResolveApproval']['decision'];
 export type ControlPlaneSessionSendPromptResult = RouterOutputs['controlPlane']['sessionSendPrompt'];
 export type ControlPlaneSessionSendPromptAsyncResult = RouterOutputs['controlPlane']['sessionSendPromptAsync'];

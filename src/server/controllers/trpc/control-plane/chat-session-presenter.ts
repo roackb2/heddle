@@ -1,6 +1,7 @@
 import type { ChatSession, ConversationDirectShellLineResult } from '@/core/chat/types.js';
 import type { ReasoningEffort } from '@/core/llm/types.js';
 import { ConversationDirectShellLineResultSchema } from '@/core/chat/engine/direct-shell/result-schema.js';
+import { ConversationTurnPresentationService } from '@/core/chat/engine/turns/presentation/index.js';
 import type {
   ChatSessionDetail,
   ChatSessionMessage,
@@ -232,6 +233,7 @@ export class ControlPlaneChatSessionPresenter {
       steps,
       traceFile,
       events,
+      presentation: ConversationTurnPresentationService.read(candidate.presentation),
     }];
   }
 
