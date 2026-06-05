@@ -8,6 +8,7 @@ import type {
 import { CliV2PromptLineEditorService } from '../services/prompt-input/index.js';
 
 const PROMPT_PREFIX_WIDTH = 2;
+const APP_HORIZONTAL_PADDING_WIDTH = 2;
 const FALLBACK_RENDER_WIDTH = 80;
 const MAX_VISIBLE_INPUT_LINES = 6;
 
@@ -145,9 +146,9 @@ export function PromptInput({
       </Box>
       {value ? (
         lines.map((line, index) => (
-          <Box key={`${index}-${line.before}-${line.cursor}-${line.after}-${line.hasCursor}`}>
+          <Box key={`${index}-${line.before}-${line.cursor}-${line.after}-${line.hasCursor}`} width={renderWidth}>
             <Text color="cyan">{index === 0 ? '› ' : '  '}</Text>
-            <Text>
+            <Text wrap="truncate-end">
               {line.hasCursor ? (
                 <>
                   {line.before}
@@ -228,7 +229,8 @@ export function buildPromptRenderLines(
 }
 
 export function resolvePromptInputRenderWidth(stdoutColumns?: number): number {
-  return Math.max(PROMPT_PREFIX_WIDTH + 1, Math.floor(stdoutColumns ?? FALLBACK_RENDER_WIDTH));
+  const terminalWidth = Math.floor(stdoutColumns ?? FALLBACK_RENDER_WIDTH);
+  return Math.max(PROMPT_PREFIX_WIDTH + 1, terminalWidth - APP_HORIZONTAL_PADDING_WIDTH);
 }
 
 function wrapLine(line: string, width: number): string[] {

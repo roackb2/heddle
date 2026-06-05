@@ -51,16 +51,16 @@ describe('cli-v2 PromptInput helpers', () => {
   });
 
   it('prefers explicit parent width over the fallback render width', () => {
-    expect(resolvePromptInputRenderWidth(12)).toBe(12);
+    expect(resolvePromptInputRenderWidth(12)).toBe(10);
     expect(buildPromptRenderLines('abcdefghijklmnop', 16, 8, resolvePromptInputRenderWidth(12))).toEqual([
       {
-        before: 'abcdefghij',
+        before: 'abcdefgh',
         cursor: '',
         after: '',
         hasCursor: false,
       },
       {
-        before: 'klmnop',
+        before: 'ijklmnop',
         cursor: ' ',
         after: '',
         hasCursor: true,
