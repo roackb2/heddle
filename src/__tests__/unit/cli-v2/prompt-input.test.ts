@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildPromptRenderLines,
   resolvePromptInputRenderWidth,
+  shouldKeepOptimisticPromptInputState,
 } from '@/cli-v2/components/PromptInput.js';
 
 describe('cli-v2 PromptInput helpers', () => {
@@ -66,5 +67,29 @@ describe('cli-v2 PromptInput helpers', () => {
         hasCursor: true,
       },
     ]);
+  });
+
+  it('keeps newer optimistic input when an older parent echo arrives', () => {
+    expect(shouldKeepOptimisticPromptInputState({
+      current: { value: 'abc', cursor: 3 },
+      incoming: { value: 'ab', cursor: 2 },
+      pending: { value: 'abc', cursor: 3 },
+    })).toBe(true);
+  });
+
+  it('accepts parent state once it catches up with the optimistic input', () => {
+    expect(shouldKeepOptimisticPromptInputState({
+      current: { value: 'abc', cursor: 3 },
+      incoming: { value: 'abc', cursor: 3 },
+      pending: { value: 'abc', cursor: 3 },
+    })).toBe(false);
+  });
+
+  it('accepts external parent updates after optimistic input is cleared', () => {
+    expect(shouldKeepOptimisticPromptInputState({
+      current: { value: 'abc', cursor: 3 },
+      incoming: { value: '', cursor: 0 },
+      pending: undefined,
+    })).toBe(false);
   });
 });
