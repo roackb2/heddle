@@ -1,4 +1,6 @@
-import { chromium, type BrowserContext, type Locator, type Page } from 'playwright';
+import { createRequire } from 'node:module';
+
+import type { chromium, BrowserContext, Locator, Page } from 'playwright';
 
 import type {
   BrowserDriver,
@@ -19,13 +21,16 @@ const INTERACTIVE_SELECTOR = [
   '[role]',
   '[tabindex]',
 ].join(', ');
+const nodeRequire = createRequire(import.meta.url);
+
+type PlaywrightChromium = typeof chromium;
 
 /**
  * Playwright-backed browser driver adapter for the validation spike.
  */
 export class PlaywrightBrowserDriverFactory implements BrowserDriverFactory {
   async launch(options: BrowserDriverLaunchOptions): Promise<BrowserDriver> {
-    const context = await chromium.launchPersistentContext(options.profile.userDataDir, {
+    const context = await loadPlaywrightChromium().launchPersistentContext(options.profile.userDataDir, {
       acceptDownloads: false,
       channel: options.profile.channel,
       headless: options.profile.headless ?? true,
@@ -34,6 +39,17 @@ export class PlaywrightBrowserDriverFactory implements BrowserDriverFactory {
 
     const page = context.pages()[0] ?? await context.newPage();
     return new PlaywrightBrowserDriver(context, page);
+  }
+}
+
+function loadPlaywrightChromium(): PlaywrightChromium {
+  try {
+    return (nodeRequire('playwright') as { chromium: PlaywrightChromium }).chromium;
+  } catch (error) {
+    throw new Error(
+      'Browser automation requires the optional playwright package. Install playwright or pass a custom driverFactory to createBrowserResearchToolkit.',
+      { cause: error },
+    );
   }
 }
 
