@@ -10,6 +10,17 @@ import { createLogger } from '../../../core/utils/logger.js';
 
 const silentLogger = createLogger({ level: 'silent', console: false });
 
+async function runWithRetryTimers(run: () => Promise<Awaited<ReturnType<typeof AgentRunService.run>>>) {
+  vi.useFakeTimers();
+  try {
+    const promise = run();
+    await vi.runAllTimersAsync();
+    return await promise;
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
 describe('AgentRunService.run', () => {
   it('executes tool calls, appends tool output, and finishes with a final answer', async () => {
     const seenMessages: ChatMessage[][] = [];
@@ -90,10 +101,12 @@ describe('AgentRunService.run', () => {
     });
   });
 
-  it('records an error outcome when the LLM chat throws a non-abort error', async () => {
+  it('records an error outcome when the LLM chat throws a non-retryable error', async () => {
+    let calls = 0;
     const fakeLlm: LlmAdapter = {
       async chat(): Promise<LlmResponse> {
-        throw new Error('boom');
+        calls += 1;
+        throw Object.assign(new Error('Unauthorized'), { status: 401 });
       },
     };
 
@@ -106,8 +119,118 @@ describe('AgentRunService.run', () => {
     });
 
     expect(result.outcome).toBe('error');
-    expect(result.summary).toBe('LLM error: boom');
+    expect(result.summary).toBe('LLM error: Unauthorized');
+    expect(calls).toBe(1);
     expect(result.trace.some((event) => event.type === 'run.finished')).toBe(true);
+  });
+
+  it('retries transient LLM transport errors before returning the assistant response', async () => {
+    let calls = 0;
+    const fakeLlm: LlmAdapter = {
+      async chat(): Promise<LlmResponse> {
+        calls += 1;
+
+        if (calls < 3) {
+          throw Object.assign(new Error('fetch failed'), { status: 503 });
+        }
+
+        return {
+          content: 'Recovered after reconnecting.',
+        };
+      },
+    };
+
+    const result = await runWithRetryTimers(() => AgentRunService.run({
+      goal: 'Handle provider disconnects.',
+      llm: fakeLlm,
+      tools: [],
+      maxSteps: 1,
+      logger: silentLogger,
+    }));
+
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('Recovered after reconnecting.');
+    expect(calls).toBe(3);
+    expect(result.trace.filter((event) => event.type === 'model.retry')).toEqual([
+      expect.objectContaining({
+        type: 'model.retry',
+        reason: 'transport_error',
+        attempt: 1,
+        maxAttempts: 5,
+        message: 'fetch failed',
+      }),
+      expect.objectContaining({
+        type: 'model.retry',
+        reason: 'transport_error',
+        attempt: 2,
+        maxAttempts: 5,
+        message: 'fetch failed',
+      }),
+    ]);
+  });
+
+  it('retries empty final model responses before returning an error', async () => {
+    let calls = 0;
+    const fakeLlm: LlmAdapter = {
+      async chat(): Promise<LlmResponse> {
+        calls += 1;
+        return {};
+      },
+    };
+
+    const result = await runWithRetryTimers(() => AgentRunService.run({
+      goal: 'Finish with useful text.',
+      llm: fakeLlm,
+      tools: [],
+      maxSteps: 1,
+      logger: silentLogger,
+    }));
+
+    expect(result.outcome).toBe('error');
+    expect(result.summary).toBe('Model returned an empty response after 3 attempts');
+    expect(calls).toBe(3);
+    expect(result.trace.filter((event) => event.type === 'model.retry')).toHaveLength(2);
+  });
+
+  it('does not retry a valid tool-call response without assistant text', async () => {
+    let calls = 0;
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        calls += 1;
+
+        if (messages.some((message) => message.role === 'tool')) {
+          return {
+            content: 'Done after tool use.',
+          };
+        }
+
+        return {
+          toolCalls: [{ id: 'call-1', tool: 'list_files', input: { path: '.' } }],
+        };
+      },
+    };
+
+    const listFilesTool: ToolDefinition = {
+      name: 'list_files',
+      description: 'Lists files in a directory',
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: 'README.md\nsrc/' };
+      },
+    };
+
+    const result = await AgentRunService.run({
+      goal: 'Inspect this repo.',
+      llm: fakeLlm,
+      tools: [listFilesTool],
+      maxSteps: 3,
+      logger: silentLogger,
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('Done after tool use.');
+    expect(calls).toBe(2);
+    expect(result.trace.filter((event) => event.type === 'model.retry')).toHaveLength(0);
   });
 
   it('records assistant rationale on tool turns when the model provides text with tool calls', async () => {
