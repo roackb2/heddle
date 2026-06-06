@@ -52,3 +52,15 @@ browser_open -> browser_snapshot -> browser_click -> browser_screenshot -> brows
 
 This validates the tool boundary an agent will eventually use, but it still does
 not involve an LLM.
+
+Run the live agent smoke when you want to validate whether a model can operate
+the toolkit without any default coding tools:
+
+```bash
+yarn example:browser-agent-smoke:headless
+yarn example:browser-agent-smoke:headed
+```
+
+The smoke uses `gpt-5.4` by default because it works with OpenAI account
+sign-in. Set `HEDDLE_EXAMPLE_MODEL` to try another model, or set
+`HEDDLE_BROWSER_AGENT_CREDENTIAL=api-key` to force platform API-key mode.
