@@ -246,6 +246,8 @@ export type { PlanItem, PlanItemStatus } from './core/tools/toolkits/internal/up
 export { createRunShellInspectTool, createRunShellMutateTool } from './core/tools/toolkits/shell-process/run-shell.js';
 export { createRunShellTool } from './core/tools/toolkits/shell-process/run-shell.js';
 export type { RunShellOptions } from './core/tools/toolkits/shell-process/run-shell.js';
+export { createBrowserResearchToolkit } from './core/tools/toolkits/browser-research/index.js';
+export type { BrowserResearchToolkitOptions } from './core/tools/toolkits/browser-research/toolkit.js';
 
 // Approvals
 export {

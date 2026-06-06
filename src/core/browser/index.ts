@@ -1,6 +1,7 @@
 export { BrowserEvidenceService } from './evidence/index.js';
 export { BrowserPolicyService, DEFAULT_FORBIDDEN_BROWSER_ACTION_TEXT } from './policy/index.js';
 export { BrowserProfileService } from './profiles/index.js';
+export type { BrowserProfileLease } from './profiles/index.js';
 export { BrowserSessionService } from './sessions/index.js';
 export { BrowserSnapshotService } from './snapshots/index.js';
 export { PlaywrightBrowserDriverFactory } from './playwright/index.js';
