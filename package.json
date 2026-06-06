@@ -133,10 +133,14 @@
     "control-plane"
   ],
   "peerDependencies": {
-    "cyberloop": "^1.0.0"
+    "cyberloop": "^1.0.0",
+    "playwright": "^1.59.1"
   },
   "peerDependenciesMeta": {
     "cyberloop": {
+      "optional": true
+    },
+    "playwright": {
       "optional": true
     }
   },

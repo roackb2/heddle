@@ -6,6 +6,12 @@ It is not part of `RuntimeToolService.createDefaultAgentTools(...)`. Hosts must
 include `createBrowserResearchToolkit(...)` deliberately when they want a
 research-only browser run.
 
+The package root may export this toolkit without forcing browser automation onto
+all programmatic users. The default driver loads the optional `playwright` peer
+only when a browser session is launched. Hosts that do not install Playwright
+can still import Heddle normally, and browser hosts may either install
+`playwright` or pass a custom `driverFactory`.
+
 ## Owns
 
 - Tool input validation for browser research actions.
