@@ -231,6 +231,14 @@ export class ControlPlaneSessionStore {
     await this.approvals.resolve(decision);
   }
 
+  toggleCommandResultExpanded(): void {
+    this.state.patch((current) => ({
+      commandResultExpanded: current.commandResults.some((result) => result.handled)
+        ? !current.commandResultExpanded
+        : false,
+    }));
+  }
+
   private async refreshSlashCommandCatalog(workspaceId: string): Promise<void> {
     const slashCommandCatalog = await this.api.getSlashCommandCatalog(workspaceId);
     this.state.patch({ slashCommandCatalog });

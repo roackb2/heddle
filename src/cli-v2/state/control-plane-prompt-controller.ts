@@ -56,6 +56,7 @@ export class ControlPlanePromptController {
     this.options.state.patch((current) => ({
       submitting: true,
       running: true,
+      commandResultExpanded: false,
       error: undefined,
       activePlan: undefined,
       currentActivity: ClientSharedSessionActivityService.createThinkingStatus(),
@@ -117,6 +118,7 @@ export class ControlPlanePromptController {
           error: undefined,
           running: true,
           submitting: false,
+          commandResultExpanded: false,
           liveStatus: this.options.state.getSnapshot().streamConnected
             ? 'A run is already in progress for this session.'
             : 'A run is already in progress for this session. Reconnecting live stream if needed.',
