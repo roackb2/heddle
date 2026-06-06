@@ -54,6 +54,7 @@ export type ControlPlaneSessionStoreSnapshot = {
   latestUpdate?: ControlPlaneSessionLatestUpdate;
   slashCommandCatalog?: ControlPlaneSlashCommandCatalog;
   commandResults: ControlPlaneSlashCommandResult[];
+  commandResultExpanded: boolean;
   error?: string;
 };
 
@@ -76,6 +77,7 @@ export const INITIAL_CONTROL_PLANE_SESSION_SNAPSHOT: ControlPlaneSessionStoreSna
   streamConnected: false,
   recentEditDiffs: [],
   commandResults: [],
+  commandResultExpanded: false,
 };
 
 /**

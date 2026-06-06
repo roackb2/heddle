@@ -284,6 +284,50 @@ describe('ControlPlaneSessionStore', () => {
       kind: 'message',
       message: 'Current model: gpt-5.4',
     });
+    expect(store.getSnapshot().commandResultExpanded).toBe(true);
+    store.dispose();
+  });
+
+  it('collapses command results when a prompt starts running', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await store.submitPrompt('/model');
+    expect(store.getSnapshot().commandResultExpanded).toBe(true);
+
+    await store.submitPrompt('Continue with the work');
+
+    expect(store.getSnapshot().commandResultExpanded).toBe(false);
+    expect(store.getSnapshot().running).toBe(true);
+    store.dispose();
+  });
+
+  it('collapses command results when a live run-start event arrives', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await store.submitPrompt('/model');
+    fixture.sessionEvents?.onData?.({
+      type: 'session.event',
+      sessionId: 'session-1',
+      timestamp: new Date().toISOString(),
+      activities: [
+        {
+          source: 'agent-loop',
+          type: 'loop.started',
+          runId: 'run-1',
+          goal: 'Continue with the work.',
+          model: 'gpt-test',
+          provider: 'openai',
+          workspaceRoot: '/repo',
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    } as ControlPlaneSessionEventEnvelope);
+
+    expect(store.getSnapshot().commandResultExpanded).toBe(false);
     store.dispose();
   });
 

@@ -70,6 +70,7 @@ export class ControlPlaneLiveEventReducer {
         onRunStarted: (runActivity, liveStatus) => {
           this.options.state.patch({
             running: true,
+            commandResultExpanded: false,
             liveStatus,
             currentActivity: ClientSharedSessionActivityService.createThinkingStatus(runActivity.timestamp),
             recentEditDiffs: [],

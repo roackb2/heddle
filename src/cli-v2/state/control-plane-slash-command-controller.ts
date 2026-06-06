@@ -30,6 +30,7 @@ export class ControlPlaneSlashCommandController {
           kind: 'message',
           message: 'A run is already in progress. Wait for it to finish before running a slash command.',
         }),
+        commandResultExpanded: true,
       });
       return;
     }
@@ -55,6 +56,7 @@ export class ControlPlaneSlashCommandController {
 
     this.options.state.patch({
       commandResults: this.appendCommandResult(result),
+      commandResultExpanded: true,
     });
 
     const resultSessionId = 'sessionId' in result ? result.sessionId : undefined;
@@ -85,6 +87,7 @@ export class ControlPlaneSlashCommandController {
   private async continueSession(workspaceId: string, sessionId: string): Promise<void> {
     this.options.state.patch({
       running: true,
+      commandResultExpanded: false,
       activePlan: undefined,
       currentActivity: ClientSharedSessionActivityService.createThinkingStatus(),
       liveStatus: 'Heddle is continuing from the current transcript...',
@@ -100,6 +103,7 @@ export class ControlPlaneSlashCommandController {
     await this.options.api.sendPromptAsync({ workspaceId, sessionId, prompt });
     this.options.state.patch({
       running: true,
+      commandResultExpanded: false,
       activePlan: undefined,
       currentActivity: ClientSharedSessionActivityService.createThinkingStatus(),
       liveStatus: this.options.state.getSnapshot().streamConnected

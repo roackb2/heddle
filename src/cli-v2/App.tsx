@@ -39,6 +39,7 @@ export function App({
   const hasConversationActivityGroups = ClientSharedSessionTurnPresentationService
     .projectConversationTimeline(snapshot.activeSession)
     .some((item) => item.type === 'turn_activity_group');
+  const hasCommandResults = snapshot.commandResults.some((result) => result.handled);
 
   useEffect(() => {
     if (startedRef.current) {
@@ -73,20 +74,22 @@ export function App({
       return true;
     }
 
-    if (
-      !hasConversationActivityGroups ||
-      draft.length > 0 ||
-      key.ctrl ||
-      key.meta ||
-      key.super ||
-      input !== 'a'
-    ) {
+    if (draft.length > 0 || key.ctrl || key.meta || key.super) {
       return false;
     }
 
-    setActivityExpanded((current) => !current);
+    const handlers: Record<string, (() => void) | undefined> = {
+      a: hasConversationActivityGroups ? () => setActivityExpanded((current) => !current) : undefined,
+      c: hasCommandResults ? () => store.toggleCommandResultExpanded() : undefined,
+    };
+    const handler = handlers[input];
+    if (!handler) {
+      return false;
+    }
+
+    handler();
     return true;
-  }, [hasConversationActivityGroups, recentEditDiffReview]);
+  }, [hasCommandResults, hasConversationActivityGroups, recentEditDiffReview, store]);
 
   return (
     <Box flexDirection="column" paddingX={1}>
@@ -110,7 +113,10 @@ export function App({
           running={snapshot.running}
         />
       ) : null}
-      <CommandResultPanel results={snapshot.commandResults} />
+      <CommandResultPanel
+        expanded={snapshot.commandResultExpanded}
+        results={snapshot.commandResults}
+      />
       {snapshot.pendingApproval ? (
         <ApprovalPanel
           approval={snapshot.pendingApproval}
