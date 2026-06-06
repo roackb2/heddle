@@ -1,5 +1,7 @@
 # Heddle
 
+[English](README.md) | [繁體中文](README.zh-TW.md)
+
 Heddle is an open-source AI coding agent runtime and terminal-first workspace for real project work.
 
 Official website: [heddleagent.com](https://heddleagent.com)
