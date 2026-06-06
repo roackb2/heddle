@@ -88,9 +88,7 @@ function createBrowserOpenTool(
         return invalidInput('browser_open', 'Required field: url.');
       }
 
-      const session = await getBrowserSession(options, state);
-      const result = await session.open({ url: raw.url });
-      state.opened = result.status === 'allowed';
+      const result = await openBrowserSession(options, state, raw.url);
 
       if (result.status === 'allowed') {
         return {
@@ -111,6 +109,23 @@ function createBrowserOpenTool(
       };
     },
   };
+}
+
+async function openBrowserSession(
+  options: BrowserResearchToolkitOptions,
+  state: BrowserRuntimeState,
+  url: string,
+): Promise<Awaited<ReturnType<BrowserSessionService['open']>>> {
+  const session = await getBrowserSession(options, state);
+
+  try {
+    const result = await session.open({ url });
+    state.opened = result.status === 'allowed';
+    return result;
+  } catch (error) {
+    await closeBrowserState(state);
+    throw error;
+  }
 }
 
 function createBrowserSnapshotTool(state: BrowserRuntimeState): ToolDefinition {

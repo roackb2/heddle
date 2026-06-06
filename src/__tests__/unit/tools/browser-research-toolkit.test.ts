@@ -104,6 +104,24 @@ describe('createBrowserResearchToolkit', () => {
     await second.tools.browser_close.execute({});
   });
 
+  it('releases profile locks when browser_open throws after acquiring a session', async () => {
+    const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-open-throw-'));
+    const failing = await createTools({
+      stateRoot,
+      driver: new ThrowingOpenBrowserDriver(),
+    });
+
+    await expect(failing.tools.browser_open.execute({ url: 'https://en.wikipedia.org/wiki/Browser_automation' }))
+      .rejects
+      .toThrow('driver open failed');
+
+    const fresh = await createTools({ stateRoot });
+    await expect(fresh.tools.browser_open.execute({ url: 'https://en.wikipedia.org/wiki/Browser_automation' }))
+      .resolves
+      .toMatchObject({ ok: true });
+    await fresh.tools.browser_close.execute({});
+  });
+
   it('composes as an opt-in toolkit without duplicate names', async () => {
     const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-compose-'));
     const toolkit = createBrowserResearchToolkit({
@@ -130,9 +148,10 @@ describe('createBrowserResearchToolkit', () => {
 
 async function createTools(options: {
   stateRoot?: string;
+  driver?: BrowserDriver;
 } = {}) {
   const stateRoot = options.stateRoot ?? (await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-')));
-  const driver = new FakeBrowserDriver();
+  const driver = options.driver ?? new FakeBrowserDriver();
   const tools = Object.fromEntries(
     createBrowserResearchToolkit({
       stateRoot,
@@ -210,5 +229,11 @@ class FakeBrowserDriver implements BrowserDriver {
 
   currentUrl(): string | undefined {
     return this.url;
+  }
+}
+
+class ThrowingOpenBrowserDriver extends FakeBrowserDriver {
+  override async open(_url: string): Promise<string> {
+    throw new Error('driver open failed');
   }
 }
