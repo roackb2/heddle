@@ -107,6 +107,8 @@ function formatTraceEvent(event: TraceEvent): string {
       return `[trace] run.started goal=${JSON.stringify(shorten(event.goal))}`;
     case 'assistant.turn':
       return `[trace] assistant.turn step=${event.step} tools=${event.requestedTools ? event.toolCalls?.map((call) => call.tool).join(',') || 'yes' : 'none'} content=${JSON.stringify(shorten(event.content))}`;
+    case 'model.retry':
+      return `[trace] model.retry step=${event.step} reason=${event.reason} attempt=${event.attempt}/${event.maxAttempts} retryAfterMs=${event.retryAfterMs} message=${JSON.stringify(shorten(event.message))}`;
     case 'host.warning':
       return `[trace] host.warning step=${event.step} code=${event.code} message=${JSON.stringify(shorten(event.message))}`;
     case 'tool.approval_requested':
@@ -133,6 +135,8 @@ function formatTraceEvent(event: TraceEvent): string {
       return `[trace] cyberloop.annotation step=${event.step} frame=${event.frameKind} drift=${event.driftLevel}`;
     case 'run.finished':
       return `[trace] run.finished step=${event.step} outcome=${event.outcome} summary=${JSON.stringify(shorten(event.summary))}`;
+    default:
+      return event;
   }
 }
 

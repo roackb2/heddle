@@ -1,9 +1,11 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { LlmStreamEvent, LlmUsage } from '@/core/llm/types.js';
 import { HeddleEventType } from '@/core/event-types.js';
 import { isAbortError } from '@/core/agent/utils/index.js';
 import { STREAM_UPDATE_INTERVAL_MS } from '../constants.js';
 import { AgentRunFinisher } from '../finish/index.js';
 import type { AccumulateAgentUsageArgs, AgentModelTurnResult, RequestAgentModelTurnArgs } from './types.js';
+import { AgentModelTurnRetryService } from './model-turn-retry-service.js';
 
 /**
  * Owns one LLM request/stream step inside an agent run.
@@ -15,31 +17,96 @@ export class AgentModelTurnService {
       return AgentRunFinisher.finishInterrupted(context, 'Agent run interrupted before LLM call');
     }
 
-    try {
-      const streamState = {
-        content: '',
-        reasoningSummary: '',
-        lastStreamEmitAt: 0,
-      };
-      const response = await context.llm.chat(
-        context.messages,
-        context.registry.list(),
-        context.abortSignal,
-        (event: LlmStreamEvent) => AgentModelTurnService.handleStreamEvent({ context, event, streamState }),
-      );
-      context.state.usage = AgentModelTurnService.accumulateUsage({
-        current: context.state.usage,
-        next: response.usage,
-      });
-      return response;
-    } catch (error) {
-      if (isAbortError(error) || context.abortSignal?.aborted || context.shouldStop?.()) {
-        return AgentRunFinisher.finishInterrupted(context, 'Agent run interrupted during LLM call');
-      }
+    return AgentModelTurnService.requestWithRetries(args);
+  }
 
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      context.log.error({ step: context.state.step, error: errorMessage }, 'LLM call failed');
-      return AgentRunFinisher.finish(context, 'error', `LLM error: ${errorMessage}`);
+  private static async requestWithRetries(args: RequestAgentModelTurnArgs): Promise<AgentModelTurnResult> {
+    const { context } = args;
+    let attempt = 1;
+
+    while (true) {
+      try {
+        const response = await AgentModelTurnService.requestOnce(args);
+        context.state.usage = AgentModelTurnService.accumulateUsage({
+          current: context.state.usage,
+          next: response.usage,
+        });
+
+        const retry = AgentModelTurnRetryService.resolve({ kind: 'response', response });
+        if (!retry.retryable || attempt >= retry.maxAttempts) {
+          return retry.retryable
+            ? AgentRunFinisher.finish(context, 'error', `${retry.message} after ${attempt} attempts`)
+            : response;
+        }
+
+        await AgentModelTurnService.recordRetryAndWait({ context, attempt, retry });
+        attempt += 1;
+      } catch (error) {
+        if (isAbortError(error) || context.abortSignal?.aborted || context.shouldStop?.()) {
+          return AgentRunFinisher.finishInterrupted(context, 'Agent run interrupted during LLM call');
+        }
+
+        const retry = AgentModelTurnRetryService.resolve({ kind: 'error', error });
+        if (!retry.retryable || attempt >= retry.maxAttempts) {
+          context.log.error({ step: context.state.step, error: retry.message, attempts: attempt }, 'LLM call failed');
+          return AgentRunFinisher.finish(
+            context,
+            'error',
+            attempt > 1 ? `LLM error after ${attempt} attempts: ${retry.message}` : `LLM error: ${retry.message}`,
+          );
+        }
+
+        await AgentModelTurnService.recordRetryAndWait({ context, attempt, retry });
+        attempt += 1;
+      }
+    }
+  }
+
+  private static async requestOnce(args: RequestAgentModelTurnArgs) {
+    const { context } = args;
+    const streamState = {
+      content: '',
+      reasoningSummary: '',
+      lastStreamEmitAt: 0,
+    };
+
+    return context.llm.chat(
+      context.messages,
+      context.registry.list(),
+      context.abortSignal,
+      (event: LlmStreamEvent) => AgentModelTurnService.handleStreamEvent({ context, event, streamState }),
+    );
+  }
+
+  private static async recordRetryAndWait(args: {
+    context: RequestAgentModelTurnArgs['context'];
+    attempt: number;
+    retry: ReturnType<typeof AgentModelTurnRetryService.resolve>;
+  }): Promise<void> {
+    const { context, attempt, retry } = args;
+    const retryAfterMs = AgentModelTurnRetryService.nextDelayMs(attempt);
+
+    context.live.trace({
+      type: HeddleEventType.modelRetry,
+      reason: retry.reason ?? 'transport_error',
+      attempt,
+      maxAttempts: retry.maxAttempts,
+      retryAfterMs,
+      message: retry.message,
+      step: context.state.step,
+      timestamp: context.now(),
+    });
+    context.log.warn(
+      { step: context.state.step, attempt, maxAttempts: retry.maxAttempts, retryAfterMs, reason: retry.reason, message: retry.message },
+      'Retrying LLM call',
+    );
+
+    try {
+      await sleep(retryAfterMs, undefined, { signal: context.abortSignal });
+    } catch (error) {
+      if (isAbortError(error) || context.abortSignal?.aborted) {
+        throw error;
+      }
     }
   }
 

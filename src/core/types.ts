@@ -73,6 +73,16 @@ export type TraceEvent =
       timestamp: string;
     }
   | {
+      type: typeof HeddleEventType.modelRetry;
+      reason: 'transport_error' | 'empty_response';
+      attempt: number;
+      maxAttempts: number;
+      retryAfterMs: number;
+      message: string;
+      step: number;
+      timestamp: string;
+    }
+  | {
       type: typeof HeddleEventType.hostWarning;
       code: 'actionless_completion';
       message: string;
