@@ -1,8 +1,9 @@
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ConversationTurnArtifacts, ConversationTurnPersistenceService } from '../../../core/chat/engine/turns/persistence/index.js';
+import { ConversationCompactionService } from '../../../core/chat/engine/compaction/index.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
 import { TraceSummaryService } from '@/core/observability/index.js';
 import type { AgentLoopResult } from '@/core/runtime/loop/index.js';
@@ -10,6 +11,10 @@ import type { ChatSession } from '../../../core/chat/types.js';
 import type { RunResult } from '../../../core/types.js';
 
 describe('chat turn persistence', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('uses a supplied trace summarizer registry for persisted turn events', async () => {
     const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-turn-persistence-'));
     const session = createSession();
@@ -48,6 +53,49 @@ describe('chat turn persistence', () => {
     });
 
     expect(artifacts.turn.events).toEqual(['custom summary for read_file']);
+  });
+
+  it('forces final compaction after context-window overload failures', async () => {
+    const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-turn-persistence-context-overload-'));
+    const session = createSession();
+    const result: RunResult = {
+      outcome: 'error',
+      summary: 'Your input exceeds the context window of this model. Please adjust your input and try again.',
+      trace: [],
+      transcript: [
+        { role: 'user', content: 'Large prompt' },
+        { role: 'assistant', content: 'Large prior response' },
+        { role: 'user', content: 'Retry' },
+      ],
+    };
+    const compact = vi.spyOn(ConversationCompactionService, 'compact').mockResolvedValueOnce({
+      history: result.transcript,
+      context: {
+        estimatedHistoryTokens: 3,
+      },
+      archive: {
+        archives: [],
+      },
+    });
+
+    const artifacts = await ConversationTurnArtifacts.build({
+      result,
+      prompt: 'Retry',
+      session,
+      model: 'gpt-5.5',
+      stateRoot,
+      traceDir: join(stateRoot, 'traces'),
+      toolNames: [],
+      historyForTokenEstimate: result.transcript,
+      summarizer: {},
+      createTurnId: () => 'turn-1',
+    });
+
+    expect(compact).toHaveBeenCalledWith(expect.objectContaining({
+      force: true,
+      history: result.transcript,
+    }));
+    expect(artifacts.summary).toContain('automatically compact earlier history');
   });
 
   it('persists the completed turn back to session storage', async () => {

@@ -5,6 +5,14 @@ import type { ConversationTurnFailureHintOptions } from './types.js';
  */
 export class ConversationTurnFailureMessages {
   static format(message: string, options: ConversationTurnFailureHintOptions): string {
+    if (ConversationTurnFailureMessages.looksLikeContextWindowOverload(message)) {
+      const sizeHint =
+        typeof options.estimatedHistoryTokens === 'number' ?
+          ` Current session history is estimated at about ${options.estimatedHistoryTokens.toLocaleString()} tokens before the next request.`
+        : '';
+      return `${message}\n\nThis failed because the current prompt plus session history exceeded the model context window.${sizeHint} Heddle will automatically compact earlier history for the next retry.`;
+    }
+
     if (ConversationTurnFailureMessages.looksLikeAnthropicInputRateLimit(message)) {
       const sizeHint =
         typeof options.estimatedHistoryTokens === 'number' ?
@@ -18,6 +26,23 @@ export class ConversationTurnFailureMessages {
     }
 
     return message;
+  }
+
+  static shouldForceCompactionAfterFailure(message: string): boolean {
+    return ConversationTurnFailureMessages.looksLikeContextWindowOverload(message);
+  }
+
+  private static looksLikeContextWindowOverload(message: string): boolean {
+    const normalized = message.toLowerCase();
+    return [
+      'exceeds the context window',
+      'exceeded the context window',
+      'context window exceeded',
+      'context length exceeded',
+      'maximum context length',
+      'prompt is too long',
+      'input is too long',
+    ].some((phrase) => normalized.includes(phrase));
   }
 
   private static looksLikeAnthropicInputRateLimit(message: string): boolean {
