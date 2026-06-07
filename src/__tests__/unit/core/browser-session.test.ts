@@ -8,6 +8,7 @@ import {
   BrowserSessionService,
   type BrowserActionEvidenceEvent,
   type BrowserDriver,
+  type BrowserDriverClickOptions,
   type BrowserDriverFactory,
   type BrowserDriverLaunchOptions,
   type BrowserDriverSnapshotOptions,
@@ -74,6 +75,32 @@ describe('BrowserSessionService', () => {
         path: expect.stringContaining('after-click.png'),
       },
     });
+  });
+
+  it('revokes snapshot refs after a click changes the page', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'heddle-browser-session-revoke-refs-'));
+    const driver = new FakeBrowserDriver();
+    const session = new BrowserSessionService({
+      profile: {
+        profileId: 'test',
+        userDataDir: join(dir, 'profile'),
+        headless: true,
+      },
+      policy: {
+        allowedDomains: ['wikipedia.org'],
+      },
+      evidenceDir: join(dir, 'run'),
+    }, new FakeBrowserDriverFactory(driver));
+
+    await session.open({ url: 'https://en.wikipedia.org/wiki/Browser_automation' });
+    await session.snapshot();
+    await expect(session.click({ ref: 'el_1' })).resolves.toMatchObject({ status: 'allowed' });
+
+    await expect(session.click({ ref: 'el_1' })).resolves.toMatchObject({
+      status: 'blocked',
+      reason: 'Unknown browser snapshot ref: el_1',
+    });
+    expect(driver.clickedRefs).toEqual(['el_1']);
   });
 
   it('blocks forbidden click refs before the driver executes them', async () => {
@@ -154,6 +181,60 @@ describe('BrowserSessionService', () => {
     expect(driver.clickedRefs).toEqual([]);
   });
 
+  it('requires approval for click refs without known destinations before the driver executes them', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'heddle-browser-session-unknown-click-'));
+    const driver = new FakeBrowserDriver();
+    const session = new BrowserSessionService({
+      profile: {
+        profileId: 'test',
+        userDataDir: join(dir, 'profile'),
+        headless: true,
+      },
+      policy: {
+        allowedDomains: ['wikipedia.org'],
+      },
+      evidenceDir: join(dir, 'run'),
+    }, new FakeBrowserDriverFactory(driver));
+
+    await session.open({ url: 'https://en.wikipedia.org/wiki/Browser_automation' });
+    await session.snapshot();
+    const result = await session.click({ ref: 'el_4' });
+
+    expect(result).toMatchObject({
+      status: 'approvalRequired',
+      reason: expect.stringContaining('does not expose a browser navigation URL'),
+    });
+    expect(driver.clickedRefs).toEqual([]);
+  });
+
+  it('blocks off-domain navigation triggered by an allowlisted click ref', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'heddle-browser-session-redirect-'));
+    const driver = new FakeBrowserDriver();
+    const session = new BrowserSessionService({
+      profile: {
+        profileId: 'test',
+        userDataDir: join(dir, 'profile'),
+        headless: true,
+      },
+      policy: {
+        allowedDomains: ['wikipedia.org'],
+      },
+      evidenceDir: join(dir, 'run'),
+    }, new FakeBrowserDriverFactory(driver));
+
+    await session.open({ url: 'https://en.wikipedia.org/wiki/Browser_automation' });
+    await session.snapshot();
+    const result = await session.click({ ref: 'el_5' });
+
+    expect(result).toMatchObject({
+      status: 'approvalRequired',
+      url: 'https://example.com/redirect',
+      reason: expect.stringContaining('outside the browser domain allowlist'),
+    });
+    expect(driver.clickedRefs).toEqual([]);
+    expect(driver.currentUrl()).toBe('https://en.wikipedia.org/wiki/Browser_automation');
+  });
+
   it('passes the snapshot max element cap to the browser driver', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'heddle-browser-session-cap-'));
     const driver = new FakeBrowserDriver();
@@ -223,13 +304,32 @@ class FakeBrowserDriver implements BrowserDriver {
           href: 'https://example.com/source',
           tagName: 'a',
         },
+        {
+          ref: 'el_4',
+          role: 'button',
+          name: 'Open menu',
+          text: 'Open menu',
+          tagName: 'button',
+        },
+        {
+          ref: 'el_5',
+          role: 'link',
+          name: 'Safe redirect',
+          href: 'https://en.wikipedia.org/wiki/Safe_redirect',
+          tagName: 'a',
+        },
       ],
     };
   }
 
-  async click(ref: string): Promise<string> {
+  async click(ref: string, options: BrowserDriverClickOptions = {}): Promise<string> {
+    const nextUrl = ref === 'el_5' ? 'https://example.com/redirect' : 'https://en.wikipedia.org/wiki/History';
+    if (!(options.canNavigateTo?.(nextUrl) ?? true)) {
+      throw new Error('navigation blocked by browser guard');
+    }
+
     this.clickedRefs.push(ref);
-    this.url = 'https://en.wikipedia.org/wiki/History';
+    this.url = nextUrl;
     return this.url;
   }
 

@@ -1,9 +1,10 @@
 import { createRequire } from 'node:module';
 
-import type { chromium, BrowserContext, Locator, Page } from 'playwright';
+import type { chromium, BrowserContext, Locator, Page, Route } from 'playwright';
 
 import type {
   BrowserDriver,
+  BrowserDriverClickOptions,
   BrowserDriverFactory,
   BrowserDriverLaunchOptions,
   BrowserDriverSnapshotOptions,
@@ -93,14 +94,20 @@ class PlaywrightBrowserDriver implements BrowserDriver {
     };
   }
 
-  async click(ref: string): Promise<string> {
+  async click(ref: string, options: BrowserDriverClickOptions = {}): Promise<string> {
     const locator = this.refs.get(ref);
     if (!locator) {
       throw new Error(`Unknown browser snapshot ref: ${ref}`);
     }
 
-    await locator.click();
-    await this.page.waitForLoadState('domcontentloaded').catch(() => undefined);
+    const routeHandler = this.createNavigationGuard(options);
+    await this.page.route('**/*', routeHandler);
+    try {
+      await locator.click();
+      await this.page.waitForLoadState('domcontentloaded').catch(() => undefined);
+    } finally {
+      await this.page.unroute('**/*', routeHandler).catch(() => undefined);
+    }
     return this.page.url();
   }
 
@@ -114,6 +121,34 @@ class PlaywrightBrowserDriver implements BrowserDriver {
 
   currentUrl(): string | undefined {
     return this.page.url();
+  }
+
+  private createNavigationGuard(options: BrowserDriverClickOptions): (route: Route) => Promise<void> {
+    return async (route) => {
+      const request = route.request();
+      if (!request.isNavigationRequest() || !options.canNavigateTo) {
+        await route.continue();
+        return;
+      }
+
+      if (!options.canNavigateTo(request.url())) {
+        await route.abort('blockedbyclient');
+        return;
+      }
+
+      const finalUrl = await this.resolveFinalNavigationUrl(route);
+      if (!options.canNavigateTo(finalUrl)) {
+        await route.abort('blockedbyclient');
+        return;
+      }
+
+      await route.continue();
+    };
+  }
+
+  private async resolveFinalNavigationUrl(route: Route): Promise<string> {
+    const response = await route.fetch({ maxRedirects: 20 });
+    return response.url();
   }
 
   private async snapshotElement(locator: Locator, index: number): Promise<BrowserSnapshotElement | undefined> {

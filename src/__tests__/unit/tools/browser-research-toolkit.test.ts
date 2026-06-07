@@ -122,6 +122,25 @@ describe('createBrowserResearchToolkit', () => {
     await fresh.tools.browser_close.execute({});
   });
 
+  it('releases profile locks when browser_close throws during driver shutdown', async () => {
+    const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-close-throw-'));
+    const failing = await createTools({
+      stateRoot,
+      driver: new ThrowingCloseBrowserDriver(),
+    });
+
+    await failing.tools.browser_open.execute({ url: 'https://en.wikipedia.org/wiki/Browser_automation' });
+    await expect(failing.tools.browser_close.execute({}))
+      .rejects
+      .toThrow('driver close failed');
+
+    const fresh = await createTools({ stateRoot });
+    await expect(fresh.tools.browser_open.execute({ url: 'https://en.wikipedia.org/wiki/Browser_automation' }))
+      .resolves
+      .toMatchObject({ ok: true });
+    await fresh.tools.browser_close.execute({});
+  });
+
   it('composes as an opt-in toolkit without duplicate names', async () => {
     const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-compose-'));
     const toolkit = createBrowserResearchToolkit({
@@ -235,5 +254,11 @@ class FakeBrowserDriver implements BrowserDriver {
 class ThrowingOpenBrowserDriver extends FakeBrowserDriver {
   override async open(_url: string): Promise<string> {
     throw new Error('driver open failed');
+  }
+}
+
+class ThrowingCloseBrowserDriver extends FakeBrowserDriver {
+  override async close(): Promise<void> {
+    throw new Error('driver close failed');
   }
 }

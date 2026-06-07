@@ -62,7 +62,21 @@ export class BrowserPolicyService {
       };
     }
 
-    const hrefDecision = element.href ? this.evaluateNavigation(element.href) : { status: 'allowed' as const };
+    if (!element.href) {
+      return this.config.requireApprovalForOffDomainNavigation ?? true
+        ? {
+          status: 'approvalRequired',
+          risk: 'medium',
+          reason: 'Click target does not expose a browser navigation URL before execution.',
+        }
+        : {
+          status: 'blocked',
+          risk: 'medium',
+          reason: 'Click target does not expose a browser navigation URL before execution.',
+        };
+    }
+
+    const hrefDecision = this.evaluateNavigation(element.href);
     if (hrefDecision.status !== 'allowed') {
       return hrefDecision;
     }

@@ -129,25 +129,58 @@ export class BrowserSessionService {
 
     const decision = this.policy.evaluateClick(element);
     if (decision.status !== 'allowed') {
-      await this.record({
-        id: actionId,
-        timestamp,
-        action: 'click',
-        status: decision.status,
-        reason: decision.reason,
-        url: this.currentUrl(),
-        detail: { ref: input.ref, target: this.evidenceTarget(element) },
-      });
-      return {
-        status: decision.status,
+      return await this.completePolicyDeniedClick({
         actionId,
         timestamp,
+        ref: input.ref,
+        element,
+        decision,
         url: this.currentUrl(),
-        reason: decision.reason,
-      };
+      });
     }
 
-    const finalUrl = await (await this.getDriver()).click(input.ref);
+    let blockedNavigation: { url: string; decision: ReturnType<BrowserPolicyService['evaluateNavigation']> } | undefined;
+    let finalUrl: string;
+    try {
+      finalUrl = await (await this.getDriver()).click(input.ref, {
+        canNavigateTo: (url) => {
+          const navigationDecision = this.policy.evaluateNavigation(url);
+          if (navigationDecision.status === 'allowed') {
+            return true;
+          }
+
+          blockedNavigation = { url, decision: navigationDecision };
+          return false;
+        },
+      });
+    } catch (error) {
+      this.latestSnapshot = undefined;
+      if (blockedNavigation) {
+        return await this.completePolicyDeniedClick({
+          actionId,
+          timestamp,
+          ref: input.ref,
+          element,
+          decision: blockedNavigation.decision,
+          url: blockedNavigation.url,
+        });
+      }
+
+      throw error;
+    }
+    this.latestSnapshot = undefined;
+
+    if (blockedNavigation) {
+      return await this.completePolicyDeniedClick({
+        actionId,
+        timestamp,
+        ref: input.ref,
+        element,
+        decision: blockedNavigation.decision,
+        url: blockedNavigation.url,
+      });
+    }
+
     const finalDecision = this.policy.evaluateNavigation(finalUrl);
     await this.record({
       id: actionId,
@@ -166,6 +199,32 @@ export class BrowserSessionService {
       url: finalUrl,
       reason: finalDecision.reason,
       data: { finalUrl },
+    };
+  }
+
+  private async completePolicyDeniedClick(args: {
+    actionId: string;
+    timestamp: string;
+    ref: string;
+    element: BrowserSnapshot['elements'][number];
+    decision: ReturnType<BrowserPolicyService['evaluateNavigation']>;
+    url?: string;
+  }): Promise<BrowserActionResult<{ finalUrl: string }>> {
+    await this.record({
+      id: args.actionId,
+      timestamp: args.timestamp,
+      action: 'click',
+      status: args.decision.status,
+      reason: args.decision.reason,
+      url: args.url,
+      detail: { ref: args.ref, target: this.evidenceTarget(args.element) },
+    });
+    return {
+      status: args.decision.status,
+      actionId: args.actionId,
+      timestamp: args.timestamp,
+      url: args.url,
+      reason: args.decision.reason,
     };
   }
 

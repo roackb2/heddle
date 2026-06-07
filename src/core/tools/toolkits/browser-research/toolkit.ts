@@ -291,12 +291,14 @@ async function getBrowserSession(
 }
 
 async function closeBrowserState(state: BrowserRuntimeState): Promise<Awaited<ReturnType<BrowserSessionService['close']>> | undefined> {
-  const result = await state.session?.close();
-  state.lease?.release();
-  state.session = undefined;
-  state.lease = undefined;
-  state.opened = false;
-  return result;
+  try {
+    return await state.session?.close();
+  } finally {
+    state.lease?.release();
+    state.session = undefined;
+    state.lease = undefined;
+    state.opened = false;
+  }
 }
 
 function createSessionConfig(

@@ -65,6 +65,22 @@ describe('BrowserPolicyService', () => {
     });
   });
 
+  it('requires approval for click targets without known destinations', () => {
+    const policy = new BrowserPolicyService({ allowedDomains: ['wikipedia.org'] });
+
+    expect(policy.evaluateClick({
+      ref: 'el_1',
+      role: 'button',
+      name: 'Open menu',
+      text: 'Open menu',
+      tagName: 'button',
+    })).toMatchObject({
+      status: 'approvalRequired',
+      risk: 'medium',
+      reason: expect.stringContaining('does not expose a browser navigation URL'),
+    });
+  });
+
   it('classifies forbidden click text before off-domain navigation', () => {
     const policy = new BrowserPolicyService({ allowedDomains: ['wikipedia.org'] });
 

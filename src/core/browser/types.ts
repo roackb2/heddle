@@ -94,10 +94,14 @@ export interface BrowserDriverSnapshotResult {
   elements: BrowserSnapshotElement[];
 }
 
+export interface BrowserDriverClickOptions {
+  canNavigateTo?: (url: string) => boolean;
+}
+
 export interface BrowserDriver {
   open(url: string): Promise<string>;
   snapshot(options: BrowserDriverSnapshotOptions): Promise<BrowserDriverSnapshotResult>;
-  click(ref: string): Promise<string>;
+  click(ref: string, options?: BrowserDriverClickOptions): Promise<string>;
   screenshot(path: string): Promise<void>;
   close(): Promise<void>;
   currentUrl(): string | undefined;
