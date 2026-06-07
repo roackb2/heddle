@@ -33,5 +33,11 @@ Current domains:
   API runtime defaults, subscriptions, and run-state polling that are specific
   to Ink rendering and cli-v2 store coordination.
 - `slash-commands/`: local hint filtering and tab completion over
-  control-plane-provided slash command metadata.
+  control-plane-provided slash command metadata, plus TUI-local slash-style
+  commands whose entire effect is terminal presentation state. Keep commands
+  here only when they operate on Ink-local UI state such as disclosure expansion,
+  focused terminal review mode, or terminal-only result visibility. Put commands
+  in core/control-plane slash modules when they affect shared session, runtime,
+  model, auth, heartbeat, compaction, or workspace behavior, or when another
+  host should observe the same command semantics.
 - `status/`: terminal status-bar formatting over control-plane runtime context.

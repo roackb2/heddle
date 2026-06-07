@@ -22,7 +22,7 @@ export function CommandResultPanel({
     <Box flexDirection="column" marginTop={1}>
       <Text>
         <Text color="green">Command</Text>
-        <Text dimColor> · press c to collapse</Text>
+        <Text dimColor> · /c to collapse</Text>
       </Text>
       {visibleResults.map((result, index) => (
         <Box key={index} flexDirection="column" marginTop={index === 0 ? 0 : 1}>
@@ -47,7 +47,7 @@ function CollapsedCommandResult({
       <Text>
         <Text color="green">Command</Text>
         <Text dimColor> · {summarizeResult(result)}</Text>
-        <Text dimColor> · press c to expand</Text>
+        <Text dimColor> · /c to expand</Text>
       </Text>
     </Box>
   );

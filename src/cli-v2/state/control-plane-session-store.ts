@@ -239,6 +239,16 @@ export class ControlPlaneSessionStore {
     }));
   }
 
+  showLocalCommandMessage(message: string): void {
+    this.state.patch((current) => ({
+      commandResults: [
+        ...current.commandResults,
+        { handled: true, kind: 'message', message } as const,
+      ].slice(-5),
+      commandResultExpanded: true,
+    }));
+  }
+
   private async refreshSlashCommandCatalog(workspaceId: string): Promise<void> {
     const slashCommandCatalog = await this.api.getSlashCommandCatalog(workspaceId);
     this.state.patch({ slashCommandCatalog });

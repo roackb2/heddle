@@ -10,16 +10,20 @@ import { useFileMentionPicker } from '../hooks/useFileMentionPicker.js';
 import { usePromptDraft } from '../hooks/usePromptDraft.js';
 import { usePromptPickers } from '../hooks/usePromptPickers.js';
 import { ClientSharedPromptInputService } from '@/client-shared/services/prompt-input/index.js';
+import { SlashCommandAutocompleteService } from '../services/slash-commands/index.js';
 import type {
   ControlPlaneSessionStore,
   ControlPlaneSessionStoreSnapshot,
 } from '../state/control-plane-session-store.js';
+import type { ControlPlaneSlashCommandHint } from '@/client-shared/api/types.js';
 import type { PromptInputKey } from './PromptInput.js';
 
 type ComposerPanelProps = {
   store: ControlPlaneSessionStore;
   snapshot: ControlPlaneSessionStoreSnapshot;
   keyboardDisabled?: boolean;
+  localSlashCommandHints?: ControlPlaneSlashCommandHint[];
+  onLocalSlashCommand?: (command: string) => boolean;
   onSpecialKey?: (input: string, key: PromptInputKey, draft: string) => boolean;
 };
 
@@ -35,6 +39,8 @@ export const ComposerPanel = React.memo(function ComposerPanel({
   store,
   snapshot,
   keyboardDisabled = false,
+  localSlashCommandHints = [],
+  onLocalSlashCommand,
   onSpecialKey,
 }: ComposerPanelProps) {
   const {
@@ -50,7 +56,10 @@ export const ComposerPanel = React.memo(function ComposerPanel({
   } = usePromptDraft();
   const submitDisabled = snapshot.loading || snapshot.submitting || Boolean(snapshot.pendingDirectShellConfirmation);
   const inputDisabled = snapshot.loading || Boolean(snapshot.pendingDirectShellConfirmation) || Boolean(snapshot.pendingApproval);
-  const slashCommandHints = store.getSlashCommandHints(draft);
+  const slashCommandHints = [
+    ...SlashCommandAutocompleteService.filterHints(draft, localSlashCommandHints),
+    ...store.getSlashCommandHints(draft),
+  ];
   const directShellDraft = ClientSharedPromptInputService.parseDirectShellDraft(draft);
   const pickers = usePromptPickers({
     draft,
@@ -88,12 +97,17 @@ export const ComposerPanel = React.memo(function ComposerPanel({
     }
 
     clearDraft();
+    if (onLocalSlashCommand?.(trimmed)) {
+      return;
+    }
+
     if (!trimmed.startsWith('/')) {
       recordSubmittedPrompt(trimmed);
     }
     void store.submitPrompt(value);
   }, [
     clearDraft,
+    onLocalSlashCommand,
     pickers,
     recordSubmittedPrompt,
     store,
@@ -147,7 +161,12 @@ export const ComposerPanel = React.memo(function ComposerPanel({
         cursor={cursor}
         onChange={setDraftState}
         onSubmit={submitPrompt}
-        onComplete={(value) => store.completeSlashCommandDraft(value)}
+        onComplete={(value) => (
+          SlashCommandAutocompleteService.complete(value, [
+            ...SlashCommandAutocompleteService.filterHints(value, localSlashCommandHints),
+            ...store.getSlashCommandHints(value),
+          ]) ?? store.completeSlashCommandDraft(value)
+        )}
         onHistory={navigateHistory}
         onUndo={undoPromptEdit}
         onRedo={redoPromptEdit}

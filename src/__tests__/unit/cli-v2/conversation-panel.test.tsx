@@ -128,7 +128,7 @@ describe('cli-v2 ConversationPanel', () => {
     expect(view.container.textContent).toContain('Activity');
     expect(view.container.textContent).toContain('Agent tool activities');
     expect(view.container.textContent).toContain('1 item');
-    expect(view.container.textContent).toContain('press a to expand');
+    expect(view.container.textContent).toContain('/a to expand');
     expect(view.container.textContent).not.toContain('docs/index.md');
     expect(view.container.textContent).not.toContain('+new');
   });
@@ -171,7 +171,7 @@ describe('cli-v2 ConversationPanel', () => {
       />,
     );
 
-    expect(view.container.textContent).toContain('press a to collapse');
+    expect(view.container.textContent).toContain('/a to collapse');
     expect(view.container.textContent).toContain('Edit diff');
     expect(view.container.textContent).toContain('docs/index.md');
     expect(view.container.textContent).toContain('+new');

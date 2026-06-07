@@ -13,7 +13,6 @@ export type RecentEditDiffReviewState = {
   close: () => void;
   next: () => void;
   previous: () => void;
-  handlePromptSpecialKey: (input: string, key: PromptInputKey, draft: string) => boolean;
   handleReviewKey: (input: string, key: PromptInputKey) => boolean;
 };
 
@@ -69,19 +68,6 @@ export function useRecentEditDiffReview(diffs: ClientSharedRecentEditDiff[]): Re
     move(-1);
   }, [move]);
 
-  const handlePromptSpecialKey = useCallback((input: string, key: PromptInputKey, draft: string) => {
-    if (!hasDiffs || mode === 'review' || key.ctrl || key.meta || key.super || draft.length > 0) {
-      return false;
-    }
-
-    if (input !== 'd') {
-      return false;
-    }
-
-    open();
-    return true;
-  }, [hasDiffs, mode, open]);
-
   const handleReviewKey = useCallback((input: string, key: PromptInputKey) => {
     if (mode !== 'review') {
       return false;
@@ -114,12 +100,10 @@ export function useRecentEditDiffReview(diffs: ClientSharedRecentEditDiff[]): Re
     close,
     next,
     previous,
-    handlePromptSpecialKey,
     handleReviewKey,
   }), [
     close,
     diffs,
-    handlePromptSpecialKey,
     handleReviewKey,
     hasDiffs,
     mode,

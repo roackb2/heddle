@@ -21,7 +21,7 @@ describe('cli-v2 recent edit diff review', () => {
 
     expect(view.container.textContent).toContain('Recent edits: 2 edits across 2 files');
     expect(view.container.textContent).toContain('run done');
-    expect(view.container.textContent).toContain('press d to review');
+    expect(view.container.textContent).toContain('type /d to review');
     expect(view.container.textContent).not.toContain('@@ -1,2 +1,2 @@');
   });
 
@@ -63,16 +63,13 @@ describe('cli-v2 recent edit diff review', () => {
     expect(view.container.textContent).not.toContain('src/file-1.ts');
   });
 
-  it('opens from an empty prompt and ignores normal draft text', () => {
+  it('opens only through explicit review mode actions', () => {
     const { result } = renderHook(() => useRecentEditDiffReview(createDiffs(1)));
 
-    act(() => {
-      expect(result.current.handlePromptSpecialKey('d', {}, 'draft')).toBe(false);
-    });
     expect(result.current.mode).toBe('summary');
 
     act(() => {
-      expect(result.current.handlePromptSpecialKey('d', {}, '')).toBe(true);
+      result.current.open();
     });
     expect(result.current.mode).toBe('review');
   });

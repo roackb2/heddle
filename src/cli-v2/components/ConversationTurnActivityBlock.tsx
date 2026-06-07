@@ -34,7 +34,7 @@ export function ConversationTurnActivityBlock({
       <Text>
         <Text color="cyan">Agent tool activities</Text>
         <Text dimColor> · {formatActivityCount(item.activities.length)}</Text>
-        <Text dimColor>{expanded ? ' · press a to collapse' : ' · press a to expand'}</Text>
+        <Text dimColor>{expanded ? ' · /a to collapse' : ' · /a to expand'}</Text>
       </Text>
       {expanded ? (
         <Box flexDirection="column" marginTop={1} paddingLeft={2}>

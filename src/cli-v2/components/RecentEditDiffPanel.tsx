@@ -42,8 +42,8 @@ function RecentEditDiffSummary({
       <Text dimColor>Recent edits: </Text>
       <Text>{formatDiffScope(diffs)}</Text>
       <Text dimColor>{running ? ' · run active' : ' · run done'}</Text>
-      <Text dimColor> · press </Text>
-      <Text color="cyan">d</Text>
+      <Text dimColor> · type </Text>
+      <Text color="cyan">/d</Text>
       <Text dimColor> to review</Text>
     </Box>
   );

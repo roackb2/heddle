@@ -27,6 +27,13 @@
 - `services/`: TUI-specific domain services used by hooks and components.
   Services are not hooks; they centralize terminal-only logic behind clear
   class boundaries.
+- TUI-local slash-style commands such as `/a`, `/d`, and `/c` may live under
+  `services/slash-commands` only when their entire effect is Ink-local
+  presentation state, such as expanding a terminal disclosure row or opening a
+  focused terminal review panel. Put commands in core/control-plane slash
+  modules when they affect shared session/runtime/model/auth/heartbeat/
+  compaction/workspace behavior, or when web-v2 and programmatic hosts should
+  observe the same command semantics.
 - `components/`: terminal rendering components.
 - `main.ts`: public terminal bootstrap and command routing.
 - `index.tsx`: interactive TUI entrypoint that receives a tRPC URL from

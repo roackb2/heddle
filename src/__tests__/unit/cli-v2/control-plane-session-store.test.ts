@@ -305,6 +305,23 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('records local TUI command messages without calling slash command execution', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    store.showLocalCommandMessage('No recent edit diffs are available to review.');
+
+    expect(store.getSnapshot().commandResults.at(-1)).toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'No recent edit diffs are available to review.',
+    });
+    expect(store.getSnapshot().commandResultExpanded).toBe(true);
+    expect(fixture.calls.slashCommandExecuteMutate).not.toHaveBeenCalled();
+    store.dispose();
+  });
+
   it('collapses command results when a live run-start event arrives', async () => {
     const fixture = createClientFixture();
     const store = new ControlPlaneSessionStore({ client: fixture.client });

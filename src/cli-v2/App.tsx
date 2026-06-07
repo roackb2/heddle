@@ -1,7 +1,7 @@
 // Keep this root component thin: wire top-level app state and render surfaces
 // only. Put feature behavior in cli-v2 hooks, services, or focused components
 // instead of growing App.tsx directly.
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { ApprovalPanel } from './components/ApprovalPanel.js';
 import { AgentPlanPanel } from './components/AgentPlanPanel.js';
@@ -17,9 +17,9 @@ import { RuntimeStatusBar } from './components/RuntimeStatusBar.js';
 import { useControlPlaneSessionStore } from './hooks/useControlPlaneSessionStore.js';
 import { useRecentEditDiffReview } from './hooks/useRecentEditDiffReview.js';
 import { PromptActivityService } from './services/activities/prompt-activity-service.js';
+import { TuiLocalSlashCommandService } from './services/slash-commands/index.js';
 import { ClientSharedSessionTurnPresentationService } from '@/client-shared/services/session-turn-presentation/index.js';
 import type { ControlPlaneApprovalDecision } from '@/client-shared/api/types.js';
-import type { PromptInputKey } from './components/PromptInput.js';
 import type {
   ControlPlaneSessionStore,
   ControlPlaneSessionStoreStartInput,
@@ -69,27 +69,39 @@ export function App({
     recentEditDiffReview.handleReviewKey(input, key);
   }, { isActive: recentEditDiffReview.mode === 'review' });
 
-  const handleComposerSpecialKey = useCallback((input: string, key: PromptInputKey, draft: string) => {
-    if (recentEditDiffReview.handlePromptSpecialKey(input, key, draft)) {
-      return true;
-    }
+  const localSlashCommandHandlers = useMemo(() => ({
+    activity: () => {
+      if (!hasConversationActivityGroups) {
+        store.showLocalCommandMessage('No agent tool activities are available to expand.');
+        return;
+      }
 
-    if (draft.length > 0 || key.ctrl || key.meta || key.super) {
-      return false;
-    }
+      setActivityExpanded((current) => !current);
+    },
+    commandResults: () => {
+      if (!hasCommandResults) {
+        store.showLocalCommandMessage('No command output is available to expand.');
+        return;
+      }
 
-    const handlers: Record<string, (() => void) | undefined> = {
-      a: hasConversationActivityGroups ? () => setActivityExpanded((current) => !current) : undefined,
-      c: hasCommandResults ? () => store.toggleCommandResultExpanded() : undefined,
-    };
-    const handler = handlers[input];
-    if (!handler) {
-      return false;
-    }
+      store.toggleCommandResultExpanded();
+    },
+    diff: () => {
+      if (!recentEditDiffReview.hasDiffs) {
+        store.showLocalCommandMessage('No recent edit diffs are available to review.');
+        return;
+      }
 
-    handler();
-    return true;
-  }, [hasCommandResults, hasConversationActivityGroups, recentEditDiffReview, store]);
+      recentEditDiffReview.open();
+    },
+  }), [hasCommandResults, hasConversationActivityGroups, recentEditDiffReview, store]);
+  const localSlashCommandHints = useMemo(
+    () => TuiLocalSlashCommandService.hints(),
+    [],
+  );
+  const executeLocalSlashCommand = useCallback((command: string) => (
+    TuiLocalSlashCommandService.execute(command, localSlashCommandHandlers)
+  ), [localSlashCommandHandlers]);
 
   return (
     <Box flexDirection="column" paddingX={1}>
@@ -146,7 +158,8 @@ export function App({
         store={store}
         snapshot={snapshot}
         keyboardDisabled={recentEditDiffReview.mode === 'review'}
-        onSpecialKey={handleComposerSpecialKey}
+        localSlashCommandHints={localSlashCommandHints}
+        onLocalSlashCommand={executeLocalSlashCommand}
       />
       <RuntimeStatusBar snapshot={snapshot} />
     </Box>
