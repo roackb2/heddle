@@ -41,6 +41,9 @@ export class ClientSharedApiLinkService {
       splitLink({
         condition: (operation) => operation.type === 'subscription',
         true: httpSubscriptionLink({ url, EventSource: eventSource }),
+        // Only request/response operations use the timeout link. Subscriptions
+        // are long-lived event streams, so timing them out would disconnect live
+        // session updates even when the control plane is healthy.
         false: [
           createControlPlaneRequestTimeoutLink({ defaultTimeoutMs: requestTimeoutMs }),
           requestLink,
@@ -50,6 +53,8 @@ export class ClientSharedApiLinkService {
   }
 }
 
+// Per-operation timeout override for intentionally long request/response calls
+// such as slash commands that may compact or summarize a large conversation.
 export function createControlPlaneRequestContext({
   timeoutMs,
 }: {
@@ -60,12 +65,17 @@ export function createControlPlaneRequestContext({
   };
 }
 
+// Applies a client-side timeout to finite control-plane requests. This is kept
+// as a tRPC link so every shared API consumer gets the same timeout behavior
+// without duplicating host-specific fetch or command handling.
 export function createControlPlaneRequestTimeoutLink({
   defaultTimeoutMs = DEFAULT_CONTROL_PLANE_REQUEST_TIMEOUT_MS,
 }: {
   defaultTimeoutMs?: number;
 } = {}): TRPCLink<AppRouter> {
   return () => ({ op, next }) => observable((observer) => {
+    // Defensive guard: this link should only be installed on the request branch,
+    // but subscriptions must never inherit finite request timeouts.
     if (op.type === 'subscription') {
       return next(op).subscribe(observer);
     }
@@ -98,6 +108,8 @@ export function createControlPlaneRequestTimeoutLink({
   });
 }
 
+// Reads the operation override set by createControlPlaneRequestContext and
+// falls back to the shared default resolved at link creation time.
 function resolveControlPlaneRequestTimeoutMs(
   op: Operation,
   defaultTimeoutMs: number,
@@ -106,6 +118,9 @@ function resolveControlPlaneRequestTimeoutMs(
   return typeof candidate === 'number' ? candidate : defaultTimeoutMs;
 }
 
+// Fetch-level timeout for request transports that need AbortSignal support.
+// It preserves upstream cancellation reasons so tRPC/client callers can still
+// distinguish caller cancellation from a control-plane timeout.
 export function createControlPlaneRequestFetch({
   fetchImpl = globalThis.fetch,
   timeoutMs = DEFAULT_CONTROL_PLANE_REQUEST_TIMEOUT_MS,

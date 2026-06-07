@@ -48,7 +48,7 @@ describe('control-plane API links', () => {
 
   it('times out tRPC operations at the default request budget', async () => {
     vi.useFakeTimers();
-    const request = runNeverCompletingOperation({
+    const request = waitForHungQueryThroughTimeoutLink({
       defaultTimeoutMs: 25,
       context: {},
     });
@@ -61,7 +61,7 @@ describe('control-plane API links', () => {
   it('uses per-operation timeout context when provided', async () => {
     vi.useFakeTimers();
     let settled = false;
-    const request = runNeverCompletingOperation({
+    const request = waitForHungQueryThroughTimeoutLink({
       defaultTimeoutMs: 25,
       context: createControlPlaneRequestContext({ timeoutMs: 75 }),
     }).finally(() => {
@@ -80,7 +80,7 @@ describe('control-plane API links', () => {
   it('does not time out subscription operations', async () => {
     vi.useFakeTimers();
     let error: unknown;
-    const subscription = createNeverCompletingOperation({
+    const subscription = createHungOperationThroughTimeoutLink({
       defaultTimeoutMs: 25,
       context: {},
       type: 'subscription',
@@ -96,21 +96,26 @@ describe('control-plane API links', () => {
   });
 });
 
-function runNeverCompletingOperation({
+// Simulates a query whose server response never arrives so the test can verify
+// the client-side timeout link without relying on a real control-plane server.
+function waitForHungQueryThroughTimeoutLink({
   context,
   defaultTimeoutMs,
 }: {
   context: Record<string, unknown>;
   defaultTimeoutMs: number;
 }) {
-  return observableToPromise(createNeverCompletingOperation({
+  return observableToPromise(createHungOperationThroughTimeoutLink({
     context,
     defaultTimeoutMs,
     type: 'query',
   }));
 }
 
-function createNeverCompletingOperation({
+// Builds a tRPC operation that never emits or completes. Request operations
+// should be timed out by the link; subscriptions should remain open because
+// live event streams are expected to be long-lived.
+function createHungOperationThroughTimeoutLink({
   context,
   defaultTimeoutMs,
   type,
