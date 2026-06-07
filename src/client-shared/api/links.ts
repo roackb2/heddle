@@ -3,8 +3,12 @@ import {
   httpLink,
   httpSubscriptionLink,
   splitLink,
+  TRPCClientError,
+  type Operation,
+  type OperationContext,
   type TRPCLink,
 } from '@trpc/client';
+import { observable } from '@trpc/server/observable';
 import type { EventSource } from 'eventsource';
 import type { AppRouter } from '@/server/router.js';
 
@@ -16,6 +20,7 @@ export type CreateControlPlaneTrpcLinksOptions = {
 };
 
 const DEFAULT_CONTROL_PLANE_REQUEST_TIMEOUT_MS = 30_000;
+export const CONTROL_PLANE_REQUEST_TIMEOUT_CONTEXT_KEY = 'requestTimeoutMs';
 
 /**
  * Shared tRPC link service for frontend API consumers.
@@ -30,10 +35,10 @@ export class ClientSharedApiLinkService {
     eventSource,
     requestTimeoutMs = DEFAULT_CONTROL_PLANE_REQUEST_TIMEOUT_MS,
   }: CreateControlPlaneTrpcLinksOptions): TRPCLink<AppRouter>[] {
-    const fetch = createControlPlaneRequestFetch({ timeoutMs: requestTimeoutMs });
-    const requestLink = batch ? httpBatchLink({ url, fetch }) : httpLink({ url, fetch });
+    const requestLink = batch ? httpBatchLink({ url }) : httpLink({ url });
 
     return [
+      createControlPlaneRequestTimeoutLink({ defaultTimeoutMs: requestTimeoutMs }),
       splitLink({
         condition: (operation) => operation.type === 'subscription',
         true: httpSubscriptionLink({ url, EventSource: eventSource }),
@@ -41,6 +46,58 @@ export class ClientSharedApiLinkService {
       }),
     ];
   }
+}
+
+export function createControlPlaneRequestContext({
+  timeoutMs,
+}: {
+  timeoutMs: number;
+}): OperationContext {
+  return {
+    [CONTROL_PLANE_REQUEST_TIMEOUT_CONTEXT_KEY]: timeoutMs,
+  };
+}
+
+export function createControlPlaneRequestTimeoutLink({
+  defaultTimeoutMs = DEFAULT_CONTROL_PLANE_REQUEST_TIMEOUT_MS,
+}: {
+  defaultTimeoutMs?: number;
+} = {}): TRPCLink<AppRouter> {
+  return () => ({ op, next }) => observable((observer) => {
+    const timeoutMs = resolveControlPlaneRequestTimeoutMs(op, defaultTimeoutMs);
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      return next(op).subscribe(observer);
+    }
+
+    const timeoutId = setTimeout(() => {
+      subscription.unsubscribe();
+      observer.error(TRPCClientError.from(new Error(`Control-plane request "${op.path}" timed out after ${timeoutMs}ms.`)));
+    }, timeoutMs);
+    const subscription = next(op).subscribe({
+      next: (value) => observer.next(value),
+      error: (error) => {
+        clearTimeout(timeoutId);
+        observer.error(error);
+      },
+      complete: () => {
+        clearTimeout(timeoutId);
+        observer.complete();
+      },
+    });
+
+    return () => {
+      clearTimeout(timeoutId);
+      subscription.unsubscribe();
+    };
+  });
+}
+
+function resolveControlPlaneRequestTimeoutMs(
+  op: Operation,
+  defaultTimeoutMs: number,
+): number {
+  const candidate = op.context[CONTROL_PLANE_REQUEST_TIMEOUT_CONTEXT_KEY];
+  return typeof candidate === 'number' ? candidate : defaultTimeoutMs;
 }
 
 export function createControlPlaneRequestFetch({

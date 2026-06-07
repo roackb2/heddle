@@ -43,7 +43,16 @@ export class ControlPlaneSlashCommandController {
       const result = await this.options.api.executeSlashCommand({ workspaceId, sessionId, command });
       await this.applyResult(workspaceId, result);
     } catch (error) {
-      this.options.state.patch({ error: this.options.formatError(error) });
+      const message = this.formatSlashCommandError(command, error);
+      this.options.state.patch({
+        error: message,
+        commandResults: this.appendCommandResult({
+          handled: true,
+          kind: 'message',
+          message,
+        }),
+        commandResultExpanded: true,
+      });
     } finally {
       this.options.state.patch({ submitting: false });
     }
@@ -116,5 +125,18 @@ export class ControlPlaneSlashCommandController {
 
   private appendCommandResult(result: ControlPlaneSlashCommandResult): ControlPlaneSlashCommandResult[] {
     return [...this.options.state.getSnapshot().commandResults, result].slice(-5);
+  }
+
+  private formatSlashCommandError(command: string, error: unknown): string {
+    const message = this.options.formatError(error);
+    if (!message.includes('timed out')) {
+      return `Slash command "${command}" failed. ${message}`;
+    }
+
+    return [
+      `Slash command "${command}" timed out waiting for the control plane.`,
+      message,
+      'Server-side work may still finish; watch the activity/status line for follow-up updates.',
+    ].join(' ');
   }
 }

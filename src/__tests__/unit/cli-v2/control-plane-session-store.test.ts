@@ -10,6 +10,8 @@ import type {
   ControlPlaneSessionView,
   ControlPlaneSessionsEventEnvelope,
 } from '../../../client-shared/api/types.js';
+import { createControlPlaneRequestContext } from '../../../client-shared/api/links.js';
+import { SLASH_COMMAND_REQUEST_TIMEOUT_MS } from '../../../cli-v2/services/sessions/control-plane-session-api-service.js';
 import { ControlPlaneSessionStore } from '../../../cli-v2/state/control-plane-session-store.js';
 
 describe('ControlPlaneSessionStore', () => {
@@ -246,22 +248,22 @@ describe('ControlPlaneSessionStore', () => {
       workspaceId: 'workspace-1',
       sessionId: 'session-1',
       command: '/model gpt-5.4-mini',
-    });
+    }, slashCommandRequestOptions());
     expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenNthCalledWith(2, {
       workspaceId: 'workspace-1',
       sessionId: 'session-1',
       command: '/reasoning medium',
-    });
+    }, slashCommandRequestOptions());
     expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenNthCalledWith(3, {
       workspaceId: 'workspace-1',
       sessionId: 'session-1',
       command: '/reasoning default',
-    });
+    }, slashCommandRequestOptions());
     expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenNthCalledWith(4, {
       workspaceId: 'workspace-1',
       sessionId: 'session-1',
       command: '/session switch session-2',
-    });
+    }, slashCommandRequestOptions());
     expect(fixture.calls.sessionSendPromptAsyncMutate).not.toHaveBeenCalled();
     store.dispose();
   });
@@ -277,7 +279,7 @@ describe('ControlPlaneSessionStore', () => {
       workspaceId: 'workspace-1',
       sessionId: 'session-1',
       command: '/model',
-    });
+    }, slashCommandRequestOptions());
     expect(fixture.calls.sessionSendPromptAsyncMutate).not.toHaveBeenCalled();
     expect(store.getSnapshot().commandResults.at(-1)).toEqual({
       handled: true,
@@ -349,6 +351,30 @@ describe('ControlPlaneSessionStore', () => {
       kind: 'message',
       message: 'Unknown command: /nope. Use the slash command hints to inspect available commands.',
     });
+    store.dispose();
+  });
+
+  it('surfaces slash command timeout details in prompt and command-result UI state', async () => {
+    const fixture = createClientFixture();
+    fixture.calls.slashCommandExecuteMutate.mockRejectedValueOnce(
+      new Error('Control-plane request "controlPlane.slashCommandExecute" timed out after 300000ms.'),
+    );
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await store.submitPrompt('/compact');
+
+    expect(store.getSnapshot().error).toBe(
+      'Slash command "/compact" timed out waiting for the control plane. '
+      + 'Control-plane request "controlPlane.slashCommandExecute" timed out after 300000ms. '
+      + 'Server-side work may still finish; watch the activity/status line for follow-up updates.',
+    );
+    expect(store.getSnapshot().commandResults.at(-1)).toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: store.getSnapshot().error,
+    });
+    expect(store.getSnapshot().commandResultExpanded).toBe(true);
     store.dispose();
   });
 
@@ -902,6 +928,14 @@ function createPendingApproval(): NonNullable<ControlPlanePendingApproval> {
     input: { command: 'touch queued.txt' },
     requestedAt: new Date().toISOString(),
     summary: 'run shell command',
+  };
+}
+
+function slashCommandRequestOptions() {
+  return {
+    context: createControlPlaneRequestContext({
+      timeoutMs: SLASH_COMMAND_REQUEST_TIMEOUT_MS,
+    }),
   };
 }
 

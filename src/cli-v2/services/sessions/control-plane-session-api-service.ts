@@ -1,4 +1,5 @@
 import type { ControlPlaneProxyClient } from '@/client-shared/api/proxy.js';
+import { createControlPlaneRequestContext } from '@/client-shared/api/links.js';
 import type {
   ControlPlaneApprovalDecision,
   RouterInputs,
@@ -11,6 +12,8 @@ type SessionDirectShellPreflightInput = RouterInputs['controlPlane']['sessionDir
 type SessionDirectShellAsyncInput = RouterInputs['controlPlane']['sessionDirectShellAsync'];
 type SlashCommandExecuteInput = RouterInputs['controlPlane']['slashCommandExecute'];
 type WorkspaceFileSearchInput = RouterInputs['controlPlane']['workspaceFileSearch'];
+
+export const SLASH_COMMAND_REQUEST_TIMEOUT_MS = 5 * 60_000;
 
 export type ControlPlaneSessionApiServiceOptions = {
   client: ControlPlaneProxyClient;
@@ -138,7 +141,11 @@ export class ControlPlaneSessionApiService {
   }
 
   async executeSlashCommand(input: Pick<SlashCommandExecuteInput, 'workspaceId' | 'sessionId' | 'command'>) {
-    return this.client.controlPlane.slashCommandExecute.mutate(input);
+    return this.client.controlPlane.slashCommandExecute.mutate(input, {
+      context: createControlPlaneRequestContext({
+        timeoutMs: SLASH_COMMAND_REQUEST_TIMEOUT_MS,
+      }),
+    });
   }
 
   async continueSession(workspaceId: string, sessionId: string) {
