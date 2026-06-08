@@ -6,6 +6,9 @@ import {
   TOOL_POLICY_OPERATIONS,
 } from './types.js';
 
+const ROOT_DESCRIPTION =
+  'A root is a project/workspace boundary, usually a git repository root or a folder with project config such as package.json, requirements.txt, pyproject.toml, Cargo.toml, go.mod, or similar. Use the narrowest project root involved, not an individual file path.';
+
 const POLICY_ENVELOPE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -28,17 +31,17 @@ const POLICY_ENVELOPE_SCHEMA = {
     targetRoots: {
       type: 'array',
       items: { type: 'string' },
-      description: 'Filesystem or environment roots the agent expects this call to touch.',
+      description: `Project/workspace roots the agent expects this call to touch. ${ROOT_DESCRIPTION}`,
     },
     readRoots: {
       type: 'array',
       items: { type: 'string' },
-      description: 'Roots the agent expects this call may read.',
+      description: `Project/workspace roots the agent expects this call may read. ${ROOT_DESCRIPTION}`,
     },
     writeRoots: {
       type: 'array',
       items: { type: 'string' },
-      description: 'Roots the agent expects this call may write, delete, move, or otherwise mutate.',
+      description: `Project/workspace roots the agent expects this call may write, delete, move, or otherwise mutate. ${ROOT_DESCRIPTION}`,
     },
     expectedEffects: {
       type: 'array',

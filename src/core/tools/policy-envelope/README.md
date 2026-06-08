@@ -52,13 +52,22 @@ Field meanings:
   This is an array because real work often combines actions, such as
   `execute + write` for a migration script.
 - `intent`: short natural-language explanation of why the tool call exists.
-- `targetRoots`: broad roots involved in the work.
-- `readRoots`: optional narrower read roots when read and write scopes differ.
-- `writeRoots`: optional narrower write roots when the call mutates files.
+- `targetRoots`: project/workspace roots involved in the work.
+- `readRoots`: optional narrower project/workspace roots when read and write
+  scopes differ.
+- `writeRoots`: optional narrower project/workspace roots when the call mutates
+  files.
 - `expectedEffects`: concise effect claims useful for approval UI and trace.
 - `maxDestructiveScope`: expected upper bound of destructive change.
 - `environment`: where the operation is expected to act.
 - `confidence`: how certain the agent is that the declaration is complete.
+
+A root is a project/workspace boundary, usually a git repository root or a
+folder with project config such as `package.json`, `requirements.txt`,
+`pyproject.toml`, `Cargo.toml`, `go.mod`, or similar. Agents should use the
+narrowest project root involved, not an individual file path. For example,
+reading `src/core/tools/registry.ts` should normally claim `targetRoots: ["."]`,
+not `targetRoots: ["src/core/tools/registry.ts"]`.
 
 ## Example Tool Inputs
 
