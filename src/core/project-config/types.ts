@@ -1,3 +1,5 @@
+import type { AutopilotProfile } from '@/core/approvals/index.js';
+
 export type ProjectConfig = {
   model?: string;
   maxSteps?: number;
@@ -5,6 +7,7 @@ export type ProjectConfig = {
   directShellApproval?: 'always' | 'never';
   searchIgnoreDirs?: string[];
   agentContextPaths?: string[];
+  autopilot?: AutopilotProfile;
 };
 
 export type ProjectConfigInitializeResult =

@@ -217,8 +217,10 @@ policy hints together.
 
 ## Current Limits
 
-This service is the core policy foundation. Workspace/user profile loading,
-user-facing yolo controls, and postflight effect auditing are follow-up slices.
-The existing `AutonomyPostflightAudit` type reserves the downstream shape so the
-future implementation can record observed effects without inventing a second
-trace vocabulary.
+This service is the core policy foundation. Workspace config may provide an
+`autopilot` profile through `.heddle/config.json`; project-config validates the
+persisted shape, and control-plane request context passes the profile into this
+approval policy. User-facing yolo controls and postflight effect auditing remain
+follow-up slices. The existing `AutonomyPostflightAudit` type reserves the
+downstream shape so the future implementation can record observed effects
+without inventing a second trace vocabulary.

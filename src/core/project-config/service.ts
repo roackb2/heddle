@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { AutopilotProfileSchema } from '@/core/approvals/autonomy/index.js';
 import type { ProjectConfig, ProjectConfigInitializeResult } from './types.js';
 
 const LOCAL_CONFIG_DIR_NAME = '.heddle';
@@ -24,6 +25,7 @@ const projectConfigSchema = z.object({
   directShellApproval: z.enum(['always', 'never']).optional().catch(undefined),
   searchIgnoreDirs: z.array(z.string()).optional().catch(undefined),
   agentContextPaths: z.array(z.string()).optional().catch(undefined),
+  autopilot: AutopilotProfileSchema.optional().catch(undefined),
 }).strip();
 
 /**
