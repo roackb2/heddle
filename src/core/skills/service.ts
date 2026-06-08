@@ -13,6 +13,10 @@ import type {
   AgentSkillCatalogEntry,
   AgentSkillCatalogIssue,
   AgentSkillCatalogPromptOptions,
+  AgentSkillActivationRecord,
+  AgentSkillActivationResult,
+  AgentSkillActivationStorePort,
+  AgentSkillActivationView,
   AgentSkillReadResult,
   AgentSkillRoot,
   AgentSkillServiceOptions,
@@ -33,12 +37,14 @@ export class AgentSkillService {
   private readonly cwd: string;
   private readonly homeDir: string;
   private readonly builtInSkillRoots: string[];
+  private readonly activationStore?: AgentSkillActivationStorePort;
 
   constructor(options: AgentSkillServiceOptions) {
     this.workspaceRoot = resolve(options.workspaceRoot);
     this.cwd = resolve(options.cwd ?? options.workspaceRoot);
     this.homeDir = resolve(options.homeDir ?? homedir());
     this.builtInSkillRoots = (options.builtInSkillRoots ?? []).map((root) => resolve(root));
+    this.activationStore = options.activationStore;
   }
 
   async loadCatalog(): Promise<AgentSkillCatalog> {
@@ -83,6 +89,107 @@ export class AgentSkillService {
       skill,
       body: parsed.body,
       resources: extractResourceLinks(parsed.body),
+    };
+  }
+
+  async loadActivatedCatalog(): Promise<AgentSkillCatalog> {
+    const catalog = await this.loadCatalog();
+    const activeSkillNames = new Set(
+      Object.values(this.activationStore?.read().skills ?? {})
+        .filter((record) => record.status === 'active')
+        .map((record) => record.name),
+    );
+
+    return {
+      skills: catalog.skills.filter((skill) => activeSkillNames.has(skill.name)),
+      issues: catalog.issues,
+    };
+  }
+
+  async listActivationViews(): Promise<AgentSkillActivationView[]> {
+    const catalog = await this.loadCatalog();
+    const entriesByName = new Map(catalog.skills.map((skill) => [skill.name, skill]));
+    const records = Object.values(this.activationStore?.read().skills ?? {});
+    const viewsByName = new Map<string, AgentSkillActivationView>();
+
+    for (const skill of catalog.skills) {
+      viewsByName.set(skill.name, {
+        name: skill.name,
+        status: 'available',
+        catalogEntry: skill,
+      });
+    }
+
+    for (const record of records) {
+      viewsByName.set(record.name, {
+        name: record.name,
+        status: entriesByName.has(record.name) ? record.status : 'missing',
+        catalogEntry: entriesByName.get(record.name),
+        record,
+      });
+    }
+
+    return Array.from(viewsByName.values())
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }
+
+  async activateSkill(name: string, now = new Date()): Promise<AgentSkillActivationResult> {
+    const catalog = await this.loadCatalog();
+    const skill = catalog.skills.find((entry) => entry.name === name);
+
+    if (!skill) {
+      return {
+        ok: false,
+        reason: 'skill_not_found',
+        name,
+      };
+    }
+
+    const timestamp = now.toISOString();
+    const store = this.readActivationStore();
+    const existing = store.skills[name];
+    const record: AgentSkillActivationRecord = {
+      name: skill.name,
+      source: skill.source,
+      skillFilePath: skill.skillFilePath,
+      status: 'active',
+      activatedAt: existing?.activatedAt ?? timestamp,
+      updatedAt: timestamp,
+    };
+
+    store.skills[name] = record;
+    this.writeActivationStore(store);
+
+    return {
+      ok: true,
+      record,
+    };
+  }
+
+  async disableSkill(name: string, now = new Date()): Promise<AgentSkillActivationResult> {
+    const store = this.readActivationStore();
+    const existing = store.skills[name];
+
+    if (!existing || existing.status !== 'active') {
+      return {
+        ok: false,
+        reason: 'skill_not_active',
+        name,
+      };
+    }
+
+    const record: AgentSkillActivationRecord = {
+      ...existing,
+      status: 'disabled',
+      updatedAt: now.toISOString(),
+    };
+
+    store.skills[name] = record;
+    this.writeActivationStore(store);
+
+    return {
+      ok: true,
+      record,
     };
   }
 
@@ -242,6 +349,21 @@ export class AgentSkillService {
     }
 
     return {};
+  }
+
+  private readActivationStore() {
+    return this.activationStore?.read() ?? {
+      version: 1 as const,
+      skills: {},
+    };
+  }
+
+  private writeActivationStore(store: ReturnType<AgentSkillService['readActivationStore']>): void {
+    if (!this.activationStore) {
+      throw new Error('Agent Skill activation store is required to persist activation changes.');
+    }
+
+    this.activationStore.write(store);
   }
 }
 

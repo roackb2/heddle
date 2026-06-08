@@ -10,18 +10,20 @@ Responsibilities:
 - parse and validate `SKILL.md` frontmatter with the standard
   `agent-skills-ts-sdk` package;
 - expose only catalog metadata for initial agent context;
-- read the full skill body only when a caller explicitly asks for one skill.
+- read the full skill body only when a caller explicitly asks for one skill;
+- persist workspace-level activation status under Heddle state without copying
+  skill definitions.
 
 Boundaries:
 
 - This domain does not grant tool permissions. `allowed-tools` is preserved as
   skill metadata, while Heddle's runtime approval policy remains authoritative.
-- This domain does not store skill definitions in Heddle state. Future consent
-  state should store activation/disabled metadata only.
+- This domain does not store skill definitions in Heddle state. Activation
+  state stores only the skill name, source, path, status, and timestamps.
 - Tool exposure belongs in `src/core/tools`; runtime bundle assembly belongs in
   `src/core/runtime/tools`.
 
-The first integration point should use `AgentSkillService.loadCatalog()` to add
-an `<available_skills>` block to the agent context, then use a consent-gated
-tool to call `AgentSkillService.readSkill(name)` when the model requests a full
-definition.
+The first live-runtime integration point should use
+`AgentSkillService.loadActivatedCatalog()` to add an `<available_skills>` block
+for workspace-approved skills only, then use a consent-gated tool to call
+`AgentSkillService.readSkill(name)` when the model requests a full definition.
