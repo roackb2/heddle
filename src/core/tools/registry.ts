@@ -1,4 +1,5 @@
 import type { ToolDefinition } from '@/core/types.js';
+import { ToolPolicyEnvelopeSchemaService } from './policy-envelope/index.js';
 
 /**
  * Registry for the executable tool set available to one agent run.
@@ -20,7 +21,7 @@ export class ToolRegistry {
   }
 
   list(): ToolDefinition[] {
-    return [...this.toolMap.values()];
+    return [...this.toolMap.values()].map((tool) => ToolPolicyEnvelopeSchemaService.addToTool(tool));
   }
 
   names(): string[] {

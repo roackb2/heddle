@@ -1,6 +1,6 @@
 import type { Logger } from 'pino';
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
-import { ToolApprovalPolicies, ToolApprovalService } from '@/core/approvals/index.js';
+import { AutonomyTraceService, ToolApprovalPolicies, ToolApprovalService } from '@/core/approvals/index.js';
 import { HeddleEventType } from '@/core/event-types.js';
 import { ToolActivitySummarizer } from '@/core/live/index.js';
 import { ToolExecutionService, type ToolRegistry } from '@/core/tools/index.js';
@@ -81,6 +81,13 @@ export class AgentToolDispatcher {
         return humanDecision;
       } : undefined,
     });
+    if (approval.autonomyEvaluation) {
+      live.trace(AutonomyTraceService.decision({
+        evaluation: approval.autonomyEvaluation,
+        step,
+        timestamp: now(),
+      }));
+    }
     if (approval.approved) {
       return undefined;
     }

@@ -111,6 +111,10 @@ function formatTraceEvent(event: TraceEvent): string {
       return `[trace] model.retry step=${event.step} reason=${event.reason} attempt=${event.attempt}/${event.maxAttempts} retryAfterMs=${event.retryAfterMs} message=${JSON.stringify(shorten(event.message))}`;
     case 'host.warning':
       return `[trace] host.warning step=${event.step} code=${event.code} message=${JSON.stringify(shorten(event.message))}`;
+    case 'autonomy.decision':
+      return `[trace] autonomy.decision step=${event.step} tool=${event.evaluation.call.tool} decision=${event.evaluation.decision.type} reason=${JSON.stringify(shorten(event.evaluation.decision.reason))}`;
+    case 'autonomy.postflight':
+      return `[trace] autonomy.postflight step=${event.step} tool=${event.audit.call.tool} decision=${event.audit.decision} reason=${JSON.stringify(shorten(event.audit.reason ?? ''))}`;
     case 'tool.approval_requested':
       return `[trace] tool.approval_requested step=${event.step} tool=${event.call.tool}`;
     case 'tool.approval_resolved':

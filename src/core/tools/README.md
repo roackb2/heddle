@@ -11,6 +11,7 @@ workspace.
   tool names.
 - Tool registry creation and duplicate-name protection at execution time.
 - Tool execution wrapper and timeout behavior.
+- Shared tool policy-envelope schema injection and input stripping.
 - Coding file tools under `toolkits/coding-files/`.
 - Knowledge and memory-surface tools under `toolkits/knowledge/`.
 - External context tools under `toolkits/external-context/`.
@@ -23,6 +24,8 @@ workspace.
 - Default runtime bundle policy. That lives in `src/core/runtime`.
 - Human approval policy and remembered approvals. Those live in
   `src/core/approvals`.
+- Autopilot policy decisions. The tools domain exposes and strips the shared
+  policy envelope, but `src/core/approvals/autonomy/` evaluates it.
 - Host UI for tool calls or results.
 - Memory maintenance domain rules beyond the knowledge-tool interfaces.
 
@@ -31,6 +34,9 @@ workspace.
 - `index.ts`: public class-based boundary for registry, execution, and bundle
   composition.
 - `toolkit.ts`: shared toolkit types plus `ToolBundleComposer` guardrails.
+- `policy-envelope/`: shared `ToolPolicyEnvelope` contract, model-visible
+  schema injection, and execution-time stripping/validation. Tool-specific
+  input remains owned by the individual tool.
 - `toolkits/coding-files/`: file/search/edit tool implementations plus shared
   edit-core behavior.
 - `toolkits/knowledge/`: memory notes, memory checkpoint, and durable knowledge
@@ -48,9 +54,13 @@ workspace.
 
 - `ToolRegistry`: duplicate-checked registry for the tools in one run.
 - `ToolExecutionService`: executes one tool call against a registry with
-  timeout/error normalization.
+  timeout/error normalization. It removes the shared policy envelope before
+  calling the tool implementation.
 - `ToolBundleComposer`: toolkit composition API used by runtime default-tool
   assembly.
+- `policy-envelope/*`: the cross-tool declaration shape used by approval
+  policy and trace. Downstream services should consume this shape directly
+  instead of creating near-duplicate DTOs.
 - `toolkits/coding-files/*`: coding file tools.
 - `toolkits/knowledge/*`: knowledge and memory-surface tools.
 - `toolkits/external-context/*`: web and image tools.
@@ -69,6 +79,8 @@ workspace.
   family, policy, or composition responsibility.
 - Attach approval policy through approval/toolkit registration rather than
   embedding host approval UI in tool implementations.
+- Extend the shared `ToolPolicyEnvelope` only when all tool families can use
+  the field consistently. Tool-specific arguments stay in each tool schema.
 
 ## Common Changes
 
@@ -88,6 +100,8 @@ workspace.
   approval-rule compatibility tests.
 - To change a tool output shape, update trace/review projection tests if hosts
   depend on that output.
+- To change the model-visible policy declaration, update `policy-envelope/`
+  tests plus approval/autonomy tests that evaluate the declared intent.
 
 ## Tests
 
@@ -95,6 +109,7 @@ workspace.
 - `src/__tests__/integration/core/agent-loop.test.ts`
 - `src/__tests__/integration/memory/memory-integration.test.ts`
 - `src/__tests__/unit/tools/run-shell.command.test.ts`
+- `src/__tests__/unit/tools/tool-policy-envelope.test.ts`
 - toolkit/default-tool guardrail tests near runtime or tools integration suites
 
 ## Notes For Coding Agents

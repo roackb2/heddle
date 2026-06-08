@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import { AgentRunService } from '../../../core/agent/index.js';
 import type { AgentRunEvent } from '../../../core/agent/index.js';
+import { ToolApprovalPolicies, type AutopilotProfile } from '../../../core/approvals/index.js';
 import type { ChatMessage, LlmAdapter, LlmResponse } from '../../../core/llm/types.js';
 import type { ToolDefinition } from '../../../core/types.js';
 import { createLogger } from '../../../core/utils/logger.js';
@@ -829,6 +830,97 @@ describe('AgentRunService.run', () => {
       },
       step: 1,
       timestamp: expect.any(String),
+    }));
+  });
+
+  it('records autonomy decision traces when autopilot denies before human approval', async () => {
+    const approveToolCall = vi.fn(async () => ({ approved: true, reason: 'should not be requested' }));
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        if (messages.some((message) => message.role === 'tool')) {
+          return { content: 'The destructive command was blocked by autopilot.' };
+        }
+
+        return {
+          toolCalls: [{
+            id: 'call-1',
+            tool: 'run_shell_mutate',
+            input: {
+              command: 'rm -rf ~',
+              policy: {
+                operations: ['delete'],
+                intent: 'cleanup temporary files',
+                targetRoots: ['.'],
+                expectedEffects: ['cleanup temporary files'],
+                maxDestructiveScope: 'single-file',
+                environment: 'local',
+                confidence: 'high',
+              },
+            },
+          }],
+        };
+      },
+    };
+    const profile: AutopilotProfile = {
+      mode: 'autopilot',
+      roots: [{
+        path: '.',
+        access: 'autopilot',
+        allow: ['read', 'write', 'execute', 'simple-delete'],
+      }],
+      environments: {
+        allow: ['local', 'dev'],
+        requireApproval: ['staging', 'production', 'unknown'],
+      },
+    };
+    const mutateTool: ToolDefinition = {
+      name: 'run_shell_mutate',
+      description: 'Runs a bounded workspace mutation command',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: 'should not run' };
+      },
+    };
+
+    const result = await AgentRunService.run({
+      goal: 'Clean up temporary files.',
+      llm: fakeLlm,
+      tools: [mutateTool],
+      maxSteps: 3,
+      logger: silentLogger,
+      approvalPolicies: [ToolApprovalPolicies.autopilot({ profile })],
+      approveToolCall,
+      workspaceRoot: '/workspace/current',
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(approveToolCall).not.toHaveBeenCalled();
+    expect(result.trace.map((event) => event.type)).toContain('autonomy.decision');
+    expect(result.trace.map((event) => event.type)).not.toContain('tool.approval_requested');
+    expect(result.trace).toContainEqual(expect.objectContaining({
+      type: 'autonomy.decision',
+      evaluation: expect.objectContaining({
+        decision: expect.objectContaining({
+          type: 'deny',
+          reason: 'root/home recursive deletion is blocked',
+        }),
+        envelope: expect.objectContaining({
+          operations: ['delete'],
+          intent: 'cleanup temporary files',
+        }),
+        facts: expect.objectContaining({
+          command: 'rm -rf ~',
+          hardDenyReasons: ['root/home recursive deletion is blocked'],
+        }),
+      }),
+    }));
+    expect(result.trace).toContainEqual(expect.objectContaining({
+      type: 'tool.completed',
+      result: expect.objectContaining({
+        ok: false,
+        error: 'Approval denied for run_shell_mutate: root/home recursive deletion is blocked',
+      }),
     }));
   });
 

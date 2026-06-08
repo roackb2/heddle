@@ -1,5 +1,6 @@
 import type { ToolCall, ToolResult } from '@/core/types.js';
 import type { ToolRegistry } from './registry.js';
+import { ToolPolicyEnvelopeInputService } from './policy-envelope/index.js';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -21,8 +22,16 @@ export class ToolExecutionService {
     }
 
     try {
+      const extraction = ToolPolicyEnvelopeInputService.extract(call.input);
+      if (extraction.error) {
+        return {
+          ok: false,
+          error: extraction.error,
+        };
+      }
+
       const result = await Promise.race([
-        tool.execute(call.input),
+        tool.execute(extraction.toolInput),
         new Promise<ToolResult>((_, reject) =>
           setTimeout(() => reject(new Error(`Tool "${call.tool}" timed out after ${timeoutMs}ms`)), timeoutMs),
         ),

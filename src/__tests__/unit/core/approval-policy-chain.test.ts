@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ToolApprovalPolicies,
   ToolApprovalService,
+  type AutopilotProfile,
 } from '@/core/approvals/index.js';
 import { ProjectApprovalRuleCodec } from '@/core/approvals/remembered-rules/index.js';
 import type { ToolApprovalPolicyContext } from '@/core/approvals/types.js';
@@ -166,6 +167,104 @@ describe('approval policy chain', () => {
       approved: false,
       reason: 'Command not allowed. This command appears catastrophically destructive (home/root/disk-level) and is blocked even in approval-gated mutate mode.',
     });
+  });
+
+  it('lets autopilot satisfy an earlier approval request when the declared envelope is allowed', async () => {
+    const service = new ToolApprovalService();
+    const human = vi.fn(async () => ({ approved: false, reason: 'should not request human approval' }));
+    const profile: AutopilotProfile = {
+      mode: 'autopilot',
+      roots: [{
+        path: '.',
+        access: 'autopilot',
+        allow: ['read', 'write', 'execute', 'verification'],
+      }],
+      environments: {
+        allow: ['local', 'dev'],
+        requireApproval: ['staging', 'production', 'unknown'],
+      },
+    };
+
+    await expect(service.resolve({
+      policies: [
+        ...ToolApprovalPolicies.default(),
+        ToolApprovalPolicies.autopilot({ profile }),
+      ],
+      context: context({
+        call: {
+          id: 'call-test',
+          tool: 'run_shell_mutate',
+          input: {
+            command: 'yarn test',
+            policy: {
+              operations: ['execute'],
+              intent: 'run local tests',
+              targetRoots: ['.'],
+              expectedEffects: ['run test suite'],
+              environment: 'local',
+              confidence: 'high',
+            },
+          },
+        },
+      }),
+      requestHumanApproval: human,
+    })).resolves.toEqual(expect.objectContaining({
+      approved: true,
+      reason: 'allowed by autopilot profile and declared policy envelope',
+      autonomyEvaluation: expect.objectContaining({
+        decision: expect.objectContaining({ type: 'allow' }),
+      }),
+    }));
+    expect(human).not.toHaveBeenCalled();
+  });
+
+  it('lets autopilot deny unsafe commands without falling through to human approval', async () => {
+    const service = new ToolApprovalService();
+    const human = vi.fn(async () => ({ approved: true, reason: 'should not request human approval' }));
+    const profile: AutopilotProfile = {
+      mode: 'autopilot',
+      roots: [{
+        path: '.',
+        access: 'autopilot',
+        allow: ['read', 'write', 'execute'],
+      }],
+      environments: {
+        allow: ['local', 'dev'],
+        requireApproval: ['staging', 'production', 'unknown'],
+      },
+    };
+
+    await expect(service.resolve({
+      policies: [
+        ...ToolApprovalPolicies.default(),
+        ToolApprovalPolicies.autopilot({ profile }),
+      ],
+      context: context({
+        call: {
+          id: 'call-rm',
+          tool: 'run_shell_mutate',
+          input: {
+            command: 'rm -rf ~',
+            policy: {
+              operations: ['delete'],
+              intent: 'cleanup',
+              targetRoots: ['.'],
+              expectedEffects: ['cleanup'],
+              environment: 'local',
+              confidence: 'high',
+            },
+          },
+        },
+      }),
+      requestHumanApproval: human,
+    })).resolves.toEqual(expect.objectContaining({
+      approved: false,
+      reason: 'root/home recursive deletion is blocked',
+      autonomyEvaluation: expect.objectContaining({
+        decision: expect.objectContaining({ type: 'deny' }),
+      }),
+    }));
+    expect(human).not.toHaveBeenCalled();
   });
 
   it('lets remembered outside-workspace read_file approvals satisfy request policies before human approval', async () => {
