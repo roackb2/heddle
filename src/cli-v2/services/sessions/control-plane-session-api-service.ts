@@ -2,6 +2,7 @@ import type { ControlPlaneProxyClient } from '@/client-shared/api/proxy.js';
 import { createControlPlaneRequestContext } from '@/client-shared/api/links.js';
 import type {
   ControlPlaneApprovalDecision,
+  ControlPlanePermissionModeUpdateInput,
   RouterInputs,
 } from '@/client-shared/api/types.js';
 
@@ -93,6 +94,10 @@ export class ControlPlaneSessionApiService {
 
   async getSlashCommandCatalog(workspaceId: string) {
     return this.client.controlPlane.slashCommandCatalog.query({ workspaceId });
+  }
+
+  async updatePermissionMode(workspaceId: string, mode: ControlPlanePermissionModeUpdateInput['mode']) {
+    return this.client.controlPlane.workspacePermissionModeUpdate.mutate({ workspaceId, mode });
   }
 
   async searchWorkspaceFiles(input: WorkspaceFileSearchInput) {

@@ -54,6 +54,7 @@ type ControlPlaneSessionDetailState = {
   deleteQueuedPrompt: ReturnType<typeof useControlPlaneQueuedPrompts>['deleteQueuedPrompt'];
   cancelRun: () => Promise<void>;
   updateDriftEnabled: ReturnType<typeof useControlPlaneSessionSettings>['updateDriftEnabled'];
+  updatePermissionMode: ReturnType<typeof useControlPlaneSessionSettings>['updatePermissionMode'];
   updateModel: ReturnType<typeof useControlPlaneSessionSettings>['updateModel'];
   updateReasoningEffort: ReturnType<typeof useControlPlaneSessionSettings>['updateReasoningEffort'];
   resolvePendingApproval: ReturnType<typeof useControlPlanePendingApproval>['resolvePendingApproval'];
@@ -158,6 +159,7 @@ export function useControlPlaneSessionDetail({
     deleteQueuedPrompt: queuedPrompts.deleteQueuedPrompt,
     cancelRun: runControl.cancelRun,
     updateDriftEnabled: settings.updateDriftEnabled,
+    updatePermissionMode: settings.updatePermissionMode,
     updateModel: settings.updateModel,
     updateReasoningEffort: settings.updateReasoningEffort,
     resolvePendingApproval: approval.resolvePendingApproval,
@@ -190,6 +192,7 @@ export function useControlPlaneSessionDetail({
     settings.settingsError,
     settings.settingsUpdating,
     settings.updateDriftEnabled,
+    settings.updatePermissionMode,
     settings.updateModel,
     settings.updateReasoningEffort,
   ]);

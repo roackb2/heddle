@@ -73,6 +73,22 @@
       "uploadFailed": "圖片上傳失敗。",
       "uploading": "上傳中"
     },
+    "permissionMode": {
+      "auto": {
+        "description": "自動核准可信任的本機 coding 動作。",
+        "label": "Auto"
+      },
+      "custom": {
+        "description": "使用工作區自訂 policy。",
+        "label": "Custom"
+      },
+      "default": {
+        "description": "使用預設權限行為。",
+        "label": "Default"
+      },
+      "statusPrefix": "模式",
+      "title": "權限模式"
+    },
     "model": "模型",
     "placeholder": "送出後續訊息",
     "promptAriaLabel": "訊息",

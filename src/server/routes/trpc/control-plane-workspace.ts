@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import type { Logger } from 'pino';
-import type { AutopilotProfile } from '@/core/approvals/index.js';
+import { AutonomyPermissionModeService, type AutopilotProfile } from '@/core/approvals/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import type { WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
@@ -71,6 +71,10 @@ export function resolveControlPlaneRequestWorkspace(
 ): ControlPlaneRequestWorkspace {
   const workspace = resolveWorkspaceDescriptor(ctx, input?.workspaceId);
   const projectConfig = ProjectConfigService.read(workspace.workspaceRoot);
+  const autopilot = AutonomyPermissionModeService.resolveEffectiveProfile({
+    config: projectConfig,
+    workspaceRoot: workspace.workspaceRoot,
+  });
   const logger = getWorkspaceOperationLogger(workspace.stateRoot);
   return {
     workspace,
@@ -81,7 +85,7 @@ export function resolveControlPlaneRequestWorkspace(
       sessionStoragePath: resolve(workspace.stateRoot, 'chat-sessions.catalog.json'),
       preferApiKey: ctx.preferApiKey,
       workspaceId: workspace.id,
-      autopilot: projectConfig.autopilot,
+      autopilot,
     },
   };
 }

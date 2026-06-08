@@ -5,7 +5,7 @@ import type { ControlPlaneSessionStoreSnapshot } from '../../../cli-v2/state/con
 describe('RuntimeStatusService', () => {
   it('formats runtime context for the cli-v2 status bar', () => {
     expect(RuntimeStatusService.build(createSnapshot())).toBe(
-      'model=gpt-5.4 • reasoning=medium • auth=openai-oauth • context window ~400,000 tokens • drift=off • session=session-1 (Session 1)',
+      'model=gpt-5.4 • reasoning=medium • permissions=default • auth=openai-oauth • context window ~400,000 tokens • drift=off • session=session-1 (Session 1)',
     );
   });
 
@@ -20,7 +20,7 @@ describe('RuntimeStatusService', () => {
         running: true,
       },
     }))).toBe(
-      'model=gpt-5.4 • reasoning=medium • auth=openai-oauth • estimated input 20,000 / 400,000 tokens (5%) • drift=low • session=session-1 (Session 1) • status=running',
+      'model=gpt-5.4 • reasoning=medium • permissions=default • auth=openai-oauth • estimated input 20,000 / 400,000 tokens (5%) • drift=low • session=session-1 (Session 1) • status=running',
     );
   });
 });
@@ -40,6 +40,14 @@ function createSnapshot(overrides: Partial<ControlPlaneSessionStoreSnapshot> = {
       effectiveReasoningEffort: 'medium',
       reasoningSupported: true,
       reasoningOptions: [],
+      permissionMode: 'default',
+      permissionModeOptions: [
+        {
+          id: 'default',
+          label: 'Default',
+          description: 'Use default permission behavior',
+        },
+      ],
       credentialSource: {
         type: 'oauth',
         provider: 'openai',

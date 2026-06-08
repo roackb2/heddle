@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { PromptInputKey } from '../components/PromptInput.js';
 import { CliV2PickerService } from '../services/pickers/index.js';
 import type { ControlPlaneSessionStoreSnapshot } from '../state/control-plane-session-store.js';
+import type { ControlPlanePermissionMode } from '@/client-shared/api/types.js';
 
 export function usePromptPickers({
   draft,
@@ -9,6 +10,7 @@ export function usePromptPickers({
   clearDraft,
   onSelectModel,
   onSelectReasoning,
+  onSelectPermissionMode,
   onSelectSession,
 }: {
   draft: string;
@@ -16,20 +18,25 @@ export function usePromptPickers({
   clearDraft: () => void;
   onSelectModel: (model: string) => void;
   onSelectReasoning: (reasoningEffort: string) => void;
+  onSelectPermissionMode: (mode: ControlPlanePermissionMode) => void;
   onSelectSession: (sessionId: string) => void;
 }) {
   const [modelIndex, setModelIndex] = useState(0);
   const [reasoningIndex, setReasoningIndex] = useState(0);
+  const [permissionModeIndex, setPermissionModeIndex] = useState(0);
   const [sessionIndex, setSessionIndex] = useState(0);
 
   const modelQuery = CliV2PickerService.modelQuery(draft);
   const reasoningQuery = CliV2PickerService.reasoningQuery(draft);
+  const permissionModeQuery = CliV2PickerService.permissionModeQuery(draft);
   const sessionQuery = CliV2PickerService.sessionQuery(draft);
   const modelItems = CliV2PickerService.filterModels(snapshot.modelOptions, modelQuery);
   const reasoningItems = CliV2PickerService.filterReasoningOptions(snapshot.runtimeContext, reasoningQuery);
+  const permissionModeItems = CliV2PickerService.filterPermissionModes(snapshot.runtimeContext, permissionModeQuery);
   const sessionItems = CliV2PickerService.filterSessions(snapshot.sessions, sessionQuery);
   const modelHighlightedIndex = CliV2PickerService.clampIndex(modelIndex, modelItems.length);
   const reasoningHighlightedIndex = CliV2PickerService.clampIndex(reasoningIndex, reasoningItems.length);
+  const permissionModeHighlightedIndex = CliV2PickerService.clampIndex(permissionModeIndex, permissionModeItems.length);
   const sessionHighlightedIndex = CliV2PickerService.clampIndex(sessionIndex, sessionItems.length);
 
   useEffect(() => {
@@ -39,6 +46,13 @@ export function usePromptPickers({
   useEffect(() => {
     setReasoningIndex(0);
   }, [reasoningQuery]);
+
+  useEffect(() => {
+    setPermissionModeIndex(CliV2PickerService.permissionModeInitialIndex(
+      snapshot.runtimeContext,
+      permissionModeQuery,
+    ));
+  }, [permissionModeQuery, snapshot.runtimeContext]);
 
   useEffect(() => {
     setSessionIndex(0);
@@ -78,6 +92,17 @@ export function usePromptPickers({
       });
     }
 
+    if (permissionModeQuery !== undefined) {
+      return handlePickerKey({
+        key,
+        itemCount: permissionModeItems.length,
+        clearDraft,
+        resetIndex: () => setPermissionModeIndex(0),
+        advance: () => setPermissionModeIndex((current) => CliV2PickerService.nextIndex(current, permissionModeItems.length)),
+        retreat: () => setPermissionModeIndex((current) => CliV2PickerService.previousIndex(current, permissionModeItems.length)),
+      });
+    }
+
     return false;
   }, [
     clearDraft,
@@ -85,6 +110,8 @@ export function usePromptPickers({
     modelQuery,
     reasoningItems.length,
     reasoningQuery,
+    permissionModeItems.length,
+    permissionModeQuery,
     sessionItems.length,
     sessionQuery,
   ]);
@@ -122,6 +149,18 @@ export function usePromptPickers({
       return true;
     }
 
+    const highlightedPermissionMode = permissionModeItems[permissionModeHighlightedIndex];
+    if (permissionModeQuery !== undefined && highlightedPermissionMode) {
+      if (highlightedPermissionMode.disabled) {
+        return true;
+      }
+
+      clearDraft();
+      setPermissionModeIndex(0);
+      onSelectPermissionMode(highlightedPermissionMode.id);
+      return true;
+    }
+
     return false;
   }, [
     clearDraft,
@@ -129,8 +168,12 @@ export function usePromptPickers({
     modelItems,
     modelQuery,
     onSelectModel,
+    onSelectPermissionMode,
     onSelectReasoning,
     onSelectSession,
+    permissionModeHighlightedIndex,
+    permissionModeItems,
+    permissionModeQuery,
     reasoningHighlightedIndex,
     reasoningItems,
     reasoningQuery,
@@ -154,6 +197,13 @@ export function usePromptPickers({
       highlighted: reasoningItems[reasoningHighlightedIndex],
       resetIndex: () => setReasoningIndex(0),
     },
+    permissionMode: {
+      query: permissionModeQuery,
+      items: permissionModeItems,
+      highlightedIndex: permissionModeHighlightedIndex,
+      highlighted: permissionModeItems[permissionModeHighlightedIndex],
+      resetIndex: () => setPermissionModeIndex(0),
+    },
     session: {
       query: sessionQuery,
       items: sessionItems,
@@ -161,7 +211,7 @@ export function usePromptPickers({
       highlighted: sessionItems[sessionHighlightedIndex],
       resetIndex: () => setSessionIndex(0),
     },
-    visible: modelQuery !== undefined || reasoningQuery !== undefined || sessionQuery !== undefined,
+    visible: modelQuery !== undefined || reasoningQuery !== undefined || permissionModeQuery !== undefined || sessionQuery !== undefined,
     handleSpecialKey,
     submitSelection,
   };

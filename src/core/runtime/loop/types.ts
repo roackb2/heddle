@@ -1,5 +1,6 @@
 import type { Logger } from 'pino';
-import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
+import type { AutonomyEvaluation } from '@/core/approvals/autonomy/index.js';
+import type { ToolApprovalDecision, ToolApprovalPolicy } from '@/core/approvals/types.js';
 import { HeddleEventType } from '@/core/event-types.js';
 import type {
   ConversationAssistantStreamActivity,
@@ -95,7 +96,7 @@ export type RunAgentLoopOptions = {
   onEvent?: (event: AgentLoopEvent) => void;
   onTraceEvent?: (event: TraceEvent) => void;
   approvalPolicies?: ToolApprovalPolicy[];
-  approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
+  approveToolCall?: (call: ToolCall, tool: ToolDefinition, autonomyEvaluation?: AutonomyEvaluation) => Promise<ToolApprovalDecision>;
   shouldStop?: () => boolean;
   abortSignal?: AbortSignal;
 };

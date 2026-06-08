@@ -20,6 +20,7 @@ export function ApprovalPanel({ approval, resolving, error, onResolve }: Approva
     path: t('approval.path'),
   });
   const rawPayload = detail ? undefined : ClientSharedApprovalDisplayService.formatPayload(approval.input, 1600);
+  const autoRootLabel = approval.autopilotRootApproval?.label;
   const rememberLabel = approval.rememberProjectApproval?.label;
 
   return (
@@ -70,6 +71,21 @@ export function ApprovalPanel({ approval, resolving, error, onResolve }: Approva
           <Check aria-hidden="true" />
           {t('approval.approveOnce')}
         </Button>
+        {autoRootLabel ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={resolving}
+            onClick={() => void onResolve({
+              type: 'approve_and_trust_autopilot_root',
+              reason: `Approved and trusted ${approval.autopilotRootApproval?.relativeRoot ?? 'repo'} for Auto in web-v2`,
+            })}
+          >
+            <BookmarkCheck aria-hidden="true" />
+            {autoRootLabel}
+          </Button>
+        ) : null}
         {rememberLabel ? (
           <Button
             type="button"

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AUTONOMY_PERMISSION_MODES } from '@/core/approvals/index.js';
 
 export const sessionInputSchema = z.object({
   id: z.string().min(1),
@@ -127,6 +128,10 @@ export const sessionApprovalDecisionSchema = z.object({
       reason: z.string().optional(),
     }),
     z.object({
+      type: z.literal('approve_and_trust_autopilot_root'),
+      reason: z.string().optional(),
+    }),
+    z.object({
       type: z.literal('approve_and_remember_project'),
       reason: z.string().optional(),
     }),
@@ -230,6 +235,11 @@ export const workspaceFileDiffInputSchema = z.object({
 export const workspaceScopedInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
 }).optional();
+
+export const workspacePermissionModeUpdateInputSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+  mode: z.enum(AUTONOMY_PERMISSION_MODES),
+});
 
 export const memoryListInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),

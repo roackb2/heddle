@@ -6,14 +6,19 @@ import { ClientSharedApprovalDisplayService } from '@/client-shared/services/app
 
 export type PendingApproval = NonNullable<ControlPlanePendingApproval>;
 
-export type ApprovalChoice = 'approve' | 'allow_project' | 'deny';
+export type ApprovalChoice = 'approve' | 'trust_repo' | 'allow_project' | 'deny';
 
 /**
  * Owns cli-v2 approval choices, labels, and terminal display formatting.
  */
 export class PendingApprovalService {
   static resolveAvailableChoices(approval: PendingApproval): ApprovalChoice[] {
-    return approval.rememberProjectApproval ? ['approve', 'allow_project', 'deny'] : ['approve', 'deny'];
+    return [
+      'approve',
+      ...(approval.autopilotRootApproval ? ['trust_repo' as const] : []),
+      ...(approval.rememberProjectApproval ? ['allow_project' as const] : []),
+      'deny',
+    ];
   }
 
   static resolveDecision(
@@ -28,6 +33,13 @@ export class PendingApprovalService {
       return {
         type: 'approve_and_remember_project',
         reason: 'Approved and remembered for this project in cli-v2',
+      };
+    }
+
+    if (choice === 'trust_repo' && approval.autopilotRootApproval) {
+      return {
+        type: 'approve_and_trust_autopilot_root',
+        reason: `Approved and trusted ${approval.autopilotRootApproval.relativeRoot} for Auto in cli-v2`,
       };
     }
 

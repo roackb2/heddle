@@ -1,6 +1,7 @@
 import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import {
   trpcReact,
+  type ControlPlanePermissionMode,
   type ControlPlaneModelOptions,
   type ControlPlaneSessionDetail,
   type ControlPlaneSessionSettingsInput,
@@ -21,6 +22,7 @@ export type ControlPlaneSessionSettingsState = {
   settingsUpdating: boolean;
   settingsError?: string;
   updateDriftEnabled: (enabled: boolean) => Promise<void>;
+  updatePermissionMode: (mode: ControlPlanePermissionMode) => Promise<void>;
   updateModel: (model: string) => Promise<void>;
   updateReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
 };
@@ -36,6 +38,7 @@ export function useControlPlaneSessionSettings({
   const utils = trpcReact.useUtils();
   const modelOptionsQuery = trpcReact.controlPlane.modelOptions.useQuery();
   const updateSettingsMutation = trpcReact.controlPlane.sessionSettingsUpdate.useMutation();
+  const updatePermissionModeMutation = trpcReact.controlPlane.workspacePermissionModeUpdate.useMutation();
 
   const updateSettings = useCallback(async (settings: Omit<ControlPlaneSessionSettingsInput, 'id' | 'workspaceId'>) => {
     if (!sessionId || !workspaceId) {
@@ -71,11 +74,42 @@ export function useControlPlaneSessionSettings({
     workspaceId,
   ]);
 
+  const updatePermissionMode = useCallback(async (mode: ControlPlanePermissionMode) => {
+    if (!workspaceId) {
+      return;
+    }
+
+    try {
+      await updatePermissionModeMutation.mutateAsync({ workspaceId, mode });
+      setError(undefined);
+      await Promise.all([
+        utils.controlPlane.state.invalidate(),
+        utils.controlPlane.sessions.invalidate({ workspaceId }),
+        sessionId ? utils.controlPlane.session.invalidate({ id: sessionId, workspaceId }) : Promise.resolve(),
+        sessionId ? utils.controlPlane.sessionRuntimeContext.invalidate({ sessionId, workspaceId }) : Promise.resolve(),
+      ]);
+    } catch (permissionModeError) {
+      setError(permissionModeError instanceof Error ? permissionModeError.message : String(permissionModeError));
+    }
+  }, [
+    sessionId,
+    setError,
+    updatePermissionModeMutation,
+    utils.controlPlane.session,
+    utils.controlPlane.sessionRuntimeContext,
+    utils.controlPlane.sessions,
+    utils.controlPlane.state,
+    workspaceId,
+  ]);
+
   return useMemo(() => ({
     modelOptions: modelOptionsQuery.data,
-    settingsUpdating: updateSettingsMutation.isPending,
-    settingsError: updateSettingsMutation.error instanceof Error ? updateSettingsMutation.error.message : undefined,
+    settingsUpdating: updateSettingsMutation.isPending || updatePermissionModeMutation.isPending,
+    settingsError: updateSettingsMutation.error instanceof Error ? updateSettingsMutation.error.message
+      : updatePermissionModeMutation.error instanceof Error ? updatePermissionModeMutation.error.message
+      : undefined,
     updateDriftEnabled: (enabled: boolean) => updateSettings({ driftEnabled: enabled }),
+    updatePermissionMode,
     updateModel: (model: string) => updateSettings({ model }),
     updateReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => updateSettings({
       reasoningEffort: value === 'default' ? null : value,
@@ -83,7 +117,10 @@ export function useControlPlaneSessionSettings({
   }), [
     modelOptionsQuery.data,
     updateSettings,
+    updatePermissionMode,
     updateSettingsMutation.error,
     updateSettingsMutation.isPending,
+    updatePermissionModeMutation.error,
+    updatePermissionModeMutation.isPending,
   ]);
 }

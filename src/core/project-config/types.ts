@@ -1,4 +1,4 @@
-import type { AutopilotProfile } from '@/core/approvals/index.js';
+import type { AutonomyPermissionMode, AutopilotProfile } from '@/core/approvals/index.js';
 
 export type ProjectConfig = {
   model?: string;
@@ -7,6 +7,8 @@ export type ProjectConfig = {
   directShellApproval?: 'always' | 'never';
   searchIgnoreDirs?: string[];
   agentContextPaths?: string[];
+  permissionMode?: AutonomyPermissionMode;
+  autoTrustedRoots?: string[];
   autopilot?: AutopilotProfile;
 };
 

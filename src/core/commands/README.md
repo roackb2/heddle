@@ -29,8 +29,8 @@ registries and render the command results.
   paths as commands and provide match predicates.
 - `SlashCommandRegistry`: register and dispatch command modules.
 - `SlashCommandAutocomplete`: filter command hints and produce completions.
-- `slash/modules/*`: model, auth, session, compaction, heartbeat, and drift
-  command modules.
+- `slash/modules/*`: model, auth, session, compaction, heartbeat, drift, and
+  permission mode command modules.
 
 ## Extension Points
 

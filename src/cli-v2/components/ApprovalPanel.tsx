@@ -82,7 +82,15 @@ function resolveChoiceKey(input: string, choices: ApprovalChoice[]): ApprovalCho
     return 'approve';
   }
 
+  if (input === 'r' && choices.includes('trust_repo')) {
+    return 'trust_repo';
+  }
+
   if (input === 'r' && choices.includes('allow_project')) {
+    return 'allow_project';
+  }
+
+  if (input === 'm' && choices.includes('allow_project')) {
     return 'allow_project';
   }
 
@@ -94,7 +102,18 @@ function resolveChoiceKey(input: string, choices: ApprovalChoice[]): ApprovalCho
 }
 
 function formatChoiceHint(choices: ApprovalChoice[]): string {
-  return choices.includes('allow_project')
+  const trustRepo = choices.includes('trust_repo');
+  const allowProject = choices.includes('allow_project');
+
+  if (trustRepo && allowProject) {
+    return '[a] approve once  [r] trust this repo  [m] remember request  [d] deny';
+  }
+
+  if (trustRepo) {
+    return '[a] approve once  [r] trust this repo  [d] deny';
+  }
+
+  return allowProject
     ? '[a] approve once  [r] remember for project  [d] deny'
     : '[a] approve once  [d] deny';
 }

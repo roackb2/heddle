@@ -10,6 +10,11 @@ The public adapter methods are intentionally small:
   returning only supported fields and `{}` when the file is missing or invalid.
 - `ProjectConfigService.initialize(workspaceRoot)` creates the default config
   template when absent and reports whether a file was created.
+- `ProjectConfigService.update(workspaceRoot, updater)` persists supported
+  config fields through the same schema used for reads.
+- The optional `permissionMode` field stores the selected user-facing
+  Default/Auto/Custom mode. Approval autonomy owns the mapping from that mode to
+  an effective profile.
 - The optional `autopilot` field uses the approval autonomy profile schema from
   `src/core/approvals/autonomy/`. Project config validates the persisted shape,
   but approval semantics and policy decisions stay in the approvals domain.

@@ -13,6 +13,8 @@ Older workspaces with a root-level `heddle.config.json` still load for backward 
   "stateDir": ".heddle",
   "directShellApproval": "never",
   "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"],
+  "permissionMode": "default",
+  "autoTrustedRoots": ["../heddle-workspace-notes"],
   "autopilot": {
     "mode": "interactive",
     "roots": [
@@ -45,6 +47,17 @@ Configuration is applied in this order:
 - `directShellApproval`: whether explicit `!command` usage in chat still requires approval
 - `searchIgnoreDirs`: directories excluded from routine `search_files` calls
 - `agentContextPaths`: optional project instruction files injected into the system prompt. When omitted, Heddle loads the first non-empty file found in this order: `HEDDLE.md`, `AGENTS.md`, `CLAUDE.md`. Only one default file is loaded to preserve context space. If configured, Heddle uses the listed paths exactly, so advanced projects can opt into custom names or multiple files.
+- `permissionMode`: user-facing approval mode for the workspace. `default`
+  keeps normal approval behavior, `auto` enables the generated local coding
+  profile, and `custom` uses the hand-authored `autopilot` profile when one
+  exists with `mode: "autopilot"`. Switching modes preserves the `autopilot`
+  field so a custom profile is not deleted when the user temporarily returns to
+  Default or Auto. An `autopilot` block with `mode: "interactive"` documents
+  normal approval behavior and does not make Custom selectable.
+- `autoTrustedRoots`: optional project/repo roots added to the generated Auto
+  profile. Approval UI can add a detected sibling repo here when the user
+  chooses to trust that repo. These roots do not make the workspace
+  Custom; Heddle still owns the Auto capabilities and hard-deny defaults.
 - `autopilot`: optional approval autonomy profile. `mode: "interactive"` keeps
   ordinary approval behavior. `mode: "autopilot"` lets matching tool calls run
   without manual approval when the agent honestly declares a compatible policy
@@ -69,6 +82,11 @@ narrowest project root involved, not individual file paths.
 
 Common capabilities include `read`, `write`, `execute`, `simple-delete`,
 `many-file-edit`, `verification`, `formatting`, `dependency`, and `git-stage`.
+
+`autoTrustedRoots[]` follows the same root guidance as `autopilot.roots[].path`.
+Use repo/project roots, not one-off files. Relative roots resolve from the
+active workspace root, so a sibling notes repo can be stored as
+`"../heddle-workspace-notes"`.
 
 ## When To Use Config
 

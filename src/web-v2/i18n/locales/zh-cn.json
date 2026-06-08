@@ -73,6 +73,22 @@
       "uploadFailed": "图片上传失败。",
       "uploading": "上传中"
     },
+    "permissionMode": {
+      "auto": {
+        "description": "自动批准可信的本地 coding 操作。",
+        "label": "Auto"
+      },
+      "custom": {
+        "description": "使用工作区自定义 policy。",
+        "label": "Custom"
+      },
+      "default": {
+        "description": "使用默认权限行为。",
+        "label": "Default"
+      },
+      "statusPrefix": "模式",
+      "title": "权限模式"
+    },
     "model": "模型",
     "placeholder": "发送后续消息",
     "promptAriaLabel": "消息",

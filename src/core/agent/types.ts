@@ -2,7 +2,8 @@ import type { Logger } from 'pino';
 import { HeddleEventType } from '@/core/event-types.js';
 import type { LlmAdapter, ChatMessage, LlmUsage } from '@/core/llm/types.js';
 import type { ConversationAgentLoopActivity } from '@/core/live/index.js';
-import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
+import type { AutonomyEvaluation } from '@/core/approvals/autonomy/index.js';
+import type { ToolApprovalDecision, ToolApprovalPolicy } from '@/core/approvals/types.js';
 import type { ToolRegistry } from '@/core/tools/index.js';
 import type { PlanItem } from '@/core/tools/toolkits/internal/update-plan.js';
 import type { RunResult, ToolDefinition, ToolCall, TraceEvent, StopReason } from '@/core/types.js';
@@ -46,7 +47,7 @@ export type RunAgentOptions = {
   systemContext?: string;
   onEvent?: (event: AgentRunEvent) => void;
   approvalPolicies?: ToolApprovalPolicy[];
-  approveToolCall?: (call: ToolCall, tool: ToolDefinition) => Promise<{ approved: boolean; reason?: string }>;
+  approveToolCall?: (call: ToolCall, tool: ToolDefinition, autonomyEvaluation?: AutonomyEvaluation) => Promise<ToolApprovalDecision>;
   shouldStop?: () => boolean;
   abortSignal?: AbortSignal;
 };

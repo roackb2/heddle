@@ -1,8 +1,9 @@
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  AutonomyPolicyService,
   ToolApprovalPolicies,
   ToolApprovalService,
   type AutopilotProfile,
@@ -370,6 +371,59 @@ describe('approval policy chain', () => {
     }));
     expect(request.editPreview?.path).toBe('README.md');
     expect(request.rememberProjectApproval?.label).toBe('allow edit_file for this project');
+  });
+
+  it('adds an Auto repo expansion option when autonomy requests approval for a sibling project root', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-auto-approval-'));
+    const workspaceRoot = join(root, 'heddle');
+    const siblingRoot = join(root, 'heddle-workspace-notes');
+    mkdirSync(join(workspaceRoot, '.git'), { recursive: true });
+    mkdirSync(join(siblingRoot, '.git'), { recursive: true });
+    writeFileSync(join(siblingRoot, 'README.md'), '# notes\n');
+
+    const approvalContext = context({
+      call: {
+        id: 'call-read',
+        tool: 'read_file',
+        input: { path: '../heddle-workspace-notes/README.md' },
+      },
+      tool: {
+        name: 'read_file',
+        description: 'reads files',
+        requiresApproval: false,
+        parameters: {},
+        execute: async () => ({ ok: true }),
+      },
+      workspaceRoot,
+    });
+    const autonomyEvaluation = AutonomyPolicyService.evaluate({
+      context: approvalContext,
+      profile: {
+        mode: 'autopilot',
+        preset: 'auto',
+        roots: [
+          { path: '.', access: 'autopilot', allow: ['read', 'write', 'execute'] },
+          { path: root, access: 'manual-only' },
+        ],
+        environments: {
+          allow: ['local', 'dev'],
+          requireApproval: ['staging', 'production', 'unknown'],
+        },
+      },
+    });
+
+    const request = await new ToolApprovalService({ workspaceRoot }).createRequest({
+      ...approvalContext,
+      reason: autonomyEvaluation.decision.reason,
+      autonomyEvaluation,
+    });
+
+    expect(request.autopilotRootApproval).toEqual(expect.objectContaining({
+      label: 'Trust this repo',
+      root: siblingRoot,
+      relativeRoot: '../heddle-workspace-notes',
+      access: 'autopilot',
+    }));
   });
 
   it('resolves approve-and-remember decisions through the existing project approval repository', () => {

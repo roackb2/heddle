@@ -6,6 +6,7 @@ import type { ReviewDiffFile } from '@/core/review/index.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import type { ReasoningEffortOption } from '@/core/llm/models/index.js';
 import type { ReasoningEffort } from '@/core/llm/types.js';
+import type { AutonomyPermissionMode, AutonomyPermissionModeOption } from '@/core/approvals/index.js';
 import type {
   ChatSessionRetention,
   ConversationDirectShellLineResult,
@@ -181,6 +182,8 @@ export type ControlPlaneSessionRuntimeContext = {
   driftLevel?: ChatSessionView['driftLevel'];
   compactionStatus?: NonNullable<NonNullable<ChatSessionView['context']>['compaction']>['status'];
   running: boolean;
+  permissionMode: AutonomyPermissionMode;
+  permissionModeOptions: AutonomyPermissionModeOption[];
   welcomeGuide: ControlPlaneSessionWelcomeGuide;
 };
 

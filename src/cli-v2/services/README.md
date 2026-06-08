@@ -38,6 +38,8 @@ Current domains:
   here only when they operate on Ink-local UI state such as disclosure expansion,
   focused terminal review mode, or terminal-only result visibility. Put commands
   in core/control-plane slash modules when they affect shared session, runtime,
-  model, auth, heartbeat, compaction, or workspace behavior, or when another
-  host should observe the same command semantics.
+  model, auth, heartbeat, compaction, permission mode, or workspace behavior,
+  or when another host should observe the same command semantics. TUI-only
+  picker mechanics may live in `pickers/`, but picker command metadata for
+  shared state belongs to the core/control-plane command catalog.
 - `status/`: terminal status-bar formatting over control-plane runtime context.

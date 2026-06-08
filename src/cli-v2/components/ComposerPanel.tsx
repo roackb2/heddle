@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { DirectShellModeHintPanel } from './DirectShellModeHintPanel.js';
 import { FileMentionPickerPanel } from './FileMentionPickerPanel.js';
 import { ModelPickerPanel } from './ModelPickerPanel.js';
+import { PermissionModePickerPanel } from './PermissionModePickerPanel.js';
 import { PromptInput } from './PromptInput.js';
 import { ReasoningEffortPickerPanel } from './ReasoningEffortPickerPanel.js';
 import { SessionPickerPanel } from './SessionPickerPanel.js';
@@ -71,6 +72,9 @@ export const ComposerPanel = React.memo(function ComposerPanel({
     onSelectReasoning: (reasoningEffort) => {
       void store.selectReasoningFromPicker(reasoningEffort);
     },
+    onSelectPermissionMode: (mode) => {
+      void store.selectPermissionModeFromPicker(mode);
+    },
     onSelectSession: (sessionId) => {
       void store.selectSessionFromPicker(sessionId);
     },
@@ -88,11 +92,11 @@ export const ComposerPanel = React.memo(function ComposerPanel({
       return;
     }
 
-    if (submitDisabled) {
+    if (pickers.submitSelection()) {
       return;
     }
 
-    if (pickers.submitSelection()) {
+    if (submitDisabled) {
       return;
     }
 
@@ -132,6 +136,14 @@ export const ComposerPanel = React.memo(function ComposerPanel({
           highlightedIndex={pickers.reasoning.highlightedIndex}
         />
       ) : null}
+      {pickers.permissionMode.query !== undefined ? (
+        <PermissionModePickerPanel
+          query={pickers.permissionMode.query}
+          options={pickers.permissionMode.items}
+          activePermissionMode={snapshot.runtimeContext?.permissionMode}
+          highlightedIndex={pickers.permissionMode.highlightedIndex}
+        />
+      ) : null}
       {pickers.session.query !== undefined ? (
         <SessionPickerPanel
           query={pickers.session.query}
@@ -155,7 +167,11 @@ export const ComposerPanel = React.memo(function ComposerPanel({
       ) : null}
       <PromptInput
         disabled={inputDisabled || keyboardDisabled}
-        submitDisabled={submitDisabled || keyboardDisabled}
+        submitDisabled={shouldDisablePromptInputSubmit({
+          keyboardDisabled,
+          pickerVisible: pickers.visible,
+          submitDisabled,
+        })}
         placeholder={resolvePromptPlaceholder(snapshot)}
         value={draft}
         cursor={cursor}
@@ -179,6 +195,18 @@ export const ComposerPanel = React.memo(function ComposerPanel({
     </>
   );
 });
+
+export function shouldDisablePromptInputSubmit({
+  keyboardDisabled,
+  pickerVisible,
+  submitDisabled,
+}: {
+  keyboardDisabled: boolean;
+  pickerVisible: boolean;
+  submitDisabled: boolean;
+}): boolean {
+  return keyboardDisabled || (submitDisabled && !pickerVisible);
+}
 
 function resolvePromptPlaceholder(snapshot: ControlPlaneSessionStoreSnapshot): string {
   if (snapshot.loading) {

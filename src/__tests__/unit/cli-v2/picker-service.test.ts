@@ -70,6 +70,62 @@ describe('CliV2PickerService', () => {
     ]);
   });
 
+  it('filters runtime permission mode options for the /permissions set picker', () => {
+    const runtimeContext = {
+      permissionMode: 'auto',
+      permissionModeOptions: [
+        {
+          id: 'default',
+          label: 'Default',
+          description: 'Use default permission behavior',
+        },
+        {
+          id: 'auto',
+          label: 'Auto',
+          description: 'Approve trusted local coding actions',
+        },
+      ],
+    } as const;
+
+    const query = CliV2PickerService.permissionModeQuery('/permissions set auto');
+
+    expect(query).toBe('auto');
+    expect(CliV2PickerService.filterPermissionModes(runtimeContext, query)).toEqual([
+      {
+        id: 'auto',
+        label: 'Auto',
+        description: 'Approve trusted local coding actions',
+      },
+    ]);
+  });
+
+  it('initializes the permission mode picker cursor to the active mode', () => {
+    const runtimeContext = {
+      permissionMode: 'auto',
+      permissionModeOptions: [
+        {
+          id: 'default',
+          label: 'Default',
+          description: 'Use default permission behavior',
+        },
+        {
+          id: 'auto',
+          label: 'Auto',
+          description: 'Approve trusted local coding actions',
+        },
+        {
+          id: 'custom',
+          label: 'Custom',
+          description: 'Use workspace-specific policy',
+          disabled: true,
+          disabledReason: 'Custom profile editing is not available yet.',
+        },
+      ],
+    } as const;
+
+    expect(CliV2PickerService.permissionModeInitialIndex(runtimeContext, '')).toBe(1);
+    expect(CliV2PickerService.permissionModeInitialIndex(runtimeContext, 'custom')).toBe(0);
+  });
 
   it('cycles picker indexes locally', () => {
     expect(CliV2PickerService.nextIndex(1, 2)).toBe(0);

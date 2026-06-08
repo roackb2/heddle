@@ -17,11 +17,12 @@ import { watch } from 'node:fs';
 import { join } from 'node:path';
 import type { Logger } from 'pino';
 import {
+  AutonomyPermissionModeService,
   ToolApprovalPolicies,
   ToolApprovalService,
   type AutopilotProfile,
-  type ToolApprovalPolicy,
   type ToolApprovalRequest,
+  type ToolApprovalPolicy,
   type ToolApprovalUserDecision,
 } from '@/core/approvals/index.js';
 import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
@@ -42,7 +43,7 @@ import { ModelPolicyService } from '@/core/llm/models/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { RuntimeSubscriptionStream } from '@/core/runtime/subscriptions/index.js';
-import type { ToolCall, ToolDefinition } from '@/core/types.js';
+import { ProjectConfigService } from '@/core/project-config/index.js';
 import { ControlPlaneChatSessionEventsController } from './chat-session-events.js';
 import { ControlPlaneChatSessionPresenter } from './chat-session-presenter.js';
 import { ControlPlaneChatTurnReviewPresenter } from './chat-turn-review-presenter.js';
@@ -759,17 +760,22 @@ export class ControlPlaneChatSessionsController {
         onActivity: publisher.publishActivity,
       },
       approvals: {
-        requestToolApproval: async ({ call, tool }: { call: ToolCall; tool: ToolDefinition }) => {
+        requestToolApproval: async ({ call, tool, autonomyEvaluation }) => {
           const decision = await approvalService.requestHumanApproval({
             call,
             tool,
             workspaceRoot: args.workspaceRoot,
+            autonomyEvaluation,
             storePending: ({ request, resolve }) => {
               // Keep the resolver in memory while the browser renders the
               // request. sessionResolveApproval later calls this resolver.
               this.runService.storePendingApproval(args, {
                 approval: request,
-                resolve,
+                resolve: (decision) => resolve(this.applyPendingApprovalProfileDecision({
+                  engineArgs: args,
+                  request,
+                  decision,
+                })),
               });
               publisher.publishApprovalUpdated();
             },
@@ -787,6 +793,49 @@ export class ControlPlaneChatSessionsController {
       workspaceRoot: args.workspaceRoot,
       projectApprovalRulesFile: join(args.stateRoot, 'command-approvals.json'),
     });
+  }
+
+  private applyPendingApprovalProfileDecision(input: {
+    engineArgs: ControlPlaneSessionReadArgs;
+    request: ToolApprovalRequest;
+    decision: ToolApprovalUserDecision;
+  }): ToolApprovalUserDecision {
+    if (input.decision.type !== 'approve_and_trust_autopilot_root') {
+      return input.decision;
+    }
+
+    const rootApproval = input.request.autopilotRootApproval;
+    if (!rootApproval || input.engineArgs.autopilot?.preset !== 'auto') {
+      return {
+        type: 'deny',
+        reason: 'No Auto repo root is available for this approval.',
+      };
+    }
+
+    try {
+      ProjectConfigService.update(input.engineArgs.workspaceRoot, (config) => (
+        AutonomyPermissionModeService.trustAutoRoot({
+          config,
+          workspaceRoot: input.engineArgs.workspaceRoot,
+          root: rootApproval.root,
+        })
+      ));
+      AutonomyPermissionModeService.addTrustedRootToProfile({
+        profile: input.engineArgs.autopilot,
+        workspaceRoot: input.engineArgs.workspaceRoot,
+        root: rootApproval.root,
+      });
+
+      return {
+        type: 'approve_and_trust_autopilot_root',
+        reason: input.decision.reason ?? `Approved and trusted ${rootApproval.relativeRoot} for Auto`,
+      };
+    } catch (error) {
+      return {
+        type: 'deny',
+        reason: `Could not update Auto profile: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
   }
 
   private assertNoActiveRun(sessionAddress: ControlPlaneSessionAddress): void {

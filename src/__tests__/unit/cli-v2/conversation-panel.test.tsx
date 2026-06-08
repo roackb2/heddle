@@ -207,6 +207,14 @@ function createRuntimeContext(
     effectiveReasoningEffort: 'medium',
     reasoningSupported: true,
     reasoningOptions: [],
+    permissionMode: 'default',
+    permissionModeOptions: [
+      {
+        id: 'default',
+        label: 'Default',
+        description: 'Use default permission behavior',
+      },
+    ],
     credentialSource: {
       type: 'oauth',
       provider: 'openai',

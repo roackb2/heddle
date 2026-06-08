@@ -16,6 +16,7 @@ import { previewEditFileInput } from '@/core/tools/toolkits/coding-files/edit-fi
 import { ToolActivitySummarizer } from '@/core/live/index.js';
 import { ToolPolicyEnvelopeInputService } from '@/core/tools/index.js';
 import type { ToolApprovalPolicyContext } from './types.js';
+import { AutonomyRootScopeService } from './autonomy/index.js';
 
 export type ToolApprovalServiceOptions = {
   workspaceRoot?: string;
@@ -80,7 +81,7 @@ export class ToolApprovalService {
       };
     }
 
-    const decision = await args.requestHumanApproval(args.context, requestReason);
+    const decision = await args.requestHumanApproval(args.context, requestReason, autonomyEvaluation);
     return ToolApprovalService.withAutonomyEvaluation(decision, autonomyEvaluation);
   }
 
@@ -98,7 +99,10 @@ export class ToolApprovalService {
     });
   }
 
-  async createRequest(args: ToolApprovalPolicyContext & { reason?: string }): Promise<ToolApprovalRequest> {
+  async createRequest(args: ToolApprovalPolicyContext & {
+    reason?: string;
+    autonomyEvaluation?: ToolApprovalDecision['autonomyEvaluation'];
+  }): Promise<ToolApprovalRequest> {
     const input = ToolPolicyEnvelopeInputService.extract(args.call.input).toolInput;
     const call = {
       ...args.call,
@@ -118,6 +122,10 @@ export class ToolApprovalService {
       summary: ToolActivitySummarizer.summarizeCall(call),
       reason: args.reason,
       editPreview,
+      autopilotRootApproval: AutonomyRootScopeService.resolveAutoRootApproval({
+        evaluation: args.autonomyEvaluation,
+        workspaceRoot: args.workspaceRoot ?? this.options.workspaceRoot ?? process.cwd(),
+      }),
       rememberProjectApproval: rememberedRule
         ? {
             label: ProjectApprovalRules.describe(rememberedRule),
@@ -143,6 +151,13 @@ export class ToolApprovalService {
       return {
         approved: true,
         reason: args.decision.reason ?? 'Approved and remembered for this project',
+      };
+    }
+
+    if (args.decision.type === 'approve_and_trust_autopilot_root') {
+      return {
+        approved: true,
+        reason: args.decision.reason ?? 'Approved and trusted this repo for Auto',
       };
     }
 

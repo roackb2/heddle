@@ -3,7 +3,9 @@ import type { ConversationEngine, ConversationEngineConfig } from '@/core/chat/e
 import { resolveEffectiveReasoningEffort } from '@/core/chat/engine/sessions/preferences/service.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
+import { AutonomyPermissionModeService } from '@/core/approvals/index.js';
 import { ModelCatalogService, ModelPolicyService } from '@/core/llm/models/index.js';
+import { ProjectConfigService } from '@/core/project-config/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import type { ChatSessionView, ControlPlaneSessionRuntimeContext } from '@/server/control-plane-types.js';
 import { ControlPlaneSessionDriftService } from './session-drift-service.js';
@@ -57,6 +59,15 @@ export class ControlPlaneSessionRuntimeContextService {
     const model = session.model ?? args.model ?? DEFAULT_OPENAI_MODEL;
     const estimatedInputTokens = session.context?.request?.usage?.inputTokens ?? session.context?.request?.estimatedTokens;
     const credentialSource = RuntimeCredentialService.resolveCredentialSourceForModel(model, args);
+    const projectConfig = ProjectConfigService.read(args.workspaceRoot);
+    const permissionMode = AutonomyPermissionModeService.resolveMode({
+      config: projectConfig,
+      workspaceRoot: args.workspaceRoot,
+    });
+    const permissionModeOptions = AutonomyPermissionModeService.buildOptions({
+      config: projectConfig,
+      workspaceRoot: args.workspaceRoot,
+    });
 
     return {
       args,
@@ -82,6 +93,8 @@ export class ControlPlaneSessionRuntimeContextService {
         driftLevel: options.driftLevel ?? ControlPlaneSessionDriftService.readLatestDriftLevel(session.turns),
         compactionStatus: session.context?.compaction?.status,
         running: options.running ?? false,
+        permissionMode,
+        permissionModeOptions,
         welcomeGuide: {
           mode: 'conversation',
           hasProviderCredential: credentialSource.type !== 'missing',

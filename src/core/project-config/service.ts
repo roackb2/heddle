@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { AutopilotProfileSchema } from '@/core/approvals/autonomy/index.js';
+import { AUTONOMY_PERMISSION_MODES, AutopilotProfileSchema } from '@/core/approvals/autonomy/index.js';
 import type { ProjectConfig, ProjectConfigInitializeResult } from './types.js';
 
 const LOCAL_CONFIG_DIR_NAME = '.heddle';
@@ -25,6 +25,8 @@ const projectConfigSchema = z.object({
   directShellApproval: z.enum(['always', 'never']).optional().catch(undefined),
   searchIgnoreDirs: z.array(z.string()).optional().catch(undefined),
   agentContextPaths: z.array(z.string()).optional().catch(undefined),
+  permissionMode: z.enum(AUTONOMY_PERMISSION_MODES).optional().catch(undefined),
+  autoTrustedRoots: z.array(z.string().min(1)).optional().catch(undefined),
   autopilot: AutopilotProfileSchema.optional().catch(undefined),
 }).strip();
 
@@ -74,6 +76,17 @@ export class ProjectConfigService {
       configPath,
       config: template,
     };
+  }
+
+  static update(
+    workspaceRoot: string,
+    updater: (config: ProjectConfig) => ProjectConfig,
+  ): ProjectConfig {
+    const config = updater(ProjectConfigService.read(workspaceRoot));
+    const configPath = ProjectConfigService.resolvePath(workspaceRoot);
+    mkdirSync(resolve(workspaceRoot, LOCAL_CONFIG_DIR_NAME), { recursive: true });
+    writeFileSync(configPath, `${JSON.stringify(projectConfigSchema.parse(config), null, 2)}\n`);
+    return ProjectConfigService.read(workspaceRoot);
   }
 
   private static resolveReadablePath(workspaceRoot: string): string {
