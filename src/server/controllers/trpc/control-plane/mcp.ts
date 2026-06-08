@@ -5,6 +5,14 @@ export class ControlPlaneMcpController {
     return ControlPlaneMcpController.service(workspaceRoot, stateRoot).listOverview();
   }
 
+  static config(workspaceRoot: string, stateRoot: string) {
+    return ControlPlaneMcpController.service(workspaceRoot, stateRoot).readConfigDocument();
+  }
+
+  static saveConfig(workspaceRoot: string, stateRoot: string, content: string) {
+    return ControlPlaneMcpController.service(workspaceRoot, stateRoot).saveConfigDocument(content);
+  }
+
   static enable(workspaceRoot: string, stateRoot: string, serverId: string) {
     return ControlPlaneMcpController.service(workspaceRoot, stateRoot).activateServer(serverId);
   }

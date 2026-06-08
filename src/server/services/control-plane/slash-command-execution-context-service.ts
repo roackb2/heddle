@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { ProviderCredentialCommandService } from '@/core/auth/index.js';
 import { AutonomyPermissionModeService } from '@/core/approvals/index.js';
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
@@ -126,6 +127,13 @@ export class ControlPlaneSlashCommandExecutionContextService {
         enable: async (serverId) => mcp.activateServer(serverId),
         disable: async (serverId) => mcp.disableServer(serverId),
         refresh: async (serverId) => await mcp.refreshServer(serverId),
+        openConfig: async () => {
+          const document = mcp.ensureConfigDocument();
+          const opened = openFileInDefaultApplication(document.configPath);
+          return opened.ok
+            ? { ok: true, configPath: document.configPath, command: opened.command }
+            : { ok: false, configPath: document.configPath, error: opened.error };
+        },
       },
       help: {
         message: () => this.formatHelpMessage(hints),
@@ -153,6 +161,40 @@ export class ControlPlaneSlashCommandExecutionContextService {
 }
 
 export const controlPlaneSlashCommandExecutionContextService = new ControlPlaneSlashCommandExecutionContextService();
+
+function openFileInDefaultApplication(filePath: string): { ok: true; command: string } | { ok: false; error: string } {
+  try {
+    const { command, args } = buildOpenFileCommand(filePath, process.platform);
+    const child = spawn(command, args, {
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.unref();
+    return { ok: true, command: [command, ...args].join(' ') };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function buildOpenFileCommand(filePath: string, platform: NodeJS.Platform): { command: string; args: string[] } {
+  if (platform === 'darwin') {
+    return { command: 'open', args: [filePath] };
+  }
+
+  if (platform === 'win32') {
+    const script = `Start-Process -FilePath '${escapePowerShellSingleQuotedString(filePath)}'`;
+    return {
+      command: 'powershell.exe',
+      args: ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')],
+    };
+  }
+
+  return { command: 'xdg-open', args: [filePath] };
+}
+
+function escapePowerShellSingleQuotedString(value: string): string {
+  return value.replaceAll("'", "''");
+}
 
 function capitalizeFirst(value: string): string {
   return value.length > 0 ? `${value[0]?.toUpperCase()}${value.slice(1)}.` : value;

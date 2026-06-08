@@ -1,18 +1,22 @@
 import { useMemo, useState } from 'react';
-import type { ControlPlaneMcpServerView, ControlPlaneMcpServers } from '@web/api/client';
+import type { ControlPlaneMcpConfig, ControlPlaneMcpServerView, ControlPlaneMcpServers } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
 import { Input } from '@web/components/ui/input';
 import { Switch } from '@web/components/ui/switch';
+import { Textarea } from '@web/components/ui/textarea';
 import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
 import { cn } from '@web/lib/utils';
 
 export interface McpSettingsViewProps {
   mcp?: ControlPlaneMcpServers;
+  config?: ControlPlaneMcpConfig;
   loading: boolean;
   error?: string;
   updating: boolean;
   refreshing: boolean;
+  savingConfig: boolean;
+  onSaveConfig: (content: string) => Promise<void>;
   onSetServerEnabled: (serverId: string, enabled: boolean) => Promise<void>;
   onRefreshServer: (serverId: string) => Promise<void>;
 }
@@ -44,10 +48,13 @@ const statusToneClasses = {
 
 export function McpSettingsView({
   mcp,
+  config,
   loading,
   error,
   updating,
   refreshing,
+  savingConfig,
+  onSaveConfig,
   onSetServerEnabled,
   onRefreshServer,
 }: McpSettingsViewProps) {
@@ -138,6 +145,14 @@ export function McpSettingsView({
 
         {actionError ? <McpSettingsAlert message={actionError} /> : null}
 
+        <McpConfigEditor
+          key={`${config?.configPath ?? 'mcp-config'}:${config?.content ?? ''}`}
+          config={config}
+          fallbackConfigPath={mcp?.configPath}
+          saving={savingConfig}
+          onSave={onSaveConfig}
+        />
+
         <section className="min-w-0">
           <h2 className="v2-type-section-label mb-3 text-muted-foreground">{t('mcpSettings.catalogTitle')}</h2>
           <div className="flex flex-col gap-4">
@@ -178,6 +193,73 @@ export function McpSettingsView({
         ) : null}
       </div>
     </div>
+  );
+}
+
+function McpConfigEditor({
+  config,
+  fallbackConfigPath,
+  saving,
+  onSave,
+}: {
+  config?: ControlPlaneMcpConfig;
+  fallbackConfigPath?: string;
+  saving: boolean;
+  onSave: (content: string) => Promise<void>;
+}) {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState(config?.content ?? '{\n  "mcpServers": {}\n}\n');
+  const [saveError, setSaveError] = useState<string | undefined>();
+  const [saved, setSaved] = useState(false);
+  const changed = draft !== (config?.content ?? '{\n  "mcpServers": {}\n}\n');
+
+  async function save() {
+    try {
+      setSaveError(undefined);
+      setSaved(false);
+      await onSave(draft);
+      setSaved(true);
+    } catch (nextError) {
+      setSaveError(nextError instanceof Error ? nextError.message : String(nextError));
+    }
+  }
+
+  return (
+    <section className="min-w-0">
+      <div className="mb-3 flex min-w-0 flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="v2-type-section-label text-muted-foreground">{t('mcpSettings.configTitle')}</h2>
+          <p className="v2-type-panel-subtitle mt-1 truncate text-muted-foreground">
+            {config?.configPath ?? fallbackConfigPath ?? t('mcpSettings.noConfig')}
+          </p>
+        </div>
+        <div className="flex min-w-0 items-center gap-2">
+          {saved && !changed ? <span className="v2-type-caption text-muted-foreground">{t('mcpSettings.configSaved')}</span> : null}
+          <Button
+            disabled={!changed || saving}
+            size="sm"
+            type="button"
+            variant="outline"
+            onClick={() => void save()}
+          >
+            {saving ? t('mcpSettings.configSaving') : t('mcpSettings.configSaveAction')}
+          </Button>
+        </div>
+      </div>
+      <div className="rounded-md border border-border bg-muted/10">
+        <Textarea
+          aria-label={t('mcpSettings.configEditorLabel')}
+          className="min-h-52 resize-y p-3 font-mono text-xs leading-5"
+          spellCheck={false}
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setSaved(false);
+          }}
+        />
+      </div>
+      {saveError ? <McpSettingsAlert message={saveError} /> : null}
+    </section>
   );
 }
 

@@ -1,7 +1,8 @@
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { SlashCommandAutocomplete } from '../../../core/commands/slash/autocomplete.js';
-import { listMcpMessage } from '../../../core/commands/slash/modules/mcp/mcp-commands.js';
+import { createMcpSlashCommandModule, listMcpMessage } from '../../../core/commands/slash/modules/mcp/mcp-commands.js';
+import type { SlashCommandExecutionContext } from '../../../core/commands/slash/modules/context.js';
 import { listSkillsMessage } from '../../../core/commands/slash/modules/skills/skills-commands.js';
 import { SlashCommandParser } from '../../../core/commands/slash/parser.js';
 import { SlashCommandRegistry } from '../../../core/commands/slash/registry.js';
@@ -122,6 +123,7 @@ describe('MCP slash command output', () => {
         enable: vi.fn(),
         disable: vi.fn(),
         refresh: vi.fn(),
+        openConfig: vi.fn(),
       },
     })).resolves.toEqual({
       handled: true,
@@ -149,10 +151,35 @@ describe('MCP slash command output', () => {
         '  none',
         '',
         'Commands',
+        '  /mcp config',
         '  /mcp enable <server>',
         '  /mcp disable <server>',
         '  /mcp refresh <server>',
       ].join('\n'),
+    });
+  });
+
+  it('opens the MCP config file through the slash context', async () => {
+    const openConfig = vi.fn(async () => ({
+      ok: true as const,
+      configPath: '/workspace/.heddle/mcp.json',
+      command: 'open /workspace/.heddle/mcp.json',
+    }));
+    const registry = new SlashCommandRegistry([createMcpSlashCommandModule()]);
+    const context = {
+      mcp: {
+        list: vi.fn(),
+        enable: vi.fn(),
+        disable: vi.fn(),
+        refresh: vi.fn(),
+        openConfig,
+      },
+    } as Pick<SlashCommandExecutionContext, 'mcp'> as SlashCommandExecutionContext;
+
+    await expect(registry.run(context, '/mcp config')).resolves.toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'Opened MCP config: /workspace/.heddle/mcp.json',
     });
   });
 });

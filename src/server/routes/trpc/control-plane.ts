@@ -40,6 +40,7 @@ import {
   memoryListInputSchema,
   memoryReadInputSchema,
   memorySearchInputSchema,
+  mcpConfigInputSchema,
   sessionApprovalDecisionSchema,
   sessionCompactInputSchema,
   sessionDirectShellInputSchema,
@@ -440,6 +441,14 @@ export const controlPlaneRouter = router({
   mcpServers: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
     const { workspace } = ctx.requestWorkspace;
     return ControlPlaneMcpController.list(workspace.workspaceRoot, workspace.stateRoot);
+  }),
+  mcpConfig: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return ControlPlaneMcpController.config(workspace.workspaceRoot, workspace.stateRoot);
+  }),
+  mcpConfigSave: controlPlaneWorkspaceProcedure.input(mcpConfigInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return ControlPlaneMcpController.saveConfig(workspace.workspaceRoot, workspace.stateRoot, input.content);
   }),
   mcpServerEnable: controlPlaneWorkspaceProcedure.input(mcpServerInputSchema).mutation(async ({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;

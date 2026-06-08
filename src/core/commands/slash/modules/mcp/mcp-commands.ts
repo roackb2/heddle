@@ -21,6 +21,7 @@ export function createMcpSlashCommandModule(): SlashCommandModule<SlashCommandRe
     id: 'mcp',
     hints: [
       { command: '/mcp', description: 'list MCP servers and cached tool status' },
+      { command: '/mcp config', description: 'open the workspace MCP config file' },
       { command: '/mcp enable <server>', description: 'enable one configured MCP server for this workspace' },
       { command: '/mcp disable <server>', description: 'disable one MCP server for this workspace' },
       { command: '/mcp refresh <server>', description: 'connect to one enabled MCP server and refresh its cached tools' },
@@ -32,6 +33,13 @@ export function createMcpSlashCommandModule(): SlashCommandModule<SlashCommandRe
         description: 'list MCP servers and cached tool status',
         match: SlashCommandParser.matchesExact('/mcp'),
         run: (context) => listMcpMessage(context),
+      },
+      {
+        id: 'mcp.config',
+        syntax: '/mcp config',
+        description: 'open the workspace MCP config file',
+        match: SlashCommandParser.matchesExact('/mcp config'),
+        run: (context) => openMcpConfigMessage(context),
       },
       {
         id: 'mcp.enable',
@@ -73,10 +81,20 @@ export async function listMcpMessage(
     ...MCP_LIST_SECTIONS.map((section) => formatMcpSection(section, overview.servers)),
     '',
     'Commands',
+    '  /mcp config',
     '  /mcp enable <server>',
     '  /mcp disable <server>',
     '  /mcp refresh <server>',
   ].join('\n'));
+}
+
+async function openMcpConfigMessage(
+  context: Pick<SlashCommandExecutionContext, 'mcp'>,
+): Promise<SlashCommandResult> {
+  const result = await context.mcp.openConfig();
+  return result.ok
+    ? slashMessageResult(`Opened MCP config: ${result.configPath}`)
+    : slashMessageResult(`Failed to open MCP config ${result.configPath}: ${result.error}`);
 }
 
 async function enableMcpMessage(

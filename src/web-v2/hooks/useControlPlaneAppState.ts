@@ -33,6 +33,7 @@ export function useControlPlaneAppState() {
   const mcpServerEnableMutation = trpcReact.controlPlane.mcpServerEnable.useMutation();
   const mcpServerDisableMutation = trpcReact.controlPlane.mcpServerDisable.useMutation();
   const mcpServerRefreshMutation = trpcReact.controlPlane.mcpServerRefresh.useMutation();
+  const mcpConfigSaveMutation = trpcReact.controlPlane.mcpConfigSave.useMutation();
   const taskEvents = useControlPlaneHeartbeatEvents({
     enabled: navigation.activeSurfaceId === 'tasks',
     workspaceId: navigation.selectedWorkspaceId,
@@ -45,6 +46,9 @@ export function useControlPlaneAppState() {
     enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'skills',
   });
   const mcpQuery = trpcReact.controlPlane.mcpServers.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
+    enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'mcp',
+  });
+  const mcpConfigQuery = trpcReact.controlPlane.mcpConfig.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
     enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'mcp',
   });
   const selectedSession = useControlPlaneSessionDetail({
@@ -135,6 +139,18 @@ export function useControlPlaneAppState() {
     await utils.controlPlane.mcpServers.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined);
   }
 
+  async function saveMcpConfig(content: string) {
+    const input = sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, content } : { content };
+    const result = await mcpConfigSaveMutation.mutateAsync(input);
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+    await Promise.all([
+      utils.controlPlane.mcpConfig.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined),
+      utils.controlPlane.mcpServers.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined),
+    ]);
+  }
+
   return {
     frameProps: {
       activeSurfaceId: navigation.activeSurfaceId,
@@ -172,10 +188,13 @@ export function useControlPlaneAppState() {
       },
       mcpSettingsView: {
         mcp: mcpQuery.data,
-        loading: mcpQuery.isLoading || sidebar.stateQuery.isLoading,
-        error: mcpQuery.error instanceof Error ? mcpQuery.error.message : undefined,
+        config: mcpConfigQuery.data,
+        loading: mcpQuery.isLoading || mcpConfigQuery.isLoading || sidebar.stateQuery.isLoading,
+        error: mcpQuery.error instanceof Error ? mcpQuery.error.message : mcpConfigQuery.error instanceof Error ? mcpConfigQuery.error.message : undefined,
         updating: mcpServerEnableMutation.isPending || mcpServerDisableMutation.isPending,
         refreshing: mcpServerRefreshMutation.isPending,
+        savingConfig: mcpConfigSaveMutation.isPending,
+        onSaveConfig: saveMcpConfig,
         onSetServerEnabled: setMcpServerEnabled,
         onRefreshServer: refreshMcpServer,
       },

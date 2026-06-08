@@ -197,6 +197,11 @@
   },
   "mcpSettings": {
     "catalogTitle": "MCP servers",
+    "configEditorLabel": "MCP config JSON",
+    "configSaveAction": "保存 config",
+    "configSaved": "已保存",
+    "configSaving": "保存中",
+    "configTitle": "Configuration",
     "disableAction": "停用",
     "emptySection": "此区段没有 servers",
     "enableAction": "启用",

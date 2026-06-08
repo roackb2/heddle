@@ -55,7 +55,7 @@ Current runtime features include:
 - Agent Skills discovery from `.agents/skills/<name>/SKILL.md` and `~/.agents/skills/<name>/SKILL.md`
 - workspace-level skill activation through `/skills`, `/skills enable <name>`, and `/skills disable <name>`
 - progressive skill disclosure through the `read_agent_skill` tool for active skills only
-- MCP server management through `/mcp`, `/mcp enable <server>`, `/mcp disable <server>`, and `/mcp refresh <server>`
+- MCP server config and management through `/mcp`, `/mcp config`, `/mcp enable <server>`, `/mcp disable <server>`, and `/mcp refresh <server>`
 - cached MCP tool access through `mcp_list_tools`, `mcp_call_tool`, and namespaced tools such as `mcp__server__tool`
 - remembered per-project approvals for repeated commands and edits, with clearer previews before approval
 - interrupt and resume support for longer-running workflows

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -49,6 +49,59 @@ describe('MCP service', () => {
       { id: 'notion', status: 'available', transport: 'stdio' },
     ]);
     expect(overview.issues).toEqual([]);
+  });
+
+  it('creates and saves the raw MCP config document without enabling servers', () => {
+    const { workspaceRoot, stateRoot } = workspaceFixture();
+    const service = new McpService({ workspaceRoot, stateRoot });
+    const configPath = FileMcpConfigRepository.resolvePath(stateRoot);
+
+    expect(service.readConfigDocument()).toEqual({
+      configPath,
+      content: '{\n  "mcpServers": {}\n}\n',
+      exists: false,
+      issues: [],
+    });
+
+    const result = service.saveConfigDocument(JSON.stringify({
+      mcpServers: {
+        notion: {
+          command: 'npx',
+          args: ['-y', 'notion-mcp'],
+        },
+      },
+    }));
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      overview: expect.objectContaining({
+        servers: [expect.objectContaining({
+          id: 'notion',
+          status: 'available',
+        })],
+      }),
+    }));
+    expect(existsSync(configPath)).toBe(true);
+    expect(JSON.parse(readFileSync(configPath, 'utf8'))).toEqual({
+      mcpServers: {
+        notion: {
+          command: 'npx',
+          args: ['-y', 'notion-mcp'],
+        },
+      },
+    });
+  });
+
+  it('rejects invalid MCP config document saves', () => {
+    const { workspaceRoot, stateRoot } = workspaceFixture();
+    const service = new McpService({ workspaceRoot, stateRoot });
+
+    expect(service.saveConfigDocument('{')).toEqual({
+      ok: false,
+      configPath: FileMcpConfigRepository.resolvePath(stateRoot),
+      error: expect.any(String),
+    });
+    expect(existsSync(FileMcpConfigRepository.resolvePath(stateRoot))).toBe(false);
   });
 
   it('stores workspace enablement separately from server config', () => {

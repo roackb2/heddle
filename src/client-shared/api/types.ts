@@ -48,6 +48,7 @@ export type ControlPlaneSkills = RouterOutputs['controlPlane']['skills'];
 export type ControlPlaneSkillActivationView = ControlPlaneSkills['skills'][number];
 export type ControlPlaneMcpServers = RouterOutputs['controlPlane']['mcpServers'];
 export type ControlPlaneMcpServerView = ControlPlaneMcpServers['servers'][number];
+export type ControlPlaneMcpConfig = RouterOutputs['controlPlane']['mcpConfig'];
 export type ControlPlaneWorkspaceChanges = RouterOutputs['controlPlane']['workspaceChanges'];
 export type ControlPlaneWorkspaceChangedFile = ControlPlaneWorkspaceChanges['files'][number];
 export type ControlPlaneWorkspaceFileDiff = RouterOutputs['controlPlane']['workspaceFileDiff'];

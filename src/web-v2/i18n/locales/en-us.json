@@ -197,6 +197,11 @@
   },
   "mcpSettings": {
     "catalogTitle": "MCP servers",
+    "configEditorLabel": "MCP config JSON",
+    "configSaveAction": "Save config",
+    "configSaved": "Saved",
+    "configSaving": "Saving",
+    "configTitle": "Configuration",
     "disableAction": "Disable",
     "emptySection": "No servers in this section",
     "enableAction": "Enable",

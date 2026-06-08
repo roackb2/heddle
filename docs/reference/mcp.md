@@ -7,7 +7,7 @@ service.
 
 MCP support is workspace-scoped and operator-controlled:
 
-1. configure servers in `.heddle/mcp.json`;
+1. configure servers in `.heddle/mcp.json` or Settings -> MCP;
 2. enable the server for the workspace;
 3. refresh its cached tool catalog;
 4. let the agent call cached MCP tools through Heddle's normal tool, approval,
@@ -16,6 +16,9 @@ MCP support is workspace-scoped and operator-controlled:
 ## Config
 
 Heddle reads MCP server declarations from `.heddle/mcp.json`.
+The web control plane can edit the same file from Settings -> MCP. Paste a full
+MCP JSON document into the Configuration editor and save it. Saving config does
+not enable servers, refresh tools, or grant tool-call permission.
 
 The primary shape is the common `mcpServers` JSON format:
 
@@ -57,10 +60,15 @@ Use slash commands from chat:
 
 ```text
 /mcp
+/mcp config
 /mcp enable <server>
 /mcp disable <server>
 /mcp refresh <server>
 ```
+
+`/mcp config` creates `.heddle/mcp.json` if needed and opens it with the system
+file opener. This is intended for TUI users who want to edit the same config
+file in their normal editor.
 
 `/mcp refresh <server>` connects to an enabled server and writes the discovered
 tool list to `.heddle/mcp/catalog.json`. Runtime tool assembly reads this cache
@@ -68,9 +76,9 @@ so normal agent turns do not need to block on MCP discovery.
 
 ## Web Settings
 
-The browser control plane includes Settings -> MCP. It shows configured,
-enabled, disabled, and missing servers, plus cached tool counts and refresh
-actions.
+The browser control plane includes Settings -> MCP. It shows a JSON config
+editor, configured/enabled/disabled/missing servers, cached tool counts, and
+refresh actions.
 
 ## Agent Tools
 
@@ -94,4 +102,3 @@ server.
 
 MCP tool descriptions, resources, prompts, and outputs are external content.
 Treat them as untrusted input, especially when connecting to community servers.
-

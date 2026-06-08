@@ -6,6 +6,7 @@ import type {
   McpActivationStorePort,
   McpCatalogStore,
   McpCatalogStorePort,
+  McpConfigDocument,
   McpConfigIssue,
   McpConfigLoadResult,
   McpConfigStorePort,
@@ -16,6 +17,7 @@ import type {
 } from './types.js';
 
 const CONFIG_FILE_NAME = 'mcp.json';
+const DEFAULT_CONFIG_CONTENT = JSON.stringify({ mcpServers: {} }, null, 2);
 
 export class FileMcpConfigRepository implements McpConfigStorePort {
   private readonly workspaceRoot: string;
@@ -60,6 +62,44 @@ export class FileMcpConfigRepository implements McpConfigStorePort {
         }],
       };
     }
+  }
+
+  ensureDocument(): McpConfigDocument {
+    const configPath = FileMcpConfigRepository.resolvePath(this.stateRoot);
+    if (!existsSync(configPath)) {
+      mkdirSync(dirname(configPath), { recursive: true });
+      writeFileSync(configPath, `${DEFAULT_CONFIG_CONTENT}\n`, 'utf8');
+    }
+
+    return this.readDocument();
+  }
+
+  readDocument(): McpConfigDocument {
+    const configPath = FileMcpConfigRepository.resolvePath(this.stateRoot);
+    if (!existsSync(configPath)) {
+      return {
+        configPath,
+        content: `${DEFAULT_CONFIG_CONTENT}\n`,
+        exists: false,
+        issues: [],
+      };
+    }
+
+    const content = readFileSync(configPath, 'utf8');
+    return {
+      configPath,
+      content,
+      exists: true,
+      issues: this.read().issues,
+    };
+  }
+
+  writeDocument(content: string): McpConfigDocument {
+    const configPath = FileMcpConfigRepository.resolvePath(this.stateRoot);
+    const formatted = formatConfigContent(content);
+    mkdirSync(dirname(configPath), { recursive: true });
+    writeFileSync(configPath, formatted, 'utf8');
+    return this.readDocument();
   }
 }
 
@@ -146,6 +186,11 @@ function normalizeRawConfig(
     servers: normalized.flatMap((result) => result.server ? [result.server] : []),
     issues: normalized.flatMap((result) => result.issues),
   };
+}
+
+function formatConfigContent(content: string): string {
+  const raw = content.trim().length > 0 ? JSON.parse(content) as unknown : { mcpServers: {} };
+  return `${JSON.stringify(McpSchemas.parseRawConfig(raw), null, 2)}\n`;
 }
 
 function normalizeServer(

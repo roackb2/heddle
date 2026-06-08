@@ -13,6 +13,7 @@ import type {
 import type {
   McpActivationResult,
   McpOverview,
+  McpOpenConfigResult,
   McpRefreshResult,
 } from '@/core/mcp/index.js';
 import type { SlashCommandResult } from '../result-types.js';
@@ -67,6 +68,7 @@ export type SlashCommandExecutionContext = {
     enable: (serverId: string) => Promise<McpActivationResult>;
     disable: (serverId: string) => Promise<McpActivationResult>;
     refresh: (serverId: string) => Promise<McpRefreshResult>;
+    openConfig: () => Promise<McpOpenConfigResult>;
   };
   help: {
     message: () => string;

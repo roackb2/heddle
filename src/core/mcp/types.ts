@@ -52,6 +52,37 @@ export type McpConfigLoadResult = {
   issues: McpConfigIssue[];
 };
 
+export type McpConfigDocument = {
+  configPath: string;
+  content: string;
+  exists: boolean;
+  issues: McpConfigIssue[];
+};
+
+export type McpConfigSaveResult =
+  | {
+      ok: true;
+      document: McpConfigDocument;
+      overview: McpOverview;
+    }
+  | {
+      ok: false;
+      configPath: string;
+      error: string;
+    };
+
+export type McpOpenConfigResult =
+  | {
+      ok: true;
+      configPath: string;
+      command: string;
+    }
+  | {
+      ok: false;
+      configPath: string;
+      error: string;
+    };
+
 export type McpServerActivationStatus = 'enabled' | 'disabled';
 
 export type McpServerActivationRecord = {
@@ -150,6 +181,9 @@ export type McpCallToolResult =
 
 export type McpConfigStorePort = {
   read(): McpConfigLoadResult;
+  ensureDocument(): McpConfigDocument;
+  readDocument(): McpConfigDocument;
+  writeDocument(content: string): McpConfigDocument;
 };
 
 export type McpActivationStorePort = {

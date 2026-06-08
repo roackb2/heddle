@@ -9,6 +9,8 @@ import type {
   McpActivationResult,
   McpActivationStorePort,
   McpCallToolResult,
+  McpConfigDocument,
+  McpConfigSaveResult,
   McpCatalogStorePort,
   McpConfigStorePort,
   McpOverview,
@@ -46,6 +48,31 @@ export class McpService {
       servers: this.buildServerViews(config.servers),
       issues: config.issues,
     };
+  }
+
+  readConfigDocument(): McpConfigDocument {
+    return this.configStore.readDocument();
+  }
+
+  ensureConfigDocument(): McpConfigDocument {
+    return this.configStore.ensureDocument();
+  }
+
+  saveConfigDocument(content: string): McpConfigSaveResult {
+    try {
+      const document = this.configStore.writeDocument(content);
+      return {
+        ok: true,
+        document,
+        overview: this.listOverview(),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        configPath: this.configStore.read().configPath,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 
   activateServer(serverId: string, now = new Date()): McpActivationResult {

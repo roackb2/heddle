@@ -22,6 +22,10 @@ they trust. Heddle then acts as the MCP host:
 Server config is not permission by itself. Enabling a server allows Heddle to
 connect to it, but individual tool calls remain normal Heddle tool calls.
 
+Users can configure servers by editing `.heddle/mcp.json` directly, running
+`/mcp config` from a host that supports file opening, or pasting a full MCP JSON
+document into Settings -> MCP. All of those paths target the same config file.
+
 ## State Files
 
 `src/core/mcp` owns three workspace-local files:
@@ -70,6 +74,9 @@ work inside a synchronous toolkit.
 
 - `FileMcpConfigRepository`
   - resolves `.heddle/mcp.json`;
+  - creates the default `{ "mcpServers": {} }` document when an edit/open flow
+    needs a concrete file;
+  - reads/writes the raw JSON document for user-facing config editors;
   - parses standard `mcpServers` and VS Code `servers`;
   - normalizes transport names and validates server ids;
   - returns issues instead of throwing for user-facing config errors.
@@ -86,6 +93,7 @@ work inside a synchronous toolkit.
   - closes client and transport resources after each operation.
 - `McpService`
   - owns Heddle-level semantics on top of repositories and SDK calls;
+  - exposes config document read/create/save methods for control-plane hosts;
   - builds UI/API server views;
   - enables/disables servers;
   - refreshes catalogs for enabled servers;
@@ -133,14 +141,22 @@ Control-plane routes live in `src/server/controllers/trpc/control-plane/mcp.ts`
 and `src/server/routes/trpc/control-plane.ts`.
 
 The web settings page lives in `src/web-v2/components/settings/McpSettingsView.tsx`.
-It renders state and calls control-plane mutations. It must not read
+It renders state and calls control-plane mutations. Its JSON editor reads and
+saves the config document through control-plane routes; it must not read
 `.heddle/mcp.json` directly or duplicate MCP state logic.
+
+`/mcp config` is a shared slash command, but opening a file is host/OS behavior.
+The slash command asks the typed `mcp` port to open the config file. The
+control-plane execution context ensures the config document exists and then
+spawns the platform file opener. Keep that OS-specific opener outside
+`src/core/mcp`; the MCP domain owns the document, not desktop lifecycle.
 
 ## Policy Rules
 
 Keep these invariants:
 
 - Configured does not mean enabled.
+- Saving config does not enable servers or refresh cached tools.
 - Enabled does not mean trusted for unattended execution.
 - Tool calls still go through Heddle approval and tracing.
 - MCP server/tool descriptions and outputs are untrusted external content.
@@ -163,6 +179,8 @@ Heddle permissions until an approval-domain design explicitly supports that.
 - Add transport/auth behavior inside `McpClientService`.
 - Add persisted MCP state only through repository schemas in this folder.
 - Add user-visible state by extending `McpService.listOverview()`.
+- Add config document behavior through `FileMcpConfigRepository` and
+  `McpService`, then expose it through control-plane APIs.
 - Add runtime tool exposure through `src/core/tools/toolkits/mcp`.
 - Add terminal/web controls through control-plane APIs, not by importing this
   service directly into host components.
@@ -181,6 +199,5 @@ Deferred work should be implemented as separate slices:
 - remote OAuth and secure token storage;
 - MCP registry import;
 - resources and prompts;
-- web config editing;
 - large-catalog search/progressive discovery;
 - async live discovery during runtime tool assembly.
