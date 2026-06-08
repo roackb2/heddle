@@ -24,3 +24,139 @@ low-friction intent contract without duplicating schema fragments.
 
 Agents report intent through this envelope. The runtime may use it as a policy
 claim, but it must not treat it as verified fact.
+
+The envelope is deliberately shared across tools. It gives the agent one stable
+vocabulary for "what I am trying to do" while each tool keeps its own business
+arguments. The tools domain exposes and removes the envelope; approvals decide
+whether the claim is allowed.
+
+## Envelope Shape
+
+```ts
+type ToolPolicyEnvelope = {
+  operations: Array<'read' | 'write' | 'delete' | 'move' | 'execute' | 'git' | 'network' | 'unknown'>;
+  intent: string;
+  targetRoots: string[];
+  readRoots?: string[];
+  writeRoots?: string[];
+  expectedEffects: string[];
+  maxDestructiveScope?: 'none' | 'single-file' | 'generated-files' | 'many-files';
+  environment: 'local' | 'dev' | 'staging' | 'production' | 'unknown';
+  confidence: 'high' | 'medium' | 'low';
+};
+```
+
+Field meanings:
+
+- `operations`: all operation classes the agent expects the call to perform.
+  This is an array because real work often combines actions, such as
+  `execute + write` for a migration script.
+- `intent`: short natural-language explanation of why the tool call exists.
+- `targetRoots`: broad roots involved in the work.
+- `readRoots`: optional narrower read roots when read and write scopes differ.
+- `writeRoots`: optional narrower write roots when the call mutates files.
+- `expectedEffects`: concise effect claims useful for approval UI and trace.
+- `maxDestructiveScope`: expected upper bound of destructive change.
+- `environment`: where the operation is expected to act.
+- `confidence`: how certain the agent is that the declaration is complete.
+
+## Example Tool Inputs
+
+Read-only inspection can declare only read intent:
+
+```json
+{
+  "path": "src/core/tools/registry.ts",
+  "policy": {
+    "operations": ["read"],
+    "intent": "Inspect the tool registry before wiring policy envelope support.",
+    "targetRoots": ["."],
+    "readRoots": ["."],
+    "expectedEffects": ["no files changed"],
+    "maxDestructiveScope": "none",
+    "environment": "local",
+    "confidence": "high"
+  }
+}
+```
+
+A free-form shell mutation can declare multiple operations and a sibling repo
+scope without forcing the tool schema to understand the shell command:
+
+```json
+{
+  "command": "node scripts/rewrite-imports.js ../heddle-workspace-notes",
+  "policy": {
+    "operations": ["execute", "write"],
+    "intent": "Run a local migration script that updates markdown import paths in the sibling notes repo.",
+    "targetRoots": ["../heddle-workspace-notes"],
+    "readRoots": ["../heddle-workspace-notes"],
+    "writeRoots": ["../heddle-workspace-notes"],
+    "expectedEffects": ["many markdown files may be edited"],
+    "maxDestructiveScope": "many-files",
+    "environment": "local",
+    "confidence": "medium"
+  }
+}
+```
+
+A cleanup can describe delete plus git effects together:
+
+```json
+{
+  "command": "rm generated/*.tmp && git add generated",
+  "policy": {
+    "operations": ["delete", "git"],
+    "intent": "Remove generated temporary files and stage the generated folder.",
+    "targetRoots": ["generated"],
+    "writeRoots": ["generated"],
+    "expectedEffects": ["generated temporary files deleted", "generated folder staged"],
+    "maxDestructiveScope": "generated-files",
+    "environment": "local",
+    "confidence": "medium"
+  }
+}
+```
+
+## Runtime Flow
+
+The model sees augmented schemas from `ToolRegistry.list()`. The executable
+tool definitions returned by `ToolRegistry.get(...)` stay unchanged.
+
+```text
+ToolRegistry.list()
+  -> ToolPolicyEnvelopeSchemaService.addToTool(...)
+  -> model sees optional policy field
+
+ToolExecutionService.execute(...)
+  -> ToolPolicyEnvelopeInputService.extract(...)
+  -> validate and remove policy
+  -> execute raw tool with stripped business input
+```
+
+Approval code also extracts the envelope before building previews and approval
+requests. Tool implementations should not receive or inspect `policy`; it is
+intent metadata for approval, trace, and future postflight auditing.
+
+## Relationship To Autonomy
+
+`src/core/approvals/autonomy/` consumes this shape directly. It compares the
+agent's declared intent with configured roots, known tool targets, command
+hard-deny patterns, and environment policy. Trace records the same domain
+objects that include this envelope.
+
+Do not create a second "trace envelope" or "approval envelope" with the same
+fields. If a consumer needs less data, project from this type at that consumer's
+presentation boundary.
+
+## Maintenance Rules
+
+- Keep the envelope optional so ordinary tools remain lightweight.
+- Add fields only when they are useful across tool families, not for one tool's
+  private needs.
+- Keep tool-specific validation in the toolkit that owns the tool.
+- Keep approval decisions in `src/core/approvals`, not here.
+- Keep extraction centralized in `ToolPolicyEnvelopeInputService` so tools,
+  approvals, and tests agree on the stripped input shape.
+- Update `src/__tests__/unit/tools/tool-policy-envelope.test.ts` when changing
+  schema injection, validation, or stripping behavior.
