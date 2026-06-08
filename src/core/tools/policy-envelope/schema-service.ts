@@ -1,4 +1,10 @@
 import type { ToolDefinition } from '@/core/types.js';
+import {
+  TOOL_POLICY_CONFIDENCE_LEVELS,
+  TOOL_POLICY_DESTRUCTIVE_SCOPES,
+  TOOL_POLICY_ENVIRONMENTS,
+  TOOL_POLICY_OPERATIONS,
+} from './types.js';
 
 const POLICY_ENVELOPE_SCHEMA = {
   type: 'object',
@@ -11,7 +17,7 @@ const POLICY_ENVELOPE_SCHEMA = {
       minItems: 1,
       items: {
         type: 'string',
-        enum: ['read', 'write', 'delete', 'move', 'execute', 'git', 'network', 'unknown'],
+        enum: [...TOOL_POLICY_OPERATIONS],
       },
       description: 'Operation categories the agent expects this tool call to perform. Use multiple values when appropriate.',
     },
@@ -41,17 +47,17 @@ const POLICY_ENVELOPE_SCHEMA = {
     },
     maxDestructiveScope: {
       type: 'string',
-      enum: ['none', 'single-file', 'generated-files', 'many-files'],
+      enum: [...TOOL_POLICY_DESTRUCTIVE_SCOPES],
       description: 'Largest destructive effect the agent expects.',
     },
     environment: {
       type: 'string',
-      enum: ['local', 'dev', 'staging', 'production', 'unknown'],
+      enum: [...TOOL_POLICY_ENVIRONMENTS],
       description: 'Environment the agent believes this call targets.',
     },
     confidence: {
       type: 'string',
-      enum: ['high', 'medium', 'low'],
+      enum: [...TOOL_POLICY_CONFIDENCE_LEVELS],
       description: 'Confidence in the declared envelope.',
     },
   },

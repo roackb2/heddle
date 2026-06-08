@@ -1,16 +1,22 @@
 import { z } from 'zod';
-import type { ToolPolicyEnvelopeExtraction } from './types.js';
+import {
+  TOOL_POLICY_CONFIDENCE_LEVELS,
+  TOOL_POLICY_DESTRUCTIVE_SCOPES,
+  TOOL_POLICY_ENVIRONMENTS,
+  TOOL_POLICY_OPERATIONS,
+  type ToolPolicyEnvelopeExtraction,
+} from './types.js';
 
 const ToolPolicyEnvelopeSchema = z.object({
-  operations: z.array(z.enum(['read', 'write', 'delete', 'move', 'execute', 'git', 'network', 'unknown'])).min(1),
+  operations: z.array(z.enum(TOOL_POLICY_OPERATIONS)).min(1),
   intent: z.string().min(1),
   targetRoots: z.array(z.string()).min(1),
   readRoots: z.array(z.string()).optional(),
   writeRoots: z.array(z.string()).optional(),
   expectedEffects: z.array(z.string()),
-  maxDestructiveScope: z.enum(['none', 'single-file', 'generated-files', 'many-files']).optional(),
-  environment: z.enum(['local', 'dev', 'staging', 'production', 'unknown']),
-  confidence: z.enum(['high', 'medium', 'low']),
+  maxDestructiveScope: z.enum(TOOL_POLICY_DESTRUCTIVE_SCOPES).optional(),
+  environment: z.enum(TOOL_POLICY_ENVIRONMENTS),
+  confidence: z.enum(TOOL_POLICY_CONFIDENCE_LEVELS),
 }).strip();
 
 /**
