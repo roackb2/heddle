@@ -191,7 +191,49 @@
   "settings": {
     "general": "General",
     "memory": "Memory Status",
+    "skills": "Skills",
     "workspaces": "Workspace"
+  },
+  "skillSettings": {
+    "catalogTitle": "Skill catalog",
+    "disableAction": "Disable",
+    "emptySection": "No skills in this section",
+    "enableAction": "Enable",
+    "errorTitle": "Skills unavailable",
+    "issuesTitle": "Catalog issues",
+    "loadingBody": "Reading Agent Skills from the active workspace.",
+    "loadingTitle": "Loading skills",
+    "metrics": {
+      "active": "Active",
+      "activeDetail": "Shown to future agent turns",
+      "available": "Available",
+      "availableDetail": "Discovered but not enabled",
+      "disabled": "Disabled",
+      "disabledDetail": "Not shown to the agent"
+    },
+    "missingDescription": "Skill definition is missing.",
+    "noActivationStore": "No activation store",
+    "overviewTitle": "Agent Skills",
+    "searchLabel": "Search skills",
+    "searchPlaceholder": "Search skills",
+    "sections": {
+      "active": "Active",
+      "available": "Available",
+      "disabled": "Disabled",
+      "missing": "Missing definitions"
+    },
+    "source": {
+      "builtIn": "built-in",
+      "project": "project",
+      "user": "user"
+    },
+    "status": {
+      "active": "active",
+      "available": "available",
+      "disabled": "disabled",
+      "missing": "missing"
+    },
+    "updating": "Updating"
   },
   "workspaceSettings": {
     "addDetail": "Attach a workspace by choosing the folder that owns its .heddle state directory.",

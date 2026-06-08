@@ -9,6 +9,7 @@ export type {
   AgentSkillActivationStore,
   AgentSkillActivationStoreOptions,
   AgentSkillActivationStorePort,
+  AgentSkillActivationOverview,
   AgentSkillActivationView,
   AgentSkillActivationViewStatus,
   AgentSkillCatalog,

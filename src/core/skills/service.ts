@@ -8,6 +8,7 @@ import type {
   AgentSkillCatalogIssue,
   AgentSkillCatalogPromptOptions,
   AgentSkillActivationRecord,
+  AgentSkillActivationOverview,
   AgentSkillActivationResult,
   AgentSkillActivationStorePort,
   AgentSkillActivationView,
@@ -133,7 +134,18 @@ export class AgentSkillService {
   }
 
   async listActivationViews(): Promise<AgentSkillActivationView[]> {
+    return (await this.listActivationOverview()).skills;
+  }
+
+  async listActivationOverview(): Promise<AgentSkillActivationOverview> {
     const catalog = await this.loadCatalog();
+    return {
+      skills: this.buildActivationViews(catalog),
+      issues: catalog.issues,
+    };
+  }
+
+  private buildActivationViews(catalog: AgentSkillCatalog): AgentSkillActivationView[] {
     const entriesByName = new Map(catalog.skills.map((skill) => [skill.name, skill]));
     const records = Object.values(this.activationStore?.read().skills ?? {});
     const viewsByName = new Map<string, AgentSkillActivationView>();

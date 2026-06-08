@@ -191,7 +191,49 @@
   "settings": {
     "general": "一般",
     "memory": "記憶狀態",
+    "skills": "Skills",
     "workspaces": "工作區"
+  },
+  "skillSettings": {
+    "catalogTitle": "Skill catalog",
+    "disableAction": "停用",
+    "emptySection": "此區段沒有 skills",
+    "enableAction": "啟用",
+    "errorTitle": "Skills 無法使用",
+    "issuesTitle": "Catalog issues",
+    "loadingBody": "正在讀取目前工作區的 Agent Skills。",
+    "loadingTitle": "正在載入 skills",
+    "metrics": {
+      "active": "Active",
+      "activeDetail": "會顯示給未來的 agent turns",
+      "available": "Available",
+      "availableDetail": "已找到但尚未啟用",
+      "disabled": "Disabled",
+      "disabledDetail": "不會顯示給 agent"
+    },
+    "missingDescription": "Skill definition 遺失。",
+    "noActivationStore": "沒有 activation store",
+    "overviewTitle": "Agent Skills",
+    "searchLabel": "搜尋 skills",
+    "searchPlaceholder": "搜尋 skills",
+    "sections": {
+      "active": "Active",
+      "available": "Available",
+      "disabled": "Disabled",
+      "missing": "定義遺失"
+    },
+    "source": {
+      "builtIn": "built-in",
+      "project": "project",
+      "user": "user"
+    },
+    "status": {
+      "active": "active",
+      "available": "available",
+      "disabled": "disabled",
+      "missing": "missing"
+    },
+    "updating": "更新中"
   },
   "workspaceSettings": {
     "addDetail": "選擇擁有 .heddle 狀態目錄的資料夾來加入工作區。",

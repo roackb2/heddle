@@ -28,6 +28,8 @@ export function useControlPlaneAppState() {
   const workspaceCreateMutation = trpcReact.controlPlane.workspaceCreate.useMutation();
   const workspaceRenameMutation = trpcReact.controlPlane.workspaceRename.useMutation();
   const workspaceSetActiveMutation = trpcReact.controlPlane.workspaceSetActive.useMutation();
+  const skillActivateMutation = trpcReact.controlPlane.skillActivate.useMutation();
+  const skillDisableMutation = trpcReact.controlPlane.skillDisable.useMutation();
   const taskEvents = useControlPlaneHeartbeatEvents({
     enabled: navigation.activeSurfaceId === 'tasks',
     workspaceId: navigation.selectedWorkspaceId,
@@ -35,6 +37,9 @@ export function useControlPlaneAppState() {
   const sidebar = useControlPlaneSidebarData({ navigation, taskEvents });
   const memoryStatusQuery = trpcReact.controlPlane.memoryStatus.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
     enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'memory',
+  });
+  const skillsQuery = trpcReact.controlPlane.skills.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
+    enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'skills',
   });
   const selectedSession = useControlPlaneSessionDetail({
     workspaceId: sidebar.workspaceId,
@@ -98,6 +103,16 @@ export function useControlPlaneAppState() {
     await utils.controlPlane.state.invalidate();
   }
 
+  async function setSkillActive(name: string, active: boolean) {
+    const input = sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, name } : { name };
+    if (active) {
+      await skillActivateMutation.mutateAsync(input);
+    } else {
+      await skillDisableMutation.mutateAsync(input);
+    }
+    await utils.controlPlane.skills.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined);
+  }
+
   return {
     frameProps: {
       activeSurfaceId: navigation.activeSurfaceId,
@@ -125,6 +140,13 @@ export function useControlPlaneAppState() {
         status: memoryStatusQuery.data ?? stateMemoryStatus,
         loading: memoryStatusQuery.isLoading || sidebar.stateQuery.isLoading,
         error: memoryStatusQuery.error instanceof Error ? memoryStatusQuery.error.message : undefined,
+      },
+      skillsSettingsView: {
+        skills: skillsQuery.data,
+        loading: skillsQuery.isLoading || sidebar.stateQuery.isLoading,
+        error: skillsQuery.error instanceof Error ? skillsQuery.error.message : undefined,
+        updating: skillActivateMutation.isPending || skillDisableMutation.isPending,
+        onSetSkillActive: setSkillActive,
       },
       workspaceSettingsView: {
         state,

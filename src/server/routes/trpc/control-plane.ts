@@ -17,6 +17,7 @@ import { ControlPlaneMemoryController } from '@/server/controllers/trpc/control-
 import { ControlPlaneLayoutSnapshotsController } from '@/server/controllers/trpc/control-plane/layout-snapshots.js';
 import { ControlPlaneWorkspaceFilesController } from '@/server/controllers/trpc/control-plane/workspace-files.js';
 import { ControlPlaneWorkspaceDiffController } from '@/server/controllers/trpc/control-plane/workspace-diff.js';
+import { ControlPlaneSkillsController } from '@/server/controllers/trpc/control-plane/skills.js';
 import { controlPlaneSlashCommandsController } from '@/server/controllers/trpc/control-plane/slash-commands-controller.js';
 import { controlPlaneSessionRuntimeContextService } from '@/server/services/control-plane/session-runtime-context-service.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
@@ -49,6 +50,7 @@ import {
   sessionQueuedPromptUpdateInputSchema,
   sessionRenameInputSchema,
   sessionRuntimeContextInputSchema,
+  skillInputSchema,
   slashCommandCatalogInputSchema,
   slashCommandExecuteInputSchema,
   sessionsEventsInputSchema,
@@ -420,6 +422,18 @@ export const controlPlaneRouter = router({
       path: input.path,
       maxResults: input.maxResults,
     });
+  }),
+  skills: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneSkillsController.list(workspace.workspaceRoot, workspace.stateRoot);
+  }),
+  skillActivate: controlPlaneWorkspaceProcedure.input(skillInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneSkillsController.activate(workspace.workspaceRoot, workspace.stateRoot, input.name);
+  }),
+  skillDisable: controlPlaneWorkspaceProcedure.input(skillInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneSkillsController.disable(workspace.workspaceRoot, workspace.stateRoot, input.name);
   }),
   heartbeatTaskEnable: controlPlaneWorkspaceProcedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;

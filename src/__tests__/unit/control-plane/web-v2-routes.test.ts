@@ -18,6 +18,7 @@ describe('web-v2 workspace routes', () => {
     expect(routeForSession('workspace/one', 'session 1')).toBe('/workspaces/workspace%2Fone/sessions/session%201');
     expect(routeForTaskRun('default', 'task-a', 'run-b')).toBe('/workspaces/default/tasks/task-a/runs/run-b');
     expect(routeForSettingsSection('memory', 'default')).toBe('/workspaces/default/settings/memory');
+    expect(routeForSettingsSection('skills', 'default')).toBe('/workspaces/default/settings/skills');
   });
 
   it('parses workspace-scoped session, task, and settings routes', () => {

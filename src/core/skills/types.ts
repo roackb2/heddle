@@ -69,6 +69,11 @@ export type AgentSkillActivationView = {
   record?: AgentSkillActivationRecord;
 };
 
+export type AgentSkillActivationOverview = {
+  skills: AgentSkillActivationView[];
+  issues: AgentSkillCatalogIssue[];
+};
+
 export type AgentSkillActivationResult =
   | {
       ok: true;

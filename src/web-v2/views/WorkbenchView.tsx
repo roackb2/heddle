@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { ConversationThread } from '@web/components/conversation';
-import { GeneralSettingsView, MemorySettingsView, WorkspaceSettingsView } from '@web/components/settings';
+import { GeneralSettingsView, MemorySettingsView, SkillsSettingsView, WorkspaceSettingsView } from '@web/components/settings';
 import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
@@ -9,6 +9,7 @@ import { TasksWorkbenchView } from './TasksWorkbenchView';
 export type SessionWorkbenchViewProps = Omit<ComponentProps<typeof ConversationThread>, 'emptyTitle'>;
 export type TaskWorkbenchViewProps = ComponentProps<typeof TasksWorkbenchView>;
 export type MemorySettingsViewProps = ComponentProps<typeof MemorySettingsView>;
+export type SkillsSettingsViewProps = ComponentProps<typeof SkillsSettingsView>;
 export type WorkspaceSettingsViewProps = ComponentProps<typeof WorkspaceSettingsView>;
 
 interface WorkbenchViewProps {
@@ -17,6 +18,7 @@ interface WorkbenchViewProps {
   memorySettingsView: MemorySettingsViewProps;
   sessionView: SessionWorkbenchViewProps;
   settingsOpen: boolean;
+  skillsSettingsView: SkillsSettingsViewProps;
   taskView: TaskWorkbenchViewProps;
   workspaceSettingsView: WorkspaceSettingsViewProps;
 }
@@ -29,6 +31,7 @@ const appSurfaceLabelKeys = {
 const settingsSectionLabelKeys = {
   general: 'settings.general',
   workspaces: 'settings.workspaces',
+  skills: 'settings.skills',
   memory: 'settings.memory',
 } satisfies Record<SettingsSectionId, I18nMessageKey>;
 
@@ -40,6 +43,7 @@ export function WorkbenchView({
   memorySettingsView,
   sessionView,
   settingsOpen,
+  skillsSettingsView,
   taskView,
   workspaceSettingsView,
 }: WorkbenchViewProps) {
@@ -57,6 +61,7 @@ export function WorkbenchView({
   const settingsViews = {
     general: <GeneralSettingsView />,
     workspaces: <WorkspaceSettingsView {...workspaceSettingsView} />,
+    skills: <SkillsSettingsView {...skillsSettingsView} />,
     memory: <MemorySettingsView {...memorySettingsView} />,
   } satisfies Record<SettingsSectionId, ReactNode>;
   const activeSurface = surfaceViews[activeSurfaceId];

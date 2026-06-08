@@ -364,6 +364,69 @@ description: Research web pages through a browser.
     });
   });
 
+  it('manages Agent Skills through the workspace-scoped API', async () => {
+    const { caller, activeWorkspace } = createControlPlaneCaller();
+    writeSkillSync(activeWorkspace.workspaceRoot, 'browser-research', `---
+name: browser-research
+description: Research web pages through a browser.
+---
+# Browser Research
+`);
+
+    await expect(caller.skills({ workspaceId: activeWorkspace.id })).resolves.toMatchObject({
+      activationStorePath: expect.stringContaining('.heddle/skills/activation.json'),
+      skills: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'browser-research',
+          status: 'available',
+          catalogEntry: expect.objectContaining({
+            description: 'Research web pages through a browser.',
+            source: 'project',
+          }),
+        }),
+      ]),
+      issues: [],
+    });
+
+    await expect(caller.skillActivate({
+      workspaceId: activeWorkspace.id,
+      name: 'browser-research',
+    })).resolves.toMatchObject({
+      ok: true,
+      record: expect.objectContaining({
+        name: 'browser-research',
+        status: 'active',
+      }),
+    });
+    await expect(caller.skills({ workspaceId: activeWorkspace.id })).resolves.toMatchObject({
+      skills: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'browser-research',
+          status: 'active',
+        }),
+      ]),
+    });
+
+    await expect(caller.skillDisable({
+      workspaceId: activeWorkspace.id,
+      name: 'browser-research',
+    })).resolves.toMatchObject({
+      ok: true,
+      record: expect.objectContaining({
+        name: 'browser-research',
+        status: 'disabled',
+      }),
+    });
+    await expect(caller.skills({ workspaceId: activeWorkspace.id })).resolves.toMatchObject({
+      skills: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'browser-research',
+          status: 'disabled',
+        }),
+      ]),
+    });
+  });
+
   it('executes auth login through the shared core auth command service', async () => {
     const login = vi.spyOn(ProviderCredentialCommandService, 'loginProviderWithOAuth')
       .mockResolvedValue('Stored OpenAI OAuth credential.');
