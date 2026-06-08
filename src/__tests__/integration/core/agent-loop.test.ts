@@ -1,10 +1,11 @@
-import { mkdir, mkdtemp } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AgentLoopCheckpointService, AgentLoopRuntimeService } from '@/core/runtime/loop/index.js';
 import { RuntimeToolService } from '@/core/runtime/tools/index.js';
 import { ToolBundleComposer, type ToolToolkit } from '@/core/tools/index.js';
+import { AgentSkillService, FileAgentSkillActivationRepository } from '@/core/skills/index.js';
 import type { ChatMessage, LlmAdapter, LlmResponse } from '../../../core/llm/types.js';
 import type { AgentHeartbeatEvent, AgentLoopEvent, ToolDefinition } from '../../../index.js';
 import { createLogger } from '../../../core/utils/logger.js';
@@ -154,6 +155,62 @@ describe('AgentLoopRuntimeService.run', () => {
     }));
   });
 
+  it('adds only activated Agent Skills catalog metadata to the runtime system context', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'heddle-loop-skills-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(messages);
+        return { content: 'Done.' };
+      },
+    };
+
+    await mkdir(join(workspaceRoot, '.agents', 'skills', 'browser-research'), { recursive: true });
+    await writeFile(
+      join(workspaceRoot, '.agents', 'skills', 'browser-research', 'SKILL.md'),
+      `---
+name: browser-research
+description: Research web pages through a browser.
+---
+# Browser Research
+
+Use browser_snapshot before making claims.
+`,
+      'utf8',
+    );
+    await new AgentSkillService({
+      workspaceRoot,
+      activationStore: new FileAgentSkillActivationRepository({ stateRoot }),
+    }).activateSkill('browser-research', new Date('2026-06-08T10:00:00.000Z'));
+
+    await AgentLoopRuntimeService.run({
+      goal: 'Use skills.',
+      llm: fakeLlm,
+      maxSteps: 1,
+      logger: silentLogger,
+      workspaceRoot,
+      stateDir: '.heddle',
+    });
+
+    const systemMessage = seenMessages[0]?.find((message) => message.role === 'system')?.content ?? '';
+    expect(systemMessage).toContain('<available_skills>');
+    expect(systemMessage).toContain('browser-research');
+    expect(systemMessage).toContain('Research web pages through a browser.');
+    expect(systemMessage).toContain('read_agent_skill');
+    expect(systemMessage).not.toContain('Use browser_snapshot before making claims.');
+  });
+
   it('emits streamed reasoning summaries as assistant progress events', async () => {
     const events: AgentLoopEvent[] = [];
     const fakeLlm: LlmAdapter = {
@@ -301,6 +358,7 @@ describe('RuntimeToolService.createDefaultAgentTools', () => {
     });
 
     expect(withPlan.map((tool) => tool.name)).toEqual([
+      'read_agent_skill',
       'project_dashboard',
       'list_files',
       'read_file',
@@ -320,6 +378,7 @@ describe('RuntimeToolService.createDefaultAgentTools', () => {
       'run_shell_mutate',
     ]);
     expect(withoutPlan.map((tool) => tool.name)).toEqual([
+      'read_agent_skill',
       'project_dashboard',
       'list_files',
       'read_file',
@@ -373,6 +432,7 @@ describe('RuntimeToolService.createDefaultAgentTools', () => {
 describe('ToolBundleComposer', () => {
   const context = {
     workspaceRoot: '/tmp/workspace',
+    stateRoot: '/tmp/workspace/.heddle',
     model: 'gpt-test',
     memoryDir: '/tmp/memory',
     memoryMode: 'none' as const,

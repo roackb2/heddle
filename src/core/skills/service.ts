@@ -12,6 +12,7 @@ import type {
   AgentSkillActivationStorePort,
   AgentSkillActivationView,
   AgentSkillReadResult,
+  AgentSkillResourceReadResult,
   AgentSkillRoot,
   AgentSkillServiceOptions,
   AgentSkillSourceKind,
@@ -83,6 +84,37 @@ export class AgentSkillService {
       skill,
       body: parsed.body,
       resources: AgentSkillParser.extractResourceLinks(parsed.body),
+    };
+  }
+
+  async readActivatedSkill(name: string): Promise<AgentSkillReadResult | null> {
+    const activatedCatalog = await this.loadActivatedCatalog();
+    if (!activatedCatalog.skills.some((skill) => skill.name === name)) {
+      return null;
+    }
+
+    return await this.readSkill(name);
+  }
+
+  async readActivatedSkillResource(name: string, resource: string): Promise<AgentSkillResourceReadResult | null> {
+    const skill = await this.readActivatedSkill(name);
+    const resolvedResource = skill?.resources.find((candidate) => (
+      candidate.name === resource || candidate.path === resource
+    ));
+
+    if (!skill || !resolvedResource) {
+      return null;
+    }
+
+    const resourcePath = resolve(skill.skill.skillRootPath, resolvedResource.path);
+    if (!isPathInsideRoot(resourcePath, skill.skill.skillRootPath)) {
+      return null;
+    }
+
+    return {
+      skill: skill.skill,
+      resource: resolvedResource,
+      content: await readFile(resourcePath, 'utf8'),
     };
   }
 

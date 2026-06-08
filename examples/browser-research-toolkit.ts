@@ -40,6 +40,7 @@ async function main() {
     maxElementsPerSnapshot: 60,
   }).createTools({
     workspaceRoot: process.cwd(),
+    stateRoot: STATE_ROOT,
     model: 'gpt-5.1-codex-mini',
     memoryDir: join(STATE_ROOT, 'memory'),
     memoryMode: 'none',

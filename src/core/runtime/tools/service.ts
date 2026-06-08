@@ -1,4 +1,5 @@
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { agentSkillsToolkit } from '@/core/tools/toolkits/agent-skills/toolkit.js';
 import { codingAwarenessToolkit } from '@/core/tools/toolkits/coding-awareness/toolkit.js';
 import { codingFilesToolkit } from '@/core/tools/toolkits/coding-files/toolkit.js';
 import { externalContextToolkit } from '@/core/tools/toolkits/external-context/toolkit.js';
@@ -15,15 +16,17 @@ import type { DefaultAgentToolsOptions } from './types.js';
 export class RuntimeToolService {
   static createDefaultAgentTools(options: DefaultAgentToolsOptions): ToolDefinition[] {
     const workspaceRoot = options.workspaceRoot ?? process.cwd();
+    const stateRoot = options.stateRoot ?? resolve(workspaceRoot, options.stateDir ?? '.heddle');
     const memoryDir =
       options.memoryDir ??
-      join(workspaceRoot, options.stateDir ?? '.heddle', 'memory');
+      join(stateRoot, 'memory');
     const memoryMode = options.memoryMode ?? 'read-and-record';
 
     return ToolBundleComposer.compose({
       toolkits: this.createDefaultToolkits({ includePlanTool: options.includePlanTool }),
       context: {
         workspaceRoot,
+        stateRoot,
         model: options.model,
         apiKey: options.apiKey,
         providerCredentialSource: options.providerCredentialSource,
@@ -39,6 +42,7 @@ export class RuntimeToolService {
     includePlanTool?: boolean;
   }): ToolToolkit[] {
     return [
+      agentSkillsToolkit,
       codingAwarenessToolkit,
       codingFilesToolkit,
       externalContextToolkit,

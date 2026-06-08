@@ -70,8 +70,9 @@ export {
 export type { ApiKeyRuntime, ProviderCredentialSource } from './core/runtime/credentials/index.js';
 export { RuntimeToolService } from './core/runtime/tools/index.js';
 export type { DefaultAgentToolsOptions } from './core/runtime/tools/index.js';
-export { AgentSkillService, FileAgentSkillActivationRepository } from './core/skills/index.js';
+export { AgentSkillService, AgentSkillsRuntimeContextService, FileAgentSkillActivationRepository } from './core/skills/index.js';
 export type {
+  AppendAgentSkillsSystemContextOptions,
   AgentSkillActivationRecord,
   AgentSkillActivationResult,
   AgentSkillActivationStatus,
@@ -86,6 +87,7 @@ export type {
   AgentSkillCatalogIssueCode,
   AgentSkillCatalogPromptOptions,
   AgentSkillReadResult,
+  AgentSkillResourceReadResult,
   AgentSkillRoot,
   AgentSkillServiceOptions,
   AgentSkillSourceKind,
@@ -246,6 +248,8 @@ export { webSearchTool, createWebSearchTool } from './core/tools/toolkits/extern
 export type { WebSearchToolOptions } from './core/tools/toolkits/external-context/web-search.js';
 export { viewImageTool, createViewImageTool } from './core/tools/toolkits/external-context/view-image.js';
 export type { ViewImageToolOptions } from './core/tools/toolkits/external-context/view-image.js';
+export { createReadAgentSkillTool } from './core/tools/toolkits/agent-skills/index.js';
+export type { ReadAgentSkillToolOptions } from './core/tools/toolkits/agent-skills/index.js';
 export {
   listMemoryNotesTool,
   readMemoryNoteTool,

@@ -9,6 +9,7 @@ import { createHelpSlashCommandModule } from './help/help-commands.js';
 import { createModelSlashCommandModule, createReasoningSlashCommandModule } from './model/model-commands.js';
 import { createPermissionsSlashCommandModule } from './permissions/permission-commands.js';
 import { createSessionSlashCommandModule } from './session/session-commands.js';
+import { createSkillsSlashCommandModule } from './skills/skills-commands.js';
 
 export function createCoreSlashCommandModules(): SlashCommandModule<
   SlashCommandResult,
@@ -24,5 +25,6 @@ export function createCoreSlashCommandModules(): SlashCommandModule<
     createPermissionsSlashCommandModule(),
     createSessionSlashCommandModule(),
     createHeartbeatSlashCommandModule(),
+    createSkillsSlashCommandModule(),
   ];
 }

@@ -7,6 +7,7 @@ export type DefaultAgentToolsOptions = {
   credentialStorePath?: string;
   workspaceRoot?: string;
   stateDir?: string;
+  stateRoot?: string;
   memoryDir?: string;
   memoryMode?: 'none' | 'read-and-record' | 'maintainer' | 'legacy-full';
   searchIgnoreDirs?: string[];

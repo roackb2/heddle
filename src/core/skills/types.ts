@@ -103,6 +103,12 @@ export type AgentSkillReadResult = {
   resources: AgentSkillResourceLink[];
 };
 
+export type AgentSkillResourceReadResult = {
+  skill: AgentSkillCatalogEntry;
+  resource: AgentSkillResourceLink;
+  content: string;
+};
+
 export type AgentSkillCatalogPromptOptions = {
   readToolName?: string;
 };

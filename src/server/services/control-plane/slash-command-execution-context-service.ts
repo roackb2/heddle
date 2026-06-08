@@ -8,6 +8,7 @@ import type { SlashCommandExecutionContext } from '@/core/commands/slash/modules
 import type { SlashCommandHint } from '@/core/commands/slash/types.js';
 import { FileHeartbeatTaskService } from '@/core/heartbeat/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
+import { AgentSkillService, FileAgentSkillActivationRepository } from '@/core/skills/index.js';
 import { controlPlaneSessionRuntimeContextService } from './session-runtime-context-service.js';
 
 export type ControlPlaneSlashCommandExecutionContextArgs = Omit<ConversationEngineConfig, 'model'> & {
@@ -30,6 +31,10 @@ export class ControlPlaneSlashCommandExecutionContextService {
     const resolved = controlPlaneSessionRuntimeContextService.resolve(args);
     const { runtimeContext, sessions } = resolved;
     const heartbeatTasks = new FileHeartbeatTaskService({ stateRoot: args.stateRoot });
+    const skills = new AgentSkillService({
+      workspaceRoot: args.workspaceRoot,
+      activationStore: new FileAgentSkillActivationRepository({ stateRoot: args.stateRoot }),
+    });
 
     return {
       model: {
@@ -105,6 +110,11 @@ export class ControlPlaneSlashCommandExecutionContextService {
         listTasks: async () => await heartbeatTasks.listTasks(),
         listRunRecords: async (options) => await heartbeatTasks.listRunRecords(options),
         loadRunRecord: async (id) => await heartbeatTasks.loadRunRecord(id),
+      },
+      skills: {
+        list: async () => await skills.listActivationViews(),
+        activate: async (name) => await skills.activateSkill(name),
+        disable: async (name) => await skills.disableSkill(name),
       },
       help: {
         message: () => this.formatHelpMessage(hints),

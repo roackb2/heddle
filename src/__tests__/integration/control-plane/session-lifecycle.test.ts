@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import pino from 'pino';
@@ -315,6 +315,42 @@ describe('control-plane session lifecycle API', () => {
     });
   });
 
+  it('enables and lists Agent Skills through shared slash commands', async () => {
+    const { caller, activeWorkspace } = createControlPlaneCaller();
+    const session = await caller.sessionCreate({ name: 'Skills slash command session' });
+    writeSkillSync(activeWorkspace.workspaceRoot, 'browser-research', `---
+name: browser-research
+description: Research web pages through a browser.
+---
+# Browser Research
+`);
+
+    await expect(caller.slashCommandExecute({
+      sessionId: session.id,
+      command: '/skills',
+    })).resolves.toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: expect.stringContaining('available browser-research'),
+    });
+    await expect(caller.slashCommandExecute({
+      sessionId: session.id,
+      command: '/skills enable browser-research',
+    })).resolves.toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'Activated Agent Skill browser-research. It will be available to future agent turns in this workspace.',
+    });
+    await expect(caller.slashCommandExecute({
+      sessionId: session.id,
+      command: '/skills',
+    })).resolves.toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: expect.stringContaining('active browser-research'),
+    });
+  });
+
   it('executes auth login through the shared core auth command service', async () => {
     const login = vi.spyOn(ProviderCredentialCommandService, 'loginProviderWithOAuth')
       .mockResolvedValue('Stored OpenAI OAuth credential.');
@@ -608,4 +644,10 @@ function createWorkspaceEngine(workspace: WorkspaceDescriptor) {
     model: 'gpt-5.4',
     apiKeyPresent: true,
   });
+}
+
+function writeSkillSync(workspaceRoot: string, name: string, content: string): void {
+  const skillRoot = join(workspaceRoot, '.agents', 'skills', name);
+  mkdirSync(skillRoot, { recursive: true });
+  writeFileSync(join(skillRoot, 'SKILL.md'), content, 'utf8');
 }

@@ -185,6 +185,7 @@ describe('chat turn preparation modules', () => {
     expect(context.session.id).toBe('session-1');
     expect(context.runtime.model).toBe('gpt-5.4');
     expect(context.toolNames).toEqual([
+      'read_agent_skill',
       'project_dashboard',
       'list_files',
       'read_file',

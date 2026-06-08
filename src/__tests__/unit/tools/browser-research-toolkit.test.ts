@@ -189,6 +189,7 @@ async function createTools(options: {
 function context(stateRoot: string): ToolToolkitContext {
   return {
     workspaceRoot: process.cwd(),
+    stateRoot,
     model: 'gpt-5.1-codex-mini',
     memoryDir: join(stateRoot, 'memory'),
     memoryMode: 'none',

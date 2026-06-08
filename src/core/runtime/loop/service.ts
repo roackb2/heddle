@@ -4,6 +4,7 @@ import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import { HeddleEventType } from '@/core/event-types.js';
 import { AgentRunService } from '@/core/agent/index.js';
 import type { AgentRunEvent } from '@/core/agent/index.js';
+import { AgentSkillsRuntimeContextService } from '@/core/skills/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
 import type { LlmAdapter, ReasoningEffort } from '@/core/llm/types.js';
 import type { ToolDefinition } from '@/core/types.js';
@@ -43,6 +44,11 @@ export class AgentLoopRuntimeService {
       providerCredentialSource,
       workspaceRoot,
       credentialStorePath,
+    });
+    const systemContext = await this.resolveSystemContext({
+      options,
+      tools,
+      workspaceRoot,
     });
     const now = () => new Date().toISOString();
     const startedAt = now();
@@ -86,7 +92,7 @@ export class AgentLoopRuntimeService {
       maxSteps: options.maxSteps,
       logger,
       history: AgentLoopCheckpointService.resolveHistory(options),
-      systemContext: options.systemContext,
+      systemContext,
       onEvent: (event) => {
         AgentLoopRuntimeService.emitAgentRunEvent({ event, runId, now, options });
       },
@@ -195,6 +201,7 @@ export class AgentLoopRuntimeService {
         credentialStorePath: runtime.credentialStorePath,
         workspaceRoot: runtime.workspaceRoot,
         stateDir: options.stateDir,
+        stateRoot: this.resolveStateRoot(runtime.workspaceRoot, options.stateDir),
         memoryDir: options.memoryDir,
         searchIgnoreDirs: options.searchIgnoreDirs,
         includePlanTool: options.includePlanTool,
@@ -202,5 +209,26 @@ export class AgentLoopRuntimeService {
       ...providedTools,
       ...extraTools,
     ];
+  }
+
+  private static async resolveSystemContext(args: {
+    options: RunAgentLoopOptions;
+    tools: ToolDefinition[];
+    workspaceRoot: string;
+  }): Promise<string | undefined> {
+    if (!args.tools.some((tool) => tool.name === 'read_agent_skill')) {
+      return args.options.systemContext;
+    }
+
+    return await AgentSkillsRuntimeContextService.appendActivatedCatalog({
+      workspaceRoot: args.workspaceRoot,
+      stateRoot: this.resolveStateRoot(args.workspaceRoot, args.options.stateDir),
+      systemContext: args.options.systemContext,
+      readToolName: 'read_agent_skill',
+    });
+  }
+
+  private static resolveStateRoot(workspaceRoot: string, stateDir?: string): string {
+    return resolve(workspaceRoot, stateDir ?? '.heddle');
   }
 }
