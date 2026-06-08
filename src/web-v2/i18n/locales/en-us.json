@@ -191,8 +191,57 @@
   "settings": {
     "general": "General",
     "memory": "Memory Status",
+    "mcp": "MCP",
     "skills": "Skills",
     "workspaces": "Workspace"
+  },
+  "mcpSettings": {
+    "catalogTitle": "MCP servers",
+    "disableAction": "Disable",
+    "emptySection": "No servers in this section",
+    "enableAction": "Enable",
+    "errorTitle": "MCP unavailable",
+    "issuesTitle": "Config issues",
+    "loadingBody": "Reading MCP server configuration for the active workspace.",
+    "loadingTitle": "Loading MCP",
+    "metrics": {
+      "available": "Not enabled",
+      "availableDetail": "Configured with no workspace decision",
+      "disabled": "Disabled",
+      "disabledDetail": "Explicitly turned off or missing config",
+      "enabled": "Enabled",
+      "enabledDetail": "May be used by future agent turns",
+      "issues": "Issues",
+      "issuesDetail": "Config entries that need attention"
+    },
+    "noConfig": "No MCP config",
+    "overviewTitle": "MCP integrations",
+    "refreshedAt": "Refreshed",
+    "refreshAction": "Refresh",
+    "refreshing": "Refreshing",
+    "searchLabel": "Search MCP servers",
+    "searchPlaceholder": "Search MCP",
+    "sectionDetails": {
+      "available": "Configured servers with no enablement record yet.",
+      "disabled": "Servers explicitly turned off for this workspace.",
+      "enabled": "Servers Heddle may connect to for cached MCP tools.",
+      "missing": "Enablement records whose server config is no longer found."
+    },
+    "sections": {
+      "available": "Not enabled",
+      "disabled": "Disabled",
+      "enabled": "Enabled",
+      "missing": "Missing config"
+    },
+    "status": {
+      "available": "not enabled",
+      "disabled": "disabled",
+      "enabled": "enabled",
+      "failed": "failed",
+      "missing": "missing"
+    },
+    "toolsLabel": "tools",
+    "updating": "Updating"
   },
   "skillSettings": {
     "catalogTitle": "Skill catalog",

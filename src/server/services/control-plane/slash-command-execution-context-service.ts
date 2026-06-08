@@ -7,6 +7,7 @@ import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/i
 import type { SlashCommandExecutionContext } from '@/core/commands/slash/modules/context.js';
 import type { SlashCommandHint } from '@/core/commands/slash/types.js';
 import { FileHeartbeatTaskService } from '@/core/heartbeat/index.js';
+import { McpService } from '@/core/mcp/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
 import { AgentSkillService, FileAgentSkillActivationRepository } from '@/core/skills/index.js';
 import { controlPlaneSessionRuntimeContextService } from './session-runtime-context-service.js';
@@ -34,6 +35,10 @@ export class ControlPlaneSlashCommandExecutionContextService {
     const skills = new AgentSkillService({
       workspaceRoot: args.workspaceRoot,
       activationStore: new FileAgentSkillActivationRepository({ stateRoot: args.stateRoot }),
+    });
+    const mcp = new McpService({
+      workspaceRoot: args.workspaceRoot,
+      stateRoot: args.stateRoot,
     });
 
     return {
@@ -115,6 +120,12 @@ export class ControlPlaneSlashCommandExecutionContextService {
         list: async () => await skills.listActivationViews(),
         activate: async (name) => await skills.activateSkill(name),
         disable: async (name) => await skills.disableSkill(name),
+      },
+      mcp: {
+        list: async () => mcp.listOverview(),
+        enable: async (serverId) => mcp.activateServer(serverId),
+        disable: async (serverId) => mcp.disableServer(serverId),
+        refresh: async (serverId) => await mcp.refreshServer(serverId),
       },
       help: {
         message: () => this.formatHelpMessage(hints),

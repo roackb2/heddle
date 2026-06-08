@@ -14,6 +14,7 @@ import { ControlPlaneStateController } from '@/server/controllers/trpc/control-p
 import { ControlPlaneHeartbeatController } from '@/server/controllers/trpc/control-plane/heartbeat.js';
 import { controlPlaneHeartbeatEventsController } from '@/server/controllers/trpc/control-plane/heartbeat-events.js';
 import { ControlPlaneMemoryController } from '@/server/controllers/trpc/control-plane/memory.js';
+import { ControlPlaneMcpController } from '@/server/controllers/trpc/control-plane/mcp.js';
 import { ControlPlaneLayoutSnapshotsController } from '@/server/controllers/trpc/control-plane/layout-snapshots.js';
 import { ControlPlaneWorkspaceFilesController } from '@/server/controllers/trpc/control-plane/workspace-files.js';
 import { ControlPlaneWorkspaceDiffController } from '@/server/controllers/trpc/control-plane/workspace-diff.js';
@@ -51,6 +52,7 @@ import {
   sessionRenameInputSchema,
   sessionRuntimeContextInputSchema,
   skillInputSchema,
+  mcpServerInputSchema,
   slashCommandCatalogInputSchema,
   slashCommandExecuteInputSchema,
   sessionsEventsInputSchema,
@@ -434,6 +436,22 @@ export const controlPlaneRouter = router({
   skillDisable: controlPlaneWorkspaceProcedure.input(skillInputSchema).mutation(async ({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;
     return await ControlPlaneSkillsController.disable(workspace.workspaceRoot, workspace.stateRoot, input.name);
+  }),
+  mcpServers: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return ControlPlaneMcpController.list(workspace.workspaceRoot, workspace.stateRoot);
+  }),
+  mcpServerEnable: controlPlaneWorkspaceProcedure.input(mcpServerInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return ControlPlaneMcpController.enable(workspace.workspaceRoot, workspace.stateRoot, input.serverId);
+  }),
+  mcpServerDisable: controlPlaneWorkspaceProcedure.input(mcpServerInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return ControlPlaneMcpController.disable(workspace.workspaceRoot, workspace.stateRoot, input.serverId);
+  }),
+  mcpServerRefresh: controlPlaneWorkspaceProcedure.input(mcpServerInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneMcpController.refresh(workspace.workspaceRoot, workspace.stateRoot, input.serverId);
   }),
   heartbeatTaskEnable: controlPlaneWorkspaceProcedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;

@@ -1,10 +1,12 @@
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { SlashCommandAutocomplete } from '../../../core/commands/slash/autocomplete.js';
+import { listMcpMessage } from '../../../core/commands/slash/modules/mcp/mcp-commands.js';
 import { listSkillsMessage } from '../../../core/commands/slash/modules/skills/skills-commands.js';
 import { SlashCommandParser } from '../../../core/commands/slash/parser.js';
 import { SlashCommandRegistry } from '../../../core/commands/slash/registry.js';
 import type { AgentSkillActivationView } from '../../../core/skills/index.js';
+import type { McpOverview } from '../../../core/mcp/index.js';
 import type { SlashCommand, SlashCommandModule } from '../../../core/commands/slash/types.js';
 
 type TestResult = { kind: string; value?: string };
@@ -68,6 +70,90 @@ describe('slash command parser', () => {
     expect(SlashCommandParser.matchesAnyExact(['/session list', '/session switch session-a'])(parsed)).toBe(true);
     expect(SlashCommandParser.matchesPrefix('/session switch')(parsed)).toBe(true);
     expect(SlashCommandParser.matchesPrefix('/session close')(parsed)).toBe(false);
+  });
+});
+
+describe('MCP slash command output', () => {
+  it('groups MCP servers by activation status with refresh actions', async () => {
+    const overview: McpOverview = {
+      configPath: '/workspace/.heddle/mcp.json',
+      activationStorePath: '/workspace/.heddle/mcp/activation.json',
+      catalogStorePath: '/workspace/.heddle/mcp/catalog.json',
+      issues: [],
+      servers: [
+        {
+          id: 'notion',
+          status: 'enabled',
+          config: {
+            id: 'notion',
+            transport: 'stdio',
+            source: 'standard',
+            command: 'npx',
+            args: ['-y', 'notion-mcp'],
+            env: {},
+          },
+          toolCount: 2,
+          action: '/mcp disable notion',
+          catalog: {
+            serverId: 'notion',
+            tools: [],
+            refreshedAt: '2026-06-08T00:00:00.000Z',
+          },
+        },
+        {
+          id: 'anytype',
+          status: 'available',
+          config: {
+            id: 'anytype',
+            transport: 'http',
+            source: 'standard',
+            url: 'https://example.com/mcp',
+            headers: {},
+          },
+          toolCount: 0,
+          action: '/mcp enable anytype',
+        },
+      ],
+    };
+
+    await expect(listMcpMessage({
+      mcp: {
+        list: async () => overview,
+        enable: vi.fn(),
+        disable: vi.fn(),
+        refresh: vi.fn(),
+      },
+    })).resolves.toEqual({
+      handled: true,
+      kind: 'message',
+      message: [
+        'MCP Servers',
+        'config=/workspace/.heddle/mcp.json',
+        '',
+        'Enabled (1)',
+        '- notion',
+        '  transport=stdio',
+        '  target=npx -y notion-mcp',
+        '  cachedTools=2',
+        '  refreshedAt=2026-06-08T00:00:00.000Z',
+        '  action=/mcp disable notion',
+        'Available (1)',
+        '- anytype',
+        '  transport=http',
+        '  target=https://example.com/mcp',
+        '  cachedTools=0',
+        '  action=/mcp enable anytype',
+        'Disabled (0)',
+        '  none',
+        'Missing config (0)',
+        '  none',
+        '',
+        'Commands',
+        '  /mcp enable <server>',
+        '  /mcp disable <server>',
+        '  /mcp refresh <server>',
+      ].join('\n'),
+    });
   });
 });
 

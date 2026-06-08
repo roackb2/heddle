@@ -191,8 +191,57 @@
   "settings": {
     "general": "一般",
     "memory": "記憶狀態",
+    "mcp": "MCP",
     "skills": "Skills",
     "workspaces": "工作區"
+  },
+  "mcpSettings": {
+    "catalogTitle": "MCP servers",
+    "disableAction": "停用",
+    "emptySection": "此區段沒有 servers",
+    "enableAction": "啟用",
+    "errorTitle": "MCP 無法使用",
+    "issuesTitle": "Config issues",
+    "loadingBody": "正在讀取目前工作區的 MCP server 設定。",
+    "loadingTitle": "正在載入 MCP",
+    "metrics": {
+      "available": "Not enabled",
+      "availableDetail": "已設定，尚未有 workspace decision",
+      "disabled": "Disabled",
+      "disabledDetail": "已明確停用或 config 遺失",
+      "enabled": "Enabled",
+      "enabledDetail": "可供未來的 agent turns 使用",
+      "issues": "Issues",
+      "issuesDetail": "需要處理的 config entries"
+    },
+    "noConfig": "沒有 MCP config",
+    "overviewTitle": "MCP integrations",
+    "refreshedAt": "已刷新",
+    "refreshAction": "刷新",
+    "refreshing": "刷新中",
+    "searchLabel": "搜尋 MCP servers",
+    "searchPlaceholder": "搜尋 MCP",
+    "sectionDetails": {
+      "available": "已設定，但還沒有 enablement record。",
+      "disabled": "已針對此 workspace 明確關閉。",
+      "enabled": "Heddle 可以連線並使用 cached MCP tools。",
+      "missing": "Enablement record 指向的 server config 已找不到。"
+    },
+    "sections": {
+      "available": "Not enabled",
+      "disabled": "Disabled",
+      "enabled": "Enabled",
+      "missing": "Config 遺失"
+    },
+    "status": {
+      "available": "not enabled",
+      "disabled": "disabled",
+      "enabled": "enabled",
+      "failed": "failed",
+      "missing": "missing"
+    },
+    "toolsLabel": "tools",
+    "updating": "更新中"
   },
   "skillSettings": {
     "catalogTitle": "Skill catalog",
