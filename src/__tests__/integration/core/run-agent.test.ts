@@ -924,6 +924,101 @@ describe('AgentRunService.run', () => {
     }));
   });
 
+  it('records autonomy postflight traces after autopilot-approved tool execution', async () => {
+    const approveToolCall = vi.fn(async () => ({ approved: false, reason: 'should not be requested' }));
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        if (messages.some((message) => message.role === 'tool')) {
+          return { content: 'The source file was updated under autopilot.' };
+        }
+
+        return {
+          toolCalls: [{
+            id: 'call-1',
+            tool: 'edit_file',
+            input: {
+              path: 'src/generated.ts',
+              content: 'export const value = 1;\n',
+              createIfMissing: true,
+              policy: {
+                operations: ['write'],
+                intent: 'Create a generated source file in the current project.',
+                targetRoots: ['.'],
+                writeRoots: ['.'],
+                expectedEffects: ['one generated source file is created'],
+                maxDestructiveScope: 'single-file',
+                environment: 'local',
+                confidence: 'high',
+              },
+            },
+          }],
+        };
+      },
+    };
+    const profile: AutopilotProfile = {
+      mode: 'autopilot',
+      roots: [{
+        path: '.',
+        access: 'autopilot',
+        allow: ['read', 'write'],
+      }],
+      environments: {
+        allow: ['local', 'dev'],
+        requireApproval: ['staging', 'production', 'unknown'],
+      },
+    };
+    const editTool: ToolDefinition = {
+      name: 'edit_file',
+      description: 'Edits files',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        return { ok: true, output: { path: 'src/generated.ts', action: 'created' } };
+      },
+    };
+
+    const result = await AgentRunService.run({
+      goal: 'Create a generated source file.',
+      llm: fakeLlm,
+      tools: [editTool],
+      maxSteps: 3,
+      logger: silentLogger,
+      approvalPolicies: [ToolApprovalPolicies.autopilot({ profile })],
+      approveToolCall,
+      workspaceRoot: '/workspace/current',
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(approveToolCall).not.toHaveBeenCalled();
+    expect(result.trace.map((event) => event.type)).toEqual([
+      'run.started',
+      'assistant.turn',
+      'autonomy.decision',
+      'tool.calling',
+      'autonomy.postflight',
+      'tool.completed',
+      'assistant.turn',
+      'run.finished',
+    ]);
+    expect(result.trace).toContainEqual(expect.objectContaining({
+      type: 'autonomy.postflight',
+      audit: expect.objectContaining({
+        call: expect.objectContaining({
+          id: 'call-1',
+          tool: 'edit_file',
+        }),
+        observedEffects: {
+          changedPaths: ['/workspace/current/src/generated.ts'],
+          changedRoots: ['/workspace/current'],
+          exceededDeclaredRoots: [],
+          gitHistoryChanged: false,
+        },
+        decision: 'continue',
+        reason: 'observed changes stayed within declared write roots',
+      }),
+    }));
+  });
+
   it('requires approval before reading a file outside the workspace root', async () => {
     const externalRoot = await mkdtemp(join(tmpdir(), 'heddle-read-outside-'));
     const externalFile = join(externalRoot, 'secret.txt');

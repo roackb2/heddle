@@ -12,6 +12,12 @@ export const DEFAULT_TRACE_SUMMARIZERS: TraceSummarizerMap = {
     : 'assistant answered',
   ],
   [HeddleEventType.hostWarning]: (event) => [`host warning ${event.code}: ${truncate(event.message, 140)}`],
+  [HeddleEventType.autonomyDecision]: (event) => [
+    `autonomy ${event.evaluation.decision.type} for ${ToolActivitySummarizer.summarizeCall(event.evaluation.call)}: ${truncate(event.evaluation.decision.reason, 100)}`,
+  ],
+  [HeddleEventType.autonomyPostflight]: (event) => [
+    `autonomy postflight ${event.audit.decision} for ${ToolActivitySummarizer.summarizeCall(event.audit.call)}: ${truncate(event.audit.reason ?? 'no reason recorded', 100)}`,
+  ],
   [HeddleEventType.toolApprovalRequested]: (event) => [`approval requested for ${ToolActivitySummarizer.summarizeCall(event.call)}`],
   [HeddleEventType.toolApprovalResolved]: (event) => [
     `approval ${event.approved ? 'granted' : 'denied'} for ${ToolActivitySummarizer.summarizeCall(event.call)}${event.reason ? ` (${truncate(event.reason, 80)})` : ''}`,

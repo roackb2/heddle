@@ -96,6 +96,82 @@ describe('TraceConsoleFormatter', () => {
     expect(output).toContain('"goal":"continue on the work"');
   });
 
+  it('renders autonomy decision and postflight events readably', () => {
+    const output = TraceConsoleFormatter.format([
+      {
+        type: 'autonomy.decision',
+        evaluation: {
+          call: { id: 'call-1', tool: 'edit_file', input: { path: 'src/generated.ts' } },
+          profileMode: 'autopilot',
+          envelope: {
+            operations: ['write'],
+            intent: 'Create a generated source file.',
+            targetRoots: ['.'],
+            writeRoots: ['.'],
+            expectedEffects: ['one file changes'],
+            maxDestructiveScope: 'single-file',
+            environment: 'local',
+            confidence: 'high',
+          },
+          facts: {
+            tool: 'edit_file',
+            operations: ['write'],
+            cwd: '/workspace/current',
+            claimedReadRoots: ['/workspace/current'],
+            claimedWriteRoots: ['/workspace/current'],
+            resolvedKnownTargets: ['/workspace/current/src/generated.ts'],
+            rootDecisions: [],
+            hardDenyReasons: [],
+            approvalReasons: [],
+            claimMismatches: [],
+          },
+          decision: {
+            type: 'allow',
+            reason: 'allowed by autopilot profile and declared policy envelope',
+            facts: {
+              tool: 'edit_file',
+              operations: ['write'],
+              cwd: '/workspace/current',
+              claimedReadRoots: ['/workspace/current'],
+              claimedWriteRoots: ['/workspace/current'],
+              resolvedKnownTargets: ['/workspace/current/src/generated.ts'],
+              rootDecisions: [],
+              hardDenyReasons: [],
+              approvalReasons: [],
+              claimMismatches: [],
+            },
+          },
+          policyHints: [],
+        },
+        step: 2,
+        timestamp: '2024-01-01T00:00:01Z',
+      },
+      {
+        type: 'autonomy.postflight',
+        audit: {
+          call: { id: 'call-1', tool: 'edit_file', input: { path: 'src/generated.ts' } },
+          observedEffects: {
+            changedPaths: ['/workspace/current/src/generated.ts'],
+            changedRoots: ['/workspace/current'],
+            exceededDeclaredRoots: [],
+            gitHistoryChanged: false,
+          },
+          decision: 'continue',
+          reason: 'observed changes stayed within declared write roots',
+        },
+        step: 2,
+        timestamp: '2024-01-01T00:00:02Z',
+      },
+    ]);
+
+    expect(output).toContain('Autonomy Decision');
+    expect(output).toContain('allowed by autopilot profile');
+    expect(output).toContain('Create a generated source file.');
+    expect(output).toContain('Autonomy Postflight');
+    expect(output).toContain('observed changes stayed within declared write roots');
+    expect(output).toContain('/workspace/current/src/generated.ts');
+  });
+
   it('renders structured tool outputs readably instead of object coercions', () => {
     const output = TraceConsoleFormatter.format([
       {

@@ -40,9 +40,9 @@ Approval behavior currently exists in these places:
 - `policies.ts`: `ToolApprovalPolicies` built-in tool, workspace-boundary,
   remembered-rule, autonomy, and human-surface policy constructors.
 - `autonomy/`: autopilot profile normalization, tool policy evaluation,
-  computed policy facts, and autonomy trace event construction. This subdomain
-  owns approval decisions for long-running agent mode, not tool execution or
-  host presentation.
+  computed policy facts, postflight audit objects, and autonomy trace event
+  construction. This subdomain owns approval decisions for long-running agent
+  mode, not tool execution or host presentation.
 - `remembered-rules/`: project approval rule service, repository, codec,
   schemas, and types. The repository is an internal storage boundary for
   `ToolApprovalService`; host/controller code must not import it directly.
@@ -188,6 +188,7 @@ state from event fragments.
 - `src/__tests__/unit/core/project-approval-rules.test.ts`
 - `src/__tests__/unit/core/approval-policy-chain.test.ts`
 - `src/__tests__/unit/core/autonomy-policy-service.test.ts`
+- `src/__tests__/unit/core/autonomy-postflight-audit-service.test.ts`
 - `src/__tests__/integration/core/run-agent.test.ts`
 - `src/__tests__/integration/tools/tools.test.ts`
 

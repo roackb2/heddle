@@ -199,6 +199,20 @@ domain object:
 - `autonomy.decision` contains `AutonomyEvaluation`;
 - `autonomy.postflight` contains `AutonomyPostflightAudit`.
 
+Postflight audit runs only after an unattended autopilot allow decision. The
+agent dispatcher passes the original `AutonomyEvaluation` and tool result into
+`AutonomyPostflightAuditService`, then records the returned audit through
+`AutonomyTraceService.postflight(...)`.
+
+The audit intentionally uses structured effects the runtime can see:
+
+- first-class file tools can report changed paths from their structured output;
+- shell-like tools usually report only command metadata, so postflight can flag
+  known git-history mutation commands but cannot prove every filesystem effect;
+- if structured changed paths exceed declared write roots, the audit decision is
+  `stop` and the tool result returned to the agent is converted into a
+  postflight failure.
+
 Do not create a trace-only shape that renames the same fields. If another layer
 needs less data for display, project it at the presentation boundary. The core
 trace should keep the agent envelope, computed facts, decision, reason, and
@@ -209,6 +223,8 @@ policy hints together.
 - Add policy logic in `AutonomyPolicyService`, not in hosts or tool
   implementations.
 - Add profile normalization/default behavior in `AutopilotProfileService`.
+- Add post-execution observed-effect logic in
+  `AutonomyPostflightAuditService`.
 - Add or change the shared envelope only in `src/core/tools/policy-envelope/`.
 - Keep tool execution using stripped tool input; the `policy` field is intent
   metadata, not part of the tool's business input.
@@ -220,7 +236,6 @@ policy hints together.
 This service is the core policy foundation. Workspace config may provide an
 `autopilot` profile through `.heddle/config.json`; project-config validates the
 persisted shape, and control-plane request context passes the profile into this
-approval policy. User-facing yolo controls and postflight effect auditing remain
-follow-up slices. The existing `AutonomyPostflightAudit` type reserves the
-downstream shape so the future implementation can record observed effects
-without inventing a second trace vocabulary.
+approval policy. Postflight audit now records observed structured effects after
+unattended autopilot execution. User-facing yolo controls and richer shell
+effect observation remain follow-up slices.

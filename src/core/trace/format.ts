@@ -66,6 +66,29 @@ export class TraceConsoleFormatter {
           );
           break;
 
+        case 'autonomy.decision':
+          lines.push(
+            `${COLORS.cyan}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}Autonomy Decision:${COLORS.reset} ${event.evaluation.decision.type} ${event.evaluation.call.tool}`,
+            `  Reason: ${event.evaluation.decision.reason}`,
+            event.evaluation.envelope ? `  Intent: ${TraceConsoleFormatter.truncate(event.evaluation.envelope.intent, 200)}` : '  Intent: not declared',
+            '',
+          );
+          break;
+
+        case 'autonomy.postflight': {
+          const color = event.audit.decision === 'continue' ? COLORS.green : COLORS.red;
+          lines.push(
+            `${color}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}Autonomy Postflight:${COLORS.reset} ${event.audit.decision} ${event.audit.call.tool}`,
+            `  Reason: ${event.audit.reason ?? 'no reason recorded'}`,
+            `  Changed Paths: ${event.audit.observedEffects.changedPaths.length ? TraceConsoleFormatter.truncate(JSON.stringify(event.audit.observedEffects.changedPaths), 300) : 'none reported'}`,
+            event.audit.observedEffects.exceededDeclaredRoots.length
+              ? `  Exceeded Roots: ${TraceConsoleFormatter.truncate(JSON.stringify(event.audit.observedEffects.exceededDeclaredRoots), 300)}`
+              : '  Exceeded Roots: none',
+            '',
+          );
+          break;
+        }
+
         case 'tool.calling':
           lines.push(
             `${COLORS.yellow}  [step ${event.step}]${COLORS.reset} ${COLORS.bold}Tool Call:${COLORS.reset} ${event.call.tool}`,

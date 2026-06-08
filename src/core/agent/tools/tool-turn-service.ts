@@ -53,7 +53,7 @@ export class AgentToolTurnService {
     }
 
     const tool = context.registry.get(call.tool);
-    const approvalDeniedResult = await AgentToolDispatcher.maybeDenyToolCall({
+    const authorization = await AgentToolDispatcher.authorizeToolCall({
       call,
       tool,
       step: context.state.step,
@@ -64,12 +64,13 @@ export class AgentToolTurnService {
       live: context.live,
       log: context.log,
     });
-    if (approvalDeniedResult) {
-      return AgentToolTurnService.handleDeniedResult(context, call.id, approvalDeniedResult);
+    if (authorization.type === 'denied') {
+      return AgentToolTurnService.handleDeniedResult(context, call.id, authorization.result);
     }
 
     const execution = await AgentToolDispatcher.executeToolCallWithFallback({
       call,
+      autonomyEvaluation: authorization.autonomyEvaluation,
       step: context.state.step,
       now: context.now,
       registry: context.registry,
