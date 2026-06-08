@@ -27,6 +27,7 @@ export class ConversationTurnContextBuilder {
     const tools = RuntimeToolService.createDefaultAgentTools({
       ...toolContext,
       ...toolRuntime,
+      stateRoot: args.stateRoot,
     });
 
     return {

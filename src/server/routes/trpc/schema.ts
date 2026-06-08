@@ -236,6 +236,11 @@ export const workspaceScopedInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
 }).optional();
 
+export const skillInputSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+  name: z.string().min(1),
+});
+
 export const workspacePermissionModeUpdateInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   mode: z.enum(AUTONOMY_PERMISSION_MODES),

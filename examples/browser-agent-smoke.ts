@@ -71,6 +71,7 @@ async function main() {
   });
   const tools = browserToolkit.createTools({
     workspaceRoot: process.cwd(),
+    stateRoot: STATE_ROOT,
     model,
     apiKey,
     providerCredentialSource: credentialSource,

@@ -19,7 +19,7 @@ export type PrepareConversationTurnContextArgs = {
 
 export type ConversationTurnToolContextArgs = Pick<
   PrepareConversationTurnContextArgs,
-  'workspaceRoot' | 'credentialStorePath' | 'searchIgnoreDirs' | 'includePlanTool'
+  'workspaceRoot' | 'credentialStorePath' | 'searchIgnoreDirs' | 'includePlanTool' | 'stateRoot'
 >;
 
 export type ConversationTurnToolRuntimeArgs = Pick<

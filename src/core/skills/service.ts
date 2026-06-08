@@ -8,10 +8,12 @@ import type {
   AgentSkillCatalogIssue,
   AgentSkillCatalogPromptOptions,
   AgentSkillActivationRecord,
+  AgentSkillActivationOverview,
   AgentSkillActivationResult,
   AgentSkillActivationStorePort,
   AgentSkillActivationView,
   AgentSkillReadResult,
+  AgentSkillResourceReadResult,
   AgentSkillRoot,
   AgentSkillServiceOptions,
   AgentSkillSourceKind,
@@ -86,6 +88,37 @@ export class AgentSkillService {
     };
   }
 
+  async readActivatedSkill(name: string): Promise<AgentSkillReadResult | null> {
+    const activatedCatalog = await this.loadActivatedCatalog();
+    if (!activatedCatalog.skills.some((skill) => skill.name === name)) {
+      return null;
+    }
+
+    return await this.readSkill(name);
+  }
+
+  async readActivatedSkillResource(name: string, resource: string): Promise<AgentSkillResourceReadResult | null> {
+    const skill = await this.readActivatedSkill(name);
+    const resolvedResource = skill?.resources.find((candidate) => (
+      candidate.name === resource || candidate.path === resource
+    ));
+
+    if (!skill || !resolvedResource) {
+      return null;
+    }
+
+    const resourcePath = resolve(skill.skill.skillRootPath, resolvedResource.path);
+    if (!isPathInsideRoot(resourcePath, skill.skill.skillRootPath)) {
+      return null;
+    }
+
+    return {
+      skill: skill.skill,
+      resource: resolvedResource,
+      content: await readFile(resourcePath, 'utf8'),
+    };
+  }
+
   async loadActivatedCatalog(): Promise<AgentSkillCatalog> {
     const catalog = await this.loadCatalog();
     const activeSkillNames = new Set(
@@ -101,7 +134,18 @@ export class AgentSkillService {
   }
 
   async listActivationViews(): Promise<AgentSkillActivationView[]> {
+    return (await this.listActivationOverview()).skills;
+  }
+
+  async listActivationOverview(): Promise<AgentSkillActivationOverview> {
     const catalog = await this.loadCatalog();
+    return {
+      skills: this.buildActivationViews(catalog),
+      issues: catalog.issues,
+    };
+  }
+
+  private buildActivationViews(catalog: AgentSkillCatalog): AgentSkillActivationView[] {
     const entriesByName = new Map(catalog.skills.map((skill) => [skill.name, skill]));
     const records = Object.values(this.activationStore?.read().skills ?? {});
     const viewsByName = new Map<string, AgentSkillActivationView>();

@@ -191,7 +191,55 @@
   "settings": {
     "general": "General",
     "memory": "Memory Status",
+    "skills": "Skills",
     "workspaces": "Workspace"
+  },
+  "skillSettings": {
+    "catalogTitle": "Skill catalog",
+    "disableAction": "Disable",
+    "emptySection": "No skills in this section",
+    "enableAction": "Enable",
+    "errorTitle": "Skills unavailable",
+    "issuesTitle": "Catalog issues",
+    "loadingBody": "Reading Agent Skills from the active workspace.",
+    "loadingTitle": "Loading skills",
+    "metrics": {
+      "active": "Active",
+      "activeDetail": "Shown to future agent turns",
+      "available": "Not enabled",
+      "availableDetail": "Discovered with no workspace decision",
+      "disabled": "Disabled",
+      "disabledDetail": "Explicitly turned off in this workspace"
+    },
+    "missingDescription": "Skill definition is missing.",
+    "noActivationStore": "No activation store",
+    "overviewTitle": "Agent Skills",
+    "searchLabel": "Search skills",
+    "searchPlaceholder": "Search skills",
+    "sectionDetails": {
+      "active": "Loaded into future agent turns.",
+      "available": "Discovered skills with no activation record yet.",
+      "disabled": "Skills explicitly turned off for this workspace.",
+      "missing": "Activation records whose SKILL.md file is no longer found."
+    },
+    "sections": {
+      "active": "Active",
+      "available": "Not enabled",
+      "disabled": "Disabled",
+      "missing": "Missing definitions"
+    },
+    "source": {
+      "builtIn": "built-in",
+      "project": "project",
+      "user": "user"
+    },
+    "status": {
+      "active": "active",
+      "available": "not enabled",
+      "disabled": "disabled",
+      "missing": "missing"
+    },
+    "updating": "Updating"
   },
   "workspaceSettings": {
     "addDetail": "Attach a workspace by choosing the folder that owns its .heddle state directory.",

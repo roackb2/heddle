@@ -34,6 +34,7 @@ It is a good fit if you want:
 
 - a terminal-first coding agent that works in a real repository
 - an agent that learns durable project knowledge while working with you, using inspectable local memory
+- standard Agent Skills support for opt-in reusable workflows and tool-use instructions
 - explicit traces, approvals, and reviewable workflow artifacts
 - a browser control plane for local oversight, workspace switching, and session review
 - a path from interactive use to programmatic and scheduled agent workflows
@@ -50,6 +51,7 @@ At a high level, Heddle helps with:
 - keeping multi-step work going across sessions instead of starting from scratch each time
 - switching between local workspaces from the browser control plane
 - learning durable facts, preferences, and workflows from real usage
+- enabling workspace-approved Agent Skills so the agent can load specialized instructions only when needed
 - exposing more operator visibility than a black-box chat tool
 
 If you want a terminal-first coding agent with local state, review traces, workspace memory, and a path toward longer-running workflows, that is the problem Heddle is trying to solve.
@@ -245,6 +247,31 @@ Only one default file is loaded to preserve context space. If a project needs a 
 
 More: [Project config](docs/reference/config.md)
 
+### Agent Skills
+
+Heddle supports the standard Agent Skills folder format for reusable, opt-in
+agent workflows. Put project skills under `.agents/skills/<name>/SKILL.md` or
+user skills under `~/.agents/skills/<name>/SKILL.md`, then manage workspace
+activation from chat:
+
+```text
+/skills
+/skills enable <name>
+/skills disable <name>
+```
+
+Only active skills are shown to the agent. Heddle initially exposes a compact
+catalog with each active skill's name and description, then the agent can call
+`read_agent_skill` to fetch the full `SKILL.md` body when a skill is relevant.
+Activation state is stored under `.heddle/skills/activation.json`; skill
+definitions stay in their original folders.
+
+Skills are instructions, not permissions. They do not bypass Heddle's approval
+policy or tool safety checks, so users remain responsible for which project or
+user skills they enable.
+
+More: [Agent Skills guide](docs/guides/agent-skills.md)
+
 ### Sessions and continuity
 
 Heddle keeps saved sessions under `.heddle/` so longer work does not have to reset every time. Current versions store the session catalog at `.heddle/chat-sessions.catalog.json` and per-session bodies under `.heddle/chat-sessions/`. That means you can come back to an interrupted task, continue a previous debugging thread, or preserve project-specific context across runs.
@@ -429,6 +456,7 @@ npx -p @roackb2/heddle -p cyberloop heddle
 - [Runtime host model](docs/guides/runtime-host-model.md)
 - [Control plane](docs/guides/control-plane.md)
 - [Heartbeat](docs/guides/heartbeat.md)
+- [Agent Skills](docs/guides/agent-skills.md)
 - [Knowledge persistence](docs/guides/knowledge-persistence.md)
 - [Semantic drift](docs/guides/semantic-drift.md)
 - [Programmatic use](docs/guides/programmatic-use.md)
@@ -450,6 +478,7 @@ Current strengths include:
 
 - terminal-first coding and repository workflows
 - autonomous, catalog-backed workspace memory that helps the agent learn from normal usage
+- standard Agent Skills support with workspace-level activation and progressive disclosure
 - explicit traces, approval previews, diff review, and local workspace state
 - browser-based oversight and workspace switching through the control plane
 - local-first heartbeat primitives for scheduled agent work

@@ -1,8 +1,10 @@
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { SlashCommandAutocomplete } from '../../../core/commands/slash/autocomplete.js';
+import { listSkillsMessage } from '../../../core/commands/slash/modules/skills/skills-commands.js';
 import { SlashCommandParser } from '../../../core/commands/slash/parser.js';
 import { SlashCommandRegistry } from '../../../core/commands/slash/registry.js';
+import type { AgentSkillActivationView } from '../../../core/skills/index.js';
 import type { SlashCommand, SlashCommandModule } from '../../../core/commands/slash/types.js';
 
 type TestResult = { kind: string; value?: string };
@@ -152,6 +154,9 @@ describe('slash command autocomplete', () => {
     { command: '/model', description: 'show active model' },
     { command: '/model <name>', description: 'switch model' },
     { command: '/model set [query]', description: 'pick model' },
+    { command: '/skills', description: 'list Agent Skills and activation status' },
+    { command: '/skills enable <name>', description: 'activate one Agent Skill' },
+    { command: '/skills disable <name>', description: 'disable one Agent Skill' },
     { command: '/session switch <id>', description: 'switch session' },
     { command: '/session close <id>', description: 'close session' },
   ];
@@ -159,6 +164,11 @@ describe('slash command autocomplete', () => {
   it('filters hints by command prefix and falls back for unmatched slash drafts', () => {
     expect(SlashCommandAutocomplete.filterHints('/session sw', hints)).toEqual([
       { command: '/session switch <id>', description: 'switch session' },
+    ]);
+    expect(SlashCommandAutocomplete.filterHints('/skills ', hints)).toEqual([
+      { command: '/skills', description: 'list Agent Skills and activation status' },
+      { command: '/skills enable <name>', description: 'activate one Agent Skill' },
+      { command: '/skills disable <name>', description: 'disable one Agent Skill' },
     ]);
     expect(SlashCommandAutocomplete.filterHints('/nope', hints)).toEqual(hints);
     expect(SlashCommandAutocomplete.filterHints(absoluteScreenshotFixturePath, hints)).toEqual([]);
@@ -184,5 +194,96 @@ describe('slash command autocomplete', () => {
 
     expect(SlashCommandAutocomplete.complete('/h', registry.hints())).toBe('/help');
     expect(run).not.toHaveBeenCalled();
+  });
+});
+
+describe('skills slash command output', () => {
+  it('groups skills by activation status with per-skill actions', async () => {
+    const views: AgentSkillActivationView[] = [
+      {
+        name: 'available-skill',
+        status: 'available',
+        catalogEntry: {
+          name: 'available-skill',
+          description: 'Can be enabled.',
+          source: 'project',
+          skillRoot: '/workspace/.agents/skills/available-skill',
+          skillFilePath: '/workspace/.agents/skills/available-skill/SKILL.md',
+        },
+      },
+      {
+        name: 'active-skill',
+        status: 'active',
+        catalogEntry: {
+          name: 'active-skill',
+          description: 'Already active.',
+          source: 'user',
+          skillRoot: '/home/.agents/skills/active-skill',
+          skillFilePath: '/home/.agents/skills/active-skill/SKILL.md',
+        },
+      },
+      {
+        name: 'disabled-skill',
+        status: 'disabled',
+        catalogEntry: {
+          name: 'disabled-skill',
+          description: 'Can be re-enabled.',
+          source: 'project',
+          skillRoot: '/workspace/.agents/skills/disabled-skill',
+          skillFilePath: '/workspace/.agents/skills/disabled-skill/SKILL.md',
+        },
+      },
+      {
+        name: 'missing-skill',
+        status: 'missing',
+        record: {
+          name: 'missing-skill',
+          source: 'user',
+          skillFilePath: '/home/.agents/skills/missing-skill/SKILL.md',
+          status: 'active',
+          activatedAt: '2026-06-08T10:00:00.000Z',
+          updatedAt: '2026-06-08T10:00:00.000Z',
+        },
+      },
+    ];
+
+    await expect(listSkillsMessage({
+      skills: {
+        list: async () => views,
+        activate: vi.fn(),
+        disable: vi.fn(),
+      },
+    })).resolves.toEqual({
+      handled: true,
+      kind: 'message',
+      message: [
+        'Agent Skills',
+        '',
+        'Active (1)',
+        '- active-skill',
+        '  Already active.',
+        '  source=user',
+        '  action=/skills disable active-skill',
+        'Available (1)',
+        '- available-skill',
+        '  Can be enabled.',
+        '  source=project',
+        '  action=/skills enable available-skill',
+        'Disabled (1)',
+        '- disabled-skill',
+        '  Can be re-enabled.',
+        '  source=project',
+        '  action=/skills enable disabled-skill',
+        'Missing definitions (1)',
+        '- missing-skill',
+        '  skill definition is missing',
+        '  source=user',
+        '  action=restore SKILL.md or disable the stale activation record',
+        '',
+        'Commands',
+        '  /skills enable <name>',
+        '  /skills disable <name>',
+      ].join('\n'),
+    });
   });
 });

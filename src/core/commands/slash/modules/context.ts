@@ -6,6 +6,10 @@ import type {
   HeartbeatTask,
   HeartbeatTaskRunRecordEntry,
 } from '@/core/heartbeat/index.js';
+import type {
+  AgentSkillActivationResult,
+  AgentSkillActivationView,
+} from '@/core/skills/index.js';
 import type { SlashCommandResult } from '../result-types.js';
 
 export type SlashCommandExecutionContext = {
@@ -47,6 +51,11 @@ export type SlashCommandExecutionContext = {
     listTasks: () => Promise<HeartbeatTask[]>;
     listRunRecords: (options?: { taskId?: string; limit?: number }) => Promise<HeartbeatTaskRunRecordEntry[]>;
     loadRunRecord: (id: string) => Promise<HeartbeatTaskRunRecordEntry | undefined>;
+  };
+  skills: {
+    list: () => Promise<AgentSkillActivationView[]>;
+    activate: (name: string) => Promise<AgentSkillActivationResult>;
+    disable: (name: string) => Promise<AgentSkillActivationResult>;
   };
   help: {
     message: () => string;

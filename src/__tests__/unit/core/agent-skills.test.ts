@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { AgentSkillService, FileAgentSkillActivationRepository } from '@/core/skills/index.js';
+import { createReadAgentSkillTool } from '@/core/tools/toolkits/agent-skills/index.js';
 
 describe('AgentSkillService', () => {
   it('discovers standard project and user skill catalogs without exposing skill bodies', async () => {
@@ -351,6 +352,63 @@ description: Research web pages through a browser.
         record: expect.objectContaining({ status: 'disabled' }),
       }),
     ]);
+  });
+
+  it('lets the read tool load active skills only', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-agent-skill-tool-'));
+    const workspaceRoot = join(root, 'workspace');
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const service = new AgentSkillService({
+      workspaceRoot,
+      homeDir: join(root, 'home'),
+      activationStore: new FileAgentSkillActivationRepository({ stateRoot }),
+    });
+    const tool = createReadAgentSkillTool({ workspaceRoot, stateRoot });
+
+    await writeSkill(
+      join(workspaceRoot, '.agents', 'skills', 'browser-research'),
+      `---
+name: browser-research
+description: Research web pages through a browser.
+---
+# Browser Research
+
+Use [browser checklist](references/browser-checklist.md) before making claims.
+`,
+    );
+    await mkdir(join(workspaceRoot, '.agents', 'skills', 'browser-research', 'references'), { recursive: true });
+    await writeFile(
+      join(workspaceRoot, '.agents', 'skills', 'browser-research', 'references', 'browser-checklist.md'),
+      '# Browser Checklist\n\nUse browser_snapshot before making claims.\n',
+      'utf8',
+    );
+
+    await expect(tool.execute({ name: 'browser-research' })).resolves.toMatchObject({
+      ok: false,
+      error: 'Agent Skill is not active or was not found: browser-research',
+    });
+
+    await service.activateSkill('browser-research', new Date('2026-06-08T10:00:00.000Z'));
+    await expect(tool.execute({ name: 'browser-research' })).resolves.toMatchObject({
+      ok: true,
+      output: {
+        name: 'browser-research',
+        source: 'project',
+        body: expect.stringContaining('Use [browser checklist]'),
+        resources: [{ name: 'browser checklist', path: 'references/browser-checklist.md' }],
+      },
+    });
+    await expect(tool.execute({
+      name: 'browser-research',
+      resource: 'references/browser-checklist.md',
+    })).resolves.toMatchObject({
+      ok: true,
+      output: {
+        name: 'browser-research',
+        resource: { name: 'browser checklist', path: 'references/browser-checklist.md' },
+        content: expect.stringContaining('Use browser_snapshot before making claims.'),
+      },
+    });
   });
 
   it('reports activation requests for unknown or inactive skills', async () => {

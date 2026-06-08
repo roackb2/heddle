@@ -69,6 +69,11 @@ export type AgentSkillActivationView = {
   record?: AgentSkillActivationRecord;
 };
 
+export type AgentSkillActivationOverview = {
+  skills: AgentSkillActivationView[];
+  issues: AgentSkillCatalogIssue[];
+};
+
 export type AgentSkillActivationResult =
   | {
       ok: true;
@@ -101,6 +106,12 @@ export type AgentSkillReadResult = {
   skill: AgentSkillCatalogEntry;
   body: string;
   resources: AgentSkillResourceLink[];
+};
+
+export type AgentSkillResourceReadResult = {
+  skill: AgentSkillCatalogEntry;
+  resource: AgentSkillResourceLink;
+  content: string;
 };
 
 export type AgentSkillCatalogPromptOptions = {

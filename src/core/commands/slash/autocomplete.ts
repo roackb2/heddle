@@ -11,7 +11,12 @@ export class SlashCommandAutocomplete {
       return [];
     }
 
-    const filtered = hints.filter((hint) => hint.command.startsWith(trimmedStart) || trimmedStart === '/');
+    const commandPrefix = trimmedStart.trimEnd();
+    const filtered = hints.filter((hint) => (
+      hint.command.startsWith(trimmedStart)
+      || hint.command === commandPrefix
+      || trimmedStart === '/'
+    ));
     return filtered.length > 0 ? filtered : hints;
   }
 

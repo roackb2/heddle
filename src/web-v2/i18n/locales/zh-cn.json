@@ -191,7 +191,55 @@
   "settings": {
     "general": "通用",
     "memory": "记忆状态",
+    "skills": "Skills",
     "workspaces": "工作区"
+  },
+  "skillSettings": {
+    "catalogTitle": "Skill catalog",
+    "disableAction": "停用",
+    "emptySection": "此区段没有 skills",
+    "enableAction": "启用",
+    "errorTitle": "Skills 不可用",
+    "issuesTitle": "Catalog issues",
+    "loadingBody": "正在读取当前工作区的 Agent Skills。",
+    "loadingTitle": "正在加载 skills",
+    "metrics": {
+      "active": "Active",
+      "activeDetail": "会显示给未来的 agent turns",
+      "available": "Not enabled",
+      "availableDetail": "已发现，尚未有 workspace decision",
+      "disabled": "Disabled",
+      "disabledDetail": "已在此 workspace 明确停用"
+    },
+    "missingDescription": "Skill definition 缺失。",
+    "noActivationStore": "没有 activation store",
+    "overviewTitle": "Agent Skills",
+    "searchLabel": "搜索 skills",
+    "searchPlaceholder": "搜索 skills",
+    "sectionDetails": {
+      "active": "会加载到未来的 agent turns。",
+      "available": "已发现，但还没有 activation record。",
+      "disabled": "已针对当前 workspace 明确关闭。",
+      "missing": "Activation record 指向的 SKILL.md 已找不到。"
+    },
+    "sections": {
+      "active": "Active",
+      "available": "Not enabled",
+      "disabled": "Disabled",
+      "missing": "定义缺失"
+    },
+    "source": {
+      "builtIn": "built-in",
+      "project": "project",
+      "user": "user"
+    },
+    "status": {
+      "active": "active",
+      "available": "not enabled",
+      "disabled": "disabled",
+      "missing": "missing"
+    },
+    "updating": "更新中"
   },
   "workspaceSettings": {
     "addDetail": "选择拥有 .heddle 状态目录的文件夹来加入工作区。",
