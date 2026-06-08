@@ -152,6 +152,9 @@ describe('slash command autocomplete', () => {
     { command: '/model', description: 'show active model' },
     { command: '/model <name>', description: 'switch model' },
     { command: '/model set [query]', description: 'pick model' },
+    { command: '/skills', description: 'list Agent Skills and activation status' },
+    { command: '/skills enable <name>', description: 'activate one Agent Skill' },
+    { command: '/skills disable <name>', description: 'disable one Agent Skill' },
     { command: '/session switch <id>', description: 'switch session' },
     { command: '/session close <id>', description: 'close session' },
   ];
@@ -159,6 +162,11 @@ describe('slash command autocomplete', () => {
   it('filters hints by command prefix and falls back for unmatched slash drafts', () => {
     expect(SlashCommandAutocomplete.filterHints('/session sw', hints)).toEqual([
       { command: '/session switch <id>', description: 'switch session' },
+    ]);
+    expect(SlashCommandAutocomplete.filterHints('/skills ', hints)).toEqual([
+      { command: '/skills', description: 'list Agent Skills and activation status' },
+      { command: '/skills enable <name>', description: 'activate one Agent Skill' },
+      { command: '/skills disable <name>', description: 'disable one Agent Skill' },
     ]);
     expect(SlashCommandAutocomplete.filterHints('/nope', hints)).toEqual(hints);
     expect(SlashCommandAutocomplete.filterHints(absoluteScreenshotFixturePath, hints)).toEqual([]);

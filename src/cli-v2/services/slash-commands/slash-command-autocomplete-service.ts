@@ -20,7 +20,12 @@ export class SlashCommandAutocompleteService {
       return [];
     }
 
-    const filtered = hints.filter((hint) => hint.command.startsWith(trimmed) || trimmed === '/');
+    const commandPrefix = trimmed.trimEnd();
+    const filtered = hints.filter((hint) => (
+      hint.command.startsWith(trimmed)
+      || hint.command === commandPrefix
+      || trimmed === '/'
+    ));
     return filtered.length > 0 ? filtered : hints;
   }
 
