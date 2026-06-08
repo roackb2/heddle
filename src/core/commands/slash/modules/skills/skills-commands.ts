@@ -5,6 +5,24 @@ import type { AgentSkillActivationView } from '@/core/skills/index.js';
 import type { SlashCommandExecutionContext } from '../context.js';
 import { argumentAfterPrefix, slashMessageResult } from '../results.js';
 
+const SKILL_LIST_SECTIONS: {
+  status: AgentSkillActivationView['status'];
+  title: string;
+  empty: string;
+}[] = [
+  { status: 'active', title: 'Active', empty: 'none' },
+  { status: 'available', title: 'Available', empty: 'none' },
+  { status: 'disabled', title: 'Disabled', empty: 'none' },
+  { status: 'missing', title: 'Missing definitions', empty: 'none' },
+];
+
+const SKILL_STATUS_ACTIONS = new Map<AgentSkillActivationView['status'], (name: string) => string>([
+  ['active', (name) => `/skills disable ${name}`],
+  ['available', (name) => `/skills enable ${name}`],
+  ['disabled', (name) => `/skills enable ${name}`],
+  ['missing', () => 'restore SKILL.md or disable the stale activation record'],
+]);
+
 export function createSkillsSlashCommandModule(): SlashCommandModule<SlashCommandResult, SlashCommandExecutionContext> {
   return {
     id: 'skills',
@@ -50,7 +68,11 @@ export async function listSkillsMessage(
   return slashMessageResult([
     'Agent Skills',
     '',
-    ...skills.map(formatSkillListItem),
+    ...SKILL_LIST_SECTIONS.map((section) => formatSkillSection(section, skills)),
+    '',
+    'Commands',
+    '  /skills enable <name>',
+    '  /skills disable <name>',
   ].join('\n'));
 }
 
@@ -78,12 +100,25 @@ async function disableSkillMessage(
 
 function formatSkillListItem(view: AgentSkillActivationView): string {
   const description = view.catalogEntry?.description ?? 'skill definition is missing';
-  const location = view.catalogEntry?.skillFilePath ?? view.record?.skillFilePath;
+  const source = view.catalogEntry?.source ?? view.record?.source;
+  const action = SKILL_STATUS_ACTIONS.get(view.status)?.(view.name);
   return [
-    `${view.status} ${view.name}`,
+    `- ${view.name}`,
     `  ${description}`,
-    location ? `  ${location}` : undefined,
+    source ? `  source=${source}` : undefined,
+    action ? `  action=${action}` : undefined,
   ].filter((line): line is string => line !== undefined).join('\n');
+}
+
+function formatSkillSection(
+  section: typeof SKILL_LIST_SECTIONS[number],
+  skills: AgentSkillActivationView[],
+): string {
+  const sectionSkills = skills.filter((view) => view.status === section.status);
+  return [
+    `${section.title} (${sectionSkills.length})`,
+    ...(sectionSkills.length > 0 ? sectionSkills.map(formatSkillListItem) : [`  ${section.empty}`]),
+  ].join('\n');
 }
 
 function matchesRequiredSkillArgument(prefix: string): (input: { raw: string }) => boolean {

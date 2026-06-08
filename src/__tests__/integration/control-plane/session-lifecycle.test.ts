@@ -331,7 +331,20 @@ description: Research web pages through a browser.
     })).resolves.toMatchObject({
       handled: true,
       kind: 'message',
-      message: expect.stringContaining('available browser-research'),
+      message: expect.stringContaining('Available ('),
+    });
+    await expect(caller.slashCommandExecute({
+      sessionId: session.id,
+      command: '/skills',
+    })).resolves.toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: expect.stringContaining([
+        '- browser-research',
+        '  Research web pages through a browser.',
+        '  source=project',
+        '  action=/skills enable browser-research',
+      ].join('\n')),
     });
     await expect(caller.slashCommandExecute({
       sessionId: session.id,
@@ -347,7 +360,7 @@ description: Research web pages through a browser.
     })).resolves.toMatchObject({
       handled: true,
       kind: 'message',
-      message: expect.stringContaining('active browser-research'),
+      message: expect.stringContaining('Active (1)\n- browser-research'),
     });
   });
 
