@@ -19,6 +19,8 @@ import type { Logger } from 'pino';
 import {
   ToolApprovalPolicies,
   ToolApprovalService,
+  type AutopilotProfile,
+  type ToolApprovalPolicy,
   type ToolApprovalRequest,
   type ToolApprovalUserDecision,
 } from '@/core/approvals/index.js';
@@ -62,6 +64,7 @@ type ControlPlaneSessionReadArgs = Omit<ConversationEngineConfig, 'model' | 'wor
   model?: string;
   sessionStoragePath: string;
   workspaceId: string;
+  autopilot?: AutopilotProfile;
 };
 
 type CreateControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & {
@@ -132,7 +135,7 @@ export class ControlPlaneChatSessionsController {
   createSession(args: CreateControlPlaneChatSessionArgs): ChatSessionDetail {
     const { suggestedName, ...engineInput } = args;
     const model = this.resolveSessionCreationModel(args);
-    const engine = createConversationEngine({
+    const engine = this.createEngine({
       ...engineInput,
       model,
     });
@@ -721,17 +724,31 @@ export class ControlPlaneChatSessionsController {
   }
 
   private createEngine(args: ControlPlaneSessionReadArgs): ConversationEngine {
+    const { autopilot, ...engineArgs } = args;
     const approvalService = this.createApprovalService(args);
     return createConversationEngine({
-      ...args,
+      ...engineArgs,
       model: args.model ?? DEFAULT_OPENAI_MODEL,
-      approvalPolicies: [
-        ...(args.approvalPolicies ?? []),
-        ToolApprovalPolicies.rememberedProjectRule({
-          isApproved: (context) => approvalService.isApprovedByRememberedProjectRule(context),
-        }),
-      ],
+      approvalPolicies: this.createApprovalPolicies({
+        approvalPolicies: args.approvalPolicies,
+        autopilot,
+        approvalService,
+      }),
     });
+  }
+
+  private createApprovalPolicies(args: {
+    approvalPolicies?: ToolApprovalPolicy[];
+    autopilot?: AutopilotProfile;
+    approvalService: ToolApprovalService;
+  }): ToolApprovalPolicy[] {
+    return [
+      ...(args.autopilot ? [ToolApprovalPolicies.autopilot({ profile: args.autopilot })] : []),
+      ...(args.approvalPolicies ?? []),
+      ToolApprovalPolicies.rememberedProjectRule({
+        isApproved: (context) => args.approvalService.isApprovedByRememberedProjectRule(context),
+      }),
+    ];
   }
 
   private createEngineHost(args: ControlPlaneSessionReadArgs & ControlPlaneSessionAddress, publisher: ControlPlaneTurnPublisher): ConversationEngineHost {

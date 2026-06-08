@@ -1,5 +1,7 @@
 import { resolve } from 'node:path';
 import type { Logger } from 'pino';
+import type { AutopilotProfile } from '@/core/approvals/index.js';
+import { ProjectConfigService } from '@/core/project-config/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import type { WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
 import { getWorkspaceOperationLogger } from '@/server/logging/workspace-operation-logger.js';
@@ -20,6 +22,7 @@ export type ControlPlaneRequestWorkspace = {
     sessionStoragePath: string;
     preferApiKey: boolean;
     workspaceId: string;
+    autopilot?: AutopilotProfile;
   };
 };
 
@@ -67,6 +70,7 @@ export function resolveControlPlaneRequestWorkspace(
   input?: WorkspaceScopedInput,
 ): ControlPlaneRequestWorkspace {
   const workspace = resolveWorkspaceDescriptor(ctx, input?.workspaceId);
+  const projectConfig = ProjectConfigService.read(workspace.workspaceRoot);
   const logger = getWorkspaceOperationLogger(workspace.stateRoot);
   return {
     workspace,
@@ -77,6 +81,7 @@ export function resolveControlPlaneRequestWorkspace(
       sessionStoragePath: resolve(workspace.stateRoot, 'chat-sessions.catalog.json'),
       preferApiKey: ctx.preferApiKey,
       workspaceId: workspace.id,
+      autopilot: projectConfig.autopilot,
     },
   };
 }

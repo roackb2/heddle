@@ -10,6 +10,9 @@ The public adapter methods are intentionally small:
   returning only supported fields and `{}` when the file is missing or invalid.
 - `ProjectConfigService.initialize(workspaceRoot)` creates the default config
   template when absent and reports whether a file was created.
+- The optional `autopilot` field uses the approval autonomy profile schema from
+  `src/core/approvals/autonomy/`. Project config validates the persisted shape,
+  but approval semantics and policy decisions stay in the approvals domain.
 
 Terminal command adapters may call these methods directly. They should not
 duplicate config defaults, parse JSON themselves, reinterpret invalid values, or

@@ -45,6 +45,18 @@ describe('ProjectConfigService', () => {
       directShellApproval: 'sometimes',
       searchIgnoreDirs: ['node_modules'],
       agentContextPaths: ['AGENTS.md'],
+      autopilot: {
+        mode: 'autopilot',
+        roots: [{
+          path: '.',
+          access: 'autopilot',
+          allow: ['read', 'write', 'execute'],
+        }],
+        environments: {
+          allow: ['local', 'dev'],
+          requireApproval: ['staging', 'production', 'unknown'],
+        },
+      },
       unknown: true,
     })}\n`);
 
@@ -53,6 +65,42 @@ describe('ProjectConfigService', () => {
       stateDir: '.state',
       searchIgnoreDirs: ['node_modules'],
       agentContextPaths: ['AGENTS.md'],
+      autopilot: {
+        mode: 'autopilot',
+        roots: [{
+          path: '.',
+          access: 'autopilot',
+          allow: ['read', 'write', 'execute'],
+        }],
+        environments: {
+          allow: ['local', 'dev'],
+          requireApproval: ['staging', 'production', 'unknown'],
+        },
+      },
+    });
+  });
+
+  it('ignores invalid autopilot profile config without rejecting other fields', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-project-config-'));
+    const initResult = ProjectConfigService.initialize(workspaceRoot);
+    writeFileSync(initResult.configPath, `${JSON.stringify({
+      model: 'gpt-5.4',
+      autopilot: {
+        mode: 'autopilot',
+        roots: [{
+          path: '.',
+          access: 'autopilot',
+          allow: ['rm-everything'],
+        }],
+        environments: {
+          allow: ['production'],
+          requireApproval: ['staging', 'production', 'unknown'],
+        },
+      },
+    })}\n`);
+
+    expect(ProjectConfigService.read(workspaceRoot)).toEqual({
+      model: 'gpt-5.4',
     });
   });
 

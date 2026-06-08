@@ -7,6 +7,7 @@ import { EngineConversationTurnService } from '@/core/chat/engine/turns/service.
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import * as agentLoopModule from '@/core/runtime/loop/index.js';
+import type { AutopilotProfile } from '@/core/approvals/index.js';
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
 import type { RunResult, ToolCall, ToolDefinition } from '@/index.js';
 import { controlPlaneChatSessionsController } from '@/server/controllers/trpc/control-plane/chat-sessions-controller.js';
@@ -206,6 +207,79 @@ describe('control-plane session runtime integration', () => {
     ]);
     expect(detail?.lastContinuePrompt).toBe('inspect file with expanded mention contents');
     expect(continueResult.session?.lastContinuePrompt).toBe('inspect file with expanded mention contents');
+  });
+
+  it('passes config autopilot policy before remembered approval rules into control-plane turns', async () => {
+    const engineArgs = createControlPlaneSessionEngineArgs();
+    const autopilot: AutopilotProfile = {
+      mode: 'autopilot',
+      roots: [{
+        path: '.',
+        access: 'autopilot',
+        allow: ['read', 'write', 'execute', 'many-file-edit'],
+      }],
+      environments: {
+        allow: ['local', 'dev'],
+        requireApproval: ['staging', 'production', 'unknown'],
+      },
+    };
+    const session = controlPlaneChatSessionsController.createSession({
+      ...engineArgs,
+      suggestedName: 'Autopilot policy order test',
+      model: 'gpt-5.4',
+      autopilot,
+    });
+    const loopSpy = vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(createLoopResult({
+      workspaceRoot: engineArgs.workspaceRoot,
+      prompt: 'Run safely.',
+      summary: 'Done.',
+    }) as never);
+
+    await controlPlaneChatSessionsController.submitPrompt({
+      ...engineArgs,
+      sessionId: session.id,
+      prompt: 'Run safely.',
+      autopilot,
+      leaseOwner: {
+        ownerKind: 'daemon',
+        ownerId: 'daemon-test',
+        clientLabel: 'control plane',
+      },
+    });
+
+    const firstPolicy = loopSpy.mock.calls[0]?.[0].approvalPolicies?.[0];
+    const decision = await firstPolicy?.({
+      workspaceRoot: engineArgs.workspaceRoot,
+      call: {
+        id: 'call-danger',
+        tool: 'run_shell_mutate',
+        input: {
+          command: 'rm -rf ~',
+          policy: {
+            operations: ['delete'],
+            intent: 'Delete home directory',
+            targetRoots: ['.'],
+            writeRoots: ['.'],
+            expectedEffects: ['delete many files'],
+            maxDestructiveScope: 'many-files',
+            environment: 'local',
+            confidence: 'high',
+          },
+        },
+      },
+      tool: {
+        name: 'run_shell_mutate',
+        description: 'Mutate shell',
+        requiresApproval: true,
+        parameters: { type: 'object' },
+        execute: async () => ({ ok: true }),
+      },
+    });
+
+    expect(decision).toEqual(expect.objectContaining({
+      type: 'deny',
+      reason: expect.stringContaining('root/home recursive deletion is blocked'),
+    }));
   });
 });
 
