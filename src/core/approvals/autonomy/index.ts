@@ -1,5 +1,6 @@
 export { AutopilotProfileService, DEFAULT_INTERACTIVE_AUTOPILOT_PROFILE } from './profile-service.js';
 export { AutonomyPolicyService } from './policy-service.js';
+export { AutonomyPostflightAuditService } from './postflight-audit-service.js';
 export { AutonomyTraceService } from './trace-service.js';
 export {
   AutopilotCapabilitySchema,

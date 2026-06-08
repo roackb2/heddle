@@ -2,6 +2,7 @@ export { ToolApprovalPolicies } from './policies.js';
 export { ToolApprovalService } from './service.js';
 export {
   AutonomyPolicyService,
+  AutonomyPostflightAuditService,
   AutonomyTraceService,
   AutopilotProfileService,
   DEFAULT_INTERACTIVE_AUTOPILOT_PROFILE,

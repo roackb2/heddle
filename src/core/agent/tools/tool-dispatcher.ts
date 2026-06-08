@@ -1,12 +1,22 @@
 import type { Logger } from 'pino';
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
-import { AutonomyTraceService, ToolApprovalPolicies, ToolApprovalService } from '@/core/approvals/index.js';
+import {
+  AutonomyPostflightAuditService,
+  AutonomyTraceService,
+  ToolApprovalPolicies,
+  ToolApprovalService,
+  type AutonomyEvaluation,
+} from '@/core/approvals/index.js';
 import { HeddleEventType } from '@/core/event-types.js';
 import { ToolActivitySummarizer } from '@/core/live/index.js';
 import { ToolExecutionService, type ToolRegistry } from '@/core/tools/index.js';
 import type { ToolCall, ToolDefinition } from '@/core/types.js';
 import { normalizeToolInput, stableSerialize } from '@/core/agent/utils/index.js';
 import type { AgentRunLiveRecorder, RunAgentOptions } from '../types.js';
+
+type ToolAuthorizationResult =
+  | { type: 'allowed'; autonomyEvaluation?: AutonomyEvaluation }
+  | { type: 'denied'; result: { ok: false; error: string } };
 
 /**
  * Owns tool approval, execution, deduplication, and inspect-to-mutate fallback.
@@ -15,7 +25,7 @@ import type { AgentRunLiveRecorder, RunAgentOptions } from '../types.js';
  * a single call is authorized, executed, traced, and optionally retried.
  */
 export class AgentToolDispatcher {
-  static async maybeDenyToolCall(args: {
+  static async authorizeToolCall(args: {
     call: ToolCall;
     tool: ToolDefinition | undefined;
     step: number;
@@ -25,10 +35,10 @@ export class AgentToolDispatcher {
     workspaceRoot?: string;
     live: AgentRunLiveRecorder;
     log: Logger;
-  }): Promise<{ ok: false; error: string } | undefined> {
+  }): Promise<ToolAuthorizationResult> {
     const { call, tool, step, now, approveToolCall, live, log } = args;
     if (!tool) {
-      return undefined;
+      return { type: 'allowed' };
     }
 
     const approval = await new ToolApprovalService().resolve({
@@ -89,7 +99,10 @@ export class AgentToolDispatcher {
       }));
     }
     if (approval.approved) {
-      return undefined;
+      return {
+        type: 'allowed',
+        autonomyEvaluation: approval.autonomyEvaluation,
+      };
     }
 
     const result = {
@@ -110,11 +123,12 @@ export class AgentToolDispatcher {
         durationMs: 0,
       },
     });
-    return result;
+    return { type: 'denied', result };
   }
 
   static async executeToolCallWithFallback(args: {
     call: ToolCall;
+    autonomyEvaluation?: AutonomyEvaluation;
     step: number;
     now: () => string;
     registry: ToolRegistry;
@@ -163,7 +177,7 @@ export class AgentToolDispatcher {
         },
       },
     });
-    const approvalDeniedResult = await AgentToolDispatcher.maybeDenyToolCall({
+    const authorization = await AgentToolDispatcher.authorizeToolCall({
       call: mutateCall,
       tool: mutateTool,
       step: args.step,
@@ -174,20 +188,24 @@ export class AgentToolDispatcher {
       live: args.live,
       log: args.log,
     });
-    if (approvalDeniedResult) {
-      return { effectiveCall: mutateCall, result: approvalDeniedResult };
+    if (authorization.type === 'denied') {
+      return { effectiveCall: mutateCall, result: authorization.result };
     }
 
     args.log.info(
       { step: args.step, from: args.call.tool, to: mutateCall.tool, reason: fallbackReason },
       'Retrying inspect failure through mutate fallback',
     );
-    return AgentToolDispatcher.executeRecordedToolCall(mutateCall, args);
+    return AgentToolDispatcher.executeRecordedToolCall(mutateCall, {
+      ...args,
+      autonomyEvaluation: authorization.autonomyEvaluation,
+    });
   }
 
   private static async executeRecordedToolCall(
     call: ToolCall,
     args: {
+      autonomyEvaluation?: AutonomyEvaluation;
       step: number;
       now: () => string;
       registry: ToolRegistry;
@@ -226,10 +244,34 @@ export class AgentToolDispatcher {
     }
 
     const startedAt = Date.now();
-    const result = await ToolExecutionService.execute(registry, call);
+    const rawResult = await ToolExecutionService.execute(registry, call);
+    const audit = AutonomyPostflightAuditService.shouldAudit(args.autonomyEvaluation)
+      ? AutonomyPostflightAuditService.create({
+        evaluation: args.autonomyEvaluation,
+        result: rawResult,
+        workspaceRoot: args.autonomyEvaluation.facts.cwd,
+      })
+      : undefined;
+    const result = audit?.decision === 'stop'
+      ? {
+        ok: false as const,
+        error: `Autopilot postflight audit stopped the run: ${audit.reason ?? 'observed effects exceeded policy'}`,
+        output: {
+          toolResult: rawResult,
+          audit,
+        },
+      }
+      : rawResult;
     const durationMs = Date.now() - startedAt;
     seenToolCalls.set(signature, seenCount + 1);
     log.debug({ step, tool: call.tool, ok: result.ok }, 'Tool result');
+    if (audit) {
+      live.trace(AutonomyTraceService.postflight({
+        audit,
+        step,
+        timestamp: now(),
+      }));
+    }
     live.traceActivity({
       trace: { type: HeddleEventType.toolCompleted, call, result, durationMs, step, timestamp: now() },
       activity: {
