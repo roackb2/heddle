@@ -206,19 +206,25 @@
     "metrics": {
       "active": "Active",
       "activeDetail": "會顯示給未來的 agent turns",
-      "available": "Available",
-      "availableDetail": "已找到但尚未啟用",
+      "available": "Not enabled",
+      "availableDetail": "已找到，尚未有 workspace decision",
       "disabled": "Disabled",
-      "disabledDetail": "不會顯示給 agent"
+      "disabledDetail": "已在此 workspace 明確停用"
     },
     "missingDescription": "Skill definition 遺失。",
     "noActivationStore": "沒有 activation store",
     "overviewTitle": "Agent Skills",
     "searchLabel": "搜尋 skills",
     "searchPlaceholder": "搜尋 skills",
+    "sectionDetails": {
+      "active": "會載入未來的 agent turns。",
+      "available": "已找到，但還沒有 activation record。",
+      "disabled": "已針對此 workspace 明確關閉。",
+      "missing": "Activation record 指向的 SKILL.md 已找不到。"
+    },
     "sections": {
       "active": "Active",
-      "available": "Available",
+      "available": "Not enabled",
       "disabled": "Disabled",
       "missing": "定義遺失"
     },
@@ -229,7 +235,7 @@
     },
     "status": {
       "active": "active",
-      "available": "available",
+      "available": "not enabled",
       "disabled": "disabled",
       "missing": "missing"
     },

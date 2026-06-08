@@ -206,19 +206,25 @@
     "metrics": {
       "active": "Active",
       "activeDetail": "Shown to future agent turns",
-      "available": "Available",
-      "availableDetail": "Discovered but not enabled",
+      "available": "Not enabled",
+      "availableDetail": "Discovered with no workspace decision",
       "disabled": "Disabled",
-      "disabledDetail": "Not shown to the agent"
+      "disabledDetail": "Explicitly turned off in this workspace"
     },
     "missingDescription": "Skill definition is missing.",
     "noActivationStore": "No activation store",
     "overviewTitle": "Agent Skills",
     "searchLabel": "Search skills",
     "searchPlaceholder": "Search skills",
+    "sectionDetails": {
+      "active": "Loaded into future agent turns.",
+      "available": "Discovered skills with no activation record yet.",
+      "disabled": "Skills explicitly turned off for this workspace.",
+      "missing": "Activation records whose SKILL.md file is no longer found."
+    },
     "sections": {
       "active": "Active",
-      "available": "Available",
+      "available": "Not enabled",
       "disabled": "Disabled",
       "missing": "Missing definitions"
     },
@@ -229,7 +235,7 @@
     },
     "status": {
       "active": "active",
-      "available": "available",
+      "available": "not enabled",
       "disabled": "disabled",
       "missing": "missing"
     },

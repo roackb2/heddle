@@ -17,11 +17,11 @@ export interface SkillsSettingsViewProps {
 type SkillStatus = ControlPlaneSkillActivationView['status'];
 
 const skillStatusSections = [
-  { status: 'active', labelKey: 'skillSettings.sections.active' },
-  { status: 'available', labelKey: 'skillSettings.sections.available' },
-  { status: 'disabled', labelKey: 'skillSettings.sections.disabled' },
-  { status: 'missing', labelKey: 'skillSettings.sections.missing' },
-] satisfies { status: SkillStatus; labelKey: I18nMessageKey }[];
+  { status: 'active', labelKey: 'skillSettings.sections.active', detailKey: 'skillSettings.sectionDetails.active' },
+  { status: 'available', labelKey: 'skillSettings.sections.available', detailKey: 'skillSettings.sectionDetails.available' },
+  { status: 'disabled', labelKey: 'skillSettings.sections.disabled', detailKey: 'skillSettings.sectionDetails.disabled' },
+  { status: 'missing', labelKey: 'skillSettings.sections.missing', detailKey: 'skillSettings.sectionDetails.missing' },
+] satisfies { status: SkillStatus; labelKey: I18nMessageKey; detailKey: I18nMessageKey }[];
 
 const statusLabelKeys = {
   active: 'skillSettings.status.active',
@@ -144,6 +144,7 @@ export function SkillsSettingsView({
             {skillStatusSections.map((section) => (
               <SkillSection
                 key={section.status}
+                detail={t(section.detailKey)}
                 label={t(section.labelKey)}
                 pendingSkillName={pendingSkillName}
                 skills={visibleSkills.filter((skill) => skill.status === section.status)}
@@ -178,12 +179,14 @@ export function SkillsSettingsView({
 }
 
 function SkillSection({
+  detail,
   label,
   pendingSkillName,
   skills,
   updating,
   onSetSkillActive,
 }: {
+  detail: string;
   label: string;
   pendingSkillName?: string;
   skills: ControlPlaneSkillActivationView[];
@@ -194,7 +197,10 @@ function SkillSection({
   return (
     <div className="min-w-0">
       <div className="mb-2 flex min-w-0 items-center justify-between gap-3">
-        <h3 className="v2-type-nav-primary text-foreground">{label}</h3>
+        <div className="min-w-0">
+          <h3 className="v2-type-nav-primary text-foreground">{label}</h3>
+          <p className="v2-type-caption mt-0.5 truncate text-muted-foreground">{detail}</p>
+        </div>
         <span className="v2-type-caption tabular-nums text-muted-foreground">{skills.length}</span>
       </div>
       <div className="v2-settings-group">
