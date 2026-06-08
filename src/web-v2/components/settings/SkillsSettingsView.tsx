@@ -117,23 +117,23 @@ export function SkillsSettingsView({
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
-          <div className="v2-settings-group">
-            <SkillMetricRow
+          <dl className="flex min-w-0 flex-wrap items-center gap-2">
+            <SkillMetricPill
               label={t('skillSettings.metrics.active')}
               value={counts.active}
               detail={t('skillSettings.metrics.activeDetail')}
             />
-            <SkillMetricRow
+            <SkillMetricPill
               label={t('skillSettings.metrics.available')}
               value={counts.available}
               detail={t('skillSettings.metrics.availableDetail')}
             />
-            <SkillMetricRow
+            <SkillMetricPill
               label={t('skillSettings.metrics.disabled')}
               value={counts.disabled + counts.missing}
               detail={t('skillSettings.metrics.disabledDetail')}
             />
-          </div>
+          </dl>
         </section>
 
         {actionError ? <SkillsSettingsAlert message={actionError} /> : null}
@@ -259,7 +259,7 @@ function SkillRow({
   );
 }
 
-function SkillMetricRow({
+function SkillMetricPill({
   detail,
   label,
   value,
@@ -269,12 +269,15 @@ function SkillMetricRow({
   value: number;
 }) {
   return (
-    <div className="v2-settings-row">
-      <div className="v2-type-nav-primary min-w-0 text-foreground">{label}</div>
-      <div className="min-w-0 text-right">
-        <p className="v2-type-body-strong tabular-nums text-foreground">{value.toLocaleString()}</p>
-        <p className="v2-type-caption mt-1 text-muted-foreground">{detail}</p>
-      </div>
+    <div
+      className="inline-flex min-w-0 items-center gap-2 rounded-md border border-border bg-muted/15 px-2.5 py-1"
+      title={detail}
+    >
+      <dt className="v2-type-caption min-w-0 truncate text-muted-foreground">{label}</dt>
+      <dd className="v2-type-caption tabular-nums text-foreground">
+        {value.toLocaleString()}
+        <span className="sr-only">, {detail}</span>
+      </dd>
     </div>
   );
 }
