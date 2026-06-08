@@ -4,6 +4,12 @@ Heddle can store local workspace defaults in `.heddle/config.json` so you do not
 
 Older workspaces with a root-level `heddle.config.json` still load for backward compatibility when `.heddle/config.json` is absent. New initialization writes only `.heddle/config.json` so Heddle does not create repository-root files by default.
 
+MCP server declarations use a separate `.heddle/mcp.json` file so external
+integration config, activation state, and cached tool catalogs stay separate
+from ordinary workspace defaults. You can edit this file directly, open it with
+`/mcp config`, or paste the JSON document into Settings -> MCP. See
+[MCP integrations](mcp.md).
+
 ## Example
 
 ```json

@@ -10,6 +10,12 @@ import type {
   AgentSkillActivationResult,
   AgentSkillActivationView,
 } from '@/core/skills/index.js';
+import type {
+  McpActivationResult,
+  McpOverview,
+  McpOpenConfigResult,
+  McpRefreshResult,
+} from '@/core/mcp/index.js';
 import type { SlashCommandResult } from '../result-types.js';
 
 export type SlashCommandExecutionContext = {
@@ -56,6 +62,13 @@ export type SlashCommandExecutionContext = {
     list: () => Promise<AgentSkillActivationView[]>;
     activate: (name: string) => Promise<AgentSkillActivationResult>;
     disable: (name: string) => Promise<AgentSkillActivationResult>;
+  };
+  mcp: {
+    list: () => Promise<McpOverview>;
+    enable: (serverId: string) => Promise<McpActivationResult>;
+    disable: (serverId: string) => Promise<McpActivationResult>;
+    refresh: (serverId: string) => Promise<McpRefreshResult>;
+    openConfig: () => Promise<McpOpenConfigResult>;
   };
   help: {
     message: () => string;

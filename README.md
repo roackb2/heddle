@@ -272,6 +272,32 @@ user skills they enable.
 
 More: [Agent Skills guide](docs/guides/agent-skills.md)
 
+### MCP integrations
+
+Heddle can connect to user-configured Model Context Protocol servers so the
+agent can use ecosystem tools such as Notion, Anytype, GitHub, or other MCP
+integrations through Heddle's approval and trace path.
+
+Configure servers by pasting a standard `mcpServers` JSON document into
+Settings -> MCP, editing `.heddle/mcp.json` directly, or opening that file from
+chat with `/mcp config`. Server config is separate from workspace activation:
+after saving config, explicitly enable and refresh the server before future
+agent turns can see its cached tools.
+
+```text
+/mcp
+/mcp config
+/mcp enable <server>
+/mcp refresh <server>
+/mcp disable <server>
+```
+
+Refreshing an enabled server caches its tool catalog under `.heddle/mcp/`.
+Future agent turns can inspect MCP tools with `mcp_list_tools` and call them
+through approval-gated MCP tool adapters.
+
+More: [MCP integrations](docs/reference/mcp.md)
+
 ### Sessions and continuity
 
 Heddle keeps saved sessions under `.heddle/` so longer work does not have to reset every time. Current versions store the session catalog at `.heddle/chat-sessions.catalog.json` and per-session bodies under `.heddle/chat-sessions/`. That means you can come back to an interrupted task, continue a previous debugging thread, or preserve project-specific context across runs.
@@ -457,6 +483,7 @@ npx -p @roackb2/heddle -p cyberloop heddle
 - [Control plane](docs/guides/control-plane.md)
 - [Heartbeat](docs/guides/heartbeat.md)
 - [Agent Skills](docs/guides/agent-skills.md)
+- [MCP integrations](docs/reference/mcp.md)
 - [Knowledge persistence](docs/guides/knowledge-persistence.md)
 - [Semantic drift](docs/guides/semantic-drift.md)
 - [Programmatic use](docs/guides/programmatic-use.md)

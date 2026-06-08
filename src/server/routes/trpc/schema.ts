@@ -241,6 +241,16 @@ export const skillInputSchema = z.object({
   name: z.string().min(1),
 });
 
+export const mcpServerInputSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+  serverId: z.string().min(1),
+});
+
+export const mcpConfigInputSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+  content: z.string(),
+});
+
 export const workspacePermissionModeUpdateInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   mode: z.enum(AUTONOMY_PERMISSION_MODES),

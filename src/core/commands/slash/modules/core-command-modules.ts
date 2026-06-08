@@ -7,6 +7,7 @@ import { createDriftSlashCommandModule } from './drift/drift-commands.js';
 import { createHeartbeatSlashCommandModule } from './heartbeat/heartbeat-commands.js';
 import { createHelpSlashCommandModule } from './help/help-commands.js';
 import { createModelSlashCommandModule, createReasoningSlashCommandModule } from './model/model-commands.js';
+import { createMcpSlashCommandModule } from './mcp/mcp-commands.js';
 import { createPermissionsSlashCommandModule } from './permissions/permission-commands.js';
 import { createSessionSlashCommandModule } from './session/session-commands.js';
 import { createSkillsSlashCommandModule } from './skills/skills-commands.js';
@@ -26,5 +27,6 @@ export function createCoreSlashCommandModules(): SlashCommandModule<
     createSessionSlashCommandModule(),
     createHeartbeatSlashCommandModule(),
     createSkillsSlashCommandModule(),
+    createMcpSlashCommandModule(),
   ];
 }

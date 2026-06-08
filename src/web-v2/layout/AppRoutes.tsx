@@ -8,6 +8,7 @@ import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
 import {
   WorkbenchView,
   type MemorySettingsViewProps,
+  type McpSettingsViewProps,
   type SkillsSettingsViewProps,
   type SessionWorkbenchViewProps,
   type TaskWorkbenchViewProps,
@@ -18,6 +19,7 @@ interface AppRoutesProps {
   activeSurfaceId: AppSurfaceId;
   activeSettingsSectionId: SettingsSectionId;
   memorySettingsView: MemorySettingsViewProps;
+  mcpSettingsView: McpSettingsViewProps;
   sessionView: SessionWorkbenchViewProps;
   skillsSettingsView: SkillsSettingsViewProps;
   taskView: TaskWorkbenchViewProps;
@@ -42,6 +44,7 @@ export function AppRoutes({
   activeSurfaceId,
   activeSettingsSectionId,
   memorySettingsView,
+  mcpSettingsView,
   sessionView,
   skillsSettingsView,
   taskView,
@@ -50,6 +53,7 @@ export function AppRoutes({
   const sharedWorkbenchProps = {
     activeSettingsSectionId,
     memorySettingsView,
+    mcpSettingsView,
     sessionView,
     skillsSettingsView,
     taskView,

@@ -5,6 +5,7 @@ import { codingFilesToolkit } from '@/core/tools/toolkits/coding-files/toolkit.j
 import { externalContextToolkit } from '@/core/tools/toolkits/external-context/toolkit.js';
 import { internalToolkit } from '@/core/tools/toolkits/internal/toolkit.js';
 import { knowledgeToolkit } from '@/core/tools/toolkits/knowledge/toolkit.js';
+import { mcpToolkit } from '@/core/tools/toolkits/mcp/toolkit.js';
 import { shellProcessToolkit } from '@/core/tools/toolkits/shell-process/toolkit.js';
 import { ToolBundleComposer, type ToolToolkit } from '@/core/tools/index.js';
 import type { ToolDefinition } from '@/core/types.js';
@@ -47,6 +48,7 @@ export class RuntimeToolService {
       codingFilesToolkit,
       externalContextToolkit,
       knowledgeToolkit,
+      mcpToolkit,
       this.createDefaultInternalToolkit({ includePlanTool: args.includePlanTool }),
       shellProcessToolkit,
     ];
