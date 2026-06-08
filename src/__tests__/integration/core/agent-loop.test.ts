@@ -345,15 +345,19 @@ Use browser_snapshot before making claims.
 });
 
 describe('RuntimeToolService.createDefaultAgentTools', () => {
-  it('creates the default runtime tool bundle with stable ordering and can omit planning for single-turn hosts', () => {
+  it('creates the default runtime tool bundle with stable ordering and can omit planning for single-turn hosts', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'heddle-runtime-tools-'));
+    const memoryDir = join(workspaceRoot, 'memory');
     const withPlan = RuntimeToolService.createDefaultAgentTools({
       model: 'gpt-test',
-      memoryDir: '/tmp/heddle-memory',
+      workspaceRoot,
+      memoryDir,
       includePlanTool: true,
     });
     const withoutPlan = RuntimeToolService.createDefaultAgentTools({
       model: 'gpt-test',
-      memoryDir: '/tmp/heddle-memory',
+      workspaceRoot,
+      memoryDir,
       includePlanTool: false,
     });
 
@@ -399,20 +403,25 @@ describe('RuntimeToolService.createDefaultAgentTools', () => {
     expect(withoutPlan.map((tool) => tool.name)).not.toContain('edit_memory_note');
   });
 
-  it('supports explicit memory tool modes', () => {
+  it('supports explicit memory tool modes', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'heddle-runtime-tools-'));
+    const memoryDir = join(workspaceRoot, 'memory');
     const none = RuntimeToolService.createDefaultAgentTools({
       model: 'gpt-test',
-      memoryDir: '/tmp/heddle-memory',
+      workspaceRoot,
+      memoryDir,
       memoryMode: 'none',
     }).map((tool) => tool.name);
     const maintainer = RuntimeToolService.createDefaultAgentTools({
       model: 'gpt-test',
-      memoryDir: '/tmp/heddle-memory',
+      workspaceRoot,
+      memoryDir,
       memoryMode: 'maintainer',
     }).map((tool) => tool.name);
     const legacy = RuntimeToolService.createDefaultAgentTools({
       model: 'gpt-test',
-      memoryDir: '/tmp/heddle-memory',
+      workspaceRoot,
+      memoryDir,
       memoryMode: 'legacy-full',
     }).map((tool) => tool.name);
 
