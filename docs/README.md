@@ -11,6 +11,7 @@ If you are new to Heddle, begin with:
 - [Root README](../README.md) for installation and product overview
 - [Runtime host model](guides/runtime-host-model.md) for how terminal chat, daemon mode, workspace identity, and the shared control-plane server fit together
 - [Chat and sessions](guides/chat-and-sessions.md) for the core interactive workflow
+- [Agent Skills](guides/agent-skills.md) for opt-in reusable agent workflows and skill activation
 - [Knowledge persistence](guides/knowledge-persistence.md) for how Heddle learns durable workspace knowledge while it works
 - [Control plane](guides/control-plane.md) for the browser UI, workspace switching, session review, task workbench, and browser composer
 - [Heartbeat](guides/heartbeat.md) for scheduled/background task workflows
@@ -40,6 +41,7 @@ Read only when needed:
 Task-oriented guides:
 
 - [Chat and sessions](guides/chat-and-sessions.md)
+- [Agent Skills](guides/agent-skills.md)
 - [Runtime host model](guides/runtime-host-model.md)
 - [Control plane](guides/control-plane.md)
 - [Knowledge persistence](guides/knowledge-persistence.md)
@@ -90,9 +92,10 @@ Evaluation:
 
 1. [README](../README.md)
 2. [Chat and sessions](guides/chat-and-sessions.md)
-3. [Knowledge persistence](guides/knowledge-persistence.md)
-4. [Providers and models](reference/providers-and-models.md)
-5. [Project config](reference/config.md)
+3. [Agent Skills](guides/agent-skills.md)
+4. [Knowledge persistence](guides/knowledge-persistence.md)
+5. [Providers and models](reference/providers-and-models.md)
+6. [Project config](reference/config.md)
 
 ### I want the browser UI and remote oversight
 

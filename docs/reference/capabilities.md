@@ -12,6 +12,7 @@ Heddle is built to help with real workspace tasks such as:
 - carrying work across multi-turn sessions instead of treating every prompt as stateless
 - switching between local project workspaces through the browser control plane
 - learning durable workspace knowledge from normal usage through catalog-backed memory
+- enabling standard Agent Skills for workspace-approved reusable instructions
 - exposing local browser oversight through the control plane
 - supporting bounded autonomous work through heartbeat scheduling
 
@@ -50,6 +51,9 @@ Current runtime features include:
 - automatic durable memory candidate recording and maintainer-backed catalog updates under `.heddle/memory/`
 - read-only memory visibility through `heddle memory status/list/read/search`
 - memory validation through `heddle memory validate`
+- Agent Skills discovery from `.agents/skills/<name>/SKILL.md` and `~/.agents/skills/<name>/SKILL.md`
+- workspace-level skill activation through `/skills`, `/skills enable <name>`, and `/skills disable <name>`
+- progressive skill disclosure through the `read_agent_skill` tool for active skills only
 - remembered per-project approvals for repeated commands and edits, with clearer previews before approval
 - interrupt and resume support for longer-running workflows
 - serializable checkpoints for programmatic continuation
@@ -77,6 +81,7 @@ Beyond terminal chat, Heddle includes:
 
 - Heddle is a coding/workspace agent runtime, not a general-purpose autonomous system.
 - Knowledge persistence uses explicit local catalogs and maintainer runs, so users can audit what Heddle learned instead of relying on opaque retrieval.
+- Agent Skills are instructions, not permissions. Enabling a skill does not bypass Heddle's approval policy, tool safety checks, browser policy, or workspace permissions.
 - The control plane review view is read-only. Current changes are Git-backed, while historical turn evidence is trace-backed; it is not yet an editable IDE-grade diff surface or live file watcher.
 - The image workflow is intentionally lightweight: terminal users can provide a local image path, and browser uploads are saved back to local workspace state as readable image paths. In both cases, Heddle decides whether inspection is needed through `view_image`.
 - OpenAI account sign-in can now drive `view_image` through the Codex OAuth transport. Hosted `web_search` and drift embeddings still require OpenAI Platform API-key mode today.
@@ -87,5 +92,6 @@ Beyond terminal chat, Heddle includes:
 ## See Also
 
 - [Chat and sessions](../guides/chat-and-sessions.md)
+- [Agent Skills](../guides/agent-skills.md)
 - [Programmatic use](../guides/programmatic-use.md)
 - [Control plane](../guides/control-plane.md)

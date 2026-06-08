@@ -117,9 +117,27 @@ By default, the normalized engine config derives these paths from `stateRoot`:
 - per-session bodies: `stateRoot/chat-sessions/<session-id>.json`
 - memory directory: `stateRoot/memory`
 - trace directory: `stateRoot/traces`
+- Agent Skills activation state: `stateRoot/skills/activation.json`
 
 For ordinary Heddle usage, that state root is typically the workspace-local `.heddle/` directory.
 The current session storage format is the catalog plus per-session JSON files; older flat `chat-sessions.json` files are not migrated or read.
+
+## Agent Skills In Programmatic Hosts
+
+Programmatic hosts can use the same Agent Skills support as the CLI. Heddle
+discovers standard skills from `.agents/skills/<name>/SKILL.md` and
+`~/.agents/skills/<name>/SKILL.md`, stores only workspace activation status
+under the configured `stateRoot`, and exposes active skills through progressive
+disclosure.
+
+When active skills exist and the default `read_agent_skill` tool is available,
+the runtime appends a compact `<available_skills>` catalog to the system
+context. The model can then call `read_agent_skill` to read one active
+`SKILL.md` body or a linked resource under `scripts/`, `references/`, or
+`assets/`.
+
+Skills are instructions, not permissions. Hosts still own approval callbacks,
+tool policy, workspace boundaries, and any UI needed for activation management.
 
 ## Host Callbacks
 

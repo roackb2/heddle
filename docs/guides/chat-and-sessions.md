@@ -66,6 +66,7 @@ Common use cases:
 - watch streamed `Thinking:` progress, tool activity, and current plan updates while long turns are running
 - keep longer work usable through saved sessions, `/continue`, automatic history compaction, and manual `/compact`
 - let the agent create and update a short working plan for a multi-step implementation
+- enable standard Agent Skills when you want the agent to load reusable workflow instructions on demand
 - search official docs or current external references with provider-backed `web_search`
 - mention important repo files with `@path/to/file`
 - reference a local screenshot path and have the agent inspect it with `view_image`
@@ -100,6 +101,9 @@ Useful chat commands:
 - `/session close <id>`: remove a saved session
 - `/clear`: clear the current transcript
 - `/compact`: compact older session history immediately
+- `/skills`: list discovered Agent Skills and activation status
+- `/skills enable <name>`: enable one Agent Skill for future turns in this workspace
+- `/skills disable <name>`: disable one active Agent Skill for future turns in this workspace
 - `/drift`: show CyberLoop semantic drift detection status
 - `/drift on`: re-enable observe-only CyberLoop telemetry for chat runs
 - `/drift off`: disable CyberLoop semantic drift detection
@@ -127,6 +131,30 @@ Read-oriented commands stay in inspect mode when possible. Workspace-changing or
 
 Approval prompts show the command or search query being requested, and remembered project approvals can cover repeated safe commands without hiding the original action from review.
 
+## Agent Skills
+
+Agent Skills let you keep reusable workflow instructions in standard
+`SKILL.md` folders without pasting those instructions into every prompt.
+
+Create project skills under `.agents/skills/<name>/SKILL.md` or user skills
+under `~/.agents/skills/<name>/SKILL.md`, then enable them in chat:
+
+```text
+/skills
+/skills enable <name>
+/skills disable <name>
+```
+
+Only active skills are shown to the agent. Heddle adds a compact active-skill
+catalog to the run context, and the agent can use `read_agent_skill` to read
+the full skill body or linked resources only when needed.
+
+Skills do not grant tool permissions. Heddle's approval policy and tool safety
+checks still decide whether shell commands, file edits, browser actions, and
+other sensitive operations can run.
+
+More: [Agent Skills](agent-skills.md)
+
 ## State And Continuity
 
 Chat state is stored under `.heddle/`, including saved sessions, traces, approvals, and memory notes. Saved sessions use `.heddle/chat-sessions.catalog.json` plus per-session files under `.heddle/chat-sessions/`; older flat `chat-sessions.json` files are not read by current versions. The footer context indicator is an estimate of total request input against the active model's context window, not only raw chat history length.
@@ -147,5 +175,6 @@ Drift telemetry is disabled by default for new sessions. For installed usage, in
 
 - [CLI reference](../reference/cli.md)
 - [Capabilities and tools](../reference/capabilities.md)
+- [Agent Skills](agent-skills.md)
 - [Semantic drift](semantic-drift.md)
 - [Knowledge persistence](knowledge-persistence.md)

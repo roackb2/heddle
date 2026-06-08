@@ -118,6 +118,9 @@ Inside `heddle` / `heddle chat`, the most-used local commands are:
 - `/session choose <query>`: filter and choose a saved session
 - `/continue`: continue the current session
 - `/compact`: compact older session history
+- `/skills`: list discovered Agent Skills and activation status for this workspace
+- `/skills enable <name>`: enable one Agent Skill for future turns in this workspace
+- `/skills disable <name>`: disable one active Agent Skill for future turns in this workspace
 
 Prompt editing supports `Shift+Enter` for newlines, `Ctrl+Z`/`Ctrl+Y` for undo/redo, and `Up`/`Down` for submitted prompt history when the cursor is on the first or last logical line.
 
@@ -147,6 +150,7 @@ yarn typecheck
 ## See Also
 
 - [Chat and sessions guide](../guides/chat-and-sessions.md)
+- [Agent Skills guide](../guides/agent-skills.md)
 - [Control plane guide](../guides/control-plane.md)
 - [Heartbeat guide](../guides/heartbeat.md)
 - [Project config](config.md)
