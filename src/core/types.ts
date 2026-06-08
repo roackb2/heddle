@@ -5,6 +5,7 @@
 
 import type { ChatMessage, LlmUsage } from './llm/types.js';
 import { HeddleEventType } from './event-types.js';
+import type { AutonomyEvaluation, AutonomyPostflightAudit } from './approvals/autonomy/index.js';
 
 /**
  * Input to the agent loop.
@@ -87,6 +88,18 @@ export type TraceEvent =
       code: 'actionless_completion';
       message: string;
       details?: Record<string, unknown>;
+      step: number;
+      timestamp: string;
+    }
+  | {
+      type: typeof HeddleEventType.autonomyDecision;
+      evaluation: AutonomyEvaluation;
+      step: number;
+      timestamp: string;
+    }
+  | {
+      type: typeof HeddleEventType.autonomyPostflight;
+      audit: AutonomyPostflightAudit;
       step: number;
       timestamp: string;
     }

@@ -14,6 +14,7 @@ import {
 } from './remembered-rules/index.js';
 import { previewEditFileInput } from '@/core/tools/toolkits/coding-files/edit-file.js';
 import { ToolActivitySummarizer } from '@/core/live/index.js';
+import { ToolPolicyEnvelopeInputService } from '@/core/tools/index.js';
 import type { ToolApprovalPolicyContext } from './types.js';
 
 export type ToolApprovalServiceOptions = {
@@ -45,6 +46,7 @@ export class ToolApprovalService {
 
   async resolve(args: ResolveToolApprovalArgs): Promise<ToolApprovalDecision> {
     let requestReason: string | undefined;
+    let autonomyEvaluation: ToolApprovalDecision['autonomyEvaluation'];
 
     for (const policy of args.policies) {
       const decision = await policy(args.context);
@@ -52,12 +54,14 @@ export class ToolApprovalService {
         continue;
       }
 
+      autonomyEvaluation ??= decision.autonomyEvaluation;
+
       if (decision.type === 'deny') {
-        return { approved: false, reason: decision.reason };
+        return ToolApprovalService.withAutonomyEvaluation({ approved: false, reason: decision.reason }, autonomyEvaluation);
       }
 
       if (decision.type === 'allow') {
-        return { approved: true, reason: decision.reason };
+        return ToolApprovalService.withAutonomyEvaluation({ approved: true, reason: decision.reason }, autonomyEvaluation);
       }
 
       requestReason ??= decision.reason;
@@ -69,12 +73,15 @@ export class ToolApprovalService {
 
     if (!args.requestHumanApproval) {
       return {
-        approved: false,
-        reason: `No approval handler configured for ${args.context.call.tool}${requestReason ? `: ${requestReason}` : ''}`,
+        ...ToolApprovalService.withAutonomyEvaluation({
+          approved: false,
+          reason: `No approval handler configured for ${args.context.call.tool}${requestReason ? `: ${requestReason}` : ''}`,
+        }, autonomyEvaluation),
       };
     }
 
-    return args.requestHumanApproval(args.context, requestReason);
+    const decision = await args.requestHumanApproval(args.context, requestReason);
+    return ToolApprovalService.withAutonomyEvaluation(decision, autonomyEvaluation);
   }
 
   async requestHumanApproval(args: RequestToolApprovalThroughServiceArgs): Promise<ToolApprovalDecision> {
@@ -92,18 +99,23 @@ export class ToolApprovalService {
   }
 
   async createRequest(args: ToolApprovalPolicyContext & { reason?: string }): Promise<ToolApprovalRequest> {
-    const rememberedRule = ProjectApprovalRules.createForCall(args.call);
+    const input = ToolPolicyEnvelopeInputService.extract(args.call.input).toolInput;
+    const call = {
+      ...args.call,
+      input,
+    };
+    const rememberedRule = ProjectApprovalRules.createForCall(call);
     const editPreview =
       args.call.tool === 'edit_file'
-        ? await previewEditFileInput(args.call.input, this.options.workspaceRoot)
+        ? await previewEditFileInput(input, this.options.workspaceRoot)
         : undefined;
 
     return {
       tool: args.tool.name,
       callId: args.call.id,
-      input: args.call.input,
+      input,
       requestedAt: (this.options.now ?? (() => new Date()))().toISOString(),
-      summary: ToolActivitySummarizer.summarizeCall(args.call),
+      summary: ToolActivitySummarizer.summarizeCall(call),
       reason: args.reason,
       editPreview,
       rememberProjectApproval: rememberedRule
@@ -174,5 +186,12 @@ export class ToolApprovalService {
     return this.options.projectApprovalRulesFile
       ? new FileProjectApprovalRuleRepository(this.options.projectApprovalRulesFile)
       : undefined;
+  }
+
+  private static withAutonomyEvaluation(
+    decision: ToolApprovalDecision,
+    autonomyEvaluation: ToolApprovalDecision['autonomyEvaluation'],
+  ): ToolApprovalDecision {
+    return autonomyEvaluation ? { ...decision, autonomyEvaluation } : decision;
   }
 }

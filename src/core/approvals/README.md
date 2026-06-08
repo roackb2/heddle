@@ -25,6 +25,7 @@ Approval behavior currently exists in these places:
 - `src/core/agent/tools/tool-dispatcher.ts`
 - `src/core/approvals/service.ts`
 - `src/core/approvals/policies.ts`
+- `src/core/approvals/autonomy/`
 - `src/core/approvals/remembered-rules/`
 - `src/cli-v2/components/ApprovalPanel.tsx`
 - `src/server/controllers/trpc/control-plane/chat-sessions-controller.ts`
@@ -37,7 +38,11 @@ Approval behavior currently exists in these places:
   request-to-human approval resolution, approval request view construction,
   edit previews, and remembered project approval rule application.
 - `policies.ts`: `ToolApprovalPolicies` built-in tool, workspace-boundary,
-  remembered-rule, and human-surface policy constructors.
+  remembered-rule, autonomy, and human-surface policy constructors.
+- `autonomy/`: autopilot profile normalization, tool policy evaluation,
+  computed policy facts, and autonomy trace event construction. This subdomain
+  owns approval decisions for long-running agent mode, not tool execution or
+  host presentation.
 - `remembered-rules/`: project approval rule service, repository, codec,
   schemas, and types. The repository is an internal storage boundary for
   `ToolApprovalService`; host/controller code must not import it directly.
@@ -156,6 +161,9 @@ state from event fragments.
 
 - Add a runtime approval rule by passing `approvalPolicies` into `AgentRunService.run`,
   `AgentLoopRuntimeService.run`, `HeartbeatRunnerAgent.run`, or `createConversationEngine(...).turns`.
+- Add autopilot behavior in `autonomy/` and expose it through
+  `ToolApprovalPolicies.autopilot(...)`. Do not duplicate the policy envelope
+  shape in host, trace, or tool execution layers.
 - Add host UI by instantiating `ToolApprovalService` in the host controller and
   passing its request payload to the host presentation layer.
 - Add remembered approval storage by extending `ToolApprovalService` and the
@@ -171,11 +179,15 @@ state from event fragments.
   in `ProjectApprovalRuleCodec` and Zod schemas.
 - To change approval trace behavior, update trace/event tests and host projection
   tests.
+- To change autopilot policy semantics, update `autonomy/` service tests and
+  keep trace events wrapping the domain `AutonomyEvaluation` /
+  `AutonomyPostflightAudit` shapes instead of redefining trace-only copies.
 
 ## Tests
 
 - `src/__tests__/unit/core/project-approval-rules.test.ts`
 - `src/__tests__/unit/core/approval-policy-chain.test.ts`
+- `src/__tests__/unit/core/autonomy-policy-service.test.ts`
 - `src/__tests__/integration/core/run-agent.test.ts`
 - `src/__tests__/integration/tools/tools.test.ts`
 

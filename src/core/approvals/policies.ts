@@ -5,6 +5,7 @@ import {
   DEFAULT_MUTATE_RULES,
 } from '@/core/tools/toolkits/shell-process/shell-policy.js';
 import type { ToolApprovalPolicy, ToolApprovalPolicyContext, ToolApprovalSurface } from './types.js';
+import { AutonomyPolicyService, type AutopilotProfile } from './autonomy/index.js';
 
 /**
  * Owns reusable approval policy constructors and the default policy chain.
@@ -69,6 +70,16 @@ export class ToolApprovalPolicies {
         ? { type: 'deny', reason: policy.error }
         : { type: 'allow', reason: policy.reason };
     };
+  }
+
+  static autopilot(args: { profile: AutopilotProfile }): ToolApprovalPolicy {
+    return (context) =>
+      AutonomyPolicyService.toApprovalDecision(
+        AutonomyPolicyService.evaluate({
+          context,
+          profile: args.profile,
+        }),
+      );
   }
 
   static isOutsideWorkspaceInspectionCall(args: {

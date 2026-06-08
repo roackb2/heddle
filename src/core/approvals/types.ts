@@ -1,8 +1,9 @@
 import type { ToolCall, ToolDefinition } from '@/core/types.js';
 import type { EditFilePreview } from '@/core/tools/toolkits/coding-files/edit-file.js';
 import type { ProjectApprovalRule } from './remembered-rules/index.js';
+import type { AutonomyEvaluation } from './autonomy/index.js';
 
-export type ToolApprovalDecision = { approved: boolean; reason?: string };
+export type ToolApprovalDecision = { approved: boolean; reason?: string; autonomyEvaluation?: AutonomyEvaluation };
 
 export type ToolApprovalUserDecision =
   | { type: 'approve'; reason?: string }
@@ -10,9 +11,9 @@ export type ToolApprovalUserDecision =
   | { type: 'approve_and_remember_project'; reason?: string };
 
 export type ToolApprovalPolicyDecision =
-  | { type: 'allow'; reason?: string }
-  | { type: 'deny'; reason?: string }
-  | { type: 'request'; reason?: string };
+  | { type: 'allow'; reason?: string; autonomyEvaluation?: AutonomyEvaluation }
+  | { type: 'deny'; reason?: string; autonomyEvaluation?: AutonomyEvaluation }
+  | { type: 'request'; reason?: string; autonomyEvaluation?: AutonomyEvaluation };
 
 export type ToolApprovalPolicyContext = {
   call: ToolCall;

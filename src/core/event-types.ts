@@ -10,6 +10,8 @@ export const HeddleEventType = {
   assistantStream: 'assistant.stream',
   modelRetry: 'model.retry',
   hostWarning: 'host.warning',
+  autonomyDecision: 'autonomy.decision',
+  autonomyPostflight: 'autonomy.postflight',
   toolApprovalRequested: 'tool.approval_requested',
   toolApprovalResolved: 'tool.approval_resolved',
   toolFallback: 'tool.fallback',
