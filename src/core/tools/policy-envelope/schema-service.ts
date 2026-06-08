@@ -13,7 +13,7 @@ const POLICY_ENVELOPE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   description:
-    'Optional agent-declared intent envelope for approval/autopilot policy. This is a claim, not runtime-verified fact.',
+    'Optional agent-declared intent envelope for approval/autopilot policy. Use this to honestly declare the purpose, operation categories, expected impact surface, target roots, environment, and confidence for this tool call. The harness treats this as a claim, combines it with runtime environment facts and configured policy, then decides whether to allow, request approval, or deny the action.',
   properties: {
     operations: {
       type: 'array',

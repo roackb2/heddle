@@ -30,6 +30,12 @@ vocabulary for "what I am trying to do" while each tool keeps its own business
 arguments. The tools domain exposes and removes the envelope; approvals decide
 whether the claim is allowed.
 
+The agent should use the envelope to honestly declare the purpose and expected
+impact surface of the operation: operation categories, target roots, read/write
+roots, expected effects, environment, destructive scope, and confidence. The
+harness combines that declaration with runtime environment facts and configured
+policy before deciding whether to allow, request approval, or deny the action.
+
 ## Envelope Shape
 
 ```ts
