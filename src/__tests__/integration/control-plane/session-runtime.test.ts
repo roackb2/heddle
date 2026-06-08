@@ -240,6 +240,7 @@ describe('control-plane session runtime integration', () => {
       sessionId: session.id,
       prompt: 'Run safely.',
       autopilot,
+      apiKey: 'test-openai-key',
       leaseOwner: {
         ownerKind: 'daemon',
         ownerId: 'daemon-test',
