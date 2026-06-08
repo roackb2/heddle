@@ -392,7 +392,7 @@ The installed CLI command is `heddle`.
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 22.12+
 - access to at least one supported provider:
   - OpenAI account sign-in with `heddle auth login openai`, or `OPENAI_API_KEY`
   - `ANTHROPIC_API_KEY` for Anthropic models

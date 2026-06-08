@@ -1,0 +1,259 @@
+import { access, readdir, readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import {
+  extractResourceLinks,
+  parseSkillContent,
+  readSkillProperties,
+  toDisclosureInstructions,
+  toDisclosurePrompt,
+} from 'agent-skills-ts-sdk';
+import type {
+  AgentSkillCatalog,
+  AgentSkillCatalogEntry,
+  AgentSkillCatalogIssue,
+  AgentSkillCatalogPromptOptions,
+  AgentSkillReadResult,
+  AgentSkillRoot,
+  AgentSkillServiceOptions,
+  AgentSkillSourceKind,
+} from './types.js';
+
+const SKILL_FILE_NAMES = ['SKILL.md', 'skill.md'] as const;
+
+/**
+ * Owns Agent Skills discovery and progressive-disclosure metadata.
+ *
+ * The service reads only standard `SKILL.md` frontmatter while building a
+ * catalog. Full skill instructions stay out of the agent prompt until a
+ * caller explicitly reads one skill by name.
+ */
+export class AgentSkillService {
+  private readonly workspaceRoot: string;
+  private readonly cwd: string;
+  private readonly homeDir: string;
+  private readonly builtInSkillRoots: string[];
+
+  constructor(options: AgentSkillServiceOptions) {
+    this.workspaceRoot = resolve(options.workspaceRoot);
+    this.cwd = resolve(options.cwd ?? options.workspaceRoot);
+    this.homeDir = resolve(options.homeDir ?? homedir());
+    this.builtInSkillRoots = (options.builtInSkillRoots ?? []).map((root) => resolve(root));
+  }
+
+  async loadCatalog(): Promise<AgentSkillCatalog> {
+    const rootResults = await Promise.all(
+      this.listSkillRoots().map((root) => this.readRootCatalog(root)),
+    );
+    const rawEntries = rootResults.flatMap((result) => result.entries);
+    const issues = rootResults.flatMap((result) => result.issues);
+    const entriesByName = new Map<string, AgentSkillCatalogEntry>();
+
+    for (const entry of rawEntries) {
+      if (entriesByName.has(entry.name)) {
+        issues.push({
+          code: 'duplicate_skill',
+          path: entry.skillFilePath,
+          message: `Ignored duplicate Agent Skill "${entry.name}" from ${entry.source}; ${entriesByName.get(entry.name)?.skillFilePath} has precedence.`,
+        });
+        continue;
+      }
+
+      entriesByName.set(entry.name, entry);
+    }
+
+    return {
+      skills: Array.from(entriesByName.values()),
+      issues,
+    };
+  }
+
+  async readSkill(name: string): Promise<AgentSkillReadResult | null> {
+    const catalog = await this.loadCatalog();
+    const skill = catalog.skills.find((entry) => entry.name === name);
+
+    if (!skill) {
+      return null;
+    }
+
+    const content = await readFile(skill.skillFilePath, 'utf8');
+    const parsed = parseSkillContent(content);
+
+    return {
+      skill,
+      body: parsed.body,
+      resources: extractResourceLinks(parsed.body),
+    };
+  }
+
+  formatCatalogPrompt(
+    catalog: AgentSkillCatalog,
+    options: AgentSkillCatalogPromptOptions = {},
+  ): string {
+    const readToolName = options.readToolName ?? 'read_agent_skill';
+    return [
+      toDisclosureInstructions({ toolName: readToolName }),
+      toDisclosurePrompt(catalog.skills.map((skill) => ({
+        name: skill.name,
+        description: skill.description,
+        location: skill.skillFilePath,
+      }))),
+    ].join('\n\n');
+  }
+
+  private listSkillRoots(): AgentSkillRoot[] {
+    return [
+      ...this.listProjectSkillRoots(),
+      { source: 'user' as const, path: join(this.homeDir, '.agents', 'skills') },
+      ...this.builtInSkillRoots.map((path) => ({ source: 'built-in' as const, path })),
+    ];
+  }
+
+  private listProjectSkillRoots(): AgentSkillRoot[] {
+    const roots: AgentSkillRoot[] = [];
+    const workspaceRoot = this.workspaceRoot;
+    let current = isPathInsideRoot(this.cwd, workspaceRoot) ? this.cwd : workspaceRoot;
+
+    while (true) {
+      roots.push({ source: 'project', path: join(current, '.agents', 'skills') });
+
+      if (current === workspaceRoot) {
+        return roots;
+      }
+
+      const parent = dirname(current);
+      if (parent === current) {
+        return roots;
+      }
+
+      current = parent;
+    }
+  }
+
+  private async readRootCatalog(root: AgentSkillRoot): Promise<{
+    entries: AgentSkillCatalogEntry[];
+    issues: AgentSkillCatalogIssue[];
+  }> {
+    const skillDirs = await this.readSkillDirectories(root);
+    const skillResults = await Promise.all(
+      skillDirs.entries.map((skillRootPath) => this.readCatalogEntry(root.source, skillRootPath)),
+    );
+
+    return {
+      entries: skillResults.flatMap((result) => result.entry ? [result.entry] : []),
+      issues: [...skillDirs.issues, ...skillResults.flatMap((result) => result.issues)],
+    };
+  }
+
+  private async readSkillDirectories(root: AgentSkillRoot): Promise<{
+    entries: string[];
+    issues: AgentSkillCatalogIssue[];
+  }> {
+    try {
+      const dirents = await readdir(root.path, { withFileTypes: true });
+      return {
+        entries: dirents
+          .filter((dirent) => dirent.isDirectory())
+          .map((dirent) => join(root.path, dirent.name))
+          .sort(),
+        issues: [],
+      };
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return { entries: [], issues: [] };
+      }
+
+      return {
+        entries: [],
+        issues: [{
+          code: 'unreadable_root',
+          path: root.path,
+          message: errorMessage(error),
+        }],
+      };
+    }
+  }
+
+  private async readCatalogEntry(source: AgentSkillSourceKind, skillRootPath: string): Promise<{
+    entry?: AgentSkillCatalogEntry;
+    issues: AgentSkillCatalogIssue[];
+  }> {
+    const skillFile = await this.findSkillFile(skillRootPath);
+
+    if (skillFile.issue) {
+      return { issues: [skillFile.issue] };
+    }
+
+    if (!skillFile.path) {
+      return { issues: [] };
+    }
+
+    try {
+      const content = await readFile(skillFile.path, 'utf8');
+      const properties = readSkillProperties([{ name: basename(skillFile.path), content }], {
+        location: skillFile.path,
+      });
+
+      return {
+        entry: {
+          name: properties.name,
+          description: properties.description,
+          skillFilePath: skillFile.path,
+          skillRootPath,
+          source,
+          compatibility: properties.compatibility,
+          license: properties.license,
+          allowedTools: properties.allowedTools,
+          metadata: properties.metadata,
+        },
+        issues: [],
+      };
+    } catch (error) {
+      return {
+        issues: [{
+          code: 'invalid_skill',
+          path: skillFile.path,
+          message: errorMessage(error),
+        }],
+      };
+    }
+  }
+
+  private async findSkillFile(skillRootPath: string): Promise<{
+    path?: string;
+    issue?: AgentSkillCatalogIssue;
+  }> {
+    for (const fileName of SKILL_FILE_NAMES) {
+      const skillFilePath = join(skillRootPath, fileName);
+      try {
+        await access(skillFilePath);
+        return { path: skillFilePath };
+      } catch (error) {
+        if (!isNotFoundError(error)) {
+          return {
+            issue: {
+              code: 'unreadable_skill',
+              path: skillFilePath,
+              message: errorMessage(error),
+            },
+          };
+        }
+      }
+    }
+
+    return {};
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isNotFoundError(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
+}
+
+function isPathInsideRoot(path: string, root: string): boolean {
+  const relativePath = relative(resolve(root), resolve(path));
+  return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
+}
