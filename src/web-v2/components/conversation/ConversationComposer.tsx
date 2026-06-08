@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
-import type { ControlPlaneModelOptions } from '@web/api/client';
+import type { ControlPlaneModelOptions, ControlPlanePermissionMode, ControlPlaneSessionRuntimeContext } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
 import { Textarea } from '@web/components/ui/textarea';
 import type { ControlPlaneReasoningEffortSelection } from '@web/hooks/sessions/useControlPlaneSessionDetail';
@@ -34,6 +34,8 @@ export function ConversationComposer({
   disabled,
   driftEnabled,
   driftLevel,
+  permissionMode,
+  permissionModeOptions,
   model,
   modelOptions,
   reasoningEffort,
@@ -45,6 +47,7 @@ export function ConversationComposer({
   onSubmitPrompt,
   onCancelRun,
   onUpdateDriftEnabled,
+  onUpdatePermissionMode,
   onUpdateModel,
   onUpdateReasoningEffort,
 }: {
@@ -53,6 +56,8 @@ export function ConversationComposer({
   disabled?: boolean;
   driftEnabled?: boolean;
   driftLevel?: SessionDriftLevel;
+  permissionMode?: ControlPlanePermissionMode;
+  permissionModeOptions?: ControlPlaneSessionRuntimeContext['permissionModeOptions'];
   model?: string;
   modelOptions?: ControlPlaneModelOptions;
   reasoningEffort?: ComposerReasoningEffortSelection;
@@ -64,6 +69,7 @@ export function ConversationComposer({
   onSubmitPrompt: (prompt: string) => Promise<void>;
   onCancelRun?: () => Promise<void>;
   onUpdateDriftEnabled?: (enabled: boolean) => Promise<void>;
+  onUpdatePermissionMode?: (mode: ControlPlanePermissionMode) => Promise<void>;
   onUpdateModel?: (model: string) => Promise<void>;
   onUpdateReasoningEffort?: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
 }) {
@@ -185,10 +191,13 @@ export function ConversationComposer({
           disabled={controlsDisabled}
           driftEnabled={effectiveDriftEnabled}
           driftLevel={effectiveDriftLevel}
+          permissionMode={permissionMode}
+          permissionModeOptions={permissionModeOptions}
           settingsUpdating={settingsUpdating}
           uploadDisabled={imageUploadDisabled}
           onUploadImagesClick={() => imageUploadControlsRef.current?.openFilePicker()}
           onUpdateDriftEnabled={onUpdateDriftEnabled}
+          onUpdatePermissionMode={onUpdatePermissionMode}
         />
         <div className="v2-composer-toolbar-controls">
           <ComposerExecutionMenu

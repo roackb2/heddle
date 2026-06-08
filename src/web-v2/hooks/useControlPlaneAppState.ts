@@ -163,6 +163,7 @@ export function useControlPlaneAppState() {
         onDeleteQueuedPrompt: selectedSession.deleteQueuedPrompt,
         onCancelRun: selectedSession.cancelRun,
         onUpdateDriftEnabled: selectedSession.updateDriftEnabled,
+        onUpdatePermissionMode: selectedSession.updatePermissionMode,
         onUpdateModel: selectedSession.updateModel,
         onUpdateReasoningEffort: selectedSession.updateReasoningEffort,
         onResolveApproval: selectedSession.resolvePendingApproval,

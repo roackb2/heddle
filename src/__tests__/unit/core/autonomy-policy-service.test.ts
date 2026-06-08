@@ -93,6 +93,56 @@ describe('AutonomyPolicyService', () => {
     }));
   });
 
+  it('requests approval for no-envelope reads outside configured Auto roots', () => {
+    const evaluation = AutonomyPolicyService.evaluate({
+      context: context({
+        call: {
+          id: 'call-read',
+          tool: 'read_file',
+          input: { path: '../manual/file.txt' },
+        },
+        tool: {
+          name: 'read_file',
+          description: 'reads files',
+          requiresApproval: false,
+          parameters: {},
+          execute: async () => ({ ok: true }),
+        },
+      }),
+      profile,
+    });
+
+    expect(evaluation.decision).toEqual(expect.objectContaining({
+      type: 'request',
+      reason: expect.stringContaining('root requires manual approval'),
+    }));
+  });
+
+  it('allows no-envelope reads in configured sibling Auto roots', () => {
+    const evaluation = AutonomyPolicyService.evaluate({
+      context: context({
+        call: {
+          id: 'call-read',
+          tool: 'read_file',
+          input: { path: '../sibling-repo/README.md' },
+        },
+        tool: {
+          name: 'read_file',
+          description: 'reads files',
+          requiresApproval: false,
+          parameters: {},
+          execute: async () => ({ ok: true }),
+        },
+      }),
+      profile,
+    });
+
+    expect(evaluation.decision).toEqual(expect.objectContaining({
+      type: 'allow',
+      reason: 'allowed by autopilot profile without a required policy envelope',
+    }));
+  });
+
   it('denies hard-denied roots even when the envelope claims low risk', () => {
     const evaluation = AutonomyPolicyService.evaluate({
       context: context({

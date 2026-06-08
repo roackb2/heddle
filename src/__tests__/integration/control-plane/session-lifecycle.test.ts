@@ -288,6 +288,7 @@ describe('control-plane session lifecycle API', () => {
     ]));
     expect(catalog.hints).toEqual(expect.arrayContaining([
       { command: '/help', description: 'show available slash commands' },
+      { command: '/permissions set [query]', description: 'pick permission mode with filtering' },
       { command: '/session list', description: 'list local chat sessions' },
     ]));
   });
@@ -303,6 +304,14 @@ describe('control-plane session lifecycle API', () => {
       handled: true,
       kind: 'message',
       message: 'Current model: gpt-5.4',
+    });
+    await expect(caller.slashCommandExecute({
+      sessionId: session.id,
+      command: '/permissions auto',
+    })).resolves.toEqual({
+      handled: true,
+      kind: 'message',
+      message: 'Set permission mode to auto.',
     });
   });
 

@@ -90,6 +90,7 @@ function testHeartbeatRun(overrides: Partial<HeartbeatTaskRunRecordEntry> = {}):
 function createContext(overrides: Partial<SlashCommandExecutionContext> = {}): SlashCommandExecutionContext {
   let activeModel = 'gpt-5.4';
   let driftEnabled = false;
+  let permissionMode: 'default' | 'auto' | 'custom' = 'default';
   const sessions = [
     testSession({ id: 'session-a', name: 'Alpha' }),
     testSession({ id: 'session-b', name: 'Beta', updatedAt: '2024-01-02' }),
@@ -115,6 +116,13 @@ function createContext(overrides: Partial<SlashCommandExecutionContext> = {}): S
       status: () => ({ enabled: driftEnabled }),
       setEnabled: (enabled) => {
         driftEnabled = enabled;
+      },
+    },
+    permissions: {
+      current: () => permissionMode,
+      set: (mode) => {
+        permissionMode = mode;
+        return permissionMode;
       },
     },
     session: {
@@ -252,9 +260,35 @@ describe('core slash command modules', () => {
       { command: '/auth login openai', description: 'sign in with OpenAI ChatGPT/Codex OAuth' },
       { command: '/compact', description: 'compact earlier session history for the next run' },
       { command: '/drift', description: 'show CyberLoop semantic drift detection status' },
+      { command: '/permissions set [query]', description: 'pick permission mode with filtering' },
       { command: '/session switch <id>', description: 'switch to another session' },
       { command: '/heartbeat continue <task> [run-id|latest]', description: 'continue in chat from a heartbeat run summary' },
     ]));
+  });
+
+  it('routes permission commands through the shared permission port', async () => {
+    const context = createContext();
+
+    await expect(registry.run(context, '/permissions')).resolves.toMatchObject({
+      kind: 'message',
+      message: 'Current permission mode: default',
+    });
+    await expect(registry.run(context, '/permissions auto')).resolves.toMatchObject({
+      kind: 'message',
+      message: 'Set permission mode to auto.',
+    });
+    await expect(registry.run(context, '/permissions')).resolves.toMatchObject({
+      kind: 'message',
+      message: 'Current permission mode: auto',
+    });
+    await expect(registry.run(context, '/permissions set')).resolves.toMatchObject({
+      kind: 'message',
+      message: 'Use /permissions set <query> to filter permission modes, then use arrows and Enter to choose one.',
+    });
+    await expect(registry.run(context, '/permissions nope')).resolves.toMatchObject({
+      kind: 'message',
+      message: 'Usage: /permissions set <query> or /permissions <default|auto|custom>',
+    });
   });
 
   it('routes session commands through host ports', async () => {

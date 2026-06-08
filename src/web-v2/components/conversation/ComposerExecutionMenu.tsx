@@ -192,7 +192,11 @@ function ComposerMenuOption({
       type="button"
       variant="ghost"
       size="none"
-      className={cn('v2-composer-menu-option justify-between text-left', compact && 'v2-composer-menu-option-compact')}
+      className={cn(
+        'v2-composer-menu-option text-left',
+        compact && 'v2-composer-menu-option-compact',
+        selected && 'v2-composer-menu-option-selected',
+      )}
       role="menuitemradio"
       aria-checked={selected}
       disabled={disabled}
@@ -208,7 +212,9 @@ function ComposerMenuOption({
           </span>
         ) : null}
       </span>
-      {selected ? <Check aria-hidden="true" data-icon="inline-end" /> : null}
+      <span className="v2-composer-menu-option-check-slot" aria-hidden="true">
+        {selected ? <Check data-icon="inline-end" /> : null}
+      </span>
     </Button>
   );
 }

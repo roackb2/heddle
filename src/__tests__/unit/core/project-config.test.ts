@@ -45,6 +45,8 @@ describe('ProjectConfigService', () => {
       directShellApproval: 'sometimes',
       searchIgnoreDirs: ['node_modules'],
       agentContextPaths: ['AGENTS.md'],
+      permissionMode: 'auto',
+      autoTrustedRoots: ['../heddle-workspace-notes'],
       autopilot: {
         mode: 'autopilot',
         roots: [{
@@ -65,6 +67,8 @@ describe('ProjectConfigService', () => {
       stateDir: '.state',
       searchIgnoreDirs: ['node_modules'],
       agentContextPaths: ['AGENTS.md'],
+      permissionMode: 'auto',
+      autoTrustedRoots: ['../heddle-workspace-notes'],
       autopilot: {
         mode: 'autopilot',
         roots: [{
@@ -128,5 +132,52 @@ describe('ProjectConfigService', () => {
 
     expect(ProjectConfigService.read(missingWorkspaceRoot)).toEqual({});
     expect(ProjectConfigService.read(invalidWorkspaceRoot)).toEqual({});
+  });
+
+  it('updates supported config fields without dropping an existing autopilot profile', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-project-config-'));
+    const initResult = ProjectConfigService.initialize(workspaceRoot);
+    writeFileSync(initResult.configPath, `${JSON.stringify({
+      model: 'gpt-5.4',
+      autopilot: {
+        mode: 'autopilot',
+        roots: [{
+          path: '../heddle-workspace-notes',
+          access: 'autopilot',
+          allow: ['read', 'write'],
+        }],
+        environments: {
+          allow: ['local', 'dev'],
+          requireApproval: ['staging', 'production', 'unknown'],
+        },
+      },
+    })}\n`);
+
+    const updated = ProjectConfigService.update(workspaceRoot, (config) => {
+      const next = {
+        ...config,
+        permissionMode: 'default' as const,
+        unknown: true,
+      };
+      return next;
+    });
+
+    expect(updated).toEqual({
+      model: 'gpt-5.4',
+      permissionMode: 'default',
+      autopilot: {
+        mode: 'autopilot',
+        roots: [{
+          path: '../heddle-workspace-notes',
+          access: 'autopilot',
+          allow: ['read', 'write'],
+        }],
+        environments: {
+          allow: ['local', 'dev'],
+          requireApproval: ['staging', 'production', 'unknown'],
+        },
+      },
+    });
+    expect(JSON.parse(readFileSync(initResult.configPath, 'utf8'))).not.toHaveProperty('unknown');
   });
 });

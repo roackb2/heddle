@@ -73,6 +73,22 @@
       "uploadFailed": "Image upload failed.",
       "uploading": "Uploading"
     },
+    "permissionMode": {
+      "auto": {
+        "description": "Approve trusted local coding actions.",
+        "label": "Auto"
+      },
+      "custom": {
+        "description": "Use workspace-specific policy.",
+        "label": "Custom"
+      },
+      "default": {
+        "description": "Use the default permission behavior.",
+        "label": "Default"
+      },
+      "statusPrefix": "Mode",
+      "title": "Permission mode"
+    },
     "model": "Model",
     "placeholder": "Send follow-up",
     "promptAriaLabel": "Message",

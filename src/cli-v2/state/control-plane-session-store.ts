@@ -18,6 +18,7 @@ import {
 } from './control-plane-session-state.js';
 import type {
   ControlPlaneApprovalDecision,
+  ControlPlanePermissionMode,
   ControlPlaneSessionView,
   ControlPlaneSlashCommandHint,
   ControlPlaneWorkspaceFileSuggestion,
@@ -221,6 +222,10 @@ export class ControlPlaneSessionStore {
 
   async selectReasoningFromPicker(reasoningEffort: string): Promise<void> {
     await this.slashCommands.execute(reasoningEffort === 'default' ? '/reasoning default' : `/reasoning ${reasoningEffort}`);
+  }
+
+  async selectPermissionModeFromPicker(mode: ControlPlanePermissionMode): Promise<void> {
+    await this.slashCommands.execute(`/permissions ${mode}`);
   }
 
   async cancelRun(): Promise<void> {

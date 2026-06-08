@@ -13,11 +13,12 @@ type TuiLocalSlashCommandDefinition = {
 /**
  * Owns slash-style commands whose entire effect is cli-v2 terminal presentation.
  *
- * Put a command here only when it operates on Ink-local UI state that another
- * host cannot observe or rely on: expanding a disclosure row, opening a focused
- * terminal review panel, or toggling a terminal-only result view. These commands
- * may reuse slash syntax for discoverability, but they are not shared command
- * semantics and must not require a control-plane API call to complete.
+ * Put executable commands here only when they operate on Ink-local UI state
+ * that another host cannot observe or rely on: expanding a disclosure row,
+ * opening a focused terminal review panel, or toggling a terminal-only result
+ * view. These commands may reuse slash syntax for discoverability, but they
+ * are not shared command semantics and must not require a control-plane API
+ * call to complete.
  *
  * Put a command in the core/control-plane slash registry when it affects shared
  * session, runtime, model, auth, heartbeat, compaction, or workspace behavior,

@@ -22,7 +22,11 @@ export class ConversationEngineHostNormalizer {
         }
       },
       approveToolCall: requestToolApproval
-        ? ((call, tool) => requestToolApproval({ call, tool }))
+        ? ((call, tool, autonomyEvaluation) => requestToolApproval({
+          call,
+          tool,
+          ...(autonomyEvaluation ? { autonomyEvaluation } : {}),
+        }))
         : undefined,
       onCompactionStatus: (event, phase) => {
         host?.compaction?.onStatus?.(event);

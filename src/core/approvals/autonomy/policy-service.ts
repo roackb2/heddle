@@ -50,6 +50,7 @@ export class AutonomyPolicyService {
     return {
       call: args.context.call,
       profileMode: profile.mode,
+      profilePreset: profile.preset,
       envelope,
       facts,
       decision,
@@ -89,8 +90,12 @@ export class AutonomyPolicyService {
       return { type: 'request', reason: 'tool call needs a declared policy envelope', facts };
     }
 
+    if (facts.approvalReasons.length > 0) {
+      return { type: 'request', reason: facts.approvalReasons.join('; '), facts };
+    }
+
     if (!envelope) {
-      return { type: 'allow', reason: 'autopilot profile does not require an envelope for this tool', facts };
+      return { type: 'allow', reason: 'allowed by autopilot profile without a required policy envelope', facts };
     }
 
     if (envelope.confidence === 'low' || envelope.operations.includes('unknown')) {
@@ -99,10 +104,6 @@ export class AutonomyPolicyService {
 
     if (!profile.environments.allow.includes(envelope.environment as 'local' | 'dev')) {
       return { type: 'request', reason: 'environment is not allowed for unattended execution', facts };
-    }
-
-    if (facts.approvalReasons.length > 0) {
-      return { type: 'request', reason: facts.approvalReasons.join('; '), facts };
     }
 
     return { type: 'allow', reason: 'allowed by autopilot profile and declared policy envelope', facts };
@@ -289,16 +290,11 @@ export class AutonomyPolicyService {
     profile: NormalizedAutopilotProfile;
     context: ToolApprovalPolicyContext;
   }): string[] {
-    if (!args.envelope) {
-      return [];
-    }
-    const envelope = args.envelope;
-
     return [
       ...args.rootDecisions.flatMap((decision) => AutonomyPolicyService.rootApprovalReasons({
         decision,
         operations: args.operations,
-        envelope,
+        envelope: args.envelope,
         profile: args.profile,
       })),
       ...(args.operations.includes('network') ? ['network operations require approval in initial autopilot policy'] : []),
@@ -308,7 +304,7 @@ export class AutonomyPolicyService {
   private static rootApprovalReasons(args: {
     decision: ToolPolicyRootDecision;
     operations: ToolPolicyOperation[];
-    envelope: ToolPolicyEnvelope;
+    envelope?: ToolPolicyEnvelope;
     profile: NormalizedAutopilotProfile;
   }): string[] {
     if (args.decision.access === 'unconfigured') {
@@ -334,17 +330,17 @@ export class AutonomyPolicyService {
 
   private static requiredCapabilities(
     operations: ToolPolicyOperation[],
-    envelope: ToolPolicyEnvelope,
+    envelope: ToolPolicyEnvelope | undefined,
   ): AutopilotCapability[] {
     const capabilities = operations.flatMap((operation): AutopilotCapability[] => {
       if (operation === 'read') {
         return ['read'];
       }
       if (operation === 'write' || operation === 'move') {
-        return envelope.maxDestructiveScope === 'many-files' ? ['write', 'many-file-edit'] : ['write'];
+        return envelope?.maxDestructiveScope === 'many-files' ? ['write', 'many-file-edit'] : ['write'];
       }
       if (operation === 'delete') {
-        return envelope.maxDestructiveScope === 'many-files' ? ['many-file-edit'] : ['simple-delete'];
+        return envelope?.maxDestructiveScope === 'many-files' ? ['many-file-edit'] : ['simple-delete'];
       }
       if (operation === 'execute') {
         return ['execute'];

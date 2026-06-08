@@ -11,6 +11,7 @@ export class RuntimeStatusService {
     return [
       `model=${context.model}`,
       `reasoning=${RuntimeStatusService.formatReasoning(context)}`,
+      `permissions=${context.permissionMode}`,
       RuntimeStatusService.formatAuth(context),
       RuntimeStatusService.formatContextWindow(context),
       `drift=${context.driftEnabled ? context.driftLevel ?? 'unknown' : 'off'}`,

@@ -8,6 +8,15 @@ describe('PendingApprovalService', () => {
   it('exposes remember choice only when the API provides remember metadata', () => {
     expect(PendingApprovalService.resolveAvailableChoices(createApproval())).toEqual(['approve', 'deny']);
     expect(PendingApprovalService.resolveAvailableChoices(createApproval({
+      autopilotRootApproval: {
+        label: 'Trust this repo',
+        root: '/workspace/notes',
+        relativeRoot: '../notes',
+        access: 'autopilot',
+        allow: ['read', 'write'],
+      },
+    }))).toEqual(['approve', 'trust_repo', 'deny']);
+    expect(PendingApprovalService.resolveAvailableChoices(createApproval({
       rememberProjectApproval: {
         label: 'allow command for this project',
         rule: {
@@ -44,6 +53,18 @@ describe('PendingApprovalService', () => {
     expect(PendingApprovalService.resolveDecision('allow_project', approval)).toEqual({
       type: 'approve_and_remember_project',
       reason: 'Approved and remembered for this project in cli-v2',
+    });
+    expect(PendingApprovalService.resolveDecision('trust_repo', createApproval({
+      autopilotRootApproval: {
+        label: 'Trust this repo',
+        root: '/workspace/notes',
+        relativeRoot: '../notes',
+        access: 'autopilot',
+        allow: ['read', 'write'],
+      },
+    }))).toEqual({
+      type: 'approve_and_trust_autopilot_root',
+      reason: 'Approved and trusted ../notes for Auto in cli-v2',
     });
     expect(PendingApprovalService.resolveDecision('deny', approval)).toEqual({
       type: 'deny',

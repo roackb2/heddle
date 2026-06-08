@@ -1,4 +1,5 @@
 import { ProviderCredentialCommandService } from '@/core/auth/index.js';
+import { AutonomyPermissionModeService } from '@/core/approvals/index.js';
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import type { ConversationEngineConfig } from '@/core/chat/engine/types.js';
 import type { ChatSession } from '@/core/chat/types.js';
@@ -6,6 +7,7 @@ import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/i
 import type { SlashCommandExecutionContext } from '@/core/commands/slash/modules/context.js';
 import type { SlashCommandHint } from '@/core/commands/slash/types.js';
 import { FileHeartbeatTaskService } from '@/core/heartbeat/index.js';
+import { ProjectConfigService } from '@/core/project-config/index.js';
 import { controlPlaneSessionRuntimeContextService } from './session-runtime-context-service.js';
 
 export type ControlPlaneSlashCommandExecutionContextArgs = Omit<ConversationEngineConfig, 'model'> & {
@@ -55,6 +57,25 @@ export class ControlPlaneSlashCommandExecutionContextService {
         status: () => ({ enabled: runtimeContext.driftEnabled }),
         setEnabled: (enabled) => {
           sessions.setDriftEnabled(args.sessionId, enabled);
+        },
+      },
+      permissions: {
+        current: () => AutonomyPermissionModeService.resolveMode({
+          config: ProjectConfigService.read(args.workspaceRoot),
+          workspaceRoot: args.workspaceRoot,
+        }),
+        set: (mode) => {
+          const config = ProjectConfigService.update(args.workspaceRoot, (current) => (
+            AutonomyPermissionModeService.applyMode({
+              config: current,
+              mode,
+              workspaceRoot: args.workspaceRoot,
+            })
+          ));
+          return AutonomyPermissionModeService.resolveMode({
+            config,
+            workspaceRoot: args.workspaceRoot,
+          });
         },
       },
       session: {

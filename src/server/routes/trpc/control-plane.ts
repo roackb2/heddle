@@ -3,6 +3,8 @@ import type { z } from 'zod';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import { BUILT_IN_MODEL_GROUPS, ModelPolicyService } from '@/core/llm/models/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
+import { AutonomyPermissionModeService } from '@/core/approvals/index.js';
+import { ProjectConfigService } from '@/core/project-config/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { procedure, router } from '@/server/trpc.js';
 import type { HeddleServerContext } from '@/server/types.js';
@@ -56,6 +58,7 @@ import {
   workspaceBrowseInputSchema,
   workspaceCreateInputSchema,
   workspaceFileDiffInputSchema,
+  workspacePermissionModeUpdateInputSchema,
   workspaceRenameInputSchema,
   workspaceSetActiveInputSchema,
 } from './schema.js';
@@ -117,6 +120,27 @@ export const controlPlaneRouter = router({
           credentialMode,
         })),
       })),
+    };
+  }),
+  workspacePermissionModeUpdate: controlPlaneWorkspaceProcedure.input(workspacePermissionModeUpdateInputSchema).mutation(({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    const config = ProjectConfigService.update(workspace.workspaceRoot, (current) => (
+      AutonomyPermissionModeService.applyMode({
+        config: current,
+        mode: input.mode,
+        workspaceRoot: workspace.workspaceRoot,
+      })
+    ));
+    const permissionMode = AutonomyPermissionModeService.resolveMode({
+      config,
+      workspaceRoot: workspace.workspaceRoot,
+    });
+    return {
+      permissionMode,
+      permissionModeOptions: AutonomyPermissionModeService.buildOptions({
+        config,
+        workspaceRoot: workspace.workspaceRoot,
+      }),
     };
   }),
   sessionSettingsUpdate: controlPlaneWorkspaceProcedure.input(sessionSettingsInputSchema).mutation(({ ctx, input }) => {

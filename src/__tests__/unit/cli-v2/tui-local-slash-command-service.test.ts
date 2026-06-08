@@ -22,6 +22,8 @@ describe('TuiLocalSlashCommandService', () => {
     expect(TuiLocalSlashCommandService.execute('/DIFF', { activity, diff, commandResults })).toBe(true);
     expect(TuiLocalSlashCommandService.execute(' /commands ', { activity, diff, commandResults })).toBe(true);
     expect(TuiLocalSlashCommandService.execute('/model', { activity, diff, commandResults })).toBe(false);
+    expect(TuiLocalSlashCommandService.execute('/permissions set', { activity, diff, commandResults })).toBe(false);
+    expect(TuiLocalSlashCommandService.execute('/permissions auto', { activity, diff, commandResults })).toBe(false);
 
     expect(activity).toHaveBeenCalledTimes(1);
     expect(diff).toHaveBeenCalledTimes(1);

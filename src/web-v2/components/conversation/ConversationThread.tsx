@@ -1,4 +1,8 @@
-import type { ControlPlaneModelOptions } from '@web/api/client';
+import type {
+  ControlPlaneModelOptions,
+  ControlPlanePermissionMode,
+  ControlPlaneSessionRuntimeContext,
+} from '@web/api/client';
 import type {
   ControlPlaneApprovalDecision,
   ControlPlaneReasoningEffortSelection,
@@ -6,7 +10,6 @@ import type {
   ControlPlaneSessionDirectShellPreflight,
   ControlPlaneSessionDetail,
 } from '@web/hooks/sessions/useControlPlaneSessionDetail';
-import type { ControlPlaneSessionRuntimeContext } from '@web/api/client';
 import { useConversationAutoScroll } from '@web/hooks/conversation/useConversationAutoScroll';
 import type { ClientSharedSessionPlan } from '@/client-shared/services/session-activities';
 import type {
@@ -53,6 +56,7 @@ interface ConversationThreadProps {
   onDeleteQueuedPrompt: (queueItemId: string) => Promise<void>;
   onCancelRun: () => Promise<void>;
   onUpdateDriftEnabled: (enabled: boolean) => Promise<void>;
+  onUpdatePermissionMode: (mode: ControlPlanePermissionMode) => Promise<void>;
   onUpdateModel: (model: string) => Promise<void>;
   onUpdateReasoningEffort: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
   onResolveApproval: (decision: ControlPlaneApprovalDecision) => Promise<void>;
@@ -87,6 +91,7 @@ export function ConversationThread({
   onDeleteQueuedPrompt,
   onCancelRun,
   onUpdateDriftEnabled,
+  onUpdatePermissionMode,
   onUpdateModel,
   onUpdateReasoningEffort,
   onResolveApproval,
@@ -196,6 +201,8 @@ export function ConversationThread({
           disabled={false}
           driftEnabled={session.driftEnabled ?? false}
           driftLevel={session.driftLevel}
+          permissionMode={runtimeContext?.permissionMode}
+          permissionModeOptions={runtimeContext?.permissionModeOptions}
           model={session.model}
           modelOptions={modelOptions}
           reasoningEffort={session.reasoningEffort}
@@ -207,6 +214,7 @@ export function ConversationThread({
           onSubmitPrompt={onSubmitPrompt}
           onCancelRun={onCancelRun}
           onUpdateDriftEnabled={onUpdateDriftEnabled}
+          onUpdatePermissionMode={onUpdatePermissionMode}
           onUpdateModel={onUpdateModel}
           onUpdateReasoningEffort={onUpdateReasoningEffort}
         />

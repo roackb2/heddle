@@ -1,4 +1,5 @@
 import type { ChatSession } from '../../../chat/types.js';
+import type { AutonomyPermissionMode } from '../../../approvals/index.js';
 import type { LlmProvider, ReasoningEffort } from '../../../llm/types.js';
 import type { ProviderCredentialSource } from '../../../runtime/credentials/index.js';
 import type {
@@ -26,6 +27,10 @@ export type SlashCommandExecutionContext = {
   drift: {
     status: () => { enabled: boolean; error?: string };
     setEnabled: (enabled: boolean) => void;
+  };
+  permissions: {
+    current: () => AutonomyPermissionMode;
+    set: (mode: AutonomyPermissionMode) => AutonomyPermissionMode;
   };
   session: {
     all: () => ChatSession[];

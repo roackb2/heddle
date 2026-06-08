@@ -18,6 +18,7 @@ replacement for deterministic tool validation. It combines:
 - Agent-declared policy envelope evaluation.
 - Runtime-computed autonomy facts.
 - Allow/request/deny decisions for unattended tool calls.
+- Auto profile root expansion when a user approves a detected sibling repo.
 - Policy hints that help future sessions tune config after a blocked run.
 
 ## Does Not Own
@@ -27,6 +28,7 @@ replacement for deterministic tool validation. It combines:
 - Tool execution.
 - Pending approval UI or browser/TUI presentation.
 - Remembered project approval storage.
+- Host-specific approval button layout or keyboard shortcuts.
 
 ## Boundary Rule
 
@@ -40,6 +42,117 @@ commands and scripts, the envelope is the agent's explicit contract about the
 intended operation class, roots, environment, destructive scope, and confidence.
 Autonomy evaluates that contract against configured roots and hard-deny facts.
 
+## How The Model Fits Together
+
+There is one policy object at decision time: the effective `AutopilotProfile`.
+Mode/config fields are only inputs for building that profile.
+
+User-facing mental model:
+
+```text
+Auto = agent can do normal local coding work by itself in trusted repos.
+Trusted repos = current repo + repos the user explicitly trusted.
+Dangerous or unclear actions still stop.
+```
+
+The approval UI should teach that model with `Approve once`, `Trust this repo`,
+and `Deny`. Avoid presenting `autoTrustedRoots` or the hand-authored
+`autopilot` profile as concepts users need to understand for ordinary Auto use.
+
+```text
+permissionMode: default
+  -> no effective AutopilotProfile
+  -> normal approval behavior
+
+permissionMode: auto
+  -> generated Auto profile
+  -> plus autoTrustedRoots
+  -> effective AutopilotProfile { preset: "auto" }
+
+permissionMode: custom
+  -> hand-authored config.autopilot
+  -> effective AutopilotProfile { preset: "custom" or unset legacy custom }
+```
+
+`autoTrustedRoots` is not a second approval system. It is stored config for
+expanding the generated Auto preset:
+
+```json
+{
+  "permissionMode": "auto",
+  "autoTrustedRoots": ["../heddle-workspace-notes"]
+}
+```
+
+At runtime, `AutonomyPermissionModeService.resolveEffectiveProfile(...)`
+produces:
+
+```ts
+{
+  mode: 'autopilot',
+  preset: 'auto',
+  roots: [
+    { path: '.', access: 'autopilot', source: 'generated-working-root' },
+    { path: '../heddle-workspace-notes', access: 'autopilot', source: 'user-trusted-repo' },
+    { path: homedir(), access: 'manual-only', source: 'safety-default' },
+    { path: '/Volumes', access: 'deny', source: 'safety-default' },
+    { path: '/dev', access: 'deny', source: 'safety-default' },
+  ],
+}
+```
+
+The evaluator only consumes that final profile. It does not separately inspect
+`permissionMode`, `autoTrustedRoots`, or UI approval choices.
+
+For each tool call:
+
+```text
+tool call
+  -> strip optional agent policy envelope
+  -> infer or read operation claims
+  -> resolve known target paths such as path/from/to
+  -> match each target to the most specific profile root
+  -> hard-deny checks
+  -> envelope requirement checks for approval-gated tools
+  -> root/capability/environment checks
+  -> allow | request approval | deny
+```
+
+Examples:
+
+```text
+read_file ../heddle-workspace-notes/foo.md
+  -> matches ../heddle-workspace-notes
+  -> access: autopilot
+  -> read capability allowed
+  -> allow
+
+read_file ~/Downloads/foo.txt
+  -> matches homedir()
+  -> access: manual-only
+  -> request approval
+
+read_file /dev/something
+  -> matches /dev
+  -> access: deny
+  -> deny
+```
+
+Per-request approval is the escape valve when a call is not allowed
+unattended, but is also not hard-denied:
+
+- `approve once`: resolve this pending tool call only; profile/config do not
+  change.
+- `Trust this repo`: add the detected repo root to `autoTrustedRoots`,
+  update the active in-memory Auto profile, then resume the pending tool call.
+- remembered project approvals: legacy exact/project approvals for repeated
+  command or edit requests; they are separate from Auto root expansion and
+  should not be presented as the primary repo-trust model.
+
+Auto remains Auto after repo expansion. Adding `autoTrustedRoots` means the user
+expanded the trusted root set for Heddle's Auto preset. Custom means the user
+owns the whole hand-authored `autopilot` profile.
+
 ## Example Profile
 
 Profiles are intentionally small. A profile answers: which roots may run
@@ -49,10 +162,12 @@ manual, and which environments may proceed without approval.
 ```ts
 const profile: AutopilotProfile = {
   mode: 'autopilot',
+  preset: 'auto',
   roots: [
     {
       path: '.', // current Heddle checkout, resolved relative to workspace root
       access: 'autopilot',
+      source: 'generated-working-root',
       allow: [
         'read',
         'write',
@@ -68,6 +183,7 @@ const profile: AutopilotProfile = {
     {
       path: '../heddle-workspace-notes',
       access: 'autopilot',
+      source: 'user-trusted-repo',
       allow: ['read', 'write', 'simple-delete', 'many-file-edit'],
     },
     {
@@ -100,6 +216,80 @@ Capabilities are intentionally coarse. They are policy vocabulary, not a full
 filesystem permission system. For example, `simple-delete` can allow a
 single-file delete, while `many-file-edit` is required for broad replacements or
 many-file deletion/edit scopes.
+
+## Permission Modes
+
+`AutonomyPermissionModeService` owns the product mapping from user-facing
+permission modes to effective autonomy profiles. Hosts should not build their
+own profile templates or reinterpret mode names.
+
+- `default`: no autopilot profile is active. Heddle uses the normal approval
+  flow.
+- `auto`: Heddle uses the generated local coding profile. It allows read,
+  write, execute, simple delete, many-file edit, verification, formatting,
+  dependency, and git-stage capabilities under the current workspace root and
+  any user-approved Auto roots while keeping the home directory manual-only and
+  denying device/volume roots.
+- `custom`: Heddle uses the workspace's hand-authored `autopilot` profile.
+  This is selectable only when a hand-authored profile exists with
+  `mode: "autopilot"` and differs from Heddle's generated Auto profile. An
+  `autopilot` block with `mode: "interactive"` is default approval behavior,
+  not Custom. The full custom profile editor is a later UI/TUI slice.
+
+Project config stores `permissionMode` separately from the hand-authored
+`autopilot` profile. This lets a user switch Default/Auto/Custom without
+deleting a custom profile. Auto-specific user expansions live in
+`autoTrustedRoots`, not in the custom `autopilot` object:
+
+```json
+{
+  "permissionMode": "auto",
+  "autoTrustedRoots": ["../heddle-workspace-notes"]
+}
+```
+
+`AutonomyPermissionModeService.resolveEffectiveProfile(...)` converts that
+config into one concrete `AutopilotProfile` with `preset: "auto"`. Downstream
+approval policy does not read `autoTrustedRoots` directly.
+
+## Approval-Driven Auto Expansion
+
+When Auto is active and a tool targets an unconfigured or manual-only sibling
+repo, `AutonomyRootScopeService` may detect the nearest repo/project root using
+markers such as `.git`, `package.json`, `pyproject.toml`, `requirements.txt`,
+`Cargo.toml`, or `go.mod`. The pending approval request can then include an
+`autopilotRootApproval` option.
+
+Root detection is intentionally bounded. It searches from the target path only
+up to, but not including, the active workspace's parent directory. For example,
+from `/ProjectHeddle/heddle` it can detect `/ProjectHeddle/heddle-workspace-notes`,
+but it must not promote `/ProjectHeddle`, `$HOME`, or `/` into Auto.
+
+If the user chooses "Trust this repo", the control-plane approval
+resolver calls:
+
+```ts
+AutonomyPermissionModeService.trustAutoRoot({
+  config,
+  workspaceRoot,
+  root: detectedRepoRoot,
+});
+```
+
+and mutates the active in-memory Auto profile through:
+
+```ts
+AutonomyPermissionModeService.addTrustedRootToProfile({
+  profile,
+  workspaceRoot,
+  root: detectedRepoRoot,
+});
+```
+
+The result remains Auto, not Custom. Auto means Heddle owns the policy preset;
+the user can expand the trusted root set, but capabilities still come from the
+Auto template and hard-deny/manual roots still win. Custom means the user owns a
+hand-authored `autopilot` profile.
 
 ## Agent Intent Envelope
 
@@ -185,10 +375,11 @@ Decision rules:
   reset, force push, disk formatting, device writes, or `terraform destroy`.
 - `request`: missing envelope for approval-gated mutating tools,
   `unknown`/low-confidence intent, disallowed environment, manual-only root,
-  unconfigured root, missing capability, or network operation.
-- `allow`: profile is in `autopilot` mode, the envelope is specific enough, all
-  roots are configured, capabilities match, environment is allowed, and no
-  hard-deny or approval reason is present.
+  unconfigured root, missing capability, or network operation. Root checks run
+  even for read/list/search calls that do not require an envelope.
+- `allow`: profile is in `autopilot` mode, all roots are configured,
+  capabilities match, environment is allowed when an envelope is present, and
+  no hard-deny or approval reason is present.
 
 ## Trace Contract
 
@@ -233,9 +424,10 @@ policy hints together.
 
 ## Current Limits
 
-This service is the core policy foundation. Workspace config may provide an
-`autopilot` profile through `.heddle/config.json`; project-config validates the
-persisted shape, and control-plane request context passes the profile into this
-approval policy. Postflight audit now records observed structured effects after
-unattended autopilot execution. User-facing yolo controls and richer shell
+This service is the core policy foundation. Workspace config may provide a
+`permissionMode` and optional `autopilot` profile through `.heddle/config.json`;
+project-config validates the persisted shape, and control-plane request context
+passes the resolved effective profile into this approval policy. Postflight
+audit now records observed structured effects after unattended autopilot
+execution. Richer custom profile editing and richer shell
 effect observation remain follow-up slices.

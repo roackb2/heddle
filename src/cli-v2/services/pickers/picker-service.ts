@@ -8,6 +8,8 @@ export type CliV2ModelPickerItem = ControlPlaneModelOptions['groups'][number]['o
 
 export type CliV2ReasoningPickerItem = ControlPlaneSessionRuntimeContext['reasoningOptions'][number];
 
+export type CliV2PermissionModePickerItem = ControlPlaneSessionRuntimeContext['permissionModeOptions'][number];
+
 export type CliV2SessionPickerItem = Pick<ControlPlaneSessionView, 'id' | 'name'>;
 
 export class CliV2PickerService {
@@ -23,6 +25,10 @@ export class CliV2PickerService {
     return queryAfterPrefix(draft, '/reasoning set');
   }
 
+  static permissionModeQuery(draft: string): string | undefined {
+    return queryAfterPrefix(draft, '/permissions set');
+  }
+
   static filterModels(modelOptions: ControlPlaneModelOptions | undefined, query: string | undefined): CliV2ModelPickerItem[] {
     if (query === undefined) {
       return [];
@@ -34,10 +40,7 @@ export class CliV2PickerService {
       return models;
     }
 
-    return models.filter((model) => (
-      model.id.toLowerCase().includes(normalized) ||
-      (model.label ?? '').toLowerCase().includes(normalized)
-    ));
+    return models.filter((model) => matchesNormalizedQuery([model.id, model.label], normalized));
   }
 
   static filterSessions(sessions: ControlPlaneSessionView[], query: string | undefined): CliV2SessionPickerItem[] {
@@ -51,10 +54,7 @@ export class CliV2PickerService {
     }
 
     return sessions
-      .filter((session) => (
-        session.id.toLowerCase().includes(normalized) ||
-        session.name.toLowerCase().includes(normalized)
-      ))
+      .filter((session) => matchesNormalizedQuery([session.id, session.name], normalized))
       .map(({ id, name }) => ({ id, name }));
   }
 
@@ -72,11 +72,42 @@ export class CliV2PickerService {
       return options;
     }
 
-    return options.filter((option) => (
-      option.id.toLowerCase().includes(normalized) ||
-      option.label.toLowerCase().includes(normalized) ||
-      option.description.toLowerCase().includes(normalized)
-    ));
+    return options.filter((option) => matchesNormalizedQuery([
+      option.id,
+      option.label,
+      option.description,
+    ], normalized));
+  }
+
+  static filterPermissionModes(
+    runtimeContext: ControlPlaneSessionRuntimeContext | undefined,
+    query: string | undefined,
+  ): CliV2PermissionModePickerItem[] {
+    if (query === undefined) {
+      return [];
+    }
+
+    const normalized = normalize(query);
+    const options = runtimeContext?.permissionModeOptions ?? [];
+    if (!normalized) {
+      return options;
+    }
+
+    return options.filter((option) => matchesNormalizedQuery([
+      option.id,
+      option.label,
+      option.description,
+      option.disabledReason,
+    ], normalized));
+  }
+
+  static permissionModeInitialIndex(
+    runtimeContext: ControlPlaneSessionRuntimeContext | undefined,
+    query: string | undefined,
+  ): number {
+    const options = CliV2PickerService.filterPermissionModes(runtimeContext, query);
+    const activePermissionMode = runtimeContext?.permissionMode ?? 'default';
+    return Math.max(0, options.findIndex((option) => option.id === activePermissionMode));
   }
 
   static clampIndex(index: number, itemCount: number): number {
@@ -103,4 +134,8 @@ function queryAfterPrefix(draft: string, prefix: string): string | undefined {
 
 function normalize(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function matchesNormalizedQuery(values: Array<string | undefined>, normalizedQuery: string): boolean {
+  return values.some((value) => value?.toLowerCase().includes(normalizedQuery) ?? false);
 }

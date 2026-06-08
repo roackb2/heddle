@@ -3,6 +3,14 @@ import type { ToolPolicyEnvelope, ToolPolicyOperation } from '@/core/tools/index
 
 export type AutopilotRootAccess = 'read' | 'write' | 'autopilot' | 'manual-only' | 'deny';
 
+export type AutopilotProfilePreset = 'auto' | 'custom';
+
+export type AutopilotRootSource =
+  | 'generated-working-root'
+  | 'user-trusted-repo'
+  | 'custom-config'
+  | 'safety-default';
+
 export type AutopilotCapability =
   | 'read'
   | 'write'
@@ -18,15 +26,43 @@ export type AutopilotRootPolicy = {
   path: string;
   access: AutopilotRootAccess;
   allow?: AutopilotCapability[];
+  source?: AutopilotRootSource;
 };
 
 export type AutopilotProfile = {
   mode: 'interactive' | 'autopilot';
+  preset?: AutopilotProfilePreset;
   roots: AutopilotRootPolicy[];
   environments: {
     allow: Array<'local' | 'dev'>;
     requireApproval: Array<'staging' | 'production' | 'unknown'>;
   };
+};
+
+export const AUTONOMY_PERMISSION_MODES = ['default', 'auto', 'custom'] as const;
+
+export type AutonomyPermissionMode = typeof AUTONOMY_PERMISSION_MODES[number];
+
+export type AutonomyPermissionModeConfig = {
+  permissionMode?: AutonomyPermissionMode;
+  autoTrustedRoots?: string[];
+  autopilot?: AutopilotProfile;
+};
+
+export type AutopilotRootApproval = {
+  label: string;
+  root: string;
+  relativeRoot: string;
+  access: 'autopilot';
+  allow: AutopilotCapability[];
+};
+
+export type AutonomyPermissionModeOption = {
+  id: AutonomyPermissionMode;
+  label: string;
+  description: string;
+  disabled?: boolean;
+  disabledReason?: string;
 };
 
 export type NormalizedAutopilotRootPolicy = AutopilotRootPolicy & {
@@ -71,6 +107,7 @@ export type AutonomyPolicyHint = {
 export type AutonomyEvaluation = {
   call: ToolCall;
   profileMode: AutopilotProfile['mode'];
+  profilePreset?: AutopilotProfilePreset;
   envelope?: ToolPolicyEnvelope;
   facts: ToolPolicyFacts;
   decision: AutopilotDecision;

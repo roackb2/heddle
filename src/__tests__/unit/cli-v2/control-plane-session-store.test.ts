@@ -71,6 +71,34 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('updates permission mode through the shared slash command', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+    fixture.calls.sessionRuntimeContextQuery.mockResolvedValueOnce(createRuntimeContext({
+      permissionMode: 'auto',
+      permissionModeOptions: createPermissionModeOptions('auto'),
+    }));
+
+    await store.selectPermissionModeFromPicker('auto');
+
+    expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      command: '/permissions auto',
+    }, slashCommandRequestOptions());
+    expect(fixture.calls.workspacePermissionModeUpdateMutate).not.toHaveBeenCalled();
+    expect(store.getSnapshot().runtimeContext).toMatchObject({
+      permissionMode: 'auto',
+      permissionModeOptions: [
+        expect.objectContaining({ id: 'default' }),
+        expect.objectContaining({ id: 'auto' }),
+        expect.objectContaining({ id: 'custom' }),
+      ],
+    });
+    store.dispose();
+  });
+
   it('submits prompts through sessionSendPromptAsync without a direct runtime fallback', async () => {
     const fixture = createClientFixture();
     const store = new ControlPlaneSessionStore({
@@ -242,6 +270,7 @@ describe('ControlPlaneSessionStore', () => {
     await store.selectModelFromPicker('gpt-5.4-mini');
     await store.selectReasoningFromPicker('medium');
     await store.selectReasoningFromPicker('default');
+    await store.selectPermissionModeFromPicker('auto');
     await store.selectSessionFromPicker('session-2');
 
     expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenNthCalledWith(1, {
@@ -260,6 +289,11 @@ describe('ControlPlaneSessionStore', () => {
       command: '/reasoning default',
     }, slashCommandRequestOptions());
     expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenNthCalledWith(4, {
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      command: '/permissions auto',
+    }, slashCommandRequestOptions());
+    expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenNthCalledWith(5, {
       workspaceId: 'workspace-1',
       sessionId: 'session-1',
       command: '/session switch session-2',
@@ -862,6 +896,11 @@ function createClientFixture(options: {
           description: 'list local chat sessions',
         },
         {
+          id: 'permissions.current',
+          syntax: '/permissions',
+          description: 'show the active permission mode',
+        },
+        {
           id: 'session.new',
           syntax: '/session new [name]',
           description: 'create and switch to a new session',
@@ -869,6 +908,7 @@ function createClientFixture(options: {
       ],
       hints: [
         { command: '/model', description: 'show the active model' },
+        { command: '/permissions set [query]', description: 'pick permission mode with filtering' },
         { command: '/session list', description: 'list local chat sessions' },
         { command: '/session new [name]', description: 'create and switch to a new session' },
       ],
@@ -889,6 +929,10 @@ function createClientFixture(options: {
     })),
     sessionCancelMutate: vi.fn(async () => ({ cancelled: false })),
     sessionResolveApprovalMutate: vi.fn(async () => ({ resolved: true })),
+    workspacePermissionModeUpdateMutate: vi.fn(async () => ({
+      permissionMode: 'auto',
+      permissionModeOptions: createPermissionModeOptions('auto'),
+    })),
   };
   const client = {
     controlPlane: {
@@ -923,6 +967,7 @@ function createClientFixture(options: {
       sessionContinue: { mutate: calls.sessionContinueMutate },
       sessionCancel: { mutate: calls.sessionCancelMutate },
       sessionResolveApproval: { mutate: calls.sessionResolveApprovalMutate },
+      workspacePermissionModeUpdate: { mutate: calls.workspacePermissionModeUpdateMutate },
     },
   } as unknown as ControlPlaneProxyClient;
 
@@ -1026,6 +1071,8 @@ function createRuntimeContext(
         disabledReason: 'Not supported by request path',
       },
     ],
+    permissionMode: 'default',
+    permissionModeOptions: createPermissionModeOptions('default'),
     credentialSource: {
       type: 'oauth',
       provider: 'openai',
@@ -1043,6 +1090,28 @@ function createRuntimeContext(
     },
     ...overrides,
   };
+}
+
+function createPermissionModeOptions(active: 'default' | 'auto' | 'custom') {
+  return [
+    {
+      id: 'default' as const,
+      label: 'Default',
+      description: 'Use default permission behavior',
+    },
+    {
+      id: 'auto' as const,
+      label: 'Auto',
+      description: 'Approve trusted local coding actions',
+    },
+    {
+      id: 'custom' as const,
+      label: 'Custom',
+      description: 'Use workspace-specific policy',
+      disabled: active !== 'custom',
+      disabledReason: active === 'custom' ? undefined : 'Custom profile editing is not available yet.',
+    },
+  ];
 }
 
 function createModelOptions(): ControlPlaneModelOptions {
