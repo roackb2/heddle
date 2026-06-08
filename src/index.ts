@@ -70,6 +70,26 @@ export {
 export type { ApiKeyRuntime, ProviderCredentialSource } from './core/runtime/credentials/index.js';
 export { RuntimeToolService } from './core/runtime/tools/index.js';
 export type { DefaultAgentToolsOptions } from './core/runtime/tools/index.js';
+export { AgentSkillService, FileAgentSkillActivationRepository } from './core/skills/index.js';
+export type {
+  AgentSkillActivationRecord,
+  AgentSkillActivationResult,
+  AgentSkillActivationStatus,
+  AgentSkillActivationStore,
+  AgentSkillActivationStoreOptions,
+  AgentSkillActivationStorePort,
+  AgentSkillActivationView,
+  AgentSkillActivationViewStatus,
+  AgentSkillCatalog,
+  AgentSkillCatalogEntry,
+  AgentSkillCatalogIssue,
+  AgentSkillCatalogIssueCode,
+  AgentSkillCatalogPromptOptions,
+  AgentSkillReadResult,
+  AgentSkillRoot,
+  AgentSkillServiceOptions,
+  AgentSkillSourceKind,
+} from './core/skills/index.js';
 export {
   createAwarenessService,
   createCodingAwarenessProvider,
