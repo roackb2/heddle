@@ -278,8 +278,11 @@ Heddle can connect to user-configured Model Context Protocol servers so the
 agent can use ecosystem tools such as Notion, Anytype, GitHub, or other MCP
 integrations through Heddle's approval and trace path.
 
-Configure servers in `.heddle/mcp.json` or Settings -> MCP, then manage
-workspace activation from chat or the browser settings page:
+Configure servers by pasting a standard `mcpServers` JSON document into
+Settings -> MCP, editing `.heddle/mcp.json` directly, or opening that file from
+chat with `/mcp config`. Server config is separate from workspace activation:
+after saving config, explicitly enable and refresh the server before future
+agent turns can see its cached tools.
 
 ```text
 /mcp
