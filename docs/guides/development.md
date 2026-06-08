@@ -4,7 +4,7 @@ This repository is already usable as an OSS coding-agent runtime, but it is stil
 
 ## Prerequisites
 
-- Node.js 22.12 or newer
+- Node.js 20 or newer
 - Yarn
 - Provider access if you want to run live chat or examples: `heddle auth login openai`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`
 

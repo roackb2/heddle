@@ -1,6 +1,11 @@
-import type { ResourceLink, SkillMetadataMap } from 'agent-skills-ts-sdk';
-
 export type AgentSkillSourceKind = 'project' | 'user' | 'built-in';
+
+export type AgentSkillMetadata = Record<string, string>;
+
+export type AgentSkillResourceLink = {
+  name: string;
+  path: string;
+};
 
 export type AgentSkillRoot = {
   source: AgentSkillSourceKind;
@@ -16,7 +21,7 @@ export type AgentSkillCatalogEntry = {
   compatibility?: string;
   license?: string;
   allowedTools?: string;
-  metadata?: SkillMetadataMap;
+  metadata?: AgentSkillMetadata;
 };
 
 export type AgentSkillCatalogIssueCode =
@@ -95,7 +100,7 @@ export type AgentSkillServiceOptions = {
 export type AgentSkillReadResult = {
   skill: AgentSkillCatalogEntry;
   body: string;
-  resources: ResourceLink[];
+  resources: AgentSkillResourceLink[];
 };
 
 export type AgentSkillCatalogPromptOptions = {

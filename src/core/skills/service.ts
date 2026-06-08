@@ -1,13 +1,7 @@
 import { access, readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import {
-  extractResourceLinks,
-  parseSkillContent,
-  readSkillProperties,
-  toDisclosureInstructions,
-  toDisclosurePrompt,
-} from 'agent-skills-ts-sdk';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { AgentSkillParser } from './parser.js';
 import type {
   AgentSkillCatalog,
   AgentSkillCatalogEntry,
@@ -83,12 +77,12 @@ export class AgentSkillService {
     }
 
     const content = await readFile(skill.skillFilePath, 'utf8');
-    const parsed = parseSkillContent(content);
+    const parsed = AgentSkillParser.parse(content);
 
     return {
       skill,
       body: parsed.body,
-      resources: extractResourceLinks(parsed.body),
+      resources: AgentSkillParser.extractResourceLinks(parsed.body),
     };
   }
 
@@ -198,14 +192,10 @@ export class AgentSkillService {
     options: AgentSkillCatalogPromptOptions = {},
   ): string {
     const readToolName = options.readToolName ?? 'read_agent_skill';
-    return [
-      toDisclosureInstructions({ toolName: readToolName }),
-      toDisclosurePrompt(catalog.skills.map((skill) => ({
-        name: skill.name,
-        description: skill.description,
-        location: skill.skillFilePath,
-      }))),
-    ].join('\n\n');
+    return AgentSkillParser.formatCatalogPrompt({
+      skills: catalog.skills,
+      readToolName,
+    });
   }
 
   private listSkillRoots(): AgentSkillRoot[] {
@@ -297,22 +287,15 @@ export class AgentSkillService {
 
     try {
       const content = await readFile(skillFile.path, 'utf8');
-      const properties = readSkillProperties([{ name: basename(skillFile.path), content }], {
-        location: skillFile.path,
+      const entry = AgentSkillParser.toCatalogEntry({
+        content,
+        skillFilePath: skillFile.path,
+        skillRootPath,
+        source,
       });
 
       return {
-        entry: {
-          name: properties.name,
-          description: properties.description,
-          skillFilePath: skillFile.path,
-          skillRootPath,
-          source,
-          compatibility: properties.compatibility,
-          license: properties.license,
-          allowedTools: properties.allowedTools,
-          metadata: properties.metadata,
-        },
+        entry,
         issues: [],
       };
     } catch (error) {

@@ -7,8 +7,8 @@ Responsibilities:
 
 - discover skill folders from project `.agents/skills`, user
   `~/.agents/skills`, and package-provided built-in skill roots;
-- parse and validate `SKILL.md` frontmatter with the standard
-  `agent-skills-ts-sdk` package;
+- parse and validate `SKILL.md` frontmatter with Heddle-owned semantics backed
+  by the mature `yaml` parser;
 - expose only catalog metadata for initial agent context;
 - read the full skill body only when a caller explicitly asks for one skill;
 - persist workspace-level activation status under Heddle state without copying

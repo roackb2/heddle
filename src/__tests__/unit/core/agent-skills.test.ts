@@ -93,6 +93,65 @@ Use the [browser checklist](references/browser-checklist.md) before checkout flo
     });
   });
 
+  it('escapes catalog prompt values and keeps resource links inside skill resource folders', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-agent-skill-parser-'));
+    const workspaceRoot = join(root, 'workspace');
+
+    await writeSkill(
+      join(workspaceRoot, '.agents', 'skills', 'browser-research'),
+      `---
+name: browser-research
+description: Research <browser> & "pages".
+---
+# Browser Research
+
+Use [checklist](./references/browser-checklist.md), ignore [external](https://example.com), and ignore [escape](../secret.md).
+`,
+    );
+
+    const service = new AgentSkillService({ workspaceRoot, homeDir: join(root, 'home') });
+    const catalog = await service.loadCatalog();
+    const prompt = service.formatCatalogPrompt(catalog);
+    const result = await service.readSkill('browser-research');
+
+    expect(prompt).toContain('Research &lt;browser&gt; &amp; &quot;pages&quot;.');
+    expect(result?.resources).toEqual([
+      {
+        name: 'checklist',
+        path: 'references/browser-checklist.md',
+      },
+    ]);
+  });
+
+  it('reports unsupported frontmatter fields as invalid skills', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-agent-skill-unknown-field-'));
+    const workspaceRoot = join(root, 'workspace');
+
+    await writeSkill(
+      join(workspaceRoot, '.agents', 'skills', 'invalid-skill'),
+      `---
+name: invalid-skill
+description: Invalid skill.
+extra-field: not-standard
+---
+# Invalid
+`,
+    );
+
+    const catalog = await new AgentSkillService({
+      workspaceRoot,
+      homeDir: join(root, 'home'),
+    }).loadCatalog();
+
+    expect(catalog.skills).toEqual([]);
+    expect(catalog.issues).toEqual([
+      expect.objectContaining({
+        code: 'invalid_skill',
+        message: expect.stringContaining('Unsupported Agent Skill frontmatter field(s): extra-field'),
+      }),
+    ]);
+  });
+
   it('keeps the first skill by source precedence and reports duplicates', async () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-agent-skill-duplicates-'));
     const workspaceRoot = join(root, 'workspace');
