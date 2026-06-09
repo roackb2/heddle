@@ -98,6 +98,8 @@ Useful chat commands:
 - `/session switch <id>`: switch to another session
 - `/session continue <id>`: switch and immediately continue that session
 - `/session rename <name>`: rename the current session
+- `/session pin`: keep the current session grouped above normal recent sessions
+- `/session unpin`: return the current session to the normal recent session order
 - `/session close <id>`: remove a saved session
 - `/clear`: clear the current transcript
 - `/compact`: compact older session history immediately
@@ -108,6 +110,12 @@ Useful chat commands:
 - `/drift on`: re-enable observe-only CyberLoop telemetry for chat runs
 - `/drift off`: disable CyberLoop semantic drift detection
 - `!<command>`: run a shell command directly in chat
+
+In the browser control plane, right-click a session row to manage it without
+typing slash commands. You can pin or unpin a session, rename it inline, or
+archive it. Archived sessions are hidden from normal session lists across the
+control plane and terminal session pickers. Immediately after archiving, the
+toast includes an undo action that restores the session to the list.
 
 Prompt editing shortcuts:
 
