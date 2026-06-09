@@ -117,6 +117,7 @@ function sessionWithMessages(
     id: 'session-1',
     name: 'Session 1',
     workspaceId,
+    pinned: false,
     messageCount: messages.length,
     turnCount: 0,
     queuedPromptCount: 0,

@@ -176,6 +176,9 @@
     "newTask": "新建任务",
     "noWorkspaces": "未找到工作区",
     "openSettings": "打开设置",
+    "pinSession": "置顶会话",
+    "pinnedSessionsEmpty": "没有已置顶会话",
+    "pinnedSessionsTitle": "已置顶会话",
     "primaryAriaLabel": "主导航",
     "renameSession": "重命名",
     "renameSessionEmpty": "会话名称不能为空。",
@@ -189,6 +192,7 @@
     "switchWorkspace": "切换工作区",
     "taskListAriaLabel": "任务列表",
     "taskListTitle": "任务",
+    "unpinSession": "取消置顶会话",
     "workspaceSwitcher": "工作区"
   },
   "settings": {

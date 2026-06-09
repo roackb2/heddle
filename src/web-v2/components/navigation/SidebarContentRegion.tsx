@@ -15,6 +15,7 @@ interface SidebarContentRegionProps {
   onCreateSession: () => Promise<void>;
   onCreateTask: () => void;
   onRenameSession: (sessionId: string, name: string) => Promise<void>;
+  onSetSessionPinned: (sessionId: string, pinned: boolean) => Promise<void>;
   onSelectSession: (sessionId: string) => void;
   onSelectTask: (taskId: string) => void;
 }
@@ -33,6 +34,7 @@ export function SidebarContentRegion({
   onCreateSession,
   onCreateTask,
   onRenameSession,
+  onSetSessionPinned,
   onSelectSession,
   onSelectTask,
 }: SidebarContentRegionProps) {
@@ -56,6 +58,7 @@ export function SidebarContentRegion({
           title={sessionListTitle}
           onCreateSession={onCreateSession}
           onRenameSession={onRenameSession}
+          onSetSessionPinned={onSetSessionPinned}
           onSelectSession={onSelectSession}
         />
       )}

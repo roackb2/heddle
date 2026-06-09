@@ -1,4 +1,8 @@
-import type { ControlPlaneHeartbeatTaskView } from '@web/api/client';
+import type {
+  ControlPlaneHeartbeatTaskView,
+  ControlPlaneSessionDetail,
+  ControlPlaneSessions,
+} from '@web/api/client';
 import { trpcReact } from '@web/api/client';
 import type { WorkspaceCreateInput } from '@web/components/settings';
 import { useControlPlaneErrorToasts } from './useControlPlaneErrorToasts';
@@ -26,6 +30,7 @@ export function useControlPlaneAppState() {
   const utils = trpcReact.useUtils();
   const createSessionMutation = trpcReact.controlPlane.sessionCreate.useMutation();
   const renameSessionMutation = trpcReact.controlPlane.sessionRename.useMutation();
+  const sessionPinnedUpdateMutation = trpcReact.controlPlane.sessionPinnedUpdate.useMutation();
   const workspaceCreateMutation = trpcReact.controlPlane.workspaceCreate.useMutation();
   const workspaceRenameMutation = trpcReact.controlPlane.workspaceRename.useMutation();
   const workspaceSetActiveMutation = trpcReact.controlPlane.workspaceSetActive.useMutation();
@@ -106,6 +111,40 @@ export function useControlPlaneAppState() {
         sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, id: sessionId } : { id: sessionId },
       ),
     ]);
+  }
+
+  async function setSessionPinned(sessionId: string, pinned: boolean) {
+    const sessionsInput = sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined;
+    const sessionInput = sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, id: sessionId } : { id: sessionId };
+    const previousSessions = utils.controlPlane.sessions.getData(sessionsInput);
+    const previousSession = utils.controlPlane.session.getData(sessionInput);
+
+    utils.controlPlane.sessions.setData(
+      sessionsInput,
+      (current) => applyPinnedSessionToSessions(current, sessionId, pinned),
+    );
+    utils.controlPlane.session.setData(
+      sessionInput,
+      (current) => applyPinnedSessionToDetail(current, pinned),
+    );
+
+    try {
+      const updated = await sessionPinnedUpdateMutation.mutateAsync({ ...sessionInput, pinned });
+      utils.controlPlane.sessions.setData(
+        sessionsInput,
+        (current) => applyPinnedSessionToSessions(current, sessionId, updated.pinned),
+      );
+      utils.controlPlane.session.setData(sessionInput, updated);
+    } catch (error) {
+      utils.controlPlane.sessions.setData(sessionsInput, previousSessions);
+      utils.controlPlane.session.setData(sessionInput, previousSession);
+      throw error;
+    } finally {
+      await Promise.all([
+        utils.controlPlane.sessions.invalidate(sessionsInput),
+        utils.controlPlane.session.invalidate(sessionInput),
+      ]);
+    }
   }
 
   async function switchWorkspace(workspaceId: string) {
@@ -232,6 +271,7 @@ export function useControlPlaneAppState() {
       onCreateSession: createSession,
       onCreateTask: taskActions.openCreateDialog,
       onRenameSession: renameSession,
+      onSetSessionPinned: setSessionPinned,
       onSelectWorkspace: (workspaceId: string) => void switchWorkspace(workspaceId),
       onSelectSession: navigation.selectSession,
       onSelectTask: navigation.selectTask,
@@ -349,4 +389,28 @@ export function useControlPlaneAppState() {
     taskDeleteDialogProps: taskActions.deleteDialogProps,
     taskEditDialogProps: taskActions.editDialogProps,
   };
+}
+
+function applyPinnedSessionToSessions(
+  current: ControlPlaneSessions | undefined,
+  sessionId: string,
+  pinned: boolean,
+): ControlPlaneSessions | undefined {
+  if (!current) {
+    return current;
+  }
+
+  return {
+    ...current,
+    sessions: current.sessions.map((session) => (
+      session.id === sessionId ? { ...session, pinned } : session
+    )),
+  };
+}
+
+function applyPinnedSessionToDetail(
+  current: ControlPlaneSessionDetail | undefined,
+  pinned: boolean,
+): ControlPlaneSessionDetail | undefined {
+  return current ? { ...current, pinned } : current;
 }

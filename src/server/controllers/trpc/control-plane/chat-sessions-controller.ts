@@ -83,6 +83,11 @@ type RenameControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & {
   name: string;
 };
 
+type UpdatePinnedControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & {
+  sessionId: string;
+  pinned: boolean;
+};
+
 type DeleteControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & ControlPlaneSessionAddress & {
   leaseOwner: ChatSessionLeaseOwner;
 };
@@ -160,6 +165,12 @@ export class ControlPlaneChatSessionsController {
   renameSession(args: RenameControlPlaneChatSessionArgs): ChatSessionDetail {
     const { sessionId, name, ...engineInput } = args;
     const updated = this.createEngine(engineInput).sessions.rename(sessionId, name);
+    return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
+  }
+
+  updatePinned(args: UpdatePinnedControlPlaneChatSessionArgs): ChatSessionDetail {
+    const { sessionId, pinned, ...engineInput } = args;
+    const updated = this.createEngine(engineInput).sessions.setPinned(sessionId, pinned);
     return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
   }
 
@@ -409,8 +420,7 @@ export class ControlPlaneChatSessionsController {
 
   readViews(args: ControlPlaneSessionReadArgs): ChatSessionView[] {
     return this.createEngine(args).sessions.list()
-      .flatMap((session) => ControlPlaneChatSessionPresenter.projectView(session))
-      .sort((left, right) => (right.updatedAt ?? '').localeCompare(left.updatedAt ?? ''));
+      .flatMap((session) => ControlPlaneChatSessionPresenter.projectView(session));
   }
 
   readDetail(args: ControlPlaneSessionReadArgs, id: string): ChatSessionDetail | undefined {

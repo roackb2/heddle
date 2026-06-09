@@ -27,6 +27,7 @@ export class ChatSessionRecords {
       name: options.name,
       retention: options.retention ?? 'reusable',
       workspaceId: options.workspaceId,
+      pinned: false,
       history: [],
       messages: [],
       turns: [],

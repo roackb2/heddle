@@ -140,6 +140,7 @@ export type ChatSession = {
   name: string;
   retention?: ChatSessionRetention;
   workspaceId?: string;
+  pinned: boolean;
   history: ChatMessage[];
   messages: ConversationLine[];
   turns: TurnSummary[];

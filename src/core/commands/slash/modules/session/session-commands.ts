@@ -17,6 +17,8 @@ export function createSessionSlashCommandModule(): SlashCommandModule<SlashComma
       { command: '/session switch <id>', description: 'switch to another session' },
       { command: '/session continue <id>', description: 'switch to a session and resume it' },
       { command: '/session rename <name>', description: 'rename the current session' },
+      { command: '/session pin', description: 'pin the current session' },
+      { command: '/session unpin', description: 'unpin the current session' },
       { command: '/session close <id>', description: 'remove a saved session' },
     ],
     commands: [
@@ -84,6 +86,20 @@ export function createSessionSlashCommandModule(): SlashCommandModule<SlashComma
         description: 'rename the current session',
         match: matchesRequiredSessionArgument('/session rename'),
         run: (context, input) => renameSession(context, argumentAfterPrefix(input, '/session rename')),
+      },
+      {
+        id: 'session.pin',
+        syntax: '/session pin',
+        description: 'pin the current session',
+        match: SlashCommandParser.matchesExact('/session pin'),
+        run: (context) => updatePinnedSession(context, true),
+      },
+      {
+        id: 'session.unpin',
+        syntax: '/session unpin',
+        description: 'unpin the current session',
+        match: SlashCommandParser.matchesExact('/session unpin'),
+        run: (context) => updatePinnedSession(context, false),
       },
       {
         id: 'session.close',
@@ -162,6 +178,14 @@ function renameSession(
 
   context.session.rename(name);
   return slashMessageResult(`Renamed current session to ${name}.`);
+}
+
+function updatePinnedSession(
+  context: SlashCommandExecutionContext,
+  pinned: boolean,
+): SlashCommandResult {
+  context.session.setPinned(pinned);
+  return slashMessageResult(pinned ? 'Pinned current session.' : 'Unpinned current session.');
 }
 
 function closeSession(

@@ -176,6 +176,9 @@
     "newTask": "New task",
     "noWorkspaces": "No workspaces found",
     "openSettings": "Open settings",
+    "pinSession": "Pin session",
+    "pinnedSessionsEmpty": "No pinned sessions",
+    "pinnedSessionsTitle": "Pinned sessions",
     "primaryAriaLabel": "Primary navigation",
     "renameSession": "Rename",
     "renameSessionEmpty": "Session name cannot be empty.",
@@ -189,6 +192,7 @@
     "switchWorkspace": "Switch workspace",
     "taskListAriaLabel": "Task list",
     "taskListTitle": "Tasks",
+    "unpinSession": "Unpin session",
     "workspaceSwitcher": "Workspace"
   },
   "settings": {

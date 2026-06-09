@@ -15,6 +15,7 @@ describe('AskCliV2CommandEdgeService', () => {
       createSessionResult: {
         id: 'session-ask',
         name: 'Ask 2026-06-03T00:00:00.000Z',
+        pinned: false,
         messageCount: 0,
         turnCount: 0,
         queuedPromptCount: 0,
@@ -25,6 +26,7 @@ describe('AskCliV2CommandEdgeService', () => {
         session: {
           id: 'session-ask',
           name: 'Ask',
+          pinned: false,
           messageCount: 2,
           turnCount: 1,
           queuedPromptCount: 0,
@@ -86,6 +88,7 @@ describe('AskCliV2CommandEdgeService', () => {
       sessions: [{
         id: 'session-latest',
         name: 'Latest',
+        pinned: false,
         messageCount: 1,
         turnCount: 1,
         queuedPromptCount: 0,
@@ -125,6 +128,7 @@ describe('AskCliV2CommandEdgeService', () => {
       createSessionResult: {
         id: 'session-new',
         name: 'Review session',
+        pinned: false,
         messageCount: 0,
         turnCount: 0,
         queuedPromptCount: 0,
@@ -221,6 +225,7 @@ function createClientFixture(input: {
         mutate: vi.fn(async () => input.createSessionResult ?? {
           id: 'session-created',
           name: 'Created',
+          pinned: false,
           messageCount: 0,
           turnCount: 0,
           queuedPromptCount: 0,

@@ -52,7 +52,11 @@ export class ChatSessionCodec {
   }
 
   static projectCatalogEntry(session: ChatSession): ChatSessionCatalogEntry {
-    return CatalogEntryWriteSchema.parse(session);
+    const parsed = CatalogEntryWriteSchema.parse(session);
+    return {
+      ...parsed,
+      pinned: parsed.pinned ?? false,
+    };
   }
 
   static serializeCatalog(catalog: ChatSessionCatalog): string {
@@ -83,6 +87,7 @@ export class ChatSessionCodec {
       createdAt,
       updatedAt: value.updatedAt ?? createdAt,
       driftEnabled: value.driftEnabled ?? false,
+      pinned: value.pinned ?? false,
     };
   }
 

@@ -78,5 +78,9 @@ function createSessionView(): ControlPlaneSessionView {
     id: 'session-1',
     name: 'Original name',
     model: 'gpt-5',
+    pinned: false,
+    messageCount: 0,
+    turnCount: 0,
+    queuedPromptCount: 0,
   };
 }

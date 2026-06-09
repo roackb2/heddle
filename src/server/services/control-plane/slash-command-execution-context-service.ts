@@ -109,6 +109,9 @@ export class ControlPlaneSlashCommandExecutionContextService {
         rename: (name) => {
           sessions.rename(args.sessionId, name);
         },
+        setPinned: (pinned) => {
+          sessions.setPinned(args.sessionId, pinned);
+        },
         remove: (id) => {
           sessions.delete(id);
         },

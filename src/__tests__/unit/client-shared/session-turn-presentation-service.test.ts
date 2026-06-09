@@ -7,6 +7,7 @@ describe('ClientSharedSessionTurnPresentationService', () => {
     const session = {
       id: 'session-1',
       name: 'Session 1',
+      pinned: false,
       messageCount: 0,
       turnCount: 1,
       queuedPromptCount: 0,
@@ -124,6 +125,7 @@ function createSessionDetail(
   return {
     id: 'session-1',
     name: 'Session 1',
+    pinned: false,
     messageCount: 0,
     turnCount: 0,
     queuedPromptCount: 0,

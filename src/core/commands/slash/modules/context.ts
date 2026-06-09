@@ -57,6 +57,7 @@ export type SlashCommandExecutionContext = {
     create: (name?: string) => ChatSession;
     switch: (id: string) => void;
     rename: (name: string) => void;
+    setPinned: (pinned: boolean) => void;
     remove: (id: string) => void;
     clear: () => void;
     summarize: (session: ChatSession) => string;

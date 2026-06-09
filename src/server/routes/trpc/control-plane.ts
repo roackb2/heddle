@@ -53,6 +53,7 @@ import {
   sessionEventsInputSchema,
   sessionInputSchema,
   sessionMessageInputSchema,
+  sessionPinnedUpdateInputSchema,
   sessionQueuedPromptInputSchema,
   sessionQueuedPromptUpdateInputSchema,
   sessionRenameInputSchema,
@@ -171,6 +172,14 @@ export const controlPlaneRouter = router({
       ...sessionEngineArgs,
       sessionId: input.id,
       name: input.name,
+    });
+  }),
+  sessionPinnedUpdate: controlPlaneWorkspaceProcedure.input(sessionPinnedUpdateInputSchema).mutation(({ ctx, input }) => {
+    const { sessionEngineArgs } = ctx.requestWorkspace;
+    return controlPlaneChatSessionsController.updatePinned({
+      ...sessionEngineArgs,
+      sessionId: input.id,
+      pinned: input.pinned,
     });
   }),
   sessionDelete: controlPlaneWorkspaceProcedure.input(sessionInputSchema).mutation(({ ctx, input }) => {
