@@ -1,5 +1,9 @@
 import type { ChatSession } from '../../../chat/types.js';
 import type { AutonomyPermissionMode } from '../../../approvals/index.js';
+import type {
+  BrowserAutomationOverview,
+  BrowserAutomationSetEnabledResult,
+} from '../../../browser/index.js';
 import type { LlmProvider, ReasoningEffort } from '../../../llm/types.js';
 import type { ProviderCredentialSource } from '../../../runtime/credentials/index.js';
 import type {
@@ -57,6 +61,10 @@ export type SlashCommandExecutionContext = {
     listTasks: () => Promise<HeartbeatTask[]>;
     listRunRecords: (options?: { taskId?: string; limit?: number }) => Promise<HeartbeatTaskRunRecordEntry[]>;
     loadRunRecord: (id: string) => Promise<HeartbeatTaskRunRecordEntry | undefined>;
+  };
+  browserAutomation: {
+    overview: () => Promise<BrowserAutomationOverview>;
+    setEnabled: (enabled: boolean) => Promise<BrowserAutomationSetEnabledResult>;
   };
   skills: {
     list: () => Promise<AgentSkillActivationView[]>;

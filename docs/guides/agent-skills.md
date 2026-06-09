@@ -7,11 +7,15 @@ Skills are discovered from:
 
 - project skills under `.agents/skills/<name>/SKILL.md`
 - user skills under `~/.agents/skills/<name>/SKILL.md`
-- package-provided built-in skill roots when a host registers them
+- Heddle built-in skills shipped with the package
 
 Project skills take precedence over user skills with the same name. Heddle only
 stores workspace activation state under `.heddle/skills/activation.json`; it
 does not copy skill definitions into Heddle state.
+
+Built-in skills are Heddle-owned instructions for common capabilities. They are
+visible in the same catalog as project and user skills, but they are still not
+active by default.
 
 ## Skill Format
 
@@ -60,6 +64,29 @@ Use the terminal slash commands inside `heddle` or `heddle chat`:
 - `Missing definitions`: activation records whose `SKILL.md` no longer exists
 
 Only active skills are shown to the agent during a run.
+
+Browser Automation also has a capability-specific shortcut:
+
+```text
+/browser
+/browser enable
+/browser disable
+```
+
+`/browser enable` activates Heddle's built-in `browser-automation` skill and
+adds browser tools to future default agent turns in the current workspace. The
+equivalent web path is Settings -> Browser Automation.
+
+The browser skill teaches the agent when browser automation is useful: visual
+inspection for frontend work, user-requested website interaction, web research,
+shopping comparison, and tasks where rendered browser state matters. It also
+reminds the agent that logged-in sites require a selected browser profile with a
+valid session; without one, only public or non-session pages should be assumed
+reachable.
+
+If an agent needs a starting URL, it may use `web_search` to discover the
+target page, but it should switch to `browser_open` and `browser_snapshot` when
+the user asked for browser interaction or rendered page evidence.
 
 ## What The Agent Sees
 

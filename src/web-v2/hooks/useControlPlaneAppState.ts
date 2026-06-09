@@ -30,6 +30,7 @@ export function useControlPlaneAppState() {
   const workspaceSetActiveMutation = trpcReact.controlPlane.workspaceSetActive.useMutation();
   const skillActivateMutation = trpcReact.controlPlane.skillActivate.useMutation();
   const skillDisableMutation = trpcReact.controlPlane.skillDisable.useMutation();
+  const browserAutomationSetEnabledMutation = trpcReact.controlPlane.browserAutomationSetEnabled.useMutation();
   const mcpServerEnableMutation = trpcReact.controlPlane.mcpServerEnable.useMutation();
   const mcpServerDisableMutation = trpcReact.controlPlane.mcpServerDisable.useMutation();
   const mcpServerRefreshMutation = trpcReact.controlPlane.mcpServerRefresh.useMutation();
@@ -44,6 +45,9 @@ export function useControlPlaneAppState() {
   });
   const skillsQuery = trpcReact.controlPlane.skills.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
     enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'skills',
+  });
+  const browserAutomationQuery = trpcReact.controlPlane.browserAutomation.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
+    enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'browserAutomation',
   });
   const mcpQuery = trpcReact.controlPlane.mcpServers.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
     enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'mcp',
@@ -123,6 +127,18 @@ export function useControlPlaneAppState() {
     await utils.controlPlane.skills.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined);
   }
 
+  async function setBrowserAutomationEnabled(enabled: boolean) {
+    const input = sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, enabled } : { enabled };
+    const result = await browserAutomationSetEnabledMutation.mutateAsync(input);
+    if (!result.ok) {
+      throw new Error(`Browser Automation skill not found: ${result.overview.skillName}`);
+    }
+    await Promise.all([
+      utils.controlPlane.browserAutomation.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined),
+      utils.controlPlane.skills.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined),
+    ]);
+  }
+
   async function setMcpServerEnabled(serverId: string, enabled: boolean) {
     const input = sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, serverId } : { serverId };
     if (enabled) {
@@ -178,6 +194,13 @@ export function useControlPlaneAppState() {
         status: memoryStatusQuery.data ?? stateMemoryStatus,
         loading: memoryStatusQuery.isLoading || sidebar.stateQuery.isLoading,
         error: memoryStatusQuery.error instanceof Error ? memoryStatusQuery.error.message : undefined,
+      },
+      browserAutomationSettingsView: {
+        browserAutomation: browserAutomationQuery.data,
+        loading: browserAutomationQuery.isLoading || sidebar.stateQuery.isLoading,
+        error: browserAutomationQuery.error instanceof Error ? browserAutomationQuery.error.message : undefined,
+        updating: browserAutomationSetEnabledMutation.isPending,
+        onSetEnabled: setBrowserAutomationEnabled,
       },
       skillsSettingsView: {
         skills: skillsQuery.data,

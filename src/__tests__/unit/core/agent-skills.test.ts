@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { AgentSkillService, FileAgentSkillActivationRepository } from '@/core/skills/index.js';
+import { AgentSkillService, BROWSER_AUTOMATION_SKILL_NAME, FileAgentSkillActivationRepository } from '@/core/skills/index.js';
 import { createReadAgentSkillTool } from '@/core/tools/toolkits/agent-skills/index.js';
 
 describe('AgentSkillService', () => {
@@ -37,7 +37,7 @@ description: Summarize local notes.
 `,
     );
 
-    const service = new AgentSkillService({ workspaceRoot, homeDir });
+    const service = new AgentSkillService({ workspaceRoot, homeDir, builtInSkills: [] });
     const catalog = await service.loadCatalog();
 
     expect(catalog.issues).toEqual([]);
@@ -79,7 +79,7 @@ Use the [browser checklist](references/browser-checklist.md) before checkout flo
 `,
     );
 
-    const service = new AgentSkillService({ workspaceRoot, homeDir: join(root, 'home') });
+    const service = new AgentSkillService({ workspaceRoot, homeDir: join(root, 'home'), builtInSkills: [] });
     const result = await service.readSkill('browser-research');
 
     expect(result).toMatchObject({
@@ -110,7 +110,7 @@ Use [checklist](./references/browser-checklist.md), ignore [external](https://ex
 `,
     );
 
-    const service = new AgentSkillService({ workspaceRoot, homeDir: join(root, 'home') });
+    const service = new AgentSkillService({ workspaceRoot, homeDir: join(root, 'home'), builtInSkills: [] });
     const catalog = await service.loadCatalog();
     const prompt = service.formatCatalogPrompt(catalog);
     const result = await service.readSkill('browser-research');
@@ -142,6 +142,7 @@ extra-field: not-standard
     const catalog = await new AgentSkillService({
       workspaceRoot,
       homeDir: join(root, 'home'),
+      builtInSkills: [],
     }).loadCatalog();
 
     expect(catalog.skills).toEqual([]);
@@ -177,7 +178,7 @@ description: User-level research skill.
 `,
     );
 
-    const catalog = await new AgentSkillService({ workspaceRoot, homeDir }).loadCatalog();
+    const catalog = await new AgentSkillService({ workspaceRoot, homeDir, builtInSkills: [] }).loadCatalog();
 
     expect(catalog.skills).toEqual([
       expect.objectContaining({
@@ -218,6 +219,7 @@ name: Invalid Skill
 
     const catalog = await new AgentSkillService({
       workspaceRoot,
+      builtInSkills: [],
       homeDir: join(root, 'home'),
     }).loadCatalog();
 
@@ -262,6 +264,7 @@ description: Summarize local notes.
     const service = new AgentSkillService({
       workspaceRoot,
       homeDir: join(root, 'home'),
+      builtInSkills: [],
       activationStore,
     });
 
@@ -311,6 +314,7 @@ description: Summarize local notes.
     const service = new AgentSkillService({
       workspaceRoot,
       homeDir: join(root, 'home'),
+      builtInSkills: [],
       activationStore,
     });
 
@@ -361,6 +365,7 @@ description: Research web pages through a browser.
     const service = new AgentSkillService({
       workspaceRoot,
       homeDir: join(root, 'home'),
+      builtInSkills: [],
       activationStore: new FileAgentSkillActivationRepository({ stateRoot }),
     });
     const tool = createReadAgentSkillTool({ workspaceRoot, stateRoot });
@@ -431,6 +436,104 @@ Use [browser checklist](references/browser-checklist.md) before making claims.
       ok: false,
       reason: 'skill_not_active',
       name: 'missing-skill',
+    });
+  });
+
+  it('discovers the built-in browser automation skill without activating it by default', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-agent-skill-built-in-'));
+    const workspaceRoot = join(root, 'workspace');
+    const activationStore = new FileAgentSkillActivationRepository({
+      stateRoot: join(workspaceRoot, '.heddle'),
+    });
+    const service = new AgentSkillService({
+      workspaceRoot,
+      homeDir: join(root, 'home'),
+      activationStore,
+    });
+
+    await expect(service.loadCatalog()).resolves.toMatchObject({
+      skills: [
+        expect.objectContaining({
+          name: BROWSER_AUTOMATION_SKILL_NAME,
+          source: 'built-in',
+          description: expect.stringContaining('use a browser'),
+        }),
+      ],
+      issues: [],
+    });
+    await expect(service.loadActivatedCatalog()).resolves.toMatchObject({
+      skills: [],
+      issues: [],
+    });
+
+    await service.activateSkill(BROWSER_AUTOMATION_SKILL_NAME, new Date('2026-06-09T00:00:00.000Z'));
+    await expect(service.readActivatedSkill(BROWSER_AUTOMATION_SKILL_NAME)).resolves.toMatchObject({
+      skill: {
+        name: BROWSER_AUTOMATION_SKILL_NAME,
+        source: 'built-in',
+      },
+      body: expect.stringContaining('## When To Use It'),
+    });
+  });
+
+  it('reads an activated built-in skill by stored source and path when a project skill shadows the name', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-agent-skill-shadowed-built-in-'));
+    const workspaceRoot = join(root, 'workspace');
+    const activationStore = new FileAgentSkillActivationRepository({
+      stateRoot: join(workspaceRoot, '.heddle'),
+    });
+    await writeSkill(
+      join(workspaceRoot, '.agents', 'skills', BROWSER_AUTOMATION_SKILL_NAME),
+      `---
+name: ${BROWSER_AUTOMATION_SKILL_NAME}
+description: Shadowed project skill
+---
+# Shadowed
+
+Do not use browser automation.
+`,
+    );
+    const service = new AgentSkillService({
+      workspaceRoot,
+      homeDir: join(root, 'home'),
+      activationStore,
+    });
+
+    await expect(service.loadCatalog()).resolves.toMatchObject({
+      skills: [
+        expect.objectContaining({
+          name: BROWSER_AUTOMATION_SKILL_NAME,
+          source: 'project',
+        }),
+      ],
+      issues: [
+        expect.objectContaining({ code: 'duplicate_skill' }),
+      ],
+    });
+
+    await expect(service.activateBuiltInSkill(BROWSER_AUTOMATION_SKILL_NAME, new Date('2026-06-09T00:00:00.000Z')))
+      .resolves
+      .toMatchObject({
+        ok: true,
+        record: {
+          name: BROWSER_AUTOMATION_SKILL_NAME,
+          source: 'built-in',
+        },
+      });
+    await expect(service.loadActivatedCatalog()).resolves.toMatchObject({
+      skills: [
+        expect.objectContaining({
+          name: BROWSER_AUTOMATION_SKILL_NAME,
+          source: 'built-in',
+        }),
+      ],
+    });
+    await expect(service.readActivatedSkill(BROWSER_AUTOMATION_SKILL_NAME)).resolves.toMatchObject({
+      skill: {
+        name: BROWSER_AUTOMATION_SKILL_NAME,
+        source: 'built-in',
+      },
+      body: expect.stringContaining('Use browser automation when'),
     });
   });
 });

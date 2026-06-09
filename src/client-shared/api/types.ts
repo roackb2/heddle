@@ -44,6 +44,7 @@ export type ControlPlaneHeartbeatRunView = ControlPlaneHeartbeatTask['runs'][num
 export type ControlPlaneHeartbeatRun = RouterOutputs['controlPlane']['heartbeatRun'];
 export type ControlPlaneHeartbeatTaskRunNow = RouterOutputs['controlPlane']['heartbeatTaskRunNow'];
 export type ControlPlaneMemoryStatus = RouterOutputs['controlPlane']['memoryStatus'];
+export type ControlPlaneBrowserAutomation = RouterOutputs['controlPlane']['browserAutomation'];
 export type ControlPlaneSkills = RouterOutputs['controlPlane']['skills'];
 export type ControlPlaneSkillActivationView = ControlPlaneSkills['skills'][number];
 export type ControlPlaneMcpServers = RouterOutputs['controlPlane']['mcpServers'];

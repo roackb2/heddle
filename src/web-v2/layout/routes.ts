@@ -23,6 +23,7 @@ export const APP_ROUTES = [
 export const SETTINGS_ROUTES = [
   { id: 'general', labelKey: 'settings.general', href: '/settings/general' },
   { id: 'workspaces', labelKey: 'settings.workspaces', href: '/settings/workspaces' },
+  { id: 'browserAutomation', labelKey: 'settings.browserAutomation', href: '/settings/browser-automation' },
   { id: 'skills', labelKey: 'settings.skills', href: '/settings/skills' },
   { id: 'mcp', labelKey: 'settings.mcp', href: '/settings/mcp' },
   { id: 'memory', labelKey: 'settings.memory', href: '/settings/memory' },

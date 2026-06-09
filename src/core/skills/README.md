@@ -6,7 +6,8 @@ Skills ecosystem.
 ## Responsibilities
 
 - discover skill folders from project `.agents/skills`, user
-  `~/.agents/skills`, and package-provided built-in skill roots;
+  `~/.agents/skills`, package-provided built-in skill definitions, and optional
+  built-in skill roots;
 - parse and validate `SKILL.md` frontmatter with Heddle-owned semantics backed
   by the mature `yaml` parser;
 - expose only catalog metadata for initial agent context;
@@ -15,6 +16,8 @@ Skills ecosystem.
   after the skill body has linked to them;
 - persist workspace-level activation status under Heddle state without copying
   skill definitions.
+- resolve active skills by the stored source and file path, not only by name, so
+  an activation record keeps pointing at the skill the user actually enabled.
 
 ## Boundaries
 
@@ -29,8 +32,16 @@ Skills ecosystem.
 - TUI activation is exposed through core slash commands (`/skills`,
   `/skills enable <name>`, `/skills disable <name>`) consumed by the existing
   control-plane slash command path.
+- Web activation is exposed through control-plane settings pages that call the
+  same `AgentSkillService` methods.
 
-Settings-page management is intentionally left to the web surface.
+Capability-specific settings may delegate to this domain for activation while
+owning their own user mental model. For example, Browser Automation enables the
+built-in `browser-automation` skill through `BrowserAutomationCapabilityService`;
+runtime tool assembly then checks that capability state before adding browser
+tools to default turns. Capability-owned built-ins should use
+`activateBuiltInSkill()` so project or user skills with the same name cannot
+shadow host-controlled guidance.
 
 ## How Skills Work
 
@@ -42,8 +53,12 @@ A skill is a directory with a `SKILL.md` file:
 ```
 
 `AgentSkillService.loadCatalog()` discovers project, user, and built-in skill
-roots, reads only `SKILL.md` frontmatter, validates supported fields, and
+definitions, reads only catalog frontmatter, validates supported fields, and
 returns a catalog. It does not expose the markdown body during catalog load.
+
+Built-in skills are code/package-owned definitions parsed into the same
+`SKILL.md` shape at runtime. Their editable source can live as package assets,
+but they are not copied into workspace state.
 
 Supported frontmatter fields are:
 
@@ -57,6 +72,13 @@ Supported frontmatter fields are:
 Project skills have precedence over user skills with the same name. Duplicate
 lower-precedence skills are reported as catalog issues instead of replacing the
 first entry.
+
+Precedence is:
+
+1. project skills
+2. user skills
+3. optional built-in skill roots
+4. package-provided built-in skills
 
 ## Activation Model
 
@@ -105,6 +127,8 @@ Terminal users manage workspace activation through core slash commands:
 /skills
 /skills enable browser-research
 /skills disable browser-research
+/browser enable
+/browser disable
 ```
 
 `/skills` lists activation views in sections:
@@ -114,8 +138,9 @@ Terminal users manage workspace activation through core slash commands:
 - `Disabled`: previously enabled and then disabled
 - `Missing definitions`: activation records whose original `SKILL.md` is gone
 
-The web settings page does not manage Agent Skills yet. Until that exists, the
-TUI slash commands are the user-facing activation path.
+The web Settings -> Skills page manages generic Agent Skills. Settings ->
+Browser Automation manages the built-in browser automation capability and uses
+the same activation store under the hood.
 
 ## What The Agent Sees Before Loading A Skill
 

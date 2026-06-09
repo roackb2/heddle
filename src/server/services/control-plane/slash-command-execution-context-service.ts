@@ -7,6 +7,7 @@ import type { ChatSession } from '@/core/chat/types.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import type { SlashCommandExecutionContext } from '@/core/commands/slash/modules/context.js';
 import type { SlashCommandHint } from '@/core/commands/slash/types.js';
+import { BrowserAutomationCapabilityService } from '@/core/browser/index.js';
 import { FileHeartbeatTaskService } from '@/core/heartbeat/index.js';
 import { McpService } from '@/core/mcp/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
@@ -33,6 +34,10 @@ export class ControlPlaneSlashCommandExecutionContextService {
     const resolved = controlPlaneSessionRuntimeContextService.resolve(args);
     const { runtimeContext, sessions } = resolved;
     const heartbeatTasks = new FileHeartbeatTaskService({ stateRoot: args.stateRoot });
+    const browserAutomation = new BrowserAutomationCapabilityService({
+      workspaceRoot: args.workspaceRoot,
+      stateRoot: args.stateRoot,
+    });
     const skills = new AgentSkillService({
       workspaceRoot: args.workspaceRoot,
       activationStore: new FileAgentSkillActivationRepository({ stateRoot: args.stateRoot }),
@@ -116,6 +121,10 @@ export class ControlPlaneSlashCommandExecutionContextService {
         listTasks: async () => await heartbeatTasks.listTasks(),
         listRunRecords: async (options) => await heartbeatTasks.listRunRecords(options),
         loadRunRecord: async (id) => await heartbeatTasks.loadRunRecord(id),
+      },
+      browserAutomation: {
+        overview: async () => await browserAutomation.overview(),
+        setEnabled: async (enabled) => await browserAutomation.setEnabled(enabled),
       },
       skills: {
         list: async () => await skills.listActivationViews(),

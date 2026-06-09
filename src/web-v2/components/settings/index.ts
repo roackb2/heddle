@@ -1,3 +1,5 @@
+export { BrowserAutomationSettingsView } from './BrowserAutomationSettingsView';
+export type { BrowserAutomationSettingsViewProps } from './BrowserAutomationSettingsView';
 export { GeneralSettingsView } from './GeneralSettingsView';
 export { LanguageSelect } from './LanguageSelect';
 export { MemorySettingsView } from './MemorySettingsView';

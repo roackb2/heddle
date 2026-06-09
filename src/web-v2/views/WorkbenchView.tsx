@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { ConversationThread } from '@web/components/conversation';
-import { GeneralSettingsView, McpSettingsView, MemorySettingsView, SkillsSettingsView, WorkspaceSettingsView } from '@web/components/settings';
+import { BrowserAutomationSettingsView, GeneralSettingsView, McpSettingsView, MemorySettingsView, SkillsSettingsView, WorkspaceSettingsView } from '@web/components/settings';
 import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
@@ -8,6 +8,7 @@ import { TasksWorkbenchView } from './TasksWorkbenchView';
 
 export type SessionWorkbenchViewProps = Omit<ComponentProps<typeof ConversationThread>, 'emptyTitle'>;
 export type TaskWorkbenchViewProps = ComponentProps<typeof TasksWorkbenchView>;
+export type BrowserAutomationSettingsViewProps = ComponentProps<typeof BrowserAutomationSettingsView>;
 export type MemorySettingsViewProps = ComponentProps<typeof MemorySettingsView>;
 export type McpSettingsViewProps = ComponentProps<typeof McpSettingsView>;
 export type SkillsSettingsViewProps = ComponentProps<typeof SkillsSettingsView>;
@@ -16,6 +17,7 @@ export type WorkspaceSettingsViewProps = ComponentProps<typeof WorkspaceSettings
 interface WorkbenchViewProps {
   activeSurfaceId: AppSurfaceId;
   activeSettingsSectionId: SettingsSectionId;
+  browserAutomationSettingsView: BrowserAutomationSettingsViewProps;
   memorySettingsView: MemorySettingsViewProps;
   mcpSettingsView: McpSettingsViewProps;
   sessionView: SessionWorkbenchViewProps;
@@ -31,6 +33,7 @@ const appSurfaceLabelKeys = {
 } satisfies Record<AppSurfaceId, I18nMessageKey>;
 
 const settingsSectionLabelKeys = {
+  browserAutomation: 'settings.browserAutomation',
   general: 'settings.general',
   memory: 'settings.memory',
   mcp: 'settings.mcp',
@@ -43,6 +46,7 @@ const settingsSectionLabelKeys = {
 export function WorkbenchView({
   activeSurfaceId,
   activeSettingsSectionId,
+  browserAutomationSettingsView,
   memorySettingsView,
   mcpSettingsView,
   sessionView,
@@ -63,6 +67,7 @@ export function WorkbenchView({
     },
   } satisfies Record<AppSurfaceId, { title: string; content: ReactNode }>;
   const settingsViews = {
+    browserAutomation: <BrowserAutomationSettingsView {...browserAutomationSettingsView} />,
     general: <GeneralSettingsView />,
     memory: <MemorySettingsView {...memorySettingsView} />,
     mcp: <McpSettingsView {...mcpSettingsView} />,

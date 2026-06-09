@@ -81,6 +81,27 @@ describe('createBrowserResearchToolkit', () => {
     expect(driver.clickedRefs).toEqual([]);
   });
 
+  it('uses the first opened URL as the browsing boundary when no explicit allowlist is configured', async () => {
+    const { tools, driver } = await createTools({ allowedDomains: [] });
+
+    await expect(tools.browser_open.execute({ url: 'https://en.wikipedia.org/wiki/Browser_automation' }))
+      .resolves
+      .toMatchObject({ ok: true });
+
+    await tools.browser_snapshot.execute({});
+    await expect(tools.browser_click.execute({ ref: 'el_2' }))
+      .resolves
+      .toMatchObject({
+        ok: false,
+        error: expect.stringContaining('outside the browser domain allowlist'),
+        output: {
+          status: 'approvalRequired',
+        },
+      });
+
+    expect(driver.clickedRefs).toEqual([]);
+  });
+
   it('captures screenshots and releases profile locks on close', async () => {
     const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-close-'));
     const first = await createTools({ stateRoot });
@@ -168,13 +189,14 @@ describe('createBrowserResearchToolkit', () => {
 async function createTools(options: {
   stateRoot?: string;
   driver?: BrowserDriver;
+  allowedDomains?: string[];
 } = {}) {
   const stateRoot = options.stateRoot ?? (await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-')));
   const driver = options.driver ?? new FakeBrowserDriver();
   const tools = Object.fromEntries(
     createBrowserResearchToolkit({
       stateRoot,
-      allowedDomains: ['wikipedia.org'],
+      allowedDomains: options.allowedDomains ?? ['wikipedia.org'],
       driverFactory: new FakeBrowserDriverFactory(driver),
       headless: true,
     }).createTools(context(stateRoot)).map((tool) => [tool.name, tool]),

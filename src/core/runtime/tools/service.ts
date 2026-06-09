@@ -1,5 +1,7 @@
 import { join, resolve } from 'node:path';
+import { BrowserAutomationCapabilityService } from '@/core/browser/index.js';
 import { agentSkillsToolkit } from '@/core/tools/toolkits/agent-skills/toolkit.js';
+import { createBrowserResearchToolkit } from '@/core/tools/toolkits/browser-research/index.js';
 import { codingAwarenessToolkit } from '@/core/tools/toolkits/coding-awareness/toolkit.js';
 import { codingFilesToolkit } from '@/core/tools/toolkits/coding-files/toolkit.js';
 import { externalContextToolkit } from '@/core/tools/toolkits/external-context/toolkit.js';
@@ -24,7 +26,11 @@ export class RuntimeToolService {
     const memoryMode = options.memoryMode ?? 'read-and-record';
 
     return ToolBundleComposer.compose({
-      toolkits: this.createDefaultToolkits({ includePlanTool: options.includePlanTool }),
+      toolkits: this.createDefaultToolkits({
+        includePlanTool: options.includePlanTool,
+        browserAutomationEnabled: BrowserAutomationCapabilityService.isEnabled({ stateRoot }),
+        stateRoot,
+      }),
       context: {
         workspaceRoot,
         stateRoot,
@@ -41,7 +47,20 @@ export class RuntimeToolService {
 
   private static createDefaultToolkits(args: {
     includePlanTool?: boolean;
+    browserAutomationEnabled: boolean;
+    stateRoot: string;
   }): ToolToolkit[] {
+    const browserToolkits = args.browserAutomationEnabled
+      ? [
+        createBrowserResearchToolkit({
+          stateRoot: args.stateRoot,
+          allowedDomains: [],
+          profileId: 'browser-automation',
+          maxElementsPerSnapshot: 80,
+        }),
+      ]
+      : [];
+
     return [
       agentSkillsToolkit,
       codingAwarenessToolkit,
@@ -49,6 +68,7 @@ export class RuntimeToolService {
       externalContextToolkit,
       knowledgeToolkit,
       mcpToolkit,
+      ...browserToolkits,
       this.createDefaultInternalToolkit({ includePlanTool: args.includePlanTool }),
       shellProcessToolkit,
     ];

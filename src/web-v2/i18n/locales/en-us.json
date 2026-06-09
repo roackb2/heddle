@@ -189,11 +189,32 @@
     "workspaceSwitcher": "Workspace"
   },
   "settings": {
+    "browserAutomation": "Browser Automation",
     "general": "General",
     "memory": "Memory Status",
     "mcp": "MCP",
     "skills": "Skills",
     "workspaces": "Workspace"
+  },
+  "browserAutomationSettings": {
+    "detailsTitle": "Runtime notes",
+    "disableAction": "Disable",
+    "disabled": "disabled",
+    "enableAction": "Enable",
+    "enabled": "enabled",
+    "errorTitle": "Browser Automation unavailable",
+    "loadingBody": "Reading Browser Automation settings for the active workspace.",
+    "loadingTitle": "Loading Browser Automation",
+    "noActivationStore": "No activation store",
+    "overviewTitle": "Browser Automation",
+    "profileFallback": "Logged-in sites require a selected browser profile with a valid session.",
+    "profileLabel": "Profile requirement",
+    "skillStatusLabel": "Skill status",
+    "switchDetail": "Adds built-in guidance and browser tools to future default agent turns in this workspace.",
+    "switchTitle": "Enable Browser Automation",
+    "toolsFallback": "Browser tools follow host policy and profile configuration.",
+    "toolsLabel": "Tool boundary",
+    "updating": "Updating"
   },
   "mcpSettings": {
     "catalogTitle": "MCP servers",
