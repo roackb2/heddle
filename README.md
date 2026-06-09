@@ -8,6 +8,21 @@ Official website: [heddleagent.com](https://heddleagent.com)
 
 > **Terminal UI v2 is now the default.** Run `heddle` or `heddle chat` to use the API-backed terminal experience. Messages, run events, and agent response streams now flow through the shared control-plane path, so terminal, browser, and mobile clients can follow the same work at the same time for smoother cross-device workflows.
 
+## Agenda
+
+- [See Heddle In Action](#see-heddle-in-action)
+- [Why Try Heddle](#why-try-heddle)
+- [What Heddle Does](#what-heddle-does)
+- [Programmatic Use Layers](#programmatic-use-layers)
+- [See Heddle](#see-heddle)
+- [2-Minute Try-It Path](#2-minute-try-it-path)
+- [Major Features](#major-features)
+- [Install](#install)
+- [Requirements](#requirements)
+- [Documentation](#documentation)
+- [Project Status](#project-status)
+- [Development](#development)
+
 ## See Heddle In Action
 
 Terminal, browser, and mobile surfaces can observe the same live session at once:
@@ -35,6 +50,7 @@ It is a good fit if you want:
 - a terminal-first coding agent that works in a real repository
 - an agent that learns durable project knowledge while working with you, using inspectable local memory
 - standard Agent Skills support for opt-in reusable workflows and tool-use instructions
+- opt-in Browser Automation for rendered page inspection and user-requested web workflows
 - explicit traces, approvals, and reviewable workflow artifacts
 - a browser control plane for local oversight, workspace switching, and session review
 - a path from interactive use to programmatic and scheduled agent workflows
@@ -52,6 +68,7 @@ At a high level, Heddle helps with:
 - switching between local workspaces from the browser control plane
 - learning durable facts, preferences, and workflows from real usage
 - enabling workspace-approved Agent Skills so the agent can load specialized instructions only when needed
+- enabling Browser Automation when an agent should inspect, screenshot, or operate real web pages
 - exposing more operator visibility than a black-box chat tool
 
 If you want a terminal-first coding agent with local state, review traces, workspace memory, and a path toward longer-running workflows, that is the problem Heddle is trying to solve.
@@ -260,6 +277,10 @@ activation from chat:
 /skills disable <name>
 ```
 
+Heddle also ships built-in skills for Heddle-owned capabilities. Capability
+settings can activate those built-ins without asking users to install separate
+skill files.
+
 Only active skills are shown to the agent. Heddle initially exposes a compact
 catalog with each active skill's name and description, then the agent can call
 `read_agent_skill` to fetch the full `SKILL.md` body when a skill is relevant.
@@ -271,6 +292,67 @@ policy or tool safety checks, so users remain responsible for which project or
 user skills they enable.
 
 More: [Agent Skills guide](docs/guides/agent-skills.md)
+
+### Browser Automation
+
+Browser Automation is an opt-in capability for tasks where the agent should see
+or operate real web pages instead of relying only on code inspection, tests, or
+plain web search.
+
+Use it when you want Heddle to:
+
+- visually inspect a frontend after local UI changes
+- capture page snapshots or screenshots as evidence
+- interact with a website the user asked it to browse
+- compare visible product/listing pages
+- use rendered DOM state that is not available from static files or APIs
+
+Browser Automation is off by default. Enable it from Settings -> Browser
+Automation or chat:
+
+```text
+/browser
+/browser enable
+/browser disable
+```
+
+Enabling Browser Automation activates Heddle's package-owned
+`browser-automation` Agent Skill and adds these tools to future default agent
+turns:
+
+```text
+browser_open
+browser_snapshot
+browser_click
+browser_screenshot
+browser_close
+```
+
+The built-in skill teaches the agent when browser automation is appropriate and
+when `web_search` is only useful for discovering a starting URL. Browser policy
+still remains authoritative: unsafe actions, off-domain navigation, and
+ambiguous JavaScript-only clicks can be blocked or require approval.
+
+#### Current Browser Automation Behavior
+
+- if no explicit domain allowlist is configured, the first `browser_open` URL
+  establishes the same-domain browsing boundary for that browser session
+- snapshots return scoped refs for safe `browser_click` calls
+- screenshots and browser evidence are stored under Heddle state
+- logged-in sites require a persistent browser profile with a valid session
+
+#### Browser Automation Next Steps
+
+- add profile management in Settings, including selected profile, Chrome
+  channel, headless/headed mode, and profile path visibility
+- add an "open profile for login" flow so users can prepare logged-in sessions
+  manually before agents reuse them
+- add form-safe browser tools such as `browser_type`, `browser_fill`, and
+  `browser_press`
+- surface browser evidence and screenshots in the control plane
+- design a live browser preview path, likely screenshot/CDP screencast based
+  rather than embedding Playwright's native headed window
+- add richer policy and approval flows for harmless same-origin UI clicks
 
 ### MCP integrations
 
@@ -483,6 +565,7 @@ npx -p @roackb2/heddle -p cyberloop heddle
 - [Control plane](docs/guides/control-plane.md)
 - [Heartbeat](docs/guides/heartbeat.md)
 - [Agent Skills](docs/guides/agent-skills.md)
+- Browser Automation: see the Browser Automation section above
 - [MCP integrations](docs/reference/mcp.md)
 - [Knowledge persistence](docs/guides/knowledge-persistence.md)
 - [Semantic drift](docs/guides/semantic-drift.md)
@@ -506,6 +589,7 @@ Current strengths include:
 - terminal-first coding and repository workflows
 - autonomous, catalog-backed workspace memory that helps the agent learn from normal usage
 - standard Agent Skills support with workspace-level activation and progressive disclosure
+- opt-in Browser Automation with browser snapshots, screenshots, policy checks, and a published next-step agenda
 - explicit traces, approval previews, diff review, and local workspace state
 - browser-based oversight and workspace switching through the control plane
 - local-first heartbeat primitives for scheduled agent work

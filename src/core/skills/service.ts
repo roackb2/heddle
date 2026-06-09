@@ -12,12 +12,14 @@ import type {
   AgentSkillActivationResult,
   AgentSkillActivationStorePort,
   AgentSkillActivationView,
+  AgentSkillBuiltInDefinition,
   AgentSkillReadResult,
   AgentSkillResourceReadResult,
   AgentSkillRoot,
   AgentSkillServiceOptions,
   AgentSkillSourceKind,
 } from './types.js';
+import { DEFAULT_BUILT_IN_AGENT_SKILLS } from './built-ins.js';
 
 const SKILL_FILE_NAMES = ['SKILL.md', 'skill.md'] as const;
 
@@ -32,6 +34,7 @@ export class AgentSkillService {
   private readonly workspaceRoot: string;
   private readonly cwd: string;
   private readonly homeDir: string;
+  private readonly builtInSkills: AgentSkillBuiltInDefinition[];
   private readonly builtInSkillRoots: string[];
   private readonly activationStore?: AgentSkillActivationStorePort;
 
@@ -39,6 +42,7 @@ export class AgentSkillService {
     this.workspaceRoot = resolve(options.workspaceRoot);
     this.cwd = resolve(options.cwd ?? options.workspaceRoot);
     this.homeDir = resolve(options.homeDir ?? homedir());
+    this.builtInSkills = options.builtInSkills ?? DEFAULT_BUILT_IN_AGENT_SKILLS;
     this.builtInSkillRoots = (options.builtInSkillRoots ?? []).map((root) => resolve(root));
     this.activationStore = options.activationStore;
   }
@@ -47,8 +51,15 @@ export class AgentSkillService {
     const rootResults = await Promise.all(
       this.listSkillRoots().map((root) => this.readRootCatalog(root)),
     );
-    const rawEntries = rootResults.flatMap((result) => result.entries);
-    const issues = rootResults.flatMap((result) => result.issues);
+    const builtInResult = this.readBuiltInCatalog();
+    const rawEntries = [
+      ...rootResults.flatMap((result) => result.entries),
+      ...builtInResult.entries,
+    ];
+    const issues = [
+      ...rootResults.flatMap((result) => result.issues),
+      ...builtInResult.issues,
+    ];
     const entriesByName = new Map<string, AgentSkillCatalogEntry>();
 
     for (const entry of rawEntries) {
@@ -78,23 +89,18 @@ export class AgentSkillService {
       return null;
     }
 
-    const content = await readFile(skill.skillFilePath, 'utf8');
-    const parsed = AgentSkillParser.parse(content);
-
-    return {
-      skill,
-      body: parsed.body,
-      resources: AgentSkillParser.extractResourceLinks(parsed.body),
-    };
+    return await this.readSkillEntry(skill);
   }
 
   async readActivatedSkill(name: string): Promise<AgentSkillReadResult | null> {
-    const activatedCatalog = await this.loadActivatedCatalog();
-    if (!activatedCatalog.skills.some((skill) => skill.name === name)) {
+    const record = this.readActivationStore().skills[name];
+    if (!record || record.status !== 'active') {
       return null;
     }
 
-    return await this.readSkill(name);
+    const catalog = await this.loadCatalog();
+    const skill = this.resolveActivationRecordCatalogEntry(record, catalog);
+    return skill ? await this.readSkillEntry(skill) : null;
   }
 
   async readActivatedSkillResource(name: string, resource: string): Promise<AgentSkillResourceReadResult | null> {
@@ -105,6 +111,16 @@ export class AgentSkillService {
 
     if (!skill || !resolvedResource) {
       return null;
+    }
+
+    const builtInSkill = this.findBuiltInSkill(skill.skill.skillFilePath);
+    if (builtInSkill) {
+      const content = builtInSkill.resources?.[resolvedResource.path];
+      return content === undefined ? null : {
+        skill: skill.skill,
+        resource: resolvedResource,
+        content,
+      };
     }
 
     const resourcePath = resolve(skill.skill.skillRootPath, resolvedResource.path);
@@ -121,16 +137,97 @@ export class AgentSkillService {
 
   async loadActivatedCatalog(): Promise<AgentSkillCatalog> {
     const catalog = await this.loadCatalog();
-    const activeSkillNames = new Set(
-      Object.values(this.activationStore?.read().skills ?? {})
-        .filter((record) => record.status === 'active')
-        .map((record) => record.name),
-    );
+    const activeSkills = Object.values(this.activationStore?.read().skills ?? {})
+      .filter((record) => record.status === 'active')
+      .flatMap((record) => {
+        const skill = this.resolveActivationRecordCatalogEntry(record, catalog);
+        return skill ? [skill] : [];
+      });
 
     return {
-      skills: catalog.skills.filter((skill) => activeSkillNames.has(skill.name)),
+      skills: activeSkills,
       issues: catalog.issues,
     };
+  }
+
+  getBuiltInActivationView(name: string): AgentSkillActivationView | undefined {
+    const skill = this.findBuiltInCatalogEntry(name);
+    if (!skill) {
+      return undefined;
+    }
+
+    const record = this.readActivationStore().skills[name];
+    const activeRecord = record?.source === 'built-in' && record.skillFilePath === skill.skillFilePath
+      ? record
+      : undefined;
+
+    return {
+      name,
+      status: activeRecord?.status ?? 'available',
+      catalogEntry: skill,
+      record: activeRecord,
+    };
+  }
+
+  async activateBuiltInSkill(name: string, now = new Date()): Promise<AgentSkillActivationResult> {
+    const skill = this.findBuiltInCatalogEntry(name);
+    if (!skill) {
+      return {
+        ok: false,
+        reason: 'skill_not_found',
+        name,
+      };
+    }
+
+    const timestamp = now.toISOString();
+    const store = this.readActivationStore();
+    const existing = store.skills[name];
+    const existingBuiltIn = existing?.source === skill.source && existing.skillFilePath === skill.skillFilePath
+      ? existing
+      : undefined;
+    const record: AgentSkillActivationRecord = {
+      name: skill.name,
+      source: skill.source,
+      skillFilePath: skill.skillFilePath,
+      status: 'active',
+      activatedAt: existingBuiltIn?.activatedAt ?? timestamp,
+      updatedAt: timestamp,
+    };
+
+    store.skills[name] = record;
+    this.writeActivationStore(store);
+
+    return {
+      ok: true,
+      record,
+    };
+  }
+
+  private async readSkillEntry(skill: AgentSkillCatalogEntry): Promise<AgentSkillReadResult> {
+    const content = this.findBuiltInSkill(skill.skillFilePath)?.content
+      ?? await readFile(skill.skillFilePath, 'utf8');
+    const parsed = AgentSkillParser.parse(content);
+
+    return {
+      skill,
+      body: parsed.body,
+      resources: AgentSkillParser.extractResourceLinks(parsed.body),
+    };
+  }
+
+  private resolveActivationRecordCatalogEntry(
+    record: AgentSkillActivationRecord,
+    catalog: AgentSkillCatalog,
+  ): AgentSkillCatalogEntry | undefined {
+    return catalog.skills.find((skill) => (
+      skill.name === record.name
+      && skill.source === record.source
+      && skill.skillFilePath === record.skillFilePath
+    )) ?? (
+      record.source === 'built-in'
+        ? this.findBuiltInCatalogEntry(record.name, record.skillFilePath)
+        : undefined
+    );
   }
 
   async listActivationViews(): Promise<AgentSkillActivationView[]> {
@@ -146,7 +243,6 @@ export class AgentSkillService {
   }
 
   private buildActivationViews(catalog: AgentSkillCatalog): AgentSkillActivationView[] {
-    const entriesByName = new Map(catalog.skills.map((skill) => [skill.name, skill]));
     const records = Object.values(this.activationStore?.read().skills ?? {});
     const viewsByName = new Map<string, AgentSkillActivationView>();
 
@@ -159,10 +255,11 @@ export class AgentSkillService {
     }
 
     for (const record of records) {
+      const skill = this.resolveActivationRecordCatalogEntry(record, catalog);
       viewsByName.set(record.name, {
         name: record.name,
-        status: entriesByName.has(record.name) ? record.status : 'missing',
-        catalogEntry: entriesByName.get(record.name),
+        status: skill ? record.status : 'missing',
+        catalogEntry: skill,
         record,
       });
     }
@@ -284,6 +381,50 @@ export class AgentSkillService {
       entries: skillResults.flatMap((result) => result.entry ? [result.entry] : []),
       issues: [...skillDirs.issues, ...skillResults.flatMap((result) => result.issues)],
     };
+  }
+
+  private readBuiltInCatalog(): {
+    entries: AgentSkillCatalogEntry[];
+    issues: AgentSkillCatalogIssue[];
+  } {
+    const results = this.builtInSkills.map((skill) => {
+      try {
+        return {
+          entry: AgentSkillParser.toCatalogEntry({
+            content: skill.content,
+            skillFilePath: skill.skillFilePath,
+            skillRootPath: skill.skillRootPath,
+            source: 'built-in',
+          }),
+          issue: undefined,
+        };
+      } catch (error) {
+        return {
+          entry: undefined,
+          issue: {
+            code: 'invalid_skill' as const,
+            path: skill.skillFilePath,
+            message: errorMessage(error),
+          },
+        };
+      }
+    });
+
+    return {
+      entries: results.flatMap((result) => result.entry ? [result.entry] : []),
+      issues: results.flatMap((result) => result.issue ? [result.issue] : []),
+    };
+  }
+
+  private findBuiltInSkill(skillFilePath: string): AgentSkillBuiltInDefinition | undefined {
+    return this.builtInSkills.find((skill) => skill.skillFilePath === skillFilePath);
+  }
+
+  private findBuiltInCatalogEntry(name: string, skillFilePath?: string): AgentSkillCatalogEntry | undefined {
+    return this.readBuiltInCatalog().entries.find((skill) => (
+      skill.name === name
+      && (skillFilePath === undefined || skill.skillFilePath === skillFilePath)
+    ));
   }
 
   private async readSkillDirectories(root: AgentSkillRoot): Promise<{

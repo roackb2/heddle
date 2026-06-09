@@ -1,0 +1,61 @@
+name: browser-automation
+description: Use when the user asks to use a browser, interact with web pages, search within a site or product catalog, compare shopping listings, or visually inspect rendered frontend UI.
+allowed-tools: browser_open browser_snapshot browser_click browser_screenshot browser_close
+metadata:
+  owner: heddle
+  capability: browser-automation
+body: |-
+  # Browser Automation
+
+  Use browser automation when the user's task benefits from seeing or operating a real web page. When the user explicitly asks whether you can use a browser, asks you to browse/search a site, or asks you to interact with a website, prefer browser tools over plain web search.
+
+  ## When To Use It
+
+  Use browser automation when:
+
+  - the user explicitly asks you to use a browser or browse/search a website for them;
+  - the user asks you to interact with a website, compare products, inspect listings, gather evidence from pages, or automate a web workflow;
+  - the user is developing web pages and visual inspection would reveal layout, spacing, overflow, rendering, or interaction issues that are hard to locate with unit or integration tests alone;
+  - a frontend change needs a screenshot or page snapshot to verify what actually rendered;
+  - the task depends on browser-only state such as rendered DOM, client-side navigation, visible controls, or accessibility tree structure.
+
+  Do not use browser automation when code inspection, static analysis, unit tests, integration tests, or API calls are enough to answer the task.
+
+  ## Browser Tools vs Web Search
+
+  Web search is useful for finding a current URL or reference page. It is not a substitute for browser automation when the user asked you to use a browser, inspect rendered UI, interact with a page, compare visible product listings, or collect page-state evidence.
+
+  If you need a starting URL, use web_search only to discover the target page, then continue with browser_open and browser_snapshot.
+
+  ## Session And Profile Assumptions
+
+  If the task depends on logged-in state, first check whether the browser automation host has a selected profile with a valid session for the target site. Without a valid session-backed profile, assume only public or non-session pages are reachable.
+
+  Do not enter credentials or ask the browser to bypass login walls. Ask the user to select or prepare a suitable profile when logged-in access is required.
+
+  ## Operating Loop
+
+  1. Open the target URL with browser_open.
+  2. Capture browser_snapshot before making claims or choosing click targets.
+  3. Use only refs from the latest snapshot.
+  4. After any click that may navigate or change the DOM, capture a new snapshot before further clicks.
+  5. Use browser_screenshot when visual evidence is needed for layout, styling, or rendered state.
+  6. Close the browser session when the browser task is finished.
+
+  Never reuse snapshot refs after navigation. Browser refs are page-state scoped evidence, not stable selectors.
+
+  ## Safety Boundaries
+
+  Respect domain allowlists and browser policy. Stop before checkout, purchase, irreversible submission, account mutation, credential entry, payment, booking, messaging, upload, or destructive actions unless the user explicitly approves a future Heddle workflow that supports that action safely.
+
+  If browser policy blocks navigation or a click, report the blocked action and the reason instead of trying to route around it.
+
+  ## Reporting Results
+
+  Summarize browser work with:
+
+  - current URL;
+  - visible page title or heading;
+  - relevant observed text or controls;
+  - screenshots or evidence paths when captured;
+  - uncertainty, missing session state, blocked policy decisions, or unavailable pages.

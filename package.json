@@ -37,7 +37,7 @@
     "eslint": "eslint .",
     "lint": "yarn eslint",
     "release:context": "node scripts/release-context.mjs",
-    "build": "yarn clean && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node scripts/mark-bin-executable.mjs && yarn client:build",
+    "build": "yarn clean && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node scripts/copy-built-in-skill-assets.mjs && node scripts/mark-bin-executable.mjs && yarn client:build",
     "client:build": "tsc -p src/web-v2/tsconfig.json --noEmit && vite build --config src/web-v2/vite.config.ts",
     "client:dev": "vite --config src/web-v2/vite.config.ts",
     "client:build:v2": "tsc -p src/web-v2/tsconfig.json --noEmit && vite build --config src/web-v2/vite.config.ts",

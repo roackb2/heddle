@@ -9,6 +9,7 @@ import { ConversationTurnPreflightService } from '../../../core/chat/engine/turn
 import { ConversationTurnContextBuilder } from '../../../core/chat/engine/turns/context/index.js';
 import { ConversationTurnRuntimeResolver } from '../../../core/chat/engine/turns/runtime/index.js';
 import { DEFAULT_OPENAI_MODEL } from '../../../core/config.js';
+import { BROWSER_AUTOMATION_SKILL_NAME, FileAgentSkillActivationRepository } from '../../../core/skills/index.js';
 
 describe('chat turn preparation modules', () => {
   afterEach(() => {
@@ -208,6 +209,48 @@ describe('chat turn preparation modules', () => {
       ownerKind: 'ask',
       clientLabel: 'another Heddle client',
     });
+  });
+
+  it('adds browser tools to future turns when Browser Automation is enabled', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-turn-browser-automation-'));
+    const stateRoot = join(root, '.heddle');
+    const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
+    const session = ChatSessionRecords.create({
+      id: 'session-1',
+      name: 'Session 1',
+      apiKeyPresent: true,
+      model: 'gpt-5.4',
+    });
+    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
+    new FileAgentSkillActivationRepository({ stateRoot }).write({
+      version: 1,
+      skills: {
+        [BROWSER_AUTOMATION_SKILL_NAME]: {
+          name: BROWSER_AUTOMATION_SKILL_NAME,
+          status: 'active',
+          source: 'built-in',
+          skillFilePath: 'heddle://built-in-skills/browser-automation/SKILL.md',
+          activatedAt: '2026-06-09T00:00:00.000Z',
+          updatedAt: '2026-06-09T00:00:00.000Z',
+        },
+      },
+    });
+
+    const context = ConversationTurnContextBuilder.build({
+      workspaceRoot: root,
+      stateRoot,
+      sessionStoragePath,
+      sessionId: 'session-1',
+      apiKey: 'explicit-key',
+    });
+
+    expect(context.toolNames).toEqual(expect.arrayContaining([
+      'browser_open',
+      'browser_snapshot',
+      'browser_click',
+      'browser_screenshot',
+      'browser_close',
+    ]));
   });
 
   it('persists the preflight compaction-running context for the leased session', () => {

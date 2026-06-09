@@ -121,6 +121,9 @@ Inside `heddle` / `heddle chat`, the most-used local commands are:
 - `/skills`: list discovered Agent Skills and activation status for this workspace
 - `/skills enable <name>`: enable one Agent Skill for future turns in this workspace
 - `/skills disable <name>`: disable one active Agent Skill for future turns in this workspace
+- `/browser`: show Browser Automation status for this workspace
+- `/browser enable`: enable built-in Browser Automation guidance and browser tools for future default turns in this workspace
+- `/browser disable`: disable built-in Browser Automation guidance and browser tools for future default turns in this workspace
 
 Prompt editing supports `Shift+Enter` for newlines, `Ctrl+Z`/`Ctrl+Y` for undo/redo, and `Up`/`Down` for submitted prompt history when the cursor is on the first or last logical line.
 

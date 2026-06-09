@@ -2,8 +2,9 @@
 
 This toolkit exposes the experimental browser domain as opt-in agent tools.
 
-It is not part of `RuntimeToolService.createDefaultAgentTools(...)`. Hosts must
-include `createBrowserResearchToolkit(...)` deliberately when they want a
+It is opt-in. `RuntimeToolService.createDefaultAgentTools(...)` includes it only
+when the workspace Browser Automation capability is enabled. Other hosts can
+still include `createBrowserResearchToolkit(...)` deliberately when they want a
 research-only browser run.
 
 The package root may export this toolkit without forcing browser automation onto
@@ -24,7 +25,7 @@ can still import Heddle normally, and browser hosts may either install
 - Browser execution, profile locks, policy, snapshots, or evidence persistence.
   Those stay in `src/core/browser`.
 - Approval UI or pending approval coordination.
-- Default runtime tool composition.
+- The Browser Automation capability switch and default runtime tool composition.
 - Form typing, transactions, checkout, payment, booking, messaging, uploads, or
   downloads.
 
@@ -39,6 +40,10 @@ can still import Heddle normally, and browser hosts may either install
 
 If browser policy blocks or requires approval for an action, the tool returns a
 failed tool result instead of executing the browser driver action.
+
+When `allowedDomains` is empty, `browser_open` derives the session allowlist
+from the first opened URL. Subsequent clicks remain same-domain unless a host
+provides a broader explicit allowlist.
 
 ## Example
 

@@ -15,6 +15,7 @@ import { ControlPlaneHeartbeatController } from '@/server/controllers/trpc/contr
 import { controlPlaneHeartbeatEventsController } from '@/server/controllers/trpc/control-plane/heartbeat-events.js';
 import { ControlPlaneMemoryController } from '@/server/controllers/trpc/control-plane/memory.js';
 import { ControlPlaneMcpController } from '@/server/controllers/trpc/control-plane/mcp.js';
+import { ControlPlaneBrowserAutomationController } from '@/server/controllers/trpc/control-plane/browser-automation.js';
 import { ControlPlaneLayoutSnapshotsController } from '@/server/controllers/trpc/control-plane/layout-snapshots.js';
 import { ControlPlaneWorkspaceFilesController } from '@/server/controllers/trpc/control-plane/workspace-files.js';
 import { ControlPlaneWorkspaceDiffController } from '@/server/controllers/trpc/control-plane/workspace-diff.js';
@@ -26,6 +27,7 @@ import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/co
 import { controlPlaneWorkspaceProcedure, type ControlPlaneWorkspaceContext } from './control-plane-workspace.js';
 import {
   agentAskInputSchema,
+  browserAutomationInputSchema,
   createSessionInputSchema,
   fileSearchInputSchema,
   heartbeatRunInputSchema,
@@ -437,6 +439,14 @@ export const controlPlaneRouter = router({
   skillDisable: controlPlaneWorkspaceProcedure.input(skillInputSchema).mutation(async ({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;
     return await ControlPlaneSkillsController.disable(workspace.workspaceRoot, workspace.stateRoot, input.name);
+  }),
+  browserAutomation: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneBrowserAutomationController.overview(workspace.workspaceRoot, workspace.stateRoot);
+  }),
+  browserAutomationSetEnabled: controlPlaneWorkspaceProcedure.input(browserAutomationInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneBrowserAutomationController.setEnabled(workspace.workspaceRoot, workspace.stateRoot, input.enabled);
   }),
   mcpServers: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
     const { workspace } = ctx.requestWorkspace;

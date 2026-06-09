@@ -71,14 +71,14 @@ function createBrowserOpenTool(
   return {
     name: 'browser_open',
     description:
-      'Open an allowlisted URL in the experimental Heddle-owned browser research profile. Use this before browser_snapshot, browser_click, or browser_screenshot. Input example: { "url": "https://en.wikipedia.org/wiki/Browser_automation" }.',
+      'Open a URL in the Heddle-owned browser research profile. Use this before browser_snapshot, browser_click, or browser_screenshot. If no explicit domain allowlist is configured, the first opened URL establishes the same-domain browsing boundary. Input example: { "url": "https://en.wikipedia.org/wiki/Browser_automation" }.',
     parameters: {
       type: 'object',
       additionalProperties: false,
       properties: {
         url: {
           type: 'string',
-          description: 'The URL to open. The browser policy allowlist must permit the domain.',
+          description: 'The URL to open. Browser policy must permit the domain, or the session must be configured to derive its boundary from the first URL.',
         },
       },
       required: ['url'],
@@ -116,7 +116,7 @@ async function openBrowserSession(
   state: BrowserRuntimeState,
   url: string,
 ): Promise<Awaited<ReturnType<BrowserSessionService['open']>>> {
-  const session = await getBrowserSession(options, state);
+  const session = await getBrowserSession(options, state, url);
 
   try {
     const result = await session.open({ url });
@@ -271,6 +271,7 @@ function createBrowserCloseTool(state: BrowserRuntimeState): ToolDefinition {
 async function getBrowserSession(
   options: BrowserResearchToolkitOptions,
   state: BrowserRuntimeState,
+  initialUrl?: string,
 ): Promise<BrowserSessionService> {
   if (state.session) {
     return state.session;
@@ -284,7 +285,7 @@ async function getBrowserSession(
   });
   state.lease = lease;
   state.session = new BrowserSessionService(
-    createSessionConfig(options, lease.profile),
+    createSessionConfig(options, lease.profile, initialUrl),
     options.driverFactory ?? new PlaywrightBrowserDriverFactory(),
   );
   return state.session;
@@ -304,19 +305,35 @@ async function closeBrowserState(state: BrowserRuntimeState): Promise<Awaited<Re
 function createSessionConfig(
   options: BrowserResearchToolkitOptions,
   profile: BrowserProfileConfig,
+  initialUrl?: string,
 ): BrowserSessionConfig {
   return {
     profile,
-    policy: createPolicyConfig(options),
+    policy: createPolicyConfig(options, initialUrl),
     evidenceDir: join(options.evidenceRoot ?? join(options.stateRoot, 'browser-runs'), `run-${Date.now()}`),
   };
 }
 
-function createPolicyConfig(options: BrowserResearchToolkitOptions): BrowserPolicyConfig {
+function createPolicyConfig(options: BrowserResearchToolkitOptions, initialUrl?: string): BrowserPolicyConfig {
   return {
-    allowedDomains: options.allowedDomains,
+    allowedDomains: options.allowedDomains.length > 0
+      ? options.allowedDomains
+      : initialAllowedDomains(initialUrl),
     maxElementsPerSnapshot: options.maxElementsPerSnapshot,
   };
+}
+
+function initialAllowedDomains(initialUrl: string | undefined): string[] {
+  if (!initialUrl) {
+    return [];
+  }
+
+  try {
+    const hostname = new URL(initialUrl).hostname.toLowerCase();
+    return hostname.startsWith('www.') ? [hostname.slice(4), hostname] : [hostname];
+  } catch {
+    return [];
+  }
 }
 
 function requireOpenedSession(

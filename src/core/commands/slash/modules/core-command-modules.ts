@@ -2,6 +2,7 @@ import type { SlashCommandModule } from '../types.js';
 import type { SlashCommandResult } from '../result-types.js';
 import type { SlashCommandExecutionContext } from './context.js';
 import { createAuthSlashCommandModule } from './auth/auth-commands.js';
+import { createBrowserSlashCommandModule } from './browser/browser-commands.js';
 import { createCompactionSlashCommandModule } from './compaction/compaction-commands.js';
 import { createDriftSlashCommandModule } from './drift/drift-commands.js';
 import { createHeartbeatSlashCommandModule } from './heartbeat/heartbeat-commands.js';
@@ -26,6 +27,7 @@ export function createCoreSlashCommandModules(): SlashCommandModule<
     createPermissionsSlashCommandModule(),
     createSessionSlashCommandModule(),
     createHeartbeatSlashCommandModule(),
+    createBrowserSlashCommandModule(),
     createSkillsSlashCommandModule(),
     createMcpSlashCommandModule(),
   ];

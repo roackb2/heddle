@@ -12,6 +12,13 @@ export type AgentSkillRoot = {
   path: string;
 };
 
+export type AgentSkillBuiltInDefinition = {
+  skillRootPath: string;
+  skillFilePath: string;
+  content: string;
+  resources?: Record<string, string>;
+};
+
 export type AgentSkillCatalogEntry = {
   name: string;
   description: string;
@@ -98,6 +105,7 @@ export type AgentSkillServiceOptions = {
   workspaceRoot: string;
   cwd?: string;
   homeDir?: string;
+  builtInSkills?: AgentSkillBuiltInDefinition[];
   builtInSkillRoots?: string[];
   activationStore?: AgentSkillActivationStorePort;
 };

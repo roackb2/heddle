@@ -1,12 +1,14 @@
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { SlashCommandAutocomplete } from '../../../core/commands/slash/autocomplete.js';
+import { browserStatusMessage } from '../../../core/commands/slash/modules/browser/browser-commands.js';
 import { createMcpSlashCommandModule, listMcpMessage } from '../../../core/commands/slash/modules/mcp/mcp-commands.js';
 import type { SlashCommandExecutionContext } from '../../../core/commands/slash/modules/context.js';
 import { listSkillsMessage } from '../../../core/commands/slash/modules/skills/skills-commands.js';
 import { SlashCommandParser } from '../../../core/commands/slash/parser.js';
 import { SlashCommandRegistry } from '../../../core/commands/slash/registry.js';
 import type { AgentSkillActivationView } from '../../../core/skills/index.js';
+import type { BrowserAutomationOverview } from '../../../core/browser/index.js';
 import type { McpOverview } from '../../../core/mcp/index.js';
 import type { SlashCommand, SlashCommandModule } from '../../../core/commands/slash/types.js';
 
@@ -180,6 +182,46 @@ describe('MCP slash command output', () => {
       handled: true,
       kind: 'message',
       message: 'Opened MCP config: /workspace/.heddle/mcp.json',
+    });
+  });
+});
+
+describe('Browser Automation slash command output', () => {
+  it('reports capability status and activation commands', async () => {
+    const overview: BrowserAutomationOverview = {
+      enabled: false,
+      skillName: 'browser-automation',
+      activationStorePath: '/workspace/.heddle/skills/activation.json',
+      skill: {
+        name: 'browser-automation',
+        status: 'available',
+      },
+      profileRequirement: 'Logged-in sites require a selected profile.',
+      toolAvailability: 'Browser tools remain host-controlled.',
+    };
+
+    await expect(browserStatusMessage({
+      browserAutomation: {
+        overview: async () => overview,
+        setEnabled: vi.fn(),
+      },
+    })).resolves.toEqual({
+      handled: true,
+      kind: 'message',
+      message: [
+        'Browser Automation',
+        'status=disabled',
+        'skill=browser-automation',
+        'skillStatus=available',
+        'activationStore=/workspace/.heddle/skills/activation.json',
+        '',
+        'Logged-in sites require a selected profile.',
+        'Browser tools remain host-controlled.',
+        '',
+        'Commands',
+        '  /browser enable',
+        '  /browser disable',
+      ].join('\n'),
     });
   });
 });

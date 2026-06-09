@@ -1,3 +1,8 @@
+export { BrowserAutomationCapabilityService } from './automation/index.js';
+export type {
+  BrowserAutomationOverview,
+  BrowserAutomationSetEnabledResult,
+} from './automation/index.js';
 export { BrowserEvidenceService } from './evidence/index.js';
 export { BrowserPolicyService, DEFAULT_FORBIDDEN_BROWSER_ACTION_TEXT } from './policy/index.js';
 export { BrowserProfileService } from './profiles/index.js';

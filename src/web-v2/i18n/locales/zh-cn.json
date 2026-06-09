@@ -189,11 +189,32 @@
     "workspaceSwitcher": "工作区"
   },
   "settings": {
+    "browserAutomation": "Browser Automation",
     "general": "通用",
     "memory": "记忆状态",
     "mcp": "MCP",
     "skills": "Skills",
     "workspaces": "工作区"
+  },
+  "browserAutomationSettings": {
+    "detailsTitle": "运行环境说明",
+    "disableAction": "停用",
+    "disabled": "已停用",
+    "enableAction": "启用",
+    "enabled": "已启用",
+    "errorTitle": "Browser Automation 不可用",
+    "loadingBody": "正在读取当前工作区的 Browser Automation 设置。",
+    "loadingTitle": "正在加载 Browser Automation",
+    "noActivationStore": "没有 activation store",
+    "overviewTitle": "Browser Automation",
+    "profileFallback": "需要登录状态的网站必须选择有有效 session 的浏览器 profile。",
+    "profileLabel": "Profile 条件",
+    "skillStatusLabel": "Skill 状态",
+    "switchDetail": "为当前工作区未来的 default agent turns 加入内置指引与 browser tools。",
+    "switchTitle": "启用 Browser Automation",
+    "toolsFallback": "Browser tools 会遵守 host policy 与 profile 设置。",
+    "toolsLabel": "Tool 边界",
+    "updating": "更新中"
   },
   "mcpSettings": {
     "catalogTitle": "MCP servers",
