@@ -35,6 +35,11 @@ unwinding chat, server, or web-v2 behavior.
 - Policy must run before browser actions. Prompt instructions are not a safety
   boundary.
 - Element refs are only valid for the snapshot that produced them.
+- Snapshot extraction reports browser and DOM facts only. It must not infer
+  site-specific route conventions, locale prefixes, storefront paths, account
+  sections, or workflow meanings from one observed website. If a page rewrites
+  or localizes navigation, the agent must use `browser_click` or `browser_open`
+  and verify the final URL from the next tool result or snapshot.
 - Evidence is domain-owned in this spike under a caller-provided run directory.
   Projection into Heddle trace or conversation activities should be a later,
   deliberate integration.
@@ -88,4 +93,5 @@ Run evidence is written under:
 - No form submission, cart, checkout, payment, booking, message-send, account
   mutation, upload, or download flows.
 - No live browser preview embedded in the control plane yet.
-- No ecommerce policy packs for Shopee, Airspace, or other shopping sites yet.
+- No site-specific shopping, SaaS, social, or account-management policy packs
+  yet.

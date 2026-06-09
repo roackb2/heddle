@@ -17,7 +17,7 @@ describe('BrowserProfileWindowService', () => {
   it('opens the selected profile in headed mode and closes it cleanly', async () => {
     const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-browser-profile-window-'));
     await BrowserProfileSettingsService.update(stateRoot, {
-      profileId: 'airspace-login',
+      profileId: 'shopping-login',
       headless: true,
     });
     const driverFactory = new FakeBrowserDriverFactory();
@@ -28,23 +28,23 @@ describe('BrowserProfileWindowService', () => {
     })).resolves.toMatchObject({
       ok: true,
       status: {
-        profileId: 'airspace-login',
+        profileId: 'shopping-login',
         open: true,
         currentUrl: 'https://example.com/login',
       },
     });
     expect(driverFactory.launchOptions).toMatchObject({
       profile: {
-        profileId: 'airspace-login',
+        profileId: 'shopping-login',
         headless: false,
-        userDataDir: join(stateRoot, 'browser-profiles', 'airspace-login'),
+        userDataDir: join(stateRoot, 'browser-profiles', 'shopping-login'),
       },
     });
 
     await expect(BrowserProfileWindowService.close(stateRoot)).resolves.toMatchObject({
       ok: true,
       status: {
-        profileId: 'airspace-login',
+        profileId: 'shopping-login',
         open: false,
       },
     });

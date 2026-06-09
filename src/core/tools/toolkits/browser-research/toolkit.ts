@@ -43,7 +43,7 @@ type BrowserRuntimeState = {
   opened: boolean;
 };
 
-const MAX_ARIA_SNAPSHOT_OUTPUT_LENGTH = 6000;
+const MAX_ARIA_SNAPSHOT_OUTPUT_LENGTH = 12000;
 
 type BrowserSessionRequirement =
   | { ok: true; session: BrowserSessionService }
@@ -366,11 +366,14 @@ function formatSnapshotOutput(snapshot: BrowserSnapshot | undefined): unknown {
     title: snapshot.title,
     capturedAt: snapshot.capturedAt,
     ariaSnapshot: truncateText(snapshot.ariaSnapshot, MAX_ARIA_SNAPSHOT_OUTPUT_LENGTH),
+    ariaSnapshotLength: snapshot.ariaSnapshot.length,
+    ariaSnapshotTruncated: snapshot.ariaSnapshot.length > MAX_ARIA_SNAPSHOT_OUTPUT_LENGTH,
     elements: snapshot.elements.map((element) => ({
       ref: element.ref,
       role: element.role,
       name: element.name,
       href: element.href,
+      rawHref: element.rawHref,
       text: element.text,
     })),
   };

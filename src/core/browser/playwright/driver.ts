@@ -162,6 +162,11 @@ class PlaywrightBrowserDriver implements BrowserDriver {
       const tagName = htmlElement.tagName.toLowerCase();
       const role = htmlElement.getAttribute('role') ?? inferRole(tagName, htmlElement);
       const href = element instanceof HTMLAnchorElement ? element.href : undefined;
+      // Report only browser/DOM facts. Do not infer site-specific route variants
+      // such as locale, tenant, or storefront prefixes from one observed page.
+      const rawHref = element instanceof HTMLAnchorElement
+        ? htmlElement.getAttribute('href') ?? undefined
+        : undefined;
       const name = [
         htmlElement.getAttribute('aria-label'),
         htmlElement.getAttribute('title'),
@@ -175,6 +180,7 @@ class PlaywrightBrowserDriver implements BrowserDriver {
         name,
         text: htmlElement.innerText?.trim() || undefined,
         href,
+        rawHref,
         tagName,
       };
 

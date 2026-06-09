@@ -35,18 +35,18 @@ describe('BrowserAutomationCapabilityService', () => {
     const stateRoot = join(workspaceRoot, '.heddle');
     const service = new BrowserAutomationCapabilityService({ workspaceRoot, stateRoot });
 
-    await expect(service.updateSettings({ profileId: 'airspace-login', channel: 'chrome', headless: false })).resolves.toMatchObject({
+    await expect(service.updateSettings({ profileId: 'shopping-login', channel: 'chrome', headless: false })).resolves.toMatchObject({
       ok: true,
       settings: {
-        profileId: 'airspace-login',
+        profileId: 'shopping-login',
         channel: 'chrome',
         channelSelection: 'chrome',
         displayMode: 'headed',
-        userDataDir: join(stateRoot, 'browser-profiles', 'airspace-login'),
+        userDataDir: join(stateRoot, 'browser-profiles', 'shopping-login'),
       },
     });
     expect(BrowserProfileSettingsService.toolkitOptions(stateRoot)).toMatchObject({
-      profileId: 'airspace-login',
+      profileId: 'shopping-login',
       channel: 'chrome',
       headless: false,
     });

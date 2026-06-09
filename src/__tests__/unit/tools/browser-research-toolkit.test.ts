@@ -53,11 +53,15 @@ describe('createBrowserResearchToolkit', () => {
         output: {
           title: 'Browser automation',
           ariaSnapshot: '- document "Browser automation"',
+          ariaSnapshotLength: 31,
+          ariaSnapshotTruncated: false,
           elements: expect.arrayContaining([
             expect.objectContaining({
               ref: 'el_1',
               role: 'link',
               name: 'History',
+              href: 'https://en.wikipedia.org/wiki/History',
+              rawHref: '/wiki/History',
             }),
           ]),
         },
@@ -66,7 +70,7 @@ describe('createBrowserResearchToolkit', () => {
 
   it('bounds aria snapshot output for agent-facing browser snapshots', async () => {
     const { tools } = await createTools({
-      driver: new FakeBrowserDriver({ ariaSnapshot: 'a'.repeat(7000) }),
+      driver: new FakeBrowserDriver({ ariaSnapshot: 'a'.repeat(13_000) }),
     });
 
     await tools.browser_open.execute({ url: 'https://en.wikipedia.org/wiki/Browser_automation' });
@@ -76,6 +80,8 @@ describe('createBrowserResearchToolkit', () => {
         ok: true,
         output: {
           ariaSnapshot: expect.stringMatching(/\[truncated\]$/),
+          ariaSnapshotLength: 13_000,
+          ariaSnapshotTruncated: true,
         },
       });
   });
@@ -84,7 +90,7 @@ describe('createBrowserResearchToolkit', () => {
     const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-profile-'));
     const { tools, driverFactory } = await createTools({
       stateRoot,
-      profileId: 'airspace-login',
+      profileId: 'shopping-login',
       headless: false,
     });
 
@@ -94,8 +100,8 @@ describe('createBrowserResearchToolkit', () => {
 
     expect(driverFactory.launchOptions).toMatchObject({
       profile: {
-        profileId: 'airspace-login',
-        userDataDir: join(stateRoot, 'browser-profiles', 'airspace-login'),
+        profileId: 'shopping-login',
+        userDataDir: join(stateRoot, 'browser-profiles', 'shopping-login'),
         headless: false,
       },
     });
@@ -294,6 +300,7 @@ class FakeBrowserDriver implements BrowserDriver {
           role: 'link',
           name: 'History',
           href: 'https://en.wikipedia.org/wiki/History',
+          rawHref: '/wiki/History',
           tagName: 'a',
         },
         {
@@ -301,6 +308,7 @@ class FakeBrowserDriver implements BrowserDriver {
           role: 'link',
           name: 'External reference',
           href: 'https://example.com/source',
+          rawHref: 'https://example.com/source',
           tagName: 'a',
         },
       ],
