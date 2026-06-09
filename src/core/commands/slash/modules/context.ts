@@ -2,6 +2,10 @@ import type { ChatSession } from '../../../chat/types.js';
 import type { AutonomyPermissionMode } from '../../../approvals/index.js';
 import type {
   BrowserAutomationOverview,
+  BrowserAutomationProfileOpenInput,
+  BrowserAutomationProfileWindowResult,
+  BrowserAutomationSettingsUpdateInput,
+  BrowserAutomationSettingsUpdateResult,
   BrowserAutomationSetEnabledResult,
 } from '../../../browser/index.js';
 import type { LlmProvider, ReasoningEffort } from '../../../llm/types.js';
@@ -65,6 +69,9 @@ export type SlashCommandExecutionContext = {
   browserAutomation: {
     overview: () => Promise<BrowserAutomationOverview>;
     setEnabled: (enabled: boolean) => Promise<BrowserAutomationSetEnabledResult>;
+    updateSettings: (input: BrowserAutomationSettingsUpdateInput) => Promise<BrowserAutomationSettingsUpdateResult>;
+    openProfileWindow: (input?: BrowserAutomationProfileOpenInput) => Promise<BrowserAutomationProfileWindowResult>;
+    closeProfileWindow: () => Promise<BrowserAutomationProfileWindowResult>;
   };
   skills: {
     list: () => Promise<AgentSkillActivationView[]>;

@@ -1,5 +1,5 @@
 import { join, resolve } from 'node:path';
-import { BrowserAutomationCapabilityService } from '@/core/browser/index.js';
+import { BrowserAutomationCapabilityService, BrowserProfileSettingsService } from '@/core/browser/index.js';
 import { agentSkillsToolkit } from '@/core/tools/toolkits/agent-skills/toolkit.js';
 import { createBrowserResearchToolkit } from '@/core/tools/toolkits/browser-research/index.js';
 import { codingAwarenessToolkit } from '@/core/tools/toolkits/coding-awareness/toolkit.js';
@@ -50,12 +50,17 @@ export class RuntimeToolService {
     browserAutomationEnabled: boolean;
     stateRoot: string;
   }): ToolToolkit[] {
-    const browserToolkits = args.browserAutomationEnabled
+    const browserSettings = args.browserAutomationEnabled
+      ? BrowserProfileSettingsService.toolkitOptions(args.stateRoot)
+      : undefined;
+    const browserToolkits = browserSettings
       ? [
         createBrowserResearchToolkit({
           stateRoot: args.stateRoot,
           allowedDomains: [],
-          profileId: 'browser-automation',
+          profileId: browserSettings.profileId,
+          channel: browserSettings.channel,
+          headless: browserSettings.headless,
           maxElementsPerSnapshot: 80,
         }),
       ]

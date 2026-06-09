@@ -63,6 +63,27 @@ describe('createBrowserResearchToolkit', () => {
       });
   });
 
+  it('passes the selected profile and display mode into browser driver launch options', async () => {
+    const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-profile-'));
+    const { tools, driverFactory } = await createTools({
+      stateRoot,
+      profileId: 'airspace-login',
+      headless: false,
+    });
+
+    await expect(tools.browser_open.execute({ url: 'https://en.wikipedia.org/wiki/Browser_automation' }))
+      .resolves
+      .toMatchObject({ ok: true });
+
+    expect(driverFactory.launchOptions).toMatchObject({
+      profile: {
+        profileId: 'airspace-login',
+        userDataDir: join(stateRoot, 'browser-profiles', 'airspace-login'),
+        headless: false,
+      },
+    });
+  });
+
   it('blocks off-domain clicks before the driver executes them', async () => {
     const { tools, driver } = await createTools();
 
@@ -190,20 +211,25 @@ async function createTools(options: {
   stateRoot?: string;
   driver?: BrowserDriver;
   allowedDomains?: string[];
+  profileId?: string;
+  headless?: boolean;
 } = {}) {
   const stateRoot = options.stateRoot ?? (await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-')));
   const driver = options.driver ?? new FakeBrowserDriver();
+  const driverFactory = new FakeBrowserDriverFactory(driver);
   const tools = Object.fromEntries(
     createBrowserResearchToolkit({
       stateRoot,
       allowedDomains: options.allowedDomains ?? ['wikipedia.org'],
-      driverFactory: new FakeBrowserDriverFactory(driver),
-      headless: true,
+      driverFactory,
+      profileId: options.profileId,
+      headless: options.headless ?? true,
     }).createTools(context(stateRoot)).map((tool) => [tool.name, tool]),
   );
 
   return {
     driver,
+    driverFactory,
     tools: tools as Record<'browser_open' | 'browser_snapshot' | 'browser_click' | 'browser_screenshot' | 'browser_close', ToolDefinition>,
   };
 }
@@ -219,9 +245,12 @@ function context(stateRoot: string): ToolToolkitContext {
 }
 
 class FakeBrowserDriverFactory implements BrowserDriverFactory {
+  launchOptions?: BrowserDriverLaunchOptions;
+
   constructor(private readonly driver: BrowserDriver) {}
 
-  async launch(_options: BrowserDriverLaunchOptions): Promise<BrowserDriver> {
+  async launch(options: BrowserDriverLaunchOptions): Promise<BrowserDriver> {
+    this.launchOptions = options;
     return this.driver;
   }
 }

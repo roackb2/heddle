@@ -14,7 +14,11 @@ export class SlashCommandAutocompleteService {
     return !firstToken.includes('/');
   }
 
-  static filterHints(draft: string, hints: ControlPlaneSlashCommandHint[]): ControlPlaneSlashCommandHint[] {
+  static filterHints(
+    draft: string,
+    hints: ControlPlaneSlashCommandHint[],
+    options: { fallback?: boolean } = {},
+  ): ControlPlaneSlashCommandHint[] {
     const trimmed = draft.trimStart();
     if (!SlashCommandAutocompleteService.isSlashDraft(trimmed)) {
       return [];
@@ -26,7 +30,7 @@ export class SlashCommandAutocompleteService {
       || hint.command === commandPrefix
       || trimmed === '/'
     ));
-    return filtered.length > 0 ? filtered : hints;
+    return filtered.length > 0 || options.fallback === false ? filtered : hints;
   }
 
   static complete(draft: string, hints: ControlPlaneSlashCommandHint[]): string | undefined {

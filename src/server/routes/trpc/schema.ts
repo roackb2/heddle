@@ -246,6 +246,22 @@ export const browserAutomationInputSchema = z.object({
   enabled: z.boolean(),
 });
 
+export const browserAutomationSettingsInputSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+  profileId: z.string().min(1).optional(),
+  channel: z.enum(['chromium', 'chrome', 'msedge']).optional(),
+  headless: z.boolean().optional(),
+});
+
+export const browserAutomationProfileOpenInputSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+  url: z.string().optional(),
+});
+
+export const browserAutomationProfileCloseInputSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+});
+
 export const mcpServerInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   serverId: z.string().min(1),

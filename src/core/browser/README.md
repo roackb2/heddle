@@ -10,6 +10,9 @@ unwinding chat, server, or web-v2 behavior.
 
 - Heddle-owned browser profile resolution and in-process profile locks.
 - Browser session lifecycle over a driver adapter.
+- Browser profile settings for selected Heddle-owned profile id and headless or
+  headed execution.
+- User-managed profile windows for manual login/session preparation.
 - Browser navigation and action policy decisions.
 - Accessibility-oriented page snapshots with snapshot-scoped element refs.
 - Browser run evidence files such as events, snapshots, and screenshots.
@@ -18,7 +21,7 @@ unwinding chat, server, or web-v2 behavior.
 ## Does Not Own
 
 - Conversation engine tool registration.
-- Control-plane APIs or web-v2 presentation.
+- Control-plane API transport or web-v2 presentation.
 - TUI rendering.
 - Generic Heddle trace projection.
 - Transaction, checkout, payment, booking, messaging, or account-change flows.
@@ -47,8 +50,9 @@ The first supported mode is read-oriented research:
 - write evidence;
 - block or require approval for unsafe actions.
 
-Do not add default agent tools, web-v2 UI, or ecommerce-domain policy packs until
-this foundation is proven useful.
+Default agent tools are now opt-in through Browser Automation. Do not add
+ecommerce-domain policy packs until this foundation is proven useful for
+ordinary browser inspection and read-oriented workflows.
 
 ## Example
 
@@ -83,6 +87,5 @@ Run evidence is written under:
 - No `type()` action in the first spike.
 - No form submission, cart, checkout, payment, booking, message-send, account
   mutation, upload, or download flows.
-- No default agent tool registration.
-- No conversation-engine, server, or web-v2 integration.
+- No live browser preview embedded in the control plane yet.
 - No ecommerce policy packs for Shopee, Airspace, or other shopping sites yet.

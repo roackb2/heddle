@@ -280,6 +280,12 @@ Browser Automation is off by default. Enable it from Settings -> Browser Automat
 /browser
 /browser enable
 /browser disable
+/browser headed
+/browser headless
+/browser profile <id>
+/browser channel <chromium|chrome|msedge>
+/browser open-profile [url]
+/browser close-profile
 ```
 
 Enabling Browser Automation activates Heddle's package-owned `browser-automation` Agent Skill and adds these tools to future default agent turns:
@@ -299,12 +305,14 @@ Current behavior:
 - if no explicit domain allowlist is configured, the first `browser_open` URL establishes the same-domain browsing boundary for that browser session
 - snapshots return scoped refs for safe `browser_click` calls
 - screenshots and browser evidence are stored under Heddle state
-- logged-in sites require a persistent browser profile with a valid session
+- Settings -> Browser Automation and `/browser profile <id>` select a Heddle-owned profile under `.heddle/browser-profiles/`
+- Settings -> Browser Automation and `/browser channel <chromium|chrome|msedge>` select the Playwright browser channel for future agent runs and manual profile windows
+- `/browser headed` opens future runs in a visible Playwright window so you can prepare a logged-in session; `/browser headless` reuses that profile without showing the window
+- Settings -> Browser Automation and `/browser open-profile [url]` can open the selected profile in a visible manual window for login/session management; close it with `/browser close-profile` before asking an agent to use the same profile
+- logged-in sites require the selected browser profile to already have a valid session
 
 Browser Automation agenda:
 
-- add profile management in Settings, including selected profile, Chrome channel, headless/headed mode, and profile path visibility
-- add an "open profile for login" flow so users can prepare logged-in sessions manually before agents reuse them
 - add form-safe browser tools such as `browser_type`, `browser_fill`, and `browser_press`
 - surface browser evidence and screenshots in the control plane
 - design a live browser preview path, likely screenshot/CDP screencast based rather than embedding Playwright's native headed window

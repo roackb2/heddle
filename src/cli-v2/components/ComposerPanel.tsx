@@ -58,7 +58,7 @@ export const ComposerPanel = React.memo(function ComposerPanel({
   const submitDisabled = snapshot.loading || snapshot.submitting || Boolean(snapshot.pendingDirectShellConfirmation);
   const inputDisabled = snapshot.loading || Boolean(snapshot.pendingDirectShellConfirmation) || Boolean(snapshot.pendingApproval);
   const slashCommandHints = [
-    ...SlashCommandAutocompleteService.filterHints(draft, localSlashCommandHints),
+    ...SlashCommandAutocompleteService.filterHints(draft, localSlashCommandHints, { fallback: false }),
     ...store.getSlashCommandHints(draft),
   ];
   const directShellDraft = ClientSharedPromptInputService.parseDirectShellDraft(draft);
@@ -179,7 +179,7 @@ export const ComposerPanel = React.memo(function ComposerPanel({
         onSubmit={submitPrompt}
         onComplete={(value) => (
           SlashCommandAutocompleteService.complete(value, [
-            ...SlashCommandAutocompleteService.filterHints(value, localSlashCommandHints),
+            ...SlashCommandAutocompleteService.filterHints(value, localSlashCommandHints, { fallback: false }),
             ...store.getSlashCommandHints(value),
           ]) ?? store.completeSlashCommandDraft(value)
         )}

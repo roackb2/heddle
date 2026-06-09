@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { BrowserAutomationCapabilityService } from '@/core/browser/index.js';
+import { BrowserAutomationCapabilityService, BrowserProfileSettingsService } from '@/core/browser/index.js';
 import { BROWSER_AUTOMATION_SKILL_NAME, FileAgentSkillActivationRepository } from '@/core/skills/index.js';
 
 describe('BrowserAutomationCapabilityService', () => {
@@ -16,12 +16,70 @@ describe('BrowserAutomationCapabilityService', () => {
     await expect(service.overview()).resolves.toMatchObject({
       enabled: false,
       skillName: BROWSER_AUTOMATION_SKILL_NAME,
+      browserSettings: {
+        profileId: 'browser-automation',
+        channelSelection: 'chromium',
+        displayMode: 'headless',
+      },
       skill: expect.objectContaining({
         name: BROWSER_AUTOMATION_SKILL_NAME,
         status: 'available',
       }),
     });
     expect(new FileAgentSkillActivationRepository({ stateRoot }).read().skills).toEqual({});
+  });
+
+  it('persists browser profile and display settings separately from capability activation', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-browser-settings-'));
+    const workspaceRoot = join(root, 'workspace');
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const service = new BrowserAutomationCapabilityService({ workspaceRoot, stateRoot });
+
+    await expect(service.updateSettings({ profileId: 'airspace-login', channel: 'chrome', headless: false })).resolves.toMatchObject({
+      ok: true,
+      settings: {
+        profileId: 'airspace-login',
+        channel: 'chrome',
+        channelSelection: 'chrome',
+        displayMode: 'headed',
+        userDataDir: join(stateRoot, 'browser-profiles', 'airspace-login'),
+      },
+    });
+    expect(BrowserProfileSettingsService.toolkitOptions(stateRoot)).toMatchObject({
+      profileId: 'airspace-login',
+      channel: 'chrome',
+      headless: false,
+    });
+    expect(BrowserAutomationCapabilityService.isEnabled({ stateRoot })).toBe(false);
+  });
+
+  it('rejects unsafe browser profile ids', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-browser-settings-invalid-'));
+    const workspaceRoot = join(root, 'workspace');
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const service = new BrowserAutomationCapabilityService({ workspaceRoot, stateRoot });
+
+    await expect(service.updateSettings({ profileId: '../real-chrome-profile' })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Profile id must start'),
+      settings: {
+        profileId: 'browser-automation',
+      },
+    });
+  });
+
+  it('falls back to defaults when the local browser settings file is invalid', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-browser-settings-invalid-json-'));
+    const stateRoot = join(root, 'workspace', '.heddle');
+    const settingsPath = BrowserProfileSettingsService.resolveSettingsPath(stateRoot);
+    await mkdir(join(stateRoot, 'browser'), { recursive: true });
+    await writeFile(settingsPath, '{not-json', 'utf8');
+
+    expect(BrowserProfileSettingsService.overview(stateRoot)).toMatchObject({
+      profileId: 'browser-automation',
+      channelSelection: 'chromium',
+      displayMode: 'headless',
+    });
   });
 
   it('enables and disables the built-in browser automation skill through workspace activation state', async () => {

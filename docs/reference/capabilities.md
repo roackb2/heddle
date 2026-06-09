@@ -55,7 +55,7 @@ Current runtime features include:
 - Agent Skills discovery from `.agents/skills/<name>/SKILL.md` and `~/.agents/skills/<name>/SKILL.md`
 - workspace-level skill activation through `/skills`, `/skills enable <name>`, and `/skills disable <name>`
 - progressive skill disclosure through the `read_agent_skill` tool for active skills only
-- built-in Browser Automation guidance through `/browser`, `/browser enable`, `/browser disable`, and Settings -> Browser Automation
+- built-in Browser Automation guidance through `/browser`, `/browser enable`, `/browser disable`, `/browser headed`, `/browser headless`, `/browser profile <id>`, `/browser channel <chromium|chrome|msedge>`, `/browser open-profile [url]`, `/browser close-profile`, and Settings -> Browser Automation
 - MCP server config and management through `/mcp`, `/mcp config`, `/mcp enable <server>`, `/mcp disable <server>`, and `/mcp refresh <server>`
 - cached MCP tool access through `mcp_list_tools`, `mcp_call_tool`, and namespaced tools such as `mcp__server__tool`
 - remembered per-project approvals for repeated commands and edits, with clearer previews before approval
@@ -86,7 +86,7 @@ Beyond terminal chat, Heddle includes:
 - Heddle is a coding/workspace agent runtime, not a general-purpose autonomous system.
 - Knowledge persistence uses explicit local catalogs and maintainer runs, so users can audit what Heddle learned instead of relying on opaque retrieval.
 - Agent Skills are instructions, not permissions. Enabling a skill does not bypass Heddle's approval policy, tool safety checks, browser policy, or workspace permissions.
-- Browser Automation is off by default. Enabling it activates Heddle's built-in browser guidance and adds browser tools to future default turns. Browser profiles and policy still remain authoritative; without an explicit domain allowlist, the first opened URL establishes the same-domain browsing boundary.
+- Browser Automation is off by default. Enabling it activates Heddle's built-in browser guidance and adds browser tools to future default turns. Browser profiles and policy still remain authoritative; Settings -> Browser Automation and `/browser profile <id>` select a Heddle-owned profile under `.heddle/browser-profiles/`, `/browser channel <chromium|chrome|msedge>` selects the Playwright browser channel, and `/browser open-profile [url]` opens that selected profile in a visible Playwright window for manual login or session management. Close the manual window before asking an agent to use the same profile. Without an explicit domain allowlist, the first opened URL establishes the same-domain browsing boundary.
 - MCP server declarations are integrations, not trust grants. Local stdio servers run commands with the user's OS permissions, and MCP tool calls still go through Heddle approvals and traces.
 - The control plane review view is read-only. Current changes are Git-backed, while historical turn evidence is trace-backed; it is not yet an editable IDE-grade diff surface or live file watcher.
 - The image workflow is intentionally lightweight: terminal users can provide a local image path, and browser uploads are saved back to local workspace state as readable image paths. In both cases, Heddle decides whether inspection is needed through `view_image`.

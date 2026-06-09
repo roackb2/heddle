@@ -31,6 +31,9 @@ export function useControlPlaneAppState() {
   const skillActivateMutation = trpcReact.controlPlane.skillActivate.useMutation();
   const skillDisableMutation = trpcReact.controlPlane.skillDisable.useMutation();
   const browserAutomationSetEnabledMutation = trpcReact.controlPlane.browserAutomationSetEnabled.useMutation();
+  const browserAutomationSettingsUpdateMutation = trpcReact.controlPlane.browserAutomationSettingsUpdate.useMutation();
+  const browserAutomationProfileOpenMutation = trpcReact.controlPlane.browserAutomationProfileOpen.useMutation();
+  const browserAutomationProfileCloseMutation = trpcReact.controlPlane.browserAutomationProfileClose.useMutation();
   const mcpServerEnableMutation = trpcReact.controlPlane.mcpServerEnable.useMutation();
   const mcpServerDisableMutation = trpcReact.controlPlane.mcpServerDisable.useMutation();
   const mcpServerRefreshMutation = trpcReact.controlPlane.mcpServerRefresh.useMutation();
@@ -139,6 +142,36 @@ export function useControlPlaneAppState() {
     ]);
   }
 
+  async function updateBrowserAutomationSettings(input: { profileId?: string; channel?: 'chromium' | 'chrome' | 'msedge'; headless?: boolean }) {
+    const result = await browserAutomationSettingsUpdateMutation.mutateAsync(
+      sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, ...input } : input,
+    );
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+    await utils.controlPlane.browserAutomation.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined);
+  }
+
+  async function openBrowserAutomationProfile(url?: string) {
+    const result = await browserAutomationProfileOpenMutation.mutateAsync(
+      sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, url } : { url },
+    );
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+    await utils.controlPlane.browserAutomation.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined);
+  }
+
+  async function closeBrowserAutomationProfile() {
+    const result = await browserAutomationProfileCloseMutation.mutateAsync(
+      sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : {},
+    );
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+    await utils.controlPlane.browserAutomation.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined);
+  }
+
   async function setMcpServerEnabled(serverId: string, enabled: boolean) {
     const input = sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, serverId } : { serverId };
     if (enabled) {
@@ -199,8 +232,15 @@ export function useControlPlaneAppState() {
         browserAutomation: browserAutomationQuery.data,
         loading: browserAutomationQuery.isLoading || sidebar.stateQuery.isLoading,
         error: browserAutomationQuery.error instanceof Error ? browserAutomationQuery.error.message : undefined,
-        updating: browserAutomationSetEnabledMutation.isPending,
+        updating:
+          browserAutomationSetEnabledMutation.isPending
+          || browserAutomationSettingsUpdateMutation.isPending
+          || browserAutomationProfileOpenMutation.isPending
+          || browserAutomationProfileCloseMutation.isPending,
         onSetEnabled: setBrowserAutomationEnabled,
+        onUpdateSettings: updateBrowserAutomationSettings,
+        onOpenProfile: openBrowserAutomationProfile,
+        onCloseProfile: closeBrowserAutomationProfile,
       },
       skillsSettingsView: {
         skills: skillsQuery.data,
