@@ -12,6 +12,7 @@ interface SessionListSectionProps {
   title: string;
   onCreateSession: () => Promise<void>;
   onRenameSession: (sessionId: string, name: string) => Promise<void>;
+  onSetSessionArchived: (sessionId: string, archived: boolean) => Promise<void>;
   onSetSessionPinned: (sessionId: string, pinned: boolean) => Promise<void>;
   onSelectSession: (sessionId: string) => void;
 }
@@ -24,6 +25,7 @@ export function SessionListSection({
   title,
   onCreateSession,
   onRenameSession,
+  onSetSessionArchived,
   onSetSessionPinned,
   onSelectSession,
 }: SessionListSectionProps) {
@@ -85,6 +87,7 @@ export function SessionListSection({
         session={session}
         onRenameKeyDown={handleRenameKeyDown}
         onSelectSession={onSelectSession}
+        onSetSessionArchived={onSetSessionArchived}
         onSetSessionPinned={onSetSessionPinned}
         onStartRename={startRename}
         onSubmitRename={submitRename}

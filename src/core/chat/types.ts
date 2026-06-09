@@ -141,6 +141,7 @@ export type ChatSession = {
   retention?: ChatSessionRetention;
   workspaceId?: string;
   pinned: boolean;
+  archivedAt?: string;
   history: ChatMessage[];
   messages: ConversationLine[];
   turns: TurnSummary[];

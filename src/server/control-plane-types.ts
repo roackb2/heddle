@@ -21,6 +21,7 @@ export type ChatSessionView = {
   retention?: ChatSessionRetention;
   workspaceId?: string;
   pinned: boolean;
+  archivedAt?: string;
   createdAt?: string;
   updatedAt?: string;
   model?: string;

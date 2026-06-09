@@ -47,6 +47,7 @@ import {
   memorySearchInputSchema,
   mcpConfigInputSchema,
   sessionApprovalDecisionSchema,
+  sessionArchivedUpdateInputSchema,
   sessionCompactInputSchema,
   sessionDirectShellInputSchema,
   sessionDirectShellPreflightInputSchema,
@@ -180,6 +181,14 @@ export const controlPlaneRouter = router({
       ...sessionEngineArgs,
       sessionId: input.id,
       pinned: input.pinned,
+    });
+  }),
+  sessionArchivedUpdate: controlPlaneWorkspaceProcedure.input(sessionArchivedUpdateInputSchema).mutation(({ ctx, input }) => {
+    const { sessionEngineArgs } = ctx.requestWorkspace;
+    return controlPlaneChatSessionsController.updateArchived({
+      ...sessionEngineArgs,
+      sessionId: input.id,
+      archived: input.archived,
     });
   }),
   sessionDelete: controlPlaneWorkspaceProcedure.input(sessionInputSchema).mutation(({ ctx, input }) => {

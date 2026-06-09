@@ -120,6 +120,7 @@ export class ControlPlaneChatSessionPresenter {
       retention: candidate.retention === 'reusable' || candidate.retention === 'one_off' ? candidate.retention : undefined,
       workspaceId: readString(candidate.workspaceId),
       pinned: readBoolean(candidate.pinned) ?? false,
+      archivedAt: readString(candidate.archivedAt),
       createdAt: readString(candidate.createdAt),
       updatedAt: readString(candidate.updatedAt),
       model: readString(candidate.model),

@@ -96,6 +96,13 @@ describe('createConversationEngine', () => {
     expect(renamed.name).toBe('Renamed');
     expect(engine.sessions.read(first.id)?.name).toBe('Renamed');
 
+    const archived = engine.sessions.setArchived(first.id, true);
+    expect(archived.archivedAt).toEqual(expect.any(String));
+    expect(engine.sessions.list().map((session) => session.id)).toEqual(['session-b']);
+    expect(engine.sessions.read(first.id)?.archivedAt).toBe(archived.archivedAt);
+    expect(engine.sessions.setArchived(first.id, false).archivedAt).toBeUndefined();
+    expect(engine.sessions.list().map((session) => session.id)).toEqual(['session-a', 'session-b']);
+
     expect(engine.sessions.delete(second.id)).toBe(true);
     const sessionRepository = new FileChatSessionRepository({
       sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),

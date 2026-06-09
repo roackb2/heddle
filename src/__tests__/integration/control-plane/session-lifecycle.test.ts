@@ -74,6 +74,42 @@ describe('control-plane session lifecycle API', () => {
     });
   });
 
+  it('archives sessions through the workspace-scoped API and hides them from session lists', async () => {
+    const { caller } = createControlPlaneCaller();
+    const archivedSession = await caller.sessionCreate({ name: 'Archive me' });
+    const visibleSession = await caller.sessionCreate({ name: 'Keep visible' });
+
+    const archived = await caller.sessionArchivedUpdate({
+      id: archivedSession.id,
+      archived: true,
+    });
+
+    expect(archived).toMatchObject({
+      id: archivedSession.id,
+      archivedAt: expect.any(String),
+    });
+    await expect(caller.session({ id: archivedSession.id })).resolves.toMatchObject({
+      id: archivedSession.id,
+      archivedAt: archived.archivedAt,
+    });
+    await expect(caller.sessions()).resolves.toMatchObject({
+      sessions: [expect.objectContaining({ id: visibleSession.id })],
+    });
+
+    const restored = await caller.sessionArchivedUpdate({
+      id: archivedSession.id,
+      archived: false,
+    });
+
+    expect(restored.archivedAt).toBeUndefined();
+    await expect(caller.sessions()).resolves.toMatchObject({
+      sessions: expect.arrayContaining([
+        expect.objectContaining({ id: archivedSession.id }),
+        expect.objectContaining({ id: visibleSession.id }),
+      ]),
+    });
+  });
+
   it('scopes lifecycle mutations to the requested workspace', async () => {
     const { caller, activeWorkspace, secondaryWorkspace, createEngineForWorkspace } = createControlPlaneCaller();
     const defaultEngine = createEngineForWorkspace(activeWorkspace.id);

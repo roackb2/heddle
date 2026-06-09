@@ -8,6 +8,7 @@ import type { WorkspaceCreateInput } from '@web/components/settings';
 import { useControlPlaneErrorToasts } from './useControlPlaneErrorToasts';
 import { useControlPlaneHeartbeatEvents } from './tasks/useControlPlaneHeartbeatEvents';
 import { useControlPlaneSessionDetail } from './sessions/useControlPlaneSessionDetail';
+import { useControlPlaneSessionArchive } from './shell/useControlPlaneSessionArchive';
 import { useControlPlaneSidebarData } from './shell/useControlPlaneSidebarData';
 import { useControlPlaneTaskActions } from './tasks/useControlPlaneTaskActions';
 import { useControlPlaneTaskSelection } from './tasks/useControlPlaneTaskSelection';
@@ -82,6 +83,12 @@ export function useControlPlaneAppState() {
   });
   const state = sidebar.stateQuery.data;
   const stateMemoryStatus = state && state.activeWorkspaceId === sidebar.workspaceId ? state.memory : undefined;
+  const sessionArchive = useControlPlaneSessionArchive({
+    workspaceId: sidebar.workspaceId,
+    selectedSessionId: navigation.selectedSessionId,
+    selectSession: navigation.selectSession,
+    selectSurface: navigation.selectSurface,
+  });
 
   useControlPlaneErrorToasts({
     stateError: sidebar.stateQuery.error,
@@ -271,6 +278,7 @@ export function useControlPlaneAppState() {
       onCreateSession: createSession,
       onCreateTask: taskActions.openCreateDialog,
       onRenameSession: renameSession,
+      onSetSessionArchived: sessionArchive.setSessionArchived,
       onSetSessionPinned: setSessionPinned,
       onSelectWorkspace: (workspaceId: string) => void switchWorkspace(workspaceId),
       onSelectSession: navigation.selectSession,
@@ -389,6 +397,7 @@ export function useControlPlaneAppState() {
     taskDeleteDialogProps: taskActions.deleteDialogProps,
     taskEditDialogProps: taskActions.editDialogProps,
   };
+
 }
 
 function applyPinnedSessionToSessions(

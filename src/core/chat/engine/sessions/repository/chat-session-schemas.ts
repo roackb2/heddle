@@ -202,6 +202,9 @@ export const CatalogEntryReadSchema = z.object({
     .describe('Whether this session should be grouped above unpinned sessions in session lists.')
     .optional()
     .catch(false),
+  archivedAt: z.string()
+    .describe('Timestamp when this session was archived and hidden from normal session lists.')
+    .optional(),
   createdAt: z.string()
     .describe('Timestamp when the session was created.')
     .optional(),
@@ -266,6 +269,9 @@ export const SessionBodyReadSchema = z.object({
     .describe('Whether this session should be grouped above unpinned sessions in session lists.')
     .optional()
     .catch(false),
+  archivedAt: z.string()
+    .describe('Timestamp when this session was archived and hidden from normal session lists.')
+    .optional(),
   history: ChatMessagesSchema
     .describe('Model-facing transcript retained for future turns.')
     .optional()
@@ -303,6 +309,9 @@ export const SessionBodyWriteSchema = z.object({
   pinned: z.boolean()
     .describe('Whether this session should be grouped above unpinned sessions in session lists.')
     .default(false),
+  archivedAt: z.string()
+    .describe('Timestamp when this session was archived and hidden from normal session lists.')
+    .optional(),
   history: z.array(ChatMessageSchema).describe('Model-facing transcript retained for future turns.'),
   messages: z.array(ConversationLineSchema).describe('Host-facing visible conversation lines.'),
   turns: z.array(TurnSummarySchema).describe('Recent completed turn summaries shown in session detail surfaces.'),

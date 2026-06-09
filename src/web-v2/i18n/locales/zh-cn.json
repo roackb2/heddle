@@ -167,6 +167,7 @@
     "statusOk": "正常"
   },
   "navigation": {
+    "archiveSession": "归档会话",
     "backToApp": "返回应用",
     "collapseSidebar": "收起侧边栏",
     "expandSidebar": "展开侧边栏",
@@ -185,6 +186,8 @@
     "renameSessionLabel": "会话名称",
     "sessionListAriaLabel": "会话列表",
     "sessionListTitle": "最近会话",
+    "sessionArchivedToastBody": "已从会话列表隐藏。",
+    "sessionArchivedToastTitle": "已归档会话",
     "settings": "设置",
     "settingsAriaLabel": "设置导航",
     "settingsMenuAriaLabel": "设置菜单",
@@ -193,6 +196,7 @@
     "taskListAriaLabel": "任务列表",
     "taskListTitle": "任务",
     "unpinSession": "取消置顶会话",
+    "undoArchiveSession": "撤销",
     "workspaceSwitcher": "工作区"
   },
   "settings": {
