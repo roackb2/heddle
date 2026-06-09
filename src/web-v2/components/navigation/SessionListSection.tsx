@@ -1,4 +1,3 @@
-import { useState, type FormEvent, type KeyboardEvent } from 'react';
 import type { ControlPlaneState } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
 import {
@@ -9,6 +8,7 @@ import {
 } from '@web/components/ui/context-menu';
 import { FieldError } from '@web/components/ui/field';
 import { Input } from '@web/components/ui/input';
+import { useInlineSessionRename } from '@web/hooks/shell/useInlineSessionRename';
 import { useI18n } from '@web/i18n';
 import { cn } from '@web/lib/utils';
 import { Pencil, Plus } from 'lucide-react';
@@ -22,11 +22,6 @@ interface SessionListSectionProps {
   onSelectSession: (sessionId: string) => void;
 }
 
-type RenameSessionDraft = {
-  id: string;
-  name: string;
-};
-
 // SessionListSection renders the left-rail session list using the same view
 // shape returned by the control-plane tRPC sessions endpoint.
 export function SessionListSection({
@@ -38,71 +33,19 @@ export function SessionListSection({
   onSelectSession,
 }: SessionListSectionProps) {
   const { t } = useI18n();
-  const [renamingSession, setRenamingSession] = useState<RenameSessionDraft>();
-  const [renameError, setRenameError] = useState<string>();
-  const [renameSubmitting, setRenameSubmitting] = useState(false);
-
-  function startRename(session: ControlPlaneState['sessions'][number]) {
-    setRenameError(undefined);
-    setRenamingSession({ id: session.id, name: session.name });
-  }
-
-  function cancelRename() {
-    if (renameSubmitting) {
-      return;
-    }
-
-    setRenamingSession(undefined);
-    setRenameError(undefined);
-  }
-
-  function updateRenamingSessionName(name: string) {
-    setRenamingSession((current) => current ? { ...current, name } : current);
-  }
-
-  async function submitRename(event?: FormEvent<HTMLFormElement>) {
-    event?.preventDefault();
-
-    if (!renamingSession || renameSubmitting) {
-      return;
-    }
-
-    const name = renamingSession.name.trim();
-    const originalName = sessions.find((session) => session.id === renamingSession.id)?.name;
-    if (!name) {
-      setRenameError(t('navigation.renameSessionEmpty'));
-      return;
-    }
-    if (name === originalName) {
-      setRenamingSession(undefined);
-      setRenameError(undefined);
-      return;
-    }
-
-    setRenameError(undefined);
-    setRenameSubmitting(true);
-    try {
-      await onRenameSession(renamingSession.id, name);
-      setRenamingSession(undefined);
-    } catch (error) {
-      setRenameError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setRenameSubmitting(false);
-    }
-  }
-
-  function handleRenameKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      cancelRename();
-      return;
-    }
-
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      void submitRename();
-    }
-  }
+  const {
+    handleRenameKeyDown,
+    renameError,
+    renameSubmitting,
+    renamingSession,
+    startRename,
+    submitRename,
+    updateRenamingSessionName,
+  } = useInlineSessionRename({
+    emptyNameError: t('navigation.renameSessionEmpty'),
+    onRenameSession,
+    sessions,
+  });
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-1 px-2 py-2" aria-label={title}>
