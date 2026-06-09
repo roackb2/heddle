@@ -205,6 +205,8 @@ It gives you a browser-based view into workspaces, saved conversations, live ass
 
 The workspace switcher and `Settings > Workspace` page let you register local projects, switch the control plane between them, rename workspace entries, and pick a project folder from the browser UI. The `Sessions` section is built around current work first: review starts from the live Git working tree, with changed files, structured read-only diffs, and a larger full-diff viewer when the side panel is too tight.
 
+Session rows in the browser control plane support right-click actions for common session management: pin or unpin important conversations, rename a session inline, or archive a session so it is hidden from normal session lists. Archiving is reversible immediately from the toast undo action.
+
 If terminal chat is the execution surface, the control plane is the oversight surface.
 
 More: [Control plane guide](docs/guides/control-plane.md)
@@ -217,12 +219,20 @@ Typical session commands include:
 
 ```text
 /session list
+/session choose <query>
+/session new [name]
 /session switch <id>
+/session continue <id>
+/session rename <name>
+/session pin
+/session unpin
 /continue
 /compact
 /model set
 /reasoning set
 ```
+
+The browser control plane adds right-click session actions for pinning, inline rename, and archiving. Archived sessions are hidden from the normal session list; the archive toast includes an undo action right after archiving.
 
 More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
 

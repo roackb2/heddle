@@ -43,7 +43,7 @@ Current runtime features include:
 
 - multi-turn chat sessions with saved history under `.heddle/`
 - API-backed terminal chat through the same control-plane session path as the browser UI
-- session management with create, switch, continue, rename, and close flows
+- session management with create, switch, continue, rename, pin, unpin, archive, and close flows
 - automatic conversation compaction for longer chats
 - manual `/compact` support when an operator wants to shrink session history immediately
 - inline `@file` mentions so important files are inspected first
@@ -68,6 +68,7 @@ Current runtime features include:
 Beyond terminal chat, Heddle includes:
 
 - a local browser control plane via `heddle daemon`
+- browser-side session actions for new session, pin/unpin, inline rename, archive with toast undo, send, continue, cancel, and pending approval resolution
 - live per-session updates for assistant streaming, tool progress, approval waits, and saved-session refreshes
 - workspace management for registering, renaming, choosing, and switching local project workspaces
 - Git-backed current workspace review with changed files and selected-file patches

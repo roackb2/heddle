@@ -18,7 +18,7 @@ The default control plane includes:
 - active workspace and `.heddle/` state location
 - workspace management with registered workspaces, recent known workspaces, folder picking, switching, and renaming
 - saved chat sessions with sidebar navigation, resizable desktop panels, conversation view, and review-oriented detail inspection
-- browser-side session actions for new session, send, continue, cancel, and pending approval resolution
+- browser-side session actions for new session, pin/unpin, inline rename, archive with toast undo, send, continue, cancel, and pending approval resolution
 - live per-session updates for run status, tool progress, approval waits, assistant streaming text, thinking summaries, and saved-session changes
 - a model selector and reasoning-effort control backed by the server-side built-in model catalog and session state, plus a drift toggle and latest trace-derived drift level
 - an auth status indicator in the session composer footer so you can see whether the selected model is using OAuth or API-key mode without spending header space
@@ -103,6 +103,7 @@ On mobile, the default client uses:
 - focused navigation for Sessions, Tasks, and Settings
 - a dedicated session list for choosing saved conversations
 - native-style session navigation for Chat and Review
+- right-click session actions for pin/unpin, rename, and archive; archived sessions are hidden from the normal list and the archive toast can undo the action immediately
 - a compact composer that keeps the latest conversation visible
 - current workspace diff review without desktop sidebars
 - full-diff expansion for reviewing larger patches on small screens
