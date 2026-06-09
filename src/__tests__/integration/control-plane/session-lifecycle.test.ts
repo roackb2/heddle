@@ -40,6 +40,40 @@ describe('control-plane session lifecycle API', () => {
     });
   });
 
+  it('pins sessions through the workspace-scoped API and lists pinned sessions first', async () => {
+    const { caller } = createControlPlaneCaller();
+    const older = await caller.sessionCreate({ name: 'Older session' });
+    const newer = await caller.sessionCreate({ name: 'Newer session' });
+
+    const pinned = await caller.sessionPinnedUpdate({
+      id: older.id,
+      pinned: true,
+    });
+
+    expect(pinned).toMatchObject({
+      id: older.id,
+      pinned: true,
+    });
+    await expect(caller.session({ id: older.id })).resolves.toMatchObject({
+      id: older.id,
+      pinned: true,
+    });
+    await expect(caller.sessions()).resolves.toMatchObject({
+      sessions: [
+        expect.objectContaining({ id: older.id, pinned: true }),
+        expect.objectContaining({ id: newer.id, pinned: false }),
+      ],
+    });
+
+    await expect(caller.sessionPinnedUpdate({
+      id: older.id,
+      pinned: false,
+    })).resolves.toMatchObject({
+      id: older.id,
+      pinned: false,
+    });
+  });
+
   it('scopes lifecycle mutations to the requested workspace', async () => {
     const { caller, activeWorkspace, secondaryWorkspace, createEngineForWorkspace } = createControlPlaneCaller();
     const defaultEngine = createEngineForWorkspace(activeWorkspace.id);

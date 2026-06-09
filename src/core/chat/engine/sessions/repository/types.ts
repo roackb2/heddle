@@ -6,6 +6,7 @@ export type ChatSessionCatalogEntry = {
   name: string;
   retention?: ChatSessionRetention;
   workspaceId?: string;
+  pinned: boolean;
   createdAt: string;
   updatedAt: string;
   model?: string;

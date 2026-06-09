@@ -185,6 +185,7 @@ function createSessionDetail(
     id: 'session-1',
     name: 'Session 1',
     workspaceId: 'workspace-1',
+    pinned: false,
     messageCount: 1,
     turnCount: 0,
     queuedPromptCount: 0,

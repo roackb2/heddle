@@ -198,6 +198,10 @@ export const CatalogEntryReadSchema = z.object({
   workspaceId: z.string()
     .describe('Workspace identifier this session belongs to, when known.')
     .optional(),
+  pinned: z.boolean()
+    .describe('Whether this session should be grouped above unpinned sessions in session lists.')
+    .optional()
+    .catch(false),
   createdAt: z.string()
     .describe('Timestamp when the session was created.')
     .optional(),
@@ -258,6 +262,10 @@ export const SessionBodyReadSchema = z.object({
   workspaceId: z.string()
     .describe('Workspace identifier duplicated in the body for human inspection.')
     .optional(),
+  pinned: z.boolean()
+    .describe('Whether this session should be grouped above unpinned sessions in session lists.')
+    .optional()
+    .catch(false),
   history: ChatMessagesSchema
     .describe('Model-facing transcript retained for future turns.')
     .optional()
@@ -292,6 +300,9 @@ export const SessionBodyWriteSchema = z.object({
   workspaceId: z.string()
     .describe('Workspace identifier duplicated in the body for human inspection.')
     .optional(),
+  pinned: z.boolean()
+    .describe('Whether this session should be grouped above unpinned sessions in session lists.')
+    .default(false),
   history: z.array(ChatMessageSchema).describe('Model-facing transcript retained for future turns.'),
   messages: z.array(ConversationLineSchema).describe('Host-facing visible conversation lines.'),
   turns: z.array(TurnSummarySchema).describe('Recent completed turn summaries shown in session detail surfaces.'),

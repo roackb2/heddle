@@ -337,6 +337,15 @@ export class FileConversationSessionService implements ConversationSessionServic
     }));
   }
 
+  setPinned(id: string, pinned: boolean): ChatSession {
+    return this.updateRequiredSession(id, (session) => (
+      session.pinned === pinned ? session : {
+        ...session,
+        pinned,
+      }
+    ));
+  }
+
   async autoRenameAfterFirstUserMessage(
     id: string,
     input: AutoRenameConversationSessionInput,

@@ -41,7 +41,7 @@ export class FileChatSessionRepository implements ChatSessionRepository {
 
   readCatalog(): ChatSessionCatalogEntry[] {
     const catalog = FileChatSessionRepository.readCatalogFile(this.deriveStoragePaths().catalogPath);
-    return catalog?.sessions.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)) ?? [];
+    return catalog?.sessions.sort(FileChatSessionRepository.compareSessionOrder) ?? [];
   }
 
   read(sessionId: string): ChatSession | undefined {
@@ -61,7 +61,7 @@ export class FileChatSessionRepository implements ChatSessionRepository {
     mkdirSync(paths.sessionsDir, { recursive: true });
 
     const sorted = FileChatSessionRepository.dedupeSessionsById(sessions)
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+      .sort(FileChatSessionRepository.compareSessionOrder);
     const previousCatalog = FileChatSessionRepository.readCatalogFile(paths.catalogPath);
     const previousSessionBodies = new Map<string, string>();
     for (const entry of previousCatalog?.sessions ?? []) {
@@ -136,7 +136,7 @@ export class FileChatSessionRepository implements ChatSessionRepository {
       const sessions = catalog.sessions.flatMap((entry) =>
         FileChatSessionRepository.readSessionFile(paths.sessionsDir, entry),
       );
-      return sessions.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+      return sessions.sort(FileChatSessionRepository.compareSessionOrder);
     } catch (error) {
       process.stderr.write(
         `Failed to load chat session catalog from ${paths.catalogPath}: ${error instanceof Error ? error.message : String(error)}\n`,
@@ -227,6 +227,17 @@ export class FileChatSessionRepository implements ChatSessionRepository {
     }
 
     return deduped;
+  }
+
+  private static compareSessionOrder(
+    left: Pick<ChatSession, 'pinned' | 'updatedAt'>,
+    right: Pick<ChatSession, 'pinned' | 'updatedAt'>,
+  ): number {
+    if (left.pinned !== right.pinned) {
+      return left.pinned ? -1 : 1;
+    }
+
+    return right.updatedAt.localeCompare(left.updatedAt);
   }
 
   private static sessionFilePath(sessionsDir: string, sessionId: string): string {

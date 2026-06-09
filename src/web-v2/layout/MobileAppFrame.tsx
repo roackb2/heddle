@@ -27,6 +27,7 @@ export function MobileAppFrame(props: AppFrameLayoutProps) {
     onCreateSession,
     onCreateTask,
     onRenameSession,
+    onSetSessionPinned,
     onSelectSession,
     onSelectTask,
   } = props;
@@ -89,6 +90,7 @@ export function MobileAppFrame(props: AppFrameLayoutProps) {
             onCreateSession={createSession}
             onCreateTask={createTask}
             onRenameSession={onRenameSession}
+            onSetSessionPinned={onSetSessionPinned}
             onSelectSession={selectSession}
             onSelectTask={selectTask}
           />

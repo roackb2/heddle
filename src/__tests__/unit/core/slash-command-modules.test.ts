@@ -11,6 +11,7 @@ function testSession(overrides: Partial<ChatSession> & Pick<ChatSession, 'id' | 
   return {
     history: [],
     messages: [],
+    pinned: false,
     turns: [],
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',
@@ -132,6 +133,7 @@ function createContext(overrides: Partial<SlashCommandExecutionContext> = {}): S
       create: (name) => testSession({ id: 'session-new', name: name ?? 'New session' }),
       switch: vi.fn(),
       rename: vi.fn(),
+      setPinned: vi.fn(),
       remove: vi.fn(),
       clear: vi.fn(),
       summarize: (session) => `Summary for ${session.id}`,
@@ -295,6 +297,7 @@ describe('core slash command modules', () => {
     const clear = vi.fn();
     const switchSession = vi.fn();
     const rename = vi.fn();
+    const setPinned = vi.fn();
     const remove = vi.fn();
     const context = createContext({
       session: {
@@ -302,6 +305,7 @@ describe('core slash command modules', () => {
         clear,
         switch: switchSession,
         rename,
+        setPinned,
         remove,
       },
     });
@@ -330,6 +334,18 @@ describe('core slash command modules', () => {
       message: 'Renamed current session to Focus.',
     });
     expect(rename).toHaveBeenCalledWith('Focus');
+
+    await expect(registry.run(context, '/session pin')).resolves.toMatchObject({
+      kind: 'message',
+      message: 'Pinned current session.',
+    });
+    expect(setPinned).toHaveBeenCalledWith(true);
+
+    await expect(registry.run(context, '/session unpin')).resolves.toMatchObject({
+      kind: 'message',
+      message: 'Unpinned current session.',
+    });
+    expect(setPinned).toHaveBeenCalledWith(false);
 
     await expect(registry.run(context, '/session close 2')).resolves.toMatchObject({
       kind: 'message',

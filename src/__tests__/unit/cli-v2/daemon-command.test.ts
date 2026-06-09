@@ -78,6 +78,7 @@ describe('daemon CLI helpers', () => {
       createdAt: '2026-04-15T01:00:00.000Z',
       updatedAt: '2026-04-15T02:00:00.000Z',
       model: 'gpt-5.1-codex-mini',
+      pinned: false,
       driftEnabled: true,
       messages: [
         { role: 'user', text: 'hello' },
@@ -104,6 +105,7 @@ describe('daemon CLI helpers', () => {
       createdAt: '2026-04-15T01:00:00.000Z',
       updatedAt: '2026-04-15T02:00:00.000Z',
       model: 'gpt-5.1-codex-mini',
+      pinned: false,
       driftEnabled: true,
       messageCount: 2,
       turnCount: 1,

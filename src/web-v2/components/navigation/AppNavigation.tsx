@@ -28,6 +28,7 @@ interface AppNavigationProps {
   onCreateSession: () => Promise<void>;
   onCreateTask: () => void;
   onRenameSession: (sessionId: string, name: string) => Promise<void>;
+  onSetSessionPinned: (sessionId: string, pinned: boolean) => Promise<void>;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectSession: (sessionId: string) => void;
   onSelectTask: (taskId: string) => void;
@@ -49,6 +50,7 @@ export function AppNavigation({
   onCreateSession,
   onCreateTask,
   onRenameSession,
+  onSetSessionPinned,
   onSelectWorkspace,
   onSelectSession,
   onSelectTask,
@@ -82,6 +84,7 @@ export function AppNavigation({
           onCreateSession={onCreateSession}
           onCreateTask={onCreateTask}
           onRenameSession={onRenameSession}
+          onSetSessionPinned={onSetSessionPinned}
           onSelectSession={onSelectSession}
           onSelectTask={onSelectTask}
         />

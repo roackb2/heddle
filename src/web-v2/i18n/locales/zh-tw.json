@@ -176,6 +176,9 @@
     "newTask": "新增任務",
     "noWorkspaces": "找不到工作區",
     "openSettings": "開啟設定",
+    "pinSession": "釘選對話",
+    "pinnedSessionsEmpty": "沒有已釘選對話",
+    "pinnedSessionsTitle": "已釘選對話",
     "primaryAriaLabel": "主要導覽",
     "renameSession": "重新命名",
     "renameSessionEmpty": "對話名稱不能為空。",
@@ -189,6 +192,7 @@
     "switchWorkspace": "切換工作區",
     "taskListAriaLabel": "任務清單",
     "taskListTitle": "任務",
+    "unpinSession": "取消釘選對話",
     "workspaceSwitcher": "工作區"
   },
   "settings": {

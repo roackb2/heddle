@@ -14,6 +14,12 @@ export const sessionRenameInputSchema = z.object({
   name: z.string().min(1),
 });
 
+export const sessionPinnedUpdateInputSchema = z.object({
+  id: z.string().min(1),
+  workspaceId: z.string().min(1).optional(),
+  pinned: z.boolean(),
+});
+
 export const sessionCompactInputSchema = z.object({
   id: z.string().min(1),
   workspaceId: z.string().min(1).optional(),

@@ -16,6 +16,7 @@ describe('chat session storage layout', () => {
         name: 'Session 1',
         workspaceId: 'workspace-1',
       }),
+      pinned: true,
       model: 'gpt-5.1-codex-mini',
       reasoningEffort: 'high',
       lastContinuePrompt: 'continue',
@@ -46,6 +47,7 @@ describe('chat session storage layout', () => {
       id: 'session-1',
       name: 'Session 1',
       workspaceId: 'workspace-1',
+      pinned: true,
       model: 'gpt-5.1-codex-mini',
       reasoningEffort: 'high',
       lastContinuePrompt: 'continue',
@@ -55,6 +57,7 @@ describe('chat session storage layout', () => {
     expect(storedSession).toEqual(expect.objectContaining({
       id: 'session-1',
       workspaceId: 'workspace-1',
+      pinned: true,
       reasoningEffort: 'high',
       history: [],
       messages: [{ id: 'm1', role: 'assistant', text: 'hello there' }],
@@ -117,6 +120,7 @@ describe('chat session storage layout', () => {
       id: 'session-1',
       context: undefined,
       archives: [],
+      pinned: false,
       history: [{ role: 'user', content: 'valid prompt' }],
       messages: [{ id: 'm1', role: 'assistant', text: 'valid visible message' }],
       turns: [{
@@ -187,6 +191,39 @@ describe('chat session storage layout', () => {
       model: 'gpt-5.5',
       reasoningEffort: 'high',
     }));
+  });
+
+  it('orders pinned sessions before unpinned sessions while preserving recency within each group', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'heddle-chat-storage-pinned-order-'));
+    const sessionsFile = join(dir, 'chat-sessions.catalog.json');
+    const oldPinned = {
+      ...ChatSessionRecords.create({ id: 'session-old-pinned', name: 'Old pinned' }),
+      pinned: true,
+      updatedAt: '2026-04-13T00:00:00.000Z',
+    };
+    const newPinned = {
+      ...ChatSessionRecords.create({ id: 'session-new-pinned', name: 'New pinned' }),
+      pinned: true,
+      updatedAt: '2026-04-13T02:00:00.000Z',
+    };
+    const newRegular = {
+      ...ChatSessionRecords.create({ id: 'session-new-regular', name: 'New regular' }),
+      updatedAt: '2026-04-13T03:00:00.000Z',
+    };
+
+    const repository = new FileChatSessionRepository({ sessionStoragePath: sessionsFile });
+    repository.save([newRegular, oldPinned, newPinned]);
+
+    expect(repository.list().map((session) => session.id)).toEqual([
+      'session-new-pinned',
+      'session-old-pinned',
+      'session-new-regular',
+    ]);
+    expect(repository.readCatalog().map((session) => session.id)).toEqual([
+      'session-new-pinned',
+      'session-old-pinned',
+      'session-new-regular',
+    ]);
   });
 
   it('does not rewrite unchanged session files when saving again', async () => {

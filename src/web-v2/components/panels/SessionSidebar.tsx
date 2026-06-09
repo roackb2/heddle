@@ -21,6 +21,7 @@ interface SessionSidebarProps {
   onCreateSession: () => Promise<void>;
   onCreateTask: () => void;
   onRenameSession: (sessionId: string, name: string) => Promise<void>;
+  onSetSessionPinned: (sessionId: string, pinned: boolean) => Promise<void>;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectSession: (sessionId: string) => void;
   onSelectTask: (taskId: string) => void;
@@ -46,6 +47,7 @@ export function SessionSidebar({
   onCreateSession,
   onCreateTask,
   onRenameSession,
+  onSetSessionPinned,
   onSelectWorkspace,
   onSelectSession,
   onSelectTask,
@@ -73,6 +75,7 @@ export function SessionSidebar({
           onCreateSession={onCreateSession}
           onCreateTask={onCreateTask}
           onRenameSession={onRenameSession}
+          onSetSessionPinned={onSetSessionPinned}
           onSelectWorkspace={onSelectWorkspace}
           onSelectSession={onSelectSession}
           onSelectTask={onSelectTask}

@@ -51,6 +51,7 @@ export type ConversationSessionService = {
   create(input?: CreateConversationSessionInput): ChatSession;
   createOneOff(input?: CreateConversationSessionInput): ChatSession;
   rename(id: string, name: string): ChatSession;
+  setPinned(id: string, pinned: boolean): ChatSession;
   autoRenameAfterFirstUserMessage(id: string, input: AutoRenameConversationSessionInput): Promise<AutoRenameConversationSessionResult>;
   delete(id: string): boolean;
 
