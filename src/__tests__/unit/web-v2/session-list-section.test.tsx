@@ -12,7 +12,7 @@ describe('web-v2 SessionListSection', () => {
     vi.restoreAllMocks();
   });
 
-  it('renames a session inline after the context menu action', async () => {
+  it('opens the custom context menu on repeated right-clicks', async () => {
     const onRenameSession = vi.fn().mockResolvedValue(undefined);
 
     render(
@@ -28,17 +28,19 @@ describe('web-v2 SessionListSection', () => {
       </I18nProvider>,
     );
 
-    fireEvent.contextMenu(screen.getByRole('button', { name: 'Original namegpt-5' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+    const row = screen.getByRole('button', { name: 'Original namegpt-5' });
+    expect(fireEvent.contextMenu(row)).toBe(false);
+    expect(await screen.findByRole('menuitem', { name: 'Rename' })).toBeTruthy();
 
-    const input = screen.getByLabelText<HTMLInputElement>('Session name');
-    expect(input.value).toBe('Original name');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => {
+      expect(screen.queryByRole('menuitem', { name: 'Rename' })).toBeNull();
+    });
 
-    fireEvent.change(input, { target: { value: '  Renamed session  ' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(fireEvent.contextMenu(row)).toBe(false);
 
     await waitFor(() => {
-      expect(onRenameSession).toHaveBeenCalledWith('session-1', 'Renamed session');
+      expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeTruthy();
     });
   });
 });

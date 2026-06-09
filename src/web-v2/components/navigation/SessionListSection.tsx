@@ -126,90 +126,89 @@ export function SessionListSection({
           const selected = selectedSessionId === session.id;
           const renaming = renamingSession?.id === session.id;
 
-          if (renaming) {
-            return (
-              <form
-                key={session.id}
-                className={cn(
-                  'relative flex w-full min-w-0 flex-col rounded-md py-1.5 pl-4 pr-2 text-left',
-                  selected && 'bg-sidebar-accent text-sidebar-accent-foreground',
-                )}
-                onSubmit={(event) => void submitRename(event)}
-              >
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    'absolute bottom-1.5 left-1 top-1.5 w-0.5 rounded-full bg-transparent',
-                    selected && 'bg-sidebar-accent-foreground',
-                  )}
-                />
-                <Input
-                  autoFocus
-                  aria-label={t('navigation.renameSessionLabel')}
-                  aria-invalid={renameError ? true : undefined}
-                  aria-describedby={renameError ? `session-rename-error-${session.id}` : undefined}
-                  className="h-5 rounded-sm border-sidebar-border bg-sidebar px-1 py-0 shadow-none"
-                  disabled={renameSubmitting}
-                  value={renamingSession.name}
-                  onBlur={() => void submitRename()}
-                  onChange={(event) => updateRenamingSessionName(event.target.value)}
-                  onFocus={(event) => event.currentTarget.select()}
-                  onKeyDown={handleRenameKeyDown}
-                />
-                {renameError ? (
-                  <FieldError id={`session-rename-error-${session.id}`} className="pt-1">
-                    {renameError}
-                  </FieldError>
-                ) : (
-                  <span
-                    className={cn(
-                      'v2-type-nav-secondary w-full truncate text-muted-foreground',
-                      selected && 'text-sidebar-accent-foreground/75',
-                    )}
-                  >
-                    {session.lastSummary ?? session.lastPrompt ?? session.model ?? session.id}
-                  </span>
-                )}
-              </form>
-            );
-          }
-
           return (
             <ContextMenu key={session.id}>
               <ContextMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-current={selected ? 'true' : undefined}
-                  className={cn(
-                    'group relative flex w-full min-w-0 flex-col rounded-md py-1.5 pl-4 pr-2 text-left outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring',
-                    selected && 'bg-sidebar-accent text-sidebar-accent-foreground',
+                <div className="w-full">
+                  {renaming ? (
+                    <form
+                      className={cn(
+                        'relative flex w-full min-w-0 flex-col rounded-md py-1.5 pl-4 pr-2 text-left',
+                        selected && 'bg-sidebar-accent text-sidebar-accent-foreground',
+                      )}
+                      onSubmit={(event) => void submitRename(event)}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          'absolute bottom-1.5 left-1 top-1.5 w-0.5 rounded-full bg-transparent',
+                          selected && 'bg-sidebar-accent-foreground',
+                        )}
+                      />
+                      <Input
+                        autoFocus
+                        aria-label={t('navigation.renameSessionLabel')}
+                        aria-invalid={renameError ? true : undefined}
+                        aria-describedby={renameError ? `session-rename-error-${session.id}` : undefined}
+                        className="h-5 rounded-sm border-sidebar-border bg-sidebar px-1 py-0 shadow-none"
+                        disabled={renameSubmitting}
+                        value={renamingSession.name}
+                        onBlur={() => void submitRename()}
+                        onChange={(event) => updateRenamingSessionName(event.target.value)}
+                        onFocus={(event) => event.currentTarget.select()}
+                        onKeyDown={handleRenameKeyDown}
+                      />
+                      {renameError ? (
+                        <FieldError id={`session-rename-error-${session.id}`} className="pt-1">
+                          {renameError}
+                        </FieldError>
+                      ) : (
+                        <span
+                          className={cn(
+                            'v2-type-nav-secondary w-full truncate text-muted-foreground',
+                            selected && 'text-sidebar-accent-foreground/75',
+                          )}
+                        >
+                          {session.lastSummary ?? session.lastPrompt ?? session.model ?? session.id}
+                        </span>
+                      )}
+                    </form>
+                  ) : (
+                    <button
+                      type="button"
+                      aria-current={selected ? 'true' : undefined}
+                      className={cn(
+                        'group relative flex w-full min-w-0 flex-col rounded-md py-1.5 pl-4 pr-2 text-left outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring',
+                        selected && 'bg-sidebar-accent text-sidebar-accent-foreground',
+                      )}
+                      onClick={() => onSelectSession(session.id)}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          'absolute bottom-1.5 left-1 top-1.5 w-0.5 rounded-full bg-transparent',
+                          selected && 'bg-sidebar-accent-foreground',
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          'v2-type-nav-primary w-full truncate text-sidebar-foreground group-hover:text-sidebar-accent-foreground',
+                          selected && 'text-sidebar-accent-foreground',
+                        )}
+                      >
+                        {session.name}
+                      </span>
+                      <span
+                        className={cn(
+                          'v2-type-nav-secondary w-full truncate text-muted-foreground',
+                          selected && 'text-sidebar-accent-foreground/75',
+                        )}
+                      >
+                        {session.lastSummary ?? session.lastPrompt ?? session.model ?? session.id}
+                      </span>
+                    </button>
                   )}
-                  onClick={() => onSelectSession(session.id)}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      'absolute bottom-1.5 left-1 top-1.5 w-0.5 rounded-full bg-transparent',
-                      selected && 'bg-sidebar-accent-foreground',
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      'v2-type-nav-primary w-full truncate text-sidebar-foreground group-hover:text-sidebar-accent-foreground',
-                      selected && 'text-sidebar-accent-foreground',
-                    )}
-                  >
-                    {session.name}
-                  </span>
-                  <span
-                    className={cn(
-                      'v2-type-nav-secondary w-full truncate text-muted-foreground',
-                      selected && 'text-sidebar-accent-foreground/75',
-                    )}
-                  >
-                    {session.lastSummary ?? session.lastPrompt ?? session.model ?? session.id}
-                  </span>
-                </button>
+                </div>
               </ContextMenuTrigger>
               <ContextMenuContent alignOffset={8} className="w-44">
                 <ContextMenuItem onSelect={() => startRename(session)}>
