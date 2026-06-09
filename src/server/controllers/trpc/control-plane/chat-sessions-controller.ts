@@ -88,6 +88,11 @@ type UpdatePinnedControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & {
   pinned: boolean;
 };
 
+type UpdateArchivedControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & {
+  sessionId: string;
+  archived: boolean;
+};
+
 type DeleteControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & ControlPlaneSessionAddress & {
   leaseOwner: ChatSessionLeaseOwner;
 };
@@ -171,6 +176,12 @@ export class ControlPlaneChatSessionsController {
   updatePinned(args: UpdatePinnedControlPlaneChatSessionArgs): ChatSessionDetail {
     const { sessionId, pinned, ...engineInput } = args;
     const updated = this.createEngine(engineInput).sessions.setPinned(sessionId, pinned);
+    return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
+  }
+
+  updateArchived(args: UpdateArchivedControlPlaneChatSessionArgs): ChatSessionDetail {
+    const { sessionId, archived, ...engineInput } = args;
+    const updated = this.createEngine(engineInput).sessions.setArchived(sessionId, archived);
     return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
   }
 

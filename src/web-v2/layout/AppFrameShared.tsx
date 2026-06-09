@@ -28,6 +28,7 @@ export interface AppFrameProps {
   onCreateSession: () => Promise<void>;
   onCreateTask: () => void;
   onRenameSession: (sessionId: string, name: string) => Promise<void>;
+  onSetSessionArchived: (sessionId: string, archived: boolean) => Promise<void>;
   onSetSessionPinned: (sessionId: string, pinned: boolean) => Promise<void>;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectSession: (sessionId: string) => void;
@@ -64,6 +65,7 @@ export function AppFrameSidebar({
   onCreateSession,
   onCreateTask,
   onRenameSession,
+  onSetSessionArchived,
   onSetSessionPinned,
   onSelectWorkspace,
   onSelectSession,
@@ -88,6 +90,7 @@ export function AppFrameSidebar({
       onCreateSession={onCreateSession}
       onCreateTask={onCreateTask}
       onRenameSession={onRenameSession}
+      onSetSessionArchived={onSetSessionArchived}
       onSetSessionPinned={onSetSessionPinned}
       onSelectWorkspace={onSelectWorkspace}
       onSelectSession={onSelectSession}

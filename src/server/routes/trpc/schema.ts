@@ -20,6 +20,12 @@ export const sessionPinnedUpdateInputSchema = z.object({
   pinned: z.boolean(),
 });
 
+export const sessionArchivedUpdateInputSchema = z.object({
+  id: z.string().min(1),
+  workspaceId: z.string().min(1).optional(),
+  archived: z.boolean(),
+});
+
 export const sessionCompactInputSchema = z.object({
   id: z.string().min(1),
   workspaceId: z.string().min(1).optional(),

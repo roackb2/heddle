@@ -9,6 +9,10 @@ export type ToastInput = {
   title: string
   body?: string
   tone?: ToastTone
+  action?: {
+    label: string
+    onClick: () => void | Promise<void>
+  }
 }
 
 type ToastItem = ToastInput & {
@@ -128,6 +132,7 @@ export function toast(input: ToastInput) {
       title: input.title,
       body: input.body,
       tone: input.tone,
+      action: input.action,
       open: true,
     },
   })

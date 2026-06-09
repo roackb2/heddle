@@ -167,6 +167,7 @@
     "statusOk": "正常"
   },
   "navigation": {
+    "archiveSession": "封存對話",
     "backToApp": "返回應用程式",
     "collapseSidebar": "收合側邊欄",
     "expandSidebar": "展開側邊欄",
@@ -185,6 +186,8 @@
     "renameSessionLabel": "對話名稱",
     "sessionListAriaLabel": "對話清單",
     "sessionListTitle": "最近對話",
+    "sessionArchivedToastBody": "已從對話清單隱藏。",
+    "sessionArchivedToastTitle": "已封存對話",
     "settings": "設定",
     "settingsAriaLabel": "設定導覽",
     "settingsMenuAriaLabel": "設定選單",
@@ -193,6 +196,7 @@
     "taskListAriaLabel": "任務清單",
     "taskListTitle": "任務",
     "unpinSession": "取消釘選對話",
+    "undoArchiveSession": "復原",
     "workspaceSwitcher": "工作區"
   },
   "settings": {

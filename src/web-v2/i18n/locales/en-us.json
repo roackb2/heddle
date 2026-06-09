@@ -167,6 +167,7 @@
     "statusOk": "ok"
   },
   "navigation": {
+    "archiveSession": "Archive session",
     "backToApp": "Back to App",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
@@ -185,6 +186,8 @@
     "renameSessionLabel": "Session name",
     "sessionListAriaLabel": "Session list",
     "sessionListTitle": "Recent sessions",
+    "sessionArchivedToastBody": "It is hidden from the session list.",
+    "sessionArchivedToastTitle": "Session archived",
     "settings": "Settings",
     "settingsAriaLabel": "Settings navigation",
     "settingsMenuAriaLabel": "Settings menu",
@@ -193,6 +196,7 @@
     "taskListAriaLabel": "Task list",
     "taskListTitle": "Tasks",
     "unpinSession": "Unpin session",
+    "undoArchiveSession": "Undo",
     "workspaceSwitcher": "Workspace"
   },
   "settings": {

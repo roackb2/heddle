@@ -14,6 +14,7 @@ describe('web-v2 SessionListSection', () => {
 
   it('opens the custom context menu on repeated right-clicks', async () => {
     const onRenameSession = vi.fn().mockResolvedValue(undefined);
+    const onSetSessionArchived = vi.fn().mockResolvedValue(undefined);
     const onSetSessionPinned = vi.fn().mockResolvedValue(undefined);
 
     render(
@@ -24,6 +25,7 @@ describe('web-v2 SessionListSection', () => {
           title="Recent sessions"
           onCreateSession={vi.fn()}
           onRenameSession={onRenameSession}
+          onSetSessionArchived={onSetSessionArchived}
           onSetSessionPinned={onSetSessionPinned}
           onSelectSession={vi.fn()}
         />
@@ -55,6 +57,7 @@ describe('web-v2 SessionListSection', () => {
           title="Recent sessions"
           onCreateSession={vi.fn()}
           onRenameSession={vi.fn()}
+          onSetSessionArchived={vi.fn()}
           onSetSessionPinned={vi.fn()}
           onSelectSession={vi.fn()}
         />
@@ -83,6 +86,7 @@ describe('web-v2 SessionListSection', () => {
           title="Recent sessions"
           onCreateSession={vi.fn()}
           onRenameSession={vi.fn()}
+          onSetSessionArchived={vi.fn()}
           onSetSessionPinned={onSetSessionPinned}
           onSelectSession={vi.fn()}
         />
@@ -100,6 +104,31 @@ describe('web-v2 SessionListSection', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Unpin session' }));
 
     expect(onSetSessionPinned).toHaveBeenCalledWith('session-2', false);
+  });
+
+  it('exposes archive action from the session context menu', async () => {
+    const onSetSessionArchived = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <I18nProvider>
+        <SessionListSection
+          selectedSessionId="session-1"
+          sessions={[createSessionView()]}
+          title="Recent sessions"
+          onCreateSession={vi.fn()}
+          onRenameSession={vi.fn()}
+          onSetSessionArchived={onSetSessionArchived}
+          onSetSessionPinned={vi.fn()}
+          onSelectSession={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+
+    const row = screen.getByRole('button', { name: 'Original namegpt-5' });
+    expect(fireEvent.contextMenu(row)).toBe(false);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive session' }));
+
+    expect(onSetSessionArchived).toHaveBeenCalledWith('session-1', true);
   });
 });
 

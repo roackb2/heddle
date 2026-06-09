@@ -16,6 +16,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { join, resolve } from 'node:path';
+import dayjs from 'dayjs';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/types.js';
 import { ChatSessionLeases, type ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
@@ -63,11 +64,11 @@ export class FileConversationSessionService implements ConversationSessionServic
   }
 
   list(): ChatSession[] {
-    return this.loadSessions();
+    return FileConversationSessionService.activeSessions(this.loadSessions());
   }
 
   listExisting(): ChatSession[] {
-    return this.loadExistingSessions();
+    return FileConversationSessionService.activeSessions(this.loadExistingSessions());
   }
 
   read(id: string): ChatSession | undefined {
@@ -83,11 +84,11 @@ export class FileConversationSessionService implements ConversationSessionServic
   }
 
   latest(): ChatSession | undefined {
-    return this.loadSessions()[0];
+    return this.list()[0];
   }
 
   latestExisting(): ChatSession | undefined {
-    return this.loadExistingSessions()[0];
+    return this.listExisting()[0];
   }
 
   create(input?: CreateConversationSessionInput): ChatSession {
@@ -346,6 +347,22 @@ export class FileConversationSessionService implements ConversationSessionServic
     ));
   }
 
+  setArchived(id: string, archived: boolean): ChatSession {
+    return this.updateRequiredSession(id, (session) => {
+      if (archived) {
+        return session.archivedAt ? session : {
+          ...session,
+          archivedAt: dayjs().toISOString(),
+        };
+      }
+
+      return session.archivedAt === undefined ? session : {
+        ...session,
+        archivedAt: undefined,
+      };
+    });
+  }
+
   async autoRenameAfterFirstUserMessage(
     id: string,
     input: AutoRenameConversationSessionInput,
@@ -395,6 +412,10 @@ export class FileConversationSessionService implements ConversationSessionServic
       return [fallback];
     }
     return sessions;
+  }
+
+  private static activeSessions(sessions: ChatSession[]): ChatSession[] {
+    return sessions.filter((session) => !session.archivedAt);
   }
 
   private loadExistingSessions(): ChatSession[] {

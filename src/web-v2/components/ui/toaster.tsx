@@ -1,5 +1,6 @@
 import {
   Toast,
+  ToastAction,
   ToastClose,
   ToastDescription,
   ToastProvider,
@@ -28,6 +29,16 @@ export function Toaster() {
             <ToastTitle>{item.title}</ToastTitle>
             {item.body ? <ToastDescription>{item.body}</ToastDescription> : null}
           </div>
+          {item.action ? (
+            <ToastAction
+              altText={item.action.label}
+              onClick={() => {
+                void item.action?.onClick()
+              }}
+            >
+              {item.action.label}
+            </ToastAction>
+          ) : null}
           <ToastClose aria-label="Dismiss notification" />
         </Toast>
       ))}

@@ -4,14 +4,13 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
-  ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@web/components/ui/context-menu';
 import { FieldError } from '@web/components/ui/field';
 import { Input } from '@web/components/ui/input';
 import { useI18n } from '@web/i18n';
 import { cn } from '@web/lib/utils';
-import { Pencil, Pin, PinOff } from 'lucide-react';
+import { Archive, Pencil, Pin, PinOff } from 'lucide-react';
 
 interface SessionListItemProps {
   renamingName?: string;
@@ -21,6 +20,7 @@ interface SessionListItemProps {
   session: ControlPlaneState['sessions'][number];
   onRenameKeyDown: KeyboardEventHandler<HTMLInputElement>;
   onSelectSession: (sessionId: string) => void;
+  onSetSessionArchived: (sessionId: string, archived: boolean) => Promise<void>;
   onSetSessionPinned: (sessionId: string, pinned: boolean) => Promise<void>;
   onStartRename: (session: ControlPlaneState['sessions'][number]) => void;
   onSubmitRename: (event?: FormEvent<HTMLFormElement>) => Promise<void>;
@@ -35,6 +35,7 @@ export function SessionListItem({
   session,
   onRenameKeyDown,
   onSelectSession,
+  onSetSessionArchived,
   onSetSessionPinned,
   onStartRename,
   onSubmitRename,
@@ -66,6 +67,7 @@ export function SessionListItem({
       </ContextMenuTrigger>
       <SessionListItemMenu
         session={session}
+        onSetSessionArchived={onSetSessionArchived}
         onSetSessionPinned={onSetSessionPinned}
         onStartRename={onStartRename}
       />
@@ -173,25 +175,30 @@ function SessionListItemButton({
 
 function SessionListItemMenu({
   session,
+  onSetSessionArchived,
   onSetSessionPinned,
   onStartRename,
 }: {
   session: ControlPlaneState['sessions'][number];
+  onSetSessionArchived: (sessionId: string, archived: boolean) => Promise<void>;
   onSetSessionPinned: (sessionId: string, pinned: boolean) => Promise<void>;
   onStartRename: (session: ControlPlaneState['sessions'][number]) => void;
 }) {
   const { t } = useI18n();
 
   return (
-    <ContextMenuContent alignOffset={8} className="w-44">
+    <ContextMenuContent alignOffset={8} className="w-44 p-1.5">
       <ContextMenuItem onSelect={() => void onSetSessionPinned(session.id, !session.pinned)}>
         {session.pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
         <span>{session.pinned ? t('navigation.unpinSession') : t('navigation.pinSession')}</span>
       </ContextMenuItem>
-      <ContextMenuSeparator />
       <ContextMenuItem onSelect={() => onStartRename(session)}>
         <Pencil aria-hidden="true" />
         <span>{t('navigation.renameSession')}</span>
+      </ContextMenuItem>
+      <ContextMenuItem onSelect={() => void onSetSessionArchived(session.id, true)}>
+        <Archive aria-hidden="true" />
+        <span>{t('navigation.archiveSession')}</span>
       </ContextMenuItem>
     </ContextMenuContent>
   );
