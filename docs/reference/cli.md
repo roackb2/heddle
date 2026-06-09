@@ -116,6 +116,13 @@ Inside `heddle` / `heddle chat`, the most-used local commands are:
 - `/reasoning default`: clear explicit reasoning effort for the current session
 - `/session list`: show recent saved sessions
 - `/session choose <query>`: filter and choose a saved session
+- `/session new [name]`: create and switch to a new session
+- `/session switch <id>`: switch to another saved session
+- `/session continue <id>`: switch to a session and resume it immediately
+- `/session rename <name>`: rename the current session
+- `/session pin`: keep the current session grouped above normal recent sessions
+- `/session unpin`: return the current session to normal recent ordering
+- `/session close <id>`: remove a saved session
 - `/continue`: continue the current session
 - `/compact`: compact older session history
 - `/skills`: list discovered Agent Skills and activation status for this workspace
