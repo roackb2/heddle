@@ -27,6 +27,7 @@ export interface AppFrameProps {
   onCloseSettings: () => void;
   onCreateSession: () => Promise<void>;
   onCreateTask: () => void;
+  onRenameSession: (sessionId: string, name: string) => Promise<void>;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectSession: (sessionId: string) => void;
   onSelectTask: (taskId: string) => void;
@@ -61,6 +62,7 @@ export function AppFrameSidebar({
   onCloseSettings,
   onCreateSession,
   onCreateTask,
+  onRenameSession,
   onSelectWorkspace,
   onSelectSession,
   onSelectTask,
@@ -83,6 +85,7 @@ export function AppFrameSidebar({
       onCloseSettings={onCloseSettings}
       onCreateSession={onCreateSession}
       onCreateTask={onCreateTask}
+      onRenameSession={onRenameSession}
       onSelectWorkspace={onSelectWorkspace}
       onSelectSession={onSelectSession}
       onSelectTask={onSelectTask}

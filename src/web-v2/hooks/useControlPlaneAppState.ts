@@ -25,6 +25,7 @@ export function useControlPlaneAppState() {
   const navigation = useWorkbenchNavigation();
   const utils = trpcReact.useUtils();
   const createSessionMutation = trpcReact.controlPlane.sessionCreate.useMutation();
+  const renameSessionMutation = trpcReact.controlPlane.sessionRename.useMutation();
   const workspaceCreateMutation = trpcReact.controlPlane.workspaceCreate.useMutation();
   const workspaceRenameMutation = trpcReact.controlPlane.workspaceRename.useMutation();
   const workspaceSetActiveMutation = trpcReact.controlPlane.workspaceSetActive.useMutation();
@@ -91,6 +92,20 @@ export function useControlPlaneAppState() {
     await utils.controlPlane.sessions.invalidate(
       sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined,
     );
+  }
+
+  async function renameSession(sessionId: string, name: string) {
+    await renameSessionMutation.mutateAsync(
+      sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, id: sessionId, name } : { id: sessionId, name },
+    );
+    await Promise.all([
+      utils.controlPlane.sessions.invalidate(
+        sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined,
+      ),
+      utils.controlPlane.session.invalidate(
+        sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, id: sessionId } : { id: sessionId },
+      ),
+    ]);
   }
 
   async function switchWorkspace(workspaceId: string) {
@@ -216,6 +231,7 @@ export function useControlPlaneAppState() {
       onCloseSettings: navigation.closeSettings,
       onCreateSession: createSession,
       onCreateTask: taskActions.openCreateDialog,
+      onRenameSession: renameSession,
       onSelectWorkspace: (workspaceId: string) => void switchWorkspace(workspaceId),
       onSelectSession: navigation.selectSession,
       onSelectTask: navigation.selectTask,
