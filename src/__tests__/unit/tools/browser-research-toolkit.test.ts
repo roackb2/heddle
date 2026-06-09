@@ -52,6 +52,7 @@ describe('createBrowserResearchToolkit', () => {
         ok: true,
         output: {
           title: 'Browser automation',
+          ariaSnapshot: '- document "Browser automation"',
           elements: expect.arrayContaining([
             expect.objectContaining({
               ref: 'el_1',
@@ -59,6 +60,22 @@ describe('createBrowserResearchToolkit', () => {
               name: 'History',
             }),
           ]),
+        },
+      });
+  });
+
+  it('bounds aria snapshot output for agent-facing browser snapshots', async () => {
+    const { tools } = await createTools({
+      driver: new FakeBrowserDriver({ ariaSnapshot: 'a'.repeat(7000) }),
+    });
+
+    await tools.browser_open.execute({ url: 'https://en.wikipedia.org/wiki/Browser_automation' });
+    await expect(tools.browser_snapshot.execute({}))
+      .resolves
+      .toMatchObject({
+        ok: true,
+        output: {
+          ariaSnapshot: expect.stringMatching(/\[truncated\]$/),
         },
       });
   });
@@ -259,6 +276,8 @@ class FakeBrowserDriver implements BrowserDriver {
   clickedRefs: string[] = [];
   private url = 'about:blank';
 
+  constructor(private readonly options: { ariaSnapshot?: string } = {}) {}
+
   async open(url: string): Promise<string> {
     this.url = url;
     return this.url;
@@ -268,7 +287,7 @@ class FakeBrowserDriver implements BrowserDriver {
     return {
       url: this.url,
       title: 'Browser automation',
-      ariaSnapshot: '- document "Browser automation"',
+      ariaSnapshot: this.options.ariaSnapshot ?? '- document "Browser automation"',
       elements: [
         {
           ref: 'el_1',

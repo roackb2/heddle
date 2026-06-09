@@ -43,6 +43,8 @@ type BrowserRuntimeState = {
   opened: boolean;
 };
 
+const MAX_ARIA_SNAPSHOT_OUTPUT_LENGTH = 6000;
+
 type BrowserSessionRequirement =
   | { ok: true; session: BrowserSessionService }
   | { ok: false; result: ToolResult };
@@ -363,6 +365,7 @@ function formatSnapshotOutput(snapshot: BrowserSnapshot | undefined): unknown {
     url: snapshot.url,
     title: snapshot.title,
     capturedAt: snapshot.capturedAt,
+    ariaSnapshot: truncateText(snapshot.ariaSnapshot, MAX_ARIA_SNAPSHOT_OUTPUT_LENGTH),
     elements: snapshot.elements.map((element) => ({
       ref: element.ref,
       role: element.role,
@@ -371,6 +374,10 @@ function formatSnapshotOutput(snapshot: BrowserSnapshot | undefined): unknown {
       text: element.text,
     })),
   };
+}
+
+function truncateText(value: string, maxLength: number): string {
+  return value.length <= maxLength ? value : `${value.slice(0, maxLength)}\n... [truncated]`;
 }
 
 function invalidInput(toolName: string, detail: string): ToolResult {

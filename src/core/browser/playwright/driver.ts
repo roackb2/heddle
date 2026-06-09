@@ -69,11 +69,11 @@ class PlaywrightBrowserDriver implements BrowserDriver {
 
   async snapshot(options: BrowserDriverSnapshotOptions): Promise<BrowserDriverSnapshotResult> {
     const locator = this.page.locator(INTERACTIVE_SELECTOR);
-    const count = Math.min(await locator.count(), options.maxElements);
+    const count = await locator.count();
     const elements: BrowserSnapshotElement[] = [];
     this.refs = new Map<string, Locator>();
 
-    for (let index = 0; index < count; index += 1) {
+    for (let index = 0; index < count && elements.length < options.maxElements; index += 1) {
       const item = locator.nth(index);
       const element = await this.snapshotElement(item, index);
       if (!element) {
