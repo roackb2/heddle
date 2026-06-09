@@ -2,28 +2,50 @@
 
 [English](README.md) | [繁體中文](README.zh-TW.md)
 
-Heddle is an open-source AI coding agent runtime and terminal-first workspace for real project work.
+Heddle is an open-source AI coding agent runtime and terminal-first workspace for shipping features, fixing bugs, and operating software with reviewable agent help.
 
 Official website: [heddleagent.com](https://heddleagent.com)
 
-> **Terminal UI v2 is now the default.** Run `heddle` or `heddle chat` to use the API-backed terminal experience. Messages, run events, and agent response streams now flow through the shared control-plane path, so terminal, browser, and mobile clients can follow the same work at the same time for smoother cross-device workflows.
+> **Terminal UI v2 is now the default.** Run `heddle` or `heddle chat` to use the API-backed terminal experience. Messages, run events, and agent response streams flow through the shared control-plane path, so terminal, browser, and mobile clients can follow the same work at the same time.
 
 ## Agenda
 
-- [See Heddle In Action](#see-heddle-in-action)
-- [Why Try Heddle](#why-try-heddle)
-- [What Heddle Does](#what-heddle-does)
-- [Programmatic Use Layers](#programmatic-use-layers)
-- [See Heddle](#see-heddle)
-- [2-Minute Try-It Path](#2-minute-try-it-path)
-- [Major Features](#major-features)
+- [What Heddle Can Do](#what-heddle-can-do)
+- [See It In Action](#see-it-in-action)
+- [Quick Start](#quick-start)
+- [Core Workflows](#core-workflows)
 - [Install](#install)
 - [Requirements](#requirements)
+- [Optional CyberLoop Integration](#optional-cyberloop-integration)
 - [Documentation](#documentation)
 - [Project Status](#project-status)
 - [Development](#development)
+- [License](#license)
 
-## See Heddle In Action
+## What Heddle Can Do
+
+Heddle is for engineers, maintainers, and side-project builders who want an AI coding assistant that can help with day-to-day software work while keeping local continuity and reviewable execution.
+
+It is a good fit when you want to:
+
+- inspect and understand unfamiliar repositories
+- develop new product features for work or side projects
+- build frontend pages, backend services, CLIs, docs, and tests
+- fix bugs, investigate regressions, and explain unfamiliar code paths
+- refactor existing modules while preserving reviewable diffs
+- run bounded verification such as builds, tests, and repo review
+- keep multi-step implementation work going across saved sessions
+- review file diffs, commands, approvals, traces, and semantic activity before accepting changes
+- switch between local workspaces from a browser control plane
+- let the agent learn durable project knowledge over time
+- activate standard Agent Skills only when a workspace should expose them
+- connect configured MCP servers such as Notion, Anytype, GitHub, or other tools
+- opt into Browser Automation for rendered page inspection and user-requested web workflows
+- build custom hosts on top of Heddle's runtime APIs
+
+Heddle is probably not the right fit if you only want a very simple one-shot prompt runner and do not care about sessions, persistence, observability, or operator control.
+
+## See It In Action
 
 Terminal, browser, and mobile surfaces can observe the same live session at once:
 
@@ -37,90 +59,17 @@ Inspect workspace diffs from browser and mobile while the same conversation cont
 
 ![Heddle diff review across browser and mobile](docs/images/heddle-diff-view.gif)
 
-It is designed for workflows where an agent needs to inspect a live repository, make bounded changes, verify results, keep continuity across sessions, and stay observable to the operator. Heddle supports OpenAI and Anthropic models, stores local workspace state under `.heddle/`, includes both a terminal chat experience and a browser control plane, learns durable workspace knowledge while it works, and gives users a review path for file diffs, commands, approvals, and traces.
-
-In plain terms: Heddle is for people who want an AI coding assistant that can work inside actual projects, learn each project's operating knowledge over time, switch between local workspaces, and remain inspectable instead of acting like a black box.
-
-## Why Try Heddle
-
-Heddle is aimed at people who want more than a one-shot coding chat wrapper or stateless AI code assistant.
-
-It is a good fit if you want:
-
-- a terminal-first coding agent that works in a real repository
-- an agent that learns durable project knowledge while working with you, using inspectable local memory
-- standard Agent Skills support for opt-in reusable workflows and tool-use instructions
-- opt-in Browser Automation for rendered page inspection and user-requested web workflows
-- explicit traces, approvals, and reviewable workflow artifacts
-- a browser control plane for local oversight, workspace switching, and session review
-- a path from interactive use to programmatic and scheduled agent workflows
-
-Heddle is probably not the right fit if you only want a very simple one-shot prompt runner and do not care about sessions, persistence, observability, or operator control.
-
-## What Heddle Does
-
-At a high level, Heddle helps with:
-
-- understanding unfamiliar repositories
-- making code or doc changes inside a real workspace
-- running bounded verification like builds, tests, and repo review
-- keeping multi-step work going across sessions instead of starting from scratch each time
-- switching between local workspaces from the browser control plane
-- learning durable facts, preferences, and workflows from real usage
-- enabling workspace-approved Agent Skills so the agent can load specialized instructions only when needed
-- enabling Browser Automation when an agent should inspect, screenshot, or operate real web pages
-- exposing more operator visibility than a black-box chat tool
-
-If you want a terminal-first coding agent with local state, review traces, workspace memory, and a path toward longer-running workflows, that is the problem Heddle is trying to solve.
-
-## Programmatic Use Layers
-
-Heddle currently has two main programmatic layers:
-
-- `createConversationEngine`: an alpha API for persisted multi-turn sessions with session storage, compaction, approvals, traces, semantic activity, and custom frontends or local hosts
-- `AgentLoopRuntimeService.run(...)`: a lower-level single-run execution loop for hosts that do not need persisted chat or session behavior
-
-Advanced hosts can also reuse lower-level class APIs such as `ToolRegistry`,
-`ToolExecutionService`, `TraceRecorder`, `TraceConsoleFormatter`, and
-`ReviewDiffParser` when they intentionally assemble custom runtime or review
-surfaces.
-
-If you want the programmatic surface, start with the [Programmatic use guide](docs/guides/programmatic-use.md).
-
-For contributors, the compact architecture map lives in
-[Core Layering](docs/architecture/core-layering.md) and
-[Chat Layering](docs/architecture/chat-layering.md).
-
-## See Heddle
-
-### Terminal coding workflow
-
-Heddle working in the terminal with live progress, tool activity, plans, and review output:
+Heddle also works as a terminal-first coding agent with live progress, tool activity, plans, and review output:
 
 ![Heddle terminal coding workflow](docs/images/terminal-active-run.png)
-
-Heddle can inspect files, search with ignore-aware fallbacks, explain code, make edits, run shell commands with the right approval model, and carry a task through multiple turns. Terminal chat keeps long-running turns visible with tool activity, dim `Thinking:` progress text, real-time assistant markdown, and clearer approval prompts for repeated commands or searches.
-
-### Terminal change review
 
 Terminal chat/dev workflow showing file edits, inline diff output, and verification-oriented follow-through:
 
 ![Heddle terminal change review](docs/images/terminal-change-review.png)
 
-### Browser control plane overview
-
-The default local control plane is the web-v2 browser client served by `heddle daemon`. It is the oversight surface for coding sessions, workspace state, current changes, heartbeat tasks, and settings:
+The default local control plane is the web-v2 browser client served by `heddle daemon`:
 
 ![Heddle web-v2 control plane](docs/images/control-plane-v2.png)
-
-The web-v2 client includes:
-
-- `Sessions`: saved conversations, live assistant streaming, tool progress, approvals, and current workspace diff review.
-- `Composer controls`: model and reasoning settings, semantic drift controls, `@file` mentions, and image attachments saved as local paths for `view_image`.
-- `Workspace switching`: sidebar workspace selection plus `Settings > Workspace` for registering, renaming, and switching local projects.
-- `Tasks`: heartbeat task creation, edit, enable/disable, run, resume, delete, live run state, and saved run records.
-- `Settings`: language preferences, workspace management, and memory status with catalog health, note counts, pending candidates, and latest maintenance run.
-- `Mobile`: focused panels for session list, conversation workbench, task detail, settings, and diff review.
 
 The task workbench covers recurring heartbeat tasks, live run state, and run result review:
 
@@ -134,7 +83,7 @@ The same control plane supports mobile layouts, with the session list, workbench
   <img src="docs/images/control-plane-v2-diff-view.PNG" alt="Heddle web-v2 mobile diff preview" width="220">
 </p>
 
-## 2-Minute Try-It Path
+## Quick Start
 
 1. Install Heddle:
 
@@ -198,15 +147,13 @@ heddle daemon
 
 Open the browser control plane from the daemon output. From there you can use `Sessions`, `Tasks`, and `Settings` to inspect the active workspace, continue saved sessions, review changes, inspect memory status, and switch to another local project.
 
-If you prefer a one-shot CLI run instead of interactive chat, use:
+For a one-shot run instead of interactive chat:
 
 ```bash
 heddle ask "Summarize this repository"
 ```
 
-`ask` still exits after one prompt, but it now records the run as a one-off saved session under `.heddle/` so traces, memory maintenance, and later inspection use the same persisted conversation path as normal sessions.
-
-The terminal chat footer and the control-plane session composer both show the active auth source for the selected model, so you can tell whether a session is using OpenAI account sign-in, API-key mode, or missing credentials.
+`ask` exits after one prompt, but it records the run as a one-off saved session under `.heddle/` so traces, memory maintenance, and later inspection use the same persisted conversation path as normal sessions.
 
 ### Try The Learning Loop
 
@@ -230,9 +177,9 @@ heddle memory list
 heddle memory search ticket
 ```
 
-## Major Features
+## Core Workflows
 
-### Terminal chat for real coding work
+### Terminal Coding
 
 The main way to use Heddle is interactive chat in a repository:
 
@@ -240,23 +187,46 @@ The main way to use Heddle is interactive chat in a repository:
 heddle
 ```
 
-From there, Heddle can inspect files, explain code, make edits, run shell commands with the right approval model, and carry a task through multiple turns.
-
-This is the core feature. If you only use Heddle as a coding agent in the terminal, this is the part you care about.
+From there, Heddle can inspect files, search with ignore-aware fallbacks, explain code, make edits, run shell commands with the right approval model, and carry a task through multiple turns.
 
 The terminal composer supports multiline prompts, prompt undo/redo, prompt history navigation, model picking with `/model set`, and reasoning-effort picking with `/reasoning set`. During a run, Heddle streams visible activity so you can see whether it is thinking, searching, calling tools, updating a plan, or waiting for approval.
 
 More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
 
-### Terminal UI v2 is the default
+### Browser Control Plane
 
-The default terminal chat is now the API-backed `cli-v2` experience. Run `heddle` or `heddle chat` from a project to start it.
+The control plane is Heddle's local browser UI:
 
-The v2 terminal UI consumes the same local control-plane API as the browser UI and does not reach directly into core services. For users, the goal is one behavior model across interfaces. A saved conversation, selected model, reasoning setting, approval state, and live run status should be the same whether you are looking from the terminal, the browser control plane, or another device connected to the same local control-plane server. Messages, tool events, approval waits, and streamed agent responses are delivered through the shared session event path, so multiple devices can observe and continue the same work simultaneously instead of waiting for one surface to finish or refresh.
+```bash
+heddle daemon
+```
 
-For contributors, the goal is a cleaner implementation path: TUI-specific rendering and keyboard behavior stay in `cli-v2`, shared semantics stay in core and server-owned control-plane APIs, and future advanced features can build on a maintainable API-first foundation instead of duplicating command/session logic in each interface.
+It gives you a browser-based view into workspaces, saved conversations, live assistant streaming, tool progress, approvals, current workspace diffs, heartbeat tasks, memory health, and settings.
 
-### Project instructions
+The workspace switcher and `Settings > Workspace` page let you register local projects, switch the control plane between them, rename workspace entries, and pick a project folder from the browser UI. The `Sessions` section is built around current work first: review starts from the live Git working tree, with changed files, structured read-only diffs, and a larger full-diff viewer when the side panel is too tight.
+
+If terminal chat is the execution surface, the control plane is the oversight surface.
+
+More: [Control plane guide](docs/guides/control-plane.md)
+
+### Sessions And Continuity
+
+Heddle keeps saved sessions under `.heddle/` so longer work does not have to reset every time. Current versions store the session catalog at `.heddle/chat-sessions.catalog.json` and per-session bodies under `.heddle/chat-sessions/`.
+
+Typical session commands include:
+
+```text
+/session list
+/session switch <id>
+/continue
+/compact
+/model set
+/reasoning set
+```
+
+More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
+
+### Project Instructions
 
 Heddle can load a short project instruction file at startup so a fresh session starts with the repository's operating context. By default it loads the first non-empty file found in this order: `HEDDLE.md`, `AGENTS.md`, `CLAUDE.md`.
 
@@ -264,12 +234,19 @@ Only one default file is loaded to preserve context space. If a project needs a 
 
 More: [Project config](docs/reference/config.md)
 
+### Knowledge Persistence
+
+Heddle can learn durable project knowledge while it works with you.
+
+When the agent notices reusable information such as a preferred ticket format, a canonical verification command, an operational convention, a recurring repo quirk, or a stable workflow pattern, it can record a memory candidate and let a dedicated maintainer path fold that knowledge into cataloged markdown notes under `.heddle/memory/`.
+
+The goal is practical recall: future sessions should know where to look instead of rediscovering the same context from scratch. Heddle does this through explicit catalogs, readable local notes, maintenance logs, and memory visibility commands rather than opaque retrieval.
+
+More: [Knowledge persistence](docs/guides/knowledge-persistence.md)
+
 ### Agent Skills
 
-Heddle supports the standard Agent Skills folder format for reusable, opt-in
-agent workflows. Put project skills under `.agents/skills/<name>/SKILL.md` or
-user skills under `~/.agents/skills/<name>/SKILL.md`, then manage workspace
-activation from chat:
+Heddle supports the standard Agent Skills folder format for reusable, opt-in agent workflows. Put project skills under `.agents/skills/<name>/SKILL.md` or user skills under `~/.agents/skills/<name>/SKILL.md`, then manage workspace activation from chat:
 
 ```text
 /skills
@@ -277,27 +254,17 @@ activation from chat:
 /skills disable <name>
 ```
 
-Heddle also ships built-in skills for Heddle-owned capabilities. Capability
-settings can activate those built-ins without asking users to install separate
-skill files.
+Heddle also ships built-in skills for Heddle-owned capabilities. Capability settings can activate those built-ins without asking users to install separate skill files.
 
-Only active skills are shown to the agent. Heddle initially exposes a compact
-catalog with each active skill's name and description, then the agent can call
-`read_agent_skill` to fetch the full `SKILL.md` body when a skill is relevant.
-Activation state is stored under `.heddle/skills/activation.json`; skill
-definitions stay in their original folders.
+Only active skills are shown to the agent. Heddle initially exposes a compact catalog with each active skill's name and description, then the agent can call `read_agent_skill` to fetch the full `SKILL.md` body when a skill is relevant. Activation state is stored under `.heddle/skills/activation.json`; skill definitions stay in their original folders.
 
-Skills are instructions, not permissions. They do not bypass Heddle's approval
-policy or tool safety checks, so users remain responsible for which project or
-user skills they enable.
+Skills are instructions, not permissions. They do not bypass Heddle's approval policy or tool safety checks, so users remain responsible for which project or user skills they enable.
 
 More: [Agent Skills guide](docs/guides/agent-skills.md)
 
 ### Browser Automation
 
-Browser Automation is an opt-in capability for tasks where the agent should see
-or operate real web pages instead of relying only on code inspection, tests, or
-plain web search.
+Browser Automation is an opt-in capability for tasks where the agent should see or operate real web pages instead of relying only on code inspection, tests, or plain web search.
 
 Use it when you want Heddle to:
 
@@ -307,8 +274,7 @@ Use it when you want Heddle to:
 - compare visible product/listing pages
 - use rendered DOM state that is not available from static files or APIs
 
-Browser Automation is off by default. Enable it from Settings -> Browser
-Automation or chat:
+Browser Automation is off by default. Enable it from Settings -> Browser Automation or chat:
 
 ```text
 /browser
@@ -316,9 +282,7 @@ Automation or chat:
 /browser disable
 ```
 
-Enabling Browser Automation activates Heddle's package-owned
-`browser-automation` Agent Skill and adds these tools to future default agent
-turns:
+Enabling Browser Automation activates Heddle's package-owned `browser-automation` Agent Skill and adds these tools to future default agent turns:
 
 ```text
 browser_open
@@ -328,43 +292,29 @@ browser_screenshot
 browser_close
 ```
 
-The built-in skill teaches the agent when browser automation is appropriate and
-when `web_search` is only useful for discovering a starting URL. Browser policy
-still remains authoritative: unsafe actions, off-domain navigation, and
-ambiguous JavaScript-only clicks can be blocked or require approval.
+The built-in skill teaches the agent when browser automation is appropriate and when `web_search` is only useful for discovering a starting URL. Browser policy still remains authoritative: unsafe actions, off-domain navigation, and ambiguous JavaScript-only clicks can be blocked or require approval.
 
-#### Current Browser Automation Behavior
+Current behavior:
 
-- if no explicit domain allowlist is configured, the first `browser_open` URL
-  establishes the same-domain browsing boundary for that browser session
+- if no explicit domain allowlist is configured, the first `browser_open` URL establishes the same-domain browsing boundary for that browser session
 - snapshots return scoped refs for safe `browser_click` calls
 - screenshots and browser evidence are stored under Heddle state
 - logged-in sites require a persistent browser profile with a valid session
 
-#### Browser Automation Next Steps
+Browser Automation agenda:
 
-- add profile management in Settings, including selected profile, Chrome
-  channel, headless/headed mode, and profile path visibility
-- add an "open profile for login" flow so users can prepare logged-in sessions
-  manually before agents reuse them
-- add form-safe browser tools such as `browser_type`, `browser_fill`, and
-  `browser_press`
+- add profile management in Settings, including selected profile, Chrome channel, headless/headed mode, and profile path visibility
+- add an "open profile for login" flow so users can prepare logged-in sessions manually before agents reuse them
+- add form-safe browser tools such as `browser_type`, `browser_fill`, and `browser_press`
 - surface browser evidence and screenshots in the control plane
-- design a live browser preview path, likely screenshot/CDP screencast based
-  rather than embedding Playwright's native headed window
+- design a live browser preview path, likely screenshot/CDP screencast based rather than embedding Playwright's native headed window
 - add richer policy and approval flows for harmless same-origin UI clicks
 
-### MCP integrations
+### MCP Integrations
 
-Heddle can connect to user-configured Model Context Protocol servers so the
-agent can use ecosystem tools such as Notion, Anytype, GitHub, or other MCP
-integrations through Heddle's approval and trace path.
+Heddle can connect to user-configured Model Context Protocol servers so the agent can use ecosystem tools such as Notion, Anytype, GitHub, or other MCP integrations through Heddle's approval and trace path.
 
-Configure servers by pasting a standard `mcpServers` JSON document into
-Settings -> MCP, editing `.heddle/mcp.json` directly, or opening that file from
-chat with `/mcp config`. Server config is separate from workspace activation:
-after saving config, explicitly enable and refresh the server before future
-agent turns can see its cached tools.
+Configure servers by pasting a standard `mcpServers` JSON document into Settings -> MCP, editing `.heddle/mcp.json` directly, or opening that file from chat with `/mcp config`. Server config is separate from workspace activation: after saving config, explicitly enable and refresh the server before future agent turns can see its cached tools.
 
 ```text
 /mcp
@@ -374,101 +324,15 @@ agent turns can see its cached tools.
 /mcp disable <server>
 ```
 
-Refreshing an enabled server caches its tool catalog under `.heddle/mcp/`.
-Future agent turns can inspect MCP tools with `mcp_list_tools` and call them
-through approval-gated MCP tool adapters.
+Refreshing an enabled server caches its tool catalog under `.heddle/mcp/`. Future agent turns can inspect MCP tools with `mcp_list_tools` and call them through approval-gated MCP tool adapters.
 
 More: [MCP integrations](docs/reference/mcp.md)
-
-### Sessions and continuity
-
-Heddle keeps saved sessions under `.heddle/` so longer work does not have to reset every time. Current versions store the session catalog at `.heddle/chat-sessions.catalog.json` and per-session bodies under `.heddle/chat-sessions/`. That means you can come back to an interrupted task, continue a previous debugging thread, or preserve project-specific context across runs.
-
-This matters if you are doing real multi-step work rather than one-shot prompts.
-
-Typical session commands include:
-
-- `/session list`
-- `/session switch <id>`
-- `/continue`
-- `/compact`
-- `/model set`
-- `/reasoning set`
-
-More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
-
-### Knowledge Persistence: Heddle Learns While It Works
-
-Heddle can learn durable project knowledge while it works with you.
-
-When the agent notices reusable information — a preferred ticket format, a canonical verification command, an operational convention, a recurring repo quirk, or a stable workflow pattern — it can record a memory candidate and let a dedicated maintainer path fold that knowledge into cataloged markdown notes under `.heddle/memory/`.
-
-The goal is practical recall: future sessions should know where to look instead of rediscovering the same context from scratch. Heddle does this through explicit catalogs, readable local notes, maintenance logs, and memory visibility commands rather than opaque retrieval.
-
-The learning loop is intentionally concrete:
-
-- notices durable facts and preferences during normal work
-- records memory candidates without interrupting the user
-- folds candidates into cataloged markdown through a maintainer path
-- lets future sessions recover context through explicit discovery paths
-- lets users audit memory with `heddle memory status/list/read/search/validate`
-
-Try it on a real project: tell Heddle a durable preference or let it discover a stable workflow detail, then start a fresh session and watch it recover that context through the memory catalog.
-
-For example, tell Heddle your preferred ticket template once, then ask for a ticket in a new session. The point is not just storing a note; it is making future work start from the operating knowledge you already taught the agent.
-
-More: [Knowledge persistence](docs/guides/knowledge-persistence.md)
-
-### Control plane and workspaces
-
-The control plane is Heddle's local browser UI:
-
-```bash
-heddle daemon
-```
-
-It gives you a browser-based view into workspaces, sessions, run state, heartbeat tasks, memory health, and review-oriented details. The purpose is operator oversight: seeing what the agent is doing, reviewing history more comfortably, and managing local runs from a UI instead of only from the terminal.
-
-If terminal chat is the execution surface, the control plane is the oversight surface.
-
-The workspace switcher and `Settings > Workspace` page let you register local projects, switch the control plane between them, rename workspace entries, and pick a project folder from the browser UI. Heddle also keeps a user-level workspace registry so projects you have opened from the CLI or daemon can be rediscovered later.
-
-The `Sessions` section supports a coding-review flow built around current work first. Review starts from the live Git working tree for the active workspace, with changed files, structured read-only diffs, and a larger full-diff viewer when the side panel is too tight. Historical turn diffs, review commands, verification commands, approvals, and trace events are still available, but they are separated from current review so old evidence does not distract from the task at hand.
-
-Session chat in the control plane renders assistant markdown, receives per-session live updates for assistant streaming, tool progress, approvals, and saved-session refreshes, and keeps model/reasoning controls aligned with the terminal workflow. The session composer also includes drift controls, `@file` mention suggestions, and image upload controls for attaching local screenshots or reference images to a prompt.
-
-The task surface has also moved beyond passive visibility: operators can create, edit, enable, disable, run, resume, and delete heartbeat tasks, inspect live run state, and review saved run records from the browser. Settings now include workspace and memory status views, so memory catalog health and maintenance history are visible without dropping back to terminal commands.
-
-This is useful if you want a more inspectable and operator-friendly workflow than a plain CLI transcript. The layout adapts for phone use as well, with mobile-native navigation for Sessions, Tasks, and Settings, plus focused Chat/Review and task-run workflows.
-
-More: [Control plane guide](docs/guides/control-plane.md)
-
-### Runtime host model
-
-Heddle is local-first, but it still has a runtime ownership model.
-
-The short version is:
-
-- Heddle uses one local control-plane server path for interactive chat and browser control.
-- `heddle` / `heddle chat` attach to a live control-plane server when one exists, or start an embedded one when needed.
-- `heddle daemon` starts the same server path as a standalone process for browser and longer-lived workflows.
-- Workspaces own their local `.heddle/` state, but the server does not own one global active workspace. Clients send workspace identity with workspace-scoped requests.
-
-If you want to understand how `chat`, `ask`, the daemon, the control plane, and workspace-local state fit together, read:
-
-- [Runtime host model](docs/guides/runtime-host-model.md)
 
 ### Heartbeat
 
 Heartbeat is Heddle's model for bounded autonomous wake cycles.
 
 Instead of only running when a human types a prompt, a heartbeat task lets Heddle wake up on a schedule, do a limited amount of work, checkpoint the result, and decide whether to continue, pause, complete, or escalate.
-
-Heartbeat keeps the latest runner result and saved run history in the same
-record shape, so terminal commands and the browser control plane show the same
-decision, summary, outcome, and usage data. Tasks can use operator-controlled
-continuation or agent-selected continuation depending on how much autonomy the
-host should allow.
 
 Example commands:
 
@@ -480,11 +344,22 @@ heddle heartbeat task list
 
 Why this exists: some agent work is not a single interactive chat. You may want periodic repo inspection, recurring maintenance checks, scheduled summaries, or a host that can resume work in bounded steps.
 
-If you do not need scheduled or semi-autonomous workflows, you can ignore heartbeat entirely and just use chat.
-
 More: [Heartbeat guide](docs/guides/heartbeat.md)
 
-### Semantic drift
+### Programmatic Runtime
+
+Heddle is not only a CLI. The npm package exposes two main programmatic layers:
+
+- `createConversationEngine`: an alpha API for persisted multi-turn sessions with session storage, compaction, approvals, traces, semantic activity, and custom frontends or local hosts
+- `AgentLoopRuntimeService.run(...)`: a lower-level single-run execution loop for hosts that do not need persisted chat or session behavior
+
+Advanced hosts can also reuse lower-level class APIs such as `ToolRegistry`, `ToolExecutionService`, `TraceRecorder`, `TraceConsoleFormatter`, and `ReviewDiffParser` when they intentionally assemble custom runtime or review surfaces.
+
+Other exported primitives include `HeartbeatRunnerAgent.run`, `HeartbeatSchedulerService.runDueTasks`, and `FileHeartbeatTaskService` for scheduled or custom host workflows.
+
+More: [Programmatic use](docs/guides/programmatic-use.md)
+
+### Semantic Drift
 
 Semantic drift is optional telemetry that helps you see whether the assistant's responses appear to be moving away from the recent semantic trajectory of the conversation.
 
@@ -495,19 +370,9 @@ With optional [CyberLoop](https://www.npmjs.com/package/cyberloop) integration i
 - `drift=medium`
 - `drift=high`
 
-This is an observability feature, not a magic correctness guarantee. It is meant to help operators notice when a run may be getting less aligned with its recent direction.
-
-If you are just looking for a coding agent, you do not need to care about this on day one. If you care about agent observability and runtime behavior, it is one of Heddle's more distinctive features.
+This is an observability feature, not a correctness guarantee. It is meant to help operators notice when a run may be getting less aligned with its recent direction.
 
 More: [Semantic drift](docs/guides/semantic-drift.md)
-
-### Programmatic runtime APIs
-
-Heddle is not only a CLI. The npm package also exposes runtime primitives such as `createConversationEngine`, `AgentLoopRuntimeService.run(...)`, `HeartbeatRunnerAgent.run`, `HeartbeatSchedulerService.runDueTasks`, and `FileHeartbeatTaskService` so other hosts can build on top of it.
-
-This is for people building their own agent hosts, schedulers, or control surfaces rather than only using the packaged CLI.
-
-More: [Programmatic use](docs/guides/programmatic-use.md)
 
 ## Install
 
@@ -552,16 +417,15 @@ npx -p @roackb2/heddle -p cyberloop heddle
 
 ## Documentation
 
-### Start here
+Start here:
 
 - [Documentation hub](docs/README.md)
 - [Runtime host model](docs/guides/runtime-host-model.md)
 - [Chat and sessions guide](docs/guides/chat-and-sessions.md)
 - [CLI reference](docs/reference/cli.md)
 
-### Feature guides
+Feature guides:
 
-- [Runtime host model](docs/guides/runtime-host-model.md)
 - [Control plane](docs/guides/control-plane.md)
 - [Heartbeat](docs/guides/heartbeat.md)
 - [Agent Skills](docs/guides/agent-skills.md)
@@ -571,7 +435,7 @@ npx -p @roackb2/heddle -p cyberloop heddle
 - [Semantic drift](docs/guides/semantic-drift.md)
 - [Programmatic use](docs/guides/programmatic-use.md)
 
-### Contributors
+Contributors:
 
 - [Agent context](docs/agent-context.md)
 - [Project posture](docs/project-posture.md)
@@ -590,6 +454,7 @@ Current strengths include:
 - autonomous, catalog-backed workspace memory that helps the agent learn from normal usage
 - standard Agent Skills support with workspace-level activation and progressive disclosure
 - opt-in Browser Automation with browser snapshots, screenshots, policy checks, and a published next-step agenda
+- MCP integration support for user-configured ecosystem tools
 - explicit traces, approval previews, diff review, and local workspace state
 - browser-based oversight and workspace switching through the control plane
 - local-first heartbeat primitives for scheduled agent work
@@ -598,6 +463,7 @@ Current strengths include:
 Current limitations include:
 
 - the browser control plane is read-only for file review; it is not yet an editable IDE-like diff environment
+- Browser Automation still needs profile management, form-safe actions, and richer browser evidence surfaces
 - some advanced workflows remain better documented in source and examples than in polished product UX
 - the project surface is still changing as the runtime matures
 
