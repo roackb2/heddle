@@ -44,6 +44,16 @@ body: |-
 
   Never reuse snapshot refs after navigation. Browser refs are page-state scoped evidence, not stable selectors.
 
+  ## Navigation Evidence
+
+  Prefer browser_click on snapshot refs over copying link URLs into browser_open. Some sites localize, rewrite, or route links after click. Snapshot elements may expose both rawHref from the DOM attribute and href as the browser-resolved anchor URL, but neither field should be treated as proof of the final navigated page. Trust the final URL returned by browser_open/browser_click and the next browser_snapshot.
+
+  Do not invent URL patterns from one site, one screenshot, or one guessed route. If a direct URL fails, go back to the latest snapshot, click the visible navigation ref when policy allows it, and verify the resulting page title, URL, and visible content.
+
+  If ariaSnapshotTruncated is true, say that the snapshot was partial. Use another navigation, a screenshot, or the visible top/current rows to gather more evidence instead of claiming the hidden page content.
+
+  For filter, tab, or account pages, verify the current URL/query, page heading, and visible result text after navigation. If labels appear inconsistent, report the observed evidence and uncertainty instead of inferring workflow meaning from adjacent labels.
+
   ## Safety Boundaries
 
   Respect domain allowlists and browser policy. Stop before checkout, purchase, irreversible submission, account mutation, credential entry, payment, booking, messaging, upload, or destructive actions unless the user explicitly approves a future Heddle workflow that supports that action safely.

@@ -109,6 +109,78 @@ describe('AutonomyPostflightAuditService', () => {
     expect(audit.reason).toContain('observed changes exceeded declared write roots');
   });
 
+  it('does not treat read-only path output as a changed path', () => {
+    const audit = AutonomyPostflightAuditService.create({
+      evaluation: evaluation({
+        call: {
+          id: 'call-view-image',
+          tool: 'view_image',
+          input: {
+            path: '.heddle/browser-runs/run-1/screenshots/page.png',
+            policy: {
+              operations: ['read'],
+              intent: 'Inspect an existing screenshot.',
+              targetRoots: ['.'],
+              readRoots: ['.'],
+              expectedEffects: ['Read image content only.'],
+              maxDestructiveScope: 'none',
+              environment: 'local',
+              confidence: 'high',
+            },
+          },
+        },
+        envelope: {
+          operations: ['read'],
+          intent: 'Inspect an existing screenshot.',
+          targetRoots: ['.'],
+          readRoots: ['.'],
+          expectedEffects: ['Read image content only.'],
+          maxDestructiveScope: 'none',
+          environment: 'local',
+          confidence: 'high',
+        },
+        facts: {
+          ...evaluation().facts,
+          tool: 'view_image',
+          operations: ['read'],
+          claimedWriteRoots: [],
+        },
+      }),
+      result: {
+        ok: true,
+        output: {
+          path: '/workspace/current/.heddle/browser-runs/run-1/screenshots/page.png',
+          summary: 'The screenshot shows an Order History link.',
+        },
+      },
+    });
+
+    expect(audit.decision).toBe('continue');
+    expect(audit.observedEffects.changedPaths).toEqual([]);
+    expect(audit.reason).toBe('tool result did not report structured changed paths');
+  });
+
+  it('still honors explicit changedPaths from read tools', () => {
+    const audit = AutonomyPostflightAuditService.create({
+      evaluation: evaluation({
+        facts: {
+          ...evaluation().facts,
+          operations: ['read'],
+          claimedWriteRoots: [],
+        },
+      }),
+      result: {
+        ok: true,
+        output: {
+          changedPaths: ['../sibling/cache.json'],
+        },
+      },
+    });
+
+    expect(audit.decision).toBe('stop');
+    expect(audit.observedEffects.exceededDeclaredRoots).toEqual(['/workspace/sibling/cache.json']);
+  });
+
   it('stops when the command mutates git history', () => {
     const audit = AutonomyPostflightAuditService.create({
       evaluation: evaluation({

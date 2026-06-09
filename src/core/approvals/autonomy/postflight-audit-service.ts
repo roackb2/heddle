@@ -2,7 +2,10 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import compact from 'lodash/compact.js';
 import uniq from 'lodash/uniq.js';
 import type { ToolResult } from '@/core/types.js';
+import type { ToolPolicyOperation } from '@/core/tools/index.js';
 import type { AutonomyEvaluation, AutonomyPostflightAudit } from './types.js';
+
+const PATH_OUTPUT_MUTATION_OPERATIONS = new Set<ToolPolicyOperation>(['write', 'delete', 'move', 'execute', 'git', 'unknown']);
 
 /**
  * Builds post-execution audit records for unattended autopilot tool calls.
@@ -23,6 +26,7 @@ export class AutonomyPostflightAuditService {
     const workspaceRoot = resolve(args.workspaceRoot ?? args.evaluation.facts.cwd ?? process.cwd());
     const changedPaths = AutonomyPostflightAuditService.extractChangedPaths({
       output: args.result.output,
+      operations: args.evaluation.facts.operations,
       workspaceRoot,
     });
     const changedRoots = AutonomyPostflightAuditService.resolveChangedRoots({
@@ -57,17 +61,25 @@ export class AutonomyPostflightAuditService {
 
   private static extractChangedPaths(args: {
     output: unknown;
+    operations: ToolPolicyOperation[];
     workspaceRoot: string;
   }): string[] {
     if (!isRecord(args.output)) {
       return [];
     }
 
+    const shouldInterpretPathOutputAsMutation = args.operations.some((operation) =>
+      PATH_OUTPUT_MUTATION_OPERATIONS.has(operation),
+    );
     const changedPaths = [
       ...AutonomyPostflightAuditService.stringArray(args.output.changedPaths),
-      AutonomyPostflightAuditService.stringValue(args.output.path),
-      AutonomyPostflightAuditService.stringValue(args.output.from),
-      AutonomyPostflightAuditService.stringValue(args.output.to),
+      ...(shouldInterpretPathOutputAsMutation
+        ? [
+          AutonomyPostflightAuditService.stringValue(args.output.path),
+          AutonomyPostflightAuditService.stringValue(args.output.from),
+          AutonomyPostflightAuditService.stringValue(args.output.to),
+        ]
+        : []),
     ];
 
     return uniq(compact(changedPaths).map((path) => resolve(args.workspaceRoot, path)));

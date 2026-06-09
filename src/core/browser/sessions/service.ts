@@ -298,6 +298,7 @@ export class BrowserSessionService {
       name: element.name,
       text: element.text,
       href: element.href,
+      rawHref: element.rawHref,
       tagName: element.tagName,
     };
   }

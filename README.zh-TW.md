@@ -280,6 +280,12 @@ Browser Automation 預設關閉。可以從 Settings -> Browser Automation 或 c
 /browser
 /browser enable
 /browser disable
+/browser headed
+/browser headless
+/browser profile <id>
+/browser channel <chromium|chrome|msedge>
+/browser open-profile [url]
+/browser close-profile
 ```
 
 啟用 Browser Automation 會 activate Heddle package-owned `browser-automation` Agent Skill，並把以下工具加入未來預設的 agent turns：
@@ -296,19 +302,21 @@ Built-in skill 會教 agent 什麼時候適合使用 browser automation，以及
 
 目前行為：
 
-- 如果沒有 explicit domain allowlist，第一個 `browser_open` URL 會建立該 browser session 的 same-domain browsing boundary
-- snapshots 會回傳 scoped refs，供 safe `browser_click` calls 使用
-- 截圖與 browser evidence 會存放在 Heddle state
-- 需要登入的網站需要 persistent browser profile 與有效 session
+- 如果沒有明確的網域允許清單，第一個 `browser_open` URL 會建立該瀏覽器工作階段的同網域瀏覽邊界
+- 快照會回傳作用範圍限定的 refs，供安全的 `browser_click` 呼叫使用
+- 截圖與瀏覽器證據會存放在 Heddle 狀態目錄
+- Settings -> Browser Automation 與 `/browser profile <id>` 可選擇 Heddle 管理的 profile，位置在 `.heddle/browser-profiles/`
+- Settings -> Browser Automation 與 `/browser channel <chromium|chrome|msedge>` 可選擇之後 agent 執行與手動 profile 視窗使用的 Playwright 瀏覽器 channel
+- `/browser headed` 會讓之後的瀏覽器執行顯示 Playwright 視窗，方便你先手動登入；`/browser headless` 則會在不顯示視窗的狀態下重用該 profile
+- Settings -> Browser Automation 與 `/browser open-profile [url]` 可用可見的手動視窗開啟選定 profile，供你登入或管理工作階段；請在要求 agent 使用同一 profile 前，用 `/browser close-profile` 關閉它
+- 需要登入的網站要求目前選定的瀏覽器 profile 已經有有效的登入狀態
 
 Browser Automation agenda：
 
-- 在 Settings 增加 profile 管理，包含 selected profile、Chrome channel、headless/headed mode 與 profile path visibility
-- 增加「open profile for login」流程，讓使用者可以先手動準備 logged-in sessions，再讓 agents reuse
 - 增加表單安全的 browser tools，例如 `browser_type`、`browser_fill`、`browser_press`
-- 在 control plane 顯示 browser evidence 與截圖
-- 設計即時 browser preview path，較可能基於 screenshot/CDP screencast，而不是 embedding Playwright 的 native headed window
-- 為 harmless same-origin UI clicks 加上更完整的 policy 與 approval flows
+- 在 control plane 顯示瀏覽器證據與截圖
+- 設計即時瀏覽器預覽路徑，較可能基於截圖或 CDP screencast，而不是嵌入 Playwright 原生可見視窗
+- 為無害的同源 UI 點擊加上更完整的 policy 與 approval 流程
 
 ### MCP Integrations
 

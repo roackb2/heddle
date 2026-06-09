@@ -4,7 +4,17 @@ import {
   BROWSER_AUTOMATION_SKILL_NAME,
   FileAgentSkillActivationRepository,
 } from '@/core/skills/index.js';
-import type { BrowserAutomationOverview, BrowserAutomationServiceOptions, BrowserAutomationSetEnabledResult } from './types.js';
+import { BrowserProfileSettingsService } from '../settings/index.js';
+import { BrowserProfileWindowService } from '../profile-windows/index.js';
+import type {
+  BrowserAutomationOverview,
+  BrowserAutomationProfileOpenInput,
+  BrowserAutomationProfileWindowResult,
+  BrowserAutomationServiceOptions,
+  BrowserAutomationSetEnabledResult,
+  BrowserAutomationSettingsUpdateInput,
+  BrowserAutomationSettingsUpdateResult,
+} from './types.js';
 
 /**
  * Owns the user-facing Browser Automation capability switch.
@@ -42,17 +52,32 @@ export class BrowserAutomationCapabilityService {
 
   async overview(): Promise<BrowserAutomationOverview> {
     const skill = this.skills.getBuiltInActivationView(BROWSER_AUTOMATION_SKILL_NAME);
+    const browserSettings = BrowserProfileSettingsService.overview(this.stateRoot);
 
     return {
       enabled: skill?.status === 'active',
       skillName: BROWSER_AUTOMATION_SKILL_NAME,
       activationStorePath: FileAgentSkillActivationRepository.resolvePath(this.stateRoot),
       skill,
+      browserSettings,
+      profileWindow: BrowserProfileWindowService.status(this.stateRoot),
       profileRequirement:
-        'Logged-in sites require a browser profile with a valid session. Without one, agents should assume only public pages are available.',
+        `Logged-in sites require a valid session in the selected Heddle browser profile "${browserSettings.profileId}". Use headed mode to log in manually.`,
       toolAvailability:
         'When enabled, future default agent turns include browser tools. If no explicit domain allowlist is configured, the first opened URL establishes the same-domain browsing boundary.',
     };
+  }
+
+  async updateSettings(input: BrowserAutomationSettingsUpdateInput): Promise<BrowserAutomationSettingsUpdateResult> {
+    return BrowserProfileSettingsService.update(this.stateRoot, input);
+  }
+
+  async openProfileWindow(input: BrowserAutomationProfileOpenInput = {}): Promise<BrowserAutomationProfileWindowResult> {
+    return await BrowserProfileWindowService.open(this.stateRoot, input);
+  }
+
+  async closeProfileWindow(): Promise<BrowserAutomationProfileWindowResult> {
+    return await BrowserProfileWindowService.close(this.stateRoot);
   }
 
   async setEnabled(enabled: boolean): Promise<BrowserAutomationSetEnabledResult> {

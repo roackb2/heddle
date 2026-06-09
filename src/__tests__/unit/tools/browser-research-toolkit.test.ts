@@ -52,15 +52,59 @@ describe('createBrowserResearchToolkit', () => {
         ok: true,
         output: {
           title: 'Browser automation',
+          ariaSnapshot: '- document "Browser automation"',
+          ariaSnapshotLength: 31,
+          ariaSnapshotTruncated: false,
           elements: expect.arrayContaining([
             expect.objectContaining({
               ref: 'el_1',
               role: 'link',
               name: 'History',
+              href: 'https://en.wikipedia.org/wiki/History',
+              rawHref: '/wiki/History',
             }),
           ]),
         },
       });
+  });
+
+  it('bounds aria snapshot output for agent-facing browser snapshots', async () => {
+    const { tools } = await createTools({
+      driver: new FakeBrowserDriver({ ariaSnapshot: 'a'.repeat(13_000) }),
+    });
+
+    await tools.browser_open.execute({ url: 'https://en.wikipedia.org/wiki/Browser_automation' });
+    await expect(tools.browser_snapshot.execute({}))
+      .resolves
+      .toMatchObject({
+        ok: true,
+        output: {
+          ariaSnapshot: expect.stringMatching(/\[truncated\]$/),
+          ariaSnapshotLength: 13_000,
+          ariaSnapshotTruncated: true,
+        },
+      });
+  });
+
+  it('passes the selected profile and display mode into browser driver launch options', async () => {
+    const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-profile-'));
+    const { tools, driverFactory } = await createTools({
+      stateRoot,
+      profileId: 'shopping-login',
+      headless: false,
+    });
+
+    await expect(tools.browser_open.execute({ url: 'https://en.wikipedia.org/wiki/Browser_automation' }))
+      .resolves
+      .toMatchObject({ ok: true });
+
+    expect(driverFactory.launchOptions).toMatchObject({
+      profile: {
+        profileId: 'shopping-login',
+        userDataDir: join(stateRoot, 'browser-profiles', 'shopping-login'),
+        headless: false,
+      },
+    });
   });
 
   it('blocks off-domain clicks before the driver executes them', async () => {
@@ -190,20 +234,25 @@ async function createTools(options: {
   stateRoot?: string;
   driver?: BrowserDriver;
   allowedDomains?: string[];
+  profileId?: string;
+  headless?: boolean;
 } = {}) {
   const stateRoot = options.stateRoot ?? (await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-')));
   const driver = options.driver ?? new FakeBrowserDriver();
+  const driverFactory = new FakeBrowserDriverFactory(driver);
   const tools = Object.fromEntries(
     createBrowserResearchToolkit({
       stateRoot,
       allowedDomains: options.allowedDomains ?? ['wikipedia.org'],
-      driverFactory: new FakeBrowserDriverFactory(driver),
-      headless: true,
+      driverFactory,
+      profileId: options.profileId,
+      headless: options.headless ?? true,
     }).createTools(context(stateRoot)).map((tool) => [tool.name, tool]),
   );
 
   return {
     driver,
+    driverFactory,
     tools: tools as Record<'browser_open' | 'browser_snapshot' | 'browser_click' | 'browser_screenshot' | 'browser_close', ToolDefinition>,
   };
 }
@@ -219,9 +268,12 @@ function context(stateRoot: string): ToolToolkitContext {
 }
 
 class FakeBrowserDriverFactory implements BrowserDriverFactory {
+  launchOptions?: BrowserDriverLaunchOptions;
+
   constructor(private readonly driver: BrowserDriver) {}
 
-  async launch(_options: BrowserDriverLaunchOptions): Promise<BrowserDriver> {
+  async launch(options: BrowserDriverLaunchOptions): Promise<BrowserDriver> {
+    this.launchOptions = options;
     return this.driver;
   }
 }
@@ -229,6 +281,8 @@ class FakeBrowserDriverFactory implements BrowserDriverFactory {
 class FakeBrowserDriver implements BrowserDriver {
   clickedRefs: string[] = [];
   private url = 'about:blank';
+
+  constructor(private readonly options: { ariaSnapshot?: string } = {}) {}
 
   async open(url: string): Promise<string> {
     this.url = url;
@@ -239,13 +293,14 @@ class FakeBrowserDriver implements BrowserDriver {
     return {
       url: this.url,
       title: 'Browser automation',
-      ariaSnapshot: '- document "Browser automation"',
+      ariaSnapshot: this.options.ariaSnapshot ?? '- document "Browser automation"',
       elements: [
         {
           ref: 'el_1',
           role: 'link',
           name: 'History',
           href: 'https://en.wikipedia.org/wiki/History',
+          rawHref: '/wiki/History',
           tagName: 'a',
         },
         {
@@ -253,6 +308,7 @@ class FakeBrowserDriver implements BrowserDriver {
           role: 'link',
           name: 'External reference',
           href: 'https://example.com/source',
+          rawHref: 'https://example.com/source',
           tagName: 'a',
         },
       ],

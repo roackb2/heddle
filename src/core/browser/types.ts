@@ -66,6 +66,7 @@ export interface BrowserSnapshotElement {
   name: string;
   text?: string;
   href?: string;
+  rawHref?: string;
   tagName?: string;
 }
 

@@ -124,6 +124,12 @@ Inside `heddle` / `heddle chat`, the most-used local commands are:
 - `/browser`: show Browser Automation status for this workspace
 - `/browser enable`: enable built-in Browser Automation guidance and browser tools for future default turns in this workspace
 - `/browser disable`: disable built-in Browser Automation guidance and browser tools for future default turns in this workspace
+- `/browser headed`: run future Browser Automation sessions in a visible browser window
+- `/browser headless`: run future Browser Automation sessions without a visible browser window
+- `/browser profile <id>`: select the Heddle-owned browser profile future browser runs should use
+- `/browser channel <chromium|chrome|msedge>`: select the Playwright browser channel future browser runs and manual profile windows should use
+- `/browser open-profile [url]`: open the selected Heddle-owned browser profile in a visible window for manual login or session management
+- `/browser close-profile`: close the selected manual browser profile window and release its profile lock
 
 Prompt editing supports `Shift+Enter` for newlines, `Ctrl+Z`/`Ctrl+Y` for undo/redo, and `Up`/`Down` for submitted prompt history when the cursor is on the first or last logical line.
 

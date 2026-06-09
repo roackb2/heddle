@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { SlashCommandAutocomplete } from '../../../core/commands/slash/autocomplete.js';
-import { browserStatusMessage } from '../../../core/commands/slash/modules/browser/browser-commands.js';
+import { browserStatusMessage, createBrowserSlashCommandModule } from '../../../core/commands/slash/modules/browser/browser-commands.js';
 import { createMcpSlashCommandModule, listMcpMessage } from '../../../core/commands/slash/modules/mcp/mcp-commands.js';
 import type { SlashCommandExecutionContext } from '../../../core/commands/slash/modules/context.js';
 import { listSkillsMessage } from '../../../core/commands/slash/modules/skills/skills-commands.js';
@@ -192,6 +192,28 @@ describe('Browser Automation slash command output', () => {
       enabled: false,
       skillName: 'browser-automation',
       activationStorePath: '/workspace/.heddle/skills/activation.json',
+      browserSettings: {
+        profileId: 'browser-automation',
+        channelSelection: 'chromium',
+        headless: true,
+        displayMode: 'headless',
+        settingsStorePath: '/workspace/.heddle/browser/settings.json',
+        userDataDir: '/workspace/.heddle/browser-profiles/browser-automation',
+        profiles: [
+          {
+            profileId: 'browser-automation',
+            userDataDir: '/workspace/.heddle/browser-profiles/browser-automation',
+            selected: true,
+          },
+        ],
+        profileInstruction: 'Use headed mode to log in manually.',
+        evidenceNote: 'Screenshots and snapshots are per browser run.',
+      },
+      profileWindow: {
+        profileId: 'browser-automation',
+        userDataDir: '/workspace/.heddle/browser-profiles/browser-automation',
+        open: false,
+      },
       skill: {
         name: 'browser-automation',
         status: 'available',
@@ -204,6 +226,9 @@ describe('Browser Automation slash command output', () => {
       browserAutomation: {
         overview: async () => overview,
         setEnabled: vi.fn(),
+        updateSettings: vi.fn(),
+        openProfileWindow: vi.fn(),
+        closeProfileWindow: vi.fn(),
       },
     })).resolves.toEqual({
       handled: true,
@@ -215,14 +240,112 @@ describe('Browser Automation slash command output', () => {
         'skillStatus=available',
         'activationStore=/workspace/.heddle/skills/activation.json',
         '',
+        'Browser profile',
+        '  profile=browser-automation',
+        '  channel=chromium',
+        '  mode=headless',
+        '  profilePath=/workspace/.heddle/browser-profiles/browser-automation',
+        '  settings=/workspace/.heddle/browser/settings.json',
+        '  knownProfiles=1',
+        'Manual profile window',
+        '  status=closed',
+        '',
         'Logged-in sites require a selected profile.',
         'Browser tools remain host-controlled.',
         '',
         'Commands',
         '  /browser enable',
         '  /browser disable',
+        '  /browser headed',
+        '  /browser headless',
+        '  /browser profile <id>',
+        '  /browser channel <chromium|chrome|msedge>',
+        '  /browser open-profile [url]',
+        '  /browser close-profile',
       ].join('\n'),
     });
+  });
+
+  it('updates profile settings through browser slash commands', async () => {
+    const updateSettings = vi.fn(async () => ({
+      ok: true as const,
+      settings: {
+        profileId: 'shopping',
+        channel: 'chrome',
+        channelSelection: 'chrome' as const,
+        headless: false,
+        displayMode: 'headed' as const,
+        settingsStorePath: '/workspace/.heddle/browser/settings.json',
+        userDataDir: '/workspace/.heddle/browser-profiles/shopping',
+        profiles: [
+          {
+            profileId: 'shopping',
+            userDataDir: '/workspace/.heddle/browser-profiles/shopping',
+            selected: true,
+          },
+        ],
+        profileInstruction: 'Use headed mode to log in manually.',
+        evidenceNote: 'Screenshots and snapshots are per browser run.',
+      },
+    }));
+    const openProfileWindow = vi.fn(async () => ({
+      ok: true as const,
+      status: {
+        profileId: 'shopping',
+        userDataDir: '/workspace/.heddle/browser-profiles/shopping',
+        open: true,
+        currentUrl: 'https://example.com/login',
+      },
+    }));
+    const closeProfileWindow = vi.fn(async () => ({
+      ok: true as const,
+      status: {
+        profileId: 'shopping',
+        userDataDir: '/workspace/.heddle/browser-profiles/shopping',
+        open: false,
+      },
+    }));
+    const registry = new SlashCommandRegistry([createBrowserSlashCommandModule()]);
+    const context = {
+      browserAutomation: {
+        overview: vi.fn(),
+        setEnabled: vi.fn(),
+        updateSettings,
+        openProfileWindow,
+        closeProfileWindow,
+      },
+    } as Pick<SlashCommandExecutionContext, 'browserAutomation'> as SlashCommandExecutionContext;
+
+    await expect(registry.run(context, '/browser profile shopping')).resolves.toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: expect.stringContaining('profile set to "shopping"'),
+    });
+    await expect(registry.run(context, '/browser headed')).resolves.toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: expect.stringContaining('headed mode'),
+    });
+    await expect(registry.run(context, '/browser channel chrome')).resolves.toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: expect.stringContaining('channel set to "chrome"'),
+    });
+    await expect(registry.run(context, '/browser open-profile https://example.com/login')).resolves.toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: expect.stringContaining('Opened Browser Automation profile "shopping"'),
+    });
+    await expect(registry.run(context, '/browser close-profile')).resolves.toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: expect.stringContaining('Closed Browser Automation profile window for "shopping"'),
+    });
+    expect(updateSettings).toHaveBeenCalledWith({ profileId: 'shopping' });
+    expect(updateSettings).toHaveBeenCalledWith({ headless: false });
+    expect(updateSettings).toHaveBeenCalledWith({ channel: 'chrome' });
+    expect(openProfileWindow).toHaveBeenCalledWith({ url: 'https://example.com/login' });
+    expect(closeProfileWindow).toHaveBeenCalledWith();
   });
 });
 

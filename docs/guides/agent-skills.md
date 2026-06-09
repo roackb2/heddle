@@ -71,11 +71,31 @@ Browser Automation also has a capability-specific shortcut:
 /browser
 /browser enable
 /browser disable
+/browser headed
+/browser headless
+/browser profile <id>
+/browser channel <chromium|chrome|msedge>
+/browser open-profile [url]
+/browser close-profile
 ```
 
 `/browser enable` activates Heddle's built-in `browser-automation` skill and
 adds browser tools to future default agent turns in the current workspace. The
 equivalent web path is Settings -> Browser Automation.
+
+`/browser headed` opens future browser sessions in a visible Playwright window.
+Use it to prepare a Heddle-owned browser profile for login, then switch back to
+`/browser headless` when future runs should reuse that profile without showing a
+window. `/browser profile <id>` selects the profile stored under
+`.heddle/browser-profiles/<id>`. `/browser channel <chromium|chrome|msedge>`
+selects the Playwright browser channel future agent runs and manual profile
+windows should use.
+
+To log in or manage session state, open the selected Heddle-owned profile with
+Settings -> Browser Automation -> Open Profile Window or
+`/browser open-profile https://example.com`. Log in manually in the visible
+browser window, then close it from Settings or `/browser close-profile` before
+asking the agent to use browser automation with the same profile.
 
 The browser skill teaches the agent when browser automation is useful: visual
 inspection for frontend work, user-requested website interaction, web research,

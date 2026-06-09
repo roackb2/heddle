@@ -28,6 +28,9 @@ import { controlPlaneWorkspaceProcedure, type ControlPlaneWorkspaceContext } fro
 import {
   agentAskInputSchema,
   browserAutomationInputSchema,
+  browserAutomationProfileCloseInputSchema,
+  browserAutomationProfileOpenInputSchema,
+  browserAutomationSettingsInputSchema,
   createSessionInputSchema,
   fileSearchInputSchema,
   heartbeatRunInputSchema,
@@ -447,6 +450,24 @@ export const controlPlaneRouter = router({
   browserAutomationSetEnabled: controlPlaneWorkspaceProcedure.input(browserAutomationInputSchema).mutation(async ({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;
     return await ControlPlaneBrowserAutomationController.setEnabled(workspace.workspaceRoot, workspace.stateRoot, input.enabled);
+  }),
+  browserAutomationSettingsUpdate: controlPlaneWorkspaceProcedure.input(browserAutomationSettingsInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneBrowserAutomationController.updateSettings(workspace.workspaceRoot, workspace.stateRoot, {
+      profileId: input.profileId,
+      channel: input.channel,
+      headless: input.headless,
+    });
+  }),
+  browserAutomationProfileOpen: controlPlaneWorkspaceProcedure.input(browserAutomationProfileOpenInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneBrowserAutomationController.openProfileWindow(workspace.workspaceRoot, workspace.stateRoot, {
+      url: input.url,
+    });
+  }),
+  browserAutomationProfileClose: controlPlaneWorkspaceProcedure.input(browserAutomationProfileCloseInputSchema).mutation(async ({ ctx }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneBrowserAutomationController.closeProfileWindow(workspace.workspaceRoot, workspace.stateRoot);
   }),
   mcpServers: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
     const { workspace } = ctx.requestWorkspace;
