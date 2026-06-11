@@ -11,6 +11,7 @@ import type { ApiKeyRuntime, ProviderCredentialSource } from './types.js';
  */
 export class RuntimeCredentialService {
   static readonly DEFAULT_OLLAMA_OPENAI_BASE_URL = 'http://127.0.0.1:11434/v1';
+  static readonly DEFAULT_OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
 
   static resolveProviderApiKey(provider: LlmProvider): string | undefined {
     switch (provider) {
@@ -137,7 +138,19 @@ export class RuntimeCredentialService {
     return values.find((value) => typeof value === 'string' && value.trim().length > 0);
   }
 
-  private static resolveOllamaOpenAiBaseUrl(): string {
+  static resolveOllamaBaseUrl(): string {
+    const configured = RuntimeCredentialService.firstDefinedNonEmpty(
+      process.env.OLLAMA_BASE_URL,
+      process.env.OLLAMA_OPENAI_BASE_URL,
+    );
+    if (!configured) {
+      return RuntimeCredentialService.DEFAULT_OLLAMA_BASE_URL;
+    }
+
+    return configured.replace(/\/+$/, '').replace(/\/v1$/i, '');
+  }
+
+  static resolveOllamaOpenAiBaseUrl(): string {
     const configured = RuntimeCredentialService.firstDefinedNonEmpty(
       process.env.OLLAMA_OPENAI_BASE_URL,
       process.env.OLLAMA_BASE_URL,

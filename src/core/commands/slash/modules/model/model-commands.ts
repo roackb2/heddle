@@ -4,7 +4,6 @@ import type { SlashCommandModule } from '../../types.js';
 import type { SlashCommandExecutionContext } from '../context.js';
 import { argumentAfterPrefix, slashMessageResult } from '../results.js';
 import {
-  COMMON_BUILT_IN_MODELS,
   ModelCatalogService,
   ModelPolicyService,
 } from '../../../../llm/models/index.js';
@@ -117,9 +116,10 @@ function switchModel(
     return aliased;
   }
 
+  const provider = LlmAdapterService.inferProvider(value);
   const compatibility = ModelPolicyService.validateCredentialCompatibility({
     model: value,
-    provider: LlmAdapterService.inferProvider(value),
+    provider,
     credentialMode: ModelPolicyService.credentialModeFromSource(context.model.credentialSource()),
   });
   if (!compatibility.ok) {
@@ -128,7 +128,7 @@ function switchModel(
 
   context.model.setActive(value);
   return slashMessageResult(
-    COMMON_BUILT_IN_MODELS.includes(value) ?
+    ModelCatalogService.isCommonBuiltInModel(value) || provider !== 'openai' ?
       `Switched model to ${value}`
     : `Switched model to ${value}. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.`,
   );

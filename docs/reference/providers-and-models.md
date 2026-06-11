@@ -117,6 +117,14 @@ In chat, you can also use:
 - `/model set <query>`
 - `/model <name>`
 
+When Ollama is running, `/model set <query>` and the web model selector include
+installed local Ollama models from the local Ollama API. Pick one from the
+selector, or type it directly with the `ollama/` prefix:
+
+```text
+/model ollama/llama3.2:latest
+```
+
 ## Auth Commands
 
 Provider credential commands:

@@ -14,6 +14,14 @@ describe('CliV2PickerService', () => {
             { id: 'gpt-5.4-mini', disabled: false },
           ],
         },
+        {
+          label: 'Ollama · Installed local models',
+          models: ['ollama/llama3.2:latest'],
+          source: 'local-discovered',
+          options: [
+            { id: 'ollama/llama3.2:latest', label: 'llama3.2:latest', disabled: false },
+          ],
+        },
       ],
     };
 
@@ -22,6 +30,9 @@ describe('CliV2PickerService', () => {
     expect(query).toBe('mini');
     expect(CliV2PickerService.filterModels(modelOptions, query)).toEqual([
       { id: 'gpt-5.4-mini', disabled: false },
+    ]);
+    expect(CliV2PickerService.filterModels(modelOptions, 'llama')).toEqual([
+      { id: 'ollama/llama3.2:latest', label: 'llama3.2:latest', disabled: false },
     ]);
   });
 

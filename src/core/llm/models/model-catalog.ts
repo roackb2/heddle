@@ -1,3 +1,7 @@
+import type { LlmProvider } from '@/core/llm/types.js';
+import type { CredentialAwareModelOption } from './model-policy-service.js';
+import type { ModelCredentialMode } from './model-policy-service.js';
+
 // ---------------------------------------------------------------------------
 // Built-in model shortlist used by Heddle's current UI and local commands.
 // Keep this curated rather than mirroring the entire provider catalog.
@@ -72,6 +76,22 @@ export const OPENAI_ACCOUNT_SIGN_IN_MODELS = [
   'gpt-5.3-codex',
   'gpt-5.3-codex-spark',
 ];
+
+export type ModelOptionSource = 'built-in' | 'local-discovered';
+
+export type ModelOptionGroup = {
+  label: string;
+  models: string[];
+  options: CredentialAwareModelOption[];
+  source?: ModelOptionSource;
+};
+
+export type ModelCatalogResolutionContext = {
+  credentialModes?: Partial<Record<LlmProvider, ModelCredentialMode>>;
+  ollamaBaseUrl?: string;
+  fetchImpl?: (url: unknown, init?: unknown) => Promise<globalThis.Response>;
+  signal?: AbortSignal;
+};
 
 /**
  * Curated model catalog and formatting helpers for current product surfaces.
@@ -152,6 +172,10 @@ export class ModelCatalogService {
     }
 
     return 200_000;
+  }
+
+  static isCommonBuiltInModel(model: string): boolean {
+    return COMMON_BUILT_IN_MODELS.includes(model.trim());
   }
 }
 

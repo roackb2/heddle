@@ -3,10 +3,14 @@ export {
   COMMON_BUILT_IN_MODELS,
   COMMON_OPENAI_MODELS,
   ModelCatalogService,
+  type ModelCatalogResolutionContext,
+  type ModelOptionGroup,
+  type ModelOptionSource,
   OPENAI_ACCOUNT_SIGN_IN_MODELS,
   OPENAI_MODEL_GROUPS,
 } from './model-catalog.js';
 export type { BuiltInModelGroup } from './model-catalog.js';
+export { ModelOptionsService } from './model-options-service.js';
 export {
   ANTHROPIC_COMPACTION_MODEL,
   ModelPolicyService,

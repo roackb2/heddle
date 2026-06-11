@@ -1,11 +1,9 @@
 import dayjs from 'dayjs';
 import type { z } from 'zod';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
-import { BUILT_IN_MODEL_GROUPS, ModelPolicyService } from '@/core/llm/models/index.js';
-import { LlmAdapterService } from '@/core/llm/index.js';
+import { ModelOptionsService, ModelPolicyService } from '@/core/llm/models/index.js';
 import { AutonomyPermissionModeService } from '@/core/approvals/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
-import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { procedure, router } from '@/server/trpc.js';
 import type { HeddleServerContext } from '@/server/types.js';
 import { controlPlaneChatSessionsController } from '@/server/controllers/trpc/control-plane/chat-sessions-controller.js';
@@ -23,6 +21,7 @@ import { ControlPlaneSkillsController } from '@/server/controllers/trpc/control-
 import { controlPlaneSlashCommandsController } from '@/server/controllers/trpc/control-plane/slash-commands-controller.js';
 import { controlPlaneSessionRuntimeContextService } from '@/server/services/control-plane/session-runtime-context-service.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
+import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import { controlPlaneWorkspaceProcedure, type ControlPlaneWorkspaceContext } from './control-plane-workspace.js';
 import {
@@ -118,21 +117,19 @@ export const controlPlaneRouter = router({
       signal,
     });
   }),
-  modelOptions: procedure.query(({ ctx }) => {
-    const credentialMode = ModelPolicyService.credentialModeFromSource(RuntimeCredentialService.resolveCredentialSourceForModel('gpt-5.4', {
-      preferApiKey: ctx.preferApiKey,
-    }));
-    return {
-      groups: BUILT_IN_MODEL_GROUPS.map((group) => ({
-        label: group.label,
-        models: group.models,
-        options: group.models.map((model) => ModelPolicyService.buildCredentialAwareModelOption({
-          model,
-          provider: LlmAdapterService.inferProvider(model),
-          credentialMode,
+  modelOptions: procedure.query(async ({ ctx }) => {
+    return await ModelOptionsService.resolve({
+      credentialModes: {
+        openai: ModelPolicyService.credentialModeFromSource(RuntimeCredentialService.resolveCredentialSourceForModel('gpt-5.4', {
+          preferApiKey: ctx.preferApiKey,
         })),
-      })),
-    };
+        anthropic: ModelPolicyService.credentialModeFromSource(RuntimeCredentialService.resolveCredentialSourceForModel('claude-sonnet-4-6', {
+          preferApiKey: ctx.preferApiKey,
+        })),
+        ollama: 'api-key',
+      },
+      ollamaBaseUrl: RuntimeCredentialService.resolveOllamaBaseUrl(),
+    });
   }),
   workspacePermissionModeUpdate: controlPlaneWorkspaceProcedure.input(workspacePermissionModeUpdateInputSchema).mutation(({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;

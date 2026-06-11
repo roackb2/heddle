@@ -212,7 +212,7 @@ describe('core slash command modules', () => {
 
     await expect(registry.run(context, '/model ollama/qwen3:8b')).resolves.toMatchObject({
       kind: 'message',
-      message: "Switched model to ollama/qwen3:8b. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.",
+      message: 'Switched model to ollama/qwen3:8b',
     });
     expect(setActive).toHaveBeenCalledWith('ollama/qwen3:8b');
   });
