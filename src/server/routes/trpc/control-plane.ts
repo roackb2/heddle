@@ -128,7 +128,7 @@ export const controlPlaneRouter = router({
         })),
         ollama: 'api-key',
       },
-      ollamaBaseUrl: RuntimeCredentialService.resolveOllamaBaseUrl(),
+      openAiCompatibleSources: RuntimeCredentialService.resolveOpenAiCompatibleModelDiscoverySources(),
     });
   }),
   workspacePermissionModeUpdate: controlPlaneWorkspaceProcedure.input(workspacePermissionModeUpdateInputSchema).mutation(({ ctx, input }) => {

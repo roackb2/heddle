@@ -2,7 +2,19 @@ import { z } from 'zod';
 import type { LlmProvider } from '@/core/llm/types.js';
 import type { ProviderCredentialStore, StoredProviderCredential } from './types.js';
 
-const providerSchema = z.enum(['openai', 'anthropic', 'google'])
+const providerSchema = z.enum([
+  'openai',
+  'anthropic',
+  'google',
+  'ollama',
+  'lmstudio',
+  'litellm',
+  'vllm',
+  'huggingface',
+  'openrouter',
+  'together',
+  'groq',
+])
   .describe('LLM provider that owns this stored credential.');
 
 const credentialBaseSchema = z.object({

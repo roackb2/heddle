@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProviderCredentialRepository } from '@/core/auth/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
+import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
 
 describe('RuntimeCredentialService', () => {
   afterEach(() => {
@@ -63,6 +64,86 @@ describe('RuntimeCredentialService', () => {
       type: 'local-endpoint',
       provider: 'ollama',
       baseUrl: 'http://localhost:11434/v1',
+    });
+  });
+
+  it('resolves no-key local OpenAI-compatible profiles as endpoints', () => {
+    vi.stubEnv('LMSTUDIO_OPENAI_BASE_URL', 'http://localhost:1234/v1/');
+    vi.stubEnv('OPENAI_API_KEY', 'openai-key');
+
+    expect(RuntimeCredentialService.resolveCredentialSourceForModel('lmstudio/local-model')).toEqual({
+      type: 'local-endpoint',
+      provider: 'lmstudio',
+      baseUrl: 'http://localhost:1234/v1',
+    });
+    expect(RuntimeCredentialService.resolveOpenAiCompatibleEndpointRuntime('lmstudio')).toEqual({
+      baseUrl: 'http://localhost:1234/v1',
+      auth: { type: 'none' },
+    });
+  });
+
+  it('uses hosted OpenAI-compatible provider keys without falling back to OpenAI keys', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'openai-key');
+    vi.stubEnv('OPENROUTER_API_KEY', '');
+
+    expect(RuntimeCredentialService.resolveCredentialSourceForModel('openrouter/meta-llama/llama-3.3-70b-instruct')).toEqual({
+      type: 'missing',
+      provider: 'openrouter',
+    });
+
+    vi.stubEnv('OPENROUTER_API_KEY', 'openrouter-key');
+
+    expect(RuntimeCredentialService.resolveCredentialSourceForModel('openrouter/meta-llama/llama-3.3-70b-instruct')).toEqual({
+      type: 'env-api-key',
+      provider: 'openrouter',
+    });
+    expect(RuntimeCredentialService.resolveOpenAiCompatibleEndpointRuntime('openrouter')).toEqual({
+      baseUrl: 'https://openrouter.ai/api/v1',
+      auth: { type: 'bearer', token: 'openrouter-key' },
+    });
+  });
+
+  it('resolves executable runtime endpoint auth for hosted OpenAI-compatible models', () => {
+    vi.stubEnv('OPENROUTER_API_KEY', 'openrouter-key');
+
+    expect(LlmProviderRuntimeService.resolve({
+      model: 'openrouter/meta-llama/llama-3.3-70b-instruct',
+    })).toMatchObject({
+      model: 'openrouter/meta-llama/llama-3.3-70b-instruct',
+      provider: 'openrouter',
+      apiKey: 'openrouter-key',
+      credentialSource: {
+        type: 'env-api-key',
+        provider: 'openrouter',
+      },
+      llmRuntime: {
+        endpoint: {
+          baseUrl: 'https://openrouter.ai/api/v1',
+          auth: { type: 'bearer', token: 'openrouter-key' },
+        },
+      },
+    });
+  });
+
+  it('builds model-discovery sources only for reachable local profiles and configured hosted profiles', () => {
+    vi.stubEnv('OPENROUTER_API_KEY', 'openrouter-key');
+    vi.stubEnv('HF_TOKEN', '');
+    vi.stubEnv('HUGGINGFACE_API_KEY', '');
+    vi.stubEnv('TOGETHER_API_KEY', '');
+    vi.stubEnv('GROQ_API_KEY', '');
+
+    const sources = RuntimeCredentialService.resolveOpenAiCompatibleModelDiscoverySources();
+
+    expect(sources.map((source) => source.profile.id)).toEqual([
+      'ollama',
+      'lmstudio',
+      'litellm',
+      'vllm',
+      'openrouter',
+    ]);
+    expect(sources.find((source) => source.profile.id === 'openrouter')).toMatchObject({
+      baseUrl: 'https://openrouter.ai/api/v1',
+      apiKey: 'openrouter-key',
     });
   });
 

@@ -5,6 +5,13 @@ Heddle currently has working provider adapters for:
 - OpenAI
 - Anthropic
 - Ollama
+- LM Studio
+- LiteLLM
+- vLLM
+- Hugging Face
+- OpenRouter
+- Together AI
+- Groq
 
 ## Provider Access
 
@@ -45,18 +52,55 @@ heddle --model ollama/llama3.2:latest ask "Reply with exactly: ok"
 Ollama uses the local OpenAI-compatible endpoint and does not require a hosted
 provider API key. The default endpoint is `http://127.0.0.1:11434/v1`.
 
+For other OpenAI-compatible providers, select models with the provider prefix:
+
+```bash
+heddle --model lmstudio/local-model ask "Reply with exactly: ok"
+heddle --model litellm/gpt-4o-mini ask "Reply with exactly: ok"
+heddle --model vllm/meta-llama/Llama-3.3-70B-Instruct ask "Reply with exactly: ok"
+heddle --model huggingface/meta-llama/Llama-3.3-70B-Instruct ask "Reply with exactly: ok"
+heddle --model openrouter/meta-llama/llama-3.3-70b-instruct ask "Reply with exactly: ok"
+heddle --model together/meta-llama/Llama-3.3-70B-Instruct-Turbo ask "Reply with exactly: ok"
+heddle --model groq/llama-3.3-70b-versatile ask "Reply with exactly: ok"
+```
+
+OpenAI-compatible profiles use `/chat/completions` for execution and `/models`
+for shared model picker discovery. Local servers are skipped from pickers when
+they are not running. Hosted profiles are skipped until their API key is
+configured.
+
 ## Environment Variables
 
 Supported provider API-key environment variables:
 
 - `OPENAI_API_KEY` for OpenAI models
 - `ANTHROPIC_API_KEY` for Anthropic models
+- `HF_TOKEN` or `HUGGINGFACE_API_KEY` for Hugging Face router models
+- `OPENROUTER_API_KEY` for OpenRouter models
+- `TOGETHER_API_KEY` for Together AI models
+- `GROQ_API_KEY` for Groq models
 
 Supported local-provider environment variables:
 
 - `OLLAMA_OPENAI_BASE_URL` to override the OpenAI-compatible Ollama endpoint
 - `OLLAMA_BASE_URL` to override the native Ollama base URL; Heddle appends `/v1`
 - `OLLAMA_MODEL` for scripts or explicit Ollama provider defaults
+- `LMSTUDIO_OPENAI_BASE_URL` or `LMSTUDIO_BASE_URL`; default `http://127.0.0.1:1234/v1`
+- `LMSTUDIO_MODEL` for explicit LM Studio provider defaults
+- `LITELLM_OPENAI_BASE_URL` or `LITELLM_BASE_URL`; default `http://127.0.0.1:4000/v1`
+- `LITELLM_API_KEY` when your LiteLLM gateway requires one
+- `LITELLM_MODEL` for explicit LiteLLM provider defaults
+- `VLLM_OPENAI_BASE_URL` or `VLLM_BASE_URL`; default `http://127.0.0.1:8000/v1`
+- `VLLM_API_KEY` when your vLLM server requires one
+- `VLLM_MODEL` for explicit vLLM provider defaults
+
+Supported hosted gateway endpoint overrides:
+
+- `HUGGINGFACE_OPENAI_BASE_URL` or `HF_OPENAI_BASE_URL`; default `https://router.huggingface.co/v1`
+- `OPENROUTER_OPENAI_BASE_URL` or `OPENROUTER_BASE_URL`; default `https://openrouter.ai/api/v1`
+- `TOGETHER_OPENAI_BASE_URL` or `TOGETHER_BASE_URL`; default `https://api.together.ai/v1`
+- `GROQ_OPENAI_BASE_URL` or `GROQ_BASE_URL`; default `https://api.groq.com/openai/v1`
+- `HUGGINGFACE_MODEL`, `OPENROUTER_MODEL`, `TOGETHER_MODEL`, or `GROQ_MODEL` for explicit provider defaults
 
 For local development inside this repository, fallback env vars are also accepted:
 
@@ -78,9 +122,10 @@ Current defaults:
 - OpenAI: `gpt-5.4`
 - Anthropic: `claude-sonnet-4-6`
 
-Ollama has no hardcoded default model because installed local model names vary
-by machine. Select an installed model with `ollama/<model>` or set
-`OLLAMA_MODEL`.
+OpenAI-compatible profiles have no hardcoded default model because installed,
+served, and routed model names vary by machine and account. Select a model with
+the provider prefix or set the matching `*_MODEL` variable when a script needs
+a provider default.
 
 ## Built-In Model Shortlist
 
@@ -109,6 +154,8 @@ You can select a model with CLI flags or chat commands:
 heddle --model gpt-5.4-mini
 heddle chat --model claude-3-5-haiku-latest
 heddle --model ollama/llama3.2:latest ask "Summarize this repository"
+heddle --model lmstudio/local-model ask "Summarize this repository"
+heddle --model openrouter/meta-llama/llama-3.3-70b-instruct ask "Summarize this repository"
 ```
 
 In chat, you can also use:
@@ -118,19 +165,49 @@ In chat, you can also use:
 - `/model set <query>`
 - `/model <name>`
 
-When Ollama is running, `/model set <query>` and the web model selector include
-installed local Ollama models from the local Ollama API. Pick one from the
-selector, or type it directly with the `ollama/` prefix:
+When a profiled provider is reachable, `/model set <query>` and the web model
+selector include discovered models from that provider. Ollama uses the native
+local API, and other OpenAI-compatible profiles use `/models`. Pick one from
+the selector, or type it directly with the provider prefix:
 
 ```text
 /model ollama/llama3.2:latest
+/model lmstudio/local-model
+/model openrouter/meta-llama/llama-3.3-70b-instruct
 ```
+
+## OpenAI-Compatible Smoke Tests
+
+Use Ollama as the local baseline when it is installed:
+
+```bash
+yarn smoke:ollama
+```
+
+Other provider smoke commands are optional and skip cleanly when the local
+server or hosted API key is unavailable:
+
+```bash
+yarn smoke:lmstudio
+yarn smoke:litellm
+yarn smoke:vllm
+yarn smoke:huggingface
+yarn smoke:openrouter
+yarn smoke:together
+yarn smoke:groq
+```
+
+For local servers, start the provider first and make sure at least one chat
+model is loaded or served. For hosted providers, set the relevant API key and
+optionally the `*_MODEL` variable if `/models` does not return the model you
+want to test.
 
 ## Local Model Caveats
 
-Local model behavior depends on the model family, parameter size, quantization,
-and the hardware running Ollama. Some smaller or older local models are useful
-for chat and quick experiments but are not reliable at coding-agent tool use.
+Local and gateway model behavior depends on the model family, parameter size,
+quantization, provider routing, and the hardware or service running the model.
+Some smaller, older, or aggressively routed models are useful for chat and
+quick experiments but are not reliable at coding-agent tool use.
 
 Watch especially for:
 
@@ -185,6 +262,8 @@ Use `OPENAI_API_KEY` for other OpenAI Platform models or features that require P
 
 - Provider selection is inferred from the model name prefix.
 - Ollama model names are recognized with `ollama/` or `ollama:` prefixes.
+- OpenAI-compatible profile prefixes are `ollama/`, `lmstudio/`, `litellm/`,
+  `vllm/`, `huggingface/` or `hf/`, `openrouter/`, `together/`, and `groq/`.
 - Gemini model names are recognized by provider inference, but a Google adapter is not wired yet.
 - You can pass another supported model name with `--model` if the relevant provider adapter can handle it.
 - Hosted web search and image viewing currently require Platform API-key mode for OpenAI.

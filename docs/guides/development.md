@@ -122,6 +122,24 @@ default when the selected model does not return them; pass
 or model with `OLLAMA_OPENAI_BASE_URL`, `OLLAMA_MODEL`, or
 `OLLAMA_SMOKE_TIMEOUT_MS`, or pass `--base-url`, `--model`, and `--timeout-ms`.
 
+To inspect other OpenAI-compatible profiles, start the local server or configure
+the hosted API key, then run one of the optional smoke commands:
+
+```bash
+yarn smoke:lmstudio
+yarn smoke:litellm
+yarn smoke:vllm
+yarn smoke:huggingface
+yarn smoke:openrouter
+yarn smoke:together
+yarn smoke:groq
+```
+
+These commands auto-select the first non-embedding model from `/models` unless
+you set the matching `*_MODEL` variable or pass `--model`. They skip cleanly
+when the provider is unavailable, so normal local verification can run on a
+machine that only has Ollama installed.
+
 ### Control plane
 
 For control-plane development, run the backend and frontend separately:

@@ -1,17 +1,19 @@
+import { OpenAiCompatibleModelName } from '../openai-compatible/openai-compatible-model.js';
+import { OpenAiCompatibleProviderProfileService } from '../openai-compatible/openai-compatible-profiles.js';
+
+const OLLAMA_PROFILE = OpenAiCompatibleProviderProfileService.get('ollama');
+
 /**
- * Ollama models are selected in Heddle with an `ollama/` or `ollama:` prefix,
- * while Ollama's OpenAI-compatible endpoint expects the local model name.
+ * Backwards-compatible Ollama model-name facade. The implementation lives in
+ * the OpenAI-compatible profile boundary so every compatible provider follows
+ * the same prefix rules.
  */
 export class OllamaModelName {
   static toProviderModel(model: string): string {
-    return model.trim().replace(/^ollama[/:]/i, '');
+    return OpenAiCompatibleModelName.toProviderModel(OLLAMA_PROFILE, model);
   }
 
   static toHeddleModel(model: string): string {
-    const providerModel = OllamaModelName.toProviderModel(model);
-    if (!providerModel) {
-      throw new Error('Ollama model name is required.');
-    }
-    return `ollama/${providerModel}`;
+    return OpenAiCompatibleModelName.toHeddleModel(OLLAMA_PROFILE, model);
   }
 }

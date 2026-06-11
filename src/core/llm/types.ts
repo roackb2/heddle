@@ -11,7 +11,18 @@ export type LlmStreamEvent =
   | { type: 'reasoning_summary.delta'; delta: string }
   | { type: 'reasoning_summary.done'; text: string };
 
-export type LlmProvider = 'openai' | 'anthropic' | 'google' | 'ollama' | 'huggingface';
+export type LlmProvider =
+  | 'openai'
+  | 'anthropic'
+  | 'google'
+  | 'ollama'
+  | 'lmstudio'
+  | 'litellm'
+  | 'vllm'
+  | 'huggingface'
+  | 'openrouter'
+  | 'together'
+  | 'groq';
 
 export type ReasoningEffort = 'low' | 'medium' | 'high' | 'ultrahigh';
 

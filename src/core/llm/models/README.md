@@ -9,7 +9,8 @@ This package owns:
 - the curated list of models Heddle exposes in user-facing pickers and command
   help;
 - the shared model-options contract consumed by control-plane clients, including
-  provider-owned local discovery such as installed Ollama models;
+  provider-owned discovery such as installed Ollama models and reachable
+  OpenAI-compatible provider profiles;
 - provider-specific model allowlists, including OpenAI account sign-in support;
 - reasoning-effort support, defaults, and per-model supported effort levels;
 - model-specific system selections such as compaction and session-title models;

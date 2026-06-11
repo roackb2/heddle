@@ -14,6 +14,9 @@ choosing providers themselves.
 - `registry/` owns provider inference and provider-adapter lookup.
 - `adapters/<provider>/` owns SDK-specific payload conversion, streaming, and
   credential wiring for one provider.
+- `adapters/openai-compatible/` owns the shared provider-profile family for
+  `/chat/completions` services such as Ollama, LM Studio, LiteLLM, vLLM,
+  Hugging Face, OpenRouter, Together, and Groq.
 - `models/` owns the curated model catalog and model policy decisions used by
   hosts.
 

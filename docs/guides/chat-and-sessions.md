@@ -111,12 +111,14 @@ Useful chat commands:
 - `/drift off`: disable CyberLoop semantic drift detection
 - `!<command>`: run a shell command directly in chat
 
-When a local Ollama server is running, `/model set <query>` includes installed
-Ollama chat models discovered from the local Ollama API. You can also switch
-directly with the `ollama/` prefix, for example:
+When a profiled local server or hosted gateway is reachable, `/model set
+<query>` includes models discovered from that provider. You can also switch
+directly with the provider prefix, for example:
 
 ```text
 /model ollama/llama3.2:latest
+/model lmstudio/local-model
+/model openrouter/meta-llama/llama-3.3-70b-instruct
 ```
 
 Local models vary in tool-calling quality. If a local model ignores tool

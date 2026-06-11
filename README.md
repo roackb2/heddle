@@ -14,7 +14,7 @@ Official website: [heddleagent.com](https://heddleagent.com)
 - [See It In Action](#see-it-in-action)
 - [Quick Start](#quick-start)
 - [Core Workflows](#core-workflows)
-- [Local Models](#local-models)
+- [Model Providers](#model-providers)
 - [Install](#install)
 - [Requirements](#requirements)
 - [Optional CyberLoop Integration](#optional-cyberloop-integration)
@@ -42,7 +42,7 @@ It is a good fit when you want to:
 - activate standard Agent Skills only when a workspace should expose them
 - connect configured MCP servers such as Notion, Anytype, GitHub, or other tools
 - opt into Browser Automation for rendered page inspection and user-requested web workflows
-- run against hosted models or local Ollama models through Heddle's provider adapters
+- run against hosted models, local Ollama, and OpenAI-compatible providers through Heddle's provider adapters
 - build custom hosts on top of Heddle's runtime APIs
 
 Heddle is probably not the right fit if you only want a very simple one-shot prompt runner and do not care about sessions, persistence, observability, or operator control.
@@ -128,7 +128,7 @@ ollama list
 heddle --model ollama/llama3.2:latest ask "Reply with exactly: ok"
 ```
 
-Ollama does not require a hosted provider API key. Heddle uses Ollama's local OpenAI-compatible endpoint at `http://127.0.0.1:11434/v1` by default.
+Ollama does not require a hosted provider API key. Heddle uses Ollama's local OpenAI-compatible endpoint at `http://127.0.0.1:11434/v1` by default. Heddle also supports OpenAI-compatible providers such as LM Studio, LiteLLM, vLLM, Hugging Face, OpenRouter, Together AI, and Groq; see [Model Providers](#model-providers).
 
 OpenAI account sign-in is an experimental, user-selected transport for Heddle. It is not official OpenAI support, and Heddle is not affiliated with, endorsed by, or sponsored by OpenAI. Use of OpenAI services remains subject to OpenAI's terms and policies.
 
@@ -204,9 +204,22 @@ The terminal composer supports multiline prompts, prompt undo/redo, prompt histo
 
 More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
 
-## Local Models
+## Model Providers
 
-Heddle can run with local Ollama models as well as hosted OpenAI and Anthropic models. This is useful when you want a local-first workflow, want to experiment without sending model prompts to a hosted provider, or want to test agent behavior against a specific local model.
+Heddle is not tied to one model vendor. It supports hosted frontier models, local models, and OpenAI-compatible gateways through provider adapters. This lets you choose the right tradeoff for each run: strongest hosted model, private local model, self-hosted inference server, or a routing gateway.
+
+Supported provider families:
+
+- OpenAI, including OpenAI account sign-in and Platform API-key mode
+- Anthropic Claude via API key
+- Ollama local models with the `ollama/` prefix
+- LM Studio local server models with the `lmstudio/` prefix
+- LiteLLM gateway models with the `litellm/` prefix
+- vLLM self-hosted OpenAI-compatible models with the `vllm/` prefix
+- Hugging Face router models with the `huggingface/` or `hf/` prefix
+- OpenRouter models with the `openrouter/` prefix
+- Together AI models with the `together/` prefix
+- Groq models with the `groq/` prefix
 
 Start Ollama, pull or install a chat-capable model, then choose it with the `ollama/` model prefix:
 
@@ -216,14 +229,21 @@ heddle --model ollama/llama3.2:latest ask "Summarize this repository"
 heddle chat --model ollama/llama3.2:latest
 ```
 
-Inside terminal chat, use `/model set <query>` to search available models. When Ollama is running, the terminal picker and browser model selector include installed Ollama chat models discovered from the local Ollama API, so you do not have to remember every model name.
+For other OpenAI-compatible providers, select models with their profile prefix:
+
+```bash
+heddle --model lmstudio/local-model ask "Reply with exactly: ok"
+heddle --model openrouter/meta-llama/llama-3.3-70b-instruct ask "Summarize this repository"
+```
+
+Inside terminal chat, use `/model set <query>` to search available models. The terminal picker and browser model selector use the same model-options service: Ollama is discovered from the local Ollama API, and other OpenAI-compatible profiles are discovered from `/models` when their local server is running or their hosted API key is configured.
 
 ```text
 /model set llama
 /model ollama/llama3.2:latest
 ```
 
-Local model quality varies. Some smaller or older local models are not reliable at tool calling, may ignore tool results, or may produce confident but wrong repository answers. Use manual review, keep approval prompts enabled for risky work, and prefer stronger models for edits that matter.
+Local and gateway model quality varies. Some smaller, older, or provider-routed models are not reliable at tool calling, may ignore tool results, or may produce confident but wrong repository answers. Use manual review, keep approval prompts enabled for risky work, and prefer stronger models for edits that matter.
 
 More: [Providers and models](docs/reference/providers-and-models.md)
 
@@ -448,7 +468,8 @@ The installed CLI command is `heddle`.
 - access to at least one supported provider:
   - OpenAI account sign-in with `heddle auth login openai`, or `OPENAI_API_KEY`
   - `ANTHROPIC_API_KEY` for Anthropic models
-  - a local Ollama server for `ollama/<model>` models
+  - a local Ollama, LM Studio, LiteLLM, or vLLM server for local OpenAI-compatible models
+  - a hosted gateway API key such as `HF_TOKEN`, `OPENROUTER_API_KEY`, `TOGETHER_API_KEY`, or `GROQ_API_KEY`
 
 Heddle intentionally does not support Anthropic consumer subscription OAuth. Use Anthropic API-key access unless Anthropic provides an approved third-party auth route.
 

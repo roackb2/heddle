@@ -1,11 +1,13 @@
 # Ollama Adapter Boundary
 
-This package owns Heddle's Ollama provider integration.
+This package keeps Heddle's public Ollama integration names and Ollama-native
+model discovery facade. Shared `/chat/completions` transport now lives in
+`src/core/llm/adapters/openai-compatible`.
 
 - `OllamaProviderAdapter` registers the provider and enforces explicit model
-  selection through `ollama/<model>` or `OLLAMA_MODEL`.
-- `OllamaAdapter` translates Heddle chat requests to Ollama's
-  OpenAI-compatible `/v1/chat/completions` endpoint.
+  selection through `ollama/<model>` or `OLLAMA_MODEL`, while delegating shared
+  transport to the OpenAI-compatible adapter.
+- `OllamaAdapter` remains as the public Ollama adapter export for compatibility.
 - `OllamaModelDiscoveryService` discovers installed local models through
   Ollama's native `/api/tags` endpoint for shared model pickers.
 
