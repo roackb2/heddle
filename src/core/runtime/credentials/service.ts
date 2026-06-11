@@ -10,6 +10,8 @@ import type { ApiKeyRuntime, ProviderCredentialSource } from './types.js';
  * Resolves runtime credential sources for provider-backed agent execution.
  */
 export class RuntimeCredentialService {
+  static readonly DEFAULT_OLLAMA_OPENAI_BASE_URL = 'http://127.0.0.1:11434/v1';
+
   static resolveProviderApiKey(provider: LlmProvider): string | undefined {
     switch (provider) {
       case 'openai':
@@ -25,6 +27,10 @@ export class RuntimeCredentialService {
 
   static resolveApiKeyForModel(model: string, runtime?: ApiKeyRuntime): string | undefined {
     const source = this.resolveCredentialSourceForModel(model, runtime);
+
+    if (source.type === 'local-endpoint') {
+      return undefined;
+    }
 
     if (source.type === 'explicit-api-key') {
       return runtime?.apiKey;
@@ -60,6 +66,11 @@ export class RuntimeCredentialService {
     runtime?: ApiKeyRuntime,
   ): ProviderCredentialSource {
     const provider = LlmAdapterService.inferProvider(model);
+    const localEndpointSource = this.resolveLocalEndpointCredentialSource(provider);
+    if (localEndpointSource) {
+      return localEndpointSource;
+    }
+
     if (runtime?.apiKey && runtime.apiKeyProvider === 'explicit') {
       return { type: 'explicit-api-key' };
     }
@@ -97,6 +108,18 @@ export class RuntimeCredentialService {
     return { type: 'missing', provider };
   }
 
+  static resolveLocalEndpointCredentialSource(provider: LlmProvider): Extract<ProviderCredentialSource, { type: 'local-endpoint' }> | undefined {
+    if (provider !== 'ollama') {
+      return undefined;
+    }
+
+    return {
+      type: 'local-endpoint',
+      provider,
+      baseUrl: RuntimeCredentialService.resolveOllamaOpenAiBaseUrl(),
+    };
+  }
+
   static formatMissingCredentialMessage(model: string): string {
     const provider = LlmAdapterService.inferProvider(model);
     if (provider === 'openai') {
@@ -112,5 +135,18 @@ export class RuntimeCredentialService {
 
   private static firstDefinedNonEmpty(...values: Array<string | undefined>): string | undefined {
     return values.find((value) => typeof value === 'string' && value.trim().length > 0);
+  }
+
+  private static resolveOllamaOpenAiBaseUrl(): string {
+    const configured = RuntimeCredentialService.firstDefinedNonEmpty(
+      process.env.OLLAMA_OPENAI_BASE_URL,
+      process.env.OLLAMA_BASE_URL,
+    );
+    if (!configured) {
+      return RuntimeCredentialService.DEFAULT_OLLAMA_OPENAI_BASE_URL;
+    }
+
+    const trimmed = configured.replace(/\/+$/, '');
+    return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`;
   }
 }

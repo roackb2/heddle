@@ -106,18 +106,21 @@ yarn chat:dev:anthropic
 
 These rely on the personal fallback environment variables described in [Providers and models](../reference/providers-and-models.md).
 
-To inspect a local Ollama server's OpenAI-compatible surface without enabling
-Ollama as a Heddle runtime provider, run the opt-in smoke command:
+To inspect a local Ollama server's OpenAI-compatible surface, run the opt-in
+smoke command:
 
 ```bash
 yarn smoke:ollama
 ```
 
-The smoke command checks `http://127.0.0.1:11434/v1/models`, then runs bounded
-chat-completions and tool-call requests with explicit timeouts. Override the
-defaults with `OLLAMA_OPENAI_BASE_URL`, `OLLAMA_MODEL`, or
-`OLLAMA_SMOKE_TIMEOUT_MS`, or pass `--base-url`, `--model`, and
-`--timeout-ms`.
+The smoke command discovers an installed non-embedding model from Ollama's local
+model list when `OLLAMA_MODEL` or `--model` is not provided, then checks
+`http://127.0.0.1:11434/v1/models` and runs bounded chat-completions and
+tool-call requests with explicit timeouts. Tool calls are reported as WARN by
+default when the selected model does not return them; pass
+`--require-tool-calls` to make that capability mandatory. Override the endpoint
+or model with `OLLAMA_OPENAI_BASE_URL`, `OLLAMA_MODEL`, or
+`OLLAMA_SMOKE_TIMEOUT_MS`, or pass `--base-url`, `--model`, and `--timeout-ms`.
 
 ### Control plane
 

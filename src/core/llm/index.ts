@@ -1,6 +1,8 @@
 export { LlmAdapterService } from './service.js';
 export { AnthropicAdapter, AnthropicProviderAdapter } from './adapters/anthropic/index.js';
 export type { AnthropicAdapterOptions } from './adapters/anthropic/index.js';
+export { OllamaAdapter, OllamaProviderAdapter } from './adapters/ollama/index.js';
+export type { OllamaAdapterOptions } from './adapters/ollama/index.js';
 export {
   OpenAiAdapter,
   OpenAiCodexSseService,
@@ -29,6 +31,8 @@ export type {
   LlmAdapterCreateInput,
   LlmAdapterInfo,
   LlmCredentialContext,
+  LlmProviderEndpointAuth,
+  LlmProviderEndpointRuntime,
   LlmProvider,
   LlmProviderResolutionInput,
   LlmResponse,

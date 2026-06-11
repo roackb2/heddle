@@ -4,6 +4,7 @@ import {
   type ApiKeyRuntime,
   type ProviderCredentialSource,
 } from '@/core/runtime/credentials/index.js';
+import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
 import { ModelPolicyService, type ModelCredentialMode } from '@/core/llm/models/index.js';
 import { CompactionText } from '../text.js';
 import type { ConversationCompactionOptions } from '../types.js';
@@ -42,12 +43,16 @@ export class ConversationArchiveSummarizer {
           credentialSource: options.summarizer?.credentialSource,
         }),
       });
-    const apiKey = options.summarizer?.apiKey ?? RuntimeCredentialService.resolveApiKeyForModel(model);
+    const providerRuntime = LlmProviderRuntimeService.resolve({
+      model,
+      apiKey: options.summarizer?.apiKey,
+    });
+    const apiKey = options.summarizer?.apiKey ?? providerRuntime.apiKey;
     const summarizerCredentialRuntime: ApiKeyRuntime = {
       apiKey,
       apiKeyProvider: options.summarizer?.apiKey ? 'explicit' : apiKey ? provider : undefined,
     };
-    if (!RuntimeCredentialService.hasCredentialForModel(model, summarizerCredentialRuntime)) {
+    if (providerRuntime.credentialSource.type === 'missing' || !RuntimeCredentialService.hasCredentialForModel(model, summarizerCredentialRuntime)) {
       return { model };
     }
 
@@ -56,6 +61,7 @@ export class ConversationArchiveSummarizer {
       llm: LlmAdapterService.create({
         model,
         credentials: { apiKey },
+        runtime: providerRuntime.llmRuntime,
       }),
     };
   }

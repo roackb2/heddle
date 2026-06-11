@@ -164,6 +164,34 @@ describe('chat turn preparation modules', () => {
     })).toThrow('Missing Anthropic credential. Set ANTHROPIC_API_KEY for Anthropic models.');
   });
 
+  it('resolves Ollama chat turns as local endpoint runtime without hosted credentials', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'openai-key');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'anthropic-key');
+    vi.stubEnv('OLLAMA_OPENAI_BASE_URL', 'http://localhost:11434/v1');
+    const root = mkdtempSync(join(tmpdir(), 'heddle-turn-ollama-'));
+
+    const runtime = ConversationTurnRuntimeResolver.resolve({
+      config: {
+        stateRoot: join(root, '.heddle'),
+        env: { OPENAI_MODEL: undefined, ANTHROPIC_MODEL: undefined },
+      },
+      session: { model: 'ollama/llama3.2:latest' },
+    });
+
+    expect(runtime.model).toBe('ollama/llama3.2:latest');
+    expect(runtime.provider).toBe('ollama');
+    expect(runtime.apiKey).toBeUndefined();
+    expect(runtime.providerCredentialSource).toEqual({
+      type: 'local-endpoint',
+      provider: 'ollama',
+      baseUrl: 'http://localhost:11434/v1',
+    });
+    expect(runtime.llm.info).toMatchObject({
+      provider: 'ollama',
+      model: 'ollama/llama3.2:latest',
+    });
+  });
+
   it('prepares ordinary turn context with runtime, tool bundle, and default lease owner', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-context-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');

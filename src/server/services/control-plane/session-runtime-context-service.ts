@@ -6,7 +6,7 @@ import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import { AutonomyPermissionModeService } from '@/core/approvals/index.js';
 import { ModelCatalogService, ModelPolicyService } from '@/core/llm/models/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
-import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
+import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
 import type { ChatSessionView, ControlPlaneSessionRuntimeContext } from '@/server/control-plane-types.js';
 import { ControlPlaneSessionDriftService } from './session-drift-service.js';
 
@@ -58,7 +58,12 @@ export class ControlPlaneSessionRuntimeContextService {
     const session = sessions.require(args.sessionId);
     const model = session.model ?? args.model ?? DEFAULT_OPENAI_MODEL;
     const estimatedInputTokens = session.context?.request?.usage?.inputTokens ?? session.context?.request?.estimatedTokens;
-    const credentialSource = RuntimeCredentialService.resolveCredentialSourceForModel(model, args);
+    const providerRuntime = LlmProviderRuntimeService.resolve({
+      ...args,
+      model,
+      reasoningEffort: session.reasoningEffort,
+    });
+    const credentialSource = providerRuntime.credentialSource;
     const projectConfig = ProjectConfigService.read(args.workspaceRoot);
     const permissionMode = AutonomyPermissionModeService.resolveMode({
       config: projectConfig,

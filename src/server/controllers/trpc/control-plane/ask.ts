@@ -6,11 +6,11 @@ import {
   createLogger,
   TraceConsoleFormatter,
   AgentLoopRuntimeService,
-  RuntimeCredentialService,
   type RunResult,
 } from '@/index.js';
 import { MemoryCatalogService } from '@/core/memory/catalog.js';
 import { MemoryMaintenanceIntegrationService } from '@/core/memory/maintenance-integration.js';
+import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
 
 // Legacy control-plane one-shot ask path. New ask callers should create a
 // `retention: "one_off"` chat session and submit through the session turn API
@@ -38,14 +38,17 @@ export class ControlPlaneAskController {
     const maxSteps = args.maxSteps ?? ControlPlaneAskController.parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 100;
     const logger = createLogger({ pretty: true, level: 'debug' });
     const memoryDir = join(args.stateRoot, 'memory');
-    const apiKey = RuntimeCredentialService.resolveApiKeyForModel(model, {
+    const providerRuntime = LlmProviderRuntimeService.resolve({
+      model,
       apiKey: args.apiKey,
-      apiKeyProvider: args.apiKey ? 'explicit' : undefined,
       preferApiKey: args.preferApiKey,
     });
+    LlmProviderRuntimeService.assertRunnable(providerRuntime);
+    const apiKey = args.apiKey ?? providerRuntime.apiKey;
     const llm = LlmAdapterService.create({
       model,
       credentials: { apiKey },
+      runtime: providerRuntime.llmRuntime,
     });
 
     const result = await AgentLoopRuntimeService.run({

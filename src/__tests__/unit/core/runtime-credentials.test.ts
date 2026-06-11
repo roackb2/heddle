@@ -34,6 +34,37 @@ describe('RuntimeCredentialService', () => {
     });
   });
 
+  it('resolves Ollama as a local endpoint instead of reusing hosted provider keys', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'openai-key');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'anthropic-key');
+    vi.stubEnv('OLLAMA_OPENAI_BASE_URL', 'http://127.0.0.1:11434/v1/');
+
+    expect(RuntimeCredentialService.resolveApiKeyForModel('ollama/llama3.2:latest', {
+      apiKey: 'explicit-key',
+      apiKeyProvider: 'explicit',
+    })).toBeUndefined();
+    expect(RuntimeCredentialService.resolveCredentialSourceForModel('ollama/llama3.2:latest', {
+      apiKey: 'explicit-key',
+      apiKeyProvider: 'explicit',
+    })).toEqual({
+      type: 'local-endpoint',
+      provider: 'ollama',
+      baseUrl: 'http://127.0.0.1:11434/v1',
+    });
+    expect(RuntimeCredentialService.hasCredentialForModel('ollama/llama3.2:latest')).toBe(true);
+  });
+
+  it('normalizes OLLAMA_BASE_URL to the OpenAI-compatible v1 endpoint', () => {
+    vi.stubEnv('OLLAMA_OPENAI_BASE_URL', '');
+    vi.stubEnv('OLLAMA_BASE_URL', 'http://localhost:11434/');
+
+    expect(RuntimeCredentialService.resolveCredentialSourceForModel('ollama/qwen3:8b')).toEqual({
+      type: 'local-endpoint',
+      provider: 'ollama',
+      baseUrl: 'http://localhost:11434/v1',
+    });
+  });
+
   it('resolves the provider-specific key for the requested model', () => {
     vi.stubEnv('OPENAI_API_KEY', 'openai-key');
     vi.stubEnv('ANTHROPIC_API_KEY', 'anthropic-key');

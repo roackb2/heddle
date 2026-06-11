@@ -15,6 +15,7 @@ describe('llm adapter factory', () => {
     expect(LlmAdapterService.inferProvider('gpt-5.1-codex')).toBe('openai');
     expect(LlmAdapterService.inferProvider('claude-sonnet-4-6')).toBe('anthropic');
     expect(LlmAdapterService.inferProvider('gemini-2.5-pro')).toBe('google');
+    expect(LlmAdapterService.inferProvider('ollama/llama3.2:latest')).toBe('ollama');
   });
 
   it('prefers an explicit provider over model inference', () => {
@@ -93,6 +94,105 @@ describe('llm adapter factory', () => {
         systemMessages: true,
         reasoningSummaries: false,
         parallelToolCalls: false,
+      },
+    });
+  });
+
+  it('returns an Ollama adapter with provider metadata for local models', () => {
+    const adapter = LlmAdapterService.create({
+      model: 'ollama/llama3.2:latest',
+      runtime: {
+        endpoint: {
+          baseUrl: 'http://127.0.0.1:11434/v1',
+          auth: { type: 'none' },
+        },
+      },
+    });
+
+    expect(adapter.info).toEqual({
+      provider: 'ollama',
+      model: 'ollama/llama3.2:latest',
+      capabilities: {
+        toolCalls: true,
+        systemMessages: true,
+        reasoningSummaries: false,
+        parallelToolCalls: false,
+      },
+    });
+  });
+
+  it('sends Ollama chat-completions requests with provider-local model names and parses tool calls', async () => {
+    const requests: Array<{ url: string; body: unknown }> = [];
+    const adapter = LlmAdapterService.create({
+      model: 'ollama/llama3.2:latest',
+      runtime: {
+        endpoint: {
+          baseUrl: 'http://ollama.test/v1',
+          auth: { type: 'none' },
+        },
+        fetchImpl: (async (url, init) => {
+          requests.push({
+            url: String(url),
+            body: JSON.parse(String((init as RequestInit).body)),
+          });
+          return new Response(JSON.stringify({
+            choices: [{
+              message: {
+                content: '',
+                tool_calls: [{
+                  id: 'call_1',
+                  type: 'function',
+                  function: {
+                    name: 'add',
+                    arguments: '{"a":2,"b":3}',
+                  },
+                }],
+              },
+            }],
+            usage: {
+              prompt_tokens: 10,
+              completion_tokens: 4,
+              total_tokens: 14,
+            },
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }) as typeof fetch,
+      },
+    });
+
+    const result = await adapter.chat(
+      [{ role: 'user', content: 'add 2 and 3' }],
+      [{
+        name: 'add',
+        description: 'Add two numbers.',
+        parameters: {
+          type: 'object',
+          properties: {
+            a: { type: 'number' },
+            b: { type: 'number' },
+          },
+          required: ['a', 'b'],
+        },
+        execute: async () => ({ ok: true, output: 5 }),
+      }],
+    );
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.url).toBe('http://ollama.test/v1/chat/completions');
+    expect(requests[0]?.body).toMatchObject({
+      model: 'llama3.2:latest',
+      tool_choice: 'auto',
+    });
+    expect(result).toEqual({
+      content: undefined,
+      toolCalls: [{ id: 'call_1', tool: 'add', input: { a: 2, b: 3 } }],
+      usage: {
+        inputTokens: 10,
+        outputTokens: 4,
+        totalTokens: 14,
+        requests: 1,
       },
     });
   });

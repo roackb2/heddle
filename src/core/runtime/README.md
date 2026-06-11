@@ -26,6 +26,8 @@ coordination that sit around the lower-level agent loop.
 - `loop/`: evented programmatic run service, loop event contracts, and
   checkpoint state helpers.
 - `credentials/`: provider credential source resolution for runtime execution.
+- `provider-runtime/`: provider, credential-source, and adapter-runtime
+  resolution for selected models.
 - `tools/`: default runtime tool bundle assembly.
 - `workspaces/`: workspace catalog service, repository, types, and schemas.
 - `daemon/`: daemon registry service, host resolver, message formatter, types,

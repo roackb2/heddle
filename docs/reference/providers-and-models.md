@@ -4,6 +4,7 @@ Heddle currently has working provider adapters for:
 
 - OpenAI
 - Anthropic
+- Ollama
 
 ## Provider Access
 
@@ -33,12 +34,28 @@ export ANTHROPIC_API_KEY=your_key_here
 
 Heddle does not support Anthropic consumer subscription OAuth. That path is intentionally deferred unless Anthropic documents or approves a third-party auth route.
 
+For Ollama, install and start Ollama locally, then select an installed model
+with the `ollama/` prefix:
+
+```bash
+heddle --model ollama/llama3.2:latest ask "Reply with exactly: ok"
+```
+
+Ollama uses the local OpenAI-compatible endpoint and does not require a hosted
+provider API key. The default endpoint is `http://127.0.0.1:11434/v1`.
+
 ## Environment Variables
 
 Supported provider API-key environment variables:
 
 - `OPENAI_API_KEY` for OpenAI models
 - `ANTHROPIC_API_KEY` for Anthropic models
+
+Supported local-provider environment variables:
+
+- `OLLAMA_OPENAI_BASE_URL` to override the OpenAI-compatible Ollama endpoint
+- `OLLAMA_BASE_URL` to override the native Ollama base URL; Heddle appends `/v1`
+- `OLLAMA_MODEL` for scripts or explicit Ollama provider defaults
 
 For local development inside this repository, fallback env vars are also accepted:
 
@@ -59,6 +76,10 @@ Current defaults:
 
 - OpenAI: `gpt-5.4`
 - Anthropic: `claude-sonnet-4-6`
+
+Ollama has no hardcoded default model because installed local model names vary
+by machine. Select an installed model with `ollama/<model>` or set
+`OLLAMA_MODEL`.
 
 ## Built-In Model Shortlist
 
@@ -86,6 +107,7 @@ You can select a model with CLI flags or chat commands:
 ```bash
 heddle --model gpt-5.4-mini
 heddle chat --model claude-3-5-haiku-latest
+heddle --model ollama/llama3.2:latest ask "Summarize this repository"
 ```
 
 In chat, you can also use:
@@ -112,7 +134,7 @@ Inside terminal chat, the same auth surface is available as slash commands:
 - `/auth login openai`
 - `/auth logout openai`
 
-The chat footer shows the active credential source for the selected model, such as `auth=openai-oauth`, `auth=openai-key`, or `auth=missing-openai`.
+The chat footer shows the active credential source for the selected model, such as `auth=openai-oauth`, `auth=openai-key`, `auth=ollama-local`, or `auth=missing-openai`.
 
 In the browser control plane, the same auth indicator appears in the session composer footer so it stays visible without taking space away from the conversation header.
 
@@ -136,6 +158,7 @@ Use `OPENAI_API_KEY` for other OpenAI Platform models or features that require P
 ## Notes
 
 - Provider selection is inferred from the model name prefix.
+- Ollama model names are recognized with `ollama/` or `ollama:` prefixes.
 - Gemini model names are recognized by provider inference, but a Google adapter is not wired yet.
 - You can pass another supported model name with `--model` if the relevant provider adapter can handle it.
 - Hosted web search and image viewing currently require Platform API-key mode for OpenAI.

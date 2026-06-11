@@ -1,9 +1,7 @@
 import { join } from 'node:path';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
-import {
-  RuntimeCredentialService,
-} from '@/core/runtime/credentials/index.js';
+import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
 import { appendAwarenessDomainSystemContext } from '@/core/awareness/domain-prompt.js';
 import { MemoryCatalogService } from '@/core/memory/catalog.js';
 import type { ApiKeyRuntime } from '@/core/runtime/credentials/index.js';
@@ -27,26 +25,21 @@ export class ConversationTurnRuntimeResolver {
       sessionModel: session.model,
       env: config.env,
     });
-    const provider = LlmAdapterService.inferProvider(model);
     const credentialRuntime = ConversationTurnRuntimeResolver.credentialRuntime(config);
-    const apiKey = config.apiKey ?? RuntimeCredentialService.resolveApiKeyForModel(model, credentialRuntime);
-    const providerCredentialSource = RuntimeCredentialService.resolveCredentialSourceForModel(model, {
+    const providerRuntime = LlmProviderRuntimeService.resolve({
       ...credentialRuntime,
-      apiKey,
-      apiKeyProvider: config.apiKey ? 'explicit' : apiKey ? provider : undefined,
-    });
-
-    ConversationTurnRuntimeResolver.assertCredential({
       model,
-      credentialRuntime,
+      reasoningEffort: session.reasoningEffort,
     });
+    LlmProviderRuntimeService.assertRunnable(providerRuntime);
 
+    const apiKey = config.apiKey ?? providerRuntime.apiKey;
     const memoryDir = join(config.stateRoot, 'memory');
     return {
       model,
-      provider,
+      provider: providerRuntime.provider,
       apiKey,
-      providerCredentialSource,
+      providerCredentialSource: providerRuntime.credentialSource,
       memoryDir,
       systemContext: appendAwarenessDomainSystemContext(new MemoryCatalogService(memoryDir).appendCatalogSystemContext({
         systemContext: config.systemContext,
@@ -59,6 +52,7 @@ export class ConversationTurnRuntimeResolver {
           credentialStorePath: config.credentialStorePath,
         },
         runtime: {
+          ...providerRuntime.llmRuntime,
           reasoningEffort: session.reasoningEffort,
         },
       }),
@@ -72,13 +66,5 @@ export class ConversationTurnRuntimeResolver {
       credentialStorePath: config.credentialStorePath,
       preferApiKey: config.preferApiKey,
     };
-  }
-
-  private static assertCredential(args: { model: string; credentialRuntime: ApiKeyRuntime }) {
-    const hasCredential = RuntimeCredentialService.hasCredentialForModel(args.model, args.credentialRuntime);
-
-    if (!hasCredential) {
-      throw new Error(RuntimeCredentialService.formatMissingCredentialMessage(args.model));
-    }
   }
 }

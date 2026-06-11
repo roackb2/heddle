@@ -42,6 +42,7 @@ import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import { ModelPolicyService } from '@/core/llm/models/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
+import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
 import { RuntimeSubscriptionStream } from '@/core/runtime/subscriptions/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
 import { ControlPlaneChatSessionEventsController } from './chat-session-events.js';
@@ -731,17 +732,21 @@ export class ControlPlaneChatSessionsController {
       activeModel,
       credentialMode,
     });
-    const titleCredentialSource = RuntimeCredentialService.resolveCredentialSourceForModel(titleModel, args);
-    if (titleCredentialSource.type === 'missing') {
+    const providerRuntime = LlmProviderRuntimeService.resolve({
+      ...args,
+      model: titleModel,
+    });
+    if (providerRuntime.credentialSource.type === 'missing') {
       return undefined;
     }
 
     return LlmAdapterService.create({
       model: titleModel,
       credentials: {
-        apiKey: RuntimeCredentialService.resolveApiKeyForModel(titleModel, args),
+        apiKey: providerRuntime.apiKey,
         credentialStorePath: args.credentialStorePath,
       },
+      runtime: providerRuntime.llmRuntime,
     });
   }
 
