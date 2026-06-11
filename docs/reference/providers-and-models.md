@@ -1,5 +1,7 @@
 # Providers And Models
 
+For the quick support matrix, start with [Model providers](model-providers.md).
+
 Heddle currently has working provider adapters for:
 
 - OpenAI

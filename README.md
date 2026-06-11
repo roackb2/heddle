@@ -245,7 +245,7 @@ Inside terminal chat, use `/model set <query>` to search available models. The t
 
 Local and gateway model quality varies. Some smaller, older, or provider-routed models are not reliable at tool calling, may ignore tool results, or may produce confident but wrong repository answers. Use manual review, keep approval prompts enabled for risky work, and prefer stronger models for edits that matter.
 
-More: [Providers and models](docs/reference/providers-and-models.md)
+More: [Model providers](docs/reference/model-providers.md) and [Providers and models](docs/reference/providers-and-models.md)
 
 ### Browser Control Plane
 

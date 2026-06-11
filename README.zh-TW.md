@@ -245,7 +245,7 @@ heddle --model openrouter/meta-llama/llama-3.3-70b-instruct ask "Summarize this 
 
 本地與 gateway models 的品質差異很大。有些較小、較舊或經由 provider routing 的 models 不擅長 tool calling，可能忽略 tool results，或給出有信心但錯誤的程式碼庫答案。請保留人工 review，對高風險工作維持 approval prompts，重要修改建議使用能力較強的 model。
 
-更多：[Providers and models](docs/reference/providers-and-models.md)
+更多：[Model providers](docs/reference/model-providers.md) 與 [Providers and models](docs/reference/providers-and-models.md)
 
 ### Browser Control Plane
 
