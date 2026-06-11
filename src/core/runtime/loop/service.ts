@@ -30,7 +30,9 @@ export class AgentLoopRuntimeService {
       credentialStorePath,
       reasoningEffort: options.reasoningEffort,
     });
-    LlmProviderRuntimeService.assertRunnable(providerRuntime);
+    if (!options.llm) {
+      LlmProviderRuntimeService.assertRunnable(providerRuntime);
+    }
     const apiKey = options.apiKey ?? providerRuntime.apiKey;
     const llm = options.llm ?? await this.createLoopLlmAdapter({
       model,

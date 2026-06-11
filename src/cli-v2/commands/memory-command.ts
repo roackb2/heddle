@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import compact from 'lodash/compact.js';
 import { DEFAULT_OPENAI_MODEL, LlmAdapterService } from '@/index.js';
+import { ProviderCredentialRepository } from '@/core/auth/index.js';
 import { MemoryCatalogService } from '@/core/memory/catalog.js';
 import { MemoryMaintenanceService } from '@/core/memory/maintainer.js';
 import { MemoryValidationService } from '@/core/memory/validation.js';
@@ -185,8 +186,10 @@ export class MemoryCliV2CommandEdgeService {
     }
 
     const model = options.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
+    const credentialStorePath = ProviderCredentialRepository.resolveStorePath(resolve(options.workspaceRoot, options.stateDir));
     const providerRuntime = LlmProviderRuntimeService.resolve({
       model,
+      credentialStorePath,
       preferApiKey: options.preferApiKey,
     });
     LlmProviderRuntimeService.assertRunnable(providerRuntime);
@@ -194,7 +197,10 @@ export class MemoryCliV2CommandEdgeService {
     const result = await context.maintenance.runBacklog({
       llm: LlmAdapterService.create({
         model,
-        credentials: providerRuntime.apiKey ? { apiKey: providerRuntime.apiKey } : undefined,
+        credentials: {
+          apiKey: providerRuntime.apiKey,
+          credentialStorePath,
+        },
         runtime: providerRuntime.llmRuntime,
       }),
       source: 'heddle memory maintain',

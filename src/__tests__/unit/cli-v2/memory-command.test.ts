@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryCliV2CommandEdgeService } from '@/cli-v2/commands/memory-command.js';
 import type { CliV2CommandEdgeOptions } from '@/cli-v2/commands/types.js';
+import { ProviderCredentialRepository } from '@/core/auth/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
 import { MemoryMaintenanceService } from '@/core/memory/maintainer.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
@@ -75,8 +76,23 @@ describe('MemoryCliV2CommandEdgeService', () => {
 
   it('allows maintainer runs to use stored credentials when no provider API key is present', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-memory-command-stored-credential-'));
+    const credentialStorePath = join(workspaceRoot, '.heddle', 'auth.json');
+    new ProviderCredentialRepository({ storePath: credentialStorePath }).write({
+      version: 1,
+      credentials: {
+        openai: {
+          type: 'oauth',
+          provider: 'openai',
+          accessToken: 'access-token-test',
+          refreshToken: 'refresh-token-test',
+          expiresAt: Date.now() + 60_000,
+          createdAt: '2026-06-04T00:00:00.000Z',
+          updatedAt: '2026-06-04T00:00:00.000Z',
+          accountId: 'account-test',
+        },
+      },
+    });
     vi.spyOn(RuntimeCredentialService, 'resolveApiKeyForModel').mockReturnValue(undefined);
-    vi.spyOn(RuntimeCredentialService, 'hasCredentialForModel').mockReturnValue(true);
     const createLlm = vi.spyOn(LlmAdapterService, 'create').mockReturnValue({} as ReturnType<typeof LlmAdapterService.create>);
     vi.spyOn(MemoryMaintenanceService.prototype, 'readPendingCandidates').mockResolvedValue([
       {
@@ -112,7 +128,10 @@ describe('MemoryCliV2CommandEdgeService', () => {
 
     expect(createLlm).toHaveBeenCalledWith({
       model: 'gpt-5.4',
-      credentials: undefined,
+      credentials: {
+        apiKey: undefined,
+        credentialStorePath,
+      },
       runtime: {
         endpoint: undefined,
         reasoningEffort: undefined,
