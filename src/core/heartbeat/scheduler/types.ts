@@ -1,4 +1,5 @@
 import type { AgentLoopCheckpoint, AgentLoopState } from '@/core/runtime/loop/index.js';
+import type { LlmProvider } from '@/core/llm/types.js';
 import type { AgentHeartbeatEvent, AgentHeartbeatResult, RunAgentHeartbeatOptions } from '../agent/index.js';
 import type { HeartbeatTask, HeartbeatTaskRunRecord, HeartbeatTaskStatus, HeartbeatTaskStore } from '../tasks/index.js';
 
@@ -46,7 +47,7 @@ export type HeartbeatTaskRunnerRuntimeOptions = {
   stateDir?: string;
   memoryDir?: string;
   apiKey?: string;
-  apiKeyProvider?: 'explicit' | 'openai' | 'anthropic';
+  apiKeyProvider?: 'explicit' | LlmProvider;
   preferApiKey?: boolean;
   model?: string;
   maxSteps?: number;

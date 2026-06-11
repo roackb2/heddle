@@ -49,6 +49,7 @@
     "verify:tui-behavior": "node --import tsx/esm scripts/verify-tui-behavior.tsx",
     "verify:tui-session-boundary": "yarn verify:tui-behavior",
     "verify:tui-session-switch": "yarn verify:tui-behavior",
+    "smoke:ollama": "node scripts/ollama-openai-compat-smoke.mjs",
     "eval:agent": "tsx --no-cache src/cli-v2/main.ts eval agent",
     "eval:clean": "tsx --no-cache src/cli-v2/main.ts eval clean",
     "test:browser-integration": "node scripts/browser-integration-playwright.mjs --project web-v2-chromium",

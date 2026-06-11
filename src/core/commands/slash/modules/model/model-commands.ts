@@ -8,7 +8,8 @@ import {
   ModelCatalogService,
   ModelPolicyService,
 } from '../../../../llm/models/index.js';
-import type { LlmProvider, ReasoningEffort } from '../../../../llm/types.js';
+import { LlmAdapterService } from '../../../../llm/index.js';
+import type { ReasoningEffort } from '../../../../llm/types.js';
 import {
   formatSessionReasoningEffortStatus,
   resolveEffectiveReasoningEffort,
@@ -118,7 +119,7 @@ function switchModel(
 
   const compatibility = ModelPolicyService.validateCredentialCompatibility({
     model: value,
-    provider: inferProviderForModel(value),
+    provider: LlmAdapterService.inferProvider(value),
     credentialMode: ModelPolicyService.credentialModeFromSource(context.model.credentialSource()),
   });
   if (!compatibility.ok) {
@@ -174,8 +175,4 @@ function setReasoningEffort(
 }
 function isReasoningEffort(value: string): value is ReasoningEffort {
   return value === 'low' || value === 'medium' || value === 'high' || value === 'ultrahigh';
-}
-
-function inferProviderForModel(model: string): LlmProvider {
-  return model.startsWith('claude') ? 'anthropic' : 'openai';
 }

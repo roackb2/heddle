@@ -94,7 +94,12 @@ export class ModelPolicyService {
       return args.purpose === 'chat-compaction' ? OPENAI_API_KEY_COMPACTION_MODEL : DEFAULT_OPENAI_MODEL;
     }
 
-    return DEFAULT_OPENAI_MODEL;
+    const activeModel = args.activeModel?.trim();
+    if (activeModel) {
+      return activeModel;
+    }
+
+    throw new Error(`No ${args.purpose} system model is configured for ${args.provider}.`);
   }
 
   static validateCredentialCompatibility(args: {
