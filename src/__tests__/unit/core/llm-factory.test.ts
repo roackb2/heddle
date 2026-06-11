@@ -132,6 +132,27 @@ describe('llm adapter factory', () => {
     });
   });
 
+  it('uses the active model for non-OpenAI system model selection', () => {
+    expect(ModelPolicyService.resolveSystemSelectedModel({
+      purpose: 'chat-compaction',
+      provider: 'ollama',
+      activeModel: 'ollama/qwen3:8b',
+    })).toBe('ollama/qwen3:8b');
+
+    expect(ModelPolicyService.resolveSystemSelectedModel({
+      purpose: 'session-title',
+      provider: 'huggingface',
+      activeModel: 'huggingface/meta-llama/Llama-3.3-70B-Instruct',
+    })).toBe('huggingface/meta-llama/Llama-3.3-70B-Instruct');
+  });
+
+  it('fails clearly when non-OpenAI system model selection has no active model', () => {
+    expect(() => ModelPolicyService.resolveSystemSelectedModel({
+      purpose: 'chat-compaction',
+      provider: 'ollama',
+    })).toThrow('No chat-compaction system model is configured for ollama.');
+  });
+
   it('owns per-model reasoning effort support', () => {
     expect(ModelPolicyService.supportsOpenAiRequestReasoningEffortLevel('gpt-5.4', 'ultrahigh')).toBe(false);
     expect(ModelPolicyService.supportsOpenAiRequestReasoningEffortLevel('gpt-5.5', 'ultrahigh')).toBe(true);

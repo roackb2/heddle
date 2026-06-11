@@ -195,6 +195,28 @@ describe('core slash command modules', () => {
     expect(setActive).not.toHaveBeenCalled();
   });
 
+  it('uses shared provider inference when switching local-prefixed models', async () => {
+    const setActive = vi.fn();
+    const context = createContext({
+      model: {
+        active: () => 'gpt-5.4',
+        setActive,
+        credentialSource: () => ({
+          type: 'oauth',
+          provider: 'openai',
+          accountId: 'acct',
+          expiresAt: Date.now() + 60_000,
+        }),
+      },
+    });
+
+    await expect(registry.run(context, '/model ollama/qwen3:8b')).resolves.toMatchObject({
+      kind: 'message',
+      message: "Switched model to ollama/qwen3:8b. This name is not in Heddle's common shortlist, so the next API call will fail if the provider does not recognize it.",
+    });
+    expect(setActive).toHaveBeenCalledWith('ollama/qwen3:8b');
+  });
+
   it('uses shared reasoning policy before setting reasoning effort', async () => {
     const setReasoningEffort = vi.fn();
     const context = createContext({

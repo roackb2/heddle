@@ -727,7 +727,7 @@ export class ControlPlaneChatSessionsController {
     );
     const titleModel = ModelPolicyService.resolveSystemSelectedModel({
       purpose: 'session-title',
-      provider: 'openai',
+      provider: LlmAdapterService.inferProvider(activeModel),
       activeModel,
       credentialMode,
     });

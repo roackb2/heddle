@@ -57,7 +57,7 @@ heddle --prefer-api-key daemon
 
 Current defaults:
 
-- OpenAI: `gpt-5.1-codex`
+- OpenAI: `gpt-5.4`
 - Anthropic: `claude-sonnet-4-6`
 
 ## Built-In Model Shortlist
