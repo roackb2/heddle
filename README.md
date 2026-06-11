@@ -14,6 +14,7 @@ Official website: [heddleagent.com](https://heddleagent.com)
 - [See It In Action](#see-it-in-action)
 - [Quick Start](#quick-start)
 - [Core Workflows](#core-workflows)
+- [Local Models](#local-models)
 - [Install](#install)
 - [Requirements](#requirements)
 - [Optional CyberLoop Integration](#optional-cyberloop-integration)
@@ -41,6 +42,7 @@ It is a good fit when you want to:
 - activate standard Agent Skills only when a workspace should expose them
 - connect configured MCP servers such as Notion, Anytype, GitHub, or other tools
 - opt into Browser Automation for rendered page inspection and user-requested web workflows
+- run against hosted models or local Ollama models through Heddle's provider adapters
 - build custom hosts on top of Heddle's runtime APIs
 
 Heddle is probably not the right fit if you only want a very simple one-shot prompt runner and do not care about sessions, persistence, observability, or operator control.
@@ -119,6 +121,15 @@ For Anthropic, use an API key:
 export ANTHROPIC_API_KEY=your_key_here
 ```
 
+For local models, install and start [Ollama](https://ollama.com), then select one of your installed chat models with the `ollama/` prefix:
+
+```bash
+ollama list
+heddle --model ollama/llama3.2:latest ask "Reply with exactly: ok"
+```
+
+Ollama does not require a hosted provider API key. Heddle uses Ollama's local OpenAI-compatible endpoint at `http://127.0.0.1:11434/v1` by default.
+
 OpenAI account sign-in is an experimental, user-selected transport for Heddle. It is not official OpenAI support, and Heddle is not affiliated with, endorsed by, or sponsored by OpenAI. Use of OpenAI services remains subject to OpenAI's terms and policies.
 
 3. Move into any repository you want to inspect:
@@ -192,6 +203,29 @@ From there, Heddle can inspect files, search with ignore-aware fallbacks, explai
 The terminal composer supports multiline prompts, prompt undo/redo, prompt history navigation, model picking with `/model set`, and reasoning-effort picking with `/reasoning set`. During a run, Heddle streams visible activity so you can see whether it is thinking, searching, calling tools, updating a plan, or waiting for approval.
 
 More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
+
+## Local Models
+
+Heddle can run with local Ollama models as well as hosted OpenAI and Anthropic models. This is useful when you want a local-first workflow, want to experiment without sending model prompts to a hosted provider, or want to test agent behavior against a specific local model.
+
+Start Ollama, pull or install a chat-capable model, then choose it with the `ollama/` model prefix:
+
+```bash
+ollama list
+heddle --model ollama/llama3.2:latest ask "Summarize this repository"
+heddle chat --model ollama/llama3.2:latest
+```
+
+Inside terminal chat, use `/model set <query>` to search available models. When Ollama is running, the terminal picker and browser model selector include installed Ollama chat models discovered from the local Ollama API, so you do not have to remember every model name.
+
+```text
+/model set llama
+/model ollama/llama3.2:latest
+```
+
+Local model quality varies. Some smaller or older local models are not reliable at tool calling, may ignore tool results, or may produce confident but wrong repository answers. Use manual review, keep approval prompts enabled for risky work, and prefer stronger models for edits that matter.
+
+More: [Providers and models](docs/reference/providers-and-models.md)
 
 ### Browser Control Plane
 
@@ -414,6 +448,7 @@ The installed CLI command is `heddle`.
 - access to at least one supported provider:
   - OpenAI account sign-in with `heddle auth login openai`, or `OPENAI_API_KEY`
   - `ANTHROPIC_API_KEY` for Anthropic models
+  - a local Ollama server for `ollama/<model>` models
 
 Heddle intentionally does not support Anthropic consumer subscription OAuth. Use Anthropic API-key access unless Anthropic provides an approved third-party auth route.
 
@@ -440,6 +475,7 @@ Start here:
 - [Documentation hub](docs/README.md)
 - [Runtime host model](docs/guides/runtime-host-model.md)
 - [Chat and sessions guide](docs/guides/chat-and-sessions.md)
+- [Providers and models](docs/reference/providers-and-models.md)
 - [CLI reference](docs/reference/cli.md)
 
 Feature guides:

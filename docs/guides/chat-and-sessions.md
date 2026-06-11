@@ -111,6 +111,18 @@ Useful chat commands:
 - `/drift off`: disable CyberLoop semantic drift detection
 - `!<command>`: run a shell command directly in chat
 
+When a local Ollama server is running, `/model set <query>` includes installed
+Ollama chat models discovered from the local Ollama API. You can also switch
+directly with the `ollama/` prefix, for example:
+
+```text
+/model ollama/llama3.2:latest
+```
+
+Local models vary in tool-calling quality. If a local model ignores tool
+results or gives suspicious repository answers, switch to a stronger model and
+review the trace before trusting the result.
+
 In the browser control plane, right-click a session row to manage it without
 typing slash commands. You can pin or unpin a session, rename it inline, or
 archive it. Archived sessions are hidden from normal session lists across the

@@ -38,6 +38,7 @@ For Ollama, install and start Ollama locally, then select an installed model
 with the `ollama/` prefix:
 
 ```bash
+ollama list
 heddle --model ollama/llama3.2:latest ask "Reply with exactly: ok"
 ```
 
@@ -124,6 +125,23 @@ selector, or type it directly with the `ollama/` prefix:
 ```text
 /model ollama/llama3.2:latest
 ```
+
+## Local Model Caveats
+
+Local model behavior depends on the model family, parameter size, quantization,
+and the hardware running Ollama. Some smaller or older local models are useful
+for chat and quick experiments but are not reliable at coding-agent tool use.
+
+Watch especially for:
+
+- missing or malformed tool calls
+- correct tool calls followed by answers that ignore the tool result
+- confident but wrong repository summaries
+- slower turns that hit host request timeouts
+
+For important code edits, keep approval prompts enabled, review traces and
+diffs carefully, and prefer a stronger local or hosted model when tool-calling
+quality matters.
 
 ## Auth Commands
 

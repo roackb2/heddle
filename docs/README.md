@@ -15,6 +15,7 @@ If you are new to Heddle, begin with:
 - [MCP integrations](reference/mcp.md) for connecting Heddle to ecosystem MCP servers
 - [Knowledge persistence](guides/knowledge-persistence.md) for how Heddle learns durable workspace knowledge while it works
 - [Control plane](guides/control-plane.md) for the browser UI, workspace switching, session review, task workbench, and browser composer
+- [Providers and models](reference/providers-and-models.md) for OpenAI, Anthropic, and local Ollama setup
 - [Heartbeat](guides/heartbeat.md) for scheduled/background task workflows
 - [CLI reference](reference/cli.md) for command lookup
 

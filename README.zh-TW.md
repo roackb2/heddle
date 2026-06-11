@@ -14,6 +14,7 @@ Heddle 是開源 AI 程式開發代理執行環境，也是以終端機為優先
 - [實際運作畫面](#實際運作畫面)
 - [快速開始](#快速開始)
 - [核心工作流程](#核心工作流程)
+- [本地模型](#本地模型)
 - [安裝](#安裝)
 - [需求](#需求)
 - [選用 CyberLoop 整合](#選用-cyberloop-整合)
@@ -41,6 +42,7 @@ Heddle 適合想讓 AI 程式開發助理參與日常軟體開發，同時保留
 - 只在工作區需要時啟用標準 Agent Skills
 - 連接使用者設定的 MCP servers，例如 Notion、Anytype、GitHub 或其他工具
 - 選擇性啟用 Browser Automation，用於渲染後頁面檢查與使用者要求的網頁流程
+- 透過 Heddle 的 provider adapters 使用 hosted models 或本地 Ollama models
 - 基於 Heddle runtime APIs 建立自訂 host
 
 如果你只需要非常簡單的單次提示執行工具，而且不在意 sessions、持久化、可觀測性或操作員控制，Heddle 可能不是最適合的工具。
@@ -119,6 +121,15 @@ Anthropic 使用 API key：
 export ANTHROPIC_API_KEY=your_key_here
 ```
 
+本地模型可安裝並啟動 [Ollama](https://ollama.com)，再用 `ollama/` prefix 選擇已安裝的 chat model：
+
+```bash
+ollama list
+heddle --model ollama/llama3.2:latest ask "Reply with exactly: ok"
+```
+
+Ollama 不需要 hosted provider API key。Heddle 預設使用 Ollama 的本地 OpenAI-compatible endpoint：`http://127.0.0.1:11434/v1`。
+
 OpenAI account sign-in 是 Heddle 提供的實驗性、由使用者選擇的傳輸方式。這不是 OpenAI 官方支援，Heddle 與 OpenAI 沒有 affiliation、endorsement 或 sponsorship。使用 OpenAI 服務仍受 OpenAI terms and policies 約束。
 
 3. 進入你想檢查的程式碼庫：
@@ -192,6 +203,29 @@ heddle
 Terminal composer 支援多行 prompts、prompt undo/redo、prompt history navigation、透過 `/model set` 選 model，以及透過 `/reasoning set` 選 reasoning effort。Run 進行時，Heddle 會串流可見活動，讓你知道它是在思考、搜尋、呼叫工具、更新 plan，還是在等待 approval。
 
 更多：[Chat and sessions guide](docs/guides/chat-and-sessions.md)
+
+## 本地模型
+
+Heddle 除了 hosted OpenAI 與 Anthropic models，也可以使用本地 Ollama models。當你想要 local-first 工作流程、想避免把 model prompt 送到 hosted provider，或想測試特定本地模型的 agent 行為時，這會很有用。
+
+先啟動 Ollama，pull 或安裝 chat-capable model，然後用 `ollama/` model prefix 選擇它：
+
+```bash
+ollama list
+heddle --model ollama/llama3.2:latest ask "Summarize this repository"
+heddle chat --model ollama/llama3.2:latest
+```
+
+在 terminal chat 裡，可以用 `/model set <query>` 搜尋可用 models。當 Ollama 正在執行時，terminal picker 與 browser model selector 會從本地 Ollama API 發現已安裝的 Ollama chat models，所以你不需要記住每個 model name。
+
+```text
+/model set llama
+/model ollama/llama3.2:latest
+```
+
+本地模型品質差異很大。有些較小或較舊的 local models 不擅長 tool calling，可能忽略 tool results，或給出有信心但錯誤的程式碼庫答案。請保留人工 review，對高風險工作維持 approval prompts，重要修改建議使用能力較強的 model。
+
+更多：[Providers and models](docs/reference/providers-and-models.md)
 
 ### Browser Control Plane
 
@@ -404,6 +438,7 @@ npx @roackb2/heddle
 - 至少一個 supported provider：
   - OpenAI account sign-in：`heddle auth login openai`，或 `OPENAI_API_KEY`
   - Anthropic models 使用 `ANTHROPIC_API_KEY`
+  - 本地 Ollama server，用於 `ollama/<model>` models
 
 Heddle 不支援 Anthropic consumer subscription OAuth。除非 Anthropic 提供 approved third-party auth route，請使用 Anthropic API-key access。
 
@@ -430,6 +465,7 @@ npx -p @roackb2/heddle -p cyberloop heddle
 - [Documentation hub](docs/README.md)
 - [Runtime host model](docs/guides/runtime-host-model.md)
 - [Chat and sessions guide](docs/guides/chat-and-sessions.md)
+- [Providers and models](docs/reference/providers-and-models.md)
 - [CLI reference](docs/reference/cli.md)
 
 功能指南：
