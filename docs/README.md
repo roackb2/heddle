@@ -15,6 +15,7 @@ If you are new to Heddle, begin with:
 - [MCP integrations](reference/mcp.md) for connecting Heddle to ecosystem MCP servers
 - [Knowledge persistence](guides/knowledge-persistence.md) for how Heddle learns durable workspace knowledge while it works
 - [Control plane](guides/control-plane.md) for the browser UI, workspace switching, session review, task workbench, and browser composer
+- [Model providers](reference/model-providers.md) for the quick provider-family compatibility matrix
 - [Providers and models](reference/providers-and-models.md) for OpenAI, Anthropic, local models, and OpenAI-compatible gateways
 - [Heartbeat](guides/heartbeat.md) for scheduled/background task workflows
 - [CLI reference](reference/cli.md) for command lookup
@@ -61,6 +62,7 @@ Reference material for commands, configuration, and runtime behavior:
 - [CLI reference](reference/cli.md)
 - [Capabilities and tools](reference/capabilities.md)
 - [MCP integrations](reference/mcp.md)
+- [Model providers](reference/model-providers.md)
 - [Providers and models](reference/providers-and-models.md)
 - [Project config](reference/config.md)
 
@@ -98,8 +100,9 @@ Evaluation:
 3. [Agent Skills](guides/agent-skills.md)
 4. [MCP integrations](reference/mcp.md)
 5. [Knowledge persistence](guides/knowledge-persistence.md)
-6. [Providers and models](reference/providers-and-models.md)
-7. [Project config](reference/config.md)
+6. [Model providers](reference/model-providers.md)
+7. [Providers and models](reference/providers-and-models.md)
+8. [Project config](reference/config.md)
 
 ### I want the browser UI and remote oversight
 
