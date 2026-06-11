@@ -6,7 +6,7 @@ import { MemoryMaintenanceService } from '@/core/memory/maintainer.js';
 import { MemoryValidationService } from '@/core/memory/validation.js';
 import { MemoryVisibilityService } from '@/core/memory/visibility.js';
 import type { MemoryValidationResult } from '@/core/memory/types.js';
-import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
+import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
 import type { CliV2CommandEdgeOptions } from './types.js';
 
 export type MemoryCliCommand = 'status' | 'init' | 'list' | 'read' | 'search' | 'validate' | 'maintain';
@@ -26,7 +26,7 @@ export type MemoryCliCommandFlags = {
  * Command edge for `heddle memory`.
  *
  * Owns: terminal subcommand dispatch, flag-to-service option parsing, provider
- * credential selection for the explicit maintainer command, and terminal
+ * provider runtime selection for the explicit maintainer command, and terminal
  * formatting.
  *
  * Does not own: catalog invariants, note traversal/search semantics, memory
@@ -185,15 +185,17 @@ export class MemoryCliV2CommandEdgeService {
     }
 
     const model = options.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
-    const apiKey = RuntimeCredentialService.resolveApiKeyForModel(model);
-    if (!apiKey && !RuntimeCredentialService.hasCredentialForModel(model, { preferApiKey: options.preferApiKey })) {
-      throw new Error(RuntimeCredentialService.formatMissingCredentialMessage(model));
-    }
+    const providerRuntime = LlmProviderRuntimeService.resolve({
+      model,
+      preferApiKey: options.preferApiKey,
+    });
+    LlmProviderRuntimeService.assertRunnable(providerRuntime);
 
     const result = await context.maintenance.runBacklog({
       llm: LlmAdapterService.create({
         model,
-        credentials: apiKey ? { apiKey } : undefined,
+        credentials: providerRuntime.apiKey ? { apiKey: providerRuntime.apiKey } : undefined,
+        runtime: providerRuntime.llmRuntime,
       }),
       source: 'heddle memory maintain',
     });

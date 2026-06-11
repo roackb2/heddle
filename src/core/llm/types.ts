@@ -76,9 +76,20 @@ export type LlmCredentialContext = {
   credentialStorePath?: string;
 };
 
+export type LlmProviderEndpointAuth =
+  | { type: 'none' }
+  | { type: 'bearer'; token: string };
+
+export type LlmProviderEndpointRuntime = {
+  baseUrl: string;
+  auth: LlmProviderEndpointAuth;
+  timeoutMs?: number;
+};
+
 export type LlmRuntimeContext = {
   reasoningEffort?: ReasoningEffort;
   fetchImpl?: (url: unknown, init?: unknown) => Promise<globalThis.Response>;
+  endpoint?: LlmProviderEndpointRuntime;
 };
 
 export type LlmAdapterCreateInput = {

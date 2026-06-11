@@ -110,7 +110,14 @@ describe('MemoryCliV2CommandEdgeService', () => {
 
     await MemoryCliV2CommandEdgeService.run('maintain', commandOptions(workspaceRoot));
 
-    expect(createLlm).toHaveBeenCalledWith({ model: 'gpt-5.4', credentials: undefined });
+    expect(createLlm).toHaveBeenCalledWith({
+      model: 'gpt-5.4',
+      credentials: undefined,
+      runtime: {
+        endpoint: undefined,
+        reasoningEffort: undefined,
+      },
+    });
     const output = stdout.mock.calls.map(([message]) => message).join('');
     expect(output).toContain('Outcome: done');
     expect(output).toContain('Candidates: 1/1 processed');
