@@ -2,8 +2,13 @@ import {
   ProviderCredentialRepository,
   type StoredProviderCredential,
 } from '@/core/auth/index.js';
-import { LlmAdapterService } from '@/core/llm/index.js';
-import type { LlmProvider } from '@/core/llm/types.js';
+import {
+  LlmAdapterService,
+  OpenAiCompatibleProviderProfileService,
+  type OpenAiCompatibleModelDiscoverySource,
+  type OpenAiCompatibleProviderProfile,
+} from '@/core/llm/index.js';
+import type { LlmProvider, LlmProviderEndpointRuntime } from '@/core/llm/types.js';
 import type { ApiKeyRuntime, ProviderCredentialSource } from './types.js';
 
 /**
@@ -14,6 +19,11 @@ export class RuntimeCredentialService {
   static readonly DEFAULT_OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
 
   static resolveProviderApiKey(provider: LlmProvider): string | undefined {
+    const compatibleProfile = OpenAiCompatibleProviderProfileService.maybeGet(provider);
+    if (compatibleProfile) {
+      return this.firstDefinedNonEmpty(...compatibleProfile.endpoint.apiKeyEnvNames.map((name) => process.env[name]));
+    }
+
     switch (provider) {
       case 'openai':
         return this.firstDefinedNonEmpty(process.env.OPENAI_API_KEY, process.env.PERSONAL_OPENAI_API_KEY);
@@ -21,7 +31,13 @@ export class RuntimeCredentialService {
         return this.firstDefinedNonEmpty(process.env.ANTHROPIC_API_KEY, process.env.PERSONAL_ANTHROPIC_API_KEY);
       case 'google':
       case 'ollama':
+      case 'lmstudio':
+      case 'litellm':
+      case 'vllm':
       case 'huggingface':
+      case 'openrouter':
+      case 'together':
+      case 'groq':
         return undefined;
     }
   }
@@ -110,15 +126,45 @@ export class RuntimeCredentialService {
   }
 
   static resolveLocalEndpointCredentialSource(provider: LlmProvider): Extract<ProviderCredentialSource, { type: 'local-endpoint' }> | undefined {
-    if (provider !== 'ollama') {
+    const profile = OpenAiCompatibleProviderProfileService.maybeGet(provider);
+    if (!profile || profile.endpoint.requiresApiKey) {
       return undefined;
     }
 
     return {
       type: 'local-endpoint',
       provider,
-      baseUrl: RuntimeCredentialService.resolveOllamaOpenAiBaseUrl(),
+      baseUrl: RuntimeCredentialService.resolveOpenAiCompatibleBaseUrl(profile),
     };
+  }
+
+  static resolveOpenAiCompatibleEndpointRuntime(provider: LlmProvider, runtime?: ApiKeyRuntime): LlmProviderEndpointRuntime | undefined {
+    const profile = OpenAiCompatibleProviderProfileService.maybeGet(provider);
+    if (!profile) {
+      return undefined;
+    }
+
+    const apiKey = RuntimeCredentialService.resolveEndpointApiKey(provider, runtime);
+    return {
+      baseUrl: RuntimeCredentialService.resolveOpenAiCompatibleBaseUrl(profile),
+      auth: apiKey ? { type: 'bearer', token: apiKey } : { type: 'none' },
+    };
+  }
+
+  static resolveOpenAiCompatibleModelDiscoverySources(): OpenAiCompatibleModelDiscoverySource[] {
+    return OpenAiCompatibleProviderProfileService.list().flatMap((profile) => {
+      const apiKey = RuntimeCredentialService.resolveProviderApiKey(profile.id);
+      if (profile.endpoint.requiresApiKey && !apiKey) {
+        return [];
+      }
+
+      return [{
+        profile,
+        baseUrl: RuntimeCredentialService.resolveOpenAiCompatibleBaseUrl(profile),
+        nativeBaseUrl: RuntimeCredentialService.resolveOpenAiCompatibleNativeBaseUrl(profile),
+        apiKey,
+      }];
+    });
   }
 
   static formatMissingCredentialMessage(model: string): string {
@@ -139,27 +185,43 @@ export class RuntimeCredentialService {
   }
 
   static resolveOllamaBaseUrl(): string {
-    const configured = RuntimeCredentialService.firstDefinedNonEmpty(
-      process.env.OLLAMA_BASE_URL,
-      process.env.OLLAMA_OPENAI_BASE_URL,
-    );
-    if (!configured) {
-      return RuntimeCredentialService.DEFAULT_OLLAMA_BASE_URL;
-    }
-
-    return configured.replace(/\/+$/, '').replace(/\/v1$/i, '');
+    return RuntimeCredentialService.resolveOpenAiCompatibleNativeBaseUrl(
+      OpenAiCompatibleProviderProfileService.get('ollama'),
+    ) ?? RuntimeCredentialService.DEFAULT_OLLAMA_BASE_URL;
   }
 
   static resolveOllamaOpenAiBaseUrl(): string {
-    const configured = RuntimeCredentialService.firstDefinedNonEmpty(
-      process.env.OLLAMA_OPENAI_BASE_URL,
-      process.env.OLLAMA_BASE_URL,
+    return RuntimeCredentialService.resolveOpenAiCompatibleBaseUrl(
+      OpenAiCompatibleProviderProfileService.get('ollama'),
     );
-    if (!configured) {
-      return RuntimeCredentialService.DEFAULT_OLLAMA_OPENAI_BASE_URL;
+  }
+
+  private static resolveEndpointApiKey(provider: LlmProvider, runtime?: ApiKeyRuntime): string | undefined {
+    if (runtime?.apiKey && (runtime.apiKeyProvider === 'explicit' || runtime.apiKeyProvider === provider)) {
+      return runtime.apiKey;
     }
 
-    const trimmed = configured.replace(/\/+$/, '');
-    return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`;
+    return RuntimeCredentialService.resolveProviderApiKey(provider);
+  }
+
+  private static resolveOpenAiCompatibleBaseUrl(profile: OpenAiCompatibleProviderProfile): string {
+    const configured = RuntimeCredentialService.firstDefinedNonEmpty(
+      ...profile.endpoint.baseUrlEnvNames.map((name) => process.env[name]),
+    );
+    const value = configured ?? profile.endpoint.defaultBaseUrl;
+    if (!value) {
+      throw new Error(`${profile.label} OpenAI-compatible base URL is required. Set one of ${profile.endpoint.baseUrlEnvNames.join(', ')}.`);
+    }
+
+    const trimmed = value.replace(/\/+$/, '');
+    return trimmed.endsWith('/v1') || trimmed.endsWith('/api/v1') || trimmed.endsWith('/openai/v1') ? trimmed : `${trimmed}/v1`;
+  }
+
+  private static resolveOpenAiCompatibleNativeBaseUrl(profile: OpenAiCompatibleProviderProfile): string | undefined {
+    const configured = RuntimeCredentialService.firstDefinedNonEmpty(
+      ...(profile.endpoint.nativeBaseUrlEnvNames ?? profile.endpoint.baseUrlEnvNames).map((name) => process.env[name]),
+    );
+    const value = configured ?? profile.endpoint.defaultBaseUrl;
+    return value?.replace(/\/+$/, '').replace(/\/v1$/i, '');
   }
 }

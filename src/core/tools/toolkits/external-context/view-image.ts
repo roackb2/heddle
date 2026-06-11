@@ -127,7 +127,13 @@ export function createViewImageTool(options: ViewImageToolOptions = {}): ToolDef
               error: 'view_image is not wired for Google models yet.',
             };
           case 'ollama':
+          case 'lmstudio':
+          case 'litellm':
+          case 'vllm':
           case 'huggingface':
+          case 'openrouter':
+          case 'together':
+          case 'groq':
             return {
               ok: false,
               error: `view_image is not wired for ${provider} models yet.`,

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ModelOptionsService } from '@/core/llm/models/index.js';
+import { OpenAiCompatibleProviderProfileService } from '@/core/llm/index.js';
 
 describe('ModelOptionsService', () => {
   afterEach(() => {
@@ -31,7 +32,11 @@ describe('ModelOptionsService', () => {
     })));
 
     const options = await ModelOptionsService.resolve({
-      ollamaBaseUrl: 'http://ollama.local/',
+      openAiCompatibleSources: [{
+        profile: OpenAiCompatibleProviderProfileService.get('ollama'),
+        baseUrl: 'http://ollama.local/v1',
+        nativeBaseUrl: 'http://ollama.local/',
+      }],
       fetchImpl,
     });
     const ollamaGroup = options.groups.find((group) => group.label === 'Ollama · Installed local models');
@@ -67,11 +72,63 @@ describe('ModelOptionsService', () => {
     });
 
     const options = await ModelOptionsService.resolve({
-      ollamaBaseUrl: 'http://ollama.local',
+      openAiCompatibleSources: [{
+        profile: OpenAiCompatibleProviderProfileService.get('ollama'),
+        baseUrl: 'http://ollama.local/v1',
+        nativeBaseUrl: 'http://ollama.local',
+      }],
       fetchImpl,
     });
 
     expect(options.groups.some((group) => group.label === 'OpenAI · GPT-5.4')).toBe(true);
     expect(options.groups.some((group) => group.label === 'Ollama · Installed local models')).toBe(false);
+  });
+
+  it('adds OpenAI-compatible profile models from /models to shared model options', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
+      data: [
+        { id: 'meta-llama/llama-3.3-70b-instruct' },
+        { id: 'nomic-embed-text' },
+        { id: 'qwen/qwen3-coder' },
+      ],
+    })));
+
+    const options = await ModelOptionsService.resolve({
+      openAiCompatibleSources: [{
+        profile: OpenAiCompatibleProviderProfileService.get('openrouter'),
+        baseUrl: 'https://openrouter.test/api/v1',
+        apiKey: 'openrouter-key',
+      }],
+      fetchImpl,
+    });
+    const openRouterGroup = options.groups.find((group) => group.label === 'OpenRouter · Available models');
+
+    expect(fetchImpl).toHaveBeenCalledWith('https://openrouter.test/api/v1/models', {
+      method: 'GET',
+      signal: undefined,
+      headers: { authorization: 'Bearer openrouter-key' },
+    });
+    expect(openRouterGroup).toMatchObject({
+      label: 'OpenRouter · Available models',
+      source: 'remote-discovered',
+      models: [
+        'openrouter/meta-llama/llama-3.3-70b-instruct',
+        'openrouter/qwen/qwen3-coder',
+      ],
+      options: [
+        {
+          id: 'openrouter/meta-llama/llama-3.3-70b-instruct',
+          label: 'meta-llama/llama-3.3-70b-instruct',
+          disabled: false,
+          disabledReason: undefined,
+        },
+        {
+          id: 'openrouter/qwen/qwen3-coder',
+          label: 'qwen/qwen3-coder',
+          disabled: false,
+          disabledReason: undefined,
+        },
+      ],
+    });
   });
 });

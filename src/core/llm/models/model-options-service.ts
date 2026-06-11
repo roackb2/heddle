@@ -1,5 +1,8 @@
 import type { LlmProvider } from '@/core/llm/types.js';
-import { OllamaModelDiscoveryService } from '@/core/llm/adapters/ollama/ollama-model-discovery.js';
+import {
+  OpenAiCompatibleModelDiscoveryService,
+  type OpenAiCompatibleModelDiscoverySource,
+} from '@/core/llm/adapters/openai-compatible/index.js';
 import { LlmProviderInference } from '../registry/provider-inference.js';
 import {
   BUILT_IN_MODEL_GROUPS,
@@ -18,12 +21,12 @@ export class ModelOptionsService {
   static async resolve(context: ModelCatalogResolutionContext = {}): Promise<{ groups: ModelOptionGroup[] }> {
     const credentialModes = context.credentialModes ?? {};
     const builtInGroups = BUILT_IN_MODEL_GROUPS.map((group) => ModelOptionsService.toBuiltInModelOptionGroup(group, credentialModes));
-    const localGroups = await ModelOptionsService.resolveLocalModelOptionGroups(context);
+    const discoveredGroups = await ModelOptionsService.resolveDiscoveredModelOptionGroups(context);
 
     return {
       groups: [
         ...builtInGroups,
-        ...localGroups,
+        ...discoveredGroups,
       ],
     };
   }
@@ -49,38 +52,39 @@ export class ModelOptionsService {
     };
   }
 
-  private static async resolveLocalModelOptionGroups(context: ModelCatalogResolutionContext): Promise<ModelOptionGroup[]> {
-    const ollamaModels = await ModelOptionsService.discoverOllamaModels(context);
-    if (ollamaModels.length === 0) {
-      return [];
-    }
-
-    return [{
-      label: 'Ollama · Installed local models',
-      models: ollamaModels.map((model) => model.id),
-      options: ollamaModels.map((model) => ModelPolicyService.buildCredentialAwareModelOption({
-        model: model.id,
-        provider: 'ollama',
-        label: model.name,
-        credentialMode: 'api-key',
-      })),
-      source: 'local-discovered',
-    }];
+  private static async resolveDiscoveredModelOptionGroups(context: ModelCatalogResolutionContext): Promise<ModelOptionGroup[]> {
+    const sources = context.openAiCompatibleSources ?? [];
+    const groups = await Promise.all(sources.map((source) => ModelOptionsService.resolveOpenAiCompatibleModelOptionGroup(source, context)));
+    return groups.flatMap((group) => group ?? []);
   }
 
-  private static async discoverOllamaModels(context: ModelCatalogResolutionContext) {
-    if (!context.ollamaBaseUrl) {
-      return [];
-    }
-
+  private static async resolveOpenAiCompatibleModelOptionGroup(
+    source: OpenAiCompatibleModelDiscoverySource,
+    context: ModelCatalogResolutionContext,
+  ): Promise<ModelOptionGroup | undefined> {
     try {
-      return await OllamaModelDiscoveryService.listInstalledModels({
-        baseUrl: context.ollamaBaseUrl,
+      const models = await OpenAiCompatibleModelDiscoveryService.listModels({
+        ...source,
         fetchImpl: context.fetchImpl,
         signal: context.signal,
       });
+      if (models.length === 0) {
+        return undefined;
+      }
+
+      return {
+        label: source.profile.modelDiscovery.label,
+        models: models.map((model) => model.id),
+        options: models.map((model) => ModelPolicyService.buildCredentialAwareModelOption({
+          model: model.id,
+          provider: source.profile.id,
+          label: model.name,
+          credentialMode: 'api-key',
+        })),
+        source: source.profile.modelDiscovery.source,
+      };
     } catch {
-      return [];
+      return undefined;
     }
   }
 }

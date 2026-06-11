@@ -42,7 +42,7 @@ Heddle 適合想讓 AI 程式開發助理參與日常軟體開發，同時保留
 - 只在工作區需要時啟用標準 Agent Skills
 - 連接使用者設定的 MCP servers，例如 Notion、Anytype、GitHub 或其他工具
 - 選擇性啟用 Browser Automation，用於渲染後頁面檢查與使用者要求的網頁流程
-- 透過 Heddle 的 provider adapters 使用 hosted models 或本地 Ollama models
+- 透過 Heddle 的 provider adapters 使用 hosted models、本地 Ollama 與 OpenAI-compatible providers
 - 基於 Heddle runtime APIs 建立自訂 host
 
 如果你只需要非常簡單的單次提示執行工具，而且不在意 sessions、持久化、可觀測性或操作員控制，Heddle 可能不是最適合的工具。
@@ -204,9 +204,22 @@ Terminal composer 支援多行 prompts、prompt undo/redo、prompt history navig
 
 更多：[Chat and sessions guide](docs/guides/chat-and-sessions.md)
 
-## 本地模型
+## Model Providers
 
-Heddle 除了 hosted OpenAI 與 Anthropic models，也可以使用本地 Ollama models。當你想要 local-first 工作流程、想避免把 model prompt 送到 hosted provider，或想測試特定本地模型的 agent 行為時，這會很有用。
+Heddle 不綁定單一 model vendor。它透過 provider adapters 支援 hosted frontier models、本地 models 與 OpenAI-compatible gateways，讓你可以依照每次工作選擇最合適的取捨：能力最強的 hosted model、私有本地 model、自架 inference server，或 routing gateway。
+
+支援的 provider families：
+
+- OpenAI，包含 OpenAI account sign-in 與 Platform API-key mode
+- Anthropic Claude API key
+- Ollama 本地 models，使用 `ollama/` prefix
+- LM Studio local server models，使用 `lmstudio/` prefix
+- LiteLLM gateway models，使用 `litellm/` prefix
+- vLLM self-hosted OpenAI-compatible models，使用 `vllm/` prefix
+- Hugging Face router models，使用 `huggingface/` 或 `hf/` prefix
+- OpenRouter models，使用 `openrouter/` prefix
+- Together AI models，使用 `together/` prefix
+- Groq models，使用 `groq/` prefix
 
 先啟動 Ollama，pull 或安裝 chat-capable model，然後用 `ollama/` model prefix 選擇它：
 
@@ -216,14 +229,21 @@ heddle --model ollama/llama3.2:latest ask "Summarize this repository"
 heddle chat --model ollama/llama3.2:latest
 ```
 
-在 terminal chat 裡，可以用 `/model set <query>` 搜尋可用 models。當 Ollama 正在執行時，terminal picker 與 browser model selector 會從本地 Ollama API 發現已安裝的 Ollama chat models，所以你不需要記住每個 model name。
+其他 OpenAI-compatible providers 則用對應 profile prefix 選擇 models：
+
+```bash
+heddle --model lmstudio/local-model ask "Reply with exactly: ok"
+heddle --model openrouter/meta-llama/llama-3.3-70b-instruct ask "Summarize this repository"
+```
+
+在 terminal chat 裡，可以用 `/model set <query>` 搜尋可用 models。Terminal picker 與 browser model selector 使用同一個 model-options service：Ollama 會從本地 Ollama API 發現 models，其他 OpenAI-compatible profiles 會在 local server 正在執行或 hosted API key 已設定時從 `/models` 發現 models。
 
 ```text
 /model set llama
 /model ollama/llama3.2:latest
 ```
 
-本地模型品質差異很大。有些較小或較舊的 local models 不擅長 tool calling，可能忽略 tool results，或給出有信心但錯誤的程式碼庫答案。請保留人工 review，對高風險工作維持 approval prompts，重要修改建議使用能力較強的 model。
+本地與 gateway models 的品質差異很大。有些較小、較舊或經由 provider routing 的 models 不擅長 tool calling，可能忽略 tool results，或給出有信心但錯誤的程式碼庫答案。請保留人工 review，對高風險工作維持 approval prompts，重要修改建議使用能力較強的 model。
 
 更多：[Providers and models](docs/reference/providers-and-models.md)
 

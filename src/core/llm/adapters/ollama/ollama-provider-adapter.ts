@@ -1,8 +1,10 @@
 import type { LlmAdapterCreateInput } from '@/core/llm/types.js';
 import type { LlmProviderAdapter } from '@/core/llm/registry/index.js';
-import { LlmProviderInference } from '@/core/llm/registry/provider-inference.js';
-import { OllamaAdapter } from './ollama-adapter.js';
+import { OpenAiCompatibleAdapter } from '../openai-compatible/openai-compatible-adapter.js';
+import { OpenAiCompatibleProviderProfileService } from '../openai-compatible/openai-compatible-profiles.js';
 import { OllamaModelName } from './ollama-model.js';
+
+const OLLAMA_PROFILE = OpenAiCompatibleProviderProfileService.get('ollama');
 
 /**
  * Registers Ollama as a first-class provider. The adapter requires an explicit
@@ -13,7 +15,7 @@ export class OllamaProviderAdapter implements LlmProviderAdapter {
   readonly provider = 'ollama' as const;
 
   inferModel(model: string): boolean {
-    return LlmProviderInference.matchesProviderModel(this.provider, model.trim());
+    return OpenAiCompatibleProviderProfileService.findByModel(model.trim())?.id === this.provider;
   }
 
   defaultModel(): string {
@@ -24,7 +26,10 @@ export class OllamaProviderAdapter implements LlmProviderAdapter {
     return OllamaModelName.toHeddleModel(model);
   }
 
-  createAdapter(input: LlmAdapterCreateInput & { provider: 'ollama'; model: string }): OllamaAdapter {
-    return new OllamaAdapter(input);
+  createAdapter(input: LlmAdapterCreateInput & { provider: 'ollama'; model: string }): OpenAiCompatibleAdapter {
+    return new OpenAiCompatibleAdapter({
+      ...input,
+      profile: OLLAMA_PROFILE,
+    });
   }
 }

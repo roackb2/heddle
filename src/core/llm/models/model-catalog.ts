@@ -1,4 +1,5 @@
 import type { LlmProvider } from '@/core/llm/types.js';
+import type { OpenAiCompatibleModelDiscoverySource } from '@/core/llm/adapters/openai-compatible/index.js';
 import type { CredentialAwareModelOption } from './model-policy-service.js';
 import type { ModelCredentialMode } from './model-policy-service.js';
 
@@ -77,7 +78,7 @@ export const OPENAI_ACCOUNT_SIGN_IN_MODELS = [
   'gpt-5.3-codex-spark',
 ];
 
-export type ModelOptionSource = 'built-in' | 'local-discovered';
+export type ModelOptionSource = 'built-in' | 'local-discovered' | 'remote-discovered';
 
 export type ModelOptionGroup = {
   label: string;
@@ -88,7 +89,7 @@ export type ModelOptionGroup = {
 
 export type ModelCatalogResolutionContext = {
   credentialModes?: Partial<Record<LlmProvider, ModelCredentialMode>>;
-  ollamaBaseUrl?: string;
+  openAiCompatibleSources?: OpenAiCompatibleModelDiscoverySource[];
   fetchImpl?: (url: unknown, init?: unknown) => Promise<globalThis.Response>;
   signal?: AbortSignal;
 };

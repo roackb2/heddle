@@ -16,6 +16,9 @@ describe('llm adapter factory', () => {
     expect(LlmAdapterService.inferProvider('claude-sonnet-4-6')).toBe('anthropic');
     expect(LlmAdapterService.inferProvider('gemini-2.5-pro')).toBe('google');
     expect(LlmAdapterService.inferProvider('ollama/llama3.2:latest')).toBe('ollama');
+    expect(LlmAdapterService.inferProvider('lmstudio/local-model')).toBe('lmstudio');
+    expect(LlmAdapterService.inferProvider('hf/meta-llama/Llama-3.3-70B-Instruct')).toBe('huggingface');
+    expect(LlmAdapterService.inferProvider('openrouter/anthropic/claude-sonnet-4.5')).toBe('openrouter');
   });
 
   it('prefers an explicit provider over model inference', () => {
@@ -194,6 +197,68 @@ describe('llm adapter factory', () => {
         totalTokens: 14,
         requests: 1,
       },
+    });
+  });
+
+  it('sends OpenAI-compatible profile requests with bearer auth and provider-local model names', async () => {
+    const requests: Array<{ url: string; headers: Headers; body: unknown }> = [];
+    const adapter = LlmAdapterService.create({
+      model: 'openrouter/meta-llama/llama-3.3-70b-instruct',
+      runtime: {
+        endpoint: {
+          baseUrl: 'https://openrouter.test/api/v1',
+          auth: { type: 'bearer', token: 'openrouter-key' },
+        },
+        fetchImpl: (async (url, init) => {
+          requests.push({
+            url: String(url),
+            headers: new Headers((init as RequestInit).headers),
+            body: JSON.parse(String((init as RequestInit).body)),
+          });
+          return new Response(JSON.stringify({
+            choices: [{
+              message: {
+                content: 'ok',
+              },
+            }],
+            usage: {
+              prompt_tokens: 3,
+              completion_tokens: 1,
+              total_tokens: 4,
+            },
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }) as typeof fetch,
+      },
+    });
+
+    const result = await adapter.chat([{ role: 'user', content: 'hello' }], []);
+
+    expect(adapter.info).toEqual({
+      provider: 'openrouter',
+      model: 'openrouter/meta-llama/llama-3.3-70b-instruct',
+      capabilities: {
+        toolCalls: true,
+        systemMessages: true,
+        reasoningSummaries: false,
+        parallelToolCalls: false,
+      },
+    });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.url).toBe('https://openrouter.test/api/v1/chat/completions');
+    expect(requests[0]?.headers.get('authorization')).toBe('Bearer openrouter-key');
+    expect(requests[0]?.body).toMatchObject({
+      model: 'meta-llama/llama-3.3-70b-instruct',
+      stream: false,
+    });
+    expect(result.content).toBe('ok');
+    expect(result.usage).toEqual({
+      inputTokens: 3,
+      outputTokens: 1,
+      totalTokens: 4,
+      requests: 1,
     });
   });
 

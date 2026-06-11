@@ -28,10 +28,7 @@ export class LlmProviderRuntimeService {
       credentialSource,
       llmRuntime: {
         reasoningEffort: input.reasoningEffort,
-        endpoint: credentialSource.type === 'local-endpoint' ? {
-          baseUrl: credentialSource.baseUrl,
-          auth: { type: 'none' },
-        } : undefined,
+        endpoint: RuntimeCredentialService.resolveOpenAiCompatibleEndpointRuntime(provider, credentialRuntime),
       },
     };
   }

@@ -82,11 +82,12 @@ heddle --prefer-api-key ask "List the top-level build commands"
 heddle --prefer-api-key daemon
 ```
 
-Use a local Ollama model:
+Use a local or OpenAI-compatible model:
 
 ```bash
 ollama list
 heddle --model ollama/llama3.2:latest ask "Summarize this repository"
+heddle --model lmstudio/local-model ask "Summarize this repository"
 ```
 
 Ollama models do not require a hosted provider API key. Start Ollama locally,

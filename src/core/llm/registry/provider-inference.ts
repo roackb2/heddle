@@ -49,6 +49,12 @@ export class LlmProviderInference {
     ['anthropic', (value) => value.startsWith('claude')],
     ['google', (value) => value.startsWith('gemini')],
     ['ollama', (value) => value.startsWith('ollama/') || value.startsWith('ollama:')],
+    ['lmstudio', (value) => value.startsWith('lmstudio/') || value.startsWith('lmstudio:')],
+    ['litellm', (value) => value.startsWith('litellm/') || value.startsWith('litellm:')],
+    ['vllm', (value) => value.startsWith('vllm/') || value.startsWith('vllm:')],
     ['huggingface', (value) => value.startsWith('hf/') || value.startsWith('huggingface/')],
+    ['openrouter', (value) => value.startsWith('openrouter/') || value.startsWith('openrouter:')],
+    ['together', (value) => value.startsWith('together/') || value.startsWith('together:')],
+    ['groq', (value) => value.startsWith('groq/') || value.startsWith('groq:')],
   ];
 }

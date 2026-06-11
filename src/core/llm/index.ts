@@ -4,6 +4,22 @@ export type { AnthropicAdapterOptions } from './adapters/anthropic/index.js';
 export { OllamaAdapter, OllamaProviderAdapter } from './adapters/ollama/index.js';
 export type { OllamaAdapterOptions } from './adapters/ollama/index.js';
 export {
+  OpenAiCompatibleAdapter,
+  OpenAiCompatibleModelDiscoveryService,
+  OpenAiCompatibleModelName,
+  OpenAiCompatibleProviderAdapter,
+  OPENAI_COMPATIBLE_PROVIDER_PROFILES,
+  OpenAiCompatibleProviderProfileService,
+} from './adapters/openai-compatible/index.js';
+export type {
+  OpenAiCompatibleAdapterOptions,
+  OpenAiCompatibleDiscoveredModel,
+  OpenAiCompatibleModelDiscoveryOptions,
+  OpenAiCompatibleModelDiscoverySource,
+  OpenAiCompatibleProviderId,
+  OpenAiCompatibleProviderProfile,
+} from './adapters/openai-compatible/index.js';
+export {
   OpenAiAdapter,
   OpenAiCodexSseService,
   OpenAiOAuthFetchService,

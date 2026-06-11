@@ -1,6 +1,9 @@
 import { DEFAULT_LLM_PROVIDER } from '@/core/config.js';
 import { AnthropicProviderAdapter } from '../adapters/anthropic/index.js';
-import { OllamaProviderAdapter } from '../adapters/ollama/index.js';
+import {
+  OpenAiCompatibleProviderAdapter,
+  OpenAiCompatibleProviderProfileService,
+} from '../adapters/openai-compatible/index.js';
 import { OpenAiProviderAdapter } from '../adapters/openai/index.js';
 import { LlmProviderRegistry } from './llm-provider-registry.js';
 
@@ -11,7 +14,7 @@ export class BuiltinLlmProviderRegistry {
       providers: [
         new OpenAiProviderAdapter(),
         new AnthropicProviderAdapter(),
-        new OllamaProviderAdapter(),
+        ...OpenAiCompatibleProviderProfileService.list().map((profile) => new OpenAiCompatibleProviderAdapter(profile)),
       ],
     });
   }

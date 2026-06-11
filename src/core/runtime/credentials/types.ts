@@ -11,5 +11,5 @@ export type ProviderCredentialSource =
   | { type: 'explicit-api-key' }
   | { type: 'env-api-key'; provider: LlmProvider }
   | { type: 'oauth'; provider: LlmProvider; accountId?: string; expiresAt?: number }
-  | { type: 'local-endpoint'; provider: Extract<LlmProvider, 'ollama'>; baseUrl: string }
+  | { type: 'local-endpoint'; provider: LlmProvider; baseUrl: string }
   | { type: 'missing'; provider: LlmProvider };
