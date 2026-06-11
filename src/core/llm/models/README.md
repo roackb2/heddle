@@ -8,6 +8,8 @@ This package owns:
 
 - the curated list of models Heddle exposes in user-facing pickers and command
   help;
+- the shared model-options contract consumed by control-plane clients, including
+  provider-owned local discovery such as installed Ollama models;
 - provider-specific model allowlists, including OpenAI account sign-in support;
 - reasoning-effort support, defaults, and per-model supported effort levels;
 - model-specific system selections such as compaction and session-title models;
@@ -20,9 +22,16 @@ Other services should consume `ModelCatalogService` and `ModelPolicyService`.
 They should not recreate model lists, infer reasoning support, invent context
 window estimates, or decide model fallback policy locally.
 
+`ModelOptionsService` is the control-plane-facing aggregation boundary. It
+combines the static catalog with provider discovery and returns the grouped
+`modelOptions` shape used by web, TUI, task forms, and model slash-command
+pickers. Provider-specific discovery logic should live with the provider adapter
+or provider family, then be composed here.
+
 ## Extension Rules
 
 - Add or update model availability in `model-catalog.ts`.
+- Add or update provider-backed picker aggregation in `model-options-service.ts`.
 - Add or update model policy in `model-policy-service.ts`.
 - Prefer named service methods over exporting raw constants for callers to
   combine themselves.

@@ -58,6 +58,7 @@ describe('RuntimeCredentialService', () => {
     vi.stubEnv('OLLAMA_OPENAI_BASE_URL', '');
     vi.stubEnv('OLLAMA_BASE_URL', 'http://localhost:11434/');
 
+    expect(RuntimeCredentialService.resolveOllamaBaseUrl()).toBe('http://localhost:11434');
     expect(RuntimeCredentialService.resolveCredentialSourceForModel('ollama/qwen3:8b')).toEqual({
       type: 'local-endpoint',
       provider: 'ollama',
