@@ -1,6 +1,7 @@
+import type { FormEvent, ReactNode } from 'react';
 import { useMemo, useState } from 'react';
-import { Copy, Pencil, Trash2 } from 'lucide-react';
-import type { ControlPlaneCustomAgent, ControlPlaneCustomAgents } from '@web/api/client';
+import { Copy, Pencil, Plus, Trash2 } from 'lucide-react';
+import type { ControlPlaneCustomAgent, ControlPlaneCustomAgentCreateInput, ControlPlaneCustomAgents } from '@web/api/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,18 +14,50 @@ import {
   AlertDialogTrigger,
 } from '@web/components/ui/alert-dialog';
 import { Button } from '@web/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@web/components/ui/dialog';
 import { Input } from '@web/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@web/components/ui/select';
+import { Textarea } from '@web/components/ui/textarea';
 import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
 import { cn } from '@web/lib/utils';
+
+type ProjectAgentCreateInput = Omit<ControlPlaneCustomAgentCreateInput, 'workspaceId'>;
 
 export interface AgentsSettingsViewProps {
   agents?: ControlPlaneCustomAgents;
   loading: boolean;
   error?: string;
+  creating: boolean;
   deleting: boolean;
+  onCreateProjectAgent: (input: ProjectAgentCreateInput) => Promise<void>;
   onDeleteProjectAgent: (agentProfileId: string) => Promise<void>;
 }
+
+type AgentCreateDraft = {
+  id: string;
+  name: string;
+  description: string;
+  modeAlias: 'none' | 'ask' | 'code' | 'review';
+  toolsPreset: ProjectAgentCreateInput['toolsPreset'];
+  approvalPreset: ProjectAgentCreateInput['approvalPreset'];
+  maxSteps: string;
+  promptAppendix: string;
+};
 
 const modeLabelKeys = {
   ask: 'agentSettings.mode.ask',
@@ -44,11 +77,28 @@ const sourceToneClasses = {
   user: 'border-border bg-muted/20 text-muted-foreground',
 } satisfies Record<ControlPlaneCustomAgent['source'], string>;
 
+const defaultCreateDraft: AgentCreateDraft = {
+  id: '',
+  name: '',
+  description: '',
+  modeAlias: 'ask',
+  toolsPreset: 'inspect',
+  approvalPreset: 'read_only',
+  maxSteps: '80',
+  promptAppendix: '',
+};
+
+const modeOptions = ['none', 'ask', 'code', 'review'] satisfies AgentCreateDraft['modeAlias'][];
+const toolPresetOptions = ['default', 'inspect', 'none'] satisfies ProjectAgentCreateInput['toolsPreset'][];
+const approvalPresetOptions = ['interactive', 'read_only', 'auto'] satisfies ProjectAgentCreateInput['approvalPreset'][];
+
 export function AgentsSettingsView({
   agents,
+  creating,
   deleting,
   error,
   loading,
+  onCreateProjectAgent,
   onDeleteProjectAgent,
 }: AgentsSettingsViewProps) {
   const { t } = useI18n();
@@ -56,6 +106,8 @@ export function AgentsSettingsView({
   const [pendingAgentId, setPendingAgentId] = useState<string | undefined>();
   const [copiedAgentId, setCopiedAgentId] = useState<string | undefined>();
   const [actionError, setActionError] = useState<string | undefined>();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createDraft, setCreateDraft] = useState<AgentCreateDraft>(defaultCreateDraft);
   const allAgents = useMemo(() => agents?.agents ?? [], [agents?.agents]);
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const visibleAgents = useMemo(() => {
@@ -102,6 +154,34 @@ export function AgentsSettingsView({
     }
   }
 
+  async function createProjectAgent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const maxStepsText = createDraft.maxSteps.trim();
+    const maxSteps = maxStepsText ? Number(maxStepsText) : undefined;
+    if (maxSteps !== undefined && (!Number.isInteger(maxSteps) || maxSteps <= 0)) {
+      setActionError(t('agentSettings.maxStepsInvalid'));
+      return;
+    }
+
+    try {
+      setActionError(undefined);
+      await onCreateProjectAgent({
+        id: createDraft.id.trim(),
+        name: createDraft.name.trim(),
+        description: createDraft.description.trim(),
+        modeAlias: createDraft.modeAlias === 'none' ? undefined : createDraft.modeAlias,
+        toolsPreset: createDraft.toolsPreset,
+        approvalPreset: createDraft.approvalPreset,
+        maxSteps,
+        promptAppendix: createDraft.promptAppendix.trim(),
+      });
+      setCreateDraft(defaultCreateDraft);
+      setCreateOpen(false);
+    } catch (nextError) {
+      setActionError(nextError instanceof Error ? nextError.message : String(nextError));
+    }
+  }
+
   if (loading && !agents) {
     return <AgentsSettingsEmpty title={t('agentSettings.loadingTitle')} body={t('agentSettings.loadingBody')} />;
   }
@@ -121,13 +201,23 @@ export function AgentsSettingsView({
                 {t('agentSettings.overviewBody')}
               </p>
             </div>
-            <Input
-              aria-label={t('agentSettings.searchLabel')}
-              className="v2-control w-full sm:w-72"
-              placeholder={t('agentSettings.searchPlaceholder')}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
+              <CreateAgentDialog
+                creating={creating}
+                draft={createDraft}
+                open={createOpen}
+                onDraftChange={setCreateDraft}
+                onOpenChange={setCreateOpen}
+                onSubmit={createProjectAgent}
+              />
+              <Input
+                aria-label={t('agentSettings.searchLabel')}
+                className="v2-control w-full sm:w-72"
+                placeholder={t('agentSettings.searchPlaceholder')}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </div>
           </div>
           <dl className="flex min-w-0 flex-wrap items-center gap-2">
             <AgentMetricPill label={t('agentSettings.metrics.builtIn')} value={counts['built-in']} />
@@ -182,6 +272,153 @@ export function AgentsSettingsView({
         ) : null}
       </div>
     </div>
+  );
+}
+
+function CreateAgentDialog({
+  creating,
+  draft,
+  open,
+  onDraftChange,
+  onOpenChange,
+  onSubmit,
+}: {
+  creating: boolean;
+  draft: AgentCreateDraft;
+  open: boolean;
+  onDraftChange: (draft: AgentCreateDraft) => void;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+}) {
+  const { t } = useI18n();
+  const updateDraft = <Key extends keyof AgentCreateDraft>(key: Key, value: AgentCreateDraft[Key]) => {
+    onDraftChange({ ...draft, [key]: value });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild>
+        <Button type="button" size="sm" className="shrink-0">
+          <Plus aria-hidden="true" />
+          {t('agentSettings.createAction')}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <form className="grid gap-4" onSubmit={(event) => void onSubmit(event)}>
+          <DialogHeader>
+            <DialogTitle>{t('agentSettings.createDialogTitle')}</DialogTitle>
+            <DialogDescription>{t('agentSettings.createDialogBody')}</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <AgentFormField label={t('agentSettings.idLabel')}>
+              <Input
+                required
+                className="v2-control"
+                placeholder={t('agentSettings.idPlaceholder')}
+                value={draft.id}
+                onChange={(event) => updateDraft('id', event.target.value)}
+              />
+            </AgentFormField>
+            <AgentFormField label={t('agentSettings.nameLabel')}>
+              <Input
+                required
+                className="v2-control"
+                placeholder={t('agentSettings.namePlaceholder')}
+                value={draft.name}
+                onChange={(event) => updateDraft('name', event.target.value)}
+              />
+            </AgentFormField>
+          </div>
+
+          <AgentFormField label={t('agentSettings.descriptionLabel')}>
+            <Input
+              required
+              className="v2-control"
+              placeholder={t('agentSettings.descriptionPlaceholder')}
+              value={draft.description}
+              onChange={(event) => updateDraft('description', event.target.value)}
+            />
+          </AgentFormField>
+
+          <div className="grid gap-3 sm:grid-cols-4">
+            <AgentFormField label={t('agentSettings.modeLabel')}>
+              <Select value={draft.modeAlias} onValueChange={(value) => updateDraft('modeAlias', value as AgentCreateDraft['modeAlias'])}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {modeOptions.map((mode) => (
+                    <SelectItem key={mode} value={mode}>{t(mode === 'none' ? 'agentSettings.mode.none' : modeLabelKeys[mode])}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </AgentFormField>
+            <AgentFormField label={t('agentSettings.toolProfileLabel')}>
+              <Select value={draft.toolsPreset} onValueChange={(value) => updateDraft('toolsPreset', value as AgentCreateDraft['toolsPreset'])}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {toolPresetOptions.map((preset) => (
+                    <SelectItem key={preset} value={preset}>{preset}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </AgentFormField>
+            <AgentFormField label={t('agentSettings.approvalProfileLabel')}>
+              <Select value={draft.approvalPreset} onValueChange={(value) => updateDraft('approvalPreset', value as AgentCreateDraft['approvalPreset'])}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {approvalPresetOptions.map((preset) => (
+                    <SelectItem key={preset} value={preset}>{preset}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </AgentFormField>
+            <AgentFormField label={t('agentSettings.maxStepsLabel')}>
+              <Input
+                className="v2-control"
+                inputMode="numeric"
+                placeholder={t('agentSettings.maxStepsPlaceholder')}
+                value={draft.maxSteps}
+                onChange={(event) => updateDraft('maxSteps', event.target.value)}
+              />
+            </AgentFormField>
+          </div>
+
+          <AgentFormField label={t('agentSettings.promptLabel')}>
+            <Textarea
+              required
+              className="v2-control min-h-32 px-3 py-2"
+              placeholder={t('agentSettings.promptPlaceholder')}
+              value={draft.promptAppendix}
+              onChange={(event) => updateDraft('promptAppendix', event.target.value)}
+            />
+          </AgentFormField>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={creating} onClick={() => onOpenChange(false)}>
+              {t('agentSettings.cancelAction')}
+            </Button>
+            <Button type="submit" disabled={creating}>
+              {creating ? t('agentSettings.creating') : t('agentSettings.createConfirmAction')}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AgentFormField({ children, label }: { children: ReactNode; label: string }) {
+  return (
+    <label className="grid min-w-0 gap-1.5">
+      <span className="v2-type-caption text-muted-foreground">{label}</span>
+      {children}
+    </label>
   );
 }
 

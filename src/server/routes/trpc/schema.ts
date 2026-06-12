@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import { AUTONOMY_PERMISSION_MODES } from '@/core/approvals/index.js';
+import {
+  CustomAgentApprovalPresetSchema,
+  CustomAgentModeAliasSchema,
+  CustomAgentToolPresetSchema,
+} from '@/core/custom-agents/index.js';
 
 export const sessionInputSchema = z.object({
   id: z.string().min(1),
@@ -257,6 +262,18 @@ export const skillInputSchema = z.object({
 export const customAgentInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   agentProfileId: z.string().min(1),
+});
+
+export const customAgentCreateInputSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+  id: z.string().min(1).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/),
+  name: z.string().min(1),
+  description: z.string().min(1),
+  modeAlias: CustomAgentModeAliasSchema.optional(),
+  toolsPreset: CustomAgentToolPresetSchema,
+  approvalPreset: CustomAgentApprovalPresetSchema,
+  maxSteps: z.number().int().min(1).max(500).optional(),
+  promptAppendix: z.string().min(1),
 });
 
 export const browserAutomationInputSchema = z.object({

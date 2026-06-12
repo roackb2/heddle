@@ -38,6 +38,21 @@ export type CustomAgentCatalog = {
   issues: CustomAgentCatalogIssue[];
 };
 
+export type CustomAgentCreateInput = {
+  id: string;
+  name: string;
+  description: string;
+  modeAlias?: CustomAgentModeAlias;
+  toolsPreset: RuntimeToolSelectionProfile['preset'];
+  approvalPreset: ToolApprovalProfile['preset'];
+  maxSteps?: number;
+  promptAppendix: string;
+};
+
+export type CustomAgentCreateResult = {
+  createdAgent: CustomAgentDefinition;
+};
+
 export type CustomAgentDeleteResult = {
   deletedAgent: CustomAgentDefinition;
 };
