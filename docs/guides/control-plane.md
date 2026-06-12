@@ -28,7 +28,7 @@ The default control plane includes:
 - current workspace review backed by Git status and file patches, so generated or shell-made changes are visible even when they did not come from the edit tool
 - historical turn review for trace-backed file diffs, review commands, verification commands, approvals, and events
 - lightweight toast notifications for session/action success and failure
-- browser notifications for selected-session approvals, selected-session run completion, and active-workspace task run completion while the control plane is open
+- browser notifications for open-workspace approvals, open-workspace session run completion, and active-workspace task run completion while the control plane is open
 - heartbeat task creation, editing, enabling, disabling, deletion, manual run, explicit resume, scheduling state, selected task detail, live run state, and run history
 - settings navigation for general preferences, workspace selection, and memory status
 - recent heartbeat run summaries and usage data

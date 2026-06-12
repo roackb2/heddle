@@ -9,6 +9,7 @@ import type { WorkspaceCreateInput } from '@web/components/settings';
 import { useControlPlaneErrorToasts } from './useControlPlaneErrorToasts';
 import { useControlPlaneHeartbeatEvents } from './tasks/useControlPlaneHeartbeatEvents';
 import { useControlPlaneSessionDetail } from './sessions/useControlPlaneSessionDetail';
+import { useControlPlaneWorkspaceSessionEvents } from './sessions/useControlPlaneWorkspaceSessionEvents';
 import { useControlPlaneSessionArchive } from './shell/useControlPlaneSessionArchive';
 import { useControlPlaneSidebarData } from './shell/useControlPlaneSidebarData';
 import { useControlPlaneTaskActions } from './tasks/useControlPlaneTaskActions';
@@ -56,6 +57,10 @@ export function useControlPlaneAppState() {
     workspaceId: navigation.selectedWorkspaceId,
   });
   const sidebar = useControlPlaneSidebarData({ navigation, taskEvents });
+  useControlPlaneWorkspaceSessionEvents({
+    onNotificationIntent: notifications.deliver,
+    workspaceId: sidebar.workspaceId,
+  });
   const memoryStatusQuery = trpcReact.controlPlane.memoryStatus.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
     enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'memory',
   });

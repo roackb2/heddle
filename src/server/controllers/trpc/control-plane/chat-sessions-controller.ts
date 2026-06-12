@@ -386,12 +386,22 @@ export class ControlPlaneChatSessionsController {
   }
 
   async *subscribeSessionListEvents(args: {
+    workspaceId: string;
     stateRoot: string;
     signal?: AbortSignal;
   }): AsyncGenerator<ControlPlaneSessionsEventEnvelope> {
     const stream = RuntimeSubscriptionStream.fromSources<ControlPlaneSessionsEventEnvelope>({
       signal: args.signal,
       sources: [
+        (sink) => {
+          const listener = (event: ControlPlaneSessionsEventEnvelope) => {
+            sink.push(event);
+          };
+          this.sessionEventBus.on(ControlPlaneChatSessionEventsController.workspaceAddressKey(args), listener);
+          return () => {
+            this.sessionEventBus.off(ControlPlaneChatSessionEventsController.workspaceAddressKey(args), listener);
+          };
+        },
         (sink) => {
           try {
             const watcher = watch(join(args.stateRoot, 'chat-sessions.catalog.json'), { persistent: false }, () => {

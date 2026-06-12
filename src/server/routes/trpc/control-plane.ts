@@ -91,6 +91,7 @@ export const controlPlaneRouter = router({
   sessionsEvents: controlPlaneWorkspaceProcedure.input(sessionsEventsInputSchema).subscription(({ ctx, signal }) => {
     const { workspace } = ctx.requestWorkspace;
     return controlPlaneChatSessionsController.subscribeSessionListEvents({
+      workspaceId: workspace.id,
       stateRoot: workspace.stateRoot,
       signal,
     });

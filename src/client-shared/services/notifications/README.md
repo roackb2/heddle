@@ -19,7 +19,7 @@ adapter.
 ## Current Intents
 
 - `tool.approval_requested` becomes an approval-required notification.
-- `loop.finished` becomes a selected-session run-finished notification.
+- `loop.finished` becomes a session run-finished notification.
 - `heartbeat.task.finished` and `heartbeat.task.failed` become task-run
   notifications for the active workspace while a client is open.
 
