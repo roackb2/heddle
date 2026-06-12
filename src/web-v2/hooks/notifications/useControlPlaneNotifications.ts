@@ -108,6 +108,8 @@ function showBrowserNotification(intent: Pick<ClientSharedNotificationIntent, 't
   try {
     new Notification(intent.title, {
       body: intent.body,
+      requireInteraction: true,
+      silent: false,
       tag: intent.key,
     });
     return true;

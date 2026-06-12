@@ -1,5 +1,4 @@
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import notifier from 'node-notifier';
 import {
   ClientSharedNotificationMemory,
@@ -18,12 +17,8 @@ type TerminalNotificationServiceOptions = {
   alert?: () => void;
   nativeSend?: TerminalNativeNotificationSender;
   send?: TerminalNotificationSender;
+  terminalSend?: TerminalNotificationSender;
 };
-
-const TERMINAL_NOTIFIER_PATHS = [
-  '/opt/homebrew/bin/terminal-notifier',
-  '/usr/local/bin/terminal-notifier',
-];
 
 /**
  * Owns cli-v2 desktop notification delivery. Shared notification projection
@@ -35,11 +30,13 @@ export class ControlPlaneTerminalNotificationService {
   private readonly alert: () => void;
   private readonly nativeSend: TerminalNativeNotificationSender;
   private readonly send: TerminalNotificationSender;
+  private readonly terminalSend: TerminalNotificationSender;
 
   constructor(options: TerminalNotificationServiceOptions = {}) {
     this.alert = options.alert ?? (() => process.stdout.write('\u0007'));
     this.nativeSend = options.nativeSend ?? showNativeNotification;
     this.send = options.send ?? ((message) => notifier.notify(message));
+    this.terminalSend = options.terminalSend ?? showWarpTerminalNotification;
   }
 
   deliver(intent: ClientSharedNotificationIntent | undefined): void {
@@ -48,11 +45,13 @@ export class ControlPlaneTerminalNotificationService {
       return;
     }
 
+    const sound = accepted.tone !== 'info';
+
     try {
       this.send({
         title: accepted.title,
         message: accepted.body ?? accepted.title,
-        sound: accepted.tone === 'warning' || accepted.tone === 'error',
+        sound,
       });
     } catch {
       // Notification delivery is best-effort and must never interrupt live event reduction.
@@ -62,10 +61,20 @@ export class ControlPlaneTerminalNotificationService {
       this.nativeSend({
         title: accepted.title,
         message: accepted.body ?? accepted.title,
-        sound: accepted.tone === 'warning' || accepted.tone === 'error',
+        sound,
       });
     } catch {
       // Native notification delivery is best-effort and must never interrupt live event reduction.
+    }
+
+    try {
+      this.terminalSend({
+        title: accepted.title,
+        message: accepted.body ?? accepted.title,
+        sound,
+      });
+    } catch {
+      // Terminal-native notification delivery is best-effort and must never interrupt live event reduction.
     }
 
     try {
@@ -81,36 +90,49 @@ function showNativeNotification(message: { title: string; message: string; sound
     return;
   }
 
-  const terminalNotifierPath = resolveTerminalNotifierPath();
-  if (terminalNotifierPath) {
-    execFile(terminalNotifierPath, [
-      '-title',
-      message.title,
-      '-message',
-      message.message,
-      ...(message.sound ? ['-sound', 'default'] : []),
-    ], (error) => {
-      if (error) {
-        showMacOsNotification(message);
-      }
-    });
-    return;
-  }
-
   showMacOsNotification(message);
 }
 
-function resolveTerminalNotifierPath(): string | undefined {
-  return TERMINAL_NOTIFIER_PATHS.find((path) => existsSync(path));
-}
+function showMacOsNotification(message: { title: string; message: string; sound?: boolean }): void {
+  const soundClause = message.sound ? ' sound name "Glass"' : '';
 
-function showMacOsNotification(message: { title: string; message: string }): void {
   execFile('/usr/bin/osascript', [
     '-e',
-    `display notification "${escapeAppleScriptString(message.message)}" with title "${escapeAppleScriptString(message.title)}"`,
+    `display notification "${escapeAppleScriptString(message.message)}" with title "${escapeAppleScriptString(message.title)}"${soundClause}`,
   ], () => undefined);
 }
 
 function escapeAppleScriptString(value: string): string {
   return value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+}
+
+function showWarpTerminalNotification(message: { title: string; message: string }): void {
+  if (!isWarpTerminal()) {
+    return;
+  }
+
+  process.stdout.write([
+    '\u001b]777;notify;',
+    escapeTerminalNotificationPayload(message.title),
+    ';',
+    escapeTerminalNotificationPayload(message.message),
+    '\u0007',
+  ].join(''));
+}
+
+function isWarpTerminal(): boolean {
+  return process.env.TERM_PROGRAM === 'WarpTerminal' || process.env.WARP_IS_LOCAL_SHELL_SESSION === '1';
+}
+
+function escapeTerminalNotificationPayload(value: string): string {
+  return Array.from(value)
+    .map((char) => isTerminalNotificationSafeChar(char) ? char : ' ')
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isTerminalNotificationSafeChar(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return char !== ';' && code >= 32 && code !== 127;
 }

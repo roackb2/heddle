@@ -153,12 +153,14 @@ Prompt editing supports `Shift+Enter` for newlines, `Ctrl+Z`/`Ctrl+Y` for undo/r
 
 When the terminal UI is running, Heddle sends desktop notifications for active
 session approval waits and run completion. Delivery uses the operating system
-notification bridge through the terminal process, prefers `terminal-notifier` on
-macOS when installed, falls back to the native macOS notification bridge, and
-also sends a terminal attention signal for terminal apps that support
+notification bridge through the terminal process, uses the native macOS
+notification bridge when available, requests sound for non-info notifications,
+uses Warp's terminal-native notification escape sequence when running inside
+Warp, and also sends a terminal attention signal for terminal apps that support
 bell-based notifications.
 Approval policy and run state still come from the shared control-plane session
-events.
+events. Banner and sound presentation still depend on the operating system and
+terminal app notification settings for the sender application.
 
 ## Development Commands In This Repository
 
