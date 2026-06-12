@@ -11,6 +11,8 @@
   }
 
   .v2-message-row-user {
+    flex-direction: column;
+    align-items: flex-end;
     justify-content: flex-end;
   }
 
@@ -28,6 +30,15 @@
     background: color-mix(in oklab, var(--color-accent) 82%, var(--color-background));
     padding: 0.75rem 0.875rem;
     color: var(--color-foreground);
+  }
+
+  .v2-user-message-agent-label {
+    max-width: min(42rem, 78%);
+    min-width: 0;
+    margin: 0 0 0.25rem;
+    color: var(--color-muted-foreground);
+    font-size: 0.6875rem;
+    line-height: 0.875rem;
   }
 
   .v2-assistant-article-shell {

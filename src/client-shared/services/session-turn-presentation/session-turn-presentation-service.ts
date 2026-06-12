@@ -16,6 +16,7 @@ export type ClientSharedConversationTimelineMessageItem = {
   type: 'message';
   id: string;
   message: ControlPlaneSessionMessage;
+  turnAgent?: ControlPlaneSessionTurn['agent'];
 };
 
 export type ClientSharedConversationTimelineActivityGroupItem = {
@@ -48,14 +49,12 @@ export class ClientSharedSessionTurnPresentationService {
 
     const placedTurnIds = new Set<string>();
     const timeline = session.messages.flatMap((message) => {
-      const messageItem: ClientSharedConversationTimelineMessageItem = {
-        type: 'message',
-        id: message.id,
-        message,
-      };
-
       if (message.role !== 'user') {
-        return [messageItem];
+        return [{
+          type: 'message',
+          id: message.id,
+          message,
+        } satisfies ClientSharedConversationTimelineMessageItem];
       }
 
       const turn = ClientSharedSessionTurnPresentationService.findUnplacedTurnForPrompt({
@@ -63,6 +62,12 @@ export class ClientSharedSessionTurnPresentationService {
         placedTurnIds,
         prompt: message.text,
       });
+      const messageItem: ClientSharedConversationTimelineMessageItem = {
+        type: 'message',
+        id: message.id,
+        message,
+        turnAgent: turn?.agent,
+      };
       if (!turn) {
         return [messageItem];
       }

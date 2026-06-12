@@ -1,4 +1,6 @@
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
+import type { AutopilotProfile } from '../autonomy/index.js';
+import { ToolApprovalPolicies } from '../policies.js';
 import type { ToolApprovalProfile } from './types.js';
 
 const MUTATION_CAPABILITIES = new Set([
@@ -14,17 +16,28 @@ const MUTATION_CAPABILITIES = new Set([
 export class ToolApprovalProfileService {
   static compile(input: {
     profile?: ToolApprovalProfile;
+    autoProfile?: AutopilotProfile;
     basePolicies?: ToolApprovalPolicy[];
   }): ToolApprovalPolicy[] {
-    const profilePolicies = ToolApprovalProfileService.profilePolicies(input.profile);
+    const profilePolicies = ToolApprovalProfileService.profilePolicies({
+      profile: input.profile,
+      autoProfile: input.autoProfile,
+    });
     return [
       ...profilePolicies,
       ...(input.basePolicies ?? []),
     ];
   }
 
-  private static profilePolicies(profile: ToolApprovalProfile | undefined): ToolApprovalPolicy[] {
-    const preset = profile?.preset ?? 'interactive';
+  private static profilePolicies(input: {
+    profile?: ToolApprovalProfile;
+    autoProfile?: AutopilotProfile;
+  }): ToolApprovalPolicy[] {
+    const preset = input.profile?.preset ?? 'interactive';
+    if (preset === 'auto' && input.autoProfile) {
+      return [ToolApprovalPolicies.autopilot({ profile: input.autoProfile })];
+    }
+
     return preset === 'read_only'
       ? [ToolApprovalProfileService.denyMutationCapabilities()]
       : [];

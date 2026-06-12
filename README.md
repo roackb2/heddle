@@ -14,7 +14,19 @@ Official website: [heddleagent.com](https://heddleagent.com)
 - [See It In Action](#see-it-in-action)
 - [Quick Start](#quick-start)
 - [Core Workflows](#core-workflows)
-- [Model Providers](#model-providers)
+  - [Terminal Coding](#terminal-coding)
+  - [Model Providers](#model-providers)
+  - [Browser Control Plane](#browser-control-plane)
+  - [Sessions And Continuity](#sessions-and-continuity)
+  - [Project Instructions](#project-instructions)
+  - [Knowledge Persistence](#knowledge-persistence)
+  - [Agent Skills](#agent-skills)
+  - [Custom Agents](#custom-agents)
+  - [Browser Automation](#browser-automation)
+  - [MCP Integrations](#mcp-integrations)
+  - [Heartbeat](#heartbeat)
+  - [Programmatic Runtime](#programmatic-runtime)
+  - [Semantic Drift](#semantic-drift)
 - [Install](#install)
 - [Requirements](#requirements)
 - [Optional CyberLoop Integration](#optional-cyberloop-integration)
@@ -40,6 +52,7 @@ It is a good fit when you want to:
 - switch between local workspaces from a browser control plane
 - let the agent learn durable project knowledge over time
 - activate standard Agent Skills only when a workspace should expose them
+- define custom agents for turn-scoped roles such as ask, code, review, docs writing, or release operations
 - connect configured MCP servers such as Notion, Anytype, GitHub, or other tools
 - opt into Browser Automation for rendered page inspection and user-requested web workflows
 - run against hosted models, local Ollama, and OpenAI-compatible providers through Heddle's provider adapters
@@ -204,7 +217,7 @@ The terminal composer supports multiline prompts, prompt undo/redo, prompt histo
 
 More: [Chat and sessions guide](docs/guides/chat-and-sessions.md)
 
-## Model Providers
+### Model Providers
 
 Heddle is not tied to one model vendor. It supports hosted frontier models, local models, and OpenAI-compatible gateways through provider adapters. This lets you choose the right tradeoff for each run: strongest hosted model, private local model, self-hosted inference server, or a routing gateway.
 
@@ -325,6 +338,62 @@ Only active skills are shown to the agent. Heddle initially exposes a compact ca
 Skills are instructions, not permissions. They do not bypass Heddle's approval policy or tool safety checks, so users remain responsible for which project or user skills they enable.
 
 More: [Agent Skills guide](docs/guides/agent-skills.md)
+
+### Custom Agents
+
+Custom agents let you choose the role Heddle should use for a specific turn.
+Heddle ships built-in Ask, Code, and Review modes as custom agents, and you can
+define your own project or user agents for specialized work such as repository
+review, docs writing, release operation, or incident investigation.
+
+A custom agent is a named runtime profile:
+
+- prompt appendix: extra instructions appended to Heddle's default system prompt
+- tool profile: which tools the model can see for that turn
+- approval profile: whether the agent is read-only, asks interactively, or uses auto-approved trusted actions
+- runtime defaults: optional defaults such as `maxSteps`, model, or reasoning effort
+
+Agent selection is turn-scoped, not session-scoped. In the same saved session,
+you can ask a question with Ask, switch to Code for implementation, then switch
+to Review for feedback.
+
+Project agents live under `.agents/agents/<id>/AGENT.md`; user agents live under
+`~/.agents/agents/<id>/AGENT.md`. The file starts with YAML frontmatter and the
+markdown body becomes the prompt appendix:
+
+```md
+---
+schemaVersion: 1
+id: repo-reviewer
+name: Repo Reviewer
+description: Review repository changes without applying fixes.
+modeAlias: review
+runtime:
+  maxSteps: 80
+tools:
+  preset: inspect
+approval:
+  preset: read_only
+---
+
+You are a repository review agent. Prioritize correctness, reliability, missing
+tests, and maintainability. Do not edit files or run mutation commands.
+```
+
+Use Settings -> Agents in the browser control plane to create or inspect project
+agents. In chat, use the composer plus menu to choose Ask, Code, Review, or a
+custom agent for the next prompt. For one-shot terminal usage:
+
+```bash
+heddle ask --agent repo-reviewer "Review the current workspace changes"
+heddle ask --mode review "Review the current diff"
+```
+
+Custom agents are role profiles; Agent Skills are reusable instructions the
+agent may load when relevant. A custom agent can still use active skills when
+its tool profile includes `read_agent_skill`.
+
+More: [Custom Agents guide](docs/guides/custom-agents.md)
 
 ### Browser Automation
 
@@ -504,6 +573,7 @@ Feature guides:
 - [Control plane](docs/guides/control-plane.md)
 - [Heartbeat](docs/guides/heartbeat.md)
 - [Agent Skills](docs/guides/agent-skills.md)
+- [Custom Agents](docs/guides/custom-agents.md)
 - Browser Automation: see the Browser Automation section above
 - [MCP integrations](docs/reference/mcp.md)
 - [Knowledge persistence](docs/guides/knowledge-persistence.md)
@@ -528,6 +598,7 @@ Current strengths include:
 - terminal-first coding and repository workflows
 - autonomous, catalog-backed workspace memory that helps the agent learn from normal usage
 - standard Agent Skills support with workspace-level activation and progressive disclosure
+- custom agents for turn-scoped role, tool, approval, and runtime profiles
 - opt-in Browser Automation with browser snapshots, screenshots, policy checks, and a published next-step agenda
 - MCP integration support for user-configured ecosystem tools
 - explicit traces, approval previews, diff review, and local workspace state

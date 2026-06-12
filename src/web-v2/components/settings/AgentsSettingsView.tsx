@@ -1,5 +1,5 @@
 import type { FormEvent, ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Copy, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { ControlPlaneCustomAgent, ControlPlaneCustomAgentCreateInput, ControlPlaneCustomAgents } from '@web/api/client';
 import {
@@ -24,13 +24,6 @@ import {
   DialogTrigger,
 } from '@web/components/ui/dialog';
 import { Input } from '@web/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@web/components/ui/select';
 import { Textarea } from '@web/components/ui/textarea';
 import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
@@ -52,9 +45,8 @@ type AgentCreateDraft = {
   id: string;
   name: string;
   description: string;
-  modeAlias: 'none' | 'ask' | 'code' | 'review';
-  toolsPreset: ProjectAgentCreateInput['toolsPreset'];
-  approvalPreset: ProjectAgentCreateInput['approvalPreset'];
+  access: 'read_only' | 'write';
+  changeApproval: Extract<ProjectAgentCreateInput['approvalPreset'], 'interactive' | 'auto'>;
   maxSteps: string;
   promptAppendix: string;
 };
@@ -81,16 +73,14 @@ const defaultCreateDraft: AgentCreateDraft = {
   id: '',
   name: '',
   description: '',
-  modeAlias: 'ask',
-  toolsPreset: 'inspect',
-  approvalPreset: 'read_only',
+  access: 'read_only',
+  changeApproval: 'interactive',
   maxSteps: '80',
   promptAppendix: '',
 };
 
-const modeOptions = ['none', 'ask', 'code', 'review'] satisfies AgentCreateDraft['modeAlias'][];
-const toolPresetOptions = ['default', 'inspect', 'none'] satisfies ProjectAgentCreateInput['toolsPreset'][];
-const approvalPresetOptions = ['interactive', 'read_only', 'auto'] satisfies ProjectAgentCreateInput['approvalPreset'][];
+const accessOptions = ['read_only', 'write'] satisfies AgentCreateDraft['access'][];
+const changeApprovalOptions = ['interactive', 'auto'] satisfies AgentCreateDraft['changeApproval'][];
 
 export function AgentsSettingsView({
   agents,
@@ -169,9 +159,8 @@ export function AgentsSettingsView({
         id: createDraft.id.trim(),
         name: createDraft.name.trim(),
         description: createDraft.description.trim(),
-        modeAlias: createDraft.modeAlias === 'none' ? undefined : createDraft.modeAlias,
-        toolsPreset: createDraft.toolsPreset,
-        approvalPreset: createDraft.approvalPreset,
+        toolsPreset: createDraft.access === 'read_only' ? 'inspect' : 'default',
+        approvalPreset: createDraft.access === 'read_only' ? 'read_only' : createDraft.changeApproval,
         maxSteps,
         promptAppendix: createDraft.promptAppendix.trim(),
       });
@@ -341,54 +330,6 @@ function CreateAgentDialog({
             />
           </AgentFormField>
 
-          <div className="grid gap-3 sm:grid-cols-4">
-            <AgentFormField label={t('agentSettings.modeLabel')}>
-              <Select value={draft.modeAlias} onValueChange={(value) => updateDraft('modeAlias', value as AgentCreateDraft['modeAlias'])}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {modeOptions.map((mode) => (
-                    <SelectItem key={mode} value={mode}>{t(mode === 'none' ? 'agentSettings.mode.none' : modeLabelKeys[mode])}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </AgentFormField>
-            <AgentFormField label={t('agentSettings.toolProfileLabel')}>
-              <Select value={draft.toolsPreset} onValueChange={(value) => updateDraft('toolsPreset', value as AgentCreateDraft['toolsPreset'])}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {toolPresetOptions.map((preset) => (
-                    <SelectItem key={preset} value={preset}>{preset}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </AgentFormField>
-            <AgentFormField label={t('agentSettings.approvalProfileLabel')}>
-              <Select value={draft.approvalPreset} onValueChange={(value) => updateDraft('approvalPreset', value as AgentCreateDraft['approvalPreset'])}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {approvalPresetOptions.map((preset) => (
-                    <SelectItem key={preset} value={preset}>{preset}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </AgentFormField>
-            <AgentFormField label={t('agentSettings.maxStepsLabel')}>
-              <Input
-                className="v2-control"
-                inputMode="numeric"
-                placeholder={t('agentSettings.maxStepsPlaceholder')}
-                value={draft.maxSteps}
-                onChange={(event) => updateDraft('maxSteps', event.target.value)}
-              />
-            </AgentFormField>
-          </div>
-
           <AgentFormField label={t('agentSettings.promptLabel')}>
             <Textarea
               required
@@ -396,6 +337,45 @@ function CreateAgentDialog({
               placeholder={t('agentSettings.promptPlaceholder')}
               value={draft.promptAppendix}
               onChange={(event) => updateDraft('promptAppendix', event.target.value)}
+            />
+          </AgentFormField>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <AgentChoiceGroup
+              label={t('agentSettings.accessLabel')}
+              options={accessOptions.map((access) => ({
+                id: access,
+                title: t(access === 'read_only' ? 'agentSettings.access.readOnly.label' : 'agentSettings.access.write.label'),
+                description: t(access === 'read_only' ? 'agentSettings.access.readOnly.description' : 'agentSettings.access.write.description'),
+              }))}
+              value={draft.access}
+              onValueChange={(value) => updateDraft('access', value as AgentCreateDraft['access'])}
+            />
+            {draft.access === 'write' ? (
+              <AgentChoiceGroup
+                label={t('agentSettings.changeApprovalLabel')}
+                options={changeApprovalOptions.map((approval) => ({
+                  id: approval,
+                  title: t(approval === 'interactive' ? 'agentSettings.changeApproval.interactive.label' : 'agentSettings.changeApproval.auto.label'),
+                  description: t(approval === 'interactive' ? 'agentSettings.changeApproval.interactive.description' : 'agentSettings.changeApproval.auto.description'),
+                }))}
+                value={draft.changeApproval}
+                onValueChange={(value) => updateDraft('changeApproval', value as AgentCreateDraft['changeApproval'])}
+              />
+            ) : (
+              <div className="rounded-md border border-border bg-muted/10 px-3 py-2">
+                <p className="v2-type-caption text-muted-foreground">{t('agentSettings.readOnlyApprovalNote')}</p>
+              </div>
+            )}
+          </div>
+
+          <AgentFormField label={t('agentSettings.maxStepsLabel')}>
+            <Input
+              className="v2-control"
+              inputMode="numeric"
+              placeholder={t('agentSettings.maxStepsPlaceholder')}
+              value={draft.maxSteps}
+              onChange={(event) => updateDraft('maxSteps', event.target.value)}
             />
           </AgentFormField>
 
@@ -410,6 +390,48 @@ function CreateAgentDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function AgentChoiceGroup<Value extends string>({
+  label,
+  onValueChange,
+  options,
+  value,
+}: {
+  label: string;
+  options: Array<{ id: Value; title: string; description: string }>;
+  value: Value;
+  onValueChange: (value: Value) => void;
+}) {
+  const radioGroupName = useId();
+
+  return (
+    <fieldset className="grid min-w-0 gap-1.5">
+      <legend className="v2-type-caption text-muted-foreground">{label}</legend>
+      <div className="grid gap-2">
+        {options.map((option) => (
+          <label
+            className={cn(
+              'grid cursor-pointer gap-1 rounded-md border px-3 py-2',
+              option.id === value ? 'border-primary/55 bg-primary/10' : 'border-border bg-muted/10',
+            )}
+            key={option.id}
+          >
+            <input
+              checked={option.id === value}
+              className="sr-only"
+              name={radioGroupName}
+              type="radio"
+              value={option.id}
+              onChange={() => onValueChange(option.id)}
+            />
+            <span className="v2-type-body-strong text-foreground">{option.title}</span>
+            <span className="v2-type-caption text-pretty text-muted-foreground">{option.description}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 

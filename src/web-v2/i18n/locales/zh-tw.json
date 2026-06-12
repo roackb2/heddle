@@ -52,6 +52,37 @@
       "stdout": "stdout"
     },
     "executionMenu": "執行設定",
+    "agent": {
+      "approval": {
+        "auto": "可信 roots 自動核准",
+        "custom": "自訂審核",
+        "interactive": "變更前詢問",
+        "readOnly": "唯讀"
+      },
+      "customMenuLabel": "Custom agent 選擇器",
+      "customMenuTitle": "Custom agents",
+      "customTrigger": "Custom Agent",
+      "emptyCustomAgents": "還沒有 custom agents。",
+      "manageAgents": "管理 agents",
+      "statusPrefix": "目前",
+      "title": "Agent",
+      "mode": {
+        "ask": "Ask",
+        "askDescription": "檢查並回答，不修改檔案。",
+        "code": "Code",
+        "codeDescription": "使用預設 coding agent。",
+        "review": "Review",
+        "reviewDescription": "Review 程式碼和變更，不直接修復。"
+      },
+      "quickModesLabel": "快捷模式",
+      "selectorLabel": "下一則訊息使用的 agent",
+      "tools": {
+        "custom": "自訂工具",
+        "default": "可修改",
+        "inspect": "唯讀檢查",
+        "none": "無工具"
+      }
+    },
     "fileMentions": {
       "empty": "找不到檔案：",
       "listboxLabel": "檔案建議",
@@ -209,15 +240,37 @@
     "workspaces": "工作區"
   },
   "agentSettings": {
+    "access": {
+      "readOnly": {
+        "description": "可以檢查工作區。不能編輯檔案或執行 mutation tools。",
+        "label": "唯讀"
+      },
+      "write": {
+        "description": "可以編輯檔案並執行本機 coding 命令。",
+        "label": "可修改"
+      }
+    },
+    "accessLabel": "存取權限",
     "approvalProfileLabel": "Approval",
     "cancelAction": "取消",
     "catalogTitle": "Agent catalog",
+    "changeApproval": {
+      "auto": {
+        "description": "對可信 roots 使用 Auto policy。不明確或不安全的操作仍會停止。",
+        "label": "可信 roots 自動核准"
+      },
+      "interactive": {
+        "description": "執行 mutation tools 前先詢問。",
+        "label": "變更前詢問"
+      }
+    },
+    "changeApprovalLabel": "審核",
     "copiedAction": "已複製",
     "copyIdAction": "複製 ID",
     "createAction": "新增 agent",
     "createConfirmAction": "建立 agent",
     "createDialogBody": "在目前工作區建立 project AGENT.md 定義。",
-    "createDialogTitle": "新增 project agent",
+    "createDialogTitle": "新增 custom agent",
     "creating": "建立中",
     "deleteAction": "刪除",
     "deleteConfirmAction": "刪除 agent",
@@ -258,8 +311,9 @@
     "namePlaceholder": "Repo Reviewer",
     "overviewBody": "Custom agents 是 turn-scoped runtime profiles：prompt appendix、tool profile、approval profile，以及選用的 runtime defaults。",
     "overviewTitle": "Custom agents",
-    "promptLabel": "Prompt appendix",
+    "promptLabel": "指令",
     "promptPlaceholder": "描述 agent 應該如何行動。這些指令會附加在 Heddle 預設 system prompt 後面。",
+    "readOnlyApprovalNote": "唯讀 agent 無法執行 mutation tools，因此不需要審核選項。",
     "searchLabel": "搜尋 agents",
     "searchPlaceholder": "搜尋 agents",
     "source": {
