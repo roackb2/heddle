@@ -24,16 +24,12 @@ export function useControlPlaneNotifications() {
 
     const currentPermission = readPermission();
     setPermission(currentPermission);
-    if (currentPermission === 'granted' && document.visibilityState !== 'visible') {
-      try {
-        new Notification(accepted.title, {
-          body: accepted.body,
-          tag: accepted.key,
-        });
+    if (currentPermission === 'granted') {
+      if (showBrowserNotification(accepted)) {
         return;
-      } catch {
-        setPermission(readPermission());
       }
+
+      setPermission(readPermission());
     }
 
     toast({
@@ -51,6 +47,14 @@ export function useControlPlaneNotifications() {
 
     const next = await Notification.requestPermission();
     setPermission(next);
+    if (next === 'granted') {
+      showBrowserNotification({
+        title: 'Heddle notifications enabled',
+        body: 'Approval and run completion notifications can now appear from this browser.',
+        key: 'heddle-notifications-enabled',
+      });
+    }
+
     return next;
   }, []);
 
@@ -67,4 +71,16 @@ function readPermission(): BrowserNotificationPermissionState {
   }
 
   return Notification.permission;
+}
+
+function showBrowserNotification(intent: Pick<ClientSharedNotificationIntent, 'title' | 'body' | 'key'>): boolean {
+  try {
+    new Notification(intent.title, {
+      body: intent.body,
+      tag: intent.key,
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
