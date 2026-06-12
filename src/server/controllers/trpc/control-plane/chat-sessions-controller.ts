@@ -8,9 +8,9 @@
  * DTO projection.
  *
  * Current compromise:
- * the fake browser-integration shortcut below still mutates file-backed session storage
- * directly. Keep that path isolated until test fakes can be injected through
- * the engine turn boundary.
+ * the fake browser-integration shortcut still mutates file-backed session
+ * storage directly through a dedicated helper. Keep that path isolated until
+ * test fakes can be injected through the engine turn boundary.
  */
 import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
@@ -28,7 +28,6 @@ import {
 import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
 import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import { ConversationDirectShellService } from '@/core/chat/engine/direct-shell/index.js';
-import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type {
   ConversationEngine,
   ConversationEngineConfig,
@@ -36,8 +35,8 @@ import type {
   UpdateConversationSessionSettingsInput,
 } from '@/core/chat/engine/types.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
-import { ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
-import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
+import type { ChatSession } from '@/core/chat/types.js';
+import { CustomAgentService, type CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import { ModelPolicyService } from '@/core/llm/models/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
@@ -45,6 +44,7 @@ import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
 import { RuntimeSubscriptionStream } from '@/core/runtime/subscriptions/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
+import { ControlPlaneChatSessionBrowserIntegrationFake } from './chat-session-browser-integration-fake.js';
 import { ControlPlaneChatSessionEventsController } from './chat-session-events.js';
 import { ControlPlaneChatSessionPresenter } from './chat-session-presenter.js';
 import { ControlPlaneChatTurnReviewPresenter } from './chat-turn-review-presenter.js';
@@ -110,6 +110,8 @@ type CompactControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & ControlP
 type SubmitChatPromptArgs = ControlPlaneSessionReadArgs & {
   sessionId: string;
   prompt: string;
+  agentProfileId?: string;
+  agentSnapshot?: CustomAgentExecutionSnapshot;
   maxSteps?: number;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
@@ -275,19 +277,20 @@ export class ControlPlaneChatSessionsController {
   }
 
   async submitPrompt(args: SubmitChatPromptArgs) {
-    return await this.runService.startAndWait(this.buildSubmitPromptRun(args));
+    return await this.runService.startAndWait(this.buildSubmitPromptRun(this.prepareSubmitPromptArgs(args)));
   }
 
   submitPromptAsync(args: SubmitChatPromptArgs): ControlPlaneAcceptedSessionRun {
-    if (this.isRunning(args) || this.hasQueuedPrompts(args)) {
-      const queued = this.enqueuePrompt(args);
-      if (!this.isRunning(args)) {
-        this.startNextQueuedPrompt(args);
+    const preparedArgs = this.prepareSubmitPromptArgs(args);
+    if (this.isRunning(preparedArgs) || this.hasQueuedPrompts(preparedArgs)) {
+      const queued = this.enqueuePrompt(preparedArgs);
+      if (!this.isRunning(preparedArgs)) {
+        this.startNextQueuedPrompt(preparedArgs);
       }
       return queued;
     }
 
-    return this.startPromptRun(args);
+    return this.startPromptRun(preparedArgs);
   }
 
   submitDirectShellAsync(args: SubmitDirectShellArgs): ControlPlaneAcceptedSessionRun {
@@ -461,6 +464,8 @@ export class ControlPlaneChatSessionsController {
   private enqueuePrompt(args: SubmitChatPromptArgs): ControlPlaneAcceptedSessionRun {
     const queued = this.createEngine(args).sessions.enqueuePrompt(args.sessionId, {
       prompt: args.prompt,
+      agentProfileId: args.agentProfileId,
+      agentSnapshot: args.agentSnapshot,
     });
     this.publishQueueUpdated(args, queued.session);
 
@@ -491,12 +496,18 @@ export class ControlPlaneChatSessionsController {
 
     this.publishQueueUpdated(args, dequeued.session);
     try {
-      this.startPromptRun({
+      this.startPromptRun(this.prepareSubmitPromptArgs({
         ...args,
         prompt: dequeued.item.prompt,
-      });
+        agentProfileId: dequeued.item.agentProfileId,
+        agentSnapshot: dequeued.item.agentSnapshot,
+      }));
     } catch (error) {
-      const restored = sessions.enqueuePrompt(args.sessionId, { prompt: dequeued.item.prompt });
+      const restored = sessions.enqueuePrompt(args.sessionId, {
+        prompt: dequeued.item.prompt,
+        agentProfileId: dequeued.item.agentProfileId,
+        agentSnapshot: dequeued.item.agentSnapshot,
+      });
       this.publishQueueUpdated(args, restored.session);
       args.logger?.debug(
         { error: error instanceof Error ? error.message : String(error), sessionId: args.sessionId },
@@ -529,10 +540,15 @@ export class ControlPlaneChatSessionsController {
       },
       execute: async (run: ControlPlaneSessionRunContext) => {
         const result = process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT === '1'
-          ? await this.runFakeBrowserIntegrationSessionPrompt(args)
+          ? await ControlPlaneChatSessionBrowserIntegrationFake.run({
+            ...args,
+            eventBus: this.sessionEventBus,
+          })
           : await this.runEngineTurn(args, run, async ({ engine, host, abortSignal, shouldStop }) => {
             return await engine.turns.submit({
               ...args,
+              agentProfileId: args.agentProfileId,
+              agentSnapshot: args.agentSnapshot,
               host,
               abortSignal,
               shouldStop,
@@ -567,8 +583,9 @@ export class ControlPlaneChatSessionsController {
             throw new Error('There is no interrupted or prior run to continue yet.');
           }
 
-          return await this.runFakeBrowserIntegrationSessionPrompt({
+          return await ControlPlaneChatSessionBrowserIntegrationFake.run({
             ...args,
+            eventBus: this.sessionEventBus,
             prompt: session.lastContinuePrompt,
           });
         }
@@ -678,6 +695,19 @@ export class ControlPlaneChatSessionsController {
     return {
       ...result,
       session: ControlPlaneChatSessionPresenter.projectDetail(result.session)[0] ?? null,
+    };
+  }
+
+  private prepareSubmitPromptArgs(args: SubmitChatPromptArgs): SubmitChatPromptArgs {
+    if (!args.agentProfileId || args.agentSnapshot) {
+      return args;
+    }
+
+    return {
+      ...args,
+      agentSnapshot: new CustomAgentService({
+        workspaceRoot: args.workspaceRoot,
+      }).resolveExecutionSnapshot(args.agentProfileId),
     };
   }
 
@@ -879,85 +909,6 @@ export class ControlPlaneChatSessionsController {
     if (conflict) {
       throw new Error(conflict);
     }
-  }
-
-  private async runFakeBrowserIntegrationSessionPrompt(args: SubmitChatPromptArgs) {
-    // Desired shape: fake browser integration should become an injectable engine test host.
-    // This is the only control-plane session path that should mutate the file
-    // repository directly.
-    const repository = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath });
-    const session = repository.read(args.sessionId);
-    if (!session) {
-      throw new Error(`Chat session not found: ${args.sessionId}`);
-    }
-
-    const timestamp = new Date().toISOString();
-    const assistantText = `Mocked browser integration agent response: ${args.prompt}`;
-    await this.emitBrowserIntegrationStreamPreview(args, assistantText);
-    const nextHistory = [
-      ...session.history,
-      { role: 'user' as const, content: args.prompt },
-      { role: 'assistant' as const, content: assistantText },
-    ];
-    const nextTurn: TurnSummary = {
-      id: `browser-integration-turn-${Date.now()}`,
-      prompt: args.prompt,
-      outcome: 'done',
-      summary: assistantText,
-      steps: 1,
-      traceFile: 'browser-integration-fake-trace.jsonl',
-      events: ['Mocked browser integration session run completed.'],
-    };
-    const latestSession = repository.read(args.sessionId) ?? session;
-    const updatedSession: ChatSession = {
-      ...session,
-      history: nextHistory,
-      messages: ConversationLines.fromHistory(nextHistory),
-      turns: [...session.turns, nextTurn].slice(-8),
-      updatedAt: timestamp,
-      lastContinuePrompt: args.prompt,
-      lease: undefined,
-      queuedPrompts: latestSession.queuedPrompts,
-    };
-
-    repository.save(
-      repository.readCatalog()
-        .map((entry) => repository.read(entry.id))
-        .filter((candidate): candidate is ChatSession => Boolean(candidate))
-        .map((candidate) => candidate.id === session.id ? updatedSession : candidate),
-    );
-
-    return {
-      outcome: 'done',
-      summary: assistantText,
-      session: ControlPlaneChatSessionPresenter.projectDetail(updatedSession)[0] ?? null,
-    };
-  }
-
-  private async emitBrowserIntegrationStreamPreview(sessionAddress: ControlPlaneSessionAddress, assistantText: string): Promise<void> {
-    // The browser-integration fake has to emit a real live activity before its
-    // final mutation result so web-v2 can regression-test incremental streaming.
-    const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
-      eventBus: this.sessionEventBus,
-      workspaceId: sessionAddress.workspaceId,
-      sessionId: sessionAddress.sessionId,
-    });
-    const runId = `browser-integration-run-${Date.now()}`;
-    const timestamp = new Date().toISOString();
-
-    publisher.publishActivity({
-      source: 'agent-loop',
-      type: 'assistant.stream',
-      runId,
-      step: 1,
-      text: assistantText.slice(0, 'Mocked browser integration agent response'.length),
-      done: false,
-      timestamp,
-    });
-
-    await new Promise((resolve) => {
-      setTimeout(resolve, 750);
-    });
   }
 
   private resolveSessionCreationModel(args: {

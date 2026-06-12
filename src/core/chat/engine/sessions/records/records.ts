@@ -71,6 +71,14 @@ export class ChatSessionRecords {
         turnId: input.id,
         trace: input.result.trace,
       }),
+      agent: input.agentSnapshot ? {
+        id: input.agentSnapshot.agentProfileId,
+        name: input.agentSnapshot.agentName,
+        modeAlias: input.agentSnapshot.modeAlias,
+        source: input.agentSnapshot.source,
+        definitionHash: input.agentSnapshot.definitionHash,
+      } : undefined,
+      agentSnapshot: input.agentSnapshot,
     };
   }
 

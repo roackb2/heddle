@@ -3,6 +3,7 @@ import type { ConversationEngine, ConversationEngineConfig } from '@/core/chat/e
 import { resolveEffectiveReasoningEffort } from '@/core/chat/engine/sessions/preferences/service.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
+import { CustomAgentService } from '@/core/custom-agents/index.js';
 import { AutonomyPermissionModeService } from '@/core/approvals/index.js';
 import { ModelCatalogService, ModelPolicyService } from '@/core/llm/models/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
@@ -73,6 +74,9 @@ export class ControlPlaneSessionRuntimeContextService {
       config: projectConfig,
       workspaceRoot: args.workspaceRoot,
     });
+    const agentOptions = new CustomAgentService({
+      workspaceRoot: args.workspaceRoot,
+    }).listOptions();
 
     return {
       args,
@@ -100,6 +104,7 @@ export class ControlPlaneSessionRuntimeContextService {
         running: options.running ?? false,
         permissionMode,
         permissionModeOptions,
+        agentOptions,
         welcomeGuide: {
           mode: 'conversation',
           hasProviderCredential: credentialSource.type !== 'missing',

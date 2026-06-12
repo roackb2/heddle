@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   AutonomyPolicyService,
+  ToolApprovalProfileService,
   ToolApprovalPolicies,
   ToolApprovalService,
   type AutopilotProfile,
@@ -61,6 +62,28 @@ describe('approval policy chain', () => {
       type: 'request',
       reason: 'run_shell_mutate requires approval',
     });
+  });
+
+  it('denies mutation-capability tools for read-only custom agents before base policies run', async () => {
+    const service = new ToolApprovalService();
+    const basePolicy = vi.fn(() => ({ type: 'allow' as const, reason: 'base allowed' }));
+
+    await expect(service.evaluate({
+      policies: ToolApprovalProfileService.compile({
+        profile: { preset: 'read_only' },
+        basePolicies: [basePolicy],
+      }),
+      context: context({
+        tool: {
+          ...context().tool,
+          capabilities: ['workspace.write'],
+        },
+      }),
+    })).resolves.toEqual({
+      type: 'deny',
+      reason: 'run_shell_mutate is not available to read-only agents',
+    });
+    expect(basePolicy).not.toHaveBeenCalled();
   });
 
   it('requests approval for outside-workspace inspection paths', async () => {

@@ -79,7 +79,15 @@ async function main() {
     .option('--session <id>', 'continue a saved chat session by id')
     .option('--latest', 'continue the most recently updated chat session')
     .option('--new-session [name]', 'create a fresh chat session and run this ask inside it')
-    .action(async (goalParts: string[], askOptions: { session?: string; latest?: boolean; newSession?: string | boolean }) => {
+    .option('--agent <id>', 'custom agent id for this ask turn')
+    .option('--mode <mode>', 'built-in custom agent mode: ask, code, or review')
+    .action(async (goalParts: string[], askOptions: {
+      session?: string;
+      latest?: boolean;
+      newSession?: string | boolean;
+      agent?: string;
+      mode?: string;
+    }) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
       await AskCliV2CommandEdgeService.run(goalParts.join(' ').trim(), {
@@ -99,6 +107,7 @@ async function main() {
           askOptions.newSession === undefined || askOptions.newSession === false ? undefined
           : askOptions.newSession === true ? ''
           : askOptions.newSession,
+        agentProfileId: resolveAskAgentProfileId(askOptions),
       });
     });
 
@@ -419,6 +428,27 @@ function parsePositiveInt(raw: string | undefined): number | undefined {
   }
 
   return value;
+}
+
+function resolveAskAgentProfileId(options: { agent?: string; mode?: string }): string | undefined {
+  if (options.agent && options.mode) {
+    throw new Error('Choose only one of --agent or --mode for heddle ask.');
+  }
+
+  if (options.agent) {
+    return options.agent;
+  }
+
+  if (!options.mode) {
+    return undefined;
+  }
+
+  const mode = options.mode.trim();
+  if (mode === 'ask' || mode === 'code' || mode === 'review') {
+    return `builtin:${mode}`;
+  }
+
+  throw new Error('Usage: --mode must be one of ask, code, or review.');
 }
 
 

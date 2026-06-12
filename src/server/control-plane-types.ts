@@ -80,6 +80,14 @@ export type ChatSessionMessage = {
   directShellResult?: ConversationDirectShellLineResult;
 };
 
+export type ChatTurnAgentView = {
+  id: string;
+  name: string;
+  modeAlias?: 'ask' | 'code' | 'review';
+  source: 'project' | 'user' | 'built-in';
+  definitionHash: string;
+};
+
 export type ChatTurnView = {
   id: string;
   prompt: string;
@@ -89,6 +97,7 @@ export type ChatTurnView = {
   traceFile: string;
   events: string[];
   presentation?: ConversationTurnPresentation;
+  agent?: ChatTurnAgentView;
 };
 
 export type CommandEvidenceView = {
@@ -186,6 +195,13 @@ export type ControlPlaneSessionRuntimeContext = {
   running: boolean;
   permissionMode: AutonomyPermissionMode;
   permissionModeOptions: AutonomyPermissionModeOption[];
+  agentOptions: Array<{
+    id: string;
+    name: string;
+    description: string;
+    modeAlias?: 'ask' | 'code' | 'review';
+    source: 'project' | 'user' | 'built-in';
+  }>;
   welcomeGuide: ControlPlaneSessionWelcomeGuide;
 };
 

@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import { ConversationDirectShellLineResultSchema } from '@/core/chat/engine/direct-shell/result-schema.js';
 import { ConversationTurnPresentationSchema } from '@/core/chat/engine/turns/presentation/index.js';
+import { CustomAgentExecutionSnapshotSchema } from '@/core/custom-agents/index.js';
 
 const ReasoningEffortSchema = z.enum(['low', 'medium', 'high', 'ultrahigh']);
 const ChatSessionRetentionSchema = z.enum(['reusable', 'one_off']);
@@ -77,6 +78,22 @@ const TurnSummarySchema = z.object({
   events: z.array(z.string()).describe('Compact event summaries extracted from the turn trace.'),
   presentation: ConversationTurnPresentationSchema
     .describe('Compact non-transcript tool activity metadata for conversation timeline presentation.')
+    .optional()
+    .catch(undefined),
+  agent: z.object({
+    id: z.string().describe('Custom agent id used for this turn.'),
+    name: z.string().describe('Custom agent display name used for this turn.'),
+    modeAlias: z.enum(['ask', 'code', 'review'])
+      .describe('Built-in mode alias for this custom agent, when present.')
+      .optional(),
+    source: z.enum(['project', 'user', 'built-in'])
+      .describe('Definition source for the custom agent used for this turn.'),
+    definitionHash: z.string().describe('Hash of the custom-agent definition snapshot used for this turn.'),
+  }).describe('Compact custom-agent metadata for this completed turn.')
+    .optional()
+    .catch(undefined),
+  agentSnapshot: CustomAgentExecutionSnapshotSchema
+    .describe('Resolved custom-agent execution snapshot used by this completed turn.')
     .optional()
     .catch(undefined),
 });
@@ -178,6 +195,13 @@ const ChatSessionLeaseSchema = z.object({
 const QueuedConversationPromptSchema = z.object({
   id: z.string().describe('Stable identifier for this queued prompt.'),
   prompt: z.string().describe('User prompt waiting for the current or earlier run to finish.'),
+  agentProfileId: z.string()
+    .describe('Custom agent id selected when this prompt entered the queue.')
+    .optional(),
+  agentSnapshot: CustomAgentExecutionSnapshotSchema
+    .describe('Resolved custom-agent execution snapshot selected when this prompt entered the queue.')
+    .optional()
+    .catch(undefined),
   createdAt: z.string().describe('Timestamp when this prompt entered the session queue.'),
   updatedAt: z.string().describe('Timestamp when this queued prompt was last edited.'),
 });

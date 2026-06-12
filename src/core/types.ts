@@ -22,6 +22,7 @@ export type ToolDefinition = {
   name: string;
   description: string;
   requiresApproval?: boolean;
+  capabilities?: string[];
   parameters: Record<string, unknown>; // JSON Schema object
   execute: (input: unknown) => Promise<ToolResult>;
 };

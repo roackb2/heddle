@@ -236,7 +236,38 @@ export class ControlPlaneChatSessionPresenter {
       traceFile,
       events,
       presentation: ConversationTurnPresentationService.read(candidate.presentation),
+      agent: ControlPlaneChatSessionPresenter.projectTurnAgent(candidate.agent),
     }];
+  }
+
+  private static projectTurnAgent(raw: unknown): ChatTurnView['agent'] | undefined {
+    const candidate = readObject(raw);
+    if (!candidate) {
+      return undefined;
+    }
+
+    const id = readString(candidate.id);
+    const name = readString(candidate.name);
+    const source: NonNullable<ChatTurnView['agent']>['source'] | undefined =
+      candidate.source === 'project' || candidate.source === 'user' || candidate.source === 'built-in'
+      ? candidate.source
+      : undefined;
+    const definitionHash = readString(candidate.definitionHash);
+    if (!id || !name || !source || !definitionHash) {
+      return undefined;
+    }
+    const modeAlias: NonNullable<ChatTurnView['agent']>['modeAlias'] =
+      candidate.modeAlias === 'ask' || candidate.modeAlias === 'code' || candidate.modeAlias === 'review'
+      ? candidate.modeAlias
+      : undefined;
+
+    return omitUndefined({
+      id,
+      name,
+      modeAlias,
+      source,
+      definitionHash,
+    });
   }
 
   private static readReasoningEffort(value: unknown): ReasoningEffort | undefined {

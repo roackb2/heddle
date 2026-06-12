@@ -8,6 +8,7 @@ import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/re
 import { TraceSummaryService } from '@/core/observability/index.js';
 import type { AgentLoopResult } from '@/core/runtime/loop/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
+import type { CustomAgentExecutionSnapshot } from '../../../core/custom-agents/index.js';
 import type { RunResult } from '../../../core/types.js';
 
 describe('chat turn persistence', () => {
@@ -173,6 +174,52 @@ describe('chat turn persistence', () => {
     expect(stored?.lease).toBeUndefined();
   });
 
+  it('persists the selected custom-agent snapshot with the completed turn', async () => {
+    const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-turn-persistence-agent-'));
+    const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
+    const session = createSession();
+    const agentSnapshot = askAgentSnapshot();
+    new FileChatSessionRepository({ sessionStoragePath }).save([session]);
+
+    const result: AgentLoopResult = {
+      outcome: 'done',
+      summary: 'Done.',
+      trace: [],
+      transcript: [
+        { role: 'user', content: 'Explain this repository.' },
+        { role: 'assistant', content: 'Done.' },
+      ],
+      model: 'gpt-5.4',
+      provider: 'openai',
+      workspaceRoot: stateRoot,
+    };
+
+    await ConversationTurnPersistenceService.persistCompleted({
+      result,
+      prompt: 'Explain this repository.',
+      session,
+      sessions: [session],
+      sessionStoragePath,
+      model: 'gpt-5.4',
+      stateRoot,
+      traceDir: join(stateRoot, 'traces'),
+      toolNames: ['read_file'],
+      historyForTokenEstimate: session.history,
+      credentialSource: { type: 'explicit-api-key' },
+      agentSnapshot,
+    });
+
+    const stored = new FileChatSessionRepository({ sessionStoragePath }).list()[0];
+    expect(stored?.turns[0]?.agent).toEqual({
+      id: 'builtin:ask',
+      name: 'Ask',
+      modeAlias: 'ask',
+      source: 'built-in',
+      definitionHash: 'askhash',
+    });
+    expect(stored?.turns[0]?.agentSnapshot).toEqual(agentSnapshot);
+  });
+
   it('normalizes an accepted user message without duplicating it after completion', async () => {
     const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-turn-persistence-accepted-'));
     const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
@@ -240,5 +287,23 @@ function createSession(): ChatSession {
     turns: [],
     createdAt: '2026-05-02T00:00:00.000Z',
     updatedAt: '2026-05-02T00:00:00.000Z',
+  };
+}
+
+function askAgentSnapshot(): CustomAgentExecutionSnapshot {
+  return {
+    agentProfileId: 'builtin:ask',
+    agentName: 'Ask',
+    modeAlias: 'ask',
+    source: 'built-in',
+    definitionHash: 'askhash',
+    runtime: { maxSteps: 60 },
+    toolProfile: {
+      preset: 'inspect',
+      includeTools: ['read_file', 'search_files', 'run_shell_inspect'],
+      memoryMode: 'none',
+    },
+    approvalProfile: { preset: 'read_only' },
+    systemContextAppendix: 'You are running in ask mode.',
   };
 }

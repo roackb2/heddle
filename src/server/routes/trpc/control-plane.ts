@@ -21,6 +21,7 @@ import { ControlPlaneSkillsController } from '@/server/controllers/trpc/control-
 import { controlPlaneSlashCommandsController } from '@/server/controllers/trpc/control-plane/slash-commands-controller.js';
 import { controlPlaneSessionRuntimeContextService } from '@/server/services/control-plane/session-runtime-context-service.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
+import { CustomAgentService } from '@/core/custom-agents/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import { controlPlaneWorkspaceProcedure, type ControlPlaneWorkspaceContext } from './control-plane-workspace.js';
@@ -130,6 +131,12 @@ export const controlPlaneRouter = router({
       },
       openAiCompatibleSources: RuntimeCredentialService.resolveOpenAiCompatibleModelDiscoverySources(),
     });
+  }),
+  customAgents: controlPlaneWorkspaceProcedure.query(({ ctx }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return new CustomAgentService({
+      workspaceRoot: workspace.workspaceRoot,
+    }).catalog();
   }),
   workspacePermissionModeUpdate: controlPlaneWorkspaceProcedure.input(workspacePermissionModeUpdateInputSchema).mutation(({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;

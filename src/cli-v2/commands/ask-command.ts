@@ -20,6 +20,7 @@ export type AskCliV2CommandOptions = {
   sessionId?: string;
   latestSession?: boolean;
   createSessionName?: string;
+  agentProfileId?: string;
 };
 
 type AskSessionSelection = {
@@ -77,6 +78,7 @@ export class AskCliV2CommandEdgeService {
         workspaceId,
         sessionId,
         prompt,
+        agentProfileId: options.agentProfileId ?? 'builtin:ask',
         includePlanTool: false,
         memoryMaintenanceMode: 'inline',
       });
@@ -85,6 +87,7 @@ export class AskCliV2CommandEdgeService {
         sessionId: result.session?.id ?? sessionId,
         outcome: result.outcome,
         summary: result.summary,
+        agentName: result.session?.turns.at(-1)?.agent?.name,
         traceFile: result.session?.turns.at(-1)?.traceFile,
         latestArchivePath: result.session?.context?.archive?.lastArchivePath,
       });
@@ -142,12 +145,14 @@ export class AskCliV2CommandEdgeService {
     sessionId: string;
     outcome: string;
     summary: string;
+    agentName?: string;
     traceFile?: string;
     latestArchivePath?: string;
   }): void {
     process.stdout.write(`${compact([
       `Session: ${result.sessionId}`,
       `Outcome: ${result.outcome}`,
+      result.agentName ? `Agent: ${result.agentName}` : undefined,
       `Summary: ${result.summary}`,
       result.traceFile ? `Trace: ${result.traceFile}` : undefined,
       result.latestArchivePath ? `Latest archive: ${result.latestArchivePath}` : undefined,

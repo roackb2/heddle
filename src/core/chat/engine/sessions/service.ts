@@ -185,6 +185,8 @@ export class FileConversationSessionService implements ConversationSessionServic
     const item = {
       id: `queued-prompt-${randomUUID()}`,
       prompt,
+      agentProfileId: input.agentProfileId,
+      agentSnapshot: input.agentSnapshot,
       createdAt: now,
       updatedAt: now,
     };

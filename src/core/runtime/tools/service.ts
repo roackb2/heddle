@@ -11,6 +11,7 @@ import { mcpToolkit } from '@/core/tools/toolkits/mcp/toolkit.js';
 import { shellProcessToolkit } from '@/core/tools/toolkits/shell-process/toolkit.js';
 import { ToolBundleComposer, type ToolToolkit } from '@/core/tools/index.js';
 import type { ToolDefinition } from '@/core/types.js';
+import { RuntimeToolProfileService } from './profiles/index.js';
 import type { DefaultAgentToolsOptions } from './types.js';
 
 /**
@@ -25,7 +26,7 @@ export class RuntimeToolService {
       join(stateRoot, 'memory');
     const memoryMode = options.memoryMode ?? 'read-and-record';
 
-    return ToolBundleComposer.compose({
+    const tools = ToolBundleComposer.compose({
       toolkits: this.createDefaultToolkits({
         includePlanTool: options.includePlanTool,
         browserAutomationEnabled: BrowserAutomationCapabilityService.isEnabled({ stateRoot }),
@@ -42,6 +43,10 @@ export class RuntimeToolService {
         memoryMode,
         searchIgnoreDirs: options.searchIgnoreDirs,
       },
+    });
+    return RuntimeToolProfileService.apply({
+      tools,
+      profile: options.toolProfile,
     });
   }
 

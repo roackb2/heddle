@@ -1,4 +1,5 @@
 import { AgentLoopRuntimeService } from '@/core/runtime/loop/index.js';
+import { ToolApprovalProfileService } from '@/core/approvals/index.js';
 import { FileConversationSessionService } from '@/core/chat/engine/sessions/service.js';
 import type { NormalizedConversationEngineConfig } from '@/core/chat/engine/config.js';
 import type {
@@ -75,7 +76,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
   static async run(args: RunConversationTurnArgs): Promise<RunConversationTurnResult> {
     const contextInput: PrepareConversationTurnContextArgs = args;
     const context = ConversationTurnContextBuilder.build(contextInput);
-    const { sessions, session, runtime, tools, toolNames, leaseOwner } = context;
+    const { sessions, session, runtime, tools, toolNames, leaseOwner, agentSnapshot } = context;
     const host = EngineConversationTurnService.turnHost(args);
     const source = `chat session ${session.id}`;
     const preflightInput: TurnPreflightInput = args;
@@ -115,10 +116,15 @@ export class EngineConversationTurnService implements ConversationTurnService {
         llm: runtime.llm,
         tools,
         includeDefaultTools: false,
+        maxSteps: args.maxSteps ?? agentSnapshot?.runtime.maxSteps,
         history: preflight.compacted.history,
         systemContext: runtime.systemContext,
         onEvent: host.onEvent,
         approveToolCall: host.approveToolCall,
+        approvalPolicies: ToolApprovalProfileService.compile({
+          profile: agentSnapshot?.approvalProfile,
+          basePolicies: args.approvalPolicies,
+        }),
       });
       const maintenanceMode = args.memoryMaintenanceMode ?? 'background';
       const resultForPersistence =
@@ -140,6 +146,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         historyForTokenEstimate: session.history,
         credentialSource: runtime.providerCredentialSource,
         host,
+        agentSnapshot,
       });
 
       if (maintenanceMode === 'background') {

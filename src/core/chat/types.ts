@@ -2,6 +2,15 @@ import type { ChatMessage, LlmUsage, ReasoningEffort } from '../llm/types.js';
 import type { ToolCall, ToolDefinition } from '../types.js';
 import type { EditFilePreview } from '../tools/toolkits/coding-files/edit-file.js';
 import type { ToolApprovalUserDecision } from '../approvals/types.js';
+import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
+
+export type ChatTurnAgent = {
+  id: string;
+  name: string;
+  modeAlias?: 'ask' | 'code' | 'review';
+  source: 'project' | 'user' | 'built-in';
+  definitionHash: string;
+};
 
 export type TurnSummary = {
   id: string;
@@ -12,6 +21,8 @@ export type TurnSummary = {
   traceFile: string;
   events: string[];
   presentation?: ConversationTurnPresentation;
+  agent?: ChatTurnAgent;
+  agentSnapshot?: CustomAgentExecutionSnapshot;
 };
 
 export type ConversationTurnPresentation = {
@@ -131,6 +142,8 @@ export type ChatSessionRetention = 'reusable' | 'one_off';
 export type QueuedConversationPrompt = {
   id: string;
   prompt: string;
+  agentProfileId?: string;
+  agentSnapshot?: CustomAgentExecutionSnapshot;
   createdAt: string;
   updatedAt: string;
 };
