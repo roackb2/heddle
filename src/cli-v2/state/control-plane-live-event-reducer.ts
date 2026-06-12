@@ -1,8 +1,10 @@
 import { ClientSharedSessionActivityService } from '@/client-shared/services/session-activities/index.js';
+import { ClientSharedNotificationIntentService } from '@/client-shared/services/notifications/index.js';
 import { ClientSharedSessionMessageService } from '@/client-shared/services/session-messages/index.js';
 import type { ControlPlaneSessionEventEnvelope } from '@/client-shared/api/types.js';
 import { SessionActivityService } from '../services/activities/session-activity-service.js';
 import type { AssistantStreamBufferService, AssistantStreamUpdate } from '../services/sessions/assistant-stream-buffer-service.js';
+import type { ControlPlaneTerminalNotificationService } from '../services/notifications/index.js';
 import type { ControlPlaneSessionLoader } from './control-plane-session-loader.js';
 import type { ControlPlaneSessionState } from './control-plane-session-state.js';
 
@@ -12,6 +14,7 @@ type ControlPlaneLiveEventReducerOptions = {
   assistantStreamBuffer: AssistantStreamBufferService;
   refreshSessions: () => Promise<unknown>;
   refreshPendingApproval: (sessionId: string) => Promise<void>;
+  notificationService?: ControlPlaneTerminalNotificationService;
 };
 
 const MAX_RECENT_EDIT_DIFFS = 5;
@@ -58,6 +61,12 @@ export class ControlPlaneLiveEventReducer {
     }
 
     event.activities.forEach((activity) => {
+      this.options.notificationService?.deliver(ClientSharedNotificationIntentService.projectSessionActivity({
+        workspaceId,
+        sessionId: event.sessionId,
+        activity,
+      }));
+
       ClientSharedSessionActivityService.applyActivity(activity, {
         onAssistantStream: (streamActivity) => {
           this.options.assistantStreamBuffer.push({

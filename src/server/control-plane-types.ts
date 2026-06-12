@@ -247,10 +247,12 @@ export type ControlPlaneSessionEventEnvelope =
     timestamp: string;
   };
 
-export type ControlPlaneSessionsEventEnvelope = {
-  type: 'sessions.updated' | 'waiting';
-  timestamp: string;
-};
+export type ControlPlaneSessionsEventEnvelope =
+  | {
+    type: 'sessions.updated' | 'waiting';
+    timestamp: string;
+  }
+  | (ControlPlaneSessionLiveEvent & { type: 'session.event' });
 
 export type ControlPlaneHeartbeatAgentEvent = {
   type: string;

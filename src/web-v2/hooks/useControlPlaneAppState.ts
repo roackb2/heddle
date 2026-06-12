@@ -9,10 +9,12 @@ import type { WorkspaceCreateInput } from '@web/components/settings';
 import { useControlPlaneErrorToasts } from './useControlPlaneErrorToasts';
 import { useControlPlaneHeartbeatEvents } from './tasks/useControlPlaneHeartbeatEvents';
 import { useControlPlaneSessionDetail } from './sessions/useControlPlaneSessionDetail';
+import { useControlPlaneWorkspaceSessionEvents } from './sessions/useControlPlaneWorkspaceSessionEvents';
 import { useControlPlaneSessionArchive } from './shell/useControlPlaneSessionArchive';
 import { useControlPlaneSidebarData } from './shell/useControlPlaneSidebarData';
 import { useControlPlaneTaskActions } from './tasks/useControlPlaneTaskActions';
 import { useControlPlaneTaskSelection } from './tasks/useControlPlaneTaskSelection';
+import { useControlPlaneNotifications } from './notifications/useControlPlaneNotifications';
 import { useWorkbenchNavigation } from './useWorkbenchNavigation';
 
 export type ControlPlaneRightPanelProps = {
@@ -30,6 +32,7 @@ export type ControlPlaneRightPanelProps = {
 export function useControlPlaneAppState() {
   const navigation = useWorkbenchNavigation();
   const utils = trpcReact.useUtils();
+  const notifications = useControlPlaneNotifications();
   const createSessionMutation = trpcReact.controlPlane.sessionCreate.useMutation();
   const renameSessionMutation = trpcReact.controlPlane.sessionRename.useMutation();
   const sessionPinnedUpdateMutation = trpcReact.controlPlane.sessionPinnedUpdate.useMutation();
@@ -49,10 +52,15 @@ export function useControlPlaneAppState() {
   const mcpServerRefreshMutation = trpcReact.controlPlane.mcpServerRefresh.useMutation();
   const mcpConfigSaveMutation = trpcReact.controlPlane.mcpConfigSave.useMutation();
   const taskEvents = useControlPlaneHeartbeatEvents({
-    enabled: navigation.activeSurfaceId === 'tasks',
+    enabled: Boolean(navigation.selectedWorkspaceId),
+    onNotificationIntent: notifications.deliver,
     workspaceId: navigation.selectedWorkspaceId,
   });
   const sidebar = useControlPlaneSidebarData({ navigation, taskEvents });
+  useControlPlaneWorkspaceSessionEvents({
+    onNotificationIntent: notifications.deliver,
+    workspaceId: sidebar.workspaceId,
+  });
   const memoryStatusQuery = trpcReact.controlPlane.memoryStatus.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
     enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'memory',
   });
@@ -72,6 +80,7 @@ export function useControlPlaneAppState() {
     enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'mcp',
   });
   const selectedSession = useControlPlaneSessionDetail({
+    onNotificationIntent: notifications.deliver,
     workspaceId: sidebar.workspaceId,
     sessionId: navigation.selectedSessionId,
   });
@@ -307,6 +316,10 @@ export function useControlPlaneAppState() {
     routeProps: {
       activeSurfaceId: navigation.activeSurfaceId,
       activeSettingsSectionId: navigation.activeSettingsSectionId,
+      generalSettingsView: {
+        notificationPermission: notifications.permission,
+        onRequestNotificationPermission: notifications.requestPermission,
+      },
       agentsSettingsView: {
         agents: customAgentsQuery.data,
         loading: customAgentsQuery.isLoading || sidebar.stateQuery.isLoading,

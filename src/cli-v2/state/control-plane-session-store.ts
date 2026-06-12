@@ -116,6 +116,7 @@ export class ControlPlaneSessionStore {
       assistantStreamBuffer: this.assistantStreamBuffer,
       refreshSessions: () => this.refreshSessions(),
       refreshPendingApproval: (sessionId) => this.approvals.refresh(sessionId),
+      notificationService: options.notificationService,
     });
     this.directShell = new ControlPlaneDirectShellController({
       api: this.api,
@@ -133,6 +134,7 @@ export class ControlPlaneSessionStore {
       approvals: this.approvals,
       refreshSessions: () => this.refreshSessions(),
       formatError,
+      notificationService: options.notificationService,
     });
     this.slashCommands = new ControlPlaneSlashCommandController({
       api: this.api,

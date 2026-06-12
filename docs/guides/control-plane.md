@@ -28,6 +28,7 @@ The default control plane includes:
 - current workspace review backed by Git status and file patches, so generated or shell-made changes are visible even when they did not come from the edit tool
 - historical turn review for trace-backed file diffs, review commands, verification commands, approvals, and events
 - lightweight toast notifications for session/action success and failure
+- browser notifications for open-workspace approvals, open-workspace session run completion, and active-workspace task run completion while the control plane is open
 - heartbeat task creation, editing, enabling, disabling, deletion, manual run, explicit resume, scheduling state, selected task detail, live run state, and run history
 - settings navigation for general preferences, workspace selection, and memory status
 - recent heartbeat run summaries and usage data
@@ -39,6 +40,14 @@ browser uses the `controlPlane.sessionEvents` tRPC subscription for those
 updates. Streaming activity is separate from durable session refreshes:
 assistant/tool progress arrives as live activity, while saved-session changes
 tell the browser to refetch persisted session detail.
+
+Notifications use those same live event streams. The browser can show OS-level
+notifications only after you enable permission from `Settings > General`.
+Heddle also keeps the existing toast surface and marks the browser tab title for
+those events so there is still visible feedback if the operating system, browser
+profile, or focus settings suppress the notification banner. This is
+open-control-plane notification delivery, not Web Push after the browser app is
+closed.
 
 ## Workspaces
 

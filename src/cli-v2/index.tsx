@@ -3,6 +3,7 @@ import { render } from 'ink';
 import { EventSource } from 'eventsource';
 import { ClientSharedProxyApiService } from '@/client-shared/api/proxy.js';
 import { App } from './App.js';
+import { ControlPlaneTerminalNotificationService } from './services/notifications/index.js';
 import { ControlPlaneSessionStore } from './state/control-plane-session-store.js';
 import type { ControlPlaneSessionStoreStartInput } from './state/control-plane-session-store.js';
 
@@ -29,6 +30,7 @@ export function startChatCliV2(options: ChatCliV2Options) {
     systemContext: options.systemContext,
     apiKey: options.apiKey,
     preferApiKey: options.preferApiKey,
+    notificationService: new ControlPlaneTerminalNotificationService(),
   });
 
   return render(<App store={store} initialSelection={{

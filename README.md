@@ -270,6 +270,8 @@ heddle daemon
 
 It gives you a browser-based view into workspaces, saved conversations, live assistant streaming, tool progress, approvals, current workspace diffs, heartbeat tasks, memory health, and settings.
 
+While the control plane is open, Heddle can notify you when any session in the open workspace needs approval or finishes, and when heartbeat task runs finish for the open workspace. Enable browser notifications from `Settings > General`; Heddle also keeps an in-app toast and marks the browser tab title so the event remains visible even when the operating system suppresses the browser banner.
+
 The workspace switcher and `Settings > Workspace` page let you register local projects, switch the control plane between them, rename workspace entries, and pick a project folder from the browser UI. The `Sessions` section is built around current work first: review starts from the live Git working tree, with changed files, structured read-only diffs, and a larger full-diff viewer when the side panel is too tight.
 
 Session rows in the browser control plane support right-click actions for common session management: pin or unpin important conversations, rename a session inline, or archive a session so it is hidden from normal session lists. Archiving is reversible immediately from the toast undo action.

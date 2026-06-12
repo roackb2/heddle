@@ -70,6 +70,7 @@ Beyond terminal chat, Heddle includes:
 - a local browser control plane via `heddle daemon`
 - browser-side session actions for new session, pin/unpin, inline rename, archive with toast undo, send, continue, cancel, and pending approval resolution
 - live per-session updates for assistant streaming, tool progress, approval waits, and saved-session refreshes
+- open-client notifications for pending approvals, session run completion, and heartbeat task run completion
 - workspace management for registering, renaming, choosing, and switching local project workspaces
 - Git-backed current workspace review with changed files and selected-file patches
 - trace-backed historical turn review for captured file diffs

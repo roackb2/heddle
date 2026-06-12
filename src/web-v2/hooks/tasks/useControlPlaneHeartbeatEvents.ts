@@ -1,6 +1,10 @@
 import { useCallback, useState } from 'react';
 import { skipToken } from '@tanstack/react-query';
 import dayjs from 'dayjs';
+import {
+  ClientSharedNotificationIntentService,
+  type ClientSharedNotificationIntent,
+} from '@/client-shared/services/notifications';
 import { trpcReact, type ControlPlaneHeartbeatEventEnvelope, type ControlPlaneHeartbeatTaskView } from '@web/api/client';
 
 type HeartbeatEventEnvelope = Extract<ControlPlaneHeartbeatEventEnvelope, { type: 'heartbeat.event' }>;
@@ -18,9 +22,11 @@ export type ControlPlaneLiveTaskState = {
 
 export function useControlPlaneHeartbeatEvents({
   enabled,
+  onNotificationIntent,
   workspaceId,
 }: {
   enabled: boolean;
+  onNotificationIntent?: (intent: ClientSharedNotificationIntent | undefined) => void;
   workspaceId?: string;
 }) {
   const utils = trpcReact.useUtils();
@@ -36,6 +42,7 @@ export function useControlPlaneHeartbeatEvents({
       return;
     }
 
+    onNotificationIntent?.(ClientSharedNotificationIntentService.projectHeartbeatEnvelope({ workspaceId, envelope }));
     setLiveTasks((current) => applyHeartbeatEvent(current, event));
 
     if (event.type === 'heartbeat.task.finished') {
@@ -54,7 +61,7 @@ export function useControlPlaneHeartbeatEvents({
       void utils.controlPlane.heartbeatTask.invalidate(workspaceId ? { workspaceId, taskId: event.taskId } : { taskId: event.taskId });
       void utils.controlPlane.state.invalidate();
     }
-  }, [utils, workspaceId]);
+  }, [onNotificationIntent, utils, workspaceId]);
 
   trpcReact.controlPlane.heartbeatEvents.useSubscription(enabled && workspaceId ? { workspaceId } : skipToken, {
     onData: applyHeartbeatEnvelope,

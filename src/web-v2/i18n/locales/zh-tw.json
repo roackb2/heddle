@@ -163,7 +163,17 @@
     "title": "差異預覽"
   },
   "generalSettings": {
-    "languageDetail": "選擇 web v2 介面使用的語言。"
+    "languageDetail": "選擇 web v2 介面使用的語言。",
+    "notifications": {
+      "default": "此瀏覽器尚未啟用通知。",
+      "denied": "此瀏覽器已封鎖通知。",
+      "detail": "當選取的 session 需要核准或完成，以及此工作區開啟時 task run 完成，發送通知。",
+      "enableAction": "啟用",
+      "enabledAction": "已啟用",
+      "granted": "此瀏覽器已啟用通知。",
+      "label": "通知",
+      "unsupported": "此瀏覽器不支援通知。"
+    }
   },
   "inspector": {
     "collapsePanel": "收合脈絡檢視器",

@@ -163,7 +163,17 @@
     "title": "差异预览"
   },
   "generalSettings": {
-    "languageDetail": "选择 web v2 界面使用的语言。"
+    "languageDetail": "选择 web v2 界面使用的语言。",
+    "notifications": {
+      "default": "此浏览器尚未启用通知。",
+      "denied": "此浏览器已阻止通知。",
+      "detail": "当所选 session 需要审批或完成，以及此工作区打开时 task run 完成，发送通知。",
+      "enableAction": "启用",
+      "enabledAction": "已启用",
+      "granted": "此浏览器已启用通知。",
+      "label": "通知",
+      "unsupported": "此浏览器不支持通知。"
+    }
   },
   "inspector": {
     "collapsePanel": "收起上下文检查器",

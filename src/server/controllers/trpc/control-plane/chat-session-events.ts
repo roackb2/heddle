@@ -1,6 +1,10 @@
 import type { EventEmitter } from 'node:events';
 import type { ConversationActivity } from '@/core/live/index.js';
-import type { ControlPlaneSessionEventEnvelope, ControlPlaneSessionLiveEvent } from '@/server/control-plane-types.js';
+import type {
+  ControlPlaneSessionEventEnvelope,
+  ControlPlaneSessionLiveEvent,
+  ControlPlaneSessionsEventEnvelope,
+} from '@/server/control-plane-types.js';
 
 export class ControlPlaneChatSessionEventsController {
   static emitSessionActivities(args: {
@@ -13,11 +17,17 @@ export class ControlPlaneChatSessionEventsController {
       return;
     }
 
-    args.eventBus.emit(ControlPlaneChatSessionEventsController.sessionAddressKey(args), {
+    const event = {
       sessionId: args.sessionId,
       timestamp: new Date().toISOString(),
       activities: args.activities,
-    } satisfies ControlPlaneSessionLiveEvent);
+    } satisfies ControlPlaneSessionLiveEvent;
+
+    args.eventBus.emit(ControlPlaneChatSessionEventsController.sessionAddressKey(args), event);
+    args.eventBus.emit(ControlPlaneChatSessionEventsController.workspaceAddressKey(args), {
+      ...event,
+      type: 'session.event',
+    } satisfies ControlPlaneSessionsEventEnvelope);
   }
 
   static createSessionEventPublisher(args: {
@@ -64,5 +74,9 @@ export class ControlPlaneChatSessionEventsController {
 
   private static sessionAddressKey(address: { workspaceId: string; sessionId: string }): string {
     return `${address.workspaceId}:${address.sessionId}`;
+  }
+
+  static workspaceAddressKey(address: { workspaceId: string }): string {
+    return `workspace:${address.workspaceId}`;
   }
 }
