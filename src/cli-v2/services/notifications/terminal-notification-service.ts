@@ -11,6 +11,7 @@ type TerminalNotificationSender = (message: {
 }) => void;
 
 type TerminalNotificationServiceOptions = {
+  alert?: () => void;
   send?: TerminalNotificationSender;
 };
 
@@ -21,9 +22,11 @@ type TerminalNotificationServiceOptions = {
  */
 export class ControlPlaneTerminalNotificationService {
   private readonly memory = new ClientSharedNotificationMemory();
+  private readonly alert: () => void;
   private readonly send: TerminalNotificationSender;
 
   constructor(options: TerminalNotificationServiceOptions = {}) {
+    this.alert = options.alert ?? (() => process.stdout.write('\u0007'));
     this.send = options.send ?? ((message) => notifier.notify(message));
   }
 
@@ -41,6 +44,12 @@ export class ControlPlaneTerminalNotificationService {
       });
     } catch {
       // Notification delivery is best-effort and must never interrupt live event reduction.
+    }
+
+    try {
+      this.alert();
+    } catch {
+      // Terminal attention is best-effort and must never interrupt live event reduction.
     }
   }
 }

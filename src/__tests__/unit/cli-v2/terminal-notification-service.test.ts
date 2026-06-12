@@ -3,8 +3,9 @@ import { ControlPlaneTerminalNotificationService } from '@/cli-v2/services/notif
 
 describe('ControlPlaneTerminalNotificationService', () => {
   it('delivers deduplicated desktop notifications', () => {
+    const alert = vi.fn();
     const send = vi.fn();
-    const service = new ControlPlaneTerminalNotificationService({ send });
+    const service = new ControlPlaneTerminalNotificationService({ alert, send });
     const intent = {
       key: 'session-approval:workspace-1:session-1:call-1',
       title: 'Approval required',
@@ -16,6 +17,7 @@ describe('ControlPlaneTerminalNotificationService', () => {
     service.deliver(intent);
     service.deliver(intent);
 
+    expect(alert).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledWith({
       title: 'Approval required',
@@ -25,10 +27,11 @@ describe('ControlPlaneTerminalNotificationService', () => {
   });
 
   it('keeps live event processing best-effort when desktop delivery fails', () => {
+    const alert = vi.fn();
     const send = vi.fn(() => {
       throw new Error('notification bridge unavailable');
     });
-    const service = new ControlPlaneTerminalNotificationService({ send });
+    const service = new ControlPlaneTerminalNotificationService({ alert, send });
 
     expect(() => service.deliver({
       key: 'session-finished:workspace-1:session-1:run-1',
@@ -37,5 +40,6 @@ describe('ControlPlaneTerminalNotificationService', () => {
       tone: 'success',
       timestamp: '2026-06-12T00:00:00.000Z',
     })).not.toThrow();
+    expect(alert).toHaveBeenCalledTimes(1);
   });
 });

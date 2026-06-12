@@ -25,18 +25,13 @@ export function useControlPlaneNotifications() {
     const currentPermission = readPermission();
     setPermission(currentPermission);
     if (currentPermission === 'granted') {
-      if (showBrowserNotification(accepted)) {
-        return;
+      const delivered = showBrowserNotification(accepted);
+      if (!delivered) {
+        setPermission(readPermission());
       }
-
-      setPermission(readPermission());
     }
 
-    toast({
-      title: accepted.title,
-      body: accepted.body,
-      tone: accepted.tone === 'error' ? 'error' : accepted.tone === 'success' ? 'success' : 'info',
-    });
+    showToastNotification(accepted);
   }, [memory]);
 
   const requestPermission = useCallback(async () => {
@@ -48,11 +43,14 @@ export function useControlPlaneNotifications() {
     const next = await Notification.requestPermission();
     setPermission(next);
     if (next === 'granted') {
-      showBrowserNotification({
+      const intent = {
         title: 'Heddle notifications enabled',
         body: 'Approval and run completion notifications can now appear from this browser.',
         key: 'heddle-notifications-enabled',
-      });
+        tone: 'success',
+      } as const;
+      showBrowserNotification(intent);
+      showToastNotification(intent);
     }
 
     return next;
@@ -83,4 +81,12 @@ function showBrowserNotification(intent: Pick<ClientSharedNotificationIntent, 't
   } catch {
     return false;
   }
+}
+
+function showToastNotification(intent: Pick<ClientSharedNotificationIntent, 'title' | 'body' | 'tone'>): void {
+  toast({
+    title: intent.title,
+    body: intent.body,
+    tone: intent.tone === 'error' ? 'error' : intent.tone === 'success' ? 'success' : 'info',
+  });
 }

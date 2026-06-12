@@ -153,8 +153,10 @@ Prompt editing supports `Shift+Enter` for newlines, `Ctrl+Z`/`Ctrl+Y` for undo/r
 
 When the terminal UI is running, Heddle sends desktop notifications for active
 session approval waits and run completion. Delivery uses the operating system
-notification bridge through the terminal process; approval policy and run state
-still come from the shared control-plane session events.
+notification bridge through the terminal process and also sends a terminal
+attention signal for terminal apps that support bell-based notifications.
+Approval policy and run state still come from the shared control-plane session
+events.
 
 ## Development Commands In This Repository
 
