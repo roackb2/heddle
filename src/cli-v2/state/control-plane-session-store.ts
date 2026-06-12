@@ -134,6 +134,7 @@ export class ControlPlaneSessionStore {
       approvals: this.approvals,
       refreshSessions: () => this.refreshSessions(),
       formatError,
+      notificationService: options.notificationService,
     });
     this.slashCommands = new ControlPlaneSlashCommandController({
       api: this.api,

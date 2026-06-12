@@ -468,6 +468,48 @@ describe('ControlPlaneSessionStore', () => {
     }
   });
 
+  it('delivers terminal notifications when polling observes run completion', async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = createClientFixture();
+      const notificationService = { deliver: vi.fn() };
+      fixture.calls.sessionRunStateQuery.mockResolvedValueOnce({ running: false, pendingApproval: null });
+      const store = new ControlPlaneSessionStore({
+        client: fixture.client,
+        notificationService: notificationService as unknown as ControlPlaneTerminalNotificationService,
+      });
+      await store.start();
+
+      fixture.sessionEvents?.onData?.({
+        type: 'session.event',
+        sessionId: 'session-1',
+        timestamp: new Date().toISOString(),
+        activities: [
+          {
+            source: 'agent-loop',
+            type: 'loop.started',
+            runId: 'run-1',
+            goal: 'Finish through polling.',
+            model: 'gpt-test',
+            provider: 'openai',
+            workspaceRoot: '/repo',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      } as ControlPlaneSessionEventEnvelope);
+
+      await vi.advanceTimersByTimeAsync(800);
+
+      expect(notificationService.deliver).toHaveBeenCalledWith(expect.objectContaining({
+        key: 'session-run-finished-poll:workspace-1:session-1',
+        title: 'Session run finished',
+      }));
+      store.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('treats an in-progress submit rejection as active run state', async () => {
     const fixture = createClientFixture();
     fixture.calls.sessionSendPromptAsyncMutate.mockRejectedValueOnce(new Error('A run is already in progress for this session.'));

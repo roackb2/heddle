@@ -1,4 +1,5 @@
 import { SessionActivityService } from '../services/activities/session-activity-service.js';
+import type { ControlPlaneTerminalNotificationService } from '../services/notifications/index.js';
 import type { SessionRunStatePollAddress } from '../services/sessions/session-run-state-poller-service.js';
 import type { ControlPlaneSessionApiService } from '../services/sessions/control-plane-session-api-service.js';
 import type { ControlPlaneSessionLoader } from './control-plane-session-loader.js';
@@ -12,6 +13,7 @@ type ControlPlaneRunControllerOptions = {
   approvals: ControlPlaneApprovalController;
   refreshSessions: () => Promise<unknown>;
   formatError: (error: unknown) => string;
+  notificationService?: ControlPlaneTerminalNotificationService;
 };
 
 /**
@@ -78,6 +80,7 @@ export class ControlPlaneRunController {
     }
 
     const snapshot = this.options.state.getSnapshot();
+    const wasActive = snapshot.running || snapshot.submitting || snapshot.cancelling;
     this.options.state.patch({
       pendingApproval: runState.pendingApproval,
       running: runState.running,
@@ -96,6 +99,17 @@ export class ControlPlaneRunController {
 
     if (runState.running) {
       return;
+    }
+
+    if (wasActive && !this.options.state.getSnapshot().submitting) {
+      this.options.notificationService?.deliver({
+        key: ['session-run-finished-poll', workspaceId, sessionId].join(':'),
+        title: 'Session run finished',
+        tone: 'success',
+        timestamp: new Date().toISOString(),
+        workspaceId,
+        sessionId,
+      });
     }
 
     if (this.options.state.getSnapshot().submitting) {
