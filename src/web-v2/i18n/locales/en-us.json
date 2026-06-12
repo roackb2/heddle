@@ -52,6 +52,37 @@
       "stdout": "stdout"
     },
     "executionMenu": "Execution settings",
+    "agent": {
+      "approval": {
+        "auto": "Auto in trusted roots",
+        "custom": "Custom approval",
+        "interactive": "Ask before changes",
+        "readOnly": "Read-only"
+      },
+      "customMenuLabel": "Custom agent picker",
+      "customMenuTitle": "Custom agents",
+      "customTrigger": "Custom Agent",
+      "emptyCustomAgents": "No custom agents yet.",
+      "manageAgents": "Manage agents",
+      "statusPrefix": "Current",
+      "title": "Agent",
+      "mode": {
+        "ask": "Ask",
+        "askDescription": "Inspect and answer without changing files.",
+        "code": "Code",
+        "codeDescription": "Use the default coding agent.",
+        "review": "Review",
+        "reviewDescription": "Review code and changes without applying fixes."
+      },
+      "quickModesLabel": "Quick modes",
+      "selectorLabel": "Agent for next message",
+      "tools": {
+        "custom": "Custom tools",
+        "default": "Can make changes",
+        "inspect": "Read-only inspection",
+        "none": "No tools"
+      }
+    },
     "fileMentions": {
       "empty": "No files found for",
       "listboxLabel": "File suggestions",
@@ -209,15 +240,37 @@
     "workspaces": "Workspace"
   },
   "agentSettings": {
+    "access": {
+      "readOnly": {
+        "description": "Can inspect the workspace. Cannot edit files or run mutation tools.",
+        "label": "Read-only"
+      },
+      "write": {
+        "description": "Can edit files and run local coding commands.",
+        "label": "Can make changes"
+      }
+    },
+    "accessLabel": "Access",
     "approvalProfileLabel": "Approval",
     "cancelAction": "Cancel",
     "catalogTitle": "Agent catalog",
+    "changeApproval": {
+      "auto": {
+        "description": "Use Auto policy for trusted roots. Unclear or unsafe actions still stop.",
+        "label": "Auto in trusted roots"
+      },
+      "interactive": {
+        "description": "Ask before mutation tools run.",
+        "label": "Ask before changes"
+      }
+    },
+    "changeApprovalLabel": "Approval",
     "copiedAction": "Copied",
     "copyIdAction": "Copy ID",
     "createAction": "Add agent",
     "createConfirmAction": "Create agent",
     "createDialogBody": "Create a project AGENT.md definition in this workspace.",
-    "createDialogTitle": "Add project agent",
+    "createDialogTitle": "Add custom agent",
     "creating": "Creating",
     "deleteAction": "Delete",
     "deleteConfirmAction": "Delete agent",
@@ -258,8 +311,9 @@
     "namePlaceholder": "Repo Reviewer",
     "overviewBody": "Custom agents are turn-scoped runtime profiles: prompt appendix, tool profile, approval profile, and optional runtime defaults.",
     "overviewTitle": "Custom agents",
-    "promptLabel": "Prompt appendix",
+    "promptLabel": "Instructions",
     "promptPlaceholder": "Tell the agent how to behave. These instructions are appended to Heddle's default system prompt.",
+    "readOnlyApprovalNote": "Read-only agents cannot run mutation tools, so no approval choice is needed.",
     "searchLabel": "Search agents",
     "searchPlaceholder": "Search agents",
     "source": {

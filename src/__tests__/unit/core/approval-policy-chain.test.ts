@@ -86,6 +86,52 @@ describe('approval policy chain', () => {
     expect(basePolicy).not.toHaveBeenCalled();
   });
 
+  it('lets auto custom agents use the provided autopilot profile before base policies run', async () => {
+    const service = new ToolApprovalService();
+    const basePolicy = vi.fn(() => ({ type: 'request' as const, reason: 'base requested' }));
+    const autoProfile: AutopilotProfile = {
+      mode: 'autopilot',
+      roots: [{
+        path: '.',
+        access: 'autopilot',
+        allow: ['read', 'write', 'execute', 'verification'],
+      }],
+      environments: {
+        allow: ['local', 'dev'],
+        requireApproval: ['staging', 'production', 'unknown'],
+      },
+    };
+
+    await expect(service.evaluate({
+      policies: ToolApprovalProfileService.compile({
+        profile: { preset: 'auto' },
+        autoProfile,
+        basePolicies: [basePolicy],
+      }),
+      context: context({
+        call: {
+          id: 'call-test',
+          tool: 'run_shell_mutate',
+          input: {
+            command: 'yarn test',
+            policy: {
+              operations: ['execute'],
+              intent: 'run local tests',
+              targetRoots: ['.'],
+              expectedEffects: ['run test suite'],
+              environment: 'local',
+              confidence: 'high',
+            },
+          },
+        },
+      }),
+    })).resolves.toEqual(expect.objectContaining({
+      type: 'allow',
+      reason: 'allowed by autopilot profile and declared policy envelope',
+    }));
+    expect(basePolicy).not.toHaveBeenCalled();
+  });
+
   it('requests approval for outside-workspace inspection paths', async () => {
     const service = new ToolApprovalService();
     const readOutside = context({

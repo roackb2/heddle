@@ -1,4 +1,5 @@
 import type {
+  ControlPlaneCustomAgents,
   ControlPlaneModelOptions,
   ControlPlanePermissionMode,
   ControlPlaneSessionRuntimeContext,
@@ -40,6 +41,7 @@ interface ConversationThreadProps {
   latestUpdate?: ClientSharedSessionLatestUpdate;
   activePlan?: ClientSharedSessionPlan;
   runtimeContext?: ControlPlaneSessionRuntimeContext;
+  agents?: ControlPlaneCustomAgents;
   pendingApproval: ControlPlanePendingApproval;
   approvalResolving: boolean;
   approvalError?: string;
@@ -49,7 +51,7 @@ interface ConversationThreadProps {
   queueUpdating: boolean;
   directShellConfirmation?: ControlPlaneSessionDirectShellPreflight;
   emptyTitle: string;
-  onSubmitPrompt: (prompt: string) => Promise<void>;
+  onSubmitPrompt: (prompt: string, options?: { agentProfileId?: string }) => Promise<void>;
   onConfirmDirectShell: () => Promise<void>;
   onCancelDirectShellConfirmation: () => void;
   onUpdateQueuedPrompt: (queueItemId: string, prompt: string) => Promise<void>;
@@ -75,6 +77,7 @@ export function ConversationThread({
   latestUpdate,
   activePlan,
   runtimeContext,
+  agents,
   pendingApproval,
   approvalResolving,
   approvalError,
@@ -154,7 +157,7 @@ export function ConversationThread({
           ) : null}
           {conversationTimeline.map((item) => (
             item.type === 'message' ? (
-              <ConversationMessage key={item.id} message={item.message} />
+              <ConversationMessage key={item.id} message={item.message} turnAgent={item.turnAgent} />
             ) : (
               <ConversationTurnActivityGroup key={item.id} item={item} />
             )
@@ -206,6 +209,7 @@ export function ConversationThread({
           model={session.model}
           modelOptions={modelOptions}
           reasoningEffort={session.reasoningEffort}
+          agents={agents}
           settingsUpdating={settingsUpdating}
           settingsError={settingsError}
           submitting={submitting}

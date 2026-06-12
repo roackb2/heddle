@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
-import type { ControlPlaneModelOptions, ControlPlanePermissionMode, ControlPlaneSessionRuntimeContext } from '@web/api/client';
+import type { ControlPlaneCustomAgents, ControlPlaneModelOptions, ControlPlanePermissionMode, ControlPlaneSessionRuntimeContext } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
 import { Textarea } from '@web/components/ui/textarea';
 import type { ControlPlaneReasoningEffortSelection } from '@web/hooks/sessions/useControlPlaneSessionDetail';
@@ -16,7 +16,7 @@ import {
   ComposerImageUploadControls,
   type ComposerImageUploadControlsHandle,
 } from './ComposerImageUploadControls';
-import { ComposerContextMenu } from './ComposerContextMenu';
+import { BUILT_IN_COMPOSER_AGENT_IDS, ComposerContextMenu, isBuiltInComposerAgentId } from './ComposerContextMenu';
 import {
   ComposerExecutionMenu,
   type ComposerReasoningEffortSelection,
@@ -39,6 +39,7 @@ export function ConversationComposer({
   model,
   modelOptions,
   reasoningEffort,
+  agents,
   settingsUpdating,
   settingsError,
   submitting,
@@ -61,12 +62,13 @@ export function ConversationComposer({
   model?: string;
   modelOptions?: ControlPlaneModelOptions;
   reasoningEffort?: ComposerReasoningEffortSelection;
+  agents?: ControlPlaneCustomAgents;
   settingsUpdating?: boolean;
   settingsError?: string;
   submitting?: boolean;
   running?: boolean;
   cancelling?: boolean;
-  onSubmitPrompt: (prompt: string) => Promise<void>;
+  onSubmitPrompt: (prompt: string, options?: { agentProfileId?: string }) => Promise<void>;
   onCancelRun?: () => Promise<void>;
   onUpdateDriftEnabled?: (enabled: boolean) => Promise<void>;
   onUpdatePermissionMode?: (mode: ControlPlanePermissionMode) => Promise<void>;
@@ -77,6 +79,7 @@ export function ConversationComposer({
   const imageUploadControlsRef = useRef<ComposerImageUploadControlsHandle>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState('');
+  const [selectedAgentProfileId, setSelectedAgentProfileId] = useState<string>(BUILT_IN_COMPOSER_AGENT_IDS.code);
   const {
     attachments: imageUploadAttachments,
     clearUploadedAttachments,
@@ -100,6 +103,16 @@ export function ConversationComposer({
   const effectiveReasoningEffort = reasoningEffort ?? 'medium';
   const imageUploadDisabled = controlsDisabled || imageUploading || !workspaceId || !sessionId;
   const directShellDraft = ClientSharedPromptInputService.parseDirectShellDraft(draft);
+  useEffect(() => {
+    if (isBuiltInComposerAgentId(selectedAgentProfileId)) {
+      return;
+    }
+
+    const customAgentExists = agents?.agents.some((agent) => agent.id === selectedAgentProfileId) ?? true;
+    if (!customAgentExists) {
+      setSelectedAgentProfileId(BUILT_IN_COMPOSER_AGENT_IDS.code);
+    }
+  }, [agents?.agents, selectedAgentProfileId]);
   const handleUploadImages = useCallback((files: FileList | File[]) => {
     void uploadImages(files);
   }, [uploadImages]);
@@ -122,11 +135,11 @@ export function ConversationComposer({
       return;
     }
 
-    await onSubmitPrompt(prompt);
+    await onSubmitPrompt(prompt, { agentProfileId: selectedAgentProfileId });
     recordPrompt(prompt);
     setDraft('');
     clearUploadedAttachments();
-  }, [clearUploadedAttachments, draft, onSubmitPrompt, recordPrompt, sendDisabled, uploadedImagePaths]);
+  }, [clearUploadedAttachments, draft, onSubmitPrompt, recordPrompt, selectedAgentProfileId, sendDisabled, uploadedImagePaths]);
   const fileMentions = useFileMentionAutocomplete({
     workspaceId,
     value: draft,
@@ -188,13 +201,16 @@ export function ConversationComposer({
       />
       <div className="v2-composer-toolbar">
         <ComposerContextMenu
+          agents={agents}
           disabled={controlsDisabled}
           driftEnabled={effectiveDriftEnabled}
           driftLevel={effectiveDriftLevel}
           permissionMode={permissionMode}
           permissionModeOptions={permissionModeOptions}
+          selectedAgentProfileId={selectedAgentProfileId}
           settingsUpdating={settingsUpdating}
           uploadDisabled={imageUploadDisabled}
+          onSelectAgentProfileId={setSelectedAgentProfileId}
           onUploadImagesClick={() => imageUploadControlsRef.current?.openFilePicker()}
           onUpdateDriftEnabled={onUpdateDriftEnabled}
           onUpdatePermissionMode={onUpdatePermissionMode}

@@ -1,5 +1,7 @@
-import { Check, ImagePlus, Plus, ShieldCheck } from 'lucide-react';
-import type { ControlPlanePermissionMode, ControlPlaneSessionRuntimeContext } from '@web/api/client';
+import { useState } from 'react';
+import { Bot, Check, ImagePlus, Plus, ShieldCheck } from 'lucide-react';
+import { Link } from 'react-router';
+import type { ControlPlaneCustomAgent, ControlPlaneCustomAgents, ControlPlanePermissionMode, ControlPlaneSessionRuntimeContext } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
 import {
   Popover,
@@ -16,17 +18,29 @@ import {
 } from './SessionDriftControl';
 
 type ComposerContextMenuProps = {
+  agents?: ControlPlaneCustomAgents;
   disabled?: boolean;
   driftEnabled: boolean;
   driftLevel: SessionDriftLevel;
   permissionMode?: ControlPlanePermissionMode;
   permissionModeOptions?: ControlPlaneSessionRuntimeContext['permissionModeOptions'];
+  selectedAgentProfileId: string;
   settingsUpdating?: boolean;
   uploadDisabled?: boolean;
+  onSelectAgentProfileId: (agentProfileId: string) => void;
   onUploadImagesClick?: () => void;
   onUpdateDriftEnabled?: (enabled: boolean) => Promise<void>;
   onUpdatePermissionMode?: (mode: ControlPlanePermissionMode) => Promise<void>;
 };
+
+export const BUILT_IN_COMPOSER_AGENT_IDS = {
+  ask: 'builtin:ask',
+  code: 'builtin:code',
+  review: 'builtin:review',
+} as const;
+
+const BUILT_IN_COMPOSER_AGENT_ID_SET = new Set<string>(Object.values(BUILT_IN_COMPOSER_AGENT_IDS));
+type BuiltInComposerAgentMode = keyof typeof BUILT_IN_COMPOSER_AGENT_IDS;
 
 const driftLevelMessageKeys = {
   unknown: 'composer.drift.signalUnknown',
@@ -47,25 +61,64 @@ const permissionModeDescriptionKeys = {
   custom: 'composer.permissionMode.custom.description',
 } as const satisfies Record<ControlPlanePermissionMode, I18nMessageKey>;
 
+const builtInModeLabelKeys = {
+  ask: 'composer.agent.mode.ask',
+  code: 'composer.agent.mode.code',
+  review: 'composer.agent.mode.review',
+} satisfies Record<BuiltInComposerAgentMode, I18nMessageKey>;
+
+const builtInModeDescriptionKeys = {
+  ask: 'composer.agent.mode.askDescription',
+  code: 'composer.agent.mode.codeDescription',
+  review: 'composer.agent.mode.reviewDescription',
+} satisfies Record<BuiltInComposerAgentMode, I18nMessageKey>;
+
+const approvalLabelKeys = {
+  auto: 'composer.agent.approval.auto',
+  custom: 'composer.agent.approval.custom',
+  interactive: 'composer.agent.approval.interactive',
+  read_only: 'composer.agent.approval.readOnly',
+} satisfies Record<ControlPlaneCustomAgent['approval']['preset'], I18nMessageKey>;
+
+const toolsLabelKeys = {
+  custom: 'composer.agent.tools.custom',
+  default: 'composer.agent.tools.default',
+  inspect: 'composer.agent.tools.inspect',
+  none: 'composer.agent.tools.none',
+} satisfies Record<ControlPlaneCustomAgent['tools']['preset'], I18nMessageKey>;
+
 export function ComposerContextMenu({
+  agents,
   disabled,
   driftEnabled,
   driftLevel,
   permissionMode,
   permissionModeOptions,
+  selectedAgentProfileId,
   settingsUpdating,
   uploadDisabled,
+  onSelectAgentProfileId,
   onUploadImagesClick,
   onUpdateDriftEnabled,
   onUpdatePermissionMode,
 }: ComposerContextMenuProps) {
   const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const selectedBuiltInMode = resolveBuiltInMode(selectedAgentProfileId);
+  const customAgents = agents?.agents.filter((agent) => agent.source !== 'built-in') ?? [];
+  const selectedCustomAgent = customAgents.find((agent) => agent.id === selectedAgentProfileId);
+  const selectedAgentLabel = selectedCustomAgent?.name
+    ?? (selectedBuiltInMode ? t(builtInModeLabelKeys[selectedBuiltInMode]) : t('composer.agent.customTrigger'));
   const driftButtonLabel = driftEnabled
-    ? `${t('composer.addContext')}: ${t(driftLevelMessageKeys[driftLevel])}`
-    : t('composer.addContext');
+    ? `${t('composer.addContext')}: ${selectedAgentLabel}, ${t(driftLevelMessageKeys[driftLevel])}`
+    : `${t('composer.addContext')}: ${selectedAgentLabel}`;
+  const selectAgentProfile = (agentProfileId: string) => {
+    onSelectAgentProfileId(agentProfileId);
+    setOpen(false);
+  };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <span className="v2-composer-context-cluster">
         <PopoverTrigger asChild>
           <Button
@@ -173,6 +226,75 @@ export function ComposerContextMenu({
             </div>
           </div>
         ) : null}
+        <div className="v2-agent-menu-section">
+          <div className="v2-agent-menu-header">
+            <Bot
+              aria-hidden="true"
+              data-icon="inline-start"
+              className="v2-drift-menu-icon"
+            />
+            <span className="v2-drift-menu-copy">
+              <span className="v2-drift-menu-title truncate">
+                {t('composer.agent.title')}
+              </span>
+              <span className="v2-drift-menu-status truncate">
+                {t('composer.agent.statusPrefix')}: {selectedAgentLabel}
+              </span>
+            </span>
+          </div>
+          <div className="v2-composer-menu-options v2-agent-menu-options" aria-label={t('composer.agent.quickModesLabel')}>
+            {(Object.keys(BUILT_IN_COMPOSER_AGENT_IDS) as BuiltInComposerAgentMode[]).map((mode) => {
+              const agentProfileId = BUILT_IN_COMPOSER_AGENT_IDS[mode];
+              const selected = selectedAgentProfileId === agentProfileId;
+              return (
+                <Button
+                  key={mode}
+                  type="button"
+                  variant="ghost"
+                  size="none"
+                  role="menuitemradio"
+                  aria-checked={selected}
+                  disabled={disabled}
+                  className={cn(
+                    'v2-composer-menu-option v2-composer-menu-option-compact',
+                    selected && 'v2-composer-menu-option-selected',
+                  )}
+                  onClick={() => selectAgentProfile(agentProfileId)}
+                >
+                  <span className="v2-composer-menu-option-copy">
+                    <span className="v2-composer-menu-option-label truncate">
+                      {t(builtInModeLabelKeys[mode])}
+                    </span>
+                    <span className="v2-composer-menu-option-description truncate">
+                      {t(builtInModeDescriptionKeys[mode])}
+                    </span>
+                  </span>
+                  <span className="v2-composer-menu-option-check-slot" aria-hidden="true">
+                    {selected ? <Check data-icon="inline-end" /> : null}
+                  </span>
+                </Button>
+              );
+            })}
+          </div>
+          <div className="v2-agent-menu-custom">
+            <p className="v2-composer-menu-heading">{t('composer.agent.customMenuTitle')}</p>
+            <div className="v2-composer-menu-options">
+              {customAgents.length ? customAgents.map((agent) => (
+                <CustomAgentMenuOption
+                  agent={agent}
+                  key={agent.id}
+                  selected={agent.id === selectedAgentProfileId}
+                  onSelect={() => selectAgentProfile(agent.id)}
+                />
+              )) : (
+                <p className="v2-composer-menu-empty text-pretty">{t('composer.agent.emptyCustomAgents')}</p>
+              )}
+            </div>
+            <Button asChild className="v2-composer-menu-option v2-composer-menu-option-compact" size="none" variant="ghost">
+              <Link to="/settings/agents" onClick={() => setOpen(false)}>{t('composer.agent.manageAgents')}</Link>
+            </Button>
+          </div>
+        </div>
         {onUpdateDriftEnabled ? (
           <SessionDriftMenuSection
             disabled={disabled || settingsUpdating}
@@ -185,4 +307,47 @@ export function ComposerContextMenu({
       </PopoverContent>
     </Popover>
   );
+}
+
+function CustomAgentMenuOption({
+  agent,
+  onSelect,
+  selected,
+}: {
+  agent: ControlPlaneCustomAgent;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <Button
+      className={cn('v2-composer-menu-option', selected && 'v2-composer-menu-option-selected')}
+      role="menuitemradio"
+      aria-checked={selected}
+      size="none"
+      type="button"
+      variant="ghost"
+      onClick={onSelect}
+    >
+      <span className="v2-composer-menu-option-copy">
+        <span className="v2-composer-menu-option-label truncate">{agent.name}</span>
+        <span className="v2-composer-menu-option-description truncate">{agent.description}</span>
+        <span className="v2-agent-menu-option-meta truncate">
+          {t(toolsLabelKeys[agent.tools.preset])} · {t(approvalLabelKeys[agent.approval.preset])}
+        </span>
+      </span>
+      <span className="v2-composer-menu-option-check-slot" aria-hidden="true">
+        {selected ? <Check data-icon="inline-end" /> : null}
+      </span>
+    </Button>
+  );
+}
+
+function resolveBuiltInMode(agentProfileId: string): BuiltInComposerAgentMode | undefined {
+  return (Object.entries(BUILT_IN_COMPOSER_AGENT_IDS) as Array<[BuiltInComposerAgentMode, string]>)
+    .find(([, id]) => id === agentProfileId)?.[0];
+}
+
+export function isBuiltInComposerAgentId(agentProfileId: string): boolean {
+  return BUILT_IN_COMPOSER_AGENT_ID_SET.has(agentProfileId);
 }

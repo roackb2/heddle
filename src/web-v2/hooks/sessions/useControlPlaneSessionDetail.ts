@@ -47,7 +47,7 @@ type ControlPlaneSessionDetailState = {
   settingsError?: string;
   queueUpdating: boolean;
   directShellConfirmation?: ControlPlaneSessionDirectShellPreflight;
-  submitPrompt: (prompt: string) => Promise<void>;
+  submitPrompt: ReturnType<typeof useControlPlaneSessionPromptSubmit>['submitPrompt'];
   confirmDirectShell: () => Promise<void>;
   cancelDirectShellConfirmation: () => void;
   updateQueuedPrompt: ReturnType<typeof useControlPlaneQueuedPrompts>['updateQueuedPrompt'];

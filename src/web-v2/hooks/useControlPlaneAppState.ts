@@ -60,7 +60,7 @@ export function useControlPlaneAppState() {
     enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'skills',
   });
   const customAgentsQuery = trpcReact.controlPlane.customAgents.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
-    enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'agents',
+    enabled: (navigation.settingsOpen && navigation.activeSettingsSectionId === 'agents') || navigation.activeSurfaceId === 'sessions',
   });
   const browserAutomationQuery = trpcReact.controlPlane.browserAutomation.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
     enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'browserAutomation',
@@ -376,6 +376,7 @@ export function useControlPlaneAppState() {
         latestUpdate: selectedSession.latestUpdate,
         activePlan: selectedSession.activePlan,
         runtimeContext: selectedSession.runtimeContext,
+        agents: customAgentsQuery.data,
         pendingApproval: selectedSession.pendingApproval,
         approvalResolving: selectedSession.approvalResolving,
         approvalError: selectedSession.approvalError,

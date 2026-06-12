@@ -1,5 +1,6 @@
 import { AgentLoopRuntimeService } from '@/core/runtime/loop/index.js';
-import { ToolApprovalProfileService } from '@/core/approvals/index.js';
+import { AutonomyPermissionModeService, ToolApprovalProfileService } from '@/core/approvals/index.js';
+import { ProjectConfigService } from '@/core/project-config/index.js';
 import { FileConversationSessionService } from '@/core/chat/engine/sessions/service.js';
 import type { NormalizedConversationEngineConfig } from '@/core/chat/engine/config.js';
 import type {
@@ -123,6 +124,11 @@ export class EngineConversationTurnService implements ConversationTurnService {
         approveToolCall: host.approveToolCall,
         approvalPolicies: ToolApprovalProfileService.compile({
           profile: agentSnapshot?.approvalProfile,
+          autoProfile: agentSnapshot?.approvalProfile.preset === 'auto'
+            ? AutonomyPermissionModeService.buildAutoProfile({
+              trustedRoots: ProjectConfigService.read(args.workspaceRoot).autoTrustedRoots,
+            })
+            : undefined,
           basePolicies: args.approvalPolicies,
         }),
       });

@@ -21,7 +21,7 @@ type UseControlPlaneSessionPromptSubmitArgs = {
 
 export type ControlPlaneSessionPromptSubmitState = {
   submitting: boolean;
-  submitPrompt: (prompt: string) => Promise<void>;
+  submitPrompt: (prompt: string, options?: { agentProfileId?: string }) => Promise<void>;
   directShellConfirmation?: ControlPlaneSessionDirectShellPreflight;
   confirmDirectShell: () => Promise<void>;
   cancelDirectShellConfirmation: () => void;
@@ -61,6 +61,7 @@ export function useControlPlaneSessionPromptSubmit({
 
   const submitToControlPlane = useCallback(async (input: {
     prompt: string;
+    agentProfileId?: string;
     directShell?: { command: string; riskAccepted?: boolean };
   }) => {
     if (!workspaceId || !sessionId || submitting) {
@@ -102,7 +103,12 @@ export function useControlPlaneSessionPromptSubmit({
           riskAccepted: input.directShell.riskAccepted,
         });
       } else {
-        await sessionSendPromptMutation.mutateAsync({ workspaceId, sessionId, prompt: input.prompt });
+        await sessionSendPromptMutation.mutateAsync({
+          workspaceId,
+          sessionId,
+          prompt: input.prompt,
+          agentProfileId: input.agentProfileId,
+        });
       }
       if (isCurrentSubmission()) {
         setRunning(true);
@@ -148,7 +154,7 @@ export function useControlPlaneSessionPromptSubmit({
     workspaceId,
   ]);
 
-  const submitPrompt = useCallback(async (prompt: string) => {
+  const submitPrompt = useCallback(async (prompt: string, options?: { agentProfileId?: string }) => {
     const trimmed = prompt.trim();
     if (!workspaceId || !sessionId || !trimmed || submitting) {
       return;
@@ -184,7 +190,7 @@ export function useControlPlaneSessionPromptSubmit({
       return;
     }
 
-    await submitToControlPlane({ prompt: trimmed });
+    await submitToControlPlane({ prompt: trimmed, agentProfileId: options?.agentProfileId });
   }, [
     running,
     sessionId,
