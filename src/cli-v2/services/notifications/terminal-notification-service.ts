@@ -1,5 +1,4 @@
 import { execFile } from 'node:child_process';
-import notifier from 'node-notifier';
 import {
   ClientSharedNotificationMemory,
   type ClientSharedNotificationIntent,
@@ -16,26 +15,23 @@ type TerminalNativeNotificationSender = TerminalNotificationSender;
 type TerminalNotificationServiceOptions = {
   alert?: () => void;
   nativeSend?: TerminalNativeNotificationSender;
-  send?: TerminalNotificationSender;
   terminalSend?: TerminalNotificationSender;
 };
 
 /**
  * Owns cli-v2 desktop notification delivery. Shared notification projection
  * stays in client-shared; this service only applies terminal-specific delivery
- * and duplicate suppression around node-notifier.
+ * and duplicate suppression around terminal delivery.
  */
 export class ControlPlaneTerminalNotificationService {
   private readonly memory = new ClientSharedNotificationMemory();
   private readonly alert: () => void;
   private readonly nativeSend: TerminalNativeNotificationSender;
-  private readonly send: TerminalNotificationSender;
   private readonly terminalSend: TerminalNotificationSender;
 
   constructor(options: TerminalNotificationServiceOptions = {}) {
     this.alert = options.alert ?? (() => process.stdout.write('\u0007'));
     this.nativeSend = options.nativeSend ?? showNativeNotification;
-    this.send = options.send ?? ((message) => notifier.notify(message));
     this.terminalSend = options.terminalSend ?? showWarpTerminalNotification;
   }
 
@@ -46,16 +42,6 @@ export class ControlPlaneTerminalNotificationService {
     }
 
     const sound = accepted.tone !== 'info';
-
-    try {
-      this.send({
-        title: accepted.title,
-        message: accepted.body ?? accepted.title,
-        sound,
-      });
-    } catch {
-      // Notification delivery is best-effort and must never interrupt live event reduction.
-    }
 
     try {
       this.nativeSend({
@@ -86,7 +72,7 @@ export class ControlPlaneTerminalNotificationService {
 }
 
 function showNativeNotification(message: { title: string; message: string; sound?: boolean }): void {
-  if (process.platform !== 'darwin') {
+  if (process.platform !== 'darwin' || isWarpTerminal()) {
     return;
   }
 

@@ -33,7 +33,11 @@ test('loads the web v2 shell sections', async ({ page }) => {
   await expect(page.getByTestId('web-v2-surface-sessions')).toBeVisible();
   await expect(page.getByTestId('web-v2-workbench-title')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Sessions' })).toHaveAttribute('aria-current', 'page');
-  expect([...eventStreams].sort()).toEqual(['controlPlane.sessionEvents']);
+  expect([...eventStreams].sort()).toEqual([
+    'controlPlane.heartbeatEvents',
+    'controlPlane.sessionEvents',
+    'controlPlane.sessionsEvents',
+  ]);
 });
 
 test('collapses and expands the sidebar', async ({ page }) => {

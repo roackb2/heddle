@@ -6,11 +6,11 @@ This service folder owns terminal desktop notification delivery for cli-v2.
 
 - `src/client-shared/services/notifications` projects notification intents from
   shared control-plane events.
-- `ControlPlaneTerminalNotificationService` delivers those intents through
-  `node-notifier`, the native macOS notification bridge when available, Warp's
-  terminal-native notification escape sequence when running inside Warp, and a
-  terminal attention signal. It requests sound for non-info notifications and
-  suppresses duplicates for one terminal session.
+- `ControlPlaneTerminalNotificationService` delivers those intents through the
+  Warp terminal-native notification escape sequence when running inside Warp,
+  the native macOS notification bridge as a non-Warp fallback, and a terminal
+  attention signal. It requests sound for non-info notifications and suppresses
+  duplicates for one terminal session.
 - cli-v2 state reducers decide when to pass received event facts to the shared
   projection service.
 
