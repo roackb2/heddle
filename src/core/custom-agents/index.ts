@@ -6,12 +6,17 @@ export { CustomAgentService } from './service.js';
 export {
   CustomAgentExecutionSnapshotSchema,
   CustomAgentFrontmatterSchema,
+  CustomAgentApprovalPresetSchema,
+  CustomAgentModeAliasSchema,
+  CustomAgentToolPresetSchema,
   RuntimeToolSelectionProfileSchema,
   ToolApprovalProfileSchema,
 } from './schemas.js';
 export type {
   CustomAgentCatalog,
   CustomAgentCatalogIssue,
+  CustomAgentCreateInput,
+  CustomAgentCreateResult,
   CustomAgentDeleteResult,
   CustomAgentDefinition,
   CustomAgentExecutionSnapshot,

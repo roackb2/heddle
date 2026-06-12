@@ -1,5 +1,6 @@
 import type {
   ControlPlaneHeartbeatTaskView,
+  ControlPlaneCustomAgentCreateInput,
   ControlPlaneSessionDetail,
   ControlPlaneSessions,
 } from '@web/api/client';
@@ -37,6 +38,7 @@ export function useControlPlaneAppState() {
   const workspaceSetActiveMutation = trpcReact.controlPlane.workspaceSetActive.useMutation();
   const skillActivateMutation = trpcReact.controlPlane.skillActivate.useMutation();
   const skillDisableMutation = trpcReact.controlPlane.skillDisable.useMutation();
+  const customAgentCreateMutation = trpcReact.controlPlane.customAgentCreate.useMutation();
   const customAgentDeleteMutation = trpcReact.controlPlane.customAgentDelete.useMutation();
   const browserAutomationSetEnabledMutation = trpcReact.controlPlane.browserAutomationSetEnabled.useMutation();
   const browserAutomationSettingsUpdateMutation = trpcReact.controlPlane.browserAutomationSettingsUpdate.useMutation();
@@ -202,6 +204,13 @@ export function useControlPlaneAppState() {
     await utils.controlPlane.customAgents.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined);
   }
 
+  async function createProjectAgent(input: Omit<ControlPlaneCustomAgentCreateInput, 'workspaceId'>) {
+    await customAgentCreateMutation.mutateAsync(
+      sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, ...input } : input,
+    );
+    await utils.controlPlane.customAgents.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined);
+  }
+
   async function setBrowserAutomationEnabled(enabled: boolean) {
     const input = sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, enabled } : { enabled };
     const result = await browserAutomationSetEnabledMutation.mutateAsync(input);
@@ -302,7 +311,9 @@ export function useControlPlaneAppState() {
         agents: customAgentsQuery.data,
         loading: customAgentsQuery.isLoading || sidebar.stateQuery.isLoading,
         error: customAgentsQuery.error instanceof Error ? customAgentsQuery.error.message : undefined,
+        creating: customAgentCreateMutation.isPending,
         deleting: customAgentDeleteMutation.isPending,
+        onCreateProjectAgent: createProjectAgent,
         onDeleteProjectAgent: deleteProjectAgent,
       },
       memorySettingsView: {

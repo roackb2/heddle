@@ -47,6 +47,7 @@ export type ControlPlaneMemoryStatus = RouterOutputs['controlPlane']['memoryStat
 export type ControlPlaneBrowserAutomation = RouterOutputs['controlPlane']['browserAutomation'];
 export type ControlPlaneCustomAgents = RouterOutputs['controlPlane']['customAgents'];
 export type ControlPlaneCustomAgent = ControlPlaneCustomAgents['agents'][number];
+export type ControlPlaneCustomAgentCreateInput = RouterInputs['controlPlane']['customAgentCreate'];
 export type ControlPlaneSkills = RouterOutputs['controlPlane']['skills'];
 export type ControlPlaneSkillActivationView = ControlPlaneSkills['skills'][number];
 export type ControlPlaneMcpServers = RouterOutputs['controlPlane']['mcpServers'];

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -113,6 +113,51 @@ describe('custom agents', () => {
         message: 'Custom agent id "builtin:ask" is reserved by a built-in agent.',
       }),
     ]));
+  });
+
+  it('creates project agent definitions that load through the catalog', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-create-project-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-create-home-'));
+    const result = new CustomAgentService({ workspaceRoot, homeDir }).createProjectAgent({
+      id: 'repo-reviewer',
+      name: 'Repo Reviewer',
+      description: 'Review this repo without changing files.',
+      modeAlias: 'review',
+      toolsPreset: 'inspect',
+      approvalPreset: 'read_only',
+      maxSteps: 80,
+      promptAppendix: 'Review for regressions and missing tests.',
+    });
+    const definitionPath = join(workspaceRoot, '.agents', 'agents', 'repo-reviewer', 'AGENT.md');
+
+    expect(result.createdAgent).toMatchObject({
+      id: 'repo-reviewer',
+      name: 'Repo Reviewer',
+      source: 'project',
+      modeAlias: 'review',
+      runtime: { maxSteps: 80 },
+      tools: { preset: 'inspect' },
+      approval: { preset: 'read_only' },
+      promptAppendix: 'Review for regressions and missing tests.',
+    });
+    expect(readFileSync(definitionPath, 'utf8')).toContain('id: repo-reviewer');
+    expect(new CustomAgentService({ workspaceRoot, homeDir }).catalog().agents.map((agent) => agent.id))
+      .toContain('repo-reviewer');
+  });
+
+  it('refuses to create project agents with duplicate ids', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-create-duplicate-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-create-duplicate-home-'));
+    const service = new CustomAgentService({ workspaceRoot, homeDir });
+
+    expect(() => service.createProjectAgent({
+      id: 'builtin:ask',
+      name: 'Shadow Ask',
+      description: 'Invalid shadow.',
+      toolsPreset: 'inspect',
+      approvalPreset: 'read_only',
+      promptAppendix: 'This should not be written.',
+    })).toThrow('Custom agent already exists: builtin:ask');
   });
 
   it('deletes project agent definitions without deleting user or built-in agents', () => {

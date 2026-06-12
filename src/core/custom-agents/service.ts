@@ -1,9 +1,13 @@
 import { createHash } from 'node:crypto';
-import { existsSync, rmSync, rmdirSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, rmdirSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
+import { stringify as stringifyYaml } from 'yaml';
+import { CustomAgentFrontmatterSchema } from './schemas.js';
 import { CustomAgentDefinitionRepository } from './definition-repository.js';
 import type {
   CustomAgentCatalog,
+  CustomAgentCreateInput,
+  CustomAgentCreateResult,
   CustomAgentDeleteResult,
   CustomAgentDefinition,
   CustomAgentExecutionSnapshot,
@@ -47,6 +51,48 @@ export class CustomAgentService {
     }
 
     return CustomAgentService.toExecutionSnapshot(agent);
+  }
+
+  /**
+   * Persists a project-scoped definition file, then reloads it through the catalog
+   * parser so callers receive the same normalized shape used at turn runtime.
+   */
+  createProjectAgent(input: CustomAgentCreateInput): CustomAgentCreateResult {
+    const catalog = this.catalog();
+    if (catalog.agents.some((agent) => agent.id === input.id)) {
+      throw new Error(`Custom agent already exists: ${input.id}`);
+    }
+
+    const definitionPath = join(this.options.workspaceRoot, '.agents', 'agents', input.id, 'AGENT.md');
+    CustomAgentService.assertProjectDefinitionPath(this.options.workspaceRoot, definitionPath);
+    if (existsSync(definitionPath)) {
+      throw new Error(`Custom agent definition already exists: ${definitionPath}`);
+    }
+
+    const frontmatter = CustomAgentFrontmatterSchema.parse({
+      schemaVersion: 1,
+      id: input.id,
+      name: input.name,
+      description: input.description,
+      modeAlias: input.modeAlias,
+      runtime: input.maxSteps ? { maxSteps: input.maxSteps } : {},
+      tools: { preset: input.toolsPreset },
+      approval: { preset: input.approvalPreset },
+    });
+
+    mkdirSync(dirname(definitionPath), { recursive: true });
+    writeFileSync(
+      definitionPath,
+      `---\n${stringifyYaml(frontmatter).trimEnd()}\n---\n\n${input.promptAppendix.trim()}\n`,
+      { encoding: 'utf8', flag: 'wx' },
+    );
+
+    const createdAgent = this.catalog().agents.find((agent) => agent.id === input.id && agent.source === 'project');
+    if (!createdAgent) {
+      throw new Error(`Custom agent was written but could not be loaded: ${input.id}`);
+    }
+
+    return { createdAgent };
   }
 
   deleteProjectAgent(agentProfileId: string): CustomAgentDeleteResult {

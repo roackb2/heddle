@@ -32,6 +32,7 @@ import {
   browserAutomationProfileOpenInputSchema,
   browserAutomationSettingsInputSchema,
   createSessionInputSchema,
+  customAgentCreateInputSchema,
   customAgentInputSchema,
   fileSearchInputSchema,
   heartbeatRunInputSchema,
@@ -138,6 +139,12 @@ export const controlPlaneRouter = router({
     return new CustomAgentService({
       workspaceRoot: workspace.workspaceRoot,
     }).catalog();
+  }),
+  customAgentCreate: controlPlaneWorkspaceProcedure.input(customAgentCreateInputSchema).mutation(({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return new CustomAgentService({
+      workspaceRoot: workspace.workspaceRoot,
+    }).createProjectAgent(input);
   }),
   customAgentDelete: controlPlaneWorkspaceProcedure.input(customAgentInputSchema).mutation(({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;
