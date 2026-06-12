@@ -7,8 +7,9 @@ This service folder owns terminal desktop notification delivery for cli-v2.
 - `src/client-shared/services/notifications` projects notification intents from
   shared control-plane events.
 - `ControlPlaneTerminalNotificationService` delivers those intents through
-  `node-notifier`, sends a terminal attention signal, and suppresses duplicates
-  for one terminal session.
+  `node-notifier`, the native macOS notification bridge when available, and a
+  terminal attention signal. It also suppresses duplicates for one terminal
+  session.
 - cli-v2 state reducers decide when to pass received event facts to the shared
   projection service.
 

@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import notifier from 'node-notifier';
 import {
   ClientSharedNotificationMemory,
@@ -27,7 +28,10 @@ export class ControlPlaneTerminalNotificationService {
 
   constructor(options: TerminalNotificationServiceOptions = {}) {
     this.alert = options.alert ?? (() => process.stdout.write('\u0007'));
-    this.send = options.send ?? ((message) => notifier.notify(message));
+    this.send = options.send ?? ((message) => {
+      notifier.notify(message);
+      showMacOsNotification(message);
+    });
   }
 
   deliver(intent: ClientSharedNotificationIntent | undefined): void {
@@ -52,4 +56,19 @@ export class ControlPlaneTerminalNotificationService {
       // Terminal attention is best-effort and must never interrupt live event reduction.
     }
   }
+}
+
+function showMacOsNotification(message: { title: string; message: string }): void {
+  if (process.platform !== 'darwin') {
+    return;
+  }
+
+  execFile('/usr/bin/osascript', [
+    '-e',
+    `display notification "${escapeAppleScriptString(message.message)}" with title "${escapeAppleScriptString(message.title)}"`,
+  ], () => undefined);
+}
+
+function escapeAppleScriptString(value: string): string {
+  return value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
 }

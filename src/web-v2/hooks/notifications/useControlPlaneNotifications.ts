@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ClientSharedNotificationMemory,
   type ClientSharedNotificationIntent,
@@ -14,7 +14,39 @@ export type BrowserNotificationPermissionState = NotificationPermission | 'unsup
  */
 export function useControlPlaneNotifications() {
   const memory = useMemo(() => new ClientSharedNotificationMemory(), []);
+  const originalTitleRef = useRef<string | undefined>(undefined);
   const [permission, setPermission] = useState<BrowserNotificationPermissionState>(readPermission());
+  const markBrowserTabAttention = useCallback((title: string) => {
+    if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+      return;
+    }
+
+    originalTitleRef.current ??= document.title;
+    document.title = `● ${title} - ${originalTitleRef.current}`;
+  }, []);
+
+  useEffect(() => {
+    const clearBrowserTabAttention = () => {
+      if (typeof document === 'undefined' || document.visibilityState !== 'visible') {
+        return;
+      }
+
+      const originalTitle = originalTitleRef.current;
+      if (!originalTitle) {
+        return;
+      }
+
+      document.title = originalTitle;
+      originalTitleRef.current = undefined;
+    };
+
+    document.addEventListener('visibilitychange', clearBrowserTabAttention);
+    window.addEventListener('focus', clearBrowserTabAttention);
+    return () => {
+      document.removeEventListener('visibilitychange', clearBrowserTabAttention);
+      window.removeEventListener('focus', clearBrowserTabAttention);
+    };
+  }, []);
 
   const deliver = useCallback((intent: ClientSharedNotificationIntent | undefined) => {
     const accepted = memory.accept(intent);
@@ -31,8 +63,9 @@ export function useControlPlaneNotifications() {
       }
     }
 
+    markBrowserTabAttention(accepted.title);
     showToastNotification(accepted);
-  }, [memory]);
+  }, [markBrowserTabAttention, memory]);
 
   const requestPermission = useCallback(async () => {
     if (!('Notification' in window)) {

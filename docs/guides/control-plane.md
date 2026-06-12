@@ -43,10 +43,11 @@ tell the browser to refetch persisted session detail.
 
 Notifications use those same live event streams. The browser can show OS-level
 notifications only after you enable permission from `Settings > General`.
-Heddle also keeps the existing toast surface for those events so there is still
-visible feedback if the operating system, browser profile, or focus settings
-suppress the notification banner. This is open-control-plane notification
-delivery, not Web Push after the browser app is closed.
+Heddle also keeps the existing toast surface and marks the browser tab title for
+those events so there is still visible feedback if the operating system, browser
+profile, or focus settings suppress the notification banner. This is
+open-control-plane notification delivery, not Web Push after the browser app is
+closed.
 
 ## Workspaces
 

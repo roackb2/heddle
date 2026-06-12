@@ -7,8 +7,9 @@ This hook folder owns browser delivery for notification intents projected by
 
 - Client-shared decides which session or heartbeat events deserve
   notification.
-- web-v2 decides whether to use the browser Notification API and always keeps
-  an in-app toast as local feedback.
+- web-v2 decides whether to use the browser Notification API, keeps an in-app
+  toast as local feedback, and marks the browser tab title while the page is
+  backgrounded.
 - Browser permission is per browser profile and must be requested from a user
   gesture in General settings.
 
