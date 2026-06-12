@@ -39,6 +39,9 @@ Approval behavior currently exists in these places:
   edit previews, and remembered project approval rule application.
 - `policies.ts`: `ToolApprovalPolicies` built-in tool, workspace-boundary,
   remembered-rule, autonomy, and human-surface policy constructors.
+- `profiles/`: custom-agent approval profile compilation. A profile prepends
+  agent-scoped policy to the ordinary ordered policy chain; it does not own
+  host UI or tool execution.
 - `autonomy/`: autopilot profile normalization, tool policy evaluation,
   computed policy facts, postflight audit objects, and autonomy trace event
   construction. This subdomain owns approval decisions for long-running agent
@@ -159,6 +162,10 @@ state from event fragments.
 
 ## Extension Points
 
+- Add custom-agent approval presets in `profiles/` when the rule is about the
+  selected agent role. Keep the compiled result as an ordered
+  `ToolApprovalPolicy[]` so it composes with remembered rules, autonomy, and
+  host approval surfaces.
 - Add a runtime approval rule by passing `approvalPolicies` into `AgentRunService.run`,
   `AgentLoopRuntimeService.run`, `HeartbeatRunnerAgent.run`, or `createConversationEngine(...).turns`.
 - Add autopilot behavior in `autonomy/` and expose it through

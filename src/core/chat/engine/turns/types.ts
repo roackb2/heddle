@@ -1,4 +1,5 @@
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
+import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ConversationCompactionStatus } from '@/core/live/index.js';
 import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { RunAgentLoopOptions } from '@/core/runtime/loop/index.js';
@@ -23,6 +24,8 @@ export type RunConversationTurnArgs = {
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   host?: ChatTurnHostPort;
   approvalPolicies?: ToolApprovalPolicy[];
+  agentProfileId?: string;
+  agentSnapshot?: CustomAgentExecutionSnapshot;
   traceSummarizerRegistry?: TraceSummaryService;
   onCompactionStatus?: (event: ConversationCompactionStatus) => void;
   onTraceEvent?: RunAgentLoopOptions['onTraceEvent'];
@@ -55,6 +58,8 @@ export type TurnSubmitInput = Pick<
   | 'includePlanTool'
   | 'abortSignal'
   | 'leaseOwner'
+  | 'agentProfileId'
+  | 'agentSnapshot'
 >;
 
 export type TurnHostInput = Pick<

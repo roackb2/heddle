@@ -38,6 +38,7 @@ import type {
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import { ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
 import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
+import { CustomAgentService, type CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import { ModelPolicyService } from '@/core/llm/models/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
@@ -110,6 +111,8 @@ type CompactControlPlaneChatSessionArgs = ControlPlaneSessionReadArgs & ControlP
 type SubmitChatPromptArgs = ControlPlaneSessionReadArgs & {
   sessionId: string;
   prompt: string;
+  agentProfileId?: string;
+  agentSnapshot?: CustomAgentExecutionSnapshot;
   maxSteps?: number;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
@@ -275,19 +278,20 @@ export class ControlPlaneChatSessionsController {
   }
 
   async submitPrompt(args: SubmitChatPromptArgs) {
-    return await this.runService.startAndWait(this.buildSubmitPromptRun(args));
+    return await this.runService.startAndWait(this.buildSubmitPromptRun(this.prepareSubmitPromptArgs(args)));
   }
 
   submitPromptAsync(args: SubmitChatPromptArgs): ControlPlaneAcceptedSessionRun {
-    if (this.isRunning(args) || this.hasQueuedPrompts(args)) {
-      const queued = this.enqueuePrompt(args);
-      if (!this.isRunning(args)) {
-        this.startNextQueuedPrompt(args);
+    const preparedArgs = this.prepareSubmitPromptArgs(args);
+    if (this.isRunning(preparedArgs) || this.hasQueuedPrompts(preparedArgs)) {
+      const queued = this.enqueuePrompt(preparedArgs);
+      if (!this.isRunning(preparedArgs)) {
+        this.startNextQueuedPrompt(preparedArgs);
       }
       return queued;
     }
 
-    return this.startPromptRun(args);
+    return this.startPromptRun(preparedArgs);
   }
 
   submitDirectShellAsync(args: SubmitDirectShellArgs): ControlPlaneAcceptedSessionRun {
@@ -461,6 +465,8 @@ export class ControlPlaneChatSessionsController {
   private enqueuePrompt(args: SubmitChatPromptArgs): ControlPlaneAcceptedSessionRun {
     const queued = this.createEngine(args).sessions.enqueuePrompt(args.sessionId, {
       prompt: args.prompt,
+      agentProfileId: args.agentProfileId,
+      agentSnapshot: args.agentSnapshot,
     });
     this.publishQueueUpdated(args, queued.session);
 
@@ -491,12 +497,18 @@ export class ControlPlaneChatSessionsController {
 
     this.publishQueueUpdated(args, dequeued.session);
     try {
-      this.startPromptRun({
+      this.startPromptRun(this.prepareSubmitPromptArgs({
         ...args,
         prompt: dequeued.item.prompt,
-      });
+        agentProfileId: dequeued.item.agentProfileId,
+        agentSnapshot: dequeued.item.agentSnapshot,
+      }));
     } catch (error) {
-      const restored = sessions.enqueuePrompt(args.sessionId, { prompt: dequeued.item.prompt });
+      const restored = sessions.enqueuePrompt(args.sessionId, {
+        prompt: dequeued.item.prompt,
+        agentProfileId: dequeued.item.agentProfileId,
+        agentSnapshot: dequeued.item.agentSnapshot,
+      });
       this.publishQueueUpdated(args, restored.session);
       args.logger?.debug(
         { error: error instanceof Error ? error.message : String(error), sessionId: args.sessionId },
@@ -533,6 +545,8 @@ export class ControlPlaneChatSessionsController {
           : await this.runEngineTurn(args, run, async ({ engine, host, abortSignal, shouldStop }) => {
             return await engine.turns.submit({
               ...args,
+              agentProfileId: args.agentProfileId,
+              agentSnapshot: args.agentSnapshot,
               host,
               abortSignal,
               shouldStop,
@@ -678,6 +692,19 @@ export class ControlPlaneChatSessionsController {
     return {
       ...result,
       session: ControlPlaneChatSessionPresenter.projectDetail(result.session)[0] ?? null,
+    };
+  }
+
+  private prepareSubmitPromptArgs(args: SubmitChatPromptArgs): SubmitChatPromptArgs {
+    if (!args.agentProfileId || args.agentSnapshot) {
+      return args;
+    }
+
+    return {
+      ...args,
+      agentSnapshot: new CustomAgentService({
+        workspaceRoot: args.workspaceRoot,
+      }).resolveExecutionSnapshot(args.agentProfileId),
     };
   }
 
@@ -907,6 +934,14 @@ export class ControlPlaneChatSessionsController {
       steps: 1,
       traceFile: 'browser-integration-fake-trace.jsonl',
       events: ['Mocked browser integration session run completed.'],
+      agent: args.agentSnapshot ? {
+        id: args.agentSnapshot.agentProfileId,
+        name: args.agentSnapshot.agentName,
+        modeAlias: args.agentSnapshot.modeAlias,
+        source: args.agentSnapshot.source,
+        definitionHash: args.agentSnapshot.definitionHash,
+      } : undefined,
+      agentSnapshot: args.agentSnapshot,
     };
     const latestSession = repository.read(args.sessionId) ?? session;
     const updatedSession: ChatSession = {

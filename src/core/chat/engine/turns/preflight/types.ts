@@ -1,5 +1,6 @@
 import type { ChatMessage } from '@/core/llm/types.js';
 import type { ChatSession } from '@/core/chat/types.js';
+import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ConversationCompactionStatus } from '@/core/live/index.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import type { ChatTurnHostPort } from '../host/index.js';
@@ -23,6 +24,7 @@ export type PrepareChatSessionTurnArgs = {
   leaseOwner: ChatSessionLeaseOwner;
   sessions: ChatSession[];
   host: Pick<ChatTurnHostPort, 'onCompactionStatus'>;
+  agentSnapshot?: CustomAgentExecutionSnapshot;
 };
 
 export type PreflightTurnCompactionRuntime = Pick<

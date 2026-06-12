@@ -9,6 +9,7 @@ import { ConversationTurnPreflightService } from '../../../core/chat/engine/turn
 import { ConversationTurnContextBuilder } from '../../../core/chat/engine/turns/context/index.js';
 import { ConversationTurnRuntimeResolver } from '../../../core/chat/engine/turns/runtime/index.js';
 import { DEFAULT_OPENAI_MODEL } from '../../../core/config.js';
+import type { CustomAgentExecutionSnapshot } from '../../../core/custom-agents/index.js';
 import { BROWSER_AUTOMATION_SKILL_NAME, FileAgentSkillActivationRepository } from '../../../core/skills/index.js';
 
 describe('chat turn preparation modules', () => {
@@ -239,6 +240,47 @@ describe('chat turn preparation modules', () => {
     });
   });
 
+  it('prepares custom-agent turns with appended instructions and scoped tool bundles', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-turn-custom-agent-'));
+    const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
+    const session = ChatSessionRecords.create({
+      id: 'session-1',
+      name: 'Session 1',
+      apiKeyPresent: true,
+      model: 'gpt-5.4',
+    });
+    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
+
+    const context = ConversationTurnContextBuilder.build({
+      workspaceRoot: root,
+      stateRoot: join(root, '.heddle'),
+      sessionStoragePath,
+      sessionId: 'session-1',
+      apiKey: 'explicit-key',
+      agentSnapshot: askAgentSnapshot(),
+    });
+
+    expect(context.agentSnapshot?.agentProfileId).toBe('builtin:ask');
+    expect(context.runtime.systemContext).toContain('## Selected Agent Profile');
+    expect(context.runtime.systemContext).toContain('You are running in ask mode.');
+    expect(context.toolNames).toEqual(expect.arrayContaining([
+      'project_dashboard',
+      'read_file',
+      'search_files',
+      'run_shell_inspect',
+      'read_agent_skill',
+    ]));
+    expect(context.toolNames).not.toEqual(expect.arrayContaining([
+      'edit_file',
+      'delete_file',
+      'move_file',
+      'run_shell_mutate',
+      'memory_checkpoint',
+      'record_knowledge',
+      'mcp_call_tool',
+    ]));
+  });
+
   it('adds browser tools to future turns when Browser Automation is enabled', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-browser-automation-'));
     const stateRoot = join(root, '.heddle');
@@ -447,3 +489,27 @@ describe('chat turn preparation modules', () => {
     ]);
   });
 });
+
+function askAgentSnapshot(): CustomAgentExecutionSnapshot {
+  return {
+    agentProfileId: 'builtin:ask',
+    agentName: 'Ask',
+    modeAlias: 'ask',
+    source: 'built-in',
+    definitionHash: 'askhash',
+    runtime: { maxSteps: 60 },
+    toolProfile: {
+      preset: 'inspect',
+      includeTools: [
+        'project_dashboard',
+        'read_file',
+        'search_files',
+        'run_shell_inspect',
+        'read_agent_skill',
+      ],
+      memoryMode: 'none',
+    },
+    approvalProfile: { preset: 'read_only' },
+    systemContextAppendix: 'You are running in ask mode.',
+  };
+}

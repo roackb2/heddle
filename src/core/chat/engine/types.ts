@@ -11,6 +11,7 @@ import type { ChatMessage, LlmAdapter, ReasoningEffort } from '../../llm/types.j
 import type { TraceEvent } from '../../types.js';
 import type { ChatSessionLeaseOwner } from './sessions/leases/index.js';
 import type { ChatSession, ChatSessionRetention, QueuedConversationPrompt } from '../types.js';
+import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatTurnHostPort } from './turns/host/index.js';
 import type { ConversationCompactionResult } from '@/core/chat/engine/compaction/index.js';
 
@@ -140,6 +141,8 @@ export type MarkAcceptedConversationUserMessageFailedInput = {
 
 export type EnqueueConversationPromptInput = {
   prompt: string;
+  agentProfileId?: string;
+  agentSnapshot?: CustomAgentExecutionSnapshot;
 };
 
 export type UpdateQueuedConversationPromptInput = {
@@ -180,6 +183,8 @@ export type ConversationTurnService = {
 export type SubmitConversationTurnInput = {
   sessionId: string;
   prompt: string;
+  agentProfileId?: string;
+  agentSnapshot?: CustomAgentExecutionSnapshot;
   maxSteps?: number;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;

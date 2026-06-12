@@ -55,6 +55,7 @@ export const sessionMessageInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   sessionId: z.string().min(1),
   prompt: z.string().min(1),
+  agentProfileId: z.string().min(1).optional(),
   maxSteps: z.number().int().min(1).max(500).optional(),
   searchIgnoreDirs: z.array(z.string().min(1)).optional(),
   includePlanTool: z.boolean().optional(),

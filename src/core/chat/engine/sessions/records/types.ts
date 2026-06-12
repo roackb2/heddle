@@ -3,6 +3,7 @@ import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { ConversationCompactionResult } from '@/core/chat/engine/compaction/index.js';
 import type { RunResult } from '@/core/types.js';
 import type { ChatSession, ChatSessionRetention, ConversationLine, TurnSummary } from '@/core/chat/types.js';
+import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 
 export type CreateChatSessionRecordOptions = {
   id: string;
@@ -24,6 +25,7 @@ export type BuildChatTurnSummaryInput = {
   result: RunResult;
   traceFile: string;
   traceSummarizerRegistry?: TraceSummaryService;
+  agentSnapshot?: CustomAgentExecutionSnapshot;
 };
 
 export type ApplyCompactedChatSessionHistoryInput = {

@@ -1,6 +1,7 @@
 import type { ToolDefinition } from '@/core/types.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
+import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatTurnRuntime } from '../runtime/index.js';
 
 export type PrepareConversationTurnContextArgs = {
@@ -12,6 +13,7 @@ export type PrepareConversationTurnContextArgs = {
   preferApiKey?: boolean;
   credentialStorePath?: string;
   systemContext?: string;
+  agentSnapshot?: CustomAgentExecutionSnapshot;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
   leaseOwner?: ChatSessionLeaseOwner;
@@ -31,6 +33,7 @@ export type ConversationTurnContext = {
   sessions: ChatSession[];
   session: ChatSession;
   runtime: ChatTurnRuntime;
+  agentSnapshot?: CustomAgentExecutionSnapshot;
   tools: ToolDefinition[];
   toolNames: string[];
   leaseOwner: ChatSessionLeaseOwner;

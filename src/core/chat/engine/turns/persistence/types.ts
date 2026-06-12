@@ -5,6 +5,7 @@ import type { ConversationCompactionStatus } from '@/core/live/index.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
+import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatTurnHostPort } from '../host/index.js';
 import type {
   ConversationCompactionResult,
@@ -27,6 +28,7 @@ export type PersistChatTurnResultArgs = {
   traceSummarizerRegistry?: TraceSummaryService;
   createTurnId: () => string;
   onCompactionStatus?: (event: PersistChatTurnCompactionStatus, sourceHistory: ChatMessage[]) => void;
+  agentSnapshot?: CustomAgentExecutionSnapshot;
 };
 
 export type PersistTurnCompactionRuntime = Pick<
@@ -62,6 +64,7 @@ export type PersistCompletedChatTurnBase = {
   toolNames: string[];
   historyForTokenEstimate: ChatMessage[];
   traceSummarizerRegistry?: TraceSummaryService;
+  agentSnapshot?: CustomAgentExecutionSnapshot;
 };
 
 export type PersistCompletedChatTurnArgs = PersistCompletedChatTurnBase & {
