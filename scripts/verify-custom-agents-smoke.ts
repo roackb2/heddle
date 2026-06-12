@@ -80,12 +80,17 @@ try {
   assert.equal(result.outcome, 'done');
   assert.equal(turn?.agent?.id, 'builtin:ask');
   assert.equal(turn?.agent?.name, 'Ask');
+  assert.equal(
+    turn?.summary,
+    'Mocked browser integration agent response: Verify ask custom-agent turn-scoped selection.',
+  );
 
   process.stdout.write([
     'Custom-agent smoke passed.',
     `workspaceId=${workspaceId}`,
     `sessionId=${result.session?.id ?? session.id}`,
     `agent=${turn?.agent?.name ?? 'unknown'}`,
+    `response=${turn?.summary ?? 'unknown'}`,
   ].join('\n'));
   process.stdout.write('\n');
 } finally {
