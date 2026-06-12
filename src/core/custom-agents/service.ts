@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
+import { existsSync, rmSync, rmdirSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative } from 'node:path';
 import { CustomAgentDefinitionRepository } from './definition-repository.js';
 import type {
   CustomAgentCatalog,
+  CustomAgentDeleteResult,
   CustomAgentDefinition,
   CustomAgentExecutionSnapshot,
   CustomAgentOption,
@@ -46,6 +49,32 @@ export class CustomAgentService {
     return CustomAgentService.toExecutionSnapshot(agent);
   }
 
+  deleteProjectAgent(agentProfileId: string): CustomAgentDeleteResult {
+    const catalog = this.catalog();
+    const agent = catalog.agents.find((candidate) => candidate.id === agentProfileId);
+    if (!agent) {
+      throw new Error(`Custom agent not found: ${agentProfileId}`);
+    }
+
+    if (agent.source === 'built-in') {
+      throw new Error(`Built-in custom agents cannot be deleted: ${agentProfileId}`);
+    }
+
+    if (agent.source !== 'project') {
+      throw new Error(`Only project custom agents can be deleted from this workspace: ${agentProfileId}`);
+    }
+
+    if (!agent.definitionPath) {
+      throw new Error(`Project custom agent has no definition path: ${agentProfileId}`);
+    }
+
+    CustomAgentService.assertProjectDefinitionPath(this.options.workspaceRoot, agent.definitionPath);
+    rmSync(agent.definitionPath, { force: true });
+    CustomAgentService.removeDefinitionDirectoryIfEmpty(agent.definitionPath);
+
+    return { deletedAgent: agent };
+  }
+
   static toExecutionSnapshot(agent: CustomAgentDefinition): CustomAgentExecutionSnapshot {
     return {
       agentProfileId: agent.id,
@@ -73,5 +102,26 @@ export class CustomAgentService {
       }))
       .digest('hex')
       .slice(0, 16);
+  }
+
+  private static assertProjectDefinitionPath(workspaceRoot: string, definitionPath: string): void {
+    const projectAgentsRoot = join(workspaceRoot, '.agents', 'agents');
+    const relativePath = relative(projectAgentsRoot, definitionPath);
+    if (isAbsolute(relativePath) || relativePath.startsWith('..')) {
+      throw new Error(`Custom agent definition is outside the project agents directory: ${definitionPath}`);
+    }
+  }
+
+  private static removeDefinitionDirectoryIfEmpty(definitionPath: string): void {
+    const definitionDirectory = dirname(definitionPath);
+    if (!existsSync(definitionDirectory)) {
+      return;
+    }
+
+    try {
+      rmdirSync(definitionDirectory);
+    } catch {
+      // Keep non-empty agent directories intact; only AGENT.md is owned here.
+    }
   }
 }

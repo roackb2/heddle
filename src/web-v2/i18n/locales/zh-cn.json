@@ -200,12 +200,58 @@
     "workspaceSwitcher": "工作区"
   },
   "settings": {
+    "agents": "Agents",
     "browserAutomation": "Browser Automation",
     "general": "通用",
     "memory": "记忆状态",
     "mcp": "MCP",
     "skills": "Skills",
     "workspaces": "工作区"
+  },
+  "agentSettings": {
+    "approvalProfileLabel": "Approval",
+    "cancelAction": "取消",
+    "catalogTitle": "Agent catalog",
+    "copiedAction": "已复制",
+    "copyIdAction": "复制 ID",
+    "deleteAction": "删除",
+    "deleteConfirmAction": "删除 agent",
+    "deleteDialogBody": "这会从当前工作区移除 project AGENT.md 定义。既有 turns 会保留已保存的 agent snapshot。",
+    "deleteDialogTitle": "删除 project agent？",
+    "deleteUnavailable": "这里只能删除 project agents",
+    "deleting": "删除中",
+    "editAction": "编辑",
+    "editUnavailable": "这个 slice 尚未提供 agent 文件编辑",
+    "emptyCatalog": "没有符合搜索的 agents。",
+    "errorTitle": "Agents 不可用",
+    "inheritValue": "继承",
+    "issuesTitle": "Catalog issues",
+    "loadingBody": "正在读取当前工作区的 custom agents。",
+    "loadingTitle": "正在加载 agents",
+    "maxStepsLabel": "Max steps",
+    "metrics": {
+      "builtIn": "Built-in",
+      "issues": "Issues",
+      "project": "Project",
+      "user": "User"
+    },
+    "mode": {
+      "ask": "ask",
+      "code": "code",
+      "review": "review"
+    },
+    "modelLabel": "Model",
+    "overviewBody": "Custom agents 是 turn-scoped runtime profiles：prompt appendix、tool profile、approval profile，以及可选的 runtime defaults。",
+    "overviewTitle": "Custom agents",
+    "searchLabel": "搜索 agents",
+    "searchPlaceholder": "搜索 agents",
+    "source": {
+      "builtIn": "built-in",
+      "project": "project",
+      "user": "user"
+    },
+    "toolProfileLabel": "Tools",
+    "unknownPath": "未知路径"
   },
   "browserAutomationSettings": {
     "detailsTitle": "运行环境说明",

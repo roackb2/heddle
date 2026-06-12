@@ -7,6 +7,7 @@ import {
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
 import {
   WorkbenchView,
+  type AgentsSettingsViewProps,
   type BrowserAutomationSettingsViewProps,
   type MemorySettingsViewProps,
   type McpSettingsViewProps,
@@ -19,6 +20,7 @@ import {
 interface AppRoutesProps {
   activeSurfaceId: AppSurfaceId;
   activeSettingsSectionId: SettingsSectionId;
+  agentsSettingsView: AgentsSettingsViewProps;
   browserAutomationSettingsView: BrowserAutomationSettingsViewProps;
   memorySettingsView: MemorySettingsViewProps;
   mcpSettingsView: McpSettingsViewProps;
@@ -45,6 +47,7 @@ const appRoutePaths = APP_ROUTES.flatMap((route) => (
 export function AppRoutes({
   activeSurfaceId,
   activeSettingsSectionId,
+  agentsSettingsView,
   browserAutomationSettingsView,
   memorySettingsView,
   mcpSettingsView,
@@ -55,6 +58,7 @@ export function AppRoutes({
 }: AppRoutesProps) {
   const sharedWorkbenchProps = {
     activeSettingsSectionId,
+    agentsSettingsView,
     browserAutomationSettingsView,
     memorySettingsView,
     mcpSettingsView,

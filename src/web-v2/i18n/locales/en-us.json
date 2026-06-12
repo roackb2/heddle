@@ -200,12 +200,58 @@
     "workspaceSwitcher": "Workspace"
   },
   "settings": {
+    "agents": "Agents",
     "browserAutomation": "Browser Automation",
     "general": "General",
     "memory": "Memory Status",
     "mcp": "MCP",
     "skills": "Skills",
     "workspaces": "Workspace"
+  },
+  "agentSettings": {
+    "approvalProfileLabel": "Approval",
+    "cancelAction": "Cancel",
+    "catalogTitle": "Agent catalog",
+    "copiedAction": "Copied",
+    "copyIdAction": "Copy ID",
+    "deleteAction": "Delete",
+    "deleteConfirmAction": "Delete agent",
+    "deleteDialogBody": "This removes the project AGENT.md definition from this workspace. Existing turns keep their saved agent snapshot.",
+    "deleteDialogTitle": "Delete project agent?",
+    "deleteUnavailable": "Only project agents can be deleted here",
+    "deleting": "Deleting",
+    "editAction": "Edit",
+    "editUnavailable": "Agent file editing is not available in this slice",
+    "emptyCatalog": "No agents match this search.",
+    "errorTitle": "Agents unavailable",
+    "inheritValue": "inherit",
+    "issuesTitle": "Catalog issues",
+    "loadingBody": "Reading custom agents from the active workspace.",
+    "loadingTitle": "Loading agents",
+    "maxStepsLabel": "Max steps",
+    "metrics": {
+      "builtIn": "Built-in",
+      "issues": "Issues",
+      "project": "Project",
+      "user": "User"
+    },
+    "mode": {
+      "ask": "ask",
+      "code": "code",
+      "review": "review"
+    },
+    "modelLabel": "Model",
+    "overviewBody": "Custom agents are turn-scoped runtime profiles: prompt appendix, tool profile, approval profile, and optional runtime defaults.",
+    "overviewTitle": "Custom agents",
+    "searchLabel": "Search agents",
+    "searchPlaceholder": "Search agents",
+    "source": {
+      "builtIn": "built-in",
+      "project": "project",
+      "user": "user"
+    },
+    "toolProfileLabel": "Tools",
+    "unknownPath": "Unknown path"
   },
   "browserAutomationSettings": {
     "detailsTitle": "Runtime notes",

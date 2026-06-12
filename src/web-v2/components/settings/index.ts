@@ -1,3 +1,5 @@
+export { AgentsSettingsView } from './AgentsSettingsView';
+export type { AgentsSettingsViewProps } from './AgentsSettingsView';
 export { BrowserAutomationSettingsView } from './BrowserAutomationSettingsView';
 export type { BrowserAutomationSettingsViewProps } from './BrowserAutomationSettingsView';
 export { GeneralSettingsView } from './GeneralSettingsView';

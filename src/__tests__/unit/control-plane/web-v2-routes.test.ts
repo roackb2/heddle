@@ -19,6 +19,7 @@ describe('web-v2 workspace routes', () => {
     expect(routeForTaskRun('default', 'task-a', 'run-b')).toBe('/workspaces/default/tasks/task-a/runs/run-b');
     expect(routeForSettingsSection('memory', 'default')).toBe('/workspaces/default/settings/memory');
     expect(routeForSettingsSection('mcp', 'default')).toBe('/workspaces/default/settings/mcp');
+    expect(routeForSettingsSection('agents', 'default')).toBe('/workspaces/default/settings/agents');
     expect(routeForSettingsSection('skills', 'default')).toBe('/workspaces/default/settings/skills');
   });
 

@@ -254,6 +254,11 @@ export const skillInputSchema = z.object({
   name: z.string().min(1),
 });
 
+export const customAgentInputSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+  agentProfileId: z.string().min(1),
+});
+
 export const browserAutomationInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   enabled: z.boolean(),

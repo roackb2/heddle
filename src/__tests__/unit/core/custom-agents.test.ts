@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -114,10 +114,63 @@ describe('custom agents', () => {
       }),
     ]));
   });
+
+  it('deletes project agent definitions without deleting user or built-in agents', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-delete-project-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-delete-home-'));
+    const definitionPath = writeAgent(workspaceRoot, 'reviewer', [
+      '---',
+      'id: repo-reviewer',
+      'name: Repo Reviewer',
+      'description: Project reviewer.',
+      'tools:',
+      '  preset: inspect',
+      'approval:',
+      '  preset: read_only',
+      '---',
+      'Review this project without changing files.',
+    ].join('\n'));
+
+    const result = new CustomAgentService({ workspaceRoot, homeDir }).deleteProjectAgent('repo-reviewer');
+
+    expect(result.deletedAgent).toMatchObject({
+      id: 'repo-reviewer',
+      source: 'project',
+    });
+    expect(existsSync(definitionPath)).toBe(false);
+    expect(new CustomAgentService({ workspaceRoot, homeDir }).catalog().agents.map((agent) => agent.id))
+      .not.toContain('repo-reviewer');
+  });
+
+  it('refuses to delete built-in and user custom agents through project deletion', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-delete-policy-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-delete-user-'));
+    const userDefinitionPath = writeAgent(homeDir, 'reviewer', [
+      '---',
+      'id: user-reviewer',
+      'name: User Reviewer',
+      'description: User reviewer.',
+      'tools:',
+      '  preset: inspect',
+      'approval:',
+      '  preset: read_only',
+      '---',
+      'Review without changing files.',
+    ].join('\n'));
+    const service = new CustomAgentService({ workspaceRoot, homeDir });
+
+    expect(() => service.deleteProjectAgent('builtin:ask'))
+      .toThrow('Built-in custom agents cannot be deleted: builtin:ask');
+    expect(() => service.deleteProjectAgent('user-reviewer'))
+      .toThrow('Only project custom agents can be deleted from this workspace: user-reviewer');
+    expect(existsSync(userDefinitionPath)).toBe(true);
+  });
 });
 
-function writeAgent(root: string, directory: string, content: string): void {
+function writeAgent(root: string, directory: string, content: string): string {
   const agentDir = join(root, '.agents', 'agents', directory);
+  const definitionPath = join(agentDir, 'AGENT.md');
   mkdirSync(agentDir, { recursive: true });
-  writeFileSync(join(agentDir, 'AGENT.md'), `${content}\n`);
+  writeFileSync(definitionPath, `${content}\n`);
+  return definitionPath;
 }
