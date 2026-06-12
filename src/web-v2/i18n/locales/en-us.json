@@ -163,7 +163,17 @@
     "title": "Diff preview"
   },
   "generalSettings": {
-    "languageDetail": "Choose the language used by the web v2 interface."
+    "languageDetail": "Choose the language used by the web v2 interface.",
+    "notifications": {
+      "default": "Browser notifications are not enabled for this browser.",
+      "denied": "Browser notifications are blocked in this browser.",
+      "detail": "Notify when the selected session needs approval or finishes, and when task runs finish while this workspace is open.",
+      "enableAction": "Enable",
+      "enabledAction": "Enabled",
+      "granted": "Browser notifications are enabled for this browser.",
+      "label": "Notifications",
+      "unsupported": "Browser notifications are not supported in this browser."
+    }
   },
   "inspector": {
     "collapsePanel": "Collapse context inspector",

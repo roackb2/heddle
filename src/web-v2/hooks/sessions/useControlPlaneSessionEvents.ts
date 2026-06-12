@@ -6,6 +6,7 @@ import {
   type ControlPlaneSessionEventEnvelope,
 } from '@web/api/client';
 import { ClientSharedSessionActivityService } from '@/client-shared/services/session-activities';
+import { ClientSharedNotificationIntentService, type ClientSharedNotificationIntent } from '@/client-shared/services/notifications';
 import type {
   ClientSharedAgentActivityStatus,
   ClientSharedSessionLatestUpdate,
@@ -25,6 +26,7 @@ type UseControlPlaneSessionEventsArgs = {
   setActivePlan: Dispatch<SetStateAction<ClientSharedSessionPlan | undefined>>;
   setCurrentActivity: Dispatch<SetStateAction<ClientSharedAgentActivityStatus | undefined>>;
   setLatestUpdate: Dispatch<SetStateAction<ClientSharedSessionLatestUpdate | undefined>>;
+  onNotificationIntent?: (intent: ClientSharedNotificationIntent | undefined) => void;
 };
 
 export type ControlPlaneSessionEventsState = {
@@ -45,6 +47,7 @@ export function useControlPlaneSessionEvents({
   setActivePlan,
   setCurrentActivity,
   setLatestUpdate,
+  onNotificationIntent,
 }: UseControlPlaneSessionEventsArgs): ControlPlaneSessionEventsState {
   const utils = trpcReact.useUtils();
   const [streamConnected, setStreamConnected] = useState(false);
@@ -96,8 +99,10 @@ export function useControlPlaneSessionEvents({
       setCurrentActivity,
       setLatestUpdate,
       setRunning,
+      notify: onNotificationIntent,
+      workspaceId,
     }));
-  }, [invalidateWorkspaceDiff, refresh, refreshPendingApproval, setActivePlan, setCurrentActivity, setLatestUpdate, setLiveStatus, setRunning, setSession, utils.controlPlane.session, workspaceId]);
+  }, [invalidateWorkspaceDiff, onNotificationIntent, refresh, refreshPendingApproval, setActivePlan, setCurrentActivity, setLatestUpdate, setLiveStatus, setRunning, setSession, utils.controlPlane.session, workspaceId]);
 
   const subscription = trpcReact.controlPlane.sessionEvents.useSubscription(
     sessionId && workspaceId ? { sessionId, workspaceId } : skipToken,
@@ -164,6 +169,7 @@ function applySessionUpdate(
 }
 
 type SessionActivityContext = {
+  workspaceId?: string;
   sessionId: string;
   refresh: RefreshControlPlaneSession;
   refreshPendingApproval: (sessionId: string) => void;
@@ -174,11 +180,18 @@ type SessionActivityContext = {
   setActivePlan: Dispatch<SetStateAction<ClientSharedSessionPlan | undefined>>;
   setCurrentActivity: Dispatch<SetStateAction<ClientSharedAgentActivityStatus | undefined>>;
   setLatestUpdate: Dispatch<SetStateAction<ClientSharedSessionLatestUpdate | undefined>>;
+  notify?: (intent: ClientSharedNotificationIntent | undefined) => void;
 };
 
 type ControlPlaneSessionActivity = Extract<ControlPlaneSessionEventEnvelope, { type: 'session.event' }>['activities'][number];
 
 function applySessionActivity(activity: ControlPlaneSessionActivity, context: SessionActivityContext) {
+  context.notify?.(ClientSharedNotificationIntentService.projectSessionActivity({
+    workspaceId: context.workspaceId,
+    sessionId: context.sessionId,
+    activity,
+  }));
+
   const latestUpdate = ClientSharedSessionActivityService.resolveLatestUpdate(activity);
   if (latestUpdate) {
     context.setLatestUpdate(latestUpdate);

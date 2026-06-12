@@ -9,6 +9,7 @@ import {
   type ClientSharedSessionLatestUpdate,
   type ClientSharedSessionPlan,
 } from '@/client-shared/services/session-activities';
+import type { ClientSharedNotificationIntent } from '@/client-shared/services/notifications';
 import { useControlPlaneSessionEvents } from './useControlPlaneSessionEvents';
 import { useControlPlaneSessionLoader } from './useControlPlaneSessionLoader';
 import { useControlPlanePendingApproval } from './useControlPlanePendingApproval';
@@ -63,6 +64,7 @@ type ControlPlaneSessionDetailState = {
 type UseControlPlaneSessionDetailArgs = {
   workspaceId?: string;
   sessionId?: string;
+  onNotificationIntent?: (intent: ClientSharedNotificationIntent | undefined) => void;
 };
 
 // Composes the web-v2 session detail workflow from focused hooks: persisted
@@ -70,6 +72,7 @@ type UseControlPlaneSessionDetailArgs = {
 export function useControlPlaneSessionDetail({
   workspaceId,
   sessionId,
+  onNotificationIntent,
 }: UseControlPlaneSessionDetailArgs): ControlPlaneSessionDetailState {
   const [liveStatus, setLiveStatus] = useState<string | undefined>();
   const [currentActivity, setCurrentActivity] = useState<ClientSharedAgentActivityStatus | undefined>();
@@ -101,6 +104,7 @@ export function useControlPlaneSessionDetail({
     setActivePlan,
     setCurrentActivity,
     setLatestUpdate,
+    onNotificationIntent,
   });
   const promptSubmit = useControlPlaneSessionPromptSubmit({
     workspaceId,

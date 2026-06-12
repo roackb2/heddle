@@ -13,6 +13,7 @@ import type {
 import { createControlPlaneRequestContext } from '../../../client-shared/api/links.js';
 import { SLASH_COMMAND_REQUEST_TIMEOUT_MS } from '../../../cli-v2/services/sessions/control-plane-session-api-service.js';
 import { ControlPlaneSessionStore } from '../../../cli-v2/state/control-plane-session-store.js';
+import type { ControlPlaneTerminalNotificationService } from '../../../cli-v2/services/notifications/index.js';
 
 describe('ControlPlaneSessionStore', () => {
   it('loads workspace sessions through the shared control-plane API', async () => {
@@ -824,6 +825,38 @@ describe('ControlPlaneSessionStore', () => {
       detail: 'done',
       tone: 'success',
     });
+    store.dispose();
+  });
+
+  it('delivers terminal notifications from session live events when configured', async () => {
+    const fixture = createClientFixture();
+    const notificationService = { deliver: vi.fn() };
+    const store = new ControlPlaneSessionStore({
+      client: fixture.client,
+      notificationService: notificationService as unknown as ControlPlaneTerminalNotificationService,
+    });
+    await store.start();
+
+    fixture.sessionEvents?.onData?.({
+      type: 'session.event',
+      sessionId: 'session-1',
+      timestamp: new Date().toISOString(),
+      activities: [
+        {
+          source: 'agent-loop',
+          type: 'loop.finished',
+          runId: 'run-1',
+          outcome: 'done',
+          summary: 'Done.',
+          timestamp: '2026-06-12T00:00:00.000Z',
+        },
+      ],
+    } as ControlPlaneSessionEventEnvelope);
+
+    expect(notificationService.deliver).toHaveBeenCalledWith(expect.objectContaining({
+      key: 'session-run-finished:workspace-1:session-1:run-1',
+      title: 'Session run finished',
+    }));
     store.dispose();
   });
 });

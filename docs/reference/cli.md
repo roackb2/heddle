@@ -151,6 +151,11 @@ Inside `heddle` / `heddle chat`, the most-used local commands are:
 
 Prompt editing supports `Shift+Enter` for newlines, `Ctrl+Z`/`Ctrl+Y` for undo/redo, and `Up`/`Down` for submitted prompt history when the cursor is on the first or last logical line.
 
+When the terminal UI is running, Heddle sends desktop notifications for active
+session approval waits and run completion. Delivery uses the operating system
+notification bridge through the terminal process; approval policy and run state
+still come from the shared control-plane session events.
+
 ## Development Commands In This Repository
 
 Inside this repository, common development commands include:

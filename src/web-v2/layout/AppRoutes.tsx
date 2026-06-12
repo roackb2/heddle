@@ -9,6 +9,7 @@ import {
   WorkbenchView,
   type AgentsSettingsViewProps,
   type BrowserAutomationSettingsViewProps,
+  type GeneralSettingsViewProps,
   type MemorySettingsViewProps,
   type McpSettingsViewProps,
   type SkillsSettingsViewProps,
@@ -22,6 +23,7 @@ interface AppRoutesProps {
   activeSettingsSectionId: SettingsSectionId;
   agentsSettingsView: AgentsSettingsViewProps;
   browserAutomationSettingsView: BrowserAutomationSettingsViewProps;
+  generalSettingsView: GeneralSettingsViewProps;
   memorySettingsView: MemorySettingsViewProps;
   mcpSettingsView: McpSettingsViewProps;
   sessionView: SessionWorkbenchViewProps;
@@ -49,6 +51,7 @@ export function AppRoutes({
   activeSettingsSectionId,
   agentsSettingsView,
   browserAutomationSettingsView,
+  generalSettingsView,
   memorySettingsView,
   mcpSettingsView,
   sessionView,
@@ -60,6 +63,7 @@ export function AppRoutes({
     activeSettingsSectionId,
     agentsSettingsView,
     browserAutomationSettingsView,
+    generalSettingsView,
     memorySettingsView,
     mcpSettingsView,
     sessionView,

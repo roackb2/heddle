@@ -16,6 +16,7 @@ import type {
   ControlPlaneSlashCommandResult,
 } from '@/client-shared/api/types.js';
 import type { ControlPlaneSessionLatestUpdate } from '../services/activities/session-activity-service.js';
+import type { ControlPlaneTerminalNotificationService } from '../services/notifications/index.js';
 
 export type ControlPlaneSessionStoreOptions = {
   client: ControlPlaneProxyClient;
@@ -25,6 +26,7 @@ export type ControlPlaneSessionStoreOptions = {
   systemContext?: string;
   apiKey?: string;
   preferApiKey?: boolean;
+  notificationService?: ControlPlaneTerminalNotificationService;
 };
 
 export type ControlPlaneSessionStoreStartInput = {

@@ -10,6 +10,7 @@ export type SessionWorkbenchViewProps = Omit<ComponentProps<typeof ConversationT
 export type TaskWorkbenchViewProps = ComponentProps<typeof TasksWorkbenchView>;
 export type AgentsSettingsViewProps = ComponentProps<typeof AgentsSettingsView>;
 export type BrowserAutomationSettingsViewProps = ComponentProps<typeof BrowserAutomationSettingsView>;
+export type GeneralSettingsViewProps = ComponentProps<typeof GeneralSettingsView>;
 export type MemorySettingsViewProps = ComponentProps<typeof MemorySettingsView>;
 export type McpSettingsViewProps = ComponentProps<typeof McpSettingsView>;
 export type SkillsSettingsViewProps = ComponentProps<typeof SkillsSettingsView>;
@@ -20,6 +21,7 @@ interface WorkbenchViewProps {
   activeSettingsSectionId: SettingsSectionId;
   agentsSettingsView: AgentsSettingsViewProps;
   browserAutomationSettingsView: BrowserAutomationSettingsViewProps;
+  generalSettingsView: GeneralSettingsViewProps;
   memorySettingsView: MemorySettingsViewProps;
   mcpSettingsView: McpSettingsViewProps;
   sessionView: SessionWorkbenchViewProps;
@@ -51,6 +53,7 @@ export function WorkbenchView({
   activeSettingsSectionId,
   agentsSettingsView,
   browserAutomationSettingsView,
+  generalSettingsView,
   memorySettingsView,
   mcpSettingsView,
   sessionView,
@@ -73,7 +76,7 @@ export function WorkbenchView({
   const settingsViews = {
     agents: <AgentsSettingsView {...agentsSettingsView} />,
     browserAutomation: <BrowserAutomationSettingsView {...browserAutomationSettingsView} />,
-    general: <GeneralSettingsView />,
+    general: <GeneralSettingsView {...generalSettingsView} />,
     memory: <MemorySettingsView {...memorySettingsView} />,
     mcp: <McpSettingsView {...mcpSettingsView} />,
     skills: <SkillsSettingsView {...skillsSettingsView} />,
