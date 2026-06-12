@@ -37,6 +37,7 @@ export function useControlPlaneAppState() {
   const workspaceSetActiveMutation = trpcReact.controlPlane.workspaceSetActive.useMutation();
   const skillActivateMutation = trpcReact.controlPlane.skillActivate.useMutation();
   const skillDisableMutation = trpcReact.controlPlane.skillDisable.useMutation();
+  const customAgentDeleteMutation = trpcReact.controlPlane.customAgentDelete.useMutation();
   const browserAutomationSetEnabledMutation = trpcReact.controlPlane.browserAutomationSetEnabled.useMutation();
   const browserAutomationSettingsUpdateMutation = trpcReact.controlPlane.browserAutomationSettingsUpdate.useMutation();
   const browserAutomationProfileOpenMutation = trpcReact.controlPlane.browserAutomationProfileOpen.useMutation();
@@ -55,6 +56,9 @@ export function useControlPlaneAppState() {
   });
   const skillsQuery = trpcReact.controlPlane.skills.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
     enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'skills',
+  });
+  const customAgentsQuery = trpcReact.controlPlane.customAgents.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
+    enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'agents',
   });
   const browserAutomationQuery = trpcReact.controlPlane.browserAutomation.useQuery(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined, {
     enabled: navigation.settingsOpen && navigation.activeSettingsSectionId === 'browserAutomation',
@@ -191,6 +195,13 @@ export function useControlPlaneAppState() {
     await utils.controlPlane.skills.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined);
   }
 
+  async function deleteProjectAgent(agentProfileId: string) {
+    await customAgentDeleteMutation.mutateAsync(
+      sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, agentProfileId } : { agentProfileId },
+    );
+    await utils.controlPlane.customAgents.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined);
+  }
+
   async function setBrowserAutomationEnabled(enabled: boolean) {
     const input = sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, enabled } : { enabled };
     const result = await browserAutomationSetEnabledMutation.mutateAsync(input);
@@ -287,6 +298,13 @@ export function useControlPlaneAppState() {
     routeProps: {
       activeSurfaceId: navigation.activeSurfaceId,
       activeSettingsSectionId: navigation.activeSettingsSectionId,
+      agentsSettingsView: {
+        agents: customAgentsQuery.data,
+        loading: customAgentsQuery.isLoading || sidebar.stateQuery.isLoading,
+        error: customAgentsQuery.error instanceof Error ? customAgentsQuery.error.message : undefined,
+        deleting: customAgentDeleteMutation.isPending,
+        onDeleteProjectAgent: deleteProjectAgent,
+      },
       memorySettingsView: {
         status: memoryStatusQuery.data ?? stateMemoryStatus,
         loading: memoryStatusQuery.isLoading || sidebar.stateQuery.isLoading,

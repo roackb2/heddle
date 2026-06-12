@@ -38,6 +38,10 @@ export type CustomAgentCatalog = {
   issues: CustomAgentCatalogIssue[];
 };
 
+export type CustomAgentDeleteResult = {
+  deletedAgent: CustomAgentDefinition;
+};
+
 export type CustomAgentExecutionSnapshot = {
   agentProfileId: string;
   agentName: string;

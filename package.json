@@ -159,6 +159,7 @@
     "@hookform/resolvers": "^5.4.0",
     "@inkjs/ui": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@radix-ui/react-alert-dialog": "^1.1.16",
     "@radix-ui/react-context-menu": "^2.3.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-label": "^2.1.8",

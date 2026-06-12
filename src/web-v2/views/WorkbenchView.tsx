@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { ConversationThread } from '@web/components/conversation';
-import { BrowserAutomationSettingsView, GeneralSettingsView, McpSettingsView, MemorySettingsView, SkillsSettingsView, WorkspaceSettingsView } from '@web/components/settings';
+import { AgentsSettingsView, BrowserAutomationSettingsView, GeneralSettingsView, McpSettingsView, MemorySettingsView, SkillsSettingsView, WorkspaceSettingsView } from '@web/components/settings';
 import type { I18nMessageKey } from '@web/i18n';
 import { useI18n } from '@web/i18n';
 import type { AppSurfaceId, SettingsSectionId } from '@web/layout/types';
@@ -8,6 +8,7 @@ import { TasksWorkbenchView } from './TasksWorkbenchView';
 
 export type SessionWorkbenchViewProps = Omit<ComponentProps<typeof ConversationThread>, 'emptyTitle'>;
 export type TaskWorkbenchViewProps = ComponentProps<typeof TasksWorkbenchView>;
+export type AgentsSettingsViewProps = ComponentProps<typeof AgentsSettingsView>;
 export type BrowserAutomationSettingsViewProps = ComponentProps<typeof BrowserAutomationSettingsView>;
 export type MemorySettingsViewProps = ComponentProps<typeof MemorySettingsView>;
 export type McpSettingsViewProps = ComponentProps<typeof McpSettingsView>;
@@ -17,6 +18,7 @@ export type WorkspaceSettingsViewProps = ComponentProps<typeof WorkspaceSettings
 interface WorkbenchViewProps {
   activeSurfaceId: AppSurfaceId;
   activeSettingsSectionId: SettingsSectionId;
+  agentsSettingsView: AgentsSettingsViewProps;
   browserAutomationSettingsView: BrowserAutomationSettingsViewProps;
   memorySettingsView: MemorySettingsViewProps;
   mcpSettingsView: McpSettingsViewProps;
@@ -33,6 +35,7 @@ const appSurfaceLabelKeys = {
 } satisfies Record<AppSurfaceId, I18nMessageKey>;
 
 const settingsSectionLabelKeys = {
+  agents: 'settings.agents',
   browserAutomation: 'settings.browserAutomation',
   general: 'settings.general',
   memory: 'settings.memory',
@@ -46,6 +49,7 @@ const settingsSectionLabelKeys = {
 export function WorkbenchView({
   activeSurfaceId,
   activeSettingsSectionId,
+  agentsSettingsView,
   browserAutomationSettingsView,
   memorySettingsView,
   mcpSettingsView,
@@ -67,6 +71,7 @@ export function WorkbenchView({
     },
   } satisfies Record<AppSurfaceId, { title: string; content: ReactNode }>;
   const settingsViews = {
+    agents: <AgentsSettingsView {...agentsSettingsView} />,
     browserAutomation: <BrowserAutomationSettingsView {...browserAutomationSettingsView} />,
     general: <GeneralSettingsView />,
     memory: <MemorySettingsView {...memorySettingsView} />,
