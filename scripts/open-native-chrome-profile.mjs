@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync } from 'node:fs';
 import { createServer } from 'node:net';
+import { get } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -40,6 +41,7 @@ const chromeArgs = [
   '--no-default-browser-check',
   options.url,
 ];
+const launchCommand = createLaunchCommand(chromePath, chromeArgs);
 
 console.log(`Chrome: ${chromePath}`);
 console.log(`Profile: ${userDataDir}`);
@@ -48,7 +50,7 @@ console.log(`Start URL: ${options.url}`);
 
 if (options.printOnly) {
   console.log('\nCommand:');
-  console.log([quote(chromePath), ...chromeArgs.map(quote)].join(' '));
+  console.log(launchCommand.display);
   process.exit(0);
 }
 
@@ -60,13 +62,23 @@ if (!portAvailable && !options.allowPortInUse) {
   process.exit(1);
 }
 
-const child = spawn(chromePath, chromeArgs, {
+const child = spawn(launchCommand.command, launchCommand.args, {
   detached: true,
   stdio: 'ignore',
 });
 child.unref();
 
-console.log('\nLaunched native Chrome. Use this profile window to log in, then keep it open while testing CDP attach.');
+const cdpReady = await waitForCdpEndpoint(options.port, 10_000);
+if (!cdpReady) {
+  console.error([
+    '',
+    `Chrome was launched, but http://127.0.0.1:${options.port}/json/version did not become reachable.`,
+    'Close any Chrome window that is already using this profile, then run the command again.',
+  ].join('\n'));
+  process.exit(1);
+}
+
+console.log('\nLaunched native Chrome with CDP enabled. Use this profile window to log in, then keep it open while testing CDP attach.');
 
 function parseArgsOrExit(args) {
   try {
@@ -139,6 +151,34 @@ function findChromePath() {
   return candidates.find((candidate) => existsSync(candidate));
 }
 
+function createLaunchCommand(chromePath, chromeArgs) {
+  const macAppBundle = process.platform === 'darwin' ? macAppBundlePath(chromePath) : undefined;
+  if (macAppBundle) {
+    const args = ['-n', '-a', macAppBundle, '--args', ...chromeArgs];
+    return {
+      command: '/usr/bin/open',
+      args,
+      display: [quote('/usr/bin/open'), ...args.map(quote)].join(' '),
+    };
+  }
+
+  return {
+    command: chromePath,
+    args: chromeArgs,
+    display: [quote(chromePath), ...chromeArgs.map(quote)].join(' '),
+  };
+}
+
+function macAppBundlePath(chromePath) {
+  const marker = '.app/Contents/MacOS/';
+  const markerIndex = chromePath.indexOf(marker);
+  if (markerIndex === -1) {
+    return undefined;
+  }
+
+  return chromePath.slice(0, markerIndex + '.app'.length);
+}
+
 function isPortAvailable(port) {
   return new Promise((resolvePort) => {
     const server = createServer();
@@ -147,6 +187,38 @@ function isPortAvailable(port) {
       server.close(() => resolvePort(true));
     });
     server.listen(port, '127.0.0.1');
+  });
+}
+
+async function waitForCdpEndpoint(port, timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (await isCdpEndpointReachable(port)) {
+      return true;
+    }
+    await sleep(250);
+  }
+
+  return false;
+}
+
+function isCdpEndpointReachable(port) {
+  return new Promise((resolveReachable) => {
+    const request = get(`http://127.0.0.1:${port}/json/version`, (response) => {
+      response.resume();
+      resolveReachable(response.statusCode !== undefined && response.statusCode >= 200 && response.statusCode < 500);
+    });
+    request.setTimeout(1000, () => {
+      request.destroy();
+      resolveReachable(false);
+    });
+    request.once('error', () => resolveReachable(false));
+  });
+}
+
+function sleep(ms) {
+  return new Promise((resolveSleep) => {
+    setTimeout(resolveSleep, ms);
   });
 }
 
