@@ -18,6 +18,13 @@
   "composer": {
     "addContext": "添加上下文",
     "contextMenu": "上下文",
+    "browser": {
+      "clearIntent": "移除浏览器请求",
+      "intentChip": "使用浏览器",
+      "intentLabel": "下一条消息的浏览器请求",
+      "useAction": "使用浏览器",
+      "useDescription": "提示代理为这个任务检查或操作相关页面。"
+    },
     "drift": {
       "ariaLabel": "语义漂移",
       "disabled": "漂移关闭",

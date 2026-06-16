@@ -45,6 +45,12 @@ When `allowedDomains` is empty, `browser_open` derives the session allowlist
 from the first opened URL. Subsequent clicks remain same-domain unless a host
 provides a broader explicit allowlist.
 
+For the native Chrome CDP backend, `browser_open` is also the task entrypoint.
+If the configured local CDP endpoint is not reachable, the toolkit asks the
+browser domain to launch native Chrome with the same URL that `browser_open`
+received. Do not add placeholder launch URLs here; validation examples belong
+in examples, and production tool behavior must follow the user's task URL.
+
 ## Example
 
 Run the deterministic toolkit example from the browser automation worktree:

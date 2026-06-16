@@ -18,6 +18,13 @@
   "composer": {
     "addContext": "加入脈絡",
     "contextMenu": "脈絡",
+    "browser": {
+      "clearIntent": "移除瀏覽器要求",
+      "intentChip": "使用瀏覽器",
+      "intentLabel": "下一則訊息的瀏覽器要求",
+      "useAction": "使用瀏覽器",
+      "useDescription": "提示代理為這個任務檢查或操作相關頁面。"
+    },
     "drift": {
       "ariaLabel": "語意漂移",
       "disabled": "漂移關閉",

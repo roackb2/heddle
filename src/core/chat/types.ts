@@ -144,6 +144,7 @@ export type QueuedConversationPrompt = {
   prompt: string;
   agentProfileId?: string;
   agentSnapshot?: CustomAgentExecutionSnapshot;
+  systemContext?: string;
   createdAt: string;
   updatedAt: string;
 };

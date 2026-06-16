@@ -112,6 +112,7 @@ type SubmitChatPromptArgs = ControlPlaneSessionReadArgs & {
   prompt: string;
   agentProfileId?: string;
   agentSnapshot?: CustomAgentExecutionSnapshot;
+  systemContext?: string;
   maxSteps?: number;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
@@ -476,6 +477,7 @@ export class ControlPlaneChatSessionsController {
       prompt: args.prompt,
       agentProfileId: args.agentProfileId,
       agentSnapshot: args.agentSnapshot,
+      systemContext: args.systemContext,
     });
     this.publishQueueUpdated(args, queued.session);
 
@@ -511,12 +513,14 @@ export class ControlPlaneChatSessionsController {
         prompt: dequeued.item.prompt,
         agentProfileId: dequeued.item.agentProfileId,
         agentSnapshot: dequeued.item.agentSnapshot,
+        systemContext: dequeued.item.systemContext,
       }));
     } catch (error) {
       const restored = sessions.enqueuePrompt(args.sessionId, {
         prompt: dequeued.item.prompt,
         agentProfileId: dequeued.item.agentProfileId,
         agentSnapshot: dequeued.item.agentSnapshot,
+        systemContext: dequeued.item.systemContext,
       });
       this.publishQueueUpdated(args, restored.session);
       args.logger?.debug(

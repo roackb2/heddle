@@ -2,7 +2,7 @@
 // Example: Native Chrome CDP Attach Spike
 //
 // Usage:
-//   yarn spike:native-chrome-profile --profile personal --port 9223 --url https://example.com
+//   yarn spike:native-chrome-profile --profile personal --port 9223 --url https://en.wikipedia.org/wiki/Main_Page
 //   HEDDLE_NATIVE_CHROME_CDP_ENDPOINT=http://127.0.0.1:9223 yarn example:native-chrome-cdp-spike
 //
 // This validates the first native Chrome backend slice without involving an
@@ -27,7 +27,7 @@ type SnapshotOutput = {
 };
 
 const STATE_ROOT = join(process.cwd(), '.heddle', 'examples', 'native-chrome-cdp-spike');
-const START_URL = process.env.HEDDLE_BROWSER_START_URL ?? 'https://example.com';
+const START_URL = process.env.HEDDLE_BROWSER_START_URL ?? 'https://en.wikipedia.org/wiki/Main_Page';
 const CDP_ENDPOINT = process.env.HEDDLE_NATIVE_CHROME_CDP_ENDPOINT ?? 'http://127.0.0.1:9222';
 
 async function main() {

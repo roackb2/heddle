@@ -2,6 +2,7 @@ import { join } from 'node:path';
 
 import {
   BrowserDriverFactoryService,
+  NativeChromeProfileService,
   BrowserProfileService,
   BrowserProfileSettingsService,
   BrowserSessionService,
@@ -11,9 +12,17 @@ import {
   type BrowserDriverFactory,
   type BrowserSessionConfig,
   type BrowserSnapshot,
+  type NativeChromeConnectionStatus,
+  type NativeChromeLaunchInput,
+  type NativeChromeLaunchResult,
 } from '../../../browser/index.js';
 import type { ToolDefinition, ToolResult } from '../../../types.js';
 import type { ToolToolkit } from '../../toolkit.js';
+
+type NativeChromeLauncher = {
+  status: (stateRoot: string) => Promise<NativeChromeConnectionStatus>;
+  launch: (stateRoot: string, input?: NativeChromeLaunchInput) => Promise<NativeChromeLaunchResult>;
+};
 
 export type BrowserResearchToolkitOptions = {
   stateRoot: string;
@@ -26,6 +35,8 @@ export type BrowserResearchToolkitOptions = {
   cdpEndpoint?: string;
   maxElementsPerSnapshot?: number;
   driverFactory?: BrowserDriverFactory;
+  nativeChromeLauncher?: NativeChromeLauncher;
+  autoLaunchNativeChrome?: boolean;
 };
 
 type BrowserOpenInput = {
@@ -282,7 +293,7 @@ async function getBrowserSession(
     return state.session;
   }
 
-  const profile = await resolveBrowserProfile(options, state);
+  const profile = await resolveBrowserProfile(options, state, initialUrl);
   state.session = new BrowserSessionService(
     createSessionConfig(options, profile, initialUrl),
     options.driverFactory ?? BrowserDriverFactoryService.resolve(profile.backend),
@@ -293,8 +304,11 @@ async function getBrowserSession(
 async function resolveBrowserProfile(
   options: BrowserResearchToolkitOptions,
   state: BrowserRuntimeState,
+  initialUrl?: string,
 ): Promise<BrowserProfileConfig> {
   if (options.backend === 'native-chrome-cdp') {
+    const launcher = options.nativeChromeLauncher ?? NativeChromeProfileService;
+    const launchResult = await prepareNativeChromeProfile(options, launcher, initialUrl);
     return {
       profileId: options.profileId ?? 'browser-research',
       userDataDir: BrowserProfileSettingsService.resolveNativeChromeProfileDir(
@@ -302,7 +316,7 @@ async function resolveBrowserProfile(
         options.profileId ?? 'browser-research',
       ),
       backend: 'native-chrome-cdp',
-      cdpEndpoint: options.cdpEndpoint,
+      cdpEndpoint: launchResult?.status.endpoint ?? options.cdpEndpoint,
     };
   }
 
@@ -317,6 +331,34 @@ async function resolveBrowserProfile(
     ...lease.profile,
     backend: 'playwright-managed',
   };
+}
+
+async function prepareNativeChromeProfile(
+  options: BrowserResearchToolkitOptions,
+  launcher: NativeChromeLauncher,
+  initialUrl: string | undefined,
+): Promise<NativeChromeLaunchResult | undefined> {
+  if (!shouldAutoLaunchNativeChrome(options)) {
+    return undefined;
+  }
+
+  const status = await launcher.status(options.stateRoot);
+  if (status.state === 'reachable') {
+    return undefined;
+  }
+
+  const launchResult = await launcher.launch(options.stateRoot, {
+    profileId: options.profileId,
+    url: initialUrl,
+  });
+  if (!launchResult.ok) {
+    throw new Error(`Native Chrome launch failed: ${launchResult.error}`);
+  }
+  return launchResult;
+}
+
+function shouldAutoLaunchNativeChrome(options: BrowserResearchToolkitOptions): boolean {
+  return options.autoLaunchNativeChrome ?? !options.driverFactory;
 }
 
 async function closeBrowserState(state: BrowserRuntimeState): Promise<Awaited<ReturnType<BrowserSessionService['close']>> | undefined> {

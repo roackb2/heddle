@@ -31,6 +31,11 @@ export type {
   BrowserProfileSettingsUpdateResult,
   BrowserProfileView,
 } from './settings/index.js';
+export { BrowserAutomationIntentContextService } from './intent/index.js';
+export type {
+  BrowserAutomationIntent,
+  BrowserAutomationIntentContextInput,
+} from './intent/index.js';
 export {
   DEFAULT_NATIVE_CHROME_CDP_PORT,
   DEFAULT_NATIVE_CHROME_START_URL,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, Globe2, X } from 'lucide-react';
 import type { ControlPlaneCustomAgents, ControlPlaneModelOptions, ControlPlanePermissionMode, ControlPlaneSessionRuntimeContext } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
 import { Textarea } from '@web/components/ui/textarea';
@@ -68,7 +68,7 @@ export function ConversationComposer({
   submitting?: boolean;
   running?: boolean;
   cancelling?: boolean;
-  onSubmitPrompt: (prompt: string, options?: { agentProfileId?: string }) => Promise<void>;
+  onSubmitPrompt: (prompt: string, options?: { agentProfileId?: string; browserIntent?: 'preferred' }) => Promise<void>;
   onCancelRun?: () => Promise<void>;
   onUpdateDriftEnabled?: (enabled: boolean) => Promise<void>;
   onUpdatePermissionMode?: (mode: ControlPlanePermissionMode) => Promise<void>;
@@ -80,6 +80,7 @@ export function ConversationComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState('');
   const [selectedAgentProfileId, setSelectedAgentProfileId] = useState<string>(BUILT_IN_COMPOSER_AGENT_IDS.code);
+  const [browserIntentEnabled, setBrowserIntentEnabled] = useState(false);
   const {
     attachments: imageUploadAttachments,
     clearUploadedAttachments,
@@ -135,11 +136,15 @@ export function ConversationComposer({
       return;
     }
 
-    await onSubmitPrompt(prompt, { agentProfileId: selectedAgentProfileId });
+    await onSubmitPrompt(prompt, {
+      agentProfileId: selectedAgentProfileId,
+      browserIntent: browserIntentEnabled ? 'preferred' : undefined,
+    });
     recordPrompt(prompt);
     setDraft('');
+    setBrowserIntentEnabled(false);
     clearUploadedAttachments();
-  }, [clearUploadedAttachments, draft, onSubmitPrompt, recordPrompt, selectedAgentProfileId, sendDisabled, uploadedImagePaths]);
+  }, [browserIntentEnabled, clearUploadedAttachments, draft, onSubmitPrompt, recordPrompt, selectedAgentProfileId, sendDisabled, uploadedImagePaths]);
   const fileMentions = useFileMentionAutocomplete({
     workspaceId,
     value: draft,
@@ -162,6 +167,25 @@ export function ConversationComposer({
           void handleSubmit();
         }}
       >
+      {browserIntentEnabled ? (
+        <div className="v2-composer-intent-strip" aria-label={t('composer.browser.intentLabel')}>
+          <span className="v2-composer-intent-chip">
+            <Globe2 aria-hidden="true" data-icon="inline-start" />
+            <span className="truncate">{t('composer.browser.intentChip')}</span>
+            <Button
+              type="button"
+              size="none"
+              variant="ghost"
+              className="v2-composer-intent-remove"
+              aria-label={t('composer.browser.clearIntent')}
+              disabled={controlsDisabled}
+              onClick={() => setBrowserIntentEnabled(false)}
+            >
+              <X aria-hidden="true" data-icon="inline-end" />
+            </Button>
+          </span>
+        </div>
+      ) : null}
       <Textarea
         ref={fileMentions.textareaRef}
         aria-label={t('composer.promptAriaLabel')}
@@ -207,10 +231,12 @@ export function ConversationComposer({
           driftLevel={effectiveDriftLevel}
           permissionMode={permissionMode}
           permissionModeOptions={permissionModeOptions}
+          browserIntentEnabled={browserIntentEnabled}
           selectedAgentProfileId={selectedAgentProfileId}
           settingsUpdating={settingsUpdating}
           uploadDisabled={imageUploadDisabled}
           onSelectAgentProfileId={setSelectedAgentProfileId}
+          onToggleBrowserIntent={() => setBrowserIntentEnabled((current) => !current)}
           onUploadImagesClick={() => imageUploadControlsRef.current?.openFilePicker()}
           onUpdateDriftEnabled={onUpdateDriftEnabled}
           onUpdatePermissionMode={onUpdatePermissionMode}

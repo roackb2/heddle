@@ -18,6 +18,13 @@
   "composer": {
     "addContext": "Add context",
     "contextMenu": "Context",
+    "browser": {
+      "clearIntent": "Remove browser request",
+      "intentChip": "Use browser",
+      "intentLabel": "Browser request for next message",
+      "useAction": "Use browser",
+      "useDescription": "Nudge the agent to inspect or operate the relevant page for this task."
+    },
     "drift": {
       "ariaLabel": "Semantic drift",
       "disabled": "Drift off",

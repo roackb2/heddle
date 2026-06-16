@@ -187,6 +187,7 @@ export class FileConversationSessionService implements ConversationSessionServic
       prompt,
       agentProfileId: input.agentProfileId,
       agentSnapshot: input.agentSnapshot,
+      systemContext: input.systemContext,
       createdAt: now,
       updatedAt: now,
     };
