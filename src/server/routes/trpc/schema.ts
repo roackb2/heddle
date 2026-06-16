@@ -284,8 +284,10 @@ export const browserAutomationInputSchema = z.object({
 export const browserAutomationSettingsInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   profileId: z.string().min(1).optional(),
+  backend: z.enum(['playwright-managed', 'native-chrome-cdp']).optional(),
   channel: z.enum(['chromium', 'chrome', 'msedge']).optional(),
   headless: z.boolean().optional(),
+  cdpEndpoint: z.string().optional(),
 });
 
 export const browserAutomationProfileOpenInputSchema = z.object({

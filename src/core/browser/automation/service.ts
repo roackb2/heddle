@@ -61,8 +61,7 @@ export class BrowserAutomationCapabilityService {
       skill,
       browserSettings,
       profileWindow: BrowserProfileWindowService.status(this.stateRoot),
-      profileRequirement:
-        `Logged-in sites require a valid session in the selected Heddle browser profile "${browserSettings.profileId}". Use headed mode to log in manually.`,
+      profileRequirement: BrowserAutomationCapabilityService.profileRequirement(browserSettings),
       toolAvailability:
         'When enabled, future default agent turns include browser tools. If no explicit domain allowlist is configured, the first opened URL establishes the same-domain browsing boundary.',
     };
@@ -70,6 +69,12 @@ export class BrowserAutomationCapabilityService {
 
   async updateSettings(input: BrowserAutomationSettingsUpdateInput): Promise<BrowserAutomationSettingsUpdateResult> {
     return BrowserProfileSettingsService.update(this.stateRoot, input);
+  }
+
+  private static profileRequirement(browserSettings: Awaited<ReturnType<typeof BrowserProfileSettingsService.overview>>): string {
+    return browserSettings.backendSelection === 'native-chrome-cdp'
+      ? `Logged-in sites require the native Chrome profile "${browserSettings.profileId}" to be open with remote debugging at ${browserSettings.cdpEndpoint ?? 'a configured local CDP endpoint'}.`
+      : `Logged-in sites require a valid session in the selected Heddle browser profile "${browserSettings.profileId}". Use headed mode to log in manually.`;
   }
 
   async openProfileWindow(input: BrowserAutomationProfileOpenInput = {}): Promise<BrowserAutomationProfileWindowResult> {

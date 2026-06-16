@@ -90,7 +90,7 @@ describe('createBrowserResearchToolkit', () => {
     const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-profile-'));
     const { tools, driverFactory } = await createTools({
       stateRoot,
-      profileId: 'shopping-login',
+      profileId: 'personal-login',
       headless: false,
     });
 
@@ -100,12 +100,37 @@ describe('createBrowserResearchToolkit', () => {
 
     expect(driverFactory.launchOptions).toMatchObject({
       profile: {
-        profileId: 'shopping-login',
-        userDataDir: join(stateRoot, 'browser-profiles', 'shopping-login'),
+        profileId: 'personal-login',
+        userDataDir: join(stateRoot, 'browser-profiles', 'personal-login'),
         headless: false,
       },
     });
   });
+
+  it('passes native Chrome CDP backend settings into browser driver launch options', async () => {
+    const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-native-cdp-'));
+    const { tools, driverFactory } = await createTools({
+      stateRoot,
+      profileId: 'personal',
+      backend: 'native-chrome-cdp',
+      cdpEndpoint: 'http://127.0.0.1:9223',
+      allowedDomains: ['example.com'],
+    });
+
+    await expect(tools.browser_open.execute({ url: 'https://example.com/account/' }))
+      .resolves
+      .toMatchObject({ ok: true });
+
+    expect(driverFactory.launchOptions).toMatchObject({
+      profile: {
+        profileId: 'personal',
+        backend: 'native-chrome-cdp',
+        userDataDir: join(stateRoot, 'native-chrome-profiles', 'personal'),
+        cdpEndpoint: 'http://127.0.0.1:9223',
+      },
+    });
+  });
+
 
   it('blocks off-domain clicks before the driver executes them', async () => {
     const { tools, driver } = await createTools();
@@ -235,6 +260,8 @@ async function createTools(options: {
   driver?: BrowserDriver;
   allowedDomains?: string[];
   profileId?: string;
+  backend?: 'playwright-managed' | 'native-chrome-cdp';
+  cdpEndpoint?: string;
   headless?: boolean;
 } = {}) {
   const stateRoot = options.stateRoot ?? (await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-')));
@@ -246,6 +273,8 @@ async function createTools(options: {
       allowedDomains: options.allowedDomains ?? ['wikipedia.org'],
       driverFactory,
       profileId: options.profileId,
+      backend: options.backend,
+      cdpEndpoint: options.cdpEndpoint,
       headless: options.headless ?? true,
     }).createTools(context(stateRoot)).map((tool) => [tool.name, tool]),
   );

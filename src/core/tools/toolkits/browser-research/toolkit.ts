@@ -1,9 +1,10 @@
 import { join } from 'node:path';
 
 import {
+  BrowserDriverFactoryService,
   BrowserProfileService,
+  BrowserProfileSettingsService,
   BrowserSessionService,
-  PlaywrightBrowserDriverFactory,
   type BrowserPolicyConfig,
   type BrowserProfileLease,
   type BrowserProfileConfig,
@@ -19,8 +20,10 @@ export type BrowserResearchToolkitOptions = {
   allowedDomains: string[];
   profileId?: string;
   evidenceRoot?: string;
+  backend?: BrowserProfileConfig['backend'];
   channel?: BrowserProfileConfig['channel'];
   headless?: boolean;
+  cdpEndpoint?: string;
   maxElementsPerSnapshot?: number;
   driverFactory?: BrowserDriverFactory;
 };
@@ -279,6 +282,30 @@ async function getBrowserSession(
     return state.session;
   }
 
+  const profile = await resolveBrowserProfile(options, state);
+  state.session = new BrowserSessionService(
+    createSessionConfig(options, profile, initialUrl),
+    options.driverFactory ?? BrowserDriverFactoryService.resolve(profile.backend),
+  );
+  return state.session;
+}
+
+async function resolveBrowserProfile(
+  options: BrowserResearchToolkitOptions,
+  state: BrowserRuntimeState,
+): Promise<BrowserProfileConfig> {
+  if (options.backend === 'native-chrome-cdp') {
+    return {
+      profileId: options.profileId ?? 'browser-research',
+      userDataDir: BrowserProfileSettingsService.resolveNativeChromeProfileDir(
+        options.stateRoot,
+        options.profileId ?? 'browser-research',
+      ),
+      backend: 'native-chrome-cdp',
+      cdpEndpoint: options.cdpEndpoint,
+    };
+  }
+
   const lease = await BrowserProfileService.acquire({
     stateRoot: options.stateRoot,
     profileId: options.profileId ?? 'browser-research',
@@ -286,11 +313,10 @@ async function getBrowserSession(
     headless: options.headless,
   });
   state.lease = lease;
-  state.session = new BrowserSessionService(
-    createSessionConfig(options, lease.profile, initialUrl),
-    options.driverFactory ?? new PlaywrightBrowserDriverFactory(),
-  );
-  return state.session;
+  return {
+    ...lease.profile,
+    backend: 'playwright-managed',
+  };
 }
 
 async function closeBrowserState(state: BrowserRuntimeState): Promise<Awaited<ReturnType<BrowserSessionService['close']>> | undefined> {

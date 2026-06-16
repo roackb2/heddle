@@ -1,4 +1,5 @@
 import { BrowserAutomationCapabilityService } from '@/core/browser/index.js';
+import type { BrowserAutomationSettingsUpdateInput } from '@/core/browser/index.js';
 
 export class ControlPlaneBrowserAutomationController {
   static async overview(workspaceRoot: string, stateRoot: string) {
@@ -12,7 +13,7 @@ export class ControlPlaneBrowserAutomationController {
   static async updateSettings(
     workspaceRoot: string,
     stateRoot: string,
-    input: { profileId?: string; channel?: 'chromium' | 'chrome' | 'msedge'; headless?: boolean },
+    input: BrowserAutomationSettingsUpdateInput,
   ) {
     return await ControlPlaneBrowserAutomationController.service(workspaceRoot, stateRoot).updateSettings(input);
   }

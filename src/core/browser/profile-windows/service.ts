@@ -24,7 +24,7 @@ const openWindows = new Map<string, OpenProfileWindow>();
 export class BrowserProfileWindowService {
   static status(stateRoot: string): BrowserProfileWindowStatus {
     const settings = BrowserProfileSettingsService.read(stateRoot);
-    const userDataDir = BrowserProfileSettingsService.resolveProfileDir(stateRoot, settings.profileId);
+    const userDataDir = BrowserProfileSettingsService.resolveSelectedProfileDir(stateRoot, settings);
     const window = openWindows.get(BrowserProfileWindowService.windowKey(stateRoot, settings.profileId));
 
     return {
@@ -39,6 +39,14 @@ export class BrowserProfileWindowService {
   static async open(stateRoot: string, input: BrowserProfileWindowOpenInput = {}): Promise<BrowserProfileWindowResult> {
     const settings = BrowserProfileSettingsService.read(stateRoot);
     const status = BrowserProfileWindowService.status(stateRoot);
+    if (settings.backend === 'native-chrome-cdp') {
+      return {
+        ok: false,
+        error: 'Native Chrome CDP mode uses a user-launched Chrome window. Use yarn spike:native-chrome-profile, then set /browser endpoint <url>.',
+        status,
+      };
+    }
+
     const parsedUrl = BrowserProfileWindowService.parseOptionalUrl(input.url);
     if (!parsedUrl.ok) {
       return {

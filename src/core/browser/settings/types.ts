@@ -1,19 +1,23 @@
-import type { BrowserProfileConfig } from '../types.js';
+import type { BrowserBackendSelection, BrowserProfileConfig } from '../types.js';
 
 export type BrowserDisplayMode = 'headless' | 'headed';
 export type BrowserChannelSelection = NonNullable<BrowserProfileConfig['channel']>;
 
 export type BrowserProfileSettings = {
   profileId: string;
+  backend?: BrowserBackendSelection;
   channel?: BrowserChannelSelection;
   headless: boolean;
+  cdpEndpoint?: string;
   updatedAt?: string;
 };
 
 export type BrowserProfileSettingsUpdateInput = {
   profileId?: string;
+  backend?: BrowserBackendSelection;
   channel?: BrowserChannelSelection;
   headless?: boolean;
+  cdpEndpoint?: string;
 };
 
 export type BrowserProfileView = {
@@ -23,6 +27,7 @@ export type BrowserProfileView = {
 };
 
 export type BrowserProfileSettingsOverview = BrowserProfileSettings & {
+  backendSelection: BrowserBackendSelection;
   channelSelection: BrowserChannelSelection;
   displayMode: BrowserDisplayMode;
   settingsStorePath: string;

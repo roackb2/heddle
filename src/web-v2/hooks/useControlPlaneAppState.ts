@@ -232,7 +232,13 @@ export function useControlPlaneAppState() {
     ]);
   }
 
-  async function updateBrowserAutomationSettings(input: { profileId?: string; channel?: 'chromium' | 'chrome' | 'msedge'; headless?: boolean }) {
+  async function updateBrowserAutomationSettings(input: {
+    profileId?: string;
+    backend?: 'playwright-managed' | 'native-chrome-cdp';
+    channel?: 'chromium' | 'chrome' | 'msedge';
+    headless?: boolean;
+    cdpEndpoint?: string;
+  }) {
     const result = await browserAutomationSettingsUpdateMutation.mutateAsync(
       sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, ...input } : input,
     );

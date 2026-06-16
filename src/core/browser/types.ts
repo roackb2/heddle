@@ -2,6 +2,8 @@ export type BrowserRunMode = 'research' | 'shopping-assist' | 'transaction';
 
 export type BrowserActionStatus = 'allowed' | 'blocked' | 'approvalRequired';
 
+export type BrowserBackendSelection = 'playwright-managed' | 'native-chrome-cdp';
+
 export interface BrowserPolicyConfig {
   allowedDomains: string[];
   forbiddenActionText?: string[];
@@ -18,8 +20,10 @@ export interface BrowserPolicyDecision {
 export interface BrowserProfileConfig {
   profileId: string;
   userDataDir: string;
+  backend?: BrowserBackendSelection;
   channel?: 'chrome' | 'chromium' | 'msedge';
   headless?: boolean;
+  cdpEndpoint?: string;
 }
 
 export interface BrowserSessionConfig {

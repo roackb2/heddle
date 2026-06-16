@@ -64,8 +64,10 @@ export class RuntimeToolService {
           stateRoot: args.stateRoot,
           allowedDomains: [],
           profileId: browserSettings.profileId,
+          backend: browserSettings.backend,
           channel: browserSettings.channel,
           headless: browserSettings.headless,
+          cdpEndpoint: browserSettings.cdpEndpoint,
           maxElementsPerSnapshot: 80,
         }),
       ]

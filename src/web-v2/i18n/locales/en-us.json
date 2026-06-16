@@ -352,6 +352,14 @@
     "profilePathLabel": "Profile path",
     "profileSectionTitle": "Profile and display",
     "settingsPathLabel": "Settings file",
+    "backend": {
+      "nativeChrome": "Native Chrome",
+      "playwright": "Playwright"
+    },
+    "backendDetail": "Playwright launches and owns the browser. Native Chrome attaches to a user-launched Chrome CDP endpoint.",
+    "backendTitle": "Browser backend",
+    "cdpEndpointDetail": "Use the local endpoint printed by the native Chrome profile launcher, for example http://127.0.0.1:9222.",
+    "cdpEndpointTitle": "Native Chrome CDP endpoint",
     "channel": {
       "chrome": "Chrome",
       "chromium": "Chromium",

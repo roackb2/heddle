@@ -352,6 +352,14 @@
     "profilePathLabel": "Profile 路徑",
     "profileSectionTitle": "Profile 與顯示模式",
     "settingsPathLabel": "設定檔",
+    "backend": {
+      "nativeChrome": "原生 Chrome",
+      "playwright": "Playwright"
+    },
+    "backendDetail": "Playwright 會啟動並持有瀏覽器。原生 Chrome 會連接使用者自行啟動的 Chrome CDP endpoint。",
+    "backendTitle": "瀏覽器後端",
+    "cdpEndpointDetail": "使用原生 Chrome profile launcher 印出的本機 endpoint，例如 http://127.0.0.1:9222。",
+    "cdpEndpointTitle": "原生 Chrome CDP endpoint",
     "channel": {
       "chrome": "Chrome",
       "chromium": "Chromium",

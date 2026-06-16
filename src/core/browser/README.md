@@ -78,6 +78,53 @@ The example stores its Heddle-owned profile under:
 .heddle/examples/browser-runtime-spike/browser-profiles/wikipedia-research
 ```
 
+## Native Chrome Profile Spike
+
+`yarn spike:native-chrome-profile` opens the locally installed Google Chrome
+binary with a Heddle-specific, non-default profile directory and a local CDP
+port. It exists so users can test whether major sites allow login in a
+user-launched native Chrome profile.
+
+```bash
+yarn spike:native-chrome-profile --url https://example.com
+yarn spike:native-chrome-profile --profile personal --port 9223 --url https://example.com
+```
+
+The profile is stored under:
+
+```text
+.heddle/native-chrome-profiles/<profile-id>
+```
+
+The script avoids Playwright and does not pass automation-specific launch flags.
+It only starts Chrome with `--remote-debugging-port=<port>` and
+`--user-data-dir=<profile-dir>`. Keep the port non-zero; `0` has different
+browser-detection semantics and is not the user-authorized CDP shape this spike
+is validating.
+
+The launcher itself does not control the browser. The first attach spike is
+available through the experimental native Chrome CDP backend, which connects to
+the printed `http://127.0.0.1:<port>` endpoint:
+
+```bash
+HEDDLE_NATIVE_CHROME_CDP_ENDPOINT=http://127.0.0.1:9223 \
+HEDDLE_BROWSER_START_URL=https://example.com \
+yarn example:native-chrome-cdp-spike
+```
+
+This validates `browser_open`, `browser_snapshot`, `browser_screenshot`, and
+`browser_close` against the user-launched Chrome session. `browser_close`
+detaches from Chrome; it should not close the user's browser process.
+
+These examples intentionally use neutral URLs. The backend must stay
+site-agnostic: users choose the site, profile, port, and policy at runtime, and
+browser code must not encode assumptions from one validation website.
+
+Native CDP `browser_click` is intentionally disabled until the backend can
+preserve the same navigation-policy guarantees as the Playwright driver. Do not
+add click/type/form actions to this backend without retaining Heddle-owned
+domain policy and approval semantics.
+
 Run evidence is written under:
 
 ```text
