@@ -44,6 +44,22 @@ unwinding chat, server, or web-v2 behavior.
   Projection into Heddle trace or conversation activities should be a later,
   deliberate integration.
 
+## Service Map
+
+- `settings/`: persists the selected profile, backend, display mode, channel,
+  and native CDP endpoint. It owns validation and user-facing settings overview
+  data.
+- `profile-windows/`: opens and tracks manual Playwright-managed profile
+  windows for login/session preparation. It does not launch native Chrome CDP
+  windows.
+- `automation/`: owns the Browser Automation capability switch and built-in
+  skill activation contract.
+- `drivers/`: resolves a backend selection to a concrete driver factory.
+- `playwright/`: owns the Playwright-managed browser driver.
+- `chrome-cdp/`: owns the experimental native Chrome CDP attach driver.
+- `sessions/`: owns browser session lifecycle and policy-gated browser
+  operations over a driver.
+
 ## Validation Spike
 
 The first supported mode is read-oriented research:
