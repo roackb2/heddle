@@ -52,6 +52,8 @@ unwinding chat, server, or web-v2 behavior.
 - `native-chrome/`: launches locally installed Chrome with a Heddle-owned
   profile, verifies the local CDP endpoint, and records the profile/endpoint
   for future native CDP attach.
+- `intent/`: converts a per-message "use browser" UI nudge into model-facing
+  runtime context. It does not choose URLs or enable the capability.
 - `profile-windows/`: opens and tracks manual Playwright-managed profile
   windows for login/session preparation. It does not launch native Chrome CDP
   windows.
@@ -62,6 +64,24 @@ unwinding chat, server, or web-v2 behavior.
 - `chrome-cdp/`: owns the native Chrome CDP attach driver.
 - `sessions/`: owns browser session lifecycle and policy-gated browser
   operations over a driver.
+
+## User Mental Model
+
+Users should not need to start from Browser Automation settings for ordinary
+tasks. The normal path is:
+
+1. Enable Browser Automation for the workspace.
+2. Prepare a profile only when the task needs a logged-in session.
+3. Ask the task in chat, optionally adding the composer "Use browser" context
+   nudge for that message.
+4. Let the agent choose the relevant user/task URL and call browser tools.
+
+Settings and slash commands are setup surfaces. They prepare profiles, backend,
+display mode, channel, and native CDP endpoint. They are not task launchers.
+
+The browser intent context must stay site-agnostic. It may tell the agent to
+prefer browser tools when useful, but it must never hard-code a validation URL,
+commerce site, account route, locale prefix, or product workflow.
 
 ## Validation Spike
 
@@ -115,6 +135,12 @@ from terminal chat:
 
 The default validation URL is Wikipedia. It has real rendered text and links but
 does not require login, shopping, or account actions.
+
+When the workspace backend is `native-chrome-cdp`, an agent `browser_open` call
+may auto-launch native Chrome if the configured CDP endpoint is not already
+reachable. The launch URL is the `browser_open` URL from the user task, not a
+diagnostic default. If the endpoint is already reachable, the driver attaches
+and navigates the existing browser page.
 
 ```bash
 yarn spike:native-chrome-profile

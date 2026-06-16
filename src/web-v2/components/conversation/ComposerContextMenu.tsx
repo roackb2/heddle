@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bot, Check, ImagePlus, Plus, ShieldCheck } from 'lucide-react';
+import { Bot, Check, Globe2, ImagePlus, Plus, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router';
 import type { ControlPlaneCustomAgent, ControlPlaneCustomAgents, ControlPlanePermissionMode, ControlPlaneSessionRuntimeContext } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
@@ -22,12 +22,14 @@ type ComposerContextMenuProps = {
   disabled?: boolean;
   driftEnabled: boolean;
   driftLevel: SessionDriftLevel;
+  browserIntentEnabled?: boolean;
   permissionMode?: ControlPlanePermissionMode;
   permissionModeOptions?: ControlPlaneSessionRuntimeContext['permissionModeOptions'];
   selectedAgentProfileId: string;
   settingsUpdating?: boolean;
   uploadDisabled?: boolean;
   onSelectAgentProfileId: (agentProfileId: string) => void;
+  onToggleBrowserIntent?: () => void;
   onUploadImagesClick?: () => void;
   onUpdateDriftEnabled?: (enabled: boolean) => Promise<void>;
   onUpdatePermissionMode?: (mode: ControlPlanePermissionMode) => Promise<void>;
@@ -92,12 +94,14 @@ export function ComposerContextMenu({
   disabled,
   driftEnabled,
   driftLevel,
+  browserIntentEnabled,
   permissionMode,
   permissionModeOptions,
   selectedAgentProfileId,
   settingsUpdating,
   uploadDisabled,
   onSelectAgentProfileId,
+  onToggleBrowserIntent,
   onUploadImagesClick,
   onUpdateDriftEnabled,
   onUpdatePermissionMode,
@@ -168,6 +172,37 @@ export function ComposerContextMenu({
                 <span className="v2-drift-menu-status truncate">
                   {t('composer.images.uploadDescription')}
                 </span>
+              </span>
+            </Button>
+          </div>
+        ) : null}
+        {onToggleBrowserIntent ? (
+          <div className="v2-browser-intent-menu-section">
+            <Button
+              type="button"
+              variant="ghost"
+              size="none"
+              role="menuitemcheckbox"
+              aria-checked={browserIntentEnabled ?? false}
+              className="v2-browser-intent-menu-row"
+              disabled={disabled}
+              onClick={onToggleBrowserIntent}
+            >
+              <Globe2
+                aria-hidden="true"
+                data-icon="inline-start"
+                className="v2-drift-menu-icon"
+              />
+              <span className="v2-drift-menu-copy">
+                <span className="v2-drift-menu-title truncate">
+                  {t('composer.browser.useAction')}
+                </span>
+                <span className="v2-drift-menu-status truncate">
+                  {t('composer.browser.useDescription')}
+                </span>
+              </span>
+              <span className="v2-composer-menu-option-check-slot" aria-hidden="true">
+                {browserIntentEnabled ? <Check data-icon="inline-end" /> : null}
               </span>
             </Button>
           </div>

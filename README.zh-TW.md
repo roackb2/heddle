@@ -424,6 +424,8 @@ browser_close
 
 內建 skill 會教代理什麼時候適合使用瀏覽器自動化，以及什麼時候 `web_search` 只適合用來發現起始 URL。瀏覽器政策仍然是最終邊界：不安全操作、跨網域導覽、語意不明的 JavaScript-only 點擊可能被阻擋或要求核准。
 
+一般工作時，直接在聊天中描述任務即可。當你希望下一則訊息偏向瀏覽器檢查或網站互動，可以在 composer 的加號選單選擇「使用瀏覽器」。這不會自行啟用工作區能力，只會為下一個代理回合加入任務層級的脈絡提示。
+
 目前行為：
 
 - 如果沒有明確的網域允許清單，第一個 `browser_open` URL 會建立該瀏覽器工作階段的同網域瀏覽邊界
@@ -434,6 +436,7 @@ browser_close
 - `/browser headed` 會讓之後的瀏覽器執行顯示 Playwright 視窗，方便你先手動登入；`/browser headless` 則會在不顯示視窗的狀態下重用該設定檔
 - Settings -> Browser Automation 與 `/browser open-profile [url]` 可用可見的手動視窗開啟選定設定檔，供你登入或管理工作階段；請在要求代理使用同一設定檔前，用 `/browser close-profile` 關閉它
 - Settings -> Browser Automation 與 `/browser launch-native [url]` 可用 Heddle 管理的設定檔與 CDP endpoint 啟動本機安裝的 Chrome；請保持該 Chrome 視窗開啟，並用 `/browser check-native` 檢查連線
+- 後端為原生 Chrome 且設定的 CDP endpoint 尚未連上時，代理第一次 `browser_open` 可以用任務 URL 啟動本機 Chrome，而不是開啟診斷頁
 - 需要登入的網站要求目前選定的瀏覽器設定檔已經有有效的登入狀態
 
 瀏覽器自動化待辦方向：

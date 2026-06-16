@@ -439,6 +439,11 @@ browser_close
 
 The built-in skill teaches the agent when browser automation is appropriate and when `web_search` is only useful for discovering a starting URL. Browser policy still remains authoritative: unsafe actions, off-domain navigation, and ambiguous JavaScript-only clicks can be blocked or require approval.
 
+For normal work, ask the task in chat. Use the composer plus menu -> Use browser
+when you want to nudge the next message toward browser inspection or website
+interaction. This does not enable the workspace capability by itself; it only
+adds task-level context for the next agent turn.
+
 Current behavior:
 
 - if no explicit domain allowlist is configured, the first `browser_open` URL establishes the same-domain browsing boundary for that browser session
@@ -449,6 +454,7 @@ Current behavior:
 - `/browser headed` opens future runs in a visible Playwright window so you can prepare a logged-in session; `/browser headless` reuses that profile without showing the window
 - Settings -> Browser Automation and `/browser open-profile [url]` can open the selected profile in a visible manual window for login/session management; close it with `/browser close-profile` before asking an agent to use the same profile
 - Settings -> Browser Automation and `/browser launch-native [url]` can launch locally installed Chrome with a Heddle-owned profile and CDP endpoint; keep that Chrome window open, then verify it with `/browser check-native`
+- when the backend is native Chrome and the configured CDP endpoint is not reachable, the first agent `browser_open` can launch local Chrome with the task URL rather than a diagnostic page
 - logged-in sites require the selected browser profile to already have a valid session
 
 Browser Automation agenda:

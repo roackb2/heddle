@@ -12,6 +12,9 @@ import type {
   BrowserDriverLaunchOptions,
   BrowserDriverSnapshotOptions,
   BrowserDriverSnapshotResult,
+  NativeChromeConnectionStatus,
+  NativeChromeLaunchInput,
+  NativeChromeLaunchResult,
 } from '../../../core/browser/index.js';
 import type { ToolDefinition } from '../../../core/types.js';
 
@@ -126,6 +129,34 @@ describe('createBrowserResearchToolkit', () => {
         profileId: 'personal',
         backend: 'native-chrome-cdp',
         userDataDir: join(stateRoot, 'native-chrome-profiles', 'personal'),
+        cdpEndpoint: 'http://127.0.0.1:9223',
+      },
+    });
+  });
+
+  it('auto-launches native Chrome with the requested browser_open URL before CDP attach', async () => {
+    const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-native-auto-'));
+    const nativeChromeLauncher = new FakeNativeChromeLauncher();
+    const { tools, driverFactory } = await createTools({
+      stateRoot,
+      profileId: 'native-research',
+      backend: 'native-chrome-cdp',
+      allowedDomains: ['wikipedia.org'],
+      nativeChromeLauncher,
+      autoLaunchNativeChrome: true,
+    });
+
+    await expect(tools.browser_open.execute({ url: 'https://en.wikipedia.org/wiki/Browser_automation' }))
+      .resolves
+      .toMatchObject({ ok: true });
+
+    expect(nativeChromeLauncher.launchInput).toMatchObject({
+      profileId: 'native-research',
+      url: 'https://en.wikipedia.org/wiki/Browser_automation',
+    });
+    expect(driverFactory.launchOptions).toMatchObject({
+      profile: {
+        backend: 'native-chrome-cdp',
         cdpEndpoint: 'http://127.0.0.1:9223',
       },
     });
@@ -263,6 +294,8 @@ async function createTools(options: {
   backend?: 'playwright-managed' | 'native-chrome-cdp';
   cdpEndpoint?: string;
   headless?: boolean;
+  nativeChromeLauncher?: FakeNativeChromeLauncher;
+  autoLaunchNativeChrome?: boolean;
 } = {}) {
   const stateRoot = options.stateRoot ?? (await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-')));
   const driver = options.driver ?? new FakeBrowserDriver();
@@ -276,6 +309,8 @@ async function createTools(options: {
       backend: options.backend,
       cdpEndpoint: options.cdpEndpoint,
       headless: options.headless ?? true,
+      nativeChromeLauncher: options.nativeChromeLauncher,
+      autoLaunchNativeChrome: options.autoLaunchNativeChrome,
     }).createTools(context(stateRoot)).map((tool) => [tool.name, tool]),
   );
 
@@ -369,4 +404,37 @@ class ThrowingCloseBrowserDriver extends FakeBrowserDriver {
   override async close(): Promise<void> {
     throw new Error('driver close failed');
   }
+}
+
+class FakeNativeChromeLauncher {
+  launchInput?: NativeChromeLaunchInput;
+
+  async status(stateRoot: string): Promise<NativeChromeConnectionStatus> {
+    return fakeNativeChromeStatus(stateRoot, 'unreachable');
+  }
+
+  async launch(stateRoot: string, input: NativeChromeLaunchInput = {}): Promise<NativeChromeLaunchResult> {
+    this.launchInput = input;
+    return {
+      ok: true,
+      status: fakeNativeChromeStatus(stateRoot, 'reachable'),
+      startUrl: input.url ?? 'https://en.wikipedia.org/wiki/Main_Page',
+      reusedExisting: false,
+    };
+  }
+}
+
+function fakeNativeChromeStatus(
+  stateRoot: string,
+  state: NativeChromeConnectionStatus['state'],
+): NativeChromeConnectionStatus {
+  return {
+    state,
+    profileId: 'native-research',
+    userDataDir: join(stateRoot, 'native-chrome-profiles', 'native-research'),
+    endpoint: 'http://127.0.0.1:9223',
+    port: 9223,
+    defaultStartUrl: 'https://en.wikipedia.org/wiki/Main_Page',
+    checkedAt: '2026-06-16T00:00:00.000Z',
+  };
 }

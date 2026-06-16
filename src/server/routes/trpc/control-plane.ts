@@ -22,6 +22,7 @@ import { controlPlaneSlashCommandsController } from '@/server/controllers/trpc/c
 import { controlPlaneSessionRuntimeContextService } from '@/server/services/control-plane/session-runtime-context-service.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import { CustomAgentService } from '@/core/custom-agents/index.js';
+import { BrowserAutomationIntentContextService } from '@/core/browser/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import { controlPlaneWorkspaceProcedure, type ControlPlaneWorkspaceContext } from './control-plane-workspace.js';
@@ -712,10 +713,15 @@ type SessionMessageInput = z.infer<typeof sessionMessageInputSchema>;
 
 function buildSubmitPromptArgs(ctx: ControlPlaneWorkspaceContext, input: SessionMessageInput) {
   const { logger, sessionEngineArgs } = ctx.requestWorkspace;
+  const { browserIntent, ...messageInput } = input;
   return {
-    ...input,
+    ...messageInput,
     ...sessionEngineArgs,
     preferApiKey: input.preferApiKey ?? ctx.preferApiKey,
+    systemContext: BrowserAutomationIntentContextService.append({
+      intent: browserIntent,
+      systemContext: input.systemContext,
+    }),
     logger,
     leaseOwner: resolveControlPlaneLeaseOwner(ctx),
   };

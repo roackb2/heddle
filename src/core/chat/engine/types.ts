@@ -143,6 +143,7 @@ export type EnqueueConversationPromptInput = {
   prompt: string;
   agentProfileId?: string;
   agentSnapshot?: CustomAgentExecutionSnapshot;
+  systemContext?: string;
 };
 
 export type UpdateQueuedConversationPromptInput = {

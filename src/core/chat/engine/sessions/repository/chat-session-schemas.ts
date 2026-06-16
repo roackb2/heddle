@@ -202,6 +202,9 @@ const QueuedConversationPromptSchema = z.object({
     .describe('Resolved custom-agent execution snapshot selected when this prompt entered the queue.')
     .optional()
     .catch(undefined),
+  systemContext: z.string()
+    .describe('Optional runtime context that should be applied when this queued prompt runs.')
+    .optional(),
   createdAt: z.string().describe('Timestamp when this prompt entered the session queue.'),
   updatedAt: z.string().describe('Timestamp when this queued prompt was last edited.'),
 });

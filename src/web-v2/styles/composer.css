@@ -49,6 +49,51 @@
     box-shadow: 0 -8px 22px hsl(235 18% 3% / 0.16);
   }
 
+  .v2-composer-intent-strip {
+    display: flex;
+    min-width: 0;
+    padding: 0.125rem 0.125rem 0;
+  }
+
+  .v2-composer-intent-chip {
+    display: inline-flex;
+    max-width: min(18rem, 100%);
+    min-width: 0;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid color-mix(in oklab, var(--color-ring) 42%, var(--color-border));
+    background: color-mix(in oklab, var(--color-accent) 46%, var(--color-card));
+    padding: 0.1875rem 0.25rem 0.1875rem 0.5rem;
+    color: var(--color-accent-foreground);
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .v2-composer-intent-chip > svg {
+    height: 0.8125rem;
+    width: 0.8125rem;
+    flex-shrink: 0;
+  }
+
+  .v2-composer-intent-remove {
+    height: 1rem;
+    width: 1rem;
+    min-width: 1rem;
+    border-radius: 999px;
+    color: color-mix(in oklab, currentcolor 72%, transparent);
+  }
+
+  .v2-composer-intent-remove:hover {
+    background: color-mix(in oklab, var(--color-background) 54%, transparent);
+    color: currentcolor;
+  }
+
+  .v2-composer-intent-remove svg {
+    height: 0.75rem;
+    width: 0.75rem;
+  }
+
   .v2-direct-shell-result {
     border-radius: 0.625rem;
     border: 1px solid color-mix(in oklab, var(--color-border) 72%, transparent);
@@ -564,6 +609,12 @@
     flex-direction: column;
   }
 
+  .v2-browser-intent-menu-section {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+  }
+
   .v2-permission-mode-menu-section {
     display: flex;
     min-width: 0;
@@ -573,11 +624,13 @@
 
   .v2-composer-context-menu > :is(
     .v2-upload-menu-section,
+    .v2-browser-intent-menu-section,
     .v2-permission-mode-menu-section,
     .v2-agent-menu-section,
     .v2-drift-menu-section
   ) + :is(
     .v2-upload-menu-section,
+    .v2-browser-intent-menu-section,
     .v2-permission-mode-menu-section,
     .v2-agent-menu-section,
     .v2-drift-menu-section
@@ -631,6 +684,25 @@
     padding: 0.375rem 0.25rem;
     color: var(--color-popover-foreground);
     text-align: left;
+  }
+
+  .v2-browser-intent-menu-row {
+    display: grid !important;
+    grid-template-columns: 1rem minmax(0, 1fr) 1rem;
+    min-height: 2.75rem;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+    gap: 0.625rem;
+    border-radius: var(--radius-sm);
+    padding: 0.375rem 0.25rem;
+    color: var(--color-popover-foreground);
+    text-align: left;
+  }
+
+  .v2-browser-intent-menu-row:hover {
+    background: color-mix(in oklab, var(--color-accent) 72%, transparent);
+    color: var(--color-accent-foreground);
   }
 
   .v2-upload-menu-row:hover {
