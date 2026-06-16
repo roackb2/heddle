@@ -18,7 +18,7 @@ It stores:
 - `channel`: browser channel selection for future browser runs and manual
   profile windows. Supported values are `chromium`, `chrome`, and `msedge`.
 - `cdpEndpoint`: local CDP origin for the experimental native Chrome backend,
-  for example `http://127.0.0.1:9222`.
+  for example `http://127.0.0.1:9223`.
 
 ## User Mental Model
 
@@ -33,9 +33,10 @@ future agent runs to reuse the saved session quietly.
 
 For the experimental native Chrome CDP backend, users explicitly launch native
 Chrome with a Heddle-specific non-default profile and a local remote-debugging
-port. Heddle attaches to that local endpoint instead of launching Chrome. This
-backend must be treated as user-owned browser state: closing a browser session
-detaches Heddle and must not close the user's Chrome process.
+port from Settings or `/browser launch-native [url]`. Heddle attaches to that
+local endpoint instead of launching Playwright-managed Chrome. This backend must
+be treated as user-owned browser state: closing a browser session detaches
+Heddle and must not close the user's Chrome process.
 
 ## Boundaries
 

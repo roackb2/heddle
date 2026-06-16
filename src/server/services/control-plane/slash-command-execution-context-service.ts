@@ -131,6 +131,8 @@ export class ControlPlaneSlashCommandExecutionContextService {
         updateSettings: async (input) => await browserAutomation.updateSettings(input),
         openProfileWindow: async (input) => await browserAutomation.openProfileWindow(input),
         closeProfileWindow: async () => await browserAutomation.closeProfileWindow(),
+        launchNativeChrome: async (input) => await browserAutomation.launchNativeChrome(input),
+        nativeChromeStatus: async () => await browserAutomation.nativeChromeStatus(),
       },
       skills: {
         list: async () => await skills.listActivationViews(),

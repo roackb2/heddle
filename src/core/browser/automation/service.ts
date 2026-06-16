@@ -6,7 +6,11 @@ import {
 } from '@/core/skills/index.js';
 import { BrowserProfileSettingsService } from '../settings/index.js';
 import { BrowserProfileWindowService } from '../profile-windows/index.js';
+import { NativeChromeProfileService } from '../native-chrome/index.js';
 import type {
+  BrowserAutomationNativeChromeLaunchInput,
+  BrowserAutomationNativeChromeLaunchResult,
+  BrowserAutomationNativeChromeStatus,
   BrowserAutomationOverview,
   BrowserAutomationProfileOpenInput,
   BrowserAutomationProfileWindowResult,
@@ -61,6 +65,7 @@ export class BrowserAutomationCapabilityService {
       skill,
       browserSettings,
       profileWindow: BrowserProfileWindowService.status(this.stateRoot),
+      nativeChrome: await NativeChromeProfileService.status(this.stateRoot),
       profileRequirement: BrowserAutomationCapabilityService.profileRequirement(browserSettings),
       toolAvailability:
         'When enabled, future default agent turns include browser tools. If no explicit domain allowlist is configured, the first opened URL establishes the same-domain browsing boundary.',
@@ -69,6 +74,14 @@ export class BrowserAutomationCapabilityService {
 
   async updateSettings(input: BrowserAutomationSettingsUpdateInput): Promise<BrowserAutomationSettingsUpdateResult> {
     return BrowserProfileSettingsService.update(this.stateRoot, input);
+  }
+
+  async nativeChromeStatus(): Promise<BrowserAutomationNativeChromeStatus> {
+    return await NativeChromeProfileService.status(this.stateRoot);
+  }
+
+  async launchNativeChrome(input: BrowserAutomationNativeChromeLaunchInput = {}): Promise<BrowserAutomationNativeChromeLaunchResult> {
+    return await NativeChromeProfileService.launch(this.stateRoot, input);
   }
 
   private static profileRequirement(browserSettings: Awaited<ReturnType<typeof BrowserProfileSettingsService.overview>>): string {

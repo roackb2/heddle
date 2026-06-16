@@ -403,6 +403,10 @@ heddle ask --mode review "Review the current diff"
 /browser headed
 /browser headless
 /browser profile <id>
+/browser backend <playwright|native-chrome>
+/browser endpoint <url>
+/browser launch-native [url]
+/browser check-native
 /browser channel <chromium|chrome|msedge>
 /browser open-profile [url]
 /browser close-profile
@@ -429,6 +433,7 @@ browser_close
 - Settings -> Browser Automation 與 `/browser channel <chromium|chrome|msedge>` 可選擇之後代理執行與手動設定檔視窗使用的 Playwright 瀏覽器通道
 - `/browser headed` 會讓之後的瀏覽器執行顯示 Playwright 視窗，方便你先手動登入；`/browser headless` 則會在不顯示視窗的狀態下重用該設定檔
 - Settings -> Browser Automation 與 `/browser open-profile [url]` 可用可見的手動視窗開啟選定設定檔，供你登入或管理工作階段；請在要求代理使用同一設定檔前，用 `/browser close-profile` 關閉它
+- Settings -> Browser Automation 與 `/browser launch-native [url]` 可用 Heddle 管理的設定檔與 CDP endpoint 啟動本機安裝的 Chrome；請保持該 Chrome 視窗開啟，並用 `/browser check-native` 檢查連線
 - 需要登入的網站要求目前選定的瀏覽器設定檔已經有有效的登入狀態
 
 瀏覽器自動化待辦方向：

@@ -19,6 +19,8 @@ export function createBrowserSlashCommandModule(): SlashCommandModule<SlashComma
       { command: '/browser profile <id>', description: 'select the Heddle-owned browser profile for future browser runs' },
       { command: '/browser backend <playwright|native-chrome>', description: 'select the browser backend for future browser runs' },
       { command: '/browser endpoint <url>', description: 'set the native Chrome CDP endpoint' },
+      { command: '/browser launch-native [url]', description: 'launch the selected native Chrome profile with CDP enabled' },
+      { command: '/browser check-native', description: 'check whether the native Chrome CDP endpoint is reachable' },
       { command: '/browser channel <chromium|chrome|msedge>', description: 'select the browser channel for future browser runs' },
       { command: '/browser open-profile [url]', description: 'open the selected Heddle-owned browser profile for manual login' },
       { command: '/browser close-profile', description: 'close the selected manual browser profile window' },
@@ -86,6 +88,20 @@ export function createBrowserSlashCommandModule(): SlashCommandModule<SlashComma
         description: 'set the native Chrome CDP endpoint',
         match: SlashCommandParser.matchesPrefix('/browser endpoint'),
         run: (context, input) => setBrowserEndpointMessage(context, input.rest.replace(/^endpoint\s*/, '').trim()),
+      },
+      {
+        id: 'browser.launch-native',
+        syntax: '/browser launch-native [url]',
+        description: 'launch the selected native Chrome profile with CDP enabled',
+        match: SlashCommandParser.matchesPrefix('/browser launch-native'),
+        run: (context, input) => launchNativeChromeMessage(context, input.rest.replace(/^launch-native\s*/, '').trim()),
+      },
+      {
+        id: 'browser.check-native',
+        syntax: '/browser check-native',
+        description: 'check whether the native Chrome CDP endpoint is reachable',
+        match: SlashCommandParser.matchesExact('/browser check-native'),
+        run: (context) => checkNativeChromeMessage(context),
       },
       {
         id: 'browser.open-profile',
@@ -227,6 +243,39 @@ async function setBrowserEndpointMessage(
   ].join('\n'));
 }
 
+async function launchNativeChromeMessage(
+  context: Pick<SlashCommandExecutionContext, 'browserAutomation'>,
+  url: string,
+): Promise<SlashCommandResult> {
+  const result = await context.browserAutomation.launchNativeChrome({ url: url || undefined });
+  if (!result.ok) {
+    return slashMessageResult([
+      result.error,
+      '',
+      formatNativeChromeStatus(result.status),
+    ].join('\n'));
+  }
+
+  return slashMessageResult([
+    result.reusedExisting
+      ? 'Native Chrome CDP endpoint is already reachable. Reusing the open Chrome window.'
+      : 'Launched native Chrome with CDP enabled.',
+    `startUrl=${result.startUrl}`,
+    result.launchCommand ? `command=${result.launchCommand}` : undefined,
+    '',
+    formatNativeChromeStatus(result.status),
+    '',
+    'Keep that Chrome window open while asking the agent to use Browser Automation.',
+  ].filter(Boolean).join('\n'));
+}
+
+async function checkNativeChromeMessage(
+  context: Pick<SlashCommandExecutionContext, 'browserAutomation'>,
+): Promise<SlashCommandResult> {
+  const status = await context.browserAutomation.nativeChromeStatus();
+  return slashMessageResult(formatNativeChromeStatus(status));
+}
+
 async function openBrowserProfileWindowMessage(
   context: Pick<SlashCommandExecutionContext, 'browserAutomation'>,
   url: string,
@@ -267,6 +316,7 @@ function formatBrowserAutomationStatus(
     '',
     formatBrowserAutomationSettings(overview.browserSettings),
     formatBrowserProfileWindowStatus(overview.profileWindow),
+    formatNativeChromeStatus(overview.nativeChrome),
     '',
     overview.profileRequirement,
     overview.toolAvailability,
@@ -279,6 +329,8 @@ function formatBrowserAutomationStatus(
     '  /browser profile <id>',
     '  /browser backend <playwright|native-chrome>',
     '  /browser endpoint <url>',
+    '  /browser launch-native [url]',
+    '  /browser check-native',
     '  /browser channel <chromium|chrome|msedge>',
     '  /browser open-profile [url]',
     '  /browser close-profile',
@@ -298,6 +350,20 @@ function formatBrowserAutomationSettings(
     `  profilePath=${settings.userDataDir}`,
     `  settings=${settings.settingsStorePath}`,
     `  knownProfiles=${settings.profiles.length}`,
+  ].filter(Boolean).join('\n');
+}
+
+function formatNativeChromeStatus(
+  status: Awaited<ReturnType<SlashCommandExecutionContext['browserAutomation']['nativeChromeStatus']>>,
+): string {
+  return [
+    'Native Chrome CDP',
+    `  status=${status.state}`,
+    `  endpoint=${status.endpoint}`,
+    `  profile=${status.profileId}`,
+    `  profilePath=${status.userDataDir}`,
+    `  defaultStartUrl=${status.defaultStartUrl}`,
+    status.browser ? `  browser=${status.browser}` : undefined,
   ].filter(Boolean).join('\n');
 }
 

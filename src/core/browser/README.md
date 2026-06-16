@@ -49,6 +49,9 @@ unwinding chat, server, or web-v2 behavior.
 - `settings/`: persists the selected profile, backend, display mode, channel,
   and native CDP endpoint. It owns validation and user-facing settings overview
   data.
+- `native-chrome/`: launches locally installed Chrome with a Heddle-owned
+  profile, verifies the local CDP endpoint, and records the profile/endpoint
+  for future native CDP attach.
 - `profile-windows/`: opens and tracks manual Playwright-managed profile
   windows for login/session preparation. It does not launch native Chrome CDP
   windows.
@@ -56,7 +59,7 @@ unwinding chat, server, or web-v2 behavior.
   skill activation contract.
 - `drivers/`: resolves a backend selection to a concrete driver factory.
 - `playwright/`: owns the Playwright-managed browser driver.
-- `chrome-cdp/`: owns the experimental native Chrome CDP attach driver.
+- `chrome-cdp/`: owns the native Chrome CDP attach driver.
 - `sessions/`: owns browser session lifecycle and policy-gated browser
   operations over a driver.
 
@@ -94,16 +97,28 @@ The example stores its Heddle-owned profile under:
 .heddle/examples/browser-runtime-spike/browser-profiles/wikipedia-research
 ```
 
-## Native Chrome Profile Spike
+## Native Chrome Profile Launcher
 
-`yarn spike:native-chrome-profile` opens the locally installed Google Chrome
-binary with a Heddle-specific, non-default profile directory and a local CDP
-port. It exists so users can test whether major sites allow login in a
-user-launched native Chrome profile.
+Native Chrome mode opens the locally installed Google Chrome binary with a
+Heddle-specific, non-default profile directory and a local CDP port. It is for
+sites that reject Playwright-launched browsers or require the login behavior of
+ordinary Chrome.
+
+Users can launch the selected profile from Settings -> Browser Automation or
+from terminal chat:
+
+```text
+/browser backend native-chrome
+/browser launch-native
+/browser check-native
+```
+
+The default validation URL is Wikipedia. It has real rendered text and links but
+does not require login, shopping, or account actions.
 
 ```bash
-yarn spike:native-chrome-profile --url https://example.com
-yarn spike:native-chrome-profile --profile personal --port 9223 --url https://example.com
+yarn spike:native-chrome-profile
+yarn spike:native-chrome-profile --profile personal --port 9223 --url https://en.wikipedia.org/wiki/Main_Page
 ```
 
 The profile is stored under:
@@ -118,13 +133,13 @@ It only starts Chrome with `--remote-debugging-port=<port>` and
 browser-detection semantics and is not the user-authorized CDP shape this spike
 is validating.
 
-The launcher itself does not control the browser. The first attach spike is
-available through the experimental native Chrome CDP backend, which connects to
-the printed `http://127.0.0.1:<port>` endpoint:
+The launcher itself only starts Chrome and checks CDP reachability. Browser
+tools use the native Chrome CDP backend, which connects to the configured
+`http://127.0.0.1:<port>` endpoint:
 
 ```bash
 HEDDLE_NATIVE_CHROME_CDP_ENDPOINT=http://127.0.0.1:9223 \
-HEDDLE_BROWSER_START_URL=https://example.com \
+HEDDLE_BROWSER_START_URL=https://en.wikipedia.org/wiki/Main_Page \
 yarn example:native-chrome-cdp-spike
 ```
 

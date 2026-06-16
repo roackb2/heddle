@@ -418,6 +418,10 @@ Browser Automation is off by default. Enable it from Settings -> Browser Automat
 /browser headed
 /browser headless
 /browser profile <id>
+/browser backend <playwright|native-chrome>
+/browser endpoint <url>
+/browser launch-native [url]
+/browser check-native
 /browser channel <chromium|chrome|msedge>
 /browser open-profile [url]
 /browser close-profile
@@ -444,6 +448,7 @@ Current behavior:
 - Settings -> Browser Automation and `/browser channel <chromium|chrome|msedge>` select the Playwright browser channel for future agent runs and manual profile windows
 - `/browser headed` opens future runs in a visible Playwright window so you can prepare a logged-in session; `/browser headless` reuses that profile without showing the window
 - Settings -> Browser Automation and `/browser open-profile [url]` can open the selected profile in a visible manual window for login/session management; close it with `/browser close-profile` before asking an agent to use the same profile
+- Settings -> Browser Automation and `/browser launch-native [url]` can launch locally installed Chrome with a Heddle-owned profile and CDP endpoint; keep that Chrome window open, then verify it with `/browser check-native`
 - logged-in sites require the selected browser profile to already have a valid session
 
 Browser Automation agenda:

@@ -299,6 +299,17 @@ export const browserAutomationProfileCloseInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
 });
 
+export const browserAutomationNativeLaunchInputSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+  profileId: z.string().min(1).optional(),
+  port: z.number().int().min(1024).max(65535).optional(),
+  url: z.string().optional(),
+});
+
+export const browserAutomationNativeStatusInputSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+});
+
 export const mcpServerInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   serverId: z.string().min(1),

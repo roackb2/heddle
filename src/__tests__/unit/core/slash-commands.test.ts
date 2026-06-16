@@ -215,6 +215,15 @@ describe('Browser Automation slash command output', () => {
         userDataDir: '/workspace/.heddle/browser-profiles/browser-automation',
         open: false,
       },
+      nativeChrome: {
+        state: 'unreachable' as const,
+        profileId: 'browser-automation',
+        userDataDir: '/workspace/.heddle/native-chrome-profiles/browser-automation',
+        endpoint: 'http://127.0.0.1:9223',
+        port: 9223,
+        defaultStartUrl: 'https://en.wikipedia.org/wiki/Main_Page',
+        checkedAt: '2026-06-16T12:00:00.000Z',
+      },
       skill: {
         name: 'browser-automation',
         status: 'available',
@@ -230,6 +239,8 @@ describe('Browser Automation slash command output', () => {
         updateSettings: vi.fn(),
         openProfileWindow: vi.fn(),
         closeProfileWindow: vi.fn(),
+        launchNativeChrome: vi.fn(),
+        nativeChromeStatus: vi.fn(),
       },
     })).resolves.toEqual({
       handled: true,
@@ -251,6 +262,12 @@ describe('Browser Automation slash command output', () => {
         '  knownProfiles=1',
         'Manual profile window',
         '  status=closed',
+        'Native Chrome CDP',
+        '  status=unreachable',
+        '  endpoint=http://127.0.0.1:9223',
+        '  profile=browser-automation',
+        '  profilePath=/workspace/.heddle/native-chrome-profiles/browser-automation',
+        '  defaultStartUrl=https://en.wikipedia.org/wiki/Main_Page',
         '',
         'Logged-in sites require a selected profile.',
         'Browser tools remain host-controlled.',
@@ -263,6 +280,8 @@ describe('Browser Automation slash command output', () => {
         '  /browser profile <id>',
         '  /browser backend <playwright|native-chrome>',
         '  /browser endpoint <url>',
+        '  /browser launch-native [url]',
+        '  /browser check-native',
         '  /browser channel <chromium|chrome|msedge>',
         '  /browser open-profile [url]',
         '  /browser close-profile',
@@ -311,6 +330,31 @@ describe('Browser Automation slash command output', () => {
         open: false,
       },
     }));
+    const launchNativeChrome = vi.fn(async () => ({
+      ok: true as const,
+      status: {
+        state: 'reachable' as const,
+        profileId: 'shopping',
+        userDataDir: '/workspace/.heddle/native-chrome-profiles/shopping',
+        endpoint: 'http://127.0.0.1:9223',
+        port: 9223,
+        defaultStartUrl: 'https://en.wikipedia.org/wiki/Main_Page',
+        browser: 'Chrome/137.0',
+        checkedAt: '2026-06-16T12:00:00.000Z',
+      },
+      startUrl: 'https://en.wikipedia.org/wiki/Main_Page',
+      reusedExisting: false,
+    }));
+    const nativeChromeStatus = vi.fn(async () => ({
+      state: 'reachable' as const,
+      profileId: 'shopping',
+      userDataDir: '/workspace/.heddle/native-chrome-profiles/shopping',
+      endpoint: 'http://127.0.0.1:9223',
+      port: 9223,
+      defaultStartUrl: 'https://en.wikipedia.org/wiki/Main_Page',
+      browser: 'Chrome/137.0',
+      checkedAt: '2026-06-16T12:00:00.000Z',
+    }));
     const registry = new SlashCommandRegistry([createBrowserSlashCommandModule()]);
     const context = {
       browserAutomation: {
@@ -319,6 +363,8 @@ describe('Browser Automation slash command output', () => {
         updateSettings,
         openProfileWindow,
         closeProfileWindow,
+        launchNativeChrome,
+        nativeChromeStatus,
       },
     } as Pick<SlashCommandExecutionContext, 'browserAutomation'> as SlashCommandExecutionContext;
 
@@ -357,6 +403,16 @@ describe('Browser Automation slash command output', () => {
       kind: 'message',
       message: expect.stringContaining('Closed Browser Automation profile window for "shopping"'),
     });
+    await expect(registry.run(context, '/browser launch-native')).resolves.toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: expect.stringContaining('Launched native Chrome with CDP enabled.'),
+    });
+    await expect(registry.run(context, '/browser check-native')).resolves.toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: expect.stringContaining('status=reachable'),
+    });
     expect(updateSettings).toHaveBeenCalledWith({ profileId: 'shopping' });
     expect(updateSettings).toHaveBeenCalledWith({ headless: false });
     expect(updateSettings).toHaveBeenCalledWith({ channel: 'chrome' });
@@ -364,6 +420,8 @@ describe('Browser Automation slash command output', () => {
     expect(updateSettings).toHaveBeenCalledWith({ cdpEndpoint: 'http://127.0.0.1:9223' });
     expect(openProfileWindow).toHaveBeenCalledWith({ url: 'https://example.com/login' });
     expect(closeProfileWindow).toHaveBeenCalledWith();
+    expect(launchNativeChrome).toHaveBeenCalledWith({ url: undefined });
+    expect(nativeChromeStatus).toHaveBeenCalledWith();
   });
 });
 

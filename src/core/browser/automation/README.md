@@ -11,6 +11,9 @@ Browser automation has separate concerns:
 - **Browser execution settings**: which Heddle-owned browser profile and browser
   channel future browser turns use, and whether the Playwright session runs
   headless or headed.
+- **Native Chrome preparation**: launch/check actions for a user-authorized
+  locally installed Chrome profile when the selected backend is
+  `native-chrome-cdp`.
 - **Browser execution runtime**: profile locks, domain allowlists, evidence,
   policy, and Playwright driver behavior.
 
@@ -50,6 +53,12 @@ and then let future agent browser runs reuse the saved session. Headed/headless
 mode controls future agent browser runs; the manual profile window always opens
 visible.
 
+Native Chrome mode uses a different preparation flow: users launch the selected
+profile from Settings or `/browser launch-native [url]`, log in in that ordinary
+Chrome window, keep it open, and then future browser tool runs attach to the
+configured CDP endpoint. `/browser check-native` verifies the endpoint before an
+agent task relies on it.
+
 ## Boundaries
 
 Owned here:
@@ -60,6 +69,8 @@ Owned here:
   default browser turns.
 - Opening/closing the selected manual profile window through the browser-domain
   profile window service.
+- Launching/checking the selected native Chrome profile through the browser
+  domain native Chrome service.
 - Exposing a shared activation check for default runtime tool assembly.
 - Shared status vocabulary for slash commands and web settings.
 
