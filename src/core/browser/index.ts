@@ -8,6 +8,7 @@ export type {
   BrowserAutomationSetEnabledResult,
 } from './automation/index.js';
 export { BrowserEvidenceService } from './evidence/index.js';
+export { BrowserDriverFactoryService } from './drivers/index.js';
 export { BrowserPolicyService, DEFAULT_FORBIDDEN_BROWSER_ACTION_TEXT } from './policy/index.js';
 export { BrowserProfileWindowService } from './profile-windows/index.js';
 export type {
@@ -29,11 +30,13 @@ export type {
 } from './settings/index.js';
 export { BrowserSessionService } from './sessions/index.js';
 export { BrowserSnapshotService } from './snapshots/index.js';
+export { ChromeCdpBrowserDriverFactory } from './chrome-cdp/index.js';
 export { PlaywrightBrowserDriverFactory } from './playwright/index.js';
 export type {
   BrowserActionEvidenceEvent,
   BrowserActionResult,
   BrowserActionStatus,
+  BrowserBackendSelection,
   BrowserClickInput,
   BrowserDriver,
   BrowserDriverFactory,

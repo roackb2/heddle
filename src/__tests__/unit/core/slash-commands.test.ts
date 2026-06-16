@@ -194,6 +194,7 @@ describe('Browser Automation slash command output', () => {
       activationStorePath: '/workspace/.heddle/skills/activation.json',
       browserSettings: {
         profileId: 'browser-automation',
+        backendSelection: 'playwright-managed',
         channelSelection: 'chromium',
         headless: true,
         displayMode: 'headless',
@@ -242,6 +243,7 @@ describe('Browser Automation slash command output', () => {
         '',
         'Browser profile',
         '  profile=browser-automation',
+        '  backend=playwright-managed',
         '  channel=chromium',
         '  mode=headless',
         '  profilePath=/workspace/.heddle/browser-profiles/browser-automation',
@@ -259,6 +261,8 @@ describe('Browser Automation slash command output', () => {
         '  /browser headed',
         '  /browser headless',
         '  /browser profile <id>',
+        '  /browser backend <playwright|native-chrome>',
+        '  /browser endpoint <url>',
         '  /browser channel <chromium|chrome|msedge>',
         '  /browser open-profile [url]',
         '  /browser close-profile',
@@ -271,8 +275,10 @@ describe('Browser Automation slash command output', () => {
       ok: true as const,
       settings: {
         profileId: 'shopping',
+        backendSelection: 'native-chrome-cdp' as const,
         channel: 'chrome',
         channelSelection: 'chrome' as const,
+        cdpEndpoint: 'http://127.0.0.1:9223',
         headless: false,
         displayMode: 'headed' as const,
         settingsStorePath: '/workspace/.heddle/browser/settings.json',
@@ -331,6 +337,16 @@ describe('Browser Automation slash command output', () => {
       kind: 'message',
       message: expect.stringContaining('channel set to "chrome"'),
     });
+    await expect(registry.run(context, '/browser backend native-chrome')).resolves.toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: expect.stringContaining('backend set to "native-chrome-cdp"'),
+    });
+    await expect(registry.run(context, '/browser endpoint http://127.0.0.1:9223')).resolves.toMatchObject({
+      handled: true,
+      kind: 'message',
+      message: expect.stringContaining('endpoint set to "http://127.0.0.1:9223"'),
+    });
     await expect(registry.run(context, '/browser open-profile https://example.com/login')).resolves.toMatchObject({
       handled: true,
       kind: 'message',
@@ -344,6 +360,8 @@ describe('Browser Automation slash command output', () => {
     expect(updateSettings).toHaveBeenCalledWith({ profileId: 'shopping' });
     expect(updateSettings).toHaveBeenCalledWith({ headless: false });
     expect(updateSettings).toHaveBeenCalledWith({ channel: 'chrome' });
+    expect(updateSettings).toHaveBeenCalledWith({ backend: 'native-chrome-cdp' });
+    expect(updateSettings).toHaveBeenCalledWith({ cdpEndpoint: 'http://127.0.0.1:9223' });
     expect(openProfileWindow).toHaveBeenCalledWith({ url: 'https://example.com/login' });
     expect(closeProfileWindow).toHaveBeenCalledWith();
   });

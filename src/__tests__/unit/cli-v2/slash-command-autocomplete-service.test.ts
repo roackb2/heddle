@@ -30,6 +30,8 @@ describe('SlashCommandAutocompleteService', () => {
       { command: '/browser headed', description: 'run in a visible browser window' },
       { command: '/browser headless', description: 'run without a visible browser window' },
       { command: '/browser profile <id>', description: 'select profile' },
+      { command: '/browser backend <playwright|native-chrome>', description: 'select backend' },
+      { command: '/browser endpoint <url>', description: 'set native Chrome CDP endpoint' },
       { command: '/browser channel <chromium|chrome|msedge>', description: 'select channel' },
       { command: '/browser open-profile [url]', description: 'open selected profile' },
       { command: '/browser close-profile', description: 'close selected profile' },

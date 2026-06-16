@@ -5,6 +5,7 @@ import type { SlashCommandExecutionContext } from '../context.js';
 import { slashMessageResult } from '../results.js';
 
 const BROWSER_CHANNELS = ['chromium', 'chrome', 'msedge'] as const;
+type BrowserSlashBackend = 'playwright-managed' | 'native-chrome-cdp';
 
 export function createBrowserSlashCommandModule(): SlashCommandModule<SlashCommandResult, SlashCommandExecutionContext> {
   return {
@@ -16,6 +17,8 @@ export function createBrowserSlashCommandModule(): SlashCommandModule<SlashComma
       { command: '/browser headed', description: 'run Browser Automation in a visible browser window' },
       { command: '/browser headless', description: 'run Browser Automation without showing a browser window' },
       { command: '/browser profile <id>', description: 'select the Heddle-owned browser profile for future browser runs' },
+      { command: '/browser backend <playwright|native-chrome>', description: 'select the browser backend for future browser runs' },
+      { command: '/browser endpoint <url>', description: 'set the native Chrome CDP endpoint' },
       { command: '/browser channel <chromium|chrome|msedge>', description: 'select the browser channel for future browser runs' },
       { command: '/browser open-profile [url]', description: 'open the selected Heddle-owned browser profile for manual login' },
       { command: '/browser close-profile', description: 'close the selected manual browser profile window' },
@@ -69,6 +72,20 @@ export function createBrowserSlashCommandModule(): SlashCommandModule<SlashComma
         description: 'select the browser channel for future browser runs',
         match: SlashCommandParser.matchesPrefix('/browser channel'),
         run: (context, input) => setBrowserChannelMessage(context, input.rest.replace(/^channel\s*/, '').trim()),
+      },
+      {
+        id: 'browser.backend',
+        syntax: '/browser backend <playwright|native-chrome>',
+        description: 'select the browser backend for future browser runs',
+        match: SlashCommandParser.matchesPrefix('/browser backend'),
+        run: (context, input) => setBrowserBackendMessage(context, input.rest.replace(/^backend\s*/, '').trim()),
+      },
+      {
+        id: 'browser.endpoint',
+        syntax: '/browser endpoint <url>',
+        description: 'set the native Chrome CDP endpoint',
+        match: SlashCommandParser.matchesPrefix('/browser endpoint'),
+        run: (context, input) => setBrowserEndpointMessage(context, input.rest.replace(/^endpoint\s*/, '').trim()),
       },
       {
         id: 'browser.open-profile',
@@ -169,6 +186,47 @@ async function setBrowserChannelMessage(
   ].join('\n'));
 }
 
+async function setBrowserBackendMessage(
+  context: Pick<SlashCommandExecutionContext, 'browserAutomation'>,
+  backendInput: string,
+): Promise<SlashCommandResult> {
+  const backend = normalizeBrowserBackend(backendInput);
+  if (!backend) {
+    return slashMessageResult('Usage: /browser backend <playwright|native-chrome>');
+  }
+
+  const result = await context.browserAutomation.updateSettings({ backend });
+  if (!result.ok) {
+    return slashMessageResult(result.error);
+  }
+
+  return slashMessageResult([
+    `Browser Automation backend set to "${result.settings.backendSelection}".`,
+    '',
+    formatBrowserAutomationSettings(result.settings),
+  ].join('\n'));
+}
+
+async function setBrowserEndpointMessage(
+  context: Pick<SlashCommandExecutionContext, 'browserAutomation'>,
+  endpoint: string,
+): Promise<SlashCommandResult> {
+  if (!endpoint) {
+    return slashMessageResult('Usage: /browser endpoint <http://127.0.0.1:port>');
+  }
+
+  const result = await context.browserAutomation.updateSettings({ cdpEndpoint: endpoint });
+  if (!result.ok) {
+    return slashMessageResult(result.error);
+  }
+
+  return slashMessageResult([
+    `Native Chrome CDP endpoint set to "${result.settings.cdpEndpoint}".`,
+    '',
+    formatBrowserAutomationSettings(result.settings),
+  ].join('\n'));
+}
+
 async function openBrowserProfileWindowMessage(
   context: Pick<SlashCommandExecutionContext, 'browserAutomation'>,
   url: string,
@@ -219,6 +277,8 @@ function formatBrowserAutomationStatus(
     '  /browser headed',
     '  /browser headless',
     '  /browser profile <id>',
+    '  /browser backend <playwright|native-chrome>',
+    '  /browser endpoint <url>',
     '  /browser channel <chromium|chrome|msedge>',
     '  /browser open-profile [url]',
     '  /browser close-profile',
@@ -231,16 +291,32 @@ function formatBrowserAutomationSettings(
   return [
     'Browser profile',
     `  profile=${settings.profileId}`,
+    `  backend=${settings.backendSelection}`,
     `  channel=${settings.channelSelection}`,
+    settings.cdpEndpoint ? `  cdpEndpoint=${settings.cdpEndpoint}` : undefined,
     `  mode=${settings.displayMode}`,
     `  profilePath=${settings.userDataDir}`,
     `  settings=${settings.settingsStorePath}`,
     `  knownProfiles=${settings.profiles.length}`,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 function isBrowserChannel(channel: string): channel is typeof BROWSER_CHANNELS[number] {
   return BROWSER_CHANNELS.includes(channel as typeof BROWSER_CHANNELS[number]);
+}
+
+function normalizeBrowserBackend(backend: string): BrowserSlashBackend | undefined {
+  const normalized = backend.trim();
+  const aliases: Record<string, BrowserSlashBackend> = {
+    playwright: 'playwright-managed',
+    'playwright-managed': 'playwright-managed',
+    native: 'native-chrome-cdp',
+    'native-chrome': 'native-chrome-cdp',
+    'native-chrome-cdp': 'native-chrome-cdp',
+    cdp: 'native-chrome-cdp',
+  };
+
+  return aliases[normalized];
 }
 
 function formatBrowserProfileWindowStatus(

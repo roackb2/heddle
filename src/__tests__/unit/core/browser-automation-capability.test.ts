@@ -18,6 +18,7 @@ describe('BrowserAutomationCapabilityService', () => {
       skillName: BROWSER_AUTOMATION_SKILL_NAME,
       browserSettings: {
         profileId: 'browser-automation',
+        backendSelection: 'playwright-managed',
         channelSelection: 'chromium',
         displayMode: 'headless',
       },
@@ -47,6 +48,7 @@ describe('BrowserAutomationCapabilityService', () => {
     });
     expect(BrowserProfileSettingsService.toolkitOptions(stateRoot)).toMatchObject({
       profileId: 'shopping-login',
+      backend: 'playwright-managed',
       channel: 'chrome',
       headless: false,
     });
@@ -78,7 +80,45 @@ describe('BrowserAutomationCapabilityService', () => {
     expect(BrowserProfileSettingsService.overview(stateRoot)).toMatchObject({
       profileId: 'browser-automation',
       channelSelection: 'chromium',
+      backendSelection: 'playwright-managed',
       displayMode: 'headless',
+    });
+  });
+
+  it('persists native Chrome CDP attach settings with a local endpoint', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-browser-native-cdp-settings-'));
+    const workspaceRoot = join(root, 'workspace');
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const service = new BrowserAutomationCapabilityService({ workspaceRoot, stateRoot });
+
+    await expect(service.updateSettings({
+      backend: 'native-chrome-cdp',
+      cdpEndpoint: 'http://127.0.0.1:9222',
+    })).resolves.toMatchObject({
+      ok: true,
+      settings: {
+        backendSelection: 'native-chrome-cdp',
+        cdpEndpoint: 'http://127.0.0.1:9222',
+      },
+    });
+    expect(BrowserProfileSettingsService.toolkitOptions(stateRoot)).toMatchObject({
+      backend: 'native-chrome-cdp',
+      cdpEndpoint: 'http://127.0.0.1:9222',
+    });
+  });
+
+  it('rejects non-local native Chrome CDP endpoints', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-browser-native-cdp-invalid-'));
+    const workspaceRoot = join(root, 'workspace');
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const service = new BrowserAutomationCapabilityService({ workspaceRoot, stateRoot });
+
+    await expect(service.updateSettings({
+      backend: 'native-chrome-cdp',
+      cdpEndpoint: 'https://example.com:9222',
+    })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('local http origin'),
     });
   });
 

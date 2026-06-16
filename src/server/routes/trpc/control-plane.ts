@@ -492,8 +492,10 @@ export const controlPlaneRouter = router({
     const { workspace } = ctx.requestWorkspace;
     return await ControlPlaneBrowserAutomationController.updateSettings(workspace.workspaceRoot, workspace.stateRoot, {
       profileId: input.profileId,
+      backend: input.backend,
       channel: input.channel,
       headless: input.headless,
+      cdpEndpoint: input.cdpEndpoint,
     });
   }),
   browserAutomationProfileOpen: controlPlaneWorkspaceProcedure.input(browserAutomationProfileOpenInputSchema).mutation(async ({ ctx, input }) => {

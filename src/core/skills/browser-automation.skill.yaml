@@ -31,6 +31,8 @@ body: |-
 
   If the task depends on logged-in state, first check whether the browser automation host has a selected profile with a valid session for the target site. Without a valid session-backed profile, assume only public or non-session pages are reachable.
 
+  Browser Automation may run on different browser backends. In native Chrome CDP mode, the user must have launched a Heddle-specific Chrome profile with remote debugging and configured the local CDP endpoint. If a browser action reports that native CDP click is disabled, continue with browser_open, browser_snapshot, and browser_screenshot, or ask the user whether to switch backend.
+
   Do not enter credentials or ask the browser to bypass login walls. Ask the user to select or prepare a suitable profile when logged-in access is required.
 
   ## Operating Loop

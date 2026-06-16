@@ -63,6 +63,24 @@ describe('BrowserProfileWindowService', () => {
     });
     expect(driverFactory.launchOptions).toBeUndefined();
   });
+
+  it('does not open a Playwright profile window while native Chrome CDP is selected', async () => {
+    const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-browser-profile-window-native-cdp-'));
+    await BrowserProfileSettingsService.update(stateRoot, {
+      backend: 'native-chrome-cdp',
+      cdpEndpoint: 'http://127.0.0.1:9222',
+    });
+    const driverFactory = new FakeBrowserDriverFactory();
+
+    await expect(BrowserProfileWindowService.open(stateRoot, {
+      driverFactory,
+      url: 'https://example.com/login',
+    })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('user-launched Chrome window'),
+    });
+    expect(driverFactory.launchOptions).toBeUndefined();
+  });
 });
 
 class FakeBrowserDriverFactory implements BrowserDriverFactory {

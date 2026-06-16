@@ -12,7 +12,13 @@ export interface BrowserAutomationSettingsViewProps {
   error?: string;
   updating: boolean;
   onSetEnabled: (enabled: boolean) => Promise<void>;
-  onUpdateSettings: (input: { profileId?: string; channel?: 'chromium' | 'chrome' | 'msedge'; headless?: boolean }) => Promise<void>;
+  onUpdateSettings: (input: {
+    profileId?: string;
+    backend?: 'playwright-managed' | 'native-chrome-cdp';
+    channel?: 'chromium' | 'chrome' | 'msedge';
+    headless?: boolean;
+    cdpEndpoint?: string;
+  }) => Promise<void>;
   onOpenProfile: (url?: string) => Promise<void>;
   onCloseProfile: () => Promise<void>;
 }
@@ -21,6 +27,11 @@ const BROWSER_CHANNEL_OPTIONS = [
   { channel: 'chromium', labelKey: 'browserAutomationSettings.channel.chromium' },
   { channel: 'chrome', labelKey: 'browserAutomationSettings.channel.chrome' },
   { channel: 'msedge', labelKey: 'browserAutomationSettings.channel.msedge' },
+] as const;
+
+const BROWSER_BACKEND_OPTIONS = [
+  { backend: 'playwright-managed', labelKey: 'browserAutomationSettings.backend.playwright' },
+  { backend: 'native-chrome-cdp', labelKey: 'browserAutomationSettings.backend.nativeChrome' },
 ] as const;
 
 export function BrowserAutomationSettingsView({
@@ -181,8 +192,20 @@ function BrowserProfileSettingsPanel({
           onUpdateSettings={onUpdateSettings}
           profileId={settings.profileId}
         />
-        <BrowserChannelRow
+        <BrowserBackendRow
           disabled={disabled}
+          onError={onError}
+          onUpdateSettings={onUpdateSettings}
+          selectedBackend={settings.backendSelection}
+        />
+        <BrowserCdpEndpointRow
+          cdpEndpoint={settings.cdpEndpoint ?? ''}
+          disabled={disabled || settings.backendSelection !== 'native-chrome-cdp'}
+          onError={onError}
+          onUpdateSettings={onUpdateSettings}
+        />
+        <BrowserChannelRow
+          disabled={disabled || settings.backendSelection !== 'playwright-managed'}
           onError={onError}
           onUpdateSettings={onUpdateSettings}
           selectedChannel={settings.channelSelection}
@@ -248,6 +271,115 @@ function BrowserProfileSettingsPanel({
         />
       </div>
     </section>
+  );
+}
+
+function BrowserBackendRow({
+  disabled,
+  onError,
+  onUpdateSettings,
+  selectedBackend,
+}: {
+  disabled: boolean;
+  onError: (error: string | undefined) => void;
+  onUpdateSettings: BrowserAutomationSettingsViewProps['onUpdateSettings'];
+  selectedBackend: 'playwright-managed' | 'native-chrome-cdp';
+}) {
+  const { t } = useI18n();
+
+  async function updateBackend(backend: 'playwright-managed' | 'native-chrome-cdp') {
+    try {
+      onError(undefined);
+      await onUpdateSettings({ backend });
+    } catch (error) {
+      onError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  return (
+    <div className="v2-settings-row">
+      <div className="min-w-0">
+        <p className="v2-type-body-strong text-foreground">{t('browserAutomationSettings.backendTitle')}</p>
+        <p className="v2-type-panel-subtitle mt-1 max-w-2xl text-pretty text-muted-foreground">
+          {t('browserAutomationSettings.backendDetail')}
+        </p>
+      </div>
+      <div className="flex min-w-0 items-center gap-2">
+        {BROWSER_BACKEND_OPTIONS.map((option) => (
+          <Button
+            aria-pressed={selectedBackend === option.backend}
+            disabled={disabled}
+            key={option.backend}
+            onClick={() => {
+              if (selectedBackend !== option.backend) {
+                void updateBackend(option.backend);
+              }
+            }}
+            size="sm"
+            type="button"
+            variant={selectedBackend === option.backend ? 'default' : 'outline'}
+          >
+            {t(option.labelKey)}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BrowserCdpEndpointRow({
+  cdpEndpoint,
+  disabled,
+  onError,
+  onUpdateSettings,
+}: {
+  cdpEndpoint: string;
+  disabled: boolean;
+  onError: (error: string | undefined) => void;
+  onUpdateSettings: BrowserAutomationSettingsViewProps['onUpdateSettings'];
+}) {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState(cdpEndpoint);
+
+  async function saveEndpoint() {
+    try {
+      onError(undefined);
+      await onUpdateSettings({ cdpEndpoint: draft });
+    } catch (error) {
+      onError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  return (
+    <div className="v2-settings-row items-start">
+      <div className="min-w-0 flex-1">
+        <label className="v2-type-body-strong text-foreground" htmlFor="browser-cdp-endpoint">
+          {t('browserAutomationSettings.cdpEndpointTitle')}
+        </label>
+        <p className="v2-type-panel-subtitle mt-1 max-w-2xl text-pretty text-muted-foreground">
+          {t('browserAutomationSettings.cdpEndpointDetail')}
+        </p>
+      </div>
+      <div className="flex w-full min-w-0 max-w-md items-center gap-2">
+        <Input
+          className="min-w-0"
+          disabled={disabled}
+          id="browser-cdp-endpoint"
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder="http://127.0.0.1:9222"
+          value={draft}
+        />
+        <Button
+          disabled={disabled || draft.trim() === cdpEndpoint}
+          onClick={() => void saveEndpoint()}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          {t('browserAutomationSettings.saveProfileAction')}
+        </Button>
+      </div>
+    </div>
   );
 }
 
