@@ -12,6 +12,11 @@ import type {
   BrowserProfileWindowResult,
   BrowserProfileWindowStatus,
 } from '../profile-windows/index.js';
+import type {
+  NativeChromeConnectionStatus,
+  NativeChromeLaunchInput,
+  NativeChromeLaunchResult,
+} from '../native-chrome/index.js';
 
 export type BrowserAutomationOverview = {
   enabled: boolean;
@@ -20,6 +25,7 @@ export type BrowserAutomationOverview = {
   skill?: AgentSkillActivationView;
   browserSettings: BrowserProfileSettingsOverview;
   profileWindow: BrowserProfileWindowStatus;
+  nativeChrome: NativeChromeConnectionStatus;
   profileRequirement: string;
   toolAvailability: string;
 };
@@ -45,3 +51,6 @@ export type BrowserAutomationSettingsUpdateInput = BrowserProfileSettingsUpdateI
 export type BrowserAutomationSettingsUpdateResult = BrowserProfileSettingsUpdateResult;
 export type BrowserAutomationProfileOpenInput = BrowserProfileWindowOpenInput;
 export type BrowserAutomationProfileWindowResult = BrowserProfileWindowResult;
+export type BrowserAutomationNativeChromeLaunchInput = NativeChromeLaunchInput;
+export type BrowserAutomationNativeChromeLaunchResult = NativeChromeLaunchResult;
+export type BrowserAutomationNativeChromeStatus = NativeChromeConnectionStatus;

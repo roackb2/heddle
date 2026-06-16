@@ -1,5 +1,8 @@
 import { BrowserAutomationCapabilityService } from '@/core/browser/index.js';
-import type { BrowserAutomationSettingsUpdateInput } from '@/core/browser/index.js';
+import type {
+  BrowserAutomationNativeChromeLaunchInput,
+  BrowserAutomationSettingsUpdateInput,
+} from '@/core/browser/index.js';
 
 export class ControlPlaneBrowserAutomationController {
   static async overview(workspaceRoot: string, stateRoot: string) {
@@ -28,6 +31,18 @@ export class ControlPlaneBrowserAutomationController {
 
   static async closeProfileWindow(workspaceRoot: string, stateRoot: string) {
     return await ControlPlaneBrowserAutomationController.service(workspaceRoot, stateRoot).closeProfileWindow();
+  }
+
+  static async launchNativeChrome(
+    workspaceRoot: string,
+    stateRoot: string,
+    input: BrowserAutomationNativeChromeLaunchInput,
+  ) {
+    return await ControlPlaneBrowserAutomationController.service(workspaceRoot, stateRoot).launchNativeChrome(input);
+  }
+
+  static async nativeChromeStatus(workspaceRoot: string, stateRoot: string) {
+    return await ControlPlaneBrowserAutomationController.service(workspaceRoot, stateRoot).nativeChromeStatus();
   }
 
   private static service(workspaceRoot: string, stateRoot: string): BrowserAutomationCapabilityService {

@@ -9,13 +9,14 @@ import { Command, InvalidArgumentError } from 'commander';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PROFILE_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
+const DEFAULT_START_URL = 'https://en.wikipedia.org/wiki/Main_Page';
 
 const options = new Command()
   .name('open-native-chrome-profile')
   .description('Open native Google Chrome with a Heddle-specific profile and CDP endpoint.')
   .option('--profile <id>', 'profile id under .heddle/native-chrome-profiles/', parseProfileId, 'browser-automation')
-  .option('--port <port>', 'remote debugging port', parsePort, 9222)
-  .option('--url <url>', 'initial URL', 'about:blank')
+  .option('--port <port>', 'remote debugging port', parsePort, 9223)
+  .option('--url <url>', 'initial URL', DEFAULT_START_URL)
   .option('--state-root <path>', 'Heddle state root', (value) => resolve(value), resolve(repoRoot, '.heddle'))
   .option('--chrome-path <path>', 'explicit Chrome binary path')
   .option('--print-only', 'print the Chrome command without launching')

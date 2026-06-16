@@ -1,5 +1,8 @@
 export { BrowserAutomationCapabilityService } from './automation/index.js';
 export type {
+  BrowserAutomationNativeChromeLaunchInput,
+  BrowserAutomationNativeChromeLaunchResult,
+  BrowserAutomationNativeChromeStatus,
   BrowserAutomationOverview,
   BrowserAutomationProfileOpenInput,
   BrowserAutomationProfileWindowResult,
@@ -28,6 +31,17 @@ export type {
   BrowserProfileSettingsUpdateResult,
   BrowserProfileView,
 } from './settings/index.js';
+export {
+  DEFAULT_NATIVE_CHROME_CDP_PORT,
+  DEFAULT_NATIVE_CHROME_START_URL,
+  NativeChromeProfileService,
+} from './native-chrome/index.js';
+export type {
+  NativeChromeConnectionState,
+  NativeChromeConnectionStatus,
+  NativeChromeLaunchInput,
+  NativeChromeLaunchResult,
+} from './native-chrome/index.js';
 export { BrowserSessionService } from './sessions/index.js';
 export { BrowserSnapshotService } from './snapshots/index.js';
 export { ChromeCdpBrowserDriverFactory } from './chrome-cdp/index.js';

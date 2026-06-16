@@ -49,6 +49,15 @@ export class BrowserProfileSettingsService {
       : BrowserProfileSettingsService.resolveProfileDir(stateRoot, settings.profileId);
   }
 
+  static validateProfileId(profileId: string): { ok: true } | { ok: false; error: string } {
+    return PROFILE_ID_PATTERN.test(profileId)
+      ? { ok: true }
+      : {
+          ok: false,
+          error: 'Profile id must start with a letter or number and only use letters, numbers, dots, underscores, or hyphens.',
+        };
+  }
+
   static read(stateRoot: string): BrowserProfileSettings {
     const settingsPath = BrowserProfileSettingsService.resolveSettingsPath(stateRoot);
     if (!existsSync(settingsPath)) {
@@ -94,10 +103,11 @@ export class BrowserProfileSettingsService {
   ): BrowserProfileSettingsUpdateResult {
     const current = BrowserProfileSettingsService.read(stateRoot);
     const profileId = input.profileId === undefined ? current.profileId : input.profileId.trim();
-    if (!PROFILE_ID_PATTERN.test(profileId)) {
+    const profileIdValidation = BrowserProfileSettingsService.validateProfileId(profileId);
+    if (!profileIdValidation.ok) {
       return {
         ok: false,
-        error: 'Profile id must start with a letter or number and only use letters, numbers, dots, underscores, or hyphens.',
+        error: profileIdValidation.error,
         settings: BrowserProfileSettingsService.overview(stateRoot),
       };
     }
@@ -161,14 +171,14 @@ export class BrowserProfileSettingsService {
       if (parsed.protocol !== 'http:' || !isLoopback || parsed.pathname !== '/' || parsed.search || parsed.hash) {
         return {
           ok: false,
-          error: 'Native Chrome CDP endpoint must be a local http origin such as http://127.0.0.1:9222.',
+          error: 'Native Chrome CDP endpoint must be a local http origin such as http://127.0.0.1:9223.',
         };
       }
       return { ok: true };
     } catch {
       return {
         ok: false,
-        error: 'Native Chrome CDP endpoint must be a valid local http origin such as http://127.0.0.1:9222.',
+        error: 'Native Chrome CDP endpoint must be a valid local http origin such as http://127.0.0.1:9223.',
       };
     }
   }

@@ -28,6 +28,8 @@ import { controlPlaneWorkspaceProcedure, type ControlPlaneWorkspaceContext } fro
 import {
   agentAskInputSchema,
   browserAutomationInputSchema,
+  browserAutomationNativeLaunchInputSchema,
+  browserAutomationNativeStatusInputSchema,
   browserAutomationProfileCloseInputSchema,
   browserAutomationProfileOpenInputSchema,
   browserAutomationSettingsInputSchema,
@@ -507,6 +509,18 @@ export const controlPlaneRouter = router({
   browserAutomationProfileClose: controlPlaneWorkspaceProcedure.input(browserAutomationProfileCloseInputSchema).mutation(async ({ ctx }) => {
     const { workspace } = ctx.requestWorkspace;
     return await ControlPlaneBrowserAutomationController.closeProfileWindow(workspace.workspaceRoot, workspace.stateRoot);
+  }),
+  browserAutomationNativeLaunch: controlPlaneWorkspaceProcedure.input(browserAutomationNativeLaunchInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneBrowserAutomationController.launchNativeChrome(workspace.workspaceRoot, workspace.stateRoot, {
+      profileId: input.profileId,
+      port: input.port,
+      url: input.url,
+    });
+  }),
+  browserAutomationNativeStatus: controlPlaneWorkspaceProcedure.input(browserAutomationNativeStatusInputSchema).mutation(async ({ ctx }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneBrowserAutomationController.nativeChromeStatus(workspace.workspaceRoot, workspace.stateRoot);
   }),
   mcpServers: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
     const { workspace } = ctx.requestWorkspace;

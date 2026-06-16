@@ -21,6 +21,8 @@ export interface BrowserAutomationSettingsViewProps {
   }) => Promise<void>;
   onOpenProfile: (url?: string) => Promise<void>;
   onCloseProfile: () => Promise<void>;
+  onLaunchNativeChrome: (url?: string) => Promise<void>;
+  onCheckNativeChrome: () => Promise<void>;
 }
 
 const BROWSER_CHANNEL_OPTIONS = [
@@ -43,6 +45,8 @@ export function BrowserAutomationSettingsView({
   onUpdateSettings,
   onOpenProfile,
   onCloseProfile,
+  onLaunchNativeChrome,
+  onCheckNativeChrome,
 }: BrowserAutomationSettingsViewProps) {
   const { t } = useI18n();
   const [actionError, setActionError] = useState<string | undefined>();
@@ -117,8 +121,11 @@ export function BrowserAutomationSettingsView({
             disabled={updating}
             onError={setActionError}
             onCloseProfile={onCloseProfile}
+            onCheckNativeChrome={onCheckNativeChrome}
+            onLaunchNativeChrome={onLaunchNativeChrome}
             onOpenProfile={onOpenProfile}
             onUpdateSettings={onUpdateSettings}
+            nativeChrome={browserAutomation.nativeChrome}
             settings={browserSettings}
             windowStatus={browserAutomation.profileWindow}
           />
@@ -166,16 +173,22 @@ function BrowserProfileSettingsPanel({
   disabled,
   onError,
   onCloseProfile,
+  onCheckNativeChrome,
+  onLaunchNativeChrome,
   onOpenProfile,
   onUpdateSettings,
+  nativeChrome,
   settings,
   windowStatus,
 }: {
   disabled: boolean;
   onError: (error: string | undefined) => void;
+  onCheckNativeChrome: BrowserAutomationSettingsViewProps['onCheckNativeChrome'];
   onCloseProfile: BrowserAutomationSettingsViewProps['onCloseProfile'];
+  onLaunchNativeChrome: BrowserAutomationSettingsViewProps['onLaunchNativeChrome'];
   onOpenProfile: BrowserAutomationSettingsViewProps['onOpenProfile'];
   onUpdateSettings: BrowserAutomationSettingsViewProps['onUpdateSettings'];
+  nativeChrome: ControlPlaneBrowserAutomation['nativeChrome'];
   settings: NonNullable<ControlPlaneBrowserAutomation['browserSettings']>;
   windowStatus: ControlPlaneBrowserAutomation['profileWindow'];
 }) {
@@ -262,15 +275,119 @@ function BrowserProfileSettingsPanel({
             <p className="v2-type-panel-subtitle mt-1 text-pretty text-foreground">{settings.profileInstruction}</p>
           </div>
         </div>
-        <BrowserProfileWindowRow
-          disabled={disabled}
-          onCloseProfile={onCloseProfile}
-          onError={onError}
-          onOpenProfile={onOpenProfile}
-          windowStatus={windowStatus}
-        />
+        {settings.backendSelection === 'native-chrome-cdp' ? (
+          <NativeChromeRow
+            disabled={disabled}
+            nativeChrome={nativeChrome}
+            onCheckNativeChrome={onCheckNativeChrome}
+            onError={onError}
+            onLaunchNativeChrome={onLaunchNativeChrome}
+          />
+        ) : (
+          <BrowserProfileWindowRow
+            disabled={disabled}
+            onCloseProfile={onCloseProfile}
+            onError={onError}
+            onOpenProfile={onOpenProfile}
+            windowStatus={windowStatus}
+          />
+        )}
       </div>
     </section>
+  );
+}
+
+function NativeChromeRow({
+  disabled,
+  nativeChrome,
+  onCheckNativeChrome,
+  onError,
+  onLaunchNativeChrome,
+}: {
+  disabled: boolean;
+  nativeChrome: ControlPlaneBrowserAutomation['nativeChrome'];
+  onCheckNativeChrome: BrowserAutomationSettingsViewProps['onCheckNativeChrome'];
+  onError: (error: string | undefined) => void;
+  onLaunchNativeChrome: BrowserAutomationSettingsViewProps['onLaunchNativeChrome'];
+}) {
+  const { t } = useI18n();
+  const [url, setUrl] = useState(nativeChrome.defaultStartUrl);
+
+  async function launchNativeChrome() {
+    try {
+      onError(undefined);
+      await onLaunchNativeChrome(url.trim() || undefined);
+    } catch (error) {
+      onError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function checkNativeChrome() {
+    try {
+      onError(undefined);
+      await onCheckNativeChrome();
+    } catch (error) {
+      onError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  return (
+    <div className="v2-settings-row items-start">
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <p className="v2-type-body-strong text-foreground">{t('browserAutomationSettings.nativeChromeTitle')}</p>
+          <span
+            className={cn(
+              'v2-type-caption shrink-0 rounded-sm border px-1.5 py-0.5',
+              nativeChrome.state === 'reachable'
+                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                : 'border-border bg-muted/20 text-muted-foreground',
+            )}
+          >
+            {nativeChrome.state === 'reachable'
+              ? t('browserAutomationSettings.nativeChromeReachable')
+              : t('browserAutomationSettings.nativeChromeUnreachable')}
+          </span>
+        </div>
+        <p className="v2-type-panel-subtitle mt-1 max-w-2xl text-pretty text-muted-foreground">
+          {t('browserAutomationSettings.nativeChromeDetail')}
+        </p>
+        <p className="v2-type-caption mt-2 break-all text-muted-foreground">
+          {nativeChrome.endpoint}
+        </p>
+        {nativeChrome.browser ? (
+          <p className="v2-type-caption mt-1 break-all text-muted-foreground">{nativeChrome.browser}</p>
+        ) : null}
+      </div>
+      <div className="flex w-full min-w-0 max-w-md flex-col gap-2">
+        <Input
+          disabled={disabled}
+          onChange={(event) => setUrl(event.target.value)}
+          placeholder={nativeChrome.defaultStartUrl}
+          value={url}
+        />
+        <div className="flex min-w-0 items-center justify-end gap-2">
+          <Button
+            disabled={disabled}
+            onClick={() => void checkNativeChrome()}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {t('browserAutomationSettings.nativeChromeCheckAction')}
+          </Button>
+          <Button
+            disabled={disabled}
+            onClick={() => void launchNativeChrome()}
+            size="sm"
+            type="button"
+            variant="default"
+          >
+            {t('browserAutomationSettings.nativeChromeLaunchAction')}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -366,7 +483,7 @@ function BrowserCdpEndpointRow({
           disabled={disabled}
           id="browser-cdp-endpoint"
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="http://127.0.0.1:9222"
+          placeholder="http://127.0.0.1:9223"
           value={draft}
         />
         <Button

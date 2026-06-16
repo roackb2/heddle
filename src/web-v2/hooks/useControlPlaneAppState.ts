@@ -47,6 +47,8 @@ export function useControlPlaneAppState() {
   const browserAutomationSettingsUpdateMutation = trpcReact.controlPlane.browserAutomationSettingsUpdate.useMutation();
   const browserAutomationProfileOpenMutation = trpcReact.controlPlane.browserAutomationProfileOpen.useMutation();
   const browserAutomationProfileCloseMutation = trpcReact.controlPlane.browserAutomationProfileClose.useMutation();
+  const browserAutomationNativeLaunchMutation = trpcReact.controlPlane.browserAutomationNativeLaunch.useMutation();
+  const browserAutomationNativeStatusMutation = trpcReact.controlPlane.browserAutomationNativeStatus.useMutation();
   const mcpServerEnableMutation = trpcReact.controlPlane.mcpServerEnable.useMutation();
   const mcpServerDisableMutation = trpcReact.controlPlane.mcpServerDisable.useMutation();
   const mcpServerRefreshMutation = trpcReact.controlPlane.mcpServerRefresh.useMutation();
@@ -268,6 +270,23 @@ export function useControlPlaneAppState() {
     await utils.controlPlane.browserAutomation.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined);
   }
 
+  async function launchNativeChromeBrowser(url?: string) {
+    const result = await browserAutomationNativeLaunchMutation.mutateAsync(
+      sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, url } : { url },
+    );
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+    await utils.controlPlane.browserAutomation.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined);
+  }
+
+  async function checkNativeChromeBrowser() {
+    await browserAutomationNativeStatusMutation.mutateAsync(
+      sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : {},
+    );
+    await utils.controlPlane.browserAutomation.invalidate(sidebar.workspaceId ? { workspaceId: sidebar.workspaceId } : undefined);
+  }
+
   async function setMcpServerEnabled(serverId: string, enabled: boolean) {
     const input = sidebar.workspaceId ? { workspaceId: sidebar.workspaceId, serverId } : { serverId };
     if (enabled) {
@@ -348,11 +367,15 @@ export function useControlPlaneAppState() {
           browserAutomationSetEnabledMutation.isPending
           || browserAutomationSettingsUpdateMutation.isPending
           || browserAutomationProfileOpenMutation.isPending
-          || browserAutomationProfileCloseMutation.isPending,
+          || browserAutomationProfileCloseMutation.isPending
+          || browserAutomationNativeLaunchMutation.isPending
+          || browserAutomationNativeStatusMutation.isPending,
         onSetEnabled: setBrowserAutomationEnabled,
         onUpdateSettings: updateBrowserAutomationSettings,
         onOpenProfile: openBrowserAutomationProfile,
         onCloseProfile: closeBrowserAutomationProfile,
+        onLaunchNativeChrome: launchNativeChromeBrowser,
+        onCheckNativeChrome: checkNativeChromeBrowser,
       },
       skillsSettingsView: {
         skills: skillsQuery.data,

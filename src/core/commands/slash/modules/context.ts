@@ -1,6 +1,9 @@
 import type { ChatSession } from '../../../chat/types.js';
 import type { AutonomyPermissionMode } from '../../../approvals/index.js';
 import type {
+  BrowserAutomationNativeChromeLaunchInput,
+  BrowserAutomationNativeChromeLaunchResult,
+  BrowserAutomationNativeChromeStatus,
   BrowserAutomationOverview,
   BrowserAutomationProfileOpenInput,
   BrowserAutomationProfileWindowResult,
@@ -73,6 +76,8 @@ export type SlashCommandExecutionContext = {
     updateSettings: (input: BrowserAutomationSettingsUpdateInput) => Promise<BrowserAutomationSettingsUpdateResult>;
     openProfileWindow: (input?: BrowserAutomationProfileOpenInput) => Promise<BrowserAutomationProfileWindowResult>;
     closeProfileWindow: () => Promise<BrowserAutomationProfileWindowResult>;
+    launchNativeChrome: (input?: BrowserAutomationNativeChromeLaunchInput) => Promise<BrowserAutomationNativeChromeLaunchResult>;
+    nativeChromeStatus: () => Promise<BrowserAutomationNativeChromeStatus>;
   };
   skills: {
     list: () => Promise<AgentSkillActivationView[]>;

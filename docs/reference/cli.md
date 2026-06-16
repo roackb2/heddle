@@ -146,7 +146,9 @@ Inside `heddle` / `heddle chat`, the most-used local commands are:
 - `/browser headless`: run future Browser Automation sessions without a visible browser window
 - `/browser profile <id>`: select the Heddle-owned browser profile future browser runs should use
 - `/browser backend <playwright|native-chrome>`: select the browser backend future browser runs should use
-- `/browser endpoint <url>`: set the local native Chrome CDP endpoint, for example `http://127.0.0.1:9222`
+- `/browser endpoint <url>`: set the local native Chrome CDP endpoint, for example `http://127.0.0.1:9223`
+- `/browser launch-native [url]`: launch locally installed Chrome with the selected Heddle-owned profile and a CDP endpoint; omit the URL to open Wikipedia as a meaningful smoke target
+- `/browser check-native`: check whether the configured native Chrome CDP endpoint is reachable
 - `/browser channel <chromium|chrome|msedge>`: select the Playwright browser channel future browser runs and manual profile windows should use
 - `/browser open-profile [url]`: open the selected Heddle-owned browser profile in a visible window for manual login or session management
 - `/browser close-profile`: close the selected manual browser profile window and release its profile lock
