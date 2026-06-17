@@ -7,8 +7,9 @@
 //   yarn example:browser-research-toolkit:headless
 //
 // This deterministic example validates the opt-in browser research tools without
-// involving an LLM. It calls browser_open, browser_snapshot, browser_click,
-// browser_screenshot, and browser_close in the order an agent would use them.
+// involving an LLM. It calls browser_open, browser_snapshot, browser_type,
+// browser_click, browser_screenshot, and browser_close in the order an agent
+// would use them for a search/navigation task.
 // ---------------------------------------------------------------------------
 
 import { join } from 'node:path';
@@ -22,6 +23,9 @@ type SnapshotOutput = {
     role: string;
     name: string;
     href?: string;
+    editable?: boolean;
+    placeholder?: string;
+    inputType?: string;
   }>;
 };
 
@@ -57,10 +61,30 @@ async function main() {
     }
 
     const snapshot = await runTool(toolMap.browser_snapshot, {});
-    const elements = (snapshot.output as SnapshotOutput | undefined)?.elements ?? [];
+    let elements = (snapshot.output as SnapshotOutput | undefined)?.elements ?? [];
     console.log(`[browser_snapshot] ${elements.length} interactive elements`);
     for (const element of elements.slice(0, 8)) {
       console.log(`  ${element.ref} ${element.role} ${element.name}`);
+    }
+
+    const searchField = elements.find((element) => element.editable && (
+      element.role === 'searchbox'
+      || element.inputType === 'search'
+      || element.placeholder?.toLowerCase().includes('search')
+      || element.name.toLowerCase().includes('search')
+    ));
+    if (searchField) {
+      const typed = await runTool(toolMap.browser_type, {
+        ref: searchField.ref,
+        text: 'browser automation history',
+        submit: true,
+      });
+      console.log(`[browser_type] ${searchField.name}: ${formatResult(typed)}`);
+      const afterTypeSnapshot = await runTool(toolMap.browser_snapshot, {});
+      elements = (afterTypeSnapshot.output as SnapshotOutput | undefined)?.elements ?? [];
+      console.log(`[browser_snapshot] after type ${elements.length} interactive elements`);
+    } else {
+      console.log('[browser_type] skipped: no editable search field found');
     }
 
     const safeLink = elements.find((element) => (

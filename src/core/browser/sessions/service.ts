@@ -15,6 +15,7 @@ import type {
   BrowserScreenshotInput,
   BrowserSessionConfig,
   BrowserSnapshot,
+  BrowserTypeInput,
 } from '../types.js';
 
 /**
@@ -190,6 +191,126 @@ export class BrowserSessionService {
       url: finalUrl,
       reason: finalDecision.reason,
       detail: { ref: input.ref, target: this.evidenceTarget(element), finalUrl },
+    });
+
+    return {
+      status: finalDecision.status,
+      actionId,
+      timestamp,
+      url: finalUrl,
+      reason: finalDecision.reason,
+      data: { finalUrl },
+    };
+  }
+
+  async type(input: BrowserTypeInput): Promise<BrowserActionResult<{ finalUrl: string }>> {
+    const actionId = this.actionId('type');
+    const timestamp = this.now();
+    const element = this.latestSnapshot?.elements.find((candidate) => candidate.ref === input.ref);
+    if (!element) {
+      const reason = `Unknown browser snapshot ref: ${input.ref}`;
+      await this.record({
+        id: actionId,
+        timestamp,
+        action: 'type',
+        status: 'blocked',
+        reason,
+        detail: { ref: input.ref },
+      });
+      return {
+        status: 'blocked',
+        actionId,
+        timestamp,
+        reason,
+      };
+    }
+
+    const decision = this.policy.evaluateType(element);
+    if (decision.status !== 'allowed') {
+      await this.record({
+        id: actionId,
+        timestamp,
+        action: 'type',
+        status: decision.status,
+        reason: decision.reason,
+        url: this.currentUrl(),
+        detail: {
+          ref: input.ref,
+          target: this.evidenceTarget(element),
+          textLength: input.text.length,
+          submit: input.submit ?? false,
+        },
+      });
+      return {
+        status: decision.status,
+        actionId,
+        timestamp,
+        url: this.currentUrl(),
+        reason: decision.reason,
+      };
+    }
+
+    let blockedNavigation: { url: string; decision: ReturnType<BrowserPolicyService['evaluateNavigation']> } | undefined;
+    let finalUrl: string;
+    try {
+      finalUrl = await (await this.getDriver()).type(input.ref, {
+        text: input.text,
+        clear: input.clear ?? true,
+        submit: input.submit ?? false,
+        canNavigateTo: (url) => {
+          const navigationDecision = this.policy.evaluateNavigation(url);
+          if (navigationDecision.status === 'allowed') {
+            return true;
+          }
+
+          blockedNavigation = { url, decision: navigationDecision };
+          return false;
+        },
+      });
+    } catch (error) {
+      this.latestSnapshot = undefined;
+      if (blockedNavigation) {
+        await this.record({
+          id: actionId,
+          timestamp,
+          action: 'type',
+          status: blockedNavigation.decision.status,
+          reason: blockedNavigation.decision.reason,
+          url: blockedNavigation.url,
+          detail: {
+            ref: input.ref,
+            target: this.evidenceTarget(element),
+            textLength: input.text.length,
+            submit: input.submit ?? false,
+          },
+        });
+        return {
+          status: blockedNavigation.decision.status,
+          actionId,
+          timestamp,
+          url: blockedNavigation.url,
+          reason: blockedNavigation.decision.reason,
+        };
+      }
+
+      throw error;
+    }
+    this.latestSnapshot = undefined;
+
+    const finalDecision = this.policy.evaluateNavigation(finalUrl);
+    await this.record({
+      id: actionId,
+      timestamp,
+      action: 'type',
+      status: finalDecision.status === 'allowed' ? 'completed' : finalDecision.status,
+      url: finalUrl,
+      reason: finalDecision.reason,
+      detail: {
+        ref: input.ref,
+        target: this.evidenceTarget(element),
+        textLength: input.text.length,
+        submit: input.submit ?? false,
+      },
     });
 
     return {

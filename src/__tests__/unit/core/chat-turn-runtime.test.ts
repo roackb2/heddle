@@ -318,6 +318,7 @@ describe('chat turn preparation modules', () => {
       'browser_open',
       'browser_snapshot',
       'browser_click',
+      'browser_type',
       'browser_screenshot',
       'browser_close',
     ]));

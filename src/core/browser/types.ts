@@ -42,6 +42,13 @@ export interface BrowserClickInput {
   ref: string;
 }
 
+export interface BrowserTypeInput {
+  ref: string;
+  text: string;
+  clear?: boolean;
+  submit?: boolean;
+}
+
 export interface BrowserScreenshotInput {
   name?: string;
 }
@@ -72,12 +79,17 @@ export interface BrowserSnapshotElement {
   href?: string;
   rawHref?: string;
   tagName?: string;
+  inputType?: string;
+  placeholder?: string;
+  disabled?: boolean;
+  readonly?: boolean;
+  editable?: boolean;
 }
 
 export interface BrowserActionEvidenceEvent {
   id: string;
   timestamp: string;
-  action: 'open' | 'snapshot' | 'click' | 'screenshot' | 'close';
+  action: 'open' | 'snapshot' | 'click' | 'type' | 'screenshot' | 'close';
   status: BrowserActionStatus | 'completed';
   url?: string;
   reason?: string;
@@ -103,10 +115,18 @@ export interface BrowserDriverClickOptions {
   canNavigateTo?: (url: string) => boolean;
 }
 
+export interface BrowserDriverTypeOptions {
+  text: string;
+  clear: boolean;
+  submit: boolean;
+  canNavigateTo?: (url: string) => boolean;
+}
+
 export interface BrowserDriver {
   open(url: string): Promise<string>;
   snapshot(options: BrowserDriverSnapshotOptions): Promise<BrowserDriverSnapshotResult>;
   click(ref: string, options?: BrowserDriverClickOptions): Promise<string>;
+  type(ref: string, options: BrowserDriverTypeOptions): Promise<string>;
   screenshot(path: string): Promise<void>;
   close(): Promise<void>;
   currentUrl(): string | undefined;

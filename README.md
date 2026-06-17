@@ -433,6 +433,7 @@ Enabling Browser Automation activates Heddle's package-owned `browser-automation
 browser_open
 browser_snapshot
 browser_click
+browser_type
 browser_screenshot
 browser_close
 ```
@@ -448,6 +449,7 @@ Current behavior:
 
 - if no explicit domain allowlist is configured, the first `browser_open` URL establishes the same-domain browsing boundary for that browser session
 - snapshots return scoped refs for safe `browser_click` calls
+- `browser_type` can type into editable snapshot refs and optionally submit with Enter for search/navigation
 - screenshots and browser evidence are stored under Heddle state
 - Settings -> Browser Automation and `/browser profile <id>` select a Heddle-owned profile under `.heddle/browser-profiles/`
 - Settings -> Browser Automation and `/browser channel <chromium|chrome|msedge>` select the Playwright browser channel for future agent runs and manual profile windows
@@ -459,10 +461,10 @@ Current behavior:
 
 Browser Automation agenda:
 
-- add form-safe browser tools such as `browser_type`, `browser_fill`, and `browser_press`
+- add richer form actions such as select, checkbox, and press-key helpers
 - surface browser evidence and screenshots in the control plane
 - design a live browser preview path, likely screenshot/CDP screencast based rather than embedding Playwright's native headed window
-- add richer policy and approval flows for harmless same-origin UI clicks
+- add richer policy and approval flows for harmless same-origin UI clicks and cart-like actions
 
 ### MCP Integrations
 

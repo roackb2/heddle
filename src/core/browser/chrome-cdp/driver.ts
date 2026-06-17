@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 
-import type { chromium, Browser, BrowserContext, Locator, Page } from 'playwright';
+import type { chromium, Browser, BrowserContext, Locator, Page, Route } from 'playwright';
 
 import type {
   BrowserDriver,
@@ -9,6 +9,7 @@ import type {
   BrowserDriverLaunchOptions,
   BrowserDriverSnapshotOptions,
   BrowserDriverSnapshotResult,
+  BrowserDriverTypeOptions,
   BrowserSnapshotElement,
 } from '../types.js';
 
@@ -97,8 +98,79 @@ class ChromeCdpBrowserDriver implements BrowserDriver {
     };
   }
 
-  async click(_ref: string, _options: BrowserDriverClickOptions = {}): Promise<string> {
-    throw new Error('Native Chrome CDP click is disabled until it preserves Heddle navigation-policy parity.');
+  async click(ref: string, options: BrowserDriverClickOptions = {}): Promise<string> {
+    const locator = this.refs.get(ref);
+    if (!locator) {
+      throw new Error(`Unknown browser snapshot ref: ${ref}`);
+    }
+
+    await this.runWithNavigationGuard(options, async () => {
+      await locator.click();
+    });
+    return this.page.url();
+  }
+
+  async type(ref: string, options: BrowserDriverTypeOptions): Promise<string> {
+    const locator = this.refs.get(ref);
+    if (!locator) {
+      throw new Error(`Unknown browser snapshot ref: ${ref}`);
+    }
+
+    await this.runWithNavigationGuard(options, async () => {
+      if (options.clear) {
+        await locator.fill(options.text);
+      } else {
+        await locator.click();
+        await locator.type(options.text);
+      }
+
+      if (options.submit) {
+        await locator.press('Enter');
+      }
+    });
+    return this.page.url();
+  }
+
+  private async runWithNavigationGuard(
+    options: BrowserDriverClickOptions,
+    action: () => Promise<void>,
+  ): Promise<void> {
+    const routeHandler = this.createNavigationGuard(options);
+    await this.page.route('**/*', routeHandler);
+    try {
+      await action();
+      await this.page.waitForLoadState('domcontentloaded').catch(() => undefined);
+    } finally {
+      await this.page.unroute('**/*', routeHandler).catch(() => undefined);
+    }
+  }
+
+  private createNavigationGuard(options: BrowserDriverClickOptions): (route: Route) => Promise<void> {
+    return async (route) => {
+      const request = route.request();
+      if (!request.isNavigationRequest() || !options.canNavigateTo) {
+        await route.continue();
+        return;
+      }
+
+      if (!options.canNavigateTo(request.url())) {
+        await route.abort('blockedbyclient');
+        return;
+      }
+
+      const finalUrl = await this.resolveFinalNavigationUrl(route);
+      if (!options.canNavigateTo(finalUrl)) {
+        await route.abort('blockedbyclient');
+        return;
+      }
+
+      await route.continue();
+    };
+  }
+
+  private async resolveFinalNavigationUrl(route: Route): Promise<string> {
+    const response = await route.fetch({ maxRedirects: 20 });
+    return response.url();
   }
 
   async screenshot(path: string): Promise<void> {
@@ -124,14 +196,30 @@ class ChromeCdpBrowserDriver implements BrowserDriver {
       const tagName = htmlElement.tagName.toLowerCase();
       const role = htmlElement.getAttribute('role') ?? inferRole(tagName, htmlElement);
       const href = element instanceof HTMLAnchorElement ? element.href : undefined;
+      const inputType = element instanceof HTMLInputElement
+        ? element.type
+        : undefined;
+      const placeholder = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
+        ? element.placeholder || undefined
+        : undefined;
+      const disabled = element instanceof HTMLButtonElement
+        || element instanceof HTMLInputElement
+        || element instanceof HTMLSelectElement
+        || element instanceof HTMLTextAreaElement
+          ? element.disabled
+          : undefined;
+      const readonly = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
+        ? element.readOnly
+        : undefined;
+      const editable = isEditableElement(htmlElement);
       const rawHref = element instanceof HTMLAnchorElement
         ? htmlElement.getAttribute('href') ?? undefined
         : undefined;
       const name = [
         htmlElement.getAttribute('aria-label'),
         htmlElement.getAttribute('title'),
+        placeholder,
         htmlElement.innerText,
-        htmlElement.getAttribute('value'),
         href,
       ].find((value) => value && value.trim())?.trim() ?? tagName;
 
@@ -142,7 +230,20 @@ class ChromeCdpBrowserDriver implements BrowserDriver {
         href,
         rawHref,
         tagName,
+        inputType,
+        placeholder,
+        disabled,
+        readonly,
+        editable,
       };
+
+      function isEditableElement(node: HTMLElement): boolean {
+        return node.isContentEditable
+          || node instanceof HTMLInputElement
+          || node instanceof HTMLTextAreaElement
+          || node.getAttribute('role') === 'textbox'
+          || node.getAttribute('role') === 'searchbox';
+      }
 
       function inferRole(tag: string, node: HTMLElement): string {
         const roles: Record<string, string> = {

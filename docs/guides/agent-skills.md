@@ -106,7 +106,10 @@ reachable.
 
 If an agent needs a starting URL, it may use `web_search` to discover the
 target page, but it should switch to `browser_open` and `browser_snapshot` when
-the user asked for browser interaction or rendered page evidence.
+the user asked for browser interaction or rendered page evidence. For on-page
+search or navigation, the agent should use `browser_type` on editable snapshot
+refs and `browser_click` on current snapshot refs instead of guessing URL
+patterns.
 
 ## What The Agent Sees
 

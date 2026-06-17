@@ -1,6 +1,6 @@
 name: browser-automation
 description: Use when the user asks to use a browser, interact with web pages, search within a site or product catalog, compare shopping listings, or visually inspect rendered frontend UI.
-allowed-tools: browser_open browser_snapshot browser_click browser_screenshot browser_close
+allowed-tools: browser_open browser_snapshot browser_click browser_type browser_screenshot browser_close
 metadata:
   owner: heddle
   capability: browser-automation
@@ -31,7 +31,7 @@ body: |-
 
   If the task depends on logged-in state, first check whether the browser automation host has a selected profile with a valid session for the target site. Without a valid session-backed profile, assume only public or non-session pages are reachable.
 
-  Browser Automation may run on different browser backends. In native Chrome CDP mode, the user must have launched a Heddle-specific Chrome profile with remote debugging and configured the local CDP endpoint. If a browser action reports that native CDP click is disabled, continue with browser_open, browser_snapshot, and browser_screenshot, or ask the user whether to switch backend.
+  Browser Automation may run on different browser backends. In native Chrome CDP mode, the user must have launched a Heddle-specific Chrome profile with remote debugging and configured the local CDP endpoint.
 
   Do not enter credentials or ask the browser to bypass login walls. Ask the user to select or prepare a suitable profile when logged-in access is required.
 
@@ -40,9 +40,10 @@ body: |-
   1. Open the target URL with browser_open.
   2. Capture browser_snapshot before making claims or choosing click targets.
   3. Use only refs from the latest snapshot.
-  4. After any click that may navigate or change the DOM, capture a new snapshot before further clicks.
-  5. Use browser_screenshot when visual evidence is needed for layout, styling, or rendered state.
-  6. Close the browser session when the browser task is finished.
+  4. Use browser_type for search boxes and editable text fields. Use submit=true when pressing Enter is the expected search/navigation action.
+  5. After any click or typing action that may navigate or change the DOM, capture a new snapshot before further actions.
+  6. Use browser_screenshot when visual evidence is needed for layout, styling, or rendered state.
+  7. Close the browser session when the browser task is finished.
 
   Never reuse snapshot refs after navigation. Browser refs are page-state scoped evidence, not stable selectors.
 
@@ -59,6 +60,8 @@ body: |-
   ## Safety Boundaries
 
   Respect domain allowlists and browser policy. Stop before checkout, purchase, irreversible submission, account mutation, credential entry, payment, booking, messaging, upload, or destructive actions unless the user explicitly approves a future Heddle workflow that supports that action safely.
+
+  Shopping assistance may include searching, opening product pages, comparing options, and requesting approval for cart-like actions when browser policy requires it. Never proceed to buy, checkout, payment, subscription, booking, or account mutation.
 
   If browser policy blocks navigation or a click, report the blocked action and the reason instead of trying to route around it.
 

@@ -17,8 +17,8 @@ can still import Heddle normally, and browser hosts may either install
 
 - Tool input validation for browser research actions.
 - A single lazy browser session shared across the toolkit tools.
-- Human-readable tool outputs for browser open, snapshot, click, screenshot,
-  and close actions.
+- Human-readable tool outputs for browser open, snapshot, click, type,
+  screenshot, and close actions.
 
 ## Does Not Own
 
@@ -26,8 +26,7 @@ can still import Heddle normally, and browser hosts may either install
   Those stay in `src/core/browser`.
 - Approval UI or pending approval coordination.
 - The Browser Automation capability switch and default runtime tool composition.
-- Form typing, transactions, checkout, payment, booking, messaging, uploads, or
-  downloads.
+- Transactions, checkout, payment, booking, messaging, uploads, or downloads.
 
 ## Flow
 
@@ -35,8 +34,10 @@ can still import Heddle normally, and browser hosts may either install
 2. `browser_snapshot` returns snapshot-scoped refs.
 3. `browser_click` accepts one current snapshot ref and lets browser policy
    decide whether the click is allowed.
-4. `browser_screenshot` records a screenshot artifact.
-5. `browser_close` closes the driver and releases the profile lease.
+4. `browser_type` accepts one editable current snapshot ref, types text, and
+   can submit with Enter for search/navigation.
+5. `browser_screenshot` records a screenshot artifact.
+6. `browser_close` closes the driver and releases the profile lease.
 
 If browser policy blocks or requires approval for an action, the tool returns a
 failed tool result instead of executing the browser driver action.
@@ -64,7 +65,7 @@ yarn example:browser-research-toolkit:headed
 The example calls the tools directly in this order:
 
 ```text
-browser_open -> browser_snapshot -> browser_click -> browser_screenshot -> browser_close
+browser_open -> browser_snapshot -> browser_type -> browser_snapshot -> browser_click -> browser_screenshot -> browser_close
 ```
 
 This validates the tool boundary an agent will eventually use, but it still does

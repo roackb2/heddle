@@ -418,6 +418,7 @@ heddle ask --mode review "Review the current diff"
 browser_open
 browser_snapshot
 browser_click
+browser_type
 browser_screenshot
 browser_close
 ```
@@ -430,6 +431,7 @@ browser_close
 
 - 如果沒有明確的網域允許清單，第一個 `browser_open` URL 會建立該瀏覽器工作階段的同網域瀏覽邊界
 - 快照會回傳作用範圍限定的 refs，供安全的 `browser_click` 呼叫使用
+- `browser_type` 可以輸入到可編輯的快照 ref，並可選擇按 Enter 送出搜尋或導覽
 - 截圖與瀏覽器證據會存放在 Heddle 狀態目錄
 - Settings -> Browser Automation 與 `/browser profile <id>` 可選擇 Heddle 管理的瀏覽器設定檔，位置在 `.heddle/browser-profiles/`
 - Settings -> Browser Automation 與 `/browser channel <chromium|chrome|msedge>` 可選擇之後代理執行與手動設定檔視窗使用的 Playwright 瀏覽器通道
@@ -441,10 +443,10 @@ browser_close
 
 瀏覽器自動化待辦方向：
 
-- 增加表單安全的瀏覽器工具，例如 `browser_type`、`browser_fill`、`browser_press`
+- 增加更完整的表單操作，例如選單、核取方塊與按鍵輔助工具
 - 在控制平面顯示瀏覽器證據與截圖
 - 設計即時瀏覽器預覽路徑，較可能基於截圖或 CDP screencast，而不是嵌入 Playwright 原生可見視窗
-- 為無害的同源 UI 點擊加上更完整的政策與核准流程
+- 為無害的同源 UI 點擊與加入購物車這類動作加上更完整的政策與核准流程
 
 ### MCP 整合
 

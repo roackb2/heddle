@@ -9,6 +9,7 @@ import type {
   BrowserDriverLaunchOptions,
   BrowserDriverSnapshotOptions,
   BrowserDriverSnapshotResult,
+  BrowserDriverTypeOptions,
   BrowserSnapshotElement,
 } from '../types.js';
 
@@ -100,15 +101,45 @@ class PlaywrightBrowserDriver implements BrowserDriver {
       throw new Error(`Unknown browser snapshot ref: ${ref}`);
     }
 
+    await this.runWithNavigationGuard(options, async () => {
+      await locator.click();
+    });
+    return this.page.url();
+  }
+
+  async type(ref: string, options: BrowserDriverTypeOptions): Promise<string> {
+    const locator = this.refs.get(ref);
+    if (!locator) {
+      throw new Error(`Unknown browser snapshot ref: ${ref}`);
+    }
+
+    await this.runWithNavigationGuard(options, async () => {
+      if (options.clear) {
+        await locator.fill(options.text);
+      } else {
+        await locator.click();
+        await locator.type(options.text);
+      }
+
+      if (options.submit) {
+        await locator.press('Enter');
+      }
+    });
+    return this.page.url();
+  }
+
+  private async runWithNavigationGuard(
+    options: BrowserDriverClickOptions,
+    action: () => Promise<void>,
+  ): Promise<void> {
     const routeHandler = this.createNavigationGuard(options);
     await this.page.route('**/*', routeHandler);
     try {
-      await locator.click();
+      await action();
       await this.page.waitForLoadState('domcontentloaded').catch(() => undefined);
     } finally {
       await this.page.unroute('**/*', routeHandler).catch(() => undefined);
     }
-    return this.page.url();
   }
 
   async screenshot(path: string): Promise<void> {
@@ -162,6 +193,22 @@ class PlaywrightBrowserDriver implements BrowserDriver {
       const tagName = htmlElement.tagName.toLowerCase();
       const role = htmlElement.getAttribute('role') ?? inferRole(tagName, htmlElement);
       const href = element instanceof HTMLAnchorElement ? element.href : undefined;
+      const inputType = element instanceof HTMLInputElement
+        ? element.type
+        : undefined;
+      const placeholder = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
+        ? element.placeholder || undefined
+        : undefined;
+      const disabled = element instanceof HTMLButtonElement
+        || element instanceof HTMLInputElement
+        || element instanceof HTMLSelectElement
+        || element instanceof HTMLTextAreaElement
+          ? element.disabled
+          : undefined;
+      const readonly = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
+        ? element.readOnly
+        : undefined;
+      const editable = isEditableElement(htmlElement);
       // Report only browser/DOM facts. Do not infer site-specific route variants
       // such as locale, tenant, or storefront prefixes from one observed page.
       const rawHref = element instanceof HTMLAnchorElement
@@ -170,8 +217,8 @@ class PlaywrightBrowserDriver implements BrowserDriver {
       const name = [
         htmlElement.getAttribute('aria-label'),
         htmlElement.getAttribute('title'),
+        placeholder,
         htmlElement.innerText,
-        htmlElement.getAttribute('value'),
         href,
       ].find((value) => value && value.trim())?.trim() ?? tagName;
 
@@ -182,7 +229,20 @@ class PlaywrightBrowserDriver implements BrowserDriver {
         href,
         rawHref,
         tagName,
+        inputType,
+        placeholder,
+        disabled,
+        readonly,
+        editable,
       };
+
+      function isEditableElement(node: HTMLElement): boolean {
+        return node.isContentEditable
+          || node instanceof HTMLInputElement
+          || node instanceof HTMLTextAreaElement
+          || node.getAttribute('role') === 'textbox'
+          || node.getAttribute('role') === 'searchbox';
+      }
 
       function inferRole(tag: string, node: HTMLElement): string {
         const roles: Record<string, string> = {
