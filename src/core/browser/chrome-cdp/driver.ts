@@ -12,6 +12,7 @@ import type {
   BrowserDriverTypeOptions,
   BrowserSnapshotElement,
 } from '../types.js';
+import { selectChromeCdpTarget } from './target-selection.js';
 
 const INTERACTIVE_SELECTOR = [
   'a',
@@ -59,19 +60,25 @@ function loadPlaywrightChromium(): PlaywrightChromium {
 
 class ChromeCdpBrowserDriver implements BrowserDriver {
   private refs = new Map<string, Locator>();
+  private expectedUrl: string | undefined;
 
   constructor(
     private readonly browser: Browser,
     private readonly context: BrowserContext,
-    private readonly page: Page,
+    private page: Page,
   ) {}
 
   async open(url: string): Promise<string> {
+    this.expectedUrl = url;
+    await this.reconcilePage();
     await this.page.goto(url, { waitUntil: 'domcontentloaded' });
-    return this.page.url();
+    await this.page.bringToFront().catch(() => undefined);
+    this.expectedUrl = this.page.url();
+    return this.expectedUrl;
   }
 
   async snapshot(options: BrowserDriverSnapshotOptions): Promise<BrowserDriverSnapshotResult> {
+    await this.reconcilePage();
     const locator = this.page.locator(INTERACTIVE_SELECTOR);
     const count = await locator.count();
     const elements: BrowserSnapshotElement[] = [];
@@ -99,6 +106,7 @@ class ChromeCdpBrowserDriver implements BrowserDriver {
   }
 
   async click(ref: string, options: BrowserDriverClickOptions = {}): Promise<string> {
+    await this.reconcilePage();
     const locator = this.refs.get(ref);
     if (!locator) {
       throw new Error(`Unknown browser snapshot ref: ${ref}`);
@@ -107,10 +115,12 @@ class ChromeCdpBrowserDriver implements BrowserDriver {
     await this.runWithNavigationGuard(options, async () => {
       await locator.click();
     });
-    return this.page.url();
+    this.expectedUrl = this.page.url();
+    return this.expectedUrl;
   }
 
   async type(ref: string, options: BrowserDriverTypeOptions): Promise<string> {
+    await this.reconcilePage();
     const locator = this.refs.get(ref);
     if (!locator) {
       throw new Error(`Unknown browser snapshot ref: ${ref}`);
@@ -128,7 +138,8 @@ class ChromeCdpBrowserDriver implements BrowserDriver {
         await locator.press('Enter');
       }
     });
-    return this.page.url();
+    this.expectedUrl = this.page.url();
+    return this.expectedUrl;
   }
 
   private async runWithNavigationGuard(
@@ -174,6 +185,7 @@ class ChromeCdpBrowserDriver implements BrowserDriver {
   }
 
   async screenshot(path: string): Promise<void> {
+    await this.reconcilePage();
     await this.page.screenshot({ path, fullPage: true });
   }
 
@@ -183,6 +195,27 @@ class ChromeCdpBrowserDriver implements BrowserDriver {
 
   currentUrl(): string | undefined {
     return this.page.url();
+  }
+
+  private async reconcilePage(): Promise<void> {
+    const pages = this.context.pages().filter((page) => !page.isClosed());
+    const selection = selectChromeCdpTarget({
+      expectedUrl: this.expectedUrl ?? this.page.url(),
+      targets: pages.map((page, index) => ({
+        id: String(index),
+        url: page.url(),
+        isCurrent: page === this.page,
+      })),
+    });
+    const selectedPage = selection ? pages[Number(selection.target.id)] : undefined;
+
+    if (!selectedPage || selectedPage === this.page) {
+      return;
+    }
+
+    this.page = selectedPage;
+    this.refs = new Map<string, Locator>();
+    await this.page.bringToFront().catch(() => undefined);
   }
 
   private async snapshotElement(locator: Locator, index: number): Promise<BrowserSnapshotElement | undefined> {

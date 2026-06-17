@@ -187,6 +187,12 @@ guarantees as the Playwright driver. Do not add new input, form, coordinate, or
 JavaScript execution actions to this backend without retaining Heddle-owned
 domain policy and approval semantics.
 
+Native CDP must also reconcile the active page target before reading or acting.
+When a user manually clears a login challenge or CAPTCHA in visible Chrome, the
+successful page may be exposed as a different CDP target from the stale
+challenge page. The CDP backend owns this generic target selection; browser
+policy still owns navigation and action safety.
+
 Run evidence is written under:
 
 ```text

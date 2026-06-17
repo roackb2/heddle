@@ -10,11 +10,13 @@ normal user-launched Chrome with a dedicated Heddle profile.
 ## Owns
 
 - Connecting to a local CDP endpoint that the user explicitly launched.
-- Selecting the first available browser context and page for the attached
-  native Chrome session.
+- Selecting and reconciling the browser page target for the attached native
+  Chrome session.
 - Implementing read-oriented browser driver operations:
   - `open`
   - `snapshot`
+  - `click`
+  - `type`
   - `screenshot`
   - `currentUrl`
   - `close` as CDP detach
@@ -36,13 +38,33 @@ normal user-launched Chrome with a dedicated Heddle profile.
 
 ## Safety Boundary
 
-Native CDP currently supports read-oriented use only. `click` intentionally
-throws until this backend preserves the same navigation-policy guarantees as the
-Playwright driver.
+Native CDP supports the same policy-gated open, snapshot, click, type, and
+screenshot tool shape as the Playwright backend. Navigation still flows through
+the browser-domain policy before execution.
 
-Do not add click, type, upload, download, form submission, cart, checkout,
-payment, booking, messaging, or account-change actions here unless the browser
-domain has a matching policy and approval boundary first.
+Do not add upload, download, arbitrary JavaScript, coordinate clicking,
+checkout, payment, booking, messaging, or account-change actions here unless the
+browser domain has a matching policy and approval boundary first.
+
+## Target Reconciliation
+
+Do not pin `context.pages()[0]` and assume it stays correct. Native Chrome users
+may clear login challenges, CAPTCHA, permission prompts, or extension popups in
+the visible browser while Heddle is attached through CDP. Chrome can expose the
+resulting page as a different target than the one selected during initial
+attach.
+
+Before snapshot, click, type, and screenshot operations, the driver reconciles
+the page target using `target-selection.ts`:
+
+- prefer the page matching the current task URL;
+- otherwise prefer the same origin or host;
+- ignore internal Chrome, DevTools, and extension pages;
+- de-prioritize generic verification/challenge URLs when another same-origin
+  page exists.
+
+This must stay site-agnostic. Do not add hostnames, locale paths, storefront
+routes, account URLs, or marketplace-specific repairs to target selection.
 
 ## Maintenance Notes
 
@@ -57,4 +79,3 @@ domain has a matching policy and approval boundary first.
 - Keep public driver return types aligned with `src/core/browser/types.ts`; do
   not leak Playwright `Page`, `Locator`, or CDP protocol objects across the
   browser-domain boundary.
-
