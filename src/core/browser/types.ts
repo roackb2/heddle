@@ -8,6 +8,7 @@ export interface BrowserPolicyConfig {
   allowedDomains: string[];
   forbiddenActionText?: string[];
   requireApprovalForOffDomainNavigation?: boolean;
+  adoptFinalOpenDomain?: boolean;
   maxElementsPerSnapshot?: number;
 }
 

@@ -46,6 +46,15 @@ When `allowedDomains` is empty, `browser_open` derives the session allowlist
 from the first opened URL. Subsequent clicks remain same-domain unless a host
 provides a broader explicit allowlist.
 
+A later `browser_open` to a different requested domain closes the current
+derived session and starts a fresh browser run. This keeps one task from being
+trapped by a previous task's site boundary while preserving same-domain policy
+inside each run.
+
+If the first open redirects to a regional or canonical hostname, the browser
+domain adopts that final loaded hostname into the derived boundary. Do not solve
+this by adding site-specific redirect assumptions here.
+
 For the native Chrome CDP backend, `browser_open` is also the task entrypoint.
 If the configured local CDP endpoint is not reachable, the toolkit asks the
 browser domain to launch native Chrome with the same URL that `browser_open`

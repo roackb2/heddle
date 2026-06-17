@@ -35,6 +35,9 @@ unwinding chat, server, or web-v2 behavior.
 - Policy must run before browser actions. Prompt instructions are not a safety
   boundary.
 - Element refs are only valid for the snapshot that produced them.
+- When no explicit allowlist exists, a first-open boundary may adopt the final
+  loaded hostname after a browser redirect. This must stay generic; do not add
+  hostnames, locale prefixes, or marketplace-specific redirect assumptions.
 - Snapshot extraction reports browser and DOM facts only. It must not infer
   site-specific route conventions, locale prefixes, storefront paths, account
   sections, or workflow meanings from one observed website. If a page rewrites

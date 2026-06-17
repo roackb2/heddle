@@ -448,6 +448,8 @@ adds task-level context for the next agent turn.
 Current behavior:
 
 - if no explicit domain allowlist is configured, the first `browser_open` URL establishes the same-domain browsing boundary for that browser session
+- a later `browser_open` to a different domain starts a fresh derived browser run instead of reusing the previous site's boundary
+- if the first `browser_open` redirects to a regional/canonical domain, that final loaded domain becomes part of the derived boundary
 - snapshots return scoped refs for safe `browser_click` calls
 - `browser_type` can type into editable snapshot refs and optionally submit with Enter for search/navigation
 - screenshots and browser evidence are stored under Heddle state

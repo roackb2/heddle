@@ -61,6 +61,7 @@ type BrowserScreenshotInput = {
 type BrowserRuntimeState = {
   lease?: BrowserProfileLease;
   session?: BrowserSessionService;
+  derivedAllowedDomains?: string[];
   opened: boolean;
 };
 
@@ -140,11 +141,22 @@ async function openBrowserSession(
   state: BrowserRuntimeState,
   url: string,
 ): Promise<Awaited<ReturnType<BrowserSessionService['open']>>> {
+  if (shouldRestartDerivedSessionForUrl(options, state, url)) {
+    await closeBrowserState(state);
+  }
+
   const session = await getBrowserSession(options, state, url);
 
   try {
     const result = await session.open({ url });
     state.opened = result.status === 'allowed';
+    if (result.status === 'allowed' && options.allowedDomains.length === 0) {
+      state.derivedAllowedDomains = uniqueDomains([
+        ...(state.derivedAllowedDomains ?? []),
+        ...initialAllowedDomains(url),
+        ...initialAllowedDomains(result.data?.finalUrl),
+      ]);
+    }
     return result;
   } catch (error) {
     await closeBrowserState(state);
@@ -438,6 +450,7 @@ async function closeBrowserState(state: BrowserRuntimeState): Promise<Awaited<Re
     state.lease?.release();
     state.session = undefined;
     state.lease = undefined;
+    state.derivedAllowedDomains = undefined;
     state.opened = false;
   }
 }
@@ -455,12 +468,26 @@ function createSessionConfig(
 }
 
 function createPolicyConfig(options: BrowserResearchToolkitOptions, initialUrl?: string): BrowserPolicyConfig {
+  const explicitAllowedDomains = options.allowedDomains.length > 0;
   return {
-    allowedDomains: options.allowedDomains.length > 0
+    allowedDomains: explicitAllowedDomains
       ? options.allowedDomains
       : initialAllowedDomains(initialUrl),
+    adoptFinalOpenDomain: !explicitAllowedDomains,
     maxElementsPerSnapshot: options.maxElementsPerSnapshot,
   };
+}
+
+function shouldRestartDerivedSessionForUrl(
+  options: BrowserResearchToolkitOptions,
+  state: BrowserRuntimeState,
+  url: string,
+): boolean {
+  if (!state.session || options.allowedDomains.length > 0) {
+    return false;
+  }
+
+  return !initialAllowedDomains(url).some((domain) => isAllowedByDomains(domain, state.derivedAllowedDomains ?? []));
 }
 
 function initialAllowedDomains(initialUrl: string | undefined): string[] {
@@ -474,6 +501,17 @@ function initialAllowedDomains(initialUrl: string | undefined): string[] {
   } catch {
     return [];
   }
+}
+
+function isAllowedByDomains(hostname: string, allowedDomains: string[]): boolean {
+  const normalizedHostname = hostname.toLowerCase();
+  return allowedDomains
+    .map((domain) => domain.toLowerCase())
+    .some((domain) => normalizedHostname === domain || normalizedHostname.endsWith(`.${domain}`));
+}
+
+function uniqueDomains(domains: string[]): string[] {
+  return [...new Set(domains)];
 }
 
 function requireOpenedSession(

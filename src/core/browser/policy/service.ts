@@ -31,7 +31,11 @@ export const DEFAULT_FORBIDDEN_BROWSER_ACTION_TEXT = DEFAULT_BLOCKED_BROWSER_ACT
  * Owns browser navigation and action policy decisions.
  */
 export class BrowserPolicyService {
-  constructor(private readonly config: BrowserPolicyConfig) {}
+  private readonly allowedDomains: string[];
+
+  constructor(private readonly config: BrowserPolicyConfig) {
+    this.allowedDomains = [...config.allowedDomains];
+  }
 
   evaluateNavigation(url: string): BrowserPolicyDecision {
     const hostname = this.hostnameFromUrl(url);
@@ -157,6 +161,26 @@ export class BrowserPolicyService {
     return this.config.maxElementsPerSnapshot ?? 80;
   }
 
+  adoptAllowedDomainFromUrl(url: string): BrowserPolicyDecision {
+    const hostname = this.hostnameFromUrl(url);
+    if (!hostname) {
+      return {
+        status: 'blocked',
+        risk: 'medium',
+        reason: `Invalid browser navigation URL: ${url}`,
+      };
+    }
+
+    const domains = this.allowedDomainsFromHostname(hostname);
+    for (const domain of domains) {
+      if (!this.allowedDomains.includes(domain)) {
+        this.allowedDomains.push(domain);
+      }
+    }
+
+    return { status: 'allowed', risk: 'low' };
+  }
+
   private blockedActionText(): string[] {
     return this.config.forbiddenActionText ?? DEFAULT_FORBIDDEN_BROWSER_ACTION_TEXT;
   }
@@ -167,9 +191,16 @@ export class BrowserPolicyService {
 
   private isAllowedHostname(hostname: string): boolean {
     const normalizedHostname = hostname.toLowerCase();
-    return this.config.allowedDomains
+    return this.allowedDomains
       .map((domain) => domain.toLowerCase())
       .some((domain) => normalizedHostname === domain || normalizedHostname.endsWith(`.${domain}`));
+  }
+
+  private allowedDomainsFromHostname(hostname: string): string[] {
+    const normalizedHostname = hostname.toLowerCase();
+    return normalizedHostname.startsWith('www.')
+      ? [normalizedHostname.slice(4), normalizedHostname]
+      : [normalizedHostname];
   }
 
   private hostnameFromUrl(url: string): string | undefined {

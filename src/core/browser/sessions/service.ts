@@ -58,7 +58,12 @@ export class BrowserSessionService {
 
     const driver = await this.getDriver();
     const finalUrl = await driver.open(input.url);
-    const finalDecision = this.policy.evaluateNavigation(finalUrl);
+    let finalDecision = this.policy.evaluateNavigation(finalUrl);
+    let adoptedFinalOpenDomain = false;
+    if (finalDecision.status !== 'allowed' && this.config.policy.adoptFinalOpenDomain) {
+      finalDecision = this.policy.adoptAllowedDomainFromUrl(finalUrl);
+      adoptedFinalOpenDomain = finalDecision.status === 'allowed';
+    }
     await this.record({
       id: actionId,
       timestamp,
@@ -66,7 +71,7 @@ export class BrowserSessionService {
       status: finalDecision.status === 'allowed' ? 'completed' : finalDecision.status,
       url: finalUrl,
       reason: finalDecision.reason,
-      detail: { requestedUrl: input.url, finalUrl },
+      detail: { requestedUrl: input.url, finalUrl, adoptedFinalOpenDomain },
     });
 
     return {

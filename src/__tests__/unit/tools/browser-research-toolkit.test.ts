@@ -215,6 +215,47 @@ describe('createBrowserResearchToolkit', () => {
     expect(driver.clickedRefs).toEqual([]);
   });
 
+  it('starts a fresh derived browser session when browser_open targets a different domain', async () => {
+    const { tools, driver, driverFactory } = await createTools({ allowedDomains: [] });
+
+    await expect(tools.browser_open.execute({ url: 'https://example.com' }))
+      .resolves
+      .toMatchObject({ ok: true });
+    await expect(tools.browser_open.execute({ url: 'https://shopee.tw' }))
+      .resolves
+      .toMatchObject({
+        ok: true,
+        output: {
+          url: 'https://shopee.tw',
+        },
+      });
+
+    expect(driver.closedCount).toBe(1);
+    expect(driverFactory.launchCount).toBe(2);
+    expect(driver.openedUrls).toEqual(['https://example.com', 'https://shopee.tw']);
+  });
+
+  it('adopts the final first-open URL when a requested site redirects to a regional domain', async () => {
+    const { tools } = await createTools({
+      allowedDomains: [],
+      driver: new FakeBrowserDriver({
+        redirects: {
+          'https://shopee.com': 'https://shopee.tw',
+        },
+      }),
+    });
+
+    await expect(tools.browser_open.execute({ url: 'https://shopee.com' }))
+      .resolves
+      .toMatchObject({
+        ok: true,
+        output: {
+          status: 'allowed',
+          url: 'https://shopee.tw',
+        },
+      });
+  });
+
   it('types into editable snapshot refs and can submit search/navigation', async () => {
     const { tools, driver } = await createTools();
 
@@ -377,11 +418,13 @@ function context(stateRoot: string): ToolToolkitContext {
 
 class FakeBrowserDriverFactory implements BrowserDriverFactory {
   launchOptions?: BrowserDriverLaunchOptions;
+  launchCount = 0;
 
   constructor(private readonly driver: BrowserDriver) {}
 
   async launch(options: BrowserDriverLaunchOptions): Promise<BrowserDriver> {
     this.launchOptions = options;
+    this.launchCount += 1;
     return this.driver;
   }
 }
@@ -389,12 +432,18 @@ class FakeBrowserDriverFactory implements BrowserDriverFactory {
 class FakeBrowserDriver implements BrowserDriver {
   clickedRefs: string[] = [];
   typedInputs: Array<{ ref: string; text: string; clear: boolean; submit: boolean }> = [];
+  openedUrls: string[] = [];
+  closedCount = 0;
   private url = 'about:blank';
 
-  constructor(private readonly options: { ariaSnapshot?: string } = {}) {}
+  constructor(private readonly options: {
+    ariaSnapshot?: string;
+    redirects?: Record<string, string>;
+  } = {}) {}
 
   async open(url: string): Promise<string> {
-    this.url = url;
+    this.openedUrls.push(url);
+    this.url = this.options.redirects?.[url] ?? url;
     return this.url;
   }
 
@@ -454,7 +503,9 @@ class FakeBrowserDriver implements BrowserDriver {
 
   async screenshot(_path: string): Promise<void> {}
 
-  async close(): Promise<void> {}
+  async close(): Promise<void> {
+    this.closedCount += 1;
+  }
 
   currentUrl(): string | undefined {
     return this.url;
