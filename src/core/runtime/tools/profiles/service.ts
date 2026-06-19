@@ -24,6 +24,7 @@ const TOOL_CAPABILITIES: Record<string, ToolCapability[]> = {
   browser_screenshot: ['browser.read'],
   browser_open: ['browser.action'],
   browser_click: ['browser.action'],
+  browser_type: ['browser.action'],
   browser_close: ['browser.action'],
   mcp_list_tools: ['mcp.unknown'],
   mcp_call_tool: ['mcp.unknown'],

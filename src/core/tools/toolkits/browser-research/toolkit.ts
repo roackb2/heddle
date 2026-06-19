@@ -47,6 +47,13 @@ type BrowserClickInput = {
   ref: string;
 };
 
+type BrowserTypeInput = {
+  ref: string;
+  text: string;
+  clear?: boolean;
+  submit?: boolean;
+};
+
 type BrowserScreenshotInput = {
   name?: string;
 };
@@ -54,6 +61,7 @@ type BrowserScreenshotInput = {
 type BrowserRuntimeState = {
   lease?: BrowserProfileLease;
   session?: BrowserSessionService;
+  derivedAllowedDomains?: string[];
   opened: boolean;
 };
 
@@ -73,6 +81,7 @@ export function createBrowserResearchToolkit(options: BrowserResearchToolkitOpti
         createBrowserOpenTool(options, state),
         createBrowserSnapshotTool(state),
         createBrowserClickTool(state),
+        createBrowserTypeTool(state),
         createBrowserScreenshotTool(state),
         createBrowserCloseTool(state),
       ];
@@ -132,11 +141,22 @@ async function openBrowserSession(
   state: BrowserRuntimeState,
   url: string,
 ): Promise<Awaited<ReturnType<BrowserSessionService['open']>>> {
+  if (shouldRestartDerivedSessionForUrl(options, state, url)) {
+    await closeBrowserState(state);
+  }
+
   const session = await getBrowserSession(options, state, url);
 
   try {
     const result = await session.open({ url });
     state.opened = result.status === 'allowed';
+    if (result.status === 'allowed' && options.allowedDomains.length === 0) {
+      state.derivedAllowedDomains = uniqueDomains([
+        ...(state.derivedAllowedDomains ?? []),
+        ...initialAllowedDomains(url),
+        ...initialAllowedDomains(result.data?.finalUrl),
+      ]);
+    }
     return result;
   } catch (error) {
     await closeBrowserState(state);
@@ -212,6 +232,68 @@ function createBrowserClickTool(state: BrowserRuntimeState): ToolDefinition {
         : {
           ok: false,
           error: result.reason ?? `browser_click was ${result.status}.`,
+          output: { status: result.status, url: result.url, actionId: result.actionId },
+        };
+    },
+  };
+}
+
+function createBrowserTypeTool(state: BrowserRuntimeState): ToolDefinition {
+  return {
+    name: 'browser_type',
+    description:
+      'Type text into an editable element ref from the latest browser_snapshot. Use this for search boxes and text fields. By default it clears the field first. Set submit=true to press Enter after typing for search/navigation. Input example: { "ref": "el_4", "text": "browser automation", "submit": true }.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        ref: {
+          type: 'string',
+          description: 'Snapshot-scoped editable element ref returned by browser_snapshot.',
+        },
+        text: {
+          type: 'string',
+          description: 'Text to type. Sensitive fields such as passwords, OTP, or payment fields are blocked by browser policy.',
+        },
+        clear: {
+          type: 'boolean',
+          description: 'Whether to clear the current field value before typing. Defaults to true.',
+        },
+        submit: {
+          type: 'boolean',
+          description: 'Whether to press Enter after typing. Useful for search fields. Defaults to false.',
+        },
+      },
+      required: ['ref', 'text'],
+    },
+    async execute(raw: unknown): Promise<ToolResult> {
+      if (!isBrowserTypeInput(raw)) {
+        return invalidInput('browser_type', 'Required fields: ref, text. Optional fields: clear, submit.');
+      }
+
+      const sessionResult = requireOpenedSession(state, 'browser_type');
+      if (!sessionResult.ok) {
+        return sessionResult.result;
+      }
+
+      const result = await sessionResult.session.type({
+        ref: raw.ref,
+        text: raw.text,
+        clear: raw.clear,
+        submit: raw.submit,
+      });
+      return result.status === 'allowed'
+        ? {
+          ok: true,
+          output: {
+            status: result.status,
+            url: result.data?.finalUrl,
+            actionId: result.actionId,
+          },
+        }
+        : {
+          ok: false,
+          error: result.reason ?? `browser_type was ${result.status}.`,
           output: { status: result.status, url: result.url, actionId: result.actionId },
         };
     },
@@ -368,6 +450,7 @@ async function closeBrowserState(state: BrowserRuntimeState): Promise<Awaited<Re
     state.lease?.release();
     state.session = undefined;
     state.lease = undefined;
+    state.derivedAllowedDomains = undefined;
     state.opened = false;
   }
 }
@@ -385,12 +468,26 @@ function createSessionConfig(
 }
 
 function createPolicyConfig(options: BrowserResearchToolkitOptions, initialUrl?: string): BrowserPolicyConfig {
+  const explicitAllowedDomains = options.allowedDomains.length > 0;
   return {
-    allowedDomains: options.allowedDomains.length > 0
+    allowedDomains: explicitAllowedDomains
       ? options.allowedDomains
       : initialAllowedDomains(initialUrl),
+    adoptFinalOpenDomain: !explicitAllowedDomains,
     maxElementsPerSnapshot: options.maxElementsPerSnapshot,
   };
+}
+
+function shouldRestartDerivedSessionForUrl(
+  options: BrowserResearchToolkitOptions,
+  state: BrowserRuntimeState,
+  url: string,
+): boolean {
+  if (!state.session || options.allowedDomains.length > 0) {
+    return false;
+  }
+
+  return !initialAllowedDomains(url).some((domain) => isAllowedByDomains(domain, state.derivedAllowedDomains ?? []));
 }
 
 function initialAllowedDomains(initialUrl: string | undefined): string[] {
@@ -404,6 +501,17 @@ function initialAllowedDomains(initialUrl: string | undefined): string[] {
   } catch {
     return [];
   }
+}
+
+function isAllowedByDomains(hostname: string, allowedDomains: string[]): boolean {
+  const normalizedHostname = hostname.toLowerCase();
+  return allowedDomains
+    .map((domain) => domain.toLowerCase())
+    .some((domain) => normalizedHostname === domain || normalizedHostname.endsWith(`.${domain}`));
+}
+
+function uniqueDomains(domains: string[]): string[] {
+  return [...new Set(domains)];
 }
 
 function requireOpenedSession(
@@ -443,6 +551,12 @@ function formatSnapshotOutput(snapshot: BrowserSnapshot | undefined): unknown {
       href: element.href,
       rawHref: element.rawHref,
       text: element.text,
+      tagName: element.tagName,
+      inputType: element.inputType,
+      placeholder: element.placeholder,
+      disabled: element.disabled,
+      readonly: element.readonly,
+      editable: element.editable,
     })),
   };
 }
@@ -472,6 +586,19 @@ function isBrowserClickInput(raw: unknown): raw is BrowserClickInput {
   }
 
   return typeof raw.ref === 'string' && raw.ref.trim().length > 0;
+}
+
+function isBrowserTypeInput(raw: unknown): raw is BrowserTypeInput {
+  if (!isPlainObject(raw, ['ref', 'text', 'clear', 'submit'])) {
+    return false;
+  }
+
+  const optionalBooleansAreValid = [raw.clear, raw.submit]
+    .every((value) => value === undefined || typeof value === 'boolean');
+  return typeof raw.ref === 'string'
+    && raw.ref.trim().length > 0
+    && typeof raw.text === 'string'
+    && optionalBooleansAreValid;
 }
 
 function isBrowserScreenshotInput(raw: unknown): raw is BrowserScreenshotInput {

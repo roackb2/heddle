@@ -35,6 +35,9 @@ unwinding chat, server, or web-v2 behavior.
 - Policy must run before browser actions. Prompt instructions are not a safety
   boundary.
 - Element refs are only valid for the snapshot that produced them.
+- When no explicit allowlist exists, a first-open boundary may adopt the final
+  loaded hostname after a browser redirect. This must stay generic; do not add
+  hostnames, locale prefixes, or marketplace-specific redirect assumptions.
 - Snapshot extraction reports browser and DOM facts only. It must not infer
   site-specific route conventions, locale prefixes, storefront paths, account
   sections, or workflow meanings from one observed website. If a page rewrites
@@ -90,6 +93,7 @@ The first supported mode is read-oriented research:
 - open allowlisted public pages;
 - capture a snapshot;
 - click safe snapshot refs;
+- type into editable snapshot refs;
 - capture screenshots;
 - write evidence;
 - block or require approval for unsafe actions.
@@ -169,18 +173,25 @@ HEDDLE_BROWSER_START_URL=https://en.wikipedia.org/wiki/Main_Page \
 yarn example:native-chrome-cdp-spike
 ```
 
-This validates `browser_open`, `browser_snapshot`, `browser_screenshot`, and
-`browser_close` against the user-launched Chrome session. `browser_close`
-detaches from Chrome; it should not close the user's browser process.
+This validates `browser_open`, `browser_snapshot`, `browser_type`,
+`browser_screenshot`, and `browser_close` against the user-launched Chrome
+session. `browser_close` detaches from Chrome; it should not close the user's
+browser process.
 
 These examples intentionally use neutral URLs. The backend must stay
 site-agnostic: users choose the site, profile, port, and policy at runtime, and
 browser code must not encode assumptions from one validation website.
 
-Native CDP `browser_click` is intentionally disabled until the backend can
-preserve the same navigation-policy guarantees as the Playwright driver. Do not
-add click/type/form actions to this backend without retaining Heddle-owned
+Native CDP click and type actions must preserve the same navigation-policy
+guarantees as the Playwright driver. Do not add new input, form, coordinate, or
+JavaScript execution actions to this backend without retaining Heddle-owned
 domain policy and approval semantics.
+
+Native CDP must also reconcile the active page target before reading or acting.
+When a user manually clears a login challenge or CAPTCHA in visible Chrome, the
+successful page may be exposed as a different CDP target from the stale
+challenge page. The CDP backend owns this generic target selection; browser
+policy still owns navigation and action safety.
 
 Run evidence is written under:
 
@@ -193,9 +204,10 @@ Run evidence is written under:
 
 ## Current Non-Goals
 
-- No `type()` action in the first spike.
-- No form submission, cart, checkout, payment, booking, message-send, account
-  mutation, upload, or download flows.
+- No arbitrary coordinate clicking or JavaScript execution actions.
+- No checkout, payment, booking, message-send, account mutation, upload, or
+  download flows.
+- No site-specific shopping, SaaS, social, or account-management policy packs.
+  Cart-like clicks can require approval, but Heddle must not encode assumptions
+  from one shopping website.
 - No live browser preview embedded in the control plane yet.
-- No site-specific shopping, SaaS, social, or account-management policy packs
-  yet.

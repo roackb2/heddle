@@ -13,6 +13,7 @@ import {
   type BrowserDriverLaunchOptions,
   type BrowserDriverSnapshotOptions,
   type BrowserDriverSnapshotResult,
+  type BrowserDriverTypeOptions,
 } from '../../../core/browser/index.js';
 
 describe('BrowserSessionService', () => {
@@ -124,7 +125,7 @@ describe('BrowserSessionService', () => {
 
     expect(result).toMatchObject({
       status: 'blocked',
-      reason: expect.stringContaining('forbidden browser action text'),
+      reason: expect.stringContaining('blocked browser action text'),
     });
     expect(driver.clickedRefs).toEqual([]);
   });
@@ -235,6 +236,76 @@ describe('BrowserSessionService', () => {
     expect(driver.currentUrl()).toBe('https://en.wikipedia.org/wiki/Browser_automation');
   });
 
+  it('types into editable refs and revokes the snapshot after typing', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'heddle-browser-session-type-'));
+    const driver = new FakeBrowserDriver();
+    const session = new BrowserSessionService({
+      profile: {
+        profileId: 'test',
+        userDataDir: join(dir, 'profile'),
+        headless: true,
+      },
+      policy: {
+        allowedDomains: ['wikipedia.org'],
+      },
+      evidenceDir: join(dir, 'run'),
+    }, new FakeBrowserDriverFactory(driver));
+
+    await session.open({ url: 'https://en.wikipedia.org/wiki/Browser_automation' });
+    await session.snapshot();
+
+    await expect(session.type({
+      ref: 'el_6',
+      text: 'browser automation history',
+      submit: true,
+    })).resolves.toMatchObject({
+      status: 'allowed',
+      data: { finalUrl: 'https://en.wikipedia.org/wiki/Special:Search?search=browser+automation+history' },
+    });
+    expect(driver.typedInputs).toEqual([{
+      ref: 'el_6',
+      text: 'browser automation history',
+      clear: true,
+      submit: true,
+    }]);
+
+    await expect(session.type({
+      ref: 'el_6',
+      text: 'stale ref',
+    })).resolves.toMatchObject({
+      status: 'blocked',
+      reason: 'Unknown browser snapshot ref: el_6',
+    });
+  });
+
+  it('blocks sensitive type refs before the driver executes them', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'heddle-browser-session-type-sensitive-'));
+    const driver = new FakeBrowserDriver();
+    const session = new BrowserSessionService({
+      profile: {
+        profileId: 'test',
+        userDataDir: join(dir, 'profile'),
+        headless: true,
+      },
+      policy: {
+        allowedDomains: ['wikipedia.org'],
+      },
+      evidenceDir: join(dir, 'run'),
+    }, new FakeBrowserDriverFactory(driver));
+
+    await session.open({ url: 'https://en.wikipedia.org/wiki/Browser_automation' });
+    await session.snapshot();
+
+    await expect(session.type({
+      ref: 'el_7',
+      text: 'secret',
+    })).resolves.toMatchObject({
+      status: 'blocked',
+      reason: expect.stringContaining('sensitive'),
+    });
+    expect(driver.typedInputs).toEqual([]);
+  });
+
   it('passes the snapshot max element cap to the browser driver', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'heddle-browser-session-cap-'));
     const driver = new FakeBrowserDriver();
@@ -268,6 +339,7 @@ class FakeBrowserDriverFactory implements BrowserDriverFactory {
 
 class FakeBrowserDriver implements BrowserDriver {
   clickedRefs: string[] = [];
+  typedInputs: Array<{ ref: string; text: string; clear: boolean; submit: boolean }> = [];
   snapshotOptions: BrowserDriverSnapshotOptions[] = [];
   private url = 'about:blank';
 
@@ -318,6 +390,23 @@ class FakeBrowserDriver implements BrowserDriver {
           href: 'https://en.wikipedia.org/wiki/Safe_redirect',
           tagName: 'a',
         },
+        {
+          ref: 'el_6',
+          role: 'searchbox',
+          name: 'Search Wikipedia',
+          placeholder: 'Search Wikipedia',
+          inputType: 'search',
+          tagName: 'input',
+          editable: true,
+        },
+        {
+          ref: 'el_7',
+          role: 'textbox',
+          name: 'Password',
+          inputType: 'password',
+          tagName: 'input',
+          editable: true,
+        },
       ],
     };
   }
@@ -329,6 +418,24 @@ class FakeBrowserDriver implements BrowserDriver {
     }
 
     this.clickedRefs.push(ref);
+    this.url = nextUrl;
+    return this.url;
+  }
+
+  async type(ref: string, options: BrowserDriverTypeOptions): Promise<string> {
+    const nextUrl = options.submit
+      ? `https://en.wikipedia.org/wiki/Special:Search?search=${options.text.replaceAll(' ', '+')}`
+      : this.url;
+    if (!(options.canNavigateTo?.(nextUrl) ?? true)) {
+      throw new Error('navigation blocked by browser guard');
+    }
+
+    this.typedInputs.push({
+      ref,
+      text: options.text,
+      clear: options.clear,
+      submit: options.submit,
+    });
     this.url = nextUrl;
     return this.url;
   }

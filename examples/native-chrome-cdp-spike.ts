@@ -7,7 +7,8 @@
 //
 // This validates the first native Chrome backend slice without involving an
 // LLM. It attaches to user-launched Chrome, opens a URL, captures a snapshot,
-// captures a screenshot, then detaches.
+// types into a search field when one is visible, captures a screenshot, then
+// detaches.
 // ---------------------------------------------------------------------------
 
 import { join } from 'node:path';
@@ -23,6 +24,9 @@ type SnapshotOutput = {
     role: string;
     name: string;
     href?: string;
+    editable?: boolean;
+    placeholder?: string;
+    inputType?: string;
   }>;
 };
 
@@ -57,10 +61,30 @@ async function main() {
     }
 
     const snapshot = await runTool(toolMap.browser_snapshot, {});
-    const snapshotOutput = snapshot.output as SnapshotOutput | undefined;
+    let snapshotOutput = snapshot.output as SnapshotOutput | undefined;
     console.log(`[browser_snapshot] title=${snapshotOutput?.title ?? ''} url=${snapshotOutput?.url ?? ''}`);
     for (const element of (snapshotOutput?.elements ?? []).slice(0, 10)) {
       console.log(`  ${element.ref} ${element.role} ${element.name}${element.href ? ` -> ${element.href}` : ''}`);
+    }
+
+    const searchField = (snapshotOutput?.elements ?? []).find((element) => element.editable && (
+      element.role === 'searchbox'
+      || element.inputType === 'search'
+      || element.placeholder?.toLowerCase().includes('search')
+      || element.name.toLowerCase().includes('search')
+    ));
+    if (searchField) {
+      const typed = await runTool(toolMap.browser_type, {
+        ref: searchField.ref,
+        text: 'browser automation history',
+        submit: true,
+      });
+      console.log(`[browser_type] ${searchField.name}: ${formatResult(typed)}`);
+      const afterTypeSnapshot = await runTool(toolMap.browser_snapshot, {});
+      snapshotOutput = afterTypeSnapshot.output as SnapshotOutput | undefined;
+      console.log(`[browser_snapshot] after type title=${snapshotOutput?.title ?? ''} url=${snapshotOutput?.url ?? ''}`);
+    } else {
+      console.log('[browser_type] skipped: no editable search field found');
     }
 
     const screenshot = await runTool(toolMap.browser_screenshot, { name: 'native-chrome-cdp-page' });

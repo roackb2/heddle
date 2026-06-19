@@ -17,8 +17,8 @@ can still import Heddle normally, and browser hosts may either install
 
 - Tool input validation for browser research actions.
 - A single lazy browser session shared across the toolkit tools.
-- Human-readable tool outputs for browser open, snapshot, click, screenshot,
-  and close actions.
+- Human-readable tool outputs for browser open, snapshot, click, type,
+  screenshot, and close actions.
 
 ## Does Not Own
 
@@ -26,8 +26,7 @@ can still import Heddle normally, and browser hosts may either install
   Those stay in `src/core/browser`.
 - Approval UI or pending approval coordination.
 - The Browser Automation capability switch and default runtime tool composition.
-- Form typing, transactions, checkout, payment, booking, messaging, uploads, or
-  downloads.
+- Transactions, checkout, payment, booking, messaging, uploads, or downloads.
 
 ## Flow
 
@@ -35,8 +34,10 @@ can still import Heddle normally, and browser hosts may either install
 2. `browser_snapshot` returns snapshot-scoped refs.
 3. `browser_click` accepts one current snapshot ref and lets browser policy
    decide whether the click is allowed.
-4. `browser_screenshot` records a screenshot artifact.
-5. `browser_close` closes the driver and releases the profile lease.
+4. `browser_type` accepts one editable current snapshot ref, types text, and
+   can submit with Enter for search/navigation.
+5. `browser_screenshot` records a screenshot artifact.
+6. `browser_close` closes the driver and releases the profile lease.
 
 If browser policy blocks or requires approval for an action, the tool returns a
 failed tool result instead of executing the browser driver action.
@@ -44,6 +45,15 @@ failed tool result instead of executing the browser driver action.
 When `allowedDomains` is empty, `browser_open` derives the session allowlist
 from the first opened URL. Subsequent clicks remain same-domain unless a host
 provides a broader explicit allowlist.
+
+A later `browser_open` to a different requested domain closes the current
+derived session and starts a fresh browser run. This keeps one task from being
+trapped by a previous task's site boundary while preserving same-domain policy
+inside each run.
+
+If the first open redirects to a regional or canonical hostname, the browser
+domain adopts that final loaded hostname into the derived boundary. Do not solve
+this by adding site-specific redirect assumptions here.
 
 For the native Chrome CDP backend, `browser_open` is also the task entrypoint.
 If the configured local CDP endpoint is not reachable, the toolkit asks the
@@ -64,7 +74,7 @@ yarn example:browser-research-toolkit:headed
 The example calls the tools directly in this order:
 
 ```text
-browser_open -> browser_snapshot -> browser_click -> browser_screenshot -> browser_close
+browser_open -> browser_snapshot -> browser_type -> browser_snapshot -> browser_click -> browser_screenshot -> browser_close
 ```
 
 This validates the tool boundary an agent will eventually use, but it still does

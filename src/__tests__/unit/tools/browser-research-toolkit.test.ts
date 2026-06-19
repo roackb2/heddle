@@ -12,6 +12,7 @@ import type {
   BrowserDriverLaunchOptions,
   BrowserDriverSnapshotOptions,
   BrowserDriverSnapshotResult,
+  BrowserDriverTypeOptions,
   NativeChromeConnectionStatus,
   NativeChromeLaunchInput,
   NativeChromeLaunchResult,
@@ -19,7 +20,7 @@ import type {
 import type { ToolDefinition } from '../../../core/types.js';
 
 describe('createBrowserResearchToolkit', () => {
-  it('requires browser_open before snapshot, click, or screenshot', async () => {
+  it('requires browser_open before snapshot, click, type, or screenshot', async () => {
     const { tools } = await createTools();
 
     await expect(tools.browser_snapshot.execute({})).resolves.toMatchObject({
@@ -29,6 +30,10 @@ describe('createBrowserResearchToolkit', () => {
     await expect(tools.browser_click.execute({ ref: 'el_1' })).resolves.toMatchObject({
       ok: false,
       error: 'browser_click requires browser_open to complete successfully first.',
+    });
+    await expect(tools.browser_type.execute({ ref: 'el_3', text: 'browser automation' })).resolves.toMatchObject({
+      ok: false,
+      error: 'browser_type requires browser_open to complete successfully first.',
     });
     await expect(tools.browser_screenshot.execute({})).resolves.toMatchObject({
       ok: false,
@@ -65,6 +70,14 @@ describe('createBrowserResearchToolkit', () => {
               name: 'History',
               href: 'https://en.wikipedia.org/wiki/History',
               rawHref: '/wiki/History',
+            }),
+            expect.objectContaining({
+              ref: 'el_3',
+              role: 'searchbox',
+              name: 'Search Wikipedia',
+              placeholder: 'Search Wikipedia',
+              inputType: 'search',
+              editable: true,
             }),
           ]),
         },
@@ -202,6 +215,77 @@ describe('createBrowserResearchToolkit', () => {
     expect(driver.clickedRefs).toEqual([]);
   });
 
+  it('starts a fresh derived browser session when browser_open targets a different domain', async () => {
+    const { tools, driver, driverFactory } = await createTools({ allowedDomains: [] });
+
+    await expect(tools.browser_open.execute({ url: 'https://example.com' }))
+      .resolves
+      .toMatchObject({ ok: true });
+    await expect(tools.browser_open.execute({ url: 'https://shopee.tw' }))
+      .resolves
+      .toMatchObject({
+        ok: true,
+        output: {
+          url: 'https://shopee.tw',
+        },
+      });
+
+    expect(driver.closedCount).toBe(1);
+    expect(driverFactory.launchCount).toBe(2);
+    expect(driver.openedUrls).toEqual(['https://example.com', 'https://shopee.tw']);
+  });
+
+  it('adopts the final first-open URL when a requested site redirects to a regional domain', async () => {
+    const { tools } = await createTools({
+      allowedDomains: [],
+      driver: new FakeBrowserDriver({
+        redirects: {
+          'https://shopee.com': 'https://shopee.tw',
+        },
+      }),
+    });
+
+    await expect(tools.browser_open.execute({ url: 'https://shopee.com' }))
+      .resolves
+      .toMatchObject({
+        ok: true,
+        output: {
+          status: 'allowed',
+          url: 'https://shopee.tw',
+        },
+      });
+  });
+
+  it('types into editable snapshot refs and can submit search/navigation', async () => {
+    const { tools, driver } = await createTools();
+
+    await tools.browser_open.execute({ url: 'https://en.wikipedia.org/wiki/Browser_automation' });
+    await tools.browser_snapshot.execute({});
+
+    await expect(tools.browser_type.execute({
+      ref: 'el_3',
+      text: 'browser automation history',
+      submit: true,
+    })).resolves.toMatchObject({
+      ok: true,
+      output: {
+        status: 'allowed',
+        url: 'https://en.wikipedia.org/wiki/Special:Search?search=browser+automation+history',
+      },
+    });
+
+    expect(driver.typedInputs).toEqual([{
+      ref: 'el_3',
+      text: 'browser automation history',
+      clear: true,
+      submit: true,
+    }]);
+    await expect(tools.browser_click.execute({ ref: 'el_1' })).resolves.toMatchObject({
+      ok: false,
+      error: 'Unknown browser snapshot ref: el_1',
+    });
+  });
+
   it('captures screenshots and releases profile locks on close', async () => {
     const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-browser-toolkit-close-'));
     const first = await createTools({ stateRoot });
@@ -280,6 +364,7 @@ describe('createBrowserResearchToolkit', () => {
       'browser_open',
       'browser_snapshot',
       'browser_click',
+      'browser_type',
       'browser_screenshot',
       'browser_close',
     ]);
@@ -317,7 +402,7 @@ async function createTools(options: {
   return {
     driver,
     driverFactory,
-    tools: tools as Record<'browser_open' | 'browser_snapshot' | 'browser_click' | 'browser_screenshot' | 'browser_close', ToolDefinition>,
+    tools: tools as Record<'browser_open' | 'browser_snapshot' | 'browser_click' | 'browser_type' | 'browser_screenshot' | 'browser_close', ToolDefinition>,
   };
 }
 
@@ -333,23 +418,32 @@ function context(stateRoot: string): ToolToolkitContext {
 
 class FakeBrowserDriverFactory implements BrowserDriverFactory {
   launchOptions?: BrowserDriverLaunchOptions;
+  launchCount = 0;
 
   constructor(private readonly driver: BrowserDriver) {}
 
   async launch(options: BrowserDriverLaunchOptions): Promise<BrowserDriver> {
     this.launchOptions = options;
+    this.launchCount += 1;
     return this.driver;
   }
 }
 
 class FakeBrowserDriver implements BrowserDriver {
   clickedRefs: string[] = [];
+  typedInputs: Array<{ ref: string; text: string; clear: boolean; submit: boolean }> = [];
+  openedUrls: string[] = [];
+  closedCount = 0;
   private url = 'about:blank';
 
-  constructor(private readonly options: { ariaSnapshot?: string } = {}) {}
+  constructor(private readonly options: {
+    ariaSnapshot?: string;
+    redirects?: Record<string, string>;
+  } = {}) {}
 
   async open(url: string): Promise<string> {
-    this.url = url;
+    this.openedUrls.push(url);
+    this.url = this.options.redirects?.[url] ?? url;
     return this.url;
   }
 
@@ -375,6 +469,15 @@ class FakeBrowserDriver implements BrowserDriver {
           rawHref: 'https://example.com/source',
           tagName: 'a',
         },
+        {
+          ref: 'el_3',
+          role: 'searchbox',
+          name: 'Search Wikipedia',
+          placeholder: 'Search Wikipedia',
+          inputType: 'search',
+          tagName: 'input',
+          editable: true,
+        },
       ],
     };
   }
@@ -385,9 +488,24 @@ class FakeBrowserDriver implements BrowserDriver {
     return this.url;
   }
 
+  async type(ref: string, options: BrowserDriverTypeOptions): Promise<string> {
+    this.typedInputs.push({
+      ref,
+      text: options.text,
+      clear: options.clear,
+      submit: options.submit,
+    });
+    if (options.submit) {
+      this.url = `https://en.wikipedia.org/wiki/Special:Search?search=${options.text.replaceAll(' ', '+')}`;
+    }
+    return this.url;
+  }
+
   async screenshot(_path: string): Promise<void> {}
 
-  async close(): Promise<void> {}
+  async close(): Promise<void> {
+    this.closedCount += 1;
+  }
 
   currentUrl(): string | undefined {
     return this.url;

@@ -39,7 +39,7 @@ When it is on, Heddle teaches the agent when browser automation is appropriate:
 visual inspection for frontend work, user-requested website automation, web
 research, and workflows where rendered browser state matters. Future default
 agent turns also receive `browser_open`, `browser_snapshot`, `browser_click`,
-`browser_screenshot`, and `browser_close`.
+`browser_type`, `browser_screenshot`, and `browser_close`.
 
 If no explicit domain allowlist is configured, the first successful
 `browser_open` URL establishes the same-domain browsing boundary for that

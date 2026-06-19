@@ -50,6 +50,55 @@ describe('BrowserPolicyService', () => {
     });
   });
 
+  it('requires approval for cart-like click targets', () => {
+    const policy = new BrowserPolicyService({ allowedDomains: ['shop.example'] });
+
+    expect(policy.evaluateClick({
+      ref: 'el_1',
+      role: 'button',
+      name: 'Add to cart',
+      text: 'Add to cart',
+      tagName: 'button',
+    })).toMatchObject({
+      status: 'approvalRequired',
+      risk: 'medium',
+      reason: expect.stringContaining('requires approval'),
+    });
+  });
+
+  it('allows ordinary editable search fields', () => {
+    const policy = new BrowserPolicyService({ allowedDomains: ['shop.example'] });
+
+    expect(policy.evaluateType({
+      ref: 'el_1',
+      role: 'searchbox',
+      name: 'Search products',
+      placeholder: 'Search',
+      tagName: 'input',
+      inputType: 'search',
+      editable: true,
+    })).toMatchObject({
+      status: 'allowed',
+      risk: 'low',
+    });
+  });
+
+  it('blocks sensitive typing targets', () => {
+    const policy = new BrowserPolicyService({ allowedDomains: ['shop.example'] });
+
+    expect(policy.evaluateType({
+      ref: 'el_1',
+      role: 'textbox',
+      name: 'Password',
+      tagName: 'input',
+      inputType: 'password',
+      editable: true,
+    })).toMatchObject({
+      status: 'blocked',
+      risk: 'high',
+    });
+  });
+
   it('requires approval for click targets that navigate off-domain', () => {
     const policy = new BrowserPolicyService({ allowedDomains: ['wikipedia.org'] });
 
@@ -93,7 +142,7 @@ describe('BrowserPolicyService', () => {
     })).toMatchObject({
       status: 'blocked',
       risk: 'high',
-      reason: expect.stringContaining('forbidden browser action text'),
+      reason: expect.stringContaining('blocked browser action text'),
     });
   });
 });
