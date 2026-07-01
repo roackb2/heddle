@@ -12,6 +12,14 @@ reject duplicate names, and then apply the same tool profile filtering used for
 custom agents. Tool execution, approval, and trace recording still happen in
 the normal agent loop path.
 
+Programmatic hosts can also pass additional `ToolToolkit` values. Runtime tools
+compose host toolkits after the default toolkit list, using the same
+duplicate-id and duplicate-tool-name checks as built-in toolkits.
+
+Artifact tools are part of the default runtime bundle. They expose the generic
+artifact registry through ordinary tools while keeping persistence semantics in
+`src/core/artifacts`.
+
 ## Tool Profiles
 
 `profiles/` owns runtime tool visibility profiles. A profile is an execution-time

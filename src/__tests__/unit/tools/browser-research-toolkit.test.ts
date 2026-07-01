@@ -410,6 +410,7 @@ function context(stateRoot: string): ToolToolkitContext {
   return {
     workspaceRoot: process.cwd(),
     stateRoot,
+    artifactRoot: join(stateRoot, 'artifacts'),
     model: 'gpt-5.1-codex-mini',
     memoryDir: join(stateRoot, 'memory'),
     memoryMode: 'none',

@@ -45,6 +45,7 @@ async function main() {
   }).createTools({
     workspaceRoot: process.cwd(),
     stateRoot: STATE_ROOT,
+    artifactRoot: join(STATE_ROOT, 'artifacts'),
     model: 'gpt-5.1-codex-mini',
     memoryDir: join(STATE_ROOT, 'memory'),
     memoryMode: 'none',

@@ -7,6 +7,7 @@ const MUTATION_CAPABILITIES = new Set([
   'workspace.write',
   'shell.mutate',
   'memory.write',
+  'artifact.write',
   'browser.action',
 ]);
 

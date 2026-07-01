@@ -7,6 +7,7 @@ import type { ChatSession } from '@/core/chat/types.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import type { ChatTurnHostPort } from './host/index.js';
 import type { ToolDefinition } from '@/core/types.js';
+import type { ToolToolkit } from '@/core/tools/index.js';
 
 export type RunConversationTurnArgs = {
   workspaceRoot: string;
@@ -26,6 +27,9 @@ export type RunConversationTurnArgs = {
   host?: ChatTurnHostPort;
   approvalPolicies?: ToolApprovalPolicy[];
   tools?: ToolDefinition[];
+  toolkits?: ToolToolkit[];
+  artifactRoot: string;
+  artifactsEnabled: boolean;
   agentProfileId?: string;
   agentSnapshot?: CustomAgentExecutionSnapshot;
   traceSummarizerRegistry?: TraceSummaryService;
@@ -49,6 +53,9 @@ export type TurnRuntimeConfigInput = Pick<
   | 'memoryMaintenanceMode'
   | 'approvalPolicies'
   | 'tools'
+  | 'toolkits'
+  | 'artifactRoot'
+  | 'artifactsEnabled'
   | 'traceSummarizerRegistry'
 >;
 

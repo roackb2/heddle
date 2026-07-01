@@ -5,6 +5,8 @@ export type ToolCapability =
   | 'shell.mutate'
   | 'memory.read'
   | 'memory.write'
+  | 'artifact.read'
+  | 'artifact.write'
   | 'external.read'
   | 'browser.read'
   | 'browser.action'

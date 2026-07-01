@@ -11,6 +11,7 @@ import type { ChatSession } from '../../../core/chat/types.js';
 import { TraceSummaryService } from '@/core/observability/index.js';
 import type { LlmAdapter } from '@/core/llm/types.js';
 import type { ToolDefinition } from '../../../core/types.js';
+import type { ToolToolkit } from '../../../core/tools/index.js';
 
 describe('createConversationEngine', () => {
   beforeEach(() => {
@@ -67,15 +68,28 @@ describe('createConversationEngine', () => {
     }));
   });
 
-  it('passes engine-level host tools into submitted turns', async () => {
+  it('passes host extensions into submitted turns', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-host-tools-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    const hostTools = [tool('slidex_create_deck')];
+    const hostTools = [tool('host_create_document')];
+    const hostToolkits: ToolToolkit[] = [{
+      id: 'host.documents',
+      createTools: () => [tool('host_validate_document')],
+    }];
     const engine = createConversationEngine({
       workspaceRoot,
       stateRoot,
       model: 'gpt-5.4',
-      tools: hostTools,
+      systemContext: 'Base context',
+      hostExtensions: {
+        tools: hostTools,
+        toolkits: hostToolkits,
+        systemContext: 'Host context',
+        artifacts: {
+          root: join(stateRoot, 'custom-artifacts'),
+          enabled: false,
+        },
+      },
       apiKeyPresent: true,
     });
     const session = engine.sessions.create({ id: 'session-1', name: 'Host tools' });
@@ -87,8 +101,37 @@ describe('createConversationEngine', () => {
 
     expect(EngineConversationTurnService.run).toHaveBeenCalledWith(expect.objectContaining({
       tools: hostTools,
+      toolkits: hostToolkits,
+      systemContext: 'Base context\n\nHost context',
+      artifactRoot: join(stateRoot, 'custom-artifacts'),
+      artifactsEnabled: false,
       sessionId: session.id,
       prompt: 'Create a deck',
+    }));
+  });
+
+  it('keeps top-level host tools as a compatibility input', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-legacy-host-tools-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const hostTools = [tool('legacy_host_tool')];
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      tools: hostTools,
+      apiKeyPresent: true,
+    });
+    const session = engine.sessions.create({ id: 'session-1', name: 'Legacy host tools' });
+
+    await engine.turns.submit({
+      sessionId: session.id,
+      prompt: 'Use host tool',
+    });
+
+    expect(EngineConversationTurnService.run).toHaveBeenCalledWith(expect.objectContaining({
+      tools: hostTools,
+      artifactRoot: join(stateRoot, 'artifacts'),
+      artifactsEnabled: true,
     }));
   });
 

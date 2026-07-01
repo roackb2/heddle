@@ -16,6 +16,7 @@ export type ChatTurnRuntime = {
 export type ConversationTurnRuntimeConfig = ApiKeyRuntime & {
   stateRoot: string;
   systemContext?: string;
+  artifactsEnabled?: boolean;
   env?: Pick<NodeJS.ProcessEnv, 'OPENAI_MODEL' | 'ANTHROPIC_MODEL'>;
 };
 

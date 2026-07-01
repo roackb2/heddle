@@ -84,11 +84,36 @@ describe('chat turn preparation modules', () => {
     expect(runtime.systemContext).toContain('System context');
     expect(runtime.systemContext).toContain('## Situation Awareness Domain');
     expect(runtime.systemContext).toContain('you MUST call project_dashboard before deeper repo inspection or explanation');
+    expect(runtime.systemContext).toContain('## Artifact Domain');
+    expect(runtime.systemContext).toContain('Use artifact_dashboard before editing or continuing an existing generated output');
     expect(runtime.systemContext).toContain('## Heddle-Managed Memory Domain');
     expect(runtime.systemContext?.indexOf('## Situation Awareness Domain')).toBeLessThan(
+      runtime.systemContext?.indexOf('## Artifact Domain') ?? Infinity,
+    );
+    expect(runtime.systemContext?.indexOf('## Artifact Domain')).toBeLessThan(
       runtime.systemContext?.indexOf('## Heddle-Managed Memory Domain') ?? Infinity,
     );
     expect(runtime.llm.info?.model).toBe('gpt-5.4');
+  });
+
+  it('omits artifact domain guidance when artifacts are disabled', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-turn-runtime-no-artifacts-'));
+    const stateRoot = join(root, '.heddle');
+    mkdirSync(join(stateRoot, 'memory'), { recursive: true });
+
+    const runtime = ConversationTurnRuntimeResolver.resolve({
+      config: {
+        stateRoot,
+        apiKey: 'explicit-key',
+        artifactsEnabled: false,
+        env: { OPENAI_MODEL: undefined, ANTHROPIC_MODEL: undefined },
+      },
+      session: { model: 'gpt-5.4' },
+    });
+
+    expect(runtime.systemContext).toContain('## Situation Awareness Domain');
+    expect(runtime.systemContext).toContain('## Heddle-Managed Memory Domain');
+    expect(runtime.systemContext).not.toContain('## Artifact Domain');
   });
 
   it('carries stored session reasoning effort into the turn runtime', () => {
@@ -231,6 +256,11 @@ describe('chat turn preparation modules', () => {
       'search_memory_notes',
       'memory_checkpoint',
       'record_knowledge',
+      'artifact_dashboard',
+      'list_artifacts',
+      'read_artifact',
+      'save_artifact',
+      'set_current_artifact',
       'update_plan',
       'run_shell_inspect',
       'run_shell_mutate',
@@ -270,6 +300,9 @@ describe('chat turn preparation modules', () => {
       'search_files',
       'run_shell_inspect',
       'read_agent_skill',
+      'artifact_dashboard',
+      'list_artifacts',
+      'read_artifact',
     ]));
     expect(context.toolNames).not.toEqual(expect.arrayContaining([
       'edit_file',
@@ -278,6 +311,8 @@ describe('chat turn preparation modules', () => {
       'run_shell_mutate',
       'memory_checkpoint',
       'record_knowledge',
+      'save_artifact',
+      'set_current_artifact',
       'mcp_call_tool',
     ]));
   });
@@ -299,12 +334,12 @@ describe('chat turn preparation modules', () => {
       sessionStoragePath,
       sessionId: 'session-1',
       apiKey: 'explicit-key',
-      tools: [tool('slidex_create_deck')],
+      tools: [tool('host_create_document')],
     });
 
     expect(context.toolNames).toEqual(expect.arrayContaining([
       'read_file',
-      'slidex_create_deck',
+      'host_create_document',
     ]));
   });
 
@@ -534,6 +569,9 @@ function askAgentSnapshot(): CustomAgentExecutionSnapshot {
         'search_files',
         'run_shell_inspect',
         'read_agent_skill',
+        'artifact_dashboard',
+        'list_artifacts',
+        'read_artifact',
       ],
       memoryMode: 'none',
     },

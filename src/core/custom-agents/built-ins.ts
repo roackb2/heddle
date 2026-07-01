@@ -7,6 +7,9 @@ const INSPECT_TOOLS = [
   'search_files',
   'run_shell_inspect',
   'read_agent_skill',
+  'artifact_dashboard',
+  'list_artifacts',
+  'read_artifact',
 ];
 
 export const BUILT_IN_CUSTOM_AGENTS: CustomAgentDefinition[] = [

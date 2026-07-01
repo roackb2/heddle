@@ -72,6 +72,7 @@ async function main() {
   const tools = browserToolkit.createTools({
     workspaceRoot: process.cwd(),
     stateRoot: STATE_ROOT,
+    artifactRoot: join(STATE_ROOT, 'artifacts'),
     model,
     apiKey,
     providerCredentialSource: credentialSource,

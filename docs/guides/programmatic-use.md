@@ -139,18 +139,26 @@ context. The model can then call `read_agent_skill` to read one active
 Skills are instructions, not permissions. Hosts still own approval callbacks,
 tool policy, workspace boundaries, and any UI needed for activation management.
 
-## Host-Provided Tools
+## Host Extensions
 
-Programmatic hosts can add their own tool definitions at engine creation time.
-Heddle appends these host-provided tools to the default runtime bundle before
-applying custom-agent tool profiles.
+Programmatic hosts can add their own domain capabilities at engine creation
+time. `hostExtensions.tools` accepts ordinary `ToolDefinition` values.
+`hostExtensions.toolkits` accepts `ToolToolkit` values that receive the resolved
+runtime context and can create tools from host state.
+
+Heddle appends host-provided tools and toolkits to the default runtime bundle
+before applying custom-agent tool profiles.
 
 ```ts
-import { createConversationEngine, type ToolDefinition } from '@roackb2/heddle'
+import {
+  createConversationEngine,
+  type ToolDefinition,
+  type ToolToolkit,
+} from '@roackb2/heddle'
 
 const createDeckTool: ToolDefinition = {
-  name: 'slidex_create_deck',
-  description: 'Create a SlideX deck from a structured brief.',
+  name: 'create_project_brief',
+  description: 'Create a project brief from a structured prompt.',
   capabilities: ['workspace.write'],
   parameters: {
     type: 'object',
@@ -164,18 +172,68 @@ const createDeckTool: ToolDefinition = {
   },
 }
 
+const projectBriefToolkit: ToolToolkit = {
+  id: 'project-brief',
+  createTools(context) {
+    return [
+      {
+        ...createDeckTool,
+        description: `${createDeckTool.description} Workspace: ${context.workspaceRoot}`,
+      },
+    ]
+  },
+}
+
 const engine = createConversationEngine({
   workspaceRoot: process.cwd(),
   stateRoot: `${process.cwd()}/.heddle`,
   model: 'gpt-5.4',
-  tools: [createDeckTool],
+  hostExtensions: {
+    toolkits: [projectBriefToolkit],
+    systemContext: 'When generating durable outputs, save source and preview files as artifacts.',
+  },
 })
 ```
 
 Host tools must use unique names. If a host tool collides with a built-in tool
-name, Heddle rejects the runtime bundle instead of silently overriding behavior.
-Use `capabilities` when you want custom-agent tool profiles to filter host tools
-by read/write or domain-specific access.
+name, Heddle rejects the runtime bundle instead of silently overriding
+behavior. Host toolkits must also use unique toolkit ids.
+
+Use `capabilities` when you want custom-agent tool profiles to filter host
+tools by read/write or domain-specific access. `tools` is still accepted at the
+top level for compatibility, but new hosts should prefer
+`hostExtensions.tools`.
+
+## Artifact Tools
+
+The default runtime bundle includes generic artifact tools:
+
+- `artifact_dashboard`
+- `list_artifacts`
+- `read_artifact`
+- `save_artifact`
+- `set_current_artifact`
+
+Artifacts are stored under `stateRoot/artifacts` by default. Programmatic hosts
+can override the root or disable artifact tools:
+
+```ts
+const engine = createConversationEngine({
+  workspaceRoot: process.cwd(),
+  stateRoot: `${process.cwd()}/.heddle`,
+  model: 'gpt-5.4',
+  hostExtensions: {
+    artifacts: {
+      root: `${process.cwd()}/.heddle/project-artifacts`,
+      enabled: true,
+    },
+  },
+})
+```
+
+Artifact tools are general. A presentation host can save MotionDoc source and
+HTML preview artifacts, while another host can save reports, diagrams, JSON
+outputs, or generated documents through the same runtime path.
 
 ## Host Callbacks
 
