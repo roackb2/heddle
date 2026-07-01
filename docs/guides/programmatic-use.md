@@ -218,6 +218,106 @@ Host tools must use unique names. If a host tool collides with a built-in tool
 name, Heddle rejects the runtime bundle instead of silently overriding
 behavior. Host toolkits must also use unique toolkit ids.
 
+### MCP Host Extensions
+
+If your host already has an MCP server, you do not need to copy every MCP tool
+schema into hand-written Heddle tools. Configure and refresh the MCP server in
+Heddle state, then use `defineMcpHostExtension(...)` to expose selected cached
+MCP tools as a host extension.
+
+This is useful when a host wants a domain-specific prompt, artifact behavior, or
+tool naming surface while still letting MCP own the tool schemas and call
+protocol.
+
+```ts
+import {
+  createConversationEngine,
+  defineMcpHostExtension,
+  prepareMcpHostExtension,
+} from '@roackb2/heddle'
+
+const presentation = await prepareMcpHostExtension({
+  id: 'presentation',
+  workspaceRoot: process.cwd(),
+  stateRoot: `${process.cwd()}/.heddle`,
+  serverId: 'slides',
+  server: {
+    type: 'stdio',
+    command: 'npm',
+    args: ['run', 'mcp'],
+    tools: {
+      approval: 'never',
+    },
+  },
+  includeTools: ['create_deck', 'validate_deck', 'export_html'],
+  systemContext: [
+    'Use presentation tools when the user asks for deck creation or revision.',
+    'Save reusable source and preview outputs as artifacts when appropriate.',
+  ].join('\n'),
+  artifacts: {
+    enabled: true,
+  },
+})
+
+if (!presentation.ok) {
+  throw new Error(`Failed to prepare MCP extension: ${presentation.step}: ${presentation.error}`)
+}
+
+const knowledgeBaseExtension = defineMcpHostExtension({
+  id: 'knowledge-base',
+  serverId: 'notion',
+  includeTools: ['search_pages', 'create_page'],
+  systemContext: 'Use the knowledge base tools for durable team documentation.',
+})
+
+const engine = createConversationEngine({
+  workspaceRoot: process.cwd(),
+  stateRoot: `${process.cwd()}/.heddle`,
+  model: 'gpt-5.4',
+  hostExtensions: [
+    presentation.extension,
+    knowledgeBaseExtension,
+  ],
+})
+```
+
+By default, Heddle keeps the MCP tool names, descriptions, and input schemas
+from the cached MCP catalog. Use `toolNamePrefix` only when multiple MCP
+servers expose overlapping tool names in the same engine:
+
+```ts
+const presentationExtension = defineMcpHostExtension({
+  id: 'presentation',
+  serverId: 'slides',
+  includeTools: ['create_deck'],
+  toolNamePrefix: 'slides',
+})
+```
+
+Use `toolOverrides` only when the host needs a sharper name, description,
+capability, or approval behavior:
+
+```ts
+const presentationExtension = defineMcpHostExtension({
+  id: 'presentation',
+  serverId: 'slides',
+  includeTools: ['create_deck'],
+  toolOverrides: {
+    create_deck: {
+      name: 'presentation_create_deck',
+      description: 'Create a deck using the host presentation workspace.',
+      capabilities: ['workspace.write'],
+    },
+  },
+})
+```
+
+`defineMcpHostExtension(...)` reads the cached MCP catalog when a turn builds
+its tool bundle. It does not launch MCP servers or refresh catalogs during the
+turn. Use `prepareMcpHostExtension(...)` before creating the engine when your
+host owns the MCP server definition. That keeps turn startup synchronous and
+predictable while still giving SDK hosts a one-call setup path.
+
 Use `capabilities` when you want custom-agent tool profiles to filter host
 tools by read/write or domain-specific access. `tools` is still accepted at the
 top level for compatibility, but new hosts should prefer

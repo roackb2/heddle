@@ -1,5 +1,19 @@
 export { createConversationEngine } from './conversation-engine.js';
 export { defineHostExtension, ConversationEngineHostExtensionService } from './host-extension.js';
+export {
+  defineMcpHostExtension,
+  McpHostExtensionService,
+  prepareMcpHostExtension,
+  prepareMcpHostExtensionCatalog,
+} from './mcp-host-extension.js';
+export type {
+  DefineMcpHostExtensionOptions,
+  McpHostToolOverride,
+  PrepareMcpHostExtensionOptions,
+  PrepareMcpHostExtensionResult,
+  PrepareMcpHostExtensionCatalogOptions,
+  PrepareMcpHostExtensionCatalogResult,
+} from './mcp-host-extension.js';
 export { EngineConversationTurnService } from './turns/service.js';
 export type { RunConversationTurnArgs, RunConversationTurnResult } from './turns/types.js';
 export type {
