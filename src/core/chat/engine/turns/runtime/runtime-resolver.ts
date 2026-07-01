@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
 import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
+import { appendArtifactDomainSystemContext } from '@/core/artifacts/domain-prompt.js';
 import { appendAwarenessDomainSystemContext } from '@/core/awareness/domain-prompt.js';
 import { MemoryCatalogService } from '@/core/memory/catalog.js';
 import type { ApiKeyRuntime } from '@/core/runtime/credentials/index.js';
@@ -35,15 +36,20 @@ export class ConversationTurnRuntimeResolver {
 
     const apiKey = config.apiKey ?? providerRuntime.apiKey;
     const memoryDir = join(config.stateRoot, 'memory');
+    const memorySystemContext = new MemoryCatalogService(memoryDir).appendCatalogSystemContext({
+      systemContext: config.systemContext,
+    });
+    const domainSystemContext = config.artifactsEnabled === false
+      ? memorySystemContext
+      : appendArtifactDomainSystemContext(memorySystemContext);
+
     return {
       model,
       provider: providerRuntime.provider,
       apiKey,
       providerCredentialSource: providerRuntime.credentialSource,
       memoryDir,
-      systemContext: appendAwarenessDomainSystemContext(new MemoryCatalogService(memoryDir).appendCatalogSystemContext({
-        systemContext: config.systemContext,
-      })),
+      systemContext: appendAwarenessDomainSystemContext(domainSystemContext),
       reasoningEffort: session.reasoningEffort,
       llm: LlmAdapterService.create({
         model,

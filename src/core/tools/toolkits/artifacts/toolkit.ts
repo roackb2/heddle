@@ -87,7 +87,7 @@ function createArtifactDashboardTool(context: ArtifactToolContext): ToolDefiniti
       const recent = selectArtifacts({
         service: context.service,
         sessionId: context.sessionId,
-        scope: 'all',
+        scope: 'current-session',
         limit: 5,
       });
 

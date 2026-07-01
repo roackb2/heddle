@@ -86,6 +86,30 @@ describe('approval policy chain', () => {
     expect(basePolicy).not.toHaveBeenCalled();
   });
 
+  it('denies artifact write tools for read-only custom agents before base policies run', async () => {
+    const service = new ToolApprovalService();
+    const basePolicy = vi.fn(() => ({ type: 'allow' as const, reason: 'base allowed' }));
+
+    await expect(service.evaluate({
+      policies: ToolApprovalProfileService.compile({
+        profile: { preset: 'read_only' },
+        basePolicies: [basePolicy],
+      }),
+      context: context({
+        call: { id: 'call-1', tool: 'save_artifact', input: { content: '# Draft', kind: 'document' } },
+        tool: {
+          ...context().tool,
+          name: 'save_artifact',
+          capabilities: ['artifact.write'],
+        },
+      }),
+    })).resolves.toEqual({
+      type: 'deny',
+      reason: 'save_artifact is not available to read-only agents',
+    });
+    expect(basePolicy).not.toHaveBeenCalled();
+  });
+
   it('lets auto custom agents use the provided autopilot profile before base policies run', async () => {
     const service = new ToolApprovalService();
     const basePolicy = vi.fn(() => ({ type: 'request' as const, reason: 'base requested' }));

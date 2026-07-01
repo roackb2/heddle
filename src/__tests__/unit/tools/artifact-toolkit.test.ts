@@ -25,13 +25,24 @@ describe('artifact toolkit', () => {
     const artifactId = ((saved.output as Record<string, unknown>).artifact as Record<string, unknown>).id as string;
     expect(new ArtifactService({ artifactRoot }).current('session-1')?.id).toBe(artifactId);
 
+    const otherSessionArtifact = new ArtifactService({ artifactRoot }).saveText({
+      kind: 'document',
+      title: 'other-session.md',
+      content: '# Other Session',
+      sessionId: 'session-2',
+    });
+
     const dashboard = await tools.artifact_dashboard.execute({});
+    const recentArtifactIds = ((dashboard.output as Record<string, unknown>).recent as Array<Record<string, unknown>>)
+      .map((artifact) => artifact.id);
     expect(dashboard.output).toMatchObject({
       current: {
         id: artifactId,
         relativePath: `files/${artifactId}.md`,
       },
     });
+    expect(recentArtifactIds).toContain(artifactId);
+    expect(recentArtifactIds).not.toContain(otherSessionArtifact.id);
 
     const listed = await tools.list_artifacts.execute({ scope: 'current-session', domain: 'presentation' });
     expect(((listed.output as Record<string, unknown>).artifacts as Array<Record<string, unknown>>)[0]).toMatchObject({

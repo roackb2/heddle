@@ -91,6 +91,38 @@ describe('custom agents', () => {
     ]));
   });
 
+  it('loads artifact capability filters from project agent definitions', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-artifact-capabilities-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-home-'));
+    writeAgent(workspaceRoot, 'artifact-reviewer', [
+      '---',
+      'id: artifact-reviewer',
+      'name: Artifact Reviewer',
+      'description: Review generated artifacts without changing them.',
+      'tools:',
+      '  preset: custom',
+      '  allowedCapabilities:',
+      '    - artifact.read',
+      '  deniedCapabilities:',
+      '    - artifact.write',
+      'approval:',
+      '  preset: read_only',
+      '---',
+      'Review generated artifacts without editing them.',
+    ].join('\n'));
+
+    const agent = new CustomAgentService({ workspaceRoot, homeDir })
+      .catalog()
+      .agents
+      .find((candidate) => candidate.id === 'artifact-reviewer');
+
+    expect(agent?.tools).toMatchObject({
+      preset: 'custom',
+      allowedCapabilities: ['artifact.read'],
+      deniedCapabilities: ['artifact.write'],
+    });
+  });
+
   it('rejects filesystem agents that try to reuse built-in ids', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-reserved-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'heddle-custom-agents-home-'));
