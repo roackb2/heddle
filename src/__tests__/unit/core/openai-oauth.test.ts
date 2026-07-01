@@ -101,6 +101,48 @@ describe('OpenAI OAuth helpers', () => {
     expect(new URLSearchParams(requests[1]?.body).get('refresh_token')).toBe('refresh-token');
   });
 
+  it('completes browser login after callback token exchange succeeds', async () => {
+    const requests: Array<{ url: string; body: string }> = [];
+    let callbackResponse: Promise<Response> | undefined;
+    const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({
+        url: String(url),
+        body: String(init?.body),
+      });
+      return Response.json({
+        access_token: 'access',
+        refresh_token: 'refresh',
+        expires_in: 3600,
+      });
+    }) as typeof fetch;
+
+    const credential = await OpenAiOAuthService.runBrowserLogin({
+      port: 0,
+      openBrowser: false,
+      fetchImpl,
+      onAuthorizeUrl: (authorizeUrl) => {
+        const url = new URL(authorizeUrl);
+        const redirectUri = url.searchParams.get('redirect_uri');
+        const state = url.searchParams.get('state');
+        if (!redirectUri || !state) {
+          throw new Error('OAuth authorize URL did not include callback metadata');
+        }
+        callbackResponse = fetch(`${redirectUri}?code=callback-code&state=${state}`);
+      },
+    });
+
+    await expect(callbackResponse).resolves.toMatchObject({ status: 200 });
+    expect(credential).toMatchObject({
+      type: 'oauth',
+      provider: 'openai',
+      accessToken: 'access',
+      refreshToken: 'refresh',
+      label: 'ChatGPT/Codex OAuth',
+    });
+    expect(requests).toHaveLength(1);
+    expect(new URLSearchParams(requests[0]?.body).get('code')).toBe('callback-code');
+  });
+
   it('rewrites Responses calls to the Codex endpoint with refreshed OAuth headers', async () => {
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-oauth-fetch-')), 'auth.json');
     const requests: Array<{ url: string; headers: Headers; body: string }> = [];

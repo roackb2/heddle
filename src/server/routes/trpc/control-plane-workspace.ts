@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import type { Logger } from 'pino';
 import { AutonomyPermissionModeService, type AutopilotProfile } from '@/core/approvals/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
+import { ProviderCredentialRepository } from '@/core/auth/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import type { WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
 import { getWorkspaceOperationLogger } from '@/server/logging/workspace-operation-logger.js';
@@ -20,6 +21,7 @@ export type ControlPlaneRequestWorkspace = {
     workspaceRoot: string;
     stateRoot: string;
     sessionStoragePath: string;
+    credentialStorePath: string;
     preferApiKey: boolean;
     workspaceId: string;
     autopilot?: AutopilotProfile;
@@ -83,6 +85,7 @@ export function resolveControlPlaneRequestWorkspace(
       workspaceRoot: workspace.workspaceRoot,
       stateRoot: workspace.stateRoot,
       sessionStoragePath: resolve(workspace.stateRoot, 'chat-sessions.catalog.json'),
+      credentialStorePath: ProviderCredentialRepository.resolveStorePath(workspace.stateRoot),
       preferApiKey: ctx.preferApiKey,
       workspaceId: workspace.id,
       autopilot,
