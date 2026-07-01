@@ -71,6 +71,7 @@ export type OpenAiOAuthLoginOptions = {
 export type OpenAiOAuthRefreshOptions = {
   refreshToken: string;
   fetchImpl?: typeof fetch;
+  signal?: AbortSignal;
 };
 
 export type OpenAiIdTokenClaims = {

@@ -64,6 +64,6 @@ describe('CLI command routing', () => {
     expect(source).toMatch(/const memoryCommand = program[\s\S]*?\.command\('memory'\)[\s\S]*?\.addHelpCommand\('help \[command\]'[\s\S]*?\.action\(\(\) => \{\s*memoryCommand\.outputHelp\(\);\s*\}\);/);
     expect(source).toMatch(/memoryCommand\s*\n\s*\.command\('status'\)[\s\S]*?await MemoryCliV2CommandEdgeService\.run\('status', resolved\);/);
     expect(source).toMatch(/const authCommand = program[\s\S]*?\.command\('auth'\)[\s\S]*?\.action\(\(\) => \{\s*authCommand\.outputHelp\(\);\s*\}\);/);
-    expect(source).toMatch(/authCommand\s*\n\s*\.command\('status'\)[\s\S]*?await AuthCliCommandEdgeService\.run\('status'\);/);
+    expect(source).toMatch(/authCommand\s*\n\s*\.command\('status'\)[\s\S]*?await AuthCliCommandEdgeService\.run\('status', undefined, \{[\s\S]*?storePath: resolveWorkspaceCredentialStorePath\(resolved\),[\s\S]*?\}\);/);
   });
 });

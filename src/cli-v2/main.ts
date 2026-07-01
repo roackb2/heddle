@@ -18,6 +18,7 @@ import { RuntimeHostResolver } from '@/core/runtime/daemon/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
+import { ProviderCredentialRepository } from '@/core/auth/index.js';
 
 type RootCliOptions = {
   cwd?: string;
@@ -219,21 +220,31 @@ async function main() {
     .description('log in to a provider')
     .option('--no-browser', 'print the authorization URL without opening a browser')
     .action(async (provider: string, flags: { browser?: boolean }) => {
-      await AuthCliCommandEdgeService.run('login', provider, { openBrowser: flags.browser });
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      await AuthCliCommandEdgeService.run('login', provider, {
+        openBrowser: flags.browser,
+        storePath: resolveWorkspaceCredentialStorePath(resolved),
+      });
     });
 
   authCommand
     .command('status')
     .description('show stored provider credentials')
     .action(async () => {
-      await AuthCliCommandEdgeService.run('status');
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      await AuthCliCommandEdgeService.run('status', undefined, {
+        storePath: resolveWorkspaceCredentialStorePath(resolved),
+      });
     });
 
   authCommand
     .command('logout <provider>')
     .description('remove a stored provider credential')
     .action(async (provider: string) => {
-      await AuthCliCommandEdgeService.run('logout', provider);
+      const resolved = resolveCliOptions(program.opts<RootCliOptions>());
+      await AuthCliCommandEdgeService.run('logout', provider, {
+        storePath: resolveWorkspaceCredentialStorePath(resolved),
+      });
     });
 
   program
@@ -361,6 +372,10 @@ function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
     runtimeHost: RuntimeHostResolver.resolveLiveServer(),
     forceOwnerConflict: Boolean(flags.forceOwnerConflict),
   };
+}
+
+function resolveWorkspaceCredentialStorePath(options: Pick<ResolvedCliOptions, 'workspaceRoot' | 'stateDir'>): string {
+  return ProviderCredentialRepository.resolveStorePath(resolve(options.workspaceRoot, options.stateDir));
 }
 
 function readCliVersion(): string {

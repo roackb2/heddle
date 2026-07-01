@@ -44,6 +44,7 @@ describe('resolveControlPlaneRequestWorkspace', () => {
         requireApproval: ['staging', 'production', 'unknown'],
       },
     });
+    expect(resolved.sessionEngineArgs.credentialStorePath).toBe(join(stateRoot, 'auth.json'));
   });
 });
 

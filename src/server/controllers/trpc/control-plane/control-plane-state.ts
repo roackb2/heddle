@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import type { HeddleServerContext } from '@/server/types.js';
 import type { ControlPlaneState } from '@/server/control-plane-types.js';
+import { ProviderCredentialRepository } from '@/core/auth/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import type { WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
@@ -15,6 +16,7 @@ export class ControlPlaneStateController {
   ): Promise<ControlPlaneState> {
     const workspaceRoot = workspace.workspaceRoot;
     const stateRoot = workspace.stateRoot;
+    const credentialStorePath = ProviderCredentialRepository.resolveStorePath(stateRoot);
     const [tasks, memory] = await Promise.all([
       ControlPlaneHeartbeatController.listTasks(stateRoot),
       ControlPlaneMemoryController.readStatus(stateRoot),
@@ -25,8 +27,14 @@ export class ControlPlaneStateController {
       stateRoot,
       auth: {
         preferApiKey: context.preferApiKey,
-        openai: RuntimeCredentialService.resolveCredentialSourceForModel('gpt-5.4', { preferApiKey: context.preferApiKey }),
-        anthropic: RuntimeCredentialService.resolveCredentialSourceForModel('claude-sonnet-4-6', { preferApiKey: context.preferApiKey }),
+        openai: RuntimeCredentialService.resolveCredentialSourceForModel('gpt-5.4', {
+          credentialStorePath,
+          preferApiKey: context.preferApiKey,
+        }),
+        anthropic: RuntimeCredentialService.resolveCredentialSourceForModel('claude-sonnet-4-6', {
+          credentialStorePath,
+          preferApiKey: context.preferApiKey,
+        }),
       },
       activeWorkspaceId: workspace.id,
       workspace,
@@ -37,6 +45,7 @@ export class ControlPlaneStateController {
         workspaceRoot,
         stateRoot,
         sessionStoragePath: resolve(stateRoot, 'chat-sessions.catalog.json'),
+        credentialStorePath,
         preferApiKey: context.preferApiKey,
         workspaceId: workspace.id,
       }),

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import pino from 'pino';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ProviderCredentialCommandService } from '@/core/auth/index.js';
+import { ProviderCredentialCommandService, ProviderCredentialRepository } from '@/core/auth/index.js';
 import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
@@ -500,7 +500,7 @@ description: Research web pages through a browser.
   it('executes auth login through the shared core auth command service', async () => {
     const login = vi.spyOn(ProviderCredentialCommandService, 'loginProviderWithOAuth')
       .mockResolvedValue('Stored OpenAI OAuth credential.');
-    const { caller } = createControlPlaneCaller();
+    const { caller, activeWorkspace } = createControlPlaneCaller();
     const session = await caller.sessionCreate({ name: 'Auth slash command session' });
 
     await expect(caller.slashCommandExecute({
@@ -511,7 +511,9 @@ description: Research web pages through a browser.
       kind: 'message',
       message: 'Stored OpenAI OAuth credential.',
     });
-    expect(login).toHaveBeenCalledWith('openai', { storePath: undefined });
+    expect(login).toHaveBeenCalledWith('openai', {
+      storePath: ProviderCredentialRepository.resolveStorePath(activeWorkspace.stateRoot),
+    });
   });
 
   it('returns selected-session runtime context for commands and status surfaces', async () => {

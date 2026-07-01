@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import type { AddressInfo, Socket } from 'node:net';
 import type {
   OpenAiIdTokenClaims,
   OpenAiOAuthCallbackServer,
@@ -104,6 +104,7 @@ export class OpenAiOAuthService {
     redirectUri: string;
     codeVerifier: string;
     fetchImpl?: typeof fetch;
+    signal?: AbortSignal;
   }): Promise<OpenAiOAuthTokenResponse> {
     const fetcher = args.fetchImpl ?? fetch;
     const response = await fetcher(`${OPENAI_AUTH_ISSUER}/oauth/token`, {
@@ -116,6 +117,7 @@ export class OpenAiOAuthService {
         client_id: OPENAI_CODEX_CLIENT_ID,
         code_verifier: args.codeVerifier,
       }).toString(),
+      signal: args.signal,
     });
 
     if (!response.ok) {
@@ -135,6 +137,7 @@ export class OpenAiOAuthService {
         refresh_token: options.refreshToken,
         client_id: OPENAI_CODEX_CLIENT_ID,
       }).toString(),
+      signal: options.signal,
     });
 
     if (!response.ok) {
@@ -230,6 +233,7 @@ export class OpenAiOAuthService {
         rejectTokens(new Error('OpenAI OAuth callback timed out'));
       }
     }, args.timeoutMs ?? 5 * 60 * 1000);
+    const sockets = new Set<Socket>();
 
     const server = createServer((req, res) => {
       const url = new URL(req.url ?? '/', `http://localhost:${args.port}`);
@@ -268,15 +272,34 @@ export class OpenAiOAuthService {
 
       settled = true;
       const redirectUri = `http://localhost:${OpenAiOAuthService.getServerPort(server) ?? args.port}${OPENAI_OAUTH_CALLBACK_PATH}`;
+      const controller = new AbortController();
+      const exchangeTimeout = setTimeout(() => controller.abort(), args.timeoutMs ?? 5 * 60 * 1000);
       void OpenAiOAuthService.exchangeCode({
         code,
         redirectUri,
         codeVerifier: args.pkce.verifier,
         fetchImpl: args.fetchImpl,
-      }).then(resolveTokens, rejectTokens);
-
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(OpenAiOAuthService.renderCallbackHtml('Authorization successful', 'You can close this window and return to Heddle.'));
+        signal: controller.signal,
+      }).then((tokens) => {
+        clearTimeout(exchangeTimeout);
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(
+          OpenAiOAuthService.renderCallbackHtml('Authorization successful', 'You can close this window and return to Heddle.'),
+          () => resolveTokens(tokens),
+        );
+      }, (exchangeError) => {
+        clearTimeout(exchangeTimeout);
+        const error = exchangeError instanceof Error ? exchangeError : new Error(String(exchangeError));
+        res.writeHead(500, { 'Content-Type': 'text/html' });
+        res.end(
+          OpenAiOAuthService.renderCallbackHtml('Authorization failed', 'Return to Heddle and retry the login command.'),
+          () => rejectTokens(error),
+        );
+      });
+    });
+    server.on('connection', (socket) => {
+      sockets.add(socket);
+      socket.once('close', () => sockets.delete(socket));
     });
 
     await new Promise<void>((resolve, reject) => {
@@ -301,6 +324,10 @@ export class OpenAiOAuthService {
             return;
           }
           server.close(() => resolve());
+          server.closeIdleConnections?.();
+          for (const socket of sockets) {
+            socket.destroy();
+          }
         });
       },
     };
