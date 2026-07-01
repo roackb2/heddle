@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createConversationEngine } from '../../../core/chat/engine/conversation-engine.js';
+import { defineHostExtension } from '../../../core/chat/engine/host-extension.js';
 import { EngineConversationTurnService } from '../../../core/chat/engine/turns/service.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../core/types.js';
@@ -108,6 +109,102 @@ describe('createConversationEngine', () => {
       sessionId: session.id,
       prompt: 'Create a deck',
     }));
+  });
+
+  it('composes multiple host extensions into submitted turns in declaration order', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-host-extension-array-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const reportTool = tool('report_generate');
+    const reviewTool = tool('report_review');
+    const reportToolkit: ToolToolkit = {
+      id: 'report.workspace',
+      createTools: () => [tool('report_validate')],
+    };
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      systemContext: 'Base context',
+      hostExtensions: [
+        defineHostExtension({
+          id: 'reporting',
+          tools: [reportTool],
+          toolkits: [reportToolkit],
+          systemContext: 'Use report workspace tools for report outputs.',
+          artifacts: {
+            root: join(stateRoot, 'report-artifacts'),
+          },
+        }),
+        defineHostExtension({
+          id: 'review',
+          tools: [reviewTool],
+          systemContext: 'Review reports before finalizing them.',
+          artifacts: {
+            enabled: false,
+          },
+        }),
+      ],
+      apiKeyPresent: true,
+    });
+    const session = engine.sessions.create({ id: 'session-1', name: 'Host extension array' });
+
+    await engine.turns.submit({
+      sessionId: session.id,
+      prompt: 'Create a report',
+    });
+
+    expect(EngineConversationTurnService.run).toHaveBeenCalledWith(expect.objectContaining({
+      tools: [reportTool, reviewTool],
+      toolkits: [reportToolkit],
+      systemContext: [
+        'Base context',
+        'Use report workspace tools for report outputs.',
+        'Review reports before finalizing them.',
+      ].join('\n\n'),
+      artifactRoot: join(stateRoot, 'report-artifacts'),
+      artifactsEnabled: false,
+      sessionId: session.id,
+      prompt: 'Create a report',
+    }));
+  });
+
+  it('rejects invalid or conflicting host extension definitions before turns run', () => {
+    expect(() => defineHostExtension({
+      id: 'invalid id',
+    })).toThrow('Invalid host extension id: invalid id');
+
+    expect(() => createConversationEngine({
+      workspaceRoot: mkdtempSync(join(tmpdir(), 'heddle-engine-duplicate-extension-')),
+      stateRoot: mkdtempSync(join(tmpdir(), 'heddle-engine-state-')),
+      model: 'gpt-5.4',
+      hostExtensions: [
+        defineHostExtension({ id: 'reporting' }),
+        defineHostExtension({ id: 'reporting' }),
+      ],
+      apiKeyPresent: true,
+    })).toThrow('Duplicate host extension id: reporting');
+
+    expect(() => createConversationEngine({
+      workspaceRoot: mkdtempSync(join(tmpdir(), 'heddle-engine-duplicate-extension-tool-')),
+      stateRoot: mkdtempSync(join(tmpdir(), 'heddle-engine-state-')),
+      model: 'gpt-5.4',
+      hostExtensions: [
+        defineHostExtension({ id: 'reporting', tools: [tool('shared_tool')] }),
+        defineHostExtension({ id: 'review', tools: [tool('shared_tool')] }),
+      ],
+      apiKeyPresent: true,
+    })).toThrow('Duplicate host extension tool name: shared_tool');
+
+    expect(() => createConversationEngine({
+      workspaceRoot: mkdtempSync(join(tmpdir(), 'heddle-engine-duplicate-extension-toolkit-')),
+      stateRoot: mkdtempSync(join(tmpdir(), 'heddle-engine-state-')),
+      model: 'gpt-5.4',
+      hostExtensions: [
+        defineHostExtension({ id: 'reporting', toolkits: [{ id: 'shared.toolkit', createTools: () => [] }] }),
+        defineHostExtension({ id: 'review', toolkits: [{ id: 'shared.toolkit', createTools: () => [] }] }),
+      ],
+      apiKeyPresent: true,
+    })).toThrow('Duplicate host extension toolkit id: shared.toolkit');
   });
 
   it('keeps top-level host tools as a compatibility input', async () => {

@@ -5,6 +5,7 @@ import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { ConversationEngineConfig } from './types.js';
 import type { ToolDefinition } from '@/core/types.js';
 import type { ToolToolkit } from '@/core/tools/index.js';
+import { ConversationEngineHostExtensionService } from './host-extension.js';
 
 export type NormalizedConversationEngineConfig = {
   workspaceRoot: string;
@@ -35,15 +36,16 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
   const sessionStoragePath = resolve(config.sessionStoragePath ?? join(stateRoot, 'chat-sessions.catalog.json'));
   const memoryDir = resolve(config.memoryDir ?? join(stateRoot, 'memory'));
   const traceDir = resolve(join(stateRoot, 'traces'));
-  const artifactRoot = resolve(config.hostExtensions?.artifacts?.root ?? join(stateRoot, 'artifacts'));
+  const hostExtensions = ConversationEngineHostExtensionService.compose(config.hostExtensions);
+  const artifactRoot = resolve(hostExtensions?.artifacts?.root ?? join(stateRoot, 'artifacts'));
   const credentialStorePath = config.credentialStorePath ? resolve(config.credentialStorePath) : undefined;
   const tools = [
     ...(config.tools ?? []),
-    ...(config.hostExtensions?.tools ?? []),
+    ...(hostExtensions?.tools ?? []),
   ];
   const systemContext = [
     config.systemContext,
-    config.hostExtensions?.systemContext,
+    hostExtensions?.systemContext,
   ].filter((value): value is string => Boolean(value)).join('\n\n') || undefined;
 
   return {
@@ -59,9 +61,9 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
     traceSummarizerRegistry: config.traceSummarizerRegistry,
     approvalPolicies: config.approvalPolicies,
     tools: tools.length ? tools : undefined,
-    toolkits: config.hostExtensions?.toolkits,
+    toolkits: hostExtensions?.toolkits,
     artifactRoot,
-    artifactsEnabled: config.hostExtensions?.artifacts?.enabled ?? true,
+    artifactsEnabled: hostExtensions?.artifacts?.enabled ?? true,
     sessionStoragePath,
     memoryDir,
     traceDir,

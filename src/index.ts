@@ -371,12 +371,15 @@ export {
 
 // Chat alpha API
 export { createConversationEngine } from './core/chat/engine/conversation-engine.js';
+export { defineHostExtension, ConversationEngineHostExtensionService } from './core/chat/engine/host-extension.js';
 export type {
   ClearConversationTurnLeaseInput,
   ConversationEngine,
   ConversationEngineConfig,
   ConversationEngineHost,
+  ConversationEngineHostExtension,
   ConversationEngineHostExtensions,
+  ConversationEngineHostExtensionsInput,
   ConversationSessionService,
   ConversationTurnService,
   CreateConversationSessionInput,

@@ -14,7 +14,11 @@ import type { ChatSession, ChatSessionRetention, QueuedConversationPrompt } from
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatTurnHostPort } from './turns/host/index.js';
 import type { ConversationCompactionResult } from '@/core/chat/engine/compaction/index.js';
-import type { ToolToolkit } from '@/core/tools/index.js';
+import type {
+  ConversationEngineHostExtension,
+  ConversationEngineHostExtensionBundle,
+  ConversationEngineHostExtensionInput,
+} from './host-extension.js';
 
 export type ConversationEngineConfig = {
   workspaceRoot: string;
@@ -28,7 +32,7 @@ export type ConversationEngineConfig = {
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   traceSummarizerRegistry?: TraceSummaryService;
   approvalPolicies?: ToolApprovalPolicy[];
-  hostExtensions?: ConversationEngineHostExtensions;
+  hostExtensions?: ConversationEngineHostExtensionsInput;
   /**
    * @deprecated Prefer hostExtensions.tools for new programmatic hosts.
    */
@@ -39,15 +43,9 @@ export type ConversationEngineConfig = {
   apiKeyPresent?: boolean;
 };
 
-export type ConversationEngineHostExtensions = {
-  tools?: ToolDefinition[];
-  toolkits?: ToolToolkit[];
-  systemContext?: string;
-  artifacts?: {
-    enabled?: boolean;
-    root?: string;
-  };
-};
+export type ConversationEngineHostExtensions = ConversationEngineHostExtensionBundle;
+export type ConversationEngineHostExtensionsInput = ConversationEngineHostExtensionInput;
+export type { ConversationEngineHostExtension };
 
 export type ConversationEngine = {
   sessions: ConversationSessionService;
