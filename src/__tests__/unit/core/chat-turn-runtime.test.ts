@@ -231,6 +231,11 @@ describe('chat turn preparation modules', () => {
       'search_memory_notes',
       'memory_checkpoint',
       'record_knowledge',
+      'artifact_dashboard',
+      'list_artifacts',
+      'read_artifact',
+      'save_artifact',
+      'set_current_artifact',
       'update_plan',
       'run_shell_inspect',
       'run_shell_mutate',
@@ -270,6 +275,9 @@ describe('chat turn preparation modules', () => {
       'search_files',
       'run_shell_inspect',
       'read_agent_skill',
+      'artifact_dashboard',
+      'list_artifacts',
+      'read_artifact',
     ]));
     expect(context.toolNames).not.toEqual(expect.arrayContaining([
       'edit_file',
@@ -278,6 +286,8 @@ describe('chat turn preparation modules', () => {
       'run_shell_mutate',
       'memory_checkpoint',
       'record_knowledge',
+      'save_artifact',
+      'set_current_artifact',
       'mcp_call_tool',
     ]));
   });
@@ -299,12 +309,12 @@ describe('chat turn preparation modules', () => {
       sessionStoragePath,
       sessionId: 'session-1',
       apiKey: 'explicit-key',
-      tools: [tool('slidex_create_deck')],
+      tools: [tool('host_create_document')],
     });
 
     expect(context.toolNames).toEqual(expect.arrayContaining([
       'read_file',
-      'slidex_create_deck',
+      'host_create_document',
     ]));
   });
 
@@ -534,6 +544,9 @@ function askAgentSnapshot(): CustomAgentExecutionSnapshot {
         'search_files',
         'run_shell_inspect',
         'read_agent_skill',
+        'artifact_dashboard',
+        'list_artifacts',
+        'read_artifact',
       ],
       memoryMode: 'none',
     },

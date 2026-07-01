@@ -259,6 +259,7 @@ export {
   ToolExecutionService,
   ToolRegistry,
 } from './core/tools/index.js';
+export { artifactsToolkit } from './core/tools/toolkits/artifacts/index.js';
 export type { ToolToolkit, ToolToolkitContext } from './core/tools/index.js';
 export { listFilesTool } from './core/tools/toolkits/coding-files/list-files.js';
 export { readFileTool } from './core/tools/toolkits/coding-files/read-file.js';
@@ -375,6 +376,7 @@ export type {
   ConversationEngine,
   ConversationEngineConfig,
   ConversationEngineHost,
+  ConversationEngineHostExtensions,
   ConversationSessionService,
   ConversationTurnService,
   CreateConversationSessionInput,

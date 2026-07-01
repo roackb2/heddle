@@ -20,7 +20,7 @@ describe('artifact registry', () => {
       content: '# Deck\n\n<Slide />',
       sessionId: 'session-1',
       turnId: 'turn-1',
-      sourceTool: 'mcp__slidex__slidex_create_deck',
+      sourceTool: 'host_generate_document',
       metadata: { slideCount: 1 },
     });
 
@@ -31,7 +31,7 @@ describe('artifact registry', () => {
       title: 'deck.motion.md',
       sessionId: 'session-1',
       turnId: 'turn-1',
-      sourceTool: 'mcp__slidex__slidex_create_deck',
+      sourceTool: 'host_generate_document',
       metadata: { slideCount: 1 },
     });
     expect(artifact.path).toBe(join(artifactRoot, 'files', 'deck-source.md'));

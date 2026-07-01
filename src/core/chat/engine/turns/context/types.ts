@@ -1,4 +1,5 @@
 import type { ToolDefinition } from '@/core/types.js';
+import type { ToolToolkit } from '@/core/tools/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
@@ -14,6 +15,9 @@ export type PrepareConversationTurnContextArgs = {
   credentialStorePath?: string;
   systemContext?: string;
   tools?: ToolDefinition[];
+  toolkits?: ToolToolkit[];
+  artifactRoot: string;
+  artifactsEnabled: boolean;
   agentSnapshot?: CustomAgentExecutionSnapshot;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
@@ -22,7 +26,16 @@ export type PrepareConversationTurnContextArgs = {
 
 export type ConversationTurnToolContextArgs = Pick<
   PrepareConversationTurnContextArgs,
-  'workspaceRoot' | 'credentialStorePath' | 'searchIgnoreDirs' | 'includePlanTool' | 'stateRoot' | 'tools'
+  | 'workspaceRoot'
+  | 'credentialStorePath'
+  | 'searchIgnoreDirs'
+  | 'includePlanTool'
+  | 'stateRoot'
+  | 'tools'
+  | 'toolkits'
+  | 'artifactRoot'
+  | 'artifactsEnabled'
+  | 'sessionId'
 >;
 
 export type ConversationTurnToolRuntimeArgs = Pick<

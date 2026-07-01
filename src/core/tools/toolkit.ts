@@ -3,6 +3,8 @@ import type { ToolDefinition } from '../types.js';
 export type ToolToolkitContext = {
   workspaceRoot: string;
   stateRoot: string;
+  artifactRoot: string;
+  sessionId?: string;
   model: string;
   apiKey?: string;
   providerCredentialSource?: import('../runtime/credentials/index.js').ProviderCredentialSource;

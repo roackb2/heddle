@@ -36,6 +36,7 @@ export class ConversationTurnContextBuilder {
       ...toolContext,
       ...toolRuntime,
       stateRoot: args.stateRoot,
+      sessionId: session.id,
       memoryMode: args.agentSnapshot?.toolProfile.memoryMode,
       toolProfile: args.agentSnapshot?.toolProfile,
     });

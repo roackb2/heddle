@@ -22,7 +22,7 @@ This domain owns:
 This domain does not own:
 
 - UI preview rendering;
-- domain-specific parsing such as SlideX MotionDoc analysis;
+- domain-specific parsing such as presentation source analysis;
 - automatic promotion of arbitrary tool results into artifacts;
 - runtime tool exposure for artifact operations.
 

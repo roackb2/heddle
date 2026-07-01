@@ -18,6 +18,7 @@ export type {
   ConversationEngine,
   ConversationEngineConfig,
   ConversationEngineHost,
+  ConversationEngineHostExtensions,
   ConversationSessionService,
   ConversationTurnService,
   CreateConversationSessionInput,

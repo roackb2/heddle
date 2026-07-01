@@ -1,6 +1,7 @@
 import { join, resolve } from 'node:path';
 import { BrowserAutomationCapabilityService, BrowserProfileSettingsService } from '@/core/browser/index.js';
 import { agentSkillsToolkit } from '@/core/tools/toolkits/agent-skills/toolkit.js';
+import { artifactsToolkit } from '@/core/tools/toolkits/artifacts/index.js';
 import { createBrowserResearchToolkit } from '@/core/tools/toolkits/browser-research/index.js';
 import { codingAwarenessToolkit } from '@/core/tools/toolkits/coding-awareness/toolkit.js';
 import { codingFilesToolkit } from '@/core/tools/toolkits/coding-files/toolkit.js';
@@ -21,6 +22,7 @@ export class RuntimeToolService {
   static createDefaultAgentTools(options: DefaultAgentToolsOptions): ToolDefinition[] {
     const workspaceRoot = options.workspaceRoot ?? process.cwd();
     const stateRoot = options.stateRoot ?? resolve(workspaceRoot, options.stateDir ?? '.heddle');
+    const artifactRoot = resolve(options.artifactRoot ?? join(stateRoot, 'artifacts'));
     const memoryDir =
       options.memoryDir ??
       join(stateRoot, 'memory');
@@ -29,13 +31,16 @@ export class RuntimeToolService {
     const tools = RuntimeToolService.withHostTools({
       defaultTools: ToolBundleComposer.compose({
         toolkits: this.createDefaultToolkits({
+          artifactsEnabled: options.artifactsEnabled ?? true,
           includePlanTool: options.includePlanTool,
           browserAutomationEnabled: BrowserAutomationCapabilityService.isEnabled({ stateRoot }),
           stateRoot,
-        }),
+        }).concat(options.toolkits ?? []),
         context: {
           workspaceRoot,
           stateRoot,
+          artifactRoot,
+          sessionId: options.sessionId,
           model: options.model,
           apiKey: options.apiKey,
           providerCredentialSource: options.providerCredentialSource,
@@ -54,6 +59,7 @@ export class RuntimeToolService {
   }
 
   private static createDefaultToolkits(args: {
+    artifactsEnabled: boolean;
     includePlanTool?: boolean;
     browserAutomationEnabled: boolean;
     stateRoot: string;
@@ -84,6 +90,7 @@ export class RuntimeToolService {
       knowledgeToolkit,
       mcpToolkit,
       ...browserToolkits,
+      ...(args.artifactsEnabled ? [artifactsToolkit] : []),
       this.createDefaultInternalToolkit({ includePlanTool: args.includePlanTool }),
       shellProcessToolkit,
     ];

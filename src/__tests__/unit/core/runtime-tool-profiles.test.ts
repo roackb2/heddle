@@ -13,6 +13,8 @@ describe('runtime tool profiles', () => {
         tool('edit_file'),
         tool('run_shell_inspect'),
         tool('run_shell_mutate'),
+        tool('artifact_dashboard'),
+        tool('save_artifact'),
         tool('mcp__external_mutation'),
         tool('update_plan'),
       ],
@@ -25,6 +27,7 @@ describe('runtime tool profiles', () => {
     expect(filtered.map((candidate) => candidate.name)).toEqual([
       'read_file',
       'run_shell_inspect',
+      'artifact_dashboard',
     ]);
   });
 
@@ -44,6 +47,9 @@ describe('runtime tool profiles', () => {
           'search_files',
           'run_shell_inspect',
           'read_agent_skill',
+          'artifact_dashboard',
+          'list_artifacts',
+          'read_artifact',
         ],
         memoryMode: 'none',
       },
@@ -57,6 +63,9 @@ describe('runtime tool profiles', () => {
       'search_files',
       'run_shell_inspect',
       'read_agent_skill',
+      'artifact_dashboard',
+      'list_artifacts',
+      'read_artifact',
     ]));
     expect(toolNames).not.toEqual(expect.arrayContaining([
       'edit_file',
@@ -65,8 +74,49 @@ describe('runtime tool profiles', () => {
       'run_shell_mutate',
       'memory_checkpoint',
       'record_knowledge',
+      'save_artifact',
+      'set_current_artifact',
       'mcp_call_tool',
     ]));
+  });
+
+  it('adds host-provided toolkits before applying runtime tool profiles', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-host-toolkit-profile-'));
+    const tools = RuntimeToolService.createDefaultAgentTools({
+      model: 'gpt-5.4',
+      workspaceRoot,
+      stateRoot: join(workspaceRoot, '.heddle'),
+      apiKey: 'explicit-key',
+      toolkits: [{
+        id: 'host.documents',
+        createTools: (context) => [{
+          ...tool('host_current_workspace'),
+          capabilities: ['workspace.read'],
+          execute: async () => ({ ok: true, output: context.workspaceRoot }),
+        }],
+      }],
+      toolProfile: {
+        preset: 'custom',
+        includeTools: ['host_current_workspace'],
+      },
+    });
+
+    expect(tools.map((candidate) => candidate.name)).toContain('host_current_workspace');
+  });
+
+  it('rejects duplicate host-provided runtime toolkit ids', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-host-toolkit-duplicate-'));
+
+    expect(() => RuntimeToolService.createDefaultAgentTools({
+      model: 'gpt-5.4',
+      workspaceRoot,
+      stateRoot: join(workspaceRoot, '.heddle'),
+      apiKey: 'explicit-key',
+      toolkits: [{
+        id: 'artifacts',
+        createTools: () => [],
+      }],
+    })).toThrow('Duplicate toolkit id: artifacts');
   });
 
   it('adds host-provided tools before applying runtime tool profiles', () => {
@@ -78,11 +128,11 @@ describe('runtime tool profiles', () => {
       apiKey: 'explicit-key',
       tools: [
         {
-          ...tool('slidex_create_deck'),
+          ...tool('host_create_document'),
           capabilities: ['workspace.write'],
         },
         {
-          ...tool('slidex_read_templates'),
+          ...tool('host_read_templates'),
           capabilities: ['workspace.read'],
         },
       ],
@@ -98,9 +148,9 @@ describe('runtime tool profiles', () => {
       'read_file',
       'search_files',
       'read_agent_skill',
-      'slidex_read_templates',
+      'host_read_templates',
     ]));
-    expect(tools.map((candidate) => candidate.name)).not.toContain('slidex_create_deck');
+    expect(tools.map((candidate) => candidate.name)).not.toContain('host_create_document');
   });
 
   it('rejects duplicate host-provided runtime tool names', () => {
