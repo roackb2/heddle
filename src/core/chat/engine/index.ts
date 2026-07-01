@@ -1,4 +1,5 @@
 export { createConversationEngine } from './conversation-engine.js';
+export { defineHostExtension, ConversationEngineHostExtensionService } from './host-extension.js';
 export { EngineConversationTurnService } from './turns/service.js';
 export type { RunConversationTurnArgs, RunConversationTurnResult } from './turns/types.js';
 export type {
@@ -18,7 +19,9 @@ export type {
   ConversationEngine,
   ConversationEngineConfig,
   ConversationEngineHost,
+  ConversationEngineHostExtension,
   ConversationEngineHostExtensions,
+  ConversationEngineHostExtensionsInput,
   ConversationSessionService,
   ConversationTurnService,
   CreateConversationSessionInput,

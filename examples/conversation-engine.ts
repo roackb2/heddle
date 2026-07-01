@@ -14,10 +14,12 @@
 
 import {
   createConversationEngine,
+  defineHostExtension,
   LlmAdapterService,
   RuntimeCredentialService,
   type ConversationActivity,
   type ConversationCompactionStatus,
+  type ToolDefinition,
   type ToolApprovalPolicyContext,
   type TraceEvent,
 } from '../src/index.js';
@@ -51,6 +53,7 @@ async function main() {
     model,
     apiKey,
     preferApiKey: true,
+    hostExtensions: [createExampleHostExtension()],
   });
 
   const session = engine.sessions.create({
@@ -100,6 +103,36 @@ async function main() {
   console.log(`Session ID: ${result.session.id}`);
   console.log(`Session name: ${result.session.name}`);
   console.log(`Turns stored: ${result.session.turns.length}`);
+}
+
+function createExampleHostExtension() {
+  const createProjectBriefTool: ToolDefinition = {
+    name: 'create_project_brief',
+    description: 'Create a compact project brief artifact from a title and summary.',
+    capabilities: ['workspace.write'],
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        title: { type: 'string' },
+        summary: { type: 'string' },
+      },
+      required: ['title', 'summary'],
+    },
+    execute: async (input) => ({
+      ok: true,
+      output: input,
+    }),
+  };
+
+  return defineHostExtension({
+    id: 'project-brief-workspace',
+    tools: [createProjectBriefTool],
+    systemContext: 'Use create_project_brief when the user asks for a structured project brief, then save durable outputs as artifacts.',
+    artifacts: {
+      enabled: true,
+    },
+  });
 }
 
 const requestExampleToolApproval = async (request: ToolApprovalPolicyContext) => {

@@ -152,11 +152,12 @@ before applying custom-agent tool profiles.
 ```ts
 import {
   createConversationEngine,
+  defineHostExtension,
   type ToolDefinition,
   type ToolToolkit,
 } from '@roackb2/heddle'
 
-const createDeckTool: ToolDefinition = {
+const createReportTool: ToolDefinition = {
   name: 'create_project_brief',
   description: 'Create a project brief from a structured prompt.',
   capabilities: ['workspace.write'],
@@ -168,7 +169,7 @@ const createDeckTool: ToolDefinition = {
     required: ['brief'],
   },
   execute: async (input) => {
-    return { ok: true, output: { deckId: 'deck-123', input } }
+    return { ok: true, output: { documentId: 'brief-123', input } }
   },
 }
 
@@ -177,23 +178,41 @@ const projectBriefToolkit: ToolToolkit = {
   createTools(context) {
     return [
       {
-        ...createDeckTool,
-        description: `${createDeckTool.description} Workspace: ${context.workspaceRoot}`,
+        ...createReportTool,
+        description: `${createReportTool.description} Workspace: ${context.workspaceRoot}`,
       },
     ]
   },
 }
 
+const projectBriefExtension = defineHostExtension({
+  id: 'project-brief-workspace',
+  toolkits: [projectBriefToolkit],
+  systemContext: 'When generating durable project briefs, save source and preview files as artifacts.',
+  artifacts: {
+    enabled: true,
+  },
+})
+
 const engine = createConversationEngine({
   workspaceRoot: process.cwd(),
   stateRoot: `${process.cwd()}/.heddle`,
   model: 'gpt-5.4',
-  hostExtensions: {
-    toolkits: [projectBriefToolkit],
-    systemContext: 'When generating durable outputs, save source and preview files as artifacts.',
-  },
+  hostExtensions: [projectBriefExtension],
 })
 ```
+
+Use `defineHostExtension(...)` for new SDK integrations. It validates the
+extension id plus duplicate host tool and toolkit names before the first turn
+runs. `hostExtensions` accepts either one legacy object or an ordered array of
+defined extensions. When multiple extensions are provided, Heddle composes them
+in declaration order:
+
+- `tools` are appended in order.
+- `toolkits` are appended in order.
+- `systemContext` blocks are joined with blank lines in order.
+- `artifacts` options are merged in order, with later `enabled` or `root`
+  values overriding earlier values.
 
 Host tools must use unique names. If a host tool collides with a built-in tool
 name, Heddle rejects the runtime bundle instead of silently overriding
@@ -202,7 +221,7 @@ behavior. Host toolkits must also use unique toolkit ids.
 Use `capabilities` when you want custom-agent tool profiles to filter host
 tools by read/write or domain-specific access. `tools` is still accepted at the
 top level for compatibility, but new hosts should prefer
-`hostExtensions.tools`.
+`hostExtensions: [defineHostExtension(...)]`.
 
 ## Artifact Tools
 
