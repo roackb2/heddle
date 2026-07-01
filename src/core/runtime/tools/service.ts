@@ -26,23 +26,26 @@ export class RuntimeToolService {
       join(stateRoot, 'memory');
     const memoryMode = options.memoryMode ?? 'read-and-record';
 
-    const tools = ToolBundleComposer.compose({
-      toolkits: this.createDefaultToolkits({
-        includePlanTool: options.includePlanTool,
-        browserAutomationEnabled: BrowserAutomationCapabilityService.isEnabled({ stateRoot }),
-        stateRoot,
+    const tools = RuntimeToolService.withHostTools({
+      defaultTools: ToolBundleComposer.compose({
+        toolkits: this.createDefaultToolkits({
+          includePlanTool: options.includePlanTool,
+          browserAutomationEnabled: BrowserAutomationCapabilityService.isEnabled({ stateRoot }),
+          stateRoot,
+        }),
+        context: {
+          workspaceRoot,
+          stateRoot,
+          model: options.model,
+          apiKey: options.apiKey,
+          providerCredentialSource: options.providerCredentialSource,
+          credentialStorePath: options.credentialStorePath,
+          memoryDir,
+          memoryMode,
+          searchIgnoreDirs: options.searchIgnoreDirs,
+        },
       }),
-      context: {
-        workspaceRoot,
-        stateRoot,
-        model: options.model,
-        apiKey: options.apiKey,
-        providerCredentialSource: options.providerCredentialSource,
-        credentialStorePath: options.credentialStorePath,
-        memoryDir,
-        memoryMode,
-        searchIgnoreDirs: options.searchIgnoreDirs,
-      },
+      hostTools: options.tools,
     });
     return RuntimeToolProfileService.apply({
       tools,
@@ -99,5 +102,29 @@ export class RuntimeToolService {
         return internalToolkit.createTools(context).filter((tool) => tool.name !== 'update_plan');
       },
     };
+  }
+
+  private static withHostTools(args: {
+    defaultTools: ToolDefinition[];
+    hostTools?: ToolDefinition[];
+  }): ToolDefinition[] {
+    const tools = [
+      ...args.defaultTools,
+      ...(args.hostTools ?? []),
+    ];
+    const names = new Set<string>();
+    const duplicate = tools.find((tool) => {
+      if (names.has(tool.name)) {
+        return true;
+      }
+
+      names.add(tool.name);
+      return false;
+    });
+    if (duplicate) {
+      throw new Error(`Duplicate runtime tool name: ${duplicate.name}`);
+    }
+
+    return tools;
   }
 }

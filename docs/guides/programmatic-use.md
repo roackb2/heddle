@@ -139,6 +139,44 @@ context. The model can then call `read_agent_skill` to read one active
 Skills are instructions, not permissions. Hosts still own approval callbacks,
 tool policy, workspace boundaries, and any UI needed for activation management.
 
+## Host-Provided Tools
+
+Programmatic hosts can add their own tool definitions at engine creation time.
+Heddle appends these host-provided tools to the default runtime bundle before
+applying custom-agent tool profiles.
+
+```ts
+import { createConversationEngine, type ToolDefinition } from '@roackb2/heddle'
+
+const createDeckTool: ToolDefinition = {
+  name: 'slidex_create_deck',
+  description: 'Create a SlideX deck from a structured brief.',
+  capabilities: ['workspace.write'],
+  parameters: {
+    type: 'object',
+    properties: {
+      brief: { type: 'string' },
+    },
+    required: ['brief'],
+  },
+  execute: async (input) => {
+    return { ok: true, output: { deckId: 'deck-123', input } }
+  },
+}
+
+const engine = createConversationEngine({
+  workspaceRoot: process.cwd(),
+  stateRoot: `${process.cwd()}/.heddle`,
+  model: 'gpt-5.4',
+  tools: [createDeckTool],
+})
+```
+
+Host tools must use unique names. If a host tool collides with a built-in tool
+name, Heddle rejects the runtime bundle instead of silently overriding behavior.
+Use `capabilities` when you want custom-agent tool profiles to filter host tools
+by read/write or domain-specific access.
+
 ## Host Callbacks
 
 `createConversationEngine` accepts host callbacks per submitted turn through `host`.

@@ -10,6 +10,7 @@ import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/re
 import type { ChatSession } from '../../../core/chat/types.js';
 import { TraceSummaryService } from '@/core/observability/index.js';
 import type { LlmAdapter } from '@/core/llm/types.js';
+import type { ToolDefinition } from '../../../core/types.js';
 
 describe('createConversationEngine', () => {
   beforeEach(() => {
@@ -63,6 +64,31 @@ describe('createConversationEngine', () => {
       workspaceId: 'workspace-1',
       history: [],
       messages: [],
+    }));
+  });
+
+  it('passes engine-level host tools into submitted turns', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-host-tools-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const hostTools = [tool('slidex_create_deck')];
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      tools: hostTools,
+      apiKeyPresent: true,
+    });
+    const session = engine.sessions.create({ id: 'session-1', name: 'Host tools' });
+
+    await engine.turns.submit({
+      sessionId: session.id,
+      prompt: 'Create a deck',
+    });
+
+    expect(EngineConversationTurnService.run).toHaveBeenCalledWith(expect.objectContaining({
+      tools: hostTools,
+      sessionId: session.id,
+      prompt: 'Create a deck',
     }));
   });
 
@@ -616,6 +642,15 @@ describe('createConversationEngine', () => {
     expect(sessionRepository.read('session-1')?.lease).toBeUndefined();
   });
 });
+
+function tool(name: string): ToolDefinition {
+  return {
+    name,
+    description: name,
+    parameters: {},
+    execute: async () => ({ ok: true }),
+  };
+}
 
 function fakeTitleLlm(title: string): LlmAdapter {
   return {

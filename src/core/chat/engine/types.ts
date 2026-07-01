@@ -8,7 +8,7 @@ import type {
 } from '@/core/observability/index.js';
 import type { AgentLoopEvent, RunAgentLoopOptions } from '../../runtime/loop/index.js';
 import type { ChatMessage, LlmAdapter, ReasoningEffort } from '../../llm/types.js';
-import type { TraceEvent } from '../../types.js';
+import type { ToolDefinition, TraceEvent } from '../../types.js';
 import type { ChatSessionLeaseOwner } from './sessions/leases/index.js';
 import type { ChatSession, ChatSessionRetention, QueuedConversationPrompt } from '../types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
@@ -27,6 +27,7 @@ export type ConversationEngineConfig = {
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   traceSummarizerRegistry?: TraceSummaryService;
   approvalPolicies?: ToolApprovalPolicy[];
+  tools?: ToolDefinition[];
   sessionStoragePath?: string;
   memoryDir?: string;
   workspaceId?: string;

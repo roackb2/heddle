@@ -13,6 +13,7 @@ export type PrepareConversationTurnContextArgs = {
   preferApiKey?: boolean;
   credentialStorePath?: string;
   systemContext?: string;
+  tools?: ToolDefinition[];
   agentSnapshot?: CustomAgentExecutionSnapshot;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
@@ -21,7 +22,7 @@ export type PrepareConversationTurnContextArgs = {
 
 export type ConversationTurnToolContextArgs = Pick<
   PrepareConversationTurnContextArgs,
-  'workspaceRoot' | 'credentialStorePath' | 'searchIgnoreDirs' | 'includePlanTool' | 'stateRoot'
+  'workspaceRoot' | 'credentialStorePath' | 'searchIgnoreDirs' | 'includePlanTool' | 'stateRoot' | 'tools'
 >;
 
 export type ConversationTurnToolRuntimeArgs = Pick<

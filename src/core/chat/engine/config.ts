@@ -3,6 +3,7 @@ import type { ToolApprovalPolicy } from '../../approvals/types.js';
 import type { ReasoningEffort } from '../../llm/types.js';
 import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { ConversationEngineConfig } from './types.js';
+import type { ToolDefinition } from '@/core/types.js';
 
 export type NormalizedConversationEngineConfig = {
   workspaceRoot: string;
@@ -16,6 +17,7 @@ export type NormalizedConversationEngineConfig = {
   memoryMaintenanceMode: 'none' | 'background' | 'inline';
   traceSummarizerRegistry?: TraceSummaryService;
   approvalPolicies?: ToolApprovalPolicy[];
+  tools?: ToolDefinition[];
   sessionStoragePath: string;
   memoryDir: string;
   traceDir: string;
@@ -43,6 +45,7 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
     memoryMaintenanceMode: config.memoryMaintenanceMode ?? 'background',
     traceSummarizerRegistry: config.traceSummarizerRegistry,
     approvalPolicies: config.approvalPolicies,
+    tools: config.tools,
     sessionStoragePath,
     memoryDir,
     traceDir,

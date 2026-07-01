@@ -6,6 +6,7 @@ import type { RunAgentLoopOptions } from '@/core/runtime/loop/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import type { ChatTurnHostPort } from './host/index.js';
+import type { ToolDefinition } from '@/core/types.js';
 
 export type RunConversationTurnArgs = {
   workspaceRoot: string;
@@ -24,6 +25,7 @@ export type RunConversationTurnArgs = {
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   host?: ChatTurnHostPort;
   approvalPolicies?: ToolApprovalPolicy[];
+  tools?: ToolDefinition[];
   agentProfileId?: string;
   agentSnapshot?: CustomAgentExecutionSnapshot;
   traceSummarizerRegistry?: TraceSummaryService;
@@ -46,6 +48,7 @@ export type TurnRuntimeConfigInput = Pick<
   | 'traceDir'
   | 'memoryMaintenanceMode'
   | 'approvalPolicies'
+  | 'tools'
   | 'traceSummarizerRegistry'
 >;
 
