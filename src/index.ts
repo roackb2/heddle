@@ -68,6 +68,18 @@ export {
   RuntimeCredentialService,
 } from './core/runtime/credentials/index.js';
 export type { ApiKeyRuntime, ProviderCredentialSource } from './core/runtime/credentials/index.js';
+export { ArtifactService, FileArtifactRepository } from './core/artifacts/index.js';
+export type {
+  ArtifactCurrentPointers,
+  ArtifactKind,
+  ArtifactListOptions,
+  ArtifactReadResult,
+  ArtifactServiceOptions,
+  ArtifactStore,
+  FileArtifactRepositoryOptions,
+  RuntimeArtifact,
+  SaveTextArtifactInput,
+} from './core/artifacts/index.js';
 export { RuntimeToolService } from './core/runtime/tools/index.js';
 export type { DefaultAgentToolsOptions } from './core/runtime/tools/index.js';
 export { AgentSkillService, AgentSkillsRuntimeContextService, FileAgentSkillActivationRepository } from './core/skills/index.js';
