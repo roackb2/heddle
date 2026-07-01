@@ -6,6 +6,12 @@ Runtime tools own the default tool bundle policy for generic agent execution.
 toolkits and host context. Individual tool behavior stays in `src/core/tools`;
 this folder only decides which toolkits the generic runtime includes by default.
 
+Programmatic hosts can pass additional tool definitions through the runtime
+options. Runtime tools append those host-provided tools to the default bundle,
+reject duplicate names, and then apply the same tool profile filtering used for
+custom agents. Tool execution, approval, and trace recording still happen in
+the normal agent loop path.
+
 ## Tool Profiles
 
 `profiles/` owns runtime tool visibility profiles. A profile is an execution-time

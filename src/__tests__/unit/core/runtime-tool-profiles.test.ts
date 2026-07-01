@@ -68,6 +68,52 @@ describe('runtime tool profiles', () => {
       'mcp_call_tool',
     ]));
   });
+
+  it('adds host-provided tools before applying runtime tool profiles', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-host-tool-profile-'));
+    const tools = RuntimeToolService.createDefaultAgentTools({
+      model: 'gpt-5.4',
+      workspaceRoot,
+      stateRoot: join(workspaceRoot, '.heddle'),
+      apiKey: 'explicit-key',
+      tools: [
+        {
+          ...tool('slidex_create_deck'),
+          capabilities: ['workspace.write'],
+        },
+        {
+          ...tool('slidex_read_templates'),
+          capabilities: ['workspace.read'],
+        },
+      ],
+      toolProfile: {
+        preset: 'custom',
+        allowedCapabilities: ['workspace.read'],
+      },
+    });
+
+    expect(tools.map((candidate) => candidate.name)).toEqual(expect.arrayContaining([
+      'project_dashboard',
+      'list_files',
+      'read_file',
+      'search_files',
+      'read_agent_skill',
+      'slidex_read_templates',
+    ]));
+    expect(tools.map((candidate) => candidate.name)).not.toContain('slidex_create_deck');
+  });
+
+  it('rejects duplicate host-provided runtime tool names', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-host-tool-duplicate-'));
+
+    expect(() => RuntimeToolService.createDefaultAgentTools({
+      model: 'gpt-5.4',
+      workspaceRoot,
+      stateRoot: join(workspaceRoot, '.heddle'),
+      apiKey: 'explicit-key',
+      tools: [tool('read_file')],
+    })).toThrow('Duplicate runtime tool name: read_file');
+  });
 });
 
 function tool(name: string): ToolDefinition {
