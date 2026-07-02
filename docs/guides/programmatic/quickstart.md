@@ -10,8 +10,8 @@ await runConversationCli()
 ```
 
 The runner chooses reasonable SDK defaults: the current working directory as the
-workspace, `.heddle` under that workspace for conversation state, a default step
-budget, no automatic memory maintenance, and the first configured model from
+workspace, `.heddle` under that workspace for conversation state, no default
+step budget, no automatic memory maintenance, and the first configured model from
 `HEDDLE_MODEL`, `HEDDLE_EXAMPLE_MODEL`, `OPENAI_MODEL`, `ANTHROPIC_MODEL`, or
 Heddle's built-in OpenAI default. It resolves credentials before starting the
 session and prints the selected model and credential source. If the model has no
@@ -77,6 +77,8 @@ await runConversationCli({
   hostExtensions,
 })
 ```
+
+Pass `maxSteps` only when the host intentionally wants a hard turn budget.
 
 Use `createConversationEngine` when you are ready to own the host lifecycle,
 commands, approvals, or custom rendering:

@@ -24,7 +24,6 @@ import type {
 } from './types.js';
 
 const DEFAULT_PROMPT_LABEL = 'heddle> ';
-const DEFAULT_MAX_STEPS = 24;
 const DEFAULT_MEMORY_MAINTENANCE_MODE = 'none';
 const SUPPORTED_REASONING_EFFORTS = new Set<ReasoningEffort>(['low', 'medium', 'high', 'ultrahigh']);
 const BUILT_IN_COMMANDS = [
@@ -154,7 +153,7 @@ export class ConversationCliRunnerService {
     const workspaceRoot = options.workspaceRoot ?? process.cwd();
 
     return {
-      maxSteps: options.maxSteps ?? DEFAULT_MAX_STEPS,
+      ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
       memoryMaintenanceMode: options.memoryMaintenanceMode ?? DEFAULT_MEMORY_MAINTENANCE_MODE,
       model: ConversationCliRunnerService.resolveModel(options),
       reasoningEffort: ConversationCliRunnerService.resolveReasoningEffort(options.reasoningEffort),

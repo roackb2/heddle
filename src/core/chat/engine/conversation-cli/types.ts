@@ -88,7 +88,7 @@ export type ConversationCliRunnerDefaultsInput = Pick<
 };
 
 export type ConversationCliRunnerDefaults = {
-  maxSteps: number;
+  maxSteps?: number;
   memoryMaintenanceMode: ConversationCliMemoryMaintenanceMode;
   model: string;
   reasoningEffort?: ReasoningEffort;

@@ -69,7 +69,6 @@ describe('runConversationCli', () => {
     });
 
     expect(defaults).toEqual({
-      maxSteps: 24,
       memoryMaintenanceMode: 'none',
       model: DEFAULT_OPENAI_MODEL,
       reasoningEffort: 'medium',

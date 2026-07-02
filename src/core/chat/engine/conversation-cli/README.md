@@ -9,8 +9,8 @@ want a working conversation loop before building their own UI.
 `ConversationCliRunnerService` owns:
 
 - creating a persisted conversation engine and session;
-- resolving generic SDK defaults for workspace root, state root, model, step
-  budget, and memory maintenance mode;
+- resolving generic SDK defaults for workspace root, state root, model, and
+  memory maintenance mode;
 - resolving model credentials before a session starts;
 - printing default model and credential status;
 - resuming a caller-selected session;
@@ -48,10 +48,9 @@ The default model order is:
 5. `ANTHROPIC_MODEL`
 6. Heddle's built-in OpenAI default
 
-The runner defaults memory maintenance to `none` and max steps to `24` because
-SDK starter loops should be predictable and cheap. Hosts that need background
-maintenance or a different turn budget should override those values once at
-this boundary.
+The runner defaults memory maintenance to `none` and leaves `maxSteps`
+unset. Hosts that need background maintenance or a hard turn budget should
+override those values once at this boundary.
 
 When a host needs custom UI, routing, approvals, or domain commands, use
 `createConversationEngine` directly and treat this runner as the migration
