@@ -9,6 +9,8 @@ want a working conversation loop before building their own UI.
 `ConversationCliRunnerService` owns:
 
 - creating a persisted conversation engine and session;
+- resolving model credentials before a session starts;
+- printing default model and credential status;
 - resuming a caller-selected session;
 - running a one-shot prompt when the caller does not want an interactive loop;
 - attaching `createConversationTextHost` for streaming/status/result output;
@@ -22,6 +24,7 @@ It does not own:
 
 - product-specific command behavior;
 - custom approval UX;
+- product-specific auth instructions beyond an optional missing-credential hint;
 - custom telemetry or trace persistence beyond the default engine behavior;
 - rich terminal UI behavior from `src/cli-v2`.
 

@@ -35,6 +35,22 @@ describe('RuntimeCredentialService', () => {
     });
   });
 
+  it('formats credential sources for SDK host status output', () => {
+    expect(RuntimeCredentialService.formatCredentialSource({ type: 'explicit-api-key' })).toBe('explicit API key');
+    expect(RuntimeCredentialService.formatCredentialSource({ type: 'env-api-key', provider: 'anthropic' })).toBe('anthropic API key from environment');
+    expect(RuntimeCredentialService.formatCredentialSource({
+      type: 'oauth',
+      provider: 'openai',
+      accountId: 'account-123',
+    })).toBe('openai OAuth account account-123');
+    expect(RuntimeCredentialService.formatCredentialSource({
+      type: 'local-endpoint',
+      provider: 'ollama',
+      baseUrl: 'http://localhost:11434/v1',
+    })).toBe('ollama local endpoint http://localhost:11434/v1');
+    expect(RuntimeCredentialService.formatCredentialSource({ type: 'missing', provider: 'openai' })).toBe('missing openai credential');
+  });
+
   it('resolves Ollama as a local endpoint instead of reusing hosted provider keys', () => {
     vi.stubEnv('OPENAI_API_KEY', 'openai-key');
     vi.stubEnv('ANTHROPIC_API_KEY', 'anthropic-key');

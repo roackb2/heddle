@@ -180,6 +180,21 @@ export class RuntimeCredentialService {
     return `Missing provider credential for ${provider}.`;
   }
 
+  static formatCredentialSource(source: ProviderCredentialSource): string {
+    switch (source.type) {
+      case 'explicit-api-key':
+        return 'explicit API key';
+      case 'env-api-key':
+        return `${source.provider} API key from environment`;
+      case 'oauth':
+        return source.accountId ? `${source.provider} OAuth account ${source.accountId}` : `${source.provider} OAuth account`;
+      case 'local-endpoint':
+        return `${source.provider} local endpoint ${source.baseUrl}`;
+      case 'missing':
+        return `missing ${source.provider} credential`;
+    }
+  }
+
   private static firstDefinedNonEmpty(...values: Array<string | undefined>): string | undefined {
     return values.find((value) => typeof value === 'string' && value.trim().length > 0);
   }

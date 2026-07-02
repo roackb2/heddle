@@ -2,7 +2,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createConversationEngine,
   runConversationCli,
@@ -22,6 +22,10 @@ class CaptureOutput extends Writable {
 }
 
 describe('runConversationCli', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('dispatches caller-owned local commands inside the default loop', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-conversation-cli-command-'));
     const stateRoot = join(workspaceRoot, '.heddle');
@@ -37,6 +41,7 @@ describe('runConversationCli', () => {
           commandOutput.write(`custom artifacts for ${session.id}\n`);
         },
       }],
+      credentialPreflight: false,
       model: 'gpt-test',
       output,
       stateRoot,
@@ -67,6 +72,7 @@ describe('runConversationCli', () => {
 
     const run = runConversationCli({
       input,
+      credentialPreflight: false,
       model: 'gpt-test',
       output,
       sessionId: session.id,
@@ -81,5 +87,51 @@ describe('runConversationCli', () => {
     await run;
 
     expect(output.text()).toContain(`Session: ${session.id}`);
+  });
+
+  it('prints a generic credential status before entering the loop', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-conversation-cli-credential-status-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const input = new PassThrough();
+    const output = new CaptureOutput();
+
+    const run = runConversationCli({
+      input,
+      model: 'ollama/test-model',
+      output,
+      stateRoot,
+      workspaceRoot,
+    });
+    setImmediate(() => {
+      input.write('/exit\n');
+      input.end();
+    });
+    await run;
+
+    expect(output.text()).toContain('Model: ollama/test-model (ollama)');
+    expect(output.text()).toContain('Credential: ollama local endpoint');
+  });
+
+  it('fails early with the standard missing credential message and caller hint', async () => {
+    vi.stubEnv('OPENAI_API_KEY', '');
+    vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
+
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-conversation-cli-missing-credential-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const credentialStorePath = join(stateRoot, 'auth.json');
+
+    await expect(runConversationCli({
+      credentialPreflight: {
+        missingCredentialHint: 'Run the host-specific auth setup before starting this chat.',
+      },
+      credentialStorePath,
+      input: new PassThrough(),
+      model: 'gpt-5.4',
+      output: new CaptureOutput(),
+      stateRoot,
+      workspaceRoot,
+    })).rejects.toThrow(
+      'Missing OpenAI credential. Run `heddle auth login openai` to use OpenAI account sign-in, or set OPENAI_API_KEY for Platform API-key mode. Run the host-specific auth setup before starting this chat.',
+    );
   });
 });

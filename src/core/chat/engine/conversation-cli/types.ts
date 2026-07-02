@@ -1,5 +1,7 @@
 import type { Readable, Writable } from 'node:stream';
 import type { ReasoningEffort } from '@/core/llm/types.js';
+import type { LlmProvider } from '@/core/llm/types.js';
+import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import type { ToolDefinition } from '@/core/types.js';
 import type { ConversationEngine } from '../types.js';
 import type { ChatSession } from '../../types.js';
@@ -31,6 +33,19 @@ export type ConversationCliTurnContext = {
   workspaceRoot: string;
 };
 
+export type ConversationCliCredentialContext = {
+  model: string;
+  preferApiKey?: boolean;
+  provider: LlmProvider;
+  source: ProviderCredentialSource;
+};
+
+export type ConversationCliCredentialPreflightOptions = {
+  enabled?: boolean;
+  missingCredentialHint?: string | ((context: ConversationCliCredentialContext) => string | undefined);
+  status?: 'off' | 'status';
+};
+
 export type ConversationCliRunnerOptions = {
   model: string;
   workspaceRoot?: string;
@@ -43,6 +58,8 @@ export type ConversationCliRunnerOptions = {
   reasoningEffort?: ReasoningEffort;
   apiKey?: string;
   preferApiKey?: boolean;
+  credentialStorePath?: string;
+  credentialPreflight?: boolean | ConversationCliCredentialPreflightOptions;
   systemContext?: string;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
   tools?: ToolDefinition[];

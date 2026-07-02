@@ -11,6 +11,10 @@ await runConversationCli({
 })
 ```
 
+The runner resolves credentials before starting the session and prints the
+selected model and credential source. If the model has no usable credential, it
+fails early with Heddle's standard setup message.
+
 Run the local SDK example:
 
 ```bash
@@ -25,6 +29,9 @@ import { runConversationCli } from '@roackb2/heddle'
 
 await runConversationCli({
   model: 'gpt-5.4',
+  credentialPreflight: {
+    missingCredentialHint: 'Run your product-specific auth setup first.',
+  },
   systemContext: 'You are helping users operate this workspace.',
   promptLabel: 'workspace> ',
   formatPrompt: (prompt) => [

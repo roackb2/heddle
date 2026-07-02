@@ -2,12 +2,18 @@ import { createInterface } from 'node:readline/promises';
 import { join } from 'node:path';
 import { stdin, stdout } from 'node:process';
 import type { Writable } from 'node:stream';
+import {
+  RuntimeCredentialService,
+} from '@/core/runtime/credentials/index.js';
+import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
 import { createConversationEngine } from '../conversation-engine.js';
 import { createConversationTextHost } from '../text-host/index.js';
 import type { ChatSession } from '../../types.js';
 import type { ConversationTurnResultSummary } from '../turn-result.js';
 import type { ConversationEngine, ConversationEngineHost } from '../types.js';
 import type {
+  ConversationCliCredentialContext,
+  ConversationCliCredentialPreflightOptions,
   ConversationCliLocalCommand,
   ConversationCliRunnerOptions,
   ConversationCliTurnContext,
@@ -33,6 +39,7 @@ export class ConversationCliRunnerService {
     const workspaceRoot = options.workspaceRoot ?? process.cwd();
     const stateRoot = options.stateRoot ?? join(workspaceRoot, '.heddle');
     const output = options.output ?? stdout;
+    const credentialContext = ConversationCliRunnerService.preflightCredentials({ options });
     const engine = createConversationEngine({
       workspaceRoot,
       stateRoot,
@@ -40,6 +47,7 @@ export class ConversationCliRunnerService {
       reasoningEffort: options.reasoningEffort,
       apiKey: options.apiKey,
       preferApiKey: options.preferApiKey,
+      credentialStorePath: options.credentialStorePath,
       systemContext: options.systemContext,
       memoryMaintenanceMode: options.memoryMaintenanceMode,
       tools: options.tools,
@@ -52,6 +60,11 @@ export class ConversationCliRunnerService {
     });
     const host = ConversationCliRunnerService.composeHost(textHost.host, options.host);
 
+    ConversationCliRunnerService.writeRuntimeStatus({
+      credentialContext,
+      output,
+      reasoningEffort: options.reasoningEffort,
+    });
     output.write(`Session: ${session.id}\n`);
     output.write(`Commands: ${ConversationCliRunnerService.formatCommandList(options.localCommands)}\n`);
 
@@ -123,6 +136,97 @@ export class ConversationCliRunnerService {
     } finally {
       inputLoop.close();
     }
+  }
+
+  private static preflightCredentials(input: {
+    options: ConversationCliRunnerOptions;
+  }): ConversationCliCredentialContext | undefined {
+    const preflight = ConversationCliRunnerService.resolveCredentialPreflight(input.options.credentialPreflight);
+    if (!preflight.enabled) {
+      return undefined;
+    }
+
+    const resolution = LlmProviderRuntimeService.resolve({
+      apiKey: input.options.apiKey,
+      credentialStorePath: input.options.credentialStorePath,
+      model: input.options.model,
+      preferApiKey: input.options.preferApiKey,
+      reasoningEffort: input.options.reasoningEffort,
+    });
+    const context = {
+      model: resolution.model,
+      preferApiKey: input.options.preferApiKey,
+      provider: resolution.provider,
+      source: resolution.credentialSource,
+    } satisfies ConversationCliCredentialContext;
+
+    if (resolution.credentialSource.type === 'missing') {
+      throw new Error([
+        RuntimeCredentialService.formatMissingCredentialMessage(resolution.model),
+        ConversationCliRunnerService.resolveMissingCredentialHint({
+          context,
+          missingCredentialHint: preflight.missingCredentialHint,
+        }),
+      ].filter(Boolean).join(' '));
+    }
+
+    return preflight.status === 'status' ? context : undefined;
+  }
+
+  private static resolveCredentialPreflight(
+    input: ConversationCliRunnerOptions['credentialPreflight'],
+  ): Required<Pick<ConversationCliCredentialPreflightOptions, 'enabled' | 'status'>>
+    & Pick<ConversationCliCredentialPreflightOptions, 'missingCredentialHint'> {
+    if (input === false) {
+      return {
+        enabled: false,
+        status: 'off',
+      };
+    }
+
+    if (input === true || input === undefined) {
+      return {
+        enabled: true,
+        status: 'status',
+      };
+    }
+
+    return {
+      enabled: input.enabled ?? true,
+      missingCredentialHint: input.missingCredentialHint,
+      status: input.status ?? 'status',
+    };
+  }
+
+  private static resolveMissingCredentialHint(input: {
+    context: ConversationCliCredentialContext;
+    missingCredentialHint: ConversationCliCredentialPreflightOptions['missingCredentialHint'];
+  }): string | undefined {
+    const hint = typeof input.missingCredentialHint === 'function'
+      ? input.missingCredentialHint(input.context)
+      : input.missingCredentialHint;
+
+    return hint?.trim() || undefined;
+  }
+
+  private static writeRuntimeStatus(input: {
+    credentialContext: ConversationCliCredentialContext | undefined;
+    output: NodeJS.WritableStream;
+    reasoningEffort: ConversationCliRunnerOptions['reasoningEffort'];
+  }): void {
+    if (!input.credentialContext) {
+      return;
+    }
+
+    input.output.write(`Model: ${input.credentialContext.model} (${input.credentialContext.provider})\n`);
+    if (input.reasoningEffort) {
+      input.output.write(`Reasoning: ${input.reasoningEffort}\n`);
+    }
+    input.output.write([
+      `Credential: ${RuntimeCredentialService.formatCredentialSource(input.credentialContext.source)}`,
+      input.credentialContext.preferApiKey ? ' (API-key preferred)' : '',
+      '\n',
+    ].join(''));
   }
 
   private static async readPrompt(
