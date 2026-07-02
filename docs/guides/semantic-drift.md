@@ -30,4 +30,4 @@ Heddle does not calculate semantic drift itself. For the underlying methodology,
 ## See Also
 
 - [Chat and sessions](chat-and-sessions.md)
-- [Programmatic use](programmatic-use.md)
+- [Programmatic hosts](programmatic/README.md)

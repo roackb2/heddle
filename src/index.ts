@@ -372,6 +372,13 @@ export {
 // Chat alpha API
 export { createConversationEngine } from './core/chat/engine/conversation-engine.js';
 export { defineHostExtension, ConversationEngineHostExtensionService } from './core/chat/engine/host-extension.js';
+export { ConversationTextHostService, createConversationTextHost } from './core/chat/engine/text-host/index.js';
+export type {
+  ConversationTextHost,
+  ConversationTextHostMode,
+  ConversationTextHostOptions,
+  ConversationTextHostWriter,
+} from './core/chat/engine/text-host/index.js';
 export type {
   ConversationEngineHostArtifactOptions,
   ConversationEngineHostMcpOptions,
@@ -388,9 +395,12 @@ export {
 } from './core/chat/engine/mcp-host-extension.js';
 export type {
   DefineMcpHostExtensionOptions,
+  McpHostAutoResultArtifactHint,
+  McpHostAutoResultArtifactsOptions,
   McpHostResultArtifactOutput,
   McpHostResultArtifactReference,
   McpHostResultArtifactRule,
+  McpHostResultArtifactsOptions,
   McpHostToolOverride,
   PrepareMcpHostExtensionOptions,
   PrepareMcpHostExtensionResult,

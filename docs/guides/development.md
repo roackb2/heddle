@@ -259,6 +259,6 @@ In short:
 
 - [Chat and sessions](chat-and-sessions.md)
 - [Control plane](control-plane.md)
-- [Programmatic use](programmatic-use.md)
+- [Programmatic hosts](programmatic/README.md)
 - [CLI reference](../reference/cli.md)
 - [Framework Vision](../strategy/framework-vision.md)

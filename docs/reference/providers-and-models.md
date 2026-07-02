@@ -274,4 +274,4 @@ Use `OPENAI_API_KEY` for other OpenAI Platform models or features that require P
 
 - [CLI reference](cli.md)
 - [Chat and sessions](../guides/chat-and-sessions.md)
-- [Programmatic use](../guides/programmatic-use.md)
+- [Programmatic hosts](../guides/programmatic/README.md)

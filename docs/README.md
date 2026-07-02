@@ -52,7 +52,7 @@ Task-oriented guides:
 - [Knowledge persistence](guides/knowledge-persistence.md)
 - [Semantic drift](guides/semantic-drift.md)
 - [Heartbeat](guides/heartbeat.md)
-- [Programmatic use](guides/programmatic-use.md)
+- [Programmatic hosts](guides/programmatic/README.md)
 - [Development and contributing](guides/development.md)
 - [Debugging](guides/debugging.md)
 - [Release convention](releases/README.md)
@@ -118,7 +118,7 @@ Evaluation:
 
 1. [Heartbeat](guides/heartbeat.md)
 2. [Control plane](guides/control-plane.md)
-3. [Programmatic use](guides/programmatic-use.md)
+3. [Programmatic hosts](guides/programmatic/README.md)
 
 ### I want to switch between local projects
 
@@ -128,7 +128,7 @@ Evaluation:
 
 ### I want to build on Heddle programmatically
 
-1. [Programmatic use](guides/programmatic-use.md) for the conversation engine alpha, persisted sessions, and turn submission
+1. [Programmatic hosts](guides/programmatic/README.md) for the conversation engine alpha, persisted sessions, and turn submission
 2. [Capabilities and tools](reference/capabilities.md)
 3. [Providers and models](reference/providers-and-models.md)
 

@@ -515,7 +515,7 @@ Advanced hosts can also reuse lower-level class APIs such as `ToolRegistry`, `To
 
 Other exported primitives include `HeartbeatRunnerAgent.run`, `HeartbeatSchedulerService.runDueTasks`, and `FileHeartbeatTaskService` for scheduled or custom host workflows.
 
-More: [Programmatic use](docs/guides/programmatic-use.md)
+More: [Programmatic hosts](docs/guides/programmatic/README.md)
 
 ### Semantic Drift
 
@@ -595,7 +595,7 @@ Feature guides:
 - [MCP integrations](docs/reference/mcp.md)
 - [Knowledge persistence](docs/guides/knowledge-persistence.md)
 - [Semantic drift](docs/guides/semantic-drift.md)
-- [Programmatic use](docs/guides/programmatic-use.md)
+- [Programmatic hosts](docs/guides/programmatic/README.md)
 
 Contributors:
 
