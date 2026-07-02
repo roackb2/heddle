@@ -72,6 +72,8 @@ Use this pattern when it fits the domain:
 
 - `createConversationEngine`
 - `EngineConversationTurnService`
+- `defineHostExtension`
+- `defineMcpHostExtension`
 - engine-facing types in `types.ts`
 
 ## Common Changes
