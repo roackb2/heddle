@@ -8,6 +8,8 @@ import type { ChatSession } from '../../types.js';
 import type { ConversationTurnResultSummary } from '../turn-result.js';
 import type { ConversationEngineHost, ConversationEngineHostExtension } from '../types.js';
 
+export type ConversationCliMemoryMaintenanceMode = 'none' | 'background' | 'inline';
+
 export type ConversationCliLocalCommandContext = {
   command: string;
   engine: ConversationEngine;
@@ -47,7 +49,7 @@ export type ConversationCliCredentialPreflightOptions = {
 };
 
 export type ConversationCliRunnerOptions = {
-  model: string;
+  model?: string;
   workspaceRoot?: string;
   stateRoot?: string;
   sessionId?: string;
@@ -55,13 +57,13 @@ export type ConversationCliRunnerOptions = {
   promptLabel?: string;
   oncePrompt?: string;
   maxSteps?: number;
-  reasoningEffort?: ReasoningEffort;
+  reasoningEffort?: ReasoningEffort | string;
   apiKey?: string;
   preferApiKey?: boolean;
   credentialStorePath?: string;
   credentialPreflight?: boolean | ConversationCliCredentialPreflightOptions;
   systemContext?: string;
-  memoryMaintenanceMode?: 'none' | 'background' | 'inline';
+  memoryMaintenanceMode?: ConversationCliMemoryMaintenanceMode;
   tools?: ToolDefinition[];
   hostExtensions?: ConversationEngineHostExtension[];
   host?: ConversationEngineHost;
@@ -73,4 +75,23 @@ export type ConversationCliRunnerOptions = {
   }) => void | Promise<void>;
   input?: Readable;
   output?: Writable;
+};
+
+export type ConversationCliRunnerDefaultsInput = Pick<
+  ConversationCliRunnerOptions,
+  'maxSteps' | 'memoryMaintenanceMode' | 'model' | 'reasoningEffort' | 'stateRoot' | 'workspaceRoot'
+> & {
+  env?: Pick<
+    NodeJS.ProcessEnv,
+    'ANTHROPIC_MODEL' | 'HEDDLE_EXAMPLE_MODEL' | 'HEDDLE_MODEL' | 'OPENAI_MODEL'
+  >;
+};
+
+export type ConversationCliRunnerDefaults = {
+  maxSteps: number;
+  memoryMaintenanceMode: ConversationCliMemoryMaintenanceMode;
+  model: string;
+  reasoningEffort?: ReasoningEffort;
+  stateRoot: string;
+  workspaceRoot: string;
 };

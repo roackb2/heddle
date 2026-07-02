@@ -3,8 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import {
   createConversationEngine,
+  resolveConversationCliDefaults,
   runConversationCli,
 } from '@/core/chat/engine/index.js';
 
@@ -56,6 +58,52 @@ describe('runConversationCli', () => {
 
     expect(output.text()).toContain('Commands: /session, /help, /exit, /artifacts');
     expect(output.text()).toContain('custom artifacts for session-');
+  });
+
+  it('resolves generic SDK defaults for minimal interactive hosts', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-conversation-cli-defaults-'));
+    const defaults = resolveConversationCliDefaults({
+      env: {},
+      reasoningEffort: 'medium',
+      workspaceRoot,
+    });
+
+    expect(defaults).toEqual({
+      maxSteps: 24,
+      memoryMaintenanceMode: 'none',
+      model: DEFAULT_OPENAI_MODEL,
+      reasoningEffort: 'medium',
+      stateRoot: join(workspaceRoot, '.heddle'),
+      workspaceRoot,
+    });
+  });
+
+  it('prefers explicit model overrides before environment fallbacks', () => {
+    expect(resolveConversationCliDefaults({
+      env: {
+        ANTHROPIC_MODEL: 'claude-from-env',
+        HEDDLE_EXAMPLE_MODEL: 'gpt-example-env',
+        HEDDLE_MODEL: 'gpt-heddle-env',
+        OPENAI_MODEL: 'gpt-openai-env',
+      },
+      model: 'gpt-explicit',
+    }).model).toBe('gpt-explicit');
+
+    expect(resolveConversationCliDefaults({
+      env: {
+        ANTHROPIC_MODEL: 'claude-from-env',
+        HEDDLE_EXAMPLE_MODEL: 'gpt-example-env',
+        HEDDLE_MODEL: 'gpt-heddle-env',
+        OPENAI_MODEL: 'gpt-openai-env',
+      },
+    }).model).toBe('gpt-heddle-env');
+  });
+
+  it('rejects unsupported reasoning effort overrides early', () => {
+    expect(() => resolveConversationCliDefaults({
+      env: {},
+      reasoningEffort: 'extreme',
+    })).toThrow('Unsupported reasoning effort: extreme. Use one of low, medium, high, ultrahigh.');
   });
 
   it('can resume an existing session without owning the caller loop', async () => {

@@ -6,14 +6,16 @@ before building a custom UI:
 ```ts
 import { runConversationCli } from '@roackb2/heddle'
 
-await runConversationCli({
-  model: 'gpt-5.4',
-})
+await runConversationCli()
 ```
 
-The runner resolves credentials before starting the session and prints the
-selected model and credential source. If the model has no usable credential, it
-fails early with Heddle's standard setup message.
+The runner chooses reasonable SDK defaults: the current working directory as the
+workspace, `.heddle` under that workspace for conversation state, a default step
+budget, no automatic memory maintenance, and the first configured model from
+`HEDDLE_MODEL`, `HEDDLE_EXAMPLE_MODEL`, `OPENAI_MODEL`, `ANTHROPIC_MODEL`, or
+Heddle's built-in OpenAI default. It resolves credentials before starting the
+session and prints the selected model and credential source. If the model has no
+usable credential, it fails early with Heddle's standard setup message.
 
 Run the local SDK example:
 
@@ -28,7 +30,8 @@ not a full custom UI:
 import { runConversationCli } from '@roackb2/heddle'
 
 await runConversationCli({
-  model: 'gpt-5.4',
+  model: process.env.MY_PRODUCT_MODEL,
+  reasoningEffort: process.env.MY_PRODUCT_REASONING_EFFORT,
   credentialPreflight: {
     missingCredentialHint: 'Run your product-specific auth setup first.',
   },
@@ -48,6 +51,30 @@ await runConversationCli({
       output.write(`Artifacts for ${session.id} are available through artifact tools.\n`)
     },
   }],
+})
+```
+
+If your host must prepare extensions before starting the loop, reuse the same
+default resolver instead of rebuilding path and model fallbacks:
+
+```ts
+import {
+  resolveConversationCliDefaults,
+  runConversationCli,
+} from '@roackb2/heddle'
+
+const runtime = resolveConversationCliDefaults({
+  model: process.env.MY_PRODUCT_MODEL,
+  reasoningEffort: process.env.MY_PRODUCT_REASONING_EFFORT,
+})
+
+const hostExtensions = [
+  // prepare your generic host extensions with runtime.stateRoot
+]
+
+await runConversationCli({
+  ...runtime,
+  hostExtensions,
 })
 ```
 

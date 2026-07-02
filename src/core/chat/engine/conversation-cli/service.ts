@@ -2,6 +2,8 @@ import { createInterface } from 'node:readline/promises';
 import { join } from 'node:path';
 import { stdin, stdout } from 'node:process';
 import type { Writable } from 'node:stream';
+import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
+import type { ReasoningEffort } from '@/core/llm/types.js';
 import {
   RuntimeCredentialService,
 } from '@/core/runtime/credentials/index.js';
@@ -15,11 +17,16 @@ import type {
   ConversationCliCredentialContext,
   ConversationCliCredentialPreflightOptions,
   ConversationCliLocalCommand,
+  ConversationCliRunnerDefaults,
+  ConversationCliRunnerDefaultsInput,
   ConversationCliRunnerOptions,
   ConversationCliTurnContext,
 } from './types.js';
 
 const DEFAULT_PROMPT_LABEL = 'heddle> ';
+const DEFAULT_MAX_STEPS = 24;
+const DEFAULT_MEMORY_MAINTENANCE_MODE = 'none';
+const SUPPORTED_REASONING_EFFORTS = new Set<ReasoningEffort>(['low', 'medium', 'high', 'ultrahigh']);
 const BUILT_IN_COMMANDS = [
   { command: '/session', description: 'print the active session id' },
   { command: '/help', description: 'print available local commands' },
@@ -35,21 +42,24 @@ const BUILT_IN_COMMANDS = [
  * control path rather than a lightly customized CLI loop.
  */
 export class ConversationCliRunnerService {
-  static async run(options: ConversationCliRunnerOptions): Promise<void> {
-    const workspaceRoot = options.workspaceRoot ?? process.cwd();
-    const stateRoot = options.stateRoot ?? join(workspaceRoot, '.heddle');
+  static async run(options: ConversationCliRunnerOptions = {}): Promise<void> {
+    const defaults = ConversationCliRunnerService.resolveDefaults(options);
+    const { stateRoot, workspaceRoot } = defaults;
     const output = options.output ?? stdout;
-    const credentialContext = ConversationCliRunnerService.preflightCredentials({ options });
+    const credentialContext = ConversationCliRunnerService.preflightCredentials({
+      defaults,
+      options,
+    });
     const engine = createConversationEngine({
       workspaceRoot,
       stateRoot,
-      model: options.model,
-      reasoningEffort: options.reasoningEffort,
+      model: defaults.model,
+      reasoningEffort: defaults.reasoningEffort,
       apiKey: options.apiKey,
       preferApiKey: options.preferApiKey,
       credentialStorePath: options.credentialStorePath,
       systemContext: options.systemContext,
-      memoryMaintenanceMode: options.memoryMaintenanceMode,
+      memoryMaintenanceMode: defaults.memoryMaintenanceMode,
       tools: options.tools,
       hostExtensions: options.hostExtensions,
     });
@@ -62,14 +72,15 @@ export class ConversationCliRunnerService {
 
     ConversationCliRunnerService.writeRuntimeStatus({
       credentialContext,
+      defaults,
       output,
-      reasoningEffort: options.reasoningEffort,
     });
     output.write(`Session: ${session.id}\n`);
     output.write(`Commands: ${ConversationCliRunnerService.formatCommandList(options.localCommands)}\n`);
 
     if (options.oncePrompt?.trim()) {
       await ConversationCliRunnerService.submitPrompt({
+        defaults,
         engine,
         host,
         options,
@@ -122,6 +133,7 @@ export class ConversationCliRunnerService {
         }
 
         const result = await ConversationCliRunnerService.submitPrompt({
+          defaults,
           engine,
           host,
           options,
@@ -138,7 +150,21 @@ export class ConversationCliRunnerService {
     }
   }
 
+  static resolveDefaults(options: ConversationCliRunnerDefaultsInput = {}): ConversationCliRunnerDefaults {
+    const workspaceRoot = options.workspaceRoot ?? process.cwd();
+
+    return {
+      maxSteps: options.maxSteps ?? DEFAULT_MAX_STEPS,
+      memoryMaintenanceMode: options.memoryMaintenanceMode ?? DEFAULT_MEMORY_MAINTENANCE_MODE,
+      model: ConversationCliRunnerService.resolveModel(options),
+      reasoningEffort: ConversationCliRunnerService.resolveReasoningEffort(options.reasoningEffort),
+      stateRoot: options.stateRoot ?? join(workspaceRoot, '.heddle'),
+      workspaceRoot,
+    };
+  }
+
   private static preflightCredentials(input: {
+    defaults: ConversationCliRunnerDefaults;
     options: ConversationCliRunnerOptions;
   }): ConversationCliCredentialContext | undefined {
     const preflight = ConversationCliRunnerService.resolveCredentialPreflight(input.options.credentialPreflight);
@@ -149,9 +175,9 @@ export class ConversationCliRunnerService {
     const resolution = LlmProviderRuntimeService.resolve({
       apiKey: input.options.apiKey,
       credentialStorePath: input.options.credentialStorePath,
-      model: input.options.model,
+      model: input.defaults.model,
       preferApiKey: input.options.preferApiKey,
-      reasoningEffort: input.options.reasoningEffort,
+      reasoningEffort: input.defaults.reasoningEffort,
     });
     const context = {
       model: resolution.model,
@@ -211,16 +237,16 @@ export class ConversationCliRunnerService {
 
   private static writeRuntimeStatus(input: {
     credentialContext: ConversationCliCredentialContext | undefined;
+    defaults: ConversationCliRunnerDefaults;
     output: NodeJS.WritableStream;
-    reasoningEffort: ConversationCliRunnerOptions['reasoningEffort'];
   }): void {
     if (!input.credentialContext) {
       return;
     }
 
     input.output.write(`Model: ${input.credentialContext.model} (${input.credentialContext.provider})\n`);
-    if (input.reasoningEffort) {
-      input.output.write(`Reasoning: ${input.reasoningEffort}\n`);
+    if (input.defaults.reasoningEffort) {
+      input.output.write(`Reasoning: ${input.defaults.reasoningEffort}\n`);
     }
     input.output.write([
       `Credential: ${RuntimeCredentialService.formatCredentialSource(input.credentialContext.source)}`,
@@ -256,6 +282,7 @@ export class ConversationCliRunnerService {
   }
 
   private static async submitPrompt(input: {
+    defaults: ConversationCliRunnerDefaults;
     engine: ConversationEngine;
     host: ConversationEngineHost;
     options: ConversationCliRunnerOptions;
@@ -280,9 +307,9 @@ export class ConversationCliRunnerService {
     const result = await input.engine.turns.submit({
       sessionId: input.session.id,
       prompt: submittedPrompt,
-      maxSteps: input.options.maxSteps,
+      maxSteps: input.defaults.maxSteps,
       host: input.host,
-      memoryMaintenanceMode: input.options.memoryMaintenanceMode,
+      memoryMaintenanceMode: input.defaults.memoryMaintenanceMode,
     });
     input.textHost.renderTurnResult(result);
     await input.options.onTurnFinished?.({
@@ -402,6 +429,32 @@ export class ConversationCliRunnerService {
       ...(localCommands ?? []).map((command) => command.command),
     ].join(', ');
   }
+
+  private static resolveModel(options: ConversationCliRunnerDefaultsInput): string {
+    const env = options.env ?? process.env;
+    return [
+      options.model,
+      env.HEDDLE_MODEL,
+      env.HEDDLE_EXAMPLE_MODEL,
+      env.OPENAI_MODEL,
+      env.ANTHROPIC_MODEL,
+      DEFAULT_OPENAI_MODEL,
+    ].map((candidate) => candidate?.trim())
+      .find((candidate): candidate is string => Boolean(candidate)) ?? DEFAULT_OPENAI_MODEL;
+  }
+
+  private static resolveReasoningEffort(input: ConversationCliRunnerDefaultsInput['reasoningEffort']): ReasoningEffort | undefined {
+    const value = input?.trim();
+    if (!value) {
+      return undefined;
+    }
+
+    if (SUPPORTED_REASONING_EFFORTS.has(value as ReasoningEffort)) {
+      return value as ReasoningEffort;
+    }
+
+    throw new Error(`Unsupported reasoning effort: ${value}. Use one of low, medium, high, ultrahigh.`);
+  }
 }
 
 type ResolvedLocalCommand =
@@ -411,3 +464,4 @@ type ResolvedLocalCommand =
   | { type: 'session' };
 
 export const runConversationCli = ConversationCliRunnerService.run;
+export const resolveConversationCliDefaults = ConversationCliRunnerService.resolveDefaults;

@@ -1,2 +1,7 @@
-export { ConversationCliRunnerService, runConversationCli } from './service.js';
-export type { ConversationCliRunnerOptions } from './types.js';
+export { ConversationCliRunnerService, resolveConversationCliDefaults, runConversationCli } from './service.js';
+export type {
+  ConversationCliMemoryMaintenanceMode,
+  ConversationCliRunnerDefaults,
+  ConversationCliRunnerDefaultsInput,
+  ConversationCliRunnerOptions,
+} from './types.js';
