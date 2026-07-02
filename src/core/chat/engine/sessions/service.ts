@@ -54,9 +54,7 @@ export class FileConversationSessionService implements ConversationSessionServic
 
   constructor(config: NormalizedConversationEngineConfig | ConversationSessionServiceConfig) {
     this.config = FileConversationSessionService.normalizeConfig(config);
-    this.repository = new FileChatSessionRepository({
-      sessionStoragePath: this.config.sessionStoragePath,
-    });
+    this.repository = this.config.sessionRepository;
   }
 
   static summarize(session: ChatSession): string {
@@ -488,12 +486,14 @@ export class FileConversationSessionService implements ConversationSessionServic
 
     const workspaceRoot = resolve(config.workspaceRoot);
     const stateRoot = resolve(config.stateRoot);
+    const sessionStoragePath = resolve(config.sessionStoragePath ?? join(stateRoot, 'chat-sessions.catalog.json'));
     return {
       workspaceRoot,
       stateRoot,
       model: config.model,
       reasoningEffort: config.reasoningEffort,
-      sessionStoragePath: resolve(config.sessionStoragePath ?? join(stateRoot, 'chat-sessions.catalog.json')),
+      sessionStoragePath,
+      sessionRepository: config.sessionRepository ?? new FileChatSessionRepository({ sessionStoragePath }),
       workspaceId: config.workspaceId,
     };
   }

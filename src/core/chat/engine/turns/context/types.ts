@@ -3,13 +3,14 @@ import type { ToolDefinition } from '@/core/types.js';
 import type { ToolToolkit } from '@/core/tools/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
+import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatTurnRuntime } from '../runtime/index.js';
 
 export type PrepareConversationTurnContextArgs = {
   workspaceRoot: string;
   stateRoot: string;
-  sessionStoragePath: string;
+  sessionRepository: ChatSessionRepository;
   sessionId: string;
   apiKey?: string;
   preferApiKey?: boolean;

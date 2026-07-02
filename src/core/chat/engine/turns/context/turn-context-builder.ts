@@ -1,5 +1,4 @@
 import { RuntimeToolService } from '@/core/runtime/tools/index.js';
-import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import { CustomAgentRuntimeContextService } from '@/core/custom-agents/index.js';
 import { ConversationTurnRuntimeResolver } from '../runtime/index.js';
 import type {
@@ -15,7 +14,7 @@ import type { ConversationTurnRuntimeConfig } from '../runtime/index.js';
  */
 export class ConversationTurnContextBuilder {
   static build(args: PrepareConversationTurnContextArgs): ConversationTurnContext {
-    const sessions = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath }).list();
+    const sessions = args.sessionRepository.list();
     const session = sessions.find((candidate) => candidate.id === args.sessionId);
     if (!session) {
       throw new Error(`Chat session not found: ${args.sessionId}`);

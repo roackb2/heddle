@@ -85,5 +85,34 @@ family, and MCP host-extension result-artifact capture. `contentKey` owns
 content addressing — return whatever key your storage understands; it is stored
 as `RuntimeArtifact.path`.
 
-Sessions, traces, and memory still persist under the state root today. Making
-them injectable follows the same port-per-domain pattern.
+## Bring your own session storage
+
+Sessions follow the same pattern through the `ChatSessionRepository` port: the
+session catalog plus full session bodies.
+
+```ts
+import { createConversationEngine, type ChatSessionRepository } from '@roackb2/heddle'
+
+const sessionRepository: ChatSessionRepository = {
+  list: () => loadAllSessions(),
+  readCatalog: () => loadSessionCatalogEntries(),
+  read: (sessionId) => loadSession(sessionId),
+  save: (sessions) => storeSessions(sessions),
+}
+
+const engine = createConversationEngine({
+  workspaceRoot,
+  stateRoot,
+  model: 'gpt-5.4',
+  sessionRepository,
+})
+```
+
+The injected repository is resolved once at the engine boundary and used for
+session create/read/update/rename, turn preflight and persistence, lease
+acquisition/release, and background memory-maintenance writes. Session policy
+(leases, records, compaction state) stays inside Heddle — the repository only
+persists.
+
+Traces and memory still persist under the state root today. Making them
+injectable follows the same port-per-domain pattern.

@@ -5,6 +5,7 @@ import type { ConversationCompactionStatus } from '@/core/live/index.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
+import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatTurnHostPort } from '../host/index.js';
 import type {
@@ -69,7 +70,7 @@ export type PersistCompletedChatTurnBase = {
 
 export type PersistCompletedChatTurnArgs = PersistCompletedChatTurnBase & {
   sessions: ChatSession[];
-  sessionStoragePath: string;
+  sessionRepository: ChatSessionRepository;
   credentialSource: ProviderCredentialSource;
   host: Pick<ChatTurnHostPort, 'onCompactionStatus'>;
 };

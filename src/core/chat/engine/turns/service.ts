@@ -23,6 +23,7 @@ import { ConversationTurnPersistenceService } from './persistence/index.js';
 import { ChatSessionLeases, type ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
+import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { PrepareConversationTurnContextArgs } from './context/index.js';
 import type { ChatTurnHostPort } from './host/index.js';
 import type {
@@ -79,7 +80,11 @@ export class EngineConversationTurnService implements ConversationTurnService {
   }
 
   static async run(args: RunConversationTurnArgs): Promise<RunConversationTurnResult> {
-    const contextInput: PrepareConversationTurnContextArgs = args;
+    // Resolve session persistence once for the whole turn; every inner service
+    // receives this instance instead of re-deriving storage from paths.
+    const sessionRepository = args.sessionRepository
+      ?? new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath });
+    const contextInput: PrepareConversationTurnContextArgs = { ...args, sessionRepository };
     const context = ConversationTurnContextBuilder.build(contextInput);
     const { sessions, session, runtime, tools, toolNames, leaseOwner, agentSnapshot } = context;
     const host = EngineConversationTurnService.turnHost(args);
@@ -97,6 +102,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
     try {
       const preflight = await ConversationTurnPreflightService.prepare({
         ...preflightInput,
+        sessionRepository,
         sessionId: session.id,
         fallbackHistory: session.history,
         model: runtime.model,
@@ -147,6 +153,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
 
       const persisted = await ConversationTurnPersistenceService.persistCompleted({
         ...persistenceInput,
+        sessionRepository,
         result: resultForPersistence,
         session: preflight.session ?? session,
         sessions,
@@ -164,7 +171,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
           ...memoryRuntime,
           trace: result.trace,
           traceFile: persisted.traceFile,
-          sessionStoragePath: args.sessionStoragePath,
+          sessionRepository,
           sessionId: session.id,
           runId: result.state?.runId ?? `session-${session.id}`,
         });
@@ -184,12 +191,11 @@ export class EngineConversationTurnService implements ConversationTurnService {
         toolResults: EngineConversationTurnService.summarizeToolResults(resultForPersistence.trace),
       };
     } finally {
-      EngineConversationTurnService.clearLeaseFromStorage(args.sessionStoragePath, session.id, leaseOwner);
+      EngineConversationTurnService.clearLeaseFromStorage(sessionRepository, session.id, leaseOwner);
     }
   }
 
-  static clearLeaseFromStorage(sessionStoragePath: string, sessionId: string, owner: ChatSessionLeaseOwner): void {
-    const repository = new FileChatSessionRepository({ sessionStoragePath });
+  static clearLeaseFromStorage(repository: ChatSessionRepository, sessionId: string, owner: ChatSessionLeaseOwner): void {
     const sessions = repository.list();
     const session = sessions.find((candidate) => candidate.id === sessionId);
     if (!session?.lease) {

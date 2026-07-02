@@ -1,6 +1,8 @@
 import { join, resolve } from 'node:path';
 import { FileArtifactRepository } from '@/core/artifacts/index.js';
 import type { ArtifactRepository } from '@/core/artifacts/index.js';
+import { FileChatSessionRepository } from './sessions/repository/index.js';
+import type { ChatSessionRepository } from './sessions/repository/index.js';
 import type { ToolApprovalPolicy } from '../../approvals/types.js';
 import type { ReasoningEffort } from '../../llm/types.js';
 import type { TraceSummaryService } from '@/core/observability/index.js';
@@ -28,6 +30,7 @@ export type NormalizedConversationEngineConfig = {
   artifactRepository: ArtifactRepository;
   artifactsEnabled: boolean;
   sessionStoragePath: string;
+  sessionRepository: ChatSessionRepository;
   memoryDir: string;
   traceDir: string;
   workspaceId?: string;
@@ -38,6 +41,9 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
   const workspaceRoot = resolve(config.workspaceRoot);
   const stateRoot = resolve(config.stateRoot);
   const sessionStoragePath = resolve(config.sessionStoragePath ?? join(stateRoot, 'chat-sessions.catalog.json'));
+  // Resolve session persistence once at the engine boundary; session and turn
+  // services receive this instance instead of re-deriving storage from paths.
+  const sessionRepository = config.sessionRepository ?? new FileChatSessionRepository({ sessionStoragePath });
   const memoryDir = resolve(config.memoryDir ?? join(stateRoot, 'memory'));
   const traceDir = resolve(join(stateRoot, 'traces'));
   const hostExtensions = ConversationEngineHostExtensionService.compose(config.hostExtensions);
@@ -74,6 +80,7 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
     artifactRepository,
     artifactsEnabled: hostExtensions?.artifacts?.enabled ?? true,
     sessionStoragePath,
+    sessionRepository,
     memoryDir,
     traceDir,
     workspaceId: config.workspaceId,

@@ -207,13 +207,15 @@ export type {
 // ---------------------------------------------------------------------------
 // 5. Advanced: storage — back Heddle with your own persistence
 // ---------------------------------------------------------------------------
-// Heddle defaults to local file-backed stores. Artifacts are injectable today:
-// implement `ArtifactRepository` and pass it as `artifactRepository` to
+// Heddle defaults to local file-backed stores. Artifacts and sessions are
+// injectable today: implement `ArtifactRepository` / `ChatSessionRepository`
+// and pass them as `artifactRepository` / `sessionRepository` to
 // `createConversationEngine(...)` (or the quickstart runner) to persist
-// artifacts through your own storage — the engine reader, turn results, and
-// artifact tools all flow through it. Sessions, traces, and memory remain
-// path-oriented (stateRoot) for now; making them injectable follows the same
-// pattern (see SDK posture, rung 5).
+// through your own storage — session lifecycle, turn preflight/persistence,
+// leases, the engine artifact reader, turn results, and artifact tools all
+// flow through the injected instances. Traces and memory remain path-oriented
+// (stateRoot) for now; making them injectable follows the same pattern (see
+// SDK posture, rung 5).
 export { ArtifactService, FileArtifactRepository } from './core/artifacts/index.js';
 export type {
   ArtifactCurrentPointers,
@@ -227,5 +229,12 @@ export type {
   RuntimeArtifact,
   SaveTextArtifactInput,
 } from './core/artifacts/index.js';
+export { FileChatSessionRepository } from './core/chat/engine/sessions/repository/index.js';
+export type {
+  ChatSessionCatalog,
+  ChatSessionCatalogEntry,
+  ChatSessionRepository,
+} from './core/chat/engine/sessions/repository/index.js';
+export type { ChatSession } from './core/chat/types.js';
 export { RuntimeCredentialService } from './core/runtime/credentials/index.js';
 export type { ApiKeyRuntime, ProviderCredentialSource } from './core/runtime/credentials/index.js';

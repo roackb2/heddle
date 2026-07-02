@@ -36,11 +36,13 @@ There are two import entry points:
 5. **Advanced: storage** — back Heddle with your own persistence.
    - [Result artifacts](result-artifacts.md): save large generated values as
      reusable artifacts.
-   - Artifact storage is injectable: implement `ArtifactRepository` and pass it
-     as `artifactRepository` (see
-     [Conversation engine → Bring your own artifact storage](conversation-engine.md#bring-your-own-artifact-storage)).
-     Sessions, traces, and memory still persist under a local state root; making
-     them injectable follows the same pattern.
+   - Artifact and session storage are injectable: implement
+     `ArtifactRepository` / `ChatSessionRepository` and pass them as
+     `artifactRepository` / `sessionRepository` (see
+     [Conversation engine → Bring your own artifact storage](conversation-engine.md#bring-your-own-artifact-storage)
+     and [→ Bring your own session storage](conversation-engine.md#bring-your-own-session-storage)).
+     Traces and memory still persist under a local state root; making them
+     injectable follows the same pattern.
 
 Runnable versions of the first few rungs live in
 [`examples/sdk/`](../../../examples/sdk/README.md).

@@ -32,14 +32,14 @@ describe('chat turn preparation modules', () => {
     expect(ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
-      sessionStoragePath,
+      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
       sessionId: 'session-1',
       apiKey: 'explicit-key',
     }).session.id).toBe('session-1');
     expect(() => ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
-      sessionStoragePath,
+      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
       sessionId: 'missing',
       apiKey: 'explicit-key',
     })).toThrow('Chat session not found: missing');
@@ -131,7 +131,7 @@ describe('chat turn preparation modules', () => {
     const context = ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
-      sessionStoragePath,
+      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
       sessionId: 'session-1',
       apiKey: 'explicit-key',
     });
@@ -233,7 +233,7 @@ describe('chat turn preparation modules', () => {
     const context = ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
-      sessionStoragePath,
+      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
       sessionId: 'session-1',
       apiKey: 'explicit-key',
     });
@@ -285,7 +285,7 @@ describe('chat turn preparation modules', () => {
     const context = ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
-      sessionStoragePath,
+      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
       sessionId: 'session-1',
       apiKey: 'explicit-key',
       agentSnapshot: askAgentSnapshot(),
@@ -331,7 +331,7 @@ describe('chat turn preparation modules', () => {
     const context = ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
-      sessionStoragePath,
+      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
       sessionId: 'session-1',
       apiKey: 'explicit-key',
       tools: [tool('host_create_document')],
@@ -371,7 +371,7 @@ describe('chat turn preparation modules', () => {
     const context = ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot,
-      sessionStoragePath,
+      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
       sessionId: 'session-1',
       apiKey: 'explicit-key',
     });
@@ -412,7 +412,7 @@ describe('chat turn preparation modules', () => {
     new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([leasedSession]);
 
     ConversationTurnPreflightService.persistRunningSeed({
-      sessionStoragePath,
+      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
       sessions: [leasedSession],
       sessionId: 'session-1',
       leasedSession,
@@ -437,7 +437,7 @@ describe('chat turn preparation modules', () => {
     new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
 
     const preparedSession = ConversationTurnPreflightService.persistPrepared({
-      sessionStoragePath,
+      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
       sessions: [session],
       session,
       compacted: {
@@ -477,7 +477,7 @@ describe('chat turn preparation modules', () => {
     new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
 
     ConversationTurnPreflightService.persistPrepared({
-      sessionStoragePath,
+      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
       sessions: [session],
       session,
       compacted: {
@@ -522,7 +522,7 @@ describe('chat turn preparation modules', () => {
     new FileChatSessionRepository({ sessionStoragePath }).save([session]);
 
     ConversationTurnPreflightService.persistPrepared({
-      sessionStoragePath,
+      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
       sessions: [session],
       session,
       compacted: {

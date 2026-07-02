@@ -1,6 +1,5 @@
 import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
-import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import { ConversationTurnArtifacts } from './turn-artifacts.js';
 import type {
   PersistCompletedChatTurnBase,
@@ -31,7 +30,7 @@ export class ConversationTurnPersistenceService {
       },
     });
 
-    const repository = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath });
+    const repository = args.sessionRepository;
     const latestSessions = repository.list();
     const latestSession = latestSessions.find((candidate) => candidate.id === args.session.id);
     const session = latestSession
@@ -57,7 +56,7 @@ export class ConversationTurnPersistenceService {
         sourceHistory,
       }),
     });
-    new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
+    args.sessionRepository
       .save(args.sessions.map((candidate) => (candidate.id === args.session.id ? compactionSeed : candidate)));
   }
 

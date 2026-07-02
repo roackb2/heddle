@@ -11,6 +11,7 @@ import type { AgentLoopEvent, RunAgentLoopOptions } from '../../runtime/loop/ind
 import type { ChatMessage, LlmAdapter, ReasoningEffort } from '../../llm/types.js';
 import type { ToolDefinition, TraceEvent } from '../../types.js';
 import type { ChatSessionLeaseOwner } from './sessions/leases/index.js';
+import type { ChatSessionRepository } from './sessions/repository/index.js';
 import type { ChatSession, ChatSessionRetention, QueuedConversationPrompt } from '../types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatTurnHostPort } from './turns/host/index.js';
@@ -50,6 +51,13 @@ export type ConversationEngineConfig = {
    * through this repository instead of `stateRoot/artifacts`.
    */
   artifactRepository?: ArtifactRepository;
+  /**
+   * Custom session persistence for hosted services. When set, session
+   * create/read/update, turn preflight/persistence, leases, and background
+   * memory-maintenance writes all flow through this repository instead of the
+   * file catalog under the state root.
+   */
+  sessionRepository?: ChatSessionRepository;
 };
 
 export type ConversationEngineHostExtensions = ConversationEngineHostExtensionBundle;
