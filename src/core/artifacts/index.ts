@@ -15,6 +15,7 @@ export type {
   ArtifactKind,
   ArtifactListOptions,
   ArtifactReadResult,
+  ArtifactRepository,
   ArtifactServiceOptions,
   ArtifactStore,
   FileArtifactRepositoryOptions,

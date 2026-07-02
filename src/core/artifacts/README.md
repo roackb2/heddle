@@ -13,11 +13,25 @@ Artifacts are not memory, traces, or tool results:
 
 This domain owns:
 
-- the persisted artifact index under `stateRoot/artifacts/artifacts.json`;
-- text-like artifact file storage under `stateRoot/artifacts/files/`;
+- the `ArtifactRepository` persistence port (catalog document + content blobs);
+- the default file-backed implementation: the index at
+  `artifactRoot/artifacts.json` and text-like content under
+  `artifactRoot/files/`;
 - current artifact pointers for a workspace or session;
-- repository validation for the on-disk JSON contract;
+- repository validation for the persisted JSON contract;
 - service operations for save, list, read, and current-artifact selection.
+
+Ownership split inside the domain:
+
+- `ArtifactService` owns artifact policy: id validation, extension resolution,
+  catalog shape, and current-pointer semantics. It never touches storage
+  directly.
+- `ArtifactRepository` (port in `types.ts`) owns persistence. The default is
+  `FileArtifactRepository`; hosted services inject their own implementation via
+  `createConversationEngine({ artifactRepository })`, and it flows to the
+  engine artifact reader, turn-result listing, and artifact tools.
+- `RuntimeArtifact.path` stores the repository-owned content key: an absolute
+  file path for the file store, an opaque key for custom stores.
 
 This domain does not own:
 

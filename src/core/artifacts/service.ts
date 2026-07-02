@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, extname, join, relative, resolve } from 'node:path';
+import { basename, extname, relative, resolve } from 'node:path';
 import dayjs from 'dayjs';
 import { FileArtifactRepository } from './repository.js';
 import type {
   ArtifactKind,
   ArtifactListOptions,
   ArtifactReadResult,
+  ArtifactRepository,
   ArtifactServiceOptions,
   ArtifactStore,
   RuntimeArtifact,
@@ -24,19 +24,18 @@ const KIND_EXTENSION: Record<ArtifactKind, string> = {
 };
 
 /**
- * Owns artifact persistence and current-artifact selection.
+ * Owns artifact policy: id validation, extension resolution, catalog shape,
+ * and current-artifact selection. All persistence goes through the
+ * `ArtifactRepository` port (file-backed by default), so hosts can supply
+ * their own storage.
  */
 export class ArtifactService {
-  private readonly artifactRoot: string;
-  private readonly filesRoot: string;
-  private readonly repository: FileArtifactRepository;
+  private readonly repository: ArtifactRepository;
   private readonly now: () => string;
   private readonly nextId: () => string;
 
   constructor(options: ArtifactServiceOptions) {
-    this.artifactRoot = resolve(options.artifactRoot);
-    this.filesRoot = join(this.artifactRoot, 'files');
-    this.repository = new FileArtifactRepository({ artifactRoot: this.artifactRoot });
+    this.repository = ArtifactService.resolveRepository(options);
     this.now = options.now ?? (() => dayjs().toISOString());
     this.nextId = options.nextId ?? (() => `artifact-${randomUUID()}`);
   }
@@ -44,8 +43,8 @@ export class ArtifactService {
   saveText(input: SaveTextArtifactInput): RuntimeArtifact {
     const id = this.assertArtifactId(this.nextId());
     const timestamp = this.now();
-    const path = join(this.filesRoot, `${id}.${this.resolveExtension(input)}`);
-    if (this.get(id) || existsSync(path)) {
+    const path = this.repository.contentKey(id, this.resolveExtension(input));
+    if (this.get(id) || this.repository.contentExists(path)) {
       throw new Error(`Artifact already exists: ${id}`);
     }
 
@@ -64,14 +63,13 @@ export class ArtifactService {
       ...(input.metadata ? { metadata: input.metadata } : {}),
     };
 
-    mkdirSync(this.filesRoot, { recursive: true });
-    writeFileSync(path, input.content, 'utf8');
+    this.repository.writeContent(path, input.content);
     this.upsertArtifact(artifact, { setCurrent: input.setCurrent ?? true });
     return artifact;
   }
 
   list(options: ArtifactListOptions = {}): RuntimeArtifact[] {
-    return this.repository.read().artifacts
+    return this.repository.readCatalog().artifacts
       .filter((artifact) => !options.sessionId || artifact.sessionId === options.sessionId)
       .filter((artifact) => !options.domain || artifact.domain === options.domain)
       .filter((artifact) => !options.kind || artifact.kind === options.kind)
@@ -79,23 +77,21 @@ export class ArtifactService {
   }
 
   get(id: string): RuntimeArtifact | undefined {
-    return this.repository.read().artifacts.find((artifact) => artifact.id === id);
+    return this.repository.readCatalog().artifacts.find((artifact) => artifact.id === id);
   }
 
   read(id: string): ArtifactReadResult | undefined {
     const artifact = this.get(id);
-    if (!artifact || !existsSync(artifact.path)) {
+    if (!artifact) {
       return undefined;
     }
 
-    return {
-      artifact,
-      content: readFileSync(artifact.path, 'utf8'),
-    };
+    const content = this.repository.readContent(artifact.path);
+    return content === undefined ? undefined : { artifact, content };
   }
 
   current(sessionId?: string): RuntimeArtifact | undefined {
-    const store = this.repository.read();
+    const store = this.repository.readCatalog();
     const artifactId = sessionId
       ? store.current.sessionArtifactIds[sessionId] ?? store.current.workspaceArtifactId
       : store.current.workspaceArtifactId;
@@ -104,7 +100,7 @@ export class ArtifactService {
   }
 
   setCurrent(artifactId: string, options: { sessionId?: string } = {}): RuntimeArtifact {
-    const store = this.repository.read();
+    const store = this.repository.readCatalog();
     const artifact = store.artifacts.find((candidate) => candidate.id === artifactId);
     if (!artifact) {
       throw new Error(`Artifact not found: ${artifactId}`);
@@ -115,12 +111,12 @@ export class ArtifactService {
     } else {
       store.current.workspaceArtifactId = artifactId;
     }
-    this.repository.write(store);
+    this.repository.writeCatalog(store);
     return artifact;
   }
 
   private upsertArtifact(artifact: RuntimeArtifact, options: { setCurrent: boolean }): void {
-    const store = this.repository.read();
+    const store = this.repository.readCatalog();
     const artifacts = [
       artifact,
       ...store.artifacts.filter((candidate) => candidate.id !== artifact.id),
@@ -136,7 +132,7 @@ export class ArtifactService {
         },
       },
     };
-    this.repository.write(nextStore);
+    this.repository.writeCatalog(nextStore);
   }
 
   private resolveExtension(input: SaveTextArtifactInput): string {
@@ -149,6 +145,18 @@ export class ArtifactService {
       throw new Error(`Invalid artifact id "${id}". Use only letters, numbers, dots, underscores, and hyphens.`);
     }
     return id;
+  }
+
+  private static resolveRepository(options: ArtifactServiceOptions): ArtifactRepository {
+    if (options.repository) {
+      return options.repository;
+    }
+
+    if (!options.artifactRoot) {
+      throw new Error('ArtifactService requires either a repository or an artifactRoot.');
+    }
+
+    return new FileArtifactRepository({ artifactRoot: options.artifactRoot });
   }
 
   private static extensionFromPath(path: string | undefined): string | undefined {

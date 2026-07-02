@@ -1,4 +1,5 @@
 import type { Readable, Writable } from 'node:stream';
+import type { ArtifactRepository } from '@/core/artifacts/index.js';
 import type { ReasoningEffort } from '@/core/llm/types.js';
 import type { LlmProvider } from '@/core/llm/types.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
@@ -67,6 +68,7 @@ export type QuickstartConversationCliRunnerOptions = {
   memoryMaintenanceMode?: QuickstartConversationCliMemoryMaintenanceMode;
   tools?: ToolDefinition[];
   hostExtensions?: ConversationEngineHostExtension[];
+  artifactRepository?: ArtifactRepository;
   host?: ConversationEngineHost;
   localCommands?: QuickstartConversationCliLocalCommand[];
   formatPrompt?: (prompt: string) => string;

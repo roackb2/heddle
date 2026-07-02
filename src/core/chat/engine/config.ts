@@ -1,4 +1,6 @@
 import { join, resolve } from 'node:path';
+import { FileArtifactRepository } from '@/core/artifacts/index.js';
+import type { ArtifactRepository } from '@/core/artifacts/index.js';
 import type { ToolApprovalPolicy } from '../../approvals/types.js';
 import type { ReasoningEffort } from '../../llm/types.js';
 import type { TraceSummaryService } from '@/core/observability/index.js';
@@ -23,6 +25,7 @@ export type NormalizedConversationEngineConfig = {
   toolkits?: ToolToolkit[];
   hiddenMcpServerIds?: string[];
   artifactRoot: string;
+  artifactRepository: ArtifactRepository;
   artifactsEnabled: boolean;
   sessionStoragePath: string;
   memoryDir: string;
@@ -39,6 +42,9 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
   const traceDir = resolve(join(stateRoot, 'traces'));
   const hostExtensions = ConversationEngineHostExtensionService.compose(config.hostExtensions);
   const artifactRoot = resolve(hostExtensions?.artifacts?.root ?? join(stateRoot, 'artifacts'));
+  // Resolve artifact persistence once at the engine boundary; everything
+  // downstream (reader, turn results, artifact tools) receives this instance.
+  const artifactRepository = config.artifactRepository ?? new FileArtifactRepository({ artifactRoot });
   const credentialStorePath = config.credentialStorePath ? resolve(config.credentialStorePath) : undefined;
   const tools = [
     ...(config.tools ?? []),
@@ -65,6 +71,7 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
     toolkits: hostExtensions?.toolkits,
     hiddenMcpServerIds: hostExtensions?.mcp?.hideDefaultServers,
     artifactRoot,
+    artifactRepository,
     artifactsEnabled: hostExtensions?.artifacts?.enabled ?? true,
     sessionStoragePath,
     memoryDir,

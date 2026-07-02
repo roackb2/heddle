@@ -1,3 +1,4 @@
+import type { ArtifactRepository } from '@/core/artifacts/index.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import type { RuntimeToolSelectionProfile } from './profiles/index.js';
 import type { ToolDefinition } from '@/core/types.js';
@@ -12,6 +13,7 @@ export type DefaultAgentToolsOptions = {
   stateDir?: string;
   stateRoot?: string;
   artifactRoot?: string;
+  artifactRepository?: ArtifactRepository;
   artifactsEnabled?: boolean;
   sessionId?: string;
   memoryDir?: string;

@@ -43,7 +43,7 @@ export class McpAutoResultArtifactService {
       const kind = hint.kind ?? args.auto.kind ?? McpAutoResultArtifactService.inferArtifactKind(primary);
       const extension = hint.extension ?? args.auto.extension ?? McpAutoResultArtifactService.inferArtifactExtension(kind, primary);
       const contentPath = primary.path;
-      const artifact = new ArtifactService({ artifactRoot: args.context.artifactRoot }).saveText({
+      const artifact = new ArtifactService({ artifactRoot: args.context.artifactRoot, repository: args.context.artifactRepository }).saveText({
         content: primary.content,
         kind,
         domain: hint.domain ?? args.auto.domain,

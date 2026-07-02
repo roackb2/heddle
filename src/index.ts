@@ -207,17 +207,20 @@ export type {
 // ---------------------------------------------------------------------------
 // 5. Advanced: storage — back Heddle with your own persistence
 // ---------------------------------------------------------------------------
-// Heddle defaults to local file-backed stores. These interfaces + File impls
-// are the seams a hosted service replaces with its own storage. NOTE: today
-// `createConversationEngine` is still path-oriented (stateRoot); injecting
-// custom repositories at the engine boundary is planned (see SDK posture,
-// rung 5 / plan P2), not yet fully wired here.
+// Heddle defaults to local file-backed stores. Artifacts are injectable today:
+// implement `ArtifactRepository` and pass it as `artifactRepository` to
+// `createConversationEngine(...)` (or the quickstart runner) to persist
+// artifacts through your own storage — the engine reader, turn results, and
+// artifact tools all flow through it. Sessions, traces, and memory remain
+// path-oriented (stateRoot) for now; making them injectable follows the same
+// pattern (see SDK posture, rung 5).
 export { ArtifactService, FileArtifactRepository } from './core/artifacts/index.js';
 export type {
   ArtifactCurrentPointers,
   ArtifactKind,
   ArtifactListOptions,
   ArtifactReadResult,
+  ArtifactRepository,
   ArtifactServiceOptions,
   ArtifactStore,
   FileArtifactRepositoryOptions,

@@ -55,7 +55,7 @@ export class McpResultArtifactService {
     }
 
     const content = McpHostValueService.serializeArtifactContent(value);
-    const artifact = new ArtifactService({ artifactRoot: args.context.artifactRoot }).saveText({
+    const artifact = new ArtifactService({ artifactRoot: args.context.artifactRoot, repository: args.context.artifactRepository }).saveText({
       content,
       kind: args.rule.kind,
       domain: args.rule.domain,

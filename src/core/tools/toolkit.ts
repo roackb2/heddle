@@ -4,6 +4,8 @@ export type ToolToolkitContext = {
   workspaceRoot: string;
   stateRoot: string;
   artifactRoot: string;
+  /** Custom artifact persistence. When set, artifact tools use it instead of the file store at `artifactRoot`. */
+  artifactRepository?: import('../artifacts/index.js').ArtifactRepository;
   sessionId?: string;
   model: string;
   apiKey?: string;

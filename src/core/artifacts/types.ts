@@ -58,11 +58,36 @@ export type ArtifactReadResult = {
   content: string;
 };
 
+/**
+ * Persistence port for the artifacts domain: the catalog document plus
+ * text-like content blobs. `ArtifactService` owns artifact policy (ids,
+ * extensions, current-pointer semantics) and delegates ALL persistence here,
+ * so a host can back artifacts with its own storage (database, object store,
+ * in-memory) by implementing this contract.
+ *
+ * Content addressing: the repository owns key generation via `contentKey`.
+ * The returned key is stored as `RuntimeArtifact.path` — an absolute file
+ * path for the default file-backed store, an opaque storage key for custom
+ * stores.
+ */
+export type ArtifactRepository = {
+  readCatalog(): ArtifactStore;
+  writeCatalog(store: ArtifactStore): void;
+  contentKey(id: string, extension: string): string;
+  contentExists(key: string): boolean;
+  writeContent(key: string, content: string): void;
+  readContent(key: string): string | undefined;
+};
+
 export type FileArtifactRepositoryOptions = {
   artifactRoot: string;
 };
 
-export type ArtifactServiceOptions = FileArtifactRepositoryOptions & {
+export type ArtifactServiceOptions = {
+  /** Root for the default file-backed repository. Ignored when `repository` is provided. */
+  artifactRoot?: string;
+  /** Custom persistence implementation. Wins over `artifactRoot`. */
+  repository?: ArtifactRepository;
   now?: () => string;
   nextId?: () => string;
 };
