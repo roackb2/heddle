@@ -29,6 +29,8 @@ export type McpHostResultArtifactRule = {
   toolName: string;
   /** Path inside the MCP result output that should be persisted as an artifact. */
   path: string | string[];
+  /** Additional output paths to replace with the same artifact reference. */
+  replacePaths?: Array<string | string[]>;
   kind: ArtifactKind;
   domain?: string;
   title?: string;
@@ -255,8 +257,7 @@ export class McpHostExtensionService {
       setCurrent: args.rule.setCurrent,
     });
     const preview = content.slice(0, args.rule.maxPreviewChars ?? 1_000);
-
-    set(args.output as object, path, {
+    const artifactOutput = {
       artifact: {
         ...artifact,
         relativePath: ArtifactService.relativeArtifactPath(args.context.artifactRoot, artifact),
@@ -264,9 +265,20 @@ export class McpHostExtensionService {
       contentPath: path,
       preview,
       omittedCharacters: Math.max(content.length - preview.length, 0),
-    } satisfies McpHostResultArtifactOutput);
+    } satisfies McpHostResultArtifactOutput;
+
+    McpHostExtensionService.outputReplacementPaths(args.rule, path)
+      .forEach((replacementPath) => set(args.output as object, replacementPath, artifactOutput));
 
     return args.output;
+  }
+
+  private static outputReplacementPaths(rule: McpHostResultArtifactRule, path: string[]): string[][] {
+    const replacementPaths = (rule.replacePaths ?? [])
+      .map((candidate) => McpHostExtensionService.normalizeResultPath(candidate))
+      .filter((candidate) => candidate.length > 0);
+
+    return [path, ...replacementPaths];
   }
 
   private static normalizeResultPath(path: string | string[]): string[] {

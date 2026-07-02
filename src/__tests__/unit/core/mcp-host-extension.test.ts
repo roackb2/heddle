@@ -220,6 +220,10 @@ describe('defineMcpHostExtension', () => {
       ok: true,
       output: {
         html,
+        content: [{
+          type: 'text',
+          text: html,
+        }],
         diagnostics: {
           valid: true,
         },
@@ -232,6 +236,7 @@ describe('defineMcpHostExtension', () => {
       resultArtifacts: [{
         toolName: 'create-deck',
         path: 'html',
+        replacePaths: ['content.0.text'],
         kind: 'html',
         domain: 'preview',
         title: 'preview.html',
@@ -261,6 +266,10 @@ describe('defineMcpHostExtension', () => {
         preview: string;
         omittedCharacters: number;
       };
+      content: Array<{
+        text: unknown;
+        type: string;
+      }>;
       diagnostics: {
         valid: boolean;
       };
@@ -276,6 +285,7 @@ describe('defineMcpHostExtension', () => {
       preview: html.slice(0, 16),
       omittedCharacters: html.length - 16,
     }));
+    expect(output.content[0]?.text).toEqual(output.html);
     expect(output.html.artifact).toEqual(expect.objectContaining({
       kind: 'html',
       domain: 'preview',
@@ -292,6 +302,8 @@ describe('defineMcpHostExtension', () => {
       },
     }));
     expect(readFileSync(output.html.artifact.path, 'utf8')).toBe(html);
+    expect(new ArtifactService({ artifactRoot: context.artifactRoot }).list({ sessionId: 'session-123' }))
+      .toHaveLength(1);
     expect(new ArtifactService({ artifactRoot: context.artifactRoot }).current('session-123')?.id)
       .toBe(output.html.artifact.id);
   });

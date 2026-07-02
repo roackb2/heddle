@@ -333,6 +333,7 @@ const presentationExtension = defineMcpHostExtension({
   resultArtifacts: [{
     toolName: 'export_html',
     path: 'html',
+    replacePaths: ['content.0.text'],
     kind: 'html',
     domain: 'preview',
     title: 'presentation-preview.html',
@@ -348,6 +349,11 @@ present, Heddle saves the value under the configured artifact root and replaces
 that field with `{ artifact, contentPath, preview, omittedCharacters }`. The
 full content remains available through `read_artifact`, while the model sees a
 small preview plus the artifact id and relative path.
+
+Use `replacePaths` when the same large value also appears elsewhere in the MCP
+envelope, such as a standard `content[0].text` mirror of structured output. The
+additional paths are replaced with the same artifact reference without saving
+duplicate artifacts.
 
 `defineMcpHostExtension(...)` reads the cached MCP catalog when a turn builds
 its tool bundle. It does not launch MCP servers or refresh catalogs during the
