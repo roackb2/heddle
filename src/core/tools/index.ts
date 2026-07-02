@@ -3,6 +3,7 @@ export { ToolRegistry } from './registry.js';
 export { ToolBundleComposer } from './toolkit.js';
 export type { ToolToolkit, ToolToolkitContext } from './toolkit.js';
 export {
+  TOOL_POLICY_MUTATING_OPERATIONS,
   ToolPolicyEnvelopeInputService,
   ToolPolicyEnvelopeSchemaService,
 } from './policy-envelope/index.js';

@@ -239,6 +239,32 @@ describe('AutonomyPolicyService', () => {
     }));
   });
 
+  it('does not auto-allow a mutating shell call whose envelope declares no roots', () => {
+    const evaluation = AutonomyPolicyService.evaluate({
+      context: context({
+        call: {
+          id: 'call-shell',
+          tool: 'run_shell_mutate',
+          input: {
+            command: 'node scripts/build.js',
+            policy: {
+              operations: ['execute'],
+              intent: 'run a build command',
+              targetRoots: [],
+              expectedEffects: ['run build'],
+              environment: 'local',
+              confidence: 'high',
+            },
+          },
+        },
+      }),
+      profile,
+    });
+
+    expect(evaluation.decision.type).toBe('deny');
+    expect(evaluation.facts.hardDenyReasons.join('; ')).toContain('must declare at least one target or write root');
+  });
+
   it('denies deterministic catastrophic shell commands regardless of envelope', () => {
     const evaluation = AutonomyPolicyService.evaluate({
       context: context({
