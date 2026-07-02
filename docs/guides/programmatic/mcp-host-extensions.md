@@ -19,6 +19,7 @@ const prepared = await prepareMcpHostExtension({
     tools: { approval: 'never' },
   },
   hideDefaultMcpTools: true,
+  resultArtifacts: true,
   systemContext: 'Use document tools for drafting, validation, and export.',
 })
 
@@ -49,3 +50,8 @@ model sees the curated host tool names instead of both paths.
 Use `toolNamePrefix` only when multiple MCP servers expose overlapping tool
 names in the same engine. Use `toolOverrides` when a host needs a sharper
 description, capability, approval setting, or public tool name.
+
+`resultArtifacts: true` is the recommended starting point for MCP servers that
+return generated source, HTML, JSON, or other large text outputs. Heddle scans
+the MCP result, saves large strings as artifacts, and replaces duplicated
+structured/text mirrors with the same compact artifact reference.

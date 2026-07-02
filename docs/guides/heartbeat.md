@@ -97,7 +97,9 @@ yarn example:heartbeat-scheduler
 
 ## Host Notes
 
-Heartbeat uses a larger default step budget than ordinary short chat runs so a runner cycle has room to inspect, act, and checkpoint. Hosts can still pass `maxSteps` when they need stricter control.
+Heartbeat tasks can pass `maxSteps` when a runner cycle needs a hard budget.
+When omitted, the core agent loop does not apply a practical default step
+ceiling.
 
 The built-in heartbeat command edge uses the same control-plane heartbeat APIs as the browser workbench. It should not own its own scheduler loop, task mutation policy, or task/run storage logic.
 

@@ -15,7 +15,6 @@ from ordinary workspace defaults. You can edit this file directly, open it with
 ```json
 {
   "model": "gpt-5.4",
-  "maxSteps": 100,
   "stateDir": ".heddle",
   "directShellApproval": "never",
   "searchIgnoreDirs": [".git", "dist", "node_modules", ".heddle"],
@@ -48,7 +47,9 @@ Configuration is applied in this order:
 ## Field Notes
 
 - `model`: default model for this workspace
-- `maxSteps`: default agent-loop step budget
+- `maxSteps`: optional agent-loop step budget. When omitted, Heddle does not
+  apply a practical default step ceiling; set this only when a workspace needs a
+  hard budget.
 - `stateDir`: where Heddle stores sessions, traces, approvals, logs, and memory. This does not move the config file itself; local config stays at `.heddle/config.json`.
 - `directShellApproval`: whether explicit `!command` usage in chat still requires approval
 - `searchIgnoreDirs`: directories excluded from routine `search_files` calls

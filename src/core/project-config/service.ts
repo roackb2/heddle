@@ -12,7 +12,6 @@ const CONFIG_FILE_NAME = 'config.json';
 const LEGACY_ROOT_CONFIG_FILE_NAME = 'heddle.config.json';
 const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   model: 'gpt-5.4',
-  maxSteps: 100,
   stateDir: '.heddle',
   directShellApproval: 'never',
   searchIgnoreDirs: ['.git', 'dist', 'node_modules', '.heddle'],

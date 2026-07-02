@@ -15,7 +15,6 @@ describe('ProjectConfigService', () => {
     expect(existsSync(result.configPath)).toBe(true);
     expect(JSON.parse(readFileSync(result.configPath, 'utf8'))).toEqual({
       model: 'gpt-5.4',
-      maxSteps: 100,
       stateDir: '.heddle',
       directShellApproval: 'never',
       searchIgnoreDirs: ['.git', 'dist', 'node_modules', '.heddle'],

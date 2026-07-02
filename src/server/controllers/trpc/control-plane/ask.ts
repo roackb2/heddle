@@ -35,7 +35,7 @@ export type ControlPlaneAskResult = Pick<RunResult, 'outcome' | 'summary' | 'tra
 export class ControlPlaneAskController {
   static async run(args: RunControlPlaneAskArgs): Promise<ControlPlaneAskResult> {
     const model = args.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
-    const maxSteps = args.maxSteps ?? ControlPlaneAskController.parsePositiveInt(process.env.HEDDLE_MAX_STEPS) ?? 100;
+    const maxSteps = args.maxSteps ?? ControlPlaneAskController.parsePositiveInt(process.env.HEDDLE_MAX_STEPS);
     const logger = createLogger({ pretty: true, level: 'debug' });
     const memoryDir = join(args.stateRoot, 'memory');
     const providerRuntime = LlmProviderRuntimeService.resolve({

@@ -14,33 +14,44 @@ const prepared = await prepareMcpHostExtension({
   stateRoot,
   serverId: 'documents',
   server,
-  resultArtifacts: {
-    auto: {
-      minChars: 1200,
-      domain: 'document',
-      hints: [
-        {
-          pathIncludes: 'html',
-          kind: 'html',
-          extension: 'html',
-          mimeType: 'text/html',
-        },
-        {
-          pathIncludes: 'source',
-          kind: 'source',
-          extension: 'md',
-          mimeType: 'text/markdown',
-        },
-      ],
-    },
-  },
+  resultArtifacts: true,
 })
 ```
 
 Automatic capture traverses the MCP result, saves string values at or above the
-threshold, and replaces duplicate copies of the same content with the same
-artifact reference. Hints classify matching paths; they do not need to describe
-every exact response location.
+default threshold, infers common kinds such as HTML and JSON, and replaces
+duplicate copies of the same content with the same artifact reference. It also
+handles the common MCP shape where `content[0].text` is a JSON serialization of
+`structuredContent.result`.
+
+Use auto options only when the host needs to tune generic behavior:
+
+```ts
+resultArtifacts: {
+  auto: {
+    minChars: 1200,
+    domain: 'document',
+    maxPreviewChars: 800,
+  },
+}
+```
+
+Path hints are advanced overrides. `pathIncludes` means "prefer a result field
+whose normalized object path contains this text", such as
+`structuredContent.result.html`. Most hosts should not need this.
+
+```ts
+resultArtifacts: {
+  auto: {
+    hints: [{
+      pathIncludes: 'markdown',
+      kind: 'source',
+      extension: 'md',
+      mimeType: 'text/markdown',
+    }],
+  },
+}
+```
 
 Use manual rules only when the host needs exact control:
 

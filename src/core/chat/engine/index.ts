@@ -1,4 +1,32 @@
 export { createConversationEngine } from './conversation-engine.js';
+export {
+  ConversationCliRunnerService,
+  QuickstartConversationCliRunnerService,
+  resolveConversationCliDefaults,
+  resolveQuickstartConversationCliDefaults,
+  runConversationCli,
+  runQuickstartConversationCli,
+} from './quickstart-cli/index.js';
+export type {
+  ConversationCliCredentialContext,
+  ConversationCliCredentialPreflightOptions,
+  ConversationCliLocalCommand,
+  ConversationCliLocalCommandContext,
+  ConversationCliMemoryMaintenanceMode,
+  ConversationCliRunnerDefaults,
+  ConversationCliRunnerDefaultsInput,
+  ConversationCliRunnerOptions,
+  ConversationCliTurnContext,
+  QuickstartConversationCliCredentialContext,
+  QuickstartConversationCliCredentialPreflightOptions,
+  QuickstartConversationCliLocalCommand,
+  QuickstartConversationCliLocalCommandContext,
+  QuickstartConversationCliMemoryMaintenanceMode,
+  QuickstartConversationCliRunnerDefaults,
+  QuickstartConversationCliRunnerDefaultsInput,
+  QuickstartConversationCliRunnerOptions,
+  QuickstartConversationCliTurnContext,
+} from './quickstart-cli/index.js';
 export { defineHostExtension, ConversationEngineHostExtensionService } from './host-extension.js';
 export { ConversationTextHostService, createConversationTextHost } from './text-host/index.js';
 export type {
