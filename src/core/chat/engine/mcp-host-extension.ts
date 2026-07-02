@@ -10,6 +10,7 @@ import type { ToolDefinition, ToolResult } from '@/core/types.js';
 import type { ToolToolkit, ToolToolkitContext } from '@/core/tools/index.js';
 import cloneDeep from 'lodash/cloneDeep.js';
 import get from 'lodash/get.js';
+import isEqual from 'lodash/isEqual.js';
 import set from 'lodash/set.js';
 import {
   defineHostExtension,
@@ -41,6 +42,39 @@ export type McpHostResultArtifactRule = {
   maxPreviewChars?: number;
 };
 
+export type McpHostAutoResultArtifactHint = {
+  path?: string | readonly string[];
+  pathIncludes?: string | readonly string[];
+  kind?: ArtifactKind;
+  domain?: string;
+  title?: string;
+  extension?: string;
+  mimeType?: string;
+  metadata?: Record<string, unknown>;
+  setCurrent?: boolean;
+  maxPreviewChars?: number;
+};
+
+export type McpHostAutoResultArtifactsOptions = {
+  minChars?: number;
+  replaceDuplicateContent?: boolean;
+  kind?: ArtifactKind;
+  domain?: string;
+  extension?: string;
+  mimeType?: string;
+  metadata?: Record<string, unknown>;
+  setCurrent?: boolean;
+  maxPreviewChars?: number;
+  hints?: readonly McpHostAutoResultArtifactHint[];
+};
+
+export type McpHostResultArtifactsOptions =
+  | readonly McpHostResultArtifactRule[]
+  | {
+      auto?: boolean | McpHostAutoResultArtifactsOptions;
+      rules?: readonly McpHostResultArtifactRule[];
+    };
+
 export type McpHostResultArtifactReference = RuntimeArtifact & {
   relativePath: string;
 };
@@ -62,7 +96,7 @@ export type DefineMcpHostExtensionOptions = {
   defaultCapabilities?: string[];
   toolOverrides?: Record<string, McpHostToolOverride>;
   hideDefaultMcpTools?: boolean;
-  resultArtifacts?: McpHostResultArtifactRule[];
+  resultArtifacts?: McpHostResultArtifactsOptions;
   systemContext?: string;
   artifacts?: ConversationEngineHostArtifactOptions;
 };
@@ -103,6 +137,16 @@ export type PrepareMcpHostExtensionResult =
 type ResolvedMcpTool = {
   server: McpServerConfig;
   tool: McpToolDescriptor;
+};
+
+type ResolvedResultArtifactsOptions = {
+  auto?: McpHostAutoResultArtifactsOptions;
+  rules: readonly McpHostResultArtifactRule[];
+};
+
+type ResultArtifactCandidate = {
+  content: string;
+  path: string[];
 };
 
 /**
@@ -203,17 +247,26 @@ export class McpHostExtensionService {
     sourceTool: string;
     toolName: string;
   }): unknown {
-    const rules = (args.options.resultArtifacts ?? [])
+    const resultArtifacts = McpHostExtensionService.resolveResultArtifacts(args.options.resultArtifacts);
+    const rules = resultArtifacts.rules
       .filter((rule) => rule.toolName === args.toolName);
-    if (!rules.length) {
+    if (!rules.length && !resultArtifacts.auto) {
       return args.output;
     }
 
-    return rules.reduce((currentOutput, rule) => McpHostExtensionService.applyResultArtifactRule({
+    const manuallyCaptured = rules.reduce((currentOutput, rule) => McpHostExtensionService.applyResultArtifactRule({
       ...args,
       output: currentOutput,
       rule,
     }), cloneDeep(args.output));
+
+    return resultArtifacts.auto
+      ? McpHostExtensionService.applyAutoResultArtifactRules({
+          ...args,
+          auto: resultArtifacts.auto,
+          output: manuallyCaptured,
+        })
+      : manuallyCaptured;
   }
 
   private static applyResultArtifactRule(args: {
@@ -273,6 +326,82 @@ export class McpHostExtensionService {
     return args.output;
   }
 
+  private static applyAutoResultArtifactRules(args: {
+    auto: McpHostAutoResultArtifactsOptions;
+    context: ToolToolkitContext;
+    options: DefineMcpHostExtensionOptions;
+    output: unknown;
+    sourceTool: string;
+    toolName: string;
+  }): unknown {
+    const minChars = args.auto.minChars ?? 1_200;
+    const outputBeforeAuto = cloneDeep(args.output);
+    const candidates = McpHostExtensionService.findStringResultCandidates(args.output)
+      .filter((candidate) => candidate.content.length >= minChars)
+      .filter((candidate) => !McpHostExtensionService.isArtifactReferencePath(candidate.path))
+      .filter((candidate) => !McpHostExtensionService.isSerializedStructuredContentMirror({
+        candidate,
+        output: outputBeforeAuto,
+      }));
+    const grouped = McpHostExtensionService.groupCandidatesByContent(candidates);
+
+    grouped.forEach((group) => {
+      const primary = McpHostExtensionService.selectAutoArtifactPrimary(args.auto, group);
+      if (!primary) {
+        return;
+      }
+
+      const hint = McpHostExtensionService.resolveAutoArtifactHint(args.auto, primary.path);
+      const kind = hint.kind ?? args.auto.kind ?? McpHostExtensionService.inferArtifactKind(primary);
+      const extension = hint.extension ?? args.auto.extension ?? McpHostExtensionService.inferArtifactExtension(kind, primary);
+      const contentPath = primary.path;
+      const artifact = new ArtifactService({ artifactRoot: args.context.artifactRoot }).saveText({
+        content: primary.content,
+        kind,
+        domain: hint.domain ?? args.auto.domain,
+        title: hint.title ?? McpHostExtensionService.defaultAutoArtifactTitle({
+          extension,
+          sourceTool: args.sourceTool,
+          path: contentPath,
+        }),
+        extension,
+        mimeType: hint.mimeType ?? args.auto.mimeType ?? McpHostExtensionService.inferArtifactMimeType(kind),
+        sessionId: args.context.sessionId,
+        sourceTool: args.sourceTool,
+        metadata: {
+          ...(args.auto.metadata ?? {}),
+          ...(hint.metadata ?? {}),
+          mcpServerId: args.options.serverId,
+          mcpToolName: args.toolName,
+          resultPath: contentPath,
+          autoCaptured: true,
+        },
+        setCurrent: hint.setCurrent ?? args.auto.setCurrent,
+      });
+      const preview = primary.content.slice(0, hint.maxPreviewChars ?? args.auto.maxPreviewChars ?? 1_000);
+      const artifactOutput = {
+        artifact: {
+          ...artifact,
+          relativePath: ArtifactService.relativeArtifactPath(args.context.artifactRoot, artifact),
+        },
+        contentPath,
+        preview,
+        omittedCharacters: Math.max(primary.content.length - preview.length, 0),
+      } satisfies McpHostResultArtifactOutput;
+      const replacementPaths = args.auto.replaceDuplicateContent === false
+        ? [primary.path]
+        : group.map((candidate) => candidate.path);
+
+      replacementPaths.forEach((path) => set(args.output as object, path, artifactOutput));
+    });
+    McpHostExtensionService.replaceSerializedStructuredContentMirrors({
+      currentOutput: args.output,
+      originalOutput: outputBeforeAuto,
+    });
+
+    return args.output;
+  }
+
   private static outputReplacementPaths(rule: McpHostResultArtifactRule, path: string[]): string[][] {
     const replacementPaths = (rule.replacePaths ?? [])
       .map((candidate) => McpHostExtensionService.normalizeResultPath(candidate))
@@ -299,6 +428,196 @@ export class McpHostExtensionService {
     }
   }
 
+  private static resolveResultArtifacts(
+    resultArtifacts: McpHostResultArtifactsOptions | undefined,
+  ): ResolvedResultArtifactsOptions {
+    if (!resultArtifacts) {
+      return { rules: [] };
+    }
+
+    if (McpHostExtensionService.isResultArtifactRuleArray(resultArtifacts)) {
+      return { rules: resultArtifacts };
+    }
+
+    return {
+      rules: resultArtifacts.rules ?? [],
+      ...(resultArtifacts.auto
+        ? { auto: resultArtifacts.auto === true ? {} : resultArtifacts.auto }
+        : {}),
+    };
+  }
+
+  private static isResultArtifactRuleArray(
+    resultArtifacts: McpHostResultArtifactsOptions,
+  ): resultArtifacts is readonly McpHostResultArtifactRule[] {
+    return Array.isArray(resultArtifacts);
+  }
+
+  private static findStringResultCandidates(value: unknown, path: string[] = []): ResultArtifactCandidate[] {
+    if (typeof value === 'string') {
+      return [{ content: value, path }];
+    }
+
+    if (Array.isArray(value)) {
+      return value.flatMap((item, index) => McpHostExtensionService.findStringResultCandidates(item, [
+        ...path,
+        String(index),
+      ]));
+    }
+
+    if (!isRecord(value)) {
+      return [];
+    }
+
+    return Object.entries(value).flatMap(([key, item]) => (
+      McpHostExtensionService.findStringResultCandidates(item, [...path, key])
+    ));
+  }
+
+  private static groupCandidatesByContent(candidates: ResultArtifactCandidate[]): ResultArtifactCandidate[][] {
+    const groups = new Map<string, ResultArtifactCandidate[]>();
+    candidates.forEach((candidate) => {
+      groups.set(candidate.content, [...(groups.get(candidate.content) ?? []), candidate]);
+    });
+    return [...groups.values()];
+  }
+
+  private static resolveAutoArtifactHint(
+    auto: McpHostAutoResultArtifactsOptions,
+    path: string[],
+  ): McpHostAutoResultArtifactHint {
+    return auto.hints?.find((hint) => McpHostExtensionService.matchesAutoArtifactHint(hint, path)) ?? {};
+  }
+
+  private static selectAutoArtifactPrimary(
+    auto: McpHostAutoResultArtifactsOptions,
+    group: ResultArtifactCandidate[],
+  ): ResultArtifactCandidate | undefined {
+    return group.find((candidate) => Object.keys(McpHostExtensionService.resolveAutoArtifactHint(auto, candidate.path)).length > 0)
+      ?? group[0];
+  }
+
+  private static matchesAutoArtifactHint(hint: McpHostAutoResultArtifactHint, path: string[]): boolean {
+    const normalizedPath = path.join('.').toLowerCase();
+    const exactPath = hint.path ? McpHostExtensionService.normalizeResultPath(hint.path).join('.').toLowerCase() : undefined;
+    if (exactPath && normalizedPath === exactPath) {
+      return true;
+    }
+
+    const includes = hint.pathIncludes === undefined
+      ? []
+      : Array.isArray(hint.pathIncludes)
+        ? hint.pathIncludes
+        : [hint.pathIncludes];
+    return includes.length > 0 && includes.every((part) => normalizedPath.includes(part.toLowerCase()));
+  }
+
+  private static isArtifactReferencePath(path: string[]): boolean {
+    return path.includes('artifact') || path.includes('contentPath') || path.includes('omittedCharacters');
+  }
+
+  private static isSerializedStructuredContentMirror(input: {
+    candidate: ResultArtifactCandidate;
+    output: unknown;
+  }): boolean {
+    return McpHostExtensionService.serializedStructuredContentMirrorPath(input) !== undefined;
+  }
+
+  private static replaceSerializedStructuredContentMirrors(input: {
+    currentOutput: unknown;
+    originalOutput: unknown;
+  }): void {
+    McpHostExtensionService.findStringResultCandidates(input.originalOutput)
+      .map((candidate) => ({
+        candidate,
+        mirrorPath: McpHostExtensionService.serializedStructuredContentMirrorPath({
+          candidate,
+          output: input.originalOutput,
+        }),
+      }))
+      .filter((entry): entry is { candidate: ResultArtifactCandidate; mirrorPath: string[] } => !!entry.mirrorPath)
+      .forEach((entry) => {
+        const compactedMirror = get(input.currentOutput, entry.mirrorPath);
+        if (compactedMirror !== undefined) {
+          set(input.currentOutput as object, entry.candidate.path, cloneDeep(compactedMirror));
+        }
+      });
+  }
+
+  private static serializedStructuredContentMirrorPath(input: {
+    candidate: ResultArtifactCandidate;
+    output: unknown;
+  }): string[] | undefined {
+    if (!McpHostExtensionService.isMcpContentTextPath(input.candidate.path)) {
+      return undefined;
+    }
+
+    const parsed = McpHostExtensionService.parseJsonObject(input.candidate.content);
+    if (!parsed) {
+      return undefined;
+    }
+
+    return [
+      ['structuredContent'],
+      ['structuredContent', 'result'],
+    ].find((path) => {
+      const mirroredValue = get(input.output, path);
+      return mirroredValue !== undefined && isEqual(parsed, mirroredValue);
+    });
+  }
+
+  private static isMcpContentTextPath(path: string[]): boolean {
+    return path.length >= 3 && path[0] === 'content' && path[path.length - 1] === 'text';
+  }
+
+  private static parseJsonObject(content: string): Record<string, unknown> | undefined {
+    try {
+      const parsed = JSON.parse(content) as unknown;
+      return isRecord(parsed) ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private static inferArtifactKind(candidate: ResultArtifactCandidate): ArtifactKind {
+    const path = candidate.path.join('.').toLowerCase();
+    const trimmed = candidate.content.trimStart().toLowerCase();
+    if (path.includes('html') || trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html')) {
+      return 'html';
+    }
+
+    if (path.includes('json')) {
+      return 'json';
+    }
+
+    return 'source';
+  }
+
+  private static inferArtifactExtension(kind: ArtifactKind, candidate: ResultArtifactCandidate): string {
+    if (kind === 'html') {
+      return 'html';
+    }
+
+    if (kind === 'json') {
+      return 'json';
+    }
+
+    const path = candidate.path.join('.').toLowerCase();
+    return path.includes('markdown') || path.endsWith('.md') ? 'md' : 'txt';
+  }
+
+  private static inferArtifactMimeType(kind: ArtifactKind): string {
+    if (kind === 'html') {
+      return 'text/html';
+    }
+
+    if (kind === 'json') {
+      return 'application/json';
+    }
+
+    return 'text/plain';
+  }
+
   private static defaultArtifactTitle(args: {
     rule: McpHostResultArtifactRule;
     sourceTool: string;
@@ -307,6 +626,15 @@ export class McpHostExtensionService {
     const resultName = args.path[args.path.length - 1] ?? 'result';
     const extension = args.rule.extension?.replace(/^\./, '') ?? args.rule.kind;
     return `${args.sourceTool}-${resultName}.${extension}`;
+  }
+
+  private static defaultAutoArtifactTitle(args: {
+    extension: string;
+    sourceTool: string;
+    path: string[];
+  }): string {
+    const resultName = args.path[args.path.length - 1] ?? 'result';
+    return `${args.sourceTool}-${resultName}.${args.extension}`;
   }
 
   private static describeTool(options: DefineMcpHostExtensionOptions, tool: McpToolDescriptor): string {

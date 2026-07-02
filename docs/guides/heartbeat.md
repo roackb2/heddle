@@ -103,6 +103,6 @@ The built-in heartbeat command edge uses the same control-plane heartbeat APIs a
 
 ## See Also
 
-- [Programmatic use](programmatic-use.md)
+- [Programmatic hosts](programmatic/README.md)
 - [CLI reference](../reference/cli.md)
 - [Control plane](control-plane.md)

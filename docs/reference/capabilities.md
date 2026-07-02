@@ -102,5 +102,5 @@ Beyond terminal chat, Heddle includes:
 - [Chat and sessions](../guides/chat-and-sessions.md)
 - [Agent Skills](../guides/agent-skills.md)
 - [MCP integrations](mcp.md)
-- [Programmatic use](../guides/programmatic-use.md)
+- [Programmatic hosts](../guides/programmatic/README.md)
 - [Control plane](../guides/control-plane.md)

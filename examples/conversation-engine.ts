@@ -14,14 +14,12 @@
 
 import {
   createConversationEngine,
+  createConversationTextHost,
   defineHostExtension,
   LlmAdapterService,
   RuntimeCredentialService,
-  type ConversationActivity,
-  type ConversationCompactionStatus,
   type ToolDefinition,
   type ToolApprovalPolicyContext,
-  type TraceEvent,
 } from '../src/index.js';
 
 const DEFAULT_EXAMPLE_MODEL = 'gpt-5.1-codex-mini';
@@ -63,46 +61,21 @@ async function main() {
   console.log(`Starting session ${session.id} with model ${model} (${provider})`);
   console.log(`workspaceRoot=${workspaceRoot}`);
   console.log(`stateRoot=${stateRoot}`);
-  let streamedAssistantText = '';
+  const textHost = createConversationTextHost({ trace: 'status' });
 
   const result = await engine.turns.submit({
     sessionId: session.id,
     prompt:
       'Summarize this repository, explain what Heddle is for, and list the main verification commands in a short bullet list.',
     host: {
-      events: {
-        onActivity(activity) {
-          if (activity.type === 'assistant.stream') {
-            process.stdout.write(activity.text.slice(streamedAssistantText.length));
-            streamedAssistantText = activity.text;
-            return;
-          }
-          console.log(formatActivity(activity));
-        },
-      },
+      ...textHost.host,
       approvals: {
         requestToolApproval: requestExampleToolApproval,
-      },
-      trace: {
-        onEvent(event) {
-          console.log(`\n[trace] ${formatTraceEvent(event)}`);
-        },
-      },
-      compaction: {
-        onStatus(event) {
-          console.log(`[compaction] ${formatCompactionStatus(event)}`);
-        },
       },
     },
   });
 
-  console.log('\n\nFinal result');
-  console.log('------------');
-  console.log(`Outcome: ${result.outcome}`);
-  console.log(`Summary: ${result.summary}`);
-  console.log(`Session ID: ${result.session.id}`);
-  console.log(`Session name: ${result.session.name}`);
-  console.log(`Turns stored: ${result.session.turns.length}`);
+  textHost.renderTurnResult(result);
 }
 
 function createExampleHostExtension() {
@@ -142,40 +115,6 @@ const requestExampleToolApproval = async (request: ToolApprovalPolicyContext) =>
     reason: 'Example host denies approval-gated tools by default.',
   };
 };
-
-function formatActivity(activity: ConversationActivity): string {
-  switch (activity.type) {
-    case 'loop.started':
-      return `[activity] loop.started goal=${activity.goal}`;
-    case 'assistant.stream':
-      return activity.done
-        ? `[activity] assistant.stream done chars=${activity.text.length}`
-        : `[activity] assistant.stream chunk chars=${activity.text.length}`;
-    case 'tool.calling':
-      return `[activity] tool.calling tool=${activity.tool} step=${activity.step}`;
-    case 'tool.approval_requested':
-      return `[activity] tool.approval_requested tool=${activity.call.tool} step=${activity.step}`;
-    case 'loop.finished':
-      return `[activity] loop.finished outcome=${activity.outcome}`;
-    default:
-      return `[activity] ${activity.type}`;
-  }
-}
-
-function formatTraceEvent(event: TraceEvent): string {
-  return event.type;
-}
-
-function formatCompactionStatus(event: ConversationCompactionStatus): string {
-  switch (event.status) {
-    case 'running':
-      return event.archivePath ? `running archive=${event.archivePath}` : 'running';
-    case 'finished':
-      return event.summaryPath ? `finished summary=${event.summaryPath}` : 'finished';
-    case 'failed':
-      return event.error ? `failed error=${event.error}` : 'failed';
-  }
-}
 
 main().catch((error) => {
   console.error(error);

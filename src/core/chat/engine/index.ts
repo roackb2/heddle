@@ -1,5 +1,12 @@
 export { createConversationEngine } from './conversation-engine.js';
 export { defineHostExtension, ConversationEngineHostExtensionService } from './host-extension.js';
+export { ConversationTextHostService, createConversationTextHost } from './text-host/index.js';
+export type {
+  ConversationTextHost,
+  ConversationTextHostMode,
+  ConversationTextHostOptions,
+  ConversationTextHostWriter,
+} from './text-host/index.js';
 export type {
   ConversationTurnResultSummary,
   ConversationTurnToolResult,
@@ -16,9 +23,12 @@ export {
 } from './mcp-host-extension.js';
 export type {
   DefineMcpHostExtensionOptions,
+  McpHostAutoResultArtifactHint,
+  McpHostAutoResultArtifactsOptions,
   McpHostResultArtifactOutput,
   McpHostResultArtifactReference,
   McpHostResultArtifactRule,
+  McpHostResultArtifactsOptions,
   McpHostToolOverride,
   PrepareMcpHostExtensionOptions,
   PrepareMcpHostExtensionResult,
