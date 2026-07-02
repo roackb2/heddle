@@ -92,6 +92,34 @@ export class QuickstartConversationCliRunnerService {
       return;
     }
 
+    // Scripted multi-turn: run an explicit ordered list of prompts/commands
+    // without a readline loop. This is the reproducible non-interactive path
+    // (piping several lines into an interactive loop drops queued prompts once
+    // stdin closes mid-turn).
+    if (options.prompts && options.prompts.length > 0) {
+      const promptLabel = options.promptLabel ?? DEFAULT_PROMPT_LABEL;
+      for (const scriptedPrompt of options.prompts) {
+        output.write(`${promptLabel}${scriptedPrompt}\n`);
+        const outcome = await QuickstartConversationCliRunnerService.dispatchPrompt({
+          defaults,
+          engine,
+          host,
+          options,
+          output,
+          rawPrompt: scriptedPrompt,
+          session,
+          stateRoot,
+          textHost,
+          workspaceRoot,
+        });
+        session = outcome.session;
+        if (outcome.stop) {
+          break;
+        }
+      }
+      return;
+    }
+
     const inputLoop = createInterface({
       input: options.input ?? stdin,
       output,
@@ -104,49 +132,84 @@ export class QuickstartConversationCliRunnerService {
           break;
         }
 
-        const prompt = rawPrompt.trim();
-        if (!prompt) {
-          continue;
-        }
-
-        const localCommand = QuickstartConversationCliRunnerService.resolveLocalCommand({
-          command: prompt,
-          localCommands: options.localCommands,
-        });
-        if (localCommand) {
-          if (localCommand.type === 'exit') {
-            break;
-          }
-
-          await QuickstartConversationCliRunnerService.handleLocalCommand({
-            command: prompt,
-            engine,
-            localCommand,
-            localCommands: options.localCommands,
-            output,
-            session,
-            stateRoot,
-            workspaceRoot,
-          });
-          continue;
-        }
-
-        const result = await QuickstartConversationCliRunnerService.submitPrompt({
+        const outcome = await QuickstartConversationCliRunnerService.dispatchPrompt({
           defaults,
           engine,
           host,
           options,
-          prompt,
+          output,
+          rawPrompt,
           session,
           stateRoot,
           textHost,
           workspaceRoot,
         });
-        session = result.session;
+        session = outcome.session;
+        if (outcome.stop) {
+          break;
+        }
       }
     } finally {
       inputLoop.close();
     }
+  }
+
+  /**
+   * Runs one raw input line as either a local command or a model turn. Shared
+   * by the interactive loop and the scripted multi-turn path so both dispatch
+   * prompts, commands, and `/exit` handling identically.
+   */
+  private static async dispatchPrompt(input: {
+    defaults: QuickstartConversationCliRunnerDefaults;
+    engine: ConversationEngine;
+    host: ConversationEngineHost;
+    options: QuickstartConversationCliRunnerOptions;
+    output: NodeJS.WritableStream;
+    rawPrompt: string;
+    session: ChatSession;
+    stateRoot: string;
+    textHost: ReturnType<typeof createConversationTextHost>;
+    workspaceRoot: string;
+  }): Promise<{ session: ChatSession; stop: boolean }> {
+    const prompt = input.rawPrompt.trim();
+    if (!prompt) {
+      return { session: input.session, stop: false };
+    }
+
+    const localCommand = QuickstartConversationCliRunnerService.resolveLocalCommand({
+      command: prompt,
+      localCommands: input.options.localCommands,
+    });
+    if (localCommand) {
+      if (localCommand.type === 'exit') {
+        return { session: input.session, stop: true };
+      }
+
+      await QuickstartConversationCliRunnerService.handleLocalCommand({
+        command: prompt,
+        engine: input.engine,
+        localCommand,
+        localCommands: input.options.localCommands,
+        output: input.output,
+        session: input.session,
+        stateRoot: input.stateRoot,
+        workspaceRoot: input.workspaceRoot,
+      });
+      return { session: input.session, stop: false };
+    }
+
+    const result = await QuickstartConversationCliRunnerService.submitPrompt({
+      defaults: input.defaults,
+      engine: input.engine,
+      host: input.host,
+      options: input.options,
+      prompt,
+      session: input.session,
+      stateRoot: input.stateRoot,
+      textHost: input.textHost,
+      workspaceRoot: input.workspaceRoot,
+    });
+    return { session: result.session, stop: false };
   }
 
   static resolveDefaults(options: QuickstartConversationCliRunnerDefaultsInput = {}): QuickstartConversationCliRunnerDefaults {

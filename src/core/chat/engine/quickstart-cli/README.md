@@ -20,6 +20,8 @@ conversation easier, smaller, or more predictable.
 - printing default model and credential status;
 - resuming a caller-selected session;
 - running a one-shot prompt when the caller does not want an interactive loop;
+- running an explicit scripted list of prompts/commands for reproducible
+  non-interactive multi-turn runs (smokes, evals);
 - attaching `createConversationTextHost` for streaming/status/result output;
 - decorating user prompts before submission;
 - running a readline loop;
@@ -117,6 +119,22 @@ When a host needs custom UI, routing, approvals, or domain commands, use
 example. If a host only needs prompt decoration, approval policy, turn hooks, or
 a few local commands, keep those concerns at this boundary and let the runner
 own the generic console loop.
+
+## Prompt Input Modes
+
+The runner selects exactly one input mode, checked in this order:
+
+1. `oncePrompt` — submit a single prompt as one turn, then return. Use for the
+   simplest one-shot host.
+2. `prompts` — submit an explicit ordered list of prompts and local commands as
+   sequential turns, then return. This is the reproducible non-interactive
+   multi-turn path for smokes and evals. Each entry is dispatched exactly like
+   an interactive line (local commands such as `/session`, `/exit`, and
+   caller-supplied commands are honored, and `/exit` stops the run early).
+   Prefer this over piping newline-separated prompts into `input`: an
+   interactive readline loop drops queued prompts once stdin closes while a turn
+   is still running, so only the first prompt survives.
+3. `input` (default) — run the interactive readline loop until `/exit` or EOF.
 
 ## Compatibility Aliases
 

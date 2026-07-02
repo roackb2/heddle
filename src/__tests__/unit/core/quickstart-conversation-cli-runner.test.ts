@@ -60,6 +60,33 @@ describe('runQuickstartConversationCli', () => {
     expect(output.text()).toContain('custom artifacts for session-');
   });
 
+  it('runs an explicit scripted prompt list without a readline loop and stops at /exit', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-quickstart-cli-scripted-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const output = new CaptureOutput();
+
+    await runQuickstartConversationCli({
+      prompts: ['/mark first', '/exit', '/mark second'],
+      localCommands: [{
+        command: '/mark',
+        description: 'echo a marker',
+        run({ command, output: commandOutput }) {
+          commandOutput.write(`MARK ${command}\n`);
+        },
+      }],
+      credentialPreflight: false,
+      model: 'gpt-test',
+      output,
+      stateRoot,
+      workspaceRoot,
+    });
+
+    const text = output.text();
+    expect(text).toContain('heddle> /mark first');
+    expect(text).toContain('MARK /mark first');
+    expect(text).not.toContain('MARK /mark second');
+  });
+
   it('resolves generic SDK defaults for minimal interactive hosts', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-quickstart-cli-defaults-'));
     const defaults = resolveQuickstartConversationCliDefaults({
