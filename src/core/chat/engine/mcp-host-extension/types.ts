@@ -1,0 +1,155 @@
+import type { ArtifactKind, RuntimeArtifact } from '@/core/artifacts/index.js';
+import type { McpRefreshResult, McpServerConfig, McpToolDescriptor } from '@/core/mcp/index.js';
+import type { ToolToolkitContext } from '@/core/tools/index.js';
+import type {
+  ConversationEngineHostArtifactOptions,
+  ConversationEngineHostExtension,
+} from '../host-extension.js';
+
+export type McpHostToolOverride = {
+  name?: string;
+  description?: string;
+  capabilities?: string[];
+  requiresApproval?: boolean;
+};
+
+export type McpHostResultArtifactRule = {
+  /** Original MCP tool name from the cached catalog, before host renaming. */
+  toolName: string;
+  /** Path inside the MCP result output that should be persisted as an artifact. */
+  path: string | readonly string[];
+  /** Additional output paths to replace with the same artifact reference. */
+  replacePaths?: ReadonlyArray<string | readonly string[]>;
+  kind: ArtifactKind;
+  domain?: string;
+  title?: string;
+  extension?: string;
+  mimeType?: string;
+  metadata?: Record<string, unknown>;
+  setCurrent?: boolean;
+  maxPreviewChars?: number;
+};
+
+export type McpHostAutoResultArtifactHint = {
+  path?: string | readonly string[];
+  pathIncludes?: string | readonly string[];
+  kind?: ArtifactKind;
+  domain?: string;
+  title?: string;
+  extension?: string;
+  mimeType?: string;
+  metadata?: Record<string, unknown>;
+  setCurrent?: boolean;
+  maxPreviewChars?: number;
+};
+
+export type McpHostAutoResultArtifactsOptions = {
+  minChars?: number;
+  replaceDuplicateContent?: boolean;
+  kind?: ArtifactKind;
+  domain?: string;
+  extension?: string;
+  mimeType?: string;
+  metadata?: Record<string, unknown>;
+  setCurrent?: boolean;
+  maxPreviewChars?: number;
+  hints?: readonly McpHostAutoResultArtifactHint[];
+};
+
+export type McpHostResultArtifactsOptions =
+  | boolean
+  | readonly McpHostResultArtifactRule[]
+  | {
+      auto?: boolean | McpHostAutoResultArtifactsOptions;
+      rules?: readonly McpHostResultArtifactRule[];
+    };
+
+export type McpHostResultArtifactReference = RuntimeArtifact & {
+  relativePath: string;
+};
+
+export type McpHostResultArtifactOutput = {
+  artifact: McpHostResultArtifactReference;
+  contentPath: string[];
+  preview: string;
+  omittedCharacters: number;
+};
+
+export type DefineMcpHostExtensionOptions = {
+  id: string;
+  serverId: string;
+  includeTools?: string[];
+  excludeTools?: string[];
+  /** Prefix exposed tool names only when multiple MCP servers may collide. */
+  toolNamePrefix?: string;
+  defaultCapabilities?: string[];
+  toolOverrides?: Record<string, McpHostToolOverride>;
+  hideDefaultMcpTools?: boolean;
+  resultArtifacts?: McpHostResultArtifactsOptions;
+  systemContext?: string;
+  artifacts?: ConversationEngineHostArtifactOptions;
+};
+
+export type PrepareMcpHostExtensionCatalogOptions = {
+  workspaceRoot: string;
+  stateRoot: string;
+  serverId: string;
+  server: Record<string, unknown>;
+};
+
+export type PrepareMcpHostExtensionOptions = DefineMcpHostExtensionOptions & {
+  workspaceRoot: string;
+  stateRoot: string;
+  server: Record<string, unknown>;
+};
+
+export type PrepareMcpHostExtensionCatalogResult =
+  | {
+      ok: true;
+      serverId: string;
+      refresh: Extract<McpRefreshResult, { ok: true }>;
+      toolNames: string[];
+    }
+  | {
+      ok: false;
+      serverId: string;
+      step: 'save_config' | 'activate_server' | 'refresh_catalog';
+      error: string;
+    };
+
+export type PrepareMcpHostExtensionResult =
+  | (Extract<PrepareMcpHostExtensionCatalogResult, { ok: true }> & {
+      extension: ConversationEngineHostExtension;
+    })
+  | Extract<PrepareMcpHostExtensionCatalogResult, { ok: false }>;
+
+export type ResolvedMcpTool = {
+  server: McpServerConfig;
+  tool: McpToolDescriptor;
+};
+
+export type ResolvedResultArtifactsOptions = {
+  auto?: McpHostAutoResultArtifactsOptions;
+  rules: readonly McpHostResultArtifactRule[];
+};
+
+export type ResultArtifactCandidate = {
+  content: string;
+  path: string[];
+};
+
+export type McpResultArtifactApplyInput = {
+  context: ToolToolkitContext;
+  options: DefineMcpHostExtensionOptions;
+  output: unknown;
+  sourceTool: string;
+  toolName: string;
+};
+
+export type McpManualResultArtifactApplyInput = McpResultArtifactApplyInput & {
+  rule: McpHostResultArtifactRule;
+};
+
+export type McpAutoResultArtifactApplyInput = McpResultArtifactApplyInput & {
+  auto: McpHostAutoResultArtifactsOptions;
+};

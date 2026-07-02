@@ -371,6 +371,8 @@ export {
 
 // Chat alpha API
 export { createConversationEngine } from './core/chat/engine/conversation-engine.js';
+export { ConversationCliRunnerService, runConversationCli } from './core/chat/engine/conversation-cli/index.js';
+export type { ConversationCliRunnerOptions } from './core/chat/engine/conversation-cli/index.js';
 export { defineHostExtension, ConversationEngineHostExtensionService } from './core/chat/engine/host-extension.js';
 export { ConversationTextHostService, createConversationTextHost } from './core/chat/engine/text-host/index.js';
 export type {

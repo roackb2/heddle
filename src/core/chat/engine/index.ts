@@ -1,4 +1,6 @@
 export { createConversationEngine } from './conversation-engine.js';
+export { ConversationCliRunnerService, runConversationCli } from './conversation-cli/index.js';
+export type { ConversationCliRunnerOptions } from './conversation-cli/index.js';
 export { defineHostExtension, ConversationEngineHostExtensionService } from './host-extension.js';
 export { ConversationTextHostService, createConversationTextHost } from './text-host/index.js';
 export type {

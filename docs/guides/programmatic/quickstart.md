@@ -1,7 +1,24 @@
 # Quickstart
 
-Use `createConversationEngine` when you want durable sessions and multi-turn
-conversation behavior.
+Use `runConversationCli` when you want a working interactive conversation loop
+before building a custom UI:
+
+```ts
+import { runConversationCli } from '@roackb2/heddle'
+
+await runConversationCli({
+  model: 'gpt-5.4',
+})
+```
+
+Run the local SDK example:
+
+```bash
+yarn example:sdk:interactive
+```
+
+Use `createConversationEngine` when you are ready to own the host lifecycle,
+commands, approvals, or custom rendering:
 
 ```ts
 import {
