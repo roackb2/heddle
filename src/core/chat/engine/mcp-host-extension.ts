@@ -340,7 +340,7 @@ export class McpHostExtensionService {
     const grouped = McpHostExtensionService.groupCandidatesByContent(candidates);
 
     grouped.forEach((group) => {
-      const primary = group[0];
+      const primary = McpHostExtensionService.selectAutoArtifactPrimary(args.auto, group);
       if (!primary) {
         return;
       }
@@ -477,6 +477,14 @@ export class McpHostExtensionService {
     path: string[],
   ): McpHostAutoResultArtifactHint {
     return auto.hints?.find((hint) => McpHostExtensionService.matchesAutoArtifactHint(hint, path)) ?? {};
+  }
+
+  private static selectAutoArtifactPrimary(
+    auto: McpHostAutoResultArtifactsOptions,
+    group: ResultArtifactCandidate[],
+  ): ResultArtifactCandidate | undefined {
+    return group.find((candidate) => Object.keys(McpHostExtensionService.resolveAutoArtifactHint(auto, candidate.path)).length > 0)
+      ?? group[0];
   }
 
   private static matchesAutoArtifactHint(hint: McpHostAutoResultArtifactHint, path: string[]): boolean {

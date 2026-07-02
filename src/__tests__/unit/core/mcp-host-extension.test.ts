@@ -326,16 +326,16 @@ describe('defineMcpHostExtension', () => {
     vi.spyOn(McpService.prototype, 'callTool').mockResolvedValue({
       ok: true,
       output: {
+        content: [{
+          type: 'text',
+          text: html,
+        }],
         structuredContent: {
           result: {
             html,
             status: 'ok',
           },
         },
-        content: [{
-          type: 'text',
-          text: html,
-        }],
       },
     });
     const extension = defineMcpHostExtension({
