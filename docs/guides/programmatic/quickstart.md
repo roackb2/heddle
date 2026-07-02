@@ -17,6 +17,33 @@ Run the local SDK example:
 yarn example:sdk:interactive
 ```
 
+Customize the starter loop when your product needs a little domain behavior but
+not a full custom UI:
+
+```ts
+import { runConversationCli } from '@roackb2/heddle'
+
+await runConversationCli({
+  model: 'gpt-5.4',
+  systemContext: 'You are helping users operate this workspace.',
+  promptLabel: 'workspace> ',
+  formatPrompt: (prompt) => [
+    prompt,
+    '',
+    'Operational requirements:',
+    '1. Prefer host-provided tools when they apply.',
+    '2. Summarize artifacts and validation status in the final answer.',
+  ].join('\n'),
+  localCommands: [{
+    command: '/artifacts',
+    description: 'print saved artifacts for the active session',
+    run({ output, session }) {
+      output.write(`Artifacts for ${session.id} are available through artifact tools.\n`)
+    },
+  }],
+})
+```
+
 Use `createConversationEngine` when you are ready to own the host lifecycle,
 commands, approvals, or custom rendering:
 

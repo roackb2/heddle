@@ -1,26 +1,38 @@
 import { createInterface } from 'node:readline/promises';
 import { join } from 'node:path';
 import { stdin, stdout } from 'node:process';
+import type { Writable } from 'node:stream';
 import { createConversationEngine } from '../conversation-engine.js';
 import { createConversationTextHost } from '../text-host/index.js';
-import type { ConversationEngineHost } from '../types.js';
-import type { ConversationCliRunnerOptions } from './types.js';
+import type { ChatSession } from '../../types.js';
+import type { ConversationTurnResultSummary } from '../turn-result.js';
+import type { ConversationEngine, ConversationEngineHost } from '../types.js';
+import type {
+  ConversationCliLocalCommand,
+  ConversationCliRunnerOptions,
+  ConversationCliTurnContext,
+} from './types.js';
 
 const DEFAULT_PROMPT_LABEL = 'heddle> ';
-const LOCAL_COMMANDS = new Set(['/exit', '/quit', '/help', '/session']);
+const BUILT_IN_COMMANDS = [
+  { command: '/session', description: 'print the active session id' },
+  { command: '/help', description: 'print available local commands' },
+  { command: '/exit', aliases: ['/quit'], description: 'close the conversation loop' },
+] satisfies Array<Pick<ConversationCliLocalCommand, 'aliases' | 'command' | 'description'>>;
 
 /**
  * Owns the minimal interactive console experience for SDK starters.
  *
- * This is intentionally small: it wires a persisted conversation session,
- * default text rendering, and a readline loop. Product hosts should graduate to
- * `createConversationEngine` directly when they need custom UI, routing,
- * approvals, or product-specific commands.
+ * Keep terminal lifecycle, session resume, one-shot submission, prompt
+ * formatting, and local command dispatch here. Product hosts should only drop
+ * down to `createConversationEngine` when they need to own a full UI or runtime
+ * control path rather than a lightly customized CLI loop.
  */
 export class ConversationCliRunnerService {
   static async run(options: ConversationCliRunnerOptions): Promise<void> {
     const workspaceRoot = options.workspaceRoot ?? process.cwd();
     const stateRoot = options.stateRoot ?? join(workspaceRoot, '.heddle');
+    const output = options.output ?? stdout;
     const engine = createConversationEngine({
       workspaceRoot,
       stateRoot,
@@ -29,56 +41,153 @@ export class ConversationCliRunnerService {
       apiKey: options.apiKey,
       preferApiKey: options.preferApiKey,
       systemContext: options.systemContext,
+      memoryMaintenanceMode: options.memoryMaintenanceMode,
       tools: options.tools,
       hostExtensions: options.hostExtensions,
     });
-    const session = engine.sessions.create({
-      name: options.sessionName ?? 'Heddle SDK interactive chat',
-    });
+    let session = ConversationCliRunnerService.resolveSession({ engine, options });
     const textHost = createConversationTextHost({
-      output: (text) => (options.output ?? stdout).write(text),
+      output: (text) => output.write(text),
       trace: 'status',
     });
     const host = ConversationCliRunnerService.composeHost(textHost.host, options.host);
+
+    output.write(`Session: ${session.id}\n`);
+    output.write(`Commands: ${ConversationCliRunnerService.formatCommandList(options.localCommands)}\n`);
+
+    if (options.oncePrompt?.trim()) {
+      await ConversationCliRunnerService.submitPrompt({
+        engine,
+        host,
+        options,
+        prompt: options.oncePrompt.trim(),
+        session,
+        stateRoot,
+        textHost,
+        workspaceRoot,
+      });
+      return;
+    }
+
     const inputLoop = createInterface({
       input: options.input ?? stdin,
-      output: options.output ?? stdout,
+      output,
     });
-
-    (options.output ?? stdout).write(`Session: ${session.id}\n`);
-    (options.output ?? stdout).write('Commands: /session, /help, /exit\n');
 
     try {
       for (;;) {
-        const prompt = (await inputLoop.question(options.promptLabel ?? DEFAULT_PROMPT_LABEL)).trim();
+        const rawPrompt = await ConversationCliRunnerService.readPrompt(inputLoop, options.promptLabel ?? DEFAULT_PROMPT_LABEL);
+        if (rawPrompt === undefined) {
+          break;
+        }
+
+        const prompt = rawPrompt.trim();
         if (!prompt) {
           continue;
         }
 
-        if (LOCAL_COMMANDS.has(prompt)) {
-          if (prompt === '/exit' || prompt === '/quit') {
+        const localCommand = ConversationCliRunnerService.resolveLocalCommand({
+          command: prompt,
+          localCommands: options.localCommands,
+        });
+        if (localCommand) {
+          if (localCommand.type === 'exit') {
             break;
           }
 
-          ConversationCliRunnerService.handleLocalCommand({
-            output: options.output ?? stdout,
-            prompt,
-            sessionId: session.id,
+          await ConversationCliRunnerService.handleLocalCommand({
+            command: prompt,
+            engine,
+            localCommand,
+            localCommands: options.localCommands,
+            output,
+            session,
+            stateRoot,
+            workspaceRoot,
           });
           continue;
         }
 
-        const result = await engine.turns.submit({
-          sessionId: session.id,
-          prompt,
-          maxSteps: options.maxSteps,
+        const result = await ConversationCliRunnerService.submitPrompt({
+          engine,
           host,
+          options,
+          prompt,
+          session,
+          stateRoot,
+          textHost,
+          workspaceRoot,
         });
-        textHost.renderTurnResult(result);
+        session = result.session;
       }
     } finally {
       inputLoop.close();
     }
+  }
+
+  private static async readPrompt(
+    inputLoop: ReturnType<typeof createInterface>,
+    promptLabel: string,
+  ): Promise<string | undefined> {
+    try {
+      return await inputLoop.question(promptLabel);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'readline was closed') {
+        return undefined;
+      }
+
+      throw error;
+    }
+  }
+
+  private static resolveSession(input: {
+    engine: ConversationEngine;
+    options: ConversationCliRunnerOptions;
+  }): ChatSession {
+    return input.options.sessionId
+      ? input.engine.sessions.require(input.options.sessionId)
+      : input.engine.sessions.create({
+          name: input.options.sessionName ?? 'Heddle SDK interactive chat',
+        });
+  }
+
+  private static async submitPrompt(input: {
+    engine: ConversationEngine;
+    host: ConversationEngineHost;
+    options: ConversationCliRunnerOptions;
+    prompt: string;
+    session: ChatSession;
+    stateRoot: string;
+    textHost: ReturnType<typeof createConversationTextHost>;
+    workspaceRoot: string;
+  }): Promise<ConversationTurnResultSummary> {
+    const submittedPrompt = input.options.formatPrompt?.(input.prompt) ?? input.prompt;
+    const context = {
+      engine: input.engine,
+      prompt: input.prompt,
+      session: input.session,
+      stateRoot: input.stateRoot,
+      submittedPrompt,
+      workspaceRoot: input.workspaceRoot,
+    } satisfies ConversationCliTurnContext;
+
+    await input.options.onTurnStarted?.(context);
+
+    const result = await input.engine.turns.submit({
+      sessionId: input.session.id,
+      prompt: submittedPrompt,
+      maxSteps: input.options.maxSteps,
+      host: input.host,
+      memoryMaintenanceMode: input.options.memoryMaintenanceMode,
+    });
+    input.textHost.renderTurnResult(result);
+    await input.options.onTurnFinished?.({
+      ...context,
+      result,
+      session: result.session,
+    });
+
+    return result;
   }
 
   private static composeHost(
@@ -109,18 +218,92 @@ export class ConversationCliRunnerService {
     };
   }
 
-  private static handleLocalCommand(input: {
+  private static async handleLocalCommand(input: {
+    command: string;
+    engine: ConversationEngine;
+    localCommand: ResolvedLocalCommand;
+    localCommands: ConversationCliLocalCommand[] | undefined;
     output: NodeJS.WritableStream;
-    prompt: string;
-    sessionId: string;
-  }): void {
-    if (input.prompt === '/session') {
-      input.output.write(`Session: ${input.sessionId}\n`);
+    session: ChatSession;
+    stateRoot: string;
+    workspaceRoot: string;
+  }): Promise<void> {
+    if (input.localCommand.type === 'session') {
+      input.output.write(`Session: ${input.session.id}\n`);
       return;
     }
 
-    input.output.write('Commands: /session, /help, /exit\n');
+    if (input.localCommand.type === 'help') {
+      input.output.write(`Commands: ${ConversationCliRunnerService.formatCommandList(input.localCommands)}\n`);
+      return;
+    }
+
+    if (input.localCommand.type !== 'custom') {
+      return;
+    }
+
+    await input.localCommand.command.run({
+      command: input.command,
+      engine: input.engine,
+      output: input.output as Writable,
+      session: input.session,
+      stateRoot: input.stateRoot,
+      workspaceRoot: input.workspaceRoot,
+    });
+  }
+
+  private static resolveLocalCommand(input: {
+    command: string;
+    localCommands: ConversationCliLocalCommand[] | undefined;
+  }): ResolvedLocalCommand | undefined {
+    const commandName = input.command.split(/\s+/)[0];
+    const builtIn = ConversationCliRunnerService.resolveBuiltInCommand(commandName);
+    if (builtIn) {
+      return builtIn;
+    }
+
+    const customCommand = input.localCommands
+      ?.find((localCommand) => [
+        localCommand.command,
+        ...(localCommand.aliases ?? []),
+      ].includes(commandName));
+
+    return customCommand
+      ? {
+          type: 'custom',
+          command: customCommand,
+        }
+      : undefined;
+  }
+
+  private static resolveBuiltInCommand(command: string): ResolvedLocalCommand | undefined {
+    if (command === '/exit' || command === '/quit') {
+      return { type: 'exit' };
+    }
+
+    if (command === '/session') {
+      return { type: 'session' };
+    }
+
+    if (command === '/help') {
+      return { type: 'help' };
+    }
+
+    return undefined;
+  }
+
+  private static formatCommandList(localCommands: ConversationCliLocalCommand[] | undefined): string {
+    return [
+      ...BUILT_IN_COMMANDS.map((command) => command.command),
+      ...(localCommands ?? []).map((command) => command.command),
+    ].join(', ');
   }
 }
+
+type ResolvedLocalCommand =
+  | { type: 'custom'; command: ConversationCliLocalCommand }
+  | { type: 'exit' }
+  | { type: 'help' }
+  | { type: 'session' };
 
 export const runConversationCli = ConversationCliRunnerService.run;
