@@ -125,6 +125,42 @@ describe('createConversationEngine', () => {
     expect(existsSync(join(stateRoot, 'artifacts'))).toBe(false);
   });
 
+  it('persists sessions through an injected repository without touching the state root', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-session-repo-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    let stored: ChatSession[] = [];
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+      sessionRepository: {
+        list: () => structuredClone(stored),
+        readCatalog: () => stored.map((session) => ({
+          id: session.id,
+          name: session.name,
+          pinned: session.pinned,
+          createdAt: session.createdAt,
+          updatedAt: session.updatedAt,
+        })),
+        read: (sessionId) => structuredClone(stored.find((session) => session.id === sessionId)),
+        save: (sessions) => {
+          stored = structuredClone(sessions);
+        },
+      },
+    });
+
+    engine.sessions.create({ id: 'session-hosted', name: 'Hosted session' });
+
+    expect(stored.map((session) => session.id)).toContain('session-hosted');
+    expect(engine.sessions.read('session-hosted')?.name).toBe('Hosted session');
+
+    engine.sessions.rename('session-hosted', 'Renamed hosted');
+    expect(stored.find((session) => session.id === 'session-hosted')?.name).toBe('Renamed hosted');
+    // Nothing was written to the default on-disk session catalog.
+    expect(existsSync(join(stateRoot, 'chat-sessions.catalog.json'))).toBe(false);
+  });
+
   it('roots the artifacts reader at a custom host-extension artifacts root', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-artifacts-custom-'));
     const stateRoot = join(workspaceRoot, '.heddle');

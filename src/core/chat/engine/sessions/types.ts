@@ -3,12 +3,12 @@ import type { NormalizedConversationEngineConfig } from '../config.js';
 
 export type ConversationSessionServiceConfig = Pick<
   ConversationEngineConfig,
-  'workspaceRoot' | 'stateRoot' | 'model' | 'reasoningEffort' | 'sessionStoragePath' | 'workspaceId'
+  'workspaceRoot' | 'stateRoot' | 'model' | 'reasoningEffort' | 'sessionStoragePath' | 'sessionRepository' | 'workspaceId'
 >;
 
 export type NormalizedConversationSessionServiceConfig = Pick<
   NormalizedConversationEngineConfig,
-  'workspaceRoot' | 'stateRoot' | 'model' | 'reasoningEffort' | 'sessionStoragePath' | 'workspaceId'
+  'workspaceRoot' | 'stateRoot' | 'model' | 'reasoningEffort' | 'sessionStoragePath' | 'sessionRepository' | 'workspaceId'
 >;
 
 export type FileConversationSessionServiceContract = ConversationSessionService;

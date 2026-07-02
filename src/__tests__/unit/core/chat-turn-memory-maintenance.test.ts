@@ -53,7 +53,7 @@ describe('chat turn memory maintenance helpers', () => {
         step: 2,
         timestamp: '2026-05-02T00:00:01.000Z',
       }],
-      sessionStoragePath,
+      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
       sessionId: 'session-1',
     });
 

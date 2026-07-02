@@ -1,7 +1,6 @@
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import { ChatSessionLeases } from '@/core/chat/engine/sessions/leases/index.js';
-import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type {
   PersistPreflightRunningSeedArgs,
@@ -17,8 +16,7 @@ import type {
  */
 export class ConversationTurnPreflightService {
   static async prepare(args: PrepareChatSessionTurnArgs): Promise<PrepareChatSessionTurnResult> {
-    const persistedSession = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
-      .read(args.sessionId);
+    const persistedSession = args.sessionRepository.read(args.sessionId);
     const leaseConflict = persistedSession ? ChatSessionLeases.conflict(persistedSession, args.leaseOwner) : undefined;
     if (leaseConflict) {
       return {
@@ -65,7 +63,7 @@ export class ConversationTurnPreflightService {
       ...args.leasedSession,
       context: ConversationTurnPreflightService.buildRunningCompactionContext(args),
     });
-    new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
+    args.sessionRepository
       .save(args.sessions.map((candidate) => (candidate.id === args.sessionId ? compactionSeed : candidate)));
   }
 
@@ -76,7 +74,7 @@ export class ConversationTurnPreflightService {
       preserveAcceptedUserMessages: true,
     }));
 
-    new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
+    args.sessionRepository
       .save(args.sessions.map((candidate) => (candidate.id === args.session.id ? preparedSession : candidate)));
 
     return {

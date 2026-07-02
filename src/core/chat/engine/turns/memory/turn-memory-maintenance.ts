@@ -4,7 +4,6 @@ import type { TraceEvent } from '@/core/types.js';
 import { MemoryMaintenanceIntegrationService } from '@/core/memory/maintenance-integration.js';
 import { TraceSummaryService } from '@/core/observability/index.js';
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
-import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type {
   AppendTurnMemoryMaintenanceEventsArgs,
   RunMemoryMaintenanceCoreArgs,
@@ -83,7 +82,7 @@ export class ConversationTurnMemoryMaintenance {
     const nextTrace = [...ConversationTurnMemoryMaintenance.readTraceEvents(args.traceFile), ...args.events];
     writeFileSync(args.traceFile, `${JSON.stringify(nextTrace, null, 2)}\n`, 'utf8');
 
-    const repository = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath });
+    const repository = args.sessionRepository;
     const sessions = repository.list();
     const nextSessions = sessions.map((session) => {
       if (session.id !== args.sessionId) {

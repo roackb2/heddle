@@ -3,6 +3,7 @@ import type { ChatSession } from '@/core/chat/types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ConversationCompactionStatus } from '@/core/live/index.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
+import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { ChatTurnHostPort } from '../host/index.js';
 import type {
   ConversationCompactionResult,
@@ -12,7 +13,7 @@ import type {
 export type ChatTurnPreflightCompactionStatus = ConversationCompactionStatus;
 
 export type PrepareChatSessionTurnArgs = {
-  sessionStoragePath: string;
+  sessionRepository: ChatSessionRepository;
   sessionId: string;
   fallbackHistory: ChatMessage[];
   prompt: string;
@@ -39,7 +40,7 @@ export type PreflightTurnCompactionRequest = {
 
 export type PersistPreflightRunningSeedArgs = Pick<
   PrepareChatSessionTurnArgs,
-  'sessionStoragePath' | 'sessions' | 'sessionId'
+  'sessionRepository' | 'sessions' | 'sessionId'
 > & {
   leasedSession: ChatSession;
   archivePath?: string;
@@ -47,7 +48,7 @@ export type PersistPreflightRunningSeedArgs = Pick<
 
 export type PersistPreparedChatSessionTurnArgs = Pick<
   PrepareChatSessionTurnArgs,
-  'sessionStoragePath' | 'sessions'
+  'sessionRepository' | 'sessions'
 > & {
   session: ChatSession;
   compacted: ConversationCompactionResult;

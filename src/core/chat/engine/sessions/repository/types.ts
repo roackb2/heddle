@@ -29,10 +29,17 @@ export type SessionStoragePaths = {
   sessionsDir: string;
 };
 
+/**
+ * Persistence port for chat sessions: the session catalog plus full session
+ * bodies. Session/turn services own session policy (leases, records,
+ * compaction state) and delegate persistence here, so a host can back
+ * sessions with its own storage (database, object store, in-memory) by
+ * implementing this contract and passing it to
+ * `createConversationEngine({ sessionRepository })`.
+ */
 export type ChatSessionRepository = {
   list(): ChatSession[];
   readCatalog(): ChatSessionCatalogEntry[];
   read(sessionId: string): ChatSession | undefined;
   save(sessions: ChatSession[]): void;
-  deriveStoragePaths(): SessionStoragePaths;
 };
