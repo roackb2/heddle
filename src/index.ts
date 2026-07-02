@@ -1,24 +1,21 @@
 // ===========================================================================
-// Heddle — Public SDK
+// Heddle — Public SDK (curated entry)
 // ===========================================================================
-// This surface is organized as a progressive-disclosure ladder. Start at the
-// top and go deeper only when you need to. Full guide:
-// docs/guides/programmatic/quickstart.md
+// This is the default `@roackb2/heddle` import: the curated surface a product
+// host needs to build an agentic experience, organized as a progressive-
+// disclosure ladder. Start at the top and go deeper only when you need to.
+// Full guide: docs/guides/programmatic/quickstart.md
 //
 //   1. Start here            — stand up a conversation agent in a few lines
 //   • Core types             — the handful of types shared across the ladder
 //   2. Add capabilities      — your own tools, MCP servers, skills
 //   3. Shape input/output    — render streaming activity / text, read results
-//   4. Advanced: lifecycle   — drive the conversation engine and sessions
+//   4. Advanced: lifecycle   — drive the engine, sessions, and approvals
 //   5. Advanced: storage     — back artifacts/credentials with your own store
-//   —  Building blocks        — LLM adapters, individual tools, approvals,
-//                                trace, memory, models, awareness
-//   —  Specialized runtimes   — agent loop, heartbeat, integrations
-//   —  Utilities & errors
 //
-// Rungs 1–5 are what most product hosts need. Everything below "Building
-// blocks" is lower-level runtime plumbing you can reach for, but a beginner
-// should not need to.
+// Lower-level runtime plumbing (LLM adapters, individual tools, trace, memory,
+// models, awareness, the agent loop, heartbeat, integrations, utilities) lives
+// behind the `@roackb2/heddle/advanced` subpath — see src/advanced.ts.
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
@@ -63,7 +60,7 @@ export type {
 // ---------------------------------------------------------------------------
 // Author a tool with the `ToolDefinition` type above; wire an MCP server with
 // `prepareMcpHostExtension`; compose host tools/context with
-// `defineHostExtension`. Ready-made tools live under "Building blocks".
+// `defineHostExtension`. Ready-made tools live in `@roackb2/heddle/advanced`.
 export {
   defineMcpHostExtension,
   McpHostExtensionService,
@@ -154,10 +151,11 @@ export type {
 export { ToolActivitySummarizer } from './core/live/index.js';
 
 // ---------------------------------------------------------------------------
-// 4. Advanced: conversation engine lifecycle & sessions
+// 4. Advanced: engine lifecycle, sessions & approvals
 // ---------------------------------------------------------------------------
 // Types and services for hosts that embed `createConversationEngine` (rung 1)
-// directly and manage session create/resume/turn lifecycle themselves.
+// directly and manage session create/resume/turn lifecycle and approval policy
+// themselves.
 export type {
   ClearConversationTurnLeaseInput,
   ConversationEngine,
@@ -179,106 +177,6 @@ export type {
   RunConversationTurnArgs,
   RunConversationTurnResult,
 } from './core/chat/engine/turns/types.js';
-
-// ---------------------------------------------------------------------------
-// 5. Advanced: storage — back Heddle with your own persistence
-// ---------------------------------------------------------------------------
-// Heddle defaults to local file-backed stores. These interfaces + File impls
-// are the seams a hosted service replaces with its own storage. NOTE: today
-// `createConversationEngine` is still path-oriented (stateRoot); injecting
-// custom repositories at the engine boundary is planned (see SDK posture,
-// rung 5 / plan P2), not yet fully wired here.
-export { ArtifactService, FileArtifactRepository } from './core/artifacts/index.js';
-export type {
-  ArtifactCurrentPointers,
-  ArtifactKind,
-  ArtifactListOptions,
-  ArtifactReadResult,
-  ArtifactServiceOptions,
-  ArtifactStore,
-  FileArtifactRepositoryOptions,
-  RuntimeArtifact,
-  SaveTextArtifactInput,
-} from './core/artifacts/index.js';
-export { RuntimeCredentialService } from './core/runtime/credentials/index.js';
-export type { ApiKeyRuntime, ProviderCredentialSource } from './core/runtime/credentials/index.js';
-
-// ===========================================================================
-// Building blocks
-// ===========================================================================
-
-// --- Building blocks: LLM adapters & models --------------------------------
-export type {
-  LlmAdapter,
-  LlmAdapterCreateInput,
-  ChatMessage,
-  LlmResponse,
-  LlmProvider,
-  ReasoningEffort,
-  LlmAdapterCapabilities,
-  LlmAdapterInfo,
-  LlmUsage,
-} from './core/llm/types.js';
-export {
-  AnthropicAdapter,
-  AnthropicProviderAdapter,
-  LlmAdapterService,
-  LlmProviderRegistry,
-  OpenAiAdapter,
-  OpenAiCompatibleAdapter,
-  OpenAiCompatibleModelDiscoveryService,
-  OpenAiCompatibleModelName,
-  OpenAiCompatibleProviderAdapter,
-  OPENAI_COMPATIBLE_PROVIDER_PROFILES,
-  OpenAiCompatibleProviderProfileService,
-  OpenAiCodexSseService,
-  OpenAiOAuthFetchService,
-  OpenAiProviderAdapter,
-} from './core/llm/index.js';
-export type {
-  AnthropicAdapterOptions,
-  LlmProviderAdapter,
-  OpenAiAdapterOptions,
-  OpenAiCompatibleAdapterOptions,
-  OpenAiCompatibleDiscoveredModel,
-  OpenAiCompatibleModelDiscoveryOptions,
-  OpenAiCompatibleModelDiscoverySource,
-  OpenAiCompatibleProviderId,
-  OpenAiCompatibleProviderProfile,
-  OpenAiOAuthFetchOptions,
-} from './core/llm/index.js';
-export {
-  OPENAI_MODEL_GROUPS,
-  COMMON_OPENAI_MODELS,
-  COMMON_BUILT_IN_MODELS,
-  ModelCatalogService,
-  ModelPolicyService,
-} from './core/llm/models/index.js';
-export type { BuiltInModelGroup } from './core/llm/models/index.js';
-
-// --- Building blocks: ready-made tools -------------------------------------
-export { listFilesTool } from './core/tools/toolkits/coding-files/list-files.js';
-export { readFileTool } from './core/tools/toolkits/coding-files/read-file.js';
-export { editFileTool } from './core/tools/toolkits/coding-files/edit-file.js';
-export { deleteFileTool, createDeleteFileTool } from './core/tools/toolkits/coding-files/delete-file.js';
-export type { DeleteFileToolOptions } from './core/tools/toolkits/coding-files/delete-file.js';
-export { moveFileTool, createMoveFileTool } from './core/tools/toolkits/coding-files/move-file.js';
-export type { MoveFileToolOptions } from './core/tools/toolkits/coding-files/move-file.js';
-export { searchFilesTool, createSearchFilesTool, DEFAULT_SEARCH_EXCLUDED_DIRS } from './core/tools/toolkits/coding-files/search-files.js';
-export type { SearchFilesOptions } from './core/tools/toolkits/coding-files/search-files.js';
-export { webSearchTool, createWebSearchTool } from './core/tools/toolkits/external-context/web-search.js';
-export type { WebSearchToolOptions } from './core/tools/toolkits/external-context/web-search.js';
-export { viewImageTool, createViewImageTool } from './core/tools/toolkits/external-context/view-image.js';
-export type { ViewImageToolOptions } from './core/tools/toolkits/external-context/view-image.js';
-export { updatePlanTool } from './core/tools/toolkits/internal/update-plan.js';
-export type { PlanItem, PlanItemStatus } from './core/tools/toolkits/internal/update-plan.js';
-export { createRunShellInspectTool, createRunShellMutateTool } from './core/tools/toolkits/shell-process/run-shell.js';
-export { createRunShellTool } from './core/tools/toolkits/shell-process/run-shell.js';
-export type { RunShellOptions } from './core/tools/toolkits/shell-process/run-shell.js';
-export { createBrowserResearchToolkit } from './core/tools/toolkits/browser-research/index.js';
-export type { BrowserResearchToolkitOptions } from './core/tools/toolkits/browser-research/toolkit.js';
-
-// --- Building blocks: approvals --------------------------------------------
 export {
   ToolApprovalPolicies,
   ToolApprovalService,
@@ -306,210 +204,25 @@ export type {
   ProjectApprovalRule,
 } from './core/approvals/remembered-rules/index.js';
 
-// --- Building blocks: trace, observability & review ------------------------
-export { TraceConsoleFormatter, TraceRecorder } from './core/trace/index.js';
-export type { TraceRecordSink } from './core/trace/index.js';
-export { ReviewDiffParser } from './core/review/index.js';
-export type {
-  ReviewDiffFile,
-  ReviewDiffHunk,
-  ReviewDiffLine,
-  ReviewFileStatus,
-} from './core/review/index.js';
-export {
-  DEFAULT_TRACE_SUMMARIZERS,
-  TraceSummaryService,
-} from './core/observability/index.js';
-export type {
-  TraceEventOfType,
-  TraceEventType,
-  TraceSummarizer,
-  TraceSummarizerMap,
-  TraceSummaryContext,
-  TraceSummaryValue,
-} from './core/observability/index.js';
-export {
-  TRACE_CORRELATION_FIELDS,
-  TRACE_EVENT_DOMAINS,
-  TRACE_EVENT_TYPES,
-} from './core/observability/index.js';
-export { buildSystemPrompt } from './core/prompts/system-prompt.js';
-
-// --- Building blocks: memory & knowledge -----------------------------------
-export { buildMemoryDomainSystemContext } from './core/memory/domain-prompt.js';
-export {
-  DEFAULT_MEMORY_CATEGORIES,
-  DEFAULT_MEMORY_FOLDER_CATALOG_MAX_BYTES,
-  DEFAULT_MEMORY_FOLDER_CATALOG_TARGET_BYTES,
-  DEFAULT_MEMORY_ROOT_CATALOG_MAX_BYTES,
-  DEFAULT_MEMORY_ROOT_CATALOG_TARGET_BYTES,
-  MemoryCatalogService,
-} from './core/memory/catalog.js';
-export { MemoryMaintenanceRepository } from './core/memory/maintenance-repository.js';
-export { MemoryMaintenanceService } from './core/memory/maintainer.js';
-export { MemoryMaintenanceIntegrationService } from './core/memory/maintenance-integration.js';
-export { MemoryNoteService } from './core/memory/note-service.js';
-export { MemoryValidationService } from './core/memory/validation.js';
-export { MemoryVisibilityService } from './core/memory/visibility.js';
-export type {
-  BootstrapMemoryWorkspaceResult,
-  KnowledgeCandidate,
-  KnowledgeCandidateStatusRecord,
-  KnowledgeMaintenanceRunRecord,
-  ListMemoryNotesInput,
-  MemoryCatalogLoadResult,
-  MemoryCatalogShapeValidation,
-  MemoryCategory,
-  MemoryStatusView,
-  MemoryValidationIssue,
-  MemoryValidationResult,
-  ReadMemoryNoteInput,
-  RunMaintenanceForRecordedCandidatesOptions,
-  RunMaintenanceForRecordedCandidatesResult,
-  RunKnowledgeMaintenanceOptions,
-  RunKnowledgeMaintenanceResult,
-  SearchMemoryNotesInput,
-} from './core/memory/types.js';
-export { createMemoryMaintainerTools } from './core/memory/maintainer-tools.js';
-export { createMemoryNoteTemplate, slugifyMemoryTitle } from './core/memory/templates.js';
-export {
-  listMemoryNotesTool,
-  readMemoryNoteTool,
-  searchMemoryNotesTool,
-  editMemoryNoteTool,
-  createListMemoryNotesTool,
-  createReadMemoryNoteTool,
-  createSearchMemoryNotesTool,
-  createEditMemoryNoteTool,
-} from './core/tools/toolkits/knowledge/memory-notes.js';
-export type { MemoryNotesToolOptions } from './core/tools/toolkits/knowledge/memory-notes.js';
-export { createMemoryCheckpointTool } from './core/tools/toolkits/knowledge/memory-checkpoint.js';
-export type { MemoryCheckpointToolOptions } from './core/tools/toolkits/knowledge/memory-checkpoint.js';
-export { createRecordKnowledgeTool, recordKnowledgeTool } from './core/tools/toolkits/knowledge/record-knowledge.js';
-export type { RecordKnowledgeToolOptions } from './core/tools/toolkits/knowledge/record-knowledge.js';
-
-// --- Building blocks: awareness --------------------------------------------
-export {
-  createAwarenessService,
-  createCodingAwarenessProvider,
-  formatCodingProjectDashboardSnapshot,
-} from './core/awareness/index.js';
-export type {
-  AwarenessCollectInput,
-  AwarenessDomain,
-  AwarenessLimit,
-  AwarenessProfile,
-  AwarenessProvider,
-  AwarenessSnapshot,
-  AwarenessSource,
-  CodingAwarenessSection,
-  CodingAwarenessSnapshot,
-  CodingProjectDashboardOutput,
-  CodingWorkingEnvironment,
-  CodingWorkspaceTree,
-  CodingWorkspaceTreeEntry,
-} from './core/awareness/index.js';
-
-// ===========================================================================
-// Specialized runtimes
-// ===========================================================================
-
-// --- Specialized runtimes: agent loop --------------------------------------
-export { AgentRunService } from './core/agent/index.js';
-export type { RunAgentOptions } from './core/agent/index.js';
-export { AgentLoopCheckpointService, AgentLoopRuntimeService } from './core/runtime/loop/index.js';
-export type { AgentLoopCheckpoint, AgentLoopEvent, AgentLoopResult, AgentLoopState, AgentLoopStatus, RunAgentLoopOptions } from './core/runtime/loop/index.js';
-
-// --- Specialized runtimes: heartbeat ---------------------------------------
-export { HeartbeatRunnerAgent } from './core/heartbeat/agent/index.js';
-export type {
-  AgentHeartbeatEvent,
-  AgentHeartbeatResult,
-  HeartbeatDecision,
-  HeartbeatDecisionEvent,
-  HeartbeatEscalationEvent,
-  RunAgentHeartbeatOptions,
-} from './core/heartbeat/agent/index.js';
-export {
-  FileHeartbeatCheckpointRepository,
-  StoredHeartbeatService,
-} from './core/heartbeat/checkpoint/index.js';
-export type {
-  FileHeartbeatCheckpointRepositoryOptions,
-  HeartbeatCheckpointStore,
-  RunStoredHeartbeatOptions,
-  StoredHeartbeatResult,
-} from './core/heartbeat/checkpoint/index.js';
-export {
-  FileHeartbeatTaskService,
-} from './core/heartbeat/tasks/index.js';
-export type {
-  FileHeartbeatTaskServiceOptions,
-  HeartbeatTask,
-  HeartbeatTaskRunRecord,
-  HeartbeatTaskRunRecordEntry,
-  HeartbeatTaskStore,
-} from './core/heartbeat/tasks/index.js';
-export {
-  HeartbeatSchedulerService,
-} from './core/heartbeat/scheduler/index.js';
-export type {
-  HeartbeatSchedulerHandle,
-  HeartbeatSchedulerEvent,
-  HeartbeatTaskRunner,
-  HeartbeatTaskRunnerRuntimeOptions,
-  RunDueHeartbeatTasksOptions,
-  RunDueHeartbeatTasksResult,
-  RunHeartbeatSchedulerOptions,
-  StartHeartbeatSchedulerOptions,
-} from './core/heartbeat/scheduler/index.js';
-export type {
-  HeartbeatRunView,
-  HeartbeatTaskView,
-} from './core/heartbeat/views/index.js';
-export {
-  HeartbeatLucidPresenter,
-} from './core/heartbeat/views/index.js';
-export type {
-  LucidAgentMessage,
-  LucidAgentProgressNotification,
-  LucidAgentResponseNotification,
-  LucidAgentStatus,
-  LucidAgentStatusNotification,
-  LucidAdapterOptions,
-} from './core/heartbeat/views/index.js';
-
-// --- Specialized runtimes: integrations (cyberloop) ------------------------
-export {
-  createCyberLoopObserver,
-  createRuntimeFrameEmbedder,
-  eventToRuntimeFrame,
-  formatRuntimeFrameForEmbedding,
-  inferDriftLevel,
-} from './integrations/cyberloop.js';
-export { createCyberLoopKinematicsObserver } from './integrations/cyberloop-kinematics.js';
-export type {
-  CyberLoopCompatibleMiddleware,
-  CyberLoopCompatibleStateEmbedder,
-  CyberLoopDriftLevel,
-  CyberLoopMetadataChannels,
-  CyberLoopObserver,
-  CyberLoopObserverAnnotation,
-  CyberLoopStepContext,
-  CyberLoopStepResult,
-  CreateRuntimeFrameEmbedderOptions,
-  HeddleRuntimeFrame,
-  HeddleRuntimeFrameKind,
-  RuntimeFrameEmbedText,
-} from './integrations/cyberloop.js';
-export type {
-  CreateCyberLoopKinematicsObserverOptions,
-  CyberLoopKinematicsObserver,
-} from './integrations/cyberloop-kinematics.js';
-
 // ---------------------------------------------------------------------------
-// Utilities & errors
+// 5. Advanced: storage — back Heddle with your own persistence
 // ---------------------------------------------------------------------------
-export { AgentStepBudget } from './core/agent/budget/index.js';
-export { HeddleError, ToolExecutionError, LlmError, BudgetExhaustedError } from './core/utils/errors.js';
-export { createLogger, logger } from './core/utils/logger.js';
+// Heddle defaults to local file-backed stores. These interfaces + File impls
+// are the seams a hosted service replaces with its own storage. NOTE: today
+// `createConversationEngine` is still path-oriented (stateRoot); injecting
+// custom repositories at the engine boundary is planned (see SDK posture,
+// rung 5 / plan P2), not yet fully wired here.
+export { ArtifactService, FileArtifactRepository } from './core/artifacts/index.js';
+export type {
+  ArtifactCurrentPointers,
+  ArtifactKind,
+  ArtifactListOptions,
+  ArtifactReadResult,
+  ArtifactServiceOptions,
+  ArtifactStore,
+  FileArtifactRepositoryOptions,
+  RuntimeArtifact,
+  SaveTextArtifactInput,
+} from './core/artifacts/index.js';
+export { RuntimeCredentialService } from './core/runtime/credentials/index.js';
+export type { ApiKeyRuntime, ProviderCredentialSource } from './core/runtime/credentials/index.js';

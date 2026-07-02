@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import compact from 'lodash/compact.js';
-import { DEFAULT_OPENAI_MODEL, LlmAdapterService } from '@/index.js';
+import { DEFAULT_OPENAI_MODEL, LlmAdapterService } from '@/advanced.js';
 import { ProviderCredentialRepository } from '@/core/auth/index.js';
 import { MemoryCatalogService } from '@/core/memory/catalog.js';
 import { MemoryMaintenanceService } from '@/core/memory/maintainer.js';

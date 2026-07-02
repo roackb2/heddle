@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
-import { FileHeartbeatTaskService, type HeartbeatTask } from '@/index.js';
+import { FileHeartbeatTaskService, type HeartbeatTask } from '@/advanced.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import { controlPlaneRouter } from '@/server/routes/trpc/control-plane.js';
 import { ControlPlaneHeartbeatController } from '@/server/controllers/trpc/control-plane/heartbeat.js';

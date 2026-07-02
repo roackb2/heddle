@@ -19,7 +19,7 @@ import {
   createRunShellMutateTool,
   TraceConsoleFormatter,
   createLogger,
-} from '../src/index.js';
+} from '../src/advanced.js';
 
 async function main() {
   const goal = process.argv[2];

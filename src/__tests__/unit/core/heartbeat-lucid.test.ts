@@ -6,7 +6,7 @@ import {
   type HeartbeatRunView,
   type HeartbeatSchedulerEvent,
   type HeartbeatTaskView,
-} from '../../../index.js';
+} from '../../../advanced.js';
 
 describe('heartbeat Lucid adapter', () => {
   it('maps heartbeat task states into Lucid-style agent statuses', () => {

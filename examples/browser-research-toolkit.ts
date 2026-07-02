@@ -14,7 +14,7 @@
 
 import { join } from 'node:path';
 
-import { createBrowserResearchToolkit, type BrowserResearchToolkitOptions } from '../src/index.js';
+import { createBrowserResearchToolkit, type BrowserResearchToolkitOptions } from '../src/advanced.js';
 import type { ToolDefinition, ToolResult } from '../src/core/types.js';
 
 type SnapshotOutput = {

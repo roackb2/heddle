@@ -22,7 +22,7 @@ import {
   type AgentLoopEvent,
   type BrowserResearchToolkitOptions,
   type ProviderCredentialSource,
-} from '../src/index.js';
+} from '../src/advanced.js';
 import { LlmAdapterService } from '../src/core/llm/index.js';
 import type { TraceEvent } from '../src/core/types.js';
 

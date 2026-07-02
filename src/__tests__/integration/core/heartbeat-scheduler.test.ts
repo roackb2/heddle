@@ -8,7 +8,7 @@ import {
   type HeartbeatSchedulerEvent,
   type HeartbeatTask,
   type HeartbeatTaskStore,
-} from '../../../index.js';
+} from '../../../advanced.js';
 import type { AgentHeartbeatResult } from '@/core/heartbeat/index.js';
 import { AgentLoopCheckpointService, type AgentLoopCheckpoint } from '@/core/runtime/loop/index.js';
 

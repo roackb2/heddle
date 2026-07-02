@@ -6,8 +6,16 @@ owns durable sessions, turn execution, compaction, traces, artifacts, default
 tools, host extensions, and approval callbacks.
 
 These guides follow a **progressive-disclosure ladder**. Start at rung 1 and go
-deeper only when you need to. This mirrors how the public API is organized in
-`src/index.ts`.
+deeper only when you need to. This mirrors how the public API is organized.
+
+There are two import entry points:
+
+- `@roackb2/heddle` — the **curated** default surface (rungs 1–5): everything a
+  product host needs to build an agentic experience.
+- `@roackb2/heddle/advanced` — the **full** surface: the curated exports plus
+  lower-level building blocks (LLM adapters, individual tools, trace, memory,
+  models, awareness) and specialized runtimes (agent loop, heartbeat,
+  integrations). Reach for this only when the curated surface is not enough.
 
 1. **Start here** — stand up a conversation agent.
    - [Quickstart](quickstart.md): a minimal persisted conversation with default

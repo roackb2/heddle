@@ -7,7 +7,7 @@ import {
   TraceConsoleFormatter,
   AgentLoopRuntimeService,
   type RunResult,
-} from '@/index.js';
+} from '@/advanced.js';
 import { MemoryCatalogService } from '@/core/memory/catalog.js';
 import { MemoryMaintenanceIntegrationService } from '@/core/memory/maintenance-integration.js';
 import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';

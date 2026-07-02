@@ -7,7 +7,7 @@ import {
   type LlmAdapter,
   type LlmResponse,
   type ToolDefinition,
-} from '../src/index.js';
+} from '../src/advanced.js';
 
 const createMockLlm = (): LlmAdapter => {
   let turn = 0;
