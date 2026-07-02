@@ -21,6 +21,8 @@ not each invent their own version.
 - The alpha programmatic API through `conversation-engine.ts` and `index.ts`.
 - Host-extension composition for SDK integrations, including curated MCP tool
   surfaces and artifact behavior.
+- Host-facing turn result summaries, including trace file, completed tool
+  results, and session artifacts.
 
 ## Domain Ownership Rule
 
@@ -90,6 +92,8 @@ Use this pattern when it fits the domain:
 - Put submit/continue behavior in `turns/service.ts`.
 - Put persisted turn phases in the explicit `turns/*/` subdomains.
 - Put shared compaction behavior in `compaction/`.
+- Put public turn result vocabulary in `turn-result.ts` so SDK hosts do not
+  parse trace or artifact storage for common summaries.
 - Put host-extension policy in `host-extension.ts` or focused helpers such as
   `mcp-host-extension.ts`; runtime toolkits should receive resolved policy,
   not re-read host-extension config.

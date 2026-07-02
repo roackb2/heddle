@@ -22,6 +22,8 @@ describe('createConversationEngine', () => {
       summary: 'ok',
       session: new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
         .read(args.sessionId) as ChatSession,
+      artifacts: [],
+      toolResults: [],
     }));
   });
 

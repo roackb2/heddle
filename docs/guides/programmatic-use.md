@@ -526,7 +526,21 @@ const result = await engine.turns.submit({
 console.log('\nOutcome:', result.outcome)
 console.log('Summary:', result.summary)
 console.log('Session:', result.session.id)
+console.log('Trace file:', result.traceFile)
+console.log('Artifacts:', result.artifacts.map((artifact) => artifact.id))
+console.log('Tool calls:', result.toolResults.map((entry) => entry.call.tool))
 ```
+
+Submitted turns return host-facing summary fields in addition to the persisted
+session:
+
+- `traceFile` points at the persisted trace for the turn.
+- `artifacts` lists Heddle artifacts currently associated with the session.
+- `toolResults` lists completed tool calls with their call input, result,
+  duration, step, and timestamp.
+
+Use those fields for common SDK-host summaries. Reach for raw trace files only
+when your host needs lower-level evidence or custom analysis.
 
 ## `EngineConversationTurnService.run(...)`
 

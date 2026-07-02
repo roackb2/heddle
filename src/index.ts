@@ -376,6 +376,10 @@ export type {
   ConversationEngineHostArtifactOptions,
   ConversationEngineHostMcpOptions,
 } from './core/chat/engine/host-extension.js';
+export type {
+  ConversationTurnResultSummary,
+  ConversationTurnToolResult,
+} from './core/chat/engine/turn-result.js';
 export {
   defineMcpHostExtension,
   McpHostExtensionService,

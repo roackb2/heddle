@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProviderCredentialRepository } from '@/core/auth/index.js';
+import { ArtifactService } from '@/core/artifacts/index.js';
 import { EngineConversationTurnService } from '@/core/chat/engine/turns/service.js';
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
@@ -309,6 +310,8 @@ describe('conversation turn lifecycle', () => {
       prompt: 'Edit safely.',
       apiKey: 'explicit-key',
       memoryMaintenanceMode: 'none',
+      artifactRoot: storage.artifactRoot,
+      artifactsEnabled: true,
       approvalPolicies: [policy],
       host: {
         approveToolCall: (call, tool) => requestToolApproval({ call, tool }),
@@ -334,6 +337,75 @@ describe('conversation turn lifecycle', () => {
     expect(requestToolApproval).toHaveBeenCalledWith({ call, tool });
   });
 
+  it('returns persisted trace, session artifacts, and completed tool results to hosts', async () => {
+    const storage = createConversationTurnStorage();
+    const artifact = new ArtifactService({ artifactRoot: storage.artifactRoot }).saveText({
+      sessionId: storage.sessionId,
+      content: '# Brief',
+      kind: 'source',
+      domain: 'document',
+      title: 'brief.md',
+      sourceTool: 'doc_create',
+    });
+    const call: ToolCall = { id: 'call-1', tool: 'doc_create', input: { title: 'Brief' } };
+    const result = { ok: true, output: { artifactId: artifact.id } };
+    vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(createLoopResult({
+      workspaceRoot: storage.workspaceRoot,
+      prompt: 'Create a brief.',
+      summary: 'Created.',
+      trace: [
+        {
+          type: 'tool.completed',
+          call,
+          result,
+          durationMs: 42,
+          step: 1,
+          timestamp: '2026-05-03T00:00:01.000Z',
+        },
+        {
+          type: 'run.finished',
+          outcome: 'done',
+          summary: 'Created.',
+          step: 2,
+          timestamp: '2026-05-03T00:00:02.000Z',
+        },
+      ],
+    }) as never);
+
+    const turnResult = await EngineConversationTurnService.run({
+      workspaceRoot: storage.workspaceRoot,
+      stateRoot: storage.stateRoot,
+      traceDir: join(storage.stateRoot, 'traces'),
+      sessionStoragePath: storage.sessionStoragePath,
+      sessionId: storage.sessionId,
+      prompt: 'Create a brief.',
+      apiKey: 'explicit-key',
+      memoryMaintenanceMode: 'none',
+      artifactRoot: storage.artifactRoot,
+      artifactsEnabled: true,
+    });
+
+    expect(turnResult.traceFile).toEqual(expect.stringContaining('trace-'));
+    expect(turnResult.artifacts).toEqual([
+      expect.objectContaining({
+        id: artifact.id,
+        kind: 'source',
+        domain: 'document',
+        sessionId: storage.sessionId,
+        sourceTool: 'doc_create',
+      }),
+    ]);
+    expect(turnResult.toolResults).toEqual([
+      {
+        call,
+        result,
+        durationMs: 42,
+        step: 1,
+        timestamp: '2026-05-03T00:00:01.000Z',
+      },
+    ]);
+  });
+
   it('clears the session lease when the run loop fails', async () => {
     const storage = createConversationTurnStorage();
     vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockRejectedValue(new Error('loop failed'));
@@ -346,6 +418,8 @@ describe('conversation turn lifecycle', () => {
       prompt: 'Fail after preflight.',
       apiKey: 'explicit-key',
       memoryMaintenanceMode: 'none',
+      artifactRoot: storage.artifactRoot,
+      artifactsEnabled: true,
       leaseOwner: {
         ownerKind: 'daemon',
         ownerId: 'daemon-test',
@@ -387,6 +461,7 @@ function createConversationTurnStorage() {
     stateRoot,
     sessionStoragePath,
     sessionId: session.id,
+    artifactRoot: join(stateRoot, 'artifacts'),
   };
 }
 
@@ -394,8 +469,9 @@ function createLoopResult(args: {
   workspaceRoot: string;
   prompt: string;
   summary: string;
+  trace?: RunResult['trace'];
 }) {
-  const trace: RunResult['trace'] = [
+  const trace: RunResult['trace'] = args.trace ?? [
     {
       type: 'assistant.turn',
       content: args.summary,

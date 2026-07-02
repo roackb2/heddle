@@ -3,11 +3,11 @@ import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js
 import type { ConversationCompactionStatus } from '@/core/live/index.js';
 import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { RunAgentLoopOptions } from '@/core/runtime/loop/index.js';
-import type { ChatSession } from '@/core/chat/types.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import type { ChatTurnHostPort } from './host/index.js';
 import type { ToolDefinition } from '@/core/types.js';
 import type { ToolToolkit } from '@/core/tools/index.js';
+import type { ConversationTurnResultSummary } from '../turn-result.js';
 
 export type RunConversationTurnArgs = {
   workspaceRoot: string;
@@ -94,8 +94,4 @@ export type TurnPersistenceInput = Pick<
   'sessionStoragePath' | 'stateRoot' | 'traceDir' | 'traceSummarizerRegistry' | 'prompt'
 >;
 
-export type RunConversationTurnResult = {
-  outcome: string;
-  summary: string;
-  session: ChatSession;
-};
+export type RunConversationTurnResult = ConversationTurnResultSummary;
