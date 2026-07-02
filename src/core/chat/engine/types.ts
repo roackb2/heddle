@@ -1,4 +1,4 @@
-import type { ArtifactService } from '@/core/artifacts/index.js';
+import type { ArtifactRepository, ArtifactService } from '@/core/artifacts/index.js';
 import type { ToolApprovalPolicy, ToolApprovalSurface } from '../../approvals/types.js';
 import type {
   ConversationActivity,
@@ -43,6 +43,13 @@ export type ConversationEngineConfig = {
   memoryDir?: string;
   workspaceId?: string;
   apiKeyPresent?: boolean;
+  /**
+   * Custom artifact persistence for hosted services that cannot use the
+   * default file store under the state root. When set, the engine's artifact
+   * reader, turn-result artifact listing, and artifact tools all persist
+   * through this repository instead of `stateRoot/artifacts`.
+   */
+  artifactRepository?: ArtifactRepository;
 };
 
 export type ConversationEngineHostExtensions = ConversationEngineHostExtensionBundle;

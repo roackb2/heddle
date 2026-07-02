@@ -10,6 +10,6 @@ export function createConversationEngine(config: ConversationEngineConfig): Conv
   return {
     sessions: new FileConversationSessionService(normalizedConfig),
     turns: new EngineConversationTurnService(normalizedConfig),
-    artifacts: new ArtifactService({ artifactRoot: normalizedConfig.artifactRoot }),
+    artifacts: new ArtifactService({ repository: normalizedConfig.artifactRepository }),
   };
 }

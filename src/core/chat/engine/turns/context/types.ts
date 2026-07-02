@@ -1,3 +1,4 @@
+import type { ArtifactRepository } from '@/core/artifacts/index.js';
 import type { ToolDefinition } from '@/core/types.js';
 import type { ToolToolkit } from '@/core/tools/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
@@ -18,6 +19,7 @@ export type PrepareConversationTurnContextArgs = {
   toolkits?: ToolToolkit[];
   hiddenMcpServerIds?: string[];
   artifactRoot: string;
+  artifactRepository?: ArtifactRepository;
   artifactsEnabled: boolean;
   agentSnapshot?: CustomAgentExecutionSnapshot;
   searchIgnoreDirs?: string[];
@@ -36,6 +38,7 @@ export type ConversationTurnToolContextArgs = Pick<
   | 'toolkits'
   | 'hiddenMcpServerIds'
   | 'artifactRoot'
+  | 'artifactRepository'
   | 'artifactsEnabled'
   | 'sessionId'
 >;

@@ -1,3 +1,4 @@
+import type { ArtifactRepository } from '@/core/artifacts/index.js';
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ConversationCompactionStatus } from '@/core/live/index.js';
@@ -30,6 +31,7 @@ export type RunConversationTurnArgs = {
   toolkits?: ToolToolkit[];
   hiddenMcpServerIds?: string[];
   artifactRoot: string;
+  artifactRepository?: ArtifactRepository;
   artifactsEnabled: boolean;
   agentProfileId?: string;
   agentSnapshot?: CustomAgentExecutionSnapshot;
@@ -57,6 +59,7 @@ export type TurnRuntimeConfigInput = Pick<
   | 'toolkits'
   | 'hiddenMcpServerIds'
   | 'artifactRoot'
+  | 'artifactRepository'
   | 'artifactsEnabled'
   | 'traceSummarizerRegistry'
 >;

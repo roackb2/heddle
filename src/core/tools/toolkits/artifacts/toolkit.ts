@@ -44,7 +44,10 @@ const SetCurrentArtifactInputSchema = z.object({
 export const artifactsToolkit: ToolToolkit = {
   id: 'artifacts',
   createTools(context) {
-    const service = new ArtifactService({ artifactRoot: context.artifactRoot });
+    const service = new ArtifactService({
+      artifactRoot: context.artifactRoot,
+      repository: context.artifactRepository,
+    });
     const serviceContext = {
       service,
       artifactRoot: context.artifactRoot,

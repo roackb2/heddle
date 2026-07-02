@@ -40,6 +40,7 @@ export class RuntimeToolService {
           workspaceRoot,
           stateRoot,
           artifactRoot,
+          artifactRepository: options.artifactRepository,
           sessionId: options.sessionId,
           model: options.model,
           apiKey: options.apiKey,

@@ -1,6 +1,7 @@
 import { AgentLoopRuntimeService } from '@/core/runtime/loop/index.js';
 import { AutonomyPermissionModeService, ToolApprovalProfileService } from '@/core/approvals/index.js';
 import { ArtifactService } from '@/core/artifacts/index.js';
+import type { ArtifactRepository } from '@/core/artifacts/index.js';
 import { HeddleEventType } from '@/core/event-types.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
 import { FileConversationSessionService } from '@/core/chat/engine/sessions/service.js';
@@ -176,6 +177,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         traceFile: persisted.traceFile,
         artifacts: EngineConversationTurnService.listTurnArtifacts({
           artifactRoot: args.artifactRoot,
+          artifactRepository: args.artifactRepository,
           artifactsEnabled: args.artifactsEnabled,
           sessionId: session.id,
         }),
@@ -231,11 +233,13 @@ export class EngineConversationTurnService implements ConversationTurnService {
 
   private static listTurnArtifacts(args: {
     artifactRoot: string;
+    artifactRepository?: ArtifactRepository;
     artifactsEnabled: boolean;
     sessionId: string;
   }): RunConversationTurnResult['artifacts'] {
     return args.artifactsEnabled
-      ? new ArtifactService({ artifactRoot: args.artifactRoot }).list({ sessionId: args.sessionId })
+      ? new ArtifactService({ artifactRoot: args.artifactRoot, repository: args.artifactRepository })
+        .list({ sessionId: args.sessionId })
       : [];
   }
 

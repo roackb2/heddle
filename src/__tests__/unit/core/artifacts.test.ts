@@ -3,6 +3,27 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ArtifactService, FileArtifactRepository } from '@/core/artifacts/index.js';
+import type { ArtifactRepository, ArtifactStore } from '@/core/artifacts/index.js';
+
+/** Non-file ArtifactRepository proving the port is not shaped around the filesystem. */
+function createInMemoryArtifactRepository(): ArtifactRepository & { contents: Map<string, string> } {
+  let catalog: ArtifactStore = FileArtifactRepository.emptyStore();
+  const contents = new Map<string, string>();
+
+  return {
+    contents,
+    readCatalog: () => structuredClone(catalog),
+    writeCatalog: (store) => {
+      catalog = structuredClone(store);
+    },
+    contentKey: (id, extension) => `memory://${id}.${extension}`,
+    contentExists: (key) => contents.has(key),
+    writeContent: (key, content) => {
+      contents.set(key, content);
+    },
+    readContent: (key) => contents.get(key),
+  };
+}
 
 describe('artifact registry', () => {
   it('saves text artifacts, stores metadata, and reads content back', () => {
@@ -120,14 +141,48 @@ describe('artifact registry', () => {
     });
 
     expect(existsSync(artifact.path)).toBe(true);
-    expect(repository.read().artifacts).toHaveLength(1);
+    expect(repository.readCatalog().artifacts).toHaveLength(1);
 
     const storePath = FileArtifactRepository.resolveStorePath(artifactRoot);
     // Keep malformed JSON from surfacing partial or invalid artifact state.
     writeFileSync(storePath, '{not valid json', 'utf8');
 
-    expect(repository.read()).toEqual(FileArtifactRepository.emptyStore());
+    expect(repository.readCatalog()).toEqual(FileArtifactRepository.emptyStore());
     expect(existsSync(artifact.path)).toBe(true);
+  });
+
+  it('runs the full artifact lifecycle through a custom repository with no filesystem access', () => {
+    const repository = createInMemoryArtifactRepository();
+    let id = 0;
+    const service = new ArtifactService({
+      repository,
+      now: () => `2026-07-02T00:00:0${id}.000Z`,
+      nextId: () => `artifact-${++id}`,
+    });
+
+    const source = service.saveText({
+      kind: 'source',
+      content: '# Deck',
+      sessionId: 'session-1',
+    });
+    const html = service.saveText({
+      kind: 'html',
+      content: '<html></html>',
+      sessionId: 'session-1',
+    });
+
+    expect(source.path).toBe('memory://artifact-1.txt');
+    expect(repository.contents.get('memory://artifact-1.txt')).toBe('# Deck');
+    expect(service.list({ sessionId: 'session-1' }).map((artifact) => artifact.id)).toEqual([html.id, source.id]);
+    expect(service.read(source.id)).toEqual({ artifact: source, content: '# Deck' });
+    expect(service.current('session-1')).toEqual(html);
+
+    service.setCurrent(source.id, { sessionId: 'session-1' });
+    expect(service.current('session-1')).toEqual(source);
+  });
+
+  it('requires either a repository or an artifactRoot', () => {
+    expect(() => new ArtifactService({})).toThrow('ArtifactService requires either a repository or an artifactRoot.');
   });
 
   it('rejects duplicate artifact ids instead of overwriting stored files', () => {

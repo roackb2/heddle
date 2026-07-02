@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -89,6 +89,40 @@ describe('createConversationEngine', () => {
     expect(engine.artifacts.read(saved.id)?.content).toBe('# Deck');
     // Backed by the default stateRoot/artifacts root.
     expect(new ArtifactService({ artifactRoot: join(stateRoot, 'artifacts') }).get(saved.id)?.id).toBe(saved.id);
+  });
+
+  it('persists artifacts through an injected repository without touching the state root', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-artifact-repo-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    let catalog = { version: 1 as const, artifacts: [], current: { sessionArtifactIds: {} } };
+    const contents = new Map<string, string>();
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+      artifactRepository: {
+        readCatalog: () => structuredClone(catalog),
+        writeCatalog: (store) => {
+          catalog = structuredClone(store) as typeof catalog;
+        },
+        contentKey: (id, extension) => `hosted://${id}.${extension}`,
+        contentExists: (key) => contents.has(key),
+        writeContent: (key, content) => {
+          contents.set(key, content);
+        },
+        readContent: (key) => contents.get(key),
+      },
+    });
+    const session = engine.sessions.create({ id: 'session-1', name: 'Hosted artifacts' });
+
+    const saved = engine.artifacts.saveText({ content: '# Hosted deck', kind: 'source', sessionId: session.id });
+
+    expect(saved.path).toBe(`hosted://${saved.id}.txt`);
+    expect(contents.get(saved.path)).toBe('# Hosted deck');
+    expect(engine.artifacts.read(saved.id)?.content).toBe('# Hosted deck');
+    // Nothing was written to the default on-disk artifact store.
+    expect(existsSync(join(stateRoot, 'artifacts'))).toBe(false);
   });
 
   it('roots the artifacts reader at a custom host-extension artifacts root', () => {

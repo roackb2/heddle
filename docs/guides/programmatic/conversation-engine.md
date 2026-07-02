@@ -52,3 +52,38 @@ const source = engine.artifacts.read(artifactId)?.content
 correct even when a host extension sets a custom `artifacts.root`. Do not
 recompute the artifact root (`stateRoot/artifacts`) in host code — that breaks
 when the root is customized.
+
+## Bring your own artifact storage
+
+Hosted services usually cannot persist under a local state root. Implement the
+`ArtifactRepository` port and pass it to the engine (or the quickstart runner):
+
+```ts
+import { createConversationEngine, type ArtifactRepository } from '@roackb2/heddle'
+
+const artifactRepository: ArtifactRepository = {
+  readCatalog: () => loadCatalogFromDatabase(),
+  writeCatalog: (store) => saveCatalogToDatabase(store),
+  contentKey: (id, extension) => `artifacts/${id}.${extension}`,
+  contentExists: (key) => blobExists(key),
+  writeContent: (key, content) => putBlob(key, content),
+  readContent: (key) => getBlob(key),
+}
+
+const engine = createConversationEngine({
+  workspaceRoot,
+  stateRoot,
+  model: 'gpt-5.4',
+  artifactRepository,
+})
+```
+
+The injected repository is resolved once at the engine boundary and used
+everywhere artifacts are persisted or read: `engine.artifacts`, per-turn
+artifact listings in turn results, the `save_artifact`/`read_artifact` tool
+family, and MCP host-extension result-artifact capture. `contentKey` owns
+content addressing — return whatever key your storage understands; it is stored
+as `RuntimeArtifact.path`.
+
+Sessions, traces, and memory still persist under the state root today. Making
+them injectable follows the same port-per-domain pattern.

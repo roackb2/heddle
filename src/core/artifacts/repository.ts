@@ -1,16 +1,22 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { ArtifactStoreSchema } from './schemas.js';
-import type { ArtifactStore, FileArtifactRepositoryOptions } from './types.js';
+import type { ArtifactRepository, ArtifactStore, FileArtifactRepositoryOptions } from './types.js';
 
 /**
- * File-backed artifact repository for the artifact index.
+ * Default file-backed artifact persistence: the catalog index at
+ * `artifactRoot/artifacts.json` and content blobs under `artifactRoot/files/`.
+ * Implements the `ArtifactRepository` port so hosts can swap in their own
+ * storage without touching artifact policy.
  */
-export class FileArtifactRepository {
+export class FileArtifactRepository implements ArtifactRepository {
   private readonly storePath: string;
+  private readonly filesRoot: string;
 
   constructor(options: FileArtifactRepositoryOptions) {
-    this.storePath = FileArtifactRepository.resolveStorePath(options.artifactRoot);
+    const artifactRoot = resolve(options.artifactRoot);
+    this.storePath = FileArtifactRepository.resolveStorePath(artifactRoot);
+    this.filesRoot = join(artifactRoot, 'files');
   }
 
   static resolveStorePath(artifactRoot: string): string {
@@ -27,7 +33,7 @@ export class FileArtifactRepository {
     };
   }
 
-  read(): ArtifactStore {
+  readCatalog(): ArtifactStore {
     if (!existsSync(this.storePath)) {
       return FileArtifactRepository.emptyStore();
     }
@@ -39,8 +45,29 @@ export class FileArtifactRepository {
     }
   }
 
-  write(store: ArtifactStore): void {
+  writeCatalog(store: ArtifactStore): void {
     mkdirSync(dirname(this.storePath), { recursive: true });
     writeFileSync(this.storePath, `${JSON.stringify(ArtifactStoreSchema.parse(store), null, 2)}\n`, 'utf8');
+  }
+
+  contentKey(id: string, extension: string): string {
+    return join(this.filesRoot, `${id}.${extension}`);
+  }
+
+  contentExists(key: string): boolean {
+    return existsSync(key);
+  }
+
+  writeContent(key: string, content: string): void {
+    mkdirSync(dirname(key), { recursive: true });
+    writeFileSync(key, content, 'utf8');
+  }
+
+  readContent(key: string): string | undefined {
+    if (!existsSync(key)) {
+      return undefined;
+    }
+
+    return readFileSync(key, 'utf8');
   }
 }

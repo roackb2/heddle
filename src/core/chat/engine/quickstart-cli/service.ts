@@ -61,6 +61,7 @@ export class QuickstartConversationCliRunnerService {
       memoryMaintenanceMode: defaults.memoryMaintenanceMode,
       tools: options.tools,
       hostExtensions: options.hostExtensions,
+      artifactRepository: options.artifactRepository,
     });
     let session = QuickstartConversationCliRunnerService.resolveSession({ engine, options });
     const textHost = createConversationTextHost({
