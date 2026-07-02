@@ -1,3 +1,3 @@
-import { runConversationCli } from '../../src/index.js';
+import { runQuickstartConversationCli } from '../../src/index.js';
 
-await runConversationCli();
+await runQuickstartConversationCli();

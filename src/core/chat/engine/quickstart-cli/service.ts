@@ -14,13 +14,13 @@ import type { ChatSession } from '../../types.js';
 import type { ConversationTurnResultSummary } from '../turn-result.js';
 import type { ConversationEngine, ConversationEngineHost } from '../types.js';
 import type {
-  ConversationCliCredentialContext,
-  ConversationCliCredentialPreflightOptions,
-  ConversationCliLocalCommand,
-  ConversationCliRunnerDefaults,
-  ConversationCliRunnerDefaultsInput,
-  ConversationCliRunnerOptions,
-  ConversationCliTurnContext,
+  QuickstartConversationCliCredentialContext,
+  QuickstartConversationCliCredentialPreflightOptions,
+  QuickstartConversationCliLocalCommand,
+  QuickstartConversationCliRunnerDefaults,
+  QuickstartConversationCliRunnerDefaultsInput,
+  QuickstartConversationCliRunnerOptions,
+  QuickstartConversationCliTurnContext,
 } from './types.js';
 
 const DEFAULT_PROMPT_LABEL = 'heddle> ';
@@ -30,22 +30,22 @@ const BUILT_IN_COMMANDS = [
   { command: '/session', description: 'print the active session id' },
   { command: '/help', description: 'print available local commands' },
   { command: '/exit', aliases: ['/quit'], description: 'close the conversation loop' },
-] satisfies Array<Pick<ConversationCliLocalCommand, 'aliases' | 'command' | 'description'>>;
+] satisfies Array<Pick<QuickstartConversationCliLocalCommand, 'aliases' | 'command' | 'description'>>;
 
 /**
- * Owns the minimal interactive console experience for SDK starters.
+ * Owns the minimal quickstart console experience for SDK starters.
  *
  * Keep terminal lifecycle, session resume, one-shot submission, prompt
- * formatting, and local command dispatch here. Product hosts should only drop
- * down to `createConversationEngine` when they need to own a full UI or runtime
- * control path rather than a lightly customized CLI loop.
+ * formatting, and local command dispatch here only when they make first-run
+ * SDK examples smaller. Heddle product CLI/TUI behavior belongs in `src/cli-v2`;
+ * product-specific host behavior belongs in that product host.
  */
-export class ConversationCliRunnerService {
-  static async run(options: ConversationCliRunnerOptions = {}): Promise<void> {
-    const defaults = ConversationCliRunnerService.resolveDefaults(options);
+export class QuickstartConversationCliRunnerService {
+  static async run(options: QuickstartConversationCliRunnerOptions = {}): Promise<void> {
+    const defaults = QuickstartConversationCliRunnerService.resolveDefaults(options);
     const { stateRoot, workspaceRoot } = defaults;
     const output = options.output ?? stdout;
-    const credentialContext = ConversationCliRunnerService.preflightCredentials({
+    const credentialContext = QuickstartConversationCliRunnerService.preflightCredentials({
       defaults,
       options,
     });
@@ -62,23 +62,23 @@ export class ConversationCliRunnerService {
       tools: options.tools,
       hostExtensions: options.hostExtensions,
     });
-    let session = ConversationCliRunnerService.resolveSession({ engine, options });
+    let session = QuickstartConversationCliRunnerService.resolveSession({ engine, options });
     const textHost = createConversationTextHost({
       output: (text) => output.write(text),
       trace: 'status',
     });
-    const host = ConversationCliRunnerService.composeHost(textHost.host, options.host);
+    const host = QuickstartConversationCliRunnerService.composeHost(textHost.host, options.host);
 
-    ConversationCliRunnerService.writeRuntimeStatus({
+    QuickstartConversationCliRunnerService.writeRuntimeStatus({
       credentialContext,
       defaults,
       output,
     });
     output.write(`Session: ${session.id}\n`);
-    output.write(`Commands: ${ConversationCliRunnerService.formatCommandList(options.localCommands)}\n`);
+    output.write(`Commands: ${QuickstartConversationCliRunnerService.formatCommandList(options.localCommands)}\n`);
 
     if (options.oncePrompt?.trim()) {
-      await ConversationCliRunnerService.submitPrompt({
+      await QuickstartConversationCliRunnerService.submitPrompt({
         defaults,
         engine,
         host,
@@ -99,7 +99,7 @@ export class ConversationCliRunnerService {
 
     try {
       for (;;) {
-        const rawPrompt = await ConversationCliRunnerService.readPrompt(inputLoop, options.promptLabel ?? DEFAULT_PROMPT_LABEL);
+        const rawPrompt = await QuickstartConversationCliRunnerService.readPrompt(inputLoop, options.promptLabel ?? DEFAULT_PROMPT_LABEL);
         if (rawPrompt === undefined) {
           break;
         }
@@ -109,7 +109,7 @@ export class ConversationCliRunnerService {
           continue;
         }
 
-        const localCommand = ConversationCliRunnerService.resolveLocalCommand({
+        const localCommand = QuickstartConversationCliRunnerService.resolveLocalCommand({
           command: prompt,
           localCommands: options.localCommands,
         });
@@ -118,7 +118,7 @@ export class ConversationCliRunnerService {
             break;
           }
 
-          await ConversationCliRunnerService.handleLocalCommand({
+          await QuickstartConversationCliRunnerService.handleLocalCommand({
             command: prompt,
             engine,
             localCommand,
@@ -131,7 +131,7 @@ export class ConversationCliRunnerService {
           continue;
         }
 
-        const result = await ConversationCliRunnerService.submitPrompt({
+        const result = await QuickstartConversationCliRunnerService.submitPrompt({
           defaults,
           engine,
           host,
@@ -149,24 +149,24 @@ export class ConversationCliRunnerService {
     }
   }
 
-  static resolveDefaults(options: ConversationCliRunnerDefaultsInput = {}): ConversationCliRunnerDefaults {
+  static resolveDefaults(options: QuickstartConversationCliRunnerDefaultsInput = {}): QuickstartConversationCliRunnerDefaults {
     const workspaceRoot = options.workspaceRoot ?? process.cwd();
 
     return {
       ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
       memoryMaintenanceMode: options.memoryMaintenanceMode ?? DEFAULT_MEMORY_MAINTENANCE_MODE,
-      model: ConversationCliRunnerService.resolveModel(options),
-      reasoningEffort: ConversationCliRunnerService.resolveReasoningEffort(options.reasoningEffort),
+      model: QuickstartConversationCliRunnerService.resolveModel(options),
+      reasoningEffort: QuickstartConversationCliRunnerService.resolveReasoningEffort(options.reasoningEffort),
       stateRoot: options.stateRoot ?? join(workspaceRoot, '.heddle'),
       workspaceRoot,
     };
   }
 
   private static preflightCredentials(input: {
-    defaults: ConversationCliRunnerDefaults;
-    options: ConversationCliRunnerOptions;
-  }): ConversationCliCredentialContext | undefined {
-    const preflight = ConversationCliRunnerService.resolveCredentialPreflight(input.options.credentialPreflight);
+    defaults: QuickstartConversationCliRunnerDefaults;
+    options: QuickstartConversationCliRunnerOptions;
+  }): QuickstartConversationCliCredentialContext | undefined {
+    const preflight = QuickstartConversationCliRunnerService.resolveCredentialPreflight(input.options.credentialPreflight);
     if (!preflight.enabled) {
       return undefined;
     }
@@ -183,12 +183,12 @@ export class ConversationCliRunnerService {
       preferApiKey: input.options.preferApiKey,
       provider: resolution.provider,
       source: resolution.credentialSource,
-    } satisfies ConversationCliCredentialContext;
+    } satisfies QuickstartConversationCliCredentialContext;
 
     if (resolution.credentialSource.type === 'missing') {
       throw new Error([
         RuntimeCredentialService.formatMissingCredentialMessage(resolution.model),
-        ConversationCliRunnerService.resolveMissingCredentialHint({
+        QuickstartConversationCliRunnerService.resolveMissingCredentialHint({
           context,
           missingCredentialHint: preflight.missingCredentialHint,
         }),
@@ -199,9 +199,9 @@ export class ConversationCliRunnerService {
   }
 
   private static resolveCredentialPreflight(
-    input: ConversationCliRunnerOptions['credentialPreflight'],
-  ): Required<Pick<ConversationCliCredentialPreflightOptions, 'enabled' | 'status'>>
-    & Pick<ConversationCliCredentialPreflightOptions, 'missingCredentialHint'> {
+    input: QuickstartConversationCliRunnerOptions['credentialPreflight'],
+  ): Required<Pick<QuickstartConversationCliCredentialPreflightOptions, 'enabled' | 'status'>>
+    & Pick<QuickstartConversationCliCredentialPreflightOptions, 'missingCredentialHint'> {
     if (input === false) {
       return {
         enabled: false,
@@ -224,8 +224,8 @@ export class ConversationCliRunnerService {
   }
 
   private static resolveMissingCredentialHint(input: {
-    context: ConversationCliCredentialContext;
-    missingCredentialHint: ConversationCliCredentialPreflightOptions['missingCredentialHint'];
+    context: QuickstartConversationCliCredentialContext;
+    missingCredentialHint: QuickstartConversationCliCredentialPreflightOptions['missingCredentialHint'];
   }): string | undefined {
     const hint = typeof input.missingCredentialHint === 'function'
       ? input.missingCredentialHint(input.context)
@@ -235,8 +235,8 @@ export class ConversationCliRunnerService {
   }
 
   private static writeRuntimeStatus(input: {
-    credentialContext: ConversationCliCredentialContext | undefined;
-    defaults: ConversationCliRunnerDefaults;
+    credentialContext: QuickstartConversationCliCredentialContext | undefined;
+    defaults: QuickstartConversationCliRunnerDefaults;
     output: NodeJS.WritableStream;
   }): void {
     if (!input.credentialContext) {
@@ -271,7 +271,7 @@ export class ConversationCliRunnerService {
 
   private static resolveSession(input: {
     engine: ConversationEngine;
-    options: ConversationCliRunnerOptions;
+    options: QuickstartConversationCliRunnerOptions;
   }): ChatSession {
     return input.options.sessionId
       ? input.engine.sessions.require(input.options.sessionId)
@@ -281,10 +281,10 @@ export class ConversationCliRunnerService {
   }
 
   private static async submitPrompt(input: {
-    defaults: ConversationCliRunnerDefaults;
+    defaults: QuickstartConversationCliRunnerDefaults;
     engine: ConversationEngine;
     host: ConversationEngineHost;
-    options: ConversationCliRunnerOptions;
+    options: QuickstartConversationCliRunnerOptions;
     prompt: string;
     session: ChatSession;
     stateRoot: string;
@@ -299,7 +299,7 @@ export class ConversationCliRunnerService {
       stateRoot: input.stateRoot,
       submittedPrompt,
       workspaceRoot: input.workspaceRoot,
-    } satisfies ConversationCliTurnContext;
+    } satisfies QuickstartConversationCliTurnContext;
 
     await input.options.onTurnStarted?.(context);
 
@@ -352,7 +352,7 @@ export class ConversationCliRunnerService {
     command: string;
     engine: ConversationEngine;
     localCommand: ResolvedLocalCommand;
-    localCommands: ConversationCliLocalCommand[] | undefined;
+    localCommands: QuickstartConversationCliLocalCommand[] | undefined;
     output: NodeJS.WritableStream;
     session: ChatSession;
     stateRoot: string;
@@ -364,7 +364,7 @@ export class ConversationCliRunnerService {
     }
 
     if (input.localCommand.type === 'help') {
-      input.output.write(`Commands: ${ConversationCliRunnerService.formatCommandList(input.localCommands)}\n`);
+      input.output.write(`Commands: ${QuickstartConversationCliRunnerService.formatCommandList(input.localCommands)}\n`);
       return;
     }
 
@@ -384,10 +384,10 @@ export class ConversationCliRunnerService {
 
   private static resolveLocalCommand(input: {
     command: string;
-    localCommands: ConversationCliLocalCommand[] | undefined;
+    localCommands: QuickstartConversationCliLocalCommand[] | undefined;
   }): ResolvedLocalCommand | undefined {
     const commandName = input.command.split(/\s+/)[0];
-    const builtIn = ConversationCliRunnerService.resolveBuiltInCommand(commandName);
+    const builtIn = QuickstartConversationCliRunnerService.resolveBuiltInCommand(commandName);
     if (builtIn) {
       return builtIn;
     }
@@ -422,14 +422,14 @@ export class ConversationCliRunnerService {
     return undefined;
   }
 
-  private static formatCommandList(localCommands: ConversationCliLocalCommand[] | undefined): string {
+  private static formatCommandList(localCommands: QuickstartConversationCliLocalCommand[] | undefined): string {
     return [
       ...BUILT_IN_COMMANDS.map((command) => command.command),
       ...(localCommands ?? []).map((command) => command.command),
     ].join(', ');
   }
 
-  private static resolveModel(options: ConversationCliRunnerDefaultsInput): string {
+  private static resolveModel(options: QuickstartConversationCliRunnerDefaultsInput): string {
     const env = options.env ?? process.env;
     return [
       options.model,
@@ -442,7 +442,7 @@ export class ConversationCliRunnerService {
       .find((candidate): candidate is string => Boolean(candidate)) ?? DEFAULT_OPENAI_MODEL;
   }
 
-  private static resolveReasoningEffort(input: ConversationCliRunnerDefaultsInput['reasoningEffort']): ReasoningEffort | undefined {
+  private static resolveReasoningEffort(input: QuickstartConversationCliRunnerDefaultsInput['reasoningEffort']): ReasoningEffort | undefined {
     const value = input?.trim();
     if (!value) {
       return undefined;
@@ -457,10 +457,10 @@ export class ConversationCliRunnerService {
 }
 
 type ResolvedLocalCommand =
-  | { type: 'custom'; command: ConversationCliLocalCommand }
+  | { type: 'custom'; command: QuickstartConversationCliLocalCommand }
   | { type: 'exit' }
   | { type: 'help' }
   | { type: 'session' };
 
-export const runConversationCli = ConversationCliRunnerService.run;
-export const resolveConversationCliDefaults = ConversationCliRunnerService.resolveDefaults;
+export const runQuickstartConversationCli = QuickstartConversationCliRunnerService.run;
+export const resolveQuickstartConversationCliDefaults = QuickstartConversationCliRunnerService.resolveDefaults;

@@ -371,13 +371,34 @@ export {
 
 // Chat alpha API
 export { createConversationEngine } from './core/chat/engine/conversation-engine.js';
-export { ConversationCliRunnerService, resolveConversationCliDefaults, runConversationCli } from './core/chat/engine/conversation-cli/index.js';
+export {
+  ConversationCliRunnerService,
+  QuickstartConversationCliRunnerService,
+  resolveConversationCliDefaults,
+  resolveQuickstartConversationCliDefaults,
+  runConversationCli,
+  runQuickstartConversationCli,
+} from './core/chat/engine/quickstart-cli/index.js';
 export type {
+  ConversationCliCredentialContext,
+  ConversationCliCredentialPreflightOptions,
+  ConversationCliLocalCommand,
+  ConversationCliLocalCommandContext,
   ConversationCliMemoryMaintenanceMode,
   ConversationCliRunnerDefaults,
   ConversationCliRunnerDefaultsInput,
   ConversationCliRunnerOptions,
-} from './core/chat/engine/conversation-cli/index.js';
+  ConversationCliTurnContext,
+  QuickstartConversationCliCredentialContext,
+  QuickstartConversationCliCredentialPreflightOptions,
+  QuickstartConversationCliLocalCommand,
+  QuickstartConversationCliLocalCommandContext,
+  QuickstartConversationCliMemoryMaintenanceMode,
+  QuickstartConversationCliRunnerDefaults,
+  QuickstartConversationCliRunnerDefaultsInput,
+  QuickstartConversationCliRunnerOptions,
+  QuickstartConversationCliTurnContext,
+} from './core/chat/engine/quickstart-cli/index.js';
 export { defineHostExtension, ConversationEngineHostExtensionService } from './core/chat/engine/host-extension.js';
 export { ConversationTextHostService, createConversationTextHost } from './core/chat/engine/text-host/index.js';
 export type {

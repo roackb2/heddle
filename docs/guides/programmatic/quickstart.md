@@ -1,12 +1,12 @@
 # Quickstart
 
-Use `runConversationCli` when you want a working interactive conversation loop
+Use `runQuickstartConversationCli` when you want a working interactive conversation loop
 before building a custom UI:
 
 ```ts
-import { runConversationCli } from '@roackb2/heddle'
+import { runQuickstartConversationCli } from '@roackb2/heddle'
 
-await runConversationCli()
+await runQuickstartConversationCli()
 ```
 
 The runner chooses reasonable SDK defaults: the current working directory as the
@@ -16,6 +16,11 @@ step budget, no automatic memory maintenance, and the first configured model fro
 Heddle's built-in OpenAI default. It resolves credentials before starting the
 session and prints the selected model and credential source. If the model has no
 usable credential, it fails early with Heddle's standard setup message.
+
+This quickstart runner is intentionally smaller than Heddle's product CLI/TUI.
+Use it to get an SDK conversation working quickly, then move to
+`createConversationEngine` when your product needs custom UI state, rendering,
+approval screens, session browsers, or control-plane lifecycle.
 
 Run the local SDK example:
 
@@ -27,9 +32,9 @@ Customize the starter loop when your product needs a little domain behavior but
 not a full custom UI:
 
 ```ts
-import { runConversationCli } from '@roackb2/heddle'
+import { runQuickstartConversationCli } from '@roackb2/heddle'
 
-await runConversationCli({
+await runQuickstartConversationCli({
   model: process.env.MY_PRODUCT_MODEL,
   reasoningEffort: process.env.MY_PRODUCT_REASONING_EFFORT,
   credentialPreflight: {
@@ -59,11 +64,11 @@ default resolver instead of rebuilding path and model fallbacks:
 
 ```ts
 import {
-  resolveConversationCliDefaults,
-  runConversationCli,
+  resolveQuickstartConversationCliDefaults,
+  runQuickstartConversationCli,
 } from '@roackb2/heddle'
 
-const runtime = resolveConversationCliDefaults({
+const runtime = resolveQuickstartConversationCliDefaults({
   model: process.env.MY_PRODUCT_MODEL,
   reasoningEffort: process.env.MY_PRODUCT_REASONING_EFFORT,
 })
@@ -72,7 +77,7 @@ const hostExtensions = [
   // prepare your generic host extensions with runtime.stateRoot
 ]
 
-await runConversationCli({
+await runQuickstartConversationCli({
   ...runtime,
   hostExtensions,
 })

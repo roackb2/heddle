@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import {
   createConversationEngine,
-  resolveConversationCliDefaults,
-  runConversationCli,
+  resolveQuickstartConversationCliDefaults,
+  runQuickstartConversationCli,
 } from '@/core/chat/engine/index.js';
 
 class CaptureOutput extends Writable {
@@ -23,18 +23,18 @@ class CaptureOutput extends Writable {
   }
 }
 
-describe('runConversationCli', () => {
+describe('runQuickstartConversationCli', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
   it('dispatches caller-owned local commands inside the default loop', async () => {
-    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-conversation-cli-command-'));
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-quickstart-cli-command-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const input = new PassThrough();
     const output = new CaptureOutput();
 
-    const run = runConversationCli({
+    const run = runQuickstartConversationCli({
       input,
       localCommands: [{
         command: '/artifacts',
@@ -61,8 +61,8 @@ describe('runConversationCli', () => {
   });
 
   it('resolves generic SDK defaults for minimal interactive hosts', () => {
-    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-conversation-cli-defaults-'));
-    const defaults = resolveConversationCliDefaults({
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-quickstart-cli-defaults-'));
+    const defaults = resolveQuickstartConversationCliDefaults({
       env: {},
       reasoningEffort: 'medium',
       workspaceRoot,
@@ -78,7 +78,7 @@ describe('runConversationCli', () => {
   });
 
   it('prefers explicit model overrides before environment fallbacks', () => {
-    expect(resolveConversationCliDefaults({
+    expect(resolveQuickstartConversationCliDefaults({
       env: {
         ANTHROPIC_MODEL: 'claude-from-env',
         HEDDLE_EXAMPLE_MODEL: 'gpt-example-env',
@@ -88,7 +88,7 @@ describe('runConversationCli', () => {
       model: 'gpt-explicit',
     }).model).toBe('gpt-explicit');
 
-    expect(resolveConversationCliDefaults({
+    expect(resolveQuickstartConversationCliDefaults({
       env: {
         ANTHROPIC_MODEL: 'claude-from-env',
         HEDDLE_EXAMPLE_MODEL: 'gpt-example-env',
@@ -99,14 +99,14 @@ describe('runConversationCli', () => {
   });
 
   it('rejects unsupported reasoning effort overrides early', () => {
-    expect(() => resolveConversationCliDefaults({
+    expect(() => resolveQuickstartConversationCliDefaults({
       env: {},
       reasoningEffort: 'extreme',
     })).toThrow('Unsupported reasoning effort: extreme. Use one of low, medium, high, ultrahigh.');
   });
 
   it('can resume an existing session without owning the caller loop', async () => {
-    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-conversation-cli-resume-'));
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-quickstart-cli-resume-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const engine = createConversationEngine({
       model: 'gpt-test',
@@ -117,7 +117,7 @@ describe('runConversationCli', () => {
     const input = new PassThrough();
     const output = new CaptureOutput();
 
-    const run = runConversationCli({
+    const run = runQuickstartConversationCli({
       input,
       credentialPreflight: false,
       model: 'gpt-test',
@@ -137,12 +137,12 @@ describe('runConversationCli', () => {
   });
 
   it('prints a generic credential status before entering the loop', async () => {
-    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-conversation-cli-credential-status-'));
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-quickstart-cli-credential-status-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const input = new PassThrough();
     const output = new CaptureOutput();
 
-    const run = runConversationCli({
+    const run = runQuickstartConversationCli({
       input,
       model: 'ollama/test-model',
       output,
@@ -163,11 +163,11 @@ describe('runConversationCli', () => {
     vi.stubEnv('OPENAI_API_KEY', '');
     vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
 
-    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-conversation-cli-missing-credential-'));
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-quickstart-cli-missing-credential-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const credentialStorePath = join(stateRoot, 'auth.json');
 
-    await expect(runConversationCli({
+    await expect(runQuickstartConversationCli({
       credentialPreflight: {
         missingCredentialHint: 'Run the host-specific auth setup before starting this chat.',
       },
