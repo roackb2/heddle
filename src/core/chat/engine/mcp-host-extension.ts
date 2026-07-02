@@ -10,6 +10,7 @@ import type { ToolDefinition, ToolResult } from '@/core/types.js';
 import type { ToolToolkit, ToolToolkitContext } from '@/core/tools/index.js';
 import cloneDeep from 'lodash/cloneDeep.js';
 import get from 'lodash/get.js';
+import isEqual from 'lodash/isEqual.js';
 import set from 'lodash/set.js';
 import {
   defineHostExtension,
@@ -334,9 +335,14 @@ export class McpHostExtensionService {
     toolName: string;
   }): unknown {
     const minChars = args.auto.minChars ?? 1_200;
+    const outputBeforeAuto = cloneDeep(args.output);
     const candidates = McpHostExtensionService.findStringResultCandidates(args.output)
       .filter((candidate) => candidate.content.length >= minChars)
-      .filter((candidate) => !McpHostExtensionService.isArtifactReferencePath(candidate.path));
+      .filter((candidate) => !McpHostExtensionService.isArtifactReferencePath(candidate.path))
+      .filter((candidate) => !McpHostExtensionService.isSerializedStructuredContentMirror({
+        candidate,
+        output: outputBeforeAuto,
+      }));
     const grouped = McpHostExtensionService.groupCandidatesByContent(candidates);
 
     grouped.forEach((group) => {
@@ -387,6 +393,10 @@ export class McpHostExtensionService {
         : group.map((candidate) => candidate.path);
 
       replacementPaths.forEach((path) => set(args.output as object, path, artifactOutput));
+    });
+    McpHostExtensionService.replaceSerializedStructuredContentMirrors({
+      currentOutput: args.output,
+      originalOutput: outputBeforeAuto,
     });
 
     return args.output;
@@ -504,6 +514,69 @@ export class McpHostExtensionService {
 
   private static isArtifactReferencePath(path: string[]): boolean {
     return path.includes('artifact') || path.includes('contentPath') || path.includes('omittedCharacters');
+  }
+
+  private static isSerializedStructuredContentMirror(input: {
+    candidate: ResultArtifactCandidate;
+    output: unknown;
+  }): boolean {
+    return McpHostExtensionService.serializedStructuredContentMirrorPath(input) !== undefined;
+  }
+
+  private static replaceSerializedStructuredContentMirrors(input: {
+    currentOutput: unknown;
+    originalOutput: unknown;
+  }): void {
+    McpHostExtensionService.findStringResultCandidates(input.originalOutput)
+      .map((candidate) => ({
+        candidate,
+        mirrorPath: McpHostExtensionService.serializedStructuredContentMirrorPath({
+          candidate,
+          output: input.originalOutput,
+        }),
+      }))
+      .filter((entry): entry is { candidate: ResultArtifactCandidate; mirrorPath: string[] } => !!entry.mirrorPath)
+      .forEach((entry) => {
+        const compactedMirror = get(input.currentOutput, entry.mirrorPath);
+        if (compactedMirror !== undefined) {
+          set(input.currentOutput as object, entry.candidate.path, cloneDeep(compactedMirror));
+        }
+      });
+  }
+
+  private static serializedStructuredContentMirrorPath(input: {
+    candidate: ResultArtifactCandidate;
+    output: unknown;
+  }): string[] | undefined {
+    if (!McpHostExtensionService.isMcpContentTextPath(input.candidate.path)) {
+      return undefined;
+    }
+
+    const parsed = McpHostExtensionService.parseJsonObject(input.candidate.content);
+    if (!parsed) {
+      return undefined;
+    }
+
+    return [
+      ['structuredContent'],
+      ['structuredContent', 'result'],
+    ].find((path) => {
+      const mirroredValue = get(input.output, path);
+      return mirroredValue !== undefined && isEqual(parsed, mirroredValue);
+    });
+  }
+
+  private static isMcpContentTextPath(path: string[]): boolean {
+    return path.length >= 3 && path[0] === 'content' && path[path.length - 1] === 'text';
+  }
+
+  private static parseJsonObject(content: string): Record<string, unknown> | undefined {
+    try {
+      const parsed = JSON.parse(content) as unknown;
+      return isRecord(parsed) ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   private static inferArtifactKind(candidate: ResultArtifactCandidate): ArtifactKind {

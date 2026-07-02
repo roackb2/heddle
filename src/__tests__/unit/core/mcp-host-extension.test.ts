@@ -420,6 +420,91 @@ describe('defineMcpHostExtension', () => {
       .toHaveLength(1);
   });
 
+  it('compacts serialized structured content mirrors without saving duplicate artifacts', async () => {
+    const context = contextFixture();
+    const html = `<!doctype html><html><body>${'x'.repeat(64)}</body></html>`;
+    vi.spyOn(McpService.prototype, 'callTool').mockResolvedValue({
+      ok: true,
+      output: {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            html,
+            summary: 'Exported preview.',
+          }, null, 2),
+        }],
+        structuredContent: {
+          result: {
+            html,
+            summary: 'Exported preview.',
+          },
+        },
+      },
+    });
+    const extension = defineMcpHostExtension({
+      id: 'slides',
+      serverId: 'deck_service',
+      includeTools: ['create-deck'],
+      resultArtifacts: {
+        auto: {
+          minChars: 64,
+          domain: 'preview',
+          hints: [{
+            pathIncludes: 'html',
+            kind: 'html',
+            title: 'preview.html',
+            extension: 'html',
+            mimeType: 'text/html',
+          }],
+        },
+      },
+    });
+    const [tool] = extension.toolkits?.flatMap((toolkit) => toolkit.createTools(context)) ?? [];
+    if (!tool) {
+      throw new Error('Expected create-deck host tool');
+    }
+
+    const result = await tool.execute({ title: 'Quarterly plan' });
+    const output = result.output as {
+      structuredContent: {
+        result: {
+          html: {
+            artifact: {
+              id: string;
+              path: string;
+            };
+            contentPath: string[];
+          };
+          summary: string;
+        };
+      };
+      content: Array<{
+        text: {
+          html: {
+            artifact: {
+              id: string;
+            };
+          };
+          summary: string;
+        };
+        type: string;
+      }>;
+    };
+
+    expect(result.ok).toBe(true);
+    expect(output.structuredContent.result.html).toEqual(expect.objectContaining({
+      contentPath: ['structuredContent', 'result', 'html'],
+    }));
+    expect(output.content[0]?.text).toEqual({
+      html: output.structuredContent.result.html,
+      summary: 'Exported preview.',
+    });
+    expect(output.content[0]?.text.html.artifact.id).toBe(output.structuredContent.result.html.artifact.id);
+    expect(readFileSync(output.structuredContent.result.html.artifact.path, 'utf8')).toBe(html);
+    expect(new ArtifactService({ artifactRoot: context.artifactRoot }).list({ sessionId: 'session-123' }))
+      .toHaveLength(1);
+  });
+
   it('returns no tools until the MCP server is enabled and refreshed', () => {
     const context = contextFixture();
     const extension = defineMcpHostExtension({
