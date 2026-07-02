@@ -1,7 +1,8 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ArtifactService } from '@/core/artifacts/index.js';
 import {
   FileMcpCatalogRepository,
   FileMcpConfigRepository,
@@ -98,6 +99,7 @@ function contextFixture(): ToolToolkitContext {
     workspaceRoot,
     stateRoot,
     artifactRoot: join(stateRoot, 'artifacts'),
+    sessionId: 'session-123',
     model: 'gpt-5.5',
     memoryDir: join(stateRoot, 'memory'),
     memoryMode: 'none',
@@ -105,6 +107,10 @@ function contextFixture(): ToolToolkitContext {
 }
 
 describe('defineMcpHostExtension', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('creates host tools from cached MCP descriptors without manual schema mapping', () => {
     const context = contextFixture();
     const extension = defineMcpHostExtension({
@@ -168,6 +174,19 @@ describe('defineMcpHostExtension', () => {
     expect(tools.find((tool) => tool.name === 'docs__search_pages')?.requiresApproval).toBe(false);
   });
 
+  it('can hide the source MCP server from the default MCP surface', () => {
+    const extension = defineMcpHostExtension({
+      id: 'slides',
+      serverId: 'deck_service',
+      includeTools: ['create-deck'],
+      hideDefaultMcpTools: true,
+    });
+    const bundle = ConversationEngineHostExtensionService.compose([extension]);
+
+    expect(extension.mcp).toEqual({ hideDefaultServers: ['deck_service'] });
+    expect(bundle?.mcp).toEqual({ hideDefaultServers: ['deck_service'] });
+  });
+
   it('allows host-specific names, descriptions, capabilities, and approval policy overrides', () => {
     const context = contextFixture();
     const extension = defineMcpHostExtension({
@@ -192,6 +211,89 @@ describe('defineMcpHostExtension', () => {
       capabilities: ['workspace.write'],
       requiresApproval: false,
     }));
+  });
+
+  it('stores configured MCP result fields as artifacts and returns compact references', async () => {
+    const context = contextFixture();
+    const html = `<!doctype html><html><body>${'x'.repeat(64)}</body></html>`;
+    vi.spyOn(McpService.prototype, 'callTool').mockResolvedValue({
+      ok: true,
+      output: {
+        html,
+        diagnostics: {
+          valid: true,
+        },
+      },
+    });
+    const extension = defineMcpHostExtension({
+      id: 'slides',
+      serverId: 'deck_service',
+      includeTools: ['create-deck'],
+      resultArtifacts: [{
+        toolName: 'create-deck',
+        path: 'html',
+        kind: 'html',
+        domain: 'preview',
+        title: 'preview.html',
+        extension: 'html',
+        mimeType: 'text/html',
+        metadata: {
+          source: 'unit-test',
+        },
+        maxPreviewChars: 16,
+      }],
+    });
+    const [tool] = extension.toolkits?.flatMap((toolkit) => toolkit.createTools(context)) ?? [];
+    if (!tool) {
+      throw new Error('Expected create-deck host tool');
+    }
+
+    const result = await tool.execute({ title: 'Quarterly plan' });
+    const output = result.output as {
+      html: {
+        artifact: {
+          id: string;
+          path: string;
+          relativePath: string;
+          metadata: Record<string, unknown>;
+        };
+        contentPath: string[];
+        preview: string;
+        omittedCharacters: number;
+      };
+      diagnostics: {
+        valid: boolean;
+      };
+    };
+
+    expect(result.ok).toBe(true);
+    expect(McpService.prototype.callTool).toHaveBeenCalledWith('deck_service', 'create-deck', {
+      title: 'Quarterly plan',
+    });
+    expect(output.diagnostics).toEqual({ valid: true });
+    expect(output.html).toEqual(expect.objectContaining({
+      contentPath: ['html'],
+      preview: html.slice(0, 16),
+      omittedCharacters: html.length - 16,
+    }));
+    expect(output.html.artifact).toEqual(expect.objectContaining({
+      kind: 'html',
+      domain: 'preview',
+      title: 'preview.html',
+      mimeType: 'text/html',
+      sessionId: 'session-123',
+      sourceTool: 'create_deck',
+      relativePath: expect.stringMatching(/^files\/artifact-/),
+      metadata: {
+        source: 'unit-test',
+        mcpServerId: 'deck_service',
+        mcpToolName: 'create-deck',
+        resultPath: ['html'],
+      },
+    }));
+    expect(readFileSync(output.html.artifact.path, 'utf8')).toBe(html);
+    expect(new ArtifactService({ artifactRoot: context.artifactRoot }).current('session-123')?.id)
+      .toBe(output.html.artifact.id);
   });
 
   it('returns no tools until the MCP server is enabled and refreshed', () => {

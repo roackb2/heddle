@@ -28,6 +28,7 @@ export type RunConversationTurnArgs = {
   approvalPolicies?: ToolApprovalPolicy[];
   tools?: ToolDefinition[];
   toolkits?: ToolToolkit[];
+  hiddenMcpServerIds?: string[];
   artifactRoot: string;
   artifactsEnabled: boolean;
   agentProfileId?: string;
@@ -54,6 +55,7 @@ export type TurnRuntimeConfigInput = Pick<
   | 'approvalPolicies'
   | 'tools'
   | 'toolkits'
+  | 'hiddenMcpServerIds'
   | 'artifactRoot'
   | 'artifactsEnabled'
   | 'traceSummarizerRegistry'

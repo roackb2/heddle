@@ -9,7 +9,10 @@ import {
 } from '@/core/mcp/index.js';
 import { mcpToolkit } from '@/core/tools/toolkits/mcp/toolkit.js';
 
-function contextFixture() {
+function contextFixture(options: {
+  hiddenMcpServerIds?: string[];
+  includeGithub?: boolean;
+} = {}) {
   const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-mcp-toolkit-'));
   const stateRoot = join(workspaceRoot, '.heddle');
   mkdirSync(stateRoot, { recursive: true });
@@ -22,9 +25,21 @@ function contextFixture() {
           approval: 'always',
         },
       },
+      ...(options.includeGithub ? {
+        github: {
+          command: 'npx',
+          args: ['-y', 'github-mcp'],
+          tools: {
+            approval: 'never',
+          },
+        },
+      } : {}),
     },
   }), 'utf8');
   new McpService({ workspaceRoot, stateRoot }).activateServer('notion');
+  if (options.includeGithub) {
+    new McpService({ workspaceRoot, stateRoot }).activateServer('github');
+  }
   new FileMcpCatalogRepository({ stateRoot }).write({
     version: 1,
     servers: {
@@ -42,15 +57,33 @@ function contextFixture() {
         }],
         refreshedAt: '2026-06-08T00:00:00.000Z',
       },
+      ...(options.includeGithub ? {
+        github: {
+          serverId: 'github',
+          tools: [{
+            name: 'list-issues',
+            description: 'List GitHub issues.',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: { repo: { type: 'string' } },
+              required: ['repo'],
+            },
+          }],
+          refreshedAt: '2026-06-08T00:00:00.000Z',
+        },
+      } : {}),
     },
   });
 
   return {
     workspaceRoot,
     stateRoot,
+    artifactRoot: join(stateRoot, 'artifacts'),
     model: 'gpt-5.5',
     memoryDir: join(stateRoot, 'memory'),
     memoryMode: 'none' as const,
+    hiddenMcpServerIds: options.hiddenMcpServerIds,
   };
 }
 
@@ -97,5 +130,45 @@ describe('MCP toolkit', () => {
       }),
       required: ['serverId', 'toolName', 'arguments'],
     }));
+  });
+
+  it('hides host-owned MCP servers from the default tool surface', async () => {
+    const tools = mcpToolkit.createTools(contextFixture({
+      includeGithub: true,
+      hiddenMcpServerIds: ['notion'],
+    }));
+    const listTools = tools.find((candidate) => candidate.name === 'mcp_list_tools');
+    const callTool = tools.find((candidate) => candidate.name === 'mcp_call_tool');
+
+    expect(tools.map((tool) => tool.name)).toEqual([
+      'mcp_list_tools',
+      'mcp_call_tool',
+      'mcp__github__list_issues',
+    ]);
+    await expect(listTools?.execute({})).resolves.toEqual({
+      ok: true,
+      output: {
+        servers: [expect.objectContaining({
+          id: 'github',
+          tools: [expect.objectContaining({
+            name: 'list-issues',
+            heddleToolName: 'mcp__github__list_issues',
+          })],
+        })],
+        issues: [],
+      },
+    });
+    await expect(callTool?.execute({
+      serverId: 'notion',
+      toolName: 'search-pages',
+      arguments: { query: 'roadmap' },
+    })).resolves.toEqual({
+      ok: false,
+      error: 'MCP server is not available through default MCP tools: notion',
+    });
+  });
+
+  it('removes the default MCP toolkit when every configured server is hidden', () => {
+    expect(mcpToolkit.createTools(contextFixture({ hiddenMcpServerIds: ['notion'] }))).toEqual([]);
   });
 });

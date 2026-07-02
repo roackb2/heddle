@@ -48,6 +48,7 @@ export class RuntimeToolService {
           memoryDir,
           memoryMode,
           searchIgnoreDirs: options.searchIgnoreDirs,
+          hiddenMcpServerIds: options.hiddenMcpServerIds,
         },
       }),
       hostTools: options.tools,

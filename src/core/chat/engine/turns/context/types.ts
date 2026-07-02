@@ -16,6 +16,7 @@ export type PrepareConversationTurnContextArgs = {
   systemContext?: string;
   tools?: ToolDefinition[];
   toolkits?: ToolToolkit[];
+  hiddenMcpServerIds?: string[];
   artifactRoot: string;
   artifactsEnabled: boolean;
   agentSnapshot?: CustomAgentExecutionSnapshot;
@@ -33,6 +34,7 @@ export type ConversationTurnToolContextArgs = Pick<
   | 'stateRoot'
   | 'tools'
   | 'toolkits'
+  | 'hiddenMcpServerIds'
   | 'artifactRoot'
   | 'artifactsEnabled'
   | 'sessionId'

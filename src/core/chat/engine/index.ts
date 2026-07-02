@@ -1,5 +1,9 @@
 export { createConversationEngine } from './conversation-engine.js';
 export { defineHostExtension, ConversationEngineHostExtensionService } from './host-extension.js';
+export type {
+  ConversationEngineHostArtifactOptions,
+  ConversationEngineHostMcpOptions,
+} from './host-extension.js';
 export {
   defineMcpHostExtension,
   McpHostExtensionService,
@@ -8,6 +12,9 @@ export {
 } from './mcp-host-extension.js';
 export type {
   DefineMcpHostExtensionOptions,
+  McpHostResultArtifactOutput,
+  McpHostResultArtifactReference,
+  McpHostResultArtifactRule,
   McpHostToolOverride,
   PrepareMcpHostExtensionOptions,
   PrepareMcpHostExtensionResult,

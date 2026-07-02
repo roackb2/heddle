@@ -3,9 +3,14 @@ import {
   isToolAllowed,
   shouldMcpToolRequireApproval,
 } from '@/core/mcp/index.js';
+import { ArtifactService } from '@/core/artifacts/index.js';
 import type { McpRefreshResult, McpServerConfig, McpToolDescriptor } from '@/core/mcp/index.js';
+import type { ArtifactKind, RuntimeArtifact } from '@/core/artifacts/index.js';
 import type { ToolDefinition, ToolResult } from '@/core/types.js';
 import type { ToolToolkit, ToolToolkitContext } from '@/core/tools/index.js';
+import cloneDeep from 'lodash/cloneDeep.js';
+import get from 'lodash/get.js';
+import set from 'lodash/set.js';
 import {
   defineHostExtension,
   type ConversationEngineHostArtifactOptions,
@@ -19,6 +24,32 @@ export type McpHostToolOverride = {
   requiresApproval?: boolean;
 };
 
+export type McpHostResultArtifactRule = {
+  /** Original MCP tool name from the cached catalog, before host renaming. */
+  toolName: string;
+  /** Path inside the MCP result output that should be persisted as an artifact. */
+  path: string | string[];
+  kind: ArtifactKind;
+  domain?: string;
+  title?: string;
+  extension?: string;
+  mimeType?: string;
+  metadata?: Record<string, unknown>;
+  setCurrent?: boolean;
+  maxPreviewChars?: number;
+};
+
+export type McpHostResultArtifactReference = RuntimeArtifact & {
+  relativePath: string;
+};
+
+export type McpHostResultArtifactOutput = {
+  artifact: McpHostResultArtifactReference;
+  contentPath: string[];
+  preview: string;
+  omittedCharacters: number;
+};
+
 export type DefineMcpHostExtensionOptions = {
   id: string;
   serverId: string;
@@ -28,6 +59,8 @@ export type DefineMcpHostExtensionOptions = {
   toolNamePrefix?: string;
   defaultCapabilities?: string[];
   toolOverrides?: Record<string, McpHostToolOverride>;
+  hideDefaultMcpTools?: boolean;
+  resultArtifacts?: McpHostResultArtifactRule[];
   systemContext?: string;
   artifacts?: ConversationEngineHostArtifactOptions;
 };
@@ -83,6 +116,7 @@ export class McpHostExtensionService {
       toolkits: [toolkit],
       ...(options.systemContext ? { systemContext: options.systemContext } : {}),
       ...(options.artifacts ? { artifacts: options.artifacts } : {}),
+      ...(options.hideDefaultMcpTools ? { mcp: { hideDefaultServers: [options.serverId] } } : {}),
     });
   }
 
@@ -132,9 +166,10 @@ export class McpHostExtensionService {
     tool: McpToolDescriptor;
   }): ToolDefinition {
     const override = args.options.toolOverrides?.[args.tool.name];
+    const name = override?.name ?? McpHostExtensionService.toHostToolName(args.options, args.tool.name);
 
     return {
-      name: override?.name ?? McpHostExtensionService.toHostToolName(args.options, args.tool.name),
+      name,
       requiresApproval: override?.requiresApproval ?? shouldMcpToolRequireApproval(args.server),
       description: override?.description ?? McpHostExtensionService.describeTool(args.options, args.tool),
       capabilities: override?.capabilities ?? args.options.defaultCapabilities ?? ['mcp.unknown'],
@@ -143,9 +178,123 @@ export class McpHostExtensionService {
         const result = await McpHostExtensionService.createMcpService(args.context)
           .callTool(args.options.serverId, args.tool.name, isRecord(raw) ? raw : {});
 
-        return result.ok ? { ok: true, output: result.output } : { ok: false, error: result.error };
+        return result.ok
+          ? {
+              ok: true,
+              output: McpHostExtensionService.applyResultArtifactRules({
+                context: args.context,
+                options: args.options,
+                output: result.output,
+                sourceTool: name,
+                toolName: args.tool.name,
+              }),
+            }
+          : { ok: false, error: result.error };
       },
     };
+  }
+
+  private static applyResultArtifactRules(args: {
+    context: ToolToolkitContext;
+    options: DefineMcpHostExtensionOptions;
+    output: unknown;
+    sourceTool: string;
+    toolName: string;
+  }): unknown {
+    const rules = (args.options.resultArtifacts ?? [])
+      .filter((rule) => rule.toolName === args.toolName);
+    if (!rules.length) {
+      return args.output;
+    }
+
+    return rules.reduce((currentOutput, rule) => McpHostExtensionService.applyResultArtifactRule({
+      ...args,
+      output: currentOutput,
+      rule,
+    }), cloneDeep(args.output));
+  }
+
+  private static applyResultArtifactRule(args: {
+    context: ToolToolkitContext;
+    options: DefineMcpHostExtensionOptions;
+    output: unknown;
+    rule: McpHostResultArtifactRule;
+    sourceTool: string;
+    toolName: string;
+  }): unknown {
+    const path = McpHostExtensionService.normalizeResultPath(args.rule.path);
+    if (!path.length) {
+      return args.output;
+    }
+
+    const value = get(args.output, path);
+    if (value === undefined) {
+      return args.output;
+    }
+
+    const content = McpHostExtensionService.serializeArtifactContent(value);
+    const artifact = new ArtifactService({ artifactRoot: args.context.artifactRoot }).saveText({
+      content,
+      kind: args.rule.kind,
+      domain: args.rule.domain,
+      title: args.rule.title ?? McpHostExtensionService.defaultArtifactTitle({
+        rule: args.rule,
+        sourceTool: args.sourceTool,
+        path,
+      }),
+      extension: args.rule.extension,
+      mimeType: args.rule.mimeType,
+      sessionId: args.context.sessionId,
+      sourceTool: args.sourceTool,
+      metadata: {
+        ...(args.rule.metadata ?? {}),
+        mcpServerId: args.options.serverId,
+        mcpToolName: args.toolName,
+        resultPath: path,
+      },
+      setCurrent: args.rule.setCurrent,
+    });
+    const preview = content.slice(0, args.rule.maxPreviewChars ?? 1_000);
+
+    set(args.output as object, path, {
+      artifact: {
+        ...artifact,
+        relativePath: ArtifactService.relativeArtifactPath(args.context.artifactRoot, artifact),
+      },
+      contentPath: path,
+      preview,
+      omittedCharacters: Math.max(content.length - preview.length, 0),
+    } satisfies McpHostResultArtifactOutput);
+
+    return args.output;
+  }
+
+  private static normalizeResultPath(path: string | string[]): string[] {
+    return Array.isArray(path)
+      ? path
+      : path.split('.').map((part) => part.trim()).filter((part) => part.length > 0);
+  }
+
+  private static serializeArtifactContent(value: unknown): string {
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    try {
+      return JSON.stringify(value, null, 2) ?? String(value);
+    } catch {
+      return String(value);
+    }
+  }
+
+  private static defaultArtifactTitle(args: {
+    rule: McpHostResultArtifactRule;
+    sourceTool: string;
+    path: string[];
+  }): string {
+    const resultName = args.path[args.path.length - 1] ?? 'result';
+    const extension = args.rule.extension?.replace(/^\./, '') ?? args.rule.kind;
+    return `${args.sourceTool}-${resultName}.${extension}`;
   }
 
   private static describeTool(options: DefineMcpHostExtensionOptions, tool: McpToolDescriptor): string {

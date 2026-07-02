@@ -213,6 +213,8 @@ in declaration order:
 - `systemContext` blocks are joined with blank lines in order.
 - `artifacts` options are merged in order, with later `enabled` or `root`
   values overriding earlier values.
+- `mcp.hideDefaultServers` values are de-duplicated and passed to the default
+  MCP toolkit so curated host tools do not compete with raw generic MCP tools.
 
 Host tools must use unique names. If a host tool collides with a built-in tool
 name, Heddle rejects the runtime bundle instead of silently overriding
@@ -302,6 +304,7 @@ const presentationExtension = defineMcpHostExtension({
   id: 'presentation',
   serverId: 'slides',
   includeTools: ['create_deck'],
+  hideDefaultMcpTools: true,
   toolOverrides: {
     create_deck: {
       name: 'presentation_create_deck',
@@ -311,6 +314,40 @@ const presentationExtension = defineMcpHostExtension({
   },
 })
 ```
+
+Set `hideDefaultMcpTools: true` when the host extension is the intended tool
+surface for that MCP server. Heddle will still call the same MCP server behind
+the scenes, but the default `mcp_list_tools`, `mcp_call_tool`, and
+`mcp__server__tool` paths will not expose that server to the model.
+
+Use `resultArtifacts` when an MCP tool returns a large generated value that
+should be persisted and inspected through artifact tools instead of copied back
+into the model context:
+
+```ts
+const presentationExtension = defineMcpHostExtension({
+  id: 'presentation',
+  serverId: 'slides',
+  includeTools: ['export_html'],
+  hideDefaultMcpTools: true,
+  resultArtifacts: [{
+    toolName: 'export_html',
+    path: 'html',
+    kind: 'html',
+    domain: 'preview',
+    title: 'presentation-preview.html',
+    extension: 'html',
+    mimeType: 'text/html',
+    maxPreviewChars: 800,
+  }],
+})
+```
+
+`resultArtifacts` paths point into the MCP tool result output. When the path is
+present, Heddle saves the value under the configured artifact root and replaces
+that field with `{ artifact, contentPath, preview, omittedCharacters }`. The
+full content remains available through `read_artifact`, while the model sees a
+small preview plus the artifact id and relative path.
 
 `defineMcpHostExtension(...)` reads the cached MCP catalog when a turn builds
 its tool bundle. It does not launch MCP servers or refresh catalogs during the

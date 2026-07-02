@@ -19,6 +19,8 @@ not each invent their own version.
 - User-facing live conversation activity under `live/`. This is the shared
   event contract for TUI, browser control plane, and programmatic hosts.
 - The alpha programmatic API through `conversation-engine.ts` and `index.ts`.
+- Host-extension composition for SDK integrations, including curated MCP tool
+  surfaces and artifact behavior.
 
 ## Domain Ownership Rule
 
@@ -88,6 +90,9 @@ Use this pattern when it fits the domain:
 - Put submit/continue behavior in `turns/service.ts`.
 - Put persisted turn phases in the explicit `turns/*/` subdomains.
 - Put shared compaction behavior in `compaction/`.
+- Put host-extension policy in `host-extension.ts` or focused helpers such as
+  `mcp-host-extension.ts`; runtime toolkits should receive resolved policy,
+  not re-read host-extension config.
 
 ## Notes For Coding Agents
 
