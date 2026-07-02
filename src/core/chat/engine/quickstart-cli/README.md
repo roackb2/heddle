@@ -135,10 +135,3 @@ The runner selects exactly one input mode, checked in this order:
    interactive readline loop drops queued prompts once stdin closes while a turn
    is still running, so only the first prompt survives.
 3. `input` (default) — run the interactive readline loop until `/exit` or EOF.
-
-## Compatibility Aliases
-
-The package also exports the older names `runConversationCli`,
-`resolveConversationCliDefaults`, and `ConversationCliRunnerService` as aliases
-for the quickstart API. New docs and examples should use the quickstart names so
-the intent stays clear.

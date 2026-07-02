@@ -96,13 +96,3 @@ export type QuickstartConversationCliRunnerDefaults = {
   stateRoot: string;
   workspaceRoot: string;
 };
-
-export type ConversationCliMemoryMaintenanceMode = QuickstartConversationCliMemoryMaintenanceMode;
-export type ConversationCliLocalCommandContext = QuickstartConversationCliLocalCommandContext;
-export type ConversationCliLocalCommand = QuickstartConversationCliLocalCommand;
-export type ConversationCliTurnContext = QuickstartConversationCliTurnContext;
-export type ConversationCliCredentialContext = QuickstartConversationCliCredentialContext;
-export type ConversationCliCredentialPreflightOptions = QuickstartConversationCliCredentialPreflightOptions;
-export type ConversationCliRunnerOptions = QuickstartConversationCliRunnerOptions;
-export type ConversationCliRunnerDefaultsInput = QuickstartConversationCliRunnerDefaultsInput;
-export type ConversationCliRunnerDefaults = QuickstartConversationCliRunnerDefaults;
