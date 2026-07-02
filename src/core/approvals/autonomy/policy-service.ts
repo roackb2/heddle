@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import type { ToolApprovalPolicyContext, ToolApprovalPolicyDecision } from '../types.js';
-import { ToolPolicyEnvelopeInputService, type ToolPolicyEnvelope, type ToolPolicyOperation } from '@/core/tools/index.js';
+import { TOOL_POLICY_MUTATING_OPERATIONS, ToolPolicyEnvelopeInputService, type ToolPolicyEnvelope, type ToolPolicyOperation } from '@/core/tools/index.js';
 import type {
   AutonomyEvaluation,
   AutonomyPolicyHint,
@@ -14,7 +14,6 @@ import type {
 import { AutopilotProfileService } from './profile-service.js';
 
 const ENVELOPE_REQUIRED_TOOLS = new Set(['run_shell_mutate', 'edit_file', 'delete_file', 'move_file']);
-const MUTATING_OPERATIONS = new Set<ToolPolicyOperation>(['write', 'delete', 'move', 'execute', 'git', 'network', 'unknown']);
 
 /**
  * Owns autopilot allow/request/deny decisions from a profile plus tool facts.
@@ -201,7 +200,7 @@ export class AutonomyPolicyService {
       return envelope.writeRoots;
     }
 
-    return envelope.operations.some((operation) => MUTATING_OPERATIONS.has(operation))
+    return envelope.operations.some((operation) => TOOL_POLICY_MUTATING_OPERATIONS.has(operation))
       ? envelope.targetRoots
       : [];
   }

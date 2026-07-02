@@ -106,6 +106,56 @@ describe('tool policy envelope', () => {
     expect(execute).toHaveBeenCalledWith({ path: 'README.md' });
   });
 
+  it('rejects an envelope with empty roots for mutating operations', async () => {
+    const execute = vi.fn(async () => ({ ok: true }));
+    const registry = new ToolRegistry([tool({ execute })]);
+
+    await expect(ToolExecutionService.execute(registry, {
+      id: 'call-1',
+      tool: 'test_tool',
+      input: {
+        path: 'README.md',
+        policy: {
+          operations: ['execute'],
+          intent: 'run a build command',
+          targetRoots: [],
+          expectedEffects: ['run build'],
+          environment: 'local',
+          confidence: 'high',
+        },
+      },
+    })).resolves.toEqual(expect.objectContaining({
+      ok: false,
+      error: expect.stringContaining('must declare at least one target or write root'),
+    }));
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('accepts a mutating envelope when writeRoots are declared without targetRoots', async () => {
+    const execute = vi.fn(async () => ({ ok: true, output: 'ok' }));
+    const registry = new ToolRegistry([tool({ execute })]);
+
+    await expect(ToolExecutionService.execute(registry, {
+      id: 'call-1',
+      tool: 'test_tool',
+      input: {
+        path: 'README.md',
+        policy: {
+          operations: ['write'],
+          intent: 'edit a file',
+          targetRoots: [],
+          writeRoots: ['.'],
+          expectedEffects: ['edit README'],
+          environment: 'local',
+          confidence: 'high',
+        },
+      },
+    })).resolves.toEqual({ ok: true, output: 'ok' });
+
+    expect(execute).toHaveBeenCalledWith({ path: 'README.md' });
+  });
+
   it('rejects invalid policy envelope before execution', async () => {
     const execute = vi.fn(async () => ({ ok: true }));
     const registry = new ToolRegistry([tool({ execute })]);

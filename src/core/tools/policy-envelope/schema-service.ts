@@ -31,7 +31,7 @@ const POLICY_ENVELOPE_SCHEMA = {
     targetRoots: {
       type: 'array',
       items: { type: 'string' },
-      description: `Project/workspace roots the agent expects this call to touch. ${ROOT_DESCRIPTION}`,
+      description: `Project/workspace roots the agent expects this call to touch. May be empty only for read-only or state-only calls that touch no project root, such as planning tools. Calls that write, delete, move, execute, run git, or use the network must declare at least one target or write root. ${ROOT_DESCRIPTION}`,
     },
     readRoots: {
       type: 'array',
