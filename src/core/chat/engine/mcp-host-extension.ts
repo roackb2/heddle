@@ -28,9 +28,9 @@ export type McpHostResultArtifactRule = {
   /** Original MCP tool name from the cached catalog, before host renaming. */
   toolName: string;
   /** Path inside the MCP result output that should be persisted as an artifact. */
-  path: string | string[];
+  path: string | readonly string[];
   /** Additional output paths to replace with the same artifact reference. */
-  replacePaths?: Array<string | string[]>;
+  replacePaths?: ReadonlyArray<string | readonly string[]>;
   kind: ArtifactKind;
   domain?: string;
   title?: string;
@@ -281,10 +281,10 @@ export class McpHostExtensionService {
     return [path, ...replacementPaths];
   }
 
-  private static normalizeResultPath(path: string | string[]): string[] {
-    return Array.isArray(path)
-      ? path
-      : path.split('.').map((part) => part.trim()).filter((part) => part.length > 0);
+  private static normalizeResultPath(path: string | readonly string[]): string[] {
+    return typeof path === 'string'
+      ? path.split('.').map((part) => part.trim()).filter((part) => part.length > 0)
+      : [...path];
   }
 
   private static serializeArtifactContent(value: unknown): string {
