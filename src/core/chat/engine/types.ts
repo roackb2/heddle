@@ -1,3 +1,4 @@
+import type { ArtifactService } from '@/core/artifacts/index.js';
 import type { ToolApprovalPolicy, ToolApprovalSurface } from '../../approvals/types.js';
 import type {
   ConversationActivity,
@@ -51,6 +52,13 @@ export type { ConversationEngineHostExtension };
 export type ConversationEngine = {
   sessions: ConversationSessionService;
   turns: ConversationTurnService;
+  /**
+   * Read/inspect artifacts saved during turns (e.g. for a host `/artifacts`
+   * review command) without reconstructing the on-disk artifact root. Backed by
+   * the engine's resolved `artifactRoot`, so it honors a custom
+   * `hostExtensions.artifacts.root`.
+   */
+  artifacts: ArtifactService;
 };
 
 export type ConversationSessionService = {

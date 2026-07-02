@@ -1,3 +1,4 @@
+import { ArtifactService } from '@/core/artifacts/index.js';
 import { normalizeConversationEngineConfig } from './config.js';
 import { FileConversationSessionService } from './sessions/service.js';
 import { EngineConversationTurnService } from './turns/service.js';
@@ -9,5 +10,6 @@ export function createConversationEngine(config: ConversationEngineConfig): Conv
   return {
     sessions: new FileConversationSessionService(normalizedConfig),
     turns: new EngineConversationTurnService(normalizedConfig),
+    artifacts: new ArtifactService({ artifactRoot: normalizedConfig.artifactRoot }),
   };
 }

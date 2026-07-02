@@ -35,3 +35,20 @@ The normalized engine config derives default paths from `stateRoot`:
 
 Use `EngineConversationTurnService.run(...)` only when your host already owns
 session ids and storage paths. For new hosts, prefer `createConversationEngine`.
+
+## Reading artifacts
+
+Each turn result already includes the artifacts produced by that turn. To review
+all artifacts a session has accumulated (for example, a host `/artifacts`
+command), use `engine.artifacts` instead of constructing an `ArtifactService`
+against a guessed path:
+
+```ts
+const artifacts = engine.artifacts.list({ sessionId: session.id })
+const source = engine.artifacts.read(artifactId)?.content
+```
+
+`engine.artifacts` is backed by the engine's resolved artifact root, so it stays
+correct even when a host extension sets a custom `artifacts.root`. Do not
+recompute the artifact root (`stateRoot/artifacts`) in host code — that breaks
+when the root is customized.

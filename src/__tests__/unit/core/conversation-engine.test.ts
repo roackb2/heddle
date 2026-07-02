@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createConversationEngine } from '../../../core/chat/engine/conversation-engine.js';
 import { defineHostExtension } from '../../../core/chat/engine/host-extension.js';
+import { ArtifactService } from '@/core/artifacts/index.js';
 import { EngineConversationTurnService } from '../../../core/chat/engine/turns/service.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../core/types.js';
@@ -69,6 +70,45 @@ describe('createConversationEngine', () => {
       history: [],
       messages: [],
     }));
+  });
+
+  it('exposes an artifacts reader rooted at the resolved artifact root', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-artifacts-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+    });
+    const session = engine.sessions.create({ id: 'session-1', name: 'Artifacts' });
+
+    const saved = engine.artifacts.saveText({ content: '# Deck', kind: 'source', sessionId: session.id });
+
+    expect(engine.artifacts.list({ sessionId: session.id }).map((artifact) => artifact.id)).toContain(saved.id);
+    expect(engine.artifacts.read(saved.id)?.content).toBe('# Deck');
+    // Backed by the default stateRoot/artifacts root.
+    expect(new ArtifactService({ artifactRoot: join(stateRoot, 'artifacts') }).get(saved.id)?.id).toBe(saved.id);
+  });
+
+  it('roots the artifacts reader at a custom host-extension artifacts root', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-artifacts-custom-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const customRoot = join(stateRoot, 'deck-artifacts');
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+      hostExtensions: [defineHostExtension({ id: 'decks', artifacts: { root: customRoot, enabled: true } })],
+    });
+    const session = engine.sessions.create({ id: 'session-1', name: 'Custom artifacts' });
+
+    const saved = engine.artifacts.saveText({ content: '<html></html>', kind: 'html', sessionId: session.id });
+
+    // The reader uses the resolved custom root, not the default stateRoot/artifacts.
+    expect(new ArtifactService({ artifactRoot: customRoot }).get(saved.id)?.id).toBe(saved.id);
+    expect(new ArtifactService({ artifactRoot: join(stateRoot, 'artifacts') }).get(saved.id)).toBeUndefined();
   });
 
   it('passes host extensions into submitted turns', async () => {
