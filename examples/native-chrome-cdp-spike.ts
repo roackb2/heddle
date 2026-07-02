@@ -13,7 +13,7 @@
 
 import { join } from 'node:path';
 
-import { createBrowserResearchToolkit } from '../src/index.js';
+import { createBrowserResearchToolkit } from '../src/advanced.js';
 import type { ToolDefinition, ToolResult } from '../src/core/types.js';
 
 type SnapshotOutput = {

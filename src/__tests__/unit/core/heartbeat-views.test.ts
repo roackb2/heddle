@@ -8,7 +8,7 @@ import {
   type AgentLoopState,
   type HeartbeatTask,
   type HeartbeatTaskRunRecordEntry,
-} from '../../../index.js';
+} from '../../../advanced.js';
 
 describe('heartbeat task service views', () => {
   it('projects heartbeat task state into a host-facing view', () => {

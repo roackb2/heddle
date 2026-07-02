@@ -20,7 +20,7 @@ import {
   RuntimeCredentialService,
   type ToolDefinition,
   type ToolApprovalPolicyContext,
-} from '../src/index.js';
+} from '../src/advanced.js';
 
 const DEFAULT_EXAMPLE_MODEL = 'gpt-5.1-codex-mini';
 

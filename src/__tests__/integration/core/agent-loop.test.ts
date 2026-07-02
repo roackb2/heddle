@@ -7,7 +7,7 @@ import { RuntimeToolService } from '@/core/runtime/tools/index.js';
 import { ToolBundleComposer, type ToolToolkit } from '@/core/tools/index.js';
 import { AgentSkillService, FileAgentSkillActivationRepository } from '@/core/skills/index.js';
 import type { ChatMessage, LlmAdapter, LlmResponse } from '../../../core/llm/types.js';
-import type { AgentHeartbeatEvent, AgentLoopEvent, ToolDefinition } from '../../../index.js';
+import type { AgentHeartbeatEvent, AgentLoopEvent, ToolDefinition } from '../../../advanced.js';
 import { createLogger } from '../../../core/utils/logger.js';
 import {
   HeartbeatDecisionPolicy,
