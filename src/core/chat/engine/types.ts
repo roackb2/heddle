@@ -13,6 +13,7 @@ import type { ChatSessionLeaseOwner } from './sessions/leases/index.js';
 import type { ChatSession, ChatSessionRetention, QueuedConversationPrompt } from '../types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatTurnHostPort } from './turns/host/index.js';
+import type { ConversationTurnResultSummary } from './turn-result.js';
 import type { ConversationCompactionResult } from '@/core/chat/engine/compaction/index.js';
 import type {
   ConversationEngineHostExtension,
@@ -232,11 +233,7 @@ export type ClearConversationTurnLeaseInput = {
   owner: ChatSessionLeaseOwner;
 };
 
-export type SubmitConversationTurnResult = {
-  outcome: string;
-  summary: string;
-  session: ChatSession;
-};
+export type SubmitConversationTurnResult = ConversationTurnResultSummary;
 
 export type ConversationEngineHost = {
   events?: {

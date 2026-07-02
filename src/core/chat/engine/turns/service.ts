@@ -1,5 +1,7 @@
 import { AgentLoopRuntimeService } from '@/core/runtime/loop/index.js';
 import { AutonomyPermissionModeService, ToolApprovalProfileService } from '@/core/approvals/index.js';
+import { ArtifactService } from '@/core/artifacts/index.js';
+import { HeddleEventType } from '@/core/event-types.js';
 import { ProjectConfigService } from '@/core/project-config/index.js';
 import { FileConversationSessionService } from '@/core/chat/engine/sessions/service.js';
 import type { NormalizedConversationEngineConfig } from '@/core/chat/engine/config.js';
@@ -32,6 +34,7 @@ import type {
   TurnRuntimeConfigInput,
   TurnSubmitInput,
 } from './types.js';
+import type { TraceEvent } from '@/core/types.js';
 
 export class EngineConversationTurnService implements ConversationTurnService {
   private readonly sessions: ConversationSessionService;
@@ -170,6 +173,13 @@ export class EngineConversationTurnService implements ConversationTurnService {
         outcome: resultForPersistence.outcome,
         summary: persisted.summary,
         session: persisted.session,
+        traceFile: persisted.traceFile,
+        artifacts: EngineConversationTurnService.listTurnArtifacts({
+          artifactRoot: args.artifactRoot,
+          artifactsEnabled: args.artifactsEnabled,
+          sessionId: session.id,
+        }),
+        toolResults: EngineConversationTurnService.summarizeToolResults(resultForPersistence.trace),
       };
     } finally {
       EngineConversationTurnService.clearLeaseFromStorage(args.sessionStoragePath, session.id, leaseOwner);
@@ -217,5 +227,29 @@ export class EngineConversationTurnService implements ConversationTurnService {
         args.host?.onCompactionStatus?.(event, phase);
       },
     };
+  }
+
+  private static listTurnArtifacts(args: {
+    artifactRoot: string;
+    artifactsEnabled: boolean;
+    sessionId: string;
+  }): RunConversationTurnResult['artifacts'] {
+    return args.artifactsEnabled
+      ? new ArtifactService({ artifactRoot: args.artifactRoot }).list({ sessionId: args.sessionId })
+      : [];
+  }
+
+  private static summarizeToolResults(trace: TraceEvent[]): RunConversationTurnResult['toolResults'] {
+    return trace
+      .filter((event): event is Extract<TraceEvent, { type: typeof HeddleEventType.toolCompleted }> => (
+        event.type === HeddleEventType.toolCompleted
+      ))
+      .map((event) => ({
+        call: event.call,
+        result: event.result,
+        ...(event.durationMs === undefined ? {} : { durationMs: event.durationMs }),
+        step: event.step,
+        timestamp: event.timestamp,
+      }));
   }
 }

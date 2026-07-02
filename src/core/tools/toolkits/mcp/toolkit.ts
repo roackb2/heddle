@@ -16,12 +16,18 @@ const MCP_CALL_TOOL_NAME = 'mcp_call_tool';
 export const mcpToolkit: ToolToolkit = {
   id: 'mcp',
   createTools(context) {
+    const hiddenServerIds = new Set(
+      (context.hiddenMcpServerIds ?? [])
+        .map((serverId) => serverId.trim())
+        .filter((serverId) => serverId.length > 0),
+    );
     const config = new FileMcpConfigRepository({
       workspaceRoot: context.workspaceRoot,
       stateRoot: context.stateRoot,
     }).read();
 
-    if (!config.servers.length) {
+    const visibleServers = config.servers.filter((server) => !hiddenServerIds.has(server.id));
+    if (!visibleServers.length) {
       return [];
     }
 
@@ -29,9 +35,10 @@ export const mcpToolkit: ToolToolkit = {
     const enabledServerIds = new Set(
       Object.values(new FileMcpActivationRepository({ stateRoot: context.stateRoot }).read().servers)
         .filter((record) => record.status === 'enabled')
+        .filter((record) => !hiddenServerIds.has(record.serverId))
         .map((record) => record.serverId),
     );
-    const serversById = new Map(config.servers.map((server) => [server.id, server]));
+    const serversById = new Map(visibleServers.map((server) => [server.id, server]));
     const discoveredTools = Object.values(catalog.servers)
       .filter((record) => enabledServerIds.has(record.serverId))
       .flatMap((record) => record.tools.map((tool) => ({
@@ -44,10 +51,12 @@ export const mcpToolkit: ToolToolkit = {
 
     return [
       createMcpListToolsTool({
+        hiddenServerIds,
         stateRoot: context.stateRoot,
         workspaceRoot: context.workspaceRoot,
       }),
       createMcpCallToolTool({
+        hiddenServerIds,
         stateRoot: context.stateRoot,
         workspaceRoot: context.workspaceRoot,
       }),
@@ -64,6 +73,7 @@ export const mcpToolkit: ToolToolkit = {
 function createMcpListToolsTool(options: {
   workspaceRoot: string;
   stateRoot: string;
+  hiddenServerIds: ReadonlySet<string>;
 }): ToolDefinition {
   return {
     name: MCP_LIST_TOOLS_NAME,
@@ -79,18 +89,20 @@ function createMcpListToolsTool(options: {
       return {
         ok: true,
         output: {
-          servers: overview.servers.map((server) => ({
-            id: server.id,
-            status: server.status,
-            transport: server.config?.transport,
-            tools: server.catalog?.tools.map((tool) => ({
-              name: tool.name,
-              title: tool.title,
-              description: tool.description,
-              heddleToolName: server.config ? toHeddleToolName(server.id, tool.name) : undefined,
-            })) ?? [],
-          })),
-          issues: overview.issues,
+          servers: overview.servers
+            .filter((server) => !options.hiddenServerIds.has(server.id))
+            .map((server) => ({
+              id: server.id,
+              status: server.status,
+              transport: server.config?.transport,
+              tools: server.catalog?.tools.map((tool) => ({
+                name: tool.name,
+                title: tool.title,
+                description: tool.description,
+                heddleToolName: server.config ? toHeddleToolName(server.id, tool.name) : undefined,
+              })) ?? [],
+            })),
+          issues: overview.issues.filter((issue) => !isHiddenServerIssue(issue.path, options.hiddenServerIds)),
         },
       };
     },
@@ -100,6 +112,7 @@ function createMcpListToolsTool(options: {
 function createMcpCallToolTool(options: {
   workspaceRoot: string;
   stateRoot: string;
+  hiddenServerIds: ReadonlySet<string>;
 }): ToolDefinition {
   return {
     name: MCP_CALL_TOOL_NAME,
@@ -123,6 +136,10 @@ function createMcpCallToolTool(options: {
     async execute(raw: unknown): Promise<ToolResult> {
       if (!isMcpCallInput(raw)) {
         return { ok: false, error: 'Invalid input for mcp_call_tool. Required fields: serverId, toolName, arguments.' };
+      }
+
+      if (options.hiddenServerIds.has(raw.serverId)) {
+        return { ok: false, error: `MCP server is not available through default MCP tools: ${raw.serverId}` };
       }
 
       const result = await mcpService(options).callTool(raw.serverId, raw.toolName, raw.arguments);
@@ -184,6 +201,10 @@ function isMcpCallInput(raw: unknown): raw is {
 
 function isRecord(raw: unknown): raw is Record<string, unknown> {
   return raw !== null && typeof raw === 'object' && !Array.isArray(raw);
+}
+
+function isHiddenServerIssue(path: string, hiddenServerIds: ReadonlySet<string>): boolean {
+  return Array.from(hiddenServerIds).some((serverId) => path.endsWith(`#${serverId}`));
 }
 
 function mcpService(options: { workspaceRoot: string; stateRoot: string }): McpService {

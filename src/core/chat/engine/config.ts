@@ -21,6 +21,7 @@ export type NormalizedConversationEngineConfig = {
   approvalPolicies?: ToolApprovalPolicy[];
   tools?: ToolDefinition[];
   toolkits?: ToolToolkit[];
+  hiddenMcpServerIds?: string[];
   artifactRoot: string;
   artifactsEnabled: boolean;
   sessionStoragePath: string;
@@ -62,6 +63,7 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
     approvalPolicies: config.approvalPolicies,
     tools: tools.length ? tools : undefined,
     toolkits: hostExtensions?.toolkits,
+    hiddenMcpServerIds: hostExtensions?.mcp?.hideDefaultServers,
     artifactRoot,
     artifactsEnabled: hostExtensions?.artifacts?.enabled ?? true,
     sessionStoragePath,

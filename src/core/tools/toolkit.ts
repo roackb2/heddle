@@ -12,6 +12,7 @@ export type ToolToolkitContext = {
   memoryDir: string;
   memoryMode: 'none' | 'read-and-record' | 'maintainer' | 'legacy-full';
   searchIgnoreDirs?: string[];
+  hiddenMcpServerIds?: string[];
 };
 
 export type ToolToolkit = {

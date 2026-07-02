@@ -18,6 +18,7 @@ export type DefaultAgentToolsOptions = {
   memoryMode?: 'none' | 'read-and-record' | 'maintainer' | 'legacy-full';
   tools?: ToolDefinition[];
   toolkits?: ToolToolkit[];
+  hiddenMcpServerIds?: string[];
   toolProfile?: RuntimeToolSelectionProfile;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;

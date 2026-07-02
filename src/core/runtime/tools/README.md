@@ -16,6 +16,11 @@ Programmatic hosts can also pass additional `ToolToolkit` values. Runtime tools
 compose host toolkits after the default toolkit list, using the same
 duplicate-id and duplicate-tool-name checks as built-in toolkits.
 
+Runtime tools also enforce resolved default-tool visibility policy. For MCP,
+`hiddenMcpServerIds` hides host-owned servers from the generic `mcp_*` toolkit
+surface while leaving curated host-extension tools free to call the same MCP
+server through their own definitions.
+
 Artifact tools are part of the default runtime bundle. They expose the generic
 artifact registry through ordinary tools while keeping persistence semantics in
 `src/core/artifacts`.

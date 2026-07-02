@@ -22,6 +22,8 @@ describe('createConversationEngine', () => {
       summary: 'ok',
       session: new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
         .read(args.sessionId) as ChatSession,
+      artifacts: [],
+      toolResults: [],
     }));
   });
 
@@ -90,6 +92,9 @@ describe('createConversationEngine', () => {
           root: join(stateRoot, 'custom-artifacts'),
           enabled: false,
         },
+        mcp: {
+          hideDefaultServers: ['deck_service'],
+        },
       },
       apiKeyPresent: true,
     });
@@ -106,6 +111,7 @@ describe('createConversationEngine', () => {
       systemContext: 'Base context\n\nHost context',
       artifactRoot: join(stateRoot, 'custom-artifacts'),
       artifactsEnabled: false,
+      hiddenMcpServerIds: ['deck_service'],
       sessionId: session.id,
       prompt: 'Create a deck',
     }));
