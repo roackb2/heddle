@@ -1,21 +1,9 @@
 export {
   QuickstartConversationCliRunnerService,
-  QuickstartConversationCliRunnerService as ConversationCliRunnerService,
   resolveQuickstartConversationCliDefaults,
-  resolveQuickstartConversationCliDefaults as resolveConversationCliDefaults,
   runQuickstartConversationCli,
-  runQuickstartConversationCli as runConversationCli,
 } from './service.js';
 export type {
-  ConversationCliCredentialContext,
-  ConversationCliCredentialPreflightOptions,
-  ConversationCliLocalCommand,
-  ConversationCliLocalCommandContext,
-  ConversationCliMemoryMaintenanceMode,
-  ConversationCliRunnerDefaults,
-  ConversationCliRunnerDefaultsInput,
-  ConversationCliRunnerOptions,
-  ConversationCliTurnContext,
   QuickstartConversationCliCredentialContext,
   QuickstartConversationCliCredentialPreflightOptions,
   QuickstartConversationCliLocalCommand,

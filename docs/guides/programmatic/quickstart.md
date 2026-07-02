@@ -1,5 +1,10 @@
 # Quickstart
 
+This is rung 1 of the programmatic ladder — the smallest working agent. See the
+[programmatic guide index](README.md) for the full climb (add capabilities →
+shape output → lifecycle → storage), and [`examples/sdk/`](../../../examples/sdk/README.md)
+for runnable versions.
+
 Use `runQuickstartConversationCli` when you want a working interactive conversation loop
 before building a custom UI:
 
