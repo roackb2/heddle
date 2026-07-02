@@ -15,8 +15,8 @@ const ToolPolicyEnvelopeSchema = z.object({
   intent: z.string().min(1).describe(
     'Human-readable purpose for the tool call. Used for approval/debugging context, not for deterministic verification.',
   ),
-  targetRoots: z.array(z.string()).min(1).describe(
-    'Project/workspace roots involved in the call. These should be project boundaries such as repo roots or config-bearing folders, not individual file paths.',
+  targetRoots: z.array(z.string()).describe(
+    'Project/workspace roots involved in the call. These should be project boundaries such as repo roots or config-bearing folders, not individual file paths. May be empty for calls that touch no project root, such as planning or state-only tools.',
   ),
   readRoots: z.array(z.string()).optional().describe(
     'Optional project/workspace roots the agent claims the call may read when read scope differs from targetRoots.',

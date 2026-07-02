@@ -83,6 +83,29 @@ describe('tool policy envelope', () => {
     expect(execute).toHaveBeenCalledWith({ path: 'README.md' });
   });
 
+  it('accepts an envelope with empty targetRoots for non-mutating tools', async () => {
+    const execute = vi.fn(async () => ({ ok: true, output: 'ok' }));
+    const registry = new ToolRegistry([tool({ execute })]);
+
+    await expect(ToolExecutionService.execute(registry, {
+      id: 'call-1',
+      tool: 'test_tool',
+      input: {
+        path: 'README.md',
+        policy: {
+          operations: ['read'],
+          intent: 'update the active plan',
+          targetRoots: [],
+          expectedEffects: ['record plan progress'],
+          environment: 'local',
+          confidence: 'high',
+        },
+      },
+    })).resolves.toEqual({ ok: true, output: 'ok' });
+
+    expect(execute).toHaveBeenCalledWith({ path: 'README.md' });
+  });
+
   it('rejects invalid policy envelope before execution', async () => {
     const execute = vi.fn(async () => ({ ok: true }));
     const registry = new ToolRegistry([tool({ execute })]);

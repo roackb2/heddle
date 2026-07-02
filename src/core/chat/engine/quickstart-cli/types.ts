@@ -56,6 +56,7 @@ export type QuickstartConversationCliRunnerOptions = {
   sessionName?: string;
   promptLabel?: string;
   oncePrompt?: string;
+  prompts?: string[];
   maxSteps?: number;
   reasoningEffort?: ReasoningEffort | string;
   apiKey?: string;
