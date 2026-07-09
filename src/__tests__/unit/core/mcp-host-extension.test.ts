@@ -389,7 +389,7 @@ describe('defineMcpHostExtension', () => {
       .toBe(output.html.artifact.id);
   });
 
-  it('mirror-mode rules persist the artifact but keep the value inline', async () => {
+  it('mirror-mode rules persist the artifact but keep the value inline when auto capture is enabled', async () => {
     const context = contextFixture();
     const mdx = `# Deck\n\n---\n\n## Slide\n\n${'content '.repeat(64)}`;
     vi.spyOn(McpService.prototype, 'callTool').mockResolvedValue({
@@ -407,15 +407,18 @@ describe('defineMcpHostExtension', () => {
       id: 'slides',
       serverId: 'deck_service',
       includeTools: ['create-deck'],
-      resultArtifacts: [{
-        toolName: 'create-deck',
-        path: 'structuredContent.result.source',
-        mode: 'mirror',
-        kind: 'source',
-        domain: 'deck',
-        title: 'deck.mdx',
-        setCurrent: true,
-      }],
+      resultArtifacts: {
+        auto: { minChars: 16 },
+        rules: [{
+          toolName: 'create-deck',
+          path: 'structuredContent.result.source',
+          mode: 'mirror',
+          kind: 'source',
+          domain: 'deck',
+          title: 'deck.mdx',
+          setCurrent: true,
+        }],
+      },
     });
     const [tool] = extension.toolkits?.flatMap((toolkit) => toolkit.createTools(context)) ?? [];
     if (!tool) {
@@ -428,8 +431,8 @@ describe('defineMcpHostExtension', () => {
     };
 
     expect(result.ok).toBe(true);
-    // The value the model sees is untouched — the next stateless tool call can
-    // pass it straight back in.
+    // The value the model sees is untouched — including by the subsequent auto
+    // pass — so the next stateless tool call can pass it straight back in.
     expect(output.structuredContent.result.source).toBe(mdx);
     expect(output.structuredContent.result.validation).toEqual({ valid: true });
 

@@ -180,4 +180,5 @@ export type McpManualResultArtifactApplyInput = McpResultArtifactApplyInput & {
 
 export type McpAutoResultArtifactApplyInput = McpResultArtifactApplyInput & {
   auto: McpHostAutoResultArtifactsOptions;
+  excludedPaths?: ReadonlyArray<readonly string[]>;
 };

@@ -33,11 +33,16 @@ export class McpResultArtifactService {
       output: currentOutput,
       rule,
     }), cloneDeep(args.output));
+    const mirroredPaths = rules
+      .filter((rule) => rule.mode === 'mirror')
+      .map((rule) => McpArtifactPathService.normalize(rule.path))
+      .filter((path) => path.length > 0);
 
     return resultArtifacts.auto
       ? McpAutoResultArtifactService.apply({
           ...args,
           auto: resultArtifacts.auto,
+          excludedPaths: mirroredPaths,
           output: manuallyCaptured,
         })
       : manuallyCaptured;

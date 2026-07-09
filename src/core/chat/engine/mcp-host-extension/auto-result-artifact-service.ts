@@ -26,6 +26,8 @@ export class McpAutoResultArtifactService {
     const originalCandidates = McpAutoResultArtifactService.findStringResultCandidates(outputBeforeAuto);
     const candidates = originalCandidates
       .filter((candidate) => candidate.content.length >= minChars)
+      .filter((candidate) => !(args.excludedPaths ?? []).some((path) =>
+        McpArtifactPathService.isWithin(candidate.path, path)))
       .filter((candidate) => !McpArtifactPathService.isArtifactReferencePath(candidate.path))
       .filter((candidate) => !McpStructuredContentMirrorService.isSerializedStructuredContentMirror({
         candidate,

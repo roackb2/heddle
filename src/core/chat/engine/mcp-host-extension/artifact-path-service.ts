@@ -53,4 +53,10 @@ export class McpArtifactPathService {
   static isArtifactReferencePath(path: string[]): boolean {
     return path.includes('artifact') || path.includes('contentPath') || path.includes('omittedCharacters');
   }
+
+  static isWithin(path: string[], ancestor: readonly string[]): boolean {
+    return ancestor.length > 0
+      && ancestor.length <= path.length
+      && ancestor.every((part, index) => path[index] === part);
+  }
 }

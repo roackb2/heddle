@@ -84,8 +84,9 @@ resultArtifacts: [{
 
 The model keeps seeing the full value; the host gets a durable artifact and a
 one-line way to read "the outcome of this turn". `replacePaths` is ignored in
-mirror mode. Avoid combining mirror rules with `auto` capture on the same tool —
-auto may then capture the still-inline value a second time.
+mirror mode. When manual mirror rules and `auto` capture are combined, the
+mirrored path and its descendants are excluded from the auto pass so the full
+value remains inline as declared.
 
 Only add public options such as `path`, `pathIncludes`, or explicit
 `replacePaths` for advanced cases where inference cannot be reliable. When a
