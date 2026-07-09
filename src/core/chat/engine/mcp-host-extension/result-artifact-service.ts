@@ -33,11 +33,16 @@ export class McpResultArtifactService {
       output: currentOutput,
       rule,
     }), cloneDeep(args.output));
+    const mirroredPaths = rules
+      .filter((rule) => rule.mode === 'mirror')
+      .map((rule) => McpArtifactPathService.normalize(rule.path))
+      .filter((path) => path.length > 0);
 
     return resultArtifacts.auto
       ? McpAutoResultArtifactService.apply({
           ...args,
           auto: resultArtifacts.auto,
+          excludedPaths: mirroredPaths,
           output: manuallyCaptured,
         })
       : manuallyCaptured;
@@ -76,6 +81,12 @@ export class McpResultArtifactService {
       },
       setCurrent: args.rule.setCurrent,
     });
+    // Mirror mode: the artifact is persisted (above), but the value stays
+    // inline so downstream tool calls can keep consuming it directly.
+    if (args.rule.mode === 'mirror') {
+      return args.output;
+    }
+
     const preview = content.slice(0, args.rule.maxPreviewChars ?? 1_000);
     const artifactOutput = {
       artifact: {

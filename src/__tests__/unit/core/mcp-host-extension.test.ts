@@ -389,6 +389,66 @@ describe('defineMcpHostExtension', () => {
       .toBe(output.html.artifact.id);
   });
 
+  it('mirror-mode rules persist the artifact but keep the value inline when auto capture is enabled', async () => {
+    const context = contextFixture();
+    const mdx = `# Deck\n\n---\n\n## Slide\n\n${'content '.repeat(64)}`;
+    vi.spyOn(McpService.prototype, 'callTool').mockResolvedValue({
+      ok: true,
+      output: {
+        structuredContent: {
+          result: {
+            source: mdx,
+            validation: { valid: true },
+          },
+        },
+      },
+    });
+    const extension = defineMcpHostExtension({
+      id: 'slides',
+      serverId: 'deck_service',
+      includeTools: ['create-deck'],
+      resultArtifacts: {
+        auto: { minChars: 16 },
+        rules: [{
+          toolName: 'create-deck',
+          path: 'structuredContent.result.source',
+          mode: 'mirror',
+          kind: 'source',
+          domain: 'deck',
+          title: 'deck.mdx',
+          setCurrent: true,
+        }],
+      },
+    });
+    const [tool] = extension.toolkits?.flatMap((toolkit) => toolkit.createTools(context)) ?? [];
+    if (!tool) {
+      throw new Error('Expected create-deck host tool');
+    }
+
+    const result = await tool.execute({ title: 'Quarterly plan' });
+    const output = result.output as {
+      structuredContent: { result: { source: unknown; validation: { valid: boolean } } };
+    };
+
+    expect(result.ok).toBe(true);
+    // The value the model sees is untouched — including by the subsequent auto
+    // pass — so the next stateless tool call can pass it straight back in.
+    expect(output.structuredContent.result.source).toBe(mdx);
+    expect(output.structuredContent.result.validation).toEqual({ valid: true });
+
+    // ...while the artifact was persisted and marked current for the host.
+    const artifacts = new ArtifactService({ artifactRoot: context.artifactRoot });
+    const current = artifacts.current('session-123');
+    expect(current).toEqual(expect.objectContaining({
+      kind: 'source',
+      domain: 'deck',
+      title: 'deck.mdx',
+      sourceTool: 'create_deck',
+    }));
+    expect(artifacts.read(current!.id)?.content).toBe(mdx);
+    expect(artifacts.list({ sessionId: 'session-123' })).toHaveLength(1);
+  });
+
   it('auto-stores large duplicate MCP result strings as a single artifact', async () => {
     const context = contextFixture();
     const html = `<!doctype html><html><body>${'x'.repeat(64)}</body></html>`;

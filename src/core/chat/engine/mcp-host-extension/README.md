@@ -65,6 +65,29 @@ host author should be able to write:
 resultArtifacts: true
 ```
 
+### Mirror mode (keep the value inline)
+
+Replacement compaction breaks hosts whose MCP server is **stateless** — where
+each tool call takes the current document as input and returns the updated
+document (so the model must keep the full value inline for the next call).
+For that shape, a manual rule can use `mode: 'mirror'`:
+
+```ts
+resultArtifacts: [{
+  toolName: 'create-deck',
+  path: 'structuredContent.result.source',
+  mode: 'mirror',      // persist the artifact, leave the value inline untouched
+  kind: 'source',
+  setCurrent: true,    // host reads the outcome via engine.artifacts.current(...)
+}]
+```
+
+The model keeps seeing the full value; the host gets a durable artifact and a
+one-line way to read "the outcome of this turn". `replacePaths` is ignored in
+mirror mode. When manual mirror rules and `auto` capture are combined, the
+mirrored path and its descendants are excluded from the auto pass so the full
+value remains inline as declared.
+
 Only add public options such as `path`, `pathIncludes`, or explicit
 `replacePaths` for advanced cases where inference cannot be reliable. When a
 new inference is added, cover it in
