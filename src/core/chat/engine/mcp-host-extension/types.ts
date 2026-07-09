@@ -18,6 +18,19 @@ export type McpHostResultArtifactRule = {
   toolName: string;
   /** Path inside the MCP result output that should be persisted as an artifact. */
   path: string | readonly string[];
+  /**
+   * How the captured value is returned to the model.
+   *
+   * - `'replace'` (default): swap the value for a compact artifact reference —
+   *   the context-compaction behavior.
+   * - `'mirror'`: persist the artifact but leave the value inline and
+   *   untouched. Use when downstream tool calls need the full value as input
+   *   (e.g. stateless MCP servers that take the current document as an
+   *   argument) while the host still wants a durable artifact — typically with
+   *   `setCurrent: true` so the host reads the outcome via
+   *   `engine.artifacts.current(...)`. `replacePaths` is ignored in this mode.
+   */
+  mode?: 'replace' | 'mirror';
   /** Additional output paths to replace with the same artifact reference. */
   replacePaths?: ReadonlyArray<string | readonly string[]>;
   kind: ArtifactKind;

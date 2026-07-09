@@ -76,6 +76,12 @@ export class McpResultArtifactService {
       },
       setCurrent: args.rule.setCurrent,
     });
+    // Mirror mode: the artifact is persisted (above), but the value stays
+    // inline so downstream tool calls can keep consuming it directly.
+    if (args.rule.mode === 'mirror') {
+      return args.output;
+    }
+
     const preview = content.slice(0, args.rule.maxPreviewChars ?? 1_000);
     const artifactOutput = {
       artifact: {
