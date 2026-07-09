@@ -128,7 +128,7 @@ export class OpenAiCodec {
     input: ResponseInputItem[];
     tools?: FunctionTool[];
     store: boolean;
-    reasoning: { summary: 'auto' | 'detailed'; effort?: OpenAiReasoningEffort };
+    reasoning?: { summary: 'auto' | 'detailed'; effort?: OpenAiReasoningEffort };
     instructions?: string;
   } {
     const systemMessages = options.oauthMode ? messages.filter((message): message is Extract<ChatMessage, { role: 'system' }> => message.role === 'system') : [];
@@ -141,16 +141,26 @@ export class OpenAiCodec {
       model: options.model,
       explicitEffort: options.reasoningEffort,
     });
+    // Summary support and configurable effort are independent capabilities.
+    // Non-reasoning API-key models (e.g. gpt-4.1) reject the entire block,
+    // while established reasoning models may support summaries without a
+    // Heddle-managed effort setting.
+    const includeReasoning =
+      options.oauthMode ||
+      Boolean(reasoningEffort) ||
+      ModelPolicyService.supportsOpenAiReasoningSummary(options.model);
 
     return {
       model: options.model,
       input: OpenAiCodec.toResponseInput(inputMessages),
       tools: options.tools.length > 0 ? options.tools.map((tool) => OpenAiCodec.toResponseTool(tool)) : undefined,
       store: false,
-      reasoning: {
-        summary: options.oauthMode ? 'auto' : 'detailed',
-        ...(reasoningEffort ? { effort: reasoningEffort } : {}),
-      },
+      ...(includeReasoning ? {
+        reasoning: {
+          summary: options.oauthMode ? 'auto' as const : 'detailed' as const,
+          ...(reasoningEffort ? { effort: reasoningEffort } : {}),
+        },
+      } : {}),
       ...(instructions ? { instructions } : {}),
     };
   }

@@ -28,6 +28,33 @@ export const OPENAI_OAUTH_MODE_DESCRIPTION = 'OAuth mode supports a smaller Open
 
 const OPENAI_OAUTH_DISABLED_REASON = 'Not supported';
 const OPENAI_OAUTH_IMAGE_MODEL_PREFERENCES = ['gpt-5.4', 'gpt-5.4-mini'];
+// Keep this explicit and aligned with the curated reasoning models in
+// model-catalog.ts so unknown/non-reasoning models never receive this parameter.
+const OPENAI_REASONING_SUMMARY_CAPABLE_MODELS = [
+  'gpt-5.5',
+  'gpt-5.5-pro',
+  'gpt-5.4',
+  'gpt-5.4-pro',
+  'gpt-5.4-mini',
+  'gpt-5.4-nano',
+  'gpt-5',
+  'gpt-5-pro',
+  'gpt-5-mini',
+  'gpt-5-nano',
+  'gpt-5.2',
+  'gpt-5.2-pro',
+  'gpt-5.1',
+  'gpt-5.3-codex',
+  'gpt-5.3-codex-spark',
+  'gpt-5.2-codex',
+  'gpt-5.1-codex',
+  'gpt-5.1-codex-max',
+  'gpt-5.1-codex-mini',
+  'o3-pro',
+  'o3',
+  'o3-mini',
+  'o4-mini',
+] as const;
 const REASONING_EFFORT_CAPABLE_OPENAI_MODELS = [
   'gpt-5.4',
   'gpt-5.4-pro',
@@ -202,6 +229,13 @@ export class ModelPolicyService {
 
   static supportsReasoningEffort(model: string): boolean {
     return REASONING_EFFORT_CAPABLE_OPENAI_MODELS.includes(model as (typeof REASONING_EFFORT_CAPABLE_OPENAI_MODELS)[number]);
+  }
+
+  static supportsOpenAiReasoningSummary(model: string): boolean {
+    const normalized = model.trim();
+    return OPENAI_REASONING_SUMMARY_CAPABLE_MODELS.some((candidate) =>
+      normalized === candidate || normalized.startsWith(`${candidate}-20`),
+    );
   }
 
   static supportsOpenAiRequestReasoningEffort(model: string): boolean {
