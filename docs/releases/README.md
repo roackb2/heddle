@@ -251,6 +251,8 @@ Current example release note drafts:
 - [`v2.5.0.md`](./v2.5.0.md)
 - [`v3.0.0.md`](./v3.0.0.md)
 - [`v3.1.0.md`](./v3.1.0.md)
+- [`v4.0.0.md`](./v4.0.0.md)
+- [`v4.1.0.md`](./v4.1.0.md)
 
 ## Agent Rule
 
