@@ -6,6 +6,7 @@ import { ArtifactService } from '@/core/artifacts/index.js';
 import {
   FileMcpCatalogRepository,
   FileMcpConfigRepository,
+  McpClientService,
   McpService,
 } from '@/core/mcp/index.js';
 import {
@@ -157,6 +158,74 @@ describe('defineMcpHostExtension', () => {
     const tools = extension.toolkits?.flatMap((toolkit) => toolkit.createTools(context)) ?? [];
 
     expect(tools.map((tool) => tool.name)).toEqual(['create_deck', 'validate_deck']);
+  });
+
+  it('resolves and executes tools from embedded MCP data without reading stateRoot', async () => {
+    // An empty stateRoot: no mcp.json, no catalog. The stateRoot-reading path
+    // would find nothing here — so any resolved tool proves the embedded path.
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-mcp-embedded-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    mkdirSync(stateRoot, { recursive: true });
+    const context: ToolToolkitContext = {
+      workspaceRoot,
+      stateRoot,
+      artifactRoot: join(stateRoot, 'artifacts'),
+      sessionId: 'session-embedded',
+      model: 'gpt-5.5',
+      memoryDir: join(stateRoot, 'memory'),
+      memoryMode: 'none',
+    };
+
+    const resolved = {
+      server: {
+        id: 'deck_service',
+        transport: 'stdio' as const,
+        source: 'heddle' as const,
+        command: 'npm',
+        args: ['run', 'mcp'],
+        env: {},
+        tools: { deny: ['validate-deck'], approval: 'always' as const },
+      },
+      catalog: {
+        serverId: 'deck_service',
+        tools: [
+          {
+            name: 'create-deck',
+            description: 'Create a presentation deck.',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: { title: { type: 'string' } },
+              required: ['title'],
+            },
+          },
+          {
+            name: 'validate-deck',
+            description: 'Validate a presentation deck.',
+            inputSchema: { type: 'object', properties: {} },
+          },
+        ],
+        refreshedAt: '2026-07-09T00:00:00.000Z',
+      },
+    };
+
+    const extension = defineMcpHostExtension({ id: 'slides', serverId: 'deck_service' }, resolved);
+    const tools = extension.toolkits?.flatMap((toolkit) => toolkit.createTools(context)) ?? [];
+
+    // Resolved from embedded catalog (empty stateRoot), and deny policy honored.
+    expect(tools.map((tool) => tool.name)).toEqual(['create_deck']);
+
+    const clientCall = vi.spyOn(McpClientService.prototype, 'callTool')
+      .mockResolvedValue({ ok: true, output: { done: true } });
+    const stateCall = vi.spyOn(McpService.prototype, 'callTool');
+
+    const result = await tools[0]?.execute({ title: 'Quarterly plan' });
+
+    expect(result?.ok).toBe(true);
+    // Execution went straight to the embedded server config via the client,
+    // never through the stateRoot-backed McpService.
+    expect(clientCall).toHaveBeenCalledWith(resolved.server, 'create-deck', { title: 'Quarterly plan' });
+    expect(stateCall).not.toHaveBeenCalled();
   });
 
   it('supports multiple MCP host extensions without tool name conflicts', () => {

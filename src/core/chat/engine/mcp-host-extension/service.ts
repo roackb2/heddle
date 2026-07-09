@@ -1,7 +1,7 @@
 import { defineHostExtension } from '../host-extension.js';
 import { McpHostToolDefinitionService } from './tool-definition-service.js';
 import type { ConversationEngineHostExtension } from '../host-extension.js';
-import type { DefineMcpHostExtensionOptions } from './types.js';
+import type { DefineMcpHostExtensionOptions, ResolvedMcpHostExtensionData } from './types.js';
 
 /**
  * Public facade for building MCP-backed host extensions.
@@ -11,8 +11,11 @@ import type { DefineMcpHostExtensionOptions } from './types.js';
  * narrower services in this folder.
  */
 export class McpHostExtensionService {
-  static define(options: DefineMcpHostExtensionOptions): ConversationEngineHostExtension {
-    const toolkit = McpHostToolDefinitionService.createToolkit(options);
+  static define(
+    options: DefineMcpHostExtensionOptions,
+    resolved?: ResolvedMcpHostExtensionData,
+  ): ConversationEngineHostExtension {
+    const toolkit = McpHostToolDefinitionService.createToolkit(options, resolved);
 
     return defineHostExtension({
       id: options.id,

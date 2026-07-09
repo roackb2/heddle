@@ -1,5 +1,5 @@
 import type { ArtifactKind, RuntimeArtifact } from '@/core/artifacts/index.js';
-import type { McpRefreshResult, McpServerConfig, McpToolDescriptor } from '@/core/mcp/index.js';
+import type { McpRefreshResult, McpServerCatalogRecord, McpServerConfig, McpToolDescriptor } from '@/core/mcp/index.js';
 import type { ToolToolkitContext } from '@/core/tools/index.js';
 import type {
   ConversationEngineHostArtifactOptions,
@@ -108,6 +108,9 @@ export type PrepareMcpHostExtensionCatalogResult =
       ok: true;
       serverId: string;
       refresh: Extract<McpRefreshResult, { ok: true }>;
+      /** Normalized server config from the just-saved MCP config, so the prepared
+       *  extension can execute tools without re-reading `stateRoot` at runtime. */
+      resolvedServer: McpServerConfig;
       toolNames: string[];
     }
   | {
@@ -126,6 +129,18 @@ export type PrepareMcpHostExtensionResult =
 export type ResolvedMcpTool = {
   server: McpServerConfig;
   tool: McpToolDescriptor;
+};
+
+/**
+ * Self-contained MCP state embedded into a prepared host extension. When
+ * present, the toolkit resolves and executes tools from this data instead of
+ * re-reading the MCP config/catalog from `context.stateRoot` at runtime. This is
+ * what lets one prepared extension be reused across cheap, per-request engines
+ * (e.g. a multi-tenant server) without per-engine MCP prep.
+ */
+export type ResolvedMcpHostExtensionData = {
+  server: McpServerConfig;
+  catalog: McpServerCatalogRecord;
 };
 
 export type ResolvedResultArtifactsOptions = {
