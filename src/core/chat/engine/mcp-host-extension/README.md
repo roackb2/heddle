@@ -16,6 +16,23 @@ defineMcpHostExtension(...)
 Those helpers are stable entrypoints. The implementation behind them is split
 into services so future changes have one clear owner.
 
+## Self-contained (stateless) extensions
+
+`prepareMcpHostExtension(...)` returns a **self-contained** extension: it embeds
+the resolved server config and cached catalog, so at runtime the toolkit
+resolves and executes tools from that embedded data instead of re-reading the
+MCP config/catalog from `context.stateRoot`. This lets one prepared extension be
+reused across many cheap, per-request engines — e.g. a multi-tenant server that
+builds a fresh engine per request with a per-user API key and per-user storage,
+without any per-engine MCP prep or a per-user `.heddle/` directory. Tool
+execution stays stateless: each call spawns a fresh MCP subprocess via
+`McpClientService` from the embedded config and closes it.
+
+A plain `defineMcpHostExtension(options)` with no embedded data keeps the
+original behavior: the toolkit reads the server + catalog from `stateRoot` at
+runtime (the local CLI-host path). Preparation passes the embedded data as the
+optional second argument to `defineMcpHostExtension(options, resolved)`.
+
 ## Service Boundaries
 
 - `McpHostExtensionService` composes the Heddle host extension shell. Keep this

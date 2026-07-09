@@ -69,10 +69,23 @@ export class McpHostExtensionPreparationService {
       };
     }
 
+    const resolvedServer = mcp
+      .listOverview()
+      .servers.find((server) => server.id === options.serverId)?.config;
+    if (!resolvedServer) {
+      return {
+        ok: false,
+        serverId: options.serverId,
+        step: 'refresh_catalog',
+        error: `Resolved server config missing after refresh: ${options.serverId}`,
+      };
+    }
+
     return {
       ok: true,
       serverId: options.serverId,
       refresh,
+      resolvedServer,
       toolNames: refresh.record.tools.map((tool) => tool.name),
     };
   }
@@ -90,7 +103,10 @@ export class McpHostExtensionPreparationService {
     return prepared.ok
       ? {
           ...prepared,
-          extension: McpHostExtensionService.define(options),
+          extension: McpHostExtensionService.define(options, {
+            server: prepared.resolvedServer,
+            catalog: prepared.refresh.record,
+          }),
         }
       : prepared;
   }

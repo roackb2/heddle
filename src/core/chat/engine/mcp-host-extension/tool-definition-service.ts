@@ -1,14 +1,17 @@
 import {
+  McpClientService,
   McpService,
   isToolAllowed,
   shouldMcpToolRequireApproval,
 } from '@/core/mcp/index.js';
 import { McpResultArtifactService } from './result-artifact-service.js';
 import { McpHostValueService } from './value-service.js';
+import type { McpCallToolResult, McpServerCatalogRecord, McpServerConfig } from '@/core/mcp/index.js';
 import type { ToolDefinition } from '@/core/types.js';
 import type { ToolToolkit, ToolToolkitContext } from '@/core/tools/index.js';
 import type {
   DefineMcpHostExtensionOptions,
+  ResolvedMcpHostExtensionData,
   ResolvedMcpTool,
 } from './types.js';
 
@@ -20,14 +23,18 @@ import type {
  * succeeds so this service remains focused on tool-definition semantics.
  */
 export class McpHostToolDefinitionService {
-  static createToolkit(options: DefineMcpHostExtensionOptions): ToolToolkit {
+  static createToolkit(
+    options: DefineMcpHostExtensionOptions,
+    resolved?: ResolvedMcpHostExtensionData,
+  ): ToolToolkit {
     return {
       id: `mcp.${options.id}`,
       createTools(context) {
-        return McpHostToolDefinitionService.resolveTools({ context, options })
+        return McpHostToolDefinitionService.resolveTools({ context, options, resolved })
           .map(({ server, tool }) => McpHostToolDefinitionService.createTool({
             context,
             options,
+            resolved,
             server,
             tool,
           }));
@@ -38,14 +45,16 @@ export class McpHostToolDefinitionService {
   private static resolveTools(args: {
     context: ToolToolkitContext;
     options: DefineMcpHostExtensionOptions;
+    resolved?: ResolvedMcpHostExtensionData;
   }): ResolvedMcpTool[] {
-    const mcp = McpHostToolDefinitionService.createMcpService(args.context);
-    const server = mcp.listOverview().servers.find((candidate) => candidate.id === args.options.serverId);
-    if (server?.status !== 'enabled' || !server.config || !server.catalog) {
+    const source = args.resolved
+      ? { config: args.resolved.server, catalog: args.resolved.catalog }
+      : McpHostToolDefinitionService.resolveFromState(args.context, args.options.serverId);
+    if (!source) {
       return [];
     }
 
-    const { config, catalog } = server;
+    const { config, catalog } = source;
     const include = args.options.includeTools ? new Set(args.options.includeTools) : undefined;
     const exclude = new Set(args.options.excludeTools ?? []);
 
@@ -59,9 +68,24 @@ export class McpHostToolDefinitionService {
       }));
   }
 
+  /** Read the server config + cached catalog from `stateRoot` (the CLI-host path,
+   *  used when the extension was not prepared with embedded MCP data). */
+  private static resolveFromState(
+    context: ToolToolkitContext,
+    serverId: string,
+  ): { config: McpServerConfig; catalog: McpServerCatalogRecord } | undefined {
+    const mcp = McpHostToolDefinitionService.createMcpService(context);
+    const server = mcp.listOverview().servers.find((candidate) => candidate.id === serverId);
+    if (server?.status !== 'enabled' || !server.config || !server.catalog) {
+      return undefined;
+    }
+    return { config: server.config, catalog: server.catalog };
+  }
+
   private static createTool(args: ResolvedMcpTool & {
     context: ToolToolkitContext;
     options: DefineMcpHostExtensionOptions;
+    resolved?: ResolvedMcpHostExtensionData;
   }): ToolDefinition {
     const override = args.options.toolOverrides?.[args.tool.name];
     const name = override?.name ?? McpHostToolDefinitionService.toHostToolName(args.options, args.tool.name);
@@ -73,8 +97,11 @@ export class McpHostToolDefinitionService {
       capabilities: override?.capabilities ?? args.options.defaultCapabilities ?? ['mcp.unknown'],
       parameters: args.tool.inputSchema,
       async execute(raw: unknown) {
-        const result = await McpHostToolDefinitionService.createMcpService(args.context)
-          .callTool(args.options.serverId, args.tool.name, McpHostValueService.isRecord(raw) ? raw : {});
+        const callArgs = McpHostValueService.isRecord(raw) ? raw : {};
+        const result = args.resolved
+          ? await McpHostToolDefinitionService.callEmbedded(args.resolved.server, args.tool.name, callArgs)
+          : await McpHostToolDefinitionService.createMcpService(args.context)
+              .callTool(args.options.serverId, args.tool.name, callArgs);
 
         return result.ok
           ? {
@@ -112,5 +139,18 @@ export class McpHostToolDefinitionService {
       workspaceRoot: context.workspaceRoot,
       stateRoot: context.stateRoot,
     });
+  }
+
+  /** Execute a tool directly from an embedded server config, without touching
+   *  `stateRoot`. Mirrors the allow/deny guard `McpService.callTool` applies. */
+  private static async callEmbedded(
+    server: McpServerConfig,
+    toolName: string,
+    args: Record<string, unknown>,
+  ): Promise<McpCallToolResult> {
+    if (!isToolAllowed(server, toolName)) {
+      return { ok: false, error: `MCP tool is denied by Heddle config: ${server.id}/${toolName}` };
+    }
+    return await new McpClientService().callTool(server, toolName, args);
   }
 }
