@@ -30,6 +30,16 @@ describe('OpenAiCodec.buildResponsesRequest reasoning parameter', () => {
     expect(request.reasoning).toEqual({ summary: 'detailed', effort: 'medium' });
   });
 
+  it('keeps summaries for o-series models without a Heddle-managed effort', () => {
+    const request = OpenAiCodec.buildResponsesRequest(messages, {
+      model: 'o4-mini',
+      tools: [],
+      oauthMode: false,
+    });
+
+    expect(request.reasoning).toEqual({ summary: 'detailed' });
+  });
+
   it('keeps summary auto in OAuth mode', () => {
     const request = OpenAiCodec.buildResponsesRequest(messages, {
       model: 'gpt-5.4',
@@ -40,11 +50,19 @@ describe('OpenAiCodec.buildResponsesRequest reasoning parameter', () => {
     expect(request.reasoning).toEqual(expect.objectContaining({ summary: 'auto' }));
   });
 
-  it('omits reasoning for API-key models without a reasoning policy entry', () => {
-    // Codex-family models are OAuth-first and have no API-key reasoning policy;
-    // sending nothing lets the server apply its own default.
+  it('keeps summaries for Codex API-key models without a Heddle-managed effort', () => {
     const request = OpenAiCodec.buildResponsesRequest(messages, {
       model: 'gpt-5.2-codex',
+      tools: [],
+      oauthMode: false,
+    });
+
+    expect(request.reasoning).toEqual({ summary: 'detailed' });
+  });
+
+  it('omits reasoning for unknown API-key models', () => {
+    const request = OpenAiCodec.buildResponsesRequest(messages, {
+      model: 'custom-openai-model',
       tools: [],
       oauthMode: false,
     });

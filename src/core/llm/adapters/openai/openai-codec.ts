@@ -141,14 +141,14 @@ export class OpenAiCodec {
       model: options.model,
       explicitEffort: options.reasoningEffort,
     });
-    // Non-reasoning API-key models (e.g. gpt-4.1) reject `reasoning.summary`
-    // with a 400, so only send the reasoning block when the model supports it.
-    // OAuth mode keeps its current behavior: the account sign-in allowlist is
-    // reasoning models only, and that path expects `summary: 'auto'`.
+    // Summary support and configurable effort are independent capabilities.
+    // Non-reasoning API-key models (e.g. gpt-4.1) reject the entire block,
+    // while established reasoning models may support summaries without a
+    // Heddle-managed effort setting.
     const includeReasoning =
       options.oauthMode ||
       Boolean(reasoningEffort) ||
-      ModelPolicyService.supportsReasoningEffort(options.model);
+      ModelPolicyService.supportsOpenAiReasoningSummary(options.model);
 
     return {
       model: options.model,

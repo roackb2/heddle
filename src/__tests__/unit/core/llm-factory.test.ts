@@ -329,4 +329,12 @@ describe('llm adapter factory', () => {
       disabledReason: undefined,
     });
   });
+
+  it('owns reasoning-summary support independently from configurable effort', () => {
+    expect(ModelPolicyService.supportsOpenAiReasoningSummary('gpt-4.1')).toBe(false);
+    expect(ModelPolicyService.supportsOpenAiReasoningSummary('o4-mini')).toBe(true);
+    expect(ModelPolicyService.supportsReasoningEffort('o4-mini')).toBe(false);
+    expect(ModelPolicyService.supportsOpenAiReasoningSummary('gpt-5.2-codex')).toBe(true);
+    expect(ModelPolicyService.supportsOpenAiReasoningSummary('gpt-5.4-2026-01-01')).toBe(true);
+  });
 });
