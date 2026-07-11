@@ -144,6 +144,8 @@ export type {
   ToolResultSummaryOptions,
   ToolSummaryOptions,
 } from './core/chat/engine/index.js';
+export { HeddleEventType } from './core/event-types.js';
+export type { HeddleEventTypeValue } from './core/event-types.js';
 export type {
   ConversationTurnResultSummary,
   ConversationTurnToolResult,

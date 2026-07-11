@@ -40,6 +40,8 @@ describe('createConversationEngine', () => {
     });
 
     expect(engine.sessions.listExisting()).toEqual([]);
+    expect(engine.sessions.readExisting('session-1')).toBeUndefined();
+    expect(existsSync(join(stateRoot, 'chat-sessions.catalog.json'))).toBe(false);
     const fallback = engine.sessions.latest();
     expect(fallback).toEqual(expect.objectContaining({
       id: 'session-1',
@@ -54,6 +56,8 @@ describe('createConversationEngine', () => {
     const session = engine.sessions.create({ name: 'Repo investigation' });
 
     expect(engine.sessions.listExisting().map((candidate) => candidate.id)).toEqual([session.id, 'session-1']);
+    expect(engine.sessions.readExisting(session.id)?.id).toBe(session.id);
+    expect(engine.sessions.readExisting('missing')).toBeUndefined();
     const sessionRepository = new FileChatSessionRepository({
       sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
     });

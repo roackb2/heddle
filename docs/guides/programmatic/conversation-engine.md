@@ -36,6 +36,10 @@ The normalized engine config derives default paths from `stateRoot`:
 Use `EngineConversationTurnService.run(...)` only when your host already owns
 session ids and storage paths. For new hosts, prefer `createConversationEngine`.
 
+Use `engine.sessions.readExisting(id)` when checking whether a persisted session
+already exists. Unlike `read(id)`, it does not materialize Heddle's host-facing
+fallback session in an empty repository.
+
 ## Control model-visible tools
 
 Use `toolProfile` to set the engine's default model-visible tool policy. For
@@ -59,6 +63,17 @@ controls the memory tools visible to the model, while
 `memoryMaintenanceMode` controls post-turn memory maintenance scheduling. If a
 turn selects a custom agent, that agent's tool profile overrides the engine
 default for the turn.
+
+For host event adapters, import `HeddleEventType` instead of duplicating event
+name strings:
+
+```ts
+import { HeddleEventType } from '@roackb2/heddle'
+
+if (activity.type === HeddleEventType.assistantStream) {
+  renderDelta(activity.text)
+}
+```
 
 ## Reading artifacts
 
