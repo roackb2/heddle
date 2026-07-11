@@ -17,6 +17,7 @@ import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js
 import type { ChatTurnHostPort } from './turns/host/index.js';
 import type { ConversationTurnResultSummary } from './turn-result.js';
 import type { ConversationCompactionResult } from '@/core/chat/engine/compaction/index.js';
+import type { RuntimeToolSelectionProfile } from '@/core/runtime/tools/index.js';
 import type {
   ConversationEngineHostExtension,
   ConversationEngineHostExtensionBundle,
@@ -33,6 +34,8 @@ export type ConversationEngineConfig = {
   credentialStorePath?: string;
   systemContext?: string;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
+  /** Default model-visible tool policy. A selected custom agent overrides it for that turn. */
+  toolProfile?: RuntimeToolSelectionProfile;
   traceSummarizerRegistry?: TraceSummaryService;
   approvalPolicies?: ToolApprovalPolicy[];
   hostExtensions?: ConversationEngineHostExtensionsInput;

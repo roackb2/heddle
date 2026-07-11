@@ -737,6 +737,10 @@ describe('createConversationEngine', () => {
       credentialStorePath: join(stateRoot, 'auth.json'),
       systemContext: 'Engine system context',
       memoryMaintenanceMode: 'background',
+      toolProfile: {
+        preset: 'default',
+        memoryMode: 'none',
+      },
       approvalPolicies,
       traceSummarizerRegistry,
       workspaceId: 'workspace-1',
@@ -788,6 +792,10 @@ describe('createConversationEngine', () => {
       credentialStorePath: join(stateRoot, 'auth.json'),
       systemContext: 'Engine system context',
       memoryMaintenanceMode: 'inline',
+      toolProfile: {
+        preset: 'default',
+        memoryMode: 'none',
+      },
       approvalPolicies: overridePolicies,
       traceSummarizerRegistry: overrideRegistry,
     }));

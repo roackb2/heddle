@@ -6,6 +6,7 @@ import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/i
 import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatTurnRuntime } from '../runtime/index.js';
+import type { RuntimeToolSelectionProfile } from '@/core/runtime/tools/index.js';
 
 export type PrepareConversationTurnContextArgs = {
   workspaceRoot: string;
@@ -22,6 +23,7 @@ export type PrepareConversationTurnContextArgs = {
   artifactRoot: string;
   artifactRepository?: ArtifactRepository;
   artifactsEnabled: boolean;
+  toolProfile?: RuntimeToolSelectionProfile;
   agentSnapshot?: CustomAgentExecutionSnapshot;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
@@ -41,6 +43,7 @@ export type ConversationTurnToolContextArgs = Pick<
   | 'artifactRoot'
   | 'artifactRepository'
   | 'artifactsEnabled'
+  | 'toolProfile'
   | 'sessionId'
 >;
 

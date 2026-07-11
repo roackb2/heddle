@@ -10,6 +10,7 @@ import type { ChatTurnHostPort } from './host/index.js';
 import type { ToolDefinition } from '@/core/types.js';
 import type { ToolToolkit } from '@/core/tools/index.js';
 import type { ConversationTurnResultSummary } from '../turn-result.js';
+import type { RuntimeToolSelectionProfile } from '@/core/runtime/tools/index.js';
 
 export type RunConversationTurnArgs = {
   workspaceRoot: string;
@@ -28,6 +29,7 @@ export type RunConversationTurnArgs = {
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
+  toolProfile?: RuntimeToolSelectionProfile;
   host?: ChatTurnHostPort;
   approvalPolicies?: ToolApprovalPolicy[];
   tools?: ToolDefinition[];
@@ -58,6 +60,7 @@ export type TurnRuntimeConfigInput = Pick<
   | 'systemContext'
   | 'traceDir'
   | 'memoryMaintenanceMode'
+  | 'toolProfile'
   | 'approvalPolicies'
   | 'tools'
   | 'toolkits'

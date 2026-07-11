@@ -10,6 +10,7 @@ import type { ConversationEngineConfig } from './types.js';
 import type { ToolDefinition } from '@/core/types.js';
 import type { ToolToolkit } from '@/core/tools/index.js';
 import { ConversationEngineHostExtensionService } from './host-extension.js';
+import type { RuntimeToolSelectionProfile } from '@/core/runtime/tools/index.js';
 
 export type NormalizedConversationEngineConfig = {
   workspaceRoot: string;
@@ -21,6 +22,7 @@ export type NormalizedConversationEngineConfig = {
   credentialStorePath?: string;
   systemContext?: string;
   memoryMaintenanceMode: 'none' | 'background' | 'inline';
+  toolProfile?: RuntimeToolSelectionProfile;
   traceSummarizerRegistry?: TraceSummaryService;
   approvalPolicies?: ToolApprovalPolicy[];
   tools?: ToolDefinition[];
@@ -71,6 +73,7 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
     credentialStorePath,
     systemContext,
     memoryMaintenanceMode: config.memoryMaintenanceMode ?? 'background',
+    toolProfile: config.toolProfile,
     traceSummarizerRegistry: config.traceSummarizerRegistry,
     approvalPolicies: config.approvalPolicies,
     tools: tools.length ? tools : undefined,
