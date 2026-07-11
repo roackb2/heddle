@@ -1,7 +1,11 @@
-// Rung 2 — add a capability: expose an MCP server's tools to the agent.
-// prepareMcpHostExtension writes MCP config/catalog under stateRoot, then
-// returns a host extension you pass straight to the runner.
-// Run: yarn example:sdk:add-mcp   (edit the server command for a real server)
+/**
+ * Stage 03: expose an existing MCP server as curated Heddle capabilities.
+ *
+ * Prerequisites: stage 01's credential setup plus a runnable MCP server.
+ * Assumption: the host selects/configures MCP; Heddle prepares its tool catalog,
+ * approval path, and host extension. Replace the demo command for production.
+ * Run: yarn example:sdk:add-mcp
+ */
 import { join } from 'node:path';
 import { prepareMcpHostExtension, runQuickstartConversationCli } from '../../src/index.js';
 

@@ -1,3 +1,9 @@
+/**
+ * Stage 05.2 public HTTP/SSE contract.
+ *
+ * Zod schemas live at the untrusted wire boundary, not in the stage-1 service.
+ * Extend these schemas only with product data safe for remote clients.
+ */
 import { z } from 'zod';
 
 export const StartHostedAgentRunInputSchema = z.object({

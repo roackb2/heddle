@@ -1,3 +1,10 @@
+/**
+ * Stage 05.2 Express/SSE adapter for the transport-neutral hosted service.
+ *
+ * The host owns authentication, authorization, public schemas, HTTP policy,
+ * and deployment. Reimplement this adapter in the host's existing framework
+ * when Express/SSE is not already part of the stack.
+ */
 import { once } from 'node:events';
 import {
   Router,
@@ -11,7 +18,7 @@ import {
   HostedAgentRunConflictError,
   HostedAgentRunNotFoundError,
   type HostedAgentService,
-} from './agent-service.js';
+} from '../01-hosted-service/agent-service.js';
 import {
   CancelHostedAgentRunResultSchema,
   HostedAgentApiErrorSchema,

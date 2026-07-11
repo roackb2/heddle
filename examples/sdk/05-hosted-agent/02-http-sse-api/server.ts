@@ -1,8 +1,16 @@
-// Rung 4 — add an Express + SSE transport without changing the agent service.
-// Run: HEDDLE_EXAMPLE_BEARER_TOKEN=local-example-secret yarn example:sdk:hosted-api
+/**
+ * Stage 05.2 runner: expose the stage-1 service through Express and SSE.
+ *
+ * This stage assumes the host chose this transport stack. Authentication,
+ * routing, tenancy, and deployment remain host responsibilities.
+ * Run: HEDDLE_EXAMPLE_BEARER_TOKEN=local-example-secret yarn example:sdk:hosted-api
+ */
 import { timingSafeEqual } from 'node:crypto';
 import express, { type Request } from 'express';
-import { EXAMPLE_ACCOUNT_ID, createExampleHostedAgentService } from './example-agent.js';
+import {
+  EXAMPLE_ACCOUNT_ID,
+  createExampleHostedAgentService,
+} from '../01-hosted-service/example-agent.js';
 import {
   HostedAgentApiError,
   createHostedAgentApiRouter,

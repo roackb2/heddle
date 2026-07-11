@@ -1,5 +1,11 @@
-// Rung 2 — add a capability: hand the agent one of your own tools.
-// Run: yarn example:sdk:add-tool
+/**
+ * Stage 02: add one host-owned capability to the quickstart conversation.
+ *
+ * Prerequisite: stage 01's credential setup.
+ * Assumption: the host owns useful domain behavior and exposes it as a tool;
+ * Heddle owns registration, model invocation, approval integration, and traces.
+ * Run: yarn example:sdk:add-tool
+ */
 import { runQuickstartConversationCli, type ToolDefinition } from '../../src/index.js';
 
 const currentTimeTool: ToolDefinition = {

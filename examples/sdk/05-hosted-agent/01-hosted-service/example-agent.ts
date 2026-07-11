@@ -1,14 +1,17 @@
+/**
+ * Runnable composition root for stage 05.
+ *
+ * The local filesystem, inspect-only tools, demo model fallback, and denied
+ * approvals are example policy. A product should replace them here without
+ * changing the transport-neutral HostedAgentService.
+ */
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { createConversationEngine } from '../../../src/index.js';
+import { createConversationEngine } from '../../../../src/index.js';
 import { HostedAgentService } from './agent-service.js';
 
 export const EXAMPLE_ACCOUNT_ID = 'local-example-account';
 
-/**
- * Composition root for the runnable examples. A real host would usually
- * resolve credentials and repositories from its own account/container scope.
- */
 export function createExampleHostedAgentService(): HostedAgentService {
   const workspaceRoot = process.cwd();
   const exampleStateRoot = join(workspaceRoot, '.heddle', 'examples', 'hosted-agent');

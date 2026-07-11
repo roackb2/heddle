@@ -1,6 +1,11 @@
-// Rung 4 — own lifecycle without assuming a server or transport.
-// Run: yarn example:sdk:hosted-agent "What does this repository do?"
-import type { HostedAgentRunEvent } from './contracts.js';
+/**
+ * Stage 05.1 runner: exercise a hosted run without choosing HTTP, SSE, or a UI.
+ *
+ * Assumptions: the TypeScript host owns account/session identity and process
+ * lifetime; Heddle owns the persisted conversation and active run lifecycle.
+ * Run: yarn example:sdk:hosted-agent "What does this repository do?"
+ */
+import type { HostedAgentRunStreamItem } from './agent-service.js';
 import { EXAMPLE_ACCOUNT_ID, createExampleHostedAgentService } from './example-agent.js';
 
 const cancelDemo = process.argv.includes('--cancel-demo');
@@ -16,7 +21,7 @@ const accepted = await agent.start({ accountId: EXAMPLE_ACCOUNT_ID, sessionId, p
 console.log(`Accepted ${accepted.runId}.`);
 
 let cursor = 0;
-let terminal: HostedAgentRunEvent | undefined;
+let terminal: HostedAgentRunStreamItem | undefined;
 for await (const event of agent.subscribe({ accountId: EXAMPLE_ACCOUNT_ID, runId: accepted.runId })) {
   cursor = event.sequence;
   terminal = renderEvent(event);
@@ -52,7 +57,7 @@ if (cancelDemo) {
   }
 }
 
-function renderEvent(event: HostedAgentRunEvent): HostedAgentRunEvent | undefined {
+function renderEvent(event: HostedAgentRunStreamItem): HostedAgentRunStreamItem | undefined {
   if (event.kind === 'activity') {
     console.log(`[${event.sequence}] activity ${event.activity.type}`);
     return undefined;

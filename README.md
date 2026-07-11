@@ -516,8 +516,10 @@ Advanced hosts can also reuse lower-level class APIs such as `ToolRegistry`, `To
 
 Other exported primitives include `HeartbeatRunnerAgent.run`, `HeartbeatSchedulerService.runDueTasks`, and `FileHeartbeatTaskService` for scheduled or custom host workflows.
 
-More: [Programmatic hosts](docs/guides/programmatic/README.md) and the runnable
-[hosted service → HTTP/SSE → browser client example](examples/sdk/hosted-agent/README.md)
+More: [Programmatic hosts](docs/guides/programmatic/README.md),
+[choosing an integration layer](docs/guides/programmatic/integration-layers.md),
+and the runnable
+[hosted service → HTTP/SSE → browser client example](examples/sdk/05-hosted-agent/README.md).
 
 ### Semantic Drift
 

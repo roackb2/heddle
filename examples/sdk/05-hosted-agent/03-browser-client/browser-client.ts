@@ -1,3 +1,9 @@
+/**
+ * Stage 05.3 browser-compatible client for the example REST/SSE contract.
+ *
+ * This module owns protocol mechanics only. Product messages, tool rendering,
+ * reconnect UX, UI state, and terminal-result handling stay above it.
+ */
 import {
   createParser,
   type EventSourceMessage,
@@ -12,7 +18,7 @@ import {
   type HostedAgentRunEvent,
   type StartHostedAgentRunInput,
   type StartHostedAgentRunResult,
-} from './contracts.js';
+} from '../02-http-sse-api/contracts.js';
 
 type Fetch = typeof globalThis.fetch;
 
@@ -32,7 +38,6 @@ export class HostedAgentClientError extends Error {
   }
 }
 
-/** Owns the browser-side HTTP/SSE protocol, not reconnect or UI policy. */
 export class HostedAgentClient {
   private readonly baseUrl: string;
   private readonly fetch: Fetch;

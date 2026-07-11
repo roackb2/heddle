@@ -122,7 +122,7 @@ conversation state remains in the engine's session repository; transports and
 cross-process delivery remain host responsibilities.
 
 For a complete runnable host, follow the
-[hosted agent stack example](../../../examples/sdk/hosted-agent/README.md). It
+[hosted agent stack example](../../../examples/sdk/05-hosted-agent/README.md). It
 uses this exact service for account-scoped start/subscribe/cancel, then adds an
 Express/SSE adapter and a framework-neutral browser client without moving HTTP,
 authentication, or reconnect policy into the conversation core.

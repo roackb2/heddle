@@ -1,11 +1,16 @@
-// Rung 4 — framework-neutral fetch/SSE client with application-owned reconnect.
-// Start http-api-example.ts first, then run this script with the same token.
+/**
+ * Stage 05.3 runner: consume the stage-2 API with browser-compatible fetch/SSE.
+ *
+ * This is protocol code, not a UI framework. The product still owns messages,
+ * rendering, optimistic state, retry UX, and product-specific terminal data.
+ * Start the stage-2 server first, then run this script with the same token.
+ */
 import { setTimeout as delay } from 'node:timers/promises';
 import {
   HostedAgentClient,
   HostedAgentClientError,
 } from './browser-client.js';
-import type { HostedAgentRunEvent } from './contracts.js';
+import type { HostedAgentRunEvent } from '../02-http-sse-api/contracts.js';
 
 const bearerToken = process.env.HEDDLE_EXAMPLE_BEARER_TOKEN;
 if (!bearerToken) {

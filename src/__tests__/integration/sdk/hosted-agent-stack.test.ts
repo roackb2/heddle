@@ -12,15 +12,17 @@ import type {
 import {
   HostedAgentRunNotFoundError,
   HostedAgentService,
-} from '../../../../examples/sdk/hosted-agent/agent-service.js';
+} from '../../../../examples/sdk/05-hosted-agent/01-hosted-service/agent-service.js';
 import {
   HostedAgentClient,
-} from '../../../../examples/sdk/hosted-agent/browser-client.js';
-import type { HostedAgentRunEvent } from '../../../../examples/sdk/hosted-agent/contracts.js';
+} from '../../../../examples/sdk/05-hosted-agent/03-browser-client/browser-client.js';
+import type {
+  HostedAgentRunEvent,
+} from '../../../../examples/sdk/05-hosted-agent/02-http-sse-api/contracts.js';
 import {
   HostedAgentApiError,
   createHostedAgentApiRouter,
-} from '../../../../examples/sdk/hosted-agent/http-api.js';
+} from '../../../../examples/sdk/05-hosted-agent/02-http-sse-api/http-api.js';
 
 describe('hosted agent SDK stack example', () => {
   it('reuses a durable session and replays from the subscriber cursor', async () => {

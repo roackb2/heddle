@@ -1,6 +1,12 @@
-// Rung 3 — shape input/output: drive the engine directly and send streaming
-// text to your own destination instead of the default terminal writer.
-// Run: yarn example:sdk:custom-output
+/**
+ * Stage 04: keep Heddle's conversation engine and replace presentation.
+ *
+ * Prerequisite: stage 01's credential setup.
+ * Assumption: one process owns the turn while the host owns the output sink.
+ * Shows: the boundary to use for a custom terminal, webhook, log sink, or local
+ * application view before adding addressable/reconnectable run lifecycle.
+ * Run: yarn example:sdk:custom-output
+ */
 import { join } from 'node:path';
 import { createConversationEngine, createConversationTextHost } from '../../src/index.js';
 

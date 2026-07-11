@@ -1,3 +1,10 @@
+/**
+ * Stage 05.1: host application lifecycle above Heddle's conversation/run APIs.
+ *
+ * This module assumes the host owns authenticated account scope, stable product
+ * session IDs, composition, and process lifetime. It deliberately has no HTTP,
+ * transport, or UI dependency; those belong in later optional stages.
+ */
 import {
   ConversationRunService,
   type ConversationEngine,
@@ -6,11 +13,7 @@ import {
   type ConversationRunReplayOptions,
   type ConversationRunStreamItem,
   type ConversationTurnResultSummary,
-} from '../../../src/index.js';
-import type {
-  StartHostedAgentRunInput,
-  StartHostedAgentRunResult,
-} from './contracts.js';
+} from '../../../../src/index.js';
 
 const DEFAULT_RUN_RETENTION_MS = 5 * 60_000;
 
@@ -18,6 +21,19 @@ export type HostedRunAddress = {
   accountId: string;
   sessionId: string;
 };
+
+export type StartHostedAgentRunInput = HostedRunAddress & {
+  prompt: string;
+};
+
+export type HostedAgentRunAccepted = {
+  accepted: true;
+  runId: string;
+  acceptedAt: string;
+  sessionId: string;
+};
+
+export type HostedAgentRunStreamItem = ConversationRunStreamItem<ConversationTurnResultSummary>;
 
 export type HostedAgentServiceOptions = {
   createEngine(address: HostedRunAddress): ConversationEngine | Promise<ConversationEngine>;
@@ -39,7 +55,8 @@ export class HostedAgentInputError extends Error {}
  *
  * Heddle owns conversation execution and replay. This service owns account
  * scoping, engine/session construction, and authorization of run handles.
- * HTTP, SSE, authentication verification, and UI state stay outside it.
+ * Authentication verification happens before this service; HTTP, SSE, and UI
+ * state stay outside it.
  */
 export class HostedAgentService {
   private readonly runs: ConversationRunService<HostedRunAddress>;
@@ -57,7 +74,7 @@ export class HostedAgentService {
     });
   }
 
-  async start(input: StartHostedAgentRunInput & { accountId: string }): Promise<StartHostedAgentRunResult> {
+  async start(input: StartHostedAgentRunInput): Promise<HostedAgentRunAccepted> {
     const address = HostedAgentService.normalizeAddress(input);
     const prompt = input.prompt.trim();
     if (!prompt) {
@@ -102,7 +119,7 @@ export class HostedAgentService {
     runId: string;
     afterSequence?: number;
     signal?: AbortSignal;
-  }): AsyncIterable<ConversationRunStreamItem<ConversationTurnResultSummary>> {
+  }): AsyncIterable<HostedAgentRunStreamItem> {
     return this.requireOwnedRun(input.accountId, input.runId).run.events({
       afterSequence: input.afterSequence,
       signal: input.signal,

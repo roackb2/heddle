@@ -5,6 +5,10 @@ This is rung 1 of the programmatic ladder — the smallest working agent. See th
 shape output → lifecycle → storage), and [`examples/sdk/`](../../../examples/sdk/README.md)
 for runnable versions.
 
+If your product already owns a server, transport, or UI, use the
+[integration-layer chooser](integration-layers.md) to skip directly to the
+lowest matching boundary instead of copying the terminal quickstart stack.
+
 Use `runQuickstartConversationCli` when you want a working interactive conversation loop
 before building a custom UI:
 
