@@ -506,16 +506,18 @@ More: [Heartbeat guide](docs/guides/heartbeat.md)
 
 ### Programmatic Runtime
 
-Heddle is not only a CLI. The npm package exposes two main programmatic layers:
+Heddle is not only a CLI. The npm package exposes three main programmatic layers:
 
 - `createConversationEngine`: an alpha API for persisted multi-turn sessions with session storage, compaction, approvals, traces, semantic activity, and custom frontends or local hosts
+- `ConversationRunService`: process-local run identity, ordered activity, bounded replay, cancellation, and approval resolution for reconnectable hosted conversations
 - `AgentLoopRuntimeService.run(...)`: a lower-level single-run execution loop for hosts that do not need persisted chat or session behavior
 
 Advanced hosts can also reuse lower-level class APIs such as `ToolRegistry`, `ToolExecutionService`, `TraceRecorder`, `TraceConsoleFormatter`, and `ReviewDiffParser` when they intentionally assemble custom runtime or review surfaces.
 
 Other exported primitives include `HeartbeatRunnerAgent.run`, `HeartbeatSchedulerService.runDueTasks`, and `FileHeartbeatTaskService` for scheduled or custom host workflows.
 
-More: [Programmatic hosts](docs/guides/programmatic/README.md)
+More: [Programmatic hosts](docs/guides/programmatic/README.md) and the runnable
+[hosted service → HTTP/SSE → browser client example](examples/sdk/hosted-agent/README.md)
 
 ### Semantic Drift
 

@@ -121,6 +121,12 @@ The replay buffer is intentionally process-local and bounded. Durable final
 conversation state remains in the engine's session repository; transports and
 cross-process delivery remain host responsibilities.
 
+For a complete runnable host, follow the
+[hosted agent stack example](../../../examples/sdk/hosted-agent/README.md). It
+uses this exact service for account-scoped start/subscribe/cancel, then adds an
+Express/SSE adapter and a framework-neutral browser client without moving HTTP,
+authentication, or reconnect policy into the conversation core.
+
 ## Reading artifacts
 
 Each turn result already includes the artifacts produced by that turn. To review

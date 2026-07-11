@@ -33,6 +33,9 @@ There are two import entry points:
    - [Conversation engine](conversation-engine.md): engine setup, state roots,
      and persisted sessions.
    - [Approvals](approvals.md): own policy decisions in the host.
+   - [Hosted agent stack](../../../examples/sdk/hosted-agent/README.md): compose
+     a transport-neutral run service, Express/SSE API, and browser client while
+     keeping each layer replaceable.
 5. **Advanced: storage** — back Heddle with your own persistence.
    - [Result artifacts](result-artifacts.md): save large generated values as
      reusable artifacts.

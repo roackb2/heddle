@@ -41,3 +41,17 @@ yarn example:sdk:custom-output
 Drives `createConversationEngine` directly and sends streaming text to a custom
 destination via `createConversationTextHost`. Replace the `output` sink with your
 own transport (web, chat, log collector).
+
+## Hosted Agent Stack (rung 4: own lifecycle)
+
+```bash
+yarn example:sdk:hosted-agent "What does this repository do?"
+```
+
+Builds a transport-neutral application service around `ConversationRunService`,
+then shows how the same service can power an Express/SSE API and a typed browser
+client with cursor-based reconnect and explicit cancellation.
+
+Start with the [hosted agent stack walkthrough](hosted-agent/README.md). Its
+service, API, and client are separate so you can adopt or replace each layer
+without changing Heddle's conversation core.
