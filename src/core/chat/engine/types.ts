@@ -82,8 +82,9 @@ export type ConversationEngine = {
 export type ConversationSessionService = {
   // Reads
   list(): ChatSession[];
-  // Reads persisted sessions without materializing the host-facing fallback.
+  // Persisted reads that do not materialize the host-facing fallback.
   listExisting(): ChatSession[];
+  readExisting(id: string): ChatSession | undefined;
   read(id: string): ChatSession | undefined;
   require(id: string): ChatSession;
   latest(): ChatSession | undefined;

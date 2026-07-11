@@ -69,6 +69,15 @@ export class FileConversationSessionService implements ConversationSessionServic
     return FileConversationSessionService.activeSessions(this.loadExistingSessions());
   }
 
+  readExisting(id: string): ChatSession | undefined {
+    const entry = this.repository.readCatalog().find((candidate) => candidate.id === id);
+    if (!entry || entry.archivedAt) {
+      return undefined;
+    }
+
+    return this.repository.read(id);
+  }
+
   read(id: string): ChatSession | undefined {
     return this.readSession(id);
   }
