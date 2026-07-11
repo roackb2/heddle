@@ -12,7 +12,7 @@ import type { ZodType } from 'zod';
 import {
   CancelHostedAgentRunResultSchema,
   HostedAgentApiErrorSchema,
-  HostedAgentRunEventSchema,
+  HostedAgentRunProtocol,
   StartHostedAgentRunResultSchema,
   type CancelHostedAgentRunResult,
   type HostedAgentRunEvent,
@@ -161,7 +161,7 @@ function parseEvent(message: EventSourceMessage): HostedAgentRunEvent {
     throw new HostedAgentClientError('Hosted agent event contained invalid JSON.');
   }
 
-  const event = HostedAgentRunEventSchema.parse(body);
+  const event = HostedAgentRunProtocol.parseEvent(body);
   if (message.id !== String(event.sequence)) {
     throw new HostedAgentClientError('Hosted agent event ID did not match its canonical sequence.');
   }

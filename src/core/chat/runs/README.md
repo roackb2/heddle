@@ -25,6 +25,8 @@ service. Do not add a second run coordinator under `src/server` or a product
 adapter.
 
 ```ts
+import { ConversationRunService } from '@roackb2/heddle/hosted'
+
 const runs = new ConversationRunService({
   replay: { maxEventsPerRun: 512, retentionMs: 300_000 },
 });

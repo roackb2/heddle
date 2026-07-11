@@ -8,8 +8,9 @@ import {
   type ControlPlaneSessionRunReference,
 } from '@web/api/client';
 import {
-  ClientSharedConversationRunStreamService,
-  type ClientSharedConversationRunSubscriptionInput,
+  ConversationRunConsumerService,
+  type ConversationRunReference,
+  type ConversationRunSubscriptionInput,
 } from '@/client-shared/services/conversation-run-stream';
 import { ClientSharedSessionActivityService } from '@/client-shared/services/session-activities';
 import { ClientSharedNotificationIntentService, type ClientSharedNotificationIntent } from '@/client-shared/services/notifications';
@@ -23,6 +24,10 @@ import type { RefreshControlPlaneSession } from './useControlPlaneSessionLoader'
 
 type SessionRunUpdate = Extract<ControlPlaneSessionEventEnvelope, { type: 'session.run.updated' }>;
 type SessionRunTerminal = Exclude<ControlPlaneSessionRunEventEnvelope, { kind: 'activity' }>;
+type ControlPlaneConversationRunReference = ConversationRunReference & {
+  workspaceId: string;
+  sessionId: string;
+};
 
 type UseControlPlaneSessionEventsArgs = {
   workspaceId?: string;
@@ -64,9 +69,13 @@ export function useControlPlaneSessionEvents({
 }: UseControlPlaneSessionEventsArgs): ControlPlaneSessionEventsState {
   const utils = trpcReact.useUtils();
   const [streamConnected, setStreamConnected] = useState(false);
-  const [runSubscriptionInput, setRunSubscriptionInput] = useState<ClientSharedConversationRunSubscriptionInput>();
+  const [runSubscriptionInput, setRunSubscriptionInput] = useState<
+    ConversationRunSubscriptionInput<ControlPlaneConversationRunReference>
+  >();
   const activeAddressRef = useRef<SessionAddress>({ workspaceId, sessionId });
-  const runStreamRef = useRef(new ClientSharedConversationRunStreamService());
+  const runStreamRef = useRef(
+    new ConversationRunConsumerService<ControlPlaneConversationRunReference>(),
+  );
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const invalidateWorkspaceDiff = useCallback(() => {
     void utils.controlPlane.workspaceChanges.invalidate(workspaceId ? { workspaceId } : undefined);

@@ -17,7 +17,7 @@ for the runnable flow and production checklist.
 ## Read in this order
 
 1. [`agent-service.ts`](agent-service.ts) — application-owned scope and lifecycle
-   composed over Heddle's `ConversationRunService`.
+   composed over `ConversationRunService` from `@roackb2/heddle/hosted`.
 2. [`example-agent.ts`](example-agent.ts) — replaceable local composition and
    demo policy.
 3. [`run.ts`](run.ts) — disconnect, cursor replay, and explicit cancellation in

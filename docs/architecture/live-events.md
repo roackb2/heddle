@@ -24,7 +24,9 @@ The ownership split is:
 - `src/core/chat/runs` owns run identity, ordering, replay, terminal state,
   cancellation, and pending approval coordination;
 - the control plane owns transport projection and lifecycle discovery;
-- `src/client-shared` owns frontend-neutral cursor and reconnect correctness;
+- `src/core/chat/remote` owns frontend-neutral cursor and reconnect correctness;
+- `src/client-shared` exposes that browser-safe policy to Heddle interfaces
+  without giving presentation code direct access to core internals;
 - CLI and web own presentation state only.
 
 ## Activity And Run Vocabularies
@@ -75,8 +77,9 @@ flowchart TD
   Run --> Adapter["Control-plane run-stream adapter"]
   Adapter --> RunRPC["sessionRunEvents<br/>runId + afterSequence"]
   Adapter --> Lifecycle["sessionEvents<br/>run started or settled"]
-  RunRPC --> Shared["client-shared run cursor service"]
+  RunRPC --> Remote["ConversationRunConsumerService<br/>cursor and reconnect policy"]
   Lifecycle --> Shared
+  Remote --> Shared["client-shared public barrel"]
   Shared --> CLI["cli-v2 presentation"]
   Shared --> Web["web-v2 presentation"]
   Engine --> Trace["TraceEvent<br/>durable evidence"]
@@ -92,9 +95,10 @@ The main implementation path is:
 - `chat-session-events.ts` fans lifecycle, queue, and approval signals through
   a workspace/session-scoped `EventEmitter`;
 - `controlPlane.sessionRunEvents` exposes the replayable run stream;
-- `ClientSharedConversationRunStreamService` enforces duplicate suppression,
+- `ConversationRunConsumerService` enforces duplicate suppression,
   sequence-gap detection, terminal detection, and reconnect cursors;
-- cli-v2 and web-v2 bind that shared behavior to their local state models.
+- `src/client-shared` reexports that public remote-run service so cli-v2 and
+  web-v2 can bind it to their local state models without importing core.
 
 Conversation activities are published only into `ConversationRunService`.
 They are not also copied onto the session `EventEmitter`; one activity must not
@@ -205,7 +209,8 @@ The server keeps a bounded replay buffer for retained runs. A reconnecting
 client sends the last accepted `sequence` as `afterSequence`; the server replays
 only newer items and then resumes live delivery.
 
-`ClientSharedConversationRunStreamService` is the mandatory CLI/web policy:
+`ConversationRunConsumerService` from `@roackb2/heddle/remote` is the
+mandatory CLI/web policy:
 
 - ignore duplicate sequence numbers;
 - reject a gap instead of silently losing activity;
@@ -249,8 +254,8 @@ When adding shared behavior:
 1. Add structured activity fields at the owning core origin.
 2. Publish through the existing run context; do not add a second session bus.
 3. Keep server projection limited to real transport/security work.
-4. Put cursor and reconnect policy in `client-shared` when both interfaces need
-   it.
+4. Put transport-neutral cursor and reconnect policy in `src/core/chat/remote`;
+   expose it to Heddle presentation clients through `src/client-shared`.
 5. Keep CLI/web differences limited to input and presentation.
 6. Test run identity, ordered replay, terminal delivery, and reconnect behavior
    before relying on interface-level snapshots.

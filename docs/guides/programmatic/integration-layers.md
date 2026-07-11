@@ -15,9 +15,9 @@ in control.
 HOST-OWNED PRODUCT
   UI state and rendering
           |
-  transport client and public wire contract       optional
+  @roackb2/heddle/remote consumer + public contract
           |
-  server adapter, auth, tenancy, rate limits       optional
+  transport client/server adapter                  optional
           |
   application service and composition root
   (product session IDs, tools, config, repositories, policy)
@@ -44,10 +44,11 @@ not transport infrastructure.
 | Agent execution | Model/tool loop, tool registry/execution, host-extension composition, traces, and artifacts | Product tools, system context, model choice, credentials, and capability policy |
 | Approvals | Approval request/resolution lifecycle and run integration | Whether an action is allowed, authenticated approver, and approval UI/policy |
 | Active runs | Run ID, ordered sequence, process-local replay, subscription, cancellation, and terminal result | Lifetime of the run service, address scope, process routing, draining, and multi-process delivery |
+| Remote consumption | Cursor advancement, duplicate suppression, sequence-gap failure, terminal detection, bounded reconnect timing, and runtime envelope validation | Public activity/result schemas, actual transport timer/handle, and error UX |
 | Persistence | File-backed defaults plus injectable session/artifact repository ports | Production repository implementations, retention, encryption, backup, and tenancy |
 | Identity and authorization | No identity-provider assumption | Authentication, tenant/user mapping, authorization for start/subscribe/cancel |
 | Transport/API | No HTTP, tRPC, SSE, or WebSocket assumption | Framework, routes/procedures, wire schemas, errors, limits, CORS, and rate limiting |
-| Client experience | Semantic activities and terminal run events | Messages, tool rendering, UI state, retries, notifications, and product-specific result presentation |
+| Client experience | Semantic activities, terminal run events, and remote cursor/retry calculations | Messages, tool rendering, UI state, transport timers, retry UX, notifications, and product-specific result presentation |
 
 Do not rebuild Heddle-owned conversation or run behavior in the host. In
 particular, avoid replaying product chat history into every prompt, generating a
@@ -61,9 +62,10 @@ disconnect as implicit cancellation.
 | Nothing beyond a TypeScript process | `runQuickstartConversationCli` | [`01-interactive-chat.ts`](../../../examples/sdk/01-interactive-chat.ts) |
 | A local loop that needs product tools or MCP | Quickstart plus tools/host extensions | [`02-add-a-tool.ts`](../../../examples/sdk/02-add-a-tool.ts), [`03-add-an-mcp-server.ts`](../../../examples/sdk/03-add-an-mcp-server.ts) |
 | Its own output sink or local UI | `createConversationEngine` + `createConversationTextHost` or host callbacks | [`04-custom-output.ts`](../../../examples/sdk/04-custom-output.ts) |
-| A server/worker that owns transport | `createConversationEngine` + `ConversationRunService` | [`05-hosted-agent/01-hosted-service`](../../../examples/sdk/05-hosted-agent/01-hosted-service) |
+| A server/worker that owns transport | `@roackb2/heddle` + `@roackb2/heddle/hosted` | [`05-hosted-agent/01-hosted-service`](../../../examples/sdk/05-hosted-agent/01-hosted-service) |
 | Express with REST + SSE | Same core plus a host adapter | [`05-hosted-agent/02-http-sse-api`](../../../examples/sdk/05-hosted-agent/02-http-sse-api) |
-| A browser using that exact REST/SSE contract | Host API plus the protocol client | [`05-hosted-agent/03-browser-client`](../../../examples/sdk/05-hosted-agent/03-browser-client) |
+| A remote client over any transport | `@roackb2/heddle/remote` plus a host transport | [Remote conversation runs](remote-runs.md) |
+| A browser using the example REST/SSE contract | Remote layer plus the example protocol client | [`05-hosted-agent/03-browser-client`](../../../examples/sdk/05-hosted-agent/03-browser-client) |
 
 For tRPC, Fastify, Hono, Nest, WebSocket, Electron IPC, queues, or another
 transport, stop at the hosted-service layer and implement the adapter in the
@@ -93,12 +95,30 @@ lifetimes differ, clients can reconnect, or a turn needs a separately
 addressable cancel/approval lifecycle. It is a process-local coordinator above
 the engine, not a transport or durable message broker.
 
+Import it from `@roackb2/heddle/hosted` so the hosted-process assumption is
+visible. The root export remains available for compatibility.
+
+### Remote run protocol
+
+Use `ConversationRunProtocolCodec` and `ConversationRunConsumerService` from
+`@roackb2/heddle/remote` when events cross an untrusted transport boundary or a
+client can reconnect. The host supplies public activity/result schemas; Heddle
+owns envelope validation, JSON safety, cursor advancement, duplicate/gap
+handling, terminal detection, and retry calculation.
+
+This layer does not own HTTP, SSE, tRPC, timers, auth, or UI state. See
+[Remote conversation runs](remote-runs.md).
+
 ### Transport adapter
 
 Add a host-owned adapter when a remote client needs start, subscribe, cancel, or
 approval operations. Validate all untrusted wire data and project internal run
 results into an explicitly public schema. Authentication and authorization must
 happen before resolving the Heddle run address.
+
+Web-standard HTTP/SSE helpers are a planned higher assumption layer; Express
+and tRPC remain framework recipes until their residual code proves a meaningful
+adapter boundary.
 
 ### Client protocol and UI
 
@@ -118,6 +138,8 @@ normal client architecture.
 | Approval behavior | `ConversationEngineHost.approvals` and the product's policy/UI |
 | Session/artifact storage | `ChatSessionRepository` and `ArtifactRepository` |
 | Public API fields | Host-owned validation schemas and terminal-result projection |
+| Remote cursor/retry correctness | `ConversationRunConsumerService` |
+| Runtime run-envelope validation | `ConversationRunProtocolCodec` with host activity/result schemas |
 | REST, tRPC, SSE, WebSocket, or IPC | Host transport adapter above the application service |
 | React or other UI state | Product client/application layer above the protocol client |
 | Multi-process live delivery | Host-selected shared routing/broker infrastructure |

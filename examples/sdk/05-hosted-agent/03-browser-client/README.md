@@ -15,8 +15,8 @@ for the runnable reconnect/cancel flow.
 
 1. [`browser-client.ts`](browser-client.ts) — URL/auth/error/SSE parsing, schema
    validation, cursor validation, and abort propagation.
-2. [`run.ts`](run.ts) — application-owned reconnect, terminal-event, and cancel
-   policy without a UI framework.
+2. [`run.ts`](run.ts) — Heddle's public remote consumer composed with
+   application-owned transport timers, terminal rendering, and cancel policy.
 
 Keep messages, tool rendering, optimistic state, retry UX, notifications, and
 product-specific results above this protocol client. A React application should

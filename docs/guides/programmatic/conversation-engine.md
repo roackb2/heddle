@@ -84,7 +84,8 @@ process-local run identity, cancellation, ordered activity delivery, approvals,
 and bounded replay for reconnecting subscribers.
 
 ```ts
-import { ConversationRunService, createConversationEngine } from '@roackb2/heddle'
+import { createConversationEngine } from '@roackb2/heddle'
+import { ConversationRunService } from '@roackb2/heddle/hosted'
 
 const runs = new ConversationRunService({
   replay: { maxEventsPerRun: 512, retentionMs: 300_000 },
@@ -120,6 +121,10 @@ for await (const item of runs.subscribe({
 The replay buffer is intentionally process-local and bounded. Durable final
 conversation state remains in the engine's session repository; transports and
 cross-process delivery remain host responsibilities.
+
+When a remote client owns a reconnect cursor, pair this service with the
+[remote run consumer and protocol codec](remote-runs.md) rather than rebuilding
+duplicate/gap/terminal/retry behavior in the client.
 
 For a complete runnable host, follow the
 [hosted agent stack example](../../../examples/sdk/05-hosted-agent/README.md). It

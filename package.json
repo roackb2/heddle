@@ -29,6 +29,14 @@
       "types": "./dist/src/index.d.ts",
       "import": "./dist/src/index.js"
     },
+    "./hosted": {
+      "types": "./dist/src/hosted.d.ts",
+      "import": "./dist/src/hosted.js"
+    },
+    "./remote": {
+      "types": "./dist/src/remote.d.ts",
+      "import": "./dist/src/remote.js"
+    },
     "./advanced": {
       "types": "./dist/src/advanced.d.ts",
       "import": "./dist/src/advanced.js"

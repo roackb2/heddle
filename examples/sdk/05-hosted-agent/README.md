@@ -23,8 +23,9 @@ Only the first two assumptions are fundamental to the hosted-service pattern.
 Express, SSE, bearer auth, and the sample browser client are replaceable host
 choices.
 
-When copying this example into another project, replace the relative
-`src/index.js` imports with `@roackb2/heddle`. Stage 01 requires Heddle only;
+When copying this example into another project, replace the relative source
+imports with `@roackb2/heddle`, `@roackb2/heddle/hosted`, and
+`@roackb2/heddle/remote` as shown by each layer. Stage 01 requires Heddle only;
 stage 02 additionally uses `express`, its TypeScript types, and `zod`; stage 03
 uses `eventsource-parser` and the shared Zod wire contracts. Declare those
 libraries directly in the host project instead of relying on transitive
@@ -51,14 +52,14 @@ dependencies.
              |
              v
   02-http-sse-api/
-    contracts.ts           untrusted public wire schemas
+    contracts.ts           public schemas + Heddle remote protocol codec
     http-api.ts            Express start/subscribe/cancel + SSE adapter
     server.ts              runnable local server and demo authentication
              |
              v
   03-browser-client/
     browser-client.ts      typed fetch/SSE protocol adapter
-    run.ts                 reconnect, cursor, and terminal-policy demo
+    run.ts                 public consumer + transport reconnect demo
 ```
 
 The dependency direction is intentional:
@@ -145,7 +146,8 @@ POST /api/agent/runs/:runId/cancel
 ### What it showcases
 
 [`contracts.ts`](02-http-sse-api/contracts.ts) validates untrusted wire data and
-defines the public browser contract. [`http-api.ts`](02-http-sse-api/http-api.ts)
+defines the public browser contract through Heddle's
+`ConversationRunProtocolCodec`. [`http-api.ts`](02-http-sse-api/http-api.ts)
 adapts HTTP operations to the transport-neutral service:
 
 - start returns `202 Accepted` after Heddle assigns a stable run identity;
@@ -216,10 +218,11 @@ parsing with `eventsource-parser`, Zod validation, event-ID validation, and
 abort propagation.
 
 [`run.ts`](03-browser-client/run.ts) is the consuming application policy. It
-retains the greatest received sequence, deliberately disconnects after one
-activity, reconnects with bounded exponential backoff, and stops on a
-result/cancel/error terminal. Add `--cancel-demo` to exercise explicit
-cancellation.
+uses Heddle's `ConversationRunConsumerService` for cursor advancement,
+duplicate/gap handling, terminal detection, and bounded reconnect timing. The
+runner deliberately disconnects after one activity while retaining ownership
+of the actual timer and transport lifecycle. Add `--cancel-demo` to exercise
+explicit cancellation.
 
 ### Responsibility boundary
 

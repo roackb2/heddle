@@ -8,14 +8,19 @@ tools, host extensions, and approval callbacks.
 These guides follow a **progressive-disclosure ladder**. Start at rung 1 and go
 deeper only when you need to. This mirrors how the public API is organized.
 
-There are two import entry points:
+The public entry points span two independent axes: customization depth and
+hosting assumptions.
 
 - `@roackb2/heddle` — the **curated** default surface (rungs 1–5): everything a
   product host needs to build an agentic experience.
-- `@roackb2/heddle/advanced` — the **full** surface: the curated exports plus
+- `@roackb2/heddle/hosted` — process-local run identity, replay, cancellation,
+  and approvals for a long-lived host process.
+- `@roackb2/heddle/remote` — browser-safe runtime contracts plus transport-
+  neutral cursor, duplicate, gap, terminal, and reconnect correctness.
+- `@roackb2/heddle/advanced` — the **deep core customization** surface: the curated exports plus
   lower-level building blocks (LLM adapters, individual tools, trace, memory,
   models, awareness) and specialized runtimes (agent loop, heartbeat,
-  integrations). Reach for this only when the curated surface is not enough.
+  integrations). It does not implicitly opt into remote hosting or a transport.
 
 Before choosing an API, read
 [Choose a Programmatic Integration Layer](integration-layers.md). It maps common
@@ -38,6 +43,8 @@ split between Heddle and the host explicit for developers and coding agents.
    - [Conversation engine](conversation-engine.md): engine setup, state roots,
      and persisted sessions.
    - [Approvals](approvals.md): own policy decisions in the host.
+   - [Remote conversation runs](remote-runs.md): consume reconnectable runs
+     through any transport with runtime-validated public payloads.
    - [Hosted agent stack](../../../examples/sdk/05-hosted-agent/README.md): compose
      a transport-neutral run service, Express/SSE API, and browser client while
      keeping each layer replaceable.
