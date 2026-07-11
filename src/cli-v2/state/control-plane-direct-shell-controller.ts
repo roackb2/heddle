@@ -1,4 +1,5 @@
 import type { ControlPlaneSessionApiService } from '../services/sessions/control-plane-session-api-service.js';
+import type { ControlPlaneSessionDirectShellAsyncResult } from '@/client-shared/api/types.js';
 import type { AssistantStreamBufferService } from '../services/sessions/assistant-stream-buffer-service.js';
 import type { ControlPlaneSessionLoader } from './control-plane-session-loader.js';
 import type { ControlPlaneSessionState } from './control-plane-session-state.js';
@@ -10,6 +11,7 @@ type ControlPlaneDirectShellControllerOptions = {
   assistantStreamBuffer: AssistantStreamBufferService;
   refreshSessions: () => Promise<unknown>;
   refreshPendingApproval: (sessionId: string) => Promise<void>;
+  onRunAccepted: (run: Extract<ControlPlaneSessionDirectShellAsyncResult, { accepted: true }>) => void;
   formatError: (error: unknown) => string;
 };
 
@@ -117,6 +119,9 @@ export class ControlPlaneDirectShellController {
 
     try {
       const result = await this.options.api.runDirectShellAsync({ workspaceId, sessionId, command, riskAccepted });
+      if ('accepted' in result) {
+        this.options.onRunAccepted(result);
+      }
       this.options.assistantStreamBuffer.reset();
       this.options.state.patch({
         submitting: false,

@@ -27,8 +27,9 @@ snapshot and call user-intent methods.
   in core/control-plane.
 - `control-plane-approval-controller.ts` owns pending-approval mirroring and
   resolution state. Approval policy remains server/core-owned.
-- `control-plane-run-controller.ts` owns cancellation state and run-state
-  polling fallback. The server remains the run source of truth.
+- `control-plane-run-controller.ts` owns the accepted run mirror, terminal
+  state, exact-run cancellation, and run-state polling fallback. The shared
+  replayable run stream remains the source of truth.
 - `control-plane-live-event-reducer.ts` owns reduction of control-plane live
   events into the TUI snapshot. Shared activity semantics stay in
   `client-shared`.
@@ -40,6 +41,10 @@ snapshot and call user-intent methods.
   facts are not render state, such as timers or stream buffers.
 - Do not import core, server, or old CLI modules from cli-v2. Consume
   control-plane APIs and `client-shared` types/services.
+- Attach detailed activity through `sessionRunEvents`; keep `sessionEvents`
+  limited to lifecycle discovery, approval, queue, and persisted-state signals.
+- Reuse `ClientSharedConversationRunStreamService` for sequence cursors,
+  duplicate suppression, gap detection, and reconnect policy.
 - Do not add a controller that only forwards calls. A controller must own real
   workflow behavior: ordering, state transitions, lifecycle reset, event
   reduction, or terminal UX coordination.

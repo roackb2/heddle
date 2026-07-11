@@ -58,23 +58,36 @@ export class ControlPlaneSessionLoader {
       activePlan: undefined,
       recentEditDiffs: [],
       latestUpdate: undefined,
+      activeRun: undefined,
+      running: false,
       error: undefined,
       loading: true,
       streamConnected: false,
     });
 
     try {
-      const session = await this.options.api.getSession(workspaceId, sessionId);
-      const runtimeContext = await this.options.api.getRuntimeContext(workspaceId, sessionId);
-      const running = await this.options.api.getRunning(workspaceId, sessionId);
+      this.options.subscriptions.subscribeToSessionEvents(workspaceId, sessionId);
+      const [session, runtimeContext, runState] = await Promise.all([
+        this.options.api.getSession(workspaceId, sessionId),
+        this.options.api.getRuntimeContext(workspaceId, sessionId),
+        this.options.api.getRunState(workspaceId, sessionId),
+      ]);
       this.options.state.patch({
         activeSession: session,
         runtimeContext,
-        running: running.running,
+        activeRun: runState.activeRun ?? undefined,
+        running: runState.running,
+        pendingApproval: runState.pendingApproval,
         loading: false,
       });
+      if (runState.activeRun) {
+        this.options.subscriptions.subscribeToRun({
+          workspaceId,
+          sessionId,
+          runId: runState.activeRun.runId,
+        });
+      }
       await this.options.onRefreshPendingApproval(sessionId);
-      this.options.subscriptions.subscribeToSessionEvents(workspaceId, sessionId);
     } catch (error) {
       this.options.state.patch({ error: this.options.onError(error), loading: false });
     }

@@ -1,5 +1,6 @@
 import { ClientSharedPromptInputService } from '@/client-shared/services/prompt-input/index.js';
 import { ClientSharedSessionActivityService } from '@/client-shared/services/session-activities/index.js';
+import type { ControlPlaneSessionSendPromptAsyncResult } from '@/client-shared/api/types.js';
 import type { ControlPlaneSessionApiService } from '../services/sessions/control-plane-session-api-service.js';
 import type { AssistantStreamBufferService } from '../services/sessions/assistant-stream-buffer-service.js';
 import type { ControlPlaneDirectShellController } from './control-plane-direct-shell-controller.js';
@@ -17,6 +18,7 @@ type ControlPlanePromptControllerOptions = {
   directShell: ControlPlaneDirectShellController;
   refreshSessions: () => Promise<unknown>;
   refreshPendingApproval: (sessionId: string) => Promise<void>;
+  onRunAccepted: (run: Extract<ControlPlaneSessionSendPromptAsyncResult, { accepted: true }>) => void;
   formatError: (error: unknown) => string;
 };
 
@@ -94,6 +96,7 @@ export class ControlPlanePromptController {
         return;
       }
 
+      this.options.onRunAccepted(result);
       this.options.assistantStreamBuffer.reset();
       this.options.state.patch({
         submitting: false,

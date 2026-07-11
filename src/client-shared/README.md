@@ -34,6 +34,8 @@ the `ControlPlane*` types exported from `api/types.ts`.
 - shared API-consumer services such as transient conversation message
   shaping, session activity effect dispatch, and approval payload display
   shaping;
+- shared conversation-run cursor, duplicate suppression, terminal detection,
+  and bounded reconnect policy;
 - `trpcReact` for React Query tRPC usage in React interfaces;
 - `useControlPlaneTrpcClient` for provider-level React client state.
 

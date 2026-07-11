@@ -70,17 +70,32 @@ export class ControlPlaneSessionStore {
       onSessionsUpdated: () => {
         void this.refreshSessions().catch((error) => this.state.patch({ error: formatError(error) }));
       },
-      onSessionEvent: (workspaceId, event) => this.liveEvents.applySessionEvent(workspaceId, event),
+      onSessionEvent: (workspaceId, event) => {
+        this.runs.observeSessionEvent(workspaceId, event);
+        this.liveEvents.applySessionEvent(workspaceId, event);
+      },
+      onRunEvent: (workspaceId, sessionId, event) => {
+        this.liveEvents.applyRunEvent(workspaceId, sessionId, event);
+        this.runs.applyRunEvent(workspaceId, sessionId, event);
+      },
       onSessionListError: (error) => this.state.patch({ error: error.message }),
       onSessionStreamError: (error) => {
-        this.state.patch({ streamConnected: false, liveStatus: error.message });
+        this.state.patch({ error: error.message });
       },
-      onSessionStreamStarted: () => {
-        this.state.patch({ streamConnected: true });
-      },
-      onSessionStreamComplete: () => {
-        this.state.patch({ streamConnected: false });
-      },
+      onSessionStreamStarted: () => undefined,
+      onSessionStreamComplete: () => undefined,
+      onRunStreamStarted: () => this.state.patch({ streamConnected: true }),
+      onRunStreamReconnecting: ({ attempt, error }) => this.state.patch({
+        streamConnected: false,
+        liveStatus: `Reconnecting run stream (attempt ${attempt})...`,
+        error: attempt > 1 ? error.message : undefined,
+      }),
+      onRunStreamError: (error) => this.state.patch({
+        streamConnected: false,
+        liveStatus: error.message,
+        error: error.message,
+      }),
+      onRunStreamComplete: () => this.state.patch({ streamConnected: false }),
     });
     this.assistantStreamBuffer = new AssistantStreamBufferService({
       renderIntervalMs: ASSISTANT_STREAM_RENDER_INTERVAL_MS,
@@ -114,8 +129,17 @@ export class ControlPlaneSessionStore {
       state: this.state,
       loader: this.loader,
       assistantStreamBuffer: this.assistantStreamBuffer,
-      refreshSessions: () => this.refreshSessions(),
       refreshPendingApproval: (sessionId) => this.approvals.refresh(sessionId),
+      notificationService: options.notificationService,
+    });
+    this.runs = new ControlPlaneRunController({
+      api: this.api,
+      state: this.state,
+      loader: this.loader,
+      subscriptions: this.subscriptions,
+      approvals: this.approvals,
+      refreshSessions: () => this.refreshSessions(),
+      formatError,
       notificationService: options.notificationService,
     });
     this.directShell = new ControlPlaneDirectShellController({
@@ -125,21 +149,14 @@ export class ControlPlaneSessionStore {
       assistantStreamBuffer: this.assistantStreamBuffer,
       refreshSessions: () => this.refreshSessions(),
       refreshPendingApproval: (sessionId) => this.approvals.refresh(sessionId),
+      onRunAccepted: (run) => this.runs.trackAcceptedRun(run),
       formatError,
-    });
-    this.runs = new ControlPlaneRunController({
-      api: this.api,
-      state: this.state,
-      loader: this.loader,
-      approvals: this.approvals,
-      refreshSessions: () => this.refreshSessions(),
-      formatError,
-      notificationService: options.notificationService,
     });
     this.slashCommands = new ControlPlaneSlashCommandController({
       api: this.api,
       state: this.state,
       loader: this.loader,
+      onRunAccepted: (run) => this.runs.trackAcceptedRun(run),
       formatError,
     });
     this.prompts = new ControlPlanePromptController({
@@ -151,6 +168,7 @@ export class ControlPlaneSessionStore {
       directShell: this.directShell,
       refreshSessions: () => this.refreshSessions(),
       refreshPendingApproval: (sessionId) => this.approvals.refresh(sessionId),
+      onRunAccepted: (run) => this.runs.trackAcceptedRun(run),
       formatError,
     });
   }

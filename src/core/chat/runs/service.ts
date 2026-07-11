@@ -47,6 +47,10 @@ type ConversationRunRecord<Address extends { sessionId: string }, Result = unkno
   retentionTimer?: ReturnType<typeof setTimeout>;
 };
 
+type StoredPendingConversationRunApproval = PendingConversationRunApproval & {
+  runId?: string;
+};
+
 /**
  * Owns process-local conversation run coordination for programmatic hosts.
  *
@@ -57,7 +61,7 @@ type ConversationRunRecord<Address extends { sessionId: string }, Result = unkno
 export class ConversationRunService<
   Address extends { sessionId: string } = ConversationRunAddress,
 > {
-  private readonly pendingApprovals = new Map<string, PendingConversationRunApproval>();
+  private readonly pendingApprovals = new Map<string, StoredPendingConversationRunApproval>();
   private readonly activeRuns = new Map<string, ConversationRunRecord<Address>>();
   private readonly runsById = new Map<string, ConversationRunRecord<Address>>();
   private readonly addressKey: (address: Address) => string;
@@ -159,10 +163,24 @@ export class ConversationRunService<
     return this.activeRuns.has(this.addressKey(address));
   }
 
-  cancelRun(address: Address): boolean {
+  getActiveRun(address: Address): ConversationRunAccepted<Address> | undefined {
+    const run = this.activeRuns.get(this.addressKey(address));
+    if (!run) {
+      return undefined;
+    }
+
+    return {
+      ...run.address,
+      accepted: true,
+      runId: run.context.runId,
+      acceptedAt: run.context.acceptedAt,
+    };
+  }
+
+  cancelRun(address: Address, runId?: string): boolean {
     const key = this.addressKey(address);
     const run = this.activeRuns.get(key);
-    if (!run) {
+    if (!run || (runId !== undefined && run.context.runId !== runId)) {
       return false;
     }
 
@@ -183,17 +201,21 @@ export class ConversationRunService<
   }
 
   storePendingApproval(address: Address, pending: PendingConversationRunApproval): void {
-    this.pendingApprovals.set(this.addressKey(address), pending);
+    const key = this.addressKey(address);
+    this.pendingApprovals.set(key, {
+      ...pending,
+      runId: this.activeRuns.get(key)?.context.runId,
+    });
   }
 
   clearPendingApproval(address: Address): void {
     this.pendingApprovals.delete(this.addressKey(address));
   }
 
-  resolvePendingApproval(address: Address, decision: ToolApprovalUserDecision): boolean {
+  resolvePendingApproval(address: Address, decision: ToolApprovalUserDecision, runId?: string): boolean {
     const key = this.addressKey(address);
     const pending = this.pendingApprovals.get(key);
-    if (!pending) {
+    if (!pending || (runId !== undefined && pending.runId !== runId)) {
       return false;
     }
 
@@ -317,8 +339,8 @@ export class ConversationRunService<
         runId: accepted.runId,
         ...options,
       }),
-      cancel: () => this.cancelRun(accepted),
-      resolveApproval: (decision) => this.resolvePendingApproval(accepted, decision),
+      cancel: () => this.cancelRun(accepted, accepted.runId),
+      resolveApproval: (decision) => this.resolvePendingApproval(accepted, decision, accepted.runId),
     };
   }
 

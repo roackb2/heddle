@@ -162,19 +162,21 @@ export class ControlPlaneSessionApiService {
     });
   }
 
-  async cancelRun(workspaceId: string, sessionId: string) {
-    return this.client.controlPlane.sessionCancel.mutate({ id: sessionId, workspaceId });
+  async cancelRun(workspaceId: string, sessionId: string, runId?: string) {
+    return this.client.controlPlane.sessionCancel.mutate({ id: sessionId, workspaceId, runId });
   }
 
   async resolvePendingApproval(
     workspaceId: string,
     sessionId: string,
     decision: ControlPlaneApprovalDecision,
+    runId?: string,
   ) {
     return this.client.controlPlane.sessionResolveApproval.mutate({
       workspaceId,
       sessionId,
       decision,
+      ...(runId ? { runId } : {}),
     });
   }
 }

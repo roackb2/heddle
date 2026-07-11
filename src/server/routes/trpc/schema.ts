@@ -117,6 +117,15 @@ export const sessionEventsInputSchema = z.object({
   sessionId: z.string().min(1),
 });
 
+export const sessionRunEventsInputSchema = sessionEventsInputSchema.extend({
+  runId: z.string().min(1),
+  afterSequence: z.number().int().nonnegative().optional(),
+});
+
+export const sessionCancelInputSchema = sessionInputSchema.extend({
+  runId: z.string().min(1).optional(),
+});
+
 export const agentAskInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   goal: z.string().min(1),
@@ -137,6 +146,7 @@ export const turnReviewInputSchema = z.object({
 export const sessionApprovalDecisionSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   sessionId: z.string().min(1),
+  runId: z.string().min(1).optional(),
   decision: z.discriminatedUnion('type', [
     z.object({
       type: z.literal('approve'),

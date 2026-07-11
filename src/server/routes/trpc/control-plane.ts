@@ -53,6 +53,7 @@ import {
   mcpConfigInputSchema,
   sessionApprovalDecisionSchema,
   sessionArchivedUpdateInputSchema,
+  sessionCancelInputSchema,
   sessionCompactInputSchema,
   sessionDirectShellInputSchema,
   sessionDirectShellPreflightInputSchema,
@@ -64,6 +65,7 @@ import {
   sessionQueuedPromptUpdateInputSchema,
   sessionRenameInputSchema,
   sessionRuntimeContextInputSchema,
+  sessionRunEventsInputSchema,
   skillInputSchema,
   mcpServerInputSchema,
   slashCommandCatalogInputSchema,
@@ -121,6 +123,16 @@ export const controlPlaneRouter = router({
       workspaceId: workspace.id,
       stateRoot: workspace.stateRoot,
       sessionId: input.sessionId,
+      signal,
+    });
+  }),
+  sessionRunEvents: controlPlaneWorkspaceProcedure.input(sessionRunEventsInputSchema).subscription(({ ctx, input, signal }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return controlPlaneChatSessionsController.subscribeRunEvents({
+      workspaceId: workspace.id,
+      sessionId: input.sessionId,
+      runId: input.runId,
+      afterSequence: input.afterSequence,
       signal,
     });
   }),
@@ -292,16 +304,16 @@ export const controlPlaneRouter = router({
       resolved: controlPlaneChatSessionsController.resolvePendingApproval({
         workspaceId: workspace.id,
         sessionId: input.sessionId,
-      }, input.decision),
+      }, input.decision, input.runId),
     };
   }),
-  sessionCancel: controlPlaneWorkspaceProcedure.input(sessionInputSchema).mutation(({ ctx, input }) => {
+  sessionCancel: controlPlaneWorkspaceProcedure.input(sessionCancelInputSchema).mutation(({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;
     return {
       cancelled: controlPlaneChatSessionsController.cancelRun({
         workspaceId: workspace.id,
         sessionId: input.id,
-      }),
+      }, input.runId),
     };
   }),
   sessionSendPrompt: controlPlaneWorkspaceProcedure.input(sessionMessageInputSchema).mutation(async ({ ctx, input }) => {

@@ -11,6 +11,7 @@ import type {
   ControlPlaneSessionDirectShellPreflight,
   ControlPlaneSessionDetail,
   ControlPlaneSessionRuntimeContext,
+  ControlPlaneSessionRunReference,
   ControlPlaneSessionView,
   ControlPlaneSlashCommandCatalog,
   ControlPlaneSlashCommandResult,
@@ -47,6 +48,7 @@ export type ControlPlaneSessionStoreSnapshot = {
   submitting: boolean;
   approvalResolving: boolean;
   running: boolean;
+  activeRun?: ControlPlaneSessionRunReference;
   cancelling: boolean;
   streamConnected: boolean;
   liveStatus?: string;
@@ -75,6 +77,7 @@ export const INITIAL_CONTROL_PLANE_SESSION_SNAPSHOT: ControlPlaneSessionStoreSna
   submitting: false,
   approvalResolving: false,
   running: false,
+  activeRun: undefined,
   cancelling: false,
   streamConnected: false,
   recentEditDiffs: [],

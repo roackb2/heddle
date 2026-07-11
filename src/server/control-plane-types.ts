@@ -6,14 +6,18 @@ import type { ReviewDiffFile } from '@/core/review/index.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import type { ReasoningEffortOption } from '@/core/llm/models/index.js';
 import type { ReasoningEffort } from '@/core/llm/types.js';
-import type { AutonomyPermissionMode, AutonomyPermissionModeOption } from '@/core/approvals/index.js';
+import type {
+  AutonomyPermissionMode,
+  AutonomyPermissionModeOption,
+  ToolApprovalRequest,
+} from '@/core/approvals/index.js';
+import type { ConversationRunStreamItem } from '@/core/chat/runs/index.js';
 import type {
   ChatSessionRetention,
   ConversationDirectShellLineResult,
   ConversationTurnPresentation,
   QueuedConversationPrompt,
 } from '@/core/chat/types.js';
-import type { ConversationActivity } from '@/core/live/index.js';
 
 export type ChatSessionView = {
   id: string;
@@ -222,18 +226,29 @@ export type ControlPlaneAcceptedSessionRun =
     position: number;
   };
 
-export type ControlPlaneSessionLiveEvent = {
-  sessionId: string;
-  timestamp: string;
-  activities: ConversationActivity[];
+export type ControlPlaneSessionRunReference = {
+  runId: string;
+  acceptedAt: string;
 };
 
-export type ControlPlaneSessionEventEnvelope =
-  | (ControlPlaneSessionLiveEvent & { type: 'session.event' })
+export type ControlPlaneSessionRunResult = {
+  outcome?: string;
+  summary?: string;
+};
+
+export type ControlPlaneSessionRunEventEnvelope = ConversationRunStreamItem<ControlPlaneSessionRunResult>;
+
+export type ControlPlaneSessionRunTerminal = Exclude<
+  ControlPlaneSessionRunEventEnvelope,
+  { kind: 'activity' }
+>;
+
+export type ControlPlaneSessionSignalEvent =
   | {
     type: 'session.approval.updated';
     sessionId: string;
     timestamp: string;
+    approval: ToolApprovalRequest | null;
   }
   | {
     type: 'session.queue.updated';
@@ -241,6 +256,16 @@ export type ControlPlaneSessionEventEnvelope =
     timestamp: string;
     queuedPromptCount: number;
   }
+  | {
+    type: 'session.run.updated';
+    sessionId: string;
+    timestamp: string;
+    status: 'started' | 'settled';
+    run: ControlPlaneSessionRunReference;
+  };
+
+export type ControlPlaneSessionEventEnvelope =
+  | ControlPlaneSessionSignalEvent
   | {
     type: 'session.updated' | 'waiting';
     sessionId: string;
@@ -252,7 +277,13 @@ export type ControlPlaneSessionsEventEnvelope =
     type: 'sessions.updated' | 'waiting';
     timestamp: string;
   }
-  | (ControlPlaneSessionLiveEvent & { type: 'session.event' });
+  | ControlPlaneSessionSignalEvent
+  | {
+    type: 'session.run.terminal';
+    sessionId: string;
+    timestamp: string;
+    terminal: ControlPlaneSessionRunTerminal;
+  };
 
 export type ControlPlaneHeartbeatAgentEvent = {
   type: string;

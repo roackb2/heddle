@@ -1,6 +1,6 @@
 import type {
   ControlPlanePendingApproval,
-  ControlPlaneSessionEventEnvelope,
+  ControlPlaneSessionRunEventEnvelope,
 } from '../../api/types.js';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration.js';
@@ -10,7 +10,7 @@ import isString from 'lodash/isString.js';
 
 dayjs.extend(duration);
 
-export type ClientSharedSessionActivity = Extract<ControlPlaneSessionEventEnvelope, { type: 'session.event' }>['activities'][number];
+export type ClientSharedSessionActivity = Extract<ControlPlaneSessionRunEventEnvelope, { kind: 'activity' }>['activity'];
 export type ClientSharedAgentActivityStatus = {
   label: string;
   detail?: string;

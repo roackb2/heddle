@@ -1,6 +1,7 @@
 import type {
   ControlPlaneHeartbeatEventEnvelope,
-  ControlPlaneSessionEventEnvelope,
+  ControlPlaneSessionRunEventEnvelope,
+  ControlPlaneSessionsEventEnvelope,
 } from '@/client-shared/api/types.js';
 
 export type ClientSharedNotificationTone = 'info' | 'success' | 'warning' | 'error';
@@ -18,8 +19,18 @@ export type ClientSharedNotificationIntent = {
 };
 
 export type ClientSharedSessionNotificationActivity = Extract<
-  ControlPlaneSessionEventEnvelope,
-  { type: 'session.event' }
->['activities'][number];
+  ControlPlaneSessionRunEventEnvelope,
+  { kind: 'activity' }
+>['activity'];
+
+export type ClientSharedSessionRunTerminalEnvelope = Extract<
+  ControlPlaneSessionsEventEnvelope,
+  { type: 'session.run.terminal' }
+>;
+
+export type ClientSharedSessionApprovalEnvelope = Extract<
+  ControlPlaneSessionsEventEnvelope,
+  { type: 'session.approval.updated' }
+>;
 
 export type ClientSharedHeartbeatEventEnvelope = ControlPlaneHeartbeatEventEnvelope;

@@ -45,8 +45,15 @@ type ControlPlaneAcceptedSessionRun = {
 After the accepted response, clients render the run from:
 
 - persisted session state from `controlPlane.session`;
-- live activity from `controlPlane.sessionEvents`;
+- ordered activity and terminal state from `controlPlane.sessionRunEvents`,
+  addressed by the returned `runId`;
+- lifecycle discovery from `controlPlane.sessionEvents`;
 - fallback run state from `controlPlane.sessionRunState`.
+
+If another run already owns the session, a normal prompt can instead return a
+`queued: true` result. The queued prompt receives its own run identity through
+`session.run.updated` when it is admitted later; clients do not invent an ID or
+reuse the preceding run's stream.
 
 ### `controlPlane.sessionSendPrompt`
 
@@ -109,21 +116,29 @@ The main flow is:
 client
   -> controlPlane.sessionSendPromptAsync
   -> ControlPlaneChatSessionsController.submitPromptAsync
-  -> ControlPlaneSessionRunService.start
+  -> ConversationRunService.start
   -> ConversationSessionService.acceptUserMessage
   -> background ConversationEngine.turns.submit
-  -> controlPlane.sessionEvents live activity
+  -> ConversationRunService ordered activity + terminal
+  -> controlPlane.sessionRunEvents replayable delivery
   -> final ConversationEngine persistence
-  -> session.updated / sessionRunState false / refreshed session detail
+  -> session.run.updated settled / sessionRunState false / refreshed detail
 ```
 
-`ControlPlaneSessionRunService` owns process-local run coordination:
+`ConversationRunService` owns reusable run coordination for both SDK hosts and
+Heddle's control-plane clients:
 
 - in-flight run registry;
 - accepted run id generation;
 - abort controller lifecycle;
 - pending approval resolver cleanup;
-- async start vs wait-for-result behavior.
+- async start vs wait-for-result behavior;
+- ordered replay buffers and one terminal item;
+- active-run discovery and exact-run cancellation.
+
+`chat-session-run-stream.ts` is the transport adapter. It projects the generic
+run result into the stable control-plane result shape and fans out run
+started/settled discovery signals. It does not implement another run registry.
 
 It does not own persisted chat meaning. Core chat/session services own:
 
@@ -148,8 +163,12 @@ rather than seeing a disappearing prompt or a permanently pending user line.
 
 Live streaming is primary:
 
-- `controlPlane.sessionEvents` carries `session.event` envelopes for assistant
-  stream deltas, tool activity, approvals, compaction, and run lifecycle.
+- `controlPlane.sessionRunEvents` carries ordered activity plus the result,
+  cancellation, or error terminal for one `runId`;
+- clients reconnect with `afterSequence` and replay from their last accepted
+  item;
+- `controlPlane.sessionEvents` carries run identity, queue, approval, and
+  persisted-session lifecycle signals;
 - `session.updated` tells clients to refetch persisted session detail.
 
 Polling is a fallback:
@@ -157,8 +176,9 @@ Polling is a fallback:
 - clients query `controlPlane.sessionRunState` while a run is believed active;
 - when polling observes `running: false`, clients refetch session detail,
   session list, and pending approval state;
-- polling protects clients that missed a live finalization event because
-  current live events are process-local and not replayable.
+- polling lets a refreshed client recover `activeRun` if it missed the
+  lifecycle start signal and confirms final state when transport recovery is
+  exhausted.
 
 Do not poll the whole session for every stream delta. Streaming activities
 should update interface-local transient state, while durable session refreshes
@@ -172,9 +192,13 @@ Interactive clients should:
 - treat `submitting` as "waiting for accepted response";
 - treat `running` as "server run active or believed active";
 - keep draft typing available while a run is active;
-- block sending another prompt while the selected session has an active run;
+- allow normal prompts to enter the server-owned queue while a run is active;
 - render the accepted user prompt from server session state;
-- render assistant stream and tool status from `sessionEvents`;
+- attach `sessionRunEvents` using the accepted, discovered, or recovered run ID;
+- render assistant stream and tool status from ordered run activities;
+- treat the run terminal—not `loop.finished` presentation activity—as the
+  authoritative completion boundary;
+- target cancellation with the observed run ID;
 - refresh session detail when receiving `session.updated` or when
   `sessionRunState` changes from active to inactive.
 
@@ -184,6 +208,7 @@ Interactive clients should not:
 - call core chat services directly;
 - use `sessionSendPrompt` for normal interactive chat;
 - infer run completion only from a mutation finishing;
+- duplicate run cursor, gap, or reconnect policy per interface;
 - let cached `sessionRunState.running === false` cancel a freshly submitted run
   before a post-submit run-state refetch returns.
 
@@ -194,13 +219,16 @@ Current intended usage:
 - `src/web-v2/hooks/sessions/useControlPlaneSessionPromptSubmit.ts` uses
   `sessionSendPromptAsync`.
 - `src/web-v2/hooks/sessions/useControlPlaneSessionEvents.ts` consumes
-  `sessionEvents`.
+  lifecycle and replayable run subscriptions.
 - `src/web-v2/hooks/sessions/useControlPlaneSessionRunControl.ts` handles
-  run-state fallback polling and cancellation.
+  accepted run identity, exact cancellation, terminal state, and polling
+  fallback.
 - `src/cli-v2/services/sessions/control-plane-session-api-service.ts` exposes
   `sendPromptAsync`.
-- `src/cli-v2/state/control-plane-session-store.ts` coordinates cli-v2 session
-  loading, async submit, event subscription, and run-state fallback.
+- `src/cli-v2/services/sessions/control-plane-session-subscription-service.ts`
+  binds the shared run cursor service to the Node tRPC transport.
+- `src/cli-v2/state/control-plane-run-controller.ts` mirrors accepted run
+  identity, terminal state, exact cancellation, and polling fallback.
 
 Completion-oriented or compatibility callers may still use
 `sessionSendPrompt`, but new interactive clients should not.
@@ -212,8 +240,8 @@ When adding new chat submission behavior:
 1. Decide whether it belongs to prompt acceptance, live run activity, or final
    transcript persistence.
 2. Put persisted meaning in `src/core/chat/engine`.
-3. Put process-local control-plane orchestration in
-   `src/server/services/control-plane`.
+3. Put run transport projection in `chat-session-run-stream.ts` and keep
+   conversation application orchestration in `chat-sessions-controller.ts`.
 4. Put transport exposure in `src/server/routes/trpc/control-plane.ts`.
 5. Put shared API-consumer types in `src/client-shared`.
 6. Keep web-v2 and cli-v2 consumers aligned unless the difference is purely

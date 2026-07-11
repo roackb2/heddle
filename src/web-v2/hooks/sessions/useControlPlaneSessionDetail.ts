@@ -90,16 +90,22 @@ export function useControlPlaneSessionDetail({
     sessionId,
     running: runControl.running,
   });
-  const approval = useControlPlanePendingApproval({ workspaceId, sessionId }, {
+  const approval = useControlPlanePendingApproval({
+    workspaceId,
+    sessionId,
+    runId: runControl.activeRun?.runId,
+  }, {
     pollingEnabled: runControl.running,
   });
   const events = useControlPlaneSessionEvents({
     workspaceId,
     sessionId,
+    activeRun: runControl.activeRun,
     refresh: loader.refresh,
     refreshPendingApproval: approval.refreshPendingApproval,
+    observeRunUpdate: runControl.observeRunUpdate,
+    finishRun: runControl.finishRun,
     setSession: loader.setSession,
-    setRunning: runControl.setRunning,
     setLiveStatus,
     setActivePlan,
     setCurrentActivity,
@@ -115,6 +121,7 @@ export function useControlPlaneSessionDetail({
     setError: loader.setError,
     setLiveStatus,
     setCurrentActivity,
+    onRunAccepted: runControl.trackAcceptedRun,
   });
   const settings = useControlPlaneSessionSettings({
     workspaceId,

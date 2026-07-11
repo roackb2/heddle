@@ -52,6 +52,10 @@ import { ProjectConfigService } from '@/core/project-config/index.js';
 import { ControlPlaneChatSessionBrowserIntegrationFake } from './chat-session-browser-integration-fake.js';
 import { ControlPlaneChatSessionEventsController } from './chat-session-events.js';
 import { ControlPlaneChatSessionPresenter } from './chat-session-presenter.js';
+import {
+  ControlPlaneChatSessionRunStreamController,
+  type ControlPlaneSessionAddress,
+} from './chat-session-run-stream.js';
 import { ControlPlaneChatTurnReviewPresenter } from './chat-turn-review-presenter.js';
 import type {
   ChatSessionDetail,
@@ -59,7 +63,7 @@ import type {
   ChatTurnReview,
   ControlPlaneAcceptedSessionRun,
   ControlPlaneSessionEventEnvelope,
-  ControlPlaneSessionLiveEvent,
+  ControlPlaneSessionRunEventEnvelope,
   ControlPlaneSessionsEventEnvelope,
 } from '@/server/control-plane-types.js';
 
@@ -133,7 +137,10 @@ type SubmitDirectShellArgs = ControlPlaneSessionReadArgs & ControlPlaneSessionAd
   logger?: Pick<Logger, 'debug'>;
 };
 
-type ControlPlaneTurnPublisher = ReturnType<typeof ControlPlaneChatSessionEventsController.createSessionEventPublisher>;
+type ControlPlaneTurnPublisher = ReturnType<typeof ControlPlaneChatSessionEventsController.createSessionEventPublisher> & {
+  publishActivity: (activity: ConversationActivity) => void;
+  publishActivities: (activities: ConversationActivity[]) => void;
+};
 
 type UpdateQueuedChatPromptArgs = ControlPlaneSessionReadArgs & ControlPlaneSessionAddress & {
   queueItemId: string;
@@ -148,6 +155,10 @@ export class ControlPlaneChatSessionsController {
   private readonly sessionEventBus = new EventEmitter();
   private readonly runService = new ConversationRunService<ControlPlaneSessionAddress>({
     addressKey: ControlPlaneChatSessionsController.sessionAddressKey,
+  });
+  private readonly runStreams = new ControlPlaneChatSessionRunStreamController({
+    eventBus: this.sessionEventBus,
+    runService: this.runService,
   });
 
   createSession(args: CreateControlPlaneChatSessionArgs): ChatSessionDetail {
@@ -213,7 +224,10 @@ export class ControlPlaneChatSessionsController {
 
   async compactSession(args: CompactControlPlaneChatSessionArgs): Promise<ChatSessionDetail> {
     return await this.runService.startAndWait({
-      address: args,
+      address: this.runStreams.resolveAddress(args),
+      ...this.runStreams.createLifecycle(args, {
+        onSettled: () => this.startNextQueuedPrompt(args),
+      }),
       onHeartbeat: () => {
         this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
       },
@@ -270,10 +284,7 @@ export class ControlPlaneChatSessionsController {
   }
 
   readRunState(sessionAddress: ControlPlaneSessionAddress) {
-    return {
-      running: this.isRunning(sessionAddress),
-      pendingApproval: this.getPendingApproval(sessionAddress) ?? null,
-    };
+    return this.runStreams.readState(sessionAddress);
   }
 
   async submitPrompt(args: SubmitChatPromptArgs) {
@@ -324,7 +335,7 @@ export class ControlPlaneChatSessionsController {
 
   subscribeToEvents(
     sessionAddress: ControlPlaneSessionAddress,
-    listener: (event: ControlPlaneSessionLiveEvent | Extract<ControlPlaneSessionEventEnvelope, { type: 'session.approval.updated' }>) => void,
+    listener: (event: ControlPlaneSessionEventEnvelope) => void,
   ): () => void {
     const key = ControlPlaneChatSessionsController.sessionAddressKey(sessionAddress);
     this.sessionEventBus.on(key, listener);
@@ -342,19 +353,10 @@ export class ControlPlaneChatSessionsController {
     const stream = RuntimeSubscriptionStream.fromSources<ControlPlaneSessionEventEnvelope>({
       signal: args.signal,
       sources: [
-        // Live LLM/tool/compaction updates arrive through the in-memory event
-        // bus. This path streams assistant text without touching the session
-        // file for each model delta.
+        // Run identity, queue, and approval signals use the in-memory event bus.
+        // Ordered conversation activities use subscribeRunEvents instead.
         (sink) => this.subscribeToEvents(args, (event) => {
-          if ('type' in event) {
-            sink.push(event);
-            return;
-          }
-
-          sink.push({
-            ...event,
-            type: 'session.event',
-          });
+          sink.push(event);
         }),
         (sink) => {
           try {
@@ -424,6 +426,14 @@ export class ControlPlaneChatSessionsController {
     yield* stream;
   }
 
+  async *subscribeRunEvents(args: ControlPlaneSessionAddress & {
+    runId: string;
+    afterSequence?: number;
+    signal?: AbortSignal;
+  }): AsyncGenerator<ControlPlaneSessionRunEventEnvelope> {
+    yield* this.runStreams.subscribe(args);
+  }
+
   getPendingApproval(sessionAddress: ControlPlaneSessionAddress): ToolApprovalRequest | undefined {
     return this.runService.getPendingApproval(sessionAddress);
   }
@@ -432,15 +442,16 @@ export class ControlPlaneChatSessionsController {
     return this.runService.isRunning(sessionAddress);
   }
 
-  cancelRun(sessionAddress: ControlPlaneSessionAddress): boolean {
-    return this.runService.cancelRun(sessionAddress);
+  cancelRun(sessionAddress: ControlPlaneSessionAddress, runId?: string): boolean {
+    return this.runService.cancelRun(sessionAddress, runId);
   }
 
   resolvePendingApproval(
     sessionAddress: ControlPlaneSessionAddress,
     decision: ToolApprovalUserDecision,
+    runId?: string,
   ): boolean {
-    return this.runService.resolvePendingApproval(sessionAddress, decision);
+    return this.runService.resolvePendingApproval(sessionAddress, decision, runId);
   }
 
   readViews(args: ControlPlaneSessionReadArgs): ChatSessionView[] {
@@ -494,7 +505,7 @@ export class ControlPlaneChatSessionsController {
     return (this.createEngine(args).sessions.read(args.sessionId)?.queuedPrompts.length ?? 0) > 0;
   }
 
-  private startNextQueuedPrompt(args: SubmitChatPromptArgs): void {
+  private startNextQueuedPrompt(args: ContinueChatPromptArgs): void {
     if (this.isRunning(args)) {
       return;
     }
@@ -544,28 +555,27 @@ export class ControlPlaneChatSessionsController {
       workspaceId: address.workspaceId,
       sessionId: address.sessionId,
     });
-    const publishActivity = (activity: ConversationActivity) => {
-      run.publishActivity(activity);
-      publisher.publishActivity(activity);
-    };
 
     return {
       ...publisher,
-      publishActivity,
-      publishActivities: (activities: ConversationActivity[]) => activities.forEach(publishActivity),
+      publishActivity: run.publishActivity,
+      publishActivities: (activities: ConversationActivity[]) => activities.forEach(run.publishActivity),
     };
   }
 
   private buildSubmitPromptRun(args: SubmitChatPromptArgs) {
     return {
-      address: args,
-      onAccepted: (run: ConversationRunContext) => {
-        this.createEngine(args).sessions.acceptUserMessage(args.sessionId, {
-          runId: run.runId,
-          prompt: args.prompt,
-          leaseOwner: args.leaseOwner,
-        });
-      },
+      address: this.runStreams.resolveAddress(args),
+      ...this.runStreams.createLifecycle(args, {
+        onAccepted: (run) => {
+          this.createEngine(args).sessions.acceptUserMessage(args.sessionId, {
+            runId: run.runId,
+            prompt: args.prompt,
+            leaseOwner: args.leaseOwner,
+          });
+        },
+        onSettled: () => this.startNextQueuedPrompt(args),
+      }),
       onHeartbeat: () => {
         this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
       },
@@ -573,7 +583,8 @@ export class ControlPlaneChatSessionsController {
         const result = process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT === '1'
           ? await ControlPlaneChatSessionBrowserIntegrationFake.run({
             ...args,
-            eventBus: this.sessionEventBus,
+            runId: run.runId,
+            publishActivity: run.publishActivity,
           })
           : await this.runEngineTurn(args, run, async ({ engine, host, abortSignal, shouldStop }) => {
             return await engine.turns.submit({
@@ -595,15 +606,15 @@ export class ControlPlaneChatSessionsController {
       onError: (error: unknown, run: ConversationRunContext) => {
         this.persistRunFailureMessage(args, run, error);
       },
-      onSettled: () => {
-        this.startNextQueuedPrompt(args);
-      },
     };
   }
 
   private buildContinuePromptRun(args: ContinueChatPromptArgs) {
     return {
-      address: args,
+      address: this.runStreams.resolveAddress(args),
+      ...this.runStreams.createLifecycle(args, {
+        onSettled: () => this.startNextQueuedPrompt(args),
+      }),
       onHeartbeat: () => {
         this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
       },
@@ -616,7 +627,8 @@ export class ControlPlaneChatSessionsController {
 
           return await ControlPlaneChatSessionBrowserIntegrationFake.run({
             ...args,
-            eventBus: this.sessionEventBus,
+            runId: run.runId,
+            publishActivity: run.publishActivity,
             prompt: session.lastContinuePrompt,
           });
         }
@@ -639,7 +651,10 @@ export class ControlPlaneChatSessionsController {
 
   private buildDirectShellRun(args: SubmitDirectShellArgs) {
     return {
-      address: args,
+      address: this.runStreams.resolveAddress(args),
+      ...this.runStreams.createLifecycle(args, {
+        onSettled: () => this.startNextQueuedPrompt(args),
+      }),
       onHeartbeat: () => {
         this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
       },
@@ -856,11 +871,11 @@ export class ControlPlaneChatSessionsController {
                   decision,
                 })),
               });
-              publisher.publishApprovalUpdated();
+              publisher.publishApprovalUpdated(request);
             },
           });
           this.runService.clearPendingApproval(args);
-          publisher.publishApprovalUpdated();
+          publisher.publishApprovalUpdated(null);
           return decision;
         },
       },
@@ -961,10 +976,5 @@ export class ControlPlaneChatSessionsController {
     return `${address.workspaceId}:${address.sessionId}`;
   }
 }
-
-type ControlPlaneSessionAddress = {
-  workspaceId: string;
-  sessionId: string;
-};
 
 export const controlPlaneChatSessionsController = new ControlPlaneChatSessionsController();

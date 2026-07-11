@@ -169,17 +169,27 @@ test('submits a prompt and renders the mocked session response', async ({ page }
   await page.getByRole('textbox', { name: 'Message' }).fill('Run the web v2 submit smoke');
   const sendButton = page.getByRole('button', { name: 'Send' });
   await expectComposerActionButtonCircle(sendButton);
+  const runEvents = page.waitForResponse((response) => (
+    response.url().includes('/trpc/controlPlane.sessionRunEvents') && response.status() === 200
+  ));
   await sendButton.click();
+  await runEvents;
 
   const stopButton = page.getByRole('button', { name: 'Stop' });
   await expect(stopButton).toBeVisible();
   await expectComposerActionButtonCircle(stopButton);
+  const recoveredRunEvents = page.waitForResponse((response) => (
+    response.url().includes('/trpc/controlPlane.sessionRunEvents') && response.status() === 200
+  ));
+  await page.reload();
+  await recoveredRunEvents;
   await expect(page.getByText('Run the web v2 submit smoke', { exact: true })).toBeVisible();
   await expect(page.getByText('Mocked browser integration agent response', { exact: true })).toBeVisible();
   await expect(page.getByTestId('web-v2-workbench-body').getByText(
     'Mocked browser integration agent response: Run the web v2 submit smoke',
     { exact: true },
   )).toBeVisible();
+  await expect(sendButton).toBeVisible();
   await expect(page.getByTestId('web-v2-workbench-title')).toHaveText(session.name);
 });
 

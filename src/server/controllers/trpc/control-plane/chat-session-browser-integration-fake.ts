@@ -1,17 +1,17 @@
-import type { EventEmitter } from 'node:events';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import { ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
 import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
-import { ControlPlaneChatSessionEventsController } from './chat-session-events.js';
+import type { ConversationActivity } from '@/core/live/index.js';
 import { ControlPlaneChatSessionPresenter } from './chat-session-presenter.js';
 
 type BrowserIntegrationFakePromptInput = {
-  eventBus: EventEmitter;
   workspaceId: string;
   sessionId: string;
   sessionStoragePath: string;
   prompt: string;
+  runId: string;
+  publishActivity: (activity: ConversationActivity) => void;
   agentSnapshot?: CustomAgentExecutionSnapshot;
 };
 
@@ -87,18 +87,12 @@ export class ControlPlaneChatSessionBrowserIntegrationFake {
   private static async emitStreamPreview(args: BrowserIntegrationFakePromptInput, assistantText: string): Promise<void> {
     // The browser-integration fake has to emit a real live activity before its
     // final mutation result so web-v2 can regression-test incremental streaming.
-    const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
-      eventBus: args.eventBus,
-      workspaceId: args.workspaceId,
-      sessionId: args.sessionId,
-    });
-    const runId = `browser-integration-run-${Date.now()}`;
     const timestamp = new Date().toISOString();
 
-    publisher.publishActivity({
+    args.publishActivity({
       source: 'agent-loop',
       type: 'assistant.stream',
-      runId,
+      runId: args.runId,
       step: 1,
       text: assistantText.slice(0, 'Mocked browser integration agent response'.length),
       done: false,

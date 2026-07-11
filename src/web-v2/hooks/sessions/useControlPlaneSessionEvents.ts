@@ -4,7 +4,13 @@ import {
   trpcReact,
   type ControlPlaneSessionDetail,
   type ControlPlaneSessionEventEnvelope,
+  type ControlPlaneSessionRunEventEnvelope,
+  type ControlPlaneSessionRunReference,
 } from '@web/api/client';
+import {
+  ClientSharedConversationRunStreamService,
+  type ClientSharedConversationRunSubscriptionInput,
+} from '@/client-shared/services/conversation-run-stream';
 import { ClientSharedSessionActivityService } from '@/client-shared/services/session-activities';
 import { ClientSharedNotificationIntentService, type ClientSharedNotificationIntent } from '@/client-shared/services/notifications';
 import type {
@@ -15,13 +21,18 @@ import type {
 import { ClientSharedSessionMessageService } from '@/client-shared/services/session-messages';
 import type { RefreshControlPlaneSession } from './useControlPlaneSessionLoader';
 
+type SessionRunUpdate = Extract<ControlPlaneSessionEventEnvelope, { type: 'session.run.updated' }>;
+type SessionRunTerminal = Exclude<ControlPlaneSessionRunEventEnvelope, { kind: 'activity' }>;
+
 type UseControlPlaneSessionEventsArgs = {
   workspaceId?: string;
   sessionId?: string;
+  activeRun?: ControlPlaneSessionRunReference;
   refresh: RefreshControlPlaneSession;
   refreshPendingApproval: (sessionId: string) => void;
+  observeRunUpdate: (event: SessionRunUpdate) => void;
+  finishRun: (event: SessionRunTerminal) => void;
   setSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
-  setRunning: Dispatch<SetStateAction<boolean>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
   setActivePlan: Dispatch<SetStateAction<ClientSharedSessionPlan | undefined>>;
   setCurrentActivity: Dispatch<SetStateAction<ClientSharedAgentActivityStatus | undefined>>;
@@ -33,16 +44,18 @@ export type ControlPlaneSessionEventsState = {
   streamConnected: boolean;
 };
 
-// Owns web-v2's selected-session subscription effects. Activity facts and
-// shared activity policies stay in core/client-shared; this hook only writes
-// React state and cache entries for the active conversation surface.
+// Owns web-v2's selected-session lifecycle and replayable run subscriptions.
+// Cursor correctness/backoff are shared with cli-v2; this hook only binds those
+// semantics to React Query/tRPC and browser-local presentation state.
 export function useControlPlaneSessionEvents({
   workspaceId,
   sessionId,
+  activeRun,
   refresh,
   refreshPendingApproval,
+  observeRunUpdate,
+  finishRun,
   setSession,
-  setRunning,
   setLiveStatus,
   setActivePlan,
   setCurrentActivity,
@@ -51,11 +64,51 @@ export function useControlPlaneSessionEvents({
 }: UseControlPlaneSessionEventsArgs): ControlPlaneSessionEventsState {
   const utils = trpcReact.useUtils();
   const [streamConnected, setStreamConnected] = useState(false);
+  const [runSubscriptionInput, setRunSubscriptionInput] = useState<ClientSharedConversationRunSubscriptionInput>();
   const activeAddressRef = useRef<SessionAddress>({ workspaceId, sessionId });
+  const runStreamRef = useRef(new ClientSharedConversationRunStreamService());
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const invalidateWorkspaceDiff = useCallback(() => {
     void utils.controlPlane.workspaceChanges.invalidate(workspaceId ? { workspaceId } : undefined);
     void utils.controlPlane.workspaceFileDiff.invalidate();
   }, [utils, workspaceId]);
+
+  const ensureRunSubscription = useCallback((run: ControlPlaneSessionRunReference) => {
+    if (!workspaceId || !sessionId) {
+      return;
+    }
+
+    const selected = runStreamRef.current.select({ workspaceId, sessionId, runId: run.runId });
+    if (selected && reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = undefined;
+    }
+    const input = runStreamRef.current.subscriptionInput();
+    if (input) {
+      setRunSubscriptionInput(input);
+    }
+  }, [sessionId, workspaceId]);
+
+  const scheduleReconnect = useCallback((error: Error) => {
+    if (runStreamRef.current.isTerminal() || reconnectTimerRef.current) {
+      return;
+    }
+
+    setStreamConnected(false);
+    setRunSubscriptionInput(undefined);
+    const retry = runStreamRef.current.nextRetry();
+    if (!retry) {
+      setLiveStatus(error.message);
+      return;
+    }
+
+    setLiveStatus(`Reconnecting run stream (attempt ${retry.attempt})...`);
+    reconnectTimerRef.current = setTimeout(() => {
+      reconnectTimerRef.current = undefined;
+      setRunSubscriptionInput(retry.input);
+    }, retry.delayMs);
+  }, [setLiveStatus]);
+
   const applySessionEvent = useCallback((event: ControlPlaneSessionEventEnvelope) => {
     if (!isActiveSessionAddress(activeAddressRef.current, { workspaceId, sessionId: event.sessionId })) {
       return;
@@ -76,73 +129,116 @@ export function useControlPlaneSessionEvents({
       return;
     }
 
-    if (event.type !== 'session.event') {
+    if (event.type !== 'session.run.updated') {
       return;
     }
 
-    event.activities?.forEach((activity) => applySessionActivity(activity, {
-      sessionId: event.sessionId,
-      refresh,
-      refreshPendingApproval,
-      invalidateWorkspaceDiff,
-      updateSession: (updater) => {
-        setSession(updater);
-        if (workspaceId) {
+    observeRunUpdate(event);
+    ensureRunSubscription(event.run);
+  }, [ensureRunSubscription, observeRunUpdate, refresh, refreshPendingApproval, setLiveStatus, workspaceId]);
+
+  const applyRunEvent = useCallback((event: ControlPlaneSessionRunEventEnvelope) => {
+    const {
+      workspaceId: activeWorkspaceId,
+      sessionId: activeSessionId,
+    } = activeAddressRef.current;
+    if (!activeWorkspaceId || !activeSessionId) {
+      return;
+    }
+
+    try {
+      const accepted = runStreamRef.current.accept(event);
+      if (!accepted.accepted) {
+        return;
+      }
+      if (event.kind !== 'activity') {
+        setStreamConnected(false);
+        setRunSubscriptionInput(undefined);
+        finishRun(event);
+        return;
+      }
+
+      applySessionActivity(event.activity, {
+        sessionId: activeSessionId,
+        refresh,
+        refreshPendingApproval,
+        invalidateWorkspaceDiff,
+        updateSession: (updater) => {
+          setSession(updater);
           utils.controlPlane.session.setData(
-            { id: event.sessionId, workspaceId },
+            { id: activeSessionId, workspaceId: activeWorkspaceId },
             (current) => applySessionUpdate(current ?? null, updater),
           );
-        }
-      },
-      setLiveStatus,
-      setActivePlan,
-      setCurrentActivity,
-      setLatestUpdate,
-      setRunning,
-      notify: onNotificationIntent,
-      workspaceId,
-    }));
-  }, [invalidateWorkspaceDiff, onNotificationIntent, refresh, refreshPendingApproval, setActivePlan, setCurrentActivity, setLatestUpdate, setLiveStatus, setRunning, setSession, utils.controlPlane.session, workspaceId]);
+        },
+        setLiveStatus,
+        setActivePlan,
+        setCurrentActivity,
+        setLatestUpdate,
+        notify: onNotificationIntent,
+        workspaceId: activeWorkspaceId,
+      });
+    } catch (error) {
+      scheduleReconnect(asError(error));
+    }
+  }, [finishRun, invalidateWorkspaceDiff, onNotificationIntent, refresh, refreshPendingApproval, scheduleReconnect, setActivePlan, setCurrentActivity, setLatestUpdate, setLiveStatus, setSession, utils.controlPlane.session]);
 
-  const subscription = trpcReact.controlPlane.sessionEvents.useSubscription(
+  trpcReact.controlPlane.sessionEvents.useSubscription(
     sessionId && workspaceId ? { sessionId, workspaceId } : skipToken,
     {
-      onStarted: () => {
-        setStreamConnected(true);
-      },
       onData: applySessionEvent,
-      onError: (error) => {
-        setStreamConnected(false);
-        setLiveStatus(error.message);
-      },
+      onError: (error) => setLiveStatus(error.message),
+    },
+  );
+
+  trpcReact.controlPlane.sessionRunEvents.useSubscription(
+    runSubscriptionInput ?? skipToken,
+    {
+      onStarted: () => setStreamConnected(true),
+      onData: applyRunEvent,
+      onError: (error) => scheduleReconnect(asError(error)),
       onComplete: () => {
         setStreamConnected(false);
+        if (!runStreamRef.current.isTerminal()) {
+          scheduleReconnect(new Error('Conversation run stream ended before a terminal item.'));
+        }
       },
     },
   );
 
   useEffect(() => {
     activeAddressRef.current = { workspaceId, sessionId };
+    runStreamRef.current.clear();
+    setRunSubscriptionInput(undefined);
+    setStreamConnected(false);
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = undefined;
+    }
     if (!sessionId || !workspaceId) {
-      setRunning(false);
       setLiveStatus(undefined);
       setActivePlan(undefined);
       setCurrentActivity(undefined);
       setLatestUpdate(undefined);
-      setStreamConnected(false);
       return;
     }
 
-    setRunning(false);
     setLiveStatus(undefined);
     setActivePlan(undefined);
     setCurrentActivity(undefined);
     setLatestUpdate(undefined);
-  }, [sessionId, setActivePlan, setCurrentActivity, setLatestUpdate, setLiveStatus, setRunning, workspaceId]);
+  }, [sessionId, setActivePlan, setCurrentActivity, setLatestUpdate, setLiveStatus, workspaceId]);
 
   useEffect(() => {
-    setStreamConnected(subscription.status === 'pending');
-  }, [subscription.status]);
+    if (activeRun) {
+      ensureRunSubscription(activeRun);
+    }
+  }, [activeRun, ensureRunSubscription]);
+
+  useEffect(() => () => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+    }
+  }, []);
 
   return { streamConnected };
 }
@@ -175,7 +271,6 @@ type SessionActivityContext = {
   refreshPendingApproval: (sessionId: string) => void;
   invalidateWorkspaceDiff: () => void;
   updateSession: Dispatch<SetStateAction<ControlPlaneSessionDetail>>;
-  setRunning: Dispatch<SetStateAction<boolean>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
   setActivePlan: Dispatch<SetStateAction<ClientSharedSessionPlan | undefined>>;
   setCurrentActivity: Dispatch<SetStateAction<ClientSharedAgentActivityStatus | undefined>>;
@@ -183,7 +278,7 @@ type SessionActivityContext = {
   notify?: (intent: ClientSharedNotificationIntent | undefined) => void;
 };
 
-type ControlPlaneSessionActivity = Extract<ControlPlaneSessionEventEnvelope, { type: 'session.event' }>['activities'][number];
+type ControlPlaneSessionActivity = Extract<ControlPlaneSessionRunEventEnvelope, { kind: 'activity' }>['activity'];
 
 function applySessionActivity(activity: ControlPlaneSessionActivity, context: SessionActivityContext) {
   context.notify?.(ClientSharedNotificationIntentService.projectSessionActivity({
@@ -211,35 +306,26 @@ function applySessionActivity(activity: ControlPlaneSessionActivity, context: Se
       }
     },
     onRunStarted: (_runActivity, liveStatus) => {
-      context.setRunning(true);
       context.setLiveStatus(liveStatus);
     },
     onRunFinished: (_runActivity, liveStatus) => {
-      context.setRunning(false);
       if (liveStatus !== undefined) {
         context.setLiveStatus(liveStatus);
       }
-      void context.refresh(context.sessionId, { silent: true });
     },
-    onPlanUpdated: (plan) => {
-      context.setActivePlan(plan);
-    },
-    onPlanCleared: () => {
-      context.setActivePlan(undefined);
-    },
-    onCurrentActivityChanged: (currentActivity) => {
-      context.setCurrentActivity(currentActivity);
-    },
+    onPlanUpdated: (plan) => context.setActivePlan(plan),
+    onPlanCleared: () => context.setActivePlan(undefined),
+    onCurrentActivityChanged: (currentActivity) => context.setCurrentActivity(currentActivity),
     onLiveStatus: (_statusActivity, liveStatus) => {
       if (liveStatus !== undefined) {
         context.setLiveStatus(liveStatus);
       }
     },
-    onPendingApprovalChanged: () => {
-      context.refreshPendingApproval(context.sessionId);
-    },
-    onWorkspaceChanged: () => {
-      context.invalidateWorkspaceDiff();
-    },
+    onPendingApprovalChanged: () => context.refreshPendingApproval(context.sessionId),
+    onWorkspaceChanged: context.invalidateWorkspaceDiff,
   });
+}
+
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }

@@ -7,6 +7,7 @@ conversation work embedded in a host process.
 
 - one active run per host-defined session address;
 - stable run IDs and cancellation controllers;
+- active-run discovery for hosts reconnecting after a client refresh;
 - pending approval resolution;
 - ordered `ConversationActivity` delivery;
 - bounded replay for reconnecting subscribers;
@@ -34,7 +35,15 @@ const run = runs.startTurn({
   turn: { sessionId: session.id, prompt: 'Revise the current document.' },
 });
 
+const activeRun = runs.getActiveRun({
+  scopeId: 'tenant-1',
+  sessionId: session.id,
+});
+
 for await (const item of run.events()) {
   // Serialize through the host's transport without changing Heddle semantics.
 }
 ```
+
+`run.cancel()` and `run.resolveApproval(...)` remain bound to that accepted run
+identity. A stale handle cannot affect a later run at the same address.
