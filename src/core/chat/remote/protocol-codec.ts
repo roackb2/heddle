@@ -81,10 +81,14 @@ export class ConversationRunProtocolCodec<Activity, Result> {
     try {
       const envelope = RawConversationRunProtocolEventSchema.parse(input);
       const event = this.parseHostPayload(envelope);
-      if (!z.json().safeParse(event).success) {
-        throw new ConversationRunProtocolValidationError([{
-          message: 'Conversation run events must contain only JSON-safe values.',
-        }]);
+      const jsonEvent = z.json().safeParse(event);
+      if (!jsonEvent.success) {
+        throw new ConversationRunProtocolValidationError(
+          jsonEvent.error.issues.map(({ message, path }) => ({
+            message: `Conversation run events must contain only JSON-safe values: ${message}`,
+            path: findNonJsonValuePath(event) ?? path,
+          })),
+        );
       }
       return event;
     } catch (error) {
@@ -151,6 +155,28 @@ function isPromiseLike<Value>(value: unknown): value is PromiseLike<Value> {
     && value !== null
     && 'then' in value
     && typeof value.then === 'function';
+}
+
+function findNonJsonValuePath(
+  value: unknown,
+  path: PropertyKey[] = [],
+): PropertyKey[] | undefined {
+  if (z.json().safeParse(value).success) {
+    return undefined;
+  }
+  if (Array.isArray(value)) {
+    return value.reduce<PropertyKey[] | undefined>(
+      (found, item, index) => found ?? findNonJsonValuePath(item, [...path, index]),
+      undefined,
+    ) ?? path;
+  }
+  if (typeof value === 'object' && value !== null) {
+    return Object.entries(value).reduce<PropertyKey[] | undefined>(
+      (found, [key, item]) => found ?? findNonJsonValuePath(item, [...path, key]),
+      undefined,
+    ) ?? path;
+  }
+  return path;
 }
 
 function standardIssuesFromError(error: unknown): ReadonlyArray<StandardSchemaV1.Issue> {

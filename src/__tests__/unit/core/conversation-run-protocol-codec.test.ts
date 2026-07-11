@@ -95,6 +95,18 @@ describe('ConversationRunProtocolCodec', () => {
       kind: 'activity',
       activity: { type: 'tool.calling', unsafe: undefined },
     }))).toThrow('JSON-safe');
+
+    const parsed = codec.safeParseEvent(envelope({
+      kind: 'activity',
+      activity: { type: 'tool.calling', unsafe: undefined },
+    }));
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error).toBeInstanceOf(ConversationRunProtocolValidationError);
+      expect((parsed.error as ConversationRunProtocolValidationError).issues).toEqual([
+        expect.objectContaining({ path: ['activity', 'unsafe'] }),
+      ]);
+    }
   });
 
   it('round-trips validated events through JSON serialization', () => {
