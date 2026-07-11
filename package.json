@@ -53,6 +53,7 @@
     "remote:compile": "yarn remote:verify && tsc -p tsconfig.remote-package.json",
     "remote:build": "yarn remote:clean && yarn remote:compile",
     "remote:pack": "yarn remote:build && npm pack ./packages/heddle-remote",
+    "remote:publish": "yarn remote:build && npm publish ./packages/heddle-remote",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "eslint": "eslint .",
     "lint": "yarn eslint",
