@@ -1,5 +1,6 @@
 import type {
   ConversationRunConsumerEvent,
+  ConversationRunConsumerSelectionOptions,
   ConversationRunConsumerServiceOptions,
   ConversationRunEventAcceptance,
   ConversationRunReference,
@@ -53,14 +54,22 @@ export class ConversationRunConsumerService<
     this.retry = ConversationRunConsumerService.resolveRetryOptions(options.retry);
   }
 
-  select(run: Reference): boolean {
+  select(
+    run: Reference,
+    options: ConversationRunConsumerSelectionOptions = {},
+  ): boolean {
     ConversationRunConsumerService.assertRunId(run.runId);
+    const afterSequence = options.afterSequence ?? 0;
+    ConversationRunConsumerService.assertNonNegativeSafeInteger(
+      'Conversation run replay cursor',
+      afterSequence,
+    );
     if (this.isCurrent(run)) {
       return false;
     }
 
     this.run = run;
-    this.sequence = 0;
+    this.sequence = afterSequence;
     this.terminal = false;
     this.retryAttempt = 0;
     return true;

@@ -25,6 +25,10 @@ export type ConversationRunConsumerServiceOptions = {
   retry?: ConversationRunConsumerRetryOptions;
 };
 
+export type ConversationRunConsumerSelectionOptions = {
+  afterSequence?: number;
+};
+
 export type ConversationRunRetry<Reference extends ConversationRunReference> = {
   attempt: number;
   delayMs: number;

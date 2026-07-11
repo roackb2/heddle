@@ -221,9 +221,10 @@ abort propagation.
 [`run.ts`](03-browser-client/run.ts) is the consuming application policy. It
 uses Heddle's `ConversationRunConsumerService` for cursor advancement,
 duplicate/gap handling, terminal detection, and bounded reconnect timing. The
-runner deliberately disconnects after one activity while retaining ownership
-of the actual timer and transport lifecycle. Add `--cancel-demo` to exercise
-explicit cancellation.
+runner deliberately disconnects after one activity, discards its in-memory
+consumer, then reconstructs it from the last handled sequence before resuming.
+This models a browser refresh while retaining ownership of the actual timer and
+transport lifecycle. Add `--cancel-demo` to exercise explicit cancellation.
 
 ### Responsibility boundary
 

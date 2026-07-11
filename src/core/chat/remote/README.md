@@ -6,6 +6,7 @@ conversation run across a remote boundary.
 ## Owns
 
 - selecting one accepted run reference;
+- restoring a selected run from a host-persisted replay cursor;
 - advancing the greatest accepted sequence cursor;
 - suppressing replayed duplicates;
 - rejecting sequence gaps and post-terminal events;
@@ -41,7 +42,19 @@ const protocol = new ConversationRunProtocolCodec({
 const consumer = new ConversationRunConsumerService({
   retry: { maxAttempts: 6, baseDelayMs: 500, maxDelayMs: 4_000 },
 })
+
+consumer.select(
+  { runId: persistedRunId },
+  { afterSequence: persistedSequence },
+)
 ```
+
+Pass `afterSequence` when reconstructing a consumer after a page reload or
+process-local client restart. The next accepted event must be exactly
+`afterSequence + 1`; duplicates remain suppressed and gaps still fail loudly.
+Selecting the current run again is idempotent and never rewinds or skips its
+in-memory cursor. Persist the latest `subscriptionInput().afterSequence` only
+after the application has successfully handled the corresponding event.
 
 The host must supply synchronous
 [Standard Schema](https://standardschema.dev/schema) validators that expose only

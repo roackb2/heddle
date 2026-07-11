@@ -39,6 +39,27 @@ describe('ConversationRunConsumerService', () => {
     expect(service.subscriptionInput()?.afterSequence).toBe(0);
   });
 
+  it('restores a selected run from a validated nonzero cursor', () => {
+    const service = createConsumer();
+    service.select(run('run-1'), { afterSequence: 4 });
+
+    expect(service.subscriptionInput()).toMatchObject({
+      runId: 'run-1',
+      afterSequence: 4,
+    });
+    expect(service.accept(event('activity', 4))).toEqual({ accepted: false, terminal: false });
+    expect(service.accept(event('activity', 5))).toEqual({ accepted: true, terminal: false });
+  });
+
+  it('preserves monotonic progress when the selected run is selected again', () => {
+    const service = createConsumer();
+    service.select(run('run-1'), { afterSequence: 2 });
+    service.accept(event('activity', 3));
+
+    expect(service.select(run('run-1'), { afterSequence: 0 })).toBe(false);
+    expect(service.subscriptionInput()?.afterSequence).toBe(3);
+  });
+
   it('rejects sequence gaps instead of silently losing activity', () => {
     const service = createConsumer();
     service.select(run('run-1'));
@@ -80,6 +101,12 @@ describe('ConversationRunConsumerService', () => {
     expect(service.select(run('run-2'))).toBe(true);
     expect(service.subscriptionInput()).toMatchObject({ runId: 'run-2', afterSequence: 0 });
     expect(() => service.select(run('  '))).toThrow('non-empty runId');
+    expect(() => service.select(run('run-3'), { afterSequence: -1 })).toThrow(
+      'replay cursor must be a non-negative safe integer',
+    );
+    expect(() => service.select(run('run-3'), { afterSequence: 1.5 })).toThrow(
+      'replay cursor must be a non-negative safe integer',
+    );
     expect(() => service.accept(event('activity', 0, 'run-2'))).toThrow('positive safe integer');
   });
 
