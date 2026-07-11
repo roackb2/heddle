@@ -178,6 +178,9 @@ test('submits a prompt and renders the mocked session response', async ({ page }
   const stopButton = page.getByRole('button', { name: 'Stop' });
   await expect(stopButton).toBeVisible();
   await expectComposerActionButtonCircle(stopButton);
+  expect(await trpc.controlPlane.sessionRunState.query({ id: session.id })).toMatchObject({
+    running: true,
+  });
   const recoveredRunEvents = page.waitForResponse((response) => (
     response.url().includes('/trpc/controlPlane.sessionRunEvents') && response.status() === 200
   ));

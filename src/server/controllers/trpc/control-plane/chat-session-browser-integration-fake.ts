@@ -15,6 +15,8 @@ type BrowserIntegrationFakePromptInput = {
   agentSnapshot?: CustomAgentExecutionSnapshot;
 };
 
+const DEFAULT_STREAM_PREVIEW_DELAY_MS = 750;
+
 /**
  * Owns the browser-integration fake session mutation path used by smoke tests.
  */
@@ -100,7 +102,21 @@ export class ControlPlaneChatSessionBrowserIntegrationFake {
     });
 
     await new Promise((resolve) => {
-      setTimeout(resolve, 750);
+      setTimeout(resolve, ControlPlaneChatSessionBrowserIntegrationFake.resolveStreamPreviewDelayMs());
     });
+  }
+
+  private static resolveStreamPreviewDelayMs(): number {
+    const configuredDelay = process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_STREAM_PREVIEW_MS;
+    if (!configuredDelay) {
+      return DEFAULT_STREAM_PREVIEW_DELAY_MS;
+    }
+
+    const delayMs = Number(configuredDelay);
+    if (!Number.isSafeInteger(delayMs) || delayMs < 0) {
+      throw new Error('HEDDLE_BROWSER_INTEGRATION_FAKE_STREAM_PREVIEW_MS must be a non-negative integer.');
+    }
+
+    return delayMs;
   }
 }
