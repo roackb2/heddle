@@ -1,6 +1,6 @@
 {
   "name": "@roackb2/heddle-remote",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "description": "Browser-safe protocol and run-consumer services for remotely hosted Heddle conversations",
   "author": "Jay / Fienna Liang <roackb2@gmail.com>",
   "license": "MIT",
