@@ -43,8 +43,8 @@ snapshot and call user-intent methods.
   control-plane APIs and `client-shared` types/services.
 - Attach detailed activity through `sessionRunEvents`; keep `sessionEvents`
   limited to lifecycle discovery, approval, queue, and persisted-state signals.
-- Reuse `ClientSharedConversationRunStreamService` for sequence cursors,
-  duplicate suppression, gap detection, and reconnect policy.
+- Reuse `ConversationRunConsumerService` through `client-shared` for sequence
+  cursors, duplicate suppression, gap detection, and reconnect policy.
 - Do not add a controller that only forwards calls. A controller must own real
   workflow behavior: ordering, state transitions, lifecycle reset, event
   reduction, or terminal UX coordination.

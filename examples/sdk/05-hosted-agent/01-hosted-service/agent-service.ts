@@ -6,14 +6,16 @@
  * transport, or UI dependency; those belong in later optional stages.
  */
 import {
-  ConversationRunService,
   type ConversationEngine,
   type ConversationEngineHost,
+  type ConversationTurnResultSummary,
+} from '../../../../src/index.js';
+import {
+  ConversationRunService,
   type ConversationRunHandle,
   type ConversationRunReplayOptions,
   type ConversationRunStreamItem,
-  type ConversationTurnResultSummary,
-} from '../../../../src/index.js';
+} from '../../../../src/hosted.js';
 
 const DEFAULT_RUN_RETENTION_MS = 5 * 60_000;
 

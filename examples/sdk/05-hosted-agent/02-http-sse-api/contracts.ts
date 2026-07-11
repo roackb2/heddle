@@ -5,6 +5,7 @@
  * Extend these schemas only with product data safe for remote clients.
  */
 import { z } from 'zod';
+import { ConversationRunProtocolCodec } from '../../../../src/remote.js';
 
 export const StartHostedAgentRunInputSchema = z.object({
   sessionId: z.string().trim().min(1).max(128),
@@ -18,38 +19,17 @@ export const StartHostedAgentRunResultSchema = z.object({
   sessionId: z.string().min(1),
 });
 
-const RunEventEnvelopeSchema = z.object({
-  runId: z.string().min(1),
-  sequence: z.number().int().positive().safe(),
-  timestamp: z.iso.datetime(),
+export const HostedAgentRunProtocol = new ConversationRunProtocolCodec({
+  activity: z.object({
+    type: z.string().min(1),
+  }).passthrough(),
+  result: z.object({
+    outcome: z.string().min(1),
+    summary: z.string(),
+  }),
 });
 
-export const HostedAgentRunEventSchema = z.discriminatedUnion('kind', [
-  RunEventEnvelopeSchema.extend({
-    kind: z.literal('activity'),
-    activity: z.object({
-      type: z.string().min(1),
-    }).passthrough(),
-  }),
-  RunEventEnvelopeSchema.extend({
-    kind: z.literal('result'),
-    result: z.object({
-      outcome: z.string().min(1),
-      summary: z.string(),
-    }),
-  }),
-  RunEventEnvelopeSchema.extend({
-    kind: z.literal('cancelled'),
-    reason: z.string(),
-  }),
-  RunEventEnvelopeSchema.extend({
-    kind: z.literal('error'),
-    error: z.object({
-      code: z.literal('run_failed'),
-      message: z.string(),
-    }),
-  }),
-]);
+export const HostedAgentRunEventSchema = HostedAgentRunProtocol.eventSchema;
 
 export const CancelHostedAgentRunResultSchema = z.object({
   cancelled: z.boolean(),

@@ -1,9 +1,14 @@
+// Presentation clients stay on the client-shared boundary while reusing the
+// exact public remote-run implementation exported by the Heddle SDK.
 export {
-  ClientSharedConversationRunStreamService,
-} from './conversation-run-stream-service.js';
+  ConversationRunConsumerService,
+  ConversationRunSequenceGapError,
+  ConversationRunTerminalViolationError,
+} from '@/core/chat/remote/index.js';
 export type {
-  ClientSharedConversationRunEventAcceptance,
-  ClientSharedConversationRunReference,
-  ClientSharedConversationRunRetry,
-  ClientSharedConversationRunSubscriptionInput,
-} from './conversation-run-stream-service.js';
+  ConversationRunConsumerEvent,
+  ConversationRunEventAcceptance,
+  ConversationRunReference,
+  ConversationRunRetry,
+  ConversationRunSubscriptionInput,
+} from '@/core/chat/remote/index.js';

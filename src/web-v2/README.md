@@ -66,5 +66,6 @@ Web-v2 uses the same accepted-run model exposed by the Heddle SDK:
 - cancellation includes the currently observed `runId`.
 
 Run cursor, duplicate, sequence-gap, and reconnect rules belong to
-`ClientSharedConversationRunStreamService`, shared with cli-v2. React hooks own
-only tRPC binding, cache refresh, and browser presentation state.
+`ConversationRunConsumerService` from the public remote-run SDK layer, shared
+with cli-v2 through `client-shared`. React hooks own only tRPC binding, cache
+refresh, and browser presentation state.

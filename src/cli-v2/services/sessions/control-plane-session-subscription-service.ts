@@ -5,12 +5,17 @@ import type {
   ControlPlaneSessionsEventEnvelope,
 } from '@/client-shared/api/types.js';
 import {
-  ClientSharedConversationRunStreamService,
-  type ClientSharedConversationRunReference,
+  ConversationRunConsumerService,
+  type ConversationRunReference,
 } from '@/client-shared/services/conversation-run-stream/index.js';
 
 type SubscriptionHandle = {
   unsubscribe: () => void;
+};
+
+type ControlPlaneConversationRunReference = ConversationRunReference & {
+  workspaceId: string;
+  sessionId: string;
 };
 
 export type ControlPlaneSessionSubscriptionServiceOptions = {
@@ -37,7 +42,7 @@ export class ControlPlaneSessionSubscriptionService {
   private runSubscription?: SubscriptionHandle;
   private runReconnectTimer?: ReturnType<typeof setTimeout>;
   private sessionAddress?: { workspaceId: string; sessionId: string };
-  private readonly runStream = new ClientSharedConversationRunStreamService();
+  private readonly runStream = new ConversationRunConsumerService<ControlPlaneConversationRunReference>();
 
   constructor(private readonly options: ControlPlaneSessionSubscriptionServiceOptions) {}
 
@@ -77,7 +82,7 @@ export class ControlPlaneSessionSubscriptionService {
     });
   }
 
-  subscribeToRun(run: ClientSharedConversationRunReference): void {
+  subscribeToRun(run: ControlPlaneConversationRunReference): void {
     const sessionAddress = this.sessionAddress;
     if (
       !sessionAddress

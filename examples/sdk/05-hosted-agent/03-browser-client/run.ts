@@ -6,11 +6,15 @@
  * Start the stage-2 server first, then run this script with the same token.
  */
 import { setTimeout as delay } from 'node:timers/promises';
+import { ConversationRunConsumerService } from '../../../../src/remote.js';
 import {
   HostedAgentClient,
   HostedAgentClientError,
 } from './browser-client.js';
 import type { HostedAgentRunEvent } from '../02-http-sse-api/contracts.js';
+
+type HostedAgentRunReference = { runId: string };
+type HostedAgentRunConsumer = ConversationRunConsumerService<HostedAgentRunReference>;
 
 const bearerToken = process.env.HEDDLE_EXAMPLE_BEARER_TOKEN;
 if (!bearerToken) {
@@ -32,9 +36,11 @@ const client = new HostedAgentClient({
 
 const accepted = await client.start({ sessionId, prompt });
 console.log(`Accepted ${accepted.runId}.`);
-const cursor = await disconnectAfterFirstActivity(client, accepted.runId);
+const consumer = createRunConsumer(accepted.runId);
+await disconnectAfterFirstActivity(client, consumer);
+const cursor = requireSubscriptionInput(consumer).afterSequence;
 console.log(`Browser subscription disconnected at sequence ${cursor}; reconnecting.`);
-const terminal = await consumeUntilTerminal(client, accepted.runId, cursor);
+const terminal = await consumeUntilTerminal(client, consumer);
 console.log(`Run settled as ${terminal.kind}.`);
 
 if (cancelDemo) {
@@ -44,22 +50,38 @@ if (cancelDemo) {
   });
   const cancelled = await client.cancel(cancellation.runId);
   console.log(`Cancellation accepted: ${cancelled.cancelled}.`);
-  const cancelledTerminal = await consumeUntilTerminal(client, cancellation.runId, 0);
+  const cancelledTerminal = await consumeUntilTerminal(
+    client,
+    createRunConsumer(cancellation.runId),
+  );
   if (cancelledTerminal.kind !== 'cancelled') {
     throw new Error(`Expected a cancelled terminal, received ${cancelledTerminal.kind}.`);
   }
 }
 
-async function disconnectAfterFirstActivity(agent: HostedAgentClient, runId: string): Promise<number> {
+function createRunConsumer(runId: string): HostedAgentRunConsumer {
+  const consumer = new ConversationRunConsumerService<HostedAgentRunReference>({
+    retry: { maxAttempts: 5, baseDelayMs: 250, maxDelayMs: 2_000 },
+  });
+  consumer.select({ runId });
+  return consumer;
+}
+
+async function disconnectAfterFirstActivity(
+  agent: HostedAgentClient,
+  consumer: HostedAgentRunConsumer,
+): Promise<void> {
   const subscription = new AbortController();
-  let cursor = 0;
   let disconnected = false;
   try {
     await agent.subscribe({
-      runId,
+      ...requireSubscriptionInput(consumer),
       signal: subscription.signal,
       onEvent: (event) => {
-        cursor = event.sequence;
+        const acceptance = consumer.accept(event);
+        if (!acceptance.accepted) {
+          return;
+        }
         renderEvent(event);
         if (event.kind === 'activity') {
           disconnected = true;
@@ -75,45 +97,61 @@ async function disconnectAfterFirstActivity(agent: HostedAgentClient, runId: str
   if (!disconnected) {
     throw new Error('The first subscription ended before receiving an activity.');
   }
-  return cursor;
 }
 
 async function consumeUntilTerminal(
   agent: HostedAgentClient,
-  runId: string,
-  initialCursor: number,
+  consumer: HostedAgentRunConsumer,
 ): Promise<HostedAgentRunEvent> {
-  let cursor = initialCursor;
   let terminal: HostedAgentRunEvent | undefined;
+  let lastError: unknown;
 
-  for (let attempt = 0; attempt < 5 && !terminal; attempt += 1) {
+  while (!terminal) {
     try {
       await agent.subscribe({
-        runId,
-        afterSequence: cursor,
+        ...requireSubscriptionInput(consumer),
         onEvent: (event) => {
-          cursor = Math.max(cursor, event.sequence);
+          const acceptance = consumer.accept(event);
+          if (!acceptance.accepted) {
+            return;
+          }
           renderEvent(event);
-          if (event.kind !== 'activity') {
+          if (acceptance.terminal) {
             terminal = event;
           }
         },
       });
+      if (!terminal) {
+        lastError = new Error('Hosted agent event stream ended before a terminal event.');
+      }
     } catch (error) {
       if (error instanceof HostedAgentClientError
         && (error.status === undefined || error.status < 500)) {
         throw error;
       }
+      lastError = error;
     }
+
     if (!terminal) {
-      await delay(Math.min(250 * (2 ** attempt), 2_000));
+      const retry = consumer.nextRetry();
+      if (!retry) {
+        throw lastError instanceof Error
+          ? lastError
+          : new Error('Hosted agent run exhausted its reconnect attempts.');
+      }
+      await delay(retry.delayMs);
     }
   }
 
-  if (!terminal) {
-    throw new Error(`Run ${runId} did not reach a terminal event after bounded reconnects.`);
-  }
   return terminal;
+}
+
+function requireSubscriptionInput(consumer: HostedAgentRunConsumer) {
+  const input = consumer.subscriptionInput();
+  if (!input) {
+    throw new Error('Hosted agent run no longer accepts subscriptions.');
+  }
+  return input;
 }
 
 function renderEvent(event: HostedAgentRunEvent): void {

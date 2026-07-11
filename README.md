@@ -506,10 +506,11 @@ More: [Heartbeat guide](docs/guides/heartbeat.md)
 
 ### Programmatic Runtime
 
-Heddle is not only a CLI. The npm package exposes three main programmatic layers:
+Heddle is not only a CLI. The npm package exposes explicit programmatic layers:
 
 - `createConversationEngine`: an alpha API for persisted multi-turn sessions with session storage, compaction, approvals, traces, semantic activity, and custom frontends or local hosts
-- `ConversationRunService`: process-local run identity, ordered activity, bounded replay, cancellation, and approval resolution for reconnectable hosted conversations
+- `@roackb2/heddle/hosted`: process-local run identity, ordered activity, bounded replay, cancellation, and approval resolution for reconnectable hosted conversations
+- `@roackb2/heddle/remote`: runtime-validated public run envelopes plus shared cursor, duplicate, gap, terminal, and reconnect correctness for remote clients
 - `AgentLoopRuntimeService.run(...)`: a lower-level single-run execution loop for hosts that do not need persisted chat or session behavior
 
 Advanced hosts can also reuse lower-level class APIs such as `ToolRegistry`, `ToolExecutionService`, `TraceRecorder`, `TraceConsoleFormatter`, and `ReviewDiffParser` when they intentionally assemble custom runtime or review surfaces.
@@ -518,6 +519,7 @@ Other exported primitives include `HeartbeatRunnerAgent.run`, `HeartbeatSchedule
 
 More: [Programmatic hosts](docs/guides/programmatic/README.md),
 [choosing an integration layer](docs/guides/programmatic/integration-layers.md),
+[remote conversation runs](docs/guides/programmatic/remote-runs.md),
 and the runnable
 [hosted service → HTTP/SSE → browser client example](examples/sdk/05-hosted-agent/README.md).
 

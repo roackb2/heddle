@@ -22,6 +22,7 @@ import {
 import {
   CancelHostedAgentRunResultSchema,
   HostedAgentApiErrorSchema,
+  HostedAgentRunProtocol,
   HostedAgentRunEventSchema,
   StartHostedAgentRunInputSchema,
   StartHostedAgentRunResultSchema,
@@ -153,7 +154,7 @@ async function writeSseEvent(
   event: HostedAgentRunEvent,
   signal: AbortSignal,
 ): Promise<void> {
-  const frame = `event: ${event.kind}\nid: ${event.sequence}\ndata: ${JSON.stringify(event)}\n\n`;
+  const frame = `event: ${event.kind}\nid: ${event.sequence}\ndata: ${HostedAgentRunProtocol.stringifyEvent(event)}\n\n`;
   if (response.write(frame)) {
     return;
   }
