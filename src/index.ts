@@ -158,6 +158,21 @@ export { ToolActivitySummarizer } from './core/live/index.js';
 // Types and services for hosts that embed `createConversationEngine` (rung 1)
 // directly and manage session create/resume/turn lifecycle and approval policy
 // themselves.
+export { ConversationRunService } from './core/chat/runs/index.js';
+export type {
+  ConversationRunAccepted,
+  ConversationRunAddress,
+  ConversationRunContext,
+  ConversationRunHandle,
+  ConversationRunReplayOptions,
+  ConversationRunServiceOptions,
+  ConversationRunStreamItem,
+  PendingConversationRunApproval,
+  StartConversationContinueRunInput,
+  StartConversationRunInput,
+  StartConversationTurnRunInput,
+  SubscribeConversationRunInput,
+} from './core/chat/runs/index.js';
 export type {
   ClearConversationTurnLeaseInput,
   ConversationEngine,

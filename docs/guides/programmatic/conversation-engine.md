@@ -75,6 +75,52 @@ if (activity.type === HeddleEventType.assistantStream) {
 }
 ```
 
+## Stream long-running turns
+
+Use one host-long-lived `ConversationRunService` when HTTP requests or other
+transport subscriptions should attach to the same active turn. The conversation
+engine continues to own durable session semantics; the run service owns
+process-local run identity, cancellation, ordered activity delivery, approvals,
+and bounded replay for reconnecting subscribers.
+
+```ts
+import { ConversationRunService, createConversationEngine } from '@roackb2/heddle'
+
+const runs = new ConversationRunService({
+  replay: { maxEventsPerRun: 512, retentionMs: 300_000 },
+})
+
+const engine = createConversationEngine({ workspaceRoot, stateRoot, model })
+const run = runs.startTurn({
+  address: { scopeId: tenantId, sessionId },
+  engine,
+  turn: { sessionId, prompt },
+})
+
+for await (const item of run.events()) {
+  await transport.send(item)
+}
+
+const result = await run.result
+```
+
+Reconnect with the same service and the last received sequence:
+
+```ts
+for await (const item of runs.subscribe({
+  address: { scopeId: tenantId, sessionId },
+  runId,
+  afterSequence,
+  signal,
+})) {
+  await transport.send(item)
+}
+```
+
+The replay buffer is intentionally process-local and bounded. Durable final
+conversation state remains in the engine's session repository; transports and
+cross-process delivery remain host responsibilities.
+
 ## Reading artifacts
 
 Each turn result already includes the artifacts produced by that turn. To review

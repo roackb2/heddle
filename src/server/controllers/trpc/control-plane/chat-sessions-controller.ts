@@ -36,8 +36,13 @@ import type {
 } from '@/core/chat/engine/types.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
+import {
+  ConversationRunService,
+  type ConversationRunContext,
+} from '@/core/chat/runs/index.js';
 import { CustomAgentService, type CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
+import type { ConversationActivity } from '@/core/live/index.js';
 import { ModelPolicyService } from '@/core/llm/models/index.js';
 import { LlmAdapterService } from '@/core/llm/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
@@ -57,10 +62,6 @@ import type {
   ControlPlaneSessionLiveEvent,
   ControlPlaneSessionsEventEnvelope,
 } from '@/server/control-plane-types.js';
-import {
-  ControlPlaneSessionRunService,
-  type ControlPlaneSessionRunContext,
-} from '@/server/services/control-plane/session-run-service.js';
 
 type ControlPlaneSessionReadArgs = Omit<ConversationEngineConfig, 'model' | 'workspaceId'> & {
   model?: string;
@@ -145,7 +146,9 @@ type DeleteQueuedChatPromptArgs = ControlPlaneSessionReadArgs & ControlPlaneSess
 
 export class ControlPlaneChatSessionsController {
   private readonly sessionEventBus = new EventEmitter();
-  private readonly runService = new ControlPlaneSessionRunService();
+  private readonly runService = new ConversationRunService<ControlPlaneSessionAddress>({
+    addressKey: ControlPlaneChatSessionsController.sessionAddressKey,
+  });
 
   createSession(args: CreateControlPlaneChatSessionArgs): ChatSessionDetail {
     const { suggestedName, ...engineInput } = args;
@@ -214,7 +217,7 @@ export class ControlPlaneChatSessionsController {
       onHeartbeat: () => {
         this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
       },
-      execute: async () => {
+      execute: async (run) => {
         const { sessionId, force = true, leaseOwner, ...engineInput } = args;
         const sessions = this.createEngine(engineInput).sessions;
         let leaseAcquired = false;
@@ -224,11 +227,7 @@ export class ControlPlaneChatSessionsController {
           this.assertNoLeaseConflict(sessions, sessionId, leaseOwner);
           const session = sessions.acquireLease(sessionId, leaseOwner);
           leaseAcquired = true;
-          const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
-            eventBus: this.sessionEventBus,
-            workspaceId: args.workspaceId,
-            sessionId,
-          });
+          const publisher = this.createRunEventPublisher(args, run);
           previousCompactionState = {
             context: session.context,
             archives: session.archives,
@@ -539,10 +538,28 @@ export class ControlPlaneChatSessionsController {
     publisher.publishQueueUpdated(session.queuedPrompts.length);
   }
 
+  private createRunEventPublisher(address: ControlPlaneSessionAddress, run: ConversationRunContext) {
+    const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
+      eventBus: this.sessionEventBus,
+      workspaceId: address.workspaceId,
+      sessionId: address.sessionId,
+    });
+    const publishActivity = (activity: ConversationActivity) => {
+      run.publishActivity(activity);
+      publisher.publishActivity(activity);
+    };
+
+    return {
+      ...publisher,
+      publishActivity,
+      publishActivities: (activities: ConversationActivity[]) => activities.forEach(publishActivity),
+    };
+  }
+
   private buildSubmitPromptRun(args: SubmitChatPromptArgs) {
     return {
       address: args,
-      onAccepted: (run: ControlPlaneSessionRunContext) => {
+      onAccepted: (run: ConversationRunContext) => {
         this.createEngine(args).sessions.acceptUserMessage(args.sessionId, {
           runId: run.runId,
           prompt: args.prompt,
@@ -552,7 +569,7 @@ export class ControlPlaneChatSessionsController {
       onHeartbeat: () => {
         this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
       },
-      execute: async (run: ControlPlaneSessionRunContext) => {
+      execute: async (run: ConversationRunContext) => {
         const result = process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT === '1'
           ? await ControlPlaneChatSessionBrowserIntegrationFake.run({
             ...args,
@@ -575,7 +592,7 @@ export class ControlPlaneChatSessionsController {
         });
         return result;
       },
-      onError: (error: unknown, run: ControlPlaneSessionRunContext) => {
+      onError: (error: unknown, run: ConversationRunContext) => {
         this.persistRunFailureMessage(args, run, error);
       },
       onSettled: () => {
@@ -590,7 +607,7 @@ export class ControlPlaneChatSessionsController {
       onHeartbeat: () => {
         this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
       },
-      execute: async (run: ControlPlaneSessionRunContext) => {
+      execute: async (run: ConversationRunContext) => {
         if (process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT === '1') {
           const session = this.createEngine(args).sessions.require(args.sessionId);
           if (!session.history.length || !session.lastContinuePrompt) {
@@ -614,7 +631,7 @@ export class ControlPlaneChatSessionsController {
           });
         });
       },
-      onError: (error: unknown, run: ControlPlaneSessionRunContext) => {
+      onError: (error: unknown, run: ConversationRunContext) => {
         this.persistRunFailureMessage(args, run, error);
       },
     };
@@ -626,12 +643,8 @@ export class ControlPlaneChatSessionsController {
       onHeartbeat: () => {
         this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
       },
-      execute: async (run: ControlPlaneSessionRunContext) => {
-        const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
-          eventBus: this.sessionEventBus,
-          workspaceId: args.workspaceId,
-          sessionId: args.sessionId,
-        });
+      execute: async (run: ConversationRunContext) => {
+        const publisher = this.createRunEventPublisher(args, run);
         const sessions = this.createEngine(args).sessions;
         const session = sessions.require(args.sessionId);
         this.assertNoLeaseConflict(sessions, args.sessionId, args.leaseOwner);
@@ -686,7 +699,7 @@ export class ControlPlaneChatSessionsController {
 
   private async runEngineTurn(
     args: ContinueChatPromptArgs,
-    runContext: ControlPlaneSessionRunContext,
+    runContext: ConversationRunContext,
     run: (input: {
       engine: ConversationEngine;
       host: ConversationEngineHost;
@@ -694,11 +707,7 @@ export class ControlPlaneChatSessionsController {
       shouldStop: () => boolean;
     }) => ReturnType<ConversationEngine['turns']['submit']>,
   ) {
-    const publisher = ControlPlaneChatSessionEventsController.createSessionEventPublisher({
-      eventBus: this.sessionEventBus,
-      workspaceId: args.workspaceId,
-      sessionId: args.sessionId,
-    });
+    const publisher = this.createRunEventPublisher(args, runContext);
 
     const result = await run({
       engine: this.createEngine(args),
@@ -727,7 +736,7 @@ export class ControlPlaneChatSessionsController {
 
   private persistRunFailureMessage(
     args: ContinueChatPromptArgs,
-    run: ControlPlaneSessionRunContext,
+    run: ConversationRunContext,
     error: unknown,
   ): void {
     const message = error instanceof Error ? error.message : String(error);

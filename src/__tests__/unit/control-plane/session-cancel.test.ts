@@ -7,14 +7,14 @@ import type { ChatSession } from '@/core/chat/types.js';
 import type { ToolApprovalRequest, ToolApprovalUserDecision } from '@/core/approvals/index.js';
 import type { ToolCall, ToolDefinition } from '@/core/types.js';
 import { ControlPlaneChatSessionsController } from '@/server/controllers/trpc/control-plane/chat-sessions-controller.js';
-import type {
-  ControlPlaneSessionRunContext,
-} from '@/server/services/control-plane/session-run-service.js';
-import { ControlPlaneSessionRunService } from '@/server/services/control-plane/session-run-service.js';
+import {
+  ConversationRunService,
+  type ConversationRunContext,
+} from '@/core/chat/runs/index.js';
 import { SESSION_LEASE_REFRESH_INTERVAL_MS } from '@/core/chat/engine/sessions/leases/index.js';
 
 type ControllerInternals = {
-  runService: ControlPlaneSessionRunService;
+  runService: ConversationRunService<ControlPlaneTestRunAddress>;
   createEngineHost: (
     args: Record<string, unknown>,
     publisher: {
@@ -28,7 +28,7 @@ type ControllerInternals = {
   };
   runEngineTurn: (
     args: Record<string, unknown>,
-    runContext: ControlPlaneSessionRunContext,
+    runContext: ConversationRunContext,
     run: (input: {
       abortSignal: AbortSignal;
       shouldStop: () => boolean;
@@ -43,7 +43,7 @@ type ControllerInternals = {
 describe('ControlPlaneChatSessionsController run cancellation', () => {
   it('refreshes active runs until they settle', async () => {
     vi.useFakeTimers();
-    const runService = new ControlPlaneSessionRunService();
+    const runService = createControlPlaneRunService();
     const heartbeats: string[] = [];
     let finishRun: (() => void) | undefined;
 
@@ -82,7 +82,7 @@ describe('ControlPlaneChatSessionsController run cancellation', () => {
 
   it('aborts active runs when heartbeat refresh fails', async () => {
     vi.useFakeTimers();
-    const runService = new ControlPlaneSessionRunService();
+    const runService = createControlPlaneRunService();
     let runAbortSignal: AbortSignal | undefined;
     let finishRun: (() => void) | undefined;
 
@@ -247,6 +247,17 @@ describe('ControlPlaneChatSessionsController run cancellation', () => {
     expect(publisher.publishApprovalUpdated).toHaveBeenCalledTimes(2);
   });
 });
+
+type ControlPlaneTestRunAddress = {
+  workspaceId: string;
+  sessionId: string;
+};
+
+function createControlPlaneRunService(): ConversationRunService<ControlPlaneTestRunAddress> {
+  return new ConversationRunService({
+    addressKey: ({ workspaceId, sessionId }) => `${workspaceId}:${sessionId}`,
+  });
+}
 
 function createApprovalRequest(): ToolApprovalRequest {
   return {
