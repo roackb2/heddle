@@ -317,6 +317,67 @@ describe('chat turn preparation modules', () => {
     ]));
   });
 
+  it('applies the host tool profile when no custom agent is selected', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-turn-host-profile-'));
+    const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
+    const session = ChatSessionRecords.create({
+      id: 'session-1',
+      name: 'Session 1',
+      apiKeyPresent: true,
+      model: 'gpt-5.4',
+    });
+    new FileChatSessionRepository({ sessionStoragePath }).save([session]);
+
+    const context = ConversationTurnContextBuilder.build({
+      workspaceRoot: root,
+      stateRoot: join(root, '.heddle'),
+      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionId: 'session-1',
+      apiKey: 'explicit-key',
+      toolProfile: {
+        preset: 'default',
+        memoryMode: 'none',
+      },
+    });
+
+    expect(context.toolNames).toContain('read_file');
+    expect(context.toolNames).not.toEqual(expect.arrayContaining([
+      'list_memory_notes',
+      'read_memory_note',
+      'search_memory_notes',
+      'memory_checkpoint',
+      'record_knowledge',
+    ]));
+  });
+
+  it('lets a selected custom agent override the host tool profile', () => {
+    const root = mkdtempSync(join(tmpdir(), 'heddle-turn-agent-profile-'));
+    const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
+    const session = ChatSessionRecords.create({
+      id: 'session-1',
+      name: 'Session 1',
+      apiKeyPresent: true,
+      model: 'gpt-5.4',
+    });
+    new FileChatSessionRepository({ sessionStoragePath }).save([session]);
+
+    const context = ConversationTurnContextBuilder.build({
+      workspaceRoot: root,
+      stateRoot: join(root, '.heddle'),
+      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionId: 'session-1',
+      apiKey: 'explicit-key',
+      toolProfile: { preset: 'none' },
+      agentSnapshot: askAgentSnapshot(),
+    });
+
+    expect(context.toolNames).toEqual(expect.arrayContaining([
+      'read_file',
+      'search_files',
+      'run_shell_inspect',
+    ]));
+  });
+
   it('adds host-provided tools to prepared turn context', () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-host-tools-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');

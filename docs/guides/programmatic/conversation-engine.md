@@ -36,6 +36,30 @@ The normalized engine config derives default paths from `stateRoot`:
 Use `EngineConversationTurnService.run(...)` only when your host already owns
 session ids and storage paths. For new hosts, prefer `createConversationEngine`.
 
+## Control model-visible tools
+
+Use `toolProfile` to set the engine's default model-visible tool policy. For
+example, a host that does not use Heddle-managed memory can keep the ordinary
+tool bundle while removing every memory tool:
+
+```ts
+const engine = createConversationEngine({
+  workspaceRoot,
+  stateRoot,
+  model: 'gpt-5.4',
+  toolProfile: {
+    preset: 'default',
+    memoryMode: 'none',
+  },
+})
+```
+
+This is separate from `memoryMaintenanceMode`. `toolProfile.memoryMode`
+controls the memory tools visible to the model, while
+`memoryMaintenanceMode` controls post-turn memory maintenance scheduling. If a
+turn selects a custom agent, that agent's tool profile overrides the engine
+default for the turn.
+
 ## Reading artifacts
 
 Each turn result already includes the artifacts produced by that turn. To review

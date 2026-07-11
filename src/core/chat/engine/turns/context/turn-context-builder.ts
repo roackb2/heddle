@@ -31,13 +31,14 @@ export class ConversationTurnContextBuilder {
     };
     const toolContext: ConversationTurnToolContextArgs = args;
     const toolRuntime: ConversationTurnToolRuntimeArgs = runtime;
+    const toolProfile = args.agentSnapshot?.toolProfile ?? args.toolProfile;
     const tools = RuntimeToolService.createDefaultAgentTools({
       ...toolContext,
       ...toolRuntime,
       stateRoot: args.stateRoot,
       sessionId: session.id,
-      memoryMode: args.agentSnapshot?.toolProfile.memoryMode,
-      toolProfile: args.agentSnapshot?.toolProfile,
+      memoryMode: toolProfile?.memoryMode,
+      toolProfile,
     });
 
     return {

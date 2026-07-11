@@ -173,6 +173,7 @@ export type {
   UpdateConversationSessionSettingsInput,
 } from './core/chat/engine/types.js';
 export { EngineConversationTurnService } from './core/chat/engine/turns/service.js';
+export type { RuntimeToolSelectionProfile, ToolCapability } from './core/runtime/tools/index.js';
 export type {
   RunConversationTurnArgs,
   RunConversationTurnResult,
