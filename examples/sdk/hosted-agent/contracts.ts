@@ -30,7 +30,7 @@ export const HostedAgentRunEventSchema = z.discriminatedUnion('kind', [
     result: z.object({
       outcome: z.string().min(1),
       summary: z.string(),
-    }).passthrough(),
+    }),
   }),
   RunEventEnvelopeSchema.extend({
     kind: z.literal('cancelled'),

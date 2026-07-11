@@ -112,7 +112,16 @@ describe('hosted agent SDK stack example', () => {
         afterSequence: cursor,
         onEvent: (event) => replay.push(event),
       });
-      expect(replay).toMatchObject([{ kind: 'result', sequence: 2 }]);
+      expect(replay).toEqual([
+        expect.objectContaining({
+          kind: 'result',
+          sequence: 2,
+          result: {
+            outcome: 'done',
+            summary: 'Completed: Stream this turn',
+          },
+        }),
+      ]);
 
       await expect(otherAccountClient.subscribe({
         runId: accepted.runId,

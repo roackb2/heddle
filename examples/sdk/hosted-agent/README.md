@@ -74,10 +74,11 @@ either the explicit `after` query or `Last-Event-ID` (the query wins), respects
 response backpressure, and aborts only the subscription when the connection
 closes. It never cancels the underlying run implicitly.
 
-This teaching API sends Heddle's authenticated run envelope directly, including
-the turn result on the terminal item. If your browser must not receive trace,
-artifact, tool-result, or session details, project the terminal into a smaller
-application-owned public schema before serialization.
+This teaching API preserves Heddle's run envelope but deliberately projects the
+terminal result to public `outcome` and `summary` fields. Trace paths, artifacts,
+tool results, and internal session state are not serialized to the browser.
+Replace that result schema with an application-owned public schema when your
+client needs additional product data.
 
 The authentication callback is injected. The runnable adapter deliberately
 refuses `NODE_ENV=production`; replace it with your real session/JWT verifier,
