@@ -1,4 +1,4 @@
-import type { ZodType } from 'zod';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 
 export type ConversationRunReference = {
   runId: string;
@@ -66,6 +66,22 @@ export type ConversationRunProtocolEvent<Activity, Result> =
   });
 
 export type ConversationRunProtocolCodecOptions<Activity, Result> = {
-  activity: ZodType<Activity>;
-  result: ZodType<Result>;
+  activity: StandardSchemaV1<unknown, Activity>;
+  result: StandardSchemaV1<unknown, Result>;
 };
+
+export type ConversationRunProtocolSafeParseResult<Activity, Result> =
+  | {
+    success: true;
+    data: ConversationRunProtocolEvent<Activity, Result>;
+  }
+  | {
+    success: false;
+    error: Error;
+  };
+
+export type ConversationRunProtocolEventSchema<Activity, Result> =
+  StandardSchemaV1<unknown, ConversationRunProtocolEvent<Activity, Result>> & {
+    parse(input: unknown): ConversationRunProtocolEvent<Activity, Result>;
+    safeParse(input: unknown): ConversationRunProtocolSafeParseResult<Activity, Result>;
+  };
