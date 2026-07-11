@@ -1,5 +1,8 @@
 import { ClientSharedSessionActivityService } from '@/client-shared/services/session-activities/index.js';
-import type { ControlPlaneSlashCommandResult } from '@/client-shared/api/types.js';
+import type {
+  ControlPlaneSessionSendPromptAsyncResult,
+  ControlPlaneSlashCommandResult,
+} from '@/client-shared/api/types.js';
 import type { ControlPlaneSessionApiService } from '../services/sessions/control-plane-session-api-service.js';
 import type { ControlPlaneSessionLoader } from './control-plane-session-loader.js';
 import type { ControlPlaneSessionState } from './control-plane-session-state.js';
@@ -8,6 +11,7 @@ type ControlPlaneSlashCommandControllerOptions = {
   api: ControlPlaneSessionApiService;
   state: ControlPlaneSessionState;
   loader: ControlPlaneSessionLoader;
+  onRunAccepted: (run: Extract<ControlPlaneSessionSendPromptAsyncResult, { accepted: true }>) => void;
   formatError: (error: unknown) => string;
 };
 
@@ -109,7 +113,20 @@ export class ControlPlaneSlashCommandController {
   private async submitAgentPrompt(prompt: string): Promise<void> {
     const workspaceId = this.options.state.requireWorkspaceId();
     const sessionId = this.options.state.requireActiveSessionId();
-    await this.options.api.sendPromptAsync({ workspaceId, sessionId, prompt });
+    const result = await this.options.api.sendPromptAsync({ workspaceId, sessionId, prompt });
+    if ('queued' in result) {
+      this.options.state.patch({
+        running: this.options.state.getSnapshot().running,
+        latestUpdate: {
+          label: 'Prompt queued',
+          detail: `position ${result.position}`,
+          tone: 'info',
+        },
+      });
+      return;
+    }
+
+    this.options.onRunAccepted(result);
     this.options.state.patch({
       running: true,
       commandResultExpanded: false,

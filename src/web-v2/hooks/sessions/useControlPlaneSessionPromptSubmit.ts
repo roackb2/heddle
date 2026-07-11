@@ -6,7 +6,10 @@ import {
   type ClientSharedAgentActivityStatus,
 } from '@/client-shared/services/session-activities';
 import { ClientSharedPromptInputService } from '@/client-shared/services/prompt-input';
-import type { ControlPlaneSessionDirectShellPreflight } from '@/client-shared/api/types';
+import type {
+  ControlPlaneSessionDirectShellPreflight,
+  ControlPlaneSessionRunReference,
+} from '@/client-shared/api/types';
 
 type UseControlPlaneSessionPromptSubmitArgs = {
   workspaceId?: string;
@@ -17,6 +20,7 @@ type UseControlPlaneSessionPromptSubmitArgs = {
   setError: Dispatch<SetStateAction<string | undefined>>;
   setLiveStatus: Dispatch<SetStateAction<string | undefined>>;
   setCurrentActivity: Dispatch<SetStateAction<ClientSharedAgentActivityStatus | undefined>>;
+  onRunAccepted: (run: ControlPlaneSessionRunReference) => void;
 };
 
 export type ControlPlaneSessionPromptSubmitState = {
@@ -43,6 +47,7 @@ export function useControlPlaneSessionPromptSubmit({
   setError,
   setLiveStatus,
   setCurrentActivity,
+  onRunAccepted,
 }: UseControlPlaneSessionPromptSubmitArgs): ControlPlaneSessionPromptSubmitState {
   const { t } = useI18n();
   const [submitting, setSubmitting] = useState(false);
@@ -96,22 +101,28 @@ export function useControlPlaneSessionPromptSubmit({
     }
 
     try {
-      if (input.directShell) {
-        await sessionDirectShellMutation.mutateAsync({
+      const result = input.directShell
+        ? await sessionDirectShellMutation.mutateAsync({
           workspaceId,
           sessionId,
           command: input.directShell.command,
           riskAccepted: input.directShell.riskAccepted,
-        });
-      } else {
-        await sessionSendPromptMutation.mutateAsync({
+        })
+        : await sessionSendPromptMutation.mutateAsync({
           workspaceId,
           sessionId,
           prompt: input.prompt,
           agentProfileId: input.agentProfileId,
           browserIntent: input.browserIntent,
         });
+      if ('queued' in result) {
+        if (isCurrentSubmission()) {
+          setLiveStatus(`Prompt queued at position ${result.position}.`);
+        }
+        return;
       }
+
+      onRunAccepted(result);
       if (isCurrentSubmission()) {
         setRunning(true);
         setLiveStatus((current) => (
@@ -144,6 +155,7 @@ export function useControlPlaneSessionPromptSubmit({
     setCurrentActivity,
     setRunning,
     running,
+    onRunAccepted,
     sessionId,
     sessionDirectShellMutation,
     sessionSendPromptMutation,

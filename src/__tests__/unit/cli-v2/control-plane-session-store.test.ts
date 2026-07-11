@@ -5,6 +5,7 @@ import type {
   ControlPlaneModelOptions,
   ControlPlaneSessionDetail,
   ControlPlaneSessionEventEnvelope,
+  ControlPlaneSessionRunEventEnvelope,
   ControlPlaneSessionRuntimeContext,
   ControlPlaneSessionSendPromptAsyncResult,
   ControlPlaneSessionView,
@@ -46,6 +47,37 @@ describe('ControlPlaneSessionStore', () => {
     expect(store.getSnapshot().activeSession?.messages).toEqual([
       { id: 'message-1', role: 'assistant', text: 'Ready.' },
     ]);
+    store.dispose();
+  });
+
+  it('recovers and subscribes to an active run when loading a session', async () => {
+    const fixture = createClientFixture();
+    fixture.calls.sessionRunStateQuery.mockResolvedValueOnce({
+      running: true,
+      activeRun: {
+        runId: 'recovered-run-1',
+        acceptedAt: '2026-07-11T00:00:00.000Z',
+      },
+      pendingApproval: null,
+    });
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+
+    await store.start();
+
+    expect(store.getSnapshot()).toMatchObject({
+      running: true,
+      activeRun: {
+        runId: 'recovered-run-1',
+        acceptedAt: '2026-07-11T00:00:00.000Z',
+      },
+      streamConnected: true,
+    });
+    expect(fixture.calls.sessionRunEventsSubscribe).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      runId: 'recovered-run-1',
+      afterSequence: 0,
+    }, expect.any(Object));
     store.dispose();
   });
 
@@ -363,23 +395,16 @@ describe('ControlPlaneSessionStore', () => {
     await store.start();
 
     await store.submitPrompt('/model');
-    fixture.sessionEvents?.onData?.({
-      type: 'session.event',
-      sessionId: 'session-1',
+    fixture.emitRunActivity({
+      source: 'agent-loop',
+      type: 'loop.started',
+      runId: 'run-1',
+      goal: 'Continue with the work.',
+      model: 'gpt-test',
+      provider: 'openai',
+      workspaceRoot: '/repo',
       timestamp: new Date().toISOString(),
-      activities: [
-        {
-          source: 'agent-loop',
-          type: 'loop.started',
-          runId: 'run-1',
-          goal: 'Continue with the work.',
-          model: 'gpt-test',
-          provider: 'openai',
-          workspaceRoot: '/repo',
-          timestamp: new Date().toISOString(),
-        },
-      ],
-    } as ControlPlaneSessionEventEnvelope);
+    });
 
     expect(store.getSnapshot().commandResultExpanded).toBe(false);
     store.dispose();
@@ -480,30 +505,99 @@ describe('ControlPlaneSessionStore', () => {
       });
       await store.start();
 
-      fixture.sessionEvents?.onData?.({
-        type: 'session.event',
-        sessionId: 'session-1',
+      fixture.emitRunActivity({
+        source: 'agent-loop',
+        type: 'loop.started',
+        runId: 'run-1',
+        goal: 'Finish through polling.',
+        model: 'gpt-test',
+        provider: 'openai',
+        workspaceRoot: '/repo',
         timestamp: new Date().toISOString(),
-        activities: [
-          {
-            source: 'agent-loop',
-            type: 'loop.started',
-            runId: 'run-1',
-            goal: 'Finish through polling.',
-            model: 'gpt-test',
-            provider: 'openai',
-            workspaceRoot: '/repo',
-            timestamp: new Date().toISOString(),
-          },
-        ],
-      } as ControlPlaneSessionEventEnvelope);
+      });
 
       await vi.advanceTimersByTimeAsync(800);
 
       expect(notificationService.deliver).toHaveBeenCalledWith(expect.objectContaining({
-        key: 'session-run-finished-poll:workspace-1:session-1',
+        key: 'session-run-terminal:workspace-1:session-1:run-1',
         title: 'Session run finished',
       }));
+      store.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not let an older run-state poll overwrite a streamed terminal item', async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = createClientFixture();
+      const pendingRunState = createDeferred<Awaited<ReturnType<typeof fixture.calls.sessionRunStateQuery>>>();
+      const store = new ControlPlaneSessionStore({ client: fixture.client });
+      await store.start();
+      fixture.calls.sessionRunStateQuery.mockReturnValueOnce(pendingRunState.promise);
+
+      await store.submitPrompt('Finish while a poll is in flight');
+      await vi.advanceTimersByTimeAsync(800);
+      fixture.emitRunResult({ outcome: 'done', summary: 'Done.' }, 'session-run-1');
+      pendingRunState.resolve({
+        running: true,
+        activeRun: {
+          runId: 'session-run-1',
+          acceptedAt: '2026-05-27T00:00:00.000Z',
+        },
+        pendingApproval: null,
+      });
+      await Promise.resolve();
+
+      expect(store.getSnapshot()).toMatchObject({
+        activeRun: undefined,
+        running: false,
+        latestUpdate: {
+          label: 'Run finished',
+          detail: 'done',
+          tone: 'success',
+        },
+      });
+      store.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reconnects the run stream from the latest accepted sequence', async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = createClientFixture();
+      const store = new ControlPlaneSessionStore({ client: fixture.client });
+      await store.start();
+
+      fixture.emitRunActivity({
+        source: 'agent-loop',
+        type: 'loop.started',
+        runId: 'run-1',
+        goal: 'Reconnect safely.',
+        model: 'gpt-test',
+        provider: 'openai',
+        workspaceRoot: '/repo',
+        timestamp: new Date().toISOString(),
+      });
+      fixture.runEvents?.onError?.(new Error('transport lost'));
+
+      expect(store.getSnapshot()).toMatchObject({
+        streamConnected: false,
+        latestUpdate: expect.anything(),
+      });
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(fixture.calls.sessionRunEventsSubscribe).toHaveBeenLastCalledWith({
+        workspaceId: 'workspace-1',
+        sessionId: 'session-1',
+        runId: 'run-1',
+        afterSequence: 1,
+      }, expect.any(Object));
+      fixture.emitRunResult({ outcome: 'done', summary: 'Reconnected.' });
+      expect(store.getSnapshot()).toMatchObject({ running: false, activeRun: undefined });
       store.dispose();
     } finally {
       vi.useRealTimers();
@@ -558,21 +652,17 @@ describe('ControlPlaneSessionStore', () => {
 
   it('cancels the active run through sessionCancel', async () => {
     const fixture = createClientFixture();
-    const pendingSubmit = createDeferred<Awaited<ReturnType<typeof fixture.calls.sessionSendPromptAsyncMutate>>>();
-    fixture.calls.sessionSendPromptAsyncMutate.mockReturnValueOnce(pendingSubmit.promise);
     fixture.calls.sessionCancelMutate.mockResolvedValueOnce({ cancelled: true });
-    fixture.calls.sessionRunningQuery
-      .mockResolvedValueOnce({ running: false })
-      .mockResolvedValueOnce({ running: false });
     const store = new ControlPlaneSessionStore({ client: fixture.client });
     await store.start();
 
-    const submit = store.submitPrompt('Long run');
+    await store.submitPrompt('Long run');
     await store.cancelRun();
 
     expect(fixture.calls.sessionCancelMutate).toHaveBeenCalledWith({
       workspaceId: 'workspace-1',
       id: 'session-1',
+      runId: 'session-run-1',
     });
     expect(store.getSnapshot()).toMatchObject({
       running: false,
@@ -582,8 +672,6 @@ describe('ControlPlaneSessionStore', () => {
         tone: 'warning',
       },
     });
-    pendingSubmit.resolve(createAcceptedResult());
-    await submit;
     store.dispose();
   });
 
@@ -591,12 +679,14 @@ describe('ControlPlaneSessionStore', () => {
     const fixture = createClientFixture();
     const store = new ControlPlaneSessionStore({ client: fixture.client });
     await store.start();
+    fixture.announceRun('run-approval');
 
     await store.resolvePendingApproval({ type: 'approve', reason: 'Approved in test' });
 
     expect(fixture.calls.sessionResolveApprovalMutate).toHaveBeenCalledWith({
       workspaceId: 'workspace-1',
       sessionId: 'session-1',
+      runId: 'run-approval',
       decision: { type: 'approve', reason: 'Approved in test' },
     });
     expect(store.getSnapshot()).toMatchObject({
@@ -621,6 +711,7 @@ describe('ControlPlaneSessionStore', () => {
       type: 'session.approval.updated',
       sessionId: 'session-1',
       timestamp: new Date().toISOString(),
+      approval: createPendingApproval(),
     });
     await vi.waitFor(() => {
       expect(store.getSnapshot().pendingApproval).toEqual(expect.objectContaining({
@@ -641,35 +732,24 @@ describe('ControlPlaneSessionStore', () => {
     const store = new ControlPlaneSessionStore({ client: fixture.client });
     await store.start();
 
-    fixture.sessionEvents?.onData?.({
-      type: 'session.event',
-      sessionId: 'session-1',
+    fixture.emitRunActivity({
+      source: 'agent-loop',
+      type: 'loop.started',
+      runId: 'run-1',
+      goal: 'Say hello.',
+      model: 'gpt-test',
+      provider: 'openai',
+      workspaceRoot: '/repo',
       timestamp: new Date().toISOString(),
-      activities: [
-        {
-          source: 'agent-loop',
-          type: 'loop.started',
-          runId: 'run-1',
-          goal: 'Say hello.',
-          model: 'gpt-test',
-          provider: 'openai',
-          workspaceRoot: '/repo',
-          timestamp: new Date().toISOString(),
-        },
-      ],
-    } as ControlPlaneSessionEventEnvelope);
-    fixture.sessionEvents?.onData?.({
-      type: 'session.event',
-      sessionId: 'session-1',
+    });
+    fixture.emitRunActivity({
+      source: 'agent-loop',
+      type: 'assistant.stream',
+      runId: 'run-1',
+      text: 'Streaming response',
+      done: false,
       timestamp: new Date().toISOString(),
-      activities: [
-        {
-          type: 'assistant.stream',
-          text: 'Streaming response',
-          done: false,
-        },
-      ],
-    } as ControlPlaneSessionEventEnvelope);
+    });
 
     expect(store.getSnapshot().activeSession?.messages.at(-1)).toEqual({
       id: 'live-assistant',
@@ -689,41 +769,41 @@ describe('ControlPlaneSessionStore', () => {
       const store = new ControlPlaneSessionStore({ client: fixture.client });
       await store.start();
 
-      fixture.sessionEvents?.onData?.({
-        type: 'session.event',
-        sessionId: 'session-1',
+      fixture.emitRunActivity({
+        source: 'agent-loop',
+        type: 'loop.started',
+        runId: 'run-1',
+        goal: 'Say hello.',
+        model: 'gpt-test',
+        provider: 'openai',
+        workspaceRoot: '/repo',
         timestamp: new Date().toISOString(),
-        activities: [
-          {
-            source: 'agent-loop',
-            type: 'loop.started',
-            runId: 'run-1',
-            goal: 'Say hello.',
-            model: 'gpt-test',
-            provider: 'openai',
-            workspaceRoot: '/repo',
-            timestamp: new Date().toISOString(),
-          },
-        ],
-      } as ControlPlaneSessionEventEnvelope);
+      });
 
-      fixture.sessionEvents?.onData?.({
-        type: 'session.event',
-        sessionId: 'session-1',
+      fixture.emitRunActivity({
+        source: 'agent-loop',
+        type: 'assistant.stream',
+        runId: 'run-1',
+        text: 'First chunk',
+        done: false,
         timestamp: new Date().toISOString(),
-        activities: [
-          { type: 'assistant.stream', text: 'First chunk', done: false },
-        ],
-      } as ControlPlaneSessionEventEnvelope);
-      fixture.sessionEvents?.onData?.({
-        type: 'session.event',
-        sessionId: 'session-1',
+      });
+      fixture.emitRunActivity({
+        source: 'agent-loop',
+        type: 'assistant.stream',
+        runId: 'run-1',
+        text: 'Second chunk',
+        done: false,
         timestamp: new Date().toISOString(),
-        activities: [
-          { type: 'assistant.stream', text: 'Second chunk', done: false },
-          { type: 'assistant.stream', text: 'Newest chunk', done: false },
-        ],
-      } as ControlPlaneSessionEventEnvelope);
+      });
+      fixture.emitRunActivity({
+        source: 'agent-loop',
+        type: 'assistant.stream',
+        runId: 'run-1',
+        text: 'Newest chunk',
+        done: false,
+        timestamp: new Date().toISOString(),
+      });
 
       expect(store.getSnapshot().activeSession?.messages.at(-1)?.text).toBe('First chunk');
 
@@ -731,14 +811,14 @@ describe('ControlPlaneSessionStore', () => {
 
       expect(store.getSnapshot().activeSession?.messages.at(-1)?.text).toBe('Newest chunk');
 
-      fixture.sessionEvents?.onData?.({
-        type: 'session.event',
-        sessionId: 'session-1',
+      fixture.emitRunActivity({
+        source: 'agent-loop',
+        type: 'assistant.stream',
+        runId: 'run-1',
+        text: 'Final text',
+        done: true,
         timestamp: new Date().toISOString(),
-        activities: [
-          { type: 'assistant.stream', text: 'Final text', done: true },
-        ],
-      } as ControlPlaneSessionEventEnvelope);
+      });
 
       expect(store.getSnapshot().activeSession?.messages.at(-1)).toEqual({
         id: 'live-assistant',
@@ -759,24 +839,17 @@ describe('ControlPlaneSessionStore', () => {
     const store = new ControlPlaneSessionStore({ client: fixture.client });
     await store.start();
 
-    fixture.sessionEvents?.onData?.({
-      type: 'session.event',
-      sessionId: 'session-1',
+    fixture.emitRunActivity({
+      source: 'agent-loop',
+      type: 'tool.calling',
+      runId: 'run-1',
+      step: 2,
+      tool: 'read_file',
+      toolCallId: 'call-1',
+      input: { path: 'README.md' },
+      requiresApproval: false,
       timestamp: new Date().toISOString(),
-      activities: [
-        {
-          source: 'agent-loop',
-          type: 'tool.calling',
-          runId: 'run-1',
-          step: 2,
-          tool: 'read_file',
-          toolCallId: 'call-1',
-          input: { path: 'README.md' },
-          requiresApproval: false,
-          timestamp: new Date().toISOString(),
-        },
-      ],
-    } as ControlPlaneSessionEventEnvelope);
+    });
 
     expect(store.getSnapshot().latestUpdate).toEqual({
       label: 'Running read_file',
@@ -796,46 +869,32 @@ describe('ControlPlaneSessionStore', () => {
     const store = new ControlPlaneSessionStore({ client: fixture.client });
     await store.start();
 
-    fixture.sessionEvents?.onData?.({
-      type: 'session.event',
-      sessionId: 'session-1',
+    fixture.emitRunActivity({
+      source: 'agent-loop',
+      type: 'plan.updated',
+      runId: 'run-1',
+      step: 1,
       timestamp: new Date().toISOString(),
-      activities: [
-        {
-          source: 'agent-loop',
-          type: 'plan.updated',
-          runId: 'run-1',
-          step: 1,
-          timestamp: new Date().toISOString(),
-          explanation: 'Tracking current work.',
-          items: [
-            { step: 'Inspect', status: 'completed' },
-            { step: 'Implement', status: 'in_progress' },
-          ],
-        },
+      explanation: 'Tracking current work.',
+      items: [
+        { step: 'Inspect', status: 'completed' },
+        { step: 'Implement', status: 'in_progress' },
       ],
-    } as ControlPlaneSessionEventEnvelope);
+    });
 
     expect(store.getSnapshot().activePlan?.items).toEqual([
       { step: 'Inspect', status: 'completed' },
       { step: 'Implement', status: 'in_progress' },
     ]);
 
-    fixture.sessionEvents?.onData?.({
-      type: 'session.event',
-      sessionId: 'session-1',
+    fixture.emitRunActivity({
+      source: 'agent-loop',
+      type: 'loop.finished',
+      runId: 'run-1',
+      outcome: 'done',
+      summary: 'Done.',
       timestamp: new Date().toISOString(),
-      activities: [
-        {
-          source: 'agent-loop',
-          type: 'loop.finished',
-          runId: 'run-1',
-          outcome: 'done',
-          summary: 'Done.',
-          timestamp: new Date().toISOString(),
-        },
-      ],
-    } as ControlPlaneSessionEventEnvelope);
+    });
 
     expect(store.getSnapshot().activePlan).toBeUndefined();
     store.dispose();
@@ -846,21 +905,15 @@ describe('ControlPlaneSessionStore', () => {
     const store = new ControlPlaneSessionStore({ client: fixture.client });
     await store.start();
 
-    fixture.sessionEvents?.onData?.({
-      type: 'session.event',
-      sessionId: 'session-1',
+    fixture.emitRunActivity({
+      source: 'agent-loop',
+      type: 'loop.finished',
+      runId: 'run-1',
+      outcome: 'done',
+      summary: 'Done.',
       timestamp: new Date().toISOString(),
-      activities: [
-        {
-          source: 'agent-loop',
-          type: 'loop.finished',
-          runId: 'run-1',
-          outcome: 'done',
-          summary: 'Done.',
-          timestamp: new Date().toISOString(),
-        },
-      ],
-    } as ControlPlaneSessionEventEnvelope);
+    });
+    fixture.emitRunResult({ outcome: 'done', summary: 'Done.' });
 
     expect(store.getSnapshot().latestUpdate).toEqual({
       label: 'Run finished',
@@ -879,24 +932,17 @@ describe('ControlPlaneSessionStore', () => {
     });
     await store.start();
 
-    fixture.sessionEvents?.onData?.({
-      type: 'session.event',
-      sessionId: 'session-1',
-      timestamp: new Date().toISOString(),
-      activities: [
-        {
-          source: 'agent-loop',
-          type: 'loop.finished',
-          runId: 'run-1',
-          outcome: 'done',
-          summary: 'Done.',
-          timestamp: '2026-06-12T00:00:00.000Z',
-        },
-      ],
-    } as ControlPlaneSessionEventEnvelope);
+    fixture.emitRunActivity({
+      source: 'agent-loop',
+      type: 'loop.finished',
+      runId: 'run-1',
+      outcome: 'done',
+      summary: 'Done.',
+      timestamp: '2026-06-12T00:00:00.000Z',
+    });
 
     expect(notificationService.deliver).toHaveBeenCalledWith(expect.objectContaining({
-      key: 'session-run-finished:workspace-1:session-1:run-1',
+      key: 'session-run-terminal:workspace-1:session-1:run-1',
       title: 'Session run finished',
     }));
     store.dispose();
@@ -909,6 +955,11 @@ type SubscriptionOptions<T> = {
   onError?: (error: Error) => void;
   onComplete?: () => void;
 };
+
+type ControlPlaneRunActivity = Extract<
+  ControlPlaneSessionRunEventEnvelope,
+  { kind: 'activity' }
+>['activity'];
 
 function createClientFixture(options: {
   directShellPreflight?: {
@@ -930,13 +981,16 @@ function createClientFixture(options: {
   const sessionDetail = createSessionDetail();
   const pendingApproval: ControlPlanePendingApproval = null;
   let sessionEvents: SubscriptionOptions<ControlPlaneSessionEventEnvelope> | undefined;
+  let runEvents: SubscriptionOptions<ControlPlaneSessionRunEventEnvelope> | undefined;
   let sessionsEvents: SubscriptionOptions<ControlPlaneSessionsEventEnvelope> | undefined;
+  let activeRunId: string | undefined;
+  let runSequence = 0;
   const calls = {
     stateQuery: vi.fn(async () => ({ activeWorkspaceId: 'workspace-1', workspaces: [] })),
     sessionsQuery: vi.fn(async () => ({ workspaceId: 'workspace-1', sessions: [sessionView] })),
     sessionQuery: vi.fn(async () => sessionDetail),
     sessionRunningQuery: vi.fn(async () => ({ running: false })),
-    sessionRunStateQuery: vi.fn(async () => ({ running: false, pendingApproval })),
+    sessionRunStateQuery: vi.fn(async () => ({ running: false, activeRun: null, pendingApproval })),
     sessionRuntimeContextQuery: vi.fn(async () => createRuntimeContext()),
     modelOptionsQuery: vi.fn(async () => createModelOptions()),
     sessionPendingApprovalQuery: vi.fn(async () => pendingApproval),
@@ -952,6 +1006,13 @@ function createClientFixture(options: {
       summary: 'Done.',
     })),
     sessionSendPromptAsyncMutate: vi.fn(async () => createAcceptedResult()),
+    sessionRunEventsSubscribe: vi.fn((input, subscriptionOptions) => {
+      activeRunId = input.runId;
+      runSequence = input.afterSequence;
+      runEvents = subscriptionOptions;
+      subscriptionOptions.onStarted?.();
+      return { unsubscribe: vi.fn() };
+    }),
     sessionDirectShellPreflightQuery: vi.fn(async () => options.directShellPreflight ?? ({
       command: 'echo hello',
       risk: 'safe',
@@ -1028,6 +1089,9 @@ function createClientFixture(options: {
           return { unsubscribe: vi.fn() };
         }),
       },
+      sessionRunEvents: {
+        subscribe: calls.sessionRunEventsSubscribe,
+      },
       sessionRunning: { query: calls.sessionRunningQuery },
       sessionRunState: { query: calls.sessionRunStateQuery },
       sessionRuntimeContext: { query: calls.sessionRuntimeContextQuery },
@@ -1047,11 +1111,63 @@ function createClientFixture(options: {
     },
   } as unknown as ControlPlaneProxyClient;
 
+  const announceRun = (runId = 'run-1') => {
+    if (activeRunId !== runId) {
+      activeRunId = runId;
+      runSequence = 0;
+    }
+    sessionEvents?.onData?.({
+      type: 'session.run.updated',
+      sessionId: 'session-1',
+      timestamp: new Date().toISOString(),
+      status: 'started',
+      run: {
+        runId,
+        acceptedAt: '2026-05-27T00:00:00.000Z',
+      },
+    });
+  };
+
+  const emitRunActivity = (activity: ControlPlaneRunActivity) => {
+    if (activeRunId !== activity.runId || !runEvents) {
+      announceRun(activity.runId);
+    }
+    runEvents?.onData?.({
+      kind: 'activity',
+      runId: activity.runId,
+      sequence: ++runSequence,
+      timestamp: activity.timestamp,
+      activity,
+    });
+  };
+
+  const emitRunResult = (
+    result: Extract<ControlPlaneSessionRunEventEnvelope, { kind: 'result' }>['result'],
+    runId = activeRunId ?? 'run-1',
+  ) => {
+    if (activeRunId !== runId || !runEvents) {
+      announceRun(runId);
+    }
+    runEvents?.onData?.({
+      kind: 'result',
+      runId,
+      sequence: ++runSequence,
+      timestamp: new Date().toISOString(),
+      result,
+    });
+  };
+
   return {
     client,
     calls,
+    announceRun,
+    emitRunActivity,
+    emitRunResult,
     get sessionEvents() {
       return sessionEvents;
+    },
+    get runEvents() {
+      return runEvents;
     },
     get sessionsEvents() {
       return sessionsEvents;

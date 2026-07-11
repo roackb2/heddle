@@ -56,7 +56,7 @@ export class ChatSessionEventsRestController {
       workspaceId: workspace.id,
       sessionId,
     }, (payload) => {
-      send('session.event', payload);
+      send(payload.type, payload);
     });
 
     let watcher: ReturnType<typeof watch> | undefined;

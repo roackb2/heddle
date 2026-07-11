@@ -35,11 +35,18 @@ The default control plane includes:
 
 Browser image uploads accept common image formats and keep the saved file path readable to the runtime. The browser sends those paths with the prompt instead of inventing a separate image-analysis path, so normal tool approval, trace, and `view_image` behavior still apply.
 
-Live session updates come from the daemon's per-session event stream. The
-browser uses the `controlPlane.sessionEvents` tRPC subscription for those
-updates. Streaming activity is separate from durable session refreshes:
-assistant/tool progress arrives as live activity, while saved-session changes
-tell the browser to refetch persisted session detail.
+Live session updates use the same `ConversationRunService` contract available
+to SDK hosts. The browser first learns the accepted `runId`, then consumes
+ordered activity and the terminal item from the replayable
+`controlPlane.sessionRunEvents` subscription. The lighter
+`controlPlane.sessionEvents` stream carries run discovery, approvals, queue
+changes, and persisted-session refresh signals. If the browser reconnects, it
+resumes after its latest sequence instead of silently dropping activity.
+
+Cli-v2 follows the same path. Both interfaces share cursor, duplicate, gap, and
+bounded reconnect behavior from `src/client-shared`; their differences are
+limited to input and presentation. `sessionRunState` remains a recovery path
+for finding an active run after refresh, not a competing execution model.
 
 Notifications use those same live event streams. The browser can show OS-level
 notifications only after you enable permission from `Settings > General`.

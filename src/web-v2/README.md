@@ -54,3 +54,17 @@ It owns all active browser UI work.
 Browser-only behavior should stay in this folder. Shared behavior that must
 also apply to terminal or future clients belongs in `src/client-shared`,
 `src/server`, or the owning core domain.
+
+## Conversation Runs
+
+Web-v2 uses the same accepted-run model exposed by the Heddle SDK:
+
+- prompt/direct-shell mutations return the run identity;
+- `sessionEvents` discovers started and settled runs plus durable signals;
+- `sessionRunEvents` carries ordered, replayable activity and one terminal;
+- `sessionRunState.activeRun` recovers identity after a browser refresh;
+- cancellation includes the currently observed `runId`.
+
+Run cursor, duplicate, sequence-gap, and reconnect rules belong to
+`ClientSharedConversationRunStreamService`, shared with cli-v2. React hooks own
+only tRPC binding, cache refresh, and browser presentation state.

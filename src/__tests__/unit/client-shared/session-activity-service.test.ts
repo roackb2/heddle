@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ClientSharedSessionActivityService } from '../../../client-shared/services/session-activities/index.js';
-import type { ControlPlaneSessionEventEnvelope } from '../../../client-shared/api/types.js';
+import type { ControlPlaneSessionRunEventEnvelope } from '../../../client-shared/api/types.js';
 
-type ControlPlaneSessionActivity = Extract<ControlPlaneSessionEventEnvelope, { type: 'session.event' }>['activities'][number];
+type ControlPlaneSessionActivity = Extract<ControlPlaneSessionRunEventEnvelope, { kind: 'activity' }>['activity'];
 
 describe('ClientSharedSessionActivityService', () => {
   it('applies shared live status effects for web and terminal clients', () => {

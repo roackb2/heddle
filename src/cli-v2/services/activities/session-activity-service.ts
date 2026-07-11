@@ -1,13 +1,13 @@
 import type {
   ControlPlanePendingApproval,
-  ControlPlaneSessionEventEnvelope,
+  ControlPlaneSessionRunEventEnvelope,
 } from '@/client-shared/api/types.js';
 import {
   ClientSharedSessionActivityService,
   type ClientSharedSessionLatestUpdate,
 } from '@/client-shared/services/session-activities/index.js';
 
-type ControlPlaneSessionActivity = Extract<ControlPlaneSessionEventEnvelope, { type: 'session.event' }>['activities'][number];
+type ControlPlaneSessionActivity = Extract<ControlPlaneSessionRunEventEnvelope, { kind: 'activity' }>['activity'];
 export type ControlPlaneSessionLatestUpdate = ClientSharedSessionLatestUpdate;
 
 /**

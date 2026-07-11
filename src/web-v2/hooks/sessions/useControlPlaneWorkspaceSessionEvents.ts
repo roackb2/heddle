@@ -26,17 +26,20 @@ export function useControlPlaneWorkspaceSessionEvents({
       return;
     }
 
-    if (event.type !== 'session.event') {
+    if (event.type === 'session.run.terminal') {
+      onNotificationIntent?.(ClientSharedNotificationIntentService.projectSessionRunTerminal({
+        workspaceId,
+        envelope: event,
+      }));
       return;
     }
 
-    event.activities.forEach((activity) => {
-      onNotificationIntent?.(ClientSharedNotificationIntentService.projectSessionActivity({
+    if (event.type === 'session.approval.updated') {
+      onNotificationIntent?.(ClientSharedNotificationIntentService.projectSessionApproval({
         workspaceId,
-        sessionId: event.sessionId,
-        activity,
+        envelope: event,
       }));
-    });
+    }
   }, [onNotificationIntent, utils, workspaceId]);
 
   trpcReact.controlPlane.sessionsEvents.useSubscription(

@@ -23,3 +23,21 @@ live server, print messages, install signal handlers, and call `process.exit()`.
 
 Embedded hosts such as future `chat-v2` startup should use the same lifecycle
 path instead of inventing a TUI-only server path.
+
+## Conversation Run Transport
+
+The control plane exposes core `ConversationRunService` semantics rather than
+maintaining a server-only run implementation:
+
+- `controllers/trpc/control-plane/chat-session-run-stream.ts` owns the genuine
+  adapter boundary: address sanitization, stable result projection,
+  run-addressed replay, and lifecycle/terminal fanout;
+- `chat-session-events.ts` owns only session/workspace lifecycle signals such
+  as run discovery, queue changes, and approvals;
+- `chat-sessions-controller.ts` owns conversation application orchestration and
+  publishes activity once through the core run context;
+- `routes/trpc/control-plane.ts` exposes lifecycle and run subscriptions.
+
+Do not put conversation activity back on the session `EventEmitter`. Ordered
+activity, replay, and terminals belong to `ConversationRunService`; duplicating
+them on a second bus causes inconsistent CLI, web, and SDK behavior.

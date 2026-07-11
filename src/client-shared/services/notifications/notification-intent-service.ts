@@ -4,7 +4,9 @@ import {
 import type {
   ClientSharedHeartbeatEventEnvelope,
   ClientSharedNotificationIntent,
+  ClientSharedSessionApprovalEnvelope,
   ClientSharedSessionNotificationActivity,
+  ClientSharedSessionRunTerminalEnvelope,
 } from './types.js';
 
 type SessionActivityInput = {
@@ -16,6 +18,16 @@ type SessionActivityInput = {
 type HeartbeatEnvelopeInput = {
   workspaceId?: string;
   envelope: ClientSharedHeartbeatEventEnvelope;
+};
+
+type SessionRunTerminalInput = {
+  workspaceId?: string;
+  envelope: ClientSharedSessionRunTerminalEnvelope;
+};
+
+type SessionApprovalInput = {
+  workspaceId?: string;
+  envelope: ClientSharedSessionApprovalEnvelope;
 };
 
 type NotificationMemoryOptions = {
@@ -52,7 +64,7 @@ export class ClientSharedNotificationIntentService {
     if (input.activity.type === 'loop.finished') {
       return {
         key: [
-          'session-run-finished',
+          'session-run-terminal',
           input.workspaceId ?? 'default-workspace',
           input.sessionId,
           input.activity.runId,
@@ -118,6 +130,63 @@ export class ClientSharedNotificationIntentService {
 
     return undefined;
   }
+
+  static projectSessionRunTerminal(input: SessionRunTerminalInput): ClientSharedNotificationIntent {
+    const terminal = input.envelope.terminal;
+    const presentation = projectRunTerminalPresentation(terminal);
+
+    return {
+      key: [
+        'session-run-terminal',
+        input.workspaceId ?? 'default-workspace',
+        input.envelope.sessionId,
+        terminal.runId,
+      ].join(':'),
+      ...presentation,
+      timestamp: terminal.timestamp,
+      workspaceId: input.workspaceId,
+      sessionId: input.envelope.sessionId,
+      runId: terminal.runId,
+    };
+  }
+
+  static projectSessionApproval(input: SessionApprovalInput): ClientSharedNotificationIntent | undefined {
+    const approval = input.envelope.approval;
+    if (!approval) {
+      return undefined;
+    }
+
+    return {
+      key: [
+        'session-approval',
+        input.workspaceId ?? 'default-workspace',
+        input.envelope.sessionId,
+        approval.callId,
+      ].join(':'),
+      title: 'Approval required',
+      body: `Waiting for ${approval.tool.replaceAll('_', ' ')}`,
+      tone: 'warning',
+      timestamp: approval.requestedAt,
+      workspaceId: input.workspaceId,
+      sessionId: input.envelope.sessionId,
+    };
+  }
+}
+
+function projectRunTerminalPresentation(
+  terminal: ClientSharedSessionRunTerminalEnvelope['terminal'],
+): Pick<ClientSharedNotificationIntent, 'title' | 'body' | 'tone'> {
+  if (terminal.kind === 'error') {
+    return { title: 'Session run failed', body: terminal.error.message, tone: 'error' };
+  }
+  if (terminal.kind === 'cancelled') {
+    return { title: 'Session run cancelled', body: terminal.reason, tone: 'warning' };
+  }
+  return {
+    title: 'Session run finished',
+    body: terminal.result.summary ?? terminal.result.outcome,
+    tone: 'success',
+  };
 }
 
 /**

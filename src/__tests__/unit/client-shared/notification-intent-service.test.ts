@@ -5,10 +5,10 @@ import {
 } from '@/client-shared/services/notifications/index.js';
 import type {
   ControlPlaneHeartbeatEventEnvelope,
-  ControlPlaneSessionEventEnvelope,
+  ControlPlaneSessionRunEventEnvelope,
 } from '@/client-shared/api/types.js';
 
-type SessionActivity = Extract<ControlPlaneSessionEventEnvelope, { type: 'session.event' }>['activities'][number];
+type SessionActivity = Extract<ControlPlaneSessionRunEventEnvelope, { kind: 'activity' }>['activity'];
 
 describe('ClientSharedNotificationIntentService', () => {
   it('projects approval and run-finished session activities with stable keys', () => {
@@ -52,7 +52,7 @@ describe('ClientSharedNotificationIntentService', () => {
       tone: 'warning',
     });
     expect(finished).toMatchObject({
-      key: 'session-run-finished:workspace-1:session-1:run-1',
+      key: 'session-run-terminal:workspace-1:session-1:run-1',
       title: 'Session run finished',
       body: 'All set.',
       tone: 'success',
@@ -127,6 +127,51 @@ describe('ClientSharedNotificationIntentService', () => {
       title: 'Task run failed',
       body: 'boom',
       tone: 'error',
+    });
+  });
+
+  it('projects run terminals and durable approval signals without activity duplication', () => {
+    const terminal = ClientSharedNotificationIntentService.projectSessionRunTerminal({
+      workspaceId: 'workspace-1',
+      envelope: {
+        type: 'session.run.terminal',
+        sessionId: 'session-1',
+        timestamp: '2026-06-12T00:01:00.000Z',
+        terminal: {
+          kind: 'error',
+          runId: 'run-1',
+          sequence: 3,
+          timestamp: '2026-06-12T00:01:00.000Z',
+          error: { code: 'run_failed', message: 'boom' },
+        },
+      },
+    });
+    const approval = ClientSharedNotificationIntentService.projectSessionApproval({
+      workspaceId: 'workspace-1',
+      envelope: {
+        type: 'session.approval.updated',
+        sessionId: 'session-1',
+        timestamp: '2026-06-12T00:00:00.000Z',
+        approval: {
+          tool: 'run_shell_mutate',
+          callId: 'call-1',
+          input: { command: 'yarn test' },
+          requestedAt: '2026-06-12T00:00:00.000Z',
+        },
+      },
+    });
+
+    expect(terminal).toMatchObject({
+      key: 'session-run-terminal:workspace-1:session-1:run-1',
+      title: 'Session run failed',
+      body: 'boom',
+      tone: 'error',
+    });
+    expect(approval).toMatchObject({
+      key: 'session-approval:workspace-1:session-1:call-1',
+      title: 'Approval required',
+      body: 'Waiting for run shell mutate',
+      tone: 'warning',
     });
   });
 

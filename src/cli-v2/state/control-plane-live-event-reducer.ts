@@ -1,7 +1,10 @@
 import { ClientSharedSessionActivityService } from '@/client-shared/services/session-activities/index.js';
 import { ClientSharedNotificationIntentService } from '@/client-shared/services/notifications/index.js';
 import { ClientSharedSessionMessageService } from '@/client-shared/services/session-messages/index.js';
-import type { ControlPlaneSessionEventEnvelope } from '@/client-shared/api/types.js';
+import type {
+  ControlPlaneSessionEventEnvelope,
+  ControlPlaneSessionRunEventEnvelope,
+} from '@/client-shared/api/types.js';
 import { SessionActivityService } from '../services/activities/session-activity-service.js';
 import type { AssistantStreamBufferService, AssistantStreamUpdate } from '../services/sessions/assistant-stream-buffer-service.js';
 import type { ControlPlaneTerminalNotificationService } from '../services/notifications/index.js';
@@ -12,7 +15,6 @@ type ControlPlaneLiveEventReducerOptions = {
   state: ControlPlaneSessionState;
   loader: ControlPlaneSessionLoader;
   assistantStreamBuffer: AssistantStreamBufferService;
-  refreshSessions: () => Promise<unknown>;
   refreshPendingApproval: (sessionId: string) => Promise<void>;
   notificationService?: ControlPlaneTerminalNotificationService;
 };
@@ -56,79 +58,88 @@ export class ControlPlaneLiveEventReducer {
       return;
     }
 
-    if (event.type !== 'session.event') {
+    if (event.type === 'session.run.updated') {
+      return;
+    }
+  }
+
+  applyRunEvent(
+    workspaceId: string,
+    sessionId: string,
+    event: ControlPlaneSessionRunEventEnvelope,
+  ): void {
+    if (
+      event.kind !== 'activity'
+      || !this.options.state.isActiveSessionAddress(workspaceId, sessionId)
+    ) {
       return;
     }
 
-    event.activities.forEach((activity) => {
-      this.options.notificationService?.deliver(ClientSharedNotificationIntentService.projectSessionActivity({
-        workspaceId,
-        sessionId: event.sessionId,
-        activity,
-      }));
+    const activity = event.activity;
+    this.options.notificationService?.deliver(ClientSharedNotificationIntentService.projectSessionActivity({
+      workspaceId,
+      sessionId,
+      activity,
+    }));
 
-      ClientSharedSessionActivityService.applyActivity(activity, {
-        onAssistantStream: (streamActivity) => {
-          this.options.assistantStreamBuffer.push({
-            workspaceId,
-            sessionId: event.sessionId,
-            text: streamActivity.text,
-            done: streamActivity.done,
-          });
-        },
-        onRunStarted: (runActivity, liveStatus) => {
-          this.options.state.patch({
-            running: true,
-            commandResultExpanded: false,
-            liveStatus,
-            currentActivity: ClientSharedSessionActivityService.createThinkingStatus(runActivity.timestamp),
-            recentEditDiffs: [],
-            latestUpdate: SessionActivityService.resolveLatestUpdate(runActivity),
-          });
-        },
-        onRecentEditDiff: (diff) => {
-          this.options.state.patch((current) => ({
-            recentEditDiffs: [
-              ...current.recentEditDiffs.filter((candidate) => candidate.id !== diff.id),
-              diff,
-            ].slice(-MAX_RECENT_EDIT_DIFFS),
-          }));
-        },
-        onRunFinished: (runActivity, liveStatus) => {
-          this.options.assistantStreamBuffer.flush();
-          this.options.state.patch({
-            running: false,
-            ...(liveStatus !== undefined ? { liveStatus } : {}),
-            currentActivity: undefined,
-            latestUpdate: SessionActivityService.resolveLatestUpdate(runActivity),
-          });
-          void this.options.loader.refreshSession(event.sessionId, { silent: true });
-          void this.options.refreshSessions();
-        },
-        onPendingApprovalChanged: () => {
-          void this.options.refreshPendingApproval(event.sessionId);
-        },
-        onPlanUpdated: (plan) => {
-          this.options.state.patch({ activePlan: plan });
-        },
-        onPlanCleared: () => {
-          this.options.state.patch({ activePlan: undefined });
-        },
-        onCurrentActivityChanged: (currentActivity) => {
-          this.options.state.patch({ currentActivity });
-        },
-        onLiveStatus: (statusActivity, liveStatus) => {
-          const latestUpdate = SessionActivityService.resolveLatestUpdate(statusActivity);
-          if (liveStatus === undefined && latestUpdate === undefined) {
-            return;
-          }
+    ClientSharedSessionActivityService.applyActivity(activity, {
+      onAssistantStream: (streamActivity) => {
+        this.options.assistantStreamBuffer.push({
+          workspaceId,
+          sessionId,
+          text: streamActivity.text,
+          done: streamActivity.done,
+        });
+      },
+      onRunStarted: (runActivity, liveStatus) => {
+        this.options.state.patch({
+          running: true,
+          commandResultExpanded: false,
+          liveStatus,
+          currentActivity: ClientSharedSessionActivityService.createThinkingStatus(runActivity.timestamp),
+          recentEditDiffs: [],
+          latestUpdate: SessionActivityService.resolveLatestUpdate(runActivity),
+        });
+      },
+      onRecentEditDiff: (diff) => {
+        this.options.state.patch((current) => ({
+          recentEditDiffs: [
+            ...current.recentEditDiffs.filter((candidate) => candidate.id !== diff.id),
+            diff,
+          ].slice(-MAX_RECENT_EDIT_DIFFS),
+        }));
+      },
+      onRunFinished: (runActivity, liveStatus) => {
+        this.options.assistantStreamBuffer.flush();
+        this.options.state.patch({
+          ...(liveStatus !== undefined ? { liveStatus } : {}),
+          currentActivity: undefined,
+          latestUpdate: SessionActivityService.resolveLatestUpdate(runActivity),
+        });
+      },
+      onPendingApprovalChanged: () => {
+        void this.options.refreshPendingApproval(sessionId);
+      },
+      onPlanUpdated: (plan) => {
+        this.options.state.patch({ activePlan: plan });
+      },
+      onPlanCleared: () => {
+        this.options.state.patch({ activePlan: undefined });
+      },
+      onCurrentActivityChanged: (currentActivity) => {
+        this.options.state.patch({ currentActivity });
+      },
+      onLiveStatus: (statusActivity, liveStatus) => {
+        const latestUpdate = SessionActivityService.resolveLatestUpdate(statusActivity);
+        if (liveStatus === undefined && latestUpdate === undefined) {
+          return;
+        }
 
-          this.options.state.patch({
-            ...(liveStatus !== undefined ? { liveStatus } : {}),
-            ...(latestUpdate !== undefined ? { latestUpdate } : {}),
-          });
-        },
-      });
+        this.options.state.patch({
+          ...(liveStatus !== undefined ? { liveStatus } : {}),
+          ...(latestUpdate !== undefined ? { latestUpdate } : {}),
+        });
+      },
     });
   }
 

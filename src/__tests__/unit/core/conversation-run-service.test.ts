@@ -63,6 +63,71 @@ describe('ConversationRunService', () => {
     expect(service.isRunning({ scopeId: 'tenant-1', sessionId: 'session-cancel' })).toBe(false);
   });
 
+  it('exposes the active run identity and refuses to cancel a different run id', async () => {
+    const service = createRunService();
+    let finish: (() => void) | undefined;
+    let accepted: { runId: string; acceptedAt: string } | undefined;
+    const result = service.startAndWait({
+      address: { scopeId: 'tenant-1', sessionId: 'session-active' },
+      onAccepted: (run) => {
+        accepted = run;
+      },
+      execute: async () => await new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+    });
+
+    expect(service.getActiveRun({ scopeId: 'tenant-1', sessionId: 'session-active' })).toEqual({
+      scopeId: 'tenant-1',
+      sessionId: 'session-active',
+      accepted: true,
+      runId: accepted?.runId,
+      acceptedAt: accepted?.acceptedAt,
+    });
+    expect(service.cancelRun({ scopeId: 'tenant-1', sessionId: 'session-active' }, 'another-run')).toBe(false);
+    expect(service.isRunning({ scopeId: 'tenant-1', sessionId: 'session-active' })).toBe(true);
+
+    await Promise.resolve();
+    finish?.();
+    await result;
+
+    expect(service.getActiveRun({ scopeId: 'tenant-1', sessionId: 'session-active' })).toBeUndefined();
+  });
+
+  it('prevents a stale run identity from resolving a newer pending approval', async () => {
+    const service = createRunService();
+    const address = { scopeId: 'tenant-1', sessionId: 'session-approval' };
+    let finish: (() => void) | undefined;
+    const approvalResolution = vi.fn();
+    const run = service.startTurn({
+      address,
+      engine: engineThatRuns(async () => await new Promise<ConversationTurnResultSummary>((resolve) => {
+        finish = () => resolve(turnResult());
+      })),
+      turn: { sessionId: address.sessionId, prompt: 'Wait for approval' },
+    });
+    service.storePendingApproval(address, {
+      approval: {
+        tool: 'run_shell_mutate',
+        callId: 'call-1',
+        input: { command: 'yarn test' },
+        requestedAt: '2026-07-11T00:00:00.000Z',
+        summary: 'Run tests',
+      },
+      resolve: approvalResolution,
+    });
+    const decision = { type: 'approve' as const, reason: 'Approved' };
+
+    expect(service.resolvePendingApproval(address, decision, 'stale-run')).toBe(false);
+    expect(approvalResolution).not.toHaveBeenCalled();
+    expect(run.resolveApproval(decision)).toBe(true);
+    expect(approvalResolution).toHaveBeenCalledWith(decision);
+
+    await Promise.resolve();
+    finish?.();
+    await run.result;
+  });
+
   it('rejects reconnect cursors older than the bounded replay window', async () => {
     const service = new ConversationRunService({
       replay: { maxEventsPerRun: 2, retentionMs: 60_000 },

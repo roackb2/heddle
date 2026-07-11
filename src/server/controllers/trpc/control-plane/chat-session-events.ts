@@ -1,75 +1,65 @@
 import type { EventEmitter } from 'node:events';
-import type { ConversationActivity } from '@/core/live/index.js';
 import type {
-  ControlPlaneSessionEventEnvelope,
-  ControlPlaneSessionLiveEvent,
+  ControlPlaneSessionRunReference,
+  ControlPlaneSessionRunTerminal,
+  ControlPlaneSessionSignalEvent,
   ControlPlaneSessionsEventEnvelope,
 } from '@/server/control-plane-types.js';
 
 export class ControlPlaneChatSessionEventsController {
-  static emitSessionActivities(args: {
-    eventBus: EventEmitter;
-    workspaceId: string;
-    sessionId: string;
-    activities: ConversationActivity[];
-  }) {
-    if (args.activities.length === 0) {
-      return;
-    }
-
-    const event = {
-      sessionId: args.sessionId,
-      timestamp: new Date().toISOString(),
-      activities: args.activities,
-    } satisfies ControlPlaneSessionLiveEvent;
-
-    args.eventBus.emit(ControlPlaneChatSessionEventsController.sessionAddressKey(args), event);
-    args.eventBus.emit(ControlPlaneChatSessionEventsController.workspaceAddressKey(args), {
-      ...event,
-      type: 'session.event',
-    } satisfies ControlPlaneSessionsEventEnvelope);
-  }
-
   static createSessionEventPublisher(args: {
     eventBus: EventEmitter;
     workspaceId: string;
     sessionId: string;
   }) {
-    const publishActivities = (activities: ConversationActivity[]) => {
-      ControlPlaneChatSessionEventsController.emitSessionActivities({
-        eventBus: args.eventBus,
-        workspaceId: args.workspaceId,
-        sessionId: args.sessionId,
-        activities,
-      });
+    const publishSignal = (event: ControlPlaneSessionSignalEvent) => {
+      args.eventBus.emit(ControlPlaneChatSessionEventsController.sessionAddressKey(args), event);
+      args.eventBus.emit(
+        ControlPlaneChatSessionEventsController.workspaceAddressKey(args),
+        event satisfies ControlPlaneSessionsEventEnvelope,
+      );
     };
 
-    const publisher = {
-      publishActivity(activity: ConversationActivity) {
-        publishActivities([activity]);
-      },
-
-      publishActivities,
-
-      publishApprovalUpdated() {
-        args.eventBus.emit(ControlPlaneChatSessionEventsController.sessionAddressKey(args), {
+    return {
+      publishApprovalUpdated(
+        approval: Extract<ControlPlaneSessionSignalEvent, { type: 'session.approval.updated' }>['approval'],
+      ) {
+        publishSignal({
           type: 'session.approval.updated',
           sessionId: args.sessionId,
           timestamp: new Date().toISOString(),
-        } satisfies ControlPlaneSessionEventEnvelope);
+          approval,
+        });
       },
 
       publishQueueUpdated(queuedPromptCount: number) {
-        args.eventBus.emit(ControlPlaneChatSessionEventsController.sessionAddressKey(args), {
+        publishSignal({
           type: 'session.queue.updated',
           sessionId: args.sessionId,
           timestamp: new Date().toISOString(),
           queuedPromptCount,
-        } satisfies ControlPlaneSessionEventEnvelope);
+        });
+      },
+
+      publishRunUpdated(run: ControlPlaneSessionRunReference, status: 'started' | 'settled') {
+        publishSignal({
+          type: 'session.run.updated',
+          sessionId: args.sessionId,
+          timestamp: new Date().toISOString(),
+          status,
+          run,
+        });
+      },
+
+      publishWorkspaceRunTerminal(terminal: ControlPlaneSessionRunTerminal) {
+        args.eventBus.emit(ControlPlaneChatSessionEventsController.workspaceAddressKey(args), {
+          type: 'session.run.terminal',
+          sessionId: args.sessionId,
+          timestamp: terminal.timestamp,
+          terminal,
+        } satisfies ControlPlaneSessionsEventEnvelope);
       },
     };
-
-    return publisher;
   }
 
   private static sessionAddressKey(address: { workspaceId: string; sessionId: string }): string {

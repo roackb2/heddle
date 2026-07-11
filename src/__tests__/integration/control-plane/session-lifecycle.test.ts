@@ -10,6 +10,11 @@ import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/i
 import { AgentLoopRuntimeService } from '@/core/runtime/loop/index.js';
 import { RuntimeWorkspaceService, type WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
 import { controlPlaneRouter } from '@/server/routes/trpc/control-plane.js';
+import type {
+  ControlPlaneSessionEventEnvelope,
+  ControlPlaneSessionRunEventEnvelope,
+  ControlPlaneSessionsEventEnvelope,
+} from '@/server/control-plane-types.js';
 import type { HeddleServerContext } from '@/server/types.js';
 
 const EXTERNAL_TUI_LEASE_OWNER: ChatSessionLeaseOwner = {
@@ -263,6 +268,7 @@ describe('control-plane session lifecycle API', () => {
     })).rejects.toThrow('already active');
     await expect(caller.sessionRunState({ id: session.id })).resolves.toEqual({
       running: false,
+      activeRun: null,
       pendingApproval: null,
     });
     expect(engine.sessions.require(session.id).messages.map((message) => message.text)).not.toContain('should not be accepted');
@@ -335,6 +341,7 @@ describe('control-plane session lifecycle API', () => {
 
     await expect(caller.sessionRunState({ id: session.id })).resolves.toEqual({
       running: false,
+      activeRun: null,
       pendingApproval: null,
     });
   });
@@ -580,19 +587,39 @@ description: Research web pages through a browser.
     try {
       const { caller, activeWorkspace } = createControlPlaneCaller();
       const session = await caller.sessionCreate({ name: 'Async submit session' });
+      const sessionLifecycle = await caller.sessionEvents({ sessionId: session.id });
+      const sessionLifecycleIterator = sessionLifecycle[Symbol.asyncIterator]();
+      const startedRuns = collectStartedRuns(sessionLifecycleIterator, 2);
+      const workspaceLifecycle = await caller.sessionsEvents();
+      const workspaceLifecycleIterator = workspaceLifecycle[Symbol.asyncIterator]();
+      const terminalRuns = collectTerminalRuns(workspaceLifecycleIterator, 2);
 
       const accepted = await caller.sessionSendPromptAsync({
         sessionId: session.id,
         prompt: 'Explain async submit',
       });
 
-      expect(accepted).toMatchObject({
+      expect(accepted).toEqual({
         accepted: true,
         sessionId: session.id,
         workspaceId: activeWorkspace.id,
+        runId: expect.any(String),
+        acceptedAt: expect.any(String),
       });
+      if (!('accepted' in accepted)) {
+        throw new Error('Expected an accepted run.');
+      }
+      const firstRunEvents = await caller.sessionRunEvents({
+        sessionId: session.id,
+        runId: accepted.runId,
+      });
+      const firstRunItems = collectRunEvents(firstRunEvents);
       await expect(caller.sessionRunState({ id: session.id })).resolves.toMatchObject({
         running: true,
+        activeRun: {
+          runId: accepted.runId,
+          acceptedAt: accepted.acceptedAt,
+        },
       });
       await expect(caller.session({ id: session.id })).resolves.toMatchObject({
         messages: expect.arrayContaining([
@@ -627,8 +654,21 @@ description: Research web pages through a browser.
 
       await expect(caller.sessionRunState({ id: session.id })).resolves.toEqual({
         running: false,
+        activeRun: null,
         pendingApproval: null,
       });
+      await expect(firstRunItems).resolves.toEqual([
+        expect.objectContaining({ kind: 'activity', runId: accepted.runId, sequence: 1 }),
+        expect.objectContaining({ kind: 'result', runId: accepted.runId, sequence: 2 }),
+      ]);
+      const replay = await caller.sessionRunEvents({
+        sessionId: session.id,
+        runId: accepted.runId,
+        afterSequence: 1,
+      });
+      await expect(collectRunEvents(replay)).resolves.toEqual([
+        expect.objectContaining({ kind: 'result', runId: accepted.runId, sequence: 2 }),
+      ]);
       const completed = await caller.session({ id: session.id });
       expect(completed?.messages.map((message) => message.text)).toEqual([
         'Explain async submit',
@@ -638,6 +678,16 @@ description: Research web pages through a browser.
       ]);
       expect(completed?.queuedPrompts).toEqual([]);
       expect(completed?.messages.some((message) => message.isPending)).toBe(false);
+      const runStarts = await startedRuns;
+      expect(runStarts[0]?.run.runId).toBe(accepted.runId);
+      expect(runStarts[1]?.run.runId).not.toBe(accepted.runId);
+      const runTerminals = await terminalRuns;
+      expect(runTerminals.map((event) => event.terminal.runId)).toEqual(
+        runStarts.map((event) => event.run.runId),
+      );
+      expect(runTerminals.every((event) => event.terminal.kind === 'result')).toBe(true);
+      await sessionLifecycleIterator.return?.();
+      await workspaceLifecycleIterator.return?.();
     } finally {
       vi.useRealTimers();
     }
@@ -730,6 +780,50 @@ async function flushPromises(): Promise<void> {
   await new Promise((resolve) => {
     setTimeout(resolve, 0);
   });
+}
+
+async function collectRunEvents(
+  events: AsyncIterable<ControlPlaneSessionRunEventEnvelope>,
+): Promise<ControlPlaneSessionRunEventEnvelope[]> {
+  const collected: ControlPlaneSessionRunEventEnvelope[] = [];
+  for await (const event of events) {
+    collected.push(event);
+  }
+  return collected;
+}
+
+async function collectStartedRuns(
+  events: AsyncIterator<ControlPlaneSessionEventEnvelope>,
+  count: number,
+): Promise<Array<Extract<ControlPlaneSessionEventEnvelope, { type: 'session.run.updated' }>>> {
+  const collected: Array<Extract<ControlPlaneSessionEventEnvelope, { type: 'session.run.updated' }>> = [];
+  while (collected.length < count) {
+    const next = await events.next();
+    if (next.done) {
+      throw new Error(`Session lifecycle stream ended after ${collected.length} run starts.`);
+    }
+    if (next.value.type === 'session.run.updated' && next.value.status === 'started') {
+      collected.push(next.value);
+    }
+  }
+  return collected;
+}
+
+async function collectTerminalRuns(
+  events: AsyncIterator<ControlPlaneSessionsEventEnvelope>,
+  count: number,
+): Promise<Array<Extract<ControlPlaneSessionsEventEnvelope, { type: 'session.run.terminal' }>>> {
+  const collected: Array<Extract<ControlPlaneSessionsEventEnvelope, { type: 'session.run.terminal' }>> = [];
+  while (collected.length < count) {
+    const next = await events.next();
+    if (next.done) {
+      throw new Error(`Workspace lifecycle stream ended after ${collected.length} run terminals.`);
+    }
+    if (next.value.type === 'session.run.terminal') {
+      collected.push(next.value);
+    }
+  }
+  return collected;
 }
 
 function createControlPlaneCaller() {

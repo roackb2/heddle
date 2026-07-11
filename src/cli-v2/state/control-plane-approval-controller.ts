@@ -39,7 +39,12 @@ export class ControlPlaneApprovalController {
     });
 
     try {
-      const result = await this.options.api.resolvePendingApproval(workspaceId, sessionId, decision);
+      const result = await this.options.api.resolvePendingApproval(
+        workspaceId,
+        sessionId,
+        decision,
+        this.options.state.getSnapshot().activeRun?.runId,
+      );
       if (!result.resolved) {
         throw new Error('No pending approval found for this session.');
       }

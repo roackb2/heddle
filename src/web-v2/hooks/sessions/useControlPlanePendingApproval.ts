@@ -17,6 +17,7 @@ export type ControlPlanePendingApprovalState = {
 type SessionAddress = {
   workspaceId?: string;
   sessionId?: string;
+  runId?: string;
 };
 
 type UseControlPlanePendingApprovalOptions = {
@@ -24,7 +25,7 @@ type UseControlPlanePendingApprovalOptions = {
 };
 
 export function useControlPlanePendingApproval(
-  { workspaceId, sessionId }: SessionAddress,
+  { workspaceId, sessionId, runId }: SessionAddress,
   options: UseControlPlanePendingApprovalOptions = {},
 ): ControlPlanePendingApprovalState {
   const utils = trpcReact.useUtils();
@@ -64,6 +65,7 @@ export function useControlPlanePendingApproval(
       const result = await resolveApprovalMutation.mutateAsync({
         workspaceId,
         sessionId,
+        runId,
         decision,
       });
       if (!result.resolved) {
@@ -73,7 +75,7 @@ export function useControlPlanePendingApproval(
     } catch (error) {
       setApprovalError(error instanceof Error ? error.message : String(error));
     }
-  }, [resolveApprovalMutation, sessionId, utils, workspaceId]);
+  }, [resolveApprovalMutation, runId, sessionId, utils, workspaceId]);
 
   return {
     pendingApproval: pendingApprovalQuery.data ?? null,
