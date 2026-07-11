@@ -137,9 +137,14 @@ remote package has no dependency on the Node package, so publish it first and
 then publish Heddle:
 
 ```bash
-npm publish ./packages/heddle-remote
+yarn remote:publish
 npm publish
 ```
+
+`yarn remote:publish` cleans, verifies, and compiles the remote package before
+invoking npm, so the operator cannot accidentally publish stale `dist` output.
+Pass normal npm publish flags through the script when needed, for example
+`yarn remote:publish --dry-run`.
 
 This remains a manual operator step unless npm publication was explicitly
 delegated.
