@@ -17,6 +17,11 @@ There are two import entry points:
   models, awareness) and specialized runtimes (agent loop, heartbeat,
   integrations). Reach for this only when the curated surface is not enough.
 
+Before choosing an API, read
+[Choose a Programmatic Integration Layer](integration-layers.md). It maps common
+host stacks to the smallest useful Heddle boundary and makes the responsibility
+split between Heddle and the host explicit for developers and coding agents.
+
 1. **Start here** — stand up a conversation agent.
    - [Quickstart](quickstart.md): a minimal persisted conversation with default
      text output, in a few lines.
@@ -33,6 +38,9 @@ There are two import entry points:
    - [Conversation engine](conversation-engine.md): engine setup, state roots,
      and persisted sessions.
    - [Approvals](approvals.md): own policy decisions in the host.
+   - [Hosted agent stack](../../../examples/sdk/05-hosted-agent/README.md): compose
+     a transport-neutral run service, Express/SSE API, and browser client while
+     keeping each layer replaceable.
 5. **Advanced: storage** — back Heddle with your own persistence.
    - [Result artifacts](result-artifacts.md): save large generated values as
      reusable artifacts.
