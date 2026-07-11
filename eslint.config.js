@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'local/**', '.heddle/**', 'test-results/**', 'evals/results/**'],
+    ignores: ['dist/**', 'packages/*/dist/**', 'coverage/**', 'node_modules/**', 'local/**', '.heddle/**', 'test-results/**', 'evals/results/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

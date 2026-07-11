@@ -11,13 +11,14 @@ import { ConversationRunService } from '@roackb2/heddle/hosted'
 import {
   ConversationRunConsumerService,
   ConversationRunProtocolCodec,
-} from '@roackb2/heddle/remote'
+} from '@roackb2/heddle-remote'
 ```
 
 - `@roackb2/heddle` owns persisted conversation semantics.
 - `@roackb2/heddle/hosted` owns process-local active-run coordination.
-- `@roackb2/heddle/remote` owns client cursor correctness and runtime wire
-  validation without choosing HTTP, SSE, tRPC, WebSocket, React, or auth.
+- `@roackb2/heddle-remote` is independently installable and owns client cursor
+  correctness plus runtime wire validation without choosing HTTP, SSE, tRPC,
+  WebSocket, React, or auth.
 
 ## Define the public wire payload
 
@@ -29,11 +30,11 @@ validators use the validator-neutral
 
 ```ts
 import { z } from 'zod'
-import { ConversationRunProtocolCodec } from '@roackb2/heddle/remote'
+import { ConversationRunProtocolCodec } from '@roackb2/heddle-remote'
 
 const PublicActivitySchema = z.object({
   type: z.string().min(1),
-}).passthrough()
+})
 
 const PublicResultSchema = z.object({
   outcome: z.string().min(1),
@@ -48,7 +49,9 @@ const protocol = new ConversationRunProtocolCodec({
 
 Payload validation must be synchronous because streaming parse and
 serialization are synchronous. The codec rejects an asynchronous validator with
-a clear boundary error.
+a clear boundary error. The validator output is the public projection: the Zod
+object above strips unknown internal activity fields. With another Standard
+Schema library, configure the equivalent allowlist behavior explicitly.
 
 `protocol.parseEvent(untrustedValue)` validates:
 
@@ -75,7 +78,7 @@ The consumer is a transport-neutral state machine. A reference may include any
 host fields as long as it has a stable `runId`:
 
 ```ts
-import { ConversationRunConsumerService } from '@roackb2/heddle/remote'
+import { ConversationRunConsumerService } from '@roackb2/heddle-remote'
 
 type ProductRunReference = {
   accountId: string

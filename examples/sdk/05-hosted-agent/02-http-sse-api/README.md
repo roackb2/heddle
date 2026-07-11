@@ -15,7 +15,7 @@ for curl commands, lifecycle details, and production replacements.
 ## Read in this order
 
 1. [`contracts.ts`](contracts.ts) — host-owned public payload schemas composed
-   with `ConversationRunProtocolCodec` from `@roackb2/heddle/remote`.
+   with `ConversationRunProtocolCodec` from `@roackb2/heddle-remote`.
 2. [`http-api.ts`](http-api.ts) — authenticated start, cursor subscribe, and
    explicit cancel handlers.
 3. [`server.ts`](server.ts) — runnable local composition with deliberately

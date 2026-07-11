@@ -33,10 +33,6 @@
       "types": "./dist/src/hosted.d.ts",
       "import": "./dist/src/hosted.js"
     },
-    "./remote": {
-      "types": "./dist/src/remote.d.ts",
-      "import": "./dist/src/remote.js"
-    },
     "./advanced": {
       "types": "./dist/src/advanced.d.ts",
       "import": "./dist/src/advanced.js"
@@ -52,11 +48,16 @@
   ],
   "scripts": {
     "clean": "node scripts/clean-dist.mjs",
+    "remote:clean": "node scripts/clean-dist.mjs remote",
+    "remote:verify": "node scripts/verify-remote-package.mjs",
+    "remote:compile": "yarn remote:verify && tsc -p tsconfig.remote-package.json",
+    "remote:build": "yarn remote:clean && yarn remote:compile",
+    "remote:pack": "yarn remote:build && npm pack ./packages/heddle-remote",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "eslint": "eslint .",
     "lint": "yarn eslint",
     "release:context": "node scripts/release-context.mjs",
-    "build": "yarn clean && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node scripts/copy-built-in-skill-assets.mjs && node scripts/mark-bin-executable.mjs && yarn client:build",
+    "build": "yarn clean && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && yarn remote:compile && node scripts/copy-built-in-skill-assets.mjs && node scripts/mark-bin-executable.mjs && yarn client:build",
     "client:build": "tsc -p src/web-v2/tsconfig.json --noEmit && vite build --config src/web-v2/vite.config.ts",
     "client:dev": "vite --config src/web-v2/vite.config.ts",
     "client:build:v2": "tsc -p src/web-v2/tsconfig.json --noEmit && vite build --config src/web-v2/vite.config.ts",

@@ -1,0 +1,48 @@
+{
+  "name": "@roackb2/heddle-remote",
+  "version": "4.2.0",
+  "description": "Browser-safe protocol and run-consumer services for remotely hosted Heddle conversations",
+  "author": "Jay / Fienna Liang <roackb2@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roackb2/heddle.git",
+    "directory": "packages/heddle-remote"
+  },
+  "homepage": "https://heddleagent.com",
+  "bugs": {
+    "url": "https://github.com/roackb2/heddle/issues"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "agent",
+    "ai-agent",
+    "browser",
+    "conversation",
+    "remote",
+    "sdk",
+    "streaming"
+  ],
+  "dependencies": {
+    "@standard-schema/spec": "^1.1.0",
+    "zod": "^4.3.6"
+  }
+}

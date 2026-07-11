@@ -14,7 +14,8 @@
 //   5. Advanced: storage     — back artifacts/credentials with your own store
 //
 // Remote-hosting assumptions are explicit peer entrypoints:
-// `@roackb2/heddle/hosted` and `@roackb2/heddle/remote`.
+// `@roackb2/heddle/hosted` and the lightweight `@roackb2/heddle-remote`
+// package.
 // Lower-level runtime plumbing (LLM adapters, individual tools, trace, memory,
 // models, awareness, the agent loop, heartbeat, integrations, utilities) lives
 // behind the `@roackb2/heddle/advanced` subpath — see src/advanced.ts.

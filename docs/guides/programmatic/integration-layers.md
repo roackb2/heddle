@@ -15,7 +15,7 @@ in control.
 HOST-OWNED PRODUCT
   UI state and rendering
           |
-  @roackb2/heddle/remote consumer + public contract
+  @roackb2/heddle-remote consumer + public contract
           |
   transport client/server adapter                  optional
           |
@@ -64,7 +64,7 @@ disconnect as implicit cancellation.
 | Its own output sink or local UI | `createConversationEngine` + `createConversationTextHost` or host callbacks | [`04-custom-output.ts`](../../../examples/sdk/04-custom-output.ts) |
 | A server/worker that owns transport | `@roackb2/heddle` + `@roackb2/heddle/hosted` | [`05-hosted-agent/01-hosted-service`](../../../examples/sdk/05-hosted-agent/01-hosted-service) |
 | Express with REST + SSE | Same core plus a host adapter | [`05-hosted-agent/02-http-sse-api`](../../../examples/sdk/05-hosted-agent/02-http-sse-api) |
-| A remote client over any transport | `@roackb2/heddle/remote` plus a host transport | [Remote conversation runs](remote-runs.md) |
+| A remote client over any transport | `@roackb2/heddle-remote` plus a host transport | [Remote conversation runs](remote-runs.md) |
 | A browser using the example REST/SSE contract | Remote layer plus the example protocol client | [`05-hosted-agent/03-browser-client`](../../../examples/sdk/05-hosted-agent/03-browser-client) |
 
 For tRPC, Fastify, Hono, Nest, WebSocket, Electron IPC, queues, or another
@@ -101,10 +101,12 @@ visible. The root export remains available for compatibility.
 ### Remote run protocol
 
 Use `ConversationRunProtocolCodec` and `ConversationRunConsumerService` from
-`@roackb2/heddle/remote` when events cross an untrusted transport boundary or a
-client can reconnect. The host supplies public activity/result schemas; Heddle
-owns envelope validation, JSON safety, cursor advancement, duplicate/gap
-handling, terminal detection, and retry calculation.
+`@roackb2/heddle-remote` when events cross an untrusted transport boundary or a
+client can reconnect. The independent package keeps the Node runtime, server,
+CLI, model providers, and control-plane dependencies out of remote clients.
+The host supplies public activity/result schemas; Heddle owns envelope
+validation, JSON safety, cursor advancement, duplicate/gap handling, terminal
+detection, and retry calculation.
 
 This layer does not own HTTP, SSE, tRPC, timers, auth, or UI state. See
 [Remote conversation runs](remote-runs.md).

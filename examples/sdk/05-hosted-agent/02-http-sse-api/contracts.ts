@@ -8,7 +8,7 @@ import { z } from 'zod';
 import {
   ConversationRunProtocolCodec,
   type ConversationRunProtocolEvent,
-} from '../../../../src/remote.js';
+} from '../../../../src/core/chat/remote/index.js';
 
 export const StartHostedAgentRunInputSchema = z.object({
   sessionId: z.string().trim().min(1).max(128),
@@ -22,9 +22,11 @@ export const StartHostedAgentRunResultSchema = z.object({
   sessionId: z.string().min(1),
 });
 
+// The parsed value is the public projection. Zod strips every internal
+// activity field that is not explicitly allowlisted here.
 const HostedAgentActivitySchema = z.object({
   type: z.string().min(1),
-}).passthrough();
+});
 
 const HostedAgentResultSchema = z.object({
   outcome: z.string().min(1),

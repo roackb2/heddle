@@ -4,10 +4,11 @@
 // The deep core-customization surface: the curated SDK (rungs 1-5, re-exported
 // below) plus lower-level building blocks and specialized runtimes. Remote
 // hosting remains an orthogonal opt-in through `@roackb2/heddle/hosted` and
-// `@roackb2/heddle/remote`; those subpaths are not re-exported here. Reach for
-// this entry when you need LLM adapters, individual ready-made tools, trace/memory
-// internals, the agent loop, heartbeat, or integrations. Most product hosts
-// only need the curated default entry (`@roackb2/heddle`, see src/index.ts).
+// the independent `@roackb2/heddle-remote` package; those surfaces are not
+// re-exported here. Reach for this entry when you need LLM adapters, individual
+// ready-made tools, trace/memory internals, the agent loop, heartbeat, or
+// integrations. Most product hosts only need the curated default entry
+// (`@roackb2/heddle`, see src/index.ts).
 // ===========================================================================
 
 export * from './index.js';
