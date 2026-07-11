@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { z } from 'zod';
-import { ConversationRunProtocolCodec } from '@/core/chat/remote/index.js';
+import {
+  ConversationRunProtocolCodec,
+  ConversationRunProtocolValidationError,
+} from '@/core/chat/remote/index.js';
 
 const PublicActivitySchema = z.object({
   type: z.string().min(1),
@@ -48,6 +52,21 @@ describe('ConversationRunProtocolCodec', () => {
     }));
   });
 
+  it('accepts validator-agnostic Standard Schema payloads and retains transforms', () => {
+    const codec = new ConversationRunProtocolCodec({
+      activity: PublicActivitySchema,
+      result: trimmedSummarySchema,
+    });
+
+    expect(codec.parseEvent(envelope({
+      kind: 'result',
+      result: { summary: '  Finished  ' },
+    }))).toMatchObject({
+      kind: 'result',
+      result: { summary: 'Finished' },
+    });
+  });
+
   it('rejects malformed envelopes and host payloads', () => {
     const codec = createCodec();
 
@@ -76,6 +95,18 @@ describe('ConversationRunProtocolCodec', () => {
       kind: 'activity',
       activity: { type: 'tool.calling', unsafe: undefined },
     }))).toThrow('JSON-safe');
+
+    const parsed = codec.safeParseEvent(envelope({
+      kind: 'activity',
+      activity: { type: 'tool.calling', unsafe: undefined },
+    }));
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error).toBeInstanceOf(ConversationRunProtocolValidationError);
+      expect((parsed.error as ConversationRunProtocolValidationError).issues).toEqual([
+        expect.objectContaining({ path: ['activity', 'unsafe'] }),
+      ]);
+    }
   });
 
   it('round-trips validated events through JSON serialization', () => {
@@ -87,8 +118,65 @@ describe('ConversationRunProtocolCodec', () => {
 
     expect(codec.parseEvent(JSON.parse(codec.stringifyEvent(input)))).toEqual(input);
     expect(codec.safeParseEvent(input).success).toBe(true);
+    expect(codec.eventSchema.parse(input)).toEqual(input);
+  });
+
+  it('exposes a Standard Schema validator for the complete event', () => {
+    const codec = createCodec();
+    const input = envelope({
+      kind: 'result',
+      result: { outcome: 'done', summary: 'Finished' },
+    });
+    const validation = codec.eventSchema['~standard'].validate(input);
+
+    expect(validation).not.toBeInstanceOf(Promise);
+    expect(validation).toEqual({ value: input });
+  });
+
+  it('rejects asynchronous host validators with a clear synchronous-boundary error', () => {
+    const codec = new ConversationRunProtocolCodec({
+      activity: asyncActivitySchema,
+      result: PublicResultSchema,
+    });
+
+    expect(() => codec.parseEvent(envelope({
+      kind: 'activity',
+      activity: { type: 'assistant.stream' },
+    }))).toThrow(ConversationRunProtocolValidationError);
+    expect(() => codec.parseEvent(envelope({
+      kind: 'activity',
+      activity: { type: 'assistant.stream' },
+    }))).toThrow('must validate synchronously');
   });
 });
+
+const trimmedSummarySchema: StandardSchemaV1<unknown, { summary: string }> = {
+  '~standard': {
+    version: 1,
+    vendor: 'test',
+    validate(value) {
+      const summary = typeof value === 'object'
+        && value !== null
+        && 'summary' in value
+        && typeof value.summary === 'string'
+        ? value.summary.trim()
+        : undefined;
+      return summary
+        ? { value: { summary } }
+        : { issues: [{ message: 'Expected a non-empty summary.', path: ['summary'] }] };
+    },
+  },
+};
+
+const asyncActivitySchema: StandardSchemaV1<unknown, { type: string }> = {
+  '~standard': {
+    version: 1,
+    vendor: 'test-async',
+    async validate(value) {
+      return { value: value as { type: string } };
+    },
+  },
+};
 
 function createCodec() {
   return new ConversationRunProtocolCodec({

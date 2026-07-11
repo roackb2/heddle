@@ -5,6 +5,7 @@ export {
 } from './consumer-service.js';
 export {
   ConversationRunProtocolCodec,
+  ConversationRunProtocolValidationError,
   ConversationRunReferenceSchema,
   ConversationRunReplayCursorSchema,
 } from './protocol-codec.js';
@@ -17,8 +18,10 @@ export type {
   ConversationRunProtocolEnvelope,
   ConversationRunProtocolError,
   ConversationRunProtocolEvent,
+  ConversationRunProtocolEventSchema,
   ConversationRunProtocolEventKind,
   ConversationRunReference,
   ConversationRunRetry,
+  ConversationRunProtocolSafeParseResult,
   ConversationRunSubscriptionInput,
 } from './types.js';

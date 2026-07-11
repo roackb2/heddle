@@ -22,7 +22,10 @@ import {
 ## Define the public wire payload
 
 Heddle owns the run envelope and terminal vocabulary. The host must explicitly
-choose which activity and result fields are safe for remote clients.
+choose which activity and result fields are safe for remote clients. Payload
+validators use the validator-neutral
+[Standard Schema](https://standardschema.dev/schema) interface; Zod 3.24+, Zod
+4, Valibot, ArkType, and other compatible validators work without adapters.
 
 ```ts
 import { z } from 'zod'
@@ -42,6 +45,10 @@ const protocol = new ConversationRunProtocolCodec({
   result: PublicResultSchema,
 })
 ```
+
+Payload validation must be synchronous because streaming parse and
+serialization are synchronous. The codec rejects an asynchronous validator with
+a clear boundary error.
 
 `protocol.parseEvent(untrustedValue)` validates:
 
