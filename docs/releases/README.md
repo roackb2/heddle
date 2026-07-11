@@ -16,7 +16,9 @@ For a user-facing release:
 
 1. Choose the version to ship.
 2. Check the latest published npm version and existing GitHub tags/releases so you do not reuse an already shipped version.
-3. Update the package version in `package.json`.
+3. Update the package version in both `package.json` and
+   `packages/heddle-remote/package.json`. The packages initially release in
+   lockstep, and the build fails when their versions diverge.
 4. Verify the release candidate on the intended commit.
 5. Review the actual scope from git.
 6. Write curated release notes from that real scope.
@@ -31,6 +33,7 @@ Before tagging a release, use the normal green checkpoint baseline:
 - `yarn build`
 - `yarn test`
 - `npm pack --dry-run --cache /tmp/heddle-npm-cache`
+- `npm pack ./packages/heddle-remote --dry-run --cache /tmp/heddle-npm-cache`
 
 Add more verification if the release changes a workflow that needs manual validation.
 
@@ -97,7 +100,8 @@ Do not infer release boundaries from version-bump commit messages alone when an 
 For the actual release pass:
 
 1. Confirm the latest already-published version on npm and the latest GitHub release/tag.
-2. Confirm the intended next version in `package.json`.
+2. Confirm the intended next version matches in `package.json` and
+   `packages/heddle-remote/package.json`.
 3. Run the release verification baseline.
 4. Review the git range since the previous release tag.
 5. Update or draft the release note in `docs/releases/`.
@@ -120,12 +124,25 @@ gh api user
 yarn build
 yarn test
 npm pack --dry-run --cache /tmp/heddle-npm-cache
+npm pack ./packages/heddle-remote --dry-run --cache /tmp/heddle-npm-cache
 yarn release:context <previous-tag> HEAD
 git tag -a vX.Y.Z -m "Heddle vX.Y.Z"
 git push origin main
 git push origin vX.Y.Z
 gh release create vX.Y.Z --title "Heddle vX.Y.Z" --notes-file docs/releases/vX.Y.Z.md
 ```
+
+After the GitHub release, the operator publishes both verified artifacts. The
+remote package has no dependency on the Node package, so publish it first and
+then publish Heddle:
+
+```bash
+npm publish ./packages/heddle-remote
+npm publish
+```
+
+This remains a manual operator step unless npm publication was explicitly
+delegated.
 
 If the repo does not have a previous tag yet, run `yarn release:context <base-ref> HEAD` with the intended release boundary instead.
 

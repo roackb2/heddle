@@ -24,12 +24,13 @@ Express, SSE, bearer auth, and the sample browser client are replaceable host
 choices.
 
 When copying this example into another project, replace the relative source
-imports with `@roackb2/heddle`, `@roackb2/heddle/hosted`, and
-`@roackb2/heddle/remote` as shown by each layer. Stage 01 requires Heddle only;
-stage 02 additionally uses `express`, its TypeScript types, and `zod`; stage 03
-uses `eventsource-parser` and the shared Zod wire contracts. Declare those
-libraries directly in the host project instead of relying on transitive
-dependencies.
+imports with `@roackb2/heddle`, `@roackb2/heddle/hosted`, and the independently
+installable `@roackb2/heddle-remote` package as shown by each layer. Stage 01
+requires Heddle only; stage 02 additionally uses `express`, its TypeScript
+types, `zod`, and `@roackb2/heddle-remote`; stage 03 uses
+`@roackb2/heddle-remote`, `eventsource-parser`, and the shared Zod wire
+contracts. Declare those libraries directly in the host project instead of
+relying on transitive dependencies.
 
 ## Choose the layers that match your stack
 

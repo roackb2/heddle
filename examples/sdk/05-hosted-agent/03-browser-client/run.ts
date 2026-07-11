@@ -6,7 +6,7 @@
  * Start the stage-2 server first, then run this script with the same token.
  */
 import { setTimeout as delay } from 'node:timers/promises';
-import { ConversationRunConsumerService } from '../../../../src/remote.js';
+import { ConversationRunConsumerService } from '../../../../src/core/chat/remote/index.js';
 import {
   HostedAgentClient,
   HostedAgentClientError,

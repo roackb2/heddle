@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src/core/chat/remote",
+    "outDir": "./packages/heddle-remote/dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "inlineSources": true
+  },
+  "include": ["src/core/chat/remote/**/*.ts"],
+  "exclude": ["node_modules", "packages/heddle-remote/dist"]
+}

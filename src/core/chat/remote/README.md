@@ -31,7 +31,7 @@ Import this layer explicitly so the remote-hosting assumption is visible:
 import {
   ConversationRunConsumerService,
   ConversationRunProtocolCodec,
-} from '@roackb2/heddle/remote'
+} from '@roackb2/heddle-remote'
 
 const protocol = new ConversationRunProtocolCodec({
   activity: PublicActivitySchema,
