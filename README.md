@@ -523,7 +523,7 @@ More: [Programmatic hosts](docs/guides/programmatic/README.md),
 [choosing an integration layer](docs/guides/programmatic/integration-layers.md),
 [remote conversation runs](docs/guides/programmatic/remote-runs.md),
 and the runnable
-[hosted service → HTTP/SSE → browser client example](examples/sdk/05-hosted-agent/README.md).
+[hosted service → HTTP/SSE → browser client → React reference](examples/sdk/05-hosted-agent/README.md).
 
 ### Semantic Drift
 

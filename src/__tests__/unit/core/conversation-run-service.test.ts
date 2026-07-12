@@ -140,6 +140,57 @@ describe('ConversationRunService', () => {
     ]);
   });
 
+  it('projects internal failures into a host-owned public terminal error', async () => {
+    const service = createRunService();
+    const run = service.startTurn({
+      address: { scopeId: 'tenant-1', sessionId: 'session-public-error' },
+      engine: engineThatRuns(async () => {
+        throw new Error('provider credential leaked into an internal failure');
+      }),
+      turn: { sessionId: 'session-public-error', prompt: 'Fail safely' },
+      projectError: () => ({
+        code: 'agent_unavailable',
+        message: 'The agent could not complete this request.',
+      }),
+    });
+
+    await expect(run.result).rejects.toThrow('provider credential leaked');
+    await expect(collect(run.events())).resolves.toEqual([
+      expect.objectContaining({
+        kind: 'error',
+        error: {
+          code: 'agent_unavailable',
+          message: 'The agent could not complete this request.',
+        },
+      }),
+    ]);
+  });
+
+  it('uses a safe terminal fallback when host error projection fails', async () => {
+    const service = createRunService();
+    const run = service.startTurn({
+      address: { scopeId: 'tenant-1', sessionId: 'session-error-projector-failed' },
+      engine: engineThatRuns(async () => {
+        throw new Error('internal failure');
+      }),
+      turn: { sessionId: 'session-error-projector-failed', prompt: 'Fail safely' },
+      projectError: () => {
+        throw new Error('projector failed');
+      },
+    });
+
+    await expect(run.result).rejects.toThrow('internal failure');
+    await expect(collect(run.events())).resolves.toEqual([
+      expect.objectContaining({
+        kind: 'error',
+        error: {
+          code: 'run_failed',
+          message: 'The conversation run failed.',
+        },
+      }),
+    ]);
+  });
+
   it('exposes the active run identity and refuses to cancel a different run id', async () => {
     const service = createRunService();
     let finish: (() => void) | undefined;

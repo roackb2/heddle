@@ -36,6 +36,38 @@ describe('ConversationRunHttpSseClient', () => {
     expect(startHeaders.get('content-type')).toBe('application/json');
   });
 
+  it('binds the default global fetch for browser-compatible invocation', async () => {
+    const fetch = vi.fn(function (this: unknown) {
+      if (this !== globalThis) {
+        throw new TypeError('Illegal invocation');
+      }
+      return Promise.resolve(jsonResponse({ runId: 'run-1', accepted: true }, 202));
+    }) as unknown as typeof globalThis.fetch;
+    vi.stubGlobal('fetch', fetch);
+
+    try {
+      const client = new ConversationRunHttpSseClient<
+        { prompt: string },
+        z.infer<typeof accepted>,
+        { type: string },
+        { summary: string },
+        z.infer<typeof cancellation>
+      >({
+        baseUrl: 'https://example.test/api/agent/',
+        protocol,
+        accepted,
+        cancellation,
+      });
+
+      await expect(client.start({ prompt: 'Hello' })).resolves.toEqual({
+        runId: 'run-1',
+        accepted: true,
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('parses fragmented SSE and verifies the canonical run identity', async () => {
     const event = {
       kind: 'activity' as const,

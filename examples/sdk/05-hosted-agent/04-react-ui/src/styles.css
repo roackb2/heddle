@@ -1,0 +1,19 @@
+@import "tailwindcss";
+@source "../../../../../node_modules/streamdown/dist/*.js";
+
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  background: #020617;
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+  background: #020617;
+}
+
+button,
+textarea {
+  font: inherit;
+}

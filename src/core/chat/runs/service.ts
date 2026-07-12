@@ -22,7 +22,9 @@ import type {
   ConversationRunAccepted,
   ConversationRunAddress,
   ConversationRunContext,
+  ConversationRunErrorProjector,
   ConversationRunHandle,
+  ConversationRunPublicError,
   ConversationRunServiceOptions,
   ConversationRunStreamItem,
   PendingConversationRunApproval,
@@ -118,6 +120,7 @@ export class ConversationRunService<
       onAccepted: input.onAccepted,
       onHeartbeat: input.onHeartbeat,
       onError: input.onError,
+      projectError: input.projectError,
       onSettled: input.onSettled,
       execute: async (run) => {
         const result = await input.engine.turns.submit({
@@ -146,6 +149,7 @@ export class ConversationRunService<
       onAccepted: input.onAccepted,
       onHeartbeat: input.onHeartbeat,
       onError: input.onError,
+      projectError: input.projectError,
       onSettled: input.onSettled,
       execute: async (run) => {
         const result = await input.engine.turns.continue({
@@ -325,17 +329,12 @@ export class ConversationRunService<
             // stream item even when a host-side failure hook also fails.
           }
         }
-        if (context.controller.signal.aborted) {
-          this.publish(record, { kind: 'cancelled', reason: 'Cancelled by user' });
-        } else {
-          this.publish(record, {
-            kind: 'error',
-            error: {
-              code: 'run_failed',
-              message: error instanceof Error ? error.message : String(error),
-            },
-          });
-        }
+        const publicError = context.controller.signal.aborted
+          ? undefined
+          : await ConversationRunService.projectRunError(input.projectError, error, context);
+        this.publish(record, publicError && !context.controller.signal.aborted
+          ? { kind: 'error', error: publicError }
+          : { kind: 'cancelled', reason: 'Cancelled by user' });
         throw error;
       })
       .finally(() => {
@@ -460,6 +459,34 @@ export class ConversationRunService<
     const projected = await input.projectResult(result, run);
     ConversationRunService.throwIfCancelled(run);
     return projected;
+  }
+
+  private static async projectRunError(
+    projectError: ConversationRunErrorProjector | undefined,
+    error: unknown,
+    run: ConversationRunContext,
+  ): Promise<ConversationRunPublicError> {
+    if (!projectError) {
+      return {
+        code: 'run_failed',
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    try {
+      const projected = await projectError(error, run);
+      if (typeof projected.code !== 'string'
+        || !projected.code.trim()
+        || typeof projected.message !== 'string') {
+        throw new Error('Projected conversation run errors require a code and message.');
+      }
+      return { code: projected.code.trim(), message: projected.message };
+    } catch {
+      return {
+        code: 'run_failed',
+        message: 'The conversation run failed.',
+      };
+    }
   }
 
   private static throwIfCancelled(run: ConversationRunContext): void {

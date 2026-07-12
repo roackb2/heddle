@@ -5,6 +5,7 @@
  * session IDs, composition, and process lifetime. It deliberately has no HTTP,
  * transport, or UI dependency; those belong in later optional stages.
  */
+import pick from 'lodash/pick.js';
 import {
   type ConversationEngine,
   type ConversationEngineHost,
@@ -37,6 +38,23 @@ export type HostedAgentResult = Pick<ConversationTurnResultSummary, 'outcome' | 
 
 export type HostedAgentRunStreamItem = ConversationRunStreamItem<HostedAgentResult>;
 
+export type HostedAgentConversationMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  isPending?: boolean;
+  isStreaming?: boolean;
+};
+
+export type HostedAgentConversation = {
+  sessionId: string;
+  messages: HostedAgentConversationMessage[];
+  activeRun?: {
+    runId: string;
+    acceptedAt: string;
+  };
+};
+
 export type HostedAgentServiceOptions = {
   createEngine(address: HostedRunAddress): ConversationEngine | Promise<ConversationEngine>;
   createHost?(address: HostedRunAddress): ConversationEngineHost | Promise<ConversationEngineHost>;
@@ -44,13 +62,15 @@ export type HostedAgentServiceOptions = {
 };
 
 export class HostedAgentRunNotFoundError extends Error {}
+export class HostedAgentConversationBusyError extends Error {}
 export class HostedAgentInputError extends Error {}
 
 /**
  * Owns the application-level lifecycle for a hosted conversational agent.
  *
  * Heddle owns conversation execution and replay. This service owns account
- * scoping, engine/session construction, and authorization of run handles.
+ * scoping, engine/session construction, public conversation projection, and
+ * authorization of run handles.
  * Authentication verification happens before this service; HTTP, SSE, and UI
  * state stay outside it.
  */
@@ -90,6 +110,10 @@ export class HostedAgentService {
         outcome: result.outcome,
         summary: result.summary,
       }),
+      projectError: () => ({
+        code: 'run_failed',
+        message: 'The hosted agent could not complete this request.',
+      }),
     });
 
     return {
@@ -98,6 +122,31 @@ export class HostedAgentService {
       acceptedAt: run.acceptedAt,
       sessionId: session.id,
     };
+  }
+
+  async readConversation(input: HostedRunAddress): Promise<HostedAgentConversation> {
+    const address = HostedAgentService.normalizeAddress(input);
+    const engine = await this.options.createEngine(address);
+    return this.projectConversation(
+      address,
+      engine.sessions.readExisting(address.sessionId)?.messages ?? [],
+    );
+  }
+
+  async resetConversation(input: HostedRunAddress): Promise<HostedAgentConversation> {
+    const address = HostedAgentService.normalizeAddress(input);
+    if (this.runs.isRunning(address)) {
+      throw new HostedAgentConversationBusyError(
+        `Cannot reset session ${address.sessionId} while a run is active.`,
+      );
+    }
+
+    const engine = await this.options.createEngine(address);
+    const session = engine.sessions.readExisting(address.sessionId);
+    return this.projectConversation(
+      address,
+      session ? engine.sessions.resetConversation(session.id).messages : [],
+    );
   }
 
   subscribe(input: {
@@ -125,6 +174,26 @@ export class HostedAgentService {
       throw new HostedAgentRunNotFoundError(`Hosted agent run not found: ${runId}`);
     }
     return run;
+  }
+
+  private projectConversation(
+    address: HostedRunAddress,
+    messages: HostedAgentConversationMessage[],
+  ): HostedAgentConversation {
+    const activeRun = this.runs.getActiveRun(address);
+    return {
+      sessionId: address.sessionId,
+      messages: messages.map((message) => pick(
+        message,
+        ['id', 'role', 'text', 'isPending', 'isStreaming'],
+      )),
+      ...(activeRun ? {
+        activeRun: {
+          runId: activeRun.runId,
+          acceptedAt: activeRun.acceptedAt,
+        },
+      } : {}),
+    };
   }
 
   private static normalizeAddress(input: { accountId: string; sessionId: string }): HostedRunAddress {

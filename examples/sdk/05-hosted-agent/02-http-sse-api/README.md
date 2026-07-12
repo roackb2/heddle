@@ -22,6 +22,11 @@ for curl commands, lifecycle details, and production replacements.
 3. [`server.ts`](server.ts) — runnable local composition with deliberately
    non-production auth.
 
+The example also exposes authenticated session read/reset operations for the
+optional [04 React UI](../04-react-ui/). Those product resources are ordinary
+host API code; Heddle's HTTP/SSE preset standardizes only run start, events, and
+cancel.
+
 The transport must preserve stable `runId`, ordered `sequence`, replay after a
 cursor, subscriber-only disconnect, explicit cancellation, and a terminal
 event. If the host uses tRPC, Fastify, Hono, Nest, WebSocket, or another stack,
