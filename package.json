@@ -33,6 +33,10 @@
       "types": "./dist/src/hosted.d.ts",
       "import": "./dist/src/hosted.js"
     },
+    "./hosted/http-sse": {
+      "types": "./dist/src/hosted/http-sse.d.ts",
+      "import": "./dist/src/hosted/http-sse.js"
+    },
     "./advanced": {
       "types": "./dist/src/advanced.d.ts",
       "import": "./dist/src/advanced.js"

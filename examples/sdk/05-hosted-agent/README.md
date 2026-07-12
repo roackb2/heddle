@@ -28,9 +28,10 @@ imports with `@roackb2/heddle`, `@roackb2/heddle/hosted`, and the independently
 installable `@roackb2/heddle-remote` package as shown by each layer. Stage 01
 requires Heddle only; stage 02 additionally uses `express`, its TypeScript
 types, `zod`, and `@roackb2/heddle-remote`; stage 03 uses
-`@roackb2/heddle-remote`, `eventsource-parser`, and the shared Zod wire
-contracts. Declare those libraries directly in the host project instead of
-relying on transitive dependencies.
+`@roackb2/heddle-remote` and the shared Zod wire contracts. Stage 03 opts into
+`@roackb2/heddle-remote/http-sse`, which declares its SSE parser directly.
+Declare the packages each layer imports instead of relying on transitive
+dependencies.
 
 ## Choose the layers that match your stack
 
@@ -59,7 +60,7 @@ relying on transitive dependencies.
              |
              v
   03-browser-client/
-    browser-client.ts      typed fetch/SSE protocol adapter
+    browser-client.ts      host schemas for Heddle's HTTP/SSE client
     run.ts                 public consumer + transport reconnect demo
 ```
 
@@ -158,7 +159,8 @@ POST /api/agent/runs/:runId/cancel
 [`contracts.ts`](02-http-sse-api/contracts.ts) validates untrusted wire data and
 defines the public browser contract through Heddle's
 `ConversationRunProtocolCodec`. [`http-api.ts`](02-http-sse-api/http-api.ts)
-adapts HTTP operations to the transport-neutral service:
+registers host-owned Express routes and composes
+`@roackb2/heddle/hosted/http-sse` with the transport-neutral service:
 
 - start returns `202 Accepted` after Heddle assigns a stable run identity;
 - subscribe uses each canonical run sequence as the SSE `id`;
@@ -223,10 +225,11 @@ HEDDLE_EXAMPLE_BEARER_TOKEN=local-example-secret \
 
 ### What it showcases
 
-[`browser-client.ts`](03-browser-client/browser-client.ts) owns URL
-construction, authentication headers, HTTP error decoding, incremental SSE
-parsing with `eventsource-parser`, Zod validation, event-ID validation, and
-abort propagation.
+[`browser-client.ts`](03-browser-client/browser-client.ts) supplies the
+host-owned public schemas and protocol to
+`@roackb2/heddle-remote/http-sse`. The Heddle client owns URL construction,
+header composition, HTTP error decoding, incremental SSE parsing, response
+validation, event identity checks, reader cleanup, and abort propagation.
 
 [`run.ts`](03-browser-client/run.ts) is the consuming application policy. It
 uses Heddle's `ConversationRunConsumerService` for cursor advancement,

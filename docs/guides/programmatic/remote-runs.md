@@ -12,13 +12,16 @@ import {
   ConversationRunConsumerService,
   ConversationRunProtocolCodec,
 } from '@roackb2/heddle-remote'
+import { ConversationRunHttpSseClient } from '@roackb2/heddle-remote/http-sse'
 ```
 
 - `@roackb2/heddle` owns persisted conversation semantics.
 - `@roackb2/heddle/hosted` owns process-local active-run coordination.
 - `@roackb2/heddle-remote` is independently installable and owns client cursor
-  correctness plus runtime wire validation without choosing HTTP, SSE, tRPC,
-  WebSocket, React, or auth.
+  correctness plus runtime wire validation without choosing a transport.
+- `@roackb2/heddle-remote/http-sse` is an optional assumption layer for the
+  conventional REST run resource and streaming `fetch`; it still does not
+  choose React or auth policy.
 
 ## Define the public wire payload
 
@@ -139,6 +142,40 @@ The consumer computes retry correctness and timing. The host still owns the
 actual timer, subscription handle, error presentation, online/offline policy,
 and UI state. Accepted progress resets the retry attempt budget.
 
+## Opt into the REST/SSE preset
+
+When the host exposes `POST /runs`, `GET /runs/:runId/events`, and
+`POST /runs/:runId/cancel`, use the browser-safe preset instead of recreating
+incremental SSE parsing and transport validation:
+
+```ts
+import { ConversationRunHttpSseClient } from '@roackb2/heddle-remote/http-sse'
+
+const client = new ConversationRunHttpSseClient({
+  baseUrl: '/api/agent',
+  protocol,
+  accepted: StartRunResultSchema,
+  cancellation: CancelRunResultSchema,
+  getHeaders: () => ({ Authorization: `Bearer ${accessToken}` }),
+})
+
+const accepted = await client.start({ sessionId, prompt })
+await client.subscribe({
+  runId: accepted.runId,
+  afterSequence: consumer.subscriptionInput()?.afterSequence,
+  signal: subscription.signal,
+  onEvent(event) {
+    consumer.accept(event)
+  },
+})
+```
+
+The preset owns URL encoding, header composition, response schema validation,
+incremental SSE parsing, reader cleanup, and verification that the SSE ID,
+event name, payload `runId`, and canonical envelope agree. The host supplies
+auth headers, public schemas, abort/timer lifecycle, cursor persistence, retry
+UX, and product event handling.
+
 ## Server-side run ownership
 
 Use one host-long-lived `ConversationRunService` from the hosted entrypoint:
@@ -159,10 +196,18 @@ not promise restart recovery or cross-instance delivery. Add shared routing or
 durable delivery only when the deployment explicitly requires that additional
 assumption layer.
 
+For the same conventional Node HTTP/SSE transport, import
+`parseConversationRunSseReplayCursor` and `streamConversationRunSse` from
+`@roackb2/heddle/hosted/http-sse`. They own cursor precedence, SSE headers and
+frames, backpressure, and subscriber-only disconnect cleanup. They intentionally
+do not register routes or choose authentication, authorization, CORS, rate
+limits, request validation, or public error responses.
+
 ## What remains host-owned
 
 - start/cancel routes or procedures;
-- HTTP/SSE/tRPC/WebSocket adapters;
+- routes/procedures and non-HTTP/SSE transport adapters;
+- HTTP authentication, authorization, CORS, rate limits, and public errors;
 - authentication, tenancy, CORS, rate limits, and audit;
 - engine construction, credentials, tools, and approval policy;
 - public activity/result projection;

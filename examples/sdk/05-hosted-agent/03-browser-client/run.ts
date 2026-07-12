@@ -8,8 +8,12 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { ConversationRunConsumerService } from '../../../../src/core/chat/remote/index.js';
 import {
-  HostedAgentClient,
-  HostedAgentClientError,
+  ConversationRunHttpSseClient,
+  ConversationRunHttpSseClientError,
+} from '../../../../src/core/chat/remote/http-sse/index.js';
+import {
+  HostedAgentClientContract,
+  type HostedAgentClient,
 } from './browser-client.js';
 import type { HostedAgentRunEvent } from '../02-http-sse-api/contracts.js';
 
@@ -29,8 +33,9 @@ const prompt = process.argv
   || 'Read the repository README and summarize the project in three sentences.';
 const baseUrl = process.env.HEDDLE_EXAMPLE_AGENT_URL ?? 'http://127.0.0.1:8787/api/agent';
 const sessionId = process.env.HEDDLE_EXAMPLE_SESSION_ID ?? 'hosted-agent-browser-example';
-const client = new HostedAgentClient({
+const client: HostedAgentClient = new ConversationRunHttpSseClient({
   baseUrl,
+  ...HostedAgentClientContract,
   getHeaders: () => ({ Authorization: `Bearer ${bearerToken}` }),
 });
 
@@ -126,7 +131,7 @@ async function consumeUntilTerminal(
         lastError = new Error('Hosted agent event stream ended before a terminal event.');
       }
     } catch (error) {
-      if (error instanceof HostedAgentClientError
+      if (error instanceof ConversationRunHttpSseClientError
         && (error.status === undefined || error.status < 500)) {
         throw error;
       }

@@ -53,8 +53,10 @@ export const HostedAgentApiErrorSchema = z.object({
 
 export type StartHostedAgentRunInput = z.infer<typeof StartHostedAgentRunInputSchema>;
 export type StartHostedAgentRunResult = z.infer<typeof StartHostedAgentRunResultSchema>;
+export type HostedAgentActivity = z.infer<typeof HostedAgentActivitySchema>;
+export type HostedAgentResult = z.infer<typeof HostedAgentResultSchema>;
 export type HostedAgentRunEvent = ConversationRunProtocolEvent<
-  z.infer<typeof HostedAgentActivitySchema>,
-  z.infer<typeof HostedAgentResultSchema>
+  HostedAgentActivity,
+  HostedAgentResult
 >;
 export type CancelHostedAgentRunResult = z.infer<typeof CancelHostedAgentRunResultSchema>;

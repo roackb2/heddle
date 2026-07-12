@@ -29,8 +29,8 @@ platform, an identity provider, or a database.
 | A local chat that needs product capabilities | [`02-add-a-tool.ts`](02-add-a-tool.ts) or [`03-add-an-mcp-server.ts`](03-add-an-mcp-server.ts) | Tool implementation or MCP server selection |
 | A process that already owns output/rendering | [`04-custom-output.ts`](04-custom-output.ts) | Output sink and presentation policy |
 | A server, worker, Electron backend, or custom transport | [`05-hosted-agent/01-hosted-service`](05-hosted-agent/01-hosted-service) | Identity scope, durable session IDs, engine composition, and process lifetime |
-| An Express server using REST + SSE | [`05-hosted-agent/02-http-sse-api`](05-hosted-agent/02-http-sse-api) | Authentication, API policy, HTTP operations, and deployment |
-| A browser consuming that REST + SSE contract | [`05-hosted-agent/03-browser-client`](05-hosted-agent/03-browser-client) | Transport lifecycle, UI state, rendering, retry UX, and product result handling |
+| An Express server using REST + SSE | [`05-hosted-agent/02-http-sse-api`](05-hosted-agent/02-http-sse-api) | Authentication, routes/API policy, CORS/limits, and deployment |
+| A browser consuming that REST + SSE contract | [`05-hosted-agent/03-browser-client`](05-hosted-agent/03-browser-client) | Auth headers, abort/timer lifecycle, UI state, retry UX, and product result handling |
 
 If your server already uses tRPC, Fastify, Hono, Nest, WebSocket, or another
 transport, follow the hosted-service stage and write an adapter for that stack.
@@ -88,9 +88,10 @@ yarn example:sdk:hosted-agent "What does this repository do?"
 This directory contains its own numbered path:
 
 1. `01-hosted-service` — transport-neutral account/session/run lifecycle.
-2. `02-http-sse-api` — optional Express + REST/SSE adapter.
-3. `03-browser-client` — optional framework-neutral browser protocol client
-   composed with Heddle's public remote-run consumer.
+2. `02-http-sse-api` — optional Express routes composed with Heddle's Node
+   HTTP/SSE streaming helper.
+3. `03-browser-client` — optional browser-safe HTTP/SSE preset composed with
+   Heddle's transport-neutral remote-run consumer.
 
 Read the [hosted-agent walkthrough](05-hosted-agent/README.md) before copying
 this stage. Each later folder depends only on the earlier layer it extends, so
