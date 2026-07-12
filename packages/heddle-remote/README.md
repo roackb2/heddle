@@ -26,16 +26,34 @@ const consumer = new ConversationRunConsumerService({
 })
 ```
 
+If the host uses the conventional REST/SSE run resource, opt into the transport
+preset instead of rebuilding fetch and SSE correctness:
+
+```ts
+import { ConversationRunHttpSseClient } from '@roackb2/heddle-remote/http-sse'
+
+const client = new ConversationRunHttpSseClient({
+  baseUrl: '/api/agent',
+  protocol,
+  accepted: StartRunResultSchema,
+  cancellation: CancelRunResultSchema,
+  getHeaders: () => ({ Authorization: `Bearer ${accessToken}` }),
+})
+```
+
 ## Responsibility boundary
 
-This package owns the canonical run envelope, runtime wire validation,
+The root entrypoint owns the canonical run envelope, runtime wire validation,
 JSON-safety, accepted-sequence cursor, duplicate and gap handling, terminal
-detection, and bounded retry calculation.
+detection, and bounded retry calculation. The optional `/http-sse` entrypoint
+adds conventional run resource paths, fetch lifecycle, response validation,
+incremental SSE parsing, and event identity checks.
 
-It does not own HTTP, SSE, tRPC, WebSocket, React, timers, authentication,
-authorization, public-field policy, product messages, or UI state. Hosts must
-supply synchronous Standard Schema validators whose output contains only the
-activity and result fields authorized for remote clients.
+It does not own tRPC, WebSocket, React, timers, authentication, authorization,
+public-field policy, product messages, or UI state. The HTTP/SSE preset also
+does not own retry timing or cursor persistence. Hosts must supply Standard
+Schema validators whose output contains only the activity and result fields
+authorized for remote clients.
 
 The Node host normally combines `@roackb2/heddle` with
 `@roackb2/heddle/hosted`. The browser or other remote consumer installs this

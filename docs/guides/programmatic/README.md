@@ -15,9 +15,13 @@ hosting assumptions.
   product host needs to build an agentic experience.
 - `@roackb2/heddle/hosted` — process-local run identity, replay, cancellation,
   and approvals for a long-lived host process.
+- `@roackb2/heddle/hosted/http-sse` — opt-in Node HTTP/SSE framing,
+  backpressure, replay-cursor, and subscriber-disconnect correctness.
 - `@roackb2/heddle-remote` — an independently installable, browser-safe package
   with runtime contracts plus transport-neutral cursor, duplicate, gap,
   terminal, and reconnect correctness.
+- `@roackb2/heddle-remote/http-sse` — opt-in browser-safe fetch/SSE parsing and
+  transport validation for the conventional REST run resource.
 - `@roackb2/heddle/advanced` — the **deep core customization** surface: the curated exports plus
   lower-level building blocks (LLM adapters, individual tools, trace, memory,
   models, awareness) and specialized runtimes (agent loop, heartbeat,

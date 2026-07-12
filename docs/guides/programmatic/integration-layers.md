@@ -15,9 +15,9 @@ in control.
 HOST-OWNED PRODUCT
   UI state and rendering
           |
-  @roackb2/heddle-remote consumer + public contract
+  @roackb2/heddle-remote consumer + optional HTTP/SSE client
           |
-  transport client/server adapter                  optional
+  host transport adapter + optional Node SSE helper
           |
   application service and composition root
   (product session IDs, tools, config, repositories, policy)
@@ -47,7 +47,7 @@ not transport infrastructure.
 | Remote consumption | Cursor advancement, duplicate suppression, sequence-gap failure, terminal detection, bounded reconnect timing, and runtime envelope validation | Public activity/result schemas, actual transport timer/handle, and error UX |
 | Persistence | File-backed defaults plus injectable session/artifact repository ports | Production repository implementations, retention, encryption, backup, and tenancy |
 | Identity and authorization | No identity-provider assumption | Authentication, tenant/user mapping, authorization for start/subscribe/cancel |
-| Transport/API | No HTTP, tRPC, SSE, or WebSocket assumption | Framework, routes/procedures, wire schemas, errors, limits, CORS, and rate limiting |
+| Transport/API | Optional fetch/SSE client and Node SSE streaming correctness when that preset is selected | Framework, routes/procedures, wire schemas, auth, errors, limits, CORS, and rate limiting |
 | Client experience | Semantic activities, terminal run events, and remote cursor/retry calculations | Messages, tool rendering, UI state, transport timers, retry UX, notifications, and product-specific result presentation |
 
 Do not rebuild Heddle-owned conversation or run behavior in the host. In
@@ -63,9 +63,9 @@ disconnect as implicit cancellation.
 | A local loop that needs product tools or MCP | Quickstart plus tools/host extensions | [`02-add-a-tool.ts`](../../../examples/sdk/02-add-a-tool.ts), [`03-add-an-mcp-server.ts`](../../../examples/sdk/03-add-an-mcp-server.ts) |
 | Its own output sink or local UI | `createConversationEngine` + `createConversationTextHost` or host callbacks | [`04-custom-output.ts`](../../../examples/sdk/04-custom-output.ts) |
 | A server/worker that owns transport | `@roackb2/heddle` + `@roackb2/heddle/hosted` | [`05-hosted-agent/01-hosted-service`](../../../examples/sdk/05-hosted-agent/01-hosted-service) |
-| Express with REST + SSE | Same core plus a host adapter | [`05-hosted-agent/02-http-sse-api`](../../../examples/sdk/05-hosted-agent/02-http-sse-api) |
+| Express with REST + SSE | Core plus `@roackb2/heddle/hosted/http-sse` | [`05-hosted-agent/02-http-sse-api`](../../../examples/sdk/05-hosted-agent/02-http-sse-api) |
 | A remote client over any transport | `@roackb2/heddle-remote` plus a host transport | [Remote conversation runs](remote-runs.md) |
-| A browser using the example REST/SSE contract | Remote layer plus the example protocol client | [`05-hosted-agent/03-browser-client`](../../../examples/sdk/05-hosted-agent/03-browser-client) |
+| A browser using the conventional REST/SSE contract | `@roackb2/heddle-remote/http-sse` | [`05-hosted-agent/03-browser-client`](../../../examples/sdk/05-hosted-agent/03-browser-client) |
 
 For tRPC, Fastify, Hono, Nest, WebSocket, Electron IPC, queues, or another
 transport, stop at the hosted-service layer and implement the adapter in the
@@ -108,7 +108,9 @@ The host supplies public activity/result schemas; Heddle owns envelope
 validation, JSON safety, cursor advancement, duplicate/gap handling, terminal
 detection, and retry calculation.
 
-This layer does not own HTTP, SSE, tRPC, timers, auth, or UI state. See
+This base layer does not own HTTP, SSE, tRPC, timers, auth, or UI state. Add
+`@roackb2/heddle-remote/http-sse` only when the host uses the conventional REST
+run resource and authenticated streaming `fetch`. See
 [Remote conversation runs](remote-runs.md).
 
 ### Transport adapter
@@ -118,9 +120,13 @@ approval operations. Validate all untrusted wire data and project internal run
 results into an explicitly public schema. Authentication and authorization must
 happen before resolving the Heddle run address.
 
-Web-standard HTTP/SSE helpers are a planned higher assumption layer; Express
-and tRPC remain framework recipes until their residual code proves a meaningful
-adapter boundary.
+For Node HTTP/SSE, `@roackb2/heddle/hosted/http-sse` owns strict replay cursor
+parsing, canonical frames, backpressure, and subscriber disconnect cleanup.
+The host still owns route registration, authentication/authorization, public
+schemas, JSON error policy, CORS, and limits. Express and other Node frameworks
+can share the helper because it targets `IncomingMessage` and `ServerResponse`.
+tRPC, WebSocket, native bridges, and other transports stay on the neutral base
+layer.
 
 ### Client protocol and UI
 
@@ -142,7 +148,9 @@ normal client architecture.
 | Public API fields | Host-owned validation schemas and terminal-result projection |
 | Remote cursor/retry correctness | `ConversationRunConsumerService` |
 | Runtime run-envelope validation | `ConversationRunProtocolCodec` with host activity/result schemas |
-| REST, tRPC, SSE, WebSocket, or IPC | Host transport adapter above the application service |
+| Conventional Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` plus host routes and policy |
+| Conventional browser REST/SSE | `@roackb2/heddle-remote/http-sse` plus host schemas and headers |
+| tRPC, WebSocket, or IPC | Host transport adapter above the application service |
 | React or other UI state | Product client/application layer above the protocol client |
 | Multi-process live delivery | Host-selected shared routing/broker infrastructure |
 

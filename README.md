@@ -510,7 +510,9 @@ Heddle is not only a CLI. The npm package exposes explicit programmatic layers:
 
 - `createConversationEngine`: an alpha API for persisted multi-turn sessions with session storage, compaction, approvals, traces, semantic activity, and custom frontends or local hosts
 - `@roackb2/heddle/hosted`: process-local run identity, ordered activity, bounded replay, cancellation, and approval resolution for reconnectable hosted conversations
-- `@roackb2/heddle/remote`: runtime-validated public run envelopes plus shared cursor, duplicate, gap, terminal, and reconnect correctness for remote clients
+- `@roackb2/heddle/hosted/http-sse`: optional Node HTTP/SSE framing, cursor, backpressure, and subscriber-disconnect correctness without choosing a server framework
+- `@roackb2/heddle-remote`: independently installable runtime-validated run envelopes plus shared cursor, duplicate, gap, terminal, and reconnect correctness for remote clients
+- `@roackb2/heddle-remote/http-sse`: optional browser-safe fetch/SSE transport for the conventional REST run resource
 - `AgentLoopRuntimeService.run(...)`: a lower-level single-run execution loop for hosts that do not need persisted chat or session behavior
 
 Advanced hosts can also reuse lower-level class APIs such as `ToolRegistry`, `ToolExecutionService`, `TraceRecorder`, `TraceConsoleFormatter`, and `ReviewDiffParser` when they intentionally assemble custom runtime or review surfaces.

@@ -14,8 +14,10 @@ import {
   HostedAgentService,
 } from '../../../../examples/sdk/05-hosted-agent/01-hosted-service/agent-service.js';
 import {
-  HostedAgentClient,
+  HostedAgentClientContract,
+  type HostedAgentClient,
 } from '../../../../examples/sdk/05-hosted-agent/03-browser-client/browser-client.js';
+import { ConversationRunHttpSseClient } from '../../../core/chat/remote/http-sse/index.js';
 import type {
   HostedAgentRunEvent,
 } from '../../../../examples/sdk/05-hosted-agent/02-http-sse-api/contracts.js';
@@ -313,8 +315,9 @@ async function startApi(agent: HostedAgentService): Promise<{
 }
 
 function createClient(baseUrl: string, token: string): HostedAgentClient {
-  return new HostedAgentClient({
+  return new ConversationRunHttpSseClient({
     baseUrl,
+    ...HostedAgentClientContract,
     getHeaders: () => ({ Authorization: `Bearer ${token}` }),
   });
 }

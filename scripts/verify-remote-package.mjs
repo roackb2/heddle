@@ -15,6 +15,7 @@ assert.deepEqual(
   remotePackage.dependencies,
   {
     '@standard-schema/spec': rootPackage.dependencies['@standard-schema/spec'],
+    'eventsource-parser': rootPackage.devDependencies['eventsource-parser'],
     zod: rootPackage.dependencies.zod,
   },
   '@roackb2/heddle-remote must keep its explicit browser-safe dependency boundary.',

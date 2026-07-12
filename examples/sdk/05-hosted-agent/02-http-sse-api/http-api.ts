@@ -5,7 +5,6 @@
  * and deployment. Reimplement this adapter in the host's existing framework
  * when Express/SSE is not already part of the stack.
  */
-import { once } from 'node:events';
 import {
   Router,
   type Request,
@@ -15,6 +14,11 @@ import {
 import { z, ZodError } from 'zod';
 import { ConversationRunConflictError } from '../../../../src/hosted.js';
 import {
+  ConversationRunSseReplayCursorError,
+  parseConversationRunSseReplayCursor,
+  streamConversationRunSse,
+} from '../../../../src/hosted/http-sse.js';
+import {
   HostedAgentInputError,
   HostedAgentRunNotFoundError,
   type HostedAgentService,
@@ -23,20 +27,14 @@ import {
   CancelHostedAgentRunResultSchema,
   HostedAgentApiErrorSchema,
   HostedAgentRunProtocol,
-  HostedAgentRunEventSchema,
   StartHostedAgentRunInputSchema,
   StartHostedAgentRunResultSchema,
-  type HostedAgentRunEvent,
 } from './contracts.js';
 
 const AuthenticatedAccountSchema = z.object({
   accountId: z.string().trim().min(1),
 });
 const RunIdSchema = z.string().trim().min(1);
-const ReplayCursorSchema = z.string()
-  .regex(/^(0|[1-9]\d*)$/, 'Replay cursor must be a non-negative integer.')
-  .transform(Number)
-  .refine(Number.isSafeInteger, 'Replay cursor must be a safe integer.');
 
 export type HostedAgentApiDeps = {
   agent: HostedAgentService;
@@ -77,40 +75,30 @@ export function createStartHostedAgentRunHandler(deps: HostedAgentApiDeps): Requ
 
 export function createSubscribeHostedAgentRunHandler(deps: HostedAgentApiDeps): RequestHandler {
   return async (request, response) => {
-    const subscription = new AbortController();
-    const abortSubscription = () => subscription.abort();
-    request.once('aborted', abortSubscription);
-    response.once('close', abortSubscription);
-
     try {
       const { accountId } = await authenticate(deps, request);
       const runId = RunIdSchema.parse(request.params.runId);
-      const afterSequence = parseReplayCursor(request);
-      const events = deps.agent.subscribe({
-        accountId,
-        runId,
-        afterSequence,
-        signal: subscription.signal,
+      const afterSequence = parseConversationRunSseReplayCursor({
+        query: request.query.after,
+        lastEventId: request.header('Last-Event-ID'),
       });
-
-      setSseHeaders(response);
-      for await (const event of events) {
-        await writeSseEvent(response, HostedAgentRunEventSchema.parse(event), subscription.signal);
-      }
-      endResponse(response);
+      await streamConversationRunSse({
+        request,
+        response,
+        protocol: HostedAgentRunProtocol,
+        subscribe: (signal) => deps.agent.subscribe({
+          accountId,
+          runId,
+          afterSequence,
+          signal,
+        }),
+      });
     } catch (error) {
-      if (subscription.signal.aborted) {
-        return;
-      }
       if (!response.headersSent) {
         sendRequestError(deps, response, error);
         return;
       }
       deps.onError?.(error);
-      endResponse(response);
-    } finally {
-      request.off('aborted', abortSubscription);
-      response.off('close', abortSubscription);
     }
   };
 }
@@ -131,40 +119,6 @@ export function createCancelHostedAgentRunHandler(deps: HostedAgentApiDeps): Req
 
 async function authenticate(deps: HostedAgentApiDeps, request: Request): Promise<{ accountId: string }> {
   return AuthenticatedAccountSchema.parse(await deps.authenticate(request));
-}
-
-function parseReplayCursor(request: Request): number | undefined {
-  // An explicit query cursor wins over Last-Event-ID so fetch clients can
-  // deliberately choose their checkpoint; native EventSource uses the header.
-  const value = request.query.after ?? request.header('Last-Event-ID');
-  return value === undefined ? undefined : ReplayCursorSchema.parse(value);
-}
-
-function setSseHeaders(response: Response): void {
-  response.status(200);
-  response.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-  response.setHeader('Cache-Control', 'no-cache, no-transform');
-  response.setHeader('Connection', 'keep-alive');
-  response.setHeader('X-Accel-Buffering', 'no');
-  response.flushHeaders?.();
-}
-
-async function writeSseEvent(
-  response: Response,
-  event: HostedAgentRunEvent,
-  signal: AbortSignal,
-): Promise<void> {
-  const frame = `event: ${event.kind}\nid: ${event.sequence}\ndata: ${HostedAgentRunProtocol.stringifyEvent(event)}\n\n`;
-  if (response.write(frame)) {
-    return;
-  }
-  await once(response, 'drain', { signal });
-}
-
-function endResponse(response: Response): void {
-  if (!response.destroyed && !response.writableEnded) {
-    response.end();
-  }
 }
 
 function sendRequestError(deps: HostedAgentApiDeps, response: Response, error: unknown): void {
@@ -190,7 +144,9 @@ function toApiError(error: unknown): HostedAgentApiError {
   if (error instanceof ConversationRunConflictError) {
     return new HostedAgentApiError(409, 'run_conflict', error.message);
   }
-  if (error instanceof HostedAgentInputError || error instanceof ZodError) {
+  if (error instanceof HostedAgentInputError
+    || error instanceof ConversationRunSseReplayCursorError
+    || error instanceof ZodError) {
     return new HostedAgentApiError(400, 'invalid_request', 'Request validation failed.');
   }
   return new HostedAgentApiError(500, 'internal_error', 'The hosted agent request failed.');

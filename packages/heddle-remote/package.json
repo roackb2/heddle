@@ -25,6 +25,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./http-sse": {
+      "types": "./dist/http-sse/index.d.ts",
+      "import": "./dist/http-sse/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -43,6 +47,7 @@
   ],
   "dependencies": {
     "@standard-schema/spec": "^1.1.0",
+    "eventsource-parser": "^3.1.0",
     "zod": "^4.3.6"
   }
 }

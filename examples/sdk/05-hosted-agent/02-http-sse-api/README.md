@@ -16,8 +16,9 @@ for curl commands, lifecycle details, and production replacements.
 
 1. [`contracts.ts`](contracts.ts) — host-owned public payload schemas composed
    with `ConversationRunProtocolCodec` from `@roackb2/heddle-remote`.
-2. [`http-api.ts`](http-api.ts) — authenticated start, cursor subscribe, and
-   explicit cancel handlers.
+2. [`http-api.ts`](http-api.ts) — authenticated start/cancel handlers plus
+   host-owned routes composed with `@roackb2/heddle/hosted/http-sse` for cursor,
+   framing, backpressure, and disconnect correctness.
 3. [`server.ts`](server.ts) — runnable local composition with deliberately
    non-production auth.
 

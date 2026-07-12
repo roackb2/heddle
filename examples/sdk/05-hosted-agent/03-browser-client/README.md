@@ -13,8 +13,10 @@ for the runnable reconnect/cancel flow.
 
 ## Read in this order
 
-1. [`browser-client.ts`](browser-client.ts) — URL/auth/error/SSE parsing, schema
-   validation, cursor validation, and abort propagation.
+1. [`browser-client.ts`](browser-client.ts) — host-owned public schemas and
+   protocol configured for `ConversationRunHttpSseClient`; URL, HTTP error,
+   incremental SSE parsing, identity checks, cursor validation, and abort
+   cleanup come from `@roackb2/heddle-remote/http-sse`.
 2. [`run.ts`](run.ts) — Heddle's public remote consumer composed with
    application-owned transport timers, terminal rendering, and cancel policy.
 
