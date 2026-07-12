@@ -99,6 +99,9 @@ service or a required SDK wrapper. It demonstrates how a host can:
   telemetry stay application-owned;
 - reuse `engine.sessions.readExisting(...)` before creating a conversation;
 - return an accepted run ID immediately, then subscribe or cancel separately;
+- project internal engine output before Heddle publishes the retained terminal;
+- authorize retained run handles through their host-defined address without a
+  second host-side run registry;
 - use Heddle's canonical ordered replay instead of adding a second event bus.
 
 ### Responsibility boundary
@@ -108,6 +111,12 @@ artifacts, run identity, ordered activities, bounded replay, and cancellation.
 The host owns account-to-scope mapping, durable session IDs, engine
 configuration, injected repositories, approval decisions, and process
 lifecycle.
+
+The example's `projectResult` callback reduces Heddle's internal turn result to
+`outcome` and `summary`. In a product, this callback is also the place to await
+authorized state persistence or reconciliation before clients observe success.
+Projection failure becomes the run's error terminal; it cannot race behind a
+premature successful result.
 
 [`example-agent.ts`](01-hosted-service/example-agent.ts) is the local
 composition root. It chooses a model, filesystem state root, inspect-only tool
@@ -159,10 +168,11 @@ adapts HTTP operations to the transport-neutral service:
 - closing an SSE connection aborts only that subscription, not the run;
 - cancel is a separate, authenticated operation.
 
-The API deliberately projects terminal results to public `outcome` and
-`summary` fields. Trace paths, artifacts, tool results, and internal session
-state are not serialized to the browser. Extend the public Zod schema with only
-the product data the client is authorized to receive.
+The hosted service deliberately projects terminal results to public `outcome`
+and `summary` fields before replay. The API schema validates that boundary
+again. Trace paths, artifacts, tool results, and internal session state are not
+serialized to the browser. Extend the public projection and Zod schema with
+only the product data the client is authorized to receive.
 
 ### Responsibility boundary
 

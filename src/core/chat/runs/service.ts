@@ -12,6 +12,12 @@ import { SESSION_LEASE_REFRESH_INTERVAL_MS } from '@/core/chat/engine/sessions/l
 import type { ConversationActivity } from '@/core/live/index.js';
 import { RuntimeSubscriptionStream } from '@/core/runtime/subscriptions/index.js';
 import type { RuntimeSubscriptionSink } from '@/core/runtime/subscriptions/index.js';
+import {
+  ConversationRunCancelledError,
+  ConversationRunConflictError,
+  ConversationRunNotFoundError,
+  ConversationRunReplayUnavailableError,
+} from './errors.js';
 import type {
   ConversationRunAccepted,
   ConversationRunAddress,
@@ -21,6 +27,8 @@ import type {
   ConversationRunStreamItem,
   PendingConversationRunApproval,
   StartConversationContinueRunInput,
+  StartProjectedConversationContinueRunInput,
+  StartProjectedConversationTurnRunInput,
   StartConversationRunInput,
   StartConversationTurnRunInput,
   SubscribeConversationRunInput,
@@ -96,37 +104,59 @@ export class ConversationRunService<
     return await this.startRecord(input).record.result;
   }
 
-  startTurn(input: StartConversationTurnRunInput<Address>): ConversationRunHandle<Address, SubmitConversationTurnResult> {
+  startTurn<Result>(
+    input: StartProjectedConversationTurnRunInput<Address, Result>,
+  ): ConversationRunHandle<Address, Result>;
+  startTurn(
+    input: StartConversationTurnRunInput<Address>,
+  ): ConversationRunHandle<Address, SubmitConversationTurnResult>;
+  startTurn<Result>(
+    input: StartConversationTurnRunInput<Address> | StartProjectedConversationTurnRunInput<Address, Result>,
+  ): ConversationRunHandle<Address, SubmitConversationTurnResult | Result> {
     const started = this.startRecord({
       address: input.address,
       onAccepted: input.onAccepted,
       onHeartbeat: input.onHeartbeat,
       onError: input.onError,
       onSettled: input.onSettled,
-      execute: async (run) => await input.engine.turns.submit({
-        ...input.turn,
-        abortSignal: ConversationRunService.combineAbortSignals(run.controller.signal, input.turn.abortSignal),
-        shouldStop: ConversationRunService.combineShouldStop(run.controller.signal, input.turn.shouldStop),
-        host: ConversationRunService.withActivityPublisher(input.turn.host, run.publishActivity),
-      }),
-    });
+      execute: async (run) => {
+        const result = await input.engine.turns.submit({
+          ...input.turn,
+          abortSignal: ConversationRunService.combineAbortSignals(run.controller.signal, input.turn.abortSignal),
+          shouldStop: ConversationRunService.combineShouldStop(run.controller.signal, input.turn.shouldStop),
+          host: ConversationRunService.withActivityPublisher(input.turn.host, run.publishActivity),
+        });
+        return await ConversationRunService.projectTurnResult(input, result, run);
+      },
+    }, { cancelWinsCompletion: true });
     return this.createHandle(started.accepted, started.record.result);
   }
 
-  startContinue(input: StartConversationContinueRunInput<Address>): ConversationRunHandle<Address, SubmitConversationTurnResult> {
+  startContinue<Result>(
+    input: StartProjectedConversationContinueRunInput<Address, Result>,
+  ): ConversationRunHandle<Address, Result>;
+  startContinue(
+    input: StartConversationContinueRunInput<Address>,
+  ): ConversationRunHandle<Address, SubmitConversationTurnResult>;
+  startContinue<Result>(
+    input: StartConversationContinueRunInput<Address> | StartProjectedConversationContinueRunInput<Address, Result>,
+  ): ConversationRunHandle<Address, SubmitConversationTurnResult | Result> {
     const started = this.startRecord({
       address: input.address,
       onAccepted: input.onAccepted,
       onHeartbeat: input.onHeartbeat,
       onError: input.onError,
       onSettled: input.onSettled,
-      execute: async (run) => await input.engine.turns.continue({
-        ...input.turn,
-        abortSignal: ConversationRunService.combineAbortSignals(run.controller.signal, input.turn.abortSignal),
-        shouldStop: ConversationRunService.combineShouldStop(run.controller.signal, input.turn.shouldStop),
-        host: ConversationRunService.withActivityPublisher(input.turn.host, run.publishActivity),
-      }),
-    });
+      execute: async (run) => {
+        const result = await input.engine.turns.continue({
+          ...input.turn,
+          abortSignal: ConversationRunService.combineAbortSignals(run.controller.signal, input.turn.abortSignal),
+          shouldStop: ConversationRunService.combineShouldStop(run.controller.signal, input.turn.shouldStop),
+          host: ConversationRunService.withActivityPublisher(input.turn.host, run.publishActivity),
+        });
+        return await ConversationRunService.projectTurnResult(input, result, run);
+      },
+    }, { cancelWinsCompletion: true });
     return this.createHandle(started.accepted, started.record.result);
   }
 
@@ -135,8 +165,10 @@ export class ConversationRunService<
     const afterSequence = input.afterSequence ?? 0;
     const oldestSequence = record.events[0]?.sequence;
     if (oldestSequence !== undefined && afterSequence < oldestSequence - 1) {
-      throw new Error(
-        `Conversation run replay cursor ${afterSequence} is older than retained sequence ${oldestSequence}.`,
+      throw new ConversationRunReplayUnavailableError(
+        input.runId,
+        afterSequence,
+        oldestSequence,
       );
     }
 
@@ -175,6 +207,25 @@ export class ConversationRunService<
       runId: run.context.runId,
       acceptedAt: run.context.acceptedAt,
     };
+  }
+
+  /**
+   * Returns a retained run handle together with its host-defined address.
+   * Possession of a run ID is not authorization; hosts must verify the address
+   * before exposing the handle to a caller.
+   */
+  getRetainedRun<Result = unknown>(runId: string): ConversationRunHandle<Address, Result> | undefined {
+    const record = this.runsById.get(runId) as ConversationRunRecord<Address, Result> | undefined;
+    if (!record) {
+      return undefined;
+    }
+
+    return this.createHandle({
+      ...record.address,
+      accepted: true,
+      runId: record.context.runId,
+      acceptedAt: record.context.acceptedAt,
+    }, record.result);
   }
 
   cancelRun(address: Address, runId?: string): boolean {
@@ -224,13 +275,16 @@ export class ConversationRunService<
     return true;
   }
 
-  private startRecord<Result>(input: StartConversationRunInput<Address, Result>): {
+  private startRecord<Result>(
+    input: StartConversationRunInput<Address, Result>,
+    options: { cancelWinsCompletion?: boolean } = {},
+  ): {
     accepted: ConversationRunAccepted<Address>;
     record: ConversationRunRecord<Address, Result>;
   } {
     const addressKey = this.addressKey(input.address);
     if (this.activeRuns.has(addressKey)) {
-      throw new Error('A run is already in progress for this session.');
+      throw new ConversationRunConflictError(addressKey);
     }
 
     const runId = this.createRunId();
@@ -256,6 +310,9 @@ export class ConversationRunService<
         return input.execute(context);
       })
       .then((value) => {
+        if (options.cancelWinsCompletion) {
+          ConversationRunService.throwIfCancelled(context);
+        }
         this.publish(record, { kind: 'result', result: value });
         return value;
       })
@@ -381,9 +438,34 @@ export class ConversationRunService<
   private requireRetainedRun<Result>(address: Address, runId: string): ConversationRunRecord<Address, Result> {
     const record = this.runsById.get(runId);
     if (!record || record.addressKey !== this.addressKey(address)) {
-      throw new Error(`Conversation run not found: ${runId}`);
+      throw new ConversationRunNotFoundError(runId);
     }
     return record as ConversationRunRecord<Address, Result>;
+  }
+
+  private static async projectTurnResult<Result>(
+    input:
+      | StartConversationTurnRunInput<{ sessionId: string }>
+      | StartProjectedConversationTurnRunInput<{ sessionId: string }, Result>
+      | StartConversationContinueRunInput<{ sessionId: string }>
+      | StartProjectedConversationContinueRunInput<{ sessionId: string }, Result>,
+    result: SubmitConversationTurnResult,
+    run: ConversationRunContext,
+  ): Promise<SubmitConversationTurnResult | Result> {
+    ConversationRunService.throwIfCancelled(run);
+    if (!('projectResult' in input)) {
+      return result;
+    }
+
+    const projected = await input.projectResult(result, run);
+    ConversationRunService.throwIfCancelled(run);
+    return projected;
+  }
+
+  private static throwIfCancelled(run: ConversationRunContext): void {
+    if (run.controller.signal.aborted) {
+      throw new ConversationRunCancelledError(run.runId);
+    }
   }
 
   private startHeartbeat(
@@ -443,6 +525,6 @@ export class ConversationRunService<
     if (!address.scopeId?.trim() || !address.sessionId.trim()) {
       throw new Error('Conversation run addresses require non-empty scopeId and sessionId values.');
     }
-    return `${address.scopeId}:${address.sessionId}`;
+    return JSON.stringify([address.scopeId, address.sessionId]);
   }
 }
