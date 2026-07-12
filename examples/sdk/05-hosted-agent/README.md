@@ -125,10 +125,10 @@ configuration, injected repositories, approval decisions, and process
 lifecycle.
 
 The example's `projectResult` callback reduces Heddle's internal turn result to
-`outcome` and `summary`. In a product, this callback is also the place to await
-authorized state persistence or reconciliation before clients observe success.
-Projection failure becomes the run's error terminal; it cannot race behind a
-premature successful result.
+`outcome`, `summary`, and the optional safe `failure` category. In a product,
+this callback is also the place to await authorized state persistence or
+reconciliation before clients observe success. Projection failure becomes the
+run's error terminal; it cannot race behind a premature successful result.
 
 The adjacent `projectError` callback keeps raw model, tool, provider, and
 persistence failures on the host side. Remote clients receive only the
@@ -188,11 +188,12 @@ registers host-owned Express routes and composes
 - closing an SSE connection aborts only that subscription, not the run;
 - cancel is a separate, authenticated operation.
 
-The hosted service deliberately projects terminal results to public `outcome`
-and `summary` fields before replay. The API schema validates that boundary
-again. Trace paths, artifacts, tool results, and internal session state are not
-serialized to the browser. Extend the public projection and Zod schema with
-only the product data the client is authorized to receive.
+The hosted service deliberately projects terminal results to public `outcome`,
+`summary`, and optional safe `failure` fields before replay. The API schema
+validates that boundary again. Trace paths, artifacts, tool results, and
+internal session state are not serialized to the browser. Extend the public
+projection and Zod schema with only the product data the client is authorized
+to receive.
 
 The session read/reset endpoints are example host operations used by the React
 stage. They project persisted visible messages plus the process-local active

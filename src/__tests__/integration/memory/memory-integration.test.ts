@@ -116,8 +116,9 @@ describe('memory maintenance integration', () => {
     expect(result.events.map((event) => event.type)).toEqual(['memory.maintenance_started', 'memory.maintenance_failed']);
     expect(result.events[1]).toMatchObject({
       type: 'memory.maintenance_failed',
-      error: expect.stringContaining('maintainer unavailable'),
+      error: 'LLM error: Model request failed',
     });
+    expect(JSON.stringify(result.events)).not.toContain('maintainer unavailable');
   });
 
   it('serializes maintenance runs per memory root', async () => {

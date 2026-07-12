@@ -180,6 +180,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
       return {
         outcome: resultForPersistence.outcome,
         summary: persisted.summary,
+        ...(resultForPersistence.failure ? { failure: resultForPersistence.failure } : {}),
         session: persisted.session,
         traceFile: persisted.traceFile,
         artifacts: EngineConversationTurnService.listTurnArtifacts({

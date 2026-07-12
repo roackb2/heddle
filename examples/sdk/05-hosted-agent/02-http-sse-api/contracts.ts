@@ -37,6 +37,18 @@ const HostedAgentActivitySchema = z.object({
 const HostedAgentResultSchema = z.object({
   outcome: z.string().min(1),
   summary: z.string(),
+  failure: z.object({
+    source: z.literal('model'),
+    code: z.enum([
+      'authentication',
+      'permission',
+      'rate_limit',
+      'request',
+      'transport',
+      'empty_response',
+      'unknown',
+    ]),
+  }).optional(),
 });
 
 export const HostedAgentRunProtocol = new ConversationRunProtocolCodec({

@@ -406,6 +406,32 @@ describe('conversation turn lifecycle', () => {
     ]);
   });
 
+  it('returns the safe model failure category to programmatic hosts', async () => {
+    const storage = createConversationTurnStorage();
+    vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(createLoopResult({
+      workspaceRoot: storage.workspaceRoot,
+      prompt: 'Use a rejected credential.',
+      summary: 'LLM error: Model authentication failed',
+      outcome: 'error',
+      failure: { source: 'model', code: 'authentication' },
+    }) as never);
+
+    const turnResult = await EngineConversationTurnService.run({
+      workspaceRoot: storage.workspaceRoot,
+      stateRoot: storage.stateRoot,
+      traceDir: join(storage.stateRoot, 'traces'),
+      sessionStoragePath: storage.sessionStoragePath,
+      sessionId: storage.sessionId,
+      prompt: 'Use a rejected credential.',
+      apiKey: 'rejected-key',
+      memoryMaintenanceMode: 'none',
+      artifactRoot: storage.artifactRoot,
+      artifactsEnabled: true,
+    });
+
+    expect(turnResult.failure).toEqual({ source: 'model', code: 'authentication' });
+  });
+
   it('clears the session lease when the run loop fails', async () => {
     const storage = createConversationTurnStorage();
     vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockRejectedValue(new Error('loop failed'));
@@ -469,8 +495,11 @@ function createLoopResult(args: {
   workspaceRoot: string;
   prompt: string;
   summary: string;
+  outcome?: RunResult['outcome'];
+  failure?: RunResult['failure'];
   trace?: RunResult['trace'];
 }) {
+  const outcome = args.outcome ?? 'done';
   const trace: RunResult['trace'] = args.trace ?? [
     {
       type: 'assistant.turn',
@@ -481,8 +510,9 @@ function createLoopResult(args: {
     },
     {
       type: 'run.finished',
-      outcome: 'done',
+      outcome,
       summary: args.summary,
+      ...(args.failure ? { failure: args.failure } : {}),
       step: 1,
       timestamp: '2026-05-03T00:00:02.000Z',
     },
@@ -493,8 +523,9 @@ function createLoopResult(args: {
   ];
 
   return {
-    outcome: 'done',
+    outcome,
     summary: args.summary,
+    ...(args.failure ? { failure: args.failure } : {}),
     trace,
     transcript,
     model: 'gpt-5.4',
@@ -509,8 +540,9 @@ function createLoopResult(args: {
       workspaceRoot: args.workspaceRoot,
       startedAt: '2026-05-03T00:00:00.000Z',
       finishedAt: '2026-05-03T00:00:02.000Z',
-      outcome: 'done',
+      outcome,
       summary: args.summary,
+      ...(args.failure ? { failure: args.failure } : {}),
       transcript,
       trace,
     },

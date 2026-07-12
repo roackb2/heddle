@@ -1,4 +1,4 @@
-import type { StopReason, RunResult } from '@/core/types.js';
+import type { RunFailure, StopReason, RunResult } from '@/core/types.js';
 import type { LlmResponse } from '@/core/llm/types.js';
 import type { AgentRunContext } from '../types.js';
 
@@ -7,11 +7,16 @@ export type FinishAgentRunLogging = {
   logMessage: string;
 };
 
+export type FinishAgentRunOptions = {
+  failure?: RunFailure;
+  logging?: FinishAgentRunLogging;
+};
+
 export type FinishAgentRunArgs = {
   context: AgentRunContext;
   outcome: StopReason;
   summary: string;
-  logging?: FinishAgentRunLogging;
+  options?: FinishAgentRunOptions;
 };
 
 export type FinishAssistantResponseArgs = {

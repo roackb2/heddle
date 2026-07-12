@@ -34,7 +34,7 @@ export type HostedAgentRunAccepted = {
   sessionId: string;
 };
 
-export type HostedAgentResult = Pick<ConversationTurnResultSummary, 'outcome' | 'summary'>;
+export type HostedAgentResult = Pick<ConversationTurnResultSummary, 'outcome' | 'summary' | 'failure'>;
 
 export type HostedAgentRunStreamItem = ConversationRunStreamItem<HostedAgentResult>;
 
@@ -109,6 +109,7 @@ export class HostedAgentService {
       projectResult: (result): HostedAgentResult => ({
         outcome: result.outcome,
         summary: result.summary,
+        ...(result.failure ? { failure: result.failure } : {}),
       }),
       projectError: () => ({
         code: 'run_failed',
