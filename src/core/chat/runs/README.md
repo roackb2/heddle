@@ -13,6 +13,7 @@ conversation work embedded in a host process.
 - ordered `ConversationActivity` delivery;
 - bounded replay for reconnecting subscribers;
 - awaited host result projection before terminal publication;
+- host-owned public error projection before terminal publication;
 - typed conflict, lookup, replay, and cancellation errors;
 - result/error/cancellation settlement and cleanup, including late completion
   after cancellation.
@@ -21,7 +22,7 @@ conversation work embedded in a host process.
 
 - persisted conversation semantics, which remain in `ConversationEngine`;
 - HTTP, SSE, tRPC, React, authentication, or tenant policy;
-- the contents of product-specific result projection;
+- the contents of product-specific result or error projection;
 - durable cross-process event replay.
 
 The Heddle control plane and external programmatic hosts must use this same
@@ -44,6 +45,10 @@ const run = runs.startTurn({
     await productRepository.persist(result);
     return { outcome: result.outcome, summary: result.summary };
   },
+  projectError: () => ({
+    code: 'agent_failed',
+    message: 'The agent could not complete this request.',
+  }),
 });
 
 const activeRun = runs.getActiveRun({
@@ -70,6 +75,12 @@ resolves late: the result promise rejects and replay ends with `cancelled`.
 output and the retained/public result. It may persist or reconcile product
 state and is awaited before the `result` terminal is published. If projection
 fails, the run fails instead of reporting a successful terminal prematurely.
+
+`projectError` is the symmetric public-safety boundary. The run's result
+promise still rejects with the original failure for host-side handling, while
+remote subscribers receive only the projected code and message. If the
+projector itself fails or returns an invalid shape, Heddle publishes a generic
+safe error instead of leaking the original failure.
 
 `getRetainedRun(...)` returns the original host-defined address with the handle
 so the host can authorize subscribe and cancel operations without maintaining a

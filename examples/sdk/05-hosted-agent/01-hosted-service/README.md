@@ -17,7 +17,9 @@ for the runnable flow and production checklist.
 ## Read in this order
 
 1. [`agent-service.ts`](agent-service.ts) — application-owned scope and lifecycle
-   composed over `ConversationRunService` from `@roackb2/heddle/hosted`.
+   composed over `ConversationRunService` from `@roackb2/heddle/hosted`. It also
+   projects visible messages plus active-run identity for a host UI and guards
+   session reset while work is active.
 2. [`example-agent.ts`](example-agent.ts) — replaceable local composition and
    demo policy.
 3. [`run.ts`](run.ts) — disconnect, cursor replay, and explicit cancellation in
@@ -27,3 +29,8 @@ Keep this folder free of HTTP request/response types and UI state. If the host
 already uses tRPC, Fastify, Hono, Nest, WebSocket, or IPC, adapt this service
 directly in that stack. Continue to [02 HTTP/SSE API](../02-http-sse-api/) only
 when Express + REST/SSE matches the host.
+
+Conversation read/reset are host application operations, not new Heddle core
+services. They deliberately call the existing `engine.sessions` boundary and
+project only UI-safe message fields. A product may expose equivalent operations
+through its existing session API instead.

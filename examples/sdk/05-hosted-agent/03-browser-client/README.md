@@ -24,3 +24,7 @@ Keep messages, tool rendering, optimistic state, retry UX, notifications, and
 product-specific results above this protocol client. A React application should
 integrate it with its existing query/state layer rather than adding React state
 to this folder.
+
+Continue to [04 React UI](../04-react-ui/) for one complete implementation of
+that product layer, including server-backed messages, cursor/render
+checkpointing, stop, second turn, and reset.

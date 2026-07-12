@@ -19,6 +19,7 @@ import {
   streamConversationRunSse,
 } from '../../../../src/hosted/http-sse.js';
 import {
+  HostedAgentConversationBusyError,
   HostedAgentInputError,
   HostedAgentRunNotFoundError,
   type HostedAgentService,
@@ -26,6 +27,7 @@ import {
 import {
   CancelHostedAgentRunResultSchema,
   HostedAgentApiErrorSchema,
+  HostedAgentConversationSchema,
   HostedAgentRunProtocol,
   StartHostedAgentRunInputSchema,
   StartHostedAgentRunResultSchema,
@@ -34,7 +36,7 @@ import {
 const AuthenticatedAccountSchema = z.object({
   accountId: z.string().trim().min(1),
 });
-const RunIdSchema = z.string().trim().min(1);
+const ResourceIdSchema = z.string().trim().min(1);
 
 export type HostedAgentApiDeps = {
   agent: HostedAgentService;
@@ -54,10 +56,40 @@ export class HostedAgentApiError extends Error {
 
 export function createHostedAgentApiRouter(deps: HostedAgentApiDeps): Router {
   const router = Router();
+  router.get('/sessions/:sessionId', createReadHostedAgentConversationHandler(deps));
+  router.post('/sessions/:sessionId/reset', createResetHostedAgentConversationHandler(deps));
   router.post('/runs', createStartHostedAgentRunHandler(deps));
   router.get('/runs/:runId/events', createSubscribeHostedAgentRunHandler(deps));
   router.post('/runs/:runId/cancel', createCancelHostedAgentRunHandler(deps));
   return router;
+}
+
+export function createReadHostedAgentConversationHandler(deps: HostedAgentApiDeps): RequestHandler {
+  return async (request, response) => {
+    try {
+      const { accountId } = await authenticate(deps, request);
+      const sessionId = ResourceIdSchema.parse(request.params.sessionId);
+      response.json(HostedAgentConversationSchema.parse(
+        await deps.agent.readConversation({ accountId, sessionId }),
+      ));
+    } catch (error) {
+      sendRequestError(deps, response, error);
+    }
+  };
+}
+
+export function createResetHostedAgentConversationHandler(deps: HostedAgentApiDeps): RequestHandler {
+  return async (request, response) => {
+    try {
+      const { accountId } = await authenticate(deps, request);
+      const sessionId = ResourceIdSchema.parse(request.params.sessionId);
+      response.json(HostedAgentConversationSchema.parse(
+        await deps.agent.resetConversation({ accountId, sessionId }),
+      ));
+    } catch (error) {
+      sendRequestError(deps, response, error);
+    }
+  };
 }
 
 export function createStartHostedAgentRunHandler(deps: HostedAgentApiDeps): RequestHandler {
@@ -77,7 +109,7 @@ export function createSubscribeHostedAgentRunHandler(deps: HostedAgentApiDeps): 
   return async (request, response) => {
     try {
       const { accountId } = await authenticate(deps, request);
-      const runId = RunIdSchema.parse(request.params.runId);
+      const runId = ResourceIdSchema.parse(request.params.runId);
       const afterSequence = parseConversationRunSseReplayCursor({
         query: request.query.after,
         lastEventId: request.header('Last-Event-ID'),
@@ -107,7 +139,7 @@ export function createCancelHostedAgentRunHandler(deps: HostedAgentApiDeps): Req
   return async (request, response) => {
     try {
       const { accountId } = await authenticate(deps, request);
-      const runId = RunIdSchema.parse(request.params.runId);
+      const runId = ResourceIdSchema.parse(request.params.runId);
       response.json(CancelHostedAgentRunResultSchema.parse({
         cancelled: deps.agent.cancel(accountId, runId),
       }));
@@ -143,6 +175,9 @@ function toApiError(error: unknown): HostedAgentApiError {
   }
   if (error instanceof ConversationRunConflictError) {
     return new HostedAgentApiError(409, 'run_conflict', error.message);
+  }
+  if (error instanceof HostedAgentConversationBusyError) {
+    return new HostedAgentApiError(409, 'conversation_busy', error.message);
   }
   if (error instanceof HostedAgentInputError
     || error instanceof ConversationRunSseReplayCursorError

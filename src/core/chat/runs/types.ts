@@ -40,12 +40,24 @@ export type ConversationRunContext = {
   publishActivity(activity: ConversationActivity): void;
 };
 
+export type ConversationRunPublicError = {
+  code: string;
+  message: string;
+};
+
+export type ConversationRunErrorProjector = (
+  error: unknown,
+  run: ConversationRunContext,
+) => ConversationRunPublicError | Promise<ConversationRunPublicError>;
+
 export type StartConversationRunInput<Address extends { sessionId: string }, Result> = {
   address: Address;
   onAccepted?: (run: ConversationRunContext) => void;
   onHeartbeat?: (run: ConversationRunContext) => void | Promise<void>;
   execute: (run: ConversationRunContext) => Promise<Result>;
   onError?: (error: unknown, run: ConversationRunContext) => void | Promise<void>;
+  /** Projects an execution failure into the public terminal event. */
+  projectError?: ConversationRunErrorProjector;
   onSettled?: (run: ConversationRunContext) => void | Promise<void>;
 };
 
@@ -76,10 +88,7 @@ export type ConversationRunStreamItem<Result> =
   })
   | (ConversationRunStreamEnvelope & {
     kind: 'error';
-    error: {
-      code: 'run_failed';
-      message: string;
-    };
+    error: ConversationRunPublicError;
   });
 
 export type SubscribeConversationRunInput<Address extends { sessionId: string }> = {
@@ -91,7 +100,7 @@ export type SubscribeConversationRunInput<Address extends { sessionId: string }>
 
 type ConversationRunLifecycleHooks<Address extends { sessionId: string }> = Pick<
   StartConversationRunInput<Address, unknown>,
-  'onAccepted' | 'onHeartbeat' | 'onError' | 'onSettled'
+  'onAccepted' | 'onHeartbeat' | 'onError' | 'projectError' | 'onSettled'
 >;
 
 type ConversationTurnRunInputBase<Address extends { sessionId: string }> =

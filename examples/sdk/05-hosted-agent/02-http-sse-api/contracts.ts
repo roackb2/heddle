@@ -26,6 +26,12 @@ export const StartHostedAgentRunResultSchema = z.object({
 // activity field that is not explicitly allowlisted here.
 const HostedAgentActivitySchema = z.object({
   type: z.string().min(1),
+  step: z.number().int().nonnegative().optional(),
+  text: z.string().optional(),
+  done: z.boolean().optional(),
+  tool: z.string().min(1).optional(),
+  durationMs: z.number().nonnegative().optional(),
+  outcome: z.string().optional(),
 });
 
 const HostedAgentResultSchema = z.object({
@@ -44,6 +50,21 @@ export const CancelHostedAgentRunResultSchema = z.object({
   cancelled: z.boolean(),
 });
 
+export const HostedAgentConversationSchema = z.object({
+  sessionId: z.string().min(1),
+  messages: z.array(z.object({
+    id: z.string().min(1),
+    role: z.enum(['user', 'assistant']),
+    text: z.string(),
+    isPending: z.boolean().optional(),
+    isStreaming: z.boolean().optional(),
+  })),
+  activeRun: z.object({
+    runId: z.string().min(1),
+    acceptedAt: z.iso.datetime(),
+  }).optional(),
+});
+
 export const HostedAgentApiErrorSchema = z.object({
   error: z.object({
     code: z.string().min(1),
@@ -55,6 +76,7 @@ export type StartHostedAgentRunInput = z.infer<typeof StartHostedAgentRunInputSc
 export type StartHostedAgentRunResult = z.infer<typeof StartHostedAgentRunResultSchema>;
 export type HostedAgentActivity = z.infer<typeof HostedAgentActivitySchema>;
 export type HostedAgentResult = z.infer<typeof HostedAgentResultSchema>;
+export type HostedAgentConversation = z.infer<typeof HostedAgentConversationSchema>;
 export type HostedAgentRunEvent = ConversationRunProtocolEvent<
   HostedAgentActivity,
   HostedAgentResult

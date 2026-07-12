@@ -31,6 +31,7 @@ platform, an identity provider, or a database.
 | A server, worker, Electron backend, or custom transport | [`05-hosted-agent/01-hosted-service`](05-hosted-agent/01-hosted-service) | Identity scope, durable session IDs, engine composition, and process lifetime |
 | An Express server using REST + SSE | [`05-hosted-agent/02-http-sse-api`](05-hosted-agent/02-http-sse-api) | Authentication, routes/API policy, CORS/limits, and deployment |
 | A browser consuming that REST + SSE contract | [`05-hosted-agent/03-browser-client`](05-hosted-agent/03-browser-client) | Auth headers, abort/timer lifecycle, UI state, retry UX, and product result handling |
+| A React/Vite product needing a complete reference | [`05-hosted-agent/04-react-ui`](05-hosted-agent/04-react-ui) | Session API, browser storage, UI state/rendering, auth, and deployment policy |
 
 If your server already uses tRPC, Fastify, Hono, Nest, WebSocket, or another
 transport, follow the hosted-service stage and write an adapter for that stack.
@@ -92,6 +93,8 @@ This directory contains its own numbered path:
    HTTP/SSE streaming helper.
 3. `03-browser-client` — optional browser-safe HTTP/SSE preset composed with
    Heddle's transport-neutral remote-run consumer.
+4. `04-react-ui` — optional working React/Vite product with server-backed
+   messages, reload recovery, stop, second turn, reset, and visible activity.
 
 Read the [hosted-agent walkthrough](05-hosted-agent/README.md) before copying
 this stage. Each later folder depends only on the earlier layer it extends, so

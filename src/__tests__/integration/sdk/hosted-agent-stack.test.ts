@@ -41,6 +41,13 @@ describe('hosted agent SDK stack example', () => {
       runId: accepted.runId,
     }));
     expect(first).toMatchObject({ kind: 'activity', sequence: 1 });
+    await expect(agent.readConversation({
+      accountId: 'account-a',
+      sessionId: 'conversation-a',
+    })).resolves.toMatchObject({
+      activeRun: { runId: accepted.runId },
+      messages: [{ role: 'user', text: 'First prompt' }],
+    });
     expect(() => agent.subscribe({
       accountId: 'account-b',
       runId: accepted.runId,
@@ -53,6 +60,17 @@ describe('hosted agent SDK stack example', () => {
       afterSequence: first.sequence,
     }));
     expect(replay).toMatchObject([{ kind: 'result', sequence: 2 }]);
+    const settledConversation = await agent.readConversation({
+      accountId: 'account-a',
+      sessionId: 'conversation-a',
+    });
+    expect(settledConversation).toMatchObject({
+      messages: [
+        { role: 'user', text: 'First prompt' },
+        { role: 'assistant', text: 'Completed: First prompt' },
+      ],
+    });
+    expect(settledConversation.activeRun).toBeUndefined();
 
     const second = await agent.start({
       accountId: 'account-a',
@@ -62,6 +80,11 @@ describe('hosted agent SDK stack example', () => {
     (await harness.waitForTurn(1)).complete();
     await collect(agent.subscribe({ accountId: 'account-a', runId: second.runId }));
     expect(harness.createdSessionIds).toEqual(['conversation-a']);
+
+    await expect(agent.resetConversation({
+      accountId: 'account-a',
+      sessionId: 'conversation-a',
+    })).resolves.toMatchObject({ messages: [] });
   });
 
   it('cancels the Heddle run through the owned service handle', async () => {
@@ -94,6 +117,19 @@ describe('hosted agent SDK stack example', () => {
         sessionId: 'browser-conversation',
         prompt: 'Stream this turn',
       });
+      const activeConversation = await fetch(
+        `${api.baseUrl}/sessions/${accepted.sessionId}`,
+        { headers: { Authorization: 'Bearer token-a' } },
+      );
+      expect(await activeConversation.json()).toMatchObject({
+        activeRun: { runId: accepted.runId },
+        messages: [{ role: 'user', text: 'Stream this turn' }],
+      });
+      const busyReset = await fetch(
+        `${api.baseUrl}/sessions/${accepted.sessionId}/reset`,
+        { method: 'POST', headers: { Authorization: 'Bearer token-a' } },
+      );
+      expect(busyReset.status).toBe(409);
       const subscription = new AbortController();
       let cursor = 0;
 
@@ -126,6 +162,17 @@ describe('hosted agent SDK stack example', () => {
           },
         }),
       ]);
+
+      const settledConversation = await fetch(
+        `${api.baseUrl}/sessions/${accepted.sessionId}`,
+        { headers: { Authorization: 'Bearer token-a' } },
+      );
+      expect(await settledConversation.json()).toMatchObject({
+        messages: [
+          { role: 'user', text: 'Stream this turn' },
+          { role: 'assistant', text: 'Completed: Stream this turn' },
+        ],
+      });
 
       await expect(otherAccountClient.subscribe({
         runId: accepted.runId,
@@ -177,7 +224,7 @@ describe('hosted agent SDK stack example', () => {
 });
 
 function createEngineHarness() {
-  const sessions = new Map<string, { id: string }>();
+  const sessions = new Map<string, HarnessSession>();
   const turns: ControlledTurn[] = [];
   const createdSessionIds: string[] = [];
 
@@ -188,14 +235,34 @@ function createEngineHarness() {
       sessions: {
         readExisting: (id: string) => sessions.get(id),
         create: (input: CreateConversationSessionInput = {}) => {
-          const session = { id: input.id ?? `session-${sessions.size + 1}` };
+          const session = {
+            id: input.id ?? `session-${sessions.size + 1}`,
+            messages: [],
+          } satisfies HarnessSession;
           sessions.set(session.id, session);
           createdSessionIds.push(session.id);
+          return session;
+        },
+        resetConversation: (id: string) => {
+          const session = sessions.get(id);
+          if (!session) {
+            throw new Error(`Missing test session: ${id}`);
+          }
+          session.messages = [];
           return session;
         },
       },
       turns: {
         submit: async (input: SubmitConversationTurnInput) => {
+          const session = sessions.get(input.sessionId);
+          if (!session) {
+            throw new Error(`Missing test session: ${input.sessionId}`);
+          }
+          session.messages.push({
+            id: `user-${session.messages.length + 1}`,
+            role: 'user',
+            text: input.prompt,
+          });
           const completion = deferred<void>();
           const turn: ControlledTurn = {
             signal: input.abortSignal,
@@ -210,6 +277,11 @@ function createEngineHarness() {
             timestamp: new Date().toISOString(),
           } as ConversationActivity);
           await waitForCompletion(completion.promise, input.abortSignal);
+          session.messages.push({
+            id: `assistant-${session.messages.length + 1}`,
+            role: 'assistant',
+            text: `Completed: ${input.prompt}`,
+          });
           return createTurnResult(input.sessionId, input.prompt);
         },
       },
@@ -231,6 +303,15 @@ function createEngineHarness() {
 type ControlledTurn = {
   signal?: AbortSignal;
   complete(): void;
+};
+
+type HarnessSession = {
+  id: string;
+  messages: Array<{
+    id: string;
+    role: 'user' | 'assistant';
+    text: string;
+  }>;
 };
 
 function createTurnResult(sessionId: string, prompt: string): ConversationTurnResultSummary {

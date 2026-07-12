@@ -68,7 +68,7 @@ export class ConversationRunHttpSseClient<
     if (!options.fetch && typeof globalThis.fetch !== 'function') {
       throw new ConversationRunHttpSseClientError('Conversation run HTTP client requires fetch.');
     }
-    this.fetch = options.fetch ?? globalThis.fetch;
+    this.fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
   async start(input: StartInput, signal?: AbortSignal): Promise<Accepted> {

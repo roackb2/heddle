@@ -66,6 +66,7 @@ disconnect as implicit cancellation.
 | Express with REST + SSE | Core plus `@roackb2/heddle/hosted/http-sse` | [`05-hosted-agent/02-http-sse-api`](../../../examples/sdk/05-hosted-agent/02-http-sse-api) |
 | A remote client over any transport | `@roackb2/heddle-remote` plus a host transport | [Remote conversation runs](remote-runs.md) |
 | A browser using the conventional REST/SSE contract | `@roackb2/heddle-remote/http-sse` | [`05-hosted-agent/03-browser-client`](../../../examples/sdk/05-hosted-agent/03-browser-client) |
+| A React/Vite product needing an end-to-end reference | Same remote client plus host UI/session state | [`05-hosted-agent/04-react-ui`](../../../examples/sdk/05-hosted-agent/04-react-ui) |
 
 For tRPC, Fastify, Hono, Nest, WebSocket, Electron IPC, queues, or another
 transport, stop at the hosted-service layer and implement the adapter in the
@@ -145,7 +146,7 @@ normal client architecture.
 | Model and credentials | Host composition root / `createConversationEngine` config |
 | Approval behavior | `ConversationEngineHost.approvals` and the product's policy/UI |
 | Session/artifact storage | `ChatSessionRepository` and `ArtifactRepository` |
-| Public API fields | Host-owned validation schemas and terminal-result projection |
+| Public API fields | Host-owned validation schemas and terminal result/error projection |
 | Remote cursor/retry correctness | `ConversationRunConsumerService` |
 | Runtime run-envelope validation | `ConversationRunProtocolCodec` with host activity/result schemas |
 | Conventional Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` plus host routes and policy |

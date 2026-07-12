@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'packages/*/dist/**', 'coverage/**', 'node_modules/**', 'local/**', '.heddle/**', 'test-results/**', 'evals/results/**'],
+    ignores: ['**/dist/**', 'coverage/**', 'node_modules/**', 'local/**', '.heddle/**', 'test-results/**', 'evals/results/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -43,6 +43,14 @@ export default tseslint.config(
   },
   {
     files: ['src/web/**/*.{ts,tsx}', 'src/web-v2/**/*.{ts,tsx}'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+      },
+    },
+  },
+  {
+    files: ['examples/sdk/05-hosted-agent/04-react-ui/src/**/*.{ts,tsx}'],
     languageOptions: {
       globals: {
         ...globals.browser,

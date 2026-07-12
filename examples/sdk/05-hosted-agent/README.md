@@ -16,8 +16,8 @@ files.
 - A single Node.js process can own active runs and bounded replay for this
   example.
 - The optional API uses Express, JSON requests, bearer authentication, and SSE.
-- The optional client uses browser-compatible streaming `fetch`; it does not
-  assume React or another UI framework.
+- The optional protocol client uses browser-compatible streaming `fetch`.
+- The optional final stage assumes React, Vite, React Query, and AI Elements.
 
 Only the first two assumptions are fundamental to the hosted-service pattern.
 Express, SSE, bearer auth, and the sample browser client are replaceable host
@@ -40,7 +40,8 @@ dependencies.
 | Node process, worker, Electron backend, or no remote client | `01-hosted-service` | Skip stages 02 and 03 |
 | Existing tRPC, Fastify, Hono, Nest, WebSocket, or framework-specific server | `01-hosted-service`, then adapt stage 02's lifecycle rules | Replace the Express router and wire schemas |
 | Express + REST/SSE server | `01-hosted-service` → `02-http-sse-api` | Replace only demo auth, storage, and deployment policy |
-| Browser using this exact REST/SSE protocol | All three stages | Add product UI state and rendering above stage 03 |
+| Browser using this exact REST/SSE protocol, existing UI stack | Stages 01–03 | Add product UI state and rendering above stage 03 |
+| React/Vite product needing a complete reference | All four stages | Replace demo auth, storage, visual design, and deployment policy |
 | Multi-process or serverless deployment | Use stage 01 as the application boundary | Replace process-local replay/routing with host-chosen shared infrastructure |
 
 ## Read the files in this order
@@ -62,6 +63,13 @@ dependencies.
   03-browser-client/
     browser-client.ts      host schemas for Heddle's HTTP/SSE client
     run.ts                 public consumer + transport reconnect demo
+             |
+             v
+  04-react-ui/
+    hosted-agent-ui-client.ts  run client + host session operations
+    run-checkpoint.ts          validated cursor + rendered projection
+    use-hosted-conversation.ts React Query + stream/reconnect lifecycle
+    components/                accessible conversation UI
 ```
 
 The dependency direction is intentional:
@@ -70,6 +78,8 @@ The dependency direction is intentional:
 - stage 02 imports stage 01 and translates it into one chosen wire protocol;
 - stage 03 imports stage 02's public contract and knows nothing about Heddle
   internals.
+- stage 04 composes stage 03 with host-specific session reads and React state;
+  it does not move UI behavior into Heddle.
 
 Do not reverse these imports when adapting the example. A transport-neutral
 agent service should never read an HTTP request, and Heddle core should never
@@ -101,6 +111,7 @@ service or a required SDK wrapper. It demonstrates how a host can:
 - reuse `engine.sessions.readExisting(...)` before creating a conversation;
 - return an accepted run ID immediately, then subscribe or cancel separately;
 - project internal engine output before Heddle publishes the retained terminal;
+- sanitize internal failures before Heddle publishes a public error terminal;
 - authorize retained run handles through their host-defined address without a
   second host-side run registry;
 - use Heddle's canonical ordered replay instead of adding a second event bus.
@@ -118,6 +129,11 @@ The example's `projectResult` callback reduces Heddle's internal turn result to
 authorized state persistence or reconciliation before clients observe success.
 Projection failure becomes the run's error terminal; it cannot race behind a
 premature successful result.
+
+The adjacent `projectError` callback keeps raw model, tool, provider, and
+persistence failures on the host side. Remote clients receive only the
+host-approved code and message; Heddle supplies a generic safe fallback if the
+error projector itself fails.
 
 [`example-agent.ts`](01-hosted-service/example-agent.ts) is the local
 composition root. It chooses a model, filesystem state root, inspect-only tool
@@ -149,6 +165,8 @@ HEDDLE_EXAMPLE_BEARER_TOKEN=local-example-secret \
 The sample contract is:
 
 ```text
+GET  /api/agent/sessions/:sessionId
+POST /api/agent/sessions/:sessionId/reset
 POST /api/agent/runs
 GET  /api/agent/runs/:runId/events?after=<sequence>
 POST /api/agent/runs/:runId/cancel
@@ -175,6 +193,12 @@ and `summary` fields before replay. The API schema validates that boundary
 again. Trace paths, artifacts, tool results, and internal session state are not
 serialized to the browser. Extend the public projection and Zod schema with
 only the product data the client is authorized to receive.
+
+The session read/reset endpoints are example host operations used by the React
+stage. They project persisted visible messages plus the process-local active
+run identity. They are not part of Heddle's run transport preset: products may
+already expose conversation state through tRPC, REST resources, server
+components, or another application API.
 
 ### Responsibility boundary
 
@@ -252,6 +276,32 @@ Bearer-auth browser clients use streaming `fetch` because native `EventSource`
 cannot attach an `Authorization` header. Cookie-auth applications can use
 `EventSource` and let the browser send `Last-Event-ID` on reconnect.
 
+## 04 React UI: minimal working product
+
+Start the API, then run:
+
+```bash
+VITE_HEDDLE_EXAMPLE_BEARER_TOKEN=local-example-secret \
+  yarn example:sdk:react-ui
+```
+
+Open `http://127.0.0.1:5175`. The [stage-04 README](04-react-ui/README.md)
+explains the code in order and the production substitutions.
+
+This stage demonstrates the missing product lifecycle above the protocol:
+
+- stable session identity and server-backed message hydration;
+- optimistic user messages and Markdown-safe assistant rendering;
+- safe tool/lifecycle activity separate from assistant prose;
+- active-run discovery after reload plus atomic cursor/render checkpointing;
+- bounded reconnect, visible errors, manual reconnect, stop, second turn, and
+  idle-only reset with accessible confirmation.
+
+React and React Query remain example choices. The durable lesson is the state
+boundary: server conversation state is queried, a run is an addressable live
+resource, and the browser persists the cursor together with what that cursor
+already rendered.
+
 ## Production adaptation checklist
 
 A coding agent adapting this example should report how the host handles each
@@ -265,7 +315,7 @@ item before calling the integration production-ready:
 - request validation, payload limits, CORS, rate limiting, and audit;
 - reconnect cursor persistence and duplicate-safe client event handling;
 - process ownership, draining, and cross-process run routing;
-- public terminal-result projection and sensitive-data review;
+- public terminal result/error projection and sensitive-data review;
 - traces, metrics, failure reporting, and cancellation verification.
 
 ## Deliberate limits

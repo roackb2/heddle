@@ -51,8 +51,8 @@ split between Heddle and the host explicit for developers and coding agents.
    - [Remote conversation runs](remote-runs.md): consume reconnectable runs
      through any transport with runtime-validated public payloads.
    - [Hosted agent stack](../../../examples/sdk/05-hosted-agent/README.md): compose
-     a transport-neutral run service, Express/SSE API, and browser client while
-     keeping each layer replaceable.
+     a transport-neutral run service, Express/SSE API, browser client, and
+     optional React reference product while keeping each layer replaceable.
 5. **Advanced: storage** — back Heddle with your own persistence.
    - [Result artifacts](result-artifacts.md): save large generated values as
      reusable artifacts.
