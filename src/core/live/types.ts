@@ -1,7 +1,7 @@
 import type { LlmProvider, LlmUsage } from '@/core/llm/types.js';
 import { HeddleEventType } from '@/core/event-types.js';
 import type { AgentPlanState } from '@/core/agent/planning/index.js';
-import type { StopReason, ToolCall, ToolResult } from '@/core/types.js';
+import type { RunFailure, StopReason, ToolCall, ToolResult } from '@/core/types.js';
 
 export type ConversationActivityCorrelation = {
   runId?: string;
@@ -125,6 +125,7 @@ export type ConversationLoopFinishedActivity = {
   runId: string;
   outcome: StopReason;
   summary: string;
+  failure?: RunFailure;
   usage?: LlmUsage;
   timestamp: string;
 };

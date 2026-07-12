@@ -124,6 +124,7 @@ export class AgentLoopRuntimeService {
       runId,
       outcome: result.outcome,
       summary: result.summary,
+      ...(result.failure ? { failure: result.failure } : {}),
       usage: result.usage,
       state,
       timestamp: finishedAt,

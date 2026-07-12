@@ -35,7 +35,12 @@ export class AgentModelTurnService {
         const retry = AgentModelTurnRetryService.resolve({ kind: 'response', response });
         if (!retry.retryable || attempt >= retry.maxAttempts) {
           return retry.retryable
-            ? AgentRunFinisher.finish(context, 'error', `${retry.message} after ${attempt} attempts`)
+            ? AgentRunFinisher.finish(
+                context,
+                'error',
+                `${retry.message} after ${attempt} attempts`,
+                { failure: retry.failure },
+              )
             : response;
         }
 
@@ -53,6 +58,7 @@ export class AgentModelTurnService {
             context,
             'error',
             attempt > 1 ? `LLM error after ${attempt} attempts: ${retry.message}` : `LLM error: ${retry.message}`,
+            { failure: retry.failure },
           );
         }
 

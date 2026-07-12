@@ -3,12 +3,14 @@ import includes from 'lodash/includes.js';
 import isNumber from 'lodash/isNumber.js';
 import isString from 'lodash/isString.js';
 import type { LlmResponse } from '@/core/llm/types.js';
+import type { ModelRunFailureCode, RunFailure } from '@/core/types.js';
 
 export type AgentModelTurnRetryReason = 'transport_error' | 'empty_response';
 
 export type AgentModelTurnRetryDecision = {
   retryable: boolean;
   reason?: AgentModelTurnRetryReason;
+  failure?: RunFailure;
   maxAttempts: number;
   message: string;
 };
@@ -24,6 +26,30 @@ const RETRY_MAX_DELAY_MS = 4_000;
 
 const RETRYABLE_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
 const NON_RETRYABLE_STATUS_CODES = new Set([400, 401, 403, 404, 422]);
+const MODEL_FAILURE_BY_STATUS = new Map<number, ModelRunFailureCode>([
+  [400, 'request'],
+  [401, 'authentication'],
+  [403, 'permission'],
+  [404, 'request'],
+  [408, 'transport'],
+  [409, 'transport'],
+  [422, 'request'],
+  [425, 'transport'],
+  [429, 'rate_limit'],
+  [500, 'transport'],
+  [502, 'transport'],
+  [503, 'transport'],
+  [504, 'transport'],
+]);
+const MODEL_FAILURE_MESSAGE = new Map<ModelRunFailureCode, string>([
+  ['authentication', 'Model authentication failed'],
+  ['permission', 'Model access was denied'],
+  ['rate_limit', 'Model provider rate limit reached'],
+  ['request', 'Model request was rejected'],
+  ['transport', 'Model provider is temporarily unavailable'],
+  ['empty_response', 'Model returned an empty response'],
+  ['unknown', 'Model request failed'],
+]);
 
 const RETRYABLE_ERROR_CODES = new Set([
   'ECONNRESET',
@@ -82,38 +108,45 @@ export class AgentModelTurnRetryService {
     return {
       retryable: true,
       reason: 'empty_response',
+      failure: AgentModelTurnRetryService.modelFailure('empty_response'),
       maxAttempts: EMPTY_RESPONSE_RETRY_ATTEMPTS,
       message: 'Model returned an empty response',
     };
   }
 
   private static resolveError(error: unknown): AgentModelTurnRetryDecision {
-    const message = AgentModelTurnRetryService.formatErrorMessage(error);
+    const providerMessage = AgentModelTurnRetryService.formatErrorMessage(error);
     const status = AgentModelTurnRetryService.readStatusCode(error);
+    const failureCode = status === undefined ? 'unknown' : MODEL_FAILURE_BY_STATUS.get(status) ?? 'unknown';
+    const failure = AgentModelTurnRetryService.modelFailure(failureCode);
+    const message = AgentModelTurnRetryService.safeMessage(failureCode);
 
     if (status !== undefined && NON_RETRYABLE_STATUS_CODES.has(status)) {
-      return { retryable: false, maxAttempts: 1, message };
+      return { retryable: false, failure, maxAttempts: 1, message };
     }
 
     if (status !== undefined && RETRYABLE_STATUS_CODES.has(status)) {
       return {
         retryable: true,
         reason: 'transport_error',
+        failure,
         maxAttempts: TRANSPORT_RETRY_ATTEMPTS,
         message,
       };
     }
 
-    if (AgentModelTurnRetryService.hasRetryableErrorCode(error) || AgentModelTurnRetryService.hasRetryableMessage(message)) {
+    if (AgentModelTurnRetryService.hasRetryableErrorCode(error)
+      || AgentModelTurnRetryService.hasRetryableMessage(providerMessage)) {
       return {
         retryable: true,
         reason: 'transport_error',
+        failure: AgentModelTurnRetryService.modelFailure('transport'),
         maxAttempts: TRANSPORT_RETRY_ATTEMPTS,
-        message,
+        message: AgentModelTurnRetryService.safeMessage('transport'),
       };
     }
 
-    return { retryable: false, maxAttempts: 1, message };
+    return { retryable: false, failure, maxAttempts: 1, message };
   }
 
   private static readStatusCode(error: unknown): number | undefined {
@@ -142,5 +175,13 @@ export class AgentModelTurnRetryService {
 
   private static formatErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+  }
+
+  private static modelFailure(code: ModelRunFailureCode): RunFailure {
+    return { source: 'model', code };
+  }
+
+  private static safeMessage(code: ModelRunFailureCode): string {
+    return MODEL_FAILURE_MESSAGE.get(code) ?? 'Model request failed';
   }
 }

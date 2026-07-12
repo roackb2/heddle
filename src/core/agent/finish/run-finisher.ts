@@ -3,7 +3,7 @@ import { HeddleEventType } from '@/core/event-types.js';
 import type { LlmResponse } from '@/core/llm/types.js';
 import type { RunResult, StopReason } from '@/core/types.js';
 import type { AgentRunContext } from '../types.js';
-import type { FinishAgentRunLogging } from './types.js';
+import type { FinishAgentRunOptions } from './types.js';
 
 /**
  * Owns terminal run outcomes and final RunResult shaping.
@@ -19,8 +19,10 @@ export class AgentRunFinisher {
 
   static finishInterrupted(context: AgentRunContext, logMessage: string): RunResult {
     return AgentRunFinisher.finish(context, 'interrupted', INTERRUPTED_SUMMARY, {
-      logLevel: 'info',
-      logMessage,
+      logging: {
+        logLevel: 'info',
+        logMessage,
+      },
     });
   }
 
@@ -40,15 +42,19 @@ export class AgentRunFinisher {
     context.messages.push({ role: 'assistant', content: response.content });
 
     return AgentRunFinisher.finish(context, 'done', response.content, {
-      logLevel: 'info',
-      logMessage: 'Agent run finished',
+      logging: {
+        logLevel: 'info',
+        logMessage: 'Agent run finished',
+      },
     });
   }
 
   static maxSteps(context: AgentRunContext): RunResult {
     return AgentRunFinisher.finish(context, 'max_steps', `Reached maximum step limit (${context.maxSteps})`, {
-      logLevel: 'warn',
-      logMessage: 'Budget exhausted',
+      logging: {
+        logLevel: 'warn',
+        logMessage: 'Budget exhausted',
+      },
     });
   }
 
@@ -56,19 +62,23 @@ export class AgentRunFinisher {
     context: AgentRunContext,
     outcome: StopReason,
     summary: string,
-    logging?: FinishAgentRunLogging,
+    options: FinishAgentRunOptions = {},
   ): RunResult {
     context.state.outcome = outcome;
     context.state.summary = summary;
 
-    if (logging) {
-      context.log[logging.logLevel]({ step: context.state.step, outcome, maxSteps: context.maxSteps }, logging.logMessage);
+    if (options.logging) {
+      context.log[options.logging.logLevel](
+        { step: context.state.step, outcome, maxSteps: context.maxSteps },
+        options.logging.logMessage,
+      );
     }
 
     context.live.trace({
       type: HeddleEventType.runFinished,
       outcome,
       summary,
+      ...(options.failure ? { failure: options.failure } : {}),
       step: context.state.step,
       timestamp: context.now(),
     });
@@ -76,6 +86,7 @@ export class AgentRunFinisher {
     return {
       outcome,
       summary,
+      ...(options.failure ? { failure: options.failure } : {}),
       trace: context.trace.getTrace(),
       transcript: context.messages.slice(1),
       usage: context.state.usage,

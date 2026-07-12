@@ -104,10 +104,11 @@ describe('AgentRunService.run', () => {
 
   it('records an error outcome when the LLM chat throws a non-retryable error', async () => {
     let calls = 0;
+    const providerSecret = 'sk-provider-error-sentinel';
     const fakeLlm: LlmAdapter = {
       async chat(): Promise<LlmResponse> {
         calls += 1;
-        throw Object.assign(new Error('Unauthorized'), { status: 401 });
+        throw Object.assign(new Error(`Unauthorized: ${providerSecret}`), { status: 401 });
       },
     };
 
@@ -120,9 +121,15 @@ describe('AgentRunService.run', () => {
     });
 
     expect(result.outcome).toBe('error');
-    expect(result.summary).toBe('LLM error: Unauthorized');
+    expect(result.summary).toBe('LLM error: Model authentication failed');
+    expect(result.failure).toEqual({ source: 'model', code: 'authentication' });
     expect(calls).toBe(1);
-    expect(result.trace.some((event) => event.type === 'run.finished')).toBe(true);
+    expect(result.trace.at(-1)).toMatchObject({
+      type: 'run.finished',
+      outcome: 'error',
+      failure: { source: 'model', code: 'authentication' },
+    });
+    expect(JSON.stringify(result)).not.toContain(providerSecret);
   });
 
   it('retries transient LLM transport errors before returning the assistant response', async () => {
@@ -158,14 +165,14 @@ describe('AgentRunService.run', () => {
         reason: 'transport_error',
         attempt: 1,
         maxAttempts: 5,
-        message: 'fetch failed',
+        message: 'Model provider is temporarily unavailable',
       }),
       expect.objectContaining({
         type: 'model.retry',
         reason: 'transport_error',
         attempt: 2,
         maxAttempts: 5,
-        message: 'fetch failed',
+        message: 'Model provider is temporarily unavailable',
       }),
     ]);
   });
@@ -189,6 +196,7 @@ describe('AgentRunService.run', () => {
 
     expect(result.outcome).toBe('error');
     expect(result.summary).toBe('Model returned an empty response after 3 attempts');
+    expect(result.failure).toEqual({ source: 'model', code: 'empty_response' });
     expect(calls).toBe(3);
     expect(result.trace.filter((event) => event.type === 'model.retry')).toHaveLength(2);
   });

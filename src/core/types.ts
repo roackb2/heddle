@@ -60,6 +60,21 @@ export type ToolResult = {
  */
 export type StopReason = 'done' | 'max_steps' | 'error' | 'interrupted';
 
+/** Safe host-facing classification for a failed run. Never contains provider messages or credentials. */
+export type ModelRunFailureCode =
+  | 'authentication'
+  | 'permission'
+  | 'rate_limit'
+  | 'request'
+  | 'transport'
+  | 'empty_response'
+  | 'unknown';
+
+export type RunFailure = {
+  source: 'model';
+  code: ModelRunFailureCode;
+};
+
 /**
  * A single event in the run trace. Discriminated union on `type`.
  */
@@ -177,7 +192,14 @@ export type TraceEvent =
       metadata: Record<string, unknown>;
       timestamp: string;
     }
-  | { type: typeof HeddleEventType.runFinished; outcome: StopReason; summary: string; step: number; timestamp: string };
+  | {
+      type: typeof HeddleEventType.runFinished;
+      outcome: StopReason;
+      summary: string;
+      failure?: RunFailure;
+      step: number;
+      timestamp: string;
+    };
 
 /**
  * The result returned from `AgentRunService.run`.
@@ -185,6 +207,7 @@ export type TraceEvent =
 export type RunResult = {
   outcome: StopReason;
   summary: string;
+  failure?: RunFailure;
   trace: TraceEvent[];
   transcript: ChatMessage[];
   usage?: LlmUsage;

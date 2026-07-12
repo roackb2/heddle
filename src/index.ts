@@ -50,7 +50,9 @@ export { DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL } from './core/config.js'
 // ---------------------------------------------------------------------------
 export type {
   RunInput,
+  RunFailure,
   RunResult,
+  ModelRunFailureCode,
   ToolDefinition,
   ToolCall,
   ToolResult,

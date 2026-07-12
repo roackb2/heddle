@@ -27,6 +27,7 @@ export class AgentLoopCheckpointService {
       finishedAt: args.finishedAt,
       outcome: args.result.outcome,
       summary: args.result.summary,
+      ...(args.result.failure ? { failure: args.result.failure } : {}),
       usage: args.result.usage,
       transcript: args.result.transcript,
       trace: args.result.trace,

@@ -14,7 +14,7 @@ import type {
   ConversationPlanUpdatedActivity,
 } from '@/core/live/index.js';
 import type { ChatMessage, LlmAdapter, LlmProvider, LlmUsage, ReasoningEffort } from '@/core/llm/types.js';
-import type { RunResult, StopReason, ToolCall, ToolDefinition, TraceEvent } from '@/core/types.js';
+import type { RunFailure, RunResult, StopReason, ToolCall, ToolDefinition, TraceEvent } from '@/core/types.js';
 
 export type AgentLoopStatus = 'finished';
 
@@ -29,6 +29,7 @@ export type AgentLoopState = {
   finishedAt: string;
   outcome: StopReason;
   summary: string;
+  failure?: RunFailure;
   usage?: LlmUsage;
   transcript: ChatMessage[];
   trace: TraceEvent[];

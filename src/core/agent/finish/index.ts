@@ -3,6 +3,7 @@ export type {
   AgentRunFinishedValue,
   FinishAgentRunArgs,
   FinishAgentRunLogging,
+  FinishAgentRunOptions,
   FinishAssistantResponseArgs,
   MaybeFinishInterruptedArgs,
 } from './types.js';

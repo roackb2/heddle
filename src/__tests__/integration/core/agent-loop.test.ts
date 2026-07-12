@@ -117,6 +117,45 @@ describe('AgentLoopRuntimeService.run', () => {
     });
   });
 
+  it('propagates safe model failures through loop state and terminal activity', async () => {
+    const events: AgentLoopEvent[] = [];
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        throw Object.assign(new Error('Unauthorized'), { status: 401 });
+      },
+    };
+
+    const result = await AgentLoopRuntimeService.run({
+      goal: 'Use a rejected credential.',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      logger: silentLogger,
+      workspaceRoot: resolve('/tmp/heddle-loop-failure-test'),
+      onEvent: (event) => events.push(event),
+    });
+
+    expect(result.failure).toEqual({ source: 'model', code: 'authentication' });
+    expect(result.state.failure).toEqual({ source: 'model', code: 'authentication' });
+    expect(events.at(-1)).toMatchObject({
+      type: 'loop.finished',
+      failure: { source: 'model', code: 'authentication' },
+      state: {
+        failure: { source: 'model', code: 'authentication' },
+      },
+    });
+  });
+
   it('emits assistant stream events through the programmatic event stream', async () => {
     const events: AgentHeartbeatEvent[] = [];
     const fakeLlm: LlmAdapter = {

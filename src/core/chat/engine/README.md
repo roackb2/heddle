@@ -22,7 +22,7 @@ not each invent their own version.
 - Host-extension composition for SDK integrations, including curated MCP tool
   surfaces and artifact behavior.
 - Host-facing turn result summaries, including trace file, completed tool
-  results, and session artifacts.
+  results, session artifacts, and safe model-failure categories.
 
 ## Domain Ownership Rule
 
@@ -94,6 +94,9 @@ Use this pattern when it fits the domain:
 - Put shared compaction behavior in `compaction/`.
 - Put public turn result vocabulary in `turn-result.ts` so SDK hosts do not
   parse trace or artifact storage for common summaries.
+- Read `result.failure` for product error handling. Provider error
+  classification belongs to `src/core/agent/model/`; hosts must not parse
+  `result.summary` or duplicate provider status maps.
 - Put host-extension policy in `host-extension.ts` or focused helpers such as
   `mcp-host-extension.ts`; runtime toolkits should receive resolved policy,
   not re-read host-extension config.
