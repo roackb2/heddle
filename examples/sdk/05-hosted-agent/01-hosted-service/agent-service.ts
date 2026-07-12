@@ -17,8 +17,6 @@ import {
   type ConversationRunStreamItem,
 } from '../../../../src/hosted.js';
 
-const DEFAULT_RUN_RETENTION_MS = 5 * 60_000;
-
 export type HostedRunAddress = {
   accountId: string;
   sessionId: string;
@@ -35,7 +33,9 @@ export type HostedAgentRunAccepted = {
   sessionId: string;
 };
 
-export type HostedAgentRunStreamItem = ConversationRunStreamItem<ConversationTurnResultSummary>;
+export type HostedAgentResult = Pick<ConversationTurnResultSummary, 'outcome' | 'summary'>;
+
+export type HostedAgentRunStreamItem = ConversationRunStreamItem<HostedAgentResult>;
 
 export type HostedAgentServiceOptions = {
   createEngine(address: HostedRunAddress): ConversationEngine | Promise<ConversationEngine>;
@@ -43,13 +43,7 @@ export type HostedAgentServiceOptions = {
   replay?: ConversationRunReplayOptions;
 };
 
-type HostedRunContext = {
-  address: HostedRunAddress;
-  run: ConversationRunHandle<HostedRunAddress, ConversationTurnResultSummary>;
-};
-
 export class HostedAgentRunNotFoundError extends Error {}
-export class HostedAgentRunConflictError extends Error {}
 export class HostedAgentInputError extends Error {}
 
 /**
@@ -62,17 +56,11 @@ export class HostedAgentInputError extends Error {}
  */
 export class HostedAgentService {
   private readonly runs: ConversationRunService<HostedRunAddress>;
-  private readonly contexts = new Map<string, HostedRunContext>();
-  private readonly retentionMs: number;
 
   constructor(private readonly options: HostedAgentServiceOptions) {
-    this.retentionMs = options.replay?.retentionMs ?? DEFAULT_RUN_RETENTION_MS;
     this.runs = new ConversationRunService<HostedRunAddress>({
       addressKey: ({ accountId, sessionId }) => JSON.stringify([accountId, sessionId]),
-      replay: {
-        maxEventsPerRun: options.replay?.maxEventsPerRun,
-        retentionMs: this.retentionMs,
-      },
+      replay: options.replay,
     });
   }
 
@@ -82,18 +70,10 @@ export class HostedAgentService {
     if (!prompt) {
       throw new HostedAgentInputError('Hosted agent prompts cannot be empty.');
     }
-    if (this.runs.isRunning(address)) {
-      throw new HostedAgentRunConflictError(`A run is already active for session ${address.sessionId}.`);
-    }
-
     const engine = await this.options.createEngine(address);
     const host = await this.options.createHost?.(address);
     const session = engine.sessions.readExisting(address.sessionId)
       ?? engine.sessions.create({ id: address.sessionId, name: 'Hosted agent conversation' });
-
-    if (this.runs.isRunning(address)) {
-      throw new HostedAgentRunConflictError(`A run is already active for session ${address.sessionId}.`);
-    }
 
     const run = this.runs.startTurn({
       address,
@@ -103,10 +83,14 @@ export class HostedAgentService {
         prompt,
         host,
       },
+      // Projection is awaited before Heddle publishes the terminal result.
+      // Real hosts can persist or reconcile authorized product state here and
+      // return only the public data that reconnecting clients may replay.
+      projectResult: (result): HostedAgentResult => ({
+        outcome: result.outcome,
+        summary: result.summary,
+      }),
     });
-
-    this.contexts.set(run.runId, { address, run });
-    this.expireContext(run);
 
     return {
       accepted: true,
@@ -122,34 +106,25 @@ export class HostedAgentService {
     afterSequence?: number;
     signal?: AbortSignal;
   }): AsyncIterable<HostedAgentRunStreamItem> {
-    return this.requireOwnedRun(input.accountId, input.runId).run.events({
+    return this.requireOwnedRun(input.accountId, input.runId).events({
       afterSequence: input.afterSequence,
       signal: input.signal,
     });
   }
 
   cancel(accountId: string, runId: string): boolean {
-    return this.requireOwnedRun(accountId, runId).run.cancel();
+    return this.requireOwnedRun(accountId, runId).cancel();
   }
 
-  private requireOwnedRun(accountId: string, runId: string): HostedRunContext {
-    const context = this.contexts.get(runId);
-    if (!context || context.address.accountId !== accountId.trim()) {
+  private requireOwnedRun(
+    accountId: string,
+    runId: string,
+  ): ConversationRunHandle<HostedRunAddress, HostedAgentResult> {
+    const run = this.runs.getRetainedRun<HostedAgentResult>(runId);
+    if (!run || run.accountId !== accountId.trim()) {
       throw new HostedAgentRunNotFoundError(`Hosted agent run not found: ${runId}`);
     }
-    return context;
-  }
-
-  private expireContext(run: HostedRunContext['run']): void {
-    void run.result.finally(() => {
-      if (this.retentionMs === 0) {
-        this.contexts.delete(run.runId);
-        return;
-      }
-
-      const timer = setTimeout(() => this.contexts.delete(run.runId), this.retentionMs);
-      timer.unref?.();
-    }).catch(() => undefined);
+    return run;
   }
 
   private static normalizeAddress(input: { accountId: string; sessionId: string }): HostedRunAddress {

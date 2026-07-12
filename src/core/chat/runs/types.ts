@@ -89,24 +89,50 @@ export type SubscribeConversationRunInput<Address extends { sessionId: string }>
   signal?: AbortSignal;
 };
 
-export type StartConversationTurnRunInput<Address extends { sessionId: string }> = {
+type ConversationRunLifecycleHooks<Address extends { sessionId: string }> = Pick<
+  StartConversationRunInput<Address, unknown>,
+  'onAccepted' | 'onHeartbeat' | 'onError' | 'onSettled'
+>;
+
+type ConversationTurnRunInputBase<Address extends { sessionId: string }> =
+  ConversationRunLifecycleHooks<Address> & {
   address: Address;
   engine: ConversationEngine;
   turn: SubmitConversationTurnInput;
-  onAccepted?: StartConversationRunInput<Address, SubmitConversationTurnResult>['onAccepted'];
-  onHeartbeat?: StartConversationRunInput<Address, SubmitConversationTurnResult>['onHeartbeat'];
-  onError?: StartConversationRunInput<Address, SubmitConversationTurnResult>['onError'];
-  onSettled?: StartConversationRunInput<Address, SubmitConversationTurnResult>['onSettled'];
 };
 
-export type StartConversationContinueRunInput<Address extends { sessionId: string }> = {
+type ConversationContinueRunInputBase<Address extends { sessionId: string }> =
+  ConversationRunLifecycleHooks<Address> & {
   address: Address;
   engine: ConversationEngine;
   turn: ContinueConversationTurnInput;
-  onAccepted?: StartConversationRunInput<Address, SubmitConversationTurnResult>['onAccepted'];
-  onHeartbeat?: StartConversationRunInput<Address, SubmitConversationTurnResult>['onHeartbeat'];
-  onError?: StartConversationRunInput<Address, SubmitConversationTurnResult>['onError'];
-  onSettled?: StartConversationRunInput<Address, SubmitConversationTurnResult>['onSettled'];
+};
+
+export type ConversationTurnResultProjector<Result> = (
+  result: SubmitConversationTurnResult,
+  run: ConversationRunContext,
+) => Result | Promise<Result>;
+
+export type StartConversationTurnRunInput<Address extends { sessionId: string }> =
+  ConversationTurnRunInputBase<Address>;
+
+export type StartProjectedConversationTurnRunInput<
+  Address extends { sessionId: string },
+  Result,
+> = ConversationTurnRunInputBase<Address> & {
+  /** Runs before the canonical result terminal is published. */
+  projectResult: ConversationTurnResultProjector<Result>;
+};
+
+export type StartConversationContinueRunInput<Address extends { sessionId: string }> =
+  ConversationContinueRunInputBase<Address>;
+
+export type StartProjectedConversationContinueRunInput<
+  Address extends { sessionId: string },
+  Result,
+> = ConversationContinueRunInputBase<Address> & {
+  /** Runs before the canonical result terminal is published. */
+  projectResult: ConversationTurnResultProjector<Result>;
 };
 
 export type ConversationRunHandle<Address extends { sessionId: string }, Result> =

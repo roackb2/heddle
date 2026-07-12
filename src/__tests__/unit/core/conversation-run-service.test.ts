@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ConversationRunService } from '@/core/chat/runs/index.js';
+import {
+  ConversationRunCancelledError,
+  ConversationRunConflictError,
+  ConversationRunNotFoundError,
+  ConversationRunReplayUnavailableError,
+  ConversationRunService,
+} from '@/core/chat/runs/index.js';
 import type { ConversationEngine, ConversationTurnResultSummary } from '@/core/chat/engine/index.js';
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { HeddleEventType } from '@/core/event-types.js';
@@ -63,6 +69,77 @@ describe('ConversationRunService', () => {
     expect(service.isRunning({ scopeId: 'tenant-1', sessionId: 'session-cancel' })).toBe(false);
   });
 
+  it('lets cancellation win when an executor ignores abort and resolves late', async () => {
+    const service = createRunService();
+    let finish: ((result: ConversationTurnResultSummary) => void) | undefined;
+    const run = service.startTurn({
+      address: { scopeId: 'tenant-1', sessionId: 'session-late-cancel' },
+      engine: engineThatRuns(async () => await new Promise<ConversationTurnResultSummary>((resolve) => {
+        finish = resolve;
+      })),
+      turn: { sessionId: 'session-late-cancel', prompt: 'Ignore cancellation' },
+    });
+    const items = collect(run.events());
+
+    await Promise.resolve();
+    expect(run.cancel()).toBe(true);
+    finish?.(turnResult());
+
+    await expect(run.result).rejects.toBeInstanceOf(ConversationRunCancelledError);
+    await expect(items).resolves.toEqual([
+      expect.objectContaining({ kind: 'cancelled', reason: 'Cancelled by user' }),
+    ]);
+  });
+
+  it('awaits host result projection before publishing the canonical terminal', async () => {
+    const service = createRunService();
+    const releaseProjection = deferred<void>();
+    const run = service.startTurn({
+      address: { scopeId: 'tenant-1', sessionId: 'session-projected' },
+      engine: engineThatRuns(async () => turnResult()),
+      turn: { sessionId: 'session-projected', prompt: 'Project this result' },
+      projectResult: async (result) => {
+        await releaseProjection.promise;
+        return { outcome: result.outcome, summary: result.summary };
+      },
+    });
+    const resultState = vi.fn();
+    void run.result.then(() => resultState('settled'));
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(resultState).not.toHaveBeenCalled();
+    releaseProjection.resolve();
+
+    await expect(run.result).resolves.toEqual({ outcome: 'done', summary: 'Updated' });
+    await expect(collect(run.events())).resolves.toEqual([
+      expect.objectContaining({
+        kind: 'result',
+        result: { outcome: 'done', summary: 'Updated' },
+      }),
+    ]);
+  });
+
+  it('settles as failed when host result projection fails', async () => {
+    const service = createRunService();
+    const run = service.startTurn({
+      address: { scopeId: 'tenant-1', sessionId: 'session-projection-failed' },
+      engine: engineThatRuns(async () => turnResult()),
+      turn: { sessionId: 'session-projection-failed', prompt: 'Fail projection' },
+      projectResult: () => {
+        throw new Error('Could not persist public result');
+      },
+    });
+
+    await expect(run.result).rejects.toThrow('Could not persist public result');
+    await expect(collect(run.events())).resolves.toEqual([
+      expect.objectContaining({
+        kind: 'error',
+        error: { code: 'run_failed', message: 'Could not persist public result' },
+      }),
+    ]);
+  });
+
   it('exposes the active run identity and refuses to cancel a different run id', async () => {
     const service = createRunService();
     let finish: (() => void) | undefined;
@@ -92,6 +169,56 @@ describe('ConversationRunService', () => {
     await result;
 
     expect(service.getActiveRun({ scopeId: 'tenant-1', sessionId: 'session-active' })).toBeUndefined();
+  });
+
+  it('returns retained handles with host-owned addresses for authorization', async () => {
+    const service = createRunService();
+    const run = service.startTurn({
+      address: { scopeId: 'tenant-1', sessionId: 'session-retained' },
+      engine: engineThatRuns(async () => turnResult()),
+      turn: { sessionId: 'session-retained', prompt: 'Retain this run' },
+    });
+    await run.result;
+
+    const retained = service.getRetainedRun<ConversationTurnResultSummary>(run.runId);
+
+    expect(retained).toMatchObject({
+      scopeId: 'tenant-1',
+      sessionId: 'session-retained',
+      runId: run.runId,
+      accepted: true,
+    });
+    await expect(retained?.result).resolves.toMatchObject({ outcome: 'done', summary: 'Updated' });
+    expect(retained?.cancel()).toBe(false);
+    expect(service.getRetainedRun('unknown-run')).toBeUndefined();
+  });
+
+  it('throws typed conflicts and avoids delimiter collisions in default addresses', async () => {
+    let runIndex = 0;
+    const service = new ConversationRunService({
+      replay: { retentionMs: 60_000 },
+      createRunId: () => `run-${runIndex += 1}`,
+    });
+    const first = service.startTurn({
+      address: { scopeId: 'tenant:a', sessionId: 'session' },
+      engine: engineThatWaitsForAbort(),
+      turn: { sessionId: 'session', prompt: 'First' },
+    });
+    const distinct = service.startTurn({
+      address: { scopeId: 'tenant', sessionId: 'a:session' },
+      engine: engineThatWaitsForAbort(),
+      turn: { sessionId: 'a:session', prompt: 'Distinct' },
+    });
+
+    expect(() => service.startTurn({
+      address: { scopeId: 'tenant:a', sessionId: 'session' },
+      engine: engineThatRuns(async () => turnResult()),
+      turn: { sessionId: 'session', prompt: 'Conflict' },
+    })).toThrow(ConversationRunConflictError);
+    expect(first.runId).not.toBe(distinct.runId);
+    first.cancel();
+    distinct.cancel();
+    await Promise.allSettled([first.result, distinct.result]);
   });
 
   it('prevents a stale run identity from resolving a newer pending approval', async () => {
@@ -150,7 +277,7 @@ describe('ConversationRunService', () => {
       address: { scopeId: 'tenant-1', sessionId: 'session-bounded' },
       runId: run.runId,
       afterSequence: 0,
-    })).toThrow('replay cursor 0 is older than retained sequence 3');
+    })).toThrow(ConversationRunReplayUnavailableError);
 
     const retained = await collect(service.subscribe({
       address: { scopeId: 'tenant-1', sessionId: 'session-bounded' },
@@ -161,6 +288,15 @@ describe('ConversationRunService', () => {
       [3, 'activity'],
       [4, 'result'],
     ]);
+  });
+
+  it('throws a typed not-found error for unknown subscriptions', () => {
+    const service = createRunService();
+
+    expect(() => service.subscribe({
+      address: { scopeId: 'tenant-1', sessionId: 'session-unknown' },
+      runId: 'unknown-run',
+    })).toThrow(ConversationRunNotFoundError);
   });
 });
 
@@ -181,6 +317,13 @@ function engineThatRuns(
       clearLease: () => undefined,
     },
   } as unknown as ConversationEngine;
+}
+
+function engineThatWaitsForAbort(): ConversationEngine {
+  return engineThatRuns(async (input) => await new Promise<never>((_resolve, reject) => {
+    input.abortSignal?.throwIfAborted();
+    input.abortSignal?.addEventListener('abort', () => reject(new Error('turn aborted')), { once: true });
+  }));
 }
 
 function assistantActivity(step: number, text: string): ConversationActivity {
@@ -215,4 +358,14 @@ async function collect<Result>(items: AsyncIterable<Result>): Promise<Result[]> 
     collected.push(item);
   }
   return collected;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }

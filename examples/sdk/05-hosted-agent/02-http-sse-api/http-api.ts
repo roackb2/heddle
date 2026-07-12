@@ -13,9 +13,9 @@ import {
   type Response,
 } from 'express';
 import { z, ZodError } from 'zod';
+import { ConversationRunConflictError } from '../../../../src/hosted.js';
 import {
   HostedAgentInputError,
-  HostedAgentRunConflictError,
   HostedAgentRunNotFoundError,
   type HostedAgentService,
 } from '../01-hosted-service/agent-service.js';
@@ -187,7 +187,7 @@ function toApiError(error: unknown): HostedAgentApiError {
   if (error instanceof HostedAgentRunNotFoundError) {
     return new HostedAgentApiError(404, 'run_not_found', error.message);
   }
-  if (error instanceof HostedAgentRunConflictError) {
+  if (error instanceof ConversationRunConflictError) {
     return new HostedAgentApiError(409, 'run_conflict', error.message);
   }
   if (error instanceof HostedAgentInputError || error instanceof ZodError) {
