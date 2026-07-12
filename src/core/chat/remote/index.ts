@@ -12,6 +12,7 @@ export {
 export type {
   ConversationRunConsumerEvent,
   ConversationRunConsumerRetryOptions,
+  ConversationRunConsumerSelectionOptions,
   ConversationRunConsumerServiceOptions,
   ConversationRunEventAcceptance,
   ConversationRunProtocolCodecOptions,

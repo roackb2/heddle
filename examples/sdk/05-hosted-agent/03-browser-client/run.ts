@@ -39,8 +39,9 @@ console.log(`Accepted ${accepted.runId}.`);
 const consumer = createRunConsumer(accepted.runId);
 await disconnectAfterFirstActivity(client, consumer);
 const cursor = requireSubscriptionInput(consumer).afterSequence;
-console.log(`Browser subscription disconnected at sequence ${cursor}; reconnecting.`);
-const terminal = await consumeUntilTerminal(client, consumer);
+console.log(`Browser subscription disconnected at sequence ${cursor}; restoring client state.`);
+const restoredConsumer = createRunConsumer(accepted.runId, cursor);
+const terminal = await consumeUntilTerminal(client, restoredConsumer);
 console.log(`Run settled as ${terminal.kind}.`);
 
 if (cancelDemo) {
@@ -59,11 +60,11 @@ if (cancelDemo) {
   }
 }
 
-function createRunConsumer(runId: string): HostedAgentRunConsumer {
+function createRunConsumer(runId: string, afterSequence = 0): HostedAgentRunConsumer {
   const consumer = new ConversationRunConsumerService<HostedAgentRunReference>({
     retry: { maxAttempts: 5, baseDelayMs: 250, maxDelayMs: 2_000 },
   });
-  consumer.select({ runId });
+  consumer.select({ runId }, { afterSequence });
   return consumer;
 }
 
