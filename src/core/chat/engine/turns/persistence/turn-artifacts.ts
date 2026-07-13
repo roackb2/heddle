@@ -45,6 +45,7 @@ export class ConversationTurnArtifacts {
         ? ConversationTurnFailureMessages.format(args.result.summary, {
             model: compactionRuntime.model,
             estimatedHistoryTokens: ConversationCompactionService.estimateTokens(args.historyForTokenEstimate),
+            ...(args.result.failure ? { failure: args.result.failure } : {}),
           })
         : args.result.summary;
 

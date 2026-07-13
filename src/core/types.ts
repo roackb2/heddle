@@ -64,6 +64,7 @@ export type StopReason = 'done' | 'max_steps' | 'error' | 'interrupted';
 export type ModelRunFailureCode =
   | 'authentication'
   | 'permission'
+  | 'quota'
   | 'rate_limit'
   | 'request'
   | 'transport'

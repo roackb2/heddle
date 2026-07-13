@@ -26,6 +26,9 @@ const RETRY_MAX_DELAY_MS = 4_000;
 
 const RETRYABLE_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
 const NON_RETRYABLE_STATUS_CODES = new Set([400, 401, 403, 404, 422]);
+const MODEL_FAILURE_BY_PROVIDER_CODE = new Map<string, ModelRunFailureCode>([
+  ['insufficient_quota', 'quota'],
+]);
 const MODEL_FAILURE_BY_STATUS = new Map<number, ModelRunFailureCode>([
   [400, 'request'],
   [401, 'authentication'],
@@ -44,6 +47,7 @@ const MODEL_FAILURE_BY_STATUS = new Map<number, ModelRunFailureCode>([
 const MODEL_FAILURE_MESSAGE = new Map<ModelRunFailureCode, string>([
   ['authentication', 'Model authentication failed'],
   ['permission', 'Model access was denied'],
+  ['quota', 'Model provider quota or billing limit reached'],
   ['rate_limit', 'Model provider rate limit reached'],
   ['request', 'Model request was rejected'],
   ['transport', 'Model provider is temporarily unavailable'],
@@ -116,10 +120,15 @@ export class AgentModelTurnRetryService {
 
   private static resolveError(error: unknown): AgentModelTurnRetryDecision {
     const providerMessage = AgentModelTurnRetryService.formatErrorMessage(error);
+    const providerCode = AgentModelTurnRetryService.readProviderErrorCode(error);
     const status = AgentModelTurnRetryService.readStatusCode(error);
-    const failureCode = status === undefined ? 'unknown' : MODEL_FAILURE_BY_STATUS.get(status) ?? 'unknown';
+    const failureCode = AgentModelTurnRetryService.resolveFailureCode({ providerCode, status });
     const failure = AgentModelTurnRetryService.modelFailure(failureCode);
     const message = AgentModelTurnRetryService.safeMessage(failureCode);
+
+    if (failureCode === 'quota') {
+      return { retryable: false, failure, maxAttempts: 1, message };
+    }
 
     if (status !== undefined && NON_RETRYABLE_STATUS_CODES.has(status)) {
       return { retryable: false, failure, maxAttempts: 1, message };
@@ -147,6 +156,23 @@ export class AgentModelTurnRetryService {
     }
 
     return { retryable: false, failure, maxAttempts: 1, message };
+  }
+
+  private static resolveFailureCode(args: {
+    providerCode?: string;
+    status?: number;
+  }): ModelRunFailureCode {
+    const providerFailure = args.providerCode
+      ? MODEL_FAILURE_BY_PROVIDER_CODE.get(args.providerCode)
+      : undefined;
+    return providerFailure ?? (
+      args.status === undefined ? 'unknown' : MODEL_FAILURE_BY_STATUS.get(args.status) ?? 'unknown'
+    );
+  }
+
+  private static readProviderErrorCode(error: unknown): string | undefined {
+    const code: unknown = get(error, 'code') ?? get(error, 'error.code') ?? get(error, 'cause.code');
+    return isString(code) ? code.trim().toLowerCase() : undefined;
   }
 
   private static readStatusCode(error: unknown): number | undefined {

@@ -432,6 +432,33 @@ describe('conversation turn lifecycle', () => {
     expect(turnResult.failure).toEqual({ source: 'model', code: 'authentication' });
   });
 
+  it('returns the safe quota failure category and actionable summary to programmatic hosts', async () => {
+    const storage = createConversationTurnStorage();
+    vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(createLoopResult({
+      workspaceRoot: storage.workspaceRoot,
+      prompt: 'Use a credential without quota.',
+      summary: 'LLM error: Model provider quota or billing limit reached',
+      outcome: 'error',
+      failure: { source: 'model', code: 'quota' },
+    }) as never);
+
+    const turnResult = await EngineConversationTurnService.run({
+      workspaceRoot: storage.workspaceRoot,
+      stateRoot: storage.stateRoot,
+      traceDir: join(storage.stateRoot, 'traces'),
+      sessionStoragePath: storage.sessionStoragePath,
+      sessionId: storage.sessionId,
+      prompt: 'Use a credential without quota.',
+      apiKey: 'quota-exhausted-key',
+      memoryMaintenanceMode: 'none',
+      artifactRoot: storage.artifactRoot,
+      artifactsEnabled: true,
+    });
+
+    expect(turnResult.failure).toEqual({ source: 'model', code: 'quota' });
+    expect(turnResult.summary).toContain('no usable provider quota or billing capacity');
+  });
+
   it('clears the session lease when the run loop fails', async () => {
     const storage = createConversationTurnStorage();
     vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockRejectedValue(new Error('loop failed'));
