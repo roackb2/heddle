@@ -33,4 +33,33 @@ describe('AgentModelTurnRetryService', () => {
     expect(decision.message).not.toContain('secret-value');
     expect(JSON.stringify(decision.failure)).not.toContain('secret-value');
   });
+
+  it.each([undefined, 429])(
+    'classifies structured insufficient_quota as non-retryable before status %s',
+    (status) => {
+      const decision = AgentModelTurnRetryService.resolve({
+        kind: 'error',
+        error: Object.assign(new Error('provider message'), {
+          code: 'insufficient_quota',
+          ...(status === undefined ? {} : { status }),
+        }),
+      });
+
+      expect(decision).toEqual({
+        retryable: false,
+        failure: { source: 'model', code: 'quota' },
+        maxAttempts: 1,
+        message: 'Model provider quota or billing limit reached',
+      });
+    },
+  );
+
+  it('does not infer quota exhaustion from provider message text', () => {
+    const decision = AgentModelTurnRetryService.resolve({
+      kind: 'error',
+      error: new Error('You exceeded your current quota, please check your billing details.'),
+    });
+
+    expect(decision.failure).toEqual({ source: 'model', code: 'unknown' });
+  });
 });

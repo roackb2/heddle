@@ -42,6 +42,7 @@ const HostedAgentResultSchema = z.object({
     code: z.enum([
       'authentication',
       'permission',
+      'quota',
       'rate_limit',
       'request',
       'transport',

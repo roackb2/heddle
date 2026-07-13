@@ -40,5 +40,17 @@ if (result.failure?.code === 'authentication') {
 }
 ```
 
+Quota exhaustion has a separate recovery path from transient rate limiting:
+
+```ts
+if (result.failure?.code === 'quota') {
+  throw new ProductModelQuotaError()
+}
+```
+
+`quota` is non-retryable and means the provider reported a structured quota or
+billing-capacity failure. `rate_limit` remains retryable. Hosts should map both
+from `failure.code`; do not inspect `summary` or raw provider message text.
+
 Model failure codes currently distinguish `authentication`, `permission`,
-`rate_limit`, `request`, `transport`, `empty_response`, and `unknown`.
+`quota`, `rate_limit`, `request`, `transport`, `empty_response`, and `unknown`.

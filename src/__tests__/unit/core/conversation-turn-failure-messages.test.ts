@@ -27,13 +27,19 @@ describe('ConversationTurnFailureMessages', () => {
     expect(ConversationTurnFailureMessages.shouldForceCompactionAfterFailure(formatted)).toBe(false);
   });
 
-  it('distinguishes OpenAI quota exhaustion from prompt-size issues', () => {
+  it('adds quota recovery guidance from the structured run failure', () => {
     const formatted = ConversationTurnFailureMessages.format(
-      'You exceeded your current quota, please check your plan and billing details.',
-      { model: 'gpt-5.4' },
+      'LLM error: Model provider quota or billing limit reached',
+      { model: 'gpt-5.4', failure: { source: 'model', code: 'quota' } },
     );
 
-    expect(formatted).toContain('quota or billing limit');
-    expect(formatted).toContain('not a transient prompt-size issue');
+    expect(formatted).toContain('no usable provider quota or billing capacity');
+    expect(formatted).toContain('switch credentials or providers');
+  });
+
+  it('does not infer quota recovery guidance from provider message text', () => {
+    const message = 'You exceeded your current quota, please check your plan and billing details.';
+
+    expect(ConversationTurnFailureMessages.format(message, { model: 'gpt-5.4' })).toBe(message);
   });
 });

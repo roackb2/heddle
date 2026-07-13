@@ -85,6 +85,29 @@ describe('hosted React UI example boundaries', () => {
       tone: 'running',
     }]);
   });
+
+  it('preserves the safe quota category through the hosted result contract', () => {
+    const event = HostedAgentRunProtocol.parseEvent({
+      kind: 'result',
+      runId: 'run-1',
+      sequence: 2,
+      timestamp: '2026-07-12T00:00:01.000Z',
+      result: {
+        outcome: 'error',
+        summary: 'Model provider quota or billing limit reached',
+        failure: { source: 'model', code: 'quota', providerMessage: 'must-not-cross-wire-boundary' },
+      },
+    });
+
+    expect(event).toMatchObject({
+      kind: 'result',
+      result: {
+        outcome: 'error',
+        failure: { source: 'model', code: 'quota' },
+      },
+    });
+    expect(JSON.stringify(event)).not.toContain('providerMessage');
+  });
 });
 
 class MemoryStorage implements Storage {

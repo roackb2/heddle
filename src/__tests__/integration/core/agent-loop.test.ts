@@ -156,6 +156,45 @@ describe('AgentLoopRuntimeService.run', () => {
     });
   });
 
+  it('propagates non-retryable quota failures through loop state and terminal activity', async () => {
+    const events: AgentLoopEvent[] = [];
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        throw Object.assign(new Error('provider quota response'), { code: 'insufficient_quota' });
+      },
+    };
+
+    const result = await AgentLoopRuntimeService.run({
+      goal: 'Use a credential without quota.',
+      llm: fakeLlm,
+      tools: [],
+      includeDefaultTools: false,
+      logger: silentLogger,
+      workspaceRoot: resolve('/tmp/heddle-loop-quota-failure-test'),
+      onEvent: (event) => events.push(event),
+    });
+
+    expect(result.failure).toEqual({ source: 'model', code: 'quota' });
+    expect(result.state.failure).toEqual({ source: 'model', code: 'quota' });
+    expect(events.at(-1)).toMatchObject({
+      type: 'loop.finished',
+      failure: { source: 'model', code: 'quota' },
+      state: {
+        failure: { source: 'model', code: 'quota' },
+      },
+    });
+  });
+
   it('emits assistant stream events through the programmatic event stream', async () => {
     const events: AgentHeartbeatEvent[] = [];
     const fakeLlm: LlmAdapter = {

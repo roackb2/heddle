@@ -132,6 +132,39 @@ describe('AgentRunService.run', () => {
     expect(JSON.stringify(result)).not.toContain(providerSecret);
   });
 
+  it('finishes structured quota exhaustion without retrying or exposing provider details', async () => {
+    let calls = 0;
+    const providerSecret = 'provider-quota-sentinel';
+    const fakeLlm: LlmAdapter = {
+      async chat(): Promise<LlmResponse> {
+        calls += 1;
+        throw Object.assign(new Error(`Quota response: ${providerSecret}`), {
+          code: 'insufficient_quota',
+        });
+      },
+    };
+
+    const result = await AgentRunService.run({
+      goal: 'Handle quota exhaustion safely.',
+      llm: fakeLlm,
+      tools: [],
+      maxSteps: 1,
+      logger: silentLogger,
+    });
+
+    expect(result.outcome).toBe('error');
+    expect(result.summary).toBe('LLM error: Model provider quota or billing limit reached');
+    expect(result.failure).toEqual({ source: 'model', code: 'quota' });
+    expect(calls).toBe(1);
+    expect(result.trace.filter((event) => event.type === 'model.retry')).toEqual([]);
+    expect(result.trace.at(-1)).toMatchObject({
+      type: 'run.finished',
+      outcome: 'error',
+      failure: { source: 'model', code: 'quota' },
+    });
+    expect(JSON.stringify(result)).not.toContain(providerSecret);
+  });
+
   it('retries transient LLM transport errors before returning the assistant response', async () => {
     let calls = 0;
     const fakeLlm: LlmAdapter = {

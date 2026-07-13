@@ -10,6 +10,8 @@ usage accumulation, retry policy, and safe terminal failure classification.
   agent runs are never replayed by this service.
 - Converting provider status and transport signals into the stable
   host-facing `RunFailure` category.
+- Distinguishing structured provider quota exhaustion from transient rate
+  limiting so the runtime does not retry a request that cannot succeed.
 - Replacing raw provider diagnostics with a stable safe message before the
   value reaches logs, retry traces, or the human-readable run summary.
 
@@ -28,6 +30,13 @@ checkpoints, logs, live events, and remote API results.
 Provider-specific retry behavior belongs here when it can be derived from
 structured adapter errors. Product-specific copy and HTTP/API error mapping
 belong in the consuming host.
+
+Structured provider error codes take precedence over HTTP status when they
+carry more precise recovery semantics. For example, OpenAI's
+`insufficient_quota` is exposed as `{ source: 'model', code: 'quota' }` and is
+non-retryable, even if the provider also reports HTTP 429. An ordinary HTTP 429
+remains the retryable `rate_limit` category. Add future provider codes to this
+single classifier; never infer quota state from provider message text.
 
 ## Adjacent Owners
 
