@@ -34,7 +34,7 @@ export class ControlPlaneSlashCommandsController {
 
   async execute(args: SlashCommandControllerArgs, command: string): Promise<SlashCommandResult> {
     const result = await registry.run(
-      controlPlaneSlashCommandExecutionContextService.create(args, registry.hints()),
+      await controlPlaneSlashCommandExecutionContextService.create(args, registry.hints()),
       command.trim(),
     );
     return result ?? {

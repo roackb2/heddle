@@ -7,6 +7,7 @@ import { ArtifactService } from '@/core/artifacts/index.js';
 import { EngineConversationTurnService } from '@/core/chat/engine/turns/service.js';
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
+import { readStoredChatSession } from '@/__tests__/helpers/chat-session-repository.js';
 import * as agentLoopModule from '@/core/runtime/loop/index.js';
 import type { AutopilotProfile } from '@/core/approvals/index.js';
 import type { ToolApprovalPolicy } from '@/core/approvals/types.js';
@@ -19,11 +20,11 @@ describe('control-plane session runtime integration', () => {
     vi.unstubAllEnvs();
   });
 
-  it('defaults new control-plane sessions to the shared OpenAI default model', () => {
+  it('defaults new control-plane sessions to the shared OpenAI default model', async () => {
     vi.stubEnv('OPENAI_MODEL', '');
     vi.stubEnv('ANTHROPIC_MODEL', '');
 
-    const session = controlPlaneChatSessionsController.createSession({
+    const session = await controlPlaneChatSessionsController.createSession({
       ...createControlPlaneSessionEngineArgs(),
       suggestedName: 'Default model test',
     });
@@ -31,7 +32,7 @@ describe('control-plane session runtime integration', () => {
     expect(session.model).toBe('gpt-5.4');
   });
 
-  it('falls back to an OAuth-compatible model when a configured OpenAI model is unsupported', () => {
+  it('falls back to an OAuth-compatible model when a configured OpenAI model is unsupported', async () => {
     vi.stubEnv('OPENAI_MODEL', 'gpt-4.1');
     vi.stubEnv('OPENAI_API_KEY', '');
     vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
@@ -47,7 +48,7 @@ describe('control-plane session runtime integration', () => {
       updatedAt: '2026-05-02T00:00:00.000Z',
     });
 
-    const session = controlPlaneChatSessionsController.createSession({
+    const session = await controlPlaneChatSessionsController.createSession({
       ...createControlPlaneSessionEngineArgs(),
       suggestedName: 'OAuth fallback test',
       credentialStorePath: storePath,
@@ -56,7 +57,7 @@ describe('control-plane session runtime integration', () => {
     expect(session.model).toBe('gpt-5.4');
   });
 
-  it('preserves broader OpenAI model choices in API-key mode', () => {
+  it('preserves broader OpenAI model choices in API-key mode', async () => {
     vi.stubEnv('OPENAI_MODEL', 'gpt-4.1');
     vi.stubEnv('OPENAI_API_KEY', 'test-openai-key');
     const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-control-plane-api-key-')), 'auth.json');
@@ -71,7 +72,7 @@ describe('control-plane session runtime integration', () => {
       updatedAt: '2026-05-02T00:00:00.000Z',
     });
 
-    const session = controlPlaneChatSessionsController.createSession({
+    const session = await controlPlaneChatSessionsController.createSession({
       ...createControlPlaneSessionEngineArgs(),
       suggestedName: 'API key model test',
       preferApiKey: true,
@@ -81,7 +82,7 @@ describe('control-plane session runtime integration', () => {
     expect(session.model).toBe('gpt-4.1');
   });
 
-  it('clears explicit reasoning effort when control-plane settings send null', () => {
+  it('clears explicit reasoning effort when control-plane settings send null', async () => {
     const engineArgs = createControlPlaneSessionEngineArgs();
     const session = ChatSessionRecords.create({
       id: 'session-1',
@@ -90,9 +91,9 @@ describe('control-plane session runtime integration', () => {
       model: 'gpt-5.5',
       reasoningEffort: 'high',
     });
-    new FileChatSessionRepository({ sessionStoragePath: engineArgs.sessionStoragePath }).save([session]);
+    await new FileChatSessionRepository({ sessionStoragePath: engineArgs.sessionStoragePath }).create(session);
 
-    const updated = controlPlaneChatSessionsController.updateSettings({
+    const updated = await controlPlaneChatSessionsController.updateSettings({
       ...engineArgs,
       sessionId: 'session-1',
       settings: {
@@ -101,7 +102,7 @@ describe('control-plane session runtime integration', () => {
     });
 
     expect(updated.reasoningEffort).toBeUndefined();
-    expect(controlPlaneChatSessionsController.readDetail(engineArgs, 'session-1')?.reasoningEffort).toBeUndefined();
+    expect((await controlPlaneChatSessionsController.readDetail(engineArgs, 'session-1'))?.reasoningEffort).toBeUndefined();
   });
 
   it('continues with the stored prompt while preserving continue-style transcript text', async () => {
@@ -112,7 +113,7 @@ describe('control-plane session runtime integration', () => {
     mkdirSync(traceDir, { recursive: true });
     vi.stubEnv('OPENAI_API_KEY', 'test-openai-key');
 
-    const session = controlPlaneChatSessionsController.createSession({
+    const session = await controlPlaneChatSessionsController.createSession({
       workspaceRoot,
       stateRoot,
       sessionStoragePath,
@@ -199,7 +200,7 @@ describe('control-plane session runtime integration', () => {
     const continueCall = loopSpy.mock.calls.at(-1)?.[0];
     expect(continueCall?.goal).toBe('inspect file with expanded mention contents');
 
-    const detail = controlPlaneChatSessionsController.readDetail({ workspaceRoot, stateRoot, sessionStoragePath }, session.id);
+    const detail = await controlPlaneChatSessionsController.readDetail({ workspaceRoot, stateRoot, sessionStoragePath }, session.id);
     expect(detail?.messages.map((message) => message.text)).toEqual([
       'inspect file with expanded mention contents',
       'First turn done.',
@@ -224,7 +225,7 @@ describe('control-plane session runtime integration', () => {
         requireApproval: ['staging', 'production', 'unknown'],
       },
     };
-    const session = controlPlaneChatSessionsController.createSession({
+    const session = await controlPlaneChatSessionsController.createSession({
       ...engineArgs,
       suggestedName: 'Autopilot policy order test',
       model: 'gpt-5.4',
@@ -292,7 +293,7 @@ describe('conversation turn lifecycle', () => {
   });
 
   it('passes approval policies and normalized host surfaces into the run loop', async () => {
-    const storage = createConversationTurnStorage();
+    const storage = await createConversationTurnStorage();
     const loopSpy = vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(createLoopResult({
       workspaceRoot: storage.workspaceRoot,
       prompt: 'Edit safely.',
@@ -338,7 +339,7 @@ describe('conversation turn lifecycle', () => {
   });
 
   it('returns persisted trace, session artifacts, and completed tool results to hosts', async () => {
-    const storage = createConversationTurnStorage();
+    const storage = await createConversationTurnStorage();
     const artifact = new ArtifactService({ artifactRoot: storage.artifactRoot }).saveText({
       sessionId: storage.sessionId,
       content: '# Brief',
@@ -407,7 +408,7 @@ describe('conversation turn lifecycle', () => {
   });
 
   it('returns the safe model failure category to programmatic hosts', async () => {
-    const storage = createConversationTurnStorage();
+    const storage = await createConversationTurnStorage();
     vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(createLoopResult({
       workspaceRoot: storage.workspaceRoot,
       prompt: 'Use a rejected credential.',
@@ -433,7 +434,7 @@ describe('conversation turn lifecycle', () => {
   });
 
   it('returns the safe quota failure category and actionable summary to programmatic hosts', async () => {
-    const storage = createConversationTurnStorage();
+    const storage = await createConversationTurnStorage();
     vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockResolvedValue(createLoopResult({
       workspaceRoot: storage.workspaceRoot,
       prompt: 'Use a credential without quota.',
@@ -460,7 +461,7 @@ describe('conversation turn lifecycle', () => {
   });
 
   it('clears the session lease when the run loop fails', async () => {
-    const storage = createConversationTurnStorage();
+    const storage = await createConversationTurnStorage();
     vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockRejectedValue(new Error('loop failed'));
 
     await expect(EngineConversationTurnService.run({
@@ -480,8 +481,10 @@ describe('conversation turn lifecycle', () => {
       },
     })).rejects.toThrow('loop failed');
 
-    const persisted = new FileChatSessionRepository({ sessionStoragePath: storage.sessionStoragePath }).list()
-      .find((session) => session.id === storage.sessionId);
+    const persisted = await readStoredChatSession(
+      new FileChatSessionRepository({ sessionStoragePath: storage.sessionStoragePath }),
+      storage.sessionId,
+    );
     expect(persisted?.lease).toBeUndefined();
     expect(persisted?.turns).toEqual([]);
   });
@@ -497,7 +500,7 @@ function createControlPlaneSessionEngineArgs() {
   };
 }
 
-function createConversationTurnStorage() {
+async function createConversationTurnStorage() {
   const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-conversation-turn-'));
   const stateRoot = join(workspaceRoot, '.heddle');
   const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
@@ -507,7 +510,7 @@ function createConversationTurnStorage() {
     apiKeyPresent: true,
     model: 'gpt-5.4',
   });
-  new FileChatSessionRepository({ sessionStoragePath }).save([session]);
+  await new FileChatSessionRepository({ sessionStoragePath }).create(session);
 
   return {
     workspaceRoot,

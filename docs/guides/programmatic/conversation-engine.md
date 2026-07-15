@@ -183,17 +183,19 @@ as `RuntimeArtifact.path`.
 
 ## Bring your own session storage
 
-Sessions follow the same pattern through the `ChatSessionRepository` port: the
-session catalog plus full session bodies.
+Sessions use an async, revisioned `ChatSessionRepository` port. Local products
+can keep the zero-configuration file adapter; hosted products can inject a
+record-oriented database adapter.
 
 ```ts
 import { createConversationEngine, type ChatSessionRepository } from '@roackb2/heddle'
 
 const sessionRepository: ChatSessionRepository = {
-  list: () => loadAllSessions(),
-  readCatalog: () => loadSessionCatalogEntries(),
-  read: (sessionId) => loadSession(sessionId),
-  save: (sessions) => storeSessions(sessions),
+  list: async (input) => listSessionPage(input),
+  read: async (sessionId) => readSessionRecord(sessionId),
+  create: async (session) => createSessionRecord(session),
+  update: async (input) => compareAndSwapSession(input),
+  delete: async (input) => compareAndSwapSessionDelete(input),
 }
 
 const engine = createConversationEngine({
@@ -208,7 +210,11 @@ The injected repository is resolved once at the engine boundary and used for
 session create/read/update/rename, turn preflight and persistence, lease
 acquisition/release, and background memory-maintenance writes. Session policy
 (leases, records, compaction state) stays inside Heddle — the repository only
-persists.
+persists. Updates and deletes use expected revisions so a hosted adapter cannot
+silently lose a concurrent write.
+
+See [Durable session storage](session-storage.md) for the default JSON layout,
+the exact compare-and-swap behavior, and a PostgreSQL table/query shape.
 
 Traces and memory still persist under the state root today. Making them
 injectable follows the same port-per-domain pattern.

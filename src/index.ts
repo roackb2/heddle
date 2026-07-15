@@ -261,11 +261,23 @@ export type {
   RuntimeArtifact,
   SaveTextArtifactInput,
 } from './core/artifacts/index.js';
-export { FileChatSessionRepository } from './core/chat/engine/sessions/repository/index.js';
+export {
+  ChatSessionAlreadyExistsError,
+  ChatSessionRevisionConflictError,
+  ChatSessionStorageCorruptionError,
+  FileChatSessionRepository,
+  InvalidChatSessionCursorError,
+} from './core/chat/engine/sessions/repository/index.js';
 export type {
   ChatSessionCatalog,
   ChatSessionCatalogEntry,
+  ChatSessionCatalogPage,
   ChatSessionRepository,
+  DeleteChatSessionInput,
+  ListChatSessionsInput,
+  SessionStoragePaths,
+  StoredChatSession,
+  UpdateChatSessionInput,
 } from './core/chat/engine/sessions/repository/index.js';
 export type { ChatSession } from './core/chat/types.js';
 export { RuntimeCredentialService } from './core/runtime/credentials/index.js';

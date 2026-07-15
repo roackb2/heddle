@@ -54,7 +54,7 @@ async function main() {
     hostExtensions: [createExampleHostExtension()],
   });
 
-  const session = engine.sessions.create({
+  const session = await engine.sessions.create({
     name: 'Programmatic conversation engine example',
   });
 

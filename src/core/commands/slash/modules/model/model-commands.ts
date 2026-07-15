@@ -103,10 +103,10 @@ export function createReasoningSlashCommandModule(): SlashCommandModule<SlashCom
   };
 }
 
-function switchModel(
+async function switchModel(
   context: SlashCommandExecutionContext,
   value: string,
-): SlashCommandResult {
+): Promise<SlashCommandResult> {
   if (!value) {
     return slashMessageResult('Usage: /model <name>');
   }
@@ -126,7 +126,7 @@ function switchModel(
     return slashMessageResult(compatibility.error);
   }
 
-  context.model.setActive(value);
+  await context.model.setActive(value);
   return slashMessageResult(
     ModelCatalogService.isCommonBuiltInModel(value) || provider !== 'openai' ?
       `Switched model to ${value}`
@@ -134,10 +134,10 @@ function switchModel(
   );
 }
 
-function setReasoningEffort(
+async function setReasoningEffort(
   context: SlashCommandExecutionContext,
   value: string,
-): SlashCommandResult {
+): Promise<SlashCommandResult> {
   const normalized = value.trim().toLowerCase();
   if (!normalized) {
     return slashMessageResult(formatSessionReasoningEffortStatus({
@@ -149,7 +149,7 @@ function setReasoningEffort(
   const selected = normalized.startsWith('set ') ? normalized.slice('set '.length).trim() : normalized;
 
   if (selected === 'default') {
-    context.model.setReasoningEffort(undefined);
+    await context.model.setReasoningEffort(undefined);
     return slashMessageResult(
       `Cleared explicit reasoning effort for ${context.model.active()}. Effective default: ${resolveEffectiveReasoningEffort({
         model: context.model.active(),
@@ -170,7 +170,7 @@ function setReasoningEffort(
     return slashMessageResult(`Reasoning effort "${selected}" is not supported by the OpenAI request path for model ${context.model.active()}.`);
   }
 
-  context.model.setReasoningEffort(selected);
+  await context.model.setReasoningEffort(selected);
   return slashMessageResult(`Set reasoning effort to ${selected} for ${context.model.active()}.`);
 }
 function isReasoningEffort(value: string): value is ReasoningEffort {

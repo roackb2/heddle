@@ -1,7 +1,7 @@
 import type { LlmAdapter } from '@/core/llm/types.js';
 import type { AgentLoopResult } from '@/core/runtime/loop/index.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
-import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
+import type { ConversationSessionService } from '@/core/chat/engine/types.js';
 
 export type RunInlineTurnMemoryMaintenanceArgs = {
   memoryRoot: string;
@@ -17,7 +17,7 @@ export type ScheduleBackgroundTurnMemoryMaintenanceArgs = {
   source: string;
   trace: AgentLoopResult['trace'];
   traceFile: string;
-  sessionRepository: ChatSessionRepository;
+  sessionService: ConversationSessionService;
   sessionId: string;
   runId: string;
   onEvent?: (event: AgentLoopEvent) => void;
@@ -37,7 +37,7 @@ export type TurnMemoryMaintenanceRuntimeInput = Pick<
 
 export type AppendTurnMemoryMaintenanceEventsArgs = Pick<
   ScheduleBackgroundTurnMemoryMaintenanceArgs,
-  'traceFile' | 'sessionRepository' | 'sessionId'
+  'traceFile' | 'sessionService' | 'sessionId'
 > & {
   events: AgentLoopResult['trace'];
 };

@@ -8,9 +8,9 @@
  * DTO projection.
  *
  * Current compromise:
- * the fake browser-integration shortcut still mutates file-backed session
- * storage directly through a dedicated helper. Keep that path isolated until
- * test fakes can be injected through the engine turn boundary.
+ * the fake browser-integration shortcut still bypasses the engine turn
+ * boundary, but it mutates state through the session service so persistence
+ * concurrency semantics stay consistent with real runs.
  */
 import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
@@ -161,7 +161,7 @@ export class ControlPlaneChatSessionsController {
     runService: this.runService,
   });
 
-  createSession(args: CreateControlPlaneChatSessionArgs): ChatSessionDetail {
+  async createSession(args: CreateControlPlaneChatSessionArgs): Promise<ChatSessionDetail> {
     const { suggestedName, ...engineInput } = args;
     const model = this.resolveSessionCreationModel(args);
     const engine = this.createEngine({
@@ -169,7 +169,7 @@ export class ControlPlaneChatSessionsController {
       model,
     });
 
-    const session = engine.sessions.create({
+    const session = await engine.sessions.create({
       name: suggestedName,
       model,
       workspaceId: args.workspaceId,
@@ -179,46 +179,46 @@ export class ControlPlaneChatSessionsController {
     return ControlPlaneChatSessionPresenter.projectDetail(session)[0] as ChatSessionDetail;
   }
 
-  updateSettings(args: UpdateControlPlaneChatSessionSettingsArgs): ChatSessionDetail {
+  async updateSettings(args: UpdateControlPlaneChatSessionSettingsArgs): Promise<ChatSessionDetail> {
     const { sessionId, settings, ...engineInput } = args;
-    const updated = this.createEngine(engineInput).sessions.updateSettings(sessionId, settings);
+    const updated = await this.createEngine(engineInput).sessions.updateSettings(sessionId, settings);
     return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
   }
 
-  renameSession(args: RenameControlPlaneChatSessionArgs): ChatSessionDetail {
+  async renameSession(args: RenameControlPlaneChatSessionArgs): Promise<ChatSessionDetail> {
     const { sessionId, name, ...engineInput } = args;
-    const updated = this.createEngine(engineInput).sessions.rename(sessionId, name);
+    const updated = await this.createEngine(engineInput).sessions.rename(sessionId, name);
     return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
   }
 
-  updatePinned(args: UpdatePinnedControlPlaneChatSessionArgs): ChatSessionDetail {
+  async updatePinned(args: UpdatePinnedControlPlaneChatSessionArgs): Promise<ChatSessionDetail> {
     const { sessionId, pinned, ...engineInput } = args;
-    const updated = this.createEngine(engineInput).sessions.setPinned(sessionId, pinned);
+    const updated = await this.createEngine(engineInput).sessions.setPinned(sessionId, pinned);
     return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
   }
 
-  updateArchived(args: UpdateArchivedControlPlaneChatSessionArgs): ChatSessionDetail {
+  async updateArchived(args: UpdateArchivedControlPlaneChatSessionArgs): Promise<ChatSessionDetail> {
     const { sessionId, archived, ...engineInput } = args;
-    const updated = this.createEngine(engineInput).sessions.setArchived(sessionId, archived);
+    const updated = await this.createEngine(engineInput).sessions.setArchived(sessionId, archived);
     return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
   }
 
-  deleteSession(args: DeleteControlPlaneChatSessionArgs): { deleted: boolean } {
+  async deleteSession(args: DeleteControlPlaneChatSessionArgs): Promise<{ deleted: boolean }> {
     this.assertNoActiveRun(args);
     const { sessionId, leaseOwner, ...engineInput } = args;
     const sessions = this.createEngine(engineInput).sessions;
-    this.assertNoLeaseConflict(sessions, sessionId, leaseOwner);
+    await this.assertNoLeaseConflict(sessions, sessionId, leaseOwner);
     return {
-      deleted: sessions.delete(sessionId),
+      deleted: await sessions.delete(sessionId),
     };
   }
 
-  resetSession(args: ResetControlPlaneChatSessionArgs): ChatSessionDetail {
+  async resetSession(args: ResetControlPlaneChatSessionArgs): Promise<ChatSessionDetail> {
     this.assertNoActiveRun(args);
     const { sessionId, leaseOwner, ...engineInput } = args;
     const sessions = this.createEngine(engineInput).sessions;
-    this.assertNoLeaseConflict(sessions, sessionId, leaseOwner);
-    const updated = sessions.resetConversation(sessionId);
+    await this.assertNoLeaseConflict(sessions, sessionId, leaseOwner);
+    const updated = await sessions.resetConversation(sessionId);
     return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
   }
 
@@ -228,8 +228,8 @@ export class ControlPlaneChatSessionsController {
       ...this.runStreams.createLifecycle(args, {
         onSettled: () => this.startNextQueuedPrompt(args),
       }),
-      onHeartbeat: () => {
-        this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
+      onHeartbeat: async () => {
+        await this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
       },
       execute: async (run) => {
         const { sessionId, force = true, leaseOwner, ...engineInput } = args;
@@ -238,8 +238,8 @@ export class ControlPlaneChatSessionsController {
         let previousCompactionState: Pick<ChatSession, 'context' | 'archives'> | undefined;
 
         try {
-          this.assertNoLeaseConflict(sessions, sessionId, leaseOwner);
-          const session = sessions.acquireLease(sessionId, leaseOwner);
+          await this.assertNoLeaseConflict(sessions, sessionId, leaseOwner);
+          const session = await sessions.acquireLease(sessionId, leaseOwner);
           leaseAcquired = true;
           const publisher = this.createRunEventPublisher(args, run);
           previousCompactionState = {
@@ -247,7 +247,7 @@ export class ControlPlaneChatSessionsController {
             archives: session.archives,
           };
 
-          sessions.markCompactionRunning(sessionId, { sourceHistory: session.history });
+          await sessions.markCompactionRunning(sessionId, { sourceHistory: session.history });
           const model = session.model ?? args.model ?? DEFAULT_OPENAI_MODEL;
           const compacted = await ConversationCompactionService.compact({
             history: session.history,
@@ -267,16 +267,16 @@ export class ControlPlaneChatSessionsController {
             },
             onStatusChange: publisher.publishActivity,
           });
-          const updated = sessions.applyCompactionResult(sessionId, compacted);
+          const updated = await sessions.applyCompactionResult(sessionId, compacted);
           return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
         } catch (error) {
           if (previousCompactionState) {
-            sessions.restoreCompactionState(sessionId, previousCompactionState);
+            await sessions.restoreCompactionState(sessionId, previousCompactionState);
           }
           throw error;
         } finally {
           if (leaseAcquired) {
-            sessions.releaseLease(sessionId, leaseOwner);
+            await sessions.releaseLease(sessionId, leaseOwner);
           }
         }
       },
@@ -291,17 +291,17 @@ export class ControlPlaneChatSessionsController {
     return await this.runService.startAndWait(this.buildSubmitPromptRun(this.prepareSubmitPromptArgs(args)));
   }
 
-  submitPromptAsync(args: SubmitChatPromptArgs): ControlPlaneAcceptedSessionRun {
+  async submitPromptAsync(args: SubmitChatPromptArgs): Promise<ControlPlaneAcceptedSessionRun> {
     const preparedArgs = this.prepareSubmitPromptArgs(args);
-    if (this.isRunning(preparedArgs) || this.hasQueuedPrompts(preparedArgs)) {
-      const queued = this.enqueuePrompt(preparedArgs);
+    if (this.isRunning(preparedArgs) || await this.hasQueuedPrompts(preparedArgs)) {
+      const queued = await this.enqueuePrompt(preparedArgs);
       if (!this.isRunning(preparedArgs)) {
-        this.startNextQueuedPrompt(preparedArgs);
+        await this.startNextQueuedPrompt(preparedArgs);
       }
       return queued;
     }
 
-    return this.startPromptRun(preparedArgs);
+    return await this.startPromptRun(preparedArgs);
   }
 
   submitDirectShellAsync(args: SubmitDirectShellArgs): ControlPlaneAcceptedSessionRun {
@@ -312,8 +312,8 @@ export class ControlPlaneChatSessionsController {
     return ConversationDirectShellService.preflight(command);
   }
 
-  updateQueuedPrompt(args: UpdateQueuedChatPromptArgs): ChatSessionDetail {
-    const updated = this.createEngine(args).sessions.updateQueuedPrompt(args.sessionId, {
+  async updateQueuedPrompt(args: UpdateQueuedChatPromptArgs): Promise<ChatSessionDetail> {
+    const updated = await this.createEngine(args).sessions.updateQueuedPrompt(args.sessionId, {
       queueItemId: args.queueItemId,
       prompt: args.prompt,
     });
@@ -321,8 +321,8 @@ export class ControlPlaneChatSessionsController {
     return ControlPlaneChatSessionPresenter.projectDetail(updated)[0] as ChatSessionDetail;
   }
 
-  deleteQueuedPrompt(args: DeleteQueuedChatPromptArgs): ChatSessionDetail {
-    const updated = this.createEngine(args).sessions.deleteQueuedPrompt(args.sessionId, {
+  async deleteQueuedPrompt(args: DeleteQueuedChatPromptArgs): Promise<ChatSessionDetail> {
+    const updated = await this.createEngine(args).sessions.deleteQueuedPrompt(args.sessionId, {
       queueItemId: args.queueItemId,
     });
     this.publishQueueUpdated(args, updated);
@@ -454,18 +454,18 @@ export class ControlPlaneChatSessionsController {
     return this.runService.resolvePendingApproval(sessionAddress, decision, runId);
   }
 
-  readViews(args: ControlPlaneSessionReadArgs): ChatSessionView[] {
-    return this.createEngine(args).sessions.list()
+  async readViews(args: ControlPlaneSessionReadArgs): Promise<ChatSessionView[]> {
+    return (await this.createEngine(args).sessions.list())
       .flatMap((session) => ControlPlaneChatSessionPresenter.projectView(session));
   }
 
-  readDetail(args: ControlPlaneSessionReadArgs, id: string): ChatSessionDetail | undefined {
-    const session = this.createEngine(args).sessions.read(id);
+  async readDetail(args: ControlPlaneSessionReadArgs, id: string): Promise<ChatSessionDetail | undefined> {
+    const session = await this.createEngine(args).sessions.read(id);
     return session ? ControlPlaneChatSessionPresenter.projectDetail(session)[0] : undefined;
   }
 
-  readTurnReview(args: ControlPlaneSessionReadArgs, sessionId: string, turnId: string): ChatTurnReview | undefined {
-    const session = this.readDetail(args, sessionId);
+  async readTurnReview(args: ControlPlaneSessionReadArgs, sessionId: string, turnId: string): Promise<ChatTurnReview | undefined> {
+    const session = await this.readDetail(args, sessionId);
     const turn = session?.turns.find((candidate) => candidate.id === turnId);
     if (!turn) {
       return undefined;
@@ -478,12 +478,12 @@ export class ControlPlaneChatSessionsController {
     return join(stateRoot, 'chat-sessions', `${sessionId}.json`);
   }
 
-  private startPromptRun(args: SubmitChatPromptArgs): ControlPlaneAcceptedSessionRun {
-    return this.runService.start(this.buildSubmitPromptRun(args));
+  private async startPromptRun(args: SubmitChatPromptArgs): Promise<ControlPlaneAcceptedSessionRun> {
+    return await this.runService.startAndWaitForAcceptance(this.buildSubmitPromptRun(args));
   }
 
-  private enqueuePrompt(args: SubmitChatPromptArgs): ControlPlaneAcceptedSessionRun {
-    const queued = this.createEngine(args).sessions.enqueuePrompt(args.sessionId, {
+  private async enqueuePrompt(args: SubmitChatPromptArgs): Promise<ControlPlaneAcceptedSessionRun> {
+    const queued = await this.createEngine(args).sessions.enqueuePrompt(args.sessionId, {
       prompt: args.prompt,
       agentProfileId: args.agentProfileId,
       agentSnapshot: args.agentSnapshot,
@@ -501,24 +501,24 @@ export class ControlPlaneChatSessionsController {
     };
   }
 
-  private hasQueuedPrompts(args: ControlPlaneSessionAddress & ControlPlaneSessionReadArgs): boolean {
-    return (this.createEngine(args).sessions.read(args.sessionId)?.queuedPrompts.length ?? 0) > 0;
+  private async hasQueuedPrompts(args: ControlPlaneSessionAddress & ControlPlaneSessionReadArgs): Promise<boolean> {
+    return ((await this.createEngine(args).sessions.read(args.sessionId))?.queuedPrompts.length ?? 0) > 0;
   }
 
-  private startNextQueuedPrompt(args: ContinueChatPromptArgs): void {
+  private async startNextQueuedPrompt(args: ContinueChatPromptArgs): Promise<void> {
     if (this.isRunning(args)) {
       return;
     }
 
     const sessions = this.createEngine(args).sessions;
-    const dequeued = sessions.dequeueQueuedPrompt(args.sessionId);
+    const dequeued = await sessions.dequeueQueuedPrompt(args.sessionId);
     if (!dequeued.item) {
       return;
     }
 
     this.publishQueueUpdated(args, dequeued.session);
     try {
-      this.startPromptRun(this.prepareSubmitPromptArgs({
+      await this.startPromptRun(this.prepareSubmitPromptArgs({
         ...args,
         prompt: dequeued.item.prompt,
         agentProfileId: dequeued.item.agentProfileId,
@@ -526,7 +526,7 @@ export class ControlPlaneChatSessionsController {
         systemContext: dequeued.item.systemContext,
       }));
     } catch (error) {
-      const restored = sessions.enqueuePrompt(args.sessionId, {
+      const restored = await sessions.enqueuePrompt(args.sessionId, {
         prompt: dequeued.item.prompt,
         agentProfileId: dequeued.item.agentProfileId,
         agentSnapshot: dequeued.item.agentSnapshot,
@@ -567,8 +567,8 @@ export class ControlPlaneChatSessionsController {
     return {
       address: this.runStreams.resolveAddress(args),
       ...this.runStreams.createLifecycle(args, {
-        onAccepted: (run) => {
-          this.createEngine(args).sessions.acceptUserMessage(args.sessionId, {
+        onAccepted: async (run) => {
+          await this.createEngine(args).sessions.acceptUserMessage(args.sessionId, {
             runId: run.runId,
             prompt: args.prompt,
             leaseOwner: args.leaseOwner,
@@ -576,8 +576,8 @@ export class ControlPlaneChatSessionsController {
         },
         onSettled: () => this.startNextQueuedPrompt(args),
       }),
-      onHeartbeat: () => {
-        this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
+      onHeartbeat: async () => {
+        await this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
       },
       execute: async (run: ConversationRunContext) => {
         const result = process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT === '1'
@@ -603,8 +603,8 @@ export class ControlPlaneChatSessionsController {
         });
         return result;
       },
-      onError: (error: unknown, run: ConversationRunContext) => {
-        this.persistRunFailureMessage(args, run, error);
+      onError: async (error: unknown, run: ConversationRunContext) => {
+        await this.persistRunFailureMessage(args, run, error);
       },
     };
   }
@@ -615,12 +615,12 @@ export class ControlPlaneChatSessionsController {
       ...this.runStreams.createLifecycle(args, {
         onSettled: () => this.startNextQueuedPrompt(args),
       }),
-      onHeartbeat: () => {
-        this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
+      onHeartbeat: async () => {
+        await this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
       },
       execute: async (run: ConversationRunContext) => {
         if (process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT === '1') {
-          const session = this.createEngine(args).sessions.require(args.sessionId);
+          const session = await this.createEngine(args).sessions.require(args.sessionId);
           if (!session.history.length || !session.lastContinuePrompt) {
             throw new Error('There is no interrupted or prior run to continue yet.');
           }
@@ -643,8 +643,8 @@ export class ControlPlaneChatSessionsController {
           });
         });
       },
-      onError: (error: unknown, run: ConversationRunContext) => {
-        this.persistRunFailureMessage(args, run, error);
+      onError: async (error: unknown, run: ConversationRunContext) => {
+        await this.persistRunFailureMessage(args, run, error);
       },
     };
   }
@@ -655,15 +655,15 @@ export class ControlPlaneChatSessionsController {
       ...this.runStreams.createLifecycle(args, {
         onSettled: () => this.startNextQueuedPrompt(args),
       }),
-      onHeartbeat: () => {
-        this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
+      onHeartbeat: async () => {
+        await this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
       },
       execute: async (run: ConversationRunContext) => {
         const publisher = this.createRunEventPublisher(args, run);
         const sessions = this.createEngine(args).sessions;
-        const session = sessions.require(args.sessionId);
-        this.assertNoLeaseConflict(sessions, args.sessionId, args.leaseOwner);
-        sessions.acquireLease(args.sessionId, args.leaseOwner);
+        const session = await sessions.require(args.sessionId);
+        await this.assertNoLeaseConflict(sessions, args.sessionId, args.leaseOwner);
+        await sessions.acquireLease(args.sessionId, args.leaseOwner);
 
         try {
           const result = await ConversationDirectShellService.execute({
@@ -695,15 +695,15 @@ export class ControlPlaneChatSessionsController {
           return {
             outcome: result.outcome,
             summary: result.summary,
-            session: ControlPlaneChatSessionPresenter.projectDetail(sessions.require(args.sessionId))[0] ?? null,
+            session: ControlPlaneChatSessionPresenter.projectDetail(await sessions.require(args.sessionId))[0] ?? null,
           };
         } finally {
-          sessions.releaseLease(args.sessionId, args.leaseOwner);
+          await sessions.releaseLease(args.sessionId, args.leaseOwner);
         }
       },
-      onError: (error: unknown) => {
+      onError: async (error: unknown) => {
         const message = error instanceof Error ? error.message : String(error);
-        this.createEngine(args).sessions.appendMessage(args.sessionId, {
+        await this.createEngine(args).sessions.appendMessage(args.sessionId, {
           id: `direct-shell-error-${Date.now()}`,
           role: 'assistant',
           text: `Direct shell execution failed:\n${message}`,
@@ -749,13 +749,13 @@ export class ControlPlaneChatSessionsController {
     };
   }
 
-  private persistRunFailureMessage(
+  private async persistRunFailureMessage(
     args: ContinueChatPromptArgs,
     run: ConversationRunContext,
     error: unknown,
-  ): void {
+  ): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
-    this.createEngine(args).sessions.markAcceptedUserMessageFailed(args.sessionId, {
+    await this.createEngine(args).sessions.markAcceptedUserMessageFailed(args.sessionId, {
       runId: run.runId,
       failureMessage: {
         id: `accepted-run-error-${run.runId}`,
@@ -938,12 +938,12 @@ export class ControlPlaneChatSessionsController {
     }
   }
 
-  private assertNoLeaseConflict(
+  private async assertNoLeaseConflict(
     sessions: ConversationEngine['sessions'],
     sessionId: string,
     leaseOwner: ChatSessionLeaseOwner,
-  ): void {
-    const conflict = sessions.getLeaseConflict(sessionId, leaseOwner);
+  ): Promise<void> {
+    const conflict = await sessions.getLeaseConflict(sessionId, leaseOwner);
     if (conflict) {
       throw new Error(conflict);
     }

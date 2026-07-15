@@ -66,7 +66,7 @@ export class ChatSessionImageUploadService {
   async resolveUploadDirectory(request: Request): Promise<string> {
     const sessionId = this.readSessionId(request);
     const workspace = this.resolveWorkspace(request);
-    this.requireSession(workspace, sessionId);
+    await this.requireSession(workspace, sessionId);
     const uploadDirectory = join(workspace.stateRoot, 'uploads', 'sessions', sessionId);
     await mkdir(uploadDirectory, { recursive: true });
     return uploadDirectory;
@@ -80,10 +80,10 @@ export class ChatSessionImageUploadService {
     return Boolean(this.resolveSupportedExtension(file));
   }
 
-  completeUploads(request: Request): ChatSessionImageUploadResult {
+  async completeUploads(request: Request): Promise<ChatSessionImageUploadResult> {
     const sessionId = this.readSessionId(request);
     const workspace = this.resolveWorkspace(request);
-    this.requireSession(workspace, sessionId);
+    await this.requireSession(workspace, sessionId);
 
     const files = this.readUploadedFiles(request.files);
     if (!files.length) {
@@ -109,8 +109,8 @@ export class ChatSessionImageUploadService {
     };
   }
 
-  private requireSession(workspace: WorkspaceDescriptor, sessionId: string): void {
-    const session = controlPlaneChatSessionsController.readDetail({
+  private async requireSession(workspace: WorkspaceDescriptor, sessionId: string): Promise<void> {
+    const session = await controlPlaneChatSessionsController.readDetail({
       workspaceRoot: workspace.workspaceRoot,
       stateRoot: workspace.stateRoot,
       sessionStoragePath: resolve(workspace.stateRoot, 'chat-sessions.catalog.json'),

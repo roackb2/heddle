@@ -13,12 +13,8 @@ import type { ConversationTurnRuntimeConfig } from '../runtime/index.js';
  * Builds the concrete runtime context needed before a persisted turn can run.
  */
 export class ConversationTurnContextBuilder {
-  static build(args: PrepareConversationTurnContextArgs): ConversationTurnContext {
-    const sessions = args.sessionRepository.list();
-    const session = sessions.find((candidate) => candidate.id === args.sessionId);
-    if (!session) {
-      throw new Error(`Chat session not found: ${args.sessionId}`);
-    }
+  static async build(args: PrepareConversationTurnContextArgs): Promise<ConversationTurnContext> {
+    const session = await args.sessionService.require(args.sessionId);
 
     const runtimeConfig: ConversationTurnRuntimeConfig = args;
     const baseRuntime = ConversationTurnRuntimeResolver.resolve({ config: runtimeConfig, session });
@@ -42,7 +38,6 @@ export class ConversationTurnContextBuilder {
     });
 
     return {
-      sessions,
       session,
       runtime,
       agentSnapshot: args.agentSnapshot,

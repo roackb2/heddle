@@ -60,7 +60,8 @@ split between Heddle and the host explicit for developers and coding agents.
      `ArtifactRepository` / `ChatSessionRepository` and pass them as
      `artifactRepository` / `sessionRepository` (see
      [Conversation engine → Bring your own artifact storage](conversation-engine.md#bring-your-own-artifact-storage)
-     and [→ Bring your own session storage](conversation-engine.md#bring-your-own-session-storage)).
+     and [Durable session storage](session-storage.md) for local JSON and
+     PostgreSQL adapter guidance).
      Traces and memory still persist under a local state root; making them
      injectable follows the same pattern.
 

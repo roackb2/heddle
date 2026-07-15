@@ -54,7 +54,7 @@ export type ConversationCompactionOptions = {
   request?: ConversationCompactionRequest;
   force?: boolean;
   summarizer?: ConversationCompactionSummarizerOptions;
-  onStatusChange?: (event: ConversationCompactionStatus) => void;
+  onStatusChange?: (event: ConversationCompactionStatus) => void | Promise<void>;
 };
 
 export type ConversationCompactionResult = {

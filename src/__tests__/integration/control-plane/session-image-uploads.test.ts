@@ -13,15 +13,13 @@ describe('control-plane session image uploads', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-session-image-upload-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const sessionId = 'session-images';
-    new FileChatSessionRepository({
+    await new FileChatSessionRepository({
       sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
-    }).save([
-      ChatSessionRecords.create({
+    }).create(ChatSessionRecords.create({
         id: sessionId,
         name: 'Image session',
         apiKeyPresent: true,
-      }),
-    ]);
+      }));
 
     const server = createHeddleServerApp({ workspaceRoot, stateRoot }).listen(0, '127.0.0.1');
     await onceListening(server);
@@ -62,15 +60,13 @@ describe('control-plane session image uploads', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-session-image-upload-reject-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const sessionId = 'session-images';
-    new FileChatSessionRepository({
+    await new FileChatSessionRepository({
       sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
-    }).save([
-      ChatSessionRecords.create({
+    }).create(ChatSessionRecords.create({
         id: sessionId,
         name: 'Image session',
         apiKeyPresent: true,
-      }),
-    ]);
+      }));
 
     const server = createHeddleServerApp({ workspaceRoot, stateRoot }).listen(0, '127.0.0.1');
     await onceListening(server);
@@ -111,16 +107,14 @@ describe('control-plane session image uploads', () => {
     }
 
     const sessionId = 'session-images';
-    new FileChatSessionRepository({
+    await new FileChatSessionRepository({
       sessionStoragePath: join(secondWorkspace.stateRoot, 'chat-sessions.catalog.json'),
-    }).save([
-      ChatSessionRecords.create({
+    }).create(ChatSessionRecords.create({
         id: sessionId,
         name: 'Image session',
         apiKeyPresent: true,
         workspaceId: secondWorkspace.id,
-      }),
-    ]);
+      }));
 
     const server = createHeddleServerApp({ workspaceRoot, stateRoot }).listen(0, '127.0.0.1');
     await onceListening(server);

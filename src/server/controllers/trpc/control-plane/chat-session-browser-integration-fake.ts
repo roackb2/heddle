@@ -1,4 +1,4 @@
-import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
+import { FileConversationSessionService } from '@/core/chat/engine/sessions/service.js';
 import { ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
 import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
@@ -7,6 +7,8 @@ import { ControlPlaneChatSessionPresenter } from './chat-session-presenter.js';
 
 type BrowserIntegrationFakePromptInput = {
   workspaceId: string;
+  workspaceRoot: string;
+  stateRoot: string;
   sessionId: string;
   sessionStoragePath: string;
   prompt: string;
@@ -27,10 +29,10 @@ export class ControlPlaneChatSessionBrowserIntegrationFake {
    */
   static async run(args: BrowserIntegrationFakePromptInput) {
     // Desired shape: fake browser integration should become an injectable engine test host.
-    // This remains the only control-plane session path that should mutate the
-    // file repository directly.
-    const repository = new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath });
-    const session = repository.read(args.sessionId);
+    // Until then it still uses the public session service, so fake execution
+    // exercises the same optimistic-concurrency boundary as real turns.
+    const sessions = new FileConversationSessionService(args);
+    const session = await sessions.read(args.sessionId);
     if (!session) {
       throw new Error(`Chat session not found: ${args.sessionId}`);
     }
@@ -60,24 +62,18 @@ export class ControlPlaneChatSessionBrowserIntegrationFake {
       } : undefined,
       agentSnapshot: args.agentSnapshot,
     };
-    const latestSession = repository.read(args.sessionId) ?? session;
-    const updatedSession: ChatSession = {
-      ...session,
+    const updatedSession = await sessions.update(args.sessionId, (current): ChatSession => ({
+      ...current,
       history: nextHistory,
       messages: ConversationLines.fromHistory(nextHistory),
-      turns: [...session.turns, nextTurn].slice(-8),
+      turns: [...current.turns, nextTurn].slice(-8),
       updatedAt: timestamp,
       lastContinuePrompt: args.prompt,
       lease: undefined,
-      queuedPrompts: latestSession.queuedPrompts,
-    };
-
-    repository.save(
-      repository.readCatalog()
-        .map((entry) => repository.read(entry.id))
-        .filter((candidate): candidate is ChatSession => Boolean(candidate))
-        .map((candidate) => candidate.id === session.id ? updatedSession : candidate),
-    );
+    }));
+    if (!updatedSession) {
+      throw new Error(`Chat session not found: ${args.sessionId}`);
+    }
 
     return {
       outcome: 'done',

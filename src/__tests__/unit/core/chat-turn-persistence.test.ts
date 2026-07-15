@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ConversationTurnArtifacts, ConversationTurnPersistenceService } from '../../../core/chat/engine/turns/persistence/index.js';
 import { ConversationCompactionService } from '../../../core/chat/engine/compaction/index.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
+import { FileConversationSessionService } from '../../../core/chat/engine/sessions/service.js';
+import { readStoredChatSession, seedChatSessionRepository } from '@/__tests__/helpers/chat-session-repository.js';
 import { TraceSummaryService } from '@/core/observability/index.js';
 import type { AgentLoopResult } from '@/core/runtime/loop/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
@@ -103,7 +105,9 @@ describe('chat turn persistence', () => {
     const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-turn-persistence-save-'));
     const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
     const session = createSession();
-    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
+    const repository = new FileChatSessionRepository({ sessionStoragePath });
+    await seedChatSessionRepository(repository, [session]);
+    const sessionService = createSessionService(stateRoot, sessionStoragePath, repository);
 
     const result: AgentLoopResult = {
       outcome: 'done',
@@ -155,17 +159,17 @@ describe('chat turn persistence', () => {
       result,
       prompt: 'Persist this turn.',
       session,
-      sessions: [session],
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionService,
       model: 'gpt-5.4',
       stateRoot,
       traceDir: join(stateRoot, 'traces'),
       toolNames: ['read_file'],
       historyForTokenEstimate: session.history,
       credentialSource: { type: 'explicit-api-key' },
+      host: {},
     });
 
-    const stored = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list()[0];
+    const stored = await readStoredChatSession(repository, session.id);
     expect(stored?.id).toBe(session.id);
     expect(stored?.lastContinuePrompt).toBe('Persist this turn.');
     expect(stored?.messages.map((message) => message.text)).toEqual(['Persist this turn.', 'Done.']);
@@ -179,7 +183,8 @@ describe('chat turn persistence', () => {
     const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
     const session = createSession();
     const agentSnapshot = askAgentSnapshot();
-    new FileChatSessionRepository({ sessionStoragePath }).save([session]);
+    const repository = new FileChatSessionRepository({ sessionStoragePath });
+    await seedChatSessionRepository(repository, [session]);
 
     const result: AgentLoopResult = {
       outcome: 'done',
@@ -198,8 +203,7 @@ describe('chat turn persistence', () => {
       result,
       prompt: 'Explain this repository.',
       session,
-      sessions: [session],
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionService: createSessionService(stateRoot, sessionStoragePath, repository),
       model: 'gpt-5.4',
       stateRoot,
       traceDir: join(stateRoot, 'traces'),
@@ -207,9 +211,10 @@ describe('chat turn persistence', () => {
       historyForTokenEstimate: session.history,
       credentialSource: { type: 'explicit-api-key' },
       agentSnapshot,
+      host: {},
     });
 
-    const stored = new FileChatSessionRepository({ sessionStoragePath }).list()[0];
+    const stored = await readStoredChatSession(repository, session.id);
     expect(stored?.turns[0]?.agent).toEqual({
       id: 'builtin:ask',
       name: 'Ask',
@@ -234,7 +239,8 @@ describe('chat turn persistence', () => {
         },
       ],
     };
-    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
+    const repository = new FileChatSessionRepository({ sessionStoragePath });
+    await seedChatSessionRepository(repository, [session]);
 
     const result: AgentLoopResult = {
       outcome: 'done',
@@ -253,17 +259,17 @@ describe('chat turn persistence', () => {
       result,
       prompt: 'Persist this accepted prompt.',
       session,
-      sessions: [session],
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionService: createSessionService(stateRoot, sessionStoragePath, repository),
       model: 'gpt-5.4',
       stateRoot,
       traceDir: join(stateRoot, 'traces'),
       toolNames: [],
       historyForTokenEstimate: session.history,
       credentialSource: { type: 'explicit-api-key' },
+      host: {},
     });
 
-    const stored = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list()[0];
+    const stored = await readStoredChatSession(repository, session.id);
     expect(stored?.messages).toEqual([
       expect.objectContaining({
         role: 'user',
@@ -277,6 +283,20 @@ describe('chat turn persistence', () => {
     expect(stored?.messages[0]).not.toHaveProperty('isPending');
   });
 });
+
+function createSessionService(
+  stateRoot: string,
+  sessionStoragePath: string,
+  sessionRepository: FileChatSessionRepository,
+): FileConversationSessionService {
+  return new FileConversationSessionService({
+    workspaceRoot: stateRoot,
+    stateRoot,
+    sessionStoragePath,
+    sessionRepository,
+    model: 'gpt-5.4',
+  });
+}
 
 function createSession(): ChatSession {
   return {

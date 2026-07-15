@@ -52,7 +52,7 @@ export type ConversationRunErrorProjector = (
 
 export type StartConversationRunInput<Address extends { sessionId: string }, Result> = {
   address: Address;
-  onAccepted?: (run: ConversationRunContext) => void;
+  onAccepted?: (run: ConversationRunContext) => void | Promise<void>;
   onHeartbeat?: (run: ConversationRunContext) => void | Promise<void>;
   execute: (run: ConversationRunContext) => Promise<Result>;
   onError?: (error: unknown, run: ConversationRunContext) => void | Promise<void>;

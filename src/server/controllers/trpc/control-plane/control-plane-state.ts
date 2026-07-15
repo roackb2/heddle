@@ -41,7 +41,7 @@ export class ControlPlaneStateController {
       workspaces: context.workspaces,
       knownWorkspaces: ControlPlaneStateController.readKnownWorkspaces(context),
       runtimeHost: context.runtimeHost,
-      sessions: controlPlaneChatSessionsController.readViews({
+      sessions: await controlPlaneChatSessionsController.readViews({
         workspaceRoot,
         stateRoot,
         sessionStoragePath: resolve(stateRoot, 'chat-sessions.catalog.json'),

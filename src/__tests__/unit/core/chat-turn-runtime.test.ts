@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProviderCredentialRepository } from '../../../core/auth/index.js';
 import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
+import { FileConversationSessionService } from '../../../core/chat/engine/sessions/service.js';
 import { ConversationTurnPreflightService } from '../../../core/chat/engine/turns/preflight/index.js';
 import { ConversationTurnContextBuilder } from '../../../core/chat/engine/turns/context/index.js';
 import { ConversationTurnRuntimeResolver } from '../../../core/chat/engine/turns/runtime/index.js';
@@ -12,13 +13,14 @@ import { DEFAULT_OPENAI_MODEL } from '../../../core/config.js';
 import type { CustomAgentExecutionSnapshot } from '../../../core/custom-agents/index.js';
 import { BROWSER_AUTOMATION_SKILL_NAME, FileAgentSkillActivationRepository } from '../../../core/skills/index.js';
 import type { ToolDefinition } from '../../../core/types.js';
+import { readStoredChatSession, seedChatSessionRepository } from '@/__tests__/helpers/chat-session-repository.js';
 
 describe('chat turn preparation modules', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('loads the requested session or preserves the existing missing-session error', () => {
+  it('loads the requested session or preserves the existing missing-session error', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-session-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
     const session = ChatSessionRecords.create({
@@ -27,22 +29,28 @@ describe('chat turn preparation modules', () => {
       apiKeyPresent: true,
       model: 'gpt-5.4',
     });
-    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
+    const repository = new FileChatSessionRepository({ sessionStoragePath });
+    await seedChatSessionRepository(repository, [session]);
+    const sessionService = createSessionService(root, sessionStoragePath);
 
-    expect(ConversationTurnContextBuilder.build({
+    expect((await ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionService,
       sessionId: 'session-1',
       apiKey: 'explicit-key',
-    }).session.id).toBe('session-1');
-    expect(() => ConversationTurnContextBuilder.build({
+      artifactRoot: join(root, '.heddle', 'artifacts'),
+      artifactsEnabled: true,
+    })).session.id).toBe('session-1');
+    await expect(ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionService,
       sessionId: 'missing',
       apiKey: 'explicit-key',
-    })).toThrow('Chat session not found: missing');
+      artifactRoot: join(root, '.heddle', 'artifacts'),
+      artifactsEnabled: true,
+    })).rejects.toThrow('Chat session not found: missing');
   });
 
   it('resolves chat turn model precedence without changing defaults', () => {
@@ -116,7 +124,7 @@ describe('chat turn preparation modules', () => {
     expect(runtime.systemContext).not.toContain('## Artifact Domain');
   });
 
-  it('carries stored session reasoning effort into the turn runtime', () => {
+  it('carries stored session reasoning effort into the turn runtime', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-reasoning-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
     const session = ChatSessionRecords.create({
@@ -126,14 +134,16 @@ describe('chat turn preparation modules', () => {
       model: 'gpt-5.5',
       reasoningEffort: 'medium',
     });
-    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
+    await seedChatSessionRepository(new FileChatSessionRepository({ sessionStoragePath }), [session]);
 
-    const context = ConversationTurnContextBuilder.build({
+    const context = await ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionService: createSessionService(root, sessionStoragePath),
       sessionId: 'session-1',
       apiKey: 'explicit-key',
+      artifactRoot: join(root, '.heddle', 'artifacts'),
+      artifactsEnabled: true,
     });
 
     expect(context.runtime.reasoningEffort).toBe('medium');
@@ -219,7 +229,7 @@ describe('chat turn preparation modules', () => {
     });
   });
 
-  it('prepares ordinary turn context with runtime, tool bundle, and default lease owner', () => {
+  it('prepares ordinary turn context with runtime, tool bundle, and default lease owner', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-context-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
     const session = ChatSessionRecords.create({
@@ -228,14 +238,16 @@ describe('chat turn preparation modules', () => {
       apiKeyPresent: true,
       model: 'gpt-5.4',
     });
-    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
+    await seedChatSessionRepository(new FileChatSessionRepository({ sessionStoragePath }), [session]);
 
-    const context = ConversationTurnContextBuilder.build({
+    const context = await ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionService: createSessionService(root, sessionStoragePath),
       sessionId: 'session-1',
       apiKey: 'explicit-key',
+      artifactRoot: join(root, '.heddle', 'artifacts'),
+      artifactsEnabled: true,
     });
 
     expect(context.session.id).toBe('session-1');
@@ -271,7 +283,7 @@ describe('chat turn preparation modules', () => {
     });
   });
 
-  it('prepares custom-agent turns with appended instructions and scoped tool bundles', () => {
+  it('prepares custom-agent turns with appended instructions and scoped tool bundles', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-custom-agent-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
     const session = ChatSessionRecords.create({
@@ -280,15 +292,17 @@ describe('chat turn preparation modules', () => {
       apiKeyPresent: true,
       model: 'gpt-5.4',
     });
-    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
+    await seedChatSessionRepository(new FileChatSessionRepository({ sessionStoragePath }), [session]);
 
-    const context = ConversationTurnContextBuilder.build({
+    const context = await ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionService: createSessionService(root, sessionStoragePath),
       sessionId: 'session-1',
       apiKey: 'explicit-key',
       agentSnapshot: askAgentSnapshot(),
+      artifactRoot: join(root, '.heddle', 'artifacts'),
+      artifactsEnabled: true,
     });
 
     expect(context.agentSnapshot?.agentProfileId).toBe('builtin:ask');
@@ -317,7 +331,7 @@ describe('chat turn preparation modules', () => {
     ]));
   });
 
-  it('applies the host tool profile when no custom agent is selected', () => {
+  it('applies the host tool profile when no custom agent is selected', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-host-profile-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
     const session = ChatSessionRecords.create({
@@ -326,14 +340,16 @@ describe('chat turn preparation modules', () => {
       apiKeyPresent: true,
       model: 'gpt-5.4',
     });
-    new FileChatSessionRepository({ sessionStoragePath }).save([session]);
+    await seedChatSessionRepository(new FileChatSessionRepository({ sessionStoragePath }), [session]);
 
-    const context = ConversationTurnContextBuilder.build({
+    const context = await ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionService: createSessionService(root, sessionStoragePath),
       sessionId: 'session-1',
       apiKey: 'explicit-key',
+      artifactRoot: join(root, '.heddle', 'artifacts'),
+      artifactsEnabled: true,
       toolProfile: {
         preset: 'default',
         memoryMode: 'none',
@@ -350,7 +366,7 @@ describe('chat turn preparation modules', () => {
     ]));
   });
 
-  it('lets a selected custom agent override the host tool profile', () => {
+  it('lets a selected custom agent override the host tool profile', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-agent-profile-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
     const session = ChatSessionRecords.create({
@@ -359,14 +375,16 @@ describe('chat turn preparation modules', () => {
       apiKeyPresent: true,
       model: 'gpt-5.4',
     });
-    new FileChatSessionRepository({ sessionStoragePath }).save([session]);
+    await seedChatSessionRepository(new FileChatSessionRepository({ sessionStoragePath }), [session]);
 
-    const context = ConversationTurnContextBuilder.build({
+    const context = await ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionService: createSessionService(root, sessionStoragePath),
       sessionId: 'session-1',
       apiKey: 'explicit-key',
+      artifactRoot: join(root, '.heddle', 'artifacts'),
+      artifactsEnabled: true,
       toolProfile: { preset: 'none' },
       agentSnapshot: askAgentSnapshot(),
     });
@@ -378,7 +396,7 @@ describe('chat turn preparation modules', () => {
     ]));
   });
 
-  it('adds host-provided tools to prepared turn context', () => {
+  it('adds host-provided tools to prepared turn context', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-host-tools-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
     const session = ChatSessionRecords.create({
@@ -387,15 +405,17 @@ describe('chat turn preparation modules', () => {
       apiKeyPresent: true,
       model: 'gpt-5.4',
     });
-    new FileChatSessionRepository({ sessionStoragePath }).save([session]);
+    await seedChatSessionRepository(new FileChatSessionRepository({ sessionStoragePath }), [session]);
 
-    const context = ConversationTurnContextBuilder.build({
+    const context = await ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionService: createSessionService(root, sessionStoragePath),
       sessionId: 'session-1',
       apiKey: 'explicit-key',
       tools: [tool('host_create_document')],
+      artifactRoot: join(root, '.heddle', 'artifacts'),
+      artifactsEnabled: true,
     });
 
     expect(context.toolNames).toEqual(expect.arrayContaining([
@@ -404,7 +424,7 @@ describe('chat turn preparation modules', () => {
     ]));
   });
 
-  it('adds browser tools to future turns when Browser Automation is enabled', () => {
+  it('adds browser tools to future turns when Browser Automation is enabled', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-browser-automation-'));
     const stateRoot = join(root, '.heddle');
     const sessionStoragePath = join(stateRoot, 'chat-sessions.catalog.json');
@@ -414,7 +434,7 @@ describe('chat turn preparation modules', () => {
       apiKeyPresent: true,
       model: 'gpt-5.4',
     });
-    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
+    await seedChatSessionRepository(new FileChatSessionRepository({ sessionStoragePath }), [session]);
     new FileAgentSkillActivationRepository({ stateRoot }).write({
       version: 1,
       skills: {
@@ -429,12 +449,14 @@ describe('chat turn preparation modules', () => {
       },
     });
 
-    const context = ConversationTurnContextBuilder.build({
+    const context = await ConversationTurnContextBuilder.build({
       workspaceRoot: root,
       stateRoot,
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionService: createSessionService(root, sessionStoragePath),
       sessionId: 'session-1',
       apiKey: 'explicit-key',
+      artifactRoot: join(stateRoot, 'artifacts'),
+      artifactsEnabled: true,
     });
 
     expect(context.toolNames).toEqual(expect.arrayContaining([
@@ -447,7 +469,7 @@ describe('chat turn preparation modules', () => {
     ]));
   });
 
-  it('persists the preflight compaction-running context for the leased session', () => {
+  it('persists the preflight compaction-running context for the leased session', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-preflight-seed-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
     const session = ChatSessionRecords.create({
@@ -470,23 +492,24 @@ describe('chat turn preparation modules', () => {
         lastSeenAt: '2026-05-03T00:00:00.000Z',
       },
     };
-    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([leasedSession]);
+    const repository = new FileChatSessionRepository({ sessionStoragePath });
+    await seedChatSessionRepository(repository, [leasedSession]);
+    const sessionService = createSessionService(root, sessionStoragePath);
 
-    ConversationTurnPreflightService.persistRunningSeed({
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
-      sessions: [leasedSession],
+    await ConversationTurnPreflightService.persistRunningSeed({
+      sessionService,
       sessionId: 'session-1',
       leasedSession,
       archivePath: '.heddle/chat-sessions/session-1/archives/archive-1.jsonl',
     });
 
-    const nextSession = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list()[0];
+    const nextSession = await readStoredChatSession(repository, 'session-1');
     expect(nextSession?.context?.compaction?.status).toBe('running');
     expect(nextSession?.context?.archive?.lastArchivePath).toBe('.heddle/chat-sessions/session-1/archives/archive-1.jsonl');
     expect(nextSession?.lease).toEqual(leasedSession.lease);
   });
 
-  it('persists prepared preflight session state before the run loop starts', () => {
+  it('persists prepared preflight session state before the run loop starts', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-preflight-persist-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
     const session = ChatSessionRecords.create({
@@ -495,11 +518,11 @@ describe('chat turn preparation modules', () => {
       apiKeyPresent: true,
       model: 'gpt-5.4',
     });
-    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
+    const repository = new FileChatSessionRepository({ sessionStoragePath });
+    await seedChatSessionRepository(repository, [session]);
 
-    const preparedSession = ConversationTurnPreflightService.persistPrepared({
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
-      sessions: [session],
+    const preparedSession = await ConversationTurnPreflightService.persistPrepared({
+      sessionService: createSessionService(root, sessionStoragePath),
       session,
       compacted: {
         history: [
@@ -516,14 +539,14 @@ describe('chat turn preparation modules', () => {
       },
     });
 
-    const persisted = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list()[0];
+    const persisted = await readStoredChatSession(repository, 'session-1');
     expect(preparedSession.session.history).toHaveLength(2);
     expect(persisted?.history).toEqual(preparedSession.session.history);
     expect(persisted?.messages.map((message) => message.text)).toEqual(['Earlier prompt', 'Earlier answer']);
     expect(persisted?.context?.estimatedHistoryTokens).toBe(42);
   });
 
-  it('preserves accepted visible user messages through preflight persistence', () => {
+  it('preserves accepted visible user messages through preflight persistence', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-preflight-accepted-user-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
     const session = ChatSessionRecords.markAcceptedUserMessage(ChatSessionRecords.create({
@@ -535,11 +558,11 @@ describe('chat turn preparation modules', () => {
       runId: 'run-1',
       prompt: 'New prompt still running',
     });
-    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([session]);
+    const repository = new FileChatSessionRepository({ sessionStoragePath });
+    await seedChatSessionRepository(repository, [session]);
 
-    ConversationTurnPreflightService.persistPrepared({
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
-      sessions: [session],
+    await ConversationTurnPreflightService.persistPrepared({
+      sessionService: createSessionService(root, sessionStoragePath),
       session,
       compacted: {
         history: [
@@ -555,7 +578,7 @@ describe('chat turn preparation modules', () => {
       },
     });
 
-    const persisted = new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list()[0];
+    const persisted = await readStoredChatSession(repository, 'session-1');
     expect(persisted?.messages).toEqual([
       expect.objectContaining({ role: 'user', text: 'Earlier prompt' }),
       expect.objectContaining({ role: 'assistant', text: 'Earlier answer' }),
@@ -568,7 +591,7 @@ describe('chat turn preparation modules', () => {
     ]);
   });
 
-  it('preserves an accepted prompt even when the same text already exists in history', () => {
+  it('preserves an accepted prompt even when the same text already exists in history', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-preflight-repeated-prompt-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
     const session = ChatSessionRecords.markAcceptedUserMessage(ChatSessionRecords.create({
@@ -580,11 +603,11 @@ describe('chat turn preparation modules', () => {
       runId: 'run-1',
       prompt: 'Repeat this prompt',
     });
-    new FileChatSessionRepository({ sessionStoragePath }).save([session]);
+    const repository = new FileChatSessionRepository({ sessionStoragePath });
+    await seedChatSessionRepository(repository, [session]);
 
-    ConversationTurnPreflightService.persistPrepared({
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
-      sessions: [session],
+    await ConversationTurnPreflightService.persistPrepared({
+      sessionService: createSessionService(root, sessionStoragePath),
       session,
       compacted: {
         history: [
@@ -600,7 +623,7 @@ describe('chat turn preparation modules', () => {
       },
     });
 
-    const persisted = new FileChatSessionRepository({ sessionStoragePath }).list()[0];
+    const persisted = await readStoredChatSession(repository, 'session-1');
     expect(persisted?.messages).toEqual([
       expect.objectContaining({ role: 'user', text: 'Repeat this prompt' }),
       expect.objectContaining({ role: 'assistant', text: 'Earlier answer' }),
@@ -613,6 +636,15 @@ describe('chat turn preparation modules', () => {
     ]);
   });
 });
+
+function createSessionService(root: string, sessionStoragePath: string): FileConversationSessionService {
+  return new FileConversationSessionService({
+    workspaceRoot: root,
+    stateRoot: join(root, '.heddle'),
+    sessionStoragePath,
+    model: 'gpt-5.4',
+  });
+}
 
 function askAgentSnapshot(): CustomAgentExecutionSnapshot {
   return {

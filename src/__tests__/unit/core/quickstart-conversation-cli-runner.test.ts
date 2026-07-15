@@ -140,7 +140,7 @@ describe('runQuickstartConversationCli', () => {
       stateRoot,
       workspaceRoot,
     });
-    const session = engine.sessions.create({ name: 'Existing SDK chat' });
+    const session = await engine.sessions.create({ name: 'Existing SDK chat' });
     const input = new PassThrough();
     const output = new CaptureOutput();
 

@@ -20,10 +20,8 @@ import { ConversationTurnPreflightService } from './preflight/index.js';
 import { ConversationTurnMemoryMaintenance } from './memory/index.js';
 import type { TurnMemoryMaintenanceRuntimeInput } from './memory/index.js';
 import { ConversationTurnPersistenceService } from './persistence/index.js';
-import { ChatSessionLeases, type ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
-import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
+import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
-import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { PrepareConversationTurnContextArgs } from './context/index.js';
 import type { ChatTurnHostPort } from './host/index.js';
 import type {
@@ -60,7 +58,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
   }
 
   async continue(input: ContinueConversationTurnInput): Promise<SubmitConversationTurnResult> {
-    const session = this.sessions.require(input.sessionId);
+    const session = await this.sessions.require(input.sessionId);
     if (!input.prompt && (!session.history.length || !session.lastContinuePrompt)) {
       throw new Error('There is no interrupted or prior run to continue yet.');
     }
@@ -71,12 +69,12 @@ export class EngineConversationTurnService implements ConversationTurnService {
     });
   }
 
-  clearLease(input: ClearConversationTurnLeaseInput): void {
-    if (!this.sessions.read(input.sessionId)?.lease) {
+  async clearLease(input: ClearConversationTurnLeaseInput): Promise<void> {
+    if (!(await this.sessions.read(input.sessionId))?.lease) {
       return;
     }
 
-    this.sessions.releaseLease(input.sessionId, input.owner);
+    await this.sessions.releaseLease(input.sessionId, input.owner);
   }
 
   static async run(args: RunConversationTurnArgs): Promise<RunConversationTurnResult> {
@@ -84,9 +82,15 @@ export class EngineConversationTurnService implements ConversationTurnService {
     // receives this instance instead of re-deriving storage from paths.
     const sessionRepository = args.sessionRepository
       ?? new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath });
-    const contextInput: PrepareConversationTurnContextArgs = { ...args, sessionRepository };
-    const context = ConversationTurnContextBuilder.build(contextInput);
-    const { sessions, session, runtime, tools, toolNames, leaseOwner, agentSnapshot } = context;
+    const sessionService = new FileConversationSessionService({
+      workspaceRoot: args.workspaceRoot,
+      stateRoot: args.stateRoot,
+      sessionStoragePath: args.sessionStoragePath,
+      sessionRepository,
+    });
+    const contextInput: PrepareConversationTurnContextArgs = { ...args, sessionService };
+    const context = await ConversationTurnContextBuilder.build(contextInput);
+    const { session, runtime, tools, toolNames, leaseOwner, agentSnapshot } = context;
     const host = EngineConversationTurnService.turnHost(args);
     const source = `chat session ${session.id}`;
     const preflightInput: TurnPreflightInput = args;
@@ -102,7 +106,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
     try {
       const preflight = await ConversationTurnPreflightService.prepare({
         ...preflightInput,
-        sessionRepository,
+        sessionService,
         sessionId: session.id,
         fallbackHistory: session.history,
         model: runtime.model,
@@ -110,7 +114,6 @@ export class EngineConversationTurnService implements ConversationTurnService {
         toolNames,
         summarizer: { credentialSource: runtime.providerCredentialSource },
         leaseOwner,
-        sessions,
         host,
       });
       if (!preflight.ok) {
@@ -153,10 +156,9 @@ export class EngineConversationTurnService implements ConversationTurnService {
 
       const persisted = await ConversationTurnPersistenceService.persistCompleted({
         ...persistenceInput,
-        sessionRepository,
+        sessionService,
         result: resultForPersistence,
         session: preflight.session ?? session,
-        sessions,
         model: runtime.model,
         systemContext: runtime.systemContext,
         toolNames,
@@ -171,7 +173,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
           ...memoryRuntime,
           trace: result.trace,
           traceFile: persisted.traceFile,
-          sessionRepository,
+          sessionService,
           sessionId: session.id,
           runId: result.state?.runId ?? `session-${session.id}`,
         });
@@ -192,25 +194,21 @@ export class EngineConversationTurnService implements ConversationTurnService {
         toolResults: EngineConversationTurnService.summarizeToolResults(resultForPersistence.trace),
       };
     } finally {
-      EngineConversationTurnService.clearLeaseFromStorage(sessionRepository, session.id, leaseOwner);
+      await EngineConversationTurnService.clearLeaseFromStorage(sessionService, session.id, leaseOwner);
     }
   }
 
-  static clearLeaseFromStorage(repository: ChatSessionRepository, sessionId: string, owner: ChatSessionLeaseOwner): void {
-    const sessions = repository.list();
-    const session = sessions.find((candidate) => candidate.id === sessionId);
+  static async clearLeaseFromStorage(
+    sessions: ConversationSessionService,
+    sessionId: string,
+    owner: ChatSessionLeaseOwner,
+  ): Promise<void> {
+    const session = await sessions.read(sessionId);
     if (!session?.lease) {
       return;
     }
 
-    const released = ChatSessionLeases.release(session, owner);
-    if (released === session) {
-      return;
-    }
-
-    repository.save(sessions.map((candidate) => (
-      candidate.id === sessionId ? ChatSessionRecords.touch(released) : candidate
-    )));
+    await sessions.releaseLease(sessionId, owner);
   }
 
   private static hostInput(

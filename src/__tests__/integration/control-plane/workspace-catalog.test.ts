@@ -207,14 +207,14 @@ describe('workspace catalog', () => {
       throw new Error('expected both workspaces');
     }
 
-    createConversationEngine({
+    await createConversationEngine({
       workspaceRoot: activeWorkspace.workspaceRoot,
       stateRoot: activeWorkspace.stateRoot,
       model: 'gpt-5.4',
       workspaceId: activeWorkspace.id,
       apiKeyPresent: true,
     }).sessions.create({ id: 'session-1', name: 'Default workspace session' });
-    createConversationEngine({
+    await createConversationEngine({
       workspaceRoot: secondWorkspace.workspaceRoot,
       stateRoot: secondWorkspace.stateRoot,
       model: 'gpt-5.4',

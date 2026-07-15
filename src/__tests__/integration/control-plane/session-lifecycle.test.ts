@@ -119,13 +119,13 @@ describe('control-plane session lifecycle API', () => {
     const { caller, activeWorkspace, secondaryWorkspace, createEngineForWorkspace } = createControlPlaneCaller();
     const defaultEngine = createEngineForWorkspace(activeWorkspace.id);
     const secondaryEngine = createEngineForWorkspace(secondaryWorkspace.id);
-    defaultEngine.sessions.create({
+    await defaultEngine.sessions.create({
       id: 'same-session-id',
       name: 'Default workspace session',
       apiKeyPresent: true,
       workspaceId: activeWorkspace.id,
     });
-    secondaryEngine.sessions.create({
+    await secondaryEngine.sessions.create({
       id: 'same-session-id',
       name: 'Secondary workspace session',
       apiKeyPresent: true,
@@ -163,18 +163,18 @@ describe('control-plane session lifecycle API', () => {
 
   it('resets session transcript state through the API', async () => {
     const { caller, engine, activeWorkspace } = createControlPlaneCaller();
-    const session = engine.sessions.create({
+    const session = await engine.sessions.create({
       id: 'session-reset-api',
       name: 'Reset API session',
       apiKeyPresent: true,
       workspaceId: activeWorkspace.id,
     });
-    engine.sessions.appendMessage(session.id, {
+    await engine.sessions.appendMessage(session.id, {
       id: 'local-user-message',
       role: 'user',
       text: 'old visible message',
     });
-    engine.sessions.setLastContinuePrompt(session.id, 'continue old work');
+    await engine.sessions.setLastContinuePrompt(session.id, 'continue old work');
 
     const reset = await caller.sessionReset({ id: session.id });
 
@@ -189,7 +189,7 @@ describe('control-plane session lifecycle API', () => {
 
   it('runs direct shell through the control-plane session API', async () => {
     const { caller, engine, activeWorkspace } = createControlPlaneCaller();
-    const session = engine.sessions.create({
+    const session = await engine.sessions.create({
       id: 'direct-shell-api',
       name: 'Direct shell API session',
       apiKeyPresent: true,
@@ -223,7 +223,7 @@ describe('control-plane session lifecycle API', () => {
 
   it('preflights direct shell risk before interfaces ask for confirmation', async () => {
     const { caller, engine, activeWorkspace } = createControlPlaneCaller();
-    const session = engine.sessions.create({
+    const session = await engine.sessions.create({
       id: 'direct-shell-preflight-api',
       name: 'Direct shell preflight API session',
       apiKeyPresent: true,
@@ -251,13 +251,13 @@ describe('control-plane session lifecycle API', () => {
 
   it('blocks destructive lifecycle mutations while another client owns the session lease', async () => {
     const { caller, engine, activeWorkspace } = createControlPlaneCaller();
-    const session = engine.sessions.create({
+    const session = await engine.sessions.create({
       id: 'leased-session-api',
       name: 'Leased API session',
       apiKeyPresent: true,
       workspaceId: activeWorkspace.id,
     });
-    engine.sessions.acquireLease(session.id, EXTERNAL_TUI_LEASE_OWNER);
+    await engine.sessions.acquireLease(session.id, EXTERNAL_TUI_LEASE_OWNER);
 
     await expect(caller.sessionDelete({ id: session.id })).rejects.toThrow('already active');
     await expect(caller.sessionReset({ id: session.id })).rejects.toThrow('already active');
@@ -271,18 +271,18 @@ describe('control-plane session lifecycle API', () => {
       activeRun: null,
       pendingApproval: null,
     });
-    expect(engine.sessions.require(session.id).messages.map((message) => message.text)).not.toContain('should not be accepted');
+    expect((await engine.sessions.require(session.id)).messages.map((message) => message.text)).not.toContain('should not be accepted');
   });
 
   it('compacts a session through the API without requiring clients to call compaction services', async () => {
     const { caller, engine, activeWorkspace } = createControlPlaneCaller();
-    const session = engine.sessions.create({
+    const session = await engine.sessions.create({
       id: 'session-compact-api',
       name: 'Compact API session',
       apiKeyPresent: true,
       workspaceId: activeWorkspace.id,
     });
-    engine.sessions.update(session.id, (current) => ({
+    await engine.sessions.update(session.id, (current) => ({
       ...current,
       history: [
         { role: 'user', content: 'summarize this small transcript' },
@@ -304,7 +304,7 @@ describe('control-plane session lifecycle API', () => {
 
   it('restores prior compaction state when manual compaction fails', async () => {
     const { caller, engine, activeWorkspace } = createControlPlaneCaller();
-    const session = engine.sessions.create({
+    const session = await engine.sessions.create({
       id: 'session-compact-failure-api',
       name: 'Compact failure API session',
       apiKeyPresent: true,
@@ -322,7 +322,7 @@ describe('control-plane session lifecycle API', () => {
       messageCount: 2,
       createdAt: '2026-05-26T00:00:00.000Z',
     }];
-    engine.sessions.update(session.id, (current) => ({
+    await engine.sessions.update(session.id, (current) => ({
       ...current,
       history: [{ role: 'user', content: 'please compact then fail' }],
       context: priorContext,
@@ -331,8 +331,8 @@ describe('control-plane session lifecycle API', () => {
     vi.spyOn(ConversationCompactionService, 'compact').mockRejectedValueOnce(new Error('forced compaction failure'));
 
     await expect(caller.sessionCompact({ id: session.id, force: true })).rejects.toThrow('forced compaction failure');
-    expect(engine.sessions.require(session.id).context).toEqual(priorContext);
-    expect(engine.sessions.require(session.id).archives).toEqual(priorArchives);
+    expect((await engine.sessions.require(session.id)).context).toEqual(priorContext);
+    expect((await engine.sessions.require(session.id)).archives).toEqual(priorArchives);
   });
 
   it('returns combined run state for a session', async () => {
@@ -582,8 +582,8 @@ description: Research web pages through a browser.
   });
 
   it('accepts async prompt submits before the final session result is ready', async () => {
-    vi.useFakeTimers();
     vi.stubEnv('HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT', '1');
+    vi.stubEnv('HEDDLE_BROWSER_INTEGRATION_FAKE_STREAM_PREVIEW_MS', '100');
     try {
       const { caller, activeWorkspace } = createControlPlaneCaller();
       const session = await caller.sessionCreate({ name: 'Async submit session' });
@@ -646,11 +646,17 @@ description: Research web pages through a browser.
         ],
       });
 
-      await vi.advanceTimersByTimeAsync(800);
-      await Promise.resolve();
-
-      await vi.advanceTimersByTimeAsync(1600);
-      await Promise.resolve();
+      await vi.waitFor(async () => {
+        await expect(caller.session({ id: session.id })).resolves.toMatchObject({
+          messages: [
+            expect.objectContaining({ text: 'Explain async submit' }),
+            expect.objectContaining({ text: 'Mocked browser integration agent response: Explain async submit' }),
+            expect.objectContaining({ text: 'Second prompt' }),
+            expect.objectContaining({ text: 'Mocked browser integration agent response: Second prompt' }),
+          ],
+          queuedPrompts: [],
+        });
+      });
 
       await expect(caller.sessionRunState({ id: session.id })).resolves.toEqual({
         running: false,
@@ -694,8 +700,8 @@ description: Research web pages through a browser.
   });
 
   it('updates and deletes queued prompts through the control-plane API', async () => {
-    vi.useFakeTimers();
     vi.stubEnv('HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT', '1');
+    vi.stubEnv('HEDDLE_BROWSER_INTEGRATION_FAKE_STREAM_PREVIEW_MS', '200');
     try {
       const { caller } = createControlPlaneCaller();
       const session = await caller.sessionCreate({ name: 'Queued edit session' });
@@ -728,13 +734,13 @@ description: Research web pages through a browser.
         queuedPrompts: [],
       });
 
-      await vi.advanceTimersByTimeAsync(2400);
-      await Promise.resolve();
-      const completed = await caller.session({ id: session.id });
-      expect(completed?.messages.map((message) => message.text)).toEqual([
-        'First prompt',
-        'Mocked browser integration agent response: First prompt',
-      ]);
+      await vi.waitFor(async () => {
+        const completed = await caller.session({ id: session.id });
+        expect(completed?.messages.map((message) => message.text)).toEqual([
+          'First prompt',
+          'Mocked browser integration agent response: First prompt',
+        ]);
+      });
     } finally {
       vi.useRealTimers();
     }
@@ -754,10 +760,10 @@ description: Research web pages through a browser.
       sessionId: session.id,
     });
 
-    await flushPromises();
-
-    await expect(caller.sessionRunState({ id: session.id })).resolves.toMatchObject({
-      running: false,
+    await vi.waitFor(async () => {
+      await expect(caller.sessionRunState({ id: session.id })).resolves.toMatchObject({
+        running: false,
+      });
     });
     const failedSession = await caller.session({ id: session.id });
     expect(failedSession?.messages).toEqual(expect.arrayContaining([
@@ -775,12 +781,6 @@ description: Research web pages through a browser.
     ]));
   });
 });
-
-async function flushPromises(): Promise<void> {
-  await new Promise((resolve) => {
-    setTimeout(resolve, 0);
-  });
-}
 
 async function collectRunEvents(
   events: AsyncIterable<ControlPlaneSessionRunEventEnvelope>,

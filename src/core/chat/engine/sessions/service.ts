@@ -8,17 +8,23 @@
  * - session semantics should grow here rather than leaking back into TUI/web
  *   host code.
  *
- * Current compromise:
- * this service currently uses the file-backed repository directly. That is the
- * intended direction for session persistence ownership, but some older host
- * flows still bypass the service and call the repository themselves. Those
- * flows should move inward to this service over time.
+ * The service owns session behavior and optimistic-concurrency coordination.
+ * Repository adapters own atomic record persistence and pagination.
  */
 import { randomUUID } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import dayjs from 'dayjs';
-import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
-import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/types.js';
+import {
+  ChatSessionAlreadyExistsError,
+  ChatSessionRevisionConflictError,
+  FileChatSessionRepository,
+} from '@/core/chat/engine/sessions/repository/index.js';
+import type {
+  ChatSessionCatalogEntry,
+  ChatSessionCatalogPage,
+  ChatSessionRepository,
+  ListChatSessionsInput,
+} from '@/core/chat/engine/sessions/repository/types.js';
 import { ChatSessionLeases, type ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import { ChatSessionRecords, ChatSessionTitles, ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
@@ -49,6 +55,9 @@ import type {
 } from './types.js';
 
 export class FileConversationSessionService implements ConversationSessionService {
+  private static readonly defaultCatalogPageSize = 50;
+  private static readonly maximumCatalogPageSize = 200;
+  private static readonly maximumOptimisticUpdateRetries = 4;
   private readonly repository: ChatSessionRepository;
   private readonly config: NormalizedConversationSessionServiceConfig;
 
@@ -61,45 +70,55 @@ export class FileConversationSessionService implements ConversationSessionServic
     return ChatSessionRecords.summarize(session);
   }
 
-  list(): ChatSession[] {
-    return FileConversationSessionService.activeSessions(this.loadSessions());
+  async list(): Promise<ChatSession[]> {
+    await this.ensureFallbackSession();
+    return await this.listExisting();
   }
 
-  listExisting(): ChatSession[] {
-    return FileConversationSessionService.activeSessions(this.loadExistingSessions());
+  async listCatalog(input: Partial<ListChatSessionsInput> = {}): Promise<ChatSessionCatalogPage> {
+    await this.ensureFallbackSession();
+    return await this.repository.list({
+      cursor: input.cursor,
+      limit: input.limit ?? FileConversationSessionService.defaultCatalogPageSize,
+      workspaceId: input.workspaceId,
+      archived: input.archived ?? false,
+    });
   }
 
-  readExisting(id: string): ChatSession | undefined {
-    const entry = this.repository.readCatalog().find((candidate) => candidate.id === id);
-    if (!entry || entry.archivedAt) {
-      return undefined;
-    }
-
-    return this.repository.read(id);
+  async listExisting(): Promise<ChatSession[]> {
+    const entries = await this.loadCatalogEntries({ archived: false });
+    const records = await Promise.all(entries.map((entry) => this.repository.read(entry.id)));
+    return records.flatMap((record) => record ? [record.session] : []);
   }
 
-  read(id: string): ChatSession | undefined {
-    return this.readSession(id);
+  async readExisting(id: string): Promise<ChatSession | undefined> {
+    const record = await this.repository.read(id);
+    return record?.session.archivedAt ? undefined : record?.session;
   }
 
-  require(id: string): ChatSession {
-    const session = this.readSession(id);
+  async read(id: string): Promise<ChatSession | undefined> {
+    await this.ensureFallbackSession();
+    return (await this.repository.read(id))?.session;
+  }
+
+  async require(id: string): Promise<ChatSession> {
+    const session = await this.read(id);
     if (!session) {
       throw new Error(`Chat session not found: ${id}`);
     }
     return session;
   }
 
-  latest(): ChatSession | undefined {
-    return this.list()[0];
+  async latest(): Promise<ChatSession | undefined> {
+    return (await this.list())[0];
   }
 
-  latestExisting(): ChatSession | undefined {
-    return this.listExisting()[0];
+  async latestExisting(): Promise<ChatSession | undefined> {
+    return (await this.listExisting())[0];
   }
 
-  create(input?: CreateConversationSessionInput): ChatSession {
-    const existing = this.loadExistingSessions();
+  async create(input?: CreateConversationSessionInput): Promise<ChatSession> {
+    const existing = await this.loadCatalogEntries();
     const session = ChatSessionRecords.create({
       id: input?.id?.trim() || `session-${randomUUID()}`,
       name: input?.name?.trim() || `Session ${FileConversationSessionService.getNextSessionNumber(existing)}`,
@@ -108,62 +127,79 @@ export class FileConversationSessionService implements ConversationSessionServic
       workspaceId: input?.workspaceId ?? this.config.workspaceId,
       retention: input?.retention,
     });
-    this.repository.save([session, ...existing]);
-    return session;
+    return (await this.repository.create(session)).session;
   }
 
-  createOneOff(input?: CreateConversationSessionInput): ChatSession {
-    return this.create({
+  async createOneOff(input?: CreateConversationSessionInput): Promise<ChatSession> {
+    return await this.create({
       ...input,
       name: input?.name?.trim() || `Ask ${new Date().toISOString()}`,
       retention: 'one_off',
     });
   }
 
-  update(id: string, updater: (session: ChatSession) => ChatSession): ChatSession | undefined {
-    const sessions = this.loadSessions();
-    const session = sessions.find((candidate) => candidate.id === id);
-    if (!session) {
-      return undefined;
+  async update(
+    id: string,
+    updater: (session: ChatSession) => ChatSession,
+  ): Promise<ChatSession | undefined> {
+    let conflictCount = 0;
+
+    while (true) {
+      const record = await this.repository.read(id);
+      if (!record) {
+        return undefined;
+      }
+
+      const nextSession = updater(record.session);
+      if (nextSession === record.session) {
+        return record.session;
+      }
+
+      try {
+        const touched = ChatSessionRecords.touch(nextSession);
+        return (await this.repository.update({
+          session: touched,
+          expectedRevision: record.revision,
+        }))?.session;
+      } catch (error) {
+        if (
+          !(error instanceof ChatSessionRevisionConflictError)
+          || conflictCount >= FileConversationSessionService.maximumOptimisticUpdateRetries
+        ) {
+          throw error;
+        }
+        conflictCount += 1;
+      }
     }
-
-    const nextSession = updater(session);
-    if (nextSession === session) {
-      return session;
-    }
-
-    const touched = ChatSessionRecords.touch(nextSession);
-    this.repository.save(sessions.map((candidate) => (candidate.id === id ? touched : candidate)));
-    return touched;
   }
 
-  updateSettings(id: string, input: UpdateConversationSessionSettingsInput): ChatSession {
-    return this.updateRequiredSession(id, (session) => FileConversationSessionService.applySettings(session, input));
+  async updateSettings(id: string, input: UpdateConversationSessionSettingsInput): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => FileConversationSessionService.applySettings(session, input));
   }
 
-  appendMessage(id: string, input: AppendConversationMessageInput): ChatSession {
-    return this.appendMessages(id, [input]);
+  async appendMessage(id: string, input: AppendConversationMessageInput): Promise<ChatSession> {
+    return await this.appendMessages(id, [input]);
   }
 
-  appendMessages(id: string, inputs: AppendConversationMessageInput[]): ChatSession {
+  async appendMessages(id: string, inputs: AppendConversationMessageInput[]): Promise<ChatSession> {
     if (inputs.length === 0) {
-      return this.require(id);
+      return await this.require(id);
     }
 
-    return this.updateRequiredSession(id, (session) => ({
+    return await this.updateRequiredSession(id, (session) => ({
       ...session,
       messages: [...session.messages, ...inputs],
     }));
   }
 
-  markAcceptedUserMessage(id: string, input: MarkAcceptedConversationUserMessageInput): ChatSession {
-    return this.updateRequiredSession(id, (session) => (
+  async markAcceptedUserMessage(id: string, input: MarkAcceptedConversationUserMessageInput): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => (
       ChatSessionRecords.markAcceptedUserMessage(session, input)
     ));
   }
 
-  acceptUserMessage(id: string, input: AcceptConversationUserMessageInput): ChatSession {
-    return this.updateRequiredSession(id, (session) => {
+  async acceptUserMessage(id: string, input: AcceptConversationUserMessageInput): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => {
       const conflict = ChatSessionLeases.conflict(session, input.leaseOwner);
       if (conflict) {
         throw new Error(conflict);
@@ -176,13 +212,13 @@ export class FileConversationSessionService implements ConversationSessionServic
     });
   }
 
-  markAcceptedUserMessageFailed(id: string, input: MarkAcceptedConversationUserMessageFailedInput): ChatSession {
-    return this.updateRequiredSession(id, (session) => (
+  async markAcceptedUserMessageFailed(id: string, input: MarkAcceptedConversationUserMessageFailedInput): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => (
       ChatSessionRecords.markAcceptedUserMessageFailed(session, input)
     ));
   }
 
-  enqueuePrompt(id: string, input: EnqueueConversationPromptInput): QueuedConversationPromptResult {
+  async enqueuePrompt(id: string, input: EnqueueConversationPromptInput): Promise<QueuedConversationPromptResult> {
     const prompt = input.prompt.trim();
     if (!prompt) {
       throw new Error('Queued prompt cannot be empty.');
@@ -198,7 +234,7 @@ export class FileConversationSessionService implements ConversationSessionServic
       createdAt: now,
       updatedAt: now,
     };
-    const session = this.updateRequiredSession(id, (current) => ({
+    const session = await this.updateRequiredSession(id, (current) => ({
       ...current,
       queuedPrompts: [...current.queuedPrompts, item],
     }));
@@ -210,13 +246,13 @@ export class FileConversationSessionService implements ConversationSessionServic
     };
   }
 
-  updateQueuedPrompt(id: string, input: UpdateQueuedConversationPromptInput): ChatSession {
+  async updateQueuedPrompt(id: string, input: UpdateQueuedConversationPromptInput): Promise<ChatSession> {
     const prompt = input.prompt.trim();
     if (!prompt) {
       throw new Error('Queued prompt cannot be empty.');
     }
 
-    return this.updateRequiredSession(id, (session) => {
+    return await this.updateRequiredSession(id, (session) => {
       if (!session.queuedPrompts.some((item) => item.id === input.queueItemId)) {
         throw new Error(`Queued prompt not found: ${input.queueItemId}`);
       }
@@ -232,8 +268,8 @@ export class FileConversationSessionService implements ConversationSessionServic
     });
   }
 
-  deleteQueuedPrompt(id: string, input: DeleteQueuedConversationPromptInput): ChatSession {
-    return this.updateRequiredSession(id, (session) => {
+  async deleteQueuedPrompt(id: string, input: DeleteQueuedConversationPromptInput): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => {
       if (!session.queuedPrompts.some((item) => item.id === input.queueItemId)) {
         return session;
       }
@@ -245,9 +281,9 @@ export class FileConversationSessionService implements ConversationSessionServic
     });
   }
 
-  dequeueQueuedPrompt(id: string): DequeuedConversationPromptResult {
+  async dequeueQueuedPrompt(id: string): Promise<DequeuedConversationPromptResult> {
     let item: DequeuedConversationPromptResult['item'];
-    const session = this.updateRequiredSession(id, (current) => {
+    const session = await this.updateRequiredSession(id, (current) => {
       if (current.queuedPrompts.length === 0) {
         return current;
       }
@@ -265,8 +301,8 @@ export class FileConversationSessionService implements ConversationSessionServic
     };
   }
 
-  resetConversation(id: string): ChatSession {
-    return this.updateRequiredSession(id, (session) => ({
+  async resetConversation(id: string): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => ({
       ...session,
       history: [],
       turns: [],
@@ -276,8 +312,8 @@ export class FileConversationSessionService implements ConversationSessionServic
     }));
   }
 
-  setLastContinuePrompt(id: string, prompt: string | undefined): ChatSession {
-    return this.updateRequiredSession(id, (session) => (
+  async setLastContinuePrompt(id: string, prompt: string | undefined): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => (
       session.lastContinuePrompt === prompt ? session : {
         ...session,
         lastContinuePrompt: prompt,
@@ -285,8 +321,8 @@ export class FileConversationSessionService implements ConversationSessionServic
     ));
   }
 
-  markCompactionRunning(id: string, input: MarkConversationCompactionRunningInput): ChatSession {
-    return this.updateRequiredSession(id, (session) => ({
+  async markCompactionRunning(id: string, input: MarkConversationCompactionRunningInput): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => ({
       ...session,
       history: input.sourceHistory,
       context: ConversationCompactionService.buildSessionRunningContext({
@@ -297,8 +333,8 @@ export class FileConversationSessionService implements ConversationSessionServic
     }));
   }
 
-  applyCompactionResult(id: string, input: ApplyConversationCompactionResultInput): ChatSession {
-    return this.updateRequiredSession(id, (session) => ({
+  async applyCompactionResult(id: string, input: ApplyConversationCompactionResultInput): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => ({
       ...session,
       history: input.history,
       context: input.context,
@@ -307,23 +343,23 @@ export class FileConversationSessionService implements ConversationSessionServic
     }));
   }
 
-  restoreCompactionState(id: string, input: RestoreConversationCompactionStateInput): ChatSession {
-    return this.updateRequiredSession(id, (session) => ({
+  async restoreCompactionState(id: string, input: RestoreConversationCompactionStateInput): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => ({
       ...session,
       ...input,
     }));
   }
 
-  setDriftEnabled(id: string, enabled: boolean): ChatSession {
-    return this.updateRequiredSession(id, (session) => FileConversationSessionService.applySettings(session, { driftEnabled: enabled }));
+  async setDriftEnabled(id: string, enabled: boolean): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => FileConversationSessionService.applySettings(session, { driftEnabled: enabled }));
   }
 
-  getLeaseConflict(id: string, owner: ChatSessionLeaseOwner): string | undefined {
-    return ChatSessionLeases.conflict(this.require(id), owner);
+  async getLeaseConflict(id: string, owner: ChatSessionLeaseOwner): Promise<string | undefined> {
+    return ChatSessionLeases.conflict(await this.require(id), owner);
   }
 
-  acquireLease(id: string, owner: ChatSessionLeaseOwner): ChatSession {
-    return this.updateRequiredSession(id, (session) => {
+  async acquireLease(id: string, owner: ChatSessionLeaseOwner): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => {
       const conflict = ChatSessionLeases.conflict(session, owner);
       if (conflict) {
         throw new Error(conflict);
@@ -333,23 +369,23 @@ export class FileConversationSessionService implements ConversationSessionServic
     });
   }
 
-  refreshLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): ChatSession {
-    return this.updateRequiredSession(id, (session) => ChatSessionLeases.refresh(session, owner));
+  async refreshLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => ChatSessionLeases.refresh(session, owner));
   }
 
-  releaseLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): ChatSession {
-    return this.updateRequiredSession(id, (session) => ChatSessionLeases.release(session, owner));
+  async releaseLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => ChatSessionLeases.release(session, owner));
   }
 
-  rename(id: string, name: string): ChatSession {
-    return this.updateRequiredSession(id, (session) => ({
+  async rename(id: string, name: string): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => ({
       ...session,
       name,
     }));
   }
 
-  setPinned(id: string, pinned: boolean): ChatSession {
-    return this.updateRequiredSession(id, (session) => (
+  async setPinned(id: string, pinned: boolean): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => (
       session.pinned === pinned ? session : {
         ...session,
         pinned,
@@ -357,8 +393,8 @@ export class FileConversationSessionService implements ConversationSessionServic
     ));
   }
 
-  setArchived(id: string, archived: boolean): ChatSession {
-    return this.updateRequiredSession(id, (session) => {
+  async setArchived(id: string, archived: boolean): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => {
       if (archived) {
         return session.archivedAt ? session : {
           ...session,
@@ -377,7 +413,7 @@ export class FileConversationSessionService implements ConversationSessionServic
     id: string,
     input: AutoRenameConversationSessionInput,
   ): Promise<AutoRenameConversationSessionResult> {
-    const session = this.read(id);
+    const session = await this.read(id);
     if (!session || !ChatSessionRecords.canAutoRenameAfterFirstUserMessage(session)) {
       return { renamed: false, session };
     }
@@ -387,68 +423,78 @@ export class FileConversationSessionService implements ConversationSessionServic
       return { renamed: false, session };
     }
 
-    const latest = this.require(id);
+    const latest = await this.require(id);
     if (!ChatSessionRecords.canAutoRenameAfterFirstUserMessage(latest)) {
       return { renamed: false, session: latest };
     }
 
     return {
       renamed: true,
-      session: this.rename(id, title),
+      session: await this.rename(id, title),
     };
   }
 
-  delete(id: string): boolean {
-    const sessions = this.loadSessions();
-    if (!sessions.some((candidate) => candidate.id === id)) {
+  async delete(id: string): Promise<boolean> {
+    const record = await this.repository.read(id);
+    if (!record) {
       return false;
     }
 
-    const remaining = sessions.filter((candidate) => candidate.id !== id);
-    if (remaining.length > 0) {
-      this.repository.save(remaining);
-      return true;
+    const deleted = await this.repository.delete({
+      sessionId: id,
+      expectedRevision: record.revision,
+    });
+    if (deleted) {
+      await this.ensureFallbackSession();
     }
-
-    this.repository.save([this.createFallbackSession()]);
-    return true;
+    return deleted;
   }
 
-  private loadSessions(): ChatSession[] {
-    const sessions = this.repository.list();
-    if (this.repository.readCatalog().length === 0) {
-      const fallback = this.createFallbackSession();
-      this.repository.save([fallback]);
-      return [fallback];
-    }
-    return sessions;
-  }
-
-  private static activeSessions(sessions: ChatSession[]): ChatSession[] {
-    return sessions.filter((session) => !session.archivedAt);
-  }
-
-  private loadExistingSessions(): ChatSession[] {
-    const catalog = this.repository.readCatalog();
-    if (catalog.length > 0) {
-      return catalog
-        .map((entry) => this.repository.read(entry.id))
-        .filter((session): session is ChatSession => Boolean(session));
-    }
-
-    return [];
-  }
-
-  private readSession(id: string): ChatSession | undefined {
-    return this.loadSessions().find((candidate) => candidate.id === id);
-  }
-
-  private updateRequiredSession(id: string, updater: (session: ChatSession) => ChatSession): ChatSession {
-    const updated = this.update(id, updater);
+  private async updateRequiredSession(
+    id: string,
+    updater: (session: ChatSession) => ChatSession,
+  ): Promise<ChatSession> {
+    const updated = await this.update(id, updater);
     if (!updated) {
       throw new Error(`Chat session not found: ${id}`);
     }
     return updated;
+  }
+
+  private async ensureFallbackSession(): Promise<void> {
+    const page = await this.repository.list({
+      limit: 1,
+    });
+    if (page.items.length > 0) {
+      return;
+    }
+
+    try {
+      await this.repository.create(this.createFallbackSession());
+    } catch (error) {
+      if (!(error instanceof ChatSessionAlreadyExistsError)) {
+        throw error;
+      }
+    }
+  }
+
+  private async loadCatalogEntries(
+    filters: Pick<ListChatSessionsInput, 'archived' | 'workspaceId'> = {},
+  ): Promise<ChatSessionCatalogEntry[]> {
+    const entries: ChatSessionCatalogEntry[] = [];
+    let cursor: string | undefined;
+
+    do {
+      const page = await this.repository.list({
+        ...filters,
+        cursor,
+        limit: FileConversationSessionService.maximumCatalogPageSize,
+      });
+      entries.push(...page.items);
+      cursor = page.nextCursor;
+    } while (cursor);
+
+    return entries;
   }
 
   private createFallbackSession(): ChatSession {
@@ -507,7 +553,7 @@ export class FileConversationSessionService implements ConversationSessionServic
     };
   }
 
-  private static getNextSessionNumber(sessions: ChatSession[]): number {
+  private static getNextSessionNumber(sessions: Pick<ChatSession, 'name'>[]): number {
     const highestGenericNumber = sessions.reduce((highest, session) => {
       if (!ChatSessionRecords.isGenericName(session.name)) {
         return highest;

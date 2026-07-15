@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AskCliV2CommandEdgeService } from '@/cli-v2/commands/ask-command.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
+import { listStoredChatSessions } from '@/__tests__/helpers/chat-session-repository.js';
 import type { ResolvedRuntimeHost } from '@/core/runtime/daemon/index.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
 import { createHeddleServerApp } from '@/server/app.js';
@@ -53,9 +54,9 @@ describe('AskCliV2CommandEdgeService integration', () => {
       await closeServer(server);
     }
 
-    const sessions = new FileChatSessionRepository({
+    const sessions = await listStoredChatSessions(new FileChatSessionRepository({
       sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
-    }).list();
+    }));
     expect(sessions).toHaveLength(1);
     expect(sessions[0]).toMatchObject({
       retention: 'one_off',

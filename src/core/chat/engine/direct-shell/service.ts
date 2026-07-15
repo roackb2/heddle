@@ -87,14 +87,14 @@ export class ConversationDirectShellService {
       return ConversationDirectShellService.createPreflightStopResult(preflight, 'confirmation_required');
     }
 
-    const session = input.sessions.require(input.sessionId);
+    const session = await input.sessions.require(input.sessionId);
     const shellDisplay = `!${command}`;
-    input.sessions.appendMessage(input.sessionId, {
+    await input.sessions.appendMessage(input.sessionId, {
       id: `direct-shell-user-${input.runId}`,
       role: 'user',
       text: shellDisplay,
     });
-    input.sessions.setLastContinuePrompt(input.sessionId, undefined);
+    await input.sessions.setLastContinuePrompt(input.sessionId, undefined);
 
     const chosenCall = ConversationDirectShellService.createCall(input.runId, preflight.tool ?? 'run_shell_inspect', command);
     const options = chosenCall.tool === 'run_shell_inspect' ? {
@@ -145,7 +145,7 @@ export class ConversationDirectShellService {
       onStatusChange: input.onCompactionStatus,
     });
 
-    input.sessions.applyCompactionResult(input.sessionId, compacted);
+    await input.sessions.applyCompactionResult(input.sessionId, compacted);
     input.onActivity?.(ConversationDirectShellService.createCompletedActivity(input, chosenCall, chosenResult, chosenDurationMs));
 
     return {

@@ -1,11 +1,8 @@
-import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
-import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { ConversationTurnArtifacts } from './turn-artifacts.js';
 import type {
   PersistCompletedChatTurnBase,
   PersistChatTurnResult,
   PersistCompletedChatTurnArgs,
-  PersistFinalCompactionRunningContextArgs,
   PersistFinalCompactionRunningSeedArgs,
 } from './types.js';
 
@@ -19,10 +16,10 @@ export class ConversationTurnPersistenceService {
       ...artifactInput,
       summarizer: { credentialSource: args.credentialSource },
       createTurnId: () => `server-turn-${Date.now()}`,
-      onCompactionStatus: (event) => {
+      onCompactionStatus: async (event) => {
         args.host.onCompactionStatus?.(event, 'final');
         if (event.status === 'running') {
-          ConversationTurnPersistenceService.persistFinalCompactionRunningSeed({
+          await ConversationTurnPersistenceService.persistFinalCompactionRunningSeed({
             ...args,
             archivePath: event.archivePath,
           });
@@ -30,41 +27,26 @@ export class ConversationTurnPersistenceService {
       },
     });
 
-    const repository = args.sessionRepository;
-    const latestSessions = repository.list();
-    const latestSession = latestSessions.find((candidate) => candidate.id === args.session.id);
-    const session = latestSession
-      ? {
+    const session = await args.sessionService.update(args.session.id, (latestSession) => ({
         ...persisted.session,
         queuedPrompts: latestSession.queuedPrompts,
-      }
-      : persisted.session;
-    repository.save(latestSessions.map((candidate) => (candidate.id === args.session.id ? session : candidate)));
+      }));
+    if (!session) {
+      throw new Error(`Chat session not found: ${args.session.id}`);
+    }
     return {
       ...persisted,
       session,
     };
   }
 
-  static persistFinalCompactionRunningSeed(args: PersistFinalCompactionRunningSeedArgs) {
+  static async persistFinalCompactionRunningSeed(
+    args: PersistFinalCompactionRunningSeedArgs,
+  ): Promise<void> {
     const sourceHistory = args.result.transcript;
-    const compactionSeed = ChatSessionRecords.touch({
-      ...args.session,
-      history: sourceHistory,
-      context: ConversationTurnPersistenceService.buildRunningCompactionContext({
-        ...args,
-        sourceHistory,
-      }),
-    });
-    args.sessionRepository
-      .save(args.sessions.map((candidate) => (candidate.id === args.session.id ? compactionSeed : candidate)));
-  }
-
-  private static buildRunningCompactionContext(args: PersistFinalCompactionRunningContextArgs) {
-    return ConversationCompactionService.buildSessionRunningContext({
-      session: args.session,
-      history: args.sourceHistory,
-      lastArchivePath: args.archivePath,
+    await args.sessionService.markCompactionRunning(args.session.id, {
+      sourceHistory,
+      archivePath: args.archivePath,
     });
   }
 }

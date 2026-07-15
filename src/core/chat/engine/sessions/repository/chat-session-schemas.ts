@@ -217,6 +217,12 @@ const QueuedConversationPromptsSchema = z.array(z.unknown())
 
 export const CatalogEntryReadSchema = z.object({
   id: z.string().describe('Stable session identifier used by all host surfaces.'),
+  revision: z.number()
+    .int()
+    .positive()
+    .describe('Monotonic revision used for optimistic concurrency.')
+    .optional()
+    .catch(1),
   name: z.string().describe('Human-facing session title shown in session lists.'),
   retention: ChatSessionRetentionSchema
     .describe('Whether the session is reusable or intended as a one-off ask session.')
@@ -267,6 +273,7 @@ export const CatalogEntryReadSchema = z.object({
 });
 
 export const CatalogEntryWriteSchema = CatalogEntryReadSchema.required({
+  revision: true,
   createdAt: true,
   updatedAt: true,
 });
