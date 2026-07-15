@@ -19,7 +19,7 @@ export type ControlPlaneSessionAddress = {
 };
 
 type ControlPlaneRunLifecycleCallbacks = {
-  onAccepted?: (run: ConversationRunContext) => void;
+  onAccepted?: (run: ConversationRunContext) => void | Promise<void>;
   onSettled?: (run: ConversationRunContext) => void | Promise<void>;
 };
 
@@ -87,11 +87,11 @@ export class ControlPlaneChatSessionRunStreamController {
     let terminalObserver: Promise<void> | undefined;
 
     return {
-      onAccepted: (run: ConversationRunContext) => {
-        callbacks.onAccepted?.(run);
+      onAccepted: async (run: ConversationRunContext) => {
         publisher.publishRunUpdated(this.projectRunReference(run), 'started');
         terminalObserver = this.publishWorkspaceRunTerminal(sessionAddress, run.runId, publisher);
         void terminalObserver.catch(() => undefined);
+        await callbacks.onAccepted?.(run);
       },
       onSettled: async (run: ConversationRunContext) => {
         try {

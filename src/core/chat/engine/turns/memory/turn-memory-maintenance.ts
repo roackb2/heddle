@@ -3,7 +3,6 @@ import type { AgentLoopResult } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '@/core/types.js';
 import { MemoryMaintenanceIntegrationService } from '@/core/memory/maintenance-integration.js';
 import { TraceSummaryService } from '@/core/observability/index.js';
-import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import type {
   AppendTurnMemoryMaintenanceEventsArgs,
   RunMemoryMaintenanceCoreArgs,
@@ -72,36 +71,27 @@ export class ConversationTurnMemoryMaintenance {
       return;
     }
 
-    ConversationTurnMemoryMaintenance.appendEvents({
+    await ConversationTurnMemoryMaintenance.appendEvents({
       ...args,
       events: maintenance.events,
     });
   }
 
-  static appendEvents(args: AppendTurnMemoryMaintenanceEventsArgs) {
+  static async appendEvents(args: AppendTurnMemoryMaintenanceEventsArgs): Promise<void> {
     const nextTrace = [...ConversationTurnMemoryMaintenance.readTraceEvents(args.traceFile), ...args.events];
     writeFileSync(args.traceFile, `${JSON.stringify(nextTrace, null, 2)}\n`, 'utf8');
 
-    const repository = args.sessionRepository;
-    const sessions = repository.list();
-    const nextSessions = sessions.map((session) => {
-      if (session.id !== args.sessionId) {
-        return session;
-      }
-
-      return ChatSessionRecords.touch({
-        ...session,
-        turns: session.turns.map((turn, index) =>
-          index === session.turns.length - 1
-            ? {
-                ...turn,
-                events: TraceSummaryService.default().summarizeTrace(nextTrace),
-              }
-            : turn,
-        ),
-      });
-    });
-    repository.save(nextSessions);
+    await args.sessionService.update(args.sessionId, (session) => ({
+      ...session,
+      turns: session.turns.map((turn, index) =>
+        index === session.turns.length - 1
+          ? {
+              ...turn,
+              events: TraceSummaryService.default().summarizeTrace(nextTrace),
+            }
+          : turn,
+      ),
+    }));
   }
 
   static appendAgentLoopTrace(result: AgentLoopResult, events: TraceEvent[]): AgentLoopResult {

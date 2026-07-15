@@ -86,11 +86,11 @@ export const controlPlaneRouter = router({
   state: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
     return await ControlPlaneStateController.load(ctx, ctx.requestWorkspace.workspace);
   }),
-  sessions: controlPlaneWorkspaceProcedure.input(sessionsInputSchema).query(({ ctx }) => {
+  sessions: controlPlaneWorkspaceProcedure.input(sessionsInputSchema).query(async ({ ctx }) => {
     const requestWorkspace = ctx.requestWorkspace;
     return {
       workspaceId: requestWorkspace.workspace.id,
-      sessions: controlPlaneChatSessionsController.readViews(requestWorkspace.sessionEngineArgs),
+      sessions: await controlPlaneChatSessionsController.readViews(requestWorkspace.sessionEngineArgs),
     };
   }),
   sessionsEvents: controlPlaneWorkspaceProcedure.input(sessionsEventsInputSchema).subscription(({ ctx, signal }) => {
@@ -113,9 +113,9 @@ export const controlPlaneRouter = router({
       preferApiKey: ctx.preferApiKey,
     });
   }),
-  session: controlPlaneWorkspaceProcedure.input(sessionInputSchema).query(({ ctx, input }) => {
+  session: controlPlaneWorkspaceProcedure.input(sessionInputSchema).query(async ({ ctx, input }) => {
     const { sessionEngineArgs } = ctx.requestWorkspace;
-    return controlPlaneChatSessionsController.readDetail(sessionEngineArgs, input.id) ?? null;
+    return await controlPlaneChatSessionsController.readDetail(sessionEngineArgs, input.id) ?? null;
   }),
   sessionEvents: controlPlaneWorkspaceProcedure.input(sessionEventsInputSchema).subscription(({ ctx, input, signal }) => {
     const { workspace } = ctx.requestWorkspace;
@@ -258,9 +258,9 @@ export const controlPlaneRouter = router({
       leaseOwner: resolveControlPlaneLeaseOwner(ctx),
     });
   }),
-  sessionTurnReview: controlPlaneWorkspaceProcedure.input(turnReviewInputSchema).query(({ ctx, input }) => {
+  sessionTurnReview: controlPlaneWorkspaceProcedure.input(turnReviewInputSchema).query(async ({ ctx, input }) => {
     const { sessionEngineArgs } = ctx.requestWorkspace;
-    return controlPlaneChatSessionsController.readTurnReview(sessionEngineArgs, input.sessionId, input.turnId) ?? null;
+    return await controlPlaneChatSessionsController.readTurnReview(sessionEngineArgs, input.sessionId, input.turnId) ?? null;
   }),
   sessionRunState: controlPlaneWorkspaceProcedure.input(sessionInputSchema).query(({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;
@@ -269,9 +269,9 @@ export const controlPlaneRouter = router({
       sessionId: input.id,
     });
   }),
-  sessionRuntimeContext: controlPlaneWorkspaceProcedure.input(sessionRuntimeContextInputSchema).query(({ ctx, input }) => {
+  sessionRuntimeContext: controlPlaneWorkspaceProcedure.input(sessionRuntimeContextInputSchema).query(async ({ ctx, input }) => {
     const { workspace, sessionEngineArgs } = ctx.requestWorkspace;
-    return controlPlaneSessionRuntimeContextService.read({
+    return await controlPlaneSessionRuntimeContextService.read({
       ...sessionEngineArgs,
       sessionId: input.sessionId,
       preferApiKey: ctx.preferApiKey,

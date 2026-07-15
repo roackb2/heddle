@@ -49,6 +49,7 @@ type ConversationRunRecord<Address extends { sessionId: string }, Result = unkno
   address: Address;
   addressKey: string;
   context: ConversationRunContext;
+  ready: Promise<void>;
   result: Promise<Result>;
   events: Array<ConversationRunStreamItem<Result>>;
   subscribers: Set<RuntimeSubscriptionSink<ConversationRunStreamItem<Result>>>;
@@ -100,6 +101,23 @@ export class ConversationRunService<
 
   start<Result>(input: StartConversationRunInput<Address, Result>): ConversationRunAccepted<Address> {
     return this.startRecord(input).accepted;
+  }
+
+  /**
+   * Registers a run immediately, but only reports it as accepted after the
+   * host's async acceptance hook has completed successfully.
+   */
+  async startAndWaitForAcceptance<Result>(
+    input: StartConversationRunInput<Address, Result>,
+  ): Promise<ConversationRunAccepted<Address>> {
+    const started = this.startRecord(input);
+    try {
+      await started.record.ready;
+      return started.accepted;
+    } catch (error) {
+      await started.record.result.catch(() => undefined);
+      throw error;
+    }
   }
 
   async startAndWait<Result>(input: StartConversationRunInput<Address, Result>): Promise<Result> {
@@ -295,6 +313,7 @@ export class ConversationRunService<
     const acceptedAt = this.now().toISOString();
     let accepted = false;
     let acceptanceError: unknown;
+    let acceptance: void | Promise<void>;
     let stopHeartbeat: (() => void) | undefined;
     const context: ConversationRunContext = {
       runId,
@@ -305,14 +324,59 @@ export class ConversationRunService<
         activity,
       }),
     };
-    const result = Promise.resolve()
-      .then(() => {
-        if (!accepted) {
-          throw acceptanceError ?? new Error(`Accepted run never started: ${runId}`);
-        }
+    const record: ConversationRunRecord<Address, Result> = {
+      address: input.address,
+      addressKey,
+      context,
+      ready: undefined as unknown as Promise<void>,
+      result: undefined as unknown as Promise<Result>,
+      events: [],
+      subscribers: new Set<RuntimeSubscriptionSink<ConversationRunStreamItem<Result>>>(),
+      nextSequence: 1,
+      settled: false,
+    };
+    this.activeRuns.set(addressKey, record as ConversationRunRecord<Address>);
+    this.runsById.set(runId, record as ConversationRunRecord<Address>);
 
-        return input.execute(context);
-      })
+    let ready: Promise<void>;
+    try {
+      acceptance = input.onAccepted?.(context);
+      if (acceptance) {
+        ready = Promise.resolve(acceptance).then(() => {
+          stopHeartbeat = this.startHeartbeat(context, input.onHeartbeat);
+          accepted = true;
+        });
+      } else {
+        stopHeartbeat = this.startHeartbeat(context, input.onHeartbeat);
+        accepted = true;
+        ready = Promise.resolve();
+      }
+    } catch (error) {
+      acceptanceError = error;
+      this.pendingApprovals.delete(addressKey);
+      this.activeRuns.delete(addressKey);
+      this.runsById.delete(runId);
+      throw error;
+    }
+    record.ready = ready;
+
+    const execute = async (): Promise<Result> => {
+      if (!accepted) {
+        throw acceptanceError ?? new Error(`Accepted run never started: ${runId}`);
+      }
+      ConversationRunService.throwIfCancelled(context);
+      return await input.execute(context);
+    };
+    let execution: Promise<Result>;
+    try {
+      execution = acceptance
+        ? ready.then(execute)
+        : Promise.resolve(input.execute(context));
+    } catch (error) {
+      execution = Promise.reject(error);
+    }
+
+    const result = execution
       .then((value) => {
         if (options.cancelWinsCompletion) {
           ConversationRunService.throwIfCancelled(context);
@@ -346,31 +410,8 @@ export class ConversationRunService<
           void Promise.resolve(input.onSettled?.(context)).catch(() => undefined);
         }
       });
-    const record: ConversationRunRecord<Address, Result> = {
-      address: input.address,
-      addressKey,
-      context,
-      result,
-      events: [],
-      subscribers: new Set<RuntimeSubscriptionSink<ConversationRunStreamItem<Result>>>(),
-      nextSequence: 1,
-      settled: false,
-    };
-    this.activeRuns.set(addressKey, record as ConversationRunRecord<Address>);
-    this.runsById.set(runId, record as ConversationRunRecord<Address>);
+    record.result = result;
     result.catch(() => undefined);
-
-    try {
-      input.onAccepted?.(context);
-      stopHeartbeat = this.startHeartbeat(context, input.onHeartbeat);
-      accepted = true;
-    } catch (error) {
-      acceptanceError = error;
-      this.pendingApprovals.delete(addressKey);
-      this.activeRuns.delete(addressKey);
-      this.runsById.delete(runId);
-      throw error;
-    }
 
     return {
       accepted: {

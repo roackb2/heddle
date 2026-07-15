@@ -14,7 +14,8 @@ or future hosts, it belongs here rather than in host-side code.
   a session already has earlier work to finish.
 - New-session inheritance rules.
 - Session-level default resolution at the engine boundary.
-- File-backed session storage and migration behavior.
+- Storage-independent session mutation coordination and bounded optimistic
+  update retries.
 
 ## Repository Direction
 
@@ -26,7 +27,8 @@ services.
 
 The target direction is:
 
-- repository/storage modules own file I/O and serialization details;
+- repository/storage modules own async record I/O, serialization, pagination,
+  and atomic compare-and-swap details;
 - session services own session behavior and policy;
 - hosts consume session services instead of touching storage mechanics.
 
@@ -40,7 +42,9 @@ The intended structure is class-based by responsibility:
   service instance.
 - `leases/` owns pure lease policy. Lease acquisition, release, freshness, and
   conflict semantics live together as static domain methods.
-- `repository/file-chat-session-repository.ts` owns file persistence.
+- `repository/types.ts` defines the async port used by local and hosted
+  adapters; `repository/file-chat-session-repository.ts` owns the default JSON
+  persistence implementation.
 - `archives/` owns file-backed archived transcript and rolling-summary
   persistence for compacted chat history.
 - session title prompting lives under `records/` as session metadata behavior;
@@ -49,8 +53,8 @@ The intended structure is class-based by responsibility:
 - queued prompt operations live on the session service. Hosts and control-plane
   routes may enqueue, edit, delete, and dequeue through named service methods,
   but must not keep a separate host-local queue as the source of truth.
-- `types.ts` at this folder root describes the main session service contract
-  and config shape.
+- the shared service contract lives in `../types.ts`; this folder's `types.ts`
+  owns the service composition/config shape.
 - each meaningful subfolder exposes a `types.ts` contract so callers can see
   the boundary shape without reading implementation details first.
 
@@ -67,7 +71,8 @@ The service API should cover ordinary host needs directly:
 - use `create`, `rename`, and `delete` for lifecycle changes;
 - use `updateSettings` for shared model, reasoning-effort, and drift settings;
 - reserve generic `update` for persisted session changes that are not yet
-  expressed as a named service operation.
+  expressed as a named service operation. Its updater may be reapplied after a
+  revision conflict and must not perform external side effects.
 
 That rule applies even for local hosts like the TUI. The TUI may call core
 session services directly, but it should not call repositories or file-storage

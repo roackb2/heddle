@@ -40,23 +40,23 @@ export type ControlPlaneResolvedSessionRuntimeContext = {
  * session welcome facts. Interface layers decide how to render those facts.
  */
 export class ControlPlaneSessionRuntimeContextService {
-  read(
+  async read(
     args: ControlPlaneSessionRuntimeContextArgs,
     options: ControlPlaneSessionRuntimeContextOptions = {},
-  ): ControlPlaneSessionRuntimeContext {
-    return this.resolve(args, options).runtimeContext;
+  ): Promise<ControlPlaneSessionRuntimeContext> {
+    return (await this.resolve(args, options)).runtimeContext;
   }
 
-  resolve(
+  async resolve(
     args: ControlPlaneSessionRuntimeContextArgs,
     options: ControlPlaneSessionRuntimeContextOptions = {},
-  ): ControlPlaneResolvedSessionRuntimeContext {
+  ): Promise<ControlPlaneResolvedSessionRuntimeContext> {
     const engine = createConversationEngine({
       ...args,
       model: args.model ?? DEFAULT_OPENAI_MODEL,
     });
     const sessions = engine.sessions;
-    const session = sessions.require(args.sessionId);
+    const session = await sessions.require(args.sessionId);
     const model = session.model ?? args.model ?? DEFAULT_OPENAI_MODEL;
     const estimatedInputTokens = session.context?.request?.usage?.inputTokens ?? session.context?.request?.estimatedTokens;
     const providerRuntime = LlmProviderRuntimeService.resolve({

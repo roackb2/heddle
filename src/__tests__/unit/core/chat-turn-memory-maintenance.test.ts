@@ -4,12 +4,14 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ChatSessionRecords } from '../../../core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
+import { FileConversationSessionService } from '../../../core/chat/engine/sessions/service.js';
 import { ConversationTurnMemoryMaintenance } from '../../../core/chat/engine/turns/memory/index.js';
+import { readStoredChatSession, seedChatSessionRepository } from '@/__tests__/helpers/chat-session-repository.js';
 import type { AgentLoopResult } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../core/types.js';
 
 describe('chat turn memory maintenance helpers', () => {
-  it('appends background maintenance events to the trace file and latest turn summary', () => {
+  it('appends background maintenance events to the trace file and latest turn summary', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-turn-maintenance-'));
     const sessionStoragePath = join(root, '.heddle', 'chat-sessions.catalog.json');
     const traceFile = join(root, 'trace.json');
@@ -28,7 +30,8 @@ describe('chat turn memory maintenance helpers', () => {
       apiKeyPresent: true,
       model: 'gpt-5.4',
     });
-    new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).save([{
+    const repository = new FileChatSessionRepository({ sessionStoragePath });
+    await seedChatSessionRepository(repository, [{
       ...session,
       turns: [{
         id: 'turn-1',
@@ -41,7 +44,7 @@ describe('chat turn memory maintenance helpers', () => {
       }],
     }]);
 
-    ConversationTurnMemoryMaintenance.appendEvents({
+    await ConversationTurnMemoryMaintenance.appendEvents({
       traceFile,
       events: [{
         type: 'memory.maintenance_finished',
@@ -53,7 +56,13 @@ describe('chat turn memory maintenance helpers', () => {
         step: 2,
         timestamp: '2026-05-02T00:00:01.000Z',
       }],
-      sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+      sessionService: new FileConversationSessionService({
+        workspaceRoot: root,
+        stateRoot: join(root, '.heddle'),
+        sessionStoragePath,
+        sessionRepository: repository,
+        model: 'gpt-5.4',
+      }),
       sessionId: 'session-1',
     });
 
@@ -62,7 +71,7 @@ describe('chat turn memory maintenance helpers', () => {
       'memory.candidate_recorded',
       'memory.maintenance_finished',
     ]);
-    expect(new FileChatSessionRepository({ sessionStoragePath: sessionStoragePath }).list()[0]?.turns[0]?.events).toEqual([
+    expect((await readStoredChatSession(repository, 'session-1'))?.turns[0]?.events).toEqual([
       'memory candidate recorded: candidate-1',
       'memory maintenance finished: done',
     ]);

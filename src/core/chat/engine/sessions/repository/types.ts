@@ -3,6 +3,8 @@ import type { ChatArchiveRecord, ChatContextStats, ChatSession, ChatSessionLease
 
 export type ChatSessionCatalogEntry = {
   id: string;
+  /** Monotonic persistence revision used for optimistic concurrency. */
+  revision: number;
   name: string;
   retention?: ChatSessionRetention;
   workspaceId?: string;
@@ -29,17 +31,51 @@ export type SessionStoragePaths = {
   sessionsDir: string;
 };
 
+export type StoredChatSession = {
+  session: ChatSession;
+  revision: number;
+};
+
+export type ListChatSessionsInput = {
+  /**
+   * Opaque adapter-owned cursor returned by the previous page. Adapters must
+   * use the same stable order for sorting and cursor filtering: pinned first,
+   * then updatedAt descending, then id ascending.
+   */
+  cursor?: string;
+  limit: number;
+  workspaceId?: string;
+  archived?: boolean;
+};
+
+export type ChatSessionCatalogPage = {
+  items: ChatSessionCatalogEntry[];
+  nextCursor?: string;
+};
+
+export type UpdateChatSessionInput = {
+  session: ChatSession;
+  expectedRevision: number;
+};
+
+export type DeleteChatSessionInput = {
+  sessionId: string;
+  expectedRevision: number;
+};
+
 /**
- * Persistence port for chat sessions: the session catalog plus full session
- * bodies. Session/turn services own session policy (leases, records,
- * compaction state) and delegate persistence here, so a host can back
- * sessions with its own storage (database, object store, in-memory) by
- * implementing this contract and passing it to
- * `createConversationEngine({ sessionRepository })`.
+ * Async persistence port for versioned chat-session records.
+ *
+ * Session/turn services own policy (leases, records, compaction state). An
+ * adapter owns durable record I/O, deterministic cursor pagination, and atomic
+ * expected-revision updates. Repository instances should already be scoped to
+ * the host's tenant/workspace authorization boundary; Heddle deliberately does
+ * not add product-specific user or RLS fields to this domain contract.
  */
 export type ChatSessionRepository = {
-  list(): ChatSession[];
-  readCatalog(): ChatSessionCatalogEntry[];
-  read(sessionId: string): ChatSession | undefined;
-  save(sessions: ChatSession[]): void;
+  list(input: ListChatSessionsInput): Promise<ChatSessionCatalogPage>;
+  read(sessionId: string): Promise<StoredChatSession | undefined>;
+  create(session: ChatSession): Promise<StoredChatSession>;
+  update(input: UpdateChatSessionInput): Promise<StoredChatSession | undefined>;
+  delete(input: DeleteChatSessionInput): Promise<boolean>;
 };

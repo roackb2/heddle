@@ -1,7 +1,18 @@
 export { FileChatSessionRepository } from './file-chat-session-repository.js';
+export {
+  ChatSessionAlreadyExistsError,
+  ChatSessionRevisionConflictError,
+  ChatSessionStorageCorruptionError,
+  InvalidChatSessionCursorError,
+} from './errors.js';
 export type {
   ChatSessionCatalog,
+  ChatSessionCatalogPage,
   ChatSessionCatalogEntry,
   ChatSessionRepository,
+  DeleteChatSessionInput,
+  ListChatSessionsInput,
   SessionStoragePaths,
+  StoredChatSession,
+  UpdateChatSessionInput,
 } from './types.js';

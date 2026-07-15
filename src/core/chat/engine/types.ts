@@ -11,7 +11,11 @@ import type { AgentLoopEvent, RunAgentLoopOptions } from '../../runtime/loop/ind
 import type { ChatMessage, LlmAdapter, ReasoningEffort } from '../../llm/types.js';
 import type { ToolDefinition, TraceEvent } from '../../types.js';
 import type { ChatSessionLeaseOwner } from './sessions/leases/index.js';
-import type { ChatSessionRepository } from './sessions/repository/index.js';
+import type {
+  ChatSessionCatalogPage,
+  ChatSessionRepository,
+  ListChatSessionsInput,
+} from './sessions/repository/index.js';
 import type { ChatSession, ChatSessionRetention, QueuedConversationPrompt } from '../types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatTurnHostPort } from './turns/host/index.js';
@@ -81,56 +85,58 @@ export type ConversationEngine = {
 
 export type ConversationSessionService = {
   // Reads
-  list(): ChatSession[];
+  list(): Promise<ChatSession[]>;
+  listCatalog(input?: Partial<ListChatSessionsInput>): Promise<ChatSessionCatalogPage>;
   // Persisted reads that do not materialize the host-facing fallback.
-  listExisting(): ChatSession[];
-  readExisting(id: string): ChatSession | undefined;
-  read(id: string): ChatSession | undefined;
-  require(id: string): ChatSession;
-  latest(): ChatSession | undefined;
-  latestExisting(): ChatSession | undefined;
+  listExisting(): Promise<ChatSession[]>;
+  readExisting(id: string): Promise<ChatSession | undefined>;
+  read(id: string): Promise<ChatSession | undefined>;
+  require(id: string): Promise<ChatSession>;
+  latest(): Promise<ChatSession | undefined>;
+  latestExisting(): Promise<ChatSession | undefined>;
 
   // Lifecycle
-  create(input?: CreateConversationSessionInput): ChatSession;
-  createOneOff(input?: CreateConversationSessionInput): ChatSession;
-  rename(id: string, name: string): ChatSession;
-  setPinned(id: string, pinned: boolean): ChatSession;
-  setArchived(id: string, archived: boolean): ChatSession;
+  create(input?: CreateConversationSessionInput): Promise<ChatSession>;
+  createOneOff(input?: CreateConversationSessionInput): Promise<ChatSession>;
+  rename(id: string, name: string): Promise<ChatSession>;
+  setPinned(id: string, pinned: boolean): Promise<ChatSession>;
+  setArchived(id: string, archived: boolean): Promise<ChatSession>;
   autoRenameAfterFirstUserMessage(id: string, input: AutoRenameConversationSessionInput): Promise<AutoRenameConversationSessionResult>;
-  delete(id: string): boolean;
+  delete(id: string): Promise<boolean>;
 
-  // Generic mutation escape hatch
-  update(id: string, updater: (session: ChatSession) => ChatSession): ChatSession | undefined;
+  // Generic mutation escape hatch. The updater may be reapplied after an
+  // optimistic-concurrency conflict, so it must not perform external side effects.
+  update(id: string, updater: (session: ChatSession) => ChatSession): Promise<ChatSession | undefined>;
 
   // Settings
-  updateSettings(id: string, input: UpdateConversationSessionSettingsInput): ChatSession;
-  setDriftEnabled(id: string, enabled: boolean): ChatSession;
+  updateSettings(id: string, input: UpdateConversationSessionSettingsInput): Promise<ChatSession>;
+  setDriftEnabled(id: string, enabled: boolean): Promise<ChatSession>;
 
   // Messages
-  appendMessage(id: string, input: AppendConversationMessageInput): ChatSession;
-  appendMessages(id: string, inputs: AppendConversationMessageInput[]): ChatSession;
-  acceptUserMessage(id: string, input: AcceptConversationUserMessageInput): ChatSession;
-  markAcceptedUserMessage(id: string, input: MarkAcceptedConversationUserMessageInput): ChatSession;
-  markAcceptedUserMessageFailed(id: string, input: MarkAcceptedConversationUserMessageFailedInput): ChatSession;
-  enqueuePrompt(id: string, input: EnqueueConversationPromptInput): QueuedConversationPromptResult;
-  updateQueuedPrompt(id: string, input: UpdateQueuedConversationPromptInput): ChatSession;
-  deleteQueuedPrompt(id: string, input: DeleteQueuedConversationPromptInput): ChatSession;
-  dequeueQueuedPrompt(id: string): DequeuedConversationPromptResult;
+  appendMessage(id: string, input: AppendConversationMessageInput): Promise<ChatSession>;
+  appendMessages(id: string, inputs: AppendConversationMessageInput[]): Promise<ChatSession>;
+  acceptUserMessage(id: string, input: AcceptConversationUserMessageInput): Promise<ChatSession>;
+  markAcceptedUserMessage(id: string, input: MarkAcceptedConversationUserMessageInput): Promise<ChatSession>;
+  markAcceptedUserMessageFailed(id: string, input: MarkAcceptedConversationUserMessageFailedInput): Promise<ChatSession>;
+  enqueuePrompt(id: string, input: EnqueueConversationPromptInput): Promise<QueuedConversationPromptResult>;
+  updateQueuedPrompt(id: string, input: UpdateQueuedConversationPromptInput): Promise<ChatSession>;
+  deleteQueuedPrompt(id: string, input: DeleteQueuedConversationPromptInput): Promise<ChatSession>;
+  dequeueQueuedPrompt(id: string): Promise<DequeuedConversationPromptResult>;
 
   // Conversation state
-  resetConversation(id: string): ChatSession;
-  setLastContinuePrompt(id: string, prompt: string | undefined): ChatSession;
+  resetConversation(id: string): Promise<ChatSession>;
+  setLastContinuePrompt(id: string, prompt: string | undefined): Promise<ChatSession>;
 
   // Compaction state
-  markCompactionRunning(id: string, input: MarkConversationCompactionRunningInput): ChatSession;
-  applyCompactionResult(id: string, input: ApplyConversationCompactionResultInput): ChatSession;
-  restoreCompactionState(id: string, input: RestoreConversationCompactionStateInput): ChatSession;
+  markCompactionRunning(id: string, input: MarkConversationCompactionRunningInput): Promise<ChatSession>;
+  applyCompactionResult(id: string, input: ApplyConversationCompactionResultInput): Promise<ChatSession>;
+  restoreCompactionState(id: string, input: RestoreConversationCompactionStateInput): Promise<ChatSession>;
 
   // Leases
-  getLeaseConflict(id: string, owner: ChatSessionLeaseOwner): string | undefined;
-  acquireLease(id: string, owner: ChatSessionLeaseOwner): ChatSession;
-  refreshLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): ChatSession;
-  releaseLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): ChatSession;
+  getLeaseConflict(id: string, owner: ChatSessionLeaseOwner): Promise<string | undefined>;
+  acquireLease(id: string, owner: ChatSessionLeaseOwner): Promise<ChatSession>;
+  refreshLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): Promise<ChatSession>;
+  releaseLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): Promise<ChatSession>;
 };
 
 export type CreateConversationSessionInput = {
@@ -220,7 +226,7 @@ export type RestoreConversationCompactionStateInput = Pick<ChatSession, 'context
 export type ConversationTurnService = {
   submit(input: SubmitConversationTurnInput): Promise<SubmitConversationTurnResult>;
   continue(input: ContinueConversationTurnInput): Promise<SubmitConversationTurnResult>;
-  clearLease(input: ClearConversationTurnLeaseInput): void;
+  clearLease(input: ClearConversationTurnLeaseInput): Promise<void>;
 };
 
 export type SubmitConversationTurnInput = {

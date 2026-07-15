@@ -14,8 +14,8 @@ export class ChatSessionUploadsRestController {
     this.uploadImagesMiddleware = this.createUploadImagesMiddleware();
   }
 
-  uploadImages = (request: Request, response: Response): void => {
-    response.json(this.imageUploads.completeUploads(request));
+  uploadImages = async (request: Request, response: Response): Promise<void> => {
+    response.json(await this.imageUploads.completeUploads(request));
   };
 
   handleUploadError: ErrorRequestHandler = (error, _request, response, _next): void => {

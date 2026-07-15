@@ -51,8 +51,8 @@ export class ChatSessionCodec {
     }];
   }
 
-  static projectCatalogEntry(session: ChatSession): ChatSessionCatalogEntry {
-    const parsed = CatalogEntryWriteSchema.parse(session);
+  static projectCatalogEntry(session: ChatSession, revision: number): ChatSessionCatalogEntry {
+    const parsed = CatalogEntryWriteSchema.parse({ ...session, revision });
     return {
       ...parsed,
       pinned: parsed.pinned ?? false,
@@ -84,6 +84,7 @@ export class ChatSessionCodec {
       archives: undefined,
       lease: undefined,
       ...value,
+      revision: value.revision ?? 1,
       createdAt,
       updatedAt: value.updatedAt ?? createdAt,
       driftEnabled: value.driftEnabled ?? false,

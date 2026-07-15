@@ -29,7 +29,7 @@ export class ConversationTurnArtifacts {
       request: compactionRequest,
       force: ConversationTurnFailureMessages.shouldForceCompactionAfterFailure(args.result.summary),
       summarizer: args.summarizer,
-      onStatusChange: (event) => args.onCompactionStatus?.(event, sourceHistory),
+      onStatusChange: async (event) => await args.onCompactionStatus?.(event, sourceHistory),
     });
     const traceFile = TraceWriter.write(args.traceDir, args.result.trace);
     const turn = ChatSessionRecords.buildTurnSummary({

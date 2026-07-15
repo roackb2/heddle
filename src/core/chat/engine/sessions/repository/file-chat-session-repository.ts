@@ -1,94 +1,171 @@
 /**
- * File-backed chat session repository.
+ * File-backed implementation of the versioned chat-session repository.
  *
- * Owns file paths, serialization, deserialization, and orphan-file cleanup for
- * chat sessions. Session services should depend on this class rather than
- * embedding file I/O logic themselves.
- *
- * Current compromise:
- * some older host or test paths still instantiate this repository directly.
- * The intended direction is host -> service -> repository -> files.
+ * Session bodies are immutable revision files. A body is fully written before
+ * an atomically replaced catalog points at it, so readers observe either the
+ * previous complete revision or the next complete revision. `proper-lockfile`
+ * serializes compare-and-swap writes across repository instances/processes;
+ * `async-mutex` avoids unnecessary lock contention within one instance.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import {
+  mkdir,
+  readFile,
+  rename,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
+import { Mutex } from 'async-mutex';
+import { lock } from 'proper-lockfile';
 import type { ChatSession } from '@/core/chat/types.js';
-import { ChatSessionRecords } from '../records/index.js';
 import { ChatSessionCodec } from './chat-session-codec.js';
-import type { ChatSessionCatalog, ChatSessionCatalogEntry, ChatSessionRepository, SessionStoragePaths } from './types.js';
+import {
+  ChatSessionAlreadyExistsError,
+  ChatSessionRevisionConflictError,
+  ChatSessionStorageCorruptionError,
+  InvalidChatSessionCursorError,
+} from './errors.js';
+import type {
+  ChatSessionCatalog,
+  ChatSessionCatalogEntry,
+  ChatSessionCatalogPage,
+  ChatSessionRepository,
+  DeleteChatSessionInput,
+  ListChatSessionsInput,
+  SessionStoragePaths,
+  StoredChatSession,
+  UpdateChatSessionInput,
+} from './types.js';
+
+type FileChatSessionCursor = Pick<ChatSessionCatalogEntry, 'id' | 'pinned' | 'updatedAt'>;
 
 export class FileChatSessionRepository implements ChatSessionRepository {
   private readonly sessionStoragePath: string;
   private readonly storagePaths: SessionStoragePaths;
+  private readonly mutex = new Mutex();
 
   constructor(args: { sessionStoragePath: string }) {
     this.sessionStoragePath = args.sessionStoragePath;
     this.storagePaths = FileChatSessionRepository.deriveStoragePaths(args.sessionStoragePath);
   }
 
-  list(): ChatSession[] {
-    const resolved = this.loadFromCurrentStorage();
-    if (resolved.length > 0) {
-      return resolved;
-    }
+  async list(input: ListChatSessionsInput): Promise<ChatSessionCatalogPage> {
+    return await this.mutex.runExclusive(async () => {
+      FileChatSessionRepository.validatePageLimit(input.limit);
+      const catalog = await FileChatSessionRepository.readCatalogFile(this.storagePaths.catalogPath);
+      const cursor = input.cursor
+        ? FileChatSessionRepository.decodeCursor(input.cursor)
+        : undefined;
+      const filtered = catalog.sessions
+        .filter((entry) => input.workspaceId === undefined || entry.workspaceId === input.workspaceId)
+        .filter((entry) => input.archived === undefined || Boolean(entry.archivedAt) === input.archived)
+        .filter((entry) => !cursor || FileChatSessionRepository.compareSessionOrder(entry, cursor) > 0)
+        .sort(FileChatSessionRepository.compareSessionOrder);
+      const items = filtered.slice(0, input.limit);
+      const last = items.at(-1);
 
-    return [
-      ChatSessionRecords.create({
-        id: 'session-1',
-        name: 'Session 1',
-      }),
-    ];
+      return {
+        items,
+        nextCursor: filtered.length > input.limit && last
+          ? FileChatSessionRepository.encodeCursor(last)
+          : undefined,
+      };
+    });
   }
 
-  readCatalog(): ChatSessionCatalogEntry[] {
-    const catalog = FileChatSessionRepository.readCatalogFile(this.deriveStoragePaths().catalogPath);
-    return catalog?.sessions.sort(FileChatSessionRepository.compareSessionOrder) ?? [];
-  }
-
-  read(sessionId: string): ChatSession | undefined {
-    const paths = this.deriveStoragePaths();
-    const catalog = FileChatSessionRepository.readCatalogFile(paths.catalogPath);
-    const entry = catalog?.sessions.find((candidate) => candidate.id === sessionId);
-    if (!entry) {
-      return undefined;
-    }
-
-    return FileChatSessionRepository.readSessionFile(paths.sessionsDir, entry)[0];
-  }
-
-  save(sessions: ChatSession[]): void {
-    mkdirSync(dirname(this.sessionStoragePath), { recursive: true });
-    const paths = this.deriveStoragePaths();
-    mkdirSync(paths.sessionsDir, { recursive: true });
-
-    const sorted = FileChatSessionRepository.dedupeSessionsById(sessions)
-      .sort(FileChatSessionRepository.compareSessionOrder);
-    const previousCatalog = FileChatSessionRepository.readCatalogFile(paths.catalogPath);
-    const previousSessionBodies = new Map<string, string>();
-    for (const entry of previousCatalog?.sessions ?? []) {
-      const body = FileChatSessionRepository.readSessionFileContents(paths.sessionsDir, entry.id);
-      if (body !== undefined) {
-        previousSessionBodies.set(entry.id, body);
+  async read(sessionId: string): Promise<StoredChatSession | undefined> {
+    return await this.mutex.runExclusive(async () => {
+      const catalog = await FileChatSessionRepository.readCatalogFile(this.storagePaths.catalogPath);
+      const entry = catalog.sessions.find((candidate) => candidate.id === sessionId);
+      if (!entry) {
+        return undefined;
       }
-    }
 
-    for (const session of sorted) {
-      FileChatSessionRepository.writeSessionFileIfChanged(
-        paths.sessionsDir,
-        session,
-        previousSessionBodies.get(session.id),
+      return {
+        session: await FileChatSessionRepository.readSessionFile(this.storagePaths.sessionsDir, entry),
+        revision: entry.revision,
+      };
+    });
+  }
+
+  async create(session: ChatSession): Promise<StoredChatSession> {
+    return await this.withWriteLock(async () => {
+      const catalog = await FileChatSessionRepository.readCatalogFile(this.storagePaths.catalogPath);
+      if (catalog.sessions.some((entry) => entry.id === session.id)) {
+        throw new ChatSessionAlreadyExistsError(session.id);
+      }
+
+      const revision = 1;
+      await FileChatSessionRepository.writeSessionRevision(this.storagePaths.sessionsDir, session, revision);
+      const nextCatalog: ChatSessionCatalog = {
+        version: 1,
+        sessions: [
+          ChatSessionCodec.projectCatalogEntry(session, revision),
+          ...catalog.sessions,
+        ].sort(FileChatSessionRepository.compareSessionOrder),
+      };
+      await FileChatSessionRepository.replaceCatalog(this.storagePaths.catalogPath, nextCatalog);
+      return { session, revision };
+    });
+  }
+
+  async update(input: UpdateChatSessionInput): Promise<StoredChatSession | undefined> {
+    return await this.withWriteLock(async () => {
+      const catalog = await FileChatSessionRepository.readCatalogFile(this.storagePaths.catalogPath);
+      const current = catalog.sessions.find((entry) => entry.id === input.session.id);
+      if (!current) {
+        return undefined;
+      }
+      if (current.revision !== input.expectedRevision) {
+        throw new ChatSessionRevisionConflictError(
+          input.session.id,
+          input.expectedRevision,
+          current.revision,
+        );
+      }
+
+      const revision = current.revision + 1;
+      await FileChatSessionRepository.writeSessionRevision(
+        this.storagePaths.sessionsDir,
+        input.session,
+        revision,
       );
-    }
+      const nextCatalog: ChatSessionCatalog = {
+        version: 1,
+        sessions: catalog.sessions
+          .map((entry) => entry.id === input.session.id
+            ? ChatSessionCodec.projectCatalogEntry(input.session, revision)
+            : entry)
+          .sort(FileChatSessionRepository.compareSessionOrder),
+      };
+      await FileChatSessionRepository.replaceCatalog(this.storagePaths.catalogPath, nextCatalog);
+      return { session: input.session, revision };
+    });
+  }
 
-    const catalog: ChatSessionCatalog = {
-      version: 1,
-      sessions: sorted.map((session) => ChatSessionCodec.projectCatalogEntry(session)),
-    };
+  async delete(input: DeleteChatSessionInput): Promise<boolean> {
+    return await this.withWriteLock(async () => {
+      const catalog = await FileChatSessionRepository.readCatalogFile(this.storagePaths.catalogPath);
+      const current = catalog.sessions.find((entry) => entry.id === input.sessionId);
+      if (!current) {
+        return false;
+      }
+      if (current.revision !== input.expectedRevision) {
+        throw new ChatSessionRevisionConflictError(
+          input.sessionId,
+          input.expectedRevision,
+          current.revision,
+        );
+      }
 
-    FileChatSessionRepository.writeCatalogIfChanged(paths.catalogPath, catalog, previousCatalog);
-    FileChatSessionRepository.removeOrphanedSessionFiles(
-      paths.sessionsDir,
-      catalog.sessions.map((session) => session.id),
-    );
+      const nextCatalog: ChatSessionCatalog = {
+        version: 1,
+        sessions: catalog.sessions.filter((entry) => entry.id !== input.sessionId),
+      };
+      await FileChatSessionRepository.replaceCatalog(this.storagePaths.catalogPath, nextCatalog);
+      return true;
+    });
   }
 
   deriveStoragePaths(): SessionStoragePaths {
@@ -103,168 +180,217 @@ export class FileChatSessionRepository implements ChatSessionRepository {
     if (fileName.endsWith(catalogSuffix)) {
       const catalogStem = fileName.slice(0, -catalogSuffix.length);
       return {
-        // Current layout: preserve the configured catalog path exactly.
         catalogPath: storagePath,
         sessionsDir: join(stateDir, catalogStem),
       };
     }
 
     return {
-      // Non-standard inputs are explicit catalog paths. Preserve them without
-      // scanning sibling files or trying to upgrade older layouts.
       catalogPath: storagePath,
       sessionsDir: join(stateDir, fileName),
     };
   }
 
-  private loadFromCurrentStorage(): ChatSession[] {
-    return this.loadSessionsFromCatalog(this.deriveStoragePaths());
+  private async withWriteLock<T>(operation: () => Promise<T>): Promise<T> {
+    return await this.mutex.runExclusive(async () => {
+      await mkdir(dirname(this.sessionStoragePath), { recursive: true });
+      await mkdir(this.storagePaths.sessionsDir, { recursive: true });
+      const release = await lock(dirname(this.sessionStoragePath), {
+        lockfilePath: `${this.sessionStoragePath}.lock`,
+        realpath: false,
+        stale: 30_000,
+        update: 10_000,
+        retries: {
+          retries: 20,
+          factor: 1.5,
+          minTimeout: 10,
+          maxTimeout: 500,
+          randomize: true,
+        },
+      });
+
+      try {
+        return await operation();
+      } finally {
+        await release();
+      }
+    });
   }
 
-  private loadSessionsFromCatalog(paths: SessionStoragePaths): ChatSession[] {
-    if (!existsSync(paths.catalogPath)) {
-      return [];
+  private static async readCatalogFile(catalogPath: string): Promise<ChatSessionCatalog> {
+    const contents = await FileChatSessionRepository.readOptionalFile(catalogPath);
+    if (contents === undefined) {
+      return { version: 1, sessions: [] };
     }
 
     try {
-      const raw = JSON.parse(readFileSync(paths.catalogPath, 'utf8')) as unknown;
-      const catalog = ChatSessionCodec.parseCatalog(raw);
+      const catalog = ChatSessionCodec.parseCatalog(JSON.parse(contents) as unknown);
       if (!catalog) {
-        return [];
+        throw new Error('catalog schema validation failed');
       }
-
-      const sessions = catalog.sessions.flatMap((entry) =>
-        FileChatSessionRepository.readSessionFile(paths.sessionsDir, entry),
-      );
-      return sessions.sort(FileChatSessionRepository.compareSessionOrder);
+      return {
+        ...catalog,
+        sessions: catalog.sessions.sort(FileChatSessionRepository.compareSessionOrder),
+      };
     } catch (error) {
-      process.stderr.write(
-        `Failed to load chat session catalog from ${paths.catalogPath}: ${error instanceof Error ? error.message : String(error)}\n`,
+      throw new ChatSessionStorageCorruptionError(
+        catalogPath,
+        error instanceof Error ? error.message : String(error),
       );
-      return [];
     }
   }
 
-  private static readSessionFile(
+  private static async readSessionFile(
     sessionsDir: string,
     entry: ChatSessionCatalogEntry,
-  ): ChatSession[] {
-    const path = FileChatSessionRepository.sessionFilePath(sessionsDir, entry.id);
-    if (!existsSync(path)) {
-      return [];
+  ): Promise<ChatSession> {
+    const revisionPath = FileChatSessionRepository.sessionRevisionPath(
+      sessionsDir,
+      entry.id,
+      entry.revision,
+    );
+    const revisionContents = await FileChatSessionRepository.readOptionalFile(revisionPath);
+    const legacyPath = FileChatSessionRepository.legacySessionPath(sessionsDir, entry.id);
+    const contents = revisionContents ?? (
+      entry.revision === 1
+        ? await FileChatSessionRepository.readOptionalFile(legacyPath)
+        : undefined
+    );
+    const path = revisionContents === undefined && entry.revision === 1 ? legacyPath : revisionPath;
+    if (contents === undefined) {
+      throw new ChatSessionStorageCorruptionError(path, 'referenced session body is missing');
     }
 
     try {
-      const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
-      return ChatSessionCodec.parseSessionBody(parsed, { entry });
+      const session = ChatSessionCodec.parseSessionBody(JSON.parse(contents) as unknown, { entry })[0];
+      if (!session) {
+        throw new Error('session body schema validation failed');
+      }
+      return session;
     } catch (error) {
-      process.stderr.write(
-        `Failed to load chat session file ${path}: ${error instanceof Error ? error.message : String(error)}\n`,
+      throw new ChatSessionStorageCorruptionError(
+        path,
+        error instanceof Error ? error.message : String(error),
       );
-      return [];
     }
   }
 
-  private static writeSessionFileIfChanged(sessionsDir: string, session: ChatSession, previousContent?: string): void {
-    const path = FileChatSessionRepository.sessionFilePath(sessionsDir, session.id);
-    const nextContent = ChatSessionCodec.serializeSessionBody(session);
-    if (previousContent === nextContent) {
-      return;
-    }
-
-    writeFileSync(path, nextContent);
+  private static async writeSessionRevision(
+    sessionsDir: string,
+    session: ChatSession,
+    revision: number,
+  ): Promise<void> {
+    await mkdir(sessionsDir, { recursive: true });
+    const path = FileChatSessionRepository.sessionRevisionPath(sessionsDir, session.id, revision);
+    await writeFile(path, ChatSessionCodec.serializeSessionBody(session));
   }
 
-  private static writeCatalogIfChanged(
+  private static async replaceCatalog(
     catalogPath: string,
     catalog: ChatSessionCatalog,
-    previousCatalog?: ChatSessionCatalog,
-  ): void {
-    const nextContent = ChatSessionCodec.serializeCatalog(catalog);
-    const previousContent = previousCatalog ? ChatSessionCodec.serializeCatalog(previousCatalog) : undefined;
-    if (previousContent === nextContent) {
-      return;
-    }
-
-    writeFileSync(catalogPath, nextContent);
-  }
-
-  private static readSessionFileContents(sessionsDir: string, sessionId: string): string | undefined {
-    const path = FileChatSessionRepository.sessionFilePath(sessionsDir, sessionId);
-    if (!existsSync(path)) {
-      return undefined;
-    }
-
+  ): Promise<void> {
+    await mkdir(dirname(catalogPath), { recursive: true });
+    const temporaryPath = `${catalogPath}.${process.pid}.${randomUUID()}.tmp`;
     try {
-      return readFileSync(path, 'utf8');
-    } catch {
-      return undefined;
+      await writeFile(temporaryPath, ChatSessionCodec.serializeCatalog(catalog), { flag: 'wx' });
+      await rename(temporaryPath, catalogPath);
+    } finally {
+      await FileChatSessionRepository.removeFileIfPresent(temporaryPath);
     }
   }
 
-  private static readCatalogFile(catalogPath: string): ChatSessionCatalog | undefined {
-    if (!existsSync(catalogPath)) {
-      return undefined;
-    }
-
+  private static async readOptionalFile(path: string): Promise<string | undefined> {
     try {
-      return ChatSessionCodec.parseCatalog(JSON.parse(readFileSync(catalogPath, 'utf8')) as unknown);
-    } catch {
-      return undefined;
-    }
-  }
-
-  private static dedupeSessionsById(sessions: ChatSession[]): ChatSession[] {
-    const seen = new Set<string>();
-    const deduped: ChatSession[] = [];
-    for (const session of sessions) {
-      if (seen.has(session.id)) {
-        continue;
+      return await readFile(path, 'utf8');
+    } catch (error) {
+      if (FileChatSessionRepository.isMissingFileError(error)) {
+        return undefined;
       }
-
-      seen.add(session.id);
-      deduped.push(session);
+      throw error;
     }
+  }
 
-    return deduped;
+  private static async removeFileIfPresent(path: string): Promise<void> {
+    try {
+      await unlink(path);
+    } catch (error) {
+      if (!FileChatSessionRepository.isMissingFileError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  private static isMissingFileError(error: unknown): boolean {
+    return Boolean(
+      error
+      && typeof error === 'object'
+      && 'code' in error
+      && error.code === 'ENOENT',
+    );
   }
 
   private static compareSessionOrder(
-    left: Pick<ChatSession, 'pinned' | 'updatedAt'>,
-    right: Pick<ChatSession, 'pinned' | 'updatedAt'>,
+    left: Pick<ChatSessionCatalogEntry, 'id' | 'pinned' | 'updatedAt'>,
+    right: Pick<ChatSessionCatalogEntry, 'id' | 'pinned' | 'updatedAt'>,
   ): number {
     if (left.pinned !== right.pinned) {
       return left.pinned ? -1 : 1;
     }
 
-    return right.updatedAt.localeCompare(left.updatedAt);
+    const updatedAtOrder = FileChatSessionRepository.compareText(right.updatedAt, left.updatedAt);
+    return updatedAtOrder || FileChatSessionRepository.compareText(left.id, right.id);
   }
 
-  private static sessionFilePath(sessionsDir: string, sessionId: string): string {
+  private static compareText(left: string, right: string): number {
+    return left === right ? 0 : left < right ? -1 : 1;
+  }
+
+  private static encodeCursor(entry: FileChatSessionCursor): string {
+    return Buffer.from(JSON.stringify({
+      id: entry.id,
+      pinned: entry.pinned,
+      updatedAt: entry.updatedAt,
+    }), 'utf8').toString('base64url');
+  }
+
+  private static decodeCursor(cursor: string): FileChatSessionCursor {
+    try {
+      const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as unknown;
+      if (
+        !value
+        || typeof value !== 'object'
+        || !('id' in value)
+        || !('pinned' in value)
+        || !('updatedAt' in value)
+        || typeof value.id !== 'string'
+        || typeof value.pinned !== 'boolean'
+        || typeof value.updatedAt !== 'string'
+      ) {
+        throw new InvalidChatSessionCursorError();
+      }
+      return value as FileChatSessionCursor;
+    } catch (error) {
+      if (error instanceof InvalidChatSessionCursorError) {
+        throw error;
+      }
+      throw new InvalidChatSessionCursorError();
+    }
+  }
+
+  private static validatePageLimit(limit: number): void {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+      throw new RangeError('Chat session page limit must be an integer between 1 and 200.');
+    }
+  }
+
+  private static sessionRevisionPath(sessionsDir: string, sessionId: string, revision: number): string {
+    return join(sessionsDir, `${encodeURIComponent(sessionId)}.${revision}.json`);
+  }
+
+  private static legacySessionPath(sessionsDir: string, sessionId: string): string {
+    if (basename(sessionId) !== sessionId) {
+      return FileChatSessionRepository.sessionRevisionPath(sessionsDir, sessionId, 1);
+    }
     return join(sessionsDir, `${sessionId}.json`);
   }
-
-  private static removeOrphanedSessionFiles(sessionsDir: string, activeSessionIds: string[]): void {
-    if (!existsSync(sessionsDir)) {
-      return;
-    }
-
-    const allowed = new Set(activeSessionIds.map((id) => `${id}.json`));
-    for (const name of FileChatSessionRepository.safeReadDirFiles(sessionsDir)) {
-      if (allowed.has(name) || !name.endsWith('.json')) {
-        continue;
-      }
-
-      unlinkSync(join(sessionsDir, name));
-    }
-  }
-
-  private static safeReadDirFiles(path: string): string[] {
-    try {
-      return readdirSync(path);
-    } catch {
-      return [];
-    }
-  }
-
 }

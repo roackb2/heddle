@@ -5,7 +5,7 @@ import type { ConversationCompactionStatus } from '@/core/live/index.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
-import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
+import type { ConversationSessionService } from '@/core/chat/engine/types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatTurnHostPort } from '../host/index.js';
 import type {
@@ -28,7 +28,10 @@ export type PersistChatTurnResultArgs = {
   summarizer: ConversationCompactionOptions['summarizer'];
   traceSummarizerRegistry?: TraceSummaryService;
   createTurnId: () => string;
-  onCompactionStatus?: (event: PersistChatTurnCompactionStatus, sourceHistory: ChatMessage[]) => void;
+  onCompactionStatus?: (
+    event: PersistChatTurnCompactionStatus,
+    sourceHistory: ChatMessage[],
+  ) => void | Promise<void>;
   agentSnapshot?: CustomAgentExecutionSnapshot;
 };
 
@@ -69,16 +72,11 @@ export type PersistCompletedChatTurnBase = {
 };
 
 export type PersistCompletedChatTurnArgs = PersistCompletedChatTurnBase & {
-  sessions: ChatSession[];
-  sessionRepository: ChatSessionRepository;
+  sessionService: ConversationSessionService;
   credentialSource: ProviderCredentialSource;
   host: Pick<ChatTurnHostPort, 'onCompactionStatus'>;
 };
 
 export type PersistFinalCompactionRunningSeedArgs = PersistCompletedChatTurnArgs & {
   archivePath?: string;
-};
-
-export type PersistFinalCompactionRunningContextArgs = PersistFinalCompactionRunningSeedArgs & {
-  sourceHistory: PersistFinalCompactionRunningSeedArgs['result']['transcript'];
 };

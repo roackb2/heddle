@@ -6,22 +6,22 @@ import { FileConversationSessionService } from '@/core/chat/engine/sessions/serv
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 
 describe('chat session queued prompts', () => {
-  it('preserves the selected custom-agent snapshot while queued and dequeued', () => {
+  it('preserves the selected custom-agent snapshot while queued and dequeued', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heddle-chat-session-queue-'));
     const sessions = new FileConversationSessionService({
       workspaceRoot: root,
       stateRoot: join(root, '.heddle'),
       model: 'gpt-5.4',
     });
-    const session = sessions.create({ id: 'session-1', name: 'Session 1' });
+    const session = await sessions.create({ id: 'session-1', name: 'Session 1' });
     const agentSnapshot = askAgentSnapshot();
 
-    const queued = sessions.enqueuePrompt(session.id, {
+    const queued = await sessions.enqueuePrompt(session.id, {
       prompt: 'Review this change.',
       agentProfileId: 'builtin:review',
       agentSnapshot,
     });
-    const dequeued = sessions.dequeueQueuedPrompt(session.id);
+    const dequeued = await sessions.dequeueQueuedPrompt(session.id);
 
     expect(queued.item.agentProfileId).toBe('builtin:review');
     expect(queued.item.agentSnapshot).toEqual(agentSnapshot);

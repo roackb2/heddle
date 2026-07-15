@@ -27,11 +27,11 @@ export type ControlPlaneSlashCommandExecutionContextArgs = Omit<ConversationEngi
  * Composes core slash-command ports from resolved control-plane runtime context.
  */
 export class ControlPlaneSlashCommandExecutionContextService {
-  create(
+  async create(
     args: ControlPlaneSlashCommandExecutionContextArgs,
     hints: SlashCommandHint[],
-  ): SlashCommandExecutionContext {
-    const resolved = controlPlaneSessionRuntimeContextService.resolve(args);
+  ): Promise<SlashCommandExecutionContext> {
+    const resolved = await controlPlaneSessionRuntimeContextService.resolve(args);
     const { runtimeContext, sessions } = resolved;
     const heartbeatTasks = new FileHeartbeatTaskService({ stateRoot: args.stateRoot });
     const browserAutomation = new BrowserAutomationCapabilityService({
@@ -50,12 +50,12 @@ export class ControlPlaneSlashCommandExecutionContextService {
     return {
       model: {
         active: () => runtimeContext.model,
-        setActive: (model) => {
-          sessions.updateSettings(args.sessionId, { model });
+        setActive: async (model) => {
+          await sessions.updateSettings(args.sessionId, { model });
         },
         activeReasoningEffort: () => runtimeContext.reasoningEffort,
-        setReasoningEffort: (reasoningEffort) => {
-          sessions.updateSettings(args.sessionId, { reasoningEffort });
+        setReasoningEffort: async (reasoningEffort) => {
+          await sessions.updateSettings(args.sessionId, { reasoningEffort });
         },
         credentialSource: () => runtimeContext.credentialSource,
       },
@@ -71,8 +71,8 @@ export class ControlPlaneSlashCommandExecutionContextService {
       },
       drift: {
         status: () => ({ enabled: runtimeContext.driftEnabled }),
-        setEnabled: (enabled) => {
-          sessions.setDriftEnabled(args.sessionId, enabled);
+        setEnabled: async (enabled) => {
+          await sessions.setDriftEnabled(args.sessionId, enabled);
         },
       },
       permissions: {
@@ -96,27 +96,27 @@ export class ControlPlaneSlashCommandExecutionContextService {
       },
       session: {
         all: () => sessions.listExisting(),
-        recent: () => this.recentSessions(sessions.listExisting()),
-        recentListMessage: () => this.recentSessionMessages(sessions.listExisting()),
+        recent: async () => this.recentSessions(await sessions.listExisting()),
+        recentListMessage: async () => this.recentSessionMessages(await sessions.listExisting()),
         create: (name) => sessions.create({
           name,
           model: runtimeContext.model,
           workspaceId: args.workspaceId,
         }),
-        switch: (id) => {
-          sessions.require(id);
+        switch: async (id) => {
+          await sessions.require(id);
         },
-        rename: (name) => {
-          sessions.rename(args.sessionId, name);
+        rename: async (name) => {
+          await sessions.rename(args.sessionId, name);
         },
-        setPinned: (pinned) => {
-          sessions.setPinned(args.sessionId, pinned);
+        setPinned: async (pinned) => {
+          await sessions.setPinned(args.sessionId, pinned);
         },
-        remove: (id) => {
-          sessions.delete(id);
+        remove: async (id) => {
+          await sessions.delete(id);
         },
-        clear: () => {
-          sessions.resetConversation(args.sessionId);
+        clear: async () => {
+          await sessions.resetConversation(args.sessionId);
         },
         summarize: ChatSessionRecords.summarize,
       },

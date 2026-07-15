@@ -32,9 +32,9 @@ import type { SlashCommandResult } from '../result-types.js';
 export type SlashCommandExecutionContext = {
   model: {
     active: () => string;
-    setActive: (model: string) => void;
+    setActive: (model: string) => Promise<void>;
     activeReasoningEffort: () => ReasoningEffort | undefined;
-    setReasoningEffort: (effort: ReasoningEffort | undefined) => void;
+    setReasoningEffort: (effort: ReasoningEffort | undefined) => Promise<void>;
     credentialSource: () => ProviderCredentialSource | undefined;
   };
   auth: {
@@ -47,22 +47,22 @@ export type SlashCommandExecutionContext = {
   };
   drift: {
     status: () => { enabled: boolean; error?: string };
-    setEnabled: (enabled: boolean) => void;
+    setEnabled: (enabled: boolean) => Promise<void>;
   };
   permissions: {
     current: () => AutonomyPermissionMode;
     set: (mode: AutonomyPermissionMode) => AutonomyPermissionMode;
   };
   session: {
-    all: () => ChatSession[];
-    recent: () => ChatSession[];
-    recentListMessage: () => string[];
-    create: (name?: string) => ChatSession;
-    switch: (id: string) => void;
-    rename: (name: string) => void;
-    setPinned: (pinned: boolean) => void;
-    remove: (id: string) => void;
-    clear: () => void;
+    all: () => Promise<ChatSession[]>;
+    recent: () => Promise<ChatSession[]>;
+    recentListMessage: () => Promise<string[]>;
+    create: (name?: string) => Promise<ChatSession>;
+    switch: (id: string) => Promise<void>;
+    rename: (name: string) => Promise<void>;
+    setPinned: (pinned: boolean) => Promise<void>;
+    remove: (id: string) => Promise<void>;
+    clear: () => Promise<void>;
     summarize: (session: ChatSession) => string;
   };
   heartbeat: {

@@ -3,7 +3,7 @@ import type { ToolDefinition } from '@/core/types.js';
 import type { ToolToolkit } from '@/core/tools/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
-import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
+import type { ConversationSessionService } from '@/core/chat/engine/types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatTurnRuntime } from '../runtime/index.js';
 import type { RuntimeToolSelectionProfile } from '@/core/runtime/tools/index.js';
@@ -11,7 +11,7 @@ import type { RuntimeToolSelectionProfile } from '@/core/runtime/tools/index.js'
 export type PrepareConversationTurnContextArgs = {
   workspaceRoot: string;
   stateRoot: string;
-  sessionRepository: ChatSessionRepository;
+  sessionService: ConversationSessionService;
   sessionId: string;
   apiKey?: string;
   preferApiKey?: boolean;
@@ -53,7 +53,6 @@ export type ConversationTurnToolRuntimeArgs = Pick<
 >;
 
 export type ConversationTurnContext = {
-  sessions: ChatSession[];
   session: ChatSession;
   runtime: ChatTurnRuntime;
   agentSnapshot?: CustomAgentExecutionSnapshot;

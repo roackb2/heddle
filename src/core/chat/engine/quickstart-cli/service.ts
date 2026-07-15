@@ -64,7 +64,7 @@ export class QuickstartConversationCliRunnerService {
       artifactRepository: options.artifactRepository,
       sessionRepository: options.sessionRepository,
     });
-    let session = QuickstartConversationCliRunnerService.resolveSession({ engine, options });
+    let session = await QuickstartConversationCliRunnerService.resolveSession({ engine, options });
     const textHost = createConversationTextHost({
       output: (text) => output.write(text),
       trace: 'status',
@@ -334,13 +334,13 @@ export class QuickstartConversationCliRunnerService {
     }
   }
 
-  private static resolveSession(input: {
+  private static async resolveSession(input: {
     engine: ConversationEngine;
     options: QuickstartConversationCliRunnerOptions;
-  }): ChatSession {
+  }): Promise<ChatSession> {
     return input.options.sessionId
-      ? input.engine.sessions.require(input.options.sessionId)
-      : input.engine.sessions.create({
+      ? await input.engine.sessions.require(input.options.sessionId)
+      : await input.engine.sessions.create({
           name: input.options.sessionName ?? 'Heddle SDK interactive chat',
         });
   }

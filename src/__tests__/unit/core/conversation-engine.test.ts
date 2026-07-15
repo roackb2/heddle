@@ -8,8 +8,17 @@ import { ArtifactService } from '@/core/artifacts/index.js';
 import { EngineConversationTurnService } from '../../../core/chat/engine/turns/service.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { TraceEvent } from '../../../core/types.js';
-import { FileChatSessionRepository } from '../../../core/chat/engine/sessions/repository/index.js';
+import {
+  FileChatSessionRepository,
+  type ChatSessionCatalogEntry,
+  type ChatSessionRepository,
+  type StoredChatSession,
+} from '../../../core/chat/engine/sessions/repository/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
+import {
+  listChatSessionCatalog,
+  readStoredChatSession,
+} from '../../helpers/chat-session-repository.js';
 import { TraceSummaryService } from '@/core/observability/index.js';
 import type { LlmAdapter } from '@/core/llm/types.js';
 import type { ToolDefinition } from '../../../core/types.js';
@@ -18,17 +27,20 @@ import type { ToolToolkit } from '../../../core/tools/index.js';
 describe('createConversationEngine', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    vi.spyOn(EngineConversationTurnService, 'run').mockImplementation(async (args) => ({
-      outcome: 'done',
-      summary: 'ok',
-      session: new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
-        .read(args.sessionId) as ChatSession,
-      artifacts: [],
-      toolResults: [],
-    }));
+    vi.spyOn(EngineConversationTurnService, 'run').mockImplementation(async (args) => {
+      const stored = await new FileChatSessionRepository({ sessionStoragePath: args.sessionStoragePath })
+        .read(args.sessionId);
+      return {
+        outcome: 'done',
+        summary: 'ok',
+        session: stored?.session as ChatSession,
+        artifacts: [],
+        toolResults: [],
+      };
+    });
   });
 
-  it('derives the default session storage path from stateRoot and persists session defaults', () => {
+  it('derives the default session storage path from stateRoot and persists session defaults', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const engine = createConversationEngine({
@@ -39,35 +51,35 @@ describe('createConversationEngine', () => {
       apiKeyPresent: true,
     });
 
-    expect(engine.sessions.listExisting()).toEqual([]);
-    expect(engine.sessions.readExisting('session-1')).toBeUndefined();
+    await expect(engine.sessions.listExisting()).resolves.toEqual([]);
+    await expect(engine.sessions.readExisting('session-1')).resolves.toBeUndefined();
     expect(existsSync(join(stateRoot, 'chat-sessions.catalog.json'))).toBe(false);
-    const fallback = engine.sessions.latest();
+    const fallback = await engine.sessions.latest();
     expect(fallback).toEqual(expect.objectContaining({
       id: 'session-1',
       model: 'gpt-5.4',
       workspaceId: 'workspace-1',
     }));
-    expect(engine.sessions.require('session-1')).toEqual(expect.objectContaining({
+    await expect(engine.sessions.require('session-1')).resolves.toEqual(expect.objectContaining({
       id: 'session-1',
       model: 'gpt-5.4',
     }));
 
-    const session = engine.sessions.create({ name: 'Repo investigation' });
+    const session = await engine.sessions.create({ name: 'Repo investigation' });
 
-    expect(engine.sessions.listExisting().map((candidate) => candidate.id)).toEqual([session.id, 'session-1']);
-    expect(engine.sessions.readExisting(session.id)?.id).toBe(session.id);
-    expect(engine.sessions.readExisting('missing')).toBeUndefined();
+    expect((await engine.sessions.listExisting()).map((candidate) => candidate.id)).toEqual([session.id, 'session-1']);
+    expect((await engine.sessions.readExisting(session.id))?.id).toBe(session.id);
+    await expect(engine.sessions.readExisting('missing')).resolves.toBeUndefined();
     const sessionRepository = new FileChatSessionRepository({
       sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
     });
-    expect(sessionRepository.readCatalog()[0]).toEqual(expect.objectContaining({
+    expect((await listChatSessionCatalog(sessionRepository))[0]).toEqual(expect.objectContaining({
       id: session.id,
       name: 'Repo investigation',
       model: 'gpt-5.4',
       workspaceId: 'workspace-1',
     }));
-    expect(sessionRepository.read(session.id)).toEqual(expect.objectContaining({
+    expect((await sessionRepository.read(session.id))?.session).toEqual(expect.objectContaining({
       id: session.id,
       model: 'gpt-5.4',
       workspaceId: 'workspace-1',
@@ -76,7 +88,7 @@ describe('createConversationEngine', () => {
     }));
   });
 
-  it('exposes an artifacts reader rooted at the resolved artifact root', () => {
+  it('exposes an artifacts reader rooted at the resolved artifact root', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-artifacts-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const engine = createConversationEngine({
@@ -85,7 +97,7 @@ describe('createConversationEngine', () => {
       model: 'gpt-5.4',
       apiKeyPresent: true,
     });
-    const session = engine.sessions.create({ id: 'session-1', name: 'Artifacts' });
+    const session = await engine.sessions.create({ id: 'session-1', name: 'Artifacts' });
 
     const saved = engine.artifacts.saveText({ content: '# Deck', kind: 'source', sessionId: session.id });
 
@@ -95,7 +107,7 @@ describe('createConversationEngine', () => {
     expect(new ArtifactService({ artifactRoot: join(stateRoot, 'artifacts') }).get(saved.id)?.id).toBe(saved.id);
   });
 
-  it('persists artifacts through an injected repository without touching the state root', () => {
+  it('persists artifacts through an injected repository without touching the state root', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-artifact-repo-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     let catalog = { version: 1 as const, artifacts: [], current: { sessionArtifactIds: {} } };
@@ -118,7 +130,7 @@ describe('createConversationEngine', () => {
         readContent: (key) => contents.get(key),
       },
     });
-    const session = engine.sessions.create({ id: 'session-1', name: 'Hosted artifacts' });
+    const session = await engine.sessions.create({ id: 'session-1', name: 'Hosted artifacts' });
 
     const saved = engine.artifacts.saveText({ content: '# Hosted deck', kind: 'source', sessionId: session.id });
 
@@ -129,43 +141,54 @@ describe('createConversationEngine', () => {
     expect(existsSync(join(stateRoot, 'artifacts'))).toBe(false);
   });
 
-  it('persists sessions through an injected repository without touching the state root', () => {
+  it('persists sessions through an injected repository without touching the state root', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-session-repo-'));
     const stateRoot = join(workspaceRoot, '.heddle');
-    let stored: ChatSession[] = [];
+    const stored = new Map<string, StoredChatSession>();
+    const sessionRepository: ChatSessionRepository = {
+      list: async ({ limit }) => ({
+        items: [...stored.values()].map(({ session, revision }) => catalogEntry(session, revision)).slice(0, limit),
+      }),
+      read: async (sessionId) => structuredClone(stored.get(sessionId)),
+      create: async (session) => {
+        const record = { session: structuredClone(session), revision: 1 };
+        stored.set(session.id, record);
+        return structuredClone(record);
+      },
+      update: async ({ session, expectedRevision }) => {
+        const current = stored.get(session.id);
+        if (!current || current.revision !== expectedRevision) {
+          return undefined;
+        }
+        const record = { session: structuredClone(session), revision: current.revision + 1 };
+        stored.set(session.id, record);
+        return structuredClone(record);
+      },
+      delete: async ({ sessionId, expectedRevision }) => {
+        const current = stored.get(sessionId);
+        return current?.revision === expectedRevision && stored.delete(sessionId);
+      },
+    };
     const engine = createConversationEngine({
       workspaceRoot,
       stateRoot,
       model: 'gpt-5.4',
       apiKeyPresent: true,
-      sessionRepository: {
-        list: () => structuredClone(stored),
-        readCatalog: () => stored.map((session) => ({
-          id: session.id,
-          name: session.name,
-          pinned: session.pinned,
-          createdAt: session.createdAt,
-          updatedAt: session.updatedAt,
-        })),
-        read: (sessionId) => structuredClone(stored.find((session) => session.id === sessionId)),
-        save: (sessions) => {
-          stored = structuredClone(sessions);
-        },
-      },
+      sessionRepository,
     });
 
-    engine.sessions.create({ id: 'session-hosted', name: 'Hosted session' });
+    await engine.sessions.create({ id: 'session-hosted', name: 'Hosted session' });
 
-    expect(stored.map((session) => session.id)).toContain('session-hosted');
-    expect(engine.sessions.read('session-hosted')?.name).toBe('Hosted session');
+    expect([...stored.keys()]).toContain('session-hosted');
+    expect((await engine.sessions.read('session-hosted'))?.name).toBe('Hosted session');
 
-    engine.sessions.rename('session-hosted', 'Renamed hosted');
-    expect(stored.find((session) => session.id === 'session-hosted')?.name).toBe('Renamed hosted');
+    await engine.sessions.rename('session-hosted', 'Renamed hosted');
+    expect(stored.get('session-hosted')?.session.name).toBe('Renamed hosted');
     // Nothing was written to the default on-disk session catalog.
     expect(existsSync(join(stateRoot, 'chat-sessions.catalog.json'))).toBe(false);
   });
 
-  it('roots the artifacts reader at a custom host-extension artifacts root', () => {
+  it('roots the artifacts reader at a custom host-extension artifacts root', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-artifacts-custom-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const customRoot = join(stateRoot, 'deck-artifacts');
@@ -176,7 +199,7 @@ describe('createConversationEngine', () => {
       apiKeyPresent: true,
       hostExtensions: [defineHostExtension({ id: 'decks', artifacts: { root: customRoot, enabled: true } })],
     });
-    const session = engine.sessions.create({ id: 'session-1', name: 'Custom artifacts' });
+    const session = await engine.sessions.create({ id: 'session-1', name: 'Custom artifacts' });
 
     const saved = engine.artifacts.saveText({ content: '<html></html>', kind: 'html', sessionId: session.id });
 
@@ -212,7 +235,7 @@ describe('createConversationEngine', () => {
       },
       apiKeyPresent: true,
     });
-    const session = engine.sessions.create({ id: 'session-1', name: 'Host tools' });
+    const session = await engine.sessions.create({ id: 'session-1', name: 'Host tools' });
 
     await engine.turns.submit({
       sessionId: session.id,
@@ -266,7 +289,7 @@ describe('createConversationEngine', () => {
       ],
       apiKeyPresent: true,
     });
-    const session = engine.sessions.create({ id: 'session-1', name: 'Host extension array' });
+    const session = await engine.sessions.create({ id: 'session-1', name: 'Host extension array' });
 
     await engine.turns.submit({
       sessionId: session.id,
@@ -338,7 +361,7 @@ describe('createConversationEngine', () => {
       tools: hostTools,
       apiKeyPresent: true,
     });
-    const session = engine.sessions.create({ id: 'session-1', name: 'Legacy host tools' });
+    const session = await engine.sessions.create({ id: 'session-1', name: 'Legacy host tools' });
 
     await engine.turns.submit({
       sessionId: session.id,
@@ -352,7 +375,7 @@ describe('createConversationEngine', () => {
     }));
   });
 
-  it('lists sessions in persisted storage order, reads missing sessions as undefined, updates, renames, and deletes with fallback', () => {
+  it('lists sessions in persisted storage order, reads missing sessions as undefined, updates, renames, and deletes with fallback', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const engine = createConversationEngine({
@@ -362,45 +385,45 @@ describe('createConversationEngine', () => {
       apiKeyPresent: true,
     });
 
-    const first = engine.sessions.create({ id: 'session-a', name: 'First' });
-    const second = engine.sessions.create({ id: 'session-b', name: 'Second' });
+    const first = await engine.sessions.create({ id: 'session-a', name: 'First' });
+    const second = await engine.sessions.create({ id: 'session-b', name: 'Second' });
 
-    expect(engine.sessions.list().map((session) => session.id)).toEqual(['session-b', 'session-a']);
-    expect(engine.sessions.latest()?.id).toBe(engine.sessions.list()[0]?.id);
-    expect(engine.sessions.read('missing')).toBeUndefined();
-    expect(engine.sessions.require(first.id).id).toBe(first.id);
-    expect(() => engine.sessions.require('missing')).toThrow('Chat session not found: missing');
+    expect((await engine.sessions.list()).map((session) => session.id)).toEqual(['session-b', 'session-a']);
+    expect((await engine.sessions.latest())?.id).toBe((await engine.sessions.list())[0]?.id);
+    await expect(engine.sessions.read('missing')).resolves.toBeUndefined();
+    expect((await engine.sessions.require(first.id)).id).toBe(first.id);
+    await expect(engine.sessions.require('missing')).rejects.toThrow('Chat session not found: missing');
 
-    const updated = engine.sessions.update(first.id, (session) => ({
+    const updated = await engine.sessions.update(first.id, (session) => ({
       ...session,
       driftEnabled: true,
     }));
     expect(updated?.driftEnabled).toBe(true);
-    expect(engine.sessions.read(first.id)?.driftEnabled).toBe(true);
+    expect((await engine.sessions.read(first.id))?.driftEnabled).toBe(true);
 
-    const renamed = engine.sessions.rename(first.id, 'Renamed');
+    const renamed = await engine.sessions.rename(first.id, 'Renamed');
     expect(renamed.name).toBe('Renamed');
-    expect(engine.sessions.read(first.id)?.name).toBe('Renamed');
+    expect((await engine.sessions.read(first.id))?.name).toBe('Renamed');
 
-    const archived = engine.sessions.setArchived(first.id, true);
+    const archived = await engine.sessions.setArchived(first.id, true);
     expect(archived.archivedAt).toEqual(expect.any(String));
-    expect(engine.sessions.list().map((session) => session.id)).toEqual(['session-b']);
-    expect(engine.sessions.read(first.id)?.archivedAt).toBe(archived.archivedAt);
-    expect(engine.sessions.setArchived(first.id, false).archivedAt).toBeUndefined();
-    expect(engine.sessions.list().map((session) => session.id)).toEqual(['session-a', 'session-b']);
+    expect((await engine.sessions.list()).map((session) => session.id)).toEqual(['session-b']);
+    expect((await engine.sessions.read(first.id))?.archivedAt).toBe(archived.archivedAt);
+    expect((await engine.sessions.setArchived(first.id, false)).archivedAt).toBeUndefined();
+    expect((await engine.sessions.list()).map((session) => session.id)).toEqual(['session-a', 'session-b']);
 
-    expect(engine.sessions.delete(second.id)).toBe(true);
+    await expect(engine.sessions.delete(second.id)).resolves.toBe(true);
     const sessionRepository = new FileChatSessionRepository({
       sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
     });
-    expect(sessionRepository.list().map((session) => session.id)).toEqual(['session-a']);
-    expect(engine.sessions.delete(first.id)).toBe(true);
-    expect(engine.sessions.delete('session-1')).toBe(true);
-    expect(engine.sessions.delete('missing')).toBe(false);
-    expect(sessionRepository.list().map((session) => session.id)).toEqual(['session-1']);
+    expect((await listChatSessionCatalog(sessionRepository)).map((session) => session.id)).toEqual(['session-a']);
+    await expect(engine.sessions.delete(first.id)).resolves.toBe(true);
+    await expect(engine.sessions.delete('session-1')).resolves.toBe(true);
+    await expect(engine.sessions.delete('missing')).resolves.toBe(false);
+    expect((await listChatSessionCatalog(sessionRepository)).map((session) => session.id)).toEqual(['session-1']);
   });
 
-  it('updates shared session settings for TUI and control-plane clients', () => {
+  it('updates shared session settings for TUI and control-plane clients', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const engine = createConversationEngine({
@@ -410,14 +433,14 @@ describe('createConversationEngine', () => {
       reasoningEffort: 'medium',
       apiKeyPresent: true,
     });
-    const session = engine.sessions.create({
+    const session = await engine.sessions.create({
       id: 'session-1',
       name: 'Alpha',
       model: 'gpt-5.4',
       reasoningEffort: 'high',
     });
 
-    const updated = engine.sessions.updateSettings(session.id, {
+    const updated = await engine.sessions.updateSettings(session.id, {
       model: 'gpt-5.5',
       reasoningEffort: null,
       driftEnabled: true,
@@ -433,12 +456,12 @@ describe('createConversationEngine', () => {
       messages: session.messages,
       turns: session.turns,
     }));
-    expect(engine.sessions.read(session.id)).toEqual(expect.objectContaining({
+    await expect(engine.sessions.read(session.id)).resolves.toEqual(expect.objectContaining({
       model: 'gpt-5.5',
       reasoningEffort: undefined,
       driftEnabled: true,
     }));
-    expect(() => engine.sessions.updateSettings('missing', { driftEnabled: false })).toThrow(
+    await expect(engine.sessions.updateSettings('missing', { driftEnabled: false })).rejects.toThrow(
       'Chat session not found: missing',
     );
   });
@@ -452,8 +475,8 @@ describe('createConversationEngine', () => {
       model: 'gpt-5.4',
       apiKeyPresent: true,
     });
-    const session = engine.sessions.create({ id: 'session-1', name: 'Session 1' });
-    engine.sessions.update(session.id, (current) => ({
+    const session = await engine.sessions.create({ id: 'session-1', name: 'Session 1' });
+    await engine.sessions.update(session.id, (current) => ({
       ...current,
       history: [
         { role: 'user', content: 'Inspect the architecture docs' },
@@ -468,7 +491,7 @@ describe('createConversationEngine', () => {
     });
 
     expect(result.renamed).toBe(true);
-    expect(engine.sessions.require(session.id).name).toBe('Architecture Docs Review!!!');
+    expect((await engine.sessions.require(session.id)).name).toBe('Architecture Docs Review!!!');
   });
 
   it('does not auto-rename custom sessions or later multi-message sessions', async () => {
@@ -480,16 +503,16 @@ describe('createConversationEngine', () => {
       model: 'gpt-5.4',
       apiKeyPresent: true,
     });
-    const custom = engine.sessions.create({ id: 'custom-session', name: 'Manual Investigation' });
-    const later = engine.sessions.create({ id: 'later-session', name: 'Session 42' });
-    engine.sessions.update(custom.id, (session) => ({
+    const custom = await engine.sessions.create({ id: 'custom-session', name: 'Manual Investigation' });
+    const later = await engine.sessions.create({ id: 'later-session', name: 'Session 42' });
+    await engine.sessions.update(custom.id, (session) => ({
       ...session,
       history: [
         { role: 'user', content: 'first' },
         { role: 'assistant', content: 'done' },
       ],
     }));
-    engine.sessions.update(later.id, (session) => ({
+    await engine.sessions.update(later.id, (session) => ({
       ...session,
       history: [
         { role: 'user', content: 'first' },
@@ -522,8 +545,8 @@ describe('createConversationEngine', () => {
       model: 'gpt-5.4',
       apiKeyPresent: true,
     });
-    const session = engine.sessions.create({ id: 'session-1', name: 'Session 1' });
-    engine.sessions.update(session.id, (current) => ({
+    const session = await engine.sessions.create({ id: 'session-1', name: 'Session 1' });
+    await engine.sessions.update(session.id, (current) => ({
       ...current,
       history: [
         { role: 'user', content: 'first' },
@@ -542,14 +565,14 @@ describe('createConversationEngine', () => {
       prompt: 'first',
       responseText: 'done',
     });
-    engine.sessions.rename(session.id, 'Manual Rename');
+    await engine.sessions.rename(session.id, 'Manual Rename');
     resolveTitle({ content: 'Generated Rename' });
 
     await expect(pending).resolves.toEqual({ renamed: false, session: expect.objectContaining({ name: 'Manual Rename' }) });
-    expect(engine.sessions.require(session.id).name).toBe('Manual Rename');
+    expect((await engine.sessions.require(session.id)).name).toBe('Manual Rename');
   });
 
-  it('owns persisted conversation message, reset, continue prompt, and drift mutations', () => {
+  it('owns persisted conversation message, reset, continue prompt, and drift mutations', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const engine = createConversationEngine({
@@ -558,9 +581,9 @@ describe('createConversationEngine', () => {
       model: 'gpt-5.4',
       apiKeyPresent: true,
     });
-    const session = engine.sessions.create({ id: 'session-1', name: 'Alpha' });
+    const session = await engine.sessions.create({ id: 'session-1', name: 'Alpha' });
 
-    const withUserMessage = engine.sessions.appendMessage(session.id, {
+    const withUserMessage = await engine.sessions.appendMessage(session.id, {
       id: 'message-1',
       role: 'user',
       text: 'Inspect README',
@@ -571,7 +594,7 @@ describe('createConversationEngine', () => {
       text: 'Inspect README',
     });
 
-    const withAssistantMessages = engine.sessions.appendMessages(session.id, [
+    const withAssistantMessages = await engine.sessions.appendMessages(session.id, [
       {
         id: 'message-2',
         role: 'assistant',
@@ -598,24 +621,24 @@ describe('createConversationEngine', () => {
       },
     ]);
 
-    const withPrompt = engine.sessions.setLastContinuePrompt(session.id, 'Continue the repo read');
+    const withPrompt = await engine.sessions.setLastContinuePrompt(session.id, 'Continue the repo read');
     expect(withPrompt.lastContinuePrompt).toBe('Continue the repo read');
 
-    const withDrift = engine.sessions.setDriftEnabled(session.id, true);
+    const withDrift = await engine.sessions.setDriftEnabled(session.id, true);
     expect(withDrift.driftEnabled).toBe(true);
 
-    const reset = engine.sessions.resetConversation(session.id);
+    const reset = await engine.sessions.resetConversation(session.id);
     expect(reset.history).toEqual([]);
     expect(reset.turns).toEqual([]);
     expect(reset.lastContinuePrompt).toBeUndefined();
     expect(reset.messages).toEqual([]);
-    expect(engine.sessions.read(session.id)).toEqual(expect.objectContaining({
+    await expect(engine.sessions.read(session.id)).resolves.toEqual(expect.objectContaining({
       driftEnabled: true,
       messages: [],
     }));
   });
 
-  it('owns persisted compaction state transitions', () => {
+  it('owns persisted compaction state transitions', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const engine = createConversationEngine({
@@ -624,9 +647,9 @@ describe('createConversationEngine', () => {
       model: 'gpt-5.4',
       apiKeyPresent: true,
     });
-    const session = engine.sessions.create({ id: 'session-1', name: 'Alpha' });
+    const session = await engine.sessions.create({ id: 'session-1', name: 'Alpha' });
     const sourceHistory = [{ role: 'user' as const, content: 'Inspect README' }];
-    const previousState = engine.sessions.update(session.id, (current) => ({
+    const previousState = await engine.sessions.update(session.id, (current) => ({
       ...current,
       context: {
         estimatedHistoryTokens: 7,
@@ -646,7 +669,7 @@ describe('createConversationEngine', () => {
       ],
     }))!;
 
-    const running = engine.sessions.markCompactionRunning(session.id, {
+    const running = await engine.sessions.markCompactionRunning(session.id, {
       sourceHistory,
       archivePath: '.heddle/chat-sessions/session-1/archive.jsonl',
     });
@@ -656,7 +679,7 @@ describe('createConversationEngine', () => {
       archive: expect.objectContaining({ lastArchivePath: '.heddle/chat-sessions/session-1/archive.jsonl' }),
     }));
 
-    const compacted = engine.sessions.applyCompactionResult(session.id, {
+    const compacted = await engine.sessions.applyCompactionResult(session.id, {
       history: [
         { role: 'user', content: 'Short prompt' },
         { role: 'assistant', content: 'Short answer' },
@@ -672,7 +695,7 @@ describe('createConversationEngine', () => {
     expect(compacted.messages.map((message) => message.text)).toEqual(['Short prompt', 'Short answer']);
     expect(compacted.context?.compaction?.status).toBe('idle');
 
-    const restored = engine.sessions.restoreCompactionState(session.id, {
+    const restored = await engine.sessions.restoreCompactionState(session.id, {
       context: previousState.context,
       archives: previousState.archives,
     });
@@ -680,7 +703,7 @@ describe('createConversationEngine', () => {
     expect(restored.archives).toEqual(previousState.archives);
   });
 
-  it('owns session lease conflict, acquire, and release semantics', () => {
+  it('owns session lease conflict, acquire, and release semantics', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const engine = createConversationEngine({
@@ -689,7 +712,7 @@ describe('createConversationEngine', () => {
       model: 'gpt-5.4',
       apiKeyPresent: true,
     });
-    const session = engine.sessions.create({ id: 'session-1', name: 'Alpha' });
+    const session = await engine.sessions.create({ id: 'session-1', name: 'Alpha' });
     const owner = {
       ownerKind: 'tui' as const,
       ownerId: 'tui-test-client',
@@ -701,29 +724,29 @@ describe('createConversationEngine', () => {
       clientLabel: 'control plane',
     };
 
-    expect(engine.sessions.getLeaseConflict(session.id, owner)).toBeUndefined();
-    const leased = engine.sessions.acquireLease(session.id, owner);
+    await expect(engine.sessions.getLeaseConflict(session.id, owner)).resolves.toBeUndefined();
+    const leased = await engine.sessions.acquireLease(session.id, owner);
     expect(leased.lease).toEqual(expect.objectContaining({
       ownerKind: 'tui',
       ownerId: 'tui-test-client',
       clientLabel: 'terminal chat',
     }));
-    expect(engine.sessions.getLeaseConflict(session.id, otherOwner)).toContain(
+    await expect(engine.sessions.getLeaseConflict(session.id, otherOwner)).resolves.toContain(
       'Session session-1 is already active in terminal chat.',
     );
-    expect(() => engine.sessions.acquireLease(session.id, otherOwner)).toThrow(
+    await expect(engine.sessions.acquireLease(session.id, otherOwner)).rejects.toThrow(
       'Session session-1 is already active in terminal chat.',
     );
 
-    const refreshed = engine.sessions.refreshLease(session.id, owner);
+    const refreshed = await engine.sessions.refreshLease(session.id, owner);
     expect(refreshed.lease?.ownerId).toBe('tui-test-client');
 
-    const stillLeased = engine.sessions.releaseLease(session.id, { ownerId: 'daemon-1' });
+    const stillLeased = await engine.sessions.releaseLease(session.id, { ownerId: 'daemon-1' });
     expect(stillLeased.lease?.ownerId).toBe('tui-test-client');
 
-    const released = engine.sessions.releaseLease(session.id, owner);
+    const released = await engine.sessions.releaseLease(session.id, owner);
     expect(released.lease).toBeUndefined();
-    expect(engine.sessions.read(session.id)?.lease).toBeUndefined();
+    expect((await engine.sessions.read(session.id))?.lease).toBeUndefined();
   });
 
   it('submits turns with merged engine defaults, normalized host callbacks, and override options', async () => {
@@ -750,7 +773,7 @@ describe('createConversationEngine', () => {
       workspaceId: 'workspace-1',
       apiKeyPresent: true,
     });
-    const session = engine.sessions.create({ id: 'session-1', name: 'Alpha' });
+    const session = await engine.sessions.create({ id: 'session-1', name: 'Alpha' });
     const onActivity = vi.fn();
     const onEvent = vi.fn();
     const onTraceEvent = vi.fn();
@@ -852,7 +875,7 @@ describe('createConversationEngine', () => {
       model: 'gpt-5.4',
       apiKeyPresent: true,
     });
-    const session = engine.sessions.create({ id: 'session-1', name: 'Alpha' });
+    const session = await engine.sessions.create({ id: 'session-1', name: 'Alpha' });
 
     await expect(engine.turns.continue({ sessionId: session.id })).rejects.toThrow(
       'There is no interrupted or prior run to continue yet.',
@@ -861,13 +884,19 @@ describe('createConversationEngine', () => {
     const sessionRepository = new FileChatSessionRepository({
       sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
     });
-    const stored = sessionRepository.read(session.id) as ChatSession;
-    stored.lastContinuePrompt = 'continue investigating';
-    stored.history = [{ role: 'user', content: 'prior' }];
-    stored.updatedAt = '2026-05-03T00:00:00.000Z';
-    const otherSessions = sessionRepository.list()
-      .filter((candidate) => candidate.id !== session.id);
-    sessionRepository.save([stored, ...otherSessions]);
+    const stored = await sessionRepository.read(session.id);
+    if (!stored) {
+      throw new Error(`Expected stored session: ${session.id}`);
+    }
+    await sessionRepository.update({
+      session: {
+        ...stored.session,
+        lastContinuePrompt: 'continue investigating',
+        history: [{ role: 'user', content: 'prior' }],
+        updatedAt: '2026-05-03T00:00:00.000Z',
+      },
+      expectedRevision: stored.revision,
+    });
 
     await engine.turns.continue({ sessionId: session.id });
     const runSpy = vi.mocked(EngineConversationTurnService.run);
@@ -877,7 +906,7 @@ describe('createConversationEngine', () => {
     expect(runSpy.mock.calls[1]?.[0]?.prompt).toBe('override prompt');
   });
 
-  it('clears leases through the turn service boundary', () => {
+  it('clears leases through the turn service boundary', async () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-'));
     const stateRoot = join(workspaceRoot, '.heddle');
     const engine = createConversationEngine({
@@ -887,27 +916,27 @@ describe('createConversationEngine', () => {
       apiKeyPresent: true,
     });
 
-    expect(() => engine.turns.clearLease({
+    await expect(engine.turns.clearLease({
       sessionId: 'missing',
       owner: { ownerKind: 'daemon', ownerId: 'daemon-1', clientLabel: 'control plane' },
-    })).not.toThrow();
+    })).resolves.toBeUndefined();
 
-    const session = engine.sessions.create({ id: 'session-1', name: 'Leased' });
-    engine.sessions.acquireLease(session.id, {
+    const session = await engine.sessions.create({ id: 'session-leased', name: 'Leased' });
+    await engine.sessions.acquireLease(session.id, {
       ownerKind: 'daemon',
       ownerId: 'daemon-1',
       clientLabel: 'control plane',
     });
 
-    engine.turns.clearLease({
-      sessionId: 'session-1',
+    await engine.turns.clearLease({
+      sessionId: session.id,
       owner: { ownerKind: 'daemon', ownerId: 'daemon-1', clientLabel: 'control plane' },
     });
 
     const sessionRepository = new FileChatSessionRepository({
       sessionStoragePath: join(stateRoot, 'chat-sessions.catalog.json'),
     });
-    expect(sessionRepository.read('session-1')?.lease).toBeUndefined();
+    expect((await readStoredChatSession(sessionRepository, session.id))?.lease).toBeUndefined();
   });
 });
 
@@ -923,5 +952,26 @@ function tool(name: string): ToolDefinition {
 function fakeTitleLlm(title: string): LlmAdapter {
   return {
     chat: vi.fn(async () => ({ content: title })),
+  };
+}
+
+function catalogEntry(session: ChatSession, revision: number): ChatSessionCatalogEntry {
+  return {
+    id: session.id,
+    revision,
+    name: session.name,
+    retention: session.retention,
+    workspaceId: session.workspaceId,
+    pinned: session.pinned,
+    archivedAt: session.archivedAt,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    model: session.model,
+    reasoningEffort: session.reasoningEffort,
+    driftEnabled: session.driftEnabled,
+    lastContinuePrompt: session.lastContinuePrompt,
+    context: session.context,
+    archives: session.archives,
+    lease: session.lease,
   };
 }

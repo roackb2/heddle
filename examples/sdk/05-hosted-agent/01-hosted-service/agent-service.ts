@@ -92,8 +92,8 @@ export class HostedAgentService {
     }
     const engine = await this.options.createEngine(address);
     const host = await this.options.createHost?.(address);
-    const session = engine.sessions.readExisting(address.sessionId)
-      ?? engine.sessions.create({ id: address.sessionId, name: 'Hosted agent conversation' });
+    const session = (await engine.sessions.readExisting(address.sessionId))
+      ?? await engine.sessions.create({ id: address.sessionId, name: 'Hosted agent conversation' });
 
     const run = this.runs.startTurn({
       address,
@@ -130,7 +130,7 @@ export class HostedAgentService {
     const engine = await this.options.createEngine(address);
     return this.projectConversation(
       address,
-      engine.sessions.readExisting(address.sessionId)?.messages ?? [],
+      (await engine.sessions.readExisting(address.sessionId))?.messages ?? [],
     );
   }
 
@@ -143,10 +143,10 @@ export class HostedAgentService {
     }
 
     const engine = await this.options.createEngine(address);
-    const session = engine.sessions.readExisting(address.sessionId);
+    const session = await engine.sessions.readExisting(address.sessionId);
     return this.projectConversation(
       address,
-      session ? engine.sessions.resetConversation(session.id).messages : [],
+      session ? (await engine.sessions.resetConversation(session.id)).messages : [],
     );
   }
 

@@ -101,7 +101,7 @@ export class ConversationCompactionService {
 
     const archiveId = FileChatArchiveRepository.createArchiveId();
     const archivePath = archiveRepository.writeMessagesJsonl(archiveId, archivedMessages);
-    options.onStatusChange?.({
+    await options.onStatusChange?.({
       source: 'compaction',
       type: 'compaction.running',
       status: 'running',
@@ -144,7 +144,7 @@ export class ConversationCompactionService {
         ...recentMessages,
       ];
 
-      options.onStatusChange?.({
+      await options.onStatusChange?.({
         source: 'compaction',
         type: 'compaction.finished',
         status: 'finished',
@@ -164,7 +164,7 @@ export class ConversationCompactionService {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      options.onStatusChange?.({
+      await options.onStatusChange?.({
         source: 'compaction',
         type: 'compaction.failed',
         status: 'failed',
