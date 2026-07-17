@@ -2,14 +2,12 @@
  * Codec service for current chat session persistence.
  *
  * The schema file owns the JSON contract. This class owns the read/write
- * behavior around that contract: graceful read degradation, strict write
- * validation, catalog projection, and compatibility cleanup for legacy visible
- * welcome messages.
+ * behavior around that contract: graceful read degradation, strict file-write
+ * validation, and compatibility cleanup for legacy visible welcome messages.
  */
 import type { ChatSession } from '@/core/chat/types.js';
 import {
   CatalogEntryReadSchema,
-  CatalogEntryWriteSchema,
   CatalogReadSchema,
   CatalogWriteSchema,
   SessionBodyReadSchema,
@@ -40,23 +38,16 @@ export class ChatSessionCodec {
     if (!parsed.success) {
       return [];
     }
+    const { revision: _revision, ...entry } = args.entry;
 
     return [{
       ...parsed.data,
-      ...args.entry,
+      ...entry,
       history: parsed.data.history ?? [],
       messages: ChatSessionCodec.resolveMessages(parsed.data.messages),
       turns: parsed.data.turns ?? [],
       queuedPrompts: parsed.data.queuedPrompts ?? [],
     }];
-  }
-
-  static projectCatalogEntry(session: ChatSession, revision: number): ChatSessionCatalogEntry {
-    const parsed = CatalogEntryWriteSchema.parse({ ...session, revision });
-    return {
-      ...parsed,
-      pinned: parsed.pinned ?? false,
-    };
   }
 
   static serializeCatalog(catalog: ChatSessionCatalog): string {

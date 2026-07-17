@@ -9,9 +9,14 @@ service; adapters only own durable record I/O.
 - the `ChatSessionRepository` async adapter contract
 - optimistic revisions and compare-and-swap mutation errors
 - deterministic, cursor-paginated catalog reads
+- database-neutral strict record validation and catalog projection through
+  `ChatSessionPersistenceCodec`
+- canonical in-process ordering, opaque cursors, and page validation through
+  `ChatSessionCatalogPagination`
 - the default catalog and immutable per-session revision file layout
 - persisted JSON contract in `chat-session-schemas.ts`
-- serialization/deserialization behavior through `ChatSessionCodec`
+- legacy file serialization/deserialization behavior through the private
+  `ChatSessionCodec`
 - legacy revision-one file compatibility
 
 ## Does Not Own
@@ -29,6 +34,11 @@ service; adapters only own durable record I/O.
 - hosts should not call it directly when a core session service can own the flow
 - disk-shape validation belongs in `chat-session-schemas.ts`, not in ad hoc
   repository type guards
+- remote adapters should parse opaque records and project catalog columns with
+  `ChatSessionPersistenceCodec`; do not copy Heddle's record shape into another
+  hand-maintained validator
+- adapters should use `ChatSessionCatalogPagination` for cursor wire behavior
+  and mirror its documented order exactly in database queries
 - do not add wrapper-only repository files; this folder earns its place by
   owning real file persistence mechanics
 
@@ -46,6 +56,13 @@ Every adapter must:
   predicate, so page boundaries cannot skip or repeat records;
 - scope all operations to the authenticated product boundary chosen by the
   host. Heddle's record does not invent product-specific account or RLS fields.
+
+The authoring primitives deliberately do not own SQL, transactions, connection
+pooling, migrations, identity, tenant filters, RLS, or database error codes.
+Those stay in the host adapter. `ChatSessionPersistenceCodec.parseRecord(...)`
+throws on malformed complete records instead of using the tolerant legacy-file
+read behavior; catch that failure only to add storage-specific context, never
+to return a partial conversation.
 
 The session service retries a small, bounded number of optimistic update
 conflicts by rereading the latest record and reapplying the update. A generic
@@ -84,7 +101,9 @@ the revision in the same statement or transaction. If no row is changed,
 distinguish a missing record from a revision conflict and return/throw the
 contract result accordingly.
 
-For cursor pages, use a composite cursor matching the query order (pinned
-first, then `updatedAt` descending, then ID ascending) and make the final ID
-comparison use a stable binary/C collation. Do not load and rewrite the whole
-collection for one record mutation.
+For cursor pages, decode/encode with `ChatSessionCatalogPagination` and use a
+composite database predicate matching its query order (pinned first, then
+`updatedAt` descending, then ID ascending). Make the final ID comparison use a
+stable binary/C collation. The helper's comparator is for in-process adapters
+and tests; a database adapter must express the same order in SQL rather than
+loading and rewriting the whole collection.

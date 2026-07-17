@@ -68,6 +68,17 @@ const ConversationLinesSchema = z.array(z.unknown())
     return parsed.success ? [parsed.data] : [];
   }));
 
+const ChatTurnAgentSchema = z.object({
+  id: z.string().describe('Custom agent id used for this turn.'),
+  name: z.string().describe('Custom agent display name used for this turn.'),
+  modeAlias: z.enum(['ask', 'code', 'review'])
+    .describe('Built-in mode alias for this custom agent, when present.')
+    .optional(),
+  source: z.enum(['project', 'user', 'built-in'])
+    .describe('Definition source for the custom agent used for this turn.'),
+  definitionHash: z.string().describe('Hash of the custom-agent definition snapshot used for this turn.'),
+});
+
 const TurnSummarySchema = z.object({
   id: z.string().describe('Stable identifier for this completed turn summary.'),
   prompt: z.string().describe('User prompt that started the turn.'),
@@ -78,29 +89,24 @@ const TurnSummarySchema = z.object({
   events: z.array(z.string()).describe('Compact event summaries extracted from the turn trace.'),
   presentation: ConversationTurnPresentationSchema
     .describe('Compact non-transcript tool activity metadata for conversation timeline presentation.')
-    .optional()
-    .catch(undefined),
-  agent: z.object({
-    id: z.string().describe('Custom agent id used for this turn.'),
-    name: z.string().describe('Custom agent display name used for this turn.'),
-    modeAlias: z.enum(['ask', 'code', 'review'])
-      .describe('Built-in mode alias for this custom agent, when present.')
-      .optional(),
-    source: z.enum(['project', 'user', 'built-in'])
-      .describe('Definition source for the custom agent used for this turn.'),
-    definitionHash: z.string().describe('Hash of the custom-agent definition snapshot used for this turn.'),
-  }).describe('Compact custom-agent metadata for this completed turn.')
-    .optional()
-    .catch(undefined),
+    .optional(),
+  agent: ChatTurnAgentSchema
+    .describe('Compact custom-agent metadata for this completed turn.')
+    .optional(),
   agentSnapshot: CustomAgentExecutionSnapshotSchema
     .describe('Resolved custom-agent execution snapshot used by this completed turn.')
-    .optional()
-    .catch(undefined),
+    .optional(),
+});
+
+const TurnSummaryReadSchema = TurnSummarySchema.extend({
+  presentation: ConversationTurnPresentationSchema.optional().catch(undefined),
+  agent: ChatTurnAgentSchema.optional().catch(undefined),
+  agentSnapshot: CustomAgentExecutionSnapshotSchema.optional().catch(undefined),
 });
 
 const TurnSummariesSchema = z.array(z.unknown())
   .transform((turns) => turns.flatMap((turn) => {
-    const parsed = TurnSummarySchema.safeParse(turn);
+    const parsed = TurnSummaryReadSchema.safeParse(turn);
     return parsed.success ? [parsed.data] : [];
   }));
 
@@ -200,8 +206,7 @@ const QueuedConversationPromptSchema = z.object({
     .optional(),
   agentSnapshot: CustomAgentExecutionSnapshotSchema
     .describe('Resolved custom-agent execution snapshot selected when this prompt entered the queue.')
-    .optional()
-    .catch(undefined),
+    .optional(),
   systemContext: z.string()
     .describe('Optional runtime context that should be applied when this queued prompt runs.')
     .optional(),
@@ -209,9 +214,13 @@ const QueuedConversationPromptSchema = z.object({
   updatedAt: z.string().describe('Timestamp when this queued prompt was last edited.'),
 });
 
+const QueuedConversationPromptReadSchema = QueuedConversationPromptSchema.extend({
+  agentSnapshot: CustomAgentExecutionSnapshotSchema.optional().catch(undefined),
+});
+
 const QueuedConversationPromptsSchema = z.array(z.unknown())
   .transform((prompts) => prompts.flatMap((prompt) => {
-    const parsed = QueuedConversationPromptSchema.safeParse(prompt);
+    const parsed = QueuedConversationPromptReadSchema.safeParse(prompt);
     return parsed.success ? [parsed.data] : [];
   }));
 
@@ -272,10 +281,15 @@ export const CatalogEntryReadSchema = z.object({
     .catch(undefined),
 });
 
-export const CatalogEntryWriteSchema = CatalogEntryReadSchema.required({
-  revision: true,
-  createdAt: true,
-  updatedAt: true,
+export const CatalogEntryWriteSchema = CatalogEntryReadSchema.extend({
+  revision: z.number()
+    .int()
+    .positive()
+    .describe('Monotonic revision used for optimistic concurrency.'),
+  pinned: z.boolean()
+    .describe('Whether this session should be grouped above unpinned sessions in session lists.'),
+  createdAt: z.string().describe('Timestamp when the session was created.'),
+  updatedAt: z.string().describe('Timestamp when the session was last changed.'),
 });
 
 export const CatalogReadSchema = z.object({
@@ -359,6 +373,30 @@ export const SessionBodyWriteSchema = z.object({
     .describe('FIFO user prompts accepted while the session has earlier work to finish.')
     .default([]),
 });
+
+/**
+ * Strict database-neutral shape for a complete opaque Heddle session record.
+ *
+ * Legacy file reads intentionally use the tolerant read schemas above. Remote
+ * adapters should use this schema through `ChatSessionPersistenceCodec` so a
+ * malformed database record fails loudly instead of silently losing history.
+ */
+export const ChatSessionRecordSchema = CatalogEntryWriteSchema
+  .omit({ revision: true })
+  .extend({
+    retention: ChatSessionRetentionSchema.optional(),
+    pinned: z.boolean(),
+    reasoningEffort: ReasoningEffortSchema.optional(),
+    driftEnabled: z.boolean().optional(),
+    context: ChatContextStatsSchema.optional(),
+    archives: z.array(ChatArchiveRecordSchema).optional(),
+    lease: ChatSessionLeaseSchema.optional(),
+    history: z.array(ChatMessageSchema),
+    messages: z.array(ConversationLineSchema),
+    turns: z.array(TurnSummarySchema),
+    queuedPrompts: z.array(QueuedConversationPromptSchema),
+  })
+  .strict();
 
 export type CatalogEntryRead = z.infer<typeof CatalogEntryReadSchema>;
 export type ConversationLineValue = z.infer<typeof ConversationLineSchema>;

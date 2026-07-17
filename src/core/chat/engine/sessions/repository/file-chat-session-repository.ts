@@ -19,12 +19,13 @@ import { basename, dirname, join } from 'node:path';
 import { Mutex } from 'async-mutex';
 import { lock } from 'proper-lockfile';
 import type { ChatSession } from '@/core/chat/types.js';
+import { ChatSessionCatalogPagination } from './chat-session-catalog-pagination.js';
 import { ChatSessionCodec } from './chat-session-codec.js';
+import { ChatSessionPersistenceCodec } from './chat-session-persistence-codec.js';
 import {
   ChatSessionAlreadyExistsError,
   ChatSessionRevisionConflictError,
   ChatSessionStorageCorruptionError,
-  InvalidChatSessionCursorError,
 } from './errors.js';
 import type {
   ChatSessionCatalog,
@@ -38,8 +39,6 @@ import type {
   UpdateChatSessionInput,
 } from './types.js';
 
-type FileChatSessionCursor = Pick<ChatSessionCatalogEntry, 'id' | 'pinned' | 'updatedAt'>;
-
 export class FileChatSessionRepository implements ChatSessionRepository {
   private readonly sessionStoragePath: string;
   private readonly storagePaths: SessionStoragePaths;
@@ -52,23 +51,23 @@ export class FileChatSessionRepository implements ChatSessionRepository {
 
   async list(input: ListChatSessionsInput): Promise<ChatSessionCatalogPage> {
     return await this.mutex.runExclusive(async () => {
-      FileChatSessionRepository.validatePageLimit(input.limit);
+      ChatSessionCatalogPagination.validatePageLimit(input.limit);
       const catalog = await FileChatSessionRepository.readCatalogFile(this.storagePaths.catalogPath);
       const cursor = input.cursor
-        ? FileChatSessionRepository.decodeCursor(input.cursor)
+        ? ChatSessionCatalogPagination.decodeCursor(input.cursor)
         : undefined;
       const filtered = catalog.sessions
         .filter((entry) => input.workspaceId === undefined || entry.workspaceId === input.workspaceId)
         .filter((entry) => input.archived === undefined || Boolean(entry.archivedAt) === input.archived)
-        .filter((entry) => !cursor || FileChatSessionRepository.compareSessionOrder(entry, cursor) > 0)
-        .sort(FileChatSessionRepository.compareSessionOrder);
+        .filter((entry) => !cursor || ChatSessionCatalogPagination.isAfterCursor(entry, cursor))
+        .sort(ChatSessionCatalogPagination.compare);
       const items = filtered.slice(0, input.limit);
       const last = items.at(-1);
 
       return {
         items,
         nextCursor: filtered.length > input.limit && last
-          ? FileChatSessionRepository.encodeCursor(last)
+          ? ChatSessionCatalogPagination.encodeCursor(last)
           : undefined,
       };
     });
@@ -101,9 +100,9 @@ export class FileChatSessionRepository implements ChatSessionRepository {
       const nextCatalog: ChatSessionCatalog = {
         version: 1,
         sessions: [
-          ChatSessionCodec.projectCatalogEntry(session, revision),
+          ChatSessionPersistenceCodec.projectCatalogEntry(session, revision),
           ...catalog.sessions,
-        ].sort(FileChatSessionRepository.compareSessionOrder),
+        ].sort(ChatSessionCatalogPagination.compare),
       };
       await FileChatSessionRepository.replaceCatalog(this.storagePaths.catalogPath, nextCatalog);
       return { session, revision };
@@ -135,9 +134,9 @@ export class FileChatSessionRepository implements ChatSessionRepository {
         version: 1,
         sessions: catalog.sessions
           .map((entry) => entry.id === input.session.id
-            ? ChatSessionCodec.projectCatalogEntry(input.session, revision)
+            ? ChatSessionPersistenceCodec.projectCatalogEntry(input.session, revision)
             : entry)
-          .sort(FileChatSessionRepository.compareSessionOrder),
+          .sort(ChatSessionCatalogPagination.compare),
       };
       await FileChatSessionRepository.replaceCatalog(this.storagePaths.catalogPath, nextCatalog);
       return { session: input.session, revision };
@@ -230,7 +229,7 @@ export class FileChatSessionRepository implements ChatSessionRepository {
       }
       return {
         ...catalog,
-        sessions: catalog.sessions.sort(FileChatSessionRepository.compareSessionOrder),
+        sessions: catalog.sessions.sort(ChatSessionCatalogPagination.compare),
       };
     } catch (error) {
       throw new ChatSessionStorageCorruptionError(
@@ -327,60 +326,6 @@ export class FileChatSessionRepository implements ChatSessionRepository {
       && 'code' in error
       && error.code === 'ENOENT',
     );
-  }
-
-  private static compareSessionOrder(
-    left: Pick<ChatSessionCatalogEntry, 'id' | 'pinned' | 'updatedAt'>,
-    right: Pick<ChatSessionCatalogEntry, 'id' | 'pinned' | 'updatedAt'>,
-  ): number {
-    if (left.pinned !== right.pinned) {
-      return left.pinned ? -1 : 1;
-    }
-
-    const updatedAtOrder = FileChatSessionRepository.compareText(right.updatedAt, left.updatedAt);
-    return updatedAtOrder || FileChatSessionRepository.compareText(left.id, right.id);
-  }
-
-  private static compareText(left: string, right: string): number {
-    return left === right ? 0 : left < right ? -1 : 1;
-  }
-
-  private static encodeCursor(entry: FileChatSessionCursor): string {
-    return Buffer.from(JSON.stringify({
-      id: entry.id,
-      pinned: entry.pinned,
-      updatedAt: entry.updatedAt,
-    }), 'utf8').toString('base64url');
-  }
-
-  private static decodeCursor(cursor: string): FileChatSessionCursor {
-    try {
-      const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as unknown;
-      if (
-        !value
-        || typeof value !== 'object'
-        || !('id' in value)
-        || !('pinned' in value)
-        || !('updatedAt' in value)
-        || typeof value.id !== 'string'
-        || typeof value.pinned !== 'boolean'
-        || typeof value.updatedAt !== 'string'
-      ) {
-        throw new InvalidChatSessionCursorError();
-      }
-      return value as FileChatSessionCursor;
-    } catch (error) {
-      if (error instanceof InvalidChatSessionCursorError) {
-        throw error;
-      }
-      throw new InvalidChatSessionCursorError();
-    }
-  }
-
-  private static validatePageLimit(limit: number): void {
-    if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
-      throw new RangeError('Chat session page limit must be an integer between 1 and 200.');
-    }
   }
 
   private static sessionRevisionPath(sessionsDir: string, sessionId: string, revision: number): string {

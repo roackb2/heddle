@@ -44,6 +44,7 @@ describe('chat session storage layout', () => {
       sessions: Array<Record<string, unknown>>;
     };
     const body = JSON.parse(readFileSync(join(dir, 'chat-sessions', 'session-1.1.json'), 'utf8')) as Record<string, unknown>;
+    const reread = (await repository.read('session-1'))?.session;
 
     expect(stored.revision).toBe(1);
     expect(catalog.version).toBe(1);
@@ -64,7 +65,7 @@ describe('chat session storage layout', () => {
       id: 'session-1',
       messages: [{ id: 'm1', role: 'assistant', text: 'hello there' }],
     }));
-    expect((await repository.read('session-1'))?.session).toEqual(expect.objectContaining({
+    expect(reread).toEqual(expect.objectContaining({
       id: 'session-1',
       workspaceId: 'workspace-1',
       pinned: true,
@@ -72,6 +73,7 @@ describe('chat session storage layout', () => {
       history: [],
       turns: [expect.objectContaining({ id: 't1', summary: 'said hello' })],
     }));
+    expect(reread).not.toHaveProperty('revision');
   });
 
   it('uses expected revisions to prevent lost updates across repository instances', async () => {

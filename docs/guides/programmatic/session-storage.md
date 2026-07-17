@@ -75,6 +75,44 @@ const engine = createConversationEngine({
 })
 ```
 
+### Reuse Heddle's adapter-authoring primitives
+
+Remote adapters should not maintain a second validator or invent a cursor wire
+format. Heddle exports the database-neutral parts of the contract:
+
+```ts
+import {
+  ChatSessionCatalogPagination,
+  ChatSessionPersistenceCodec,
+} from '@roackb2/heddle'
+
+// Fail loudly if JSON/JSONB cannot reconstruct one complete Heddle session.
+const session = ChatSessionPersistenceCodec.parseRecord(row.session)
+
+// Reuse the canonical browser-safe/indexed projection on create and update.
+const catalog = ChatSessionPersistenceCodec.projectCatalogEntry(
+  session,
+  Number(row.revision),
+)
+
+ChatSessionCatalogPagination.validatePageLimit(input.limit)
+const cursor = input.cursor
+  ? ChatSessionCatalogPagination.decodeCursor(input.cursor)
+  : undefined
+
+// After a query returns limit + 1 rows, encode the last included row.
+const nextCursor = hasNextPage && lastIncluded
+  ? ChatSessionCatalogPagination.encodeCursor(lastIncluded)
+  : undefined
+```
+
+`decodeCursor(...)` supplies `(pinned, updatedAt, id)` for the database
+predicate shown below. Express that predicate and order in SQL; do not fetch an
+entire tenant catalog merely to call the in-process comparator. Translate
+database constraint/CAS failures to Heddle's exported repository errors, and
+wrap record-validation failures only to add row/storage context—never continue
+with a partial session.
+
 Construct the adapter with trusted server-side identity/scope. Do not accept a
 tenant or account ID from the browser and then trust it inside repository
 methods. Heddle deliberately leaves product account IDs and row-level-security

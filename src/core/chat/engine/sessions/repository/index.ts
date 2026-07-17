@@ -1,3 +1,5 @@
+export { ChatSessionCatalogPagination } from './chat-session-catalog-pagination.js';
+export { ChatSessionPersistenceCodec } from './chat-session-persistence-codec.js';
 export { FileChatSessionRepository } from './file-chat-session-repository.js';
 export {
   ChatSessionAlreadyExistsError,
@@ -5,6 +7,9 @@ export {
   ChatSessionStorageCorruptionError,
   InvalidChatSessionCursorError,
 } from './errors.js';
+export type {
+  ChatSessionCatalogCursor,
+} from './chat-session-catalog-pagination.js';
 export type {
   ChatSessionCatalog,
   ChatSessionCatalogPage,
