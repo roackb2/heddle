@@ -10,7 +10,7 @@ adapter.
 
 - Deciding whether history needs compaction.
 - Choosing the archived slice versus recent active history.
-- Writing archived transcript files and rolling summaries.
+- Ordering durable archive writes after successful rolling-summary generation.
 - Building compacted summary messages for future turns.
 - Building persisted compaction context stats.
 - Estimating history and request-token pressure for compaction decisions.
@@ -27,6 +27,12 @@ adapter.
   context assembly.
 - `transcript-renderer.ts` owns archive transcript rendering for summarization.
 - `context-builder.ts` owns persisted compaction context stats.
+
+Archive persistence itself belongs to
+`sessions/archives/ChatArchiveRepository`. Compaction treats returned `path`
+and `summaryPath` values as opaque locators. Repository read/write failures are
+infrastructure failures and reject the compaction; summarizer failures retain
+the original history and produce a failed compaction result.
 
 Avoid adding loose exported functions for compaction-domain behavior. If the
 behavior is part of compaction semantics, put it on `ConversationCompactionService`

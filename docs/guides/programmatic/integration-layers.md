@@ -45,7 +45,7 @@ not transport infrastructure.
 | Approvals | Approval request/resolution lifecycle and run integration | Whether an action is allowed, authenticated approver, and approval UI/policy |
 | Active runs | Run ID, ordered sequence, process-local replay, subscription, cancellation, and terminal result | Lifetime of the run service, address scope, process routing, draining, and multi-process delivery |
 | Remote consumption | Cursor advancement, duplicate suppression, sequence-gap failure, terminal detection, bounded reconnect timing, and runtime envelope validation | Public activity/result schemas, actual transport timer/handle, and error UX |
-| Persistence | File-backed defaults plus injectable session/artifact repository ports | Production repository implementations, retention, encryption, backup, and tenancy |
+| Persistence | File-backed defaults plus injectable session/archive/artifact repository ports | Production repository implementations, retention, encryption, backup, and tenancy |
 | Identity and authorization | No identity-provider assumption | Authentication, tenant/user mapping, authorization for start/subscribe/cancel |
 | Transport/API | Optional fetch/SSE client and Node SSE streaming correctness when that preset is selected | Framework, routes/procedures, wire schemas, auth, errors, limits, CORS, and rate limiting |
 | Client experience | Semantic activities, terminal run events, and remote cursor/retry calculations | Messages, tool rendering, UI state, transport timers, retry UX, notifications, and product-specific result presentation |

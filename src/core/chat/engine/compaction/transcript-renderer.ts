@@ -26,7 +26,7 @@ export class CompactionTranscriptRenderer {
     );
     const lines: string[] = [
       `Summarizer transcript note: raw archive contains ${messages.length} complete messages.`,
-      `Each message below is condensed to fit the summarizer request. Read the archive file when exact wording or full tool output matters.`,
+      'Each message below is condensed to fit the summarizer request. After a successful compaction, use the configured repository retrieval capability when exact wording or full tool output matters.',
       `Summarizer input budget: about ${Math.floor(transcriptCharBudget / 4).toLocaleString()} estimated text tokens.`,
     ];
     let totalChars = lines.join('\n').length;
@@ -35,7 +35,7 @@ export class CompactionTranscriptRenderer {
       const rendered = `## Message ${index + 1}\n${CompactionTranscriptRenderer.renderMessage(message, perMessageBudget)}`;
       const separator = lines.length > 0 ? '\n\n' : '';
       if (totalChars + separator.length + rendered.length > transcriptCharBudget) {
-        lines.push(`\n\nOmitted ${messages.length - index} additional archived messages from summarizer input to stay within request budget. Inspect the raw archive for full detail.`);
+        lines.push(`\n\nOmitted ${messages.length - index} additional archived messages from summarizer input to stay within request budget. Retrieve the raw archive through the configured repository for full detail.`);
         break;
       }
 

@@ -141,7 +141,7 @@ YOUR PRODUCT
   run identity, ordered activity, replay, cancel, approvals
           |
   ConversationEngine
-  sessions, turns, compaction, traces, artifacts
+  sessions, turns, compaction, archives, traces, artifacts
           |
   models, tools, host extensions, MCP
 ```
@@ -153,7 +153,7 @@ YOUR PRODUCT
 | Approvals | Request/resolution lifecycle and run integration | Who may approve, approval policy, and approval UI |
 | Active runs | Run IDs, ordered sequences, bounded replay, cancellation, and terminal settlement | Process lifetime, routing, draining, and multi-process delivery |
 | Remote clients | Runtime envelope validation, cursor/duplicate/gap rules, terminal detection, and reconnect calculation | Public payload schemas, timers, UI state, retry UX, and result presentation |
-| Persistence | File-backed defaults and injectable session/artifact repository boundaries | Production adapters, retention, encryption, backup, tenancy, and product records |
+| Persistence | File-backed defaults and injectable session/archive/artifact repository boundaries | Production adapters, retention, encryption, backup, tenancy, and product records |
 | API and UI | Optional Node HTTP/SSE and browser transport mechanics | Server framework, routes, auth, CORS, limits, errors, and every visual decision |
 
 The full ownership model lives in
@@ -315,12 +315,11 @@ Heddle is designed to make assumptions and limitations visible:
   active-run handles and replay are process-local and bounded;
 - multi-process routing and durable in-flight delivery require infrastructure
   selected by the host;
-- session and artifact repositories are injectable, but production retention,
-  encryption, backup, tenancy, and adapter operations remain host
-  responsibilities;
-- traces, compaction archives, memory, and some supporting state remain
-  local/path-oriented unless the host deliberately provides another
-  integration path;
+- session, compacted-history archive, and artifact repositories are injectable,
+  but production retention, encryption, backup, tenancy, and adapter operations
+  remain host responsibilities;
+- traces, memory, and some supporting state remain local/path-oriented unless
+  the host deliberately provides another integration path;
 - HTTP/SSE helpers own wire correctness, not route registration,
   authentication, authorization, CORS, limits, billing, or deployment;
 - `@roackb2/heddle-remote` validates the run protocol but does not own product

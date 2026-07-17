@@ -3,6 +3,7 @@ import { FileArtifactRepository } from '@/core/artifacts/index.js';
 import type { ArtifactRepository } from '@/core/artifacts/index.js';
 import { FileChatSessionRepository } from './sessions/repository/index.js';
 import type { ChatSessionRepository } from './sessions/repository/index.js';
+import type { ChatArchiveRepository } from './sessions/archives/index.js';
 import type { ToolApprovalPolicy } from '../../approvals/types.js';
 import type { ReasoningEffort } from '../../llm/types.js';
 import type { TraceSummaryService } from '@/core/observability/index.js';
@@ -33,6 +34,7 @@ export type NormalizedConversationEngineConfig = {
   artifactsEnabled: boolean;
   sessionStoragePath: string;
   sessionRepository: ChatSessionRepository;
+  archiveRepository?: ChatArchiveRepository;
   memoryDir: string;
   traceDir: string;
   workspaceId?: string;
@@ -84,6 +86,7 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
     artifactsEnabled: hostExtensions?.artifacts?.enabled ?? true,
     sessionStoragePath,
     sessionRepository,
+    archiveRepository: config.archiveRepository,
     memoryDir,
     traceDir,
     workspaceId: config.workspaceId,

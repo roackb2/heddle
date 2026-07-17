@@ -6,6 +6,7 @@
  */
 import { z } from 'zod';
 import { ConversationDirectShellLineResultSchema } from '@/core/chat/engine/direct-shell/result-schema.js';
+import { ChatArchiveRecordSchema } from '@/core/chat/engine/sessions/archives/schemas.js';
 import { ConversationTurnPresentationSchema } from '@/core/chat/engine/turns/presentation/index.js';
 import { CustomAgentExecutionSnapshotSchema } from '@/core/custom-agents/index.js';
 
@@ -160,26 +161,12 @@ const ChatContextStatsSchema = z.object({
       .describe('Number of archive records currently associated with the session.')
       .optional(),
     currentSummaryPath: z.string()
-      .describe('Path to the active compacted summary used for context reconstruction.')
+      .describe('Repository-owned locator for the active compacted summary used for context reconstruction.')
       .optional(),
     lastArchivePath: z.string()
-      .describe('Path to the most recently written conversation archive.')
+      .describe('Repository-owned locator for the most recently written conversation archive.')
       .optional(),
-  }).describe('Archive metadata used to reconnect compacted history with persisted files.').optional(),
-});
-
-const ChatArchiveRecordSchema = z.object({
-  id: z.string().describe('Stable identifier for this conversation archive.'),
-  path: z.string().describe('Path to the archived raw conversation history.'),
-  summaryPath: z.string().describe('Path to the compacted summary generated for this archive.'),
-  shortDescription: z.string()
-    .describe('Short human-readable description of the archived conversation slice.')
-    .optional(),
-  messageCount: z.number().describe('Number of messages stored in this archive.'),
-  createdAt: z.string().describe('Timestamp when this archive was created.'),
-  summaryModel: z.string()
-    .describe('Model used to generate the archive summary, when available.')
-    .optional(),
+  }).describe('Archive metadata used to reconnect compacted history with durable repository content.').optional(),
 });
 
 const ChatArchiveRecordsSchema = z.array(z.unknown())

@@ -19,7 +19,7 @@ export class ConversationArchiveSummarizerContextBuilder {
         role: 'user',
         content: [
           `Session: ${context.sessionId}`,
-          `New archive path: ${context.archivePath}`,
+          `New archive id: ${context.archiveId}`,
           '',
           'Previous rolling summary:',
           context.previousRollingSummary?.trim() || '(none)',

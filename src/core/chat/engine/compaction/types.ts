@@ -2,6 +2,7 @@ import type { ChatArchiveRecord, ChatContextStats, ChatSession } from '@/core/ch
 import type { ConversationCompactionStatus } from '@/core/live/index.js';
 import type { ChatMessage, LlmAdapter, LlmUsage } from '@/core/llm/types.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
+import type { ChatArchiveRepository } from '@/core/chat/engine/sessions/archives/index.js';
 export type { ConversationCompactionStatus } from '@/core/live/index.js';
 
 export type ConversationCompactionSummarizerOptions = {
@@ -51,6 +52,7 @@ export type ConversationCompactionOptions = {
   history: ChatMessage[];
   runtime: ConversationCompactionRuntime;
   session: Pick<ChatSession, 'id'>;
+  archiveRepository?: ChatArchiveRepository;
   request?: ConversationCompactionRequest;
   force?: boolean;
   summarizer?: ConversationCompactionSummarizerOptions;

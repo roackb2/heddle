@@ -6,6 +6,7 @@ import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { RunAgentLoopOptions } from '@/core/runtime/loop/index.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
+import type { ChatArchiveRepository } from '@/core/chat/engine/sessions/archives/index.js';
 import type { ChatTurnHostPort } from './host/index.js';
 import type { ToolDefinition } from '@/core/types.js';
 import type { ToolToolkit } from '@/core/tools/index.js';
@@ -18,6 +19,7 @@ export type RunConversationTurnArgs = {
   sessionStoragePath: string;
   /** Custom session persistence. Defaults to the file catalog at `sessionStoragePath`. */
   sessionRepository?: ChatSessionRepository;
+  archiveRepository?: ChatArchiveRepository;
   sessionId: string;
   prompt: string;
   apiKey?: string;
@@ -54,6 +56,7 @@ export type TurnRuntimeConfigInput = Pick<
   | 'stateRoot'
   | 'sessionStoragePath'
   | 'sessionRepository'
+  | 'archiveRepository'
   | 'apiKey'
   | 'preferApiKey'
   | 'credentialStorePath'
@@ -91,7 +94,7 @@ export type TurnHostInput = Pick<
 
 export type TurnPreflightInput = Pick<
   RunConversationTurnArgs,
-  'stateRoot' | 'prompt'
+  'stateRoot' | 'archiveRepository' | 'prompt'
 >;
 
 export type AgentLoopTurnInput = Pick<
@@ -101,7 +104,7 @@ export type AgentLoopTurnInput = Pick<
 
 export type TurnPersistenceInput = Pick<
   RunConversationTurnArgs,
-  'stateRoot' | 'traceDir' | 'traceSummarizerRegistry' | 'prompt'
+  'stateRoot' | 'archiveRepository' | 'traceDir' | 'traceSummarizerRegistry' | 'prompt'
 >;
 
 export type RunConversationTurnResult = ConversationTurnResultSummary;

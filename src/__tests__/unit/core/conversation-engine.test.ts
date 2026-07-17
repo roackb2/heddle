@@ -15,6 +15,7 @@ import {
   type StoredChatSession,
 } from '../../../core/chat/engine/sessions/repository/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
+import type { ChatArchiveRepository } from '../../../core/chat/engine/sessions/archives/index.js';
 import {
   listChatSessionCatalog,
   readStoredChatSession,
@@ -186,6 +187,31 @@ describe('createConversationEngine', () => {
     expect(stored.get('session-hosted')?.session.name).toBe('Renamed hosted');
     // Nothing was written to the default on-disk session catalog.
     expect(existsSync(join(stateRoot, 'chat-sessions.catalog.json'))).toBe(false);
+  });
+
+  it('passes an injected archive repository through submitted turns', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-archive-repo-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const archiveRepository: ChatArchiveRepository = {
+      loadManifest: vi.fn(async (sessionId) => ({ version: 1, sessionId, archives: [] })),
+      readSummary: vi.fn(async () => undefined),
+      append: vi.fn(),
+    };
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+      archiveRepository,
+    });
+    const session = await engine.sessions.create({ id: 'session-1', name: 'Hosted archives' });
+
+    await engine.turns.submit({ sessionId: session.id, prompt: 'Continue remotely' });
+
+    expect(EngineConversationTurnService.run).toHaveBeenCalledWith(expect.objectContaining({
+      archiveRepository,
+      sessionId: session.id,
+    }));
   });
 
   it('roots the artifacts reader at a custom host-extension artifacts root', async () => {

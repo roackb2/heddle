@@ -3,11 +3,13 @@
 Heddle owns conversation-session semantics: messages, turns, leases, queued
 prompts, compaction metadata, and optimistic mutation coordination. A host owns
 where those records live and how an authenticated product user is scoped to
-them.
+them. Compacted raw transcripts and rolling summaries use a separate
+`ChatArchiveRepository` because their append-only lifecycle is different from
+revisioned active-session records.
 
-Use the default JSON adapter for one-machine/local-first products. Inject a
-`ChatSessionRepository` for hosted or multi-process products that already have
-a database.
+Use the default JSON adapters for one-machine/local-first products. Inject
+`ChatSessionRepository` and `ChatArchiveRepository` for hosted or multi-process
+products that already have a database.
 
 ## Local JSON: zero configuration
 
@@ -74,6 +76,64 @@ const engine = createConversationEngine({
   sessionRepository,
 })
 ```
+
+For a hosted service, session storage alone is not complete durability. Inject
+the companion archive repository as well, bound to the same trusted server-side
+identity scope:
+
+```ts
+import {
+  ChatArchivePersistenceCodec,
+  createConversationEngine,
+  type ChatArchiveRepository,
+} from '@roackb2/heddle'
+
+const archiveRepository: ChatArchiveRepository = {
+  loadManifest: async (sessionId) => {
+    const stored = await readArchiveManifest(sessionId)
+    return stored
+      ? ChatArchivePersistenceCodec.parseManifest(stored, sessionId)
+      : ChatArchivePersistenceCodec.emptyManifest(sessionId)
+  },
+  readSummary: async (summaryLocator) => readArchiveSummary(summaryLocator),
+  append: async (input) => database.transaction(async (tx) => {
+    const currentValue = await tx.readArchiveManifestForUpdate(input.sessionId)
+    const current = currentValue
+      ? ChatArchivePersistenceCodec.parseManifest(currentValue, input.sessionId)
+      : ChatArchivePersistenceCodec.emptyManifest(input.sessionId)
+    const archive = {
+      ...input.archive,
+      path: `db://conversation-archives/${input.archive.id}/messages`,
+      summaryPath: `db://conversation-archives/${input.archive.id}/summary`,
+    }
+    const manifest = ChatArchivePersistenceCodec.appendArchive(current, archive)
+
+    await tx.insertArchive({
+      sessionId: input.sessionId,
+      archive,
+      messages: input.messages,
+      summary: input.summary,
+    })
+    await tx.writeArchiveManifest(input.sessionId, manifest)
+    return { archive, manifest }
+  }),
+}
+
+const engine = createConversationEngine({
+  workspaceRoot,
+  stateRoot,
+  model: 'gpt-5.4',
+  sessionRepository,
+  archiveRepository,
+})
+```
+
+`append` is the durability boundary: the exact messages, rolling summary, and
+returned manifest must become visible in one transaction. If it rejects,
+Heddle keeps the exact active transcript and does not persist compacted session
+state that points at incomplete content. The legacy `path` and `summaryPath`
+field names are repository-owned opaque locators; only the default file adapter
+promises filesystem paths.
 
 ### Reuse Heddle's adapter-authoring primitives
 
@@ -193,6 +253,44 @@ where (
 
 Apply tenant, workspace, and archive filters before the cursor predicate.
 
+### PostgreSQL archive shape
+
+Keep archive content separate from the hot session row. One practical JSONB
+shape uses an immutable content row plus one locked manifest/head row:
+
+```sql
+create table agent_conversation_archives (
+  tenant_id uuid not null,
+  session_id text not null,
+  archive_id text not null,
+  archive_record jsonb not null,
+  messages jsonb not null,
+  summary text not null,
+  created_at timestamptz not null,
+  primary key (tenant_id, session_id, archive_id)
+);
+
+create table agent_conversation_archive_heads (
+  tenant_id uuid not null,
+  session_id text not null,
+  manifest jsonb not null,
+  updated_at timestamptz not null,
+  primary key (tenant_id, session_id)
+);
+```
+
+In `append`, create or lock the head row with `SELECT ... FOR UPDATE`, validate
+its JSONB with `ChatArchivePersistenceCodec.parseManifest`, insert the immutable
+archive row, and update the head in the same transaction. Enforce the composite
+tenant/session key in every query. A Drizzle adapter can map the JSONB columns
+to TypeScript shapes, but it must still run the Heddle codec when data crosses
+the storage boundary; TypeScript generics do not validate stored JSON.
+
+For large transcripts, replace `messages jsonb` with an object-store key. Write
+the immutable object before committing the manifest transaction. A failed
+transaction may leave an unreferenced object for a retention job to remove, but
+the committed manifest must never reference a missing object.
+
 ## Required behavior
 
 Before using a custom adapter in production, run Heddle's reusable conformance
@@ -242,4 +340,12 @@ host's normal integration-test runner produces better diagnostics.
 
 See the repository's local
 [`README.md`](../../../src/core/chat/engine/sessions/repository/README.md) for
-the exact adapter boundary and file-layout details.
+the exact session adapter boundary and file-layout details. The archive port's
+separate ownership and atomicity rules are in its
+[`README.md`](../../../src/core/chat/engine/sessions/archives/README.md).
+
+The session conformance suite does not yet certify a custom archive adapter.
+Keep host integration tests for transactional append, malformed manifest
+rejection, fresh-instance rolling-summary recovery, missing summary content,
+and storage-failure propagation. The default file adapter exercises those same
+invariants in Heddle's integration suite.

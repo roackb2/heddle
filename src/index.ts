@@ -11,7 +11,7 @@
 //   2. Add capabilities      — your own tools, MCP servers, skills
 //   3. Shape input/output    — render streaming activity / text, read results
 //   4. Advanced: lifecycle   — drive the engine, sessions, and approvals
-//   5. Advanced: storage     — back artifacts/credentials with your own store
+//   5. Advanced: storage     — back sessions/archives/artifacts with your store
 //
 // Remote-hosting assumptions are explicit peer entrypoints:
 // `@roackb2/heddle/hosted` and the lightweight `@roackb2/heddle-remote`
@@ -239,15 +239,10 @@ export type {
 // ---------------------------------------------------------------------------
 // 5. Advanced: storage — back Heddle with your own persistence
 // ---------------------------------------------------------------------------
-// Heddle defaults to local file-backed stores. Artifacts and sessions are
-// injectable today: implement `ArtifactRepository` / `ChatSessionRepository`
-// and pass them as `artifactRepository` / `sessionRepository` to
-// `createConversationEngine(...)` (or the quickstart runner) to persist
-// through your own storage — session lifecycle, turn preflight/persistence,
-// leases, the engine artifact reader, turn results, and artifact tools all
-// flow through the injected instances. Traces and memory remain path-oriented
-// (stateRoot) for now; making them injectable follows the same pattern (see
-// SDK posture, rung 5).
+// Heddle defaults to local file-backed stores. Artifacts, sessions, and
+// compacted conversation archives are injectable: implement the corresponding
+// repository and pass it to `createConversationEngine(...)` (or the quickstart
+// runner). Traces and memory remain path-oriented (`stateRoot`) for now.
 export { ArtifactService, FileArtifactRepository } from './core/artifacts/index.js';
 export type {
   ArtifactCurrentPointers,
@@ -287,6 +282,26 @@ export type {
   StoredChatSession,
   UpdateChatSessionInput,
 } from './core/chat/engine/sessions/repository/index.js';
-export type { ChatSession } from './core/chat/types.js';
+export {
+  ChatArchivePersistenceCodec,
+  ChatArchiveStorageCorruptionError,
+  ChatArchiveSummaryNotFoundError,
+  ChatArchiveRepositoryError,
+  FileChatArchiveRepository,
+} from './core/chat/engine/sessions/archives/index.js';
+export type {
+  AppendChatArchiveInput,
+  AppendChatArchiveResult,
+  ChatArchiveRecordDraft,
+  ChatArchiveRepository,
+  ChatArchiveStoragePaths,
+  FileChatArchiveRepositoryOptions,
+  ChatArchiveRepositoryOperation,
+} from './core/chat/engine/sessions/archives/index.js';
+export type {
+  ChatArchiveManifest,
+  ChatArchiveRecord,
+  ChatSession,
+} from './core/chat/types.js';
 export { RuntimeCredentialService } from './core/runtime/credentials/index.js';
 export type { ApiKeyRuntime, ProviderCredentialSource } from './core/runtime/credentials/index.js';

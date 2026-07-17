@@ -7,6 +7,7 @@ import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
 import type { ConversationSessionService } from '@/core/chat/engine/types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
+import type { ChatArchiveRepository } from '@/core/chat/engine/sessions/archives/index.js';
 import type { ChatTurnHostPort } from '../host/index.js';
 import type {
   ConversationCompactionResult,
@@ -21,6 +22,7 @@ export type PersistChatTurnResultArgs = {
   session: ChatSession;
   model: string;
   stateRoot: string;
+  archiveRepository?: ChatArchiveRepository;
   traceDir: string;
   systemContext?: string;
   toolNames: string[];
@@ -63,6 +65,7 @@ export type PersistCompletedChatTurnBase = {
   session: ChatSession;
   model: string;
   stateRoot: string;
+  archiveRepository?: ChatArchiveRepository;
   traceDir: string;
   systemContext?: string;
   toolNames: string[];
