@@ -291,6 +291,21 @@ the immutable object before committing the manifest transaction. A failed
 transaction may leave an unreferenced object for a retention job to remove, but
 the committed manifest must never reference a missing object.
 
+### Runnable PostgreSQL + Drizzle reference
+
+The repository includes a complete
+[PostgreSQL + Drizzle example](../../../examples/sdk/06-postgres-drizzle-storage/README.md)
+with checked-in migrations, scope-bound session and archive repositories, the
+public session conformance suite, concurrent archive verification, and recovery
+through fresh connection pools and engine instances. Drizzle and `pg` are
+example-only development dependencies; they are not Heddle runtime dependencies
+or exported adapters.
+
+Use that directory as a host implementation reference, then move the adapted
+files and migration ownership into your service. Do not import the example as a
+supported package or bypass your host's existing authentication, pool, and
+migration lifecycle.
+
 ## Required behavior
 
 Before using a custom adapter in production, run Heddle's reusable conformance
