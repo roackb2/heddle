@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: heddle
+      POSTGRES_PASSWORD: heddle
+      POSTGRES_DB: heddle_reference
+    ports:
+      - '54329:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U heddle -d heddle_reference']
+      interval: 2s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - heddle-postgres-reference-data:/var/lib/postgresql/data
+
+volumes:
+  heddle-postgres-reference-data:

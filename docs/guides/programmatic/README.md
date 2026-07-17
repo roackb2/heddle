@@ -62,7 +62,10 @@ split between Heddle and the host explicit for developers and coding agents.
      `sessionRepository` / `archiveRepository` (see
      [Conversation engine → Bring your own artifact storage](conversation-engine.md#bring-your-own-artifact-storage)
      and [Durable session storage](session-storage.md) for local JSON and
-     PostgreSQL adapter guidance).
+     PostgreSQL adapter guidance). The
+     [runnable PostgreSQL + Drizzle reference](../../../examples/sdk/06-postgres-drizzle-storage/README.md)
+     includes migrations, both repository implementations, public conformance,
+     and fresh-service recovery.
      Traces and memory still persist under a local state root; making them
      injectable follows the same pattern.
 
