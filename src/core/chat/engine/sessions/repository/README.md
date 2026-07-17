@@ -13,6 +13,8 @@ service; adapters only own durable record I/O.
   `ChatSessionPersistenceCodec`
 - canonical in-process ordering, opaque cursors, and page validation through
   `ChatSessionCatalogPagination`
+- the runner-neutral `ChatSessionRepositoryConformance` suite used to certify
+  host adapters against the shared behavioral contract
 - the default catalog and immutable per-session revision file layout
 - persisted JSON contract in `chat-session-schemas.ts`
 - legacy file serialization/deserialization behavior through the private
@@ -68,6 +70,30 @@ The session service retries a small, bounded number of optimistic update
 conflicts by rereading the latest record and reapplying the update. A generic
 session updater must therefore be free of external side effects. Delete remains
 strict: a concurrent change is surfaced instead of deleting newer data.
+
+## Adapter Conformance Suite
+
+`ChatSessionRepositoryConformance.createScenarios(harness)` returns named async
+callbacks that can be registered with Vitest, Node's test runner, Jest, or
+another host runner. `runAll(harness)` runs the same scenarios sequentially for
+scripts and smoke checks. The harness owns only three integration points:
+
+- create a new repository instance already bound to an opaque generated scope;
+- clean every record/resource for that scope; and
+- deliberately corrupt one addressable record for the negative-path check.
+
+The suite checks exact CRUD revisions, concurrent unique-create and CAS races,
+stable cursor pages including binary UTF-8 ties, filters before page boundaries,
+identical-ID isolation across two scopes, complete reopen through fresh adapter
+instances, corruption propagation, and invalid page limits. It invokes cleanup
+for every generated scope even when the adapter or an assertion fails.
+
+Passing this suite certifies the Heddle repository behavior exercised by the
+scenarios. It does not certify product authentication, RLS policy, migrations,
+query plans, connection pooling, load behavior, process-kill recovery, backups,
+or disaster recovery. Scope isolation proves only that the host-provided
+scope-bound factories do not cross records. The corruption hook is intentionally
+test-only and must not be exposed by production adapter APIs.
 
 ## Default JSON Layout
 
