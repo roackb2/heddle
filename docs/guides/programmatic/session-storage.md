@@ -195,7 +195,35 @@ Apply tenant, workspace, and archive filters before the cursor predicate.
 
 ## Required behavior
 
-Before using a custom adapter in production, verify:
+Before using a custom adapter in production, run Heddle's reusable conformance
+suite in the adapter's own integration-test environment:
+
+```ts
+import { test } from 'node:test'
+import {
+  ChatSessionRepositoryConformance,
+  type ChatSessionRepositoryConformanceHarness,
+} from '@roackb2/heddle'
+
+const harness: ChatSessionRepositoryConformanceHarness = {
+  // Each call must return a new instance, already bound to this server-side
+  // test tenant/scope. Never trust a browser-supplied tenant identifier here.
+  createRepository: (scopeId) => createPostgresSessionRepository({ scopeId }),
+  cleanupScope: (scopeId) => deletePostgresTestScope(scopeId),
+  // Test infrastructure should damage the stored JSON/JSONB without deleting
+  // the row, so read(sessionId) still finds and rejects the addressable record.
+  corruptSessionRecord: ({ scopeId, sessionId }) =>
+    corruptPostgresSessionRecord({ scopeId, sessionId }),
+}
+
+for (const scenario of ChatSessionRepositoryConformance.createScenarios(harness)) {
+  test(scenario.name, scenario.run)
+}
+```
+
+The suite generates opaque UUID-shaped scopes, creates fresh repository
+instances when testing races and reopen behavior, and cleans every scope even
+when a scenario fails. It verifies:
 
 - two writers updating the same revision cannot lose one another's changes;
 - the adapter distinguishes missing, already-existing, and conflicting rows;
@@ -205,6 +233,12 @@ Before using a custom adapter in production, verify:
   turns, queue, lease, and compaction state;
 - storage errors reach the host as failures rather than being reported as a
   successful turn.
+
+Passing the suite does not certify authentication/RLS, schema migrations,
+query plans, pooling, load, process-kill recovery, backups, or disaster
+recovery. Keep those checks in the host service. `runAll(harness)` is available
+for a sequential smoke script, but registering the named callbacks with the
+host's normal integration-test runner produces better diagnostics.
 
 See the repository's local
 [`README.md`](../../../src/core/chat/engine/sessions/repository/README.md) for

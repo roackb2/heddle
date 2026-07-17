@@ -43,3 +43,17 @@ export class ChatSessionStorageCorruptionError extends Error {
     this.name = 'ChatSessionStorageCorruptionError';
   }
 }
+
+/** Raised when an adapter violates the reusable repository conformance contract. */
+export class ChatSessionRepositoryConformanceError extends Error {
+  readonly code = 'CHAT_SESSION_REPOSITORY_CONFORMANCE';
+
+  constructor(
+    readonly scenario: string,
+    detail: string,
+    options?: { cause?: unknown },
+  ) {
+    super(`Chat session repository conformance failed (${scenario}): ${detail}`, options);
+    this.name = 'ChatSessionRepositoryConformanceError';
+  }
+}
