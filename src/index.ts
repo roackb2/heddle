@@ -262,7 +262,9 @@ export type {
   SaveTextArtifactInput,
 } from './core/artifacts/index.js';
 export {
+  ChatSessionCatalogPagination,
   ChatSessionAlreadyExistsError,
+  ChatSessionPersistenceCodec,
   ChatSessionRevisionConflictError,
   ChatSessionStorageCorruptionError,
   FileChatSessionRepository,
@@ -270,6 +272,7 @@ export {
 } from './core/chat/engine/sessions/repository/index.js';
 export type {
   ChatSessionCatalog,
+  ChatSessionCatalogCursor,
   ChatSessionCatalogEntry,
   ChatSessionCatalogPage,
   ChatSessionRepository,
