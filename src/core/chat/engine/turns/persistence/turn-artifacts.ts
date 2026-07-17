@@ -26,6 +26,7 @@ export class ConversationTurnArtifacts {
       history: sourceHistory,
       runtime: compactionRuntime,
       session: args.session,
+      archiveRepository: args.archiveRepository,
       request: compactionRequest,
       force: ConversationTurnFailureMessages.shouldForceCompactionAfterFailure(args.result.summary),
       summarizer: args.summarizer,

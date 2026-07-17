@@ -216,5 +216,39 @@ silently lose a concurrent write.
 See [Durable session storage](session-storage.md) for the default JSON layout,
 the exact compare-and-swap behavior, and a PostgreSQL table/query shape.
 
+## Bring your own compacted-history storage
+
+Long conversations archive exact messages and a cumulative rolling summary
+through the async `ChatArchiveRepository`. Hosted services should inject this
+beside `ChatSessionRepository`; otherwise the active session can reopen on a
+new replica while its compacted history still points at local files.
+
+```ts
+import {
+  createConversationEngine,
+  type ChatArchiveRepository,
+} from '@roackb2/heddle'
+
+const archiveRepository: ChatArchiveRepository = {
+  loadManifest: async (sessionId) => loadManifest(sessionId),
+  readSummary: async (summaryLocator) => loadSummary(summaryLocator),
+  append: async (input) => appendArchiveTransaction(input),
+}
+
+const engine = createConversationEngine({
+  workspaceRoot,
+  stateRoot,
+  model: 'gpt-5.4',
+  sessionRepository,
+  archiveRepository,
+})
+```
+
+Bind both repositories to the same server-authenticated account/tenant scope.
+`append` must atomically expose the raw messages, summary, and returned
+manifest; Heddle will not persist compacted session state until it succeeds.
+See [Durable session storage](session-storage.md) for the complete contract,
+codec helpers, and a PostgreSQL shape.
+
 Traces and memory still persist under the state root today. Making them
 injectable follows the same port-per-domain pattern.

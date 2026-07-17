@@ -63,6 +63,7 @@ export class QuickstartConversationCliRunnerService {
       hostExtensions: options.hostExtensions,
       artifactRepository: options.artifactRepository,
       sessionRepository: options.sessionRepository,
+      archiveRepository: options.archiveRepository,
     });
     let session = await QuickstartConversationCliRunnerService.resolveSession({ engine, options });
     const textHost = createConversationTextHost({

@@ -8,7 +8,7 @@ export type ConversationArchiveSummarizerRuntime = {
 
 export type ConversationArchiveSummaryContext = {
   sessionId: string;
-  archivePath: string;
+  archiveId: string;
   manifest: ChatArchiveManifest;
   previousRollingSummary?: string;
   archivedMessages: ChatMessage[];

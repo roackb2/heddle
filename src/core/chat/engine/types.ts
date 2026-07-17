@@ -11,6 +11,7 @@ import type { AgentLoopEvent, RunAgentLoopOptions } from '../../runtime/loop/ind
 import type { ChatMessage, LlmAdapter, ReasoningEffort } from '../../llm/types.js';
 import type { ToolDefinition, TraceEvent } from '../../types.js';
 import type { ChatSessionLeaseOwner } from './sessions/leases/index.js';
+import type { ChatArchiveRepository } from './sessions/archives/index.js';
 import type {
   ChatSessionCatalogPage,
   ChatSessionRepository,
@@ -65,6 +66,11 @@ export type ConversationEngineConfig = {
    * file catalog under the state root.
    */
   sessionRepository?: ChatSessionRepository;
+  /**
+   * Durable storage for compacted raw transcripts, rolling summaries, and
+   * archive manifests. Locators remain server-side and repository-owned.
+   */
+  archiveRepository?: ChatArchiveRepository;
 };
 
 export type ConversationEngineHostExtensions = ConversationEngineHostExtensionBundle;

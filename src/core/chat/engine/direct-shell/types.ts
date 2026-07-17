@@ -2,6 +2,7 @@ import type { ConversationActivity, ConversationCompactionStatus } from '@/core/
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import type { ConversationDirectShellLineResult } from '@/core/chat/types.js';
 import type { ConversationSessionService } from '../types.js';
+import type { ChatArchiveRepository } from '../sessions/archives/index.js';
 
 export type DirectShellToolName = 'run_shell_inspect' | 'run_shell_mutate';
 
@@ -22,6 +23,7 @@ export type ConversationDirectShellInput = {
   model: string;
   workspaceRoot: string;
   stateRoot: string;
+  archiveRepository?: ChatArchiveRepository;
   systemContext?: string;
   credentialSource?: ProviderCredentialSource;
   sessions: ConversationSessionService;

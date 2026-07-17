@@ -135,6 +135,7 @@ export class ConversationDirectShellService {
         systemContext: input.systemContext,
       },
       session,
+      archiveRepository: input.archiveRepository,
       request: {
         toolNames: [chosenCall.tool],
         goal: shellDisplay,

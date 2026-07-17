@@ -1,5 +1,4 @@
 import type { ChatArchiveRecord } from '@/core/chat/types.js';
-import { FileChatArchiveRepository } from '@/core/chat/engine/sessions/archives/index.js';
 import type { ChatMessage } from '@/core/llm/types.js';
 import { COMPACTED_HISTORY_MARKER } from './constants.js';
 import { CompactionText } from './text.js';
@@ -27,7 +26,6 @@ export class ConversationCompactionSummaryMessage {
   }
 
   static buildArchivedSummaryMessage(options: {
-    sessionId: string;
     rollingSummary: string;
     archives: ChatArchiveRecord[];
   }): ChatMessage {
@@ -38,15 +36,13 @@ export class ConversationCompactionSummaryMessage {
     const content = [
       COMPACTED_HISTORY_MARKER,
       '',
-      `Archive root: ${FileChatArchiveRepository.derivePaths('.', options.sessionId).displayArchivesDir}`,
-      '',
       'Current rolling summary:',
       CompactionText.truncateSummary(options.rollingSummary),
       '',
-      'Archive index:',
+      'Archive locators (resolved by the configured archive repository):',
       ...(archivePaths.length > 0 ? archivePaths : ['- No archive records found.']),
       '',
-      'If exact wording, tool output, or earlier rationale matters, inspect the archive files with normal file tools before relying on this summary.',
+      'If exact wording, tool output, or earlier rationale matters, retrieve the archive through the host capability for the configured repository. Local file-adapter locators can be read with normal file tools.',
     ].join('\n');
 
     return {

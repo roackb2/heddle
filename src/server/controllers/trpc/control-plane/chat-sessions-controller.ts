@@ -257,6 +257,7 @@ export class ControlPlaneChatSessionsController {
               systemContext: args.systemContext,
             },
             session,
+            archiveRepository: args.archiveRepository,
             force,
             summarizer: {
               credentialSource: RuntimeCredentialService.resolveCredentialSourceForModel(model, {
@@ -673,6 +674,7 @@ export class ControlPlaneChatSessionsController {
             model: session.model ?? args.model ?? DEFAULT_OPENAI_MODEL,
             workspaceRoot: args.workspaceRoot,
             stateRoot: args.stateRoot,
+            archiveRepository: args.archiveRepository,
             systemContext: args.systemContext,
             riskAccepted: args.riskAccepted,
             credentialSource: RuntimeCredentialService.resolveCredentialSourceForModel(session.model ?? args.model ?? DEFAULT_OPENAI_MODEL, args),

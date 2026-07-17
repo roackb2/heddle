@@ -1,5 +1,13 @@
+import { randomUUID } from 'node:crypto';
 import { ModelCatalogService } from '@/core/llm/models/index.js';
-import type { ChatArchiveRecord } from '@/core/chat/types.js';
+import type { ChatArchiveManifest } from '@/core/chat/types.js';
+import {
+  ChatArchiveSummaryNotFoundError,
+  ChatArchiveRepositoryError,
+  FileChatArchiveRepository,
+  type ChatArchiveRecordDraft,
+  type ChatArchiveRepository,
+} from '@/core/chat/engine/sessions/archives/index.js';
 import {
   DEFAULT_CONTEXT_WINDOW_ESTIMATE,
   MAX_HISTORY_RATIO,
@@ -12,7 +20,6 @@ import { ConversationArchiveSummarizer } from './summarizer/index.js';
 import { ConversationCompactionSplitPolicy } from './split-policy.js';
 import { ConversationCompactionSummaryMessage } from './summary-message.js';
 import { ConversationCompactionTokenEstimator } from './token-estimator.js';
-import { FileChatArchiveRepository } from '@/core/chat/engine/sessions/archives/index.js';
 import type {
   BuildSessionCompactionRunningContextOptions,
   ConversationCompactionArchiveState,
@@ -40,7 +47,7 @@ export class ConversationCompactionService {
       || (Boolean(options.force) && ConversationCompactionTokenEstimator.countNonCompactedMessages(options.history) > 0);
 
     if (!needsCompaction) {
-      return ConversationCompactionService.buildUnchangedResult(options);
+      return await ConversationCompactionService.buildUnchangedResult(options);
     }
 
     const splitIndex = ConversationCompactionSplitPolicy.findSplit(options.history, {
@@ -49,7 +56,7 @@ export class ConversationCompactionService {
       stopAtPreferredMessages: Boolean(options.force),
     });
     if (splitIndex <= 0 || splitIndex >= options.history.length) {
-      return ConversationCompactionService.buildUnchangedResult(options);
+      return await ConversationCompactionService.buildUnchangedResult(options);
     }
 
     return await ConversationCompactionService.compactArchivedSlice({ options, splitIndex });
@@ -67,9 +74,16 @@ export class ConversationCompactionService {
     return ConversationCompactionContextBuilder.buildSessionRunning(options);
   }
 
-  private static buildUnchangedResult(options: ConversationCompactionOptions): ConversationCompactionResult {
-    const archiveRepository = ConversationCompactionService.createArchiveRepository(options);
-    const manifest = archiveRepository.loadManifest();
+  private static async buildUnchangedResult(
+    options: ConversationCompactionOptions,
+  ): Promise<ConversationCompactionResult> {
+    let manifest: ChatArchiveManifest;
+    try {
+      manifest = await ConversationCompactionService.createArchiveRepository(options)
+        .loadManifest(options.session.id);
+    } catch (error) {
+      throw ConversationCompactionService.repositoryError('load_manifest', error);
+    }
     const archive: ConversationCompactionArchiveState = {
       archives: manifest.archives,
       currentSummaryPath: manifest.currentSummaryPath,
@@ -94,107 +108,138 @@ export class ConversationCompactionService {
     const archivedMessages = options.history.slice(0, splitIndex);
     const recentMessages = options.history.slice(splitIndex);
     const archiveRepository = ConversationCompactionService.createArchiveRepository(options);
-    const manifest = archiveRepository.loadManifest();
-    const previousRollingSummary =
-      (manifest.currentSummaryPath ? archiveRepository.readSummaryMarkdown(manifest.currentSummaryPath) : undefined)
-      ?? ConversationCompactionSummaryMessage.extractPriorSummary(options.history);
+    let manifest: ChatArchiveManifest;
+    let previousRollingSummary: string | undefined;
 
-    const archiveId = FileChatArchiveRepository.createArchiveId();
-    const archivePath = archiveRepository.writeMessagesJsonl(archiveId, archivedMessages);
+    try {
+      manifest = await archiveRepository.loadManifest(options.session.id);
+    } catch (error) {
+      const repositoryError = ConversationCompactionService.repositoryError('load_manifest', error);
+      await ConversationCompactionService.emitFailure(options, repositoryError);
+      throw repositoryError;
+    }
+
+    try {
+      previousRollingSummary = await ConversationCompactionService.readPreviousRollingSummary({
+        archiveRepository,
+        manifest,
+        history: options.history,
+      });
+    } catch (error) {
+      const repositoryError = ConversationCompactionService.repositoryError('read_summary', error);
+      await ConversationCompactionService.emitFailure(options, repositoryError);
+      throw repositoryError;
+    }
+
+    const archiveId = ConversationCompactionService.createArchiveId();
     await options.onStatusChange?.({
       source: 'compaction',
       type: 'compaction.running',
       status: 'running',
-      archivePath,
     });
 
+    let rollingSummary: string;
+    let summaryModel: string;
     try {
       const summarizer = ConversationArchiveSummarizer.resolve(options);
       if (!summarizer.llm) {
         throw new Error(`Missing provider API key for ${summarizer.model}`);
       }
-
-      const rollingSummary = await ConversationArchiveSummarizer.summarizeArchive({
+      summaryModel = summarizer.model;
+      rollingSummary = await ConversationArchiveSummarizer.summarizeArchive({
         runtime: { llm: summarizer.llm, model: summarizer.model },
         summaryModel: summarizer.model,
         sessionId: options.session.id,
-        archivePath,
+        archiveId,
         manifest,
         previousRollingSummary,
         archivedMessages,
       });
-      const summaryPath = archiveRepository.writeSummaryMarkdown(archiveId, rollingSummary);
-      const archiveRecord = ConversationCompactionService.buildArchiveRecord({
-        archiveId,
-        archivePath,
-        summaryPath,
-        rollingSummary,
-        archivedMessagesCount: ConversationCompactionTokenEstimator.countNonCompactedMessages(archivedMessages),
-        summaryModel: summarizer.model,
-      });
-      const nextManifest = FileChatArchiveRepository.appendManifestArchive(manifest, archiveRecord);
-      archiveRepository.saveManifest(nextManifest);
-
-      const compactedHistory = [
-        ConversationCompactionSummaryMessage.buildArchivedSummaryMessage({
-          sessionId: options.session.id,
-          rollingSummary,
-          archives: nextManifest.archives,
-        }),
-        ...recentMessages,
-      ];
-
-      await options.onStatusChange?.({
-        source: 'compaction',
-        type: 'compaction.finished',
-        status: 'finished',
-        archivePath: archiveRecord.path,
-        summaryPath: archiveRecord.summaryPath,
-      });
-
-      return ConversationCompactionService.buildCompactedResult({
-        options,
-        compactedHistory,
-        archiveRecord,
-        archive: {
-          archives: nextManifest.archives,
-          currentSummaryPath: nextManifest.currentSummaryPath,
-          lastArchivePath: archiveRecord.path,
-        },
-      });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await options.onStatusChange?.({
-        source: 'compaction',
-        type: 'compaction.failed',
-        status: 'failed',
-        archivePath,
-        error: message,
-      });
+      const message = await ConversationCompactionService.emitFailure(options, error);
       return ConversationCompactionService.buildFailedResult({
         options,
         message,
-        archive: {
-          archives: manifest.archives,
-          currentSummaryPath: manifest.currentSummaryPath,
-          lastArchivePath: archivePath,
-        },
+        archive: ConversationCompactionService.archiveStateFromManifest(manifest),
       });
     }
+
+    const archiveDraft = ConversationCompactionService.buildArchiveRecordDraft({
+      archiveId,
+      rollingSummary,
+      archivedMessagesCount: ConversationCompactionTokenEstimator.countNonCompactedMessages(archivedMessages),
+      summaryModel,
+    });
+    let appended: Awaited<ReturnType<ChatArchiveRepository['append']>>;
+    try {
+      appended = await archiveRepository.append({
+        sessionId: options.session.id,
+        archive: archiveDraft,
+        messages: archivedMessages,
+        summary: rollingSummary,
+      });
+    } catch (error) {
+      const repositoryError = ConversationCompactionService.repositoryError('append', error);
+      await ConversationCompactionService.emitFailure(options, repositoryError);
+      throw repositoryError;
+    }
+
+    const compactedHistory = [
+      ConversationCompactionSummaryMessage.buildArchivedSummaryMessage({
+        rollingSummary,
+        archives: appended.manifest.archives,
+      }),
+      ...recentMessages,
+    ];
+
+    await options.onStatusChange?.({
+      source: 'compaction',
+      type: 'compaction.finished',
+      status: 'finished',
+      archivePath: appended.archive.path,
+      summaryPath: appended.archive.summaryPath,
+    });
+
+    return ConversationCompactionService.buildCompactedResult({
+      options,
+      compactedHistory,
+      archiveRecord: appended.archive,
+      archive: {
+        archives: appended.manifest.archives,
+        currentSummaryPath: appended.manifest.currentSummaryPath,
+        lastArchivePath: appended.archive.path,
+      },
+    });
   }
 
-  private static buildArchiveRecord(args: {
+  private static async readPreviousRollingSummary(args: {
+    archiveRepository: ChatArchiveRepository;
+    manifest: ChatArchiveManifest;
+    history: ConversationCompactionOptions['history'];
+  }): Promise<string | undefined> {
+    if (!args.manifest.currentSummaryPath) {
+      return ConversationCompactionSummaryMessage.extractPriorSummary(args.history);
+    }
+
+    const summary = await args.archiveRepository.readSummary(args.manifest.currentSummaryPath);
+    if (summary === undefined) {
+      throw new ChatArchiveSummaryNotFoundError(args.manifest.currentSummaryPath);
+    }
+    return summary;
+  }
+
+  private static createArchiveId(now = new Date()): string {
+    return `archive-${now.toISOString().replaceAll(':', '-')}-${randomUUID()}`;
+  }
+
+  private static buildArchiveRecordDraft(args: {
     archiveId: string;
-    archivePath: string;
-    summaryPath: string;
     rollingSummary: string;
     archivedMessagesCount: number;
     summaryModel: string;
-  }): ChatArchiveRecord {
+  }): ChatArchiveRecordDraft {
     return {
       id: args.archiveId,
-      path: args.archivePath,
-      summaryPath: args.summaryPath,
       shortDescription: ConversationArchiveSummarizer.deriveShortDescription(args.rollingSummary),
       messageCount: args.archivedMessagesCount,
       createdAt: new Date().toISOString(),
@@ -202,10 +247,41 @@ export class ConversationCompactionService {
     };
   }
 
+  private static archiveStateFromManifest(manifest: ChatArchiveManifest): ConversationCompactionArchiveState {
+    return {
+      archives: manifest.archives,
+      currentSummaryPath: manifest.currentSummaryPath,
+      lastArchivePath: manifest.archives.at(-1)?.path,
+    };
+  }
+
+  private static async emitFailure(
+    options: ConversationCompactionOptions,
+    error: unknown,
+  ): Promise<string> {
+    const message = error instanceof Error ? error.message : String(error);
+    await options.onStatusChange?.({
+      source: 'compaction',
+      type: 'compaction.failed',
+      status: 'failed',
+      error: message,
+    });
+    return message;
+  }
+
+  private static repositoryError(
+    operation: ConstructorParameters<typeof ChatArchiveRepositoryError>[0],
+    error: unknown,
+  ): ChatArchiveRepositoryError {
+    return error instanceof ChatArchiveRepositoryError
+      ? error
+      : new ChatArchiveRepositoryError(operation, error);
+  }
+
   private static buildCompactedResult(args: {
     options: ConversationCompactionOptions;
     compactedHistory: ConversationCompactionResult['history'];
-    archiveRecord: ChatArchiveRecord;
+    archiveRecord: Awaited<ReturnType<ChatArchiveRepository['append']>>['archive'];
     archive: ConversationCompactionArchiveState;
   }): ConversationCompactionResult {
     return {
@@ -246,10 +322,9 @@ export class ConversationCompactionService {
     };
   }
 
-  private static createArchiveRepository(options: ConversationCompactionOptions): FileChatArchiveRepository {
-    return new FileChatArchiveRepository({
+  private static createArchiveRepository(options: ConversationCompactionOptions): ChatArchiveRepository {
+    return options.archiveRepository ?? new FileChatArchiveRepository({
       stateRoot: options.runtime.stateRoot,
-      sessionId: options.session.id,
     });
   }
 }

@@ -53,6 +53,22 @@ export type {
 } from './mcp-host-extension.js';
 export { EngineConversationTurnService } from './turns/service.js';
 export type { RunConversationTurnArgs, RunConversationTurnResult } from './turns/types.js';
+export {
+  ChatArchivePersistenceCodec,
+  ChatArchiveStorageCorruptionError,
+  ChatArchiveSummaryNotFoundError,
+  ChatArchiveRepositoryError,
+  FileChatArchiveRepository,
+} from './sessions/archives/index.js';
+export type {
+  AppendChatArchiveInput,
+  AppendChatArchiveResult,
+  ChatArchiveRecordDraft,
+  ChatArchiveRepository,
+  ChatArchiveStoragePaths,
+  FileChatArchiveRepositoryOptions,
+  ChatArchiveRepositoryOperation,
+} from './sessions/archives/index.js';
 export type {
   ConversationActivity,
   ConversationActivityCorrelation,

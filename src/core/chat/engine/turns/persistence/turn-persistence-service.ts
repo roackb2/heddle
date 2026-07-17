@@ -1,4 +1,5 @@
 import { ConversationTurnArtifacts } from './turn-artifacts.js';
+import { ChatArchiveRepositoryError } from '@/core/chat/engine/sessions/archives/index.js';
 import type {
   PersistCompletedChatTurnBase,
   PersistChatTurnResult,
@@ -12,20 +13,33 @@ import type {
 export class ConversationTurnPersistenceService {
   static async persistCompleted(args: PersistCompletedChatTurnArgs): Promise<PersistChatTurnResult> {
     const artifactInput: PersistCompletedChatTurnBase = args;
-    const persisted = await ConversationTurnArtifacts.persist({
-      ...artifactInput,
-      summarizer: { credentialSource: args.credentialSource },
-      createTurnId: () => `server-turn-${Date.now()}`,
-      onCompactionStatus: async (event) => {
-        args.host.onCompactionStatus?.(event, 'final');
-        if (event.status === 'running') {
-          await ConversationTurnPersistenceService.persistFinalCompactionRunningSeed({
-            ...args,
-            archivePath: event.archivePath,
-          });
-        }
-      },
-    });
+    let persisted: PersistChatTurnResult;
+    let runningSeedPersisted = false;
+    try {
+      persisted = await ConversationTurnArtifacts.persist({
+        ...artifactInput,
+        summarizer: { credentialSource: args.credentialSource },
+        createTurnId: () => `server-turn-${Date.now()}`,
+        onCompactionStatus: async (event) => {
+          args.host.onCompactionStatus?.(event, 'final');
+          if (event.status === 'running') {
+            await ConversationTurnPersistenceService.persistFinalCompactionRunningSeed({
+              ...args,
+              archivePath: event.archivePath,
+            });
+            runningSeedPersisted = true;
+          }
+        },
+      });
+    } catch (error) {
+      if (runningSeedPersisted && error instanceof ChatArchiveRepositoryError) {
+        await args.sessionService.restoreCompactionState(args.session.id, {
+          context: args.session.context,
+          archives: args.session.archives,
+        });
+      }
+      throw error;
+    }
 
     const session = await args.sessionService.update(args.session.id, (latestSession) => ({
         ...persisted.session,

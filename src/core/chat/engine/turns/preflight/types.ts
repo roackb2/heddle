@@ -3,6 +3,7 @@ import type { ChatSession } from '@/core/chat/types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ConversationCompactionStatus } from '@/core/live/index.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
+import type { ChatArchiveRepository } from '@/core/chat/engine/sessions/archives/index.js';
 import type { ConversationSessionService } from '@/core/chat/engine/types.js';
 import type { ChatTurnHostPort } from '../host/index.js';
 import type {
@@ -19,6 +20,7 @@ export type PrepareChatSessionTurnArgs = {
   prompt: string;
   model: string;
   stateRoot: string;
+  archiveRepository?: ChatArchiveRepository;
   systemContext?: string;
   toolNames: string[];
   summarizer: ConversationCompactionOptions['summarizer'];

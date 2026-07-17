@@ -56,9 +56,10 @@ split between Heddle and the host explicit for developers and coding agents.
 5. **Advanced: storage** — back Heddle with your own persistence.
    - [Result artifacts](result-artifacts.md): save large generated values as
      reusable artifacts.
-   - Artifact and session storage are injectable: implement
-     `ArtifactRepository` / `ChatSessionRepository` and pass them as
-     `artifactRepository` / `sessionRepository` (see
+   - Artifact, session, and compacted-history storage are injectable: implement
+     `ArtifactRepository` / `ChatSessionRepository` /
+     `ChatArchiveRepository` and pass them as `artifactRepository` /
+     `sessionRepository` / `archiveRepository` (see
      [Conversation engine → Bring your own artifact storage](conversation-engine.md#bring-your-own-artifact-storage)
      and [Durable session storage](session-storage.md) for local JSON and
      PostgreSQL adapter guidance).

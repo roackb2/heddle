@@ -1,5 +1,7 @@
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
+import type { ConversationCompactionResult } from '@/core/chat/engine/compaction/index.js';
+import { ChatArchiveRepositoryError } from '@/core/chat/engine/sessions/archives/index.js';
 import type {
   PersistPreflightRunningSeedArgs,
   PersistPreparedChatSessionTurnArgs,
@@ -35,23 +37,37 @@ export class ConversationTurnPreflightService {
       toolNames: args.toolNames,
       goal: args.prompt,
     };
-    const preflightCompacted = await ConversationCompactionService.compact({
-      history: initialHistory,
-      runtime: compactionRuntime,
-      session: { id: args.sessionId },
-      request: compactionRequest,
-      summarizer: args.summarizer,
-      onStatusChange: async (event) => {
-        args.host.onCompactionStatus?.(event, 'preflight');
-        if (event.status === 'running' && leasedSession) {
-          await ConversationTurnPreflightService.persistRunningSeed({
-            ...args,
-            leasedSession,
-            archivePath: event.archivePath,
-          });
-        }
-      },
-    });
+    let preflightCompacted: ConversationCompactionResult;
+    let runningSeedPersisted = false;
+    try {
+      preflightCompacted = await ConversationCompactionService.compact({
+        history: initialHistory,
+        runtime: compactionRuntime,
+        session: { id: args.sessionId },
+        archiveRepository: args.archiveRepository,
+        request: compactionRequest,
+        summarizer: args.summarizer,
+        onStatusChange: async (event) => {
+          args.host.onCompactionStatus?.(event, 'preflight');
+          if (event.status === 'running' && leasedSession) {
+            await ConversationTurnPreflightService.persistRunningSeed({
+              ...args,
+              leasedSession,
+              archivePath: event.archivePath,
+            });
+            runningSeedPersisted = true;
+          }
+        },
+      });
+    } catch (error) {
+      if (leasedSession && runningSeedPersisted && error instanceof ChatArchiveRepositoryError) {
+        await args.sessionService.restoreCompactionState(args.sessionId, {
+          context: leasedSession.context,
+          archives: leasedSession.archives,
+        });
+      }
+      throw error;
+    }
 
     return await ConversationTurnPreflightService.persistPrepared({
       ...args,
