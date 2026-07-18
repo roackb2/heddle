@@ -28,6 +28,7 @@ const FORBIDDEN_PRODUCTION_TOKENS = [
 ];
 
 const PUBLIC_EXPORT_EXPECTATIONS = [
+  'ConversationPersistenceService',
   'createConversationEngine',
   'defineHostExtension',
   'EngineConversationTurnService',

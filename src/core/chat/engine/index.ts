@@ -1,4 +1,19 @@
 export { createConversationEngine } from './conversation-engine.js';
+export { ConversationPersistenceService } from './persistence/index.js';
+export type {
+  ConversationPersistence,
+  ConversationPersistenceConfiguration,
+  ConversationPersistenceReadinessCheck,
+  ConversationPersistenceReadinessCheckId,
+  ConversationPersistenceReadinessIssue,
+  ConversationPersistenceReadinessIssueCode,
+  ConversationPersistenceReadinessReport,
+  ConversationPersistenceReadinessSource,
+  ConversationPersistenceTargetLevel,
+  HeddlePersistenceCapabilities,
+  ResolvedConversationPersistence,
+  ResolvedHeddlePersistenceCapabilities,
+} from './persistence/index.js';
 export {
   QuickstartConversationCliRunnerService,
   resolveQuickstartConversationCliDefaults,

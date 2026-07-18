@@ -13,7 +13,7 @@ contributor-facing [durable-state inventory](../../architecture/durable-state.md
 | Level | User-visible promise | Current Heddle support |
 | --- | --- | --- |
 | **Local durable** | Completed conversations survive browser refresh and process restart on one host | Supported by the default file repositories when `stateRoot` is on a persistent local filesystem |
-| **Completed-conversation durable** | After a turn finishes, another process or replica can reopen the conversation and continue with the same compacted context | Supported when the host injects remote `ChatSessionRepository` and `ChatArchiveRepository` implementations and durably commits any product-owned result before reporting success |
+| **Completed-conversation durable** | After a turn finishes, another process or replica can reopen the conversation and continue with the same compacted context | Supported when the host configures remote session and archive repositories together through `persistence.conversations` and durably commits any product-owned result before reporting success |
 | **Durable in-flight execution** | A run, approval wait, cancellation handle, and event replay survive the executor process dying | **Not provided.** Active runs, pending approvals, cancellation, and replay buffers are process-local; this requires host-selected queue/orchestration infrastructure and idempotent execution design |
 
 The completed-conversation level is a valid production boundary. A product does
@@ -46,24 +46,28 @@ from the last completed durable state.
 To promise that a user can return to a completed conversation and continue it
 after a server replacement, a host needs all of the following:
 
-1. **Remote session records.** Bind `ChatSessionRepository` to a trusted
+1. **One conversation persistence capability.** Configure
+   `persistence.conversations` with both repositories. Heddle exposes a
+   readiness report that detects incomplete/legacy configuration and enumerates
+   the remaining host checks; it does not certify infrastructure.
+2. **Remote session records.** Bind `ChatSessionRepository` to a trusted
    server-side identity scope and pass the repository conformance suite in the
    host's integration environment.
-2. **Remote compaction archives.** Bind `ChatArchiveRepository` to the same
+3. **Remote compaction archives.** Bind `ChatArchiveRepository` to the same
    identity scope and make each archive append transactional. This is required
    whenever a conversation may compact; session JSON alone cannot reconstruct
    removed exact history or the rolling summary.
-3. **Durable product truth.** If a turn changes host-owned domain state, persist
+4. **Durable product truth.** If a turn changes host-owned domain state, persist
    the canonical result before publishing terminal success. A durable
    conversation that claims an output changed while the product still stores
    the old value is not a successful durability design.
-4. **Durable user-facing projection when needed.** If the UI exposes a catalog
+5. **Durable user-facing projection when needed.** If the UI exposes a catalog
    or safe transcript, persist that product view separately instead of treating
    Heddle's complete model/tool record as a stable browser contract.
-5. **Identity, deletion, and operations.** Enforce tenant isolation in the
+6. **Identity, deletion, and operations.** Enforce tenant isolation in the
    adapter factory and database, define cascade/retention behavior, and own
    migrations, backups, monitoring, and disaster recovery.
-6. **Truthful interruption behavior.** If the executor dies before finalization,
+7. **Truthful interruption behavior.** If the executor dies before finalization,
    report the run as interrupted or failed. Do not reconstruct and replay a
    pending tool call or approval from partial evidence.
 

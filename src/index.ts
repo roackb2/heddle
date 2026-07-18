@@ -43,6 +43,7 @@ export type {
   QuickstartConversationCliTurnContext,
 } from './core/chat/engine/quickstart-cli/index.js';
 export { createConversationEngine } from './core/chat/engine/conversation-engine.js';
+export { ConversationPersistenceService } from './core/chat/engine/persistence/index.js';
 export { DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL } from './core/config.js';
 
 // ---------------------------------------------------------------------------
@@ -203,6 +204,20 @@ export type {
   SubmitConversationTurnResult,
   UpdateConversationSessionSettingsInput,
 } from './core/chat/engine/types.js';
+export type {
+  ConversationPersistence,
+  ConversationPersistenceConfiguration,
+  ConversationPersistenceReadinessCheck,
+  ConversationPersistenceReadinessCheckId,
+  ConversationPersistenceReadinessIssue,
+  ConversationPersistenceReadinessIssueCode,
+  ConversationPersistenceReadinessReport,
+  ConversationPersistenceReadinessSource,
+  ConversationPersistenceTargetLevel,
+  HeddlePersistenceCapabilities,
+  ResolvedConversationPersistence,
+  ResolvedHeddlePersistenceCapabilities,
+} from './core/chat/engine/persistence/index.js';
 export { EngineConversationTurnService } from './core/chat/engine/turns/service.js';
 export type { RuntimeToolSelectionProfile, ToolCapability } from './core/runtime/tools/index.js';
 export type {

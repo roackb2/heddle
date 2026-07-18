@@ -9,6 +9,8 @@ import {
   resolveQuickstartConversationCliDefaults,
   runQuickstartConversationCli,
 } from '@/core/chat/engine/index.js';
+import { FileChatArchiveRepository } from '@/core/chat/engine/sessions/archives/index.js';
+import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 
 class CaptureOutput extends Writable {
   private readonly chunks: string[] = [];
@@ -161,6 +163,32 @@ describe('runQuickstartConversationCli', () => {
     await run;
 
     expect(output.text()).toContain(`Session: ${session.id}`);
+  });
+
+  it('passes a complete conversation persistence capability into the quickstart engine', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-quickstart-cli-persistence-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const hostedStateRoot = join(workspaceRoot, 'hosted');
+    const sessions = new FileChatSessionRepository({
+      sessionStoragePath: join(hostedStateRoot, 'sessions.catalog.json'),
+    });
+    const archives = new FileChatArchiveRepository({ stateRoot: hostedStateRoot });
+
+    await runQuickstartConversationCli({
+      prompts: ['/exit'],
+      credentialPreflight: false,
+      model: 'gpt-test',
+      output: new CaptureOutput(),
+      persistence: {
+        conversations: { sessions, archives },
+      },
+      stateRoot,
+      workspaceRoot,
+    });
+
+    await expect(sessions.list({ limit: 10 })).resolves.toEqual(expect.objectContaining({
+      items: [expect.objectContaining({ name: 'Heddle SDK interactive chat' })],
+    }));
   });
 
   it('prints a generic credential status before entering the loop', async () => {

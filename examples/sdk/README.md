@@ -114,10 +114,12 @@ yarn example:postgres-storage:verify
 
 **Assumption:** the host already owns a PostgreSQL service and derives a trusted
 tenant/account scope from server authentication. The reference implements both
-Heddle repository ports, applies checked-in migrations, runs the public session
-conformance suite, and proves session plus archive recovery through fresh
-connection pools and engine instances. It is deliberately an example rather
-than an official adapter package.
+Heddle repository ports as one conversation persistence capability, applies
+checked-in migrations, runs the public session conformance suite, and proves
+session plus archive recovery through fresh connection pools and engine
+instances. The engine readiness report identifies the remaining host-owned
+checks. This is deliberately an example rather than an official adapter
+package.
 
 Read the [storage reference boundary](06-postgres-drizzle-storage/README.md)
 before copying it. This stage can be combined with any stage-05 transport or UI;

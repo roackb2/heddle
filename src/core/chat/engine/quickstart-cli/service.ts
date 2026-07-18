@@ -62,6 +62,7 @@ export class QuickstartConversationCliRunnerService {
       tools: options.tools,
       hostExtensions: options.hostExtensions,
       artifactRepository: options.artifactRepository,
+      persistence: options.persistence,
       sessionRepository: options.sessionRepository,
       archiveRepository: options.archiveRepository,
     });

@@ -159,8 +159,12 @@ async function verifyFreshServiceRecovery(
         stateRoot: firstStateRoot,
         model: 'gpt-5.4',
         memoryMaintenanceMode: 'none',
-        sessionRepository,
-        archiveRepository,
+        persistence: {
+          conversations: {
+            sessions: sessionRepository,
+            archives: archiveRepository,
+          },
+        },
       });
 
       const created = await engine.sessions.create({
@@ -214,8 +218,12 @@ async function verifyFreshServiceRecovery(
         stateRoot: secondStateRoot,
         model: 'gpt-5.4',
         memoryMaintenanceMode: 'none',
-        sessionRepository,
-        archiveRepository,
+        persistence: {
+          conversations: {
+            sessions: sessionRepository,
+            archives: archiveRepository,
+          },
+        },
       });
 
       assert.deepEqual(
