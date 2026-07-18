@@ -54,6 +54,9 @@ split between Heddle and the host explicit for developers and coding agents.
      a transport-neutral run service, Express/SSE API, browser client, and
      optional React reference product while keeping each layer replaceable.
 5. **Advanced: storage** — back Heddle with your own persistence.
+   - [Durability support matrix](durability-support.md): choose between local,
+     completed-conversation, and durable in-flight promises, and see which
+     state surfaces must follow a replica.
    - [Result artifacts](result-artifacts.md): save large generated values as
      reusable artifacts.
    - Artifact, session, and compacted-history storage are injectable: implement
@@ -66,8 +69,9 @@ split between Heddle and the host explicit for developers and coding agents.
      [runnable PostgreSQL + Drizzle reference](../../../examples/sdk/06-postgres-drizzle-storage/README.md)
      includes migrations, both repository implementations, public conformance,
      and fresh-service recovery.
-     Traces and memory still persist under a local state root; making them
-     injectable follows the same pattern.
+     Traces and memory still persist under a local state root. They have
+     different authority and lifecycle requirements and are not implied by
+     session/archive repository injection.
 
 Runnable versions of the first few rungs live in
 [`examples/sdk/`](../../../examples/sdk/README.md).

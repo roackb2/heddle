@@ -11,6 +11,10 @@ Use the default JSON adapters for one-machine/local-first products. Inject
 `ChatSessionRepository` and `ChatArchiveRepository` for hosted or multi-process
 products that already have a database.
 
+For the exact boundary between local durability, completed-conversation
+durability, and durable in-flight execution, see the
+[durability support matrix](durability-support.md).
+
 ## Local JSON: zero configuration
 
 `createConversationEngine` uses `FileChatSessionRepository` by default. Point
