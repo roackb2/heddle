@@ -1,4 +1,17 @@
 export { createConversationEngine } from './conversation-engine.js';
+export { ConversationAgentService } from './conversation-agent/index.js';
+export type {
+  ConversationAgentCredentialContext,
+  ConversationAgentCredentialPreflightOptions,
+  ConversationAgentMemoryMaintenanceMode,
+  ConversationAgentOptions,
+  ConversationAgentRuntimeContext,
+  ConversationAgentRuntimeDefaults,
+  ConversationAgentRuntimeDefaultsInput,
+  ConversationAgentSendInput,
+  ConversationAgentSessionOptions,
+  ConversationAgentTurnResult,
+} from './conversation-agent/index.js';
 export { ConversationPersistenceService } from './persistence/index.js';
 export type {
   ConversationPersistence,
@@ -108,6 +121,8 @@ export type {
   ConversationTurnService,
   CreateConversationSessionInput,
   ContinueConversationTurnInput,
+  EnsureConversationSessionInput,
+  EnsureConversationSessionResult,
   SubmitConversationTurnInput,
   SubmitConversationTurnResult,
   UpdateConversationSessionSettingsInput,

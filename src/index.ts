@@ -24,8 +24,22 @@
 // ---------------------------------------------------------------------------
 // 1. Start here — stand up a conversation agent
 // ---------------------------------------------------------------------------
-// `runQuickstartConversationCli()` is the smallest working agent. Drop to
-// `createConversationEngine(...)` when you want to own the turn loop / UI.
+// `ConversationAgentService` is the smallest headless structured agent;
+// `runQuickstartConversationCli()` adds a terminal loop. Drop to
+// `createConversationEngine(...)` when you want full lifecycle control.
+export { ConversationAgentService } from './core/chat/engine/conversation-agent/index.js';
+export type {
+  ConversationAgentCredentialContext,
+  ConversationAgentCredentialPreflightOptions,
+  ConversationAgentMemoryMaintenanceMode,
+  ConversationAgentOptions,
+  ConversationAgentRuntimeContext,
+  ConversationAgentRuntimeDefaults,
+  ConversationAgentRuntimeDefaultsInput,
+  ConversationAgentSendInput,
+  ConversationAgentSessionOptions,
+  ConversationAgentTurnResult,
+} from './core/chat/engine/conversation-agent/index.js';
 export {
   QuickstartConversationCliRunnerService,
   resolveQuickstartConversationCliDefaults,
@@ -200,6 +214,8 @@ export type {
   ConversationTurnService,
   CreateConversationSessionInput,
   ContinueConversationTurnInput,
+  EnsureConversationSessionInput,
+  EnsureConversationSessionResult,
   SubmitConversationTurnInput,
   SubmitConversationTurnResult,
   UpdateConversationSessionSettingsInput,

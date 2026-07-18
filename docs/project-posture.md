@@ -73,7 +73,9 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
   compaction, leases, approvals, traces, user-facing conversation activities,
   package-level programmatic use, and domain-specific persistence capability
   composition/readiness. Its `persistence/` subdomain does not define one
-  universal storage or CRUD abstraction across domains.
+  universal storage or CRUD abstraction across domains. Its
+  `conversation-agent/` subdomain owns the smallest structured headless
+  adoption path without absorbing host UI, transport, auth, or product policy.
 - `src/core/chat/` defines the shared chat boundary above the engine. It should
   stay small.
 - `src/core/tools/` owns tool definitions, registries, execution, and toolkits.
@@ -149,6 +151,7 @@ scope.
 - Memory: `src/core/tools/toolkits/knowledge/`, `src/core/memory/`.
 - Conversation persistence capabilities and readiness:
   `src/core/chat/engine/persistence/`.
+- Headless conversation starter: `src/core/chat/engine/conversation-agent/`.
 - Architecture boundaries: `docs/architecture/core-layering.md`,
   `docs/architecture/chat-layering.md`,
   `docs/architecture/durable-state.md`.

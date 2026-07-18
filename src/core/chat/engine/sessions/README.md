@@ -14,6 +14,7 @@ or future hosts, it belongs here rather than in host-side code.
   a session already has earlier work to finish.
 - New-session inheritance rules.
 - Session-level default resolution at the engine boundary.
+- Race-safe create-or-read for a host-provided stable session identity.
 - Storage-independent session mutation coordination and bounded optimistic
   update retries.
 
@@ -68,7 +69,7 @@ session policy.
 The service API should cover ordinary host needs directly:
 
 - use `list`, `read`, `require`, and `latest` for session lookup;
-- use `create`, `rename`, and `delete` for lifecycle changes;
+- use `create`, `ensure`, `rename`, and `delete` for lifecycle changes;
 - use `updateSettings` for shared model, reasoning-effort, and drift settings;
 - reserve generic `update` for persisted session changes that are not yet
   expressed as a named service operation. Its updater may be reapplied after a
