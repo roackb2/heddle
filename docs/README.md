@@ -53,6 +53,7 @@ Task-oriented guides:
 - [Semantic drift](guides/semantic-drift.md)
 - [Heartbeat](guides/heartbeat.md)
 - [Programmatic hosts](guides/programmatic/README.md)
+- [Durability support matrix](guides/programmatic/durability-support.md)
 - [Development and contributing](guides/development.md)
 - [Debugging](guides/debugging.md)
 - [Release convention](releases/README.md)
@@ -130,8 +131,9 @@ Evaluation:
 ### I want to build on Heddle programmatically
 
 1. [Programmatic hosts](guides/programmatic/README.md) for the conversation engine alpha, persisted sessions, and turn submission
-2. [Capabilities and tools](reference/capabilities.md)
-3. [Providers and models](reference/providers-and-models.md)
+2. [Durability support matrix](guides/programmatic/durability-support.md) before choosing local or remote storage boundaries
+3. [Capabilities and tools](reference/capabilities.md)
+4. [Providers and models](reference/providers-and-models.md)
 
 ### I want to contribute or develop locally
 

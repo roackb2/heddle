@@ -345,6 +345,7 @@ framework, or deployment platform.
 - [Host extensions](docs/guides/programmatic/host-extensions.md)
 - [MCP host extensions](docs/guides/programmatic/mcp-host-extensions.md)
 - [Remote conversation runs](docs/guides/programmatic/remote-runs.md)
+- [Durability support matrix](docs/guides/programmatic/durability-support.md)
 - [Result artifacts](docs/guides/programmatic/result-artifacts.md)
 - [Runnable SDK examples](examples/sdk/README.md)
 

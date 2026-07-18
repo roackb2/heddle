@@ -12,6 +12,9 @@ The inventory describes the `v5.1.0` implementation. Update it when adding a
 production writer, changing a persisted schema, or widening a repository
 contract.
 
+For the shorter adopter-facing decision guide, see the
+[durability support matrix](../guides/programmatic/durability-support.md).
+
 ## Terms
 
 The labels in this document are deliberately narrower than "persistent":
@@ -348,11 +351,10 @@ with the same level of reasoning.
 
 ## Ranked Follow-Up
 
-1. **Publish the adopter support matrix.** Distill this inventory into the
-   programmatic-host docs: sessions and archives are remote-ready; artifacts
-   are synchronously replaceable; traces, memory, approvals, heartbeat,
-   credentials, browser state, and runtime catalogs are not implied by those
-   contracts.
+1. **Keep the adopter support matrix current.** The
+   [durability support matrix](../guides/programmatic/durability-support.md)
+   now distinguishes local, completed-conversation, and durable in-flight
+   promises. Update it whenever an extension surface or support level changes.
 2. **Design the artifact boundary only if the next host needs it.** Define an
    asynchronous metadata/content split, stable opaque addresses, atomic content
    plus current-pointer semantics, size/streaming limits, and explicit deletion
