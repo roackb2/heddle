@@ -74,6 +74,7 @@ Contributor-facing architecture boundaries:
 
 - [Core Layering](architecture/core-layering.md)
 - [Chat Layering](architecture/chat-layering.md)
+- [Durable State](architecture/durable-state.md)
 - [Live Events](architecture/live-events.md)
 
 ## Project Context

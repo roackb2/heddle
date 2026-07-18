@@ -94,7 +94,8 @@ review. A good service boundary should make it obvious:
 
 For core dependency direction, use
 `docs/architecture/core-layering.md`. For chat-specific placement, use
-`docs/architecture/chat-layering.md`.
+`docs/architecture/chat-layering.md`. For persistence ownership and lifecycle,
+use `docs/architecture/durable-state.md`.
 
 For host-heavy areas, prefer an MVC-like split that stays easy to reason about:
 
@@ -137,7 +138,8 @@ scope.
   `src/server/services/`, and `src/web-v2/`.
 - Memory: `src/core/tools/toolkits/knowledge/`, `src/core/memory/`.
 - Architecture boundaries: `docs/architecture/core-layering.md`,
-  `docs/architecture/chat-layering.md`.
+  `docs/architecture/chat-layering.md`,
+  `docs/architecture/durable-state.md`.
 - Project direction: `docs/strategy/project-purpose.md`,
   `docs/strategy/framework-vision.md`.
 

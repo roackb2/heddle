@@ -363,6 +363,7 @@ framework, or deployment platform.
 - [Project posture](docs/project-posture.md)
 - [Development guide](docs/guides/development.md)
 - [Core layering](docs/architecture/core-layering.md)
+- [Durable state](docs/architecture/durable-state.md)
 - [Framework vision](docs/strategy/framework-vision.md)
 
 ## Development
