@@ -38,6 +38,7 @@ platform, an identity provider, or a database.
 | An Express server using REST + SSE | [`05-hosted-agent/02-http-sse-api`](05-hosted-agent/02-http-sse-api) | Authentication, routes/API policy, CORS/limits, and deployment |
 | A browser consuming that REST + SSE contract | [`05-hosted-agent/03-browser-client`](05-hosted-agent/03-browser-client) | Auth headers, abort/timer lifecycle, UI state, retry UX, and product result handling |
 | A React/Vite product needing a complete reference | [`05-hosted-agent/04-react-ui`](05-hosted-agent/04-react-ui) | Session API, browser storage, UI state/rendering, auth, and deployment policy |
+| A local-first product or one durable server | [`06-local-json-storage`](06-local-json-storage) | Persistent volume, access control, backup/restore, capacity, and retention |
 | A hosted service that already uses PostgreSQL | [`06-postgres-drizzle-storage`](06-postgres-drizzle-storage) | Migrations, trusted tenant scope, pooling, retention, and database operations |
 
 If your server already uses tRPC, Fastify, Hono, Nest, WebSocket, or another
@@ -120,7 +121,22 @@ this stage. Each later folder depends only on the earlier layer it extends, so
 a coding agent can replace the host-specific layer without moving transport or
 UI concerns into Heddle's conversation core.
 
-### 06 PostgreSQL + Drizzle Storage — durable completed conversations
+### 06 Local JSON Storage — durable conversations on one host
+
+```bash
+yarn example:local-json-storage:verify
+```
+
+**Assumption:** one host owns a persistent local volume with normal locking and
+atomic rename semantics. The example uses Heddle's paired default session and
+archive repositories, proves recovery through a fresh engine, and verifies a
+stopped-writer backup/restore of the complete state root without a model or API
+key. It does not claim multi-replica storage or durable in-flight execution.
+
+Read the [local operations boundary](06-local-json-storage/README.md) before
+deploying this posture.
+
+### 06 PostgreSQL + Drizzle Storage — durable completed conversations across replicas
 
 ```bash
 docker compose \

@@ -56,6 +56,14 @@ bodies plus atomic catalog replacement. Keep the directory on a filesystem
 with normal local rename/locking semantics; do not put it on an eventually
 consistent object-store mount.
 
+The runnable [local JSON storage example](../../../examples/sdk/06-local-json-storage/README.md)
+proves fresh-engine recovery and a stopped-writer backup/restore without a
+model credential. In production, mount the complete `stateRoot` on persistent
+storage, stop writers or take one atomic filesystem snapshot, and back up and
+restore the whole directory. Copying only the catalog or only archive files can
+produce an incomplete conversation. This posture is for one durable host; use
+paired remote repositories when requests can land on different replicas.
+
 ## Hosted database: inject the async port
 
 The repository contract is record-oriented. It does not ask a database adapter
