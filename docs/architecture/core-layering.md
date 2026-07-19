@@ -16,8 +16,8 @@ make the dependency explicit through a public service contract.
 ## Layer Map
 
 ```text
-Layer 5: Interface adapters
-src/cli-v2, src/server, src/web-v2
+Layer 5: SDK application services and interface adapters
+src/sdk, src/cli-v2, src/server, src/web-v2
 
 Layer 4: Product/domain workflows
 src/core/chat/engine, src/core/heartbeat, src/core/memory, src/core/awareness,
@@ -57,6 +57,12 @@ host surfaces
   -> inner agent loop
   -> LLM, tools, trace, utilities
 ```
+
+`src/sdk` is an application boundary over core, not another core domain. It may
+compose core services into adopter-facing starting points, but it must not own
+persisted meaning or make core depend on SDK host choices. Heddle product apps
+remain separate: `src/cli-v2`, `src/server`, and `src/web-v2` own their own
+interfaces and workflows.
 
 ## Service Shape
 

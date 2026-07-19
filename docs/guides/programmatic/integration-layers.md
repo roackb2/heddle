@@ -9,6 +9,22 @@ Use this guide before copying an example. The goal is to adopt the lowest layer
 that does the needed heavy lifting while leaving existing product architecture
 in control.
 
+## SDK hosts are not Heddle product apps
+
+Heddle supplies two small conversation hosts as adoption shortcuts:
+
+- `ConversationAgentService` is a structured in-process application service
+  for products that already own input and output.
+- `runQuickstartConversationCli` is a temporary console host for evaluation,
+  examples, smoke runs, and very small terminal integrations.
+
+They share runtime defaults and credential preflight, but they intentionally do
+not share the same session or output contract. Both live above the core
+conversation engine and are distinct from Heddle's `heddle` CLI/TUI, server,
+and web control plane. When a host outgrows either shortcut, it keeps the same
+engine contracts and moves down the ladder instead of migrating to a different
+runtime.
+
 ## Mental model
 
 ```text

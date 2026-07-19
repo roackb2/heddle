@@ -31,11 +31,16 @@ Before choosing an API, read
 [Choose a Programmatic Integration Layer](integration-layers.md). It maps common
 host stacks to the smallest useful Heddle boundary and makes the responsibility
 split between Heddle and the host explicit for developers and coding agents.
+When you already know the host shape, use the
+[starter recipes](starter-recipes.md) for the smallest copyable path and its
+product-owned TODOs.
 
 1. **Start here** — stand up a conversation agent.
    - [Quickstart](quickstart.md): a headless persisted conversation with
      structured activities/results in a few lines, plus an optional terminal
      loop.
+   - [Starter recipes](starter-recipes.md): copy the transparent headless,
+     hosted, or HTTP/SSE shape without adopting a generated framework.
 2. **Add capabilities** — give the agent your own tools, MCP servers, skills.
    - [Host extensions](host-extensions.md): add generic product or domain tools.
    - [MCP host extensions](mcp-host-extensions.md): expose MCP servers as curated

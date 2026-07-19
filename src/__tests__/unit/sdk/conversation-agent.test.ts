@@ -3,9 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
-import { ConversationAgentService } from '@/core/chat/engine/conversation-agent/index.js';
 import { EngineConversationTurnService } from '@/core/chat/engine/turns/service.js';
 import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
+import { ConversationAgentService } from '@/sdk/conversation/headless/index.js';
 
 describe('ConversationAgentService', () => {
   beforeEach(() => {

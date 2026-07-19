@@ -4,10 +4,10 @@ import type { ReasoningEffort } from '@/core/llm/types.js';
 import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import type {
-  ConversationAgentCredentialContext,
-  ConversationAgentCredentialPreflightOptions,
-  ConversationAgentRuntimeDefaults,
-  ConversationAgentRuntimeDefaultsInput,
+  ConversationSdkCredentialContext,
+  ConversationSdkCredentialPreflightOptions,
+  ConversationSdkRuntimeDefaults,
+  ConversationSdkRuntimeDefaultsInput,
 } from './types.js';
 
 const DEFAULT_MEMORY_MAINTENANCE_MODE = 'none';
@@ -18,18 +18,18 @@ const SUPPORTED_REASONING_EFFORTS = new Set<ReasoningEffort>([
   'ultrahigh',
 ]);
 
-/** Owns the environment-derived defaults and credential preflight shared by headless and CLI SDK starters. */
-export class ConversationAgentRuntimeService {
+/** Owns environment-derived defaults and credential preflight shared by SDK conversation hosts. */
+export class ConversationSdkRuntimeService {
   static resolveDefaults(
-    options: ConversationAgentRuntimeDefaultsInput = {},
-  ): ConversationAgentRuntimeDefaults {
+    options: ConversationSdkRuntimeDefaultsInput = {},
+  ): ConversationSdkRuntimeDefaults {
     const workspaceRoot = options.workspaceRoot ?? process.cwd();
 
     return {
       ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
       memoryMaintenanceMode: options.memoryMaintenanceMode ?? DEFAULT_MEMORY_MAINTENANCE_MODE,
-      model: ConversationAgentRuntimeService.resolveModel(options),
-      reasoningEffort: ConversationAgentRuntimeService.resolveReasoningEffort(
+      model: ConversationSdkRuntimeService.resolveModel(options),
+      reasoningEffort: ConversationSdkRuntimeService.resolveReasoningEffort(
         options.reasoningEffort,
       ),
       stateRoot: options.stateRoot ?? join(workspaceRoot, '.heddle'),
@@ -40,11 +40,11 @@ export class ConversationAgentRuntimeService {
   static preflightCredentials(input: {
     apiKey?: string;
     credentialStorePath?: string;
-    defaults: ConversationAgentRuntimeDefaults;
+    defaults: ConversationSdkRuntimeDefaults;
     preferApiKey?: boolean;
-    preflight?: boolean | ConversationAgentCredentialPreflightOptions;
-  }): ConversationAgentCredentialContext | undefined {
-    const preflight = ConversationAgentRuntimeService.resolveCredentialPreflight(input.preflight);
+    preflight?: boolean | ConversationSdkCredentialPreflightOptions;
+  }): ConversationSdkCredentialContext | undefined {
+    const preflight = ConversationSdkRuntimeService.resolveCredentialPreflight(input.preflight);
     if (!preflight.enabled) {
       return undefined;
     }
@@ -61,12 +61,12 @@ export class ConversationAgentRuntimeService {
       preferApiKey: input.preferApiKey,
       provider: resolution.provider,
       source: resolution.credentialSource,
-    } satisfies ConversationAgentCredentialContext;
+    } satisfies ConversationSdkCredentialContext;
 
     if (resolution.credentialSource.type === 'missing') {
       throw new Error([
         RuntimeCredentialService.formatMissingCredentialMessage(resolution.model),
-        ConversationAgentRuntimeService.resolveMissingCredentialHint({
+        ConversationSdkRuntimeService.resolveMissingCredentialHint({
           context,
           missingCredentialHint: preflight.missingCredentialHint,
         }),
@@ -77,9 +77,9 @@ export class ConversationAgentRuntimeService {
   }
 
   private static resolveCredentialPreflight(
-    input: boolean | ConversationAgentCredentialPreflightOptions | undefined,
-  ): Required<Pick<ConversationAgentCredentialPreflightOptions, 'enabled'>>
-    & Pick<ConversationAgentCredentialPreflightOptions, 'missingCredentialHint'> {
+    input: boolean | ConversationSdkCredentialPreflightOptions | undefined,
+  ): Required<Pick<ConversationSdkCredentialPreflightOptions, 'enabled'>>
+    & Pick<ConversationSdkCredentialPreflightOptions, 'missingCredentialHint'> {
     if (input === false) {
       return { enabled: false };
     }
@@ -95,8 +95,8 @@ export class ConversationAgentRuntimeService {
   }
 
   private static resolveMissingCredentialHint(input: {
-    context: ConversationAgentCredentialContext;
-    missingCredentialHint: ConversationAgentCredentialPreflightOptions['missingCredentialHint'];
+    context: ConversationSdkCredentialContext;
+    missingCredentialHint: ConversationSdkCredentialPreflightOptions['missingCredentialHint'];
   }): string | undefined {
     const hint = typeof input.missingCredentialHint === 'function'
       ? input.missingCredentialHint(input.context)
@@ -105,7 +105,7 @@ export class ConversationAgentRuntimeService {
     return hint?.trim() || undefined;
   }
 
-  private static resolveModel(options: ConversationAgentRuntimeDefaultsInput): string {
+  private static resolveModel(options: ConversationSdkRuntimeDefaultsInput): string {
     const env = options.env ?? process.env;
     return [
       options.model,
@@ -119,7 +119,7 @@ export class ConversationAgentRuntimeService {
   }
 
   private static resolveReasoningEffort(
-    input: ConversationAgentRuntimeDefaultsInput['reasoningEffort'],
+    input: ConversationSdkRuntimeDefaultsInput['reasoningEffort'],
   ): ReasoningEffort | undefined {
     const value = input?.trim();
     if (!value) {

@@ -4,13 +4,13 @@ import { join } from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
-import {
-  createConversationEngine,
-  resolveQuickstartConversationCliDefaults,
-  runQuickstartConversationCli,
-} from '@/core/chat/engine/index.js';
+import { createConversationEngine } from '@/core/chat/engine/index.js';
 import { FileChatArchiveRepository } from '@/core/chat/engine/sessions/archives/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
+import {
+  resolveQuickstartConversationCliDefaults,
+  runQuickstartConversationCli,
+} from '@/sdk/conversation/console/index.js';
 
 class CaptureOutput extends Writable {
   private readonly chunks: string[] = [];

@@ -1,12 +1,9 @@
 # Headless Conversation Agent
 
-This domain owns Heddle's smallest structured in-process adoption path.
+This module owns Heddle's smallest structured in-process SDK adoption path.
 
 ## Ownership
 
-- `ConversationAgentRuntimeService` resolves the model, workspace/state roots,
-  reasoning effort, memory-maintenance default, and early credential evidence
-  shared by SDK starters.
 - `ConversationAgentService` constructs one conversation engine, ensures one
   stable durable session without a read/create race, submits turns, captures
   structured activities, and returns Heddle's normal structured turn result.
@@ -14,9 +11,14 @@ This domain owns Heddle's smallest structured in-process adoption path.
   full session, turn, artifact, persistence, and host-extension APIs without a
   rewrite.
 
+Shared model, workspace/state, reasoning, memory-maintenance, and credential
+defaults come from `../runtime/`. This module consumes that policy; it does not
+fork or re-resolve it.
+
 ## Boundary
 
-The service is headless and in-process. It does not own terminal rendering,
+This is an SDK application service over `src/core/chat/engine`, not part of the
+engine domain itself. The service is headless and in-process. It does not own terminal rendering,
 HTTP, authentication, tenant mapping, public result projection, canonical
 product transactions, or durable in-flight execution. A per-turn host callback
 overrides the service default when approval or event handling is request-scoped.
