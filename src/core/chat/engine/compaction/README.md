@@ -14,6 +14,7 @@ adapter.
 - Building compacted summary messages for future turns.
 - Building persisted compaction context stats.
 - Estimating history and request-token pressure for compaction decisions.
+- Keeping summary generation on the active turn's resolved credential principal.
 
 ## Structure
 
@@ -33,6 +34,11 @@ Archive persistence itself belongs to
 and `summaryPath` values as opaque locators. Repository read/write failures are
 infrastructure failures and reject the compaction; summarizer failures retain
 the original history and produce a failed compaction result.
+
+Turn and control-plane callers must pass the concrete resolved API key or the
+selected credential-store path together with the credential source. Compaction
+may select a purpose-specific summary model, but it must not silently switch
+from a user's credential to a host environment or default auth-store credential.
 
 Avoid adding loose exported functions for compaction-domain behavior. If the
 behavior is part of compaction semantics, put it on `ConversationCompactionService`

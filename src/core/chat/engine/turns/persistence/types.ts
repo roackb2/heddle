@@ -2,7 +2,6 @@ import type { AgentLoopResult } from '@/core/runtime/loop/index.js';
 import type { RunResult } from '@/core/types.js';
 import type { ChatMessage } from '@/core/llm/types.js';
 import type { ConversationCompactionStatus } from '@/core/live/index.js';
-import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import type { TraceSummaryService } from '@/core/observability/index.js';
 import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
 import type { ConversationSessionService } from '@/core/chat/engine/types.js';
@@ -76,7 +75,7 @@ export type PersistCompletedChatTurnBase = {
 
 export type PersistCompletedChatTurnArgs = PersistCompletedChatTurnBase & {
   sessionService: ConversationSessionService;
-  credentialSource: ProviderCredentialSource;
+  summarizer: ConversationCompactionOptions['summarizer'];
   host: Pick<ChatTurnHostPort, 'onCompactionStatus'>;
 };
 

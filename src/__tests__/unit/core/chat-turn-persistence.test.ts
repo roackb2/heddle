@@ -108,6 +108,12 @@ describe('chat turn persistence', () => {
     const repository = new FileChatSessionRepository({ sessionStoragePath });
     await seedChatSessionRepository(repository, [session]);
     const sessionService = createSessionService(stateRoot, sessionStoragePath, repository);
+    const summarizer = {
+      apiKey: 'user-byok-key',
+      credentialStorePath: join(stateRoot, 'auth.json'),
+      credentialSource: { type: 'explicit-api-key' as const },
+    };
+    const persistArtifacts = vi.spyOn(ConversationTurnArtifacts, 'persist');
 
     const result: AgentLoopResult = {
       outcome: 'done',
@@ -165,10 +171,11 @@ describe('chat turn persistence', () => {
       traceDir: join(stateRoot, 'traces'),
       toolNames: ['read_file'],
       historyForTokenEstimate: session.history,
-      credentialSource: { type: 'explicit-api-key' },
+      summarizer,
       host: {},
     });
 
+    expect(persistArtifacts).toHaveBeenCalledWith(expect.objectContaining({ summarizer }));
     const stored = await readStoredChatSession(repository, session.id);
     expect(stored?.id).toBe(session.id);
     expect(stored?.lastContinuePrompt).toBe('Persist this turn.');
@@ -209,7 +216,7 @@ describe('chat turn persistence', () => {
       traceDir: join(stateRoot, 'traces'),
       toolNames: ['read_file'],
       historyForTokenEstimate: session.history,
-      credentialSource: { type: 'explicit-api-key' },
+      summarizer: { credentialSource: { type: 'explicit-api-key' } },
       agentSnapshot,
       host: {},
     });
@@ -265,7 +272,7 @@ describe('chat turn persistence', () => {
       traceDir: join(stateRoot, 'traces'),
       toolNames: [],
       historyForTokenEstimate: session.history,
-      credentialSource: { type: 'explicit-api-key' },
+      summarizer: { credentialSource: { type: 'explicit-api-key' } },
       host: {},
     });
 

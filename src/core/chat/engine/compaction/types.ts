@@ -9,6 +9,7 @@ export type ConversationCompactionSummarizerOptions = {
   provider?: 'openai' | 'anthropic' | 'active';
   model?: string;
   apiKey?: string;
+  credentialStorePath?: string;
   llm?: LlmAdapter;
   credentialSource?: ProviderCredentialSource;
 };

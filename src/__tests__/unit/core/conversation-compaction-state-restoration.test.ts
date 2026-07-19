@@ -54,7 +54,7 @@ describe('compaction infrastructure failure restoration', () => {
       traceDir: join(fixture.stateRoot, 'traces'),
       toolNames: [],
       historyForTokenEstimate: fixture.session.history,
-      credentialSource: { type: 'explicit-api-key' },
+      summarizer: { credentialSource: { type: 'explicit-api-key' } },
       host: {},
     })).rejects.toThrow('archive backend unavailable');
 

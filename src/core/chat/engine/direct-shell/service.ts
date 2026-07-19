@@ -140,9 +140,7 @@ export class ConversationDirectShellService {
         toolNames: [chosenCall.tool],
         goal: shellDisplay,
       },
-      summarizer: {
-        credentialSource: input.credentialSource,
-      },
+      summarizer: input.summarizer,
       onStatusChange: input.onCompactionStatus,
     });
 
