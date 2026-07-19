@@ -41,16 +41,19 @@ export class ConversationArchiveSummarizer {
           activeModel: options.runtime.model,
           explicitApiKey: options.summarizer?.apiKey,
           credentialSource: options.summarizer?.credentialSource,
+          credentialStorePath: options.summarizer?.credentialStorePath,
         }),
       });
     const providerRuntime = LlmProviderRuntimeService.resolve({
       model,
       apiKey: options.summarizer?.apiKey,
+      credentialStorePath: options.summarizer?.credentialStorePath,
     });
     const apiKey = options.summarizer?.apiKey ?? providerRuntime.apiKey;
     const summarizerCredentialRuntime: ApiKeyRuntime = {
       apiKey,
       apiKeyProvider: options.summarizer?.apiKey ? 'explicit' : apiKey ? provider : undefined,
+      credentialStorePath: options.summarizer?.credentialStorePath,
     };
     if (providerRuntime.credentialSource.type === 'missing' || !RuntimeCredentialService.hasCredentialForModel(model, summarizerCredentialRuntime)) {
       return { model };
@@ -60,7 +63,10 @@ export class ConversationArchiveSummarizer {
       model,
       llm: LlmAdapterService.create({
         model,
-        credentials: { apiKey },
+        credentials: {
+          apiKey,
+          credentialStorePath: options.summarizer?.credentialStorePath,
+        },
         runtime: providerRuntime.llmRuntime,
       }),
     };

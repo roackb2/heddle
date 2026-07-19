@@ -18,7 +18,7 @@ export class ConversationTurnPersistenceService {
     try {
       persisted = await ConversationTurnArtifacts.persist({
         ...artifactInput,
-        summarizer: { credentialSource: args.credentialSource },
+        summarizer: args.summarizer,
         createTurnId: () => `server-turn-${Date.now()}`,
         onCompactionStatus: async (event) => {
           args.host.onCompactionStatus?.(event, 'final');

@@ -249,6 +249,12 @@ export class ControlPlaneChatSessionsController {
 
           await sessions.markCompactionRunning(sessionId, { sourceHistory: session.history });
           const model = session.model ?? args.model ?? DEFAULT_OPENAI_MODEL;
+          const providerRuntime = LlmProviderRuntimeService.resolve({
+            model,
+            apiKey: args.apiKey,
+            credentialStorePath: args.credentialStorePath,
+            preferApiKey: args.preferApiKey,
+          });
           const compacted = await ConversationCompactionService.compact({
             history: session.history,
             runtime: {
@@ -260,11 +266,9 @@ export class ControlPlaneChatSessionsController {
             archiveRepository: args.archiveRepository,
             force,
             summarizer: {
-              credentialSource: RuntimeCredentialService.resolveCredentialSourceForModel(model, {
-                apiKey: args.apiKey,
-                credentialStorePath: args.credentialStorePath,
-                preferApiKey: args.preferApiKey,
-              }),
+              apiKey: providerRuntime.apiKey,
+              credentialStorePath: args.credentialStorePath,
+              credentialSource: providerRuntime.credentialSource,
             },
             onStatusChange: publisher.publishActivity,
           });
@@ -667,17 +671,28 @@ export class ControlPlaneChatSessionsController {
         await sessions.acquireLease(args.sessionId, args.leaseOwner);
 
         try {
+          const model = session.model ?? args.model ?? DEFAULT_OPENAI_MODEL;
+          const providerRuntime = LlmProviderRuntimeService.resolve({
+            model,
+            apiKey: args.apiKey,
+            credentialStorePath: args.credentialStorePath,
+            preferApiKey: args.preferApiKey,
+          });
           const result = await ConversationDirectShellService.execute({
             sessionId: args.sessionId,
             runId: run.runId,
             command: args.command,
-            model: session.model ?? args.model ?? DEFAULT_OPENAI_MODEL,
+            model,
             workspaceRoot: args.workspaceRoot,
             stateRoot: args.stateRoot,
             archiveRepository: args.archiveRepository,
             systemContext: args.systemContext,
             riskAccepted: args.riskAccepted,
-            credentialSource: RuntimeCredentialService.resolveCredentialSourceForModel(session.model ?? args.model ?? DEFAULT_OPENAI_MODEL, args),
+            summarizer: {
+              apiKey: providerRuntime.apiKey,
+              credentialStorePath: args.credentialStorePath,
+              credentialSource: providerRuntime.credentialSource,
+            },
             sessions,
             abortSignal: run.controller.signal,
             onActivity: publisher.publishActivity,

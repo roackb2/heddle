@@ -48,6 +48,11 @@ export class ConversationTurnRuntimeResolver {
       provider: providerRuntime.provider,
       apiKey,
       providerCredentialSource: providerRuntime.credentialSource,
+      summarizer: {
+        apiKey,
+        credentialStorePath: config.credentialStorePath,
+        credentialSource: providerRuntime.credentialSource,
+      },
       memoryDir,
       systemContext: appendAwarenessDomainSystemContext(domainSystemContext),
       reasoningEffort: session.reasoningEffort,

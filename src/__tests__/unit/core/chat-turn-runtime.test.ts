@@ -88,6 +88,11 @@ describe('chat turn preparation modules', () => {
     expect(runtime.provider).toBe('openai');
     expect(runtime.apiKey).toBe('explicit-key');
     expect(runtime.providerCredentialSource).toEqual({ type: 'explicit-api-key' });
+    expect(runtime.summarizer).toEqual({
+      apiKey: 'explicit-key',
+      credentialStorePath: undefined,
+      credentialSource: { type: 'explicit-api-key' },
+    });
     expect(runtime.memoryDir).toBe(join(stateRoot, 'memory'));
     expect(runtime.systemContext).toContain('System context');
     expect(runtime.systemContext).toContain('## Situation Awareness Domain');
@@ -181,6 +186,16 @@ describe('chat turn preparation modules', () => {
       provider: 'openai',
       accountId: 'account-123',
       expiresAt: Date.parse('2026-05-02T01:00:00.000Z'),
+    });
+    expect(runtime.summarizer).toEqual({
+      apiKey: undefined,
+      credentialStorePath,
+      credentialSource: {
+        type: 'oauth',
+        provider: 'openai',
+        accountId: 'account-123',
+        expiresAt: Date.parse('2026-05-02T01:00:00.000Z'),
+      },
     });
   });
 

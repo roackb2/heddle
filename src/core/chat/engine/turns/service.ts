@@ -112,7 +112,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         model: runtime.model,
         systemContext: runtime.systemContext,
         toolNames,
-        summarizer: { credentialSource: runtime.providerCredentialSource },
+        summarizer: runtime.summarizer,
         leaseOwner,
         host,
       });
@@ -163,7 +163,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         systemContext: runtime.systemContext,
         toolNames,
         historyForTokenEstimate: session.history,
-        credentialSource: runtime.providerCredentialSource,
+        summarizer: runtime.summarizer,
         host,
         agentSnapshot,
       });
