@@ -7,7 +7,7 @@ a process restart on one host.
 
 Use it for a local-first product, desktop/server process, or one durable server
 whose `stateRoot` is on a persistent local volume. Use the sibling
-[PostgreSQL + Drizzle reference](../06-postgres-drizzle-storage/README.md) when
+[PostgreSQL + Drizzle reference](../postgres-drizzle/README.md) when
 conversation state must follow requests across replicas or machines.
 
 ## Run the recovery proof

@@ -30,7 +30,7 @@ From the Heddle repository root:
 
 ```bash
 docker compose \
-  -f examples/sdk/06-postgres-drizzle-storage/compose.yaml \
+  -f examples/sdk/06-persistence/postgres-drizzle/compose.yaml \
   up -d --wait
 
 yarn example:postgres-storage:migrate
@@ -54,14 +54,14 @@ Stop and remove the local database and its named volume when finished:
 
 ```bash
 docker compose \
-  -f examples/sdk/06-postgres-drizzle-storage/compose.yaml \
+  -f examples/sdk/06-persistence/postgres-drizzle/compose.yaml \
   down -v
 ```
 
 ## Read the implementation
 
 ```text
-06-postgres-drizzle-storage/
+06-persistence/postgres-drizzle/
   schema.ts                              Drizzle tables and indexes
   drizzle/                               checked-in SQL migration + metadata
   postgres-chat-session-repository.ts    revisions, CAS, filters, pagination
@@ -77,7 +77,7 @@ migration is the deployment artifact; review both whenever the schema changes:
 
 ```bash
 yarn drizzle-kit generate \
-  --config examples/sdk/06-postgres-drizzle-storage/drizzle.config.ts
+  --config examples/sdk/06-persistence/postgres-drizzle/drizzle.config.ts
 ```
 
 ## Compose the repositories
@@ -121,7 +121,7 @@ It does not certify this scope, database, migrations, backup, or deployment;
 the verification script below exercises the provider-specific invariants.
 
 When copying these files into another project, replace the relative imports
-from `../../../src/index.js` with `@roackb2/heddle` and declare the dependencies
+from `../../../../src/index.js` with `@roackb2/heddle` and declare the dependencies
 your host imports directly:
 
 ```bash

@@ -72,9 +72,9 @@ product-owned TODOs.
      [Conversation engine → Bring your own artifact storage](conversation-engine.md#bring-your-own-artifact-storage)
      and [Durable session storage](session-storage.md) for local JSON and
      PostgreSQL adapter guidance). The runnable
-     [local JSON recovery example](../../../examples/sdk/06-local-json-storage/README.md)
+     [local JSON recovery example](../../../examples/sdk/06-persistence/local-json/README.md)
      covers one durable host, while the
-     [runnable PostgreSQL + Drizzle reference](../../../examples/sdk/06-postgres-drizzle-storage/README.md)
+     [runnable PostgreSQL + Drizzle reference](../../../examples/sdk/06-persistence/postgres-drizzle/README.md)
      includes migrations, both repository implementations, public conformance,
      and fresh-service recovery.
      The engine exposes a lightweight conversation-readiness report; real

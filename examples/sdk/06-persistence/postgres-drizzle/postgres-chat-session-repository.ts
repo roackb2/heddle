@@ -22,7 +22,7 @@ import {
   type ListChatSessionsInput,
   type StoredChatSession,
   type UpdateChatSessionInput,
-} from '../../../src/index.js';
+} from '../../../../src/index.js';
 import {
   hasPostgresErrorCode,
   requireTrustedScopeId,

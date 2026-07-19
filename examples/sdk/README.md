@@ -38,8 +38,8 @@ platform, an identity provider, or a database.
 | An Express server using REST + SSE | [`05-hosted-agent/02-http-sse-api`](05-hosted-agent/02-http-sse-api) | Authentication, routes/API policy, CORS/limits, and deployment |
 | A browser consuming that REST + SSE contract | [`05-hosted-agent/03-browser-client`](05-hosted-agent/03-browser-client) | Auth headers, abort/timer lifecycle, UI state, retry UX, and product result handling |
 | A React/Vite product needing a complete reference | [`05-hosted-agent/04-react-ui`](05-hosted-agent/04-react-ui) | Session API, browser storage, UI state/rendering, auth, and deployment policy |
-| A local-first product or one durable server | [`06-local-json-storage`](06-local-json-storage) | Persistent volume, access control, backup/restore, capacity, and retention |
-| A hosted service that already uses PostgreSQL | [`06-postgres-drizzle-storage`](06-postgres-drizzle-storage) | Migrations, trusted tenant scope, pooling, retention, and database operations |
+| A local-first product or one durable server | [`06-persistence/local-json`](06-persistence/local-json) | Persistent volume, access control, backup/restore, capacity, and retention |
+| A hosted service that already uses PostgreSQL | [`06-persistence/postgres-drizzle`](06-persistence/postgres-drizzle) | Migrations, trusted tenant scope, pooling, retention, and database operations |
 
 If your server already uses tRPC, Fastify, Hono, Nest, WebSocket, or another
 transport, follow the hosted-service stage and write an adapter for that stack.
@@ -121,7 +121,13 @@ this stage. Each later folder depends only on the earlier layer it extends, so
 a coding agent can replace the host-specific layer without moving transport or
 UI concerns into Heddle's conversation core.
 
-### 06 Local JSON Storage — durable conversations on one host
+### 06 Persistence — choose a durability posture
+
+Stage 06 is one customization layer with two alternative host topologies. Read
+the [persistence-stage overview](06-persistence/README.md), then choose the
+posture that matches the product. Neither option depends on the other.
+
+#### Local JSON — durable conversations on one host
 
 ```bash
 yarn example:local-json-storage:verify
@@ -133,14 +139,14 @@ archive repositories, proves recovery through a fresh engine, and verifies a
 stopped-writer backup/restore of the complete state root without a model or API
 key. It does not claim multi-replica storage or durable in-flight execution.
 
-Read the [local operations boundary](06-local-json-storage/README.md) before
+Read the [local operations boundary](06-persistence/local-json/README.md) before
 deploying this posture.
 
-### 06 PostgreSQL + Drizzle Storage — durable completed conversations across replicas
+#### PostgreSQL + Drizzle — durable completed conversations across replicas
 
 ```bash
 docker compose \
-  -f examples/sdk/06-postgres-drizzle-storage/compose.yaml \
+  -f examples/sdk/06-persistence/postgres-drizzle/compose.yaml \
   up -d --wait
 yarn example:postgres-storage:verify
 ```
@@ -154,7 +160,7 @@ instances. The engine readiness report identifies the remaining host-owned
 checks. This is deliberately an example rather than an official adapter
 package.
 
-Read the [storage reference boundary](06-postgres-drizzle-storage/README.md)
+Read the [storage reference boundary](06-persistence/postgres-drizzle/README.md)
 before copying it. This stage can be combined with any stage-05 transport or UI;
 database persistence does not require adopting the example HTTP stack.
 

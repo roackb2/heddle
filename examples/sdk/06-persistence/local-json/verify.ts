@@ -16,7 +16,7 @@ import { join, resolve } from 'node:path';
 import {
   createConversationEngine,
   type AppendChatArchiveInput,
-} from '../../../src/index.js';
+} from '../../../../src/index.js';
 
 const workspaceRoot = process.cwd();
 const configuredStateRoot = process.env.HEDDLE_EXAMPLE_STATE_ROOT?.trim();

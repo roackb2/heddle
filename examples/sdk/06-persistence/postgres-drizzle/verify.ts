@@ -12,7 +12,7 @@ import {
   createConversationEngine,
   type AppendChatArchiveInput,
   type ChatSessionRepositoryConformanceHarness,
-} from '../../../src/index.js';
+} from '../../../../src/index.js';
 import type { PostgresStorageDatabase } from './database.js';
 import { POSTGRES_REFERENCE_DATABASE_URL } from './example-config.js';
 import { migratePostgresStorage } from './migration.js';
