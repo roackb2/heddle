@@ -62,26 +62,34 @@ Install the Node runtime package:
 npm install @roackb2/heddle
 ```
 
-Then start a persisted interactive conversation:
+Then send a structured turn through a persisted conversation:
 
 ```ts
-import { runQuickstartConversationCli } from '@roackb2/heddle'
+import { ConversationAgentService } from '@roackb2/heddle'
 
-await runQuickstartConversationCli()
+const agent = new ConversationAgentService()
+const result = await agent.send({
+  prompt: 'Summarize this project and identify the main verification path.',
+})
+
+console.log(result.summary)
+console.log(result.activities)
 ```
 
-The quickstart resolves the workspace, local state root, configured model, and
-credential before opening the prompt loop. It is intentionally smaller than
-Heddle's product CLI and is the shortest path for evaluating the SDK.
+The headless service resolves the workspace, local state root, configured
+model, and credential; race-safely ensures one stable durable session; and
+returns structured activities plus Heddle's normal turn result. It does not
+choose a UI, transport, auth system, or product transaction.
 
 Run the corresponding repository example with:
 
 ```bash
-yarn example:sdk:interactive
+yarn example:sdk:headless "What does this project do?"
 ```
 
-See the [SDK quickstart](docs/guides/programmatic/quickstart.md) for model,
-credential, prompt, command, and host-extension options.
+Use `runQuickstartConversationCli()` when you also want Heddle to provide a
+temporary terminal prompt loop and text rendering. See the
+[SDK quickstart](docs/guides/programmatic/quickstart.md) for both paths.
 
 ### Own presentation and turn lifecycle
 
@@ -166,7 +174,8 @@ that already owns the mechanics your host needs:
 
 | Host need | Start with | What it adds |
 | --- | --- | --- |
-| A working local conversation | `runQuickstartConversationCli` | Prompt loop, persisted session, credentials, and text output |
+| A structured local conversation | `ConversationAgentService` | Runtime defaults, stable session ensure, structured activities, and turn result |
+| A terminal SDK evaluation | `runQuickstartConversationCli` | Prompt loop, persisted session, credentials, and text output |
 | Custom output, tools, or session UX | `@roackb2/heddle` | Conversation engine, host extensions, tools, MCP, approvals, artifacts, and turn results |
 | A server, worker, or Electron backend | `@roackb2/heddle/hosted` | Addressable process-local runs, replay, cancellation, and approval resolution |
 | Conventional Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` | Replay cursor parsing, SSE framing, backpressure, and disconnect cleanup |
@@ -182,8 +191,9 @@ Do not install Express or React merely because a reference example uses them.
 
 The runnable examples teach customization in small steps:
 
-1. [Interactive chat](examples/sdk/01-interactive-chat.ts) — start a persisted
-   conversation.
+1. [Headless conversation](examples/sdk/01-headless-conversation.ts) — send a
+   structured turn through a persisted session; or use
+   [interactive chat](examples/sdk/01-interactive-chat.ts) for a terminal loop.
 2. [Add a tool](examples/sdk/02-add-a-tool.ts) — expose native product
    behavior.
 3. [Add an MCP server](examples/sdk/03-add-an-mcp-server.ts) — prepare curated

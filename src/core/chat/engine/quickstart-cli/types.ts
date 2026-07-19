@@ -2,17 +2,21 @@ import type { Readable, Writable } from 'node:stream';
 import type { ArtifactRepository } from '@/core/artifacts/index.js';
 import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import type { ChatArchiveRepository } from '@/core/chat/engine/sessions/archives/index.js';
-import type { ReasoningEffort } from '@/core/llm/types.js';
-import type { LlmProvider } from '@/core/llm/types.js';
-import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import type { ToolDefinition } from '@/core/types.js';
 import type { ConversationEngine } from '../types.js';
 import type { ChatSession } from '../../types.js';
 import type { ConversationTurnResultSummary } from '../turn-result.js';
 import type { ConversationEngineHost, ConversationEngineHostExtension } from '../types.js';
 import type { HeddlePersistenceCapabilities } from '../persistence/index.js';
+import type {
+  ConversationAgentCredentialContext,
+  ConversationAgentCredentialPreflightOptions,
+  ConversationAgentMemoryMaintenanceMode,
+  ConversationAgentRuntimeDefaults,
+  ConversationAgentRuntimeDefaultsInput,
+} from '../conversation-agent/index.js';
 
-export type QuickstartConversationCliMemoryMaintenanceMode = 'none' | 'background' | 'inline';
+export type QuickstartConversationCliMemoryMaintenanceMode = ConversationAgentMemoryMaintenanceMode;
 
 export type QuickstartConversationCliLocalCommandContext = {
   command: string;
@@ -39,18 +43,12 @@ export type QuickstartConversationCliTurnContext = {
   workspaceRoot: string;
 };
 
-export type QuickstartConversationCliCredentialContext = {
-  model: string;
-  preferApiKey?: boolean;
-  provider: LlmProvider;
-  source: ProviderCredentialSource;
-};
+export type QuickstartConversationCliCredentialContext = ConversationAgentCredentialContext;
 
-export type QuickstartConversationCliCredentialPreflightOptions = {
-  enabled?: boolean;
-  missingCredentialHint?: string | ((context: QuickstartConversationCliCredentialContext) => string | undefined);
-  status?: 'off' | 'status';
-};
+export type QuickstartConversationCliCredentialPreflightOptions =
+  ConversationAgentCredentialPreflightOptions & {
+    status?: 'off' | 'status';
+  };
 
 export type QuickstartConversationCliRunnerOptions = {
   model?: string;
@@ -62,7 +60,7 @@ export type QuickstartConversationCliRunnerOptions = {
   oncePrompt?: string;
   prompts?: string[];
   maxSteps?: number;
-  reasoningEffort?: ReasoningEffort | string;
+  reasoningEffort?: ConversationAgentRuntimeDefaultsInput['reasoningEffort'];
   apiKey?: string;
   preferApiKey?: boolean;
   credentialStorePath?: string;
@@ -88,21 +86,6 @@ export type QuickstartConversationCliRunnerOptions = {
   output?: Writable;
 };
 
-export type QuickstartConversationCliRunnerDefaultsInput = Pick<
-  QuickstartConversationCliRunnerOptions,
-  'maxSteps' | 'memoryMaintenanceMode' | 'model' | 'reasoningEffort' | 'stateRoot' | 'workspaceRoot'
-> & {
-  env?: Pick<
-    NodeJS.ProcessEnv,
-    'ANTHROPIC_MODEL' | 'HEDDLE_EXAMPLE_MODEL' | 'HEDDLE_MODEL' | 'OPENAI_MODEL'
-  >;
-};
+export type QuickstartConversationCliRunnerDefaultsInput = ConversationAgentRuntimeDefaultsInput;
 
-export type QuickstartConversationCliRunnerDefaults = {
-  maxSteps?: number;
-  memoryMaintenanceMode: QuickstartConversationCliMemoryMaintenanceMode;
-  model: string;
-  reasoningEffort?: ReasoningEffort;
-  stateRoot: string;
-  workspaceRoot: string;
-};
+export type QuickstartConversationCliRunnerDefaults = ConversationAgentRuntimeDefaults;

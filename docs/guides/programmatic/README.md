@@ -33,8 +33,9 @@ host stacks to the smallest useful Heddle boundary and makes the responsibility
 split between Heddle and the host explicit for developers and coding agents.
 
 1. **Start here** — stand up a conversation agent.
-   - [Quickstart](quickstart.md): a minimal persisted conversation with default
-     text output, in a few lines.
+   - [Quickstart](quickstart.md): a headless persisted conversation with
+     structured activities/results in a few lines, plus an optional terminal
+     loop.
 2. **Add capabilities** — give the agent your own tools, MCP servers, skills.
    - [Host extensions](host-extensions.md): add generic product or domain tools.
    - [MCP host extensions](mcp-host-extensions.md): expose MCP servers as curated

@@ -5,9 +5,54 @@ This is rung 1 of the programmatic ladder — the smallest working agent. See th
 shape output → lifecycle → storage), and [`examples/sdk/`](../../../examples/sdk/README.md)
 for runnable versions.
 
-If your product already owns a server, transport, or UI, use the
+Start with the headless service when your product owns its input/output but not
+the agent lifecycle yet:
+
+```ts
+import { ConversationAgentService } from '@roackb2/heddle'
+
+const agent = new ConversationAgentService()
+const result = await agent.send({
+  prompt: 'Summarize this project and identify the main verification path.',
+})
+
+console.log(result.summary)
+console.log(result.activities)
+```
+
+This resolves the workspace, `.heddle` state root, configured model, and
+credential; race-safely ensures the stable `session-1`; and returns Heddle's
+structured turn result plus the ordered conversation activities observed during
+the turn. Repeated `send` calls continue the same durable conversation. Supply
+an explicit stable session ID for product scope:
+
+```ts
+const agent = new ConversationAgentService({
+  session: { id: trustedProductConversationId, name: 'Product assistant' },
+  systemContext: 'Help the user work with this product.',
+})
+```
+
+Creation fields never overwrite an existing session with that ID. A hosted
+service must derive the ID and repository scope from trusted server-side
+identity; Heddle does not provide authentication or tenant mapping.
+
+The result and activities are trusted in-process host data; they may include
+tool input/output, local paths, or other internal details. Do not serialize them
+directly to an untrusted browser. Use a host-owned public projection and the
+[remote run contracts](remote-runs.md) when crossing a network boundary.
+
+Run the headless repository example:
+
+```bash
+yarn example:sdk:headless "What does this project do?"
+```
+
+If your product already owns a server or remote transport, use the
 [integration-layer chooser](integration-layers.md) to skip directly to the
-lowest matching boundary instead of copying the terminal quickstart stack.
+lowest matching hosting boundary.
+
+## Optional terminal loop
 
 Use `runQuickstartConversationCli` when you want a working interactive conversation loop
 before building a custom UI:
@@ -26,10 +71,11 @@ Heddle's built-in OpenAI default. It resolves credentials before starting the
 session and prints the selected model and credential source. If the model has no
 usable credential, it fails early with Heddle's standard setup message.
 
-This quickstart runner is intentionally smaller than Heddle's product CLI/TUI.
-Use it to get an SDK conversation working quickly, then move to
-`createConversationEngine` when your product needs custom UI state, rendering,
-approval screens, session browsers, or control-plane lifecycle.
+This runner adds readline, text rendering, and local commands around the same
+generic runtime defaults. It is intentionally smaller than Heddle's product
+CLI/TUI. Use `ConversationAgentService` for structured headless output, or move
+to `createConversationEngine` when your product needs full session and turn
+lifecycle control.
 
 Run the local SDK example:
 
@@ -113,7 +159,7 @@ const engine = createConversationEngine({
   reasoningEffort: 'medium',
 })
 
-const session = engine.sessions.create({ name: 'Project assistant' })
+const session = await engine.sessions.create({ name: 'Project assistant' })
 const textHost = createConversationTextHost()
 
 const result = await engine.turns.submit({

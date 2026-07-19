@@ -14,9 +14,8 @@ conversation easier, smaller, or more predictable.
 `QuickstartConversationCliRunnerService` owns:
 
 - creating a persisted conversation engine and session;
-- resolving generic SDK defaults for workspace root, state root, model, and
-  memory maintenance mode;
-- resolving model credentials before a session starts;
+- consuming the headless agent domain's generic workspace/state/model/memory
+  defaults and credential preflight;
 - printing default model and credential status;
 - resuming a caller-selected session;
 - running a one-shot prompt when the caller does not want an interactive loop;
@@ -46,6 +45,11 @@ It does not own:
 ## Relationship To TUI
 
 Both this module and the TUI run from a terminal, but they are different hosts.
+
+For a non-terminal starter, use `ConversationAgentService`. It owns the shared
+runtime defaults, stable session ensure, structured activity capture, and turn
+result. This module adds readline, text rendering, commands, and CLI hooks; it
+must not become a parallel implementation of those generic mechanics.
 
 ```text
 src/core/chat/engine/quickstart-cli/

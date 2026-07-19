@@ -7,7 +7,7 @@ daemon wrappers, or products that want Heddle to own the agent runtime plumbing.
 Use it when you want:
 
 - persisted sessions under a host-controlled state root;
-- session create/read/list/rename/delete operations;
+- session create/ensure/read/list/rename/delete operations;
 - turn submission and continue behavior;
 - automatic conversation compaction;
 - approval handling through host callbacks;
@@ -39,6 +39,22 @@ session ids and storage paths. For new hosts, prefer `createConversationEngine`.
 Use `engine.sessions.readExisting(id)` when checking whether a persisted session
 already exists. Unlike `read(id)`, it does not materialize Heddle's host-facing
 fallback session in an empty repository.
+
+When a host maps a stable product conversation to Heddle, avoid a separate
+read-then-create sequence. Use the race-safe ensure operation:
+
+```ts
+const { session, created } = await engine.sessions.ensure({
+  id: trustedProductConversationId,
+  name: 'Product assistant',
+})
+```
+
+If another process creates the same ID first, `ensure` reads and returns the
+winner. Creation fields apply only to a new record; they never rename or change
+the model/settings of an existing session. Repository adapters must surface
+create collisions as `ChatSessionAlreadyExistsError`, as required by the public
+session repository contract.
 
 ## Control model-visible tools
 

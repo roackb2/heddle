@@ -41,6 +41,8 @@ import type {
   ApplyConversationCompactionResultInput,
   ConversationSessionService,
   CreateConversationSessionInput,
+  EnsureConversationSessionInput,
+  EnsureConversationSessionResult,
   MarkAcceptedConversationUserMessageFailedInput,
   MarkAcceptedConversationUserMessageInput,
   MarkConversationCompactionRunningInput,
@@ -118,16 +120,52 @@ export class FileConversationSessionService implements ConversationSessionServic
   }
 
   async create(input?: CreateConversationSessionInput): Promise<ChatSession> {
-    const existing = await this.loadCatalogEntries();
+    const requestedName = input?.name?.trim();
+    const existing = requestedName ? [] : await this.loadCatalogEntries();
     const session = ChatSessionRecords.create({
       id: input?.id?.trim() || `session-${randomUUID()}`,
-      name: input?.name?.trim() || `Session ${FileConversationSessionService.getNextSessionNumber(existing)}`,
+      name: requestedName || `Session ${FileConversationSessionService.getNextSessionNumber(existing)}`,
       model: input?.model ?? this.config.model,
       reasoningEffort: input?.reasoningEffort ?? this.config.reasoningEffort,
       workspaceId: input?.workspaceId ?? this.config.workspaceId,
       retention: input?.retention,
     });
     return (await this.repository.create(session)).session;
+  }
+
+  /**
+   * Reads an existing stable ID or creates it once. If another process wins the
+   * create race, the repository's uniqueness error becomes a successful read;
+   * existing settings are never overwritten by ensure input.
+   */
+  async ensure(input: EnsureConversationSessionInput): Promise<EnsureConversationSessionResult> {
+    const id = input.id.trim();
+    if (!id) {
+      throw new Error('Conversation session ensure requires a non-empty id.');
+    }
+
+    const existing = await this.repository.read(id);
+    if (existing) {
+      return { session: existing.session, created: false };
+    }
+
+    try {
+      return {
+        session: await this.create({ ...input, id }),
+        created: true,
+      };
+    } catch (error) {
+      if (!(error instanceof ChatSessionAlreadyExistsError)) {
+        throw error;
+      }
+
+      const raced = await this.repository.read(id);
+      if (!raced) {
+        throw error;
+      }
+
+      return { session: raced.session, created: false };
+    }
   }
 
   async createOneOff(input?: CreateConversationSessionInput): Promise<ChatSession> {
