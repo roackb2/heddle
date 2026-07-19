@@ -7,9 +7,10 @@ them. Compacted raw transcripts and rolling summaries use a separate
 `ChatArchiveRepository` because their append-only lifecycle is different from
 revisioned active-session records.
 
-Use the default JSON adapters for one-machine/local-first products. Inject
-`ChatSessionRepository` and `ChatArchiveRepository` for hosted or multi-process
-products that already have a database.
+Use the default JSON adapters for one-machine/local-first products. For hosted
+or multi-process products, inject both repositories through the
+`persistence.conversations` capability so the completed-conversation boundary
+cannot be mistaken for a session-only configuration.
 
 For the exact boundary between local durability, completed-conversation
 durability, and durable in-flight execution, see the
@@ -35,19 +36,20 @@ To choose the catalog location explicitly:
 
 ```ts
 import { join } from 'node:path'
-import {
-  createConversationEngine,
-  FileChatSessionRepository,
-} from '@roackb2/heddle'
+import { createConversationEngine } from '@roackb2/heddle'
 
 const sessionStoragePath = join(dataDir, 'agent-sessions.catalog.json')
 const engine = createConversationEngine({
   workspaceRoot,
   stateRoot: dataDir,
   model: 'gpt-5.4',
-  sessionRepository: new FileChatSessionRepository({ sessionStoragePath }),
+  sessionStoragePath,
 })
 ```
+
+The separate `sessionRepository` and `archiveRepository` options remain for
+compatibility. New hosted integrations should use the complete conversation
+capability shown below.
 
 The file adapter serializes writers across processes and uses immutable session
 bodies plus atomic catalog replacement. Keep the directory on a filesystem
@@ -72,18 +74,11 @@ const sessionRepository: ChatSessionRepository = {
   update: async (input) => compareAndSwapSession(input),
   delete: async (input) => compareAndSwapSessionDelete(input),
 }
-
-const engine = createConversationEngine({
-  workspaceRoot,
-  stateRoot,
-  model: 'gpt-5.4',
-  sessionRepository,
-})
 ```
 
-For a hosted service, session storage alone is not complete durability. Inject
-the companion archive repository as well, bound to the same trusted server-side
-identity scope:
+For a hosted service, session storage alone is not complete durability. Build
+the companion archive repository from the same trusted server-side identity
+scope, then inject the pair as one capability:
 
 ```ts
 import {
@@ -127,10 +122,44 @@ const engine = createConversationEngine({
   workspaceRoot,
   stateRoot,
   model: 'gpt-5.4',
-  sessionRepository,
-  archiveRepository,
+  persistence: {
+    conversations: {
+      sessions: sessionRepository,
+      archives: archiveRepository,
+    },
+  },
 })
 ```
+
+The engine exposes the resolved repositories and a non-certifying readiness
+report at `engine.persistence.conversations`. To inspect a configuration before
+constructing the engine:
+
+```ts
+import { ConversationPersistenceService } from '@roackb2/heddle'
+
+const readiness = ConversationPersistenceService.assess({
+  persistence: {
+    conversations: {
+      sessions: sessionRepository,
+      archives: archiveRepository,
+    },
+  },
+})
+
+if (!readiness.configurationComplete) {
+  throw new Error(readiness.issues.map((issue) => issue.message).join('\n'))
+}
+
+for (const check of readiness.requiredHostChecks) {
+  console.log(`${check.id}: ${check.description}`)
+}
+```
+
+This report confirms configuration shape and identifies the focused host checks
+needed for the selected durability level. It does not query the database or
+certify auth/RLS, scope binding, migrations, backup, load, or disaster
+recovery. Keep those checks in the host or maintained adapter.
 
 `append` is the durability boundary: the exact messages, rolling summary, and
 returned manifest must become visible in one transaction. If it rejects,
@@ -363,8 +392,9 @@ the exact session adapter boundary and file-layout details. The archive port's
 separate ownership and atomicity rules are in its
 [`README.md`](../../../src/core/chat/engine/sessions/archives/README.md).
 
-The session conformance suite does not yet certify a custom archive adapter.
-Keep host integration tests for transactional append, malformed manifest
-rejection, fresh-instance rolling-summary recovery, missing summary content,
-and storage-failure propagation. The default file adapter exercises those same
-invariants in Heddle's integration suite.
+The session conformance suite does not certify a custom archive adapter. Keep a
+small set of host integration checks for transactional append, malformed
+manifest rejection, fresh-instance rolling-summary recovery, missing summary
+content, and storage-failure propagation. Add broader provider scenarios only
+when a real adapter exposes a portable correctness risk or a public support
+claim requires the evidence.

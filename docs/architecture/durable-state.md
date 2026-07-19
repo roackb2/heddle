@@ -8,8 +8,8 @@ questions for each state surface:
 3. Which storage boundary can a programmatic host replace today?
 4. What corruption, atomicity, retention, or security constraints still apply?
 
-The inventory describes the `v5.1.0` implementation. Update it when adding a
-production writer, changing a persisted schema, or widening a repository
+The inventory describes the post-`v5.1.0` implementation. Update it when adding
+a production writer, changing a persisted schema, or widening a repository
 contract.
 
 For the shorter adopter-facing decision guide, see the
@@ -70,8 +70,7 @@ storage contract. The current extension surface is:
 
 | Domain | Injected surface | I/O and consistency shape | Current remote posture |
 | --- | --- | --- | --- |
-| Sessions | `ChatSessionRepository` on the conversation engine | Async CRUD, optimistic revisions, stable pagination, strict corruption behavior, and a conformance suite | **Remote-ready** when the host binds authenticated scope and operations |
-| Archives | `ChatArchiveRepository` on the conversation engine | Async read/append; one append atomically owns messages, summary, and manifest | **Remote-ready** when paired with the session repository's authenticated scope |
+| Conversations | `persistence.conversations`, containing `ChatSessionRepository` plus `ChatArchiveRepository` | Revisioned session CRUD/pagination plus atomic archive content/summary/manifest append | **Remote-ready as one capability** when the host binds both ports to the same authenticated scope and completes the readiness checks |
 | Artifacts | `ArtifactRepository` on the conversation engine | Synchronous catalog and text-content calls; no atomic catalog/content commit | **Host-replaceable**, not remote-ready |
 | Heartbeat | `HeartbeatTaskStore` passed to `runDueTasks` or `runLoop` | Async tasks/checkpoints/runs, but no revisions, distributed lease, multi-record transaction, or conformance suite; built-in `start` constructs the file service | **Host-replaceable scheduler primitive**, not a distributed durability promise |
 | MCP | `McpConfigStorePort`, `McpActivationStorePort`, and `McpCatalogStorePort` | Synchronous whole-document stores; activation/config authority differs from rebuildable discovery cache | **Host-replaceable for an in-process host**, not remote-ready |
@@ -79,6 +78,17 @@ storage contract. The current extension surface is:
 | All other rows | No general injected persistence port | Domain-specific files, diagnostics, secrets, or process coordination | Local/machine/process semantics remain authoritative |
 
 ## Remote-Ready Conversation State
+
+[`ConversationPersistence`](../../src/core/chat/engine/persistence/types.ts) groups sessions
+and compacted archives as one configuration capability. The engine resolves the
+pair once and exposes it at `engine.persistence.conversations` with a readiness
+report. The report catches missing or ambiguous configuration and enumerates
+the host-owned checks; it does not query or certify the database, auth, tenant
+scope, migrations, backup, or product finalization.
+
+The separate engine repository options remain as deprecated compatibility
+inputs. A partial legacy configuration can continue operating, but it is not a
+complete completed-conversation durability configuration.
 
 ### Sessions
 

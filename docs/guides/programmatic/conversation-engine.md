@@ -181,11 +181,12 @@ family, and MCP host-extension result-artifact capture. `contentKey` owns
 content addressing — return whatever key your storage understands; it is stored
 as `RuntimeArtifact.path`.
 
-## Bring your own session storage
+## Bring your own conversation storage
 
 Sessions use an async, revisioned `ChatSessionRepository` port. Local products
 can keep the zero-configuration file adapter; hosted products can inject a
-record-oriented database adapter.
+record-oriented database adapter. A hosted completed-conversation promise must
+also inject the archive repository through the same conversation capability.
 
 ```ts
 import { createConversationEngine, type ChatSessionRepository } from '@roackb2/heddle'
@@ -197,16 +198,9 @@ const sessionRepository: ChatSessionRepository = {
   update: async (input) => compareAndSwapSession(input),
   delete: async (input) => compareAndSwapSessionDelete(input),
 }
-
-const engine = createConversationEngine({
-  workspaceRoot,
-  stateRoot,
-  model: 'gpt-5.4',
-  sessionRepository,
-})
 ```
 
-The injected repository is resolved once at the engine boundary and used for
+The session repository is used for
 session create/read/update/rename, turn preflight and persistence, lease
 acquisition/release, and background memory-maintenance writes. Session policy
 (leases, records, compaction state) stays inside Heddle — the repository only
@@ -216,12 +210,13 @@ silently lose a concurrent write.
 See [Durable session storage](session-storage.md) for the default JSON layout,
 the exact compare-and-swap behavior, and a PostgreSQL table/query shape.
 
-## Bring your own compacted-history storage
+### Complete the capability with compacted-history storage
 
 Long conversations archive exact messages and a cumulative rolling summary
-through the async `ChatArchiveRepository`. Hosted services should inject this
-beside `ChatSessionRepository`; otherwise the active session can reopen on a
-new replica while its compacted history still points at local files.
+through the async `ChatArchiveRepository`. Hosted services configure both
+repositories under `persistence.conversations`; otherwise the active session
+can reopen on a new replica while its compacted history still points at local
+files.
 
 ```ts
 import {
@@ -239,16 +234,23 @@ const engine = createConversationEngine({
   workspaceRoot,
   stateRoot,
   model: 'gpt-5.4',
-  sessionRepository,
-  archiveRepository,
+  persistence: {
+    conversations: {
+      sessions: sessionRepository,
+      archives: archiveRepository,
+    },
+  },
 })
 ```
 
 Bind both repositories to the same server-authenticated account/tenant scope.
-`append` must atomically expose the raw messages, summary, and returned
+The resolved pair and its non-certifying host checklist are available at
+`engine.persistence.conversations`. `append` must atomically expose the raw
+messages, summary, and returned
 manifest; Heddle will not persist compacted session state until it succeeds.
 See [Durable session storage](session-storage.md) for the complete contract,
 codec helpers, and a PostgreSQL shape.
 
-Traces and memory still persist under the state root today. Making them
-injectable follows the same port-per-domain pattern.
+Traces and memory still persist under the state root today. Any future
+persistence capability keeps its own domain contract rather than sharing a
+universal storage interface with conversations.

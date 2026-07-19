@@ -15,7 +15,10 @@ import {
   type StoredChatSession,
 } from '../../../core/chat/engine/sessions/repository/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
-import type { ChatArchiveRepository } from '../../../core/chat/engine/sessions/archives/index.js';
+import {
+  FileChatArchiveRepository,
+  type ChatArchiveRepository,
+} from '../../../core/chat/engine/sessions/archives/index.js';
 import {
   listChatSessionCatalog,
   readStoredChatSession,
@@ -212,6 +215,57 @@ describe('createConversationEngine', () => {
       archiveRepository,
       sessionId: session.id,
     }));
+  });
+
+  it('resolves a complete conversation persistence capability once for sessions and turns', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-engine-conversation-persistence-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const sessionStoragePath = join(workspaceRoot, 'hosted', 'sessions.catalog.json');
+    const sessionRepository = new FileChatSessionRepository({ sessionStoragePath });
+    const archiveRepository = new FileChatArchiveRepository({
+      stateRoot: join(workspaceRoot, 'hosted'),
+    });
+    const engine = createConversationEngine({
+      workspaceRoot,
+      stateRoot,
+      model: 'gpt-5.4',
+      apiKeyPresent: true,
+      persistence: {
+        conversations: {
+          sessions: sessionRepository,
+          archives: archiveRepository,
+        },
+      },
+    });
+
+    expect(engine.persistence.conversations).toEqual(expect.objectContaining({
+      sessions: sessionRepository,
+      archives: archiveRepository,
+      readiness: expect.objectContaining({
+        source: 'conversation-capability',
+        targetLevel: 'completed-conversation',
+        configurationComplete: true,
+      }),
+    }));
+
+    const session = await engine.sessions.create({
+      id: 'session-capability',
+      name: 'Conversation capability',
+    });
+    await engine.turns.submit({
+      sessionId: session.id,
+      prompt: 'Continue with the paired repositories',
+    });
+
+    await expect(sessionRepository.read(session.id)).resolves.toEqual(expect.objectContaining({
+      session: expect.objectContaining({ id: session.id }),
+    }));
+    expect(EngineConversationTurnService.run).toHaveBeenCalledWith(expect.objectContaining({
+      sessionRepository,
+      archiveRepository,
+      sessionId: session.id,
+    }));
+    expect(existsSync(join(stateRoot, 'chat-sessions.catalog.json'))).toBe(false);
   });
 
   it('roots the artifacts reader at a custom host-extension artifacts root', async () => {

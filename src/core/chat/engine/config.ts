@@ -1,7 +1,6 @@
 import { join, resolve } from 'node:path';
 import { FileArtifactRepository } from '@/core/artifacts/index.js';
 import type { ArtifactRepository } from '@/core/artifacts/index.js';
-import { FileChatSessionRepository } from './sessions/repository/index.js';
 import type { ChatSessionRepository } from './sessions/repository/index.js';
 import type { ChatArchiveRepository } from './sessions/archives/index.js';
 import type { ToolApprovalPolicy } from '../../approvals/types.js';
@@ -12,6 +11,12 @@ import type { ToolDefinition } from '@/core/types.js';
 import type { ToolToolkit } from '@/core/tools/index.js';
 import { ConversationEngineHostExtensionService } from './host-extension.js';
 import type { RuntimeToolSelectionProfile } from '@/core/runtime/tools/index.js';
+import {
+  ConversationPersistenceService,
+} from './persistence/conversation-persistence.js';
+import type {
+  ResolvedHeddlePersistenceCapabilities,
+} from './persistence/index.js';
 
 export type NormalizedConversationEngineConfig = {
   workspaceRoot: string;
@@ -34,7 +39,8 @@ export type NormalizedConversationEngineConfig = {
   artifactsEnabled: boolean;
   sessionStoragePath: string;
   sessionRepository: ChatSessionRepository;
-  archiveRepository?: ChatArchiveRepository;
+  archiveRepository: ChatArchiveRepository;
+  persistence: ResolvedHeddlePersistenceCapabilities;
   memoryDir: string;
   traceDir: string;
   workspaceId?: string;
@@ -45,9 +51,16 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
   const workspaceRoot = resolve(config.workspaceRoot);
   const stateRoot = resolve(config.stateRoot);
   const sessionStoragePath = resolve(config.sessionStoragePath ?? join(stateRoot, 'chat-sessions.catalog.json'));
-  // Resolve session persistence once at the engine boundary; session and turn
-  // services receive this instance instead of re-deriving storage from paths.
-  const sessionRepository = config.sessionRepository ?? new FileChatSessionRepository({ sessionStoragePath });
+  // Resolve conversation persistence once at the engine boundary. New hosts
+  // configure the coherent capability; older separate options remain a
+  // compatibility path and receive an explicit readiness disposition.
+  const persistence = ConversationPersistenceService.resolve({
+    persistence: config.persistence,
+    sessionRepository: config.sessionRepository,
+    archiveRepository: config.archiveRepository,
+    sessionStoragePath,
+    stateRoot,
+  });
   const memoryDir = resolve(config.memoryDir ?? join(stateRoot, 'memory'));
   const traceDir = resolve(join(stateRoot, 'traces'));
   const hostExtensions = ConversationEngineHostExtensionService.compose(config.hostExtensions);
@@ -85,8 +98,9 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
     artifactRepository,
     artifactsEnabled: hostExtensions?.artifacts?.enabled ?? true,
     sessionStoragePath,
-    sessionRepository,
-    archiveRepository: config.archiveRepository,
+    sessionRepository: persistence.conversations.sessions,
+    archiveRepository: persistence.conversations.archives,
+    persistence,
     memoryDir,
     traceDir,
     workspaceId: config.workspaceId,

@@ -24,9 +24,15 @@ lifecycle, authenticated tenant/session scope, transaction, schema, retention,
 backup, and restore.
 
 The host must bind `ChatSessionRepository` and `ChatArchiveRepository` to the
-same authenticated identity scope. Heddle intentionally does not accept a user
-or tenant id on individual archive operations; trusting caller-provided scope
+same authenticated identity scope and configure them together through
+`persistence.conversations`. Heddle intentionally does not accept a user or
+tenant id on individual archive operations; trusting caller-provided scope
 would weaken the storage boundary.
+
+The capability readiness report confirms only that both Heddle ports are
+present and lists the host checks still required. It cannot prove that two
+arbitrary adapters use the same scope, transaction system, migration, backup,
+or deletion policy.
 
 ## File adapter durability
 

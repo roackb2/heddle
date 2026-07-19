@@ -106,10 +106,19 @@ const engine = createConversationEngine({
   workspaceRoot,
   stateRoot,
   model,
-  sessionRepository,
-  archiveRepository,
+  persistence: {
+    conversations: {
+      sessions: sessionRepository,
+      archives: archiveRepository,
+    },
+  },
 })
 ```
+
+`engine.persistence.conversations.readiness` confirms that the complete Heddle
+conversation boundary is configured and lists the remaining host-owned checks.
+It does not certify this scope, database, migrations, backup, or deployment;
+the verification script below exercises the provider-specific invariants.
 
 When copying these files into another project, replace the relative imports
 from `../../../src/index.js` with `@roackb2/heddle` and declare the dependencies

@@ -24,6 +24,10 @@ import type { ConversationTurnResultSummary } from './turn-result.js';
 import type { ConversationCompactionResult } from '@/core/chat/engine/compaction/index.js';
 import type { RuntimeToolSelectionProfile } from '@/core/runtime/tools/index.js';
 import type {
+  HeddlePersistenceCapabilities,
+  ResolvedHeddlePersistenceCapabilities,
+} from './persistence/index.js';
+import type {
   ConversationEngineHostExtension,
   ConversationEngineHostExtensionBundle,
   ConversationEngineHostExtensionInput,
@@ -60,15 +64,27 @@ export type ConversationEngineConfig = {
    */
   artifactRepository?: ArtifactRepository;
   /**
+   * Domain persistence capabilities configured as coherent units. New hosted
+   * conversation integrations should provide both session and archive
+   * repositories through `persistence.conversations`.
+   */
+  persistence?: HeddlePersistenceCapabilities;
+  /**
    * Custom session persistence for hosted services. When set, session
    * create/read/update, turn preflight/persistence, leases, and background
    * memory-maintenance writes all flow through this repository instead of the
    * file catalog under the state root.
+   *
+   * @deprecated Use `persistence.conversations.sessions` together with the
+   * paired archive repository.
    */
   sessionRepository?: ChatSessionRepository;
   /**
    * Durable storage for compacted raw transcripts, rolling summaries, and
    * archive manifests. Locators remain server-side and repository-owned.
+   *
+   * @deprecated Use `persistence.conversations.archives` together with the
+   * paired session repository.
    */
   archiveRepository?: ChatArchiveRepository;
 };
@@ -80,6 +96,8 @@ export type { ConversationEngineHostExtension };
 export type ConversationEngine = {
   sessions: ConversationSessionService;
   turns: ConversationTurnService;
+  /** Resolved domain persistence capabilities and readiness evidence. */
+  persistence: ResolvedHeddlePersistenceCapabilities;
   /**
    * Read/inspect artifacts saved during turns (e.g. for a host `/artifacts`
    * review command) without reconstructing the on-disk artifact root. Backed by

@@ -10,6 +10,7 @@ import type { ConversationEngine } from '../types.js';
 import type { ChatSession } from '../../types.js';
 import type { ConversationTurnResultSummary } from '../turn-result.js';
 import type { ConversationEngineHost, ConversationEngineHostExtension } from '../types.js';
+import type { HeddlePersistenceCapabilities } from '../persistence/index.js';
 
 export type QuickstartConversationCliMemoryMaintenanceMode = 'none' | 'background' | 'inline';
 
@@ -71,7 +72,10 @@ export type QuickstartConversationCliRunnerOptions = {
   tools?: ToolDefinition[];
   hostExtensions?: ConversationEngineHostExtension[];
   artifactRepository?: ArtifactRepository;
+  persistence?: HeddlePersistenceCapabilities;
+  /** @deprecated Use `persistence.conversations.sessions`. */
   sessionRepository?: ChatSessionRepository;
+  /** @deprecated Use `persistence.conversations.archives`. */
   archiveRepository?: ChatArchiveRepository;
   host?: ConversationEngineHost;
   localCommands?: QuickstartConversationCliLocalCommand[];

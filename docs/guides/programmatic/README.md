@@ -59,17 +59,19 @@ split between Heddle and the host explicit for developers and coding agents.
      state surfaces must follow a replica.
    - [Result artifacts](result-artifacts.md): save large generated values as
      reusable artifacts.
-   - Artifact, session, and compacted-history storage are injectable: implement
-     `ArtifactRepository` / `ChatSessionRepository` /
-     `ChatArchiveRepository` and pass them as `artifactRepository` /
-     `sessionRepository` / `archiveRepository` (see
+   - Artifact and conversation storage are injectable: implement
+     `ArtifactRepository`, plus the paired `ChatSessionRepository` and
+     `ChatArchiveRepository`. Pass artifacts independently and group the two
+     conversation ports under `persistence.conversations` (see
      [Conversation engine → Bring your own artifact storage](conversation-engine.md#bring-your-own-artifact-storage)
      and [Durable session storage](session-storage.md) for local JSON and
      PostgreSQL adapter guidance). The
      [runnable PostgreSQL + Drizzle reference](../../../examples/sdk/06-postgres-drizzle-storage/README.md)
      includes migrations, both repository implementations, public conformance,
      and fresh-service recovery.
-     Traces and memory still persist under a local state root. They have
+     The engine exposes a lightweight conversation-readiness report; real
+     infrastructure verification remains with the host. Traces and memory still
+     persist under a local state root. They have
      different authority and lifecycle requirements and are not implied by
      session/archive repository injection.
 
