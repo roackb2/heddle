@@ -4,12 +4,12 @@ import type { Writable } from 'node:stream';
 import {
   RuntimeCredentialService,
 } from '@/core/runtime/credentials/index.js';
-import { createConversationEngine } from '../conversation-engine.js';
-import { ConversationAgentRuntimeService } from '../conversation-agent/index.js';
-import { createConversationTextHost } from '../text-host/index.js';
-import type { ChatSession } from '../../types.js';
-import type { ConversationTurnResultSummary } from '../turn-result.js';
-import type { ConversationEngine, ConversationEngineHost } from '../types.js';
+import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
+import { createConversationTextHost } from '@/core/chat/engine/text-host/index.js';
+import type { ChatSession } from '@/core/chat/types.js';
+import type { ConversationTurnResultSummary } from '@/core/chat/engine/turn-result.js';
+import type { ConversationEngine, ConversationEngineHost } from '@/core/chat/engine/types.js';
+import { ConversationSdkRuntimeService } from '../runtime/index.js';
 import type {
   QuickstartConversationCliCredentialContext,
   QuickstartConversationCliCredentialPreflightOptions,
@@ -212,7 +212,7 @@ export class QuickstartConversationCliRunnerService {
   }
 
   static resolveDefaults(options: QuickstartConversationCliRunnerDefaultsInput = {}): QuickstartConversationCliRunnerDefaults {
-    return ConversationAgentRuntimeService.resolveDefaults(options);
+    return ConversationSdkRuntimeService.resolveDefaults(options);
   }
 
   private static preflightCredentials(input: {
@@ -220,7 +220,7 @@ export class QuickstartConversationCliRunnerService {
     options: QuickstartConversationCliRunnerOptions;
   }): QuickstartConversationCliCredentialContext | undefined {
     const preflight = QuickstartConversationCliRunnerService.resolveCredentialPreflight(input.options.credentialPreflight);
-    const context = ConversationAgentRuntimeService.preflightCredentials({
+    const context = ConversationSdkRuntimeService.preflightCredentials({
       apiKey: input.options.apiKey,
       credentialStorePath: input.options.credentialStorePath,
       defaults: input.defaults,

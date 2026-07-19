@@ -13,7 +13,7 @@ API usage, accepted user-message persistence, and streaming synchronization, see
 ## Terminology
 
 - **Host**: a concrete user interaction surface such as the TUI, web control
-  plane, ask mode, daemon API, or a future programmatic surface.
+  plane, ask mode, daemon API, or an SDK application service.
 - **View / presentation**: code that renders UI state and captures user intent
   for one host.
 - **Controller**: interface-specific orchestration that wires one host's events,
@@ -34,7 +34,8 @@ The intended long-term repo shape is:
 ```text
 src/
   core/        # shared domain behavior and reusable runtime capabilities
-  apps/        # user-facing interface surfaces
+  sdk/         # adopter-facing application services composed over core
+  apps/        # Heddle user-facing interface surfaces
     cli/       # terminal/TUI interface
     web/       # browser interface
   server/      # transport/control-plane serving layer over core capabilities
@@ -43,6 +44,8 @@ src/
 The point of this split is to make the ownership obvious:
 
 - `src/core` is the shared system.
+- `src/sdk` gives adopters small working host services without moving
+  conversation semantics or product policy out of core.
 - `src/apps/cli` and `src/apps/web` are two different interfaces over that
   shared system.
 - `src/server` is not a third product surface. It serves core capabilities to
@@ -114,6 +117,12 @@ src/
         turns/
           service.ts
           ...
+  sdk/
+    conversation/
+      README.md                 # SDK host ownership and product boundary
+      runtime/                  # shared starter defaults and credential preflight
+      headless/                 # structured in-process application service
+      console/                  # temporary readline/text SDK host
   apps/
     cli/
       chat/
@@ -143,6 +152,10 @@ src/
 
 Today, some interface code still lives under paths like `src/cli-v2/` and
 `src/web-v2/`. That is current structure, not the desired final shape.
+
+The touched SDK conversation hosts already use the explicit
+`src/sdk/conversation/` boundary. They may depend on the conversation engine;
+the engine must not depend on them.
 
 When future refactors touch these areas:
 

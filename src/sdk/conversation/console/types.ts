@@ -1,22 +1,25 @@
 import type { Readable, Writable } from 'node:stream';
 import type { ArtifactRepository } from '@/core/artifacts/index.js';
-import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
+import type { HeddlePersistenceCapabilities } from '@/core/chat/engine/persistence/index.js';
 import type { ChatArchiveRepository } from '@/core/chat/engine/sessions/archives/index.js';
-import type { ToolDefinition } from '@/core/types.js';
-import type { ConversationEngine } from '../types.js';
-import type { ChatSession } from '../../types.js';
-import type { ConversationTurnResultSummary } from '../turn-result.js';
-import type { ConversationEngineHost, ConversationEngineHostExtension } from '../types.js';
-import type { HeddlePersistenceCapabilities } from '../persistence/index.js';
+import type { ChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
+import type { ConversationTurnResultSummary } from '@/core/chat/engine/turn-result.js';
 import type {
-  ConversationAgentCredentialContext,
-  ConversationAgentCredentialPreflightOptions,
-  ConversationAgentMemoryMaintenanceMode,
-  ConversationAgentRuntimeDefaults,
-  ConversationAgentRuntimeDefaultsInput,
-} from '../conversation-agent/index.js';
+  ConversationEngine,
+  ConversationEngineHost,
+  ConversationEngineHostExtension,
+} from '@/core/chat/engine/types.js';
+import type { ChatSession } from '@/core/chat/types.js';
+import type { ToolDefinition } from '@/core/types.js';
+import type {
+  ConversationSdkCredentialContext,
+  ConversationSdkCredentialPreflightOptions,
+  ConversationSdkMemoryMaintenanceMode,
+  ConversationSdkRuntimeDefaults,
+  ConversationSdkRuntimeDefaultsInput,
+} from '../runtime/index.js';
 
-export type QuickstartConversationCliMemoryMaintenanceMode = ConversationAgentMemoryMaintenanceMode;
+export type QuickstartConversationCliMemoryMaintenanceMode = ConversationSdkMemoryMaintenanceMode;
 
 export type QuickstartConversationCliLocalCommandContext = {
   command: string;
@@ -43,10 +46,10 @@ export type QuickstartConversationCliTurnContext = {
   workspaceRoot: string;
 };
 
-export type QuickstartConversationCliCredentialContext = ConversationAgentCredentialContext;
+export type QuickstartConversationCliCredentialContext = ConversationSdkCredentialContext;
 
 export type QuickstartConversationCliCredentialPreflightOptions =
-  ConversationAgentCredentialPreflightOptions & {
+  ConversationSdkCredentialPreflightOptions & {
     status?: 'off' | 'status';
   };
 
@@ -60,7 +63,7 @@ export type QuickstartConversationCliRunnerOptions = {
   oncePrompt?: string;
   prompts?: string[];
   maxSteps?: number;
-  reasoningEffort?: ConversationAgentRuntimeDefaultsInput['reasoningEffort'];
+  reasoningEffort?: ConversationSdkRuntimeDefaultsInput['reasoningEffort'];
   apiKey?: string;
   preferApiKey?: boolean;
   credentialStorePath?: string;
@@ -86,6 +89,6 @@ export type QuickstartConversationCliRunnerOptions = {
   output?: Writable;
 };
 
-export type QuickstartConversationCliRunnerDefaultsInput = ConversationAgentRuntimeDefaultsInput;
+export type QuickstartConversationCliRunnerDefaultsInput = ConversationSdkRuntimeDefaultsInput;
 
-export type QuickstartConversationCliRunnerDefaults = ConversationAgentRuntimeDefaults;
+export type QuickstartConversationCliRunnerDefaults = ConversationSdkRuntimeDefaults;

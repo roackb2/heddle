@@ -5,6 +5,10 @@ This is rung 1 of the programmatic ladder — the smallest working agent. See th
 shape output → lifecycle → storage), and [`examples/sdk/`](../../../examples/sdk/README.md)
 for runnable versions.
 
+If you prefer a copy-oriented chooser, see the
+[starter recipes](starter-recipes.md) for headless, hosted, and HTTP/SSE shapes
+with explicit product-owned TODOs.
+
 Start with the headless service when your product owns its input/output but not
 the agent lifecycle yet:
 

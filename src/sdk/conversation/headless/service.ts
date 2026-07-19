@@ -1,12 +1,12 @@
 import omit from 'lodash/omit.js';
-import { createConversationEngine } from '../conversation-engine.js';
+import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
 import type {
   ConversationEngine,
   ConversationEngineConfig,
   ConversationEngineHost,
   EnsureConversationSessionResult,
-} from '../types.js';
-import { ConversationAgentRuntimeService } from './runtime-service.js';
+} from '@/core/chat/engine/types.js';
+import { ConversationSdkRuntimeService } from '../runtime/index.js';
 import type {
   ConversationAgentOptions,
   ConversationAgentRuntimeContext,
@@ -32,8 +32,8 @@ export class ConversationAgentService {
     & Omit<ConversationAgentSessionOptions, 'id'>;
 
   constructor(options: ConversationAgentOptions = {}) {
-    const defaults = ConversationAgentRuntimeService.resolveDefaults(options);
-    const credential = ConversationAgentRuntimeService.preflightCredentials({
+    const defaults = ConversationSdkRuntimeService.resolveDefaults(options);
+    const credential = ConversationSdkRuntimeService.preflightCredentials({
       apiKey: options.apiKey,
       credentialStorePath: options.credentialStorePath,
       defaults,

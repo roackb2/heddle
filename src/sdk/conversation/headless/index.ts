@@ -1,5 +1,4 @@
 export { ConversationAgentService } from './service.js';
-export { ConversationAgentRuntimeService } from './runtime-service.js';
 export type {
   ConversationAgentCredentialContext,
   ConversationAgentCredentialPreflightOptions,

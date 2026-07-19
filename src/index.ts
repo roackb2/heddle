@@ -27,7 +27,7 @@
 // `ConversationAgentService` is the smallest headless structured agent;
 // `runQuickstartConversationCli()` adds a terminal loop. Drop to
 // `createConversationEngine(...)` when you want full lifecycle control.
-export { ConversationAgentService } from './core/chat/engine/conversation-agent/index.js';
+export { ConversationAgentService } from './sdk/conversation/index.js';
 export type {
   ConversationAgentCredentialContext,
   ConversationAgentCredentialPreflightOptions,
@@ -39,12 +39,12 @@ export type {
   ConversationAgentSendInput,
   ConversationAgentSessionOptions,
   ConversationAgentTurnResult,
-} from './core/chat/engine/conversation-agent/index.js';
+} from './sdk/conversation/index.js';
 export {
   QuickstartConversationCliRunnerService,
   resolveQuickstartConversationCliDefaults,
   runQuickstartConversationCli,
-} from './core/chat/engine/quickstart-cli/index.js';
+} from './sdk/conversation/index.js';
 export type {
   QuickstartConversationCliCredentialContext,
   QuickstartConversationCliCredentialPreflightOptions,
@@ -55,7 +55,7 @@ export type {
   QuickstartConversationCliRunnerDefaultsInput,
   QuickstartConversationCliRunnerOptions,
   QuickstartConversationCliTurnContext,
-} from './core/chat/engine/quickstart-cli/index.js';
+} from './sdk/conversation/index.js';
 export { createConversationEngine } from './core/chat/engine/conversation-engine.js';
 export { ConversationPersistenceService } from './core/chat/engine/persistence/index.js';
 export { DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL } from './core/config.js';

@@ -21,6 +21,7 @@ Official website: [heddleagent.com](https://heddleagent.com)
 
 Start here:
 [SDK quickstart](docs/guides/programmatic/quickstart.md) ·
+[copy a starter recipe](docs/guides/programmatic/starter-recipes.md) ·
 [choose an integration layer](docs/guides/programmatic/integration-layers.md) ·
 [runnable SDK examples](examples/sdk/README.md) ·
 [try the coding agent](#try-heddle-as-a-coding-agent)

@@ -19,6 +19,7 @@ conversation 與 run 基礎之上。
 
 從這裡開始：
 [SDK 快速入門](docs/guides/programmatic/quickstart.md) ·
+[複製 starter recipe](docs/guides/programmatic/starter-recipes.md) ·
 [選擇整合層級](docs/guides/programmatic/integration-layers.md) ·
 [可執行的 SDK 範例](examples/sdk/README.md) ·
 [試用 coding agent](#將-heddle-當作-coding-agent-試用)

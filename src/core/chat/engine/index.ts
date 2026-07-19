@@ -1,17 +1,4 @@
 export { createConversationEngine } from './conversation-engine.js';
-export { ConversationAgentService } from './conversation-agent/index.js';
-export type {
-  ConversationAgentCredentialContext,
-  ConversationAgentCredentialPreflightOptions,
-  ConversationAgentMemoryMaintenanceMode,
-  ConversationAgentOptions,
-  ConversationAgentRuntimeContext,
-  ConversationAgentRuntimeDefaults,
-  ConversationAgentRuntimeDefaultsInput,
-  ConversationAgentSendInput,
-  ConversationAgentSessionOptions,
-  ConversationAgentTurnResult,
-} from './conversation-agent/index.js';
 export { ConversationPersistenceService } from './persistence/index.js';
 export type {
   ConversationPersistence,
@@ -27,22 +14,6 @@ export type {
   ResolvedConversationPersistence,
   ResolvedHeddlePersistenceCapabilities,
 } from './persistence/index.js';
-export {
-  QuickstartConversationCliRunnerService,
-  resolveQuickstartConversationCliDefaults,
-  runQuickstartConversationCli,
-} from './quickstart-cli/index.js';
-export type {
-  QuickstartConversationCliCredentialContext,
-  QuickstartConversationCliCredentialPreflightOptions,
-  QuickstartConversationCliLocalCommand,
-  QuickstartConversationCliLocalCommandContext,
-  QuickstartConversationCliMemoryMaintenanceMode,
-  QuickstartConversationCliRunnerDefaults,
-  QuickstartConversationCliRunnerDefaultsInput,
-  QuickstartConversationCliRunnerOptions,
-  QuickstartConversationCliTurnContext,
-} from './quickstart-cli/index.js';
 export { defineHostExtension, ConversationEngineHostExtensionService } from './host-extension.js';
 export { ConversationTextHostService, createConversationTextHost } from './text-host/index.js';
 export type {

@@ -58,6 +58,25 @@ describe('core import boundaries', () => {
     expect(violations).toEqual([]);
   });
 
+  it('keeps core domains independent from SDK application hosts', () => {
+    const violations = findResolvedImportViolations(
+      sourceFiles.filter((file) => toSourcePath(file).startsWith('core/')),
+      (resolvedPath) => resolvedPath.startsWith('sdk/'),
+    );
+
+    expect(violations).toEqual([]);
+  });
+
+  it('keeps SDK conversation hosts independent from Heddle product interfaces', () => {
+    const productInterfaceRoots = ['cli-v2/', 'client-shared/', 'server/', 'web-v2/'];
+    const violations = findResolvedImportViolations(
+      sourceFiles.filter((file) => toSourcePath(file).startsWith('sdk/conversation/')),
+      (resolvedPath) => productInterfaceRoots.some((root) => resolvedPath.startsWith(root)),
+    );
+
+    expect(violations).toEqual([]);
+  });
+
   it('keeps command modules free of React and Ink UI dependencies', () => {
     const violations = findImportViolations(
       sourceFiles.filter((file) => toSourcePath(file).startsWith('core/commands/')),

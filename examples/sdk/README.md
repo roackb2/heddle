@@ -8,6 +8,10 @@ stack.
 Read [Choose a Programmatic Integration Layer](../../docs/guides/programmatic/integration-layers.md)
 before adapting the examples into a product. It defines which behavior belongs
 to Heddle and which behavior must stay in the host.
+For the shortest copyable path, use the
+[starter recipes](../../docs/guides/programmatic/starter-recipes.md); they point
+to the exact example files and retain the auth, storage, finalization, and
+deployment TODOs that a generator would otherwise hide.
 
 ## Prerequisites
 
