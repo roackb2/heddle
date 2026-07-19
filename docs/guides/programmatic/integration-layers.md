@@ -9,6 +9,22 @@ Use this guide before copying an example. The goal is to adopt the lowest layer
 that does the needed heavy lifting while leaving existing product architecture
 in control.
 
+## SDK hosts are not Heddle product apps
+
+Heddle supplies two small conversation hosts as adoption shortcuts:
+
+- `ConversationAgentService` is a structured in-process application service
+  for products that already own input and output.
+- `runQuickstartConversationCli` is a temporary console host for evaluation,
+  examples, smoke runs, and very small terminal integrations.
+
+They share runtime defaults and credential preflight, but they intentionally do
+not share the same session or output contract. Both live above the core
+conversation engine and are distinct from Heddle's `heddle` CLI/TUI, server,
+and web control plane. When a host outgrows either shortcut, it keeps the same
+engine contracts and moves down the ladder instead of migrating to a different
+runtime.
+
 ## Mental model
 
 ```text
@@ -59,7 +75,8 @@ disconnect as implicit cancellation.
 
 | What the host already has | Heddle entrypoint | Example to follow |
 | --- | --- | --- |
-| Nothing beyond a TypeScript process | `runQuickstartConversationCli` | [`01-interactive-chat.ts`](../../../examples/sdk/01-interactive-chat.ts) |
+| A TypeScript process that owns input/output | `ConversationAgentService` | [`01-headless-conversation.ts`](../../../examples/sdk/01-headless-conversation.ts) |
+| A terminal evaluation with no host loop | `runQuickstartConversationCli` | [`01-interactive-chat.ts`](../../../examples/sdk/01-interactive-chat.ts) |
 | A local loop that needs product tools or MCP | Quickstart plus tools/host extensions | [`02-add-a-tool.ts`](../../../examples/sdk/02-add-a-tool.ts), [`03-add-an-mcp-server.ts`](../../../examples/sdk/03-add-an-mcp-server.ts) |
 | Its own output sink or local UI | `createConversationEngine` + `createConversationTextHost` or host callbacks | [`04-custom-output.ts`](../../../examples/sdk/04-custom-output.ts) |
 | A server/worker that owns transport | `@roackb2/heddle` + `@roackb2/heddle/hosted` | [`05-hosted-agent/01-hosted-service`](../../../examples/sdk/05-hosted-agent/01-hosted-service) |
@@ -76,12 +93,18 @@ copying Express-specific code.
 
 ## Layer-by-layer assumptions
 
+### Headless conversation agent
+
+Use `ConversationAgentService` when the host owns input/output but wants Heddle
+to resolve runtime defaults, ensure one stable session, capture structured
+activities, and return the normal turn result. The underlying engine remains
+available for progressive customization.
+
 ### Quickstart runner
 
 Use `runQuickstartConversationCli` when Heddle may own the prompt loop and
 plain-text terminal experience. The host supplies configuration and optional
-capabilities. Move deeper when the product needs its own presentation or
-lifecycle.
+capabilities. It adds a terminal host around the same generic starter defaults.
 
 ### Conversation engine
 

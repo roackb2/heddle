@@ -121,6 +121,7 @@ export type ConversationSessionService = {
 
   // Lifecycle
   create(input?: CreateConversationSessionInput): Promise<ChatSession>;
+  ensure(input: EnsureConversationSessionInput): Promise<EnsureConversationSessionResult>;
   createOneOff(input?: CreateConversationSessionInput): Promise<ChatSession>;
   rename(id: string, name: string): Promise<ChatSession>;
   setPinned(id: string, pinned: boolean): Promise<ChatSession>;
@@ -170,6 +171,19 @@ export type CreateConversationSessionInput = {
   reasoningEffort?: ReasoningEffort;
   workspaceId?: string;
   retention?: ChatSessionRetention;
+};
+
+/**
+ * Stable session identity to read or create without a read-then-create race.
+ * Creation fields apply only when the session does not already exist.
+ */
+export type EnsureConversationSessionInput = Omit<CreateConversationSessionInput, 'id'> & {
+  id: string;
+};
+
+export type EnsureConversationSessionResult = {
+  session: ChatSession;
+  created: boolean;
 };
 
 export type AutoRenameConversationSessionInput = {

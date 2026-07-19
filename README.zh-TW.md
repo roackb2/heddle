@@ -19,6 +19,7 @@ conversation 與 run 基礎之上。
 
 從這裡開始：
 [SDK 快速入門](docs/guides/programmatic/quickstart.md) ·
+[複製 starter recipe](docs/guides/programmatic/starter-recipes.md) ·
 [選擇整合層級](docs/guides/programmatic/integration-layers.md) ·
 [可執行的 SDK 範例](examples/sdk/README.md) ·
 [試用 coding agent](#將-heddle-當作-coding-agent-試用)
@@ -56,25 +57,33 @@ chat endpoint 的情境。
 npm install @roackb2/heddle
 ```
 
-接著啟動一個可持久化的互動式對話：
+接著透過可持久化對話送出一個 structured turn：
 
 ```ts
-import { runQuickstartConversationCli } from '@roackb2/heddle'
+import { ConversationAgentService } from '@roackb2/heddle'
 
-await runQuickstartConversationCli()
+const agent = new ConversationAgentService()
+const result = await agent.send({
+  prompt: '整理這個專案，並指出主要的驗證路徑。',
+})
+
+console.log(result.summary)
+console.log(result.activities)
 ```
 
-Quickstart 會在開啟 prompt loop 前，解析 workspace、本機 state root、已設定的
-model 與 credential。它刻意比 Heddle 完整產品 CLI 更小，是評估 SDK 最短的
-路徑。
+Headless service 會解析 workspace、本機 state root、已設定的 model 與
+credential，race-safe 地 ensure 一個穩定的 durable session，並回傳
+structured activities 與 Heddle 原本的 turn result。它不會替產品選擇 UI、
+transport、auth system 或 product transaction。
 
 在此 repository 中執行對應範例：
 
 ```bash
-yarn example:sdk:interactive
+yarn example:sdk:headless "What does this project do?"
 ```
 
-Model、credential、prompt、command 與 host extension 選項，請參考
+如果還希望 Heddle 暫時提供 terminal prompt loop 與 text rendering，可使用
+`runQuickstartConversationCli()`。兩條路徑請參考
 [SDK 快速入門](docs/guides/programmatic/quickstart.md)。
 
 ### 掌控 presentation 與 turn lifecycle
@@ -160,7 +169,8 @@ mechanics 的最低層即可：
 
 | Host 需求 | 從這裡開始 | 增加的能力 |
 | --- | --- | --- |
-| 可運作的本機對話 | `runQuickstartConversationCli` | Prompt loop、persisted session、credential 與 text output |
+| Structured 本機對話 | `ConversationAgentService` | Runtime defaults、stable session ensure、structured activities 與 turn result |
+| Terminal SDK 評估 | `runQuickstartConversationCli` | Prompt loop、persisted session、credential 與 text output |
 | 自訂 output、tool 或 session UX | `@roackb2/heddle` | Conversation engine、host extension、tool、MCP、approval、artifact 與 turn result |
 | Server、worker 或 Electron backend | `@roackb2/heddle/hosted` | 可定址的 process-local run、replay、cancellation 與 approval resolution |
 | 一般 Node HTTP/SSE | `@roackb2/heddle/hosted/http-sse` | Replay cursor parsing、SSE framing、backpressure 與 disconnect cleanup |
@@ -176,7 +186,9 @@ mechanics 的最低層即可：
 
 可執行的範例會以小步驟教你逐層客製：
 
-1. [Interactive chat](examples/sdk/01-interactive-chat.ts) — 啟動可持久化對話。
+1. [Headless conversation](examples/sdk/01-headless-conversation.ts) — 透過
+   persisted session 送出 structured turn；需要 terminal loop 時則使用
+   [interactive chat](examples/sdk/01-interactive-chat.ts)。
 2. [Add a tool](examples/sdk/02-add-a-tool.ts) — 暴露產品原生能力。
 3. [Add an MCP server](examples/sdk/03-add-an-mcp-server.ts) — 不複製 schema，
    直接準備經過挑選的 MCP-backed capability。

@@ -76,6 +76,10 @@ tooling, approval policy, memory, situation awareness, traces, and evaluation.
   universal storage or CRUD abstraction across domains.
 - `src/core/chat/` defines the shared chat boundary above the engine. It should
   stay small.
+- `src/sdk/conversation/` owns adopter-facing application services over the
+  conversation engine: shared starter defaults and credential preflight, the
+  structured headless agent, and the temporary quickstart console. It does not
+  own persisted semantics or Heddle product UI/workflows.
 - `src/core/tools/` owns tool definitions, registries, execution, and toolkits.
 - `src/core/commands/` owns slash-command parsing, autocomplete, registration,
   and cross-host command modules.
@@ -149,6 +153,7 @@ scope.
 - Memory: `src/core/tools/toolkits/knowledge/`, `src/core/memory/`.
 - Conversation persistence capabilities and readiness:
   `src/core/chat/engine/persistence/`.
+- SDK conversation hosts: `src/sdk/conversation/`.
 - Architecture boundaries: `docs/architecture/core-layering.md`,
   `docs/architecture/chat-layering.md`,
   `docs/architecture/durable-state.md`.

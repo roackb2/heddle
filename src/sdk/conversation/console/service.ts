@@ -1,18 +1,15 @@
 import { createInterface } from 'node:readline/promises';
-import { join } from 'node:path';
 import { stdin, stdout } from 'node:process';
 import type { Writable } from 'node:stream';
-import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
-import type { ReasoningEffort } from '@/core/llm/types.js';
 import {
   RuntimeCredentialService,
 } from '@/core/runtime/credentials/index.js';
-import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
-import { createConversationEngine } from '../conversation-engine.js';
-import { createConversationTextHost } from '../text-host/index.js';
-import type { ChatSession } from '../../types.js';
-import type { ConversationTurnResultSummary } from '../turn-result.js';
-import type { ConversationEngine, ConversationEngineHost } from '../types.js';
+import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
+import { createConversationTextHost } from '@/core/chat/engine/text-host/index.js';
+import type { ChatSession } from '@/core/chat/types.js';
+import type { ConversationTurnResultSummary } from '@/core/chat/engine/turn-result.js';
+import type { ConversationEngine, ConversationEngineHost } from '@/core/chat/engine/types.js';
+import { ConversationSdkRuntimeService } from '../runtime/index.js';
 import type {
   QuickstartConversationCliCredentialContext,
   QuickstartConversationCliCredentialPreflightOptions,
@@ -24,8 +21,6 @@ import type {
 } from './types.js';
 
 const DEFAULT_PROMPT_LABEL = 'heddle> ';
-const DEFAULT_MEMORY_MAINTENANCE_MODE = 'none';
-const SUPPORTED_REASONING_EFFORTS = new Set<ReasoningEffort>(['low', 'medium', 'high', 'ultrahigh']);
 const BUILT_IN_COMMANDS = [
   { command: '/session', description: 'print the active session id' },
   { command: '/help', description: 'print available local commands' },
@@ -217,16 +212,7 @@ export class QuickstartConversationCliRunnerService {
   }
 
   static resolveDefaults(options: QuickstartConversationCliRunnerDefaultsInput = {}): QuickstartConversationCliRunnerDefaults {
-    const workspaceRoot = options.workspaceRoot ?? process.cwd();
-
-    return {
-      ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
-      memoryMaintenanceMode: options.memoryMaintenanceMode ?? DEFAULT_MEMORY_MAINTENANCE_MODE,
-      model: QuickstartConversationCliRunnerService.resolveModel(options),
-      reasoningEffort: QuickstartConversationCliRunnerService.resolveReasoningEffort(options.reasoningEffort),
-      stateRoot: options.stateRoot ?? join(workspaceRoot, '.heddle'),
-      workspaceRoot,
-    };
+    return ConversationSdkRuntimeService.resolveDefaults(options);
   }
 
   private static preflightCredentials(input: {
@@ -234,33 +220,16 @@ export class QuickstartConversationCliRunnerService {
     options: QuickstartConversationCliRunnerOptions;
   }): QuickstartConversationCliCredentialContext | undefined {
     const preflight = QuickstartConversationCliRunnerService.resolveCredentialPreflight(input.options.credentialPreflight);
-    if (!preflight.enabled) {
-      return undefined;
-    }
-
-    const resolution = LlmProviderRuntimeService.resolve({
+    const context = ConversationSdkRuntimeService.preflightCredentials({
       apiKey: input.options.apiKey,
       credentialStorePath: input.options.credentialStorePath,
-      model: input.defaults.model,
+      defaults: input.defaults,
       preferApiKey: input.options.preferApiKey,
-      reasoningEffort: input.defaults.reasoningEffort,
+      preflight: {
+        enabled: preflight.enabled,
+        missingCredentialHint: preflight.missingCredentialHint,
+      },
     });
-    const context = {
-      model: resolution.model,
-      preferApiKey: input.options.preferApiKey,
-      provider: resolution.provider,
-      source: resolution.credentialSource,
-    } satisfies QuickstartConversationCliCredentialContext;
-
-    if (resolution.credentialSource.type === 'missing') {
-      throw new Error([
-        RuntimeCredentialService.formatMissingCredentialMessage(resolution.model),
-        QuickstartConversationCliRunnerService.resolveMissingCredentialHint({
-          context,
-          missingCredentialHint: preflight.missingCredentialHint,
-        }),
-      ].filter(Boolean).join(' '));
-    }
 
     return preflight.status === 'status' ? context : undefined;
   }
@@ -288,17 +257,6 @@ export class QuickstartConversationCliRunnerService {
       missingCredentialHint: input.missingCredentialHint,
       status: input.status ?? 'status',
     };
-  }
-
-  private static resolveMissingCredentialHint(input: {
-    context: QuickstartConversationCliCredentialContext;
-    missingCredentialHint: QuickstartConversationCliCredentialPreflightOptions['missingCredentialHint'];
-  }): string | undefined {
-    const hint = typeof input.missingCredentialHint === 'function'
-      ? input.missingCredentialHint(input.context)
-      : input.missingCredentialHint;
-
-    return hint?.trim() || undefined;
   }
 
   private static writeRuntimeStatus(input: {
@@ -496,31 +454,6 @@ export class QuickstartConversationCliRunnerService {
     ].join(', ');
   }
 
-  private static resolveModel(options: QuickstartConversationCliRunnerDefaultsInput): string {
-    const env = options.env ?? process.env;
-    return [
-      options.model,
-      env.HEDDLE_MODEL,
-      env.HEDDLE_EXAMPLE_MODEL,
-      env.OPENAI_MODEL,
-      env.ANTHROPIC_MODEL,
-      DEFAULT_OPENAI_MODEL,
-    ].map((candidate) => candidate?.trim())
-      .find((candidate): candidate is string => Boolean(candidate)) ?? DEFAULT_OPENAI_MODEL;
-  }
-
-  private static resolveReasoningEffort(input: QuickstartConversationCliRunnerDefaultsInput['reasoningEffort']): ReasoningEffort | undefined {
-    const value = input?.trim();
-    if (!value) {
-      return undefined;
-    }
-
-    if (SUPPORTED_REASONING_EFFORTS.has(value as ReasoningEffort)) {
-      return value as ReasoningEffort;
-    }
-
-    throw new Error(`Unsupported reasoning effort: ${value}. Use one of low, medium, high, ultrahigh.`);
-  }
 }
 
 type ResolvedLocalCommand =

@@ -8,6 +8,10 @@ stack.
 Read [Choose a Programmatic Integration Layer](../../docs/guides/programmatic/integration-layers.md)
 before adapting the examples into a product. It defines which behavior belongs
 to Heddle and which behavior must stay in the host.
+For the shortest copyable path, use the
+[starter recipes](../../docs/guides/programmatic/starter-recipes.md); they point
+to the exact example files and retain the auth, storage, finalization, and
+deployment TODOs that a generator would otherwise hide.
 
 ## Prerequisites
 
@@ -26,7 +30,8 @@ platform, an identity provider, or a database.
 
 | Your current host | Start with | New host responsibility |
 | --- | --- | --- |
-| No agent loop or UI yet | [`01-interactive-chat.ts`](01-interactive-chat.ts) | Configuration and prompts only |
+| A TypeScript process that owns input/output | [`01-headless-conversation.ts`](01-headless-conversation.ts) | Configuration and prompts only |
+| A terminal evaluation with no host loop | [`01-interactive-chat.ts`](01-interactive-chat.ts) | Configuration and prompts only |
 | A local chat that needs product capabilities | [`02-add-a-tool.ts`](02-add-a-tool.ts) or [`03-add-an-mcp-server.ts`](03-add-an-mcp-server.ts) | Tool implementation or MCP server selection |
 | A process that already owns output/rendering | [`04-custom-output.ts`](04-custom-output.ts) | Output sink and presentation policy |
 | A server, worker, Electron backend, or custom transport | [`05-hosted-agent/01-hosted-service`](05-hosted-agent/01-hosted-service) | Identity scope, durable session IDs, engine composition, and process lifetime |
@@ -41,14 +46,26 @@ Do not introduce Express merely to copy the example.
 
 ## Follow the customization ladder
 
-### 01 Interactive Chat — working conversation
+### 01 Headless or Interactive — working conversation
+
+For structured in-process output:
+
+```bash
+yarn example:sdk:headless "What does this repository do?"
+```
+
+**Assumption:** the host owns input/output while Heddle owns runtime defaults,
+stable session ensure, and turn execution. The result contains the normal turn
+summary plus ordered structured activities.
+
+For a temporary terminal prompt loop:
 
 ```bash
 yarn example:sdk:interactive
 ```
 
 **Assumption:** Heddle can own the local prompt loop, persisted session, and
-plain-text output. This is the smallest file to copy for an SDK evaluation.
+plain-text output. Both stage-01 paths use the same generic starter defaults.
 
 ### 02 Add a Tool — native host capability
 

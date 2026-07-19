@@ -100,6 +100,7 @@
     "chat:dev:anthropic": "ANTHROPIC_API_KEY=\"$PERSONAL_ANTHROPIC_API_KEY\" tsx --no-cache src/cli-v2/main.ts chat",
     "chat:dev:v2:anthropic": "ANTHROPIC_API_KEY=\"$PERSONAL_ANTHROPIC_API_KEY\" tsx --no-cache src/cli-v2/main.ts chat-v2",
     "example:repo-investigator": "tsx --no-cache examples/repo-investigator.ts",
+    "example:sdk:headless": "tsx --no-cache examples/sdk/01-headless-conversation.ts",
     "example:sdk:interactive": "tsx --no-cache examples/sdk/01-interactive-chat.ts",
     "example:sdk:add-tool": "tsx --no-cache examples/sdk/02-add-a-tool.ts",
     "example:sdk:add-mcp": "tsx --no-cache examples/sdk/03-add-an-mcp-server.ts",

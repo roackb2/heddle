@@ -24,13 +24,27 @@
 // ---------------------------------------------------------------------------
 // 1. Start here — stand up a conversation agent
 // ---------------------------------------------------------------------------
-// `runQuickstartConversationCli()` is the smallest working agent. Drop to
-// `createConversationEngine(...)` when you want to own the turn loop / UI.
+// `ConversationAgentService` is the smallest headless structured agent;
+// `runQuickstartConversationCli()` adds a terminal loop. Drop to
+// `createConversationEngine(...)` when you want full lifecycle control.
+export { ConversationAgentService } from './sdk/conversation/index.js';
+export type {
+  ConversationAgentCredentialContext,
+  ConversationAgentCredentialPreflightOptions,
+  ConversationAgentMemoryMaintenanceMode,
+  ConversationAgentOptions,
+  ConversationAgentRuntimeContext,
+  ConversationAgentRuntimeDefaults,
+  ConversationAgentRuntimeDefaultsInput,
+  ConversationAgentSendInput,
+  ConversationAgentSessionOptions,
+  ConversationAgentTurnResult,
+} from './sdk/conversation/index.js';
 export {
   QuickstartConversationCliRunnerService,
   resolveQuickstartConversationCliDefaults,
   runQuickstartConversationCli,
-} from './core/chat/engine/quickstart-cli/index.js';
+} from './sdk/conversation/index.js';
 export type {
   QuickstartConversationCliCredentialContext,
   QuickstartConversationCliCredentialPreflightOptions,
@@ -41,7 +55,7 @@ export type {
   QuickstartConversationCliRunnerDefaultsInput,
   QuickstartConversationCliRunnerOptions,
   QuickstartConversationCliTurnContext,
-} from './core/chat/engine/quickstart-cli/index.js';
+} from './sdk/conversation/index.js';
 export { createConversationEngine } from './core/chat/engine/conversation-engine.js';
 export { ConversationPersistenceService } from './core/chat/engine/persistence/index.js';
 export { DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL } from './core/config.js';
@@ -200,6 +214,8 @@ export type {
   ConversationTurnService,
   CreateConversationSessionInput,
   ContinueConversationTurnInput,
+  EnsureConversationSessionInput,
+  EnsureConversationSessionResult,
   SubmitConversationTurnInput,
   SubmitConversationTurnResult,
   UpdateConversationSessionSettingsInput,
