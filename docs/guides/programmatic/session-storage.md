@@ -56,6 +56,14 @@ bodies plus atomic catalog replacement. Keep the directory on a filesystem
 with normal local rename/locking semantics; do not put it on an eventually
 consistent object-store mount.
 
+The runnable [local JSON storage example](../../../examples/sdk/06-persistence/local-json/README.md)
+proves fresh-engine recovery and a stopped-writer backup/restore without a
+model credential. In production, mount the complete `stateRoot` on persistent
+storage, stop writers or take one atomic filesystem snapshot, and back up and
+restore the whole directory. Copying only the catalog or only archive files can
+produce an incomplete conversation. This posture is for one durable host; use
+paired remote repositories when requests can land on different replicas.
+
 ## Hosted database: inject the async port
 
 The repository contract is record-oriented. It does not ask a database adapter
@@ -327,7 +335,7 @@ the committed manifest must never reference a missing object.
 ### Runnable PostgreSQL + Drizzle reference
 
 The repository includes a complete
-[PostgreSQL + Drizzle example](../../../examples/sdk/06-postgres-drizzle-storage/README.md)
+[PostgreSQL + Drizzle example](../../../examples/sdk/06-persistence/postgres-drizzle/README.md)
 with checked-in migrations, scope-bound session and archive repositories, the
 public session conformance suite, concurrent archive verification, and recovery
 through fresh connection pools and engine instances. Drizzle and `pg` are

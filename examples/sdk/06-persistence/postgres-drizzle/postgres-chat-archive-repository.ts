@@ -6,7 +6,7 @@ import {
   type AppendChatArchiveResult,
   type ChatArchiveManifest,
   type ChatArchiveRepository,
-} from '../../../src/index.js';
+} from '../../../../src/index.js';
 import {
   hasPostgresErrorCode,
   requireTrustedScopeId,

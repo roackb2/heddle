@@ -204,9 +204,12 @@ The runnable examples teach customization in small steps:
 5. [Hosted agent stack](examples/sdk/05-hosted-agent/README.md) — progress from
    a transport-neutral service to an optional HTTP/SSE API, browser client, and
    React reference.
-6. [PostgreSQL + Drizzle storage](examples/sdk/06-postgres-drizzle-storage/README.md) —
-   persist complete sessions and compacted archives with checked-in migrations,
-   tenant-scoped repositories, conformance, and fresh-service recovery.
+6. [Choose a persistence posture](examples/sdk/06-persistence/README.md):
+   [local JSON](examples/sdk/06-persistence/local-json/README.md) proves
+   fresh-process and whole-root backup recovery on one durable host;
+   [PostgreSQL + Drizzle](examples/sdk/06-persistence/postgres-drizzle/README.md)
+   adds tenant-scoped repositories, migrations, conformance, and fresh-replica
+   recovery for hosted products.
 
 Each stage states its assumptions and responsibility boundary. Copy only the
 layers that match your product.

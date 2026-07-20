@@ -71,9 +71,10 @@ after a server replacement, a host needs all of the following:
    report the run as interrupted or failed. Do not reconstruct and replay a
    pending tool call or approval from partial evidence.
 
-For implementation guidance, see [durable session storage](session-storage.md)
-and the runnable
-[PostgreSQL + Drizzle reference](../../../examples/sdk/06-postgres-drizzle-storage/README.md).
+For implementation guidance, see [durable session storage](session-storage.md),
+the runnable [local JSON recovery example](../../../examples/sdk/06-persistence/local-json/README.md),
+and the
+[PostgreSQL + Drizzle reference](../../../examples/sdk/06-persistence/postgres-drizzle/README.md).
 
 ## What This Promise Does Not Require
 
