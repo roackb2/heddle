@@ -33,6 +33,7 @@ const PUBLIC_EXPORT_EXPECTATIONS = [
   'createConversationEngine',
   'defineHostExtension',
   'EngineConversationTurnService',
+  'OpenAiDeviceCodeAuthService',
 ];
 
 describe('core import boundaries', () => {

@@ -75,6 +75,16 @@ export type {
   StopReason,
 } from './core/types.js';
 
+// Provider-specific credential acquisition remains opt-in. The device-code
+// service is useful to hosted adopters that cannot receive a loopback callback.
+export { OpenAiDeviceCodeAuthService } from './core/auth/index.js';
+export type {
+  OpenAiDeviceCodeChallenge,
+  OpenAiDeviceCodePollOptions,
+  OpenAiDeviceCodePollResult,
+  OpenAiDeviceCodeRequestOptions,
+} from './core/auth/index.js';
+
 // ---------------------------------------------------------------------------
 // 2. Add capabilities — tools, MCP servers, skills
 // ---------------------------------------------------------------------------
