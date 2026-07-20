@@ -9,12 +9,14 @@ export const externalContextToolkit: ToolToolkit = {
       createWebSearchTool({
         model: context.model,
         apiKey: context.apiKey,
+        credential: context.credential,
         providerCredentialSource: context.providerCredentialSource,
         credentialStorePath: context.credentialStorePath,
       }),
       createViewImageTool({
         model: context.model,
         apiKey: context.apiKey,
+        credential: context.credential,
         providerCredentialSource: context.providerCredentialSource,
         credentialStorePath: context.credentialStorePath,
         workspaceRoot: context.workspaceRoot,

@@ -3,6 +3,7 @@ import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import type { ReasoningEffort } from '@/core/llm/types.js';
 import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
+import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
 import type {
   ConversationSdkCredentialContext,
   ConversationSdkCredentialPreflightOptions,
@@ -39,6 +40,7 @@ export class ConversationSdkRuntimeService {
 
   static preflightCredentials(input: {
     apiKey?: string;
+    credential?: RuntimeProviderCredential;
     credentialStorePath?: string;
     defaults: ConversationSdkRuntimeDefaults;
     preferApiKey?: boolean;
@@ -51,6 +53,7 @@ export class ConversationSdkRuntimeService {
 
     const resolution = LlmProviderRuntimeService.resolve({
       apiKey: input.apiKey,
+      credential: input.credential,
       credentialStorePath: input.credentialStorePath,
       model: input.defaults.model,
       preferApiKey: input.preferApiKey,

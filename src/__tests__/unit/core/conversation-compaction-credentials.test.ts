@@ -34,6 +34,7 @@ describe('conversation compaction credentials', () => {
       model: 'gpt-5.1-codex-mini',
       credentials: {
         apiKey: 'user-byok-key',
+        credential: undefined,
         credentialStorePath: undefined,
       },
     }));
@@ -82,7 +83,55 @@ describe('conversation compaction credentials', () => {
       model: 'gpt-5.4',
       credentials: {
         apiKey: undefined,
+        credential: expect.objectContaining({
+          type: 'oauth',
+          provider: 'openai',
+          accessToken: 'access-token',
+          accountId: 'account-123',
+        }),
         credentialStorePath,
+      },
+    }));
+    expect(compacted.archive.archives).toHaveLength(1);
+  });
+
+  it('keeps compaction on the request-scoped access token', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'host-openai-key');
+    vi.stubEnv('PERSONAL_OPENAI_API_KEY', '');
+    const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-compaction-runtime-oauth-'));
+    const credential = {
+      type: 'oauth-access-token' as const,
+      provider: 'openai' as const,
+      accessToken: 'request-access-token',
+      expiresAt: Date.now() + 60 * 60_000,
+      accountId: 'account-123',
+    };
+    const create = vi.spyOn(LlmAdapterService, 'create').mockReturnValue(
+      summaryLlm('Request OAuth rolling summary'),
+    );
+
+    const compacted = await ConversationCompactionService.compact({
+      history: history(),
+      runtime: { model: 'gpt-5.4', stateRoot },
+      session: { id: 'session-1' },
+      force: true,
+      summarizer: {
+        credential,
+        credentialSource: {
+          type: 'oauth-access-token',
+          provider: 'openai',
+          accountId: 'account-123',
+          expiresAt: credential.expiresAt,
+        },
+      },
+    });
+
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      model: 'gpt-5.4',
+      credentials: {
+        apiKey: undefined,
+        credential,
+        credentialStorePath: undefined,
       },
     }));
     expect(compacted.archive.archives).toHaveLength(1);

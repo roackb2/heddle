@@ -47,12 +47,18 @@ export class ConversationArchiveSummarizer {
     const providerRuntime = LlmProviderRuntimeService.resolve({
       model,
       apiKey: options.summarizer?.apiKey,
+      credential: options.summarizer?.credential?.type === 'oauth-access-token' ?
+          options.summarizer.credential
+        : undefined,
       credentialStorePath: options.summarizer?.credentialStorePath,
     });
     const apiKey = options.summarizer?.apiKey ?? providerRuntime.apiKey;
     const summarizerCredentialRuntime: ApiKeyRuntime = {
       apiKey,
       apiKeyProvider: options.summarizer?.apiKey ? 'explicit' : apiKey ? provider : undefined,
+      credential: options.summarizer?.credential?.type === 'oauth-access-token' ?
+          options.summarizer.credential
+        : undefined,
       credentialStorePath: options.summarizer?.credentialStorePath,
     };
     if (providerRuntime.credentialSource.type === 'missing' || !RuntimeCredentialService.hasCredentialForModel(model, summarizerCredentialRuntime)) {
@@ -65,6 +71,7 @@ export class ConversationArchiveSummarizer {
         model,
         credentials: {
           apiKey,
+          credential: providerRuntime.credential,
           credentialStorePath: options.summarizer?.credentialStorePath,
         },
         runtime: providerRuntime.llmRuntime,

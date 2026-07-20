@@ -1,4 +1,3 @@
-import { LlmAdapterService } from '@/core/llm/index.js';
 import {
   RuntimeCredentialService,
 } from '../credentials/index.js';
@@ -12,23 +11,21 @@ import type { LlmProviderRuntimeInput, LlmProviderRuntimeResolution } from './ty
  */
 export class LlmProviderRuntimeService {
   static resolve(input: LlmProviderRuntimeInput): LlmProviderRuntimeResolution {
-    const provider = LlmAdapterService.inferProvider(input.model);
     const credentialRuntime = LlmProviderRuntimeService.credentialRuntime(input);
-    const apiKey = RuntimeCredentialService.resolveApiKeyForModel(input.model, credentialRuntime);
-    const credentialSource = RuntimeCredentialService.resolveCredentialSourceForModel(input.model, {
-      ...credentialRuntime,
-      apiKey,
-      apiKeyProvider: input.apiKey ? 'explicit' : apiKey ? provider : undefined,
-    });
+    const resolution = RuntimeCredentialService.resolveForModel(input.model, credentialRuntime);
 
     return {
       model: input.model,
-      provider,
-      apiKey,
-      credentialSource,
+      provider: resolution.provider,
+      apiKey: resolution.apiKey,
+      credential: resolution.credential,
+      credentialSource: resolution.source,
       llmRuntime: {
         reasoningEffort: input.reasoningEffort,
-        endpoint: RuntimeCredentialService.resolveOpenAiCompatibleEndpointRuntime(provider, credentialRuntime),
+        endpoint: RuntimeCredentialService.resolveOpenAiCompatibleEndpointRuntime(
+          resolution.provider,
+          credentialRuntime,
+        ),
       },
     };
   }
@@ -43,6 +40,7 @@ export class LlmProviderRuntimeService {
     return {
       apiKey: input.apiKey,
       apiKeyProvider: input.apiKey ? 'explicit' : undefined,
+      credential: input.credential,
       credentialStorePath: input.credentialStorePath,
       preferApiKey: input.preferApiKey,
     };

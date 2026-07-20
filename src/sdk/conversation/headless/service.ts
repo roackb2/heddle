@@ -35,6 +35,7 @@ export class ConversationAgentService {
     const defaults = ConversationSdkRuntimeService.resolveDefaults(options);
     const credential = ConversationSdkRuntimeService.preflightCredentials({
       apiKey: options.apiKey,
+      credential: options.credential,
       credentialStorePath: options.credentialStorePath,
       defaults,
       preferApiKey: options.preferApiKey,

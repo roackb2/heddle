@@ -10,6 +10,9 @@ not each invent their own version.
 ## Owns
 
 - Normalized engine config and derived paths in `config.ts`.
+- Request-scoped runtime credential propagation across the main turn,
+  compaction, and provider-backed tools. Token acquisition, refresh, and host
+  transport remain outside the engine.
 - File-backed session persistence, migration, lease rules, titles, archives, and
   conversation-line projection plus session execution-preference policy under
   `sessions/`.
@@ -83,6 +86,8 @@ Use this pattern when it fits the domain:
 ## Common Changes
 
 - Put normalized config, path defaults, and engine-wide defaults in `config.ts`.
+- Accept a transient provider access token through `credential`; never put it
+  into session metadata, archives, traces, or the provider credential store.
 - Put persisted session lifecycle behavior in `sessions/service.ts` and related
   `sessions/*` modules.
 - Runtime and compaction events should already use the shared

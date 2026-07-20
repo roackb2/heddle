@@ -37,6 +37,8 @@ export class RuntimeStatusService {
         return `auth=${source.provider}-key`;
       case 'oauth':
         return `auth=${source.provider}-oauth`;
+      case 'oauth-access-token':
+        return `auth=${source.provider}-request-oauth`;
       case 'local-endpoint':
         return `auth=${source.provider}-local`;
       case 'missing':

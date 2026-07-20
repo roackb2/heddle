@@ -25,6 +25,30 @@ headless returns structured results to caller-owned input/output, while console
 owns readline, text rendering, and local commands. Their shared runtime module
 prevents defaults and credential policy from drifting.
 
+## Host-supplied account access tokens
+
+An embedding host may pass an already-acquired OpenAI account access token as a
+`RuntimeProviderCredential`:
+
+```ts
+const agent = new ConversationAgentService({
+  model: 'gpt-5.4',
+  credential: {
+    type: 'oauth-access-token',
+    provider: 'openai',
+    accessToken,
+    expiresAt,
+    accountId,
+  },
+})
+```
+
+Heddle uses that token consistently for the main model call, compaction, and
+OpenAI-backed external-context tools. It does not store or refresh the token.
+The host owns sign-in, authenticated delivery to its server, in-memory lifetime,
+and asking the user to sign in again after expiry. Use `apiKey` instead when the
+host is supplying a Platform API key; supplying both is invalid.
+
 ## Product Boundary
 
 These services are not Heddle product applications. `src/cli-v2` owns the

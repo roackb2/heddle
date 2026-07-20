@@ -22,6 +22,7 @@ import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js
 import type { ChatTurnHostPort } from './turns/host/index.js';
 import type { ConversationTurnResultSummary } from './turn-result.js';
 import type { ConversationCompactionResult } from '@/core/chat/engine/compaction/index.js';
+import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
 import type { RuntimeToolSelectionProfile } from '@/core/runtime/tools/index.js';
 import type {
   HeddlePersistenceCapabilities,
@@ -39,6 +40,11 @@ export type ConversationEngineConfig = {
   model: string;
   reasoningEffort?: ReasoningEffort;
   apiKey?: string;
+  /**
+   * Request-scoped provider credential. It stays in memory, is never refreshed
+   * or persisted, and must not be combined with `apiKey`.
+   */
+  credential?: RuntimeProviderCredential;
   preferApiKey?: boolean;
   credentialStorePath?: string;
   systemContext?: string;

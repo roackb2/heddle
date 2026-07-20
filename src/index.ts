@@ -335,4 +335,8 @@ export type {
   ChatSession,
 } from './core/chat/types.js';
 export { RuntimeCredentialService } from './core/runtime/credentials/index.js';
-export type { ApiKeyRuntime, ProviderCredentialSource } from './core/runtime/credentials/index.js';
+export type {
+  ApiKeyRuntime,
+  ProviderCredentialSource,
+  RuntimeProviderCredential,
+} from './core/runtime/credentials/index.js';

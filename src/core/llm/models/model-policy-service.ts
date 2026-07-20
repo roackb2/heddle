@@ -92,7 +92,7 @@ const DEFAULT_OPENAI_REASONING_EFFORT: Record<string, ReasoningEffort> = {
  */
 export class ModelPolicyService {
   static credentialModeFromSource(source: ProviderCredentialSource | undefined): ModelCredentialMode {
-    if (source?.type === 'oauth') {
+    if (source?.type === 'oauth' || source?.type === 'oauth-access-token') {
       return 'oauth';
     }
 

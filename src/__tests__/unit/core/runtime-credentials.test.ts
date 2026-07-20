@@ -44,6 +44,12 @@ describe('RuntimeCredentialService', () => {
       accountId: 'account-123',
     })).toBe('openai OAuth account account-123');
     expect(RuntimeCredentialService.formatCredentialSource({
+      type: 'oauth-access-token',
+      provider: 'openai',
+      accountId: 'account-123',
+      expiresAt: Date.parse('2026-07-20T02:00:00.000Z'),
+    })).toBe('openai request-scoped OAuth account account-123');
+    expect(RuntimeCredentialService.formatCredentialSource({
       type: 'local-endpoint',
       provider: 'ollama',
       baseUrl: 'http://localhost:11434/v1',
@@ -212,5 +218,48 @@ describe('RuntimeCredentialService', () => {
       type: 'env-api-key',
       provider: 'openai',
     });
+  });
+
+  it('resolves a request-scoped access token without falling back to an environment key', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'host-openai-key');
+    const credential = {
+      type: 'oauth-access-token' as const,
+      provider: 'openai' as const,
+      accessToken: 'request-access-token',
+      expiresAt: Date.now() + 60 * 60_000,
+      accountId: 'account-123',
+    };
+
+    expect(RuntimeCredentialService.resolveForModel('gpt-5.4', {
+      credential,
+      preferApiKey: true,
+    })).toEqual({
+      provider: 'openai',
+      credential,
+      source: {
+        type: 'oauth-access-token',
+        provider: 'openai',
+        accountId: 'account-123',
+        expiresAt: credential.expiresAt,
+      },
+    });
+  });
+
+  it('rejects ambiguous or provider-mismatched runtime credentials', () => {
+    const credential = {
+      type: 'oauth-access-token' as const,
+      provider: 'openai' as const,
+      accessToken: 'request-access-token',
+      expiresAt: Date.now() + 60 * 60_000,
+    };
+
+    expect(() => RuntimeCredentialService.resolveForModel('gpt-5.4', {
+      apiKey: 'api-key',
+      apiKeyProvider: 'explicit',
+      credential,
+    })).toThrow('Provide either apiKey or credential');
+    expect(() => RuntimeCredentialService.resolveForModel('claude-sonnet-4-6', {
+      credential,
+    })).toThrow('Runtime credential provider openai does not match model provider anthropic.');
   });
 });

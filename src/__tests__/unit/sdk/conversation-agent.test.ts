@@ -10,6 +10,7 @@ import { ConversationAgentService } from '@/sdk/conversation/headless/index.js';
 describe('ConversationAgentService', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     vi.spyOn(EngineConversationTurnService, 'run').mockImplementation(async (args) => {
       const event: AgentLoopEvent = {
         source: 'agent-loop',
@@ -115,5 +116,35 @@ describe('ConversationAgentService', () => {
       'Conversation agent prompt cannot be empty.',
     );
     await expect(agent.engine.sessions.listExisting()).resolves.toEqual([]);
+  });
+
+  it('accepts a request-scoped access token without selecting a host API key', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'host-openai-key');
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-conversation-agent-oauth-'));
+    const credential = {
+      type: 'oauth-access-token' as const,
+      provider: 'openai' as const,
+      accessToken: 'request-access-token',
+      expiresAt: Date.now() + 60 * 60_000,
+      accountId: 'account-123',
+    };
+    const agent = new ConversationAgentService({
+      credential,
+      model: 'gpt-5.4',
+      workspaceRoot,
+    });
+
+    await agent.send({ prompt: 'Use this account for one turn.' });
+
+    expect(agent.runtime.credential?.source).toEqual({
+      type: 'oauth-access-token',
+      provider: 'openai',
+      accountId: 'account-123',
+      expiresAt: credential.expiresAt,
+    });
+    expect(EngineConversationTurnService.run).toHaveBeenCalledWith(expect.objectContaining({
+      apiKey: undefined,
+      credential,
+    }));
   });
 });

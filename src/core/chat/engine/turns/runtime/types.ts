@@ -1,5 +1,9 @@
 import type { LlmAdapter, LlmProvider, ReasoningEffort } from '@/core/llm/types.js';
-import type { ApiKeyRuntime, ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
+import type {
+  ApiKeyRuntime,
+  ProviderCredentialSource,
+  ResolvedProviderCredential,
+} from '@/core/runtime/credentials/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { ConversationCompactionOptions } from '@/core/chat/engine/compaction/index.js';
 
@@ -8,6 +12,7 @@ export type ChatTurnRuntime = {
   reasoningEffort?: ReasoningEffort;
   provider: LlmProvider;
   apiKey: string | undefined;
+  credential: ResolvedProviderCredential | undefined;
   providerCredentialSource: ProviderCredentialSource;
   summarizer: ConversationCompactionOptions['summarizer'];
   memoryDir: string;

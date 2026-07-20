@@ -9,6 +9,7 @@ export type ToolToolkitContext = {
   sessionId?: string;
   model: string;
   apiKey?: string;
+  credential?: import('../runtime/credentials/index.js').ResolvedProviderCredential;
   providerCredentialSource?: import('../runtime/credentials/index.js').ProviderCredentialSource;
   credentialStorePath?: string;
   memoryDir: string;
