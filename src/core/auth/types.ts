@@ -74,6 +74,28 @@ export type OpenAiOAuthTokenResponse = {
   expires_in?: number;
 };
 
+export type OpenAiDeviceCodeChallenge = {
+  deviceAuthId: string;
+  userCode: string;
+  verificationUrl: string;
+  /** Minimum polling interval requested by OpenAI. */
+  intervalMs: number;
+  /** Unix epoch timestamp in milliseconds. */
+  expiresAt: number;
+};
+
+export type OpenAiDeviceCodePollResult =
+  | { status: 'pending' }
+  | { status: 'expired' }
+  | { status: 'authorized'; credential: RuntimeProviderCredential };
+
+export type OpenAiDeviceCodeRequestOptions = {
+  fetchImpl?: typeof fetch;
+  signal?: AbortSignal;
+};
+
+export type OpenAiDeviceCodePollOptions = OpenAiDeviceCodeRequestOptions;
+
 export type OpenAiOAuthCredential = Extract<StoredProviderCredential, { type: 'oauth' }>;
 
 export type OpenAiOAuthLoginOptions = {
