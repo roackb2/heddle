@@ -10,6 +10,7 @@ import type {
   OpenAiOAuthRefreshOptions,
   OpenAiOAuthTokenResponse,
   PkceCodes,
+  RuntimeProviderCredential,
 } from './types.js';
 
 export const OPENAI_CODEX_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
@@ -162,6 +163,20 @@ export class OpenAiOAuthService {
       createdAt: timestamp,
       updatedAt: timestamp,
       label: 'ChatGPT/Codex OAuth',
+    };
+  }
+
+  /** Converts OAuth tokens to an access-token-only, non-persistable runtime credential. */
+  static createRuntimeCredential(
+    tokens: OpenAiOAuthTokenResponse,
+    now = Date.now(),
+  ): RuntimeProviderCredential {
+    return {
+      type: 'oauth-access-token',
+      provider: 'openai',
+      accessToken: tokens.access_token,
+      expiresAt: now + (tokens.expires_in ?? 3600) * 1000,
+      accountId: OpenAiOAuthService.extractAccountId(tokens),
     };
   }
 

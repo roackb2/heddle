@@ -62,6 +62,18 @@ send it over an authenticated transport, keep it out of logs and durable state,
 and require sign-in again after expiry or host refresh. The same token is used
 for the turn, compaction, and OpenAI-backed tools.
 
+For a hosted product that cannot receive Codex's loopback browser callback,
+`OpenAiDeviceCodeAuthService` provides a stateless device-code handshake. Its
+`requestCode()` result contains the verification URL, one-time user code,
+expiry, and minimum polling interval. Call `poll()` no faster than
+`intervalMs`; an approved result contains the access-token-only
+`RuntimeProviderCredential` shown above. Heddle discards the refresh token.
+
+Protect both host routes with product authentication and rate limits, warn
+users not to share device codes, and keep the challenge and resulting
+credential out of durable storage and logs. This Codex account-sign-in binding
+is experimental and is not a generic third-party OpenAI OAuth integration.
+
 The result and activities are trusted in-process host data; they may include
 tool input/output, local paths, or other internal details. Do not serialize them
 directly to an untrusted browser. Use a host-owned public projection and the
