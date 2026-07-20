@@ -9,7 +9,12 @@ import {
   type OpenAiCompatibleProviderProfile,
 } from '@/core/llm/index.js';
 import type { LlmProvider, LlmProviderEndpointRuntime } from '@/core/llm/types.js';
-import type { ApiKeyRuntime, ProviderCredentialSource } from './types.js';
+import type {
+  ApiKeyRuntime,
+  ProviderCredentialResolution,
+  ProviderCredentialSource,
+  RuntimeProviderCredential,
+} from './types.js';
 
 /**
  * Resolves runtime credential sources for provider-backed agent execution.
@@ -43,23 +48,7 @@ export class RuntimeCredentialService {
   }
 
   static resolveApiKeyForModel(model: string, runtime?: ApiKeyRuntime): string | undefined {
-    const source = this.resolveCredentialSourceForModel(model, runtime);
-
-    if (source.type === 'local-endpoint') {
-      return undefined;
-    }
-
-    if (source.type === 'explicit-api-key') {
-      return runtime?.apiKey;
-    }
-
-    if (source.type === 'env-api-key') {
-      return runtime?.apiKey && runtime.apiKeyProvider === source.provider ?
-          runtime.apiKey
-        : this.resolveProviderApiKey(source.provider);
-    }
-
-    return undefined;
+    return this.resolveForModel(model, runtime).apiKey;
   }
 
   static resolveOAuthCredentialForModel(
@@ -75,54 +64,107 @@ export class RuntimeCredentialService {
     model: string,
     runtime?: ApiKeyRuntime & { credentialStorePath?: string },
   ): boolean {
-    return this.resolveCredentialSourceForModel(model, runtime).type !== 'missing';
+    return this.resolveForModel(model, runtime).source.type !== 'missing';
   }
 
   static resolveCredentialSourceForModel(
     model: string,
     runtime?: ApiKeyRuntime,
   ): ProviderCredentialSource {
+    return this.resolveForModel(model, runtime).source;
+  }
+
+  /** Resolves one concrete credential principal for a model-backed runtime. */
+  static resolveForModel(
+    model: string,
+    runtime?: ApiKeyRuntime,
+  ): ProviderCredentialResolution {
     const provider = LlmAdapterService.inferProvider(model);
+    RuntimeCredentialService.assertRuntimeCredential({
+      apiKey: runtime?.apiKey,
+      credential: runtime?.credential,
+      provider,
+    });
     const localEndpointSource = this.resolveLocalEndpointCredentialSource(provider);
     if (localEndpointSource) {
-      return localEndpointSource;
+      return { provider, source: localEndpointSource };
+    }
+
+    if (runtime?.credential) {
+      return {
+        provider,
+        credential: runtime.credential,
+        source: {
+          type: 'oauth-access-token',
+          provider: runtime.credential.provider,
+          accountId: runtime.credential.accountId,
+          expiresAt: runtime.credential.expiresAt,
+        },
+      };
     }
 
     if (runtime?.apiKey && runtime.apiKeyProvider === 'explicit') {
-      return { type: 'explicit-api-key' };
+      return {
+        provider,
+        apiKey: runtime.apiKey,
+        source: { type: 'explicit-api-key' },
+      };
     }
 
     if (runtime?.preferApiKey) {
       if (runtime.apiKey && runtime.apiKeyProvider === provider) {
-        return { type: 'env-api-key', provider };
+        return {
+          provider,
+          apiKey: runtime.apiKey,
+          source: { type: 'env-api-key', provider },
+        };
       }
 
       const preferredApiKey = this.resolveProviderApiKey(provider);
       if (preferredApiKey) {
-        return { type: 'env-api-key', provider };
+        return {
+          provider,
+          apiKey: preferredApiKey,
+          source: { type: 'env-api-key', provider },
+        };
       }
     }
 
     const oauthCredential = this.resolveOAuthCredentialForModel(model, { storePath: runtime?.credentialStorePath });
     if (oauthCredential) {
       return {
-        type: 'oauth',
-        provider: oauthCredential.provider,
-        accountId: oauthCredential.accountId,
-        expiresAt: oauthCredential.expiresAt,
+        provider,
+        credential: oauthCredential,
+        source: {
+          type: 'oauth',
+          provider: oauthCredential.provider,
+          accountId: oauthCredential.accountId,
+          expiresAt: oauthCredential.expiresAt,
+        },
       };
     }
 
     if (runtime?.apiKey && runtime.apiKeyProvider === provider) {
-      return { type: 'env-api-key', provider };
+      return {
+        provider,
+        apiKey: runtime.apiKey,
+        source: { type: 'env-api-key', provider },
+      };
     }
 
     const apiKey = this.resolveProviderApiKey(provider);
     if (apiKey) {
-      return { type: 'env-api-key', provider };
+      return {
+        provider,
+        apiKey,
+        source: { type: 'env-api-key', provider },
+      };
     }
 
-    return { type: 'missing', provider };
+    return {
+      provider,
+      source: { type: 'missing', provider },
+    };
   }
 
   static resolveLocalEndpointCredentialSource(provider: LlmProvider): Extract<ProviderCredentialSource, { type: 'local-endpoint' }> | undefined {
@@ -188,6 +230,8 @@ export class RuntimeCredentialService {
         return `${source.provider} API key from environment`;
       case 'oauth':
         return source.accountId ? `${source.provider} OAuth account ${source.accountId}` : `${source.provider} OAuth account`;
+      case 'oauth-access-token':
+        return source.accountId ? `${source.provider} request-scoped OAuth account ${source.accountId}` : `${source.provider} request-scoped OAuth access token`;
       case 'local-endpoint':
         return `${source.provider} local endpoint ${source.baseUrl}`;
       case 'missing':
@@ -217,6 +261,29 @@ export class RuntimeCredentialService {
     }
 
     return RuntimeCredentialService.resolveProviderApiKey(provider);
+  }
+
+  private static assertRuntimeCredential(args: {
+    apiKey?: string;
+    credential?: RuntimeProviderCredential;
+    provider: LlmProvider;
+  }): void {
+    if (!args.credential) {
+      return;
+    }
+
+    if (args.apiKey?.trim()) {
+      throw new Error('Provide either apiKey or credential for one runtime, not both.');
+    }
+    if (args.credential.provider !== args.provider) {
+      throw new Error(`Runtime credential provider ${args.credential.provider} does not match model provider ${args.provider}.`);
+    }
+    if (!args.credential.accessToken.trim()) {
+      throw new Error('Runtime OAuth access token cannot be empty.');
+    }
+    if (!Number.isFinite(args.credential.expiresAt)) {
+      throw new Error('Runtime OAuth access token expiry must be a finite Unix timestamp in milliseconds.');
+    }
   }
 
   private static resolveOpenAiCompatibleBaseUrl(profile: OpenAiCompatibleProviderProfile): string {

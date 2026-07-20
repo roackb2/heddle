@@ -12,6 +12,7 @@ import type { ToolDefinition } from '@/core/types.js';
 import type { ToolToolkit } from '@/core/tools/index.js';
 import type { ConversationTurnResultSummary } from '../turn-result.js';
 import type { RuntimeToolSelectionProfile } from '@/core/runtime/tools/index.js';
+import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
 
 export type RunConversationTurnArgs = {
   workspaceRoot: string;
@@ -23,6 +24,7 @@ export type RunConversationTurnArgs = {
   sessionId: string;
   prompt: string;
   apiKey?: string;
+  credential?: RuntimeProviderCredential;
   preferApiKey?: boolean;
   credentialStorePath?: string;
   systemContext?: string;
@@ -58,6 +60,7 @@ export type TurnRuntimeConfigInput = Pick<
   | 'sessionRepository'
   | 'archiveRepository'
   | 'apiKey'
+  | 'credential'
   | 'preferApiKey'
   | 'credentialStorePath'
   | 'systemContext'

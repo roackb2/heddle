@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { mkdtempSync } from 'node:fs';
+import { describe, expect, it, vi } from 'vitest';
+import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -186,6 +186,54 @@ describe('OpenAI OAuth helpers', () => {
     expect(requests[1]?.url).toBe(OPENAI_CODEX_RESPONSES_ENDPOINT);
     expect(requests[1]?.headers.get('authorization')).toBe('Bearer new-access-token');
     expect(requests[1]?.headers.get('ChatGPT-Account-Id')).toBe('account-123');
+  });
+
+  it('routes a request-scoped access token without refreshing or persisting it', async () => {
+    const storePath = join(mkdtempSync(join(tmpdir(), 'heddle-runtime-oauth-fetch-')), 'auth.json');
+    const requests: Array<{ url: string; headers: Headers }> = [];
+    const oauthFetch = OpenAiOAuthFetchService.create({
+      type: 'oauth-access-token',
+      provider: 'openai',
+      accessToken: 'request-access-token',
+      expiresAt: Date.now() + 120_000,
+      accountId: 'account-123',
+    }, {
+      storePath,
+      fetchImpl: (async (url, init) => {
+        requests.push({
+          url: String(url),
+          headers: new Headers(init?.headers),
+        });
+        return new Response('ok');
+      }) as typeof fetch,
+    });
+
+    await oauthFetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { authorization: 'Bearer placeholder' },
+    });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.url).toBe(OPENAI_CODEX_RESPONSES_ENDPOINT);
+    expect(requests[0]?.headers.get('authorization')).toBe('Bearer request-access-token');
+    expect(requests[0]?.headers.get('ChatGPT-Account-Id')).toBe('account-123');
+    expect(existsSync(storePath)).toBe(false);
+  });
+
+  it('rejects an expired request-scoped token before any provider request', async () => {
+    const fetchImpl = vi.fn<typeof fetch>();
+    const oauthFetch = OpenAiOAuthFetchService.create({
+      type: 'oauth-access-token',
+      provider: 'openai',
+      accessToken: 'expired-access-token',
+      expiresAt: Date.now() - 1_000,
+    }, { fetchImpl });
+
+    await expect(oauthFetch('https://api.openai.com/v1/responses')).rejects.toMatchObject({
+      code: 'oauth_access_token_expired',
+      status: 401,
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it('fails clearly for account sign-in with a model outside the known Codex set', async () => {

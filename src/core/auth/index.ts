@@ -11,5 +11,7 @@ export type {
   PkceCodes,
   ProviderCredentialStore,
   ProviderCredentialSummary,
+  ResolvedProviderCredential,
+  RuntimeProviderCredential,
   StoredProviderCredential,
 } from './types.js';

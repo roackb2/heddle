@@ -11,6 +11,7 @@ import type {
 } from '@/core/chat/engine/types.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { ToolDefinition } from '@/core/types.js';
+import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
 import type {
   ConversationSdkCredentialContext,
   ConversationSdkCredentialPreflightOptions,
@@ -65,6 +66,7 @@ export type QuickstartConversationCliRunnerOptions = {
   maxSteps?: number;
   reasoningEffort?: ConversationSdkRuntimeDefaultsInput['reasoningEffort'];
   apiKey?: string;
+  credential?: RuntimeProviderCredential;
   preferApiKey?: boolean;
   credentialStorePath?: string;
   credentialPreflight?: boolean | QuickstartConversationCliCredentialPreflightOptions;

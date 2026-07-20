@@ -20,6 +20,13 @@ choosing providers themselves.
 - `models/` owns the curated model catalog and model policy decisions used by
   hosts.
 
+The OpenAI adapter accepts two account-sign-in lifecycles. Stored OAuth
+credentials may refresh through Heddle's credential repository. A
+request-scoped `oauth-access-token` is already resolved by the host/runtime;
+the adapter attaches it to requests, rejects it when expired, and never refreshes
+or persists it. Provider-backed tools must receive the same resolved credential
+as the main model so one run cannot silently change principals.
+
 Provider adapters should follow the local pattern:
 
 - expose a class for the provider adapter and concrete LLM adapter;

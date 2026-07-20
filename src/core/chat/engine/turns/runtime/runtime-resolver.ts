@@ -47,9 +47,11 @@ export class ConversationTurnRuntimeResolver {
       model,
       provider: providerRuntime.provider,
       apiKey,
+      credential: providerRuntime.credential,
       providerCredentialSource: providerRuntime.credentialSource,
       summarizer: {
         apiKey,
+        credential: providerRuntime.credential,
         credentialStorePath: config.credentialStorePath,
         credentialSource: providerRuntime.credentialSource,
       },
@@ -60,6 +62,7 @@ export class ConversationTurnRuntimeResolver {
         model,
         credentials: {
           apiKey,
+          credential: providerRuntime.credential,
           credentialStorePath: config.credentialStorePath,
         },
         runtime: {
@@ -74,6 +77,7 @@ export class ConversationTurnRuntimeResolver {
     return {
       apiKey: config.apiKey,
       apiKeyProvider: config.apiKey ? 'explicit' : undefined,
+      credential: config.credential,
       credentialStorePath: config.credentialStorePath,
       preferApiKey: config.preferApiKey,
     };

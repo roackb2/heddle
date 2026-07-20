@@ -3,7 +3,10 @@
 // ---------------------------------------------------------------------------
 
 import type { AssistantDiagnostics, ToolCall, ToolDefinition } from '../types.js';
-import type { StoredProviderCredential } from '@/core/auth/index.js';
+import type {
+  RuntimeProviderCredential,
+  StoredProviderCredential,
+} from '@/core/auth/index.js';
 
 export type LlmStreamEvent =
   | { type: 'content.delta'; delta: string }
@@ -83,7 +86,7 @@ export interface LlmAdapter {
 
 export type LlmCredentialContext = {
   apiKey?: string;
-  credential?: StoredProviderCredential;
+  credential?: StoredProviderCredential | RuntimeProviderCredential;
   credentialStorePath?: string;
 };
 

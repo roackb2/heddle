@@ -7,6 +7,7 @@ import type { ConversationSessionService } from '@/core/chat/engine/types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatTurnRuntime } from '../runtime/index.js';
 import type { RuntimeToolSelectionProfile } from '@/core/runtime/tools/index.js';
+import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
 
 export type PrepareConversationTurnContextArgs = {
   workspaceRoot: string;
@@ -14,6 +15,7 @@ export type PrepareConversationTurnContextArgs = {
   sessionService: ConversationSessionService;
   sessionId: string;
   apiKey?: string;
+  credential?: RuntimeProviderCredential;
   preferApiKey?: boolean;
   credentialStorePath?: string;
   systemContext?: string;
@@ -33,6 +35,7 @@ export type PrepareConversationTurnContextArgs = {
 export type ConversationTurnToolContextArgs = Pick<
   PrepareConversationTurnContextArgs,
   | 'workspaceRoot'
+  | 'credential'
   | 'credentialStorePath'
   | 'searchIgnoreDirs'
   | 'includePlanTool'
@@ -49,7 +52,7 @@ export type ConversationTurnToolContextArgs = Pick<
 
 export type ConversationTurnToolRuntimeArgs = Pick<
   ChatTurnRuntime,
-  'model' | 'apiKey' | 'providerCredentialSource' | 'memoryDir'
+  'model' | 'apiKey' | 'credential' | 'providerCredentialSource' | 'memoryDir'
 >;
 
 export type ConversationTurnContext = {

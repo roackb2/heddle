@@ -90,6 +90,7 @@ describe('chat turn preparation modules', () => {
     expect(runtime.providerCredentialSource).toEqual({ type: 'explicit-api-key' });
     expect(runtime.summarizer).toEqual({
       apiKey: 'explicit-key',
+      credential: undefined,
       credentialStorePath: undefined,
       credentialSource: { type: 'explicit-api-key' },
     });
@@ -189,6 +190,12 @@ describe('chat turn preparation modules', () => {
     });
     expect(runtime.summarizer).toEqual({
       apiKey: undefined,
+      credential: expect.objectContaining({
+        type: 'oauth',
+        provider: 'openai',
+        accessToken: 'access-token',
+        accountId: 'account-123',
+      }),
       credentialStorePath,
       credentialSource: {
         type: 'oauth',
@@ -196,6 +203,42 @@ describe('chat turn preparation modules', () => {
         accountId: 'account-123',
         expiresAt: Date.parse('2026-05-02T01:00:00.000Z'),
       },
+    });
+  });
+
+  it('threads one request-scoped access token through turn and compaction runtime', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'host-openai-key');
+    const root = mkdtempSync(join(tmpdir(), 'heddle-turn-runtime-oauth-'));
+    const credential = {
+      type: 'oauth-access-token' as const,
+      provider: 'openai' as const,
+      accessToken: 'request-access-token',
+      expiresAt: Date.now() + 60 * 60_000,
+      accountId: 'account-123',
+    };
+
+    const runtime = ConversationTurnRuntimeResolver.resolve({
+      config: {
+        stateRoot: join(root, '.heddle'),
+        credential,
+        preferApiKey: true,
+      },
+      session: { model: 'gpt-5.4' },
+    });
+
+    expect(runtime.apiKey).toBeUndefined();
+    expect(runtime.credential).toBe(credential);
+    expect(runtime.providerCredentialSource).toEqual({
+      type: 'oauth-access-token',
+      provider: 'openai',
+      accountId: 'account-123',
+      expiresAt: credential.expiresAt,
+    });
+    expect(runtime.summarizer).toEqual({
+      apiKey: undefined,
+      credential,
+      credentialStorePath: undefined,
+      credentialSource: runtime.providerCredentialSource,
     });
   });
 

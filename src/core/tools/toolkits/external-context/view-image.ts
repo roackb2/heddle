@@ -18,7 +18,11 @@ import {
 import { ModelPolicyService } from '../../../llm/models/index.js';
 import type { LlmProvider } from '../../../llm/types.js';
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../../../config.js';
-import { RuntimeCredentialService, type ProviderCredentialSource } from '../../../runtime/credentials/index.js';
+import {
+  RuntimeCredentialService,
+  type ProviderCredentialSource,
+  type ResolvedProviderCredential,
+} from '../../../runtime/credentials/index.js';
 
 type ViewImageInput = {
   path?: string;
@@ -36,6 +40,7 @@ export type ViewImageToolOptions = {
   model?: string;
   provider?: LlmProvider;
   apiKey?: string;
+  credential?: ResolvedProviderCredential;
   providerCredentialSource?: ProviderCredentialSource;
   credentialStorePath?: string;
   workspaceRoot?: string;
@@ -156,14 +161,19 @@ async function executeOpenAiImageView(args: {
 }): Promise<ToolResult> {
   const model = args.options.model ?? DEFAULT_OPENAI_MODEL;
   const oauthCredential =
-    args.options.providerCredentialSource?.type === 'oauth' ?
+    OpenAiOAuthFetchService.isAccountCredential(args.options.credential) ? args.options.credential
+    : args.options.providerCredentialSource?.type === 'oauth' ?
       RuntimeCredentialService.resolveOAuthCredentialForModel(model, { storePath: args.options.credentialStorePath })
     : undefined;
 
-  if (args.options.providerCredentialSource?.type === 'oauth' && !oauthCredential) {
+  const expectsOAuth = args.options.providerCredentialSource?.type === 'oauth'
+    || args.options.providerCredentialSource?.type === 'oauth-access-token';
+  if (expectsOAuth && !oauthCredential) {
     return {
       ok: false,
-      error: 'view_image could not load the stored OpenAI account sign-in credential for this workspace. Sign in again with `heddle auth login openai`, or set OPENAI_API_KEY to use Platform API-key mode.',
+      error: args.options.providerCredentialSource?.type === 'oauth-access-token' ?
+          'view_image did not receive the request-scoped OpenAI access token for this run. Sign in again and retry.'
+        : 'view_image could not load the stored OpenAI account sign-in credential for this workspace. Sign in again with `heddle auth login openai`, or set OPENAI_API_KEY to use Platform API-key mode.',
     };
   }
 

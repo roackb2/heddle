@@ -125,6 +125,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         goal: args.prompt,
         model: runtime.model,
         apiKey: runtime.apiKey,
+        credential: runtime.credential?.type === 'oauth-access-token' ? runtime.credential : undefined,
         stateDir: args.stateRoot,
         memoryDir: runtime.memoryDir,
         llm: runtime.llm,

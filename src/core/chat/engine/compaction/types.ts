@@ -1,7 +1,10 @@
 import type { ChatArchiveRecord, ChatContextStats, ChatSession } from '@/core/chat/types.js';
 import type { ConversationCompactionStatus } from '@/core/live/index.js';
 import type { ChatMessage, LlmAdapter, LlmUsage } from '@/core/llm/types.js';
-import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
+import type {
+  ProviderCredentialSource,
+  ResolvedProviderCredential,
+} from '@/core/runtime/credentials/index.js';
 import type { ChatArchiveRepository } from '@/core/chat/engine/sessions/archives/index.js';
 export type { ConversationCompactionStatus } from '@/core/live/index.js';
 
@@ -9,6 +12,7 @@ export type ConversationCompactionSummarizerOptions = {
   provider?: 'openai' | 'anthropic' | 'active';
   model?: string;
   apiKey?: string;
+  credential?: ResolvedProviderCredential;
   credentialStorePath?: string;
   llm?: LlmAdapter;
   credentialSource?: ProviderCredentialSource;

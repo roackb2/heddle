@@ -15,6 +15,7 @@ import type {
 } from '@/core/live/index.js';
 import type { ChatMessage, LlmAdapter, LlmProvider, LlmUsage, ReasoningEffort } from '@/core/llm/types.js';
 import type { RunFailure, RunResult, StopReason, ToolCall, ToolDefinition, TraceEvent } from '@/core/types.js';
+import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
 
 export type AgentLoopStatus = 'finished';
 
@@ -80,6 +81,7 @@ export type RunAgentLoopOptions = {
   model?: string;
   reasoningEffort?: ReasoningEffort;
   apiKey?: string;
+  credential?: RuntimeProviderCredential;
   maxSteps?: number;
   workspaceRoot?: string;
   stateDir?: string;

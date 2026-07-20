@@ -50,6 +50,7 @@ export class QuickstartConversationCliRunnerService {
       model: defaults.model,
       reasoningEffort: defaults.reasoningEffort,
       apiKey: options.apiKey,
+      credential: options.credential,
       preferApiKey: options.preferApiKey,
       credentialStorePath: options.credentialStorePath,
       systemContext: options.systemContext,
@@ -222,6 +223,7 @@ export class QuickstartConversationCliRunnerService {
     const preflight = QuickstartConversationCliRunnerService.resolveCredentialPreflight(input.options.credentialPreflight);
     const context = ConversationSdkRuntimeService.preflightCredentials({
       apiKey: input.options.apiKey,
+      credential: input.options.credential,
       credentialStorePath: input.options.credentialStorePath,
       defaults: input.defaults,
       preferApiKey: input.options.preferApiKey,

@@ -44,6 +44,7 @@ export class RuntimeToolService {
           sessionId: options.sessionId,
           model: options.model,
           apiKey: options.apiKey,
+          credential: options.credential,
           providerCredentialSource: options.providerCredentialSource,
           credentialStorePath: options.credentialStorePath,
           memoryDir,

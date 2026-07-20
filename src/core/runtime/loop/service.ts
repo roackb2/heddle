@@ -9,7 +9,10 @@ import { LlmAdapterService } from '@/core/llm/index.js';
 import type { LlmAdapter, LlmRuntimeContext, ReasoningEffort } from '@/core/llm/types.js';
 import type { ToolDefinition } from '@/core/types.js';
 import { createLogger } from '@/core/utils/logger.js';
-import type { ProviderCredentialSource } from '../credentials/index.js';
+import type {
+  ProviderCredentialSource,
+  ResolvedProviderCredential,
+} from '../credentials/index.js';
 import { LlmProviderRuntimeService } from '../provider-runtime/index.js';
 import { RuntimeToolService } from '../tools/index.js';
 import { AgentLoopCheckpointService } from './checkpoint.js';
@@ -27,6 +30,7 @@ export class AgentLoopRuntimeService {
     const providerRuntime = LlmProviderRuntimeService.resolve({
       model,
       apiKey: options.apiKey,
+      credential: options.credential,
       credentialStorePath,
       reasoningEffort: options.reasoningEffort,
     });
@@ -37,6 +41,7 @@ export class AgentLoopRuntimeService {
     const llm = options.llm ?? await this.createLoopLlmAdapter({
       model,
       apiKey,
+      credential: providerRuntime.credential,
       credentialStorePath,
       reasoningEffort: options.reasoningEffort,
       runtime: providerRuntime.llmRuntime,
@@ -45,6 +50,7 @@ export class AgentLoopRuntimeService {
     const tools = this.resolveTools(options, {
       model,
       apiKey,
+      credential: providerRuntime.credential,
       providerCredentialSource: providerRuntime.credentialSource,
       workspaceRoot,
       credentialStorePath,
@@ -167,6 +173,7 @@ export class AgentLoopRuntimeService {
   private static async createLoopLlmAdapter(options: {
     model: string;
     apiKey?: string;
+    credential?: ResolvedProviderCredential;
     credentialStorePath?: string;
     reasoningEffort?: ReasoningEffort;
     runtime: LlmRuntimeContext;
@@ -175,6 +182,7 @@ export class AgentLoopRuntimeService {
       model: options.model,
       credentials: {
         apiKey: options.apiKey,
+        credential: options.credential,
         credentialStorePath: options.credentialStorePath,
       },
       runtime: {
@@ -189,6 +197,7 @@ export class AgentLoopRuntimeService {
     runtime: {
       model: string;
       apiKey?: string;
+      credential?: ResolvedProviderCredential;
       providerCredentialSource?: ProviderCredentialSource;
       workspaceRoot: string;
       credentialStorePath?: string;
@@ -204,6 +213,7 @@ export class AgentLoopRuntimeService {
       ...RuntimeToolService.createDefaultAgentTools({
         model: runtime.model,
         apiKey: runtime.apiKey,
+        credential: runtime.credential,
         providerCredentialSource: runtime.providerCredentialSource,
         credentialStorePath: runtime.credentialStorePath,
         workspaceRoot: runtime.workspaceRoot,

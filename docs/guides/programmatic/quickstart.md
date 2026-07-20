@@ -41,6 +41,27 @@ Creation fields never overwrite an existing session with that ID. A hosted
 service must derive the ID and repository scope from trusted server-side
 identity; Heddle does not provide authentication or tenant mapping.
 
+If the host already acquired an OpenAI account access token, it can keep the
+token request-scoped instead of writing it to Heddle's credential store:
+
+```ts
+const agent = new ConversationAgentService({
+  model: 'gpt-5.4',
+  credential: {
+    type: 'oauth-access-token',
+    provider: 'openai',
+    accessToken,
+    expiresAt,
+    accountId,
+  },
+})
+```
+
+Heddle never refreshes or persists this credential. The host must acquire it,
+send it over an authenticated transport, keep it out of logs and durable state,
+and require sign-in again after expiry or host refresh. The same token is used
+for the turn, compaction, and OpenAI-backed tools.
+
 The result and activities are trusted in-process host data; they may include
 tool input/output, local paths, or other internal details. Do not serialize them
 directly to an untrusted browser. Use a host-owned public projection and the

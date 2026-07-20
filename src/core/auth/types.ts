@@ -29,6 +29,23 @@ export type StoredProviderCredential =
       label?: string;
     };
 
+/**
+ * A provider credential supplied only for the lifetime of one runtime/engine.
+ * It intentionally excludes refresh material and persistence metadata.
+ */
+export type RuntimeProviderCredential = {
+  type: 'oauth-access-token';
+  provider: 'openai';
+  accessToken: string;
+  /** Unix epoch timestamp in milliseconds. */
+  expiresAt: number;
+  accountId?: string;
+};
+
+export type ResolvedProviderCredential =
+  | RuntimeProviderCredential
+  | Extract<StoredProviderCredential, { type: 'oauth' }>;
+
 export type ProviderCredentialStore = {
   version: 1;
   credentials: Partial<Record<LlmProvider, StoredProviderCredential>>;

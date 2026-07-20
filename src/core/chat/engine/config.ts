@@ -11,6 +11,7 @@ import type { ToolDefinition } from '@/core/types.js';
 import type { ToolToolkit } from '@/core/tools/index.js';
 import { ConversationEngineHostExtensionService } from './host-extension.js';
 import type { RuntimeToolSelectionProfile } from '@/core/runtime/tools/index.js';
+import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
 import {
   ConversationPersistenceService,
 } from './persistence/conversation-persistence.js';
@@ -24,6 +25,7 @@ export type NormalizedConversationEngineConfig = {
   model: string;
   reasoningEffort?: ReasoningEffort;
   apiKey?: string;
+  credential?: RuntimeProviderCredential;
   preferApiKey?: boolean;
   credentialStorePath?: string;
   systemContext?: string;
@@ -84,6 +86,7 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
     model: config.model,
     reasoningEffort: config.reasoningEffort,
     apiKey: config.apiKey,
+    credential: config.credential,
     preferApiKey: config.preferApiKey,
     credentialStorePath,
     systemContext,
@@ -104,6 +107,6 @@ export function normalizeConversationEngineConfig(config: ConversationEngineConf
     memoryDir,
     traceDir,
     workspaceId: config.workspaceId,
-    apiKeyPresent: config.apiKeyPresent ?? Boolean(config.apiKey),
+    apiKeyPresent: config.apiKeyPresent ?? Boolean(config.apiKey || config.credential),
   };
 }

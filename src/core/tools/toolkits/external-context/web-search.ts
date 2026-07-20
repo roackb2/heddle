@@ -24,6 +24,7 @@ import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '../../../config.j
 import {
   RuntimeCredentialService,
   type ProviderCredentialSource,
+  type ResolvedProviderCredential,
 } from '../../../runtime/credentials/index.js';
 
 type WebSearchInput = {
@@ -35,6 +36,7 @@ export type WebSearchToolOptions = {
   model?: string;
   provider?: LlmProvider;
   apiKey?: string;
+  credential?: ResolvedProviderCredential;
   providerCredentialSource?: ProviderCredentialSource;
   credentialStorePath?: string;
 };
@@ -110,14 +112,19 @@ export function createWebSearchTool(options: WebSearchToolOptions = {}): ToolDef
 async function executeOpenAiWebSearch(input: WebSearchInput, options: WebSearchToolOptions): Promise<ToolResult> {
   const model = options.model ?? process.env.OPENAI_WEB_SEARCH_MODEL ?? DEFAULT_OPENAI_MODEL;
   const oauthCredential =
-    options.providerCredentialSource?.type === 'oauth' ?
+    OpenAiOAuthFetchService.isAccountCredential(options.credential) ? options.credential
+    : options.providerCredentialSource?.type === 'oauth' ?
       RuntimeCredentialService.resolveOAuthCredentialForModel(model, { storePath: options.credentialStorePath })
     : undefined;
 
-  if (options.providerCredentialSource?.type === 'oauth' && !oauthCredential) {
+  const expectsOAuth = options.providerCredentialSource?.type === 'oauth'
+    || options.providerCredentialSource?.type === 'oauth-access-token';
+  if (expectsOAuth && !oauthCredential) {
     return {
       ok: false,
-      error: 'web_search could not load the stored OpenAI account sign-in credential for this workspace. Sign in again with `heddle auth login openai`, or set OPENAI_API_KEY to use Platform API-key mode.',
+      error: options.providerCredentialSource?.type === 'oauth-access-token' ?
+          'web_search did not receive the request-scoped OpenAI access token for this run. Sign in again and retry.'
+        : 'web_search could not load the stored OpenAI account sign-in credential for this workspace. Sign in again with `heddle auth login openai`, or set OPENAI_API_KEY to use Platform API-key mode.',
     };
   }
 
@@ -165,7 +172,7 @@ async function executeOpenAiWebSearch(input: WebSearchInput, options: WebSearchT
 async function executeOpenAiOAuthWebSearch(
   input: WebSearchInput,
   options: WebSearchToolOptions & { model: string },
-  oauthCredential: NonNullable<ReturnType<typeof RuntimeCredentialService.resolveOAuthCredentialForModel>>,
+  oauthCredential: Parameters<typeof OpenAiOAuthFetchService.create>[0],
 ): Promise<ToolResult> {
   const oauthFetch = OpenAiOAuthFetchService.create(oauthCredential, { storePath: options.credentialStorePath });
   const sseText = await OpenAiCodexSseService.execute({

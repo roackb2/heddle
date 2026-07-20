@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import OpenAI from 'openai';
+import dayjs from 'dayjs';
 import type {
   Response as OpenAiResponse,
   ResponseStreamEvent,
@@ -18,6 +19,7 @@ import {
 import {
   ProviderCredentialRepository,
   type OpenAiOAuthCredential,
+  type RuntimeProviderCredential,
   type StoredProviderCredential,
 } from '@/core/auth/index.js';
 import { ModelPolicyService } from '@/core/llm/models/index.js';
@@ -26,6 +28,7 @@ import { OpenAiCodec } from './openai-codec.js';
 export type OpenAiAdapterOptions = LlmAdapterCreateInput;
 
 export type CompatibleFetch = (url: unknown, init?: unknown) => Promise<globalThis.Response>;
+export type OpenAiAccountCredential = OpenAiOAuthCredential | RuntimeProviderCredential;
 
 /**
  * OpenAI implementation of the LLM port. It owns OpenAI Responses streaming,
@@ -43,13 +46,15 @@ export class OpenAiAdapter implements LlmAdapter {
 
   private readonly client: OpenAI;
   private readonly model: string;
-  private readonly oauthCredential?: StoredProviderCredential;
+  private readonly oauthCredential?: OpenAiAccountCredential;
   private readonly reasoningEffort?: ReasoningEffort;
 
   constructor(options: OpenAiAdapterOptions = {}) {
     const credentials = options.credentials;
     const runtime = options.runtime;
-    this.oauthCredential = credentials?.credential?.type === 'oauth' ? credentials.credential : undefined;
+    this.oauthCredential = OpenAiOAuthFetchService.isAccountCredential(credentials?.credential) ?
+        credentials.credential
+      : undefined;
     this.model = options.model ?? DEFAULT_OPENAI_MODEL;
     this.reasoningEffort = runtime?.reasoningEffort;
     this.client = new OpenAI({
@@ -227,12 +232,12 @@ export type OpenAiOAuthFetchOptions = {
 };
 
 /**
- * Builds the OpenAI OAuth fetch implementation and refreshes stored account
- * credentials before expiry.
+ * Builds the OpenAI account-mode fetch implementation. Stored credentials may
+ * refresh and persist; request-scoped access tokens never do either.
  */
 export class OpenAiOAuthFetchService {
   static create(
-    initialCredential: OpenAiOAuthCredential,
+    initialCredential: OpenAiAccountCredential,
     options: OpenAiOAuthFetchOptions = {},
   ): OpenAiFetch {
     let credential = initialCredential;
@@ -240,7 +245,11 @@ export class OpenAiOAuthFetchService {
     const refreshBeforeMs = options.refreshBeforeMs ?? 60_000;
 
     const oauthFetch: CompatibleFetch = async (requestInput, init) => {
-      if (credential.expiresAt <= Date.now() + refreshBeforeMs) {
+      if (!dayjs(credential.expiresAt).isAfter(dayjs().add(refreshBeforeMs, 'millisecond'))) {
+        if (credential.type === 'oauth-access-token') {
+          throw OpenAiOAuthFetchService.expiredRuntimeCredentialError();
+        }
+
         credential = await OpenAiOAuthService.refreshCredential(credential, { fetchImpl: fetcher as typeof fetch });
         new ProviderCredentialRepository({ storePath: options.storePath }).set(credential);
       }
@@ -267,6 +276,12 @@ export class OpenAiOAuthFetchService {
     return oauthFetch as unknown as OpenAiFetch;
   }
 
+  static isAccountCredential(
+    credential: StoredProviderCredential | RuntimeProviderCredential | undefined,
+  ): credential is OpenAiAccountCredential {
+    return credential?.type === 'oauth' || credential?.type === 'oauth-access-token';
+  }
+
   private static normalizeRequestUrl(requestInput: unknown): URL {
     if (requestInput instanceof URL) {
       return requestInput;
@@ -279,6 +294,13 @@ export class OpenAiOAuthFetchService {
 
   private static shouldRouteToCodexResponses(url: URL): boolean {
     return url.pathname.endsWith('/responses') || url.pathname.endsWith('/chat/completions');
+  }
+
+  private static expiredRuntimeCredentialError(): Error {
+    return Object.assign(
+      new Error('OpenAI OAuth access token expired. Sign in again and retry.'),
+      { code: 'oauth_access_token_expired', status: 401 },
+    );
   }
 }
 
