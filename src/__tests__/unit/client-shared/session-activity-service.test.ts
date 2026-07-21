@@ -120,6 +120,30 @@ describe('ClientSharedSessionActivityService', () => {
     expect(effects).toEqual(['Implement']);
   });
 
+  it('delivers raw reasoning-summary progress for each frontend to present', () => {
+    let summary: { text: string; done: boolean; liveStatus: string | undefined } | undefined;
+
+    ClientSharedSessionActivityService.applyActivity({
+      type: 'reasoning.summary',
+      runId: 'run-1',
+      source: 'agent-loop',
+      step: 1,
+      text: 'Inspecting the project structure.',
+      done: false,
+      timestamp: '2026-06-03T00:00:00.000Z',
+    } as ControlPlaneSessionActivity, {
+      onReasoningSummary: (activity, liveStatus) => {
+        summary = { text: activity.text, done: activity.done, liveStatus };
+      },
+    });
+
+    expect(summary).toEqual({
+      text: 'Inspecting the project structure.',
+      done: false,
+      liveStatus: 'Thinking...',
+    });
+  });
+
   it('projects recent edit diffs from successful edit_file completions', () => {
     const diffs: string[] = [];
 

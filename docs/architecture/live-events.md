@@ -33,13 +33,24 @@ The ownership split is:
 
 `ConversationActivity` describes user-facing progress. Current sources include:
 
-- `agent-loop`: `loop.started`, `assistant.stream`, tool activity, approvals,
-  plans, and `loop.finished`;
+- `agent-loop`: `loop.started`, `reasoning.summary`, `assistant.stream`, tool
+  activity, approvals, plans, and `loop.finished`;
 - `compaction`: compaction progress and outcomes;
 - `direct-shell`: direct-shell lifecycle and results.
 
 Activities contain enough structured information for each host to choose its
 own presentation. They do not carry delivery ordering by themselves.
+
+`reasoning.summary` is the provider-generated, user-visible summary of model
+progress. It streams cumulative `text` updates and ends with `done: true`.
+Heddle core does not prefix or otherwise present that text; each host decides
+whether to label it as "Thinking", place it beside tool activity, or omit it.
+It is not hidden model chain-of-thought.
+
+`assistant.stream` is the cumulative assistant response draft. Embedding hosts
+may intentionally withhold it when an incomplete response could expose source
+material or conflict with a product-owned terminal result. They can still show
+`reasoning.summary` and structured tool activity independently.
 
 `ConversationRunStreamItem<Result>` is the ordered run envelope:
 
@@ -180,6 +191,26 @@ Ordered assistant activity:
     "text": "I am checking the session loader now...",
     "done": false,
     "timestamp": "2026-07-11T01:20:01.000Z"
+  }
+}
+```
+
+Ordered reasoning-summary activity:
+
+```json
+{
+  "kind": "activity",
+  "runId": "run-123",
+  "sequence": 3,
+  "timestamp": "2026-07-11T01:20:02.000Z",
+  "activity": {
+    "source": "agent-loop",
+    "type": "reasoning.summary",
+    "runId": "run-123",
+    "step": 1,
+    "text": "Inspecting the session loader before choosing a change.",
+    "done": false,
+    "timestamp": "2026-07-11T01:20:02.000Z"
   }
 }
 ```

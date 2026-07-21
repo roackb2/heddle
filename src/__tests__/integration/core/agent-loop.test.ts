@@ -289,7 +289,7 @@ Use browser_snapshot before making claims.
     expect(systemMessage).not.toContain('Use browser_snapshot before making claims.');
   });
 
-  it('emits streamed reasoning summaries as assistant progress events', async () => {
+  it('emits provider reasoning summaries through a distinct cumulative stream', async () => {
     const events: AgentLoopEvent[] = [];
     const fakeLlm: LlmAdapter = {
       info: {
@@ -319,12 +319,18 @@ Use browser_snapshot before making claims.
       onEvent: (event) => events.push(event),
     });
 
-    expect(events).toContainEqual(expect.objectContaining({
-      type: 'assistant.stream',
+    const summaries = events.filter((event) => event.type === 'reasoning.summary');
+    expect(summaries).toHaveLength(2);
+    expect(summaries[0]).toMatchObject({
       step: 1,
-      text: 'Thinking: Inspecting the request before choosing tools.',
+      text: '**Inspecting the request**',
       done: false,
-    }));
+    });
+    expect(summaries[1]).toMatchObject({
+      step: 1,
+      text: '**Inspecting the request** before choosing tools.',
+      done: true,
+    });
   });
 
   it('does not treat the workspace state directory as the OAuth credential store', async () => {

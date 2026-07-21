@@ -151,10 +151,14 @@ export class AgentModelTurnService {
       if (streamState.content || !AgentModelTurnService.shouldEmitStreamUpdate(streamState, Date.now())) {
         return;
       }
+      const text = streamState.reasoningSummary;
+      if (!text.trim()) {
+        return;
+      }
       context.live.activity({
-        type: HeddleEventType.assistantStream,
+        type: HeddleEventType.reasoningSummary,
         step: context.state.step,
-        text: AgentModelTurnService.formatReasoningSummary(streamState.reasoningSummary),
+        text,
         done: false,
       });
       return;
@@ -163,12 +167,16 @@ export class AgentModelTurnService {
     if (event.type === 'reasoning_summary.done') {
       streamState.reasoningSummary = event.text;
       if (!streamState.content) {
+        const text = streamState.reasoningSummary;
+        if (!text.trim()) {
+          return;
+        }
         streamState.lastStreamEmitAt = Date.now();
         context.live.activity({
-          type: HeddleEventType.assistantStream,
+          type: HeddleEventType.reasoningSummary,
           step: context.state.step,
-          text: AgentModelTurnService.formatReasoningSummary(streamState.reasoningSummary),
-          done: false,
+          text,
+          done: true,
         });
       }
     }
@@ -207,17 +215,5 @@ export class AgentModelTurnService {
       reasoningTokens: reasoningTokens || undefined,
       requests: requests || undefined,
     };
-  }
-
-  private static formatReasoningSummary(text: string): string {
-    const trimmed = AgentModelTurnService.stripReasoningSummaryMarkdown(text.trim());
-    return trimmed ? `Thinking: ${trimmed}` : 'Thinking...';
-  }
-
-  private static stripReasoningSummaryMarkdown(text: string): string {
-    return text
-      .replace(/\*\*([^*]+)\*\*/g, '$1')
-      .replace(/__([^_]+)__/g, '$1')
-      .replace(/([.!?])([A-Z][A-Za-z ]{2,}:?)/g, '$1 $2');
   }
 }

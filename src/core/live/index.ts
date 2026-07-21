@@ -18,6 +18,7 @@ export type {
   ConversationLoopFinishedActivity,
   ConversationLoopStartedActivity,
   ConversationPlanUpdatedActivity,
+  ConversationReasoningSummaryActivity,
   ConversationToolApprovalRequestedActivity,
   ConversationToolApprovalResolvedActivity,
   ConversationToolFallbackActivity,

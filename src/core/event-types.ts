@@ -8,6 +8,7 @@ export const HeddleEventType = {
   runStarted: 'run.started',
   assistantTurn: 'assistant.turn',
   assistantStream: 'assistant.stream',
+  reasoningSummary: 'reasoning.summary',
   modelRetry: 'model.retry',
   hostWarning: 'host.warning',
   autonomyDecision: 'autonomy.decision',

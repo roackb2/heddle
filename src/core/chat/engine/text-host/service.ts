@@ -27,6 +27,7 @@ export class ConversationTextHostService {
   private readonly compactionMode: Exclude<ConversationTextHostMode, 'verbose'>;
   private readonly resultMode: Exclude<ConversationTextHostMode, 'verbose'>;
   private streamedAssistantText = '';
+  private streamedReasoningSummaryText = '';
 
   constructor(options: ConversationTextHostOptions = {}) {
     this.writer = ConversationTextHostService.normalizeWriter(options.output);
@@ -72,7 +73,11 @@ export class ConversationTextHostService {
   }
 
   formatActivity(activity: ConversationActivity): string | undefined {
-    if (this.activityMode === 'off' || activity.type === 'assistant.stream') {
+    if (
+      this.activityMode === 'off'
+      || activity.type === 'assistant.stream'
+      || activity.type === 'reasoning.summary'
+    ) {
       return undefined;
     }
 
@@ -154,6 +159,19 @@ export class ConversationTextHostService {
         this.writer.write(nextText);
       }
       this.streamedAssistantText = activity.text;
+      return;
+    }
+
+    if (activity.type === 'reasoning.summary') {
+      const nextText = activity.text.slice(this.streamedReasoningSummaryText.length);
+      if (nextText) {
+        this.writer.write(`${this.streamedReasoningSummaryText ? '' : 'Thinking: '}${nextText}`);
+      }
+      this.streamedReasoningSummaryText = activity.text;
+      if (activity.done) {
+        this.writer.write('\n');
+        this.streamedReasoningSummaryText = '';
+      }
       return;
     }
 

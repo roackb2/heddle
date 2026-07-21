@@ -91,6 +91,17 @@ export class ControlPlaneLiveEventReducer {
           done: streamActivity.done,
         });
       },
+      onReasoningSummary: (summaryActivity, liveStatus) => {
+        this.options.assistantStreamBuffer.push({
+          workspaceId,
+          sessionId,
+          text: `Thinking: ${summaryActivity.text}`,
+          done: false,
+        });
+        if (liveStatus !== undefined) {
+          this.options.state.patch({ liveStatus });
+        }
+      },
       onRunStarted: (runActivity, liveStatus) => {
         this.options.state.patch({
           running: true,

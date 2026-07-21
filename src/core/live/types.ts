@@ -52,6 +52,20 @@ export type ConversationAssistantStreamActivity = {
   timestamp: string;
 };
 
+/**
+ * Provider-generated reasoning summary intended for user-visible progress.
+ * This is not hidden model chain-of-thought or assistant response draft text.
+ */
+export type ConversationReasoningSummaryActivity = {
+  source: 'agent-loop';
+  type: typeof HeddleEventType.reasoningSummary;
+  runId: string;
+  step: number;
+  text: string;
+  done: boolean;
+  timestamp: string;
+};
+
 export type ConversationToolApprovalRequestedActivity = {
   source: 'agent-loop';
   type: typeof HeddleEventType.toolApprovalRequested;
@@ -133,6 +147,7 @@ export type ConversationLoopFinishedActivity = {
 export type ConversationAgentLoopActivity =
   | ConversationLoopStartedActivity
   | ConversationAssistantStreamActivity
+  | ConversationReasoningSummaryActivity
   | ConversationToolApprovalRequestedActivity
   | ConversationToolApprovalResolvedActivity
   | ConversationToolFallbackActivity

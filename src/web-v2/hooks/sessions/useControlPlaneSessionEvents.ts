@@ -314,6 +314,16 @@ function applySessionActivity(activity: ControlPlaneSessionActivity, context: Se
         context.setLiveStatus(liveStatus);
       }
     },
+    onReasoningSummary: (summaryActivity, liveStatus) => {
+      context.updateSession((current) => (
+        ClientSharedSessionMessageService.upsertLiveAssistantMessage(
+          current,
+          `Thinking: ${summaryActivity.text}`,
+          false,
+        )
+      ));
+      context.setLiveStatus(liveStatus);
+    },
     onRunStarted: (_runActivity, liveStatus) => {
       context.setLiveStatus(liveStatus);
     },

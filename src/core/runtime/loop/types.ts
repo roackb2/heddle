@@ -12,6 +12,7 @@ import type {
   ConversationToolCallingActivity,
   ConversationToolCompletedActivity,
   ConversationPlanUpdatedActivity,
+  ConversationReasoningSummaryActivity,
 } from '@/core/live/index.js';
 import type { ChatMessage, LlmAdapter, LlmProvider, LlmUsage, ReasoningEffort } from '@/core/llm/types.js';
 import type { RunFailure, RunResult, StopReason, ToolCall, ToolDefinition, TraceEvent } from '@/core/types.js';
@@ -53,6 +54,7 @@ export type AgentLoopEvent =
       timestamp: string;
     }
   | ConversationAssistantStreamActivity
+  | ConversationReasoningSummaryActivity
   | ConversationToolApprovalRequestedActivity
   | ConversationToolApprovalResolvedActivity
   | ConversationToolFallbackActivity
