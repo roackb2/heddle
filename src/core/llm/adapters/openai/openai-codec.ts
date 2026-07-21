@@ -23,6 +23,27 @@ const OPENAI_ACCOUNT_COMMENTARY_INSTRUCTIONS = `During substantial multi-step wo
  * OpenAI Responses API payloads/events.
  */
 export class OpenAiCodec {
+  /**
+   * Reads the Responses/Codex assistant-message discriminator.
+   *
+   * A completed assistant output item has this relevant shape:
+   *
+   * ```ts
+   * {
+   *   id: 'msg_123',
+   *   type: 'message',
+   *   role: 'assistant',
+   *   phase: 'commentary' | 'final_answer',
+   *   content: [{ type: 'output_text', text: '...' }],
+   * }
+   * ```
+   *
+   * `phase` is the classifier: `phase: 'commentary'` means user-facing work
+   * narration, not hidden chain-of-thought and not the final answer. The text
+   * still lives in `content[].output_text.text`. Standard Responses API output
+   * may omit `phase`; preserving `undefined` lets callers use the normal final
+   * output fallback without guessing from message wording or ordering.
+   */
   static readAssistantMessageMetadata(item: unknown): OpenAiAssistantMessageMetadata | undefined {
     if (!item || typeof item !== 'object' || Array.isArray(item)) {
       return undefined;

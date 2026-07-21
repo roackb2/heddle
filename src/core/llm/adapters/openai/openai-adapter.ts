@@ -99,6 +99,11 @@ export class OpenAiAdapter implements LlmAdapter {
     }, { signal });
 
     let streamedContent = '';
+    // Codex sends the assistant message classifier on
+    // `response.output_item.{added,done}` as `event.item.phase`, while token
+    // text arrives separately on `response.output_text.{delta,done}`. The
+    // shared message/item ID is the join key. Do not classify output text as
+    // commentary from its wording, event order, or content type.
     const assistantMessagePhases = new Map<string, 'commentary' | 'final_answer'>();
     const streamedToolCalls = new Map<string, { id: string; tool: string; argumentsText: string }>();
     let completedResponse: OpenAiResponse | undefined;

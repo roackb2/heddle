@@ -33,8 +33,8 @@ The ownership split is:
 
 `ConversationActivity` describes user-facing progress. Current sources include:
 
-- `agent-loop`: `loop.started`, `reasoning.summary`, `assistant.stream`, tool
-  activity, approvals, plans, and `loop.finished`;
+- `agent-loop`: `loop.started`, `assistant.commentary`, `reasoning.summary`,
+  `assistant.stream`, tool activity, approvals, plans, and `loop.finished`;
 - `compaction`: compaction progress and outcomes;
 - `direct-shell`: direct-shell lifecycle and results.
 
@@ -53,6 +53,33 @@ includes encrypted reasoning content so the Codex transport can emit summary
 events. The provider may still omit a summary for a trivial turn; hosts should
 keep their generic in-progress state until another activity or the terminal
 result arrives.
+
+`assistant.commentary` is assistant-authored, user-facing narration of ongoing
+work before or between tool calls. It is not inferred from message wording and
+is not hidden model chain-of-thought. For OpenAI Codex-account responses, the
+source output message is identified by its `phase` field:
+
+```json
+{
+  "id": "msg_123",
+  "type": "message",
+  "role": "assistant",
+  "phase": "commentary",
+  "content": [
+    { "type": "output_text", "text": "I found the loader and am checking its callers." }
+  ]
+}
+```
+
+The discriminator is `phase: "commentary"`; `output_text` by itself does not
+mean commentary. During streaming, Codex sends the message ID and phase on
+`response.output_item.added` or `response.output_item.done`, then sends text on
+`response.output_text.delta` and `response.output_text.done` with a matching
+`item_id`. The OpenAI adapter joins those events by ID and emits Heddle
+`assistant.commentary` activities. A message with `phase: "final_answer"` is
+the terminal-answer stream instead. Standard Responses API message output may
+omit `phase`, which Heddle treats as the normal final-output fallback rather
+than guessing a phase.
 
 `assistant.stream` is the cumulative assistant response draft. Embedding hosts
 may intentionally withhold it when an incomplete response could expose source
@@ -182,7 +209,7 @@ Run discovery:
 }
 ```
 
-Ordered assistant activity:
+Ordered terminal-answer stream activity:
 
 ```json
 {
@@ -195,9 +222,30 @@ Ordered assistant activity:
     "type": "assistant.stream",
     "runId": "run-123",
     "step": 1,
-    "text": "I am checking the session loader now...",
+    "text": "I updated the session loader and verified its callers.",
     "done": false,
     "timestamp": "2026-07-11T01:20:01.000Z"
+  }
+}
+```
+
+Ordered assistant-commentary activity:
+
+```json
+{
+  "kind": "activity",
+  "runId": "run-123",
+  "sequence": 3,
+  "timestamp": "2026-07-11T01:20:02.000Z",
+  "activity": {
+    "source": "agent-loop",
+    "type": "assistant.commentary",
+    "runId": "run-123",
+    "step": 1,
+    "messageId": "msg_123",
+    "text": "I found the loader and am checking its callers.",
+    "done": false,
+    "timestamp": "2026-07-11T01:20:02.000Z"
   }
 }
 ```
@@ -208,8 +256,8 @@ Ordered reasoning-summary activity:
 {
   "kind": "activity",
   "runId": "run-123",
-  "sequence": 3,
-  "timestamp": "2026-07-11T01:20:02.000Z",
+  "sequence": 4,
+  "timestamp": "2026-07-11T01:20:03.000Z",
   "activity": {
     "source": "agent-loop",
     "type": "reasoning.summary",
@@ -217,7 +265,7 @@ Ordered reasoning-summary activity:
     "step": 1,
     "text": "Inspecting the session loader before choosing a change.",
     "done": false,
-    "timestamp": "2026-07-11T01:20:02.000Z"
+    "timestamp": "2026-07-11T01:20:03.000Z"
   }
 }
 ```

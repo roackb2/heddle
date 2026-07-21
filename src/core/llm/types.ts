@@ -11,6 +11,9 @@ import type {
 export type LlmStreamEvent =
   | { type: 'content.delta'; delta: string }
   | { type: 'content.done'; content: string }
+  // User-facing assistant work narration. Provider adapters must derive this
+  // from an explicit provider discriminator (OpenAI/Codex uses message
+  // `phase: 'commentary'`), never from the text itself.
   | { type: 'commentary.delta'; messageId: string; delta: string }
   | { type: 'commentary.done'; messageId: string; text: string }
   | { type: 'reasoning_summary.delta'; delta: string }
