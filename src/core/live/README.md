@@ -14,6 +14,21 @@ tool progress, run lifecycle, or compaction progress. Add structured fields to
 the activity type that owns the behavior, then let interfaces decide how to
 present those fields.
 
+## Assistant Text Activities
+
+Assistant text has three separate user-visible meanings:
+
+- `assistant.commentary` is assistant-authored progress narration produced
+  before or between tool calls. It may be streamed and is safe to show, but it
+  is not the final answer.
+- `reasoning.summary` is a provider-generated summary of model reasoning. It is
+  not hidden chain-of-thought and may be as short as a heading.
+- `assistant.stream` is the draft and completion stream for the terminal answer.
+
+Core emits raw text for all three activities. Presentation layers own labels
+such as "Working" or "Thinking" and must not relabel final-answer drafts as
+reasoning.
+
 ## Plan Activity
 
 Agent planning uses the same live activity lane. The agent domain owns the

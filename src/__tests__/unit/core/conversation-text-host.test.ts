@@ -27,6 +27,26 @@ describe('createConversationTextHost', () => {
     });
     textHost.host.events?.onActivity?.({
       source: 'agent-loop',
+      type: 'assistant.commentary',
+      runId: 'run-1',
+      step: 1,
+      messageId: 'commentary-1',
+      text: 'I’m checking',
+      done: false,
+      timestamp: '2026-07-02T00:00:00.600Z',
+    });
+    textHost.host.events?.onActivity?.({
+      source: 'agent-loop',
+      type: 'assistant.commentary',
+      runId: 'run-1',
+      step: 1,
+      messageId: 'commentary-1',
+      text: 'I’m checking the files now.',
+      done: true,
+      timestamp: '2026-07-02T00:00:00.700Z',
+    });
+    textHost.host.events?.onActivity?.({
+      source: 'agent-loop',
       type: 'assistant.stream',
       runId: 'run-1',
       step: 1,
@@ -58,6 +78,9 @@ describe('createConversationTextHost', () => {
     expect(write.mock.calls.map((call) => call[0])).toEqual([
       'Thinking: Inspecting',
       ' the request.',
+      '\n',
+      'Working: I’m checking',
+      ' the files now.',
       '\n',
       'Hello',
       ' world',

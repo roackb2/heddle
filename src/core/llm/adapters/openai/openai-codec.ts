@@ -10,11 +10,41 @@ import { ModelPolicyService } from '@/core/llm/models/index.js';
 import type { ChatMessage, LlmUsage, ReasoningEffort } from '@/core/llm/types.js';
 import type { AssistantDiagnostics, ToolCall, ToolDefinition } from '@/core/types.js';
 
+export type OpenAiAssistantMessagePhase = 'commentary' | 'final_answer';
+export type OpenAiAssistantMessageMetadata = {
+  messageId: string;
+  phase?: OpenAiAssistantMessagePhase;
+};
+
+const OPENAI_ACCOUNT_COMMENTARY_INSTRUCTIONS = `During substantial multi-step work, keep the user informed with brief, concrete commentary messages before tool calls and between major phases. Describe progress and the next action without revealing hidden chain-of-thought. Skip commentary for simple one-step answers.`;
+
 /**
  * Provider-owned codec for translating between Heddle LLM port types and the
  * OpenAI Responses API payloads/events.
  */
 export class OpenAiCodec {
+  static readAssistantMessageMetadata(item: unknown): OpenAiAssistantMessageMetadata | undefined {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return undefined;
+    }
+
+    const candidate = item as { id?: unknown; type?: unknown; role?: unknown; phase?: unknown };
+    if (
+      candidate.type !== 'message'
+      || candidate.role !== 'assistant'
+      || typeof candidate.id !== 'string'
+    ) {
+      return undefined;
+    }
+
+    return {
+      messageId: candidate.id,
+      ...(candidate.phase === 'commentary' || candidate.phase === 'final_answer'
+        ? { phase: candidate.phase }
+        : {}),
+    };
+  }
+
   static parseStreamedToolCalls(
     streamedToolCalls: Map<string, { id: string; tool: string; argumentsText: string }>,
   ): ToolCall[] {
@@ -49,29 +79,30 @@ export class OpenAiCodec {
   }
 
   static extractAssistantContent(response: OpenAiResponse, preferToolCalls: boolean): string | undefined {
-    const text = response.output_text?.trim();
-    if (text) {
-      return text;
-    }
+    const output = Array.isArray(response.output) ? response.output : [];
+    const messages = output.flatMap((item) => {
+      const metadata = OpenAiCodec.readAssistantMessageMetadata(item);
+      if (!metadata || item.type !== 'message') {
+        return [];
+      }
+
+      const text = (Array.isArray(item.content) ? item.content : [])
+        .flatMap((part) => part.type === 'output_text' && part.text.trim() ? [part.text.trim()] : [])
+        .join('\n\n');
+      return text ? [{ ...metadata, text }] : [];
+    });
 
     if (preferToolCalls) {
-      return undefined;
+      const progressText = messages
+        .filter((message) => message.phase !== 'final_answer')
+        .map((message) => message.text)
+        .join('\n\n');
+      return progressText || undefined;
     }
 
-    const output = Array.isArray(response.output) ? response.output : [];
-    for (const item of output) {
-      if (item.type !== 'message') {
-        continue;
-      }
-
-      const content = Array.isArray(item.content) ? item.content : [];
-      const segment = content.find((part) => part.type === 'output_text');
-      if (segment?.text?.trim()) {
-        return segment.text.trim();
-      }
-    }
-
-    return undefined;
+    const finalText = messages.find((message) => message.phase === 'final_answer')?.text
+      ?? messages.find((message) => message.phase === undefined)?.text;
+    return finalText ?? (response.output_text?.trim() || undefined);
   }
 
   static extractAssistantDiagnostics(
@@ -135,9 +166,11 @@ export class OpenAiCodec {
   } {
     const systemMessages = options.oauthMode ? messages.filter((message): message is Extract<ChatMessage, { role: 'system' }> => message.role === 'system') : [];
     const inputMessages = options.oauthMode ? messages.filter((message) => message.role !== 'system') : messages;
-    const instructions =
-      options.oauthMode ?
-        systemMessages.map((message) => message.content.trim()).filter(Boolean).join('\n\n')
+    const instructions = options.oauthMode
+      ? [
+          ...systemMessages.map((message) => message.content.trim()).filter(Boolean),
+          OPENAI_ACCOUNT_COMMENTARY_INSTRUCTIONS,
+        ].join('\n\n')
       : undefined;
     const reasoningEffort = OpenAiCodec.resolveRequestReasoningEffort({
       model: options.model,

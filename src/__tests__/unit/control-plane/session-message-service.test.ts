@@ -65,6 +65,45 @@ describe('ClientSharedSessionMessageService', () => {
     ]);
   });
 
+  it('keeps commentary messages distinct until the final answer starts', () => {
+    const current = sessionWithMessages([
+      { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
+      { id: 'live-reasoning', role: 'assistant', text: 'Thinking: Inspecting files' },
+    ]);
+    const withCommentary = ClientSharedSessionMessageService.upsertLiveCommentaryMessage(
+      current,
+      'commentary-1',
+      'I’m checking the relevant files now.',
+      true,
+    );
+
+    expect(withCommentary?.messages).toEqual([
+      { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
+      {
+        id: 'live-commentary:commentary-1',
+        role: 'assistant',
+        text: 'I’m checking the relevant files now.',
+        isStreaming: false,
+        isPending: true,
+      },
+    ]);
+
+    expect(ClientSharedSessionMessageService.upsertLiveAssistantMessage(
+      withCommentary,
+      'Final answer.',
+      true,
+    )?.messages).toEqual([
+      { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },
+      {
+        id: 'live-assistant',
+        role: 'assistant',
+        text: 'Final answer.',
+        isPending: false,
+        isStreaming: false,
+      },
+    ]);
+  });
+
   it('does not preserve other transient message ids during stale snapshot merges', () => {
     const current = sessionWithMessages([
       { id: 'persisted-assistant', role: 'assistant', text: 'Previous answer.' },

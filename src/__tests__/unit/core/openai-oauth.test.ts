@@ -344,7 +344,8 @@ describe('OpenAI OAuth helpers', () => {
     expect(body.store).toBe(false);
     expect(body.reasoning?.summary).toBe('detailed');
     expect(body.include).toEqual(['reasoning.encrypted_content']);
-    expect(body.instructions).toBe('You are Heddle. Reply with OK only.');
+    expect(body.instructions).toContain('You are Heddle. Reply with OK only.');
+    expect(body.instructions).toContain('brief, concrete commentary messages');
     expect(body.input).toEqual([
       { type: 'message', role: 'user', content: 'hello' },
     ]);
@@ -525,6 +526,72 @@ describe('OpenAI OAuth helpers', () => {
       { type: 'reasoning_summary.delta', delta: 'Inspecting ' },
       { type: 'reasoning_summary.delta', delta: 'the repo.' },
       { type: 'reasoning_summary.done', text: 'Inspecting the repo.' },
+      { type: 'content.done', content: 'Done.' },
+    ]);
+    expect(result.content).toBe('Done.');
+  });
+
+  it('separates assistant commentary from the final-answer stream by message phase', async () => {
+    const adapter = createOpenAiTestAdapter({
+      model: 'gpt-5.4',
+      credential: {
+        type: 'oauth',
+        provider: 'openai',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresAt: Date.now() + 120_000,
+        accountId: 'account-123',
+        createdAt: '2026-04-27T00:00:00.000Z',
+        updatedAt: '2026-04-27T00:00:00.000Z',
+      },
+      fetchImpl: (async () => {
+        const body = [
+          'event: response.created',
+          'data: {"type":"response.created","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"in_progress","model":"gpt-5.4","output":[]}}',
+          '',
+          'event: response.output_item.added',
+          'data: {"type":"response.output_item.added","item":{"id":"msg_commentary","type":"message","status":"in_progress","role":"assistant","content":[{"type":"output_text","text":"","annotations":[]}],"phase":"commentary"},"output_index":0,"sequence_number":2}',
+          '',
+          'event: response.output_text.delta',
+          'data: {"type":"response.output_text.delta","delta":"I’m checking ","content_index":0,"item_id":"msg_commentary","output_index":0,"sequence_number":3}',
+          '',
+          'event: response.output_text.delta',
+          'data: {"type":"response.output_text.delta","delta":"the repository now.","content_index":0,"item_id":"msg_commentary","output_index":0,"sequence_number":4}',
+          '',
+          'event: response.output_text.done',
+          'data: {"type":"response.output_text.done","text":"I’m checking the repository now.","content_index":0,"item_id":"msg_commentary","output_index":0,"sequence_number":5}',
+          '',
+          'event: response.output_item.added',
+          'data: {"type":"response.output_item.added","item":{"id":"msg_final","type":"message","status":"in_progress","role":"assistant","content":[{"type":"output_text","text":"","annotations":[]}],"phase":"final_answer"},"output_index":1,"sequence_number":6}',
+          '',
+          'event: response.output_text.delta',
+          'data: {"type":"response.output_text.delta","delta":"Done.","content_index":0,"item_id":"msg_final","output_index":1,"sequence_number":7}',
+          '',
+          'event: response.output_text.done',
+          'data: {"type":"response.output_text.done","text":"Done.","content_index":0,"item_id":"msg_final","output_index":1,"sequence_number":8}',
+          '',
+          'event: response.completed',
+          'data: {"type":"response.completed","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"completed","completed_at":1777301835,"model":"gpt-5.4","output_text":"I’m checking the repository now.\nDone.","output":[{"id":"msg_commentary","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"I’m checking the repository now.","annotations":[]}],"phase":"commentary"},{"id":"msg_final","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Done.","annotations":[]}],"phase":"final_answer"}],"usage":{"input_tokens":10,"input_tokens_details":{"cached_tokens":0},"output_tokens":10,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":20}}}',
+          '',
+        ].join('\n');
+
+        return new Response(body, {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        });
+      }) as typeof fetch,
+    });
+    const streamEvents: unknown[] = [];
+
+    const result = await adapter.chat([{ role: 'user', content: 'Inspect the repo.' }], [], undefined, (event) => {
+      streamEvents.push(event);
+    });
+
+    expect(streamEvents).toEqual([
+      { type: 'commentary.delta', messageId: 'msg_commentary', delta: 'I’m checking ' },
+      { type: 'commentary.delta', messageId: 'msg_commentary', delta: 'the repository now.' },
+      { type: 'commentary.done', messageId: 'msg_commentary', text: 'I’m checking the repository now.' },
+      { type: 'content.delta', delta: 'Done.' },
       { type: 'content.done', content: 'Done.' },
     ]);
     expect(result.content).toBe('Done.');

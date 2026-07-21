@@ -144,6 +144,42 @@ describe('ClientSharedSessionActivityService', () => {
     });
   });
 
+  it('delivers assistant commentary separately from reasoning and final text', () => {
+    let commentary: {
+      messageId: string;
+      text: string;
+      done: boolean;
+      liveStatus: string | undefined;
+    } | undefined;
+
+    ClientSharedSessionActivityService.applyActivity({
+      type: 'assistant.commentary',
+      runId: 'run-1',
+      source: 'agent-loop',
+      step: 1,
+      messageId: 'commentary-1',
+      text: 'I’m checking the repository before making changes.',
+      done: false,
+      timestamp: '2026-06-03T00:00:00.000Z',
+    } as ControlPlaneSessionActivity, {
+      onAssistantCommentary: (activity, liveStatus) => {
+        commentary = {
+          messageId: activity.messageId,
+          text: activity.text,
+          done: activity.done,
+          liveStatus,
+        };
+      },
+    });
+
+    expect(commentary).toEqual({
+      messageId: 'commentary-1',
+      text: 'I’m checking the repository before making changes.',
+      done: false,
+      liveStatus: 'Working...',
+    });
+  });
+
   it('projects recent edit diffs from successful edit_file completions', () => {
     const diffs: string[] = [];
 

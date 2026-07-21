@@ -53,6 +53,21 @@ export type ConversationAssistantStreamActivity = {
 };
 
 /**
+ * Assistant-authored, user-facing progress narration emitted during a turn.
+ * This is distinct from provider reasoning summaries and the final response.
+ */
+export type ConversationAssistantCommentaryActivity = {
+  source: 'agent-loop';
+  type: typeof HeddleEventType.assistantCommentary;
+  runId: string;
+  step: number;
+  messageId: string;
+  text: string;
+  done: boolean;
+  timestamp: string;
+};
+
+/**
  * Provider-generated reasoning summary intended for user-visible progress.
  * This is not hidden model chain-of-thought or assistant response draft text.
  */
@@ -147,6 +162,7 @@ export type ConversationLoopFinishedActivity = {
 export type ConversationAgentLoopActivity =
   | ConversationLoopStartedActivity
   | ConversationAssistantStreamActivity
+  | ConversationAssistantCommentaryActivity
   | ConversationReasoningSummaryActivity
   | ConversationToolApprovalRequestedActivity
   | ConversationToolApprovalResolvedActivity

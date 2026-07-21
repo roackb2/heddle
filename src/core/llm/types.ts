@@ -11,6 +11,8 @@ import type {
 export type LlmStreamEvent =
   | { type: 'content.delta'; delta: string }
   | { type: 'content.done'; content: string }
+  | { type: 'commentary.delta'; messageId: string; delta: string }
+  | { type: 'commentary.done'; messageId: string; text: string }
   | { type: 'reasoning_summary.delta'; delta: string }
   | { type: 'reasoning_summary.done'; text: string };
 

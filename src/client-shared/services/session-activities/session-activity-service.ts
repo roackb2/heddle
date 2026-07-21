@@ -57,6 +57,7 @@ type SessionActivityEffectHandlers = {
 
 export type ClientSharedSessionActivityEffects = {
   onAssistantStream?: (activity: ActivityOf<'assistant.stream'>, liveStatus: string | undefined) => void;
+  onAssistantCommentary?: (activity: ActivityOf<'assistant.commentary'>, liveStatus: string | undefined) => void;
   onReasoningSummary?: (activity: ActivityOf<'reasoning.summary'>, liveStatus: string | undefined) => void;
   onRunStarted?: (activity: ActivityOf<'loop.started'> | ActivityOf<'direct_shell.started'>, liveStatus: string | undefined) => void;
   onRunFinished?: (activity: ActivityOf<'loop.finished'> | ActivityOf<'direct_shell.completed'>, liveStatus: string | undefined) => void;
@@ -87,6 +88,9 @@ export class ClientSharedSessionActivityService {
     'assistant.stream': (activity, effects) => {
       effects.onAssistantStream?.(activity, activity.done ? undefined : 'Receiving assistant response...');
       effects.onCurrentActivityChanged?.(undefined);
+    },
+    'assistant.commentary': (activity, effects) => {
+      effects.onAssistantCommentary?.(activity, 'Working...');
     },
     'reasoning.summary': (activity, effects) => {
       effects.onReasoningSummary?.(activity, 'Thinking...');

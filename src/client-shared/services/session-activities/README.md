@@ -9,6 +9,8 @@ after they receive API-provided live events.
 - Mapping each API activity type to shared client effects.
 - Shared live status copy for activity progress.
 - Shared derived labels for tool-related activities.
+- Shared effects for final-answer, commentary, and reasoning-summary streams;
+  each remains a distinct activity so clients can present them independently.
 - Active plan lifetime at the client edge: `plan.updated` sets the visible plan,
   `loop.started` and `loop.finished` clear it.
 
