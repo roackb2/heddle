@@ -99,17 +99,41 @@ export class OpenAiAdapter implements LlmAdapter {
     }, { signal });
 
     let streamedContent = '';
+    // Codex sends the assistant message classifier on
+    // `response.output_item.{added,done}` as `event.item.phase`, while token
+    // text arrives separately on `response.output_text.{delta,done}`. The
+    // shared message/item ID is the join key. Do not classify output text as
+    // commentary from its wording, event order, or content type.
+    const assistantMessagePhases = new Map<string, 'commentary' | 'final_answer'>();
     const streamedToolCalls = new Map<string, { id: string; tool: string; argumentsText: string }>();
     let completedResponse: OpenAiResponse | undefined;
     try {
       for await (const event of stream as AsyncIterable<ResponseStreamEvent>) {
         if (event.type === 'response.output_text.delta' && event.delta) {
+          if (assistantMessagePhases.get(event.item_id) === 'commentary') {
+            onStreamEvent?.({
+              type: 'commentary.delta',
+              messageId: event.item_id,
+              delta: event.delta,
+            });
+            continue;
+          }
+
           streamedContent += event.delta;
           onStreamEvent?.({ type: 'content.delta', delta: event.delta });
           continue;
         }
 
         if (event.type === 'response.output_text.done') {
+          if (assistantMessagePhases.get(event.item_id) === 'commentary') {
+            onStreamEvent?.({
+              type: 'commentary.done',
+              messageId: event.item_id,
+              text: event.text,
+            });
+            continue;
+          }
+
           streamedContent = event.text;
           onStreamEvent?.({ type: 'content.done', content: event.text });
           continue;
@@ -140,6 +164,10 @@ export class OpenAiAdapter implements LlmAdapter {
 
         if (event.type === 'response.output_item.added' || event.type === 'response.output_item.done') {
           const item = event.item;
+          const message = OpenAiCodec.readAssistantMessageMetadata(item);
+          if (message?.phase) {
+            assistantMessagePhases.set(message.messageId, message.phase);
+          }
           if (
             item.type === 'function_call'
             && typeof item.id === 'string'

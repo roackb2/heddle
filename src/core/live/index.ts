@@ -6,6 +6,7 @@ export type {
   ConversationActivityDerived,
   ConversationActivityHandlerMap,
   ConversationActivityOf,
+  ConversationAssistantCommentaryActivity,
   ConversationAssistantStreamActivity,
   ConversationCompactionActivity,
   ConversationCompactionFailedActivity,

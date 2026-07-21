@@ -440,6 +440,52 @@ describe('AgentRunService.run', () => {
     });
   });
 
+  it('delivers assistant commentary as a distinct user-facing activity', async () => {
+    const events: AgentRunEvent[] = [];
+    const fakeLlm: LlmAdapter = {
+      async chat(_messages, _tools, _signal, onStreamEvent): Promise<LlmResponse> {
+        onStreamEvent?.({
+          type: 'commentary.delta',
+          messageId: 'commentary-1',
+          delta: 'I’m checking the repository ',
+        });
+        onStreamEvent?.({
+          type: 'commentary.done',
+          messageId: 'commentary-1',
+          text: 'I’m checking the repository before answering.',
+        });
+        onStreamEvent?.({ type: 'content.done', content: 'Done.' });
+        return { content: 'Done.' };
+      },
+    };
+
+    await AgentRunService.run({
+      goal: 'Inspect this repo.',
+      llm: fakeLlm,
+      tools: [],
+      maxSteps: 1,
+      logger: silentLogger,
+      onEvent: (event) => events.push(event),
+    });
+
+    expect(events.filter((event) => event.type === 'assistant.commentary')).toEqual([
+      expect.objectContaining({
+        type: 'assistant.commentary',
+        step: 1,
+        messageId: 'commentary-1',
+        text: 'I’m checking the repository ',
+        done: false,
+      }),
+      expect.objectContaining({
+        type: 'assistant.commentary',
+        step: 1,
+        messageId: 'commentary-1',
+        text: 'I’m checking the repository before answering.',
+        done: true,
+      }),
+    ]);
+  });
+
   it('allows one repeated identical tool call, then blocks excessive repetition', async () => {
     const seenMessages: ChatMessage[][] = [];
     const fakeLlm: LlmAdapter = {

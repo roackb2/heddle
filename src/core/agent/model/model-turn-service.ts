@@ -72,6 +72,7 @@ export class AgentModelTurnService {
     const { context } = args;
     const streamState = {
       content: '',
+      commentary: new Map<string, { text: string; lastStreamEmitAt: number }>(),
       reasoningSummary: '',
       lastStreamEmitAt: 0,
     };
@@ -121,6 +122,7 @@ export class AgentModelTurnService {
     event: LlmStreamEvent;
     streamState: {
       content: string;
+      commentary: Map<string, { text: string; lastStreamEmitAt: number }>;
       reasoningSummary: string;
       lastStreamEmitAt: number;
     };
@@ -143,6 +145,47 @@ export class AgentModelTurnService {
       streamState.content = event.content;
       streamState.lastStreamEmitAt = Date.now();
       context.live.activity({ type: HeddleEventType.assistantStream, step: context.state.step, text: streamState.content, done: true });
+      return;
+    }
+
+    if (event.type === 'commentary.delta') {
+      const commentary = streamState.commentary.get(event.messageId) ?? {
+        text: '',
+        lastStreamEmitAt: 0,
+      };
+      commentary.text += event.delta;
+      streamState.commentary.set(event.messageId, commentary);
+      if (!AgentModelTurnService.shouldEmitStreamUpdate(commentary, Date.now())) {
+        return;
+      }
+      context.live.activity({
+        type: HeddleEventType.assistantCommentary,
+        step: context.state.step,
+        messageId: event.messageId,
+        text: commentary.text,
+        done: false,
+      });
+      return;
+    }
+
+    if (event.type === 'commentary.done') {
+      const commentary = streamState.commentary.get(event.messageId) ?? {
+        text: '',
+        lastStreamEmitAt: 0,
+      };
+      commentary.text = event.text;
+      commentary.lastStreamEmitAt = Date.now();
+      streamState.commentary.set(event.messageId, commentary);
+      if (!commentary.text.trim()) {
+        return;
+      }
+      context.live.activity({
+        type: HeddleEventType.assistantCommentary,
+        step: context.state.step,
+        messageId: event.messageId,
+        text: commentary.text,
+        done: true,
+      });
       return;
     }
 

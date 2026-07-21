@@ -3,6 +3,7 @@ import type { AutonomyEvaluation } from '@/core/approvals/autonomy/index.js';
 import type { ToolApprovalDecision, ToolApprovalPolicy } from '@/core/approvals/types.js';
 import { HeddleEventType } from '@/core/event-types.js';
 import type {
+  ConversationAssistantCommentaryActivity,
   ConversationAssistantStreamActivity,
   ConversationLoopFinishedActivity,
   ConversationLoopStartedActivity,
@@ -54,6 +55,7 @@ export type AgentLoopEvent =
       timestamp: string;
     }
   | ConversationAssistantStreamActivity
+  | ConversationAssistantCommentaryActivity
   | ConversationReasoningSummaryActivity
   | ConversationToolApprovalRequestedActivity
   | ConversationToolApprovalResolvedActivity

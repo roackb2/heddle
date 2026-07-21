@@ -314,12 +314,22 @@ function applySessionActivity(activity: ControlPlaneSessionActivity, context: Se
         context.setLiveStatus(liveStatus);
       }
     },
+    onAssistantCommentary: (commentaryActivity, liveStatus) => {
+      context.updateSession((current) => (
+        ClientSharedSessionMessageService.upsertLiveCommentaryMessage(
+          current,
+          commentaryActivity.messageId,
+          commentaryActivity.text,
+          commentaryActivity.done,
+        )
+      ));
+      context.setLiveStatus(liveStatus);
+    },
     onReasoningSummary: (summaryActivity, liveStatus) => {
       context.updateSession((current) => (
-        ClientSharedSessionMessageService.upsertLiveAssistantMessage(
+        ClientSharedSessionMessageService.upsertLiveReasoningMessage(
           current,
           `Thinking: ${summaryActivity.text}`,
-          false,
         )
       ));
       context.setLiveStatus(liveStatus);

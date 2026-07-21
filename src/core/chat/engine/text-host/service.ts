@@ -27,6 +27,7 @@ export class ConversationTextHostService {
   private readonly compactionMode: Exclude<ConversationTextHostMode, 'verbose'>;
   private readonly resultMode: Exclude<ConversationTextHostMode, 'verbose'>;
   private streamedAssistantText = '';
+  private readonly streamedCommentaryText = new Map<string, string>();
   private streamedReasoningSummaryText = '';
 
   constructor(options: ConversationTextHostOptions = {}) {
@@ -76,6 +77,7 @@ export class ConversationTextHostService {
     if (
       this.activityMode === 'off'
       || activity.type === 'assistant.stream'
+      || activity.type === 'assistant.commentary'
       || activity.type === 'reasoning.summary'
     ) {
       return undefined;
@@ -159,6 +161,20 @@ export class ConversationTextHostService {
         this.writer.write(nextText);
       }
       this.streamedAssistantText = activity.text;
+      return;
+    }
+
+    if (activity.type === 'assistant.commentary') {
+      const previousText = this.streamedCommentaryText.get(activity.messageId) ?? '';
+      const nextText = activity.text.slice(previousText.length);
+      if (nextText) {
+        this.writer.write(`${previousText ? '' : 'Working: '}${nextText}`);
+      }
+      this.streamedCommentaryText.set(activity.messageId, activity.text);
+      if (activity.done) {
+        this.writer.write('\n');
+        this.streamedCommentaryText.delete(activity.messageId);
+      }
       return;
     }
 
