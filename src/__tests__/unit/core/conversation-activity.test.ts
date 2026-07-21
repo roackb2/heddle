@@ -25,6 +25,24 @@ describe('conversation activity', () => {
     });
   });
 
+  it('keeps provider reasoning summaries separate from assistant response drafts', () => {
+    const activity: ConversationActivity = {
+      source: 'agent-loop',
+      type: 'reasoning.summary',
+      runId: 'run-1',
+      step: 1,
+      text: 'Inspecting the workspace before choosing a tool.',
+      done: false,
+      timestamp: '2026-05-02T00:00:00.000Z',
+    };
+
+    expect(activity).toMatchObject({
+      type: 'reasoning.summary',
+      text: 'Inspecting the workspace before choosing a tool.',
+      done: false,
+    });
+  });
+
   it('keeps compaction activity in the final conversation activity shape', () => {
     const running: ConversationActivity = {
       source: 'compaction',

@@ -185,6 +185,7 @@ describe('OpenAI OAuth helpers', () => {
     expect(requests[0]?.url).toBe(`${OPENAI_AUTH_ISSUER}/oauth/token`);
     expect(requests[1]?.url).toBe(OPENAI_CODEX_RESPONSES_ENDPOINT);
     expect(requests[1]?.headers.get('authorization')).toBe('Bearer new-access-token');
+    expect(requests[1]?.headers.get('originator')).toBe('heddle');
     expect(requests[1]?.headers.get('ChatGPT-Account-Id')).toBe('account-123');
   });
 
@@ -216,6 +217,7 @@ describe('OpenAI OAuth helpers', () => {
     expect(requests).toHaveLength(1);
     expect(requests[0]?.url).toBe(OPENAI_CODEX_RESPONSES_ENDPOINT);
     expect(requests[0]?.headers.get('authorization')).toBe('Bearer request-access-token');
+    expect(requests[0]?.headers.get('originator')).toBe('heddle');
     expect(requests[0]?.headers.get('ChatGPT-Account-Id')).toBe('account-123');
     expect(existsSync(storePath)).toBe(false);
   });
@@ -334,12 +336,14 @@ describe('OpenAI OAuth helpers', () => {
       model?: string;
       store?: boolean;
       reasoning?: { summary?: string };
+      include?: string[];
       instructions?: string;
       input?: Array<{ type?: string; role?: string; content?: string }>;
     };
     expect(body.model).toBe('gpt-5.4');
     expect(body.store).toBe(false);
-    expect(body.reasoning?.summary).toBe('auto');
+    expect(body.reasoning?.summary).toBe('detailed');
+    expect(body.include).toEqual(['reasoning.encrypted_content']);
     expect(body.instructions).toBe('You are Heddle. Reply with OK only.');
     expect(body.input).toEqual([
       { type: 'message', role: 'user', content: 'hello' },

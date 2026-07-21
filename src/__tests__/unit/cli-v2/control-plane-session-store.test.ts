@@ -762,6 +762,42 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('presents streamed reasoning summaries without changing the core event text', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    fixture.emitRunActivity({
+      source: 'agent-loop',
+      type: 'loop.started',
+      runId: 'run-1',
+      goal: 'Inspect the project.',
+      model: 'gpt-test',
+      provider: 'openai',
+      workspaceRoot: '/repo',
+      timestamp: new Date().toISOString(),
+    });
+    fixture.emitRunActivity({
+      source: 'agent-loop',
+      type: 'reasoning.summary',
+      runId: 'run-1',
+      step: 1,
+      text: 'Inspecting the project structure.',
+      done: false,
+      timestamp: new Date().toISOString(),
+    });
+
+    expect(store.getSnapshot().activeSession?.messages.at(-1)).toEqual({
+      id: 'live-assistant',
+      role: 'assistant',
+      text: 'Thinking: Inspecting the project structure.',
+      isStreaming: true,
+      isPending: true,
+    });
+    expect(store.getSnapshot().liveStatus).toBe('Thinking...');
+    store.dispose();
+  });
+
   it('coalesces rapid live assistant stream events to the newest text', async () => {
     vi.useFakeTimers();
     try {

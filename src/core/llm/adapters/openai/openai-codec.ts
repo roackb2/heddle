@@ -1,6 +1,7 @@
 import type {
   FunctionTool,
   Response as OpenAiResponse,
+  ResponseIncludable,
   ResponseInputItem,
   ResponseReasoningItem,
 } from 'openai/resources/responses/responses.js';
@@ -128,6 +129,7 @@ export class OpenAiCodec {
     input: ResponseInputItem[];
     tools?: FunctionTool[];
     store: boolean;
+    include?: ResponseIncludable[];
     reasoning?: { summary: 'auto' | 'detailed'; effort?: OpenAiReasoningEffort };
     instructions?: string;
   } {
@@ -155,9 +157,17 @@ export class OpenAiCodec {
       input: OpenAiCodec.toResponseInput(inputMessages),
       tools: options.tools.length > 0 ? options.tools.map((tool) => OpenAiCodec.toResponseTool(tool)) : undefined,
       store: false,
+      ...(options.oauthMode && includeReasoning ? {
+        // Codex account-mode summary events require the encrypted reasoning
+        // item to be requested alongside the user-visible summary.
+        include: ['reasoning.encrypted_content' as const],
+      } : {}),
       ...(includeReasoning ? {
         reasoning: {
-          summary: options.oauthMode ? 'auto' as const : 'detailed' as const,
+          // Request a summary explicitly for every supported credential path.
+          // `auto` may return no user-visible summary even when the model spent
+          // reasoning tokens, which leaves embedded hosts with no live progress.
+          summary: 'detailed' as const,
           ...(reasoningEffort ? { effort: reasoningEffort } : {}),
         },
       } : {}),
