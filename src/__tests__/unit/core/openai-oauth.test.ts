@@ -339,7 +339,7 @@ describe('OpenAI OAuth helpers', () => {
     };
     expect(body.model).toBe('gpt-5.4');
     expect(body.store).toBe(false);
-    expect(body.reasoning?.summary).toBe('auto');
+    expect(body.reasoning?.summary).toBe('detailed');
     expect(body.instructions).toBe('You are Heddle. Reply with OK only.');
     expect(body.input).toEqual([
       { type: 'message', role: 'user', content: 'hello' },

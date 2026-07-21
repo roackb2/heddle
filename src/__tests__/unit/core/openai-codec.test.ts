@@ -40,14 +40,14 @@ describe('OpenAiCodec.buildResponsesRequest reasoning parameter', () => {
     expect(request.reasoning).toEqual({ summary: 'detailed' });
   });
 
-  it('keeps summary auto in OAuth mode', () => {
+  it('requests a detailed summary in OAuth mode', () => {
     const request = OpenAiCodec.buildResponsesRequest(messages, {
       model: 'gpt-5.4',
       tools: [],
       oauthMode: true,
     });
 
-    expect(request.reasoning).toEqual(expect.objectContaining({ summary: 'auto' }));
+    expect(request.reasoning).toEqual(expect.objectContaining({ summary: 'detailed' }));
   });
 
   it('keeps summaries for Codex API-key models without a Heddle-managed effort', () => {
@@ -77,6 +77,6 @@ describe('OpenAiCodec.buildResponsesRequest reasoning parameter', () => {
       oauthMode: true,
     });
 
-    expect(request.reasoning).toEqual({ summary: 'auto' });
+    expect(request.reasoning).toEqual({ summary: 'detailed' });
   });
 });

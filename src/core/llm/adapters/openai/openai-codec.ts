@@ -157,7 +157,10 @@ export class OpenAiCodec {
       store: false,
       ...(includeReasoning ? {
         reasoning: {
-          summary: options.oauthMode ? 'auto' as const : 'detailed' as const,
+          // Request a summary explicitly for every supported credential path.
+          // `auto` may return no user-visible summary even when the model spent
+          // reasoning tokens, which leaves embedded hosts with no live progress.
+          summary: 'detailed' as const,
           ...(reasoningEffort ? { effort: reasoningEffort } : {}),
         },
       } : {}),
