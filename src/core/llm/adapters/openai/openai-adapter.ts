@@ -14,6 +14,7 @@ import type { ToolDefinition, ToolCall } from '@/core/types.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import {
   OPENAI_CODEX_RESPONSES_ENDPOINT,
+  OPENAI_OAUTH_ORIGINATOR,
   OpenAiOAuthService,
 } from '@/core/auth/openai-oauth.js';
 import {
@@ -260,6 +261,7 @@ export class OpenAiOAuthFetchService {
       headers.delete('authorization');
       headers.delete('Authorization');
       headers.set('authorization', `Bearer ${credential.accessToken}`);
+      headers.set('originator', OPENAI_OAUTH_ORIGINATOR);
       if (credential.accountId) {
         headers.set('ChatGPT-Account-Id', credential.accountId);
       }

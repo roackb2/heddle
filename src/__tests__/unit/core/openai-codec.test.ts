@@ -48,6 +48,7 @@ describe('OpenAiCodec.buildResponsesRequest reasoning parameter', () => {
     });
 
     expect(request.reasoning).toEqual(expect.objectContaining({ summary: 'detailed' }));
+    expect(request.include).toEqual(['reasoning.encrypted_content']);
   });
 
   it('keeps summaries for Codex API-key models without a Heddle-managed effort', () => {
@@ -58,6 +59,7 @@ describe('OpenAiCodec.buildResponsesRequest reasoning parameter', () => {
     });
 
     expect(request.reasoning).toEqual({ summary: 'detailed' });
+    expect(request.include).toBeUndefined();
   });
 
   it('omits reasoning for unknown API-key models', () => {
@@ -78,5 +80,6 @@ describe('OpenAiCodec.buildResponsesRequest reasoning parameter', () => {
     });
 
     expect(request.reasoning).toEqual({ summary: 'detailed' });
+    expect(request.include).toEqual(['reasoning.encrypted_content']);
   });
 });

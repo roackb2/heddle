@@ -47,6 +47,13 @@ Heddle core does not prefix or otherwise present that text; each host decides
 whether to label it as "Thinking", place it beside tool activity, or omit it.
 It is not hidden model chain-of-thought.
 
+Heddle requests detailed summaries from supported OpenAI reasoning models. In
+Codex account mode, the request also identifies Heddle as the originator and
+includes encrypted reasoning content so the Codex transport can emit summary
+events. The provider may still omit a summary for a trivial turn; hosts should
+keep their generic in-progress state until another activity or the terminal
+result arrives.
+
 `assistant.stream` is the cumulative assistant response draft. Embedding hosts
 may intentionally withhold it when an incomplete response could expose source
 material or conflict with a product-owned terminal result. They can still show

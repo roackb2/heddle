@@ -16,6 +16,7 @@ import type {
 export const OPENAI_CODEX_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 export const OPENAI_AUTH_ISSUER = 'https://auth.openai.com';
 export const OPENAI_CODEX_RESPONSES_ENDPOINT = 'https://chatgpt.com/backend-api/codex/responses';
+export const OPENAI_OAUTH_ORIGINATOR = 'heddle';
 export const OPENAI_OAUTH_CALLBACK_PATH = '/auth/callback';
 export const DEFAULT_OPENAI_OAUTH_PORT = 1455;
 
@@ -50,7 +51,7 @@ export class OpenAiOAuthService {
       id_token_add_organizations: 'true',
       codex_cli_simplified_flow: 'true',
       state: args.state,
-      originator: args.originator ?? 'heddle',
+      originator: args.originator ?? OPENAI_OAUTH_ORIGINATOR,
     });
 
     return `${OPENAI_AUTH_ISSUER}/oauth/authorize?${params.toString()}`;
