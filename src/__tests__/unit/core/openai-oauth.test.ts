@@ -400,7 +400,7 @@ describe('OpenAI OAuth helpers', () => {
 
     await expect(adapter.chat([{ role: 'user', content: 'hello' }], [])).rejects.toThrow();
     const body = JSON.parse(requests[0]?.body ?? '{}') as { reasoning?: { effort?: string } };
-    expect(body.reasoning?.effort).toBe('ultrahigh');
+    expect(body.reasoning?.effort).toBe('xhigh');
   });
 
   it('reconstructs tool calls from streamed Codex OAuth events when final response output is empty', async () => {
@@ -493,20 +493,26 @@ describe('OpenAI OAuth helpers', () => {
           'event: response.created',
           'data: {"type":"response.created","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"in_progress","model":"gpt-5.4","output":[]}}',
           '',
-          'event: response.reasoning_summary_text.delta',
-          'data: {"type":"response.reasoning_summary_text.delta","delta":"Inspecting ","item_id":"rs_1","output_index":0,"summary_index":0,"sequence_number":2}',
+          'event: response.output_item.added',
+          'data: {"type":"response.output_item.added","item":{"id":"rs_1","type":"reasoning","status":"in_progress","summary":[{"type":"summary_text","text":""}]},"output_index":0,"sequence_number":2}',
           '',
           'event: response.reasoning_summary_text.delta',
-          'data: {"type":"response.reasoning_summary_text.delta","delta":"the repo.","item_id":"rs_1","output_index":0,"summary_index":0,"sequence_number":3}',
+          'data: {"type":"response.reasoning_summary_text.delta","delta":"Inspecting ","item_id":"rs_1","output_index":0,"summary_index":0,"sequence_number":3}',
+          '',
+          'event: response.reasoning_summary_text.delta',
+          'data: {"type":"response.reasoning_summary_text.delta","delta":"the repo.","item_id":"rs_1","output_index":0,"summary_index":0,"sequence_number":4}',
           '',
           'event: response.reasoning_summary_text.done',
-          'data: {"type":"response.reasoning_summary_text.done","text":"Inspecting the repo.","item_id":"rs_1","output_index":0,"summary_index":0,"sequence_number":4}',
+          'data: {"type":"response.reasoning_summary_text.done","text":"Inspecting the repo.","item_id":"rs_1","output_index":0,"summary_index":0,"sequence_number":5}',
+          '',
+          'event: response.output_item.added',
+          'data: {"type":"response.output_item.added","item":{"id":"msg_1","type":"message","status":"in_progress","role":"assistant","content":[{"type":"output_text","text":"","annotations":[]}]},"output_index":1,"sequence_number":6}',
           '',
           'event: response.output_text.done',
-          'data: {"type":"response.output_text.done","text":"Done.","content_index":0,"item_id":"msg_1","output_index":1,"sequence_number":5}',
+          'data: {"type":"response.output_text.done","text":"Done.","content_index":0,"item_id":"msg_1","output_index":1,"sequence_number":7}',
           '',
           'event: response.completed',
-          'data: {"type":"response.completed","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"completed","completed_at":1777301835,"model":"gpt-5.4","output_text":"Done.","output":[],"usage":{"input_tokens":10,"input_tokens_details":{"cached_tokens":0},"output_tokens":5,"output_tokens_details":{"reasoning_tokens":1},"total_tokens":15}}}',
+          'data: {"type":"response.completed","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"completed","completed_at":1777301835,"model":"gpt-5.4","output_text":"Done.","output":[{"id":"rs_1","type":"reasoning","status":"completed","summary":[{"type":"summary_text","text":"Inspecting the repo."}]},{"id":"msg_1","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Done.","annotations":[]}]}],"usage":{"input_tokens":10,"input_tokens_details":{"cached_tokens":0},"output_tokens":5,"output_tokens_details":{"reasoning_tokens":1},"total_tokens":15}}}',
           '',
         ].join('\n');
 
@@ -615,8 +621,11 @@ describe('OpenAI OAuth helpers', () => {
           'event: response.created',
           'data: {"type":"response.created","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"in_progress","model":"gpt-5.4","output":[]}}',
           '',
+          'event: response.output_item.added',
+          'data: {"type":"response.output_item.added","item":{"id":"msg_1","type":"message","status":"in_progress","role":"assistant","content":[{"type":"output_text","text":"","annotations":[]}]},"output_index":0,"sequence_number":2}',
+          '',
           'event: response.output_text.done',
-          'data: {"type":"response.output_text.done","text":"Done.","content_index":0,"item_id":"msg_1","output_index":0,"sequence_number":2}',
+          'data: {"type":"response.output_text.done","text":"Done.","content_index":0,"item_id":"msg_1","output_index":0,"sequence_number":3}',
           '',
           'event: response.completed',
           'data: {"type":"response.completed","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"completed","completed_at":1777301835,"model":"gpt-5.4","output_text":"Done.","output":[{"id":"msg_1","type":"message","status":"completed","role":"assistant"}],"usage":{"input_tokens":10,"input_tokens_details":{"cached_tokens":0},"output_tokens":5,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":15}}}',

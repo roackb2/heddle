@@ -54,3 +54,21 @@ Provider adapters can still translate an already-approved Heddle policy value
 into the provider wire format. If translation discovers a provider limitation,
 move that limitation back into `ModelPolicyService` so every interface sees the
 same behavior before a request is made.
+
+## GPT-5.6 Contract
+
+The GPT-5.6 product boundary is intentionally additive:
+
+- the curated picker exposes `gpt-5.6-sol`, `gpt-5.6-terra`, and
+  `gpt-5.6-luna`;
+- the `gpt-5.6` Sol alias and all three explicit tiers are allowed through both
+  Platform API-key and OpenAI account-sign-in paths;
+- the catalog owns the 1,050,000-token context estimate;
+- `ModelPolicyService` owns the supported `none` through `max` effort levels
+  and the `medium` default;
+- the OpenAI adapter translates Heddle's backward-compatible persisted
+  `ultrahigh` value to the provider wire value `xhigh`.
+
+Do not repeat this policy in a host UI. Clients receive concrete reasoning
+options from the session runtime context so unsupported levels are disabled
+before a request starts.

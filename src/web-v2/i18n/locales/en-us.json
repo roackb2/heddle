@@ -139,8 +139,10 @@
       "default": "Default",
       "high": "High",
       "low": "Low",
+      "max": "Max",
       "medium": "Medium",
-      "ultrahigh": "Ultra high"
+      "none": "None",
+      "ultrahigh": "Extra high"
     },
     "reasoningEffort": "Reasoning effort",
     "noModelMatches": "No matching models",

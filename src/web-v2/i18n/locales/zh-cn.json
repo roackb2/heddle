@@ -139,7 +139,9 @@
       "default": "默认",
       "high": "高",
       "low": "低",
+      "max": "最大",
       "medium": "中",
+      "none": "无",
       "ultrahigh": "超高"
     },
     "reasoningEffort": "推理强度",

@@ -9,8 +9,9 @@ import { ConversationDirectShellLineResultSchema } from '@/core/chat/engine/dire
 import { ChatArchiveRecordSchema } from '@/core/chat/engine/sessions/archives/schemas.js';
 import { ConversationTurnPresentationSchema } from '@/core/chat/engine/turns/presentation/index.js';
 import { CustomAgentExecutionSnapshotSchema } from '@/core/custom-agents/index.js';
+import { REASONING_EFFORTS } from '@/core/llm/types.js';
 
-const ReasoningEffortSchema = z.enum(['low', 'medium', 'high', 'ultrahigh']);
+const ReasoningEffortSchema = z.enum(REASONING_EFFORTS);
 const ChatSessionRetentionSchema = z.enum(['reusable', 'one_off']);
 const ChatSessionLeaseOwnerSchema = z.enum(['tui', 'daemon', 'ask']);
 const CompactionStatusSchema = z.enum(['idle', 'running', 'failed']);

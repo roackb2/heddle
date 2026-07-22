@@ -1,5 +1,5 @@
 import type { ChatSession, ConversationDirectShellLineResult } from '@/core/chat/types.js';
-import type { ReasoningEffort } from '@/core/llm/types.js';
+import { REASONING_EFFORTS, type ReasoningEffort } from '@/core/llm/types.js';
 import { ConversationDirectShellLineResultSchema } from '@/core/chat/engine/direct-shell/result-schema.js';
 import { ConversationTurnPresentationService } from '@/core/chat/engine/turns/presentation/index.js';
 import type {
@@ -271,7 +271,9 @@ export class ControlPlaneChatSessionPresenter {
   }
 
   private static readReasoningEffort(value: unknown): ReasoningEffort | undefined {
-    return value === 'low' || value === 'medium' || value === 'high' || value === 'ultrahigh' ? value : undefined;
+    return typeof value === 'string' && REASONING_EFFORTS.includes(value as ReasoningEffort)
+      ? value as ReasoningEffort
+      : undefined;
   }
 }
 

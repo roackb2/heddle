@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { REASONING_EFFORTS } from '@/core/llm/types.js';
 import { AUTONOMY_PERMISSION_MODES } from '@/core/approvals/index.js';
 import {
   CustomAgentApprovalPresetSchema,
@@ -171,7 +172,7 @@ export const sessionSettingsInputSchema = z.object({
   id: z.string().min(1),
   workspaceId: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
-  reasoningEffort: z.enum(['low', 'medium', 'high', 'ultrahigh']).optional().nullable(),
+  reasoningEffort: z.enum(REASONING_EFFORTS).optional().nullable(),
   driftEnabled: z.boolean().optional(),
 });
 

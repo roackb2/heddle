@@ -30,6 +30,37 @@ describe('OpenAiCodec.buildResponsesRequest reasoning parameter', () => {
     expect(request.reasoning).toEqual({ summary: 'detailed', effort: 'medium' });
   });
 
+  it('uses GPT-5.6 defaults and canonical provider effort values', () => {
+    const defaultRequest = OpenAiCodec.buildResponsesRequest(messages, {
+      model: 'gpt-5.6-sol',
+      tools: [],
+      oauthMode: false,
+    });
+    const noneRequest = OpenAiCodec.buildResponsesRequest(messages, {
+      model: 'gpt-5.6-terra',
+      tools: [],
+      oauthMode: false,
+      reasoningEffort: 'none',
+    });
+    const extraHighRequest = OpenAiCodec.buildResponsesRequest(messages, {
+      model: 'gpt-5.6-luna',
+      tools: [],
+      oauthMode: false,
+      reasoningEffort: 'ultrahigh',
+    });
+    const maxRequest = OpenAiCodec.buildResponsesRequest(messages, {
+      model: 'gpt-5.6-sol',
+      tools: [],
+      oauthMode: false,
+      reasoningEffort: 'max',
+    });
+
+    expect(defaultRequest.reasoning).toEqual({ summary: 'detailed', effort: 'medium' });
+    expect(noneRequest.reasoning).toEqual({ summary: 'detailed', effort: 'none' });
+    expect(extraHighRequest.reasoning).toEqual({ summary: 'detailed', effort: 'xhigh' });
+    expect(maxRequest.reasoning).toEqual({ summary: 'detailed', effort: 'max' });
+  });
+
   it('keeps summaries for o-series models without a Heddle-managed effort', () => {
     const request = OpenAiCodec.buildResponsesRequest(messages, {
       model: 'o4-mini',

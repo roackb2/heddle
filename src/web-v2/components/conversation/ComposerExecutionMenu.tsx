@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Check, ChevronDown, Search } from 'lucide-react';
-import type { ControlPlaneModelOptions } from '@web/api/client';
+import type { ControlPlaneModelOptions, ControlPlaneSessionRuntimeContext } from '@web/api/client';
 import { Button } from '@web/components/ui/button';
 import {
   Popover,
@@ -14,28 +14,37 @@ import { useI18n } from '@web/i18n';
 import { cn } from '@web/lib/utils';
 
 export type ComposerReasoningEffortSelection = Exclude<ControlPlaneReasoningEffortSelection, 'default'>;
+type ComposerReasoningOption = NonNullable<ControlPlaneSessionRuntimeContext['reasoningOptions']>[number];
 
 type ComposerExecutionMenuProps = {
   model?: string;
   modelOptions?: ControlPlaneModelOptions;
   reasoningEffort: ComposerReasoningEffortSelection;
+  reasoningOptions?: ControlPlaneSessionRuntimeContext['reasoningOptions'];
   disabled?: boolean;
   settingsUpdating?: boolean;
   onUpdateModel?: (model: string) => Promise<void>;
   onUpdateReasoningEffort?: (value: ControlPlaneReasoningEffortSelection) => Promise<void>;
 };
 
-const reasoningEfforts = [
-  { value: 'low', labelKey: 'composer.reasoning.low' },
-  { value: 'medium', labelKey: 'composer.reasoning.medium' },
-  { value: 'high', labelKey: 'composer.reasoning.high' },
-  { value: 'ultrahigh', labelKey: 'composer.reasoning.ultrahigh' },
-] as const satisfies Array<{ value: ComposerReasoningEffortSelection; labelKey: I18nMessageKey }>;
+const reasoningLabelKeys = {
+  none: 'composer.reasoning.none',
+  low: 'composer.reasoning.low',
+  medium: 'composer.reasoning.medium',
+  high: 'composer.reasoning.high',
+  ultrahigh: 'composer.reasoning.ultrahigh',
+  max: 'composer.reasoning.max',
+} as const satisfies Record<ComposerReasoningEffortSelection, I18nMessageKey>;
+
+const isConcreteReasoningOption = (
+  option: ComposerReasoningOption,
+): option is ComposerReasoningOption & { id: ComposerReasoningEffortSelection } => option.id !== 'default';
 
 export function ComposerExecutionMenu({
   model,
   modelOptions,
   reasoningEffort,
+  reasoningOptions,
   disabled,
   settingsUpdating,
   onUpdateModel,
@@ -65,7 +74,13 @@ export function ComposerExecutionMenu({
       }))
       .filter((group) => group.options.length)
     : modelGroups;
-  const reasoningLabel = t(reasoningEfforts.find((option) => option.value === reasoningEffort)?.labelKey ?? 'composer.reasoning.medium');
+  const concreteReasoningOptions = reasoningOptions?.filter(isConcreteReasoningOption) ?? [{
+    id: reasoningEffort,
+    label: reasoningEffort,
+    description: '',
+    disabled: false,
+  }];
+  const reasoningLabel = t(reasoningLabelKeys[reasoningEffort]);
   const modelLabel = model ?? t('composer.model');
   const triggerLabel = `${modelLabel} · ${reasoningLabel}`;
   const triggerDisabled = disabled || settingsUpdating || (!onUpdateModel && !onUpdateReasoningEffort);
@@ -100,17 +115,18 @@ export function ComposerExecutionMenu({
             {t('composer.reasoningEffort')}
           </p>
           <div className="v2-composer-menu-options">
-            {reasoningEfforts.map((option) => (
+            {concreteReasoningOptions.map((option) => (
               <ComposerMenuOption
-                key={option.value}
+                key={option.id}
                 compact
-                selected={reasoningEffort === option.value}
-                disabled={!onUpdateReasoningEffort || settingsUpdating}
+                selected={reasoningEffort === option.id}
+                disabled={!onUpdateReasoningEffort || settingsUpdating || option.disabled}
+                description={option.disabledReason}
                 onSelect={() => {
-                  void onUpdateReasoningEffort?.(option.value);
+                  void onUpdateReasoningEffort?.(option.id);
                 }}
               >
-                {t(option.labelKey)}
+                {t(reasoningLabelKeys[option.id])}
               </ComposerMenuOption>
             ))}
           </div>

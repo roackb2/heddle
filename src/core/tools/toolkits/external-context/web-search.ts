@@ -158,7 +158,7 @@ async function executeOpenAiWebSearch(input: WebSearchInput, options: WebSearchT
     model,
     input: input.query,
     tools: [{
-      type: 'web_search_preview',
+      type: 'web_search',
       search_context_size: input.contextSize ?? 'medium',
     } satisfies WebSearchTool],
   });
