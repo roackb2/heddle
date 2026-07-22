@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
-import type { ReasoningEffort } from '@/core/llm/types.js';
+import { REASONING_EFFORTS, type ReasoningEffort } from '@/core/llm/types.js';
 import { LlmProviderRuntimeService } from '@/core/runtime/provider-runtime/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
@@ -12,12 +12,7 @@ import type {
 } from './types.js';
 
 const DEFAULT_MEMORY_MAINTENANCE_MODE = 'none';
-const SUPPORTED_REASONING_EFFORTS = new Set<ReasoningEffort>([
-  'low',
-  'medium',
-  'high',
-  'ultrahigh',
-]);
+const SUPPORTED_REASONING_EFFORTS = new Set<ReasoningEffort>(REASONING_EFFORTS);
 
 /** Owns environment-derived defaults and credential preflight shared by SDK conversation hosts. */
 export class ConversationSdkRuntimeService {
@@ -133,6 +128,6 @@ export class ConversationSdkRuntimeService {
       return value as ReasoningEffort;
     }
 
-    throw new Error(`Unsupported reasoning effort: ${value}. Use one of low, medium, high, ultrahigh.`);
+    throw new Error(`Unsupported reasoning effort: ${value}. Use one of ${REASONING_EFFORTS.join(', ')}.`);
   }
 }

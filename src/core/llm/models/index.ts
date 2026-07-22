@@ -7,6 +7,8 @@ export {
   type ModelOptionGroup,
   type ModelOptionSource,
   OPENAI_ACCOUNT_SIGN_IN_MODELS,
+  OPENAI_GPT_5_6_ALIAS,
+  OPENAI_GPT_5_6_MODELS,
   OPENAI_MODEL_GROUPS,
 } from './model-catalog.js';
 export type { BuiltInModelGroup } from './model-catalog.js';

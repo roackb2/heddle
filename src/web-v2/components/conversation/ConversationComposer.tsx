@@ -39,6 +39,7 @@ export function ConversationComposer({
   model,
   modelOptions,
   reasoningEffort,
+  reasoningOptions,
   agents,
   settingsUpdating,
   settingsError,
@@ -62,6 +63,7 @@ export function ConversationComposer({
   model?: string;
   modelOptions?: ControlPlaneModelOptions;
   reasoningEffort?: ComposerReasoningEffortSelection;
+  reasoningOptions?: ControlPlaneSessionRuntimeContext['reasoningOptions'];
   agents?: ControlPlaneCustomAgents;
   settingsUpdating?: boolean;
   settingsError?: string;
@@ -248,6 +250,7 @@ export function ConversationComposer({
             model={model}
             modelOptions={modelOptions}
             reasoningEffort={effectiveReasoningEffort}
+            reasoningOptions={reasoningOptions}
             onUpdateModel={onUpdateModel}
             onUpdateReasoningEffort={onUpdateReasoningEffort}
           />

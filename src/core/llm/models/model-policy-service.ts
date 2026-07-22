@@ -1,7 +1,12 @@
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from '@/core/config.js';
 import type { LlmProvider, ReasoningEffort } from '@/core/llm/types.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
-import { ModelCatalogService, OPENAI_ACCOUNT_SIGN_IN_MODELS } from './model-catalog.js';
+import {
+  ModelCatalogService,
+  OPENAI_ACCOUNT_SIGN_IN_MODELS,
+  OPENAI_GPT_5_6_ALIAS,
+  OPENAI_GPT_5_6_MODELS,
+} from './model-catalog.js';
 
 export type SystemModelPurpose = 'chat-compaction' | 'session-title';
 export type ModelCredentialMode = 'api-key' | 'oauth' | 'missing';
@@ -31,6 +36,8 @@ const OPENAI_OAUTH_IMAGE_MODEL_PREFERENCES = ['gpt-5.4', 'gpt-5.4-mini'];
 // Keep this explicit and aligned with the curated reasoning models in
 // model-catalog.ts so unknown/non-reasoning models never receive this parameter.
 const OPENAI_REASONING_SUMMARY_CAPABLE_MODELS = [
+  OPENAI_GPT_5_6_ALIAS,
+  ...OPENAI_GPT_5_6_MODELS,
   'gpt-5.5',
   'gpt-5.5-pro',
   'gpt-5.4',
@@ -56,6 +63,8 @@ const OPENAI_REASONING_SUMMARY_CAPABLE_MODELS = [
   'o4-mini',
 ] as const;
 const REASONING_EFFORT_CAPABLE_OPENAI_MODELS = [
+  OPENAI_GPT_5_6_ALIAS,
+  ...OPENAI_GPT_5_6_MODELS,
   'gpt-5.4',
   'gpt-5.4-pro',
   'gpt-5.4-mini',
@@ -64,6 +73,8 @@ const REASONING_EFFORT_CAPABLE_OPENAI_MODELS = [
   'gpt-5.5-pro',
 ] as const;
 const OPENAI_REQUEST_REASONING_EFFORT_COMPATIBLE_MODELS = [
+  OPENAI_GPT_5_6_ALIAS,
+  ...OPENAI_GPT_5_6_MODELS,
   'gpt-5.4',
   'gpt-5.4-pro',
   'gpt-5.4-mini',
@@ -71,6 +82,10 @@ const OPENAI_REQUEST_REASONING_EFFORT_COMPATIBLE_MODELS = [
   'gpt-5.5-pro',
 ] as const;
 const OPENAI_REQUEST_REASONING_EFFORTS_BY_MODEL: Record<string, ReasoningEffort[]> = {
+  [OPENAI_GPT_5_6_ALIAS]: ['none', 'low', 'medium', 'high', 'ultrahigh', 'max'],
+  ...Object.fromEntries(
+    OPENAI_GPT_5_6_MODELS.map((model) => [model, ['none', 'low', 'medium', 'high', 'ultrahigh', 'max']]),
+  ),
   'gpt-5.4': ['low', 'medium', 'high'],
   'gpt-5.4-pro': ['low', 'medium', 'high'],
   'gpt-5.4-mini': ['low', 'medium', 'high'],
@@ -78,6 +93,8 @@ const OPENAI_REQUEST_REASONING_EFFORTS_BY_MODEL: Record<string, ReasoningEffort[
   'gpt-5.5-pro': ['low', 'medium', 'high', 'ultrahigh'],
 };
 const DEFAULT_OPENAI_REASONING_EFFORT: Record<string, ReasoningEffort> = {
+  [OPENAI_GPT_5_6_ALIAS]: 'medium',
+  ...Object.fromEntries(OPENAI_GPT_5_6_MODELS.map((model) => [model, 'medium'])),
   'gpt-5.4': 'medium',
   'gpt-5.4-pro': 'medium',
   'gpt-5.4-mini': 'medium',
@@ -270,7 +287,7 @@ export class ModelPolicyService {
         description: defaultEffort ? `Use ${model} default (${defaultEffort})` : `Do not send reasoning effort for ${model}`,
         disabled: false,
       },
-      ...(['low', 'medium', 'high', 'ultrahigh'] as const).map((effort) => ({
+      ...(['none', 'low', 'medium', 'high', 'ultrahigh', 'max'] as const).map((effort) => ({
         id: effort,
         label: effort,
         description: `Set explicit ${effort} effort`,

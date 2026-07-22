@@ -249,7 +249,10 @@ export class OpenAiCodec {
   }
 
   private static toOpenAiReasoningEffort(value: ReasoningEffort): OpenAiReasoningEffort {
-    return value as OpenAiReasoningEffort;
+    // Heddle persisted `ultrahigh` before OpenAI standardized the provider
+    // wire value as `xhigh`. Keep the product value backward compatible and
+    // translate only at this provider-owned boundary.
+    return value === 'ultrahigh' ? 'xhigh' : value;
   }
 
   private static toResponseInput(messages: ChatMessage[]): ResponseInputItem[] {

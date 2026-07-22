@@ -133,6 +133,7 @@ a provider default.
 
 OpenAI models currently included in the built-in shortlist:
 
+- `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`
 - `gpt-5.5`, `gpt-5.5-pro`
 - `gpt-5.4`, `gpt-5.4-pro`, `gpt-5.4-mini`, `gpt-5.4-nano`
 - `gpt-5`, `gpt-5-pro`, `gpt-5-mini`, `gpt-5-nano`
@@ -147,6 +148,31 @@ Anthropic models currently included in the built-in shortlist:
 - `claude-opus-4-1`, `claude-opus-4-0`, `claude-sonnet-4-0`
 - `claude-3-7-sonnet-latest`
 - `claude-3-5-sonnet-latest`, `claude-3-5-haiku-latest`
+
+### GPT-5.6 family
+
+Heddle exposes the three explicit GPT-5.6 tiers in model pickers:
+
+- `gpt-5.6-sol` for the highest-capability tier
+- `gpt-5.6-terra` for the balanced tier
+- `gpt-5.6-luna` for cost-sensitive, high-volume work
+
+The provider alias `gpt-5.6` is also accepted and routes to Sol, but Heddle
+shows the explicit tier names so the selected cost/capability posture is clear.
+All three tiers have a 1,050,000-token context window and a 128,000-token
+maximum output. Heddle keeps `gpt-5.4` as the default; GPT-5.6 selection is
+opt-in.
+
+GPT-5.6 supports `none`, `low`, `medium`, `high`, `xhigh`, and `max` reasoning
+effort, with `medium` as the default. Heddle retains the existing persisted
+value `ultrahigh` for backward compatibility and translates it to OpenAI's
+wire value `xhigh` in the OpenAI adapter. The web and terminal clients render
+only the effort levels enabled by the selected model's shared runtime policy.
+
+See OpenAI's official model pages for
+[Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol),
+[Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), and
+[Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna).
 
 ## Choosing A Model
 
@@ -247,6 +273,10 @@ In the browser control plane, the same auth indicator appears in the session com
 
 OpenAI account sign-in is routed through the ChatGPT/Codex transport path and is limited to models Heddle has explicitly allowed for that path:
 
+- `gpt-5.6` (Sol alias)
+- `gpt-5.6-sol`
+- `gpt-5.6-terra`
+- `gpt-5.6-luna`
 - `gpt-5.1-codex`
 - `gpt-5.1-codex-max`
 - `gpt-5.1-codex-mini`

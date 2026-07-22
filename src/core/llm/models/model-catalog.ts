@@ -13,7 +13,18 @@ export type BuiltInModelGroup = {
   models: string[];
 };
 
+export const OPENAI_GPT_5_6_ALIAS = 'gpt-5.6';
+export const OPENAI_GPT_5_6_MODELS = [
+  'gpt-5.6-sol',
+  'gpt-5.6-terra',
+  'gpt-5.6-luna',
+] as const;
+
 export const BUILT_IN_MODEL_GROUPS: BuiltInModelGroup[] = [
+  {
+    label: 'OpenAI · GPT-5.6',
+    models: [...OPENAI_GPT_5_6_MODELS],
+  },
   {
     label: 'OpenAI · GPT-5.5',
     models: ['gpt-5.5', 'gpt-5.5-pro'],
@@ -67,6 +78,8 @@ export const OPENAI_MODEL_GROUPS: BuiltInModelGroup[] = BUILT_IN_MODEL_GROUPS.fi
 export const COMMON_BUILT_IN_MODELS = BUILT_IN_MODEL_GROUPS.flatMap((group) => group.models);
 export const COMMON_OPENAI_MODELS = OPENAI_MODEL_GROUPS.flatMap((group) => group.models);
 export const OPENAI_ACCOUNT_SIGN_IN_MODELS = [
+  OPENAI_GPT_5_6_ALIAS,
+  ...OPENAI_GPT_5_6_MODELS,
   'gpt-5.5',
   'gpt-5.4',
   'gpt-5.4-mini',
@@ -152,6 +165,10 @@ export class ModelCatalogService {
   }
 
   static inferContextWindowEstimate(model: string): number {
+    if (model === OPENAI_GPT_5_6_ALIAS || model.startsWith(`${OPENAI_GPT_5_6_ALIAS}-`)) {
+      return 1_050_000;
+    }
+
     if (model.startsWith('gpt-5.5')) {
       return 400_000;
     }

@@ -32,7 +32,16 @@ export type LlmProvider =
   | 'together'
   | 'groq';
 
-export type ReasoningEffort = 'low' | 'medium' | 'high' | 'ultrahigh';
+export const REASONING_EFFORTS = [
+  'none',
+  'low',
+  'medium',
+  'high',
+  'ultrahigh',
+  'max',
+] as const;
+
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 export type LlmAdapterCapabilities = {
   toolCalls: boolean;

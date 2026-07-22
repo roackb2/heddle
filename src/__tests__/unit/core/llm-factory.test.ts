@@ -8,7 +8,7 @@ import {
 import { ProviderCredentialRepository } from '../../../core/auth/index.js';
 import { AnthropicAdapter } from '../../../core/llm/adapters/anthropic/index.js';
 import { LlmAdapterService } from '../../../core/llm/index.js';
-import { ModelPolicyService } from '../../../core/llm/models/index.js';
+import { ModelCatalogService, ModelPolicyService } from '../../../core/llm/models/index.js';
 
 describe('llm adapter factory', () => {
   it('infers provider from known model prefixes', () => {
@@ -63,8 +63,11 @@ describe('llm adapter factory', () => {
             'event: response.created',
             'data: {"type":"response.created","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"in_progress","model":"gpt-5.4","output":[]}}',
             '',
+            'event: response.output_item.added',
+            'data: {"type":"response.output_item.added","item":{"id":"msg_1","type":"message","status":"in_progress","role":"assistant","content":[{"type":"output_text","text":"","annotations":[]}]},"output_index":0,"sequence_number":2}',
+            '',
             'event: response.output_text.done',
-            'data: {"type":"response.output_text.done","text":"Done.","content_index":0,"item_id":"msg_1","output_index":0,"sequence_number":2}',
+            'data: {"type":"response.output_text.done","text":"Done.","content_index":0,"item_id":"msg_1","output_index":0,"sequence_number":3}',
             '',
             'event: response.completed',
             'data: {"type":"response.completed","response":{"id":"resp_1","object":"response","created_at":1777301834,"status":"completed","completed_at":1777301835,"model":"gpt-5.4","output_text":"Done.","output":[],"usage":{"input_tokens":10,"input_tokens_details":{"cached_tokens":0},"output_tokens":5,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":15}}}',
@@ -328,6 +331,30 @@ describe('llm adapter factory', () => {
       disabled: false,
       disabledReason: undefined,
     });
+
+    expect(ModelPolicyService.supportedOpenAiRequestReasoningEfforts('gpt-5.6-sol')).toEqual([
+      'none',
+      'low',
+      'medium',
+      'high',
+      'ultrahigh',
+      'max',
+    ]);
+    expect(ModelPolicyService.buildReasoningEffortOptions('gpt-5.6-terra')).toContainEqual({
+      id: 'max',
+      label: 'max',
+      description: 'Set explicit max effort',
+      disabled: false,
+      disabledReason: undefined,
+    });
+  });
+
+  it('supports the GPT-5.6 family across catalog and account sign-in policy', () => {
+    expect(ModelCatalogService.isCommonBuiltInModel('gpt-5.6-sol')).toBe(true);
+    expect(ModelCatalogService.isOpenAiAccountSignInModel('gpt-5.6')).toBe(true);
+    expect(ModelCatalogService.isOpenAiAccountSignInModel('gpt-5.6-terra')).toBe(true);
+    expect(ModelCatalogService.estimateOpenAiContextWindow('gpt-5.6-luna')).toBe(1_050_000);
+    expect(ModelPolicyService.resolveDefaultReasoningEffort('gpt-5.6-sol')).toBe('medium');
   });
 
   it('owns reasoning-summary support independently from configurable effort', () => {

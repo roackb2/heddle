@@ -131,7 +131,7 @@ describe('runQuickstartConversationCli', () => {
     expect(() => resolveQuickstartConversationCliDefaults({
       env: {},
       reasoningEffort: 'extreme',
-    })).toThrow('Unsupported reasoning effort: extreme. Use one of low, medium, high, ultrahigh.');
+    })).toThrow('Unsupported reasoning effort: extreme. Use one of none, low, medium, high, ultrahigh, max.');
   });
 
   it('can resume an existing session without owning the caller loop', async () => {

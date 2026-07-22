@@ -8,7 +8,7 @@ import {
   ModelPolicyService,
 } from '../../../../llm/models/index.js';
 import { LlmAdapterService } from '../../../../llm/index.js';
-import type { ReasoningEffort } from '../../../../llm/types.js';
+import { REASONING_EFFORTS, type ReasoningEffort } from '../../../../llm/types.js';
 import {
   formatSessionReasoningEffortStatus,
   resolveEffectiveReasoningEffort,
@@ -159,7 +159,7 @@ async function setReasoningEffort(
   }
 
   if (!isReasoningEffort(selected)) {
-    return slashMessageResult('Usage: /reasoning set <query> or /reasoning <low|medium|high|default>');
+    return slashMessageResult('Usage: /reasoning set <query> or /reasoning <none|low|medium|high|ultrahigh|max|default>');
   }
 
   if (!ModelPolicyService.supportsReasoningEffort(context.model.active())) {
@@ -174,5 +174,5 @@ async function setReasoningEffort(
   return slashMessageResult(`Set reasoning effort to ${selected} for ${context.model.active()}.`);
 }
 function isReasoningEffort(value: string): value is ReasoningEffort {
-  return value === 'low' || value === 'medium' || value === 'high' || value === 'ultrahigh';
+  return REASONING_EFFORTS.includes(value as ReasoningEffort);
 }

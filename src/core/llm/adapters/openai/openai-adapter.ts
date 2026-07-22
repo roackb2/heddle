@@ -2,13 +2,12 @@
 // LLM Adapter — OpenAI implementation
 // ---------------------------------------------------------------------------
 
-import OpenAI from 'openai';
+import OpenAI, { type ClientOptions } from 'openai';
 import dayjs from 'dayjs';
 import type {
   Response as OpenAiResponse,
   ResponseStreamEvent,
 } from 'openai/resources/responses/responses.js';
-import type { Fetch as OpenAiFetch } from 'openai/core.js';
 import type { LlmAdapter, ChatMessage, LlmResponse, LlmAdapterCapabilities, LlmStreamEvent, ReasoningEffort, LlmAdapterCreateInput } from '@/core/llm/types.js';
 import type { ToolDefinition, ToolCall } from '@/core/types.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
@@ -30,6 +29,11 @@ export type OpenAiAdapterOptions = LlmAdapterCreateInput;
 
 export type CompatibleFetch = (url: unknown, init?: unknown) => Promise<globalThis.Response>;
 export type OpenAiAccountCredential = OpenAiOAuthCredential | RuntimeProviderCredential;
+type OpenAiFetch = NonNullable<ClientOptions['fetch']>;
+type LegacyOpenAiReasoningSummaryEvent =
+  | { type: 'response.reasoning_summary.delta'; delta: unknown }
+  | { type: 'response.reasoning_summary.done'; text: string };
+type OpenAiStreamEvent = ResponseStreamEvent | LegacyOpenAiReasoningSummaryEvent;
 
 /**
  * OpenAI implementation of the LLM port. It owns OpenAI Responses streaming,
@@ -108,7 +112,10 @@ export class OpenAiAdapter implements LlmAdapter {
     const streamedToolCalls = new Map<string, { id: string; tool: string; argumentsText: string }>();
     let completedResponse: OpenAiResponse | undefined;
     try {
-      for await (const event of stream as AsyncIterable<ResponseStreamEvent>) {
+      // The public API stream uses the SDK union. Codex account mode can also
+      // emit the two legacy summary event names retained below, so Heddle owns
+      // that narrow transport extension at this adapter boundary.
+      for await (const event of stream as AsyncIterable<OpenAiStreamEvent>) {
         if (event.type === 'response.output_text.delta' && event.delta) {
           if (assistantMessagePhases.get(event.item_id) === 'commentary') {
             onStreamEvent?.({
@@ -303,7 +310,7 @@ export class OpenAiOAuthFetchService {
         headers,
       });
     };
-    return oauthFetch as unknown as OpenAiFetch;
+    return oauthFetch as OpenAiFetch;
   }
 
   static isAccountCredential(

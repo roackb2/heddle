@@ -208,7 +208,8 @@ export function ConversationThread({
           permissionModeOptions={runtimeContext?.permissionModeOptions}
           model={session.model}
           modelOptions={modelOptions}
-          reasoningEffort={session.reasoningEffort}
+          reasoningEffort={runtimeContext?.effectiveReasoningEffort ?? session.reasoningEffort}
+          reasoningOptions={runtimeContext?.reasoningOptions}
           agents={agents}
           settingsUpdating={settingsUpdating}
           settingsError={settingsError}
