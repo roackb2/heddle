@@ -23,6 +23,7 @@ export type LlmProvider =
   | 'openai'
   | 'anthropic'
   | 'google'
+  | 'kimi'
   | 'ollama'
   | 'lmstudio'
   | 'litellm'
@@ -66,12 +67,27 @@ export type LlmUsage = {
 };
 
 /**
+ * Provider-private assistant state that must be replayed to the same provider.
+ *
+ * This state is part of the durable model-facing transcript, but it is not a
+ * user-facing reasoning summary. Hosts, traces, and presentation layers must
+ * not render or log it as assistant work narration.
+ */
+export type AssistantProviderContinuation =
+  | { provider: 'kimi'; reasoningContent: string };
+
+/**
  * A message in the chat transcript.
  */
 export type ChatMessage =
   | { role: 'system'; content: string }
   | { role: 'user'; content: string }
-  | { role: 'assistant'; content: string; toolCalls?: ToolCall[] }
+  | {
+    role: 'assistant';
+    content: string;
+    toolCalls?: ToolCall[];
+    providerContinuation?: AssistantProviderContinuation;
+  }
   | { role: 'tool'; content: string; toolCallId: string };
 
 /**
@@ -81,6 +97,7 @@ export type LlmResponse = {
   content?: string;
   diagnostics?: AssistantDiagnostics;
   toolCalls?: ToolCall[];
+  providerContinuation?: AssistantProviderContinuation;
   usage?: LlmUsage;
 };
 

@@ -13,6 +13,7 @@ For setup details, environment variables, and model-picker behavior, see
 | --- | --- | --- | --- | --- |
 | OpenAI | `gpt-*`, `o*` | OpenAI account sign-in or `OPENAI_API_KEY` | Built-in curated shortlist | Use a normal `heddle --model ... ask` run |
 | Anthropic Claude | `claude-*` | `ANTHROPIC_API_KEY` | Built-in curated shortlist | Use a normal `heddle --model ... ask` run |
+| Kimi Platform | `kimi/` or `kimi:` | `MOONSHOT_API_KEY` or `KIMI_PLATFORM_API_KEY` | Built-in K3 entry plus `/models` discovery | Use a normal `heddle --model kimi/kimi-k3 ask` run |
 | Ollama | `ollama/` or `ollama:` | Local endpoint, no hosted key required | Native Ollama `/api/tags` | `yarn smoke:ollama` |
 | LM Studio | `lmstudio/` | Local OpenAI-compatible endpoint | `/models` when the server is running | `yarn smoke:lmstudio` |
 | LiteLLM | `litellm/` | OpenAI-compatible gateway, optional gateway key | `/models` when the gateway is reachable | `yarn smoke:litellm` |
@@ -27,6 +28,7 @@ For setup details, environment variables, and model-picker behavior, see
 ```bash
 heddle --model gpt-5.4-mini ask "Summarize this repository"
 heddle --model claude-sonnet-4-6 ask "Summarize this repository"
+heddle --model kimi/kimi-k3 ask "Summarize this repository"
 heddle --model ollama/llama3.2:latest ask "Summarize this repository"
 heddle --model lmstudio/local-model ask "Summarize this repository"
 heddle --model openrouter/meta-llama/llama-3.3-70b-instruct ask "Summarize this repository"

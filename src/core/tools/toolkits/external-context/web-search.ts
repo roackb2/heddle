@@ -86,6 +86,7 @@ export function createWebSearchTool(options: WebSearchToolOptions = {}): ToolDef
               ok: false,
               error: 'web_search is not wired for Google models yet.',
             };
+          case 'kimi':
           case 'ollama':
           case 'lmstudio':
           case 'litellm':

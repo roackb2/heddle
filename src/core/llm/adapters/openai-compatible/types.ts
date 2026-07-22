@@ -3,7 +3,7 @@ import type { ModelOptionSource } from '@/core/llm/models/model-catalog.js';
 
 export type OpenAiCompatibleProviderId = Extract<
   LlmProvider,
-  'ollama' | 'lmstudio' | 'litellm' | 'vllm' | 'huggingface' | 'openrouter' | 'together' | 'groq'
+  'kimi' | 'ollama' | 'lmstudio' | 'litellm' | 'vllm' | 'huggingface' | 'openrouter' | 'together' | 'groq'
 >;
 
 export type OpenAiCompatibleModelDiscoveryMode = 'ollama-tags' | 'openai-models';

@@ -1,5 +1,6 @@
 import { DEFAULT_LLM_PROVIDER } from '@/core/config.js';
 import { AnthropicProviderAdapter } from '../adapters/anthropic/index.js';
+import { KimiProviderAdapter } from '../adapters/kimi/index.js';
 import {
   OpenAiCompatibleProviderAdapter,
   OpenAiCompatibleProviderProfileService,
@@ -14,7 +15,10 @@ export class BuiltinLlmProviderRegistry {
       providers: [
         new OpenAiProviderAdapter(),
         new AnthropicProviderAdapter(),
-        ...OpenAiCompatibleProviderProfileService.list().map((profile) => new OpenAiCompatibleProviderAdapter(profile)),
+        new KimiProviderAdapter(),
+        ...OpenAiCompatibleProviderProfileService.list()
+          .filter((profile) => profile.id !== 'kimi')
+          .map((profile) => new OpenAiCompatibleProviderAdapter(profile)),
       ],
     });
   }

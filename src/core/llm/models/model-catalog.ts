@@ -22,6 +22,10 @@ export const OPENAI_GPT_5_6_MODELS = [
 
 export const BUILT_IN_MODEL_GROUPS: BuiltInModelGroup[] = [
   {
+    label: 'Kimi Platform · K3',
+    models: ['kimi/kimi-k3'],
+  },
+  {
     label: 'OpenAI · GPT-5.6',
     models: [...OPENAI_GPT_5_6_MODELS],
   },
@@ -165,6 +169,10 @@ export class ModelCatalogService {
   }
 
   static inferContextWindowEstimate(model: string): number {
+    if (model === 'kimi/kimi-k3') {
+      return 1_000_000;
+    }
+
     if (model === OPENAI_GPT_5_6_ALIAS || model.startsWith(`${OPENAI_GPT_5_6_ALIAS}-`)) {
       return 1_050_000;
     }

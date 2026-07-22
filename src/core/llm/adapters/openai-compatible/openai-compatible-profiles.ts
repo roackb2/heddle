@@ -10,6 +10,25 @@ const CHAT_COMPLETIONS_CAPABILITIES: LlmAdapterCapabilities = {
 
 export const OPENAI_COMPATIBLE_PROVIDER_PROFILES: readonly OpenAiCompatibleProviderProfile[] = [
   {
+    id: 'kimi',
+    label: 'Kimi Platform',
+    modelPrefix: 'kimi',
+    defaultModelEnvName: 'KIMI_MODEL',
+    endpoint: {
+      defaultBaseUrl: 'https://api.moonshot.cn/v1',
+      baseUrlEnvNames: ['MOONSHOT_BASE_URL', 'KIMI_PLATFORM_BASE_URL'],
+      apiKeyEnvNames: ['MOONSHOT_API_KEY', 'KIMI_PLATFORM_API_KEY'],
+      requiresApiKey: true,
+      local: false,
+    },
+    modelDiscovery: {
+      label: 'Kimi Platform · Available models',
+      mode: 'openai-models',
+      source: 'remote-discovered',
+    },
+    capabilities: CHAT_COMPLETIONS_CAPABILITIES,
+  },
+  {
     id: 'ollama',
     label: 'Ollama',
     modelPrefix: 'ollama',

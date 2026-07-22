@@ -15,6 +15,7 @@ describe('llm adapter factory', () => {
     expect(LlmAdapterService.inferProvider('gpt-5.1-codex')).toBe('openai');
     expect(LlmAdapterService.inferProvider('claude-sonnet-4-6')).toBe('anthropic');
     expect(LlmAdapterService.inferProvider('gemini-2.5-pro')).toBe('google');
+    expect(LlmAdapterService.inferProvider('kimi/kimi-k3')).toBe('kimi');
     expect(LlmAdapterService.inferProvider('ollama/llama3.2:latest')).toBe('ollama');
     expect(LlmAdapterService.inferProvider('lmstudio/local-model')).toBe('lmstudio');
     expect(LlmAdapterService.inferProvider('hf/meta-llama/Llama-3.3-70B-Instruct')).toBe('huggingface');
@@ -355,6 +356,24 @@ describe('llm adapter factory', () => {
     expect(ModelCatalogService.isOpenAiAccountSignInModel('gpt-5.6-terra')).toBe(true);
     expect(ModelCatalogService.estimateOpenAiContextWindow('gpt-5.6-luna')).toBe(1_050_000);
     expect(ModelPolicyService.resolveDefaultReasoningEffort('gpt-5.6-sol')).toBe('medium');
+  });
+
+  it('supports Kimi K3 catalog and request policy without claiming reasoning summaries', () => {
+    expect(ModelCatalogService.isCommonBuiltInModel('kimi/kimi-k3')).toBe(true);
+    expect(ModelCatalogService.estimateBuiltInContextWindow('kimi/kimi-k3')).toBe(1_000_000);
+    expect(ModelPolicyService.supportedRequestReasoningEfforts('kimi/kimi-k3')).toEqual([
+      'low',
+      'high',
+      'max',
+    ]);
+    expect(ModelPolicyService.resolveDefaultReasoningEffort('kimi/kimi-k3')).toBe('max');
+    expect(ModelPolicyService.buildReasoningEffortOptions('kimi/kimi-k3')).toContainEqual({
+      id: 'max',
+      label: 'max',
+      description: 'Set explicit max effort',
+      disabled: false,
+      disabledReason: undefined,
+    });
   });
 
   it('owns reasoning-summary support independently from configurable effort', () => {
