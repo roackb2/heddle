@@ -1,6 +1,7 @@
 import {
   ClientSharedSessionActivityService,
 } from '@/client-shared/services/session-activities/index.js';
+import truncate from 'lodash/truncate.js';
 import type {
   ClientSharedHeartbeatEventEnvelope,
   ClientSharedNotificationIntent,
@@ -35,6 +36,7 @@ type NotificationMemoryOptions = {
 };
 
 const DEFAULT_MAX_SEEN_KEYS = 200;
+const SESSION_COMPLETION_PREVIEW_LENGTH = 160;
 
 /**
  * Owns frontend-neutral notification intent projection from shared control-plane
@@ -70,7 +72,7 @@ export class ClientSharedNotificationIntentService {
           input.activity.runId,
         ].join(':'),
         title: 'Session run finished',
-        body: input.activity.summary || input.activity.outcome,
+        body: projectSessionCompletionPreview(input.activity.summary, input.activity.outcome),
         tone: ClientSharedSessionActivityService.resolveRunOutcomeTone(input.activity.outcome),
         timestamp: input.activity.timestamp,
         workspaceId: input.workspaceId,
@@ -184,9 +186,17 @@ function projectRunTerminalPresentation(
   }
   return {
     title: 'Session run finished',
-    body: terminal.result.summary ?? terminal.result.outcome,
+    body: projectSessionCompletionPreview(terminal.result.summary, terminal.result.outcome),
     tone: 'success',
   };
+}
+
+function projectSessionCompletionPreview(summary: string | undefined, outcome: string | undefined): string {
+  const content = (summary?.trim() || outcome?.trim() || 'Completed').replace(/\s+/g, ' ');
+  return truncate(content, {
+    length: SESSION_COMPLETION_PREVIEW_LENGTH,
+    omission: '…',
+  });
 }
 
 /**

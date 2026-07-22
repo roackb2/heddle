@@ -175,6 +175,46 @@ describe('ClientSharedNotificationIntentService', () => {
     });
   });
 
+  it('projects long session results as concise notification previews', () => {
+    const longSummary = [
+      'I inspected the workspace and found the next implementation slice.',
+      '',
+      'This detail is intentionally repeated so the durable conversation keeps the complete answer. '.repeat(5),
+    ].join('\n');
+    const activity = ClientSharedNotificationIntentService.projectSessionActivity({
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      activity: {
+        source: 'agent-loop',
+        type: 'loop.finished',
+        runId: 'run-1',
+        outcome: 'done',
+        summary: longSummary,
+        timestamp: '2026-06-12T00:01:00.000Z',
+      } as SessionActivity,
+    });
+    const terminal = ClientSharedNotificationIntentService.projectSessionRunTerminal({
+      workspaceId: 'workspace-1',
+      envelope: {
+        type: 'session.run.terminal',
+        sessionId: 'session-1',
+        timestamp: '2026-06-12T00:01:00.000Z',
+        terminal: {
+          kind: 'result',
+          runId: 'run-1',
+          sequence: 3,
+          timestamp: '2026-06-12T00:01:00.000Z',
+          result: { outcome: 'done', summary: longSummary },
+        },
+      },
+    });
+
+    expect(activity?.body).toBe(terminal.body);
+    expect(activity?.body).toHaveLength(160);
+    expect(activity?.body).not.toContain('\n');
+    expect(activity?.body).toMatch(/…$/);
+  });
+
   it('deduplicates notification intents by key', () => {
     const memory = new ClientSharedNotificationMemory();
     const intent = {
