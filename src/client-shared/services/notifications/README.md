@@ -23,6 +23,11 @@ adapter.
 - `heartbeat.task.finished` and `heartbeat.task.failed` become task-run
   notifications for the active workspace while a client is open.
 
+Session-completion bodies are short, whitespace-normalized previews. The full
+assistant result remains in the conversation and must not be copied into a
+notification intent, because browser and desktop notification surfaces are
+space-constrained and may appear outside the Heddle window.
+
 Each projected intent has a stable `key`. Hosts should pass intents through
 `ClientSharedNotificationMemory` before delivery so reconnects and refetches do
 not notify repeatedly for the same event.
