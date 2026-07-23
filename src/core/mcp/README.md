@@ -34,6 +34,8 @@ document into Settings -> MCP. All of those paths target the same config file.
   - user-authored MCP server config;
   - accepts the common `mcpServers` shape and VS Code's `servers` alias;
   - supports `stdio`, `http`, normalized `streamable-http`, and legacy `sse`.
+  - optionally accepts a Heddle-specific `environment` classification:
+    `local`, `dev`, `staging`, `production`, or `unknown`.
 - `.heddle/mcp/activation.json`
   - Heddle-owned workspace state;
   - stores only whether a configured server is enabled or disabled;
@@ -93,6 +95,13 @@ work inside a synchronous toolkit.
   - forwards the owning run's abort signal to connection and request calls;
   - closes client and transport resources after each operation, on both success
     and failure.
+- `McpPolicyContextService`
+  - converts configured server identity, transport, environment, and optional
+    host-verified effects into immutable tool policy context;
+  - derives stdio and loopback endpoints as `local`;
+  - leaves an unclassified remote endpoint as `unknown` unless config or the
+    embedding host supplies its environment;
+  - never treats remote MCP annotations as authorization facts.
 - `McpService`
   - owns Heddle-level semantics on top of repositories and SDK calls;
   - exposes config document read/create/save methods for control-plane hosts;
@@ -128,7 +137,8 @@ The runtime MCP toolkit exposes:
 - cached per-tool adapters such as `mcp__notion__search_pages`
   - created only from cached catalog records;
   - use Heddle-safe namespaced names;
-  - preserve the original server id and MCP tool name when calling `McpService`.
+  - preserve the original server id and MCP tool name when calling `McpService`;
+  - attach host-owned MCP authority, transport, and environment provenance.
 
 The toolkit should stay an adapter. It should not parse config, manage
 enablement, launch servers, or decide policy beyond setting Heddle
@@ -171,6 +181,8 @@ Keep these invariants:
 - Saving config does not enable servers or refresh cached tools.
 - Enabled does not mean trusted for unattended execution.
 - Tool calls still go through Heddle approval and tracing.
+- MCP server id, tool name, transport, configured environment, and tenant
+  provenance are host-owned. A model policy envelope cannot override them.
 - MCP server/tool descriptions and outputs are untrusted external content.
 - Local stdio servers run commands with the user's OS permissions.
 - Secret values should be resolved at connection time and redacted from
@@ -185,6 +197,10 @@ Server-level tool policy is intentionally small:
 
 Do not treat MCP tool annotations such as read-only or destructive hints as
 Heddle permissions until an approval-domain design explicitly supports that.
+Likewise, an HTTP or SSE transport is not a mutating `network` operation.
+Transport provenance is recorded separately, so a host-classified remote read
+does not need fake write roots. If a remote tool's effects are not classified
+by the host, unattended execution remains approval-gated.
 
 ## Extension Rules
 

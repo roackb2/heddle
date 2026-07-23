@@ -112,6 +112,33 @@ describe('tool policy envelope', () => {
     );
   });
 
+  it('does not treat network transport as a filesystem mutation requiring roots', async () => {
+    const execute = vi.fn(async () => ({ ok: true, output: 'ok' }));
+    const registry = new ToolRegistry([tool({ execute })]);
+
+    await expect(ToolExecutionService.execute(registry, {
+      id: 'call-1',
+      tool: 'test_tool',
+      input: {
+        path: 'remote-document',
+        policy: {
+          operations: ['read', 'network'],
+          intent: 'read a document through an HTTP MCP transport',
+          targetRoots: [],
+          expectedEffects: ['read remote document'],
+          maxDestructiveScope: 'none',
+          environment: 'production',
+          confidence: 'high',
+        },
+      },
+    })).resolves.toEqual({ ok: true, output: 'ok' });
+
+    expect(execute).toHaveBeenCalledWith(
+      { path: 'remote-document' },
+      { signal: expect.any(AbortSignal) },
+    );
+  });
+
   it('rejects an envelope with empty roots for mutating operations', async () => {
     const execute = vi.fn(async () => ({ ok: true }));
     const registry = new ToolRegistry([tool({ execute })]);
@@ -179,6 +206,35 @@ describe('tool policy envelope', () => {
     })).resolves.toEqual(expect.objectContaining({
       ok: false,
       error: expect.stringContaining('Invalid tool policy envelope'),
+    }));
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('rejects model attempts to add host-owned authority fields before execution', async () => {
+    const execute = vi.fn(async () => ({ ok: true }));
+    const registry = new ToolRegistry([tool({ execute })]);
+
+    await expect(ToolExecutionService.execute(registry, {
+      id: 'call-1',
+      tool: 'test_tool',
+      input: {
+        path: 'README.md',
+        policy: {
+          operations: ['read'],
+          intent: 'inspect README',
+          targetRoots: ['.'],
+          expectedEffects: ['read README'],
+          environment: 'local',
+          confidence: 'high',
+          authority: {
+            serverId: 'spoofed-server',
+          },
+        },
+      },
+    })).resolves.toEqual(expect.objectContaining({
+      ok: false,
+      error: expect.stringContaining('authority, transport, target environment, and tenant provenance are host-owned'),
     }));
 
     expect(execute).not.toHaveBeenCalled();

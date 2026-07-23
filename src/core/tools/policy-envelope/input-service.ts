@@ -17,7 +17,7 @@ const ToolPolicyEnvelopeSchema = z.object({
     'Human-readable purpose for the tool call. Used for approval/debugging context, not for deterministic verification.',
   ),
   targetRoots: z.array(z.string()).describe(
-    'Project/workspace roots involved in the call. These should be project boundaries such as repo roots or config-bearing folders, not individual file paths. May be empty only for read-only or state-only calls that touch no project root, such as planning tools. Calls that write, delete, move, execute, run git, or use the network must declare at least one target or write root.',
+    'Project/workspace roots involved in the call. These should be project boundaries such as repo roots or config-bearing folders, not individual file paths. May be empty only for read-only or state-only calls that touch no project root, such as planning tools. Calls that write, delete, move, execute, or run git must declare at least one target or write root.',
   ),
   readRoots: z.array(z.string()).optional().describe(
     'Optional project/workspace roots the agent claims the call may read when read scope differs from targetRoots.',
@@ -37,7 +37,7 @@ const ToolPolicyEnvelopeSchema = z.object({
   confidence: z.enum(TOOL_POLICY_CONFIDENCE_LEVELS).describe(
     'Agent confidence that the envelope completely describes the purpose and impact surface of the call.',
   ),
-}).strip().superRefine((envelope, ctx) => {
+}).strict().superRefine((envelope, ctx) => {
   // A mutating envelope must declare a write scope. Autonomy policy derives
   // claimed write roots from writeRoots (or targetRoots for mutating ops), so an
   // empty-root mutating envelope would evaluate against zero roots and could be
@@ -48,7 +48,7 @@ const ToolPolicyEnvelopeSchema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['targetRoots'],
-      message: 'mutating operations (write, delete, move, execute, git, network, unknown) must declare at least one target or write root',
+      message: 'mutating operations (write, delete, move, execute, git, unknown) must declare at least one target or write root',
     });
   }
 }).describe(
@@ -86,7 +86,7 @@ export class ToolPolicyEnvelopeInputService {
     if (!parsed.success) {
       return {
         toolInput,
-        error: `Invalid tool policy envelope: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`,
+        error: `Invalid tool policy envelope: ${parsed.error.issues.map(formatIssue).join('; ')}`,
       };
     }
 
@@ -95,6 +95,15 @@ export class ToolPolicyEnvelopeInputService {
       toolInput,
     };
   }
+}
+
+function formatIssue(issue: z.ZodIssue): string {
+  if (issue.code === z.ZodIssueCode.unrecognized_keys) {
+    return `unsupported model-provided fields [${issue.keys.join(', ')}]; `
+      + 'authority, transport, target environment, and tenant provenance are host-owned';
+  }
+
+  return issue.message;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

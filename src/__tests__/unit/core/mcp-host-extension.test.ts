@@ -148,6 +148,39 @@ describe('defineMcpHostExtension', () => {
     }));
   });
 
+  it('attaches host-owned environment, authority, tenant, and effect classification', () => {
+    const context = contextFixture();
+    const extension = defineMcpHostExtension({
+      id: 'slides',
+      serverId: 'deck_service',
+      includeTools: ['create-deck'],
+      environment: 'production',
+      tenantId: 'tenant-42',
+      toolOverrides: {
+        'create-deck': {
+          operations: ['write'],
+        },
+      },
+    });
+
+    const [tool] = extension.toolkits?.flatMap((toolkit) => toolkit.createTools(context)) ?? [];
+
+    expect(tool?.hostPolicy).toEqual({
+      authority: {
+        kind: 'mcp',
+        serverId: 'deck_service',
+        toolName: 'create-deck',
+        tenantId: 'tenant-42',
+      },
+      transport: {
+        kind: 'stdio',
+        network: false,
+      },
+      environment: 'production',
+      operations: ['write'],
+    });
+  });
+
   it('exposes all enabled catalog tools when includeTools is omitted', () => {
     const context = contextFixture();
     const extension = defineMcpHostExtension({

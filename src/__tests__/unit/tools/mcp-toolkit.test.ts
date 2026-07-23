@@ -132,6 +132,41 @@ describe('MCP toolkit', () => {
     }));
   });
 
+  it('resolves broker and cached-tool policy provenance from host configuration', () => {
+    const tools = mcpToolkit.createTools(contextFixture());
+    const callTool = tools.find((candidate) => candidate.name === 'mcp_call_tool');
+    const cachedTool = tools.find((candidate) => candidate.name === 'mcp__notion__search_pages');
+
+    expect(callTool?.resolveHostPolicy?.({
+      serverId: 'notion',
+      toolName: 'search-pages',
+      arguments: { query: 'roadmap' },
+    })).toEqual({
+      authority: {
+        kind: 'mcp',
+        serverId: 'notion',
+        toolName: 'search-pages',
+      },
+      transport: {
+        kind: 'stdio',
+        network: false,
+      },
+      environment: 'local',
+    });
+    expect(cachedTool?.hostPolicy).toEqual({
+      authority: {
+        kind: 'mcp',
+        serverId: 'notion',
+        toolName: 'search-pages',
+      },
+      transport: {
+        kind: 'stdio',
+        network: false,
+      },
+      environment: 'local',
+    });
+  });
+
   it('hides host-owned MCP servers from the default tool surface', async () => {
     const tools = mcpToolkit.createTools(contextFixture({
       includeGithub: true,

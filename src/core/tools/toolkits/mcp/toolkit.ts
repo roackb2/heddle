@@ -2,6 +2,7 @@ import {
   FileMcpActivationRepository,
   FileMcpCatalogRepository,
   FileMcpConfigRepository,
+  McpPolicyContextService,
   McpService,
   isToolAllowed,
   shouldMcpToolRequireApproval,
@@ -133,6 +134,20 @@ function createMcpCallToolTool(options: {
       },
       required: ['serverId', 'toolName', 'arguments'],
     },
+    resolveHostPolicy(raw: unknown) {
+      if (!isMcpCallInput(raw) || options.hiddenServerIds.has(raw.serverId)) {
+        return undefined;
+      }
+
+      const server = mcpService(options)
+        .listOverview()
+        .servers
+        .find((candidate) => candidate.id === raw.serverId)
+        ?.config;
+      return server
+        ? McpPolicyContextService.create({ server, toolName: raw.toolName })
+        : undefined;
+    },
     async execute(raw: unknown, execution?: ToolExecutionContext): Promise<ToolResult> {
       if (!isMcpCallInput(raw)) {
         return { ok: false, error: 'Invalid input for mcp_call_tool. Required fields: serverId, toolName, arguments.' };
@@ -168,6 +183,10 @@ function createMcpServerTool(options: {
       'Calls external MCP capability through Heddle approval and trace boundaries.',
     ].join(' '),
     parameters: options.tool.inputSchema,
+    hostPolicy: McpPolicyContextService.create({
+      server: options.server,
+      toolName: options.tool.name,
+    }),
     async execute(raw: unknown, execution?: ToolExecutionContext): Promise<ToolResult> {
       const result = await mcpService(options).callTool(
         options.server.id,
