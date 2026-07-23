@@ -81,7 +81,10 @@ export class OpenAiCompatibleAdapter implements LlmAdapter {
     return {
       content,
       toolCalls: OpenAiCompatibleCodec.extractToolCalls(body),
-      usage: OpenAiCompatibleCodec.extractUsage(body),
+      usage: OpenAiCompatibleCodec.extractUsage(body, {
+        provider: this.profile.id,
+        model: this.displayModel,
+      }),
     };
   }
 

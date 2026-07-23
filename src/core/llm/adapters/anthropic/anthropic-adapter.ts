@@ -72,7 +72,7 @@ export class AnthropicAdapter implements LlmAdapter {
     return {
       content: text || undefined,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-      usage: AnthropicCodec.extractUsage(response.usage),
+      usage: AnthropicCodec.extractUsage(response.usage, response.model),
     };
   }
 

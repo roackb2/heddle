@@ -1,4 +1,5 @@
-import type { ChatMessage, LlmUsage } from '@/core/llm/types.js';
+import { LlmUsageService } from '@/core/llm/usage/index.js';
+import type { ChatMessage, LlmProvider, LlmUsage } from '@/core/llm/types.js';
 import type { ToolCall, ToolDefinition } from '@/core/types.js';
 
 type OpenAiCompatibleChatCompletionMessage = {
@@ -101,7 +102,10 @@ export class OpenAiCompatibleCodec {
     return parsed.length > 0 ? parsed : undefined;
   }
 
-  static extractUsage(response: unknown): LlmUsage | undefined {
+  static extractUsage(
+    response: unknown,
+    attribution: { provider: LlmProvider; model: string },
+  ): LlmUsage | undefined {
     if (!response || typeof response !== 'object') {
       return undefined;
     }
@@ -113,12 +117,13 @@ export class OpenAiCompatibleCodec {
 
     const inputTokens = OpenAiCompatibleCodec.numberField(usage, 'prompt_tokens') ?? 0;
     const outputTokens = OpenAiCompatibleCodec.numberField(usage, 'completion_tokens') ?? 0;
-    return {
-      inputTokens,
+    return LlmUsageService.fromProviderRequest({
+      provider: attribution.provider,
+      model: OpenAiCompatibleCodec.stringField(response, 'model') ?? attribution.model,
+      billedInputTokens: inputTokens,
       outputTokens,
       totalTokens: OpenAiCompatibleCodec.numberField(usage, 'total_tokens') ?? inputTokens + outputTokens,
-      requests: 1,
-    };
+    });
   }
 
   private static toToolCall(call: ToolCall): OpenAiCompatibleToolCall {
@@ -152,5 +157,10 @@ export class OpenAiCompatibleCodec {
   private static numberField(value: object, key: string): number | undefined {
     const field = (value as Record<string, unknown>)[key];
     return typeof field === 'number' ? field : undefined;
+  }
+
+  private static stringField(value: object, key: string): string | undefined {
+    const field = (value as Record<string, unknown>)[key];
+    return typeof field === 'string' && field.trim() ? field : undefined;
   }
 }

@@ -5,7 +5,7 @@ import type { MemoryStatusView } from '@/core/memory/types.js';
 import type { ReviewDiffFile } from '@/core/review/index.js';
 import type { ProviderCredentialSource } from '@/core/runtime/credentials/index.js';
 import type { ReasoningEffortOption } from '@/core/llm/models/index.js';
-import type { ReasoningEffort } from '@/core/llm/types.js';
+import type { LlmUsage, ReasoningEffort } from '@/core/llm/types.js';
 import type {
   AutonomyPermissionMode,
   AutonomyPermissionModeOption,
@@ -43,13 +43,7 @@ export type ChatSessionView = {
       estimatedTokens?: number;
       toolNames?: string[];
       goal?: string;
-      usage?: {
-        inputTokens?: number;
-        outputTokens?: number;
-        totalTokens?: number;
-        cachedInputTokens?: number;
-        reasoningTokens?: number;
-      };
+      usage?: LlmUsage;
     };
     compaction?: {
       compactedMessages?: number;

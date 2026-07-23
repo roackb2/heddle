@@ -1,10 +1,11 @@
 import { setTimeout as sleep } from 'node:timers/promises';
-import type { LlmStreamEvent, LlmUsage } from '@/core/llm/types.js';
+import { LlmUsageService } from '@/core/llm/usage/index.js';
+import type { LlmStreamEvent } from '@/core/llm/types.js';
 import { HeddleEventType } from '@/core/event-types.js';
 import { isAbortError } from '@/core/agent/utils/index.js';
 import { STREAM_UPDATE_INTERVAL_MS } from '../constants.js';
 import { AgentRunFinisher } from '../finish/index.js';
-import type { AccumulateAgentUsageArgs, AgentModelTurnResult, RequestAgentModelTurnArgs } from './types.js';
+import type { AgentModelTurnResult, RequestAgentModelTurnArgs } from './types.js';
 import { AgentModelTurnRetryService } from './model-turn-retry-service.js';
 
 /**
@@ -27,10 +28,7 @@ export class AgentModelTurnService {
     while (true) {
       try {
         const response = await AgentModelTurnService.requestOnce(args);
-        context.state.usage = AgentModelTurnService.accumulateUsage({
-          current: context.state.usage,
-          next: response.usage,
-        });
+        context.state.usage = LlmUsageService.aggregate(context.state.usage, response.usage);
 
         const retry = AgentModelTurnRetryService.resolve({ kind: 'response', response });
         if (!retry.retryable || attempt >= retry.maxAttempts) {
@@ -235,28 +233,5 @@ export class AgentModelTurnService {
 
     streamState.lastStreamEmitAt = nowMs;
     return true;
-  }
-
-  private static accumulateUsage(args: AccumulateAgentUsageArgs): LlmUsage | undefined {
-    if (!args.next) {
-      return args.current;
-    }
-
-    if (!args.current) {
-      return { ...args.next };
-    }
-
-    const cachedInputTokens = (args.current.cachedInputTokens ?? 0) + (args.next.cachedInputTokens ?? 0);
-    const reasoningTokens = (args.current.reasoningTokens ?? 0) + (args.next.reasoningTokens ?? 0);
-    const requests = (args.current.requests ?? 0) + (args.next.requests ?? 0);
-
-    return {
-      inputTokens: args.current.inputTokens + args.next.inputTokens,
-      outputTokens: args.current.outputTokens + args.next.outputTokens,
-      totalTokens: args.current.totalTokens + args.next.totalTokens,
-      cachedInputTokens: cachedInputTokens || undefined,
-      reasoningTokens: reasoningTokens || undefined,
-      requests: requests || undefined,
-    };
   }
 }

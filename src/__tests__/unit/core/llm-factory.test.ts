@@ -197,9 +197,21 @@ describe('llm adapter factory', () => {
       toolCalls: [{ id: 'call_1', tool: 'add', input: { a: 2, b: 3 } }],
       usage: {
         inputTokens: 10,
+        billedInputTokens: 10,
         outputTokens: 4,
         totalTokens: 14,
         requests: 1,
+        cost: { status: 'unavailable' },
+        byModel: [{
+          provider: 'ollama',
+          model: 'ollama/llama3.2:latest',
+          inputTokens: 10,
+          billedInputTokens: 10,
+          outputTokens: 4,
+          totalTokens: 14,
+          requests: 1,
+          cost: { status: 'unavailable' },
+        }],
       },
     });
   });
@@ -260,9 +272,21 @@ describe('llm adapter factory', () => {
     expect(result.content).toBe('ok');
     expect(result.usage).toEqual({
       inputTokens: 3,
+      billedInputTokens: 3,
       outputTokens: 1,
       totalTokens: 4,
       requests: 1,
+      cost: { status: 'unavailable' },
+      byModel: [{
+        provider: 'openrouter',
+        model: 'openrouter/meta-llama/llama-3.3-70b-instruct',
+        inputTokens: 3,
+        billedInputTokens: 3,
+        outputTokens: 1,
+        totalTokens: 4,
+        requests: 1,
+        cost: { status: 'unavailable' },
+      }],
     });
   });
 

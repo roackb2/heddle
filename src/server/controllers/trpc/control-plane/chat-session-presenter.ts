@@ -1,4 +1,5 @@
 import type { ChatSession, ConversationDirectShellLineResult } from '@/core/chat/types.js';
+import { LlmUsageSchema } from '@/core/llm/usage/index.js';
 import { REASONING_EFFORTS, type ReasoningEffort } from '@/core/llm/types.js';
 import { ConversationDirectShellLineResultSchema } from '@/core/chat/engine/direct-shell/result-schema.js';
 import { ConversationTurnPresentationService } from '@/core/chat/engine/turns/presentation/index.js';
@@ -59,13 +60,7 @@ export class ControlPlaneChatSessionPresenter {
       estimatedTokens: readNumber(request?.estimatedTokens),
       toolNames: readStringArray(request?.toolNames),
       goal: readString(request?.goal),
-      usage: omitEmpty({
-        inputTokens: readNumber(usage?.inputTokens),
-        outputTokens: readNumber(usage?.outputTokens),
-        totalTokens: readNumber(usage?.totalTokens),
-        cachedInputTokens: readNumber(usage?.cachedInputTokens),
-        reasoningTokens: readNumber(usage?.reasoningTokens),
-      }),
+      usage: ControlPlaneChatSessionPresenter.readUsage(usage),
     });
     const compactionView = omitEmpty({
       compactedMessages: readNumber(compaction?.compactedMessages),
@@ -208,6 +203,11 @@ export class ControlPlaneChatSessionPresenter {
   private static projectDirectShellResult(raw: unknown): ConversationDirectShellLineResult | undefined {
     const directShellResult = ConversationDirectShellLineResultSchema.safeParse(raw);
     return directShellResult.success ? directShellResult.data : undefined;
+  }
+
+  private static readUsage(raw: unknown) {
+    const usage = LlmUsageSchema.safeParse(raw);
+    return usage.success ? usage.data : undefined;
   }
 
   private static projectTurnView(raw: unknown): ChatTurnView[] {

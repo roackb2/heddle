@@ -1,4 +1,4 @@
-import type { LlmResponse, LlmUsage } from '@/core/llm/types.js';
+import type { LlmResponse } from '@/core/llm/types.js';
 import type { RunResult } from '@/core/types.js';
 import type { AgentRunContext } from '../types.js';
 
@@ -7,8 +7,3 @@ export type RequestAgentModelTurnArgs = {
 };
 
 export type AgentModelTurnResult = LlmResponse | RunResult;
-
-export type AccumulateAgentUsageArgs = {
-  current?: LlmUsage;
-  next?: LlmUsage;
-};
