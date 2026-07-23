@@ -425,6 +425,62 @@ describe('AutonomyPolicyService', () => {
     }));
   });
 
+  it('does not let local root claims authorize a host-classified remote mutation', () => {
+    const evaluation = AutonomyPolicyService.evaluate({
+      context: context({
+        call: {
+          id: 'call-mcp-write-with-roots',
+          tool: 'update_slide',
+          input: {
+            title: 'Updated',
+            policy: {
+              operations: ['write'],
+              intent: 'update a remote slide',
+              targetRoots: ['.'],
+              writeRoots: ['.'],
+              expectedEffects: ['update slide'],
+              environment: 'local',
+              confidence: 'high',
+            },
+          },
+        },
+        tool: {
+          name: 'update_slide',
+          description: 'updates a remote slide',
+          requiresApproval: true,
+          parameters: {},
+          hostPolicy: {
+            authority: {
+              kind: 'mcp',
+              serverId: 'slides',
+              toolName: 'update-slide',
+            },
+            transport: {
+              kind: 'http',
+              network: true,
+            },
+            environment: 'local',
+            operations: ['write'],
+          },
+          execute: async () => ({ ok: true }),
+        },
+      }),
+      profile,
+    });
+
+    expect(evaluation.facts.claimedWriteRoots).toEqual(['/workspace/current']);
+    expect(evaluation.facts.rootDecisions).toEqual([
+      expect.objectContaining({
+        root: '/workspace/current',
+        access: 'autopilot',
+      }),
+    ]);
+    expect(evaluation.decision).toEqual(expect.objectContaining({
+      type: 'request',
+      reason: 'remote mutating authority requires explicit approval',
+    }));
+  });
+
   it('does not auto-allow a mutating shell call whose envelope declares no roots', () => {
     const evaluation = AutonomyPolicyService.evaluate({
       context: context({

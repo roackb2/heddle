@@ -133,7 +133,10 @@ describe('tool policy envelope', () => {
       },
     })).resolves.toEqual({ ok: true, output: 'ok' });
 
-    expect(execute).toHaveBeenCalledWith({ path: 'remote-document' });
+    expect(execute).toHaveBeenCalledWith(
+      { path: 'remote-document' },
+      { signal: expect.any(AbortSignal) },
+    );
   });
 
   it('rejects an envelope with empty roots for mutating operations', async () => {

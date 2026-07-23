@@ -164,7 +164,6 @@ export class AutonomyPolicyService {
       profile: args.profile,
       context: args.context,
       policy: args.policy,
-      claimedWriteRoots,
     });
 
     return {
@@ -309,13 +308,11 @@ export class AutonomyPolicyService {
     profile: NormalizedAutopilotProfile;
     context: ToolApprovalPolicyContext;
     policy: ToolPolicyReconciliation;
-    claimedWriteRoots: string[];
   }): string[] {
     const host = args.policy.hostOwned;
     const remoteEffectsUnclassified = host?.transport.network && !host.operations;
     const remoteMutationWithoutAuthorityPolicy = host?.transport.network
-      && args.operations.some((operation) => TOOL_POLICY_MUTATING_OPERATIONS.has(operation))
-      && args.claimedWriteRoots.length === 0;
+      && args.operations.some((operation) => TOOL_POLICY_MUTATING_OPERATIONS.has(operation));
 
     return [
       ...args.rootDecisions.flatMap((decision) => AutonomyPolicyService.rootApprovalReasons({
