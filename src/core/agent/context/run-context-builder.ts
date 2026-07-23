@@ -9,6 +9,7 @@ import { AgentStepBudget } from '../budget/index.js';
 import { AgentHistorySanitizer } from '../history/index.js';
 import { AgentMemoryCheckpointTracker } from '../memory/index.js';
 import { AgentMutationTracker } from '../mutation/index.js';
+import { AgentToolConcurrencyService } from '../tools/tool-concurrency-service.js';
 import type { BuildAgentRunContextArgs, BuildInitialAgentMessagesArgs } from './types.js';
 import type { AgentRunContext } from '../types.js';
 import type { ChatMessage } from '@/core/llm/types.js';
@@ -22,11 +23,15 @@ export class AgentRunContextBuilder {
     const trace = new TraceRecorder();
     const now = () => new Date().toISOString();
     const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS;
+    const maxToolConcurrency = AgentToolConcurrencyService.resolveLimit(
+      options.maxToolConcurrency,
+    );
     const toolNames = registry.names();
 
     return {
       goal: options.goal,
       maxSteps,
+      maxToolConcurrency,
       llm: options.llm,
       registry,
       workspaceRoot: resolve(options.workspaceRoot ?? process.cwd()),

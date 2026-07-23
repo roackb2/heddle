@@ -12,6 +12,14 @@ import { createLogger } from '../../../core/utils/logger.js';
 
 const silentLogger = createLogger({ level: 'silent', console: false });
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
 async function runWithRetryTimers(run: () => Promise<Awaited<ReturnType<typeof AgentRunService.run>>>) {
   vi.useFakeTimers();
   try {
@@ -2098,4 +2106,399 @@ describe('AgentRunService.run', () => {
       ],
     });
   });
+
+  it('bounds parallel-safe tool calls and projects mixed results in call order', async () => {
+    const started: string[] = [];
+    const completed: string[] = [];
+    let active = 0;
+    let peakActive = 0;
+    let modelCalls = 0;
+    const gates = new Map([
+      ['first', deferred<{ ok: true; output: string }>()],
+      ['second', deferred<{ ok: false; error: string }>()],
+      ['third', deferred<{ ok: true; output: string }>()],
+    ]);
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          parallelToolCalls: true,
+          reasoningSummaries: false,
+          systemMessages: true,
+          toolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        modelCalls++;
+        if (modelCalls === 1) {
+          return {
+            toolCalls: [
+              { id: 'call-first', tool: 'parallel_read', input: { id: 'first' } },
+              { id: 'call-second', tool: 'parallel_read', input: { id: 'second' } },
+              { id: 'call-third', tool: 'parallel_read', input: { id: 'third' } },
+            ],
+          };
+        }
+        return { content: 'Finished the reads.' };
+      },
+    };
+    const parallelRead: ToolDefinition = {
+      name: 'parallel_read',
+      description: 'Reads one independent value.',
+      concurrency: 'parallel-safe',
+      parameters: { type: 'object', properties: { id: { type: 'string' } } },
+      async execute(input) {
+        const id = (input as { id: string }).id;
+        const gate = gates.get(id);
+        if (!gate) {
+          throw new Error(`Missing gate for ${id}`);
+        }
+        started.push(id);
+        active++;
+        peakActive = Math.max(peakActive, active);
+        try {
+          return await gate.promise;
+        } finally {
+          active--;
+          completed.push(id);
+        }
+      },
+    };
+
+    const run = AgentRunService.run({
+      goal: 'Read three independent values.',
+      llm: fakeLlm,
+      tools: [parallelRead],
+      maxSteps: 2,
+      maxToolConcurrency: 2,
+      logger: silentLogger,
+    });
+
+    await vi.waitFor(() => expect(started).toEqual(['first', 'second']));
+    gates.get('second')?.resolve({ ok: false, error: 'second failed' });
+    await vi.waitFor(() => expect(started).toEqual(['first', 'second', 'third']));
+    gates.get('third')?.resolve({ ok: true, output: 'third result' });
+    gates.get('first')?.resolve({ ok: true, output: 'first result' });
+
+    const result = await run;
+    expect(result.outcome).toBe('done');
+    expect(peakActive).toBe(2);
+    expect(completed).toEqual(['second', 'third', 'first']);
+    expect(
+      result.transcript
+        .filter((message) => message.role === 'tool')
+        .map((message) => message.toolCallId),
+    ).toEqual(['call-first', 'call-second', 'call-third']);
+    expect(
+      result.transcript
+        .filter((message) => message.role === 'tool')
+        .map((message) => JSON.parse(message.content)),
+    ).toEqual([
+      { ok: true, output: 'first result' },
+      { ok: false, error: 'second failed' },
+      { ok: true, output: 'third result' },
+    ]);
+  });
+
+  it('resolves every same-response approval before starting allowed calls', async () => {
+    const approvalRequests: string[] = [];
+    const executions: string[] = [];
+    const approvals = new Map([
+      ['call-allowed', deferred<{ approved: true }>()],
+      ['call-denied', deferred<{ approved: false; reason: string }>()],
+    ]);
+    let modelCalls = 0;
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          parallelToolCalls: true,
+          reasoningSummaries: false,
+          systemMessages: true,
+          toolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        modelCalls++;
+        return modelCalls === 1
+          ? {
+              toolCalls: [
+                { id: 'call-allowed', tool: 'approved_read', input: { id: 'allowed' } },
+                { id: 'call-denied', tool: 'approved_read', input: { id: 'denied' } },
+              ],
+            }
+          : { content: 'Approval handling finished.' };
+      },
+    };
+    const approvedRead: ToolDefinition = {
+      name: 'approved_read',
+      description: 'Reads only after explicit approval.',
+      concurrency: 'parallel-safe',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: { id: { type: 'string' } } },
+      async execute(input) {
+        const id = (input as { id: string }).id;
+        executions.push(id);
+        return { ok: true, output: id };
+      },
+    };
+
+    const run = AgentRunService.run({
+      goal: 'Run the approved reads.',
+      llm: fakeLlm,
+      tools: [approvedRead],
+      maxSteps: 2,
+      logger: silentLogger,
+      approveToolCall: async (call) => {
+        approvalRequests.push(call.id);
+        const approval = approvals.get(call.id);
+        if (!approval) {
+          throw new Error(`Missing approval for ${call.id}`);
+        }
+        return await approval.promise;
+      },
+    });
+
+    await vi.waitFor(() => expect(approvalRequests).toEqual(['call-allowed']));
+    expect(executions).toEqual([]);
+    approvals.get('call-allowed')?.resolve({ approved: true });
+    await vi.waitFor(() =>
+      expect(approvalRequests).toEqual(['call-allowed', 'call-denied']),
+    );
+    expect(executions).toEqual([]);
+    approvals.get('call-denied')?.resolve({
+      approved: false,
+      reason: 'not needed',
+    });
+
+    const result = await run;
+    expect(executions).toEqual(['allowed']);
+    expect(
+      result.transcript
+        .filter((message) => message.role === 'tool')
+        .map((message) => ({
+          id: message.toolCallId,
+          result: JSON.parse(message.content),
+        })),
+    ).toEqual([
+      {
+        id: 'call-allowed',
+        result: { ok: true, output: 'allowed' },
+      },
+      {
+        id: 'call-denied',
+        result: { ok: false, error: 'Approval denied for approved_read: not needed' },
+      },
+    ]);
+  });
+
+  it('authorizes serial calls after preceding serial effects', async () => {
+    const approvalSnapshots: string[] = [];
+    const executions: string[] = [];
+    let value = 'initial';
+    let modelCalls = 0;
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          parallelToolCalls: true,
+          reasoningSummaries: false,
+          systemMessages: true,
+          toolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        modelCalls++;
+        return modelCalls === 1
+          ? {
+              toolCalls: [
+                { id: 'call-first', tool: 'serial_edit', input: { value: 'first' } },
+                { id: 'call-second', tool: 'serial_edit', input: { value: 'second' } },
+              ],
+            }
+          : { content: 'Serial edits finished.' };
+      },
+    };
+    const serialEdit: ToolDefinition = {
+      name: 'serial_edit',
+      description: 'Mutates shared state after explicit approval.',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: { value: { type: 'string' } } },
+      async execute(input) {
+        const nextValue = (input as { value: string }).value;
+        executions.push(nextValue);
+        value = nextValue;
+        return { ok: true, output: nextValue };
+      },
+    };
+
+    const result = await AgentRunService.run({
+      goal: 'Apply two serial edits.',
+      llm: fakeLlm,
+      tools: [serialEdit],
+      maxSteps: 2,
+      maxToolConcurrency: 2,
+      logger: silentLogger,
+      approveToolCall: async (call) => {
+        approvalSnapshots.push(`${call.id}:${value}`);
+        return { approved: true };
+      },
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(approvalSnapshots).toEqual([
+      'call-first:initial',
+      'call-second:first',
+    ]);
+    expect(executions).toEqual(['first', 'second']);
+  });
+
+  it('aborts all in-flight parallel tool calls and emits one terminal event', async () => {
+    const controller = new AbortController();
+    const started: string[] = [];
+    const seenSignals: AbortSignal[] = [];
+    const events: AgentRunEvent[] = [];
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          parallelToolCalls: true,
+          reasoningSummaries: false,
+          systemMessages: true,
+          toolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        return {
+          toolCalls: [
+            { id: 'call-one', tool: 'cancellable_read', input: { id: 'one' } },
+            { id: 'call-two', tool: 'cancellable_read', input: { id: 'two' } },
+          ],
+        };
+      },
+    };
+    const cancellableRead: ToolDefinition = {
+      name: 'cancellable_read',
+      description: 'Waits until its host cancels the read.',
+      concurrency: 'parallel-safe',
+      parameters: { type: 'object', properties: { id: { type: 'string' } } },
+      async execute(input, context) {
+        const id = (input as { id: string }).id;
+        const signal = context?.signal;
+        if (!signal) {
+          throw new Error('Expected a cancellation signal');
+        }
+        started.push(id);
+        seenSignals.push(signal);
+        return await new Promise((resolve) => {
+          signal.addEventListener(
+            'abort',
+            () => resolve({ ok: false, error: `${id} cancelled` }),
+            { once: true },
+          );
+        });
+      },
+    };
+
+    const run = AgentRunService.run({
+      goal: 'Start cancellable reads.',
+      llm: fakeLlm,
+      tools: [cancellableRead],
+      maxSteps: 2,
+      maxToolConcurrency: 2,
+      abortSignal: controller.signal,
+      logger: silentLogger,
+      onEvent: (event) => events.push(event),
+    });
+
+    await vi.waitFor(() => expect(started).toEqual(['one', 'two']));
+    controller.abort();
+
+    const result = await run;
+    expect(result.outcome).toBe('interrupted');
+    expect(seenSignals).toHaveLength(2);
+    expect(seenSignals.every((signal) => signal.aborted)).toBe(true);
+    expect(
+      events.filter(
+        (event) =>
+          event.type === 'trace' && event.event.type === 'run.finished',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it.each([
+    {
+      name: 'the tool has not opted in',
+      adapterSupportsParallel: true,
+      concurrency: undefined,
+    },
+    {
+      name: 'the adapter does not support parallel calls',
+      adapterSupportsParallel: false,
+      concurrency: 'parallel-safe' as const,
+    },
+  ])(
+    'keeps calls serial when $name',
+    async ({ adapterSupportsParallel, concurrency }) => {
+      const started: string[] = [];
+      const first = deferred<{ ok: true; output: string }>();
+      let modelCalls = 0;
+      const fakeLlm: LlmAdapter = {
+        info: {
+          provider: 'openai',
+          model: 'gpt-test',
+          capabilities: {
+            parallelToolCalls: adapterSupportsParallel,
+            reasoningSummaries: false,
+            systemMessages: true,
+            toolCalls: true,
+          },
+        },
+        async chat(): Promise<LlmResponse> {
+          modelCalls++;
+          return modelCalls === 1
+            ? {
+                toolCalls: [
+                  { id: 'call-first', tool: 'serial_tool', input: { id: 'first' } },
+                  { id: 'call-second', tool: 'serial_tool', input: { id: 'second' } },
+                ],
+              }
+            : { content: 'Serial execution finished.' };
+        },
+      };
+      const serialTool: ToolDefinition = {
+        name: 'serial_tool',
+        description: 'Uses the default serial policy.',
+        parameters: { type: 'object', properties: { id: { type: 'string' } } },
+        concurrency,
+        async execute(input) {
+          const id = (input as { id: string }).id;
+          started.push(id);
+          return id === 'first'
+            ? await first.promise
+            : { ok: true, output: id };
+        },
+      };
+
+      const run = AgentRunService.run({
+        goal: 'Run the serial calls.',
+        llm: fakeLlm,
+        tools: [serialTool],
+        maxSteps: 2,
+        maxToolConcurrency: 2,
+        logger: silentLogger,
+      });
+
+      await vi.waitFor(() => expect(started).toEqual(['first']));
+      first.resolve({ ok: true, output: 'first' });
+      const result = await run;
+
+      expect(result.outcome).toBe('done');
+      expect(started).toEqual(['first', 'second']);
+    },
+  );
 });

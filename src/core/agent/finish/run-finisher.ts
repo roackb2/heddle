@@ -9,8 +9,12 @@ import type { FinishAgentRunOptions } from './types.js';
  * Owns terminal run outcomes and final RunResult shaping.
  */
 export class AgentRunFinisher {
+  static isInterrupted(context: AgentRunContext): boolean {
+    return context.abortSignal?.aborted === true || context.shouldStop?.() === true;
+  }
+
   static maybeInterrupted(context: AgentRunContext, logMessage: string): RunResult | undefined {
-    if (!context.shouldStop?.()) {
+    if (!AgentRunFinisher.isInterrupted(context)) {
       return undefined;
     }
 

@@ -13,7 +13,12 @@ export class AgentRunService {
   static async run(options: RunAgentOptions): Promise<RunResult> {
     const context = AgentRunContextBuilder.create(options);
 
-    context.log.info({ goal: options.goal, maxSteps: context.maxSteps, tools: context.registry.names() }, 'Agent run started');
+    context.log.info({
+      goal: options.goal,
+      maxSteps: context.maxSteps,
+      maxToolConcurrency: context.maxToolConcurrency,
+      tools: context.registry.names(),
+    }, 'Agent run started');
     context.live.trace({ type: HeddleEventType.runStarted, goal: options.goal, timestamp: context.now() });
 
     while (!context.budget.exhausted()) {

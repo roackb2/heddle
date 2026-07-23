@@ -346,6 +346,10 @@ describe('readFileTool', () => {
 });
 
 describe('searchFilesTool', () => {
+  it('stays serial while its subprocess implementation is synchronous', () => {
+    expect(searchFilesTool.concurrency).toBeUndefined();
+  });
+
   it('uses fallback excludes when no project ignore file is present', async () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-search-'));
     await mkdir(join(root, 'src'));

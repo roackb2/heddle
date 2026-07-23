@@ -23,6 +23,9 @@ export class ConversationSdkRuntimeService {
 
     return {
       ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
+      ...(options.maxToolConcurrency === undefined
+        ? {}
+        : { maxToolConcurrency: options.maxToolConcurrency }),
       memoryMaintenanceMode: options.memoryMaintenanceMode ?? DEFAULT_MEMORY_MAINTENANCE_MODE,
       model: ConversationSdkRuntimeService.resolveModel(options),
       reasoningEffort: ConversationSdkRuntimeService.resolveReasoningEffort(

@@ -132,6 +132,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         tools,
         includeDefaultTools: false,
         maxSteps: args.maxSteps ?? agentSnapshot?.runtime.maxSteps,
+        maxToolConcurrency: args.maxToolConcurrency,
         history: preflight.compacted.history,
         systemContext: runtime.systemContext,
         onEvent: host.onEvent,

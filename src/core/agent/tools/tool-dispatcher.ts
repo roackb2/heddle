@@ -244,6 +244,7 @@ export class AgentToolDispatcher {
         'Executing repeated identical tool call; warning only',
       );
     }
+    seenToolCalls.set(signature, seenCount + 1);
 
     const startedAt = Date.now();
     const rawResult = await ToolExecutionService.execute(registry, call, {
@@ -267,7 +268,6 @@ export class AgentToolDispatcher {
       }
       : rawResult;
     const durationMs = Date.now() - startedAt;
-    seenToolCalls.set(signature, seenCount + 1);
     log.debug({ step, tool: call.tool, ok: result.ok }, 'Tool result');
     if (audit) {
       live.trace(AutonomyTraceService.postflight({

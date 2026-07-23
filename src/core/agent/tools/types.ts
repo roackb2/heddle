@@ -7,11 +7,6 @@ export type HandleAgentToolTurnArgs = {
   response: LlmResponse;
 };
 
-export type ExecuteAgentToolTurnArgs = {
-  context: AgentRunContext;
-  call: ToolCall;
-};
-
 export type AgentToolTurnResult = RunResult | 'continue';
 
 export type HandleAgentToolResultArgs = {

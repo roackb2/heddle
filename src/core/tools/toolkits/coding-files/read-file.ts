@@ -21,6 +21,7 @@ export function createReadFileTool(options: ReadFileToolOptions = {}): ToolDefin
 
   return {
     name: 'read_file',
+    concurrency: 'parallel-safe',
     description:
       'Read the contents of a file. Use this when you already know the file path and want its contents, not when you want to inspect a directory. Relative paths are resolved from the active workspace root and may also point to nearby parent or sibling folders. Optionally limit returned lines with maxLines and start from a 0-based line offset with offset, which is useful for paging through long files. Returns the file text directly, or just the selected window when maxLines and/or offset are provided. Example inputs: { "path": "path/to/file.txt" }, { "path": "../shared-notes/summary.md" }, { "path": "src/run-agent.ts", "offset": 200, "maxLines": 120 }',
     parameters: {

@@ -87,6 +87,7 @@ export type RunAgentLoopOptions = {
   apiKey?: string;
   credential?: RuntimeProviderCredential;
   maxSteps?: number;
+  maxToolConcurrency?: number;
   workspaceRoot?: string;
   stateDir?: string;
   memoryDir?: string;

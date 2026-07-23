@@ -9,6 +9,8 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
 - Calling the LLM adapter step by step.
 - Streaming assistant content to host callbacks.
 - Executing model-requested tools through a registry.
+- Scheduling explicitly parallel-safe tool calls within a bounded concurrency
+  limit while preserving deterministic transcript order.
 - Recording low-level `TraceEvent` evidence.
 - Emitting user-facing `ConversationActivity` for inner-loop moments that
   interfaces should render live.
@@ -34,8 +36,8 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
 - `context/`: builds the mutable run context and initial model transcript.
 - `budget/`: tracks max-step consumption for one run.
 - `model/`: owns one LLM request, stream presentation, and usage accumulation.
-- `tools/`: owns assistant tool-call turns, dispatch, approval, fallback, and
-  repeat tracking.
+- `tools/`: owns assistant tool-call turns, authorization, bounded scheduling,
+  dispatch, fallback, and repeat tracking.
 - `finish/`: owns final response, interruption, error, and max-step completion.
 - `history/`: sanitizes reused transcripts before model calls.
 - `mutation/`: classifies workspace-changing tool results.
@@ -48,6 +50,9 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
 - Add per-step behavior by explicit callbacks or future turn/runtime middleware,
   not by importing host state.
 - Add tool execution behavior through `ToolDefinition` and the tool registry.
+- Mark a tool `concurrency: 'parallel-safe'` only when independent invocations
+  can overlap without shared-state, capability, or ordering conflicts. Adapter
+  support and the host concurrency limit must also opt in before calls overlap.
 - Add trace detail by emitting typed `TraceEvent` values and updating the
   observability summarizer/projection path. If the same moment is also
   user-facing, use the live recorder helper to emit trace and activity together
@@ -63,6 +68,11 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
   integration tests in `run-agent.test.ts`.
 - To change approval behavior, prefer the approval domain. The agent loop should
   ask for decisions, not own policy storage or UI.
+- To change tool scheduling, preserve the dual opt-in contract, authorize every
+  call in a parallel batch before that batch starts, authorize serial calls
+  immediately before execution so previews observe earlier mutations, keep
+  serial calls as barriers, and project results in the model's original
+  tool-call order.
 
 ## Tests
 

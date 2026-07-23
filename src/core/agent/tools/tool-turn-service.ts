@@ -2,15 +2,28 @@ import { AgentMemoryCheckpointTracker } from '../memory/index.js';
 import { AgentMutationTracker } from '../mutation/index.js';
 import { AgentPlanStateParser } from '../planning/index.js';
 import { AgentRunFinisher } from '../finish/index.js';
+import { AgentToolConcurrencyService } from './tool-concurrency-service.js';
 import { AgentToolDispatcher } from './tool-dispatcher.js';
 import { HeddleEventType } from '@/core/event-types.js';
 import type {
   AgentToolTurnResult,
-  ExecuteAgentToolTurnArgs,
   HandleAgentToolResultArgs,
   HandleAgentToolTurnArgs,
 } from './types.js';
-import type { RunResult, ToolResult } from '@/core/types.js';
+import type { RunResult, ToolCall, ToolDefinition, ToolResult } from '@/core/types.js';
+
+type ToolCallScheduleEntry = {
+  index: number;
+  call: ToolCall;
+  tool?: ToolDefinition;
+  autonomyEvaluation?: Parameters<typeof AgentToolDispatcher.executeToolCallWithFallback>[0]['autonomyEvaluation'];
+};
+
+type ProjectedToolCall = {
+  effectiveCall: ToolCall;
+  result: ToolResult;
+  executed: boolean;
+};
 
 /**
  * Owns assistant tool-call turns inside the agent loop.
@@ -36,8 +49,114 @@ export class AgentToolTurnService {
       providerContinuation: response.providerContinuation,
     });
 
-    for (const call of toolCalls) {
-      const toolCallResult = await AgentToolTurnService.execute({ context, call });
+    const projectedByIndex = new Map<number, ProjectedToolCall>();
+    const scheduledCalls: ToolCallScheduleEntry[] = toolCalls.map((call, index) => ({
+      index,
+      call,
+      tool: context.registry.get(call.tool),
+    }));
+    const interruptedBeforeScheduling = AgentRunFinisher.maybeInterrupted(
+      context,
+      'Agent run interrupted before tool scheduling',
+    );
+    if (interruptedBeforeScheduling) {
+      return interruptedBeforeScheduling;
+    }
+
+    const executions = await AgentToolConcurrencyService.execute({
+      calls: scheduledCalls,
+      adapterSupportsParallel:
+        context.llm.info?.capabilities.parallelToolCalls === true,
+      maxConcurrency: context.maxToolConcurrency,
+      isInterrupted: () => AgentRunFinisher.isInterrupted(context),
+      prepareStage: async (calls) => {
+        const authorizedCalls: ToolCallScheduleEntry[] = [];
+        for (const scheduled of calls) {
+          if (AgentRunFinisher.isInterrupted(context)) {
+            break;
+          }
+
+          const authorization = await AgentToolDispatcher.authorizeToolCall({
+            call: scheduled.call,
+            tool: scheduled.tool,
+            step: context.state.step,
+            now: context.now,
+            approveToolCall: context.approveToolCall,
+            approvalPolicies: context.approvalPolicies,
+            workspaceRoot: context.workspaceRoot,
+            live: context.live,
+            log: context.log,
+          });
+          if (authorization.type === 'denied') {
+            projectedByIndex.set(scheduled.index, {
+              effectiveCall: scheduled.call,
+              result: authorization.result,
+              executed: false,
+            });
+            continue;
+          }
+
+          authorizedCalls.push({
+            ...scheduled,
+            autonomyEvaluation: authorization.autonomyEvaluation,
+          });
+        }
+
+        return authorizedCalls;
+      },
+      execute: async (authorized) => await AgentToolDispatcher.executeToolCallWithFallback({
+        call: authorized.call,
+        autonomyEvaluation: authorized.autonomyEvaluation,
+        step: context.state.step,
+        now: context.now,
+        registry: context.registry,
+        seenToolCalls: context.seenToolCalls,
+        approveToolCall: context.approveToolCall,
+        approvalPolicies: context.approvalPolicies,
+        workspaceRoot: context.workspaceRoot,
+        abortSignal: context.abortSignal,
+        live: context.live,
+        log: context.log,
+      }),
+    });
+
+    executions.forEach((execution, index) => {
+      projectedByIndex.set(index, {
+        ...execution,
+        executed: true,
+      });
+    });
+
+    const interruptedDuringExecution = AgentRunFinisher.maybeInterrupted(
+      context,
+      'Agent run interrupted during tool execution',
+    );
+    if (interruptedDuringExecution) {
+      return interruptedDuringExecution;
+    }
+
+    for (const [index, call] of toolCalls.entries()) {
+      const projected = projectedByIndex.get(index);
+      if (!projected) {
+        continue;
+      }
+
+      if (!projected.executed) {
+        AgentToolTurnService.handleDeniedResult(
+          context,
+          call.id,
+          projected.result,
+        );
+        continue;
+      }
+
+      context.state.executedToolCalls++;
+      const toolCallResult = AgentToolTurnService.handleExecutedResult({
+        context,
+        effectiveCall: projected.effectiveCall,
+        toolCallId: call.id,
+        result: projected.result,
+      });
       if (toolCallResult) {
         return toolCallResult;
       }
@@ -46,56 +165,8 @@ export class AgentToolTurnService {
     return 'continue';
   }
 
-  private static async execute(args: ExecuteAgentToolTurnArgs): Promise<RunResult | undefined> {
-    const { context, call } = args;
-    const interrupted = AgentRunFinisher.maybeInterrupted(context, 'Agent run interrupted before tool execution');
-    if (interrupted) {
-      return interrupted;
-    }
-
-    const tool = context.registry.get(call.tool);
-    const authorization = await AgentToolDispatcher.authorizeToolCall({
-      call,
-      tool,
-      step: context.state.step,
-      now: context.now,
-      approveToolCall: context.approveToolCall,
-      approvalPolicies: context.approvalPolicies,
-      workspaceRoot: context.workspaceRoot,
-      live: context.live,
-      log: context.log,
-    });
-    if (authorization.type === 'denied') {
-      return AgentToolTurnService.handleDeniedResult(context, call.id, authorization.result);
-    }
-
-    const execution = await AgentToolDispatcher.executeToolCallWithFallback({
-      call,
-      autonomyEvaluation: authorization.autonomyEvaluation,
-      step: context.state.step,
-      now: context.now,
-      registry: context.registry,
-      seenToolCalls: context.seenToolCalls,
-      abortSignal: context.abortSignal,
-      approveToolCall: context.approveToolCall,
-      approvalPolicies: context.approvalPolicies,
-      workspaceRoot: context.workspaceRoot,
-      live: context.live,
-      log: context.log,
-    });
-
-    context.state.executedToolCalls++;
-
-    return AgentToolTurnService.handleExecutedResult({
-      context,
-      effectiveCall: execution.effectiveCall,
-      toolCallId: call.id,
-      result: execution.result,
-    });
-  }
-
   private static handleDeniedResult(
-    context: ExecuteAgentToolTurnArgs['context'],
+    context: HandleAgentToolTurnArgs['context'],
     toolCallId: string,
     result: ToolResult,
   ): RunResult | undefined {
@@ -141,12 +212,12 @@ export class AgentToolTurnService {
     return undefined;
   }
 
-  private static handleFailedExecution(context: ExecuteAgentToolTurnArgs['context'], _result: ToolResult): RunResult | undefined {
+  private static handleFailedExecution(context: HandleAgentToolTurnArgs['context'], _result: ToolResult): RunResult | undefined {
     context.state.consecutiveErrors++;
     return undefined;
   }
 
-  private static pushHostRequirementReminders(context: ExecuteAgentToolTurnArgs['context']): void {
+  private static pushHostRequirementReminders(context: HandleAgentToolTurnArgs['context']): void {
     const memoryReminder = AgentMemoryCheckpointTracker.buildReminder(context);
     if (memoryReminder && !context.state.reminders.memoryCheckpointSent) {
       context.state.reminders.memoryCheckpointSent = true;

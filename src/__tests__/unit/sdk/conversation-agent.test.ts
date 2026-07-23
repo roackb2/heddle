@@ -42,6 +42,7 @@ describe('ConversationAgentService', () => {
       env: {},
       host: { events: { onActivity } },
       maxSteps: 7,
+      maxToolConcurrency: 3,
       model: 'gpt-test',
       session: {
         id: 'project-assistant',
@@ -55,6 +56,7 @@ describe('ConversationAgentService', () => {
 
     expect(agent.runtime).toEqual(expect.objectContaining({
       maxSteps: 7,
+      maxToolConcurrency: 3,
       memoryMaintenanceMode: 'none',
       model: 'gpt-test',
       stateRoot: join(workspaceRoot, '.heddle'),
@@ -79,6 +81,7 @@ describe('ConversationAgentService', () => {
       1,
       expect.objectContaining({
         maxSteps: 7,
+        maxToolConcurrency: 3,
         memoryMaintenanceMode: 'none',
         prompt: 'Summarize this project.',
         sessionId: 'project-assistant',

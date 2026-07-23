@@ -22,6 +22,7 @@ export type ConversationSdkRuntimeDefaultsInput = {
   workspaceRoot?: string;
   stateRoot?: string;
   maxSteps?: number;
+  maxToolConcurrency?: number;
   reasoningEffort?: ReasoningEffort | string;
   memoryMaintenanceMode?: ConversationSdkMemoryMaintenanceMode;
   env?: Pick<
@@ -35,6 +36,7 @@ export type ConversationSdkRuntimeDefaults = {
   workspaceRoot: string;
   stateRoot: string;
   maxSteps?: number;
+  maxToolConcurrency?: number;
   reasoningEffort?: ReasoningEffort;
   memoryMaintenanceMode: ConversationSdkMemoryMaintenanceMode;
 };
