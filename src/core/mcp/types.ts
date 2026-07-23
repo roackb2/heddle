@@ -1,3 +1,5 @@
+import type { ToolPolicyEnvironment } from '@/core/tools/policy-envelope/types.js';
+
 export type McpTransportKind = 'stdio' | 'http' | 'sse';
 
 export type McpServerConfigSource = 'heddle' | 'standard' | 'vscode';
@@ -19,6 +21,7 @@ export type McpStdioServerConfig = {
   cwd?: string;
   env: Record<string, string>;
   envFile?: string;
+  environment?: ToolPolicyEnvironment;
   tools?: McpToolPolicy;
 };
 
@@ -28,6 +31,7 @@ export type McpHttpServerConfig = {
   source: McpServerConfigSource;
   url: string;
   headers: Record<string, string>;
+  environment?: ToolPolicyEnvironment;
   tools?: McpToolPolicy;
 };
 

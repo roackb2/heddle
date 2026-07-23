@@ -13,7 +13,7 @@ const POLICY_ENVELOPE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   description:
-    'Optional agent-declared intent envelope for approval/autopilot policy. Use this to honestly declare the purpose, operation categories, expected impact surface, target roots, environment, and confidence for this tool call. The harness treats this as a claim, combines it with runtime environment facts and configured policy, then decides whether to allow, request approval, or deny the action.',
+    'Optional agent-declared intent envelope for approval/autopilot policy. Use this to honestly declare the purpose, operation categories, expected impact surface, target roots, proposed environment, and confidence for this tool call. The harness treats this as a claim, reconciles it with immutable host authority, transport, environment, and tenant facts, then decides whether to allow, request approval, or deny the action.',
   properties: {
     operations: {
       type: 'array',
@@ -22,7 +22,7 @@ const POLICY_ENVELOPE_SCHEMA = {
         type: 'string',
         enum: [...TOOL_POLICY_OPERATIONS],
       },
-      description: 'Operation categories the agent expects this tool call to perform. Use multiple values when appropriate.',
+      description: 'Effect categories the agent expects this tool call to perform. Use multiple values when appropriate. Do not add "network" merely because the host uses HTTP or another network transport; transport is host-owned provenance.',
     },
     intent: {
       type: 'string',
@@ -31,7 +31,7 @@ const POLICY_ENVELOPE_SCHEMA = {
     targetRoots: {
       type: 'array',
       items: { type: 'string' },
-      description: `Project/workspace roots the agent expects this call to touch. May be empty only for read-only or state-only calls that touch no project root, such as planning tools. Calls that write, delete, move, execute, run git, or use the network must declare at least one target or write root. ${ROOT_DESCRIPTION}`,
+      description: `Project/workspace roots the agent expects this call to touch. May be empty only for read-only or state-only calls that touch no project root, such as planning tools. Calls that write, delete, move, execute, or run git must declare at least one target or write root. ${ROOT_DESCRIPTION}`,
     },
     readRoots: {
       type: 'array',
@@ -56,7 +56,7 @@ const POLICY_ENVELOPE_SCHEMA = {
     environment: {
       type: 'string',
       enum: [...TOOL_POLICY_ENVIRONMENTS],
-      description: 'Environment the agent believes this call targets.',
+      description: 'Environment the agent believes this call targets. When a tool has host-owned environment provenance, the host value is authoritative and this field remains only an auditable proposal.',
     },
     confidence: {
       type: 'string',

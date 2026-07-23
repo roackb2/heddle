@@ -1,6 +1,6 @@
 import type { ArtifactKind, RuntimeArtifact } from '@/core/artifacts/index.js';
 import type { McpRefreshResult, McpServerCatalogRecord, McpServerConfig, McpToolDescriptor } from '@/core/mcp/index.js';
-import type { ToolToolkitContext } from '@/core/tools/index.js';
+import type { ToolPolicyEnvironment, ToolPolicyOperation, ToolToolkitContext } from '@/core/tools/index.js';
 import type {
   ConversationEngineHostArtifactOptions,
   ConversationEngineHostExtension,
@@ -11,6 +11,11 @@ export type McpHostToolOverride = {
   description?: string;
   capabilities?: string[];
   requiresApproval?: boolean;
+  /**
+   * Host-owned effect classification. Omit when the host cannot verify the
+   * remote tool's effects; model claims remain proposals.
+   */
+  operations?: readonly ToolPolicyOperation[];
 };
 
 export type McpHostResultArtifactRule = {
@@ -96,6 +101,10 @@ export type DefineMcpHostExtensionOptions = {
   /** Prefix exposed tool names only when multiple MCP servers may collide. */
   toolNamePrefix?: string;
   defaultCapabilities?: string[];
+  /** Host-owned target environment. Overrides config/endpoint derivation. */
+  environment?: ToolPolicyEnvironment;
+  /** Optional opaque tenant boundary recorded in policy evaluation traces. */
+  tenantId?: string;
   toolOverrides?: Record<string, McpHostToolOverride>;
   hideDefaultMcpTools?: boolean;
   resultArtifacts?: McpHostResultArtifactsOptions;

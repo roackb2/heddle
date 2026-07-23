@@ -92,6 +92,27 @@ describe('MCP service', () => {
     });
   });
 
+  it('preserves host-owned environment classification from MCP config', () => {
+    const { workspaceRoot, stateRoot } = workspaceFixture();
+    writeFileSync(FileMcpConfigRepository.resolvePath(stateRoot), JSON.stringify({
+      mcpServers: {
+        production_data: {
+          type: 'streamable-http',
+          url: 'https://mcp.example.test',
+          environment: 'production',
+        },
+      },
+    }), 'utf8');
+
+    const [server] = new FileMcpConfigRepository({ workspaceRoot, stateRoot }).read().servers;
+
+    expect(server).toEqual(expect.objectContaining({
+      id: 'production_data',
+      transport: 'http',
+      environment: 'production',
+    }));
+  });
+
   it('rejects invalid MCP config document saves', () => {
     const { workspaceRoot, stateRoot } = workspaceFixture();
     const service = new McpService({ workspaceRoot, stateRoot });

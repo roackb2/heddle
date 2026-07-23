@@ -6,6 +6,7 @@
 import type { ChatMessage, LlmUsage } from './llm/types.js';
 import { HeddleEventType } from './event-types.js';
 import type { AutonomyEvaluation, AutonomyPostflightAudit } from './approvals/autonomy/index.js';
+import type { ToolPolicyHostContext } from './tools/policy-envelope/types.js';
 
 /**
  * Input to the agent loop.
@@ -32,6 +33,10 @@ export type ToolDefinition = {
   requiresApproval?: boolean;
   capabilities?: string[];
   parameters: Record<string, unknown>; // JSON Schema object
+  /** Immutable execution provenance owned by the host, never by the model. */
+  hostPolicy?: ToolPolicyHostContext;
+  /** Resolve host provenance for broker tools whose authority is input-selected. */
+  resolveHostPolicy?: (input: unknown) => ToolPolicyHostContext | undefined;
   execute: (input: unknown, context?: ToolExecutionContext) => Promise<ToolResult>;
 };
 

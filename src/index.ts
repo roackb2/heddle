@@ -124,7 +124,15 @@ export {
   ToolExecutionService,
   ToolRegistry,
 } from './core/tools/index.js';
-export type { ToolToolkit, ToolToolkitContext } from './core/tools/index.js';
+export type {
+  ToolPolicyEnvironment,
+  ToolPolicyEnvelope,
+  ToolPolicyHostContext,
+  ToolPolicyOperation,
+  ToolPolicyReconciliation,
+  ToolToolkit,
+  ToolToolkitContext,
+} from './core/tools/index.js';
 export { artifactsToolkit } from './core/tools/toolkits/artifacts/index.js';
 export { AgentSkillService, AgentSkillsRuntimeContextService, FileAgentSkillActivationRepository } from './core/skills/index.js';
 export type {

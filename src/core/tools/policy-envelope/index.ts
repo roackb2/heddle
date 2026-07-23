@@ -1,4 +1,5 @@
 export { ToolPolicyEnvelopeInputService } from './input-service.js';
+export { ToolPolicyResolutionService } from './resolution-service.js';
 export { ToolPolicyEnvelopeSchemaService } from './schema-service.js';
 export {
   TOOL_POLICY_CONFIDENCE_LEVELS,
@@ -12,6 +13,13 @@ export type {
   ToolPolicyDestructiveScope,
   ToolPolicyEnvelope,
   ToolPolicyEnvelopeExtraction,
+  ToolPolicyFieldOwnership,
+  ToolPolicyHostAuthority,
+  ToolPolicyHostContext,
+  ToolPolicyHostTransport,
   ToolPolicyEnvironment,
   ToolPolicyOperation,
+  ToolPolicyReconciliation,
+  ToolPolicyReconciliationDiagnostic,
+  ToolPolicyResolution,
 } from './types.js';

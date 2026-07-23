@@ -1,6 +1,12 @@
 import { resolve } from 'node:path';
 import type { ToolApprovalPolicyContext, ToolApprovalPolicyDecision } from '../types.js';
-import { TOOL_POLICY_MUTATING_OPERATIONS, ToolPolicyEnvelopeInputService, type ToolPolicyEnvelope, type ToolPolicyOperation } from '@/core/tools/index.js';
+import {
+  TOOL_POLICY_MUTATING_OPERATIONS,
+  ToolPolicyResolutionService,
+  type ToolPolicyEnvelope,
+  type ToolPolicyOperation,
+  type ToolPolicyReconciliation,
+} from '@/core/tools/index.js';
 import type {
   AutonomyEvaluation,
   AutonomyPolicyHint,
@@ -28,15 +34,19 @@ export class AutonomyPolicyService {
       profile: args.profile,
       workspaceRoot,
     });
-    const extraction = ToolPolicyEnvelopeInputService.extract(args.context.call.input);
-    const envelope = extraction.envelope;
+    const resolution = ToolPolicyResolutionService.resolve({
+      tool: args.context.tool,
+      input: args.context.call.input,
+    });
+    const envelope = resolution.envelope;
     const facts = AutonomyPolicyService.computeFacts({
       context: args.context,
       envelope,
       profile,
       workspaceRoot,
-      extractionError: extraction.error,
-      toolInput: extraction.toolInput,
+      policy: resolution.reconciliation,
+      extractionError: resolution.error,
+      toolInput: resolution.toolInput,
     });
     const policyHints = AutonomyPolicyService.createPolicyHints(facts);
     const decision = AutonomyPolicyService.decide({
@@ -50,6 +60,7 @@ export class AutonomyPolicyService {
       call: args.context.call,
       profileMode: profile.mode,
       profilePreset: profile.preset,
+      policy: resolution.reconciliation,
       envelope,
       facts,
       decision,
@@ -93,16 +104,17 @@ export class AutonomyPolicyService {
       return { type: 'request', reason: facts.approvalReasons.join('; '), facts };
     }
 
-    if (!envelope) {
-      return { type: 'allow', reason: 'allowed by autopilot profile without a required policy envelope', facts };
-    }
-
-    if (envelope.confidence === 'low' || envelope.operations.includes('unknown')) {
+    if (envelope && (envelope.confidence === 'low' || envelope.operations.includes('unknown'))) {
       return { type: 'request', reason: 'policy envelope is not specific enough for autopilot', facts };
     }
 
-    if (!profile.environments.allow.includes(envelope.environment as 'local' | 'dev')) {
+    const hasEnvironmentClaim = envelope !== undefined || facts.environment !== 'unknown';
+    if (hasEnvironmentClaim && !profile.environments.allow.includes(facts.environment as 'local' | 'dev')) {
       return { type: 'request', reason: 'environment is not allowed for unattended execution', facts };
+    }
+
+    if (!envelope) {
+      return { type: 'allow', reason: 'allowed by autopilot profile without a required policy envelope', facts };
     }
 
     return { type: 'allow', reason: 'allowed by autopilot profile and declared policy envelope', facts };
@@ -113,6 +125,7 @@ export class AutonomyPolicyService {
     envelope?: ToolPolicyEnvelope;
     profile: NormalizedAutopilotProfile;
     workspaceRoot: string;
+    policy: ToolPolicyReconciliation;
     extractionError?: string;
     toolInput: unknown;
   }): ToolPolicyFacts {
@@ -122,7 +135,11 @@ export class AutonomyPolicyService {
       input: args.toolInput,
       workspaceRoot: args.workspaceRoot,
     });
-    const operations = args.envelope?.operations ?? AutonomyPolicyService.inferOperations(args.context);
+    const operations = ToolPolicyResolutionService.operations({
+      reconciliation: args.policy,
+      fallback: AutonomyPolicyService.inferOperations(args.context),
+    });
+    const environment = args.policy.hostOwned?.environment ?? args.envelope?.environment ?? 'unknown';
     const claimedReadRoots = AutonomyPolicyService.resolveEnvelopeRoots({
       roots: args.envelope?.readRoots ?? args.envelope?.targetRoots ?? [],
       workspaceRoot: args.workspaceRoot,
@@ -146,11 +163,14 @@ export class AutonomyPolicyService {
       rootDecisions,
       profile: args.profile,
       context: args.context,
+      policy: args.policy,
+      claimedWriteRoots,
     });
 
     return {
       tool: args.context.call.tool,
       operations,
+      environment,
       command,
       cwd: args.workspaceRoot,
       claimedReadRoots,
@@ -159,7 +179,7 @@ export class AutonomyPolicyService {
       rootDecisions,
       hardDenyReasons,
       approvalReasons,
-      claimMismatches: [],
+      claimMismatches: args.policy.diagnostics.map((diagnostic) => diagnostic.message),
     };
   }
 
@@ -288,7 +308,15 @@ export class AutonomyPolicyService {
     rootDecisions: ToolPolicyRootDecision[];
     profile: NormalizedAutopilotProfile;
     context: ToolApprovalPolicyContext;
+    policy: ToolPolicyReconciliation;
+    claimedWriteRoots: string[];
   }): string[] {
+    const host = args.policy.hostOwned;
+    const remoteEffectsUnclassified = host?.transport.network && !host.operations;
+    const remoteMutationWithoutAuthorityPolicy = host?.transport.network
+      && args.operations.some((operation) => TOOL_POLICY_MUTATING_OPERATIONS.has(operation))
+      && args.claimedWriteRoots.length === 0;
+
     return [
       ...args.rootDecisions.flatMap((decision) => AutonomyPolicyService.rootApprovalReasons({
         decision,
@@ -297,6 +325,12 @@ export class AutonomyPolicyService {
         profile: args.profile,
       })),
       ...(args.operations.includes('network') ? ['network operations require approval in initial autopilot policy'] : []),
+      ...(remoteEffectsUnclassified
+        ? ['remote MCP tool effects are not classified by the host']
+        : []),
+      ...(remoteMutationWithoutAuthorityPolicy
+        ? ['remote mutating authority requires explicit approval']
+        : []),
     ];
   }
 

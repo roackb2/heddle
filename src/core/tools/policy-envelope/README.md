@@ -12,6 +12,7 @@ low-friction intent contract without duplicating schema fragments.
 - Central schema augmentation for object-shaped tool parameters.
 - Input extraction that separates the envelope from tool business input before
   execution.
+- Reconciliation between model-proposed intent and host-owned execution facts.
 
 ## Does Not Own
 
@@ -23,7 +24,21 @@ low-friction intent contract without duplicating schema fragments.
 ## Boundary Rule
 
 Agents report intent through this envelope. The runtime may use it as a policy
-claim, but it must not treat it as verified fact.
+claim, but it must not treat it as verified fact. A host that owns a tool can
+attach immutable authority, transport, target-environment, and effect
+classification through `ToolDefinition.hostPolicy` or
+`ToolDefinition.resolveHostPolicy(...)`.
+
+Policy evaluation keeps three views rather than collapsing their provenance:
+
+- `modelProposed`: the model-authored intent envelope;
+- `hostOwned`: immutable execution facts supplied by the tool owner;
+- `effective`: the reconciled envelope consumed by approval policy.
+
+The reconciliation record also identifies which source owns each field and
+records normalization diagnostics. This lets approval traces explain why a
+model claim was overridden without copying tool business arguments into the
+trace.
 
 The envelope is deliberately shared across tools. It gives the agent one stable
 vocabulary for "what I am trying to do" while each tool keeps its own business
@@ -56,7 +71,9 @@ Field meanings:
 
 - `operations`: all operation classes the agent expects the call to perform.
   This is an array because real work often combines actions, such as
-  `execute + write` for a migration script.
+  `execute + write` for a migration script. `network` describes a network
+  effect for an ordinary host tool; it is not a synonym for an MCP HTTP
+  transport. MCP transport is host-owned provenance.
 - `intent`: short natural-language explanation of why the tool call exists.
 - `targetRoots`: project/workspace roots involved in the work.
 - `readRoots`: optional narrower project/workspace roots when read and write
@@ -147,18 +164,30 @@ ToolExecutionService.execute(...)
   -> ToolPolicyEnvelopeInputService.extract(...)
   -> validate and remove policy
   -> execute raw tool with stripped business input
+
+AutonomyPolicyService.evaluate(...)
+  -> ToolPolicyResolutionService.resolve(...)
+  -> retain modelProposed + hostOwned
+  -> normalize transport claims and apply host environment/effects
+  -> evaluate the effective envelope
 ```
 
 Approval code also extracts the envelope before building previews and approval
 requests. Tool implementations should not receive or inspect `policy`; it is
 intent metadata for approval, trace, and future postflight auditing.
 
+The model-facing envelope schema is strict. Unsupported top-level policy fields
+such as `authority`, `transport`, or tenant provenance are rejected before tool
+execution with an actionable diagnostic. The model cannot silently redefine
+host-owned facts.
+
 ## Relationship To Autonomy
 
 `src/core/approvals/autonomy/` consumes this shape directly. It compares the
-agent's declared intent with configured roots, known tool targets, command
-hard-deny patterns, and environment policy. Trace records the same domain
-objects that include this envelope.
+agent's declared intent and host facts with configured roots, known tool
+targets, command hard-deny patterns, and environment policy. Trace records the
+same reconciliation object, including the proposed, host-owned, and effective
+views.
 
 Do not create a second "trace envelope" or "approval envelope" with the same
 fields. If a consumer needs less data, project from this type at that consumer's
@@ -170,6 +199,8 @@ presentation boundary.
 - Add fields only when they are useful across tool families, not for one tool's
   private needs.
 - Keep tool-specific validation in the toolkit that owns the tool.
+- Keep server identity, transport, environment, tenant, and verified effect
+  classification host-owned. Never infer authorization from model input.
 - Keep approval decisions in `src/core/approvals`, not here.
 - Keep extraction centralized in `ToolPolicyEnvelopeInputService` so tools,
   approvals, and tests agree on the stripped input shape.

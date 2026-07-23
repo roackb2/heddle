@@ -1,5 +1,10 @@
 import type { ToolCall } from '@/core/types.js';
-import type { ToolPolicyEnvelope, ToolPolicyOperation } from '@/core/tools/index.js';
+import type {
+  ToolPolicyEnvelope,
+  ToolPolicyEnvironment,
+  ToolPolicyOperation,
+  ToolPolicyReconciliation,
+} from '@/core/tools/index.js';
 
 export type AutopilotRootAccess = 'read' | 'write' | 'autopilot' | 'manual-only' | 'deny';
 
@@ -82,6 +87,7 @@ export type ToolPolicyRootDecision = {
 export type ToolPolicyFacts = {
   tool: string;
   operations: ToolPolicyOperation[];
+  environment: ToolPolicyEnvironment;
   command?: string;
   cwd?: string;
   claimedReadRoots: string[];
@@ -108,6 +114,9 @@ export type AutonomyEvaluation = {
   call: ToolCall;
   profileMode: AutopilotProfile['mode'];
   profilePreset?: AutopilotProfilePreset;
+  /** Proposed, host-owned, and effective fields retained for policy audit. */
+  policy: ToolPolicyReconciliation;
+  /** Effective envelope retained for compatibility with existing consumers. */
   envelope?: ToolPolicyEnvelope;
   facts: ToolPolicyFacts;
   decision: AutopilotDecision;

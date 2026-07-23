@@ -239,6 +239,192 @@ describe('AutonomyPolicyService', () => {
     }));
   });
 
+  it('uses host-owned MCP transport and environment while retaining the model proposal', () => {
+    const evaluation = AutonomyPolicyService.evaluate({
+      context: context({
+        call: {
+          id: 'call-mcp-read',
+          tool: 'search_slides',
+          input: {
+            query: 'roadmap',
+            policy: {
+              operations: ['read', 'network'],
+              intent: 'read slides through Streamable HTTP',
+              targetRoots: [],
+              expectedEffects: ['return matching slides'],
+              maxDestructiveScope: 'none',
+              environment: 'production',
+              confidence: 'high',
+            },
+          },
+        },
+        tool: {
+          name: 'search_slides',
+          description: 'search slides',
+          requiresApproval: true,
+          parameters: {},
+          hostPolicy: {
+            authority: {
+              kind: 'mcp',
+              serverId: 'slides',
+              toolName: 'search-slides',
+              tenantId: 'tenant-1',
+            },
+            transport: {
+              kind: 'http',
+              network: true,
+            },
+            environment: 'local',
+            operations: ['read'],
+          },
+          execute: async () => ({ ok: true }),
+        },
+      }),
+      profile,
+    });
+
+    expect(evaluation.decision).toEqual(expect.objectContaining({
+      type: 'allow',
+      reason: 'allowed by autopilot profile and declared policy envelope',
+    }));
+    expect(evaluation.envelope).toEqual(expect.objectContaining({
+      operations: ['read'],
+      environment: 'local',
+    }));
+    expect(evaluation.policy).toEqual(expect.objectContaining({
+      modelProposed: expect.objectContaining({
+        operations: ['read', 'network'],
+        environment: 'production',
+      }),
+      hostOwned: expect.objectContaining({
+        authority: {
+          kind: 'mcp',
+          serverId: 'slides',
+          toolName: 'search-slides',
+          tenantId: 'tenant-1',
+        },
+        transport: {
+          kind: 'http',
+          network: true,
+        },
+        environment: 'local',
+        operations: ['read'],
+      }),
+      ownership: {
+        hostOwned: ['authority', 'transport', 'environment', 'operations'],
+        modelProposed: expect.arrayContaining(['operations', 'environment', 'intent']),
+      },
+    }));
+    expect(evaluation.facts.claimMismatches).toEqual([
+      expect.stringContaining('host targets "local"'),
+      expect.stringContaining('host-owned transport provenance'),
+      expect.stringContaining('host classifies this tool as [read]'),
+    ]);
+  });
+
+  it('applies host-owned development and production environments', () => {
+    const evaluateEnvironment = (environment: 'dev' | 'production') =>
+      AutonomyPolicyService.evaluate({
+        context: context({
+          call: {
+            id: `call-mcp-${environment}`,
+            tool: 'search_slides',
+            input: {
+              query: 'roadmap',
+              policy: {
+                operations: ['read'],
+                intent: 'read slides',
+                targetRoots: [],
+                expectedEffects: ['return matching slides'],
+                environment: 'local',
+                confidence: 'high',
+              },
+            },
+          },
+          tool: {
+            name: 'search_slides',
+            description: 'search slides',
+            requiresApproval: true,
+            parameters: {},
+            hostPolicy: {
+              authority: {
+                kind: 'mcp',
+                serverId: 'slides',
+                toolName: 'search-slides',
+              },
+              transport: {
+                kind: 'http',
+                network: true,
+              },
+              environment,
+              operations: ['read'],
+            },
+            execute: async () => ({ ok: true }),
+          },
+        }),
+        profile,
+      });
+
+    expect(evaluateEnvironment('dev').decision.type).toBe('allow');
+    expect(evaluateEnvironment('production').decision).toEqual(expect.objectContaining({
+      type: 'request',
+      reason: 'environment is not allowed for unattended execution',
+    }));
+  });
+
+  it('does not let a model downgrade a host-classified remote mutation to a read', () => {
+    const evaluation = AutonomyPolicyService.evaluate({
+      context: context({
+        call: {
+          id: 'call-mcp-write',
+          tool: 'update_slide',
+          input: {
+            title: 'Updated',
+            policy: {
+              operations: ['read'],
+              intent: 'read a slide',
+              targetRoots: [],
+              expectedEffects: ['read slide'],
+              environment: 'local',
+              confidence: 'high',
+            },
+          },
+        },
+        tool: {
+          name: 'update_slide',
+          description: 'updates a remote slide',
+          requiresApproval: true,
+          parameters: {},
+          hostPolicy: {
+            authority: {
+              kind: 'mcp',
+              serverId: 'slides',
+              toolName: 'update-slide',
+            },
+            transport: {
+              kind: 'http',
+              network: true,
+            },
+            environment: 'production',
+            operations: ['write'],
+          },
+          execute: async () => ({ ok: true }),
+        },
+      }),
+      profile,
+    });
+
+    expect(evaluation.facts.operations).toEqual(['write']);
+    expect(evaluation.envelope).toEqual(expect.objectContaining({
+      operations: ['write'],
+      environment: 'production',
+    }));
+    expect(evaluation.decision).toEqual(expect.objectContaining({
+      type: 'request',
+      reason: expect.stringContaining('remote mutating authority requires explicit approval'),
+    }));
+  });
+
   it('does not auto-allow a mutating shell call whose envelope declares no roots', () => {
     const evaluation = AutonomyPolicyService.evaluate({
       context: context({

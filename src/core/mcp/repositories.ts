@@ -248,6 +248,7 @@ function normalizeServer(
       cwd: raw.cwd ? resolveTemplatePath(raw.cwd, options.workspaceRoot) : undefined,
       env: raw.env ?? {},
       envFile: raw.envFile,
+      environment: raw.environment,
       tools: raw.tools,
     };
     return { server, issues: [] };
@@ -271,6 +272,7 @@ function normalizeServer(
       source: options.source,
       url: url.toString(),
       headers: raw.headers ?? {},
+      environment: raw.environment,
       tools: raw.tools,
     };
     return { server, issues: [] };

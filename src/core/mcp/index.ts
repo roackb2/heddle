@@ -1,4 +1,5 @@
 export { McpClientService } from './client-service.js';
+export { McpPolicyContextService } from './policy-context-service.js';
 export {
   FileMcpActivationRepository,
   FileMcpCatalogRepository,

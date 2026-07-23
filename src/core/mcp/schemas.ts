@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TOOL_POLICY_ENVIRONMENTS } from '@/core/tools/policy-envelope/types.js';
 
 const McpToolApprovalModeSchema = z.enum(['always', 'never']);
 
@@ -18,6 +19,7 @@ const McpRawServerSchema = z.object({
   envFile: z.string().min(1).optional(),
   url: z.string().min(1).optional(),
   headers: z.record(z.string(), z.string()).optional(),
+  environment: z.enum(TOOL_POLICY_ENVIRONMENTS).optional(),
   tools: McpToolPolicySchema.optional(),
 }).passthrough();
 

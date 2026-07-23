@@ -1,5 +1,6 @@
 import {
   McpClientService,
+  McpPolicyContextService,
   McpService,
   isToolAllowed,
   shouldMcpToolRequireApproval,
@@ -96,6 +97,13 @@ export class McpHostToolDefinitionService {
       description: override?.description ?? McpHostToolDefinitionService.describeTool(args.options, args.tool),
       capabilities: override?.capabilities ?? args.options.defaultCapabilities ?? ['mcp.unknown'],
       parameters: args.tool.inputSchema,
+      hostPolicy: McpPolicyContextService.create({
+        server: args.server,
+        toolName: args.tool.name,
+        environment: args.options.environment,
+        tenantId: args.options.tenantId,
+        operations: override?.operations,
+      }),
       async execute(raw: unknown, execution?: ToolExecutionContext) {
         const callArgs = McpHostValueService.isRecord(raw) ? raw : {};
         const result = args.resolved

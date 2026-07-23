@@ -34,6 +34,34 @@ original behavior: the toolkit reads the server + catalog from `stateRoot` at
 runtime (the local CLI-host path). Preparation passes the embedded data as the
 optional second argument to `defineMcpHostExtension(options, resolved)`.
 
+## Host-owned policy provenance
+
+The extension owns execution facts that a model cannot safely supply:
+
+```ts
+defineMcpHostExtension({
+  id: 'slides',
+  serverId: 'motiondoc',
+  environment: 'production',
+  tenantId: currentTenantId,
+  toolOverrides: {
+    validate_deck: { operations: ['read'] },
+    update_deck: { operations: ['write'] },
+  },
+});
+```
+
+Every generated tool records the configured MCP server id, original tool name,
+transport, target environment, optional tenant, and optional verified effect
+classification. The model still describes intent and expected effects in its
+policy envelope, but approval evaluation retains both sources and applies the
+host-owned facts when they disagree.
+
+Only classify `operations` when the embedding host knows the tool contract.
+Remote MCP annotations are untrusted hints, not Heddle authorization. An
+unclassified remote tool remains manual in autopilot rather than inheriting a
+model claim.
+
 ## Service Boundaries
 
 - `McpHostExtensionService` composes the Heddle host extension shell. Keep this
@@ -42,7 +70,7 @@ optional second argument to `defineMcpHostExtension(options, resolved)`.
   activate server, refresh catalog, and return a prepared extension.
 - `McpHostToolDefinitionService` owns converting cached MCP descriptors into
   Heddle `ToolDefinition`s: filtering, host tool names, descriptions, approval
-  defaults, and wrapping tool execution.
+  defaults, host-owned policy provenance, and wrapping tool execution.
 - `McpResultArtifactService` owns the result-artifact policy entrypoint. It
   resolves manual rules and beginner-friendly auto capture.
 - `McpAutoResultArtifactService` owns auto capture heuristics for
