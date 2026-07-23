@@ -39,6 +39,11 @@ export class AgentToolConcurrencyService {
     adapterSupportsParallel: boolean;
     maxConcurrency: number;
     isInterrupted: () => boolean;
+    /**
+     * Prepares one parallel batch or one serial barrier immediately before it
+     * executes. Returning a subset lets authorization exclude denied calls.
+     */
+    prepareStage?: (calls: TCall[]) => Promise<TCall[]>;
     execute: (call: TCall) => Promise<TResult>;
   }): Promise<Map<number, TResult>> {
     const results = new Map<number, TResult>();
@@ -46,14 +51,22 @@ export class AgentToolConcurrencyService {
     let batch: TCall[] = [];
 
     const flushParallelBatch = async (): Promise<void> => {
-      if (batch.length === 0) {
+      if (batch.length === 0 || args.isInterrupted()) {
+        batch = [];
         return;
       }
 
       const activeBatch = batch;
       batch = [];
+      const preparedBatch = args.prepareStage
+        ? await args.prepareStage(activeBatch)
+        : activeBatch;
+      if (args.isInterrupted()) {
+        return;
+      }
+
       const completed = await Promise.all(
-        activeBatch.map((call) =>
+        preparedBatch.map((call) =>
           semaphore.runExclusive(async () => {
             if (args.isInterrupted()) {
               return undefined;
@@ -89,7 +102,16 @@ export class AgentToolConcurrencyService {
         break;
       }
 
-      results.set(call.index, await args.execute(call));
+      const preparedCalls = args.prepareStage
+        ? await args.prepareStage([call])
+        : [call];
+      if (args.isInterrupted()) {
+        break;
+      }
+
+      for (const preparedCall of preparedCalls) {
+        results.set(preparedCall.index, await args.execute(preparedCall));
+      }
     }
 
     await flushParallelBatch();

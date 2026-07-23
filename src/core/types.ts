@@ -19,15 +19,6 @@ export type RunInput = {
 
 export type ToolConcurrencyMode = 'serial' | 'parallel-safe';
 
-export type ToolExecutionContext = {
-  /**
-   * Cooperative cancellation for an in-flight tool call. Tool implementations
-   * should pass this signal to cancellable I/O instead of creating a detached
-   * request that outlives the agent run.
-   */
-  signal?: AbortSignal;
-};
-
 /**
  * A tool the agent can invoke.
  */

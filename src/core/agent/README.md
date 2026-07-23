@@ -68,9 +68,11 @@ execution engine used by runtime, chat turns, memory maintenance, and examples.
   integration tests in `run-agent.test.ts`.
 - To change approval behavior, prefer the approval domain. The agent loop should
   ask for decisions, not own policy storage or UI.
-- To change tool scheduling, preserve the dual opt-in contract, finish all
-  same-response authorization decisions before execution, keep serial calls as
-  barriers, and project results in the model's original tool-call order.
+- To change tool scheduling, preserve the dual opt-in contract, authorize every
+  call in a parallel batch before that batch starts, authorize serial calls
+  immediately before execution so previews observe earlier mutations, keep
+  serial calls as barriers, and project results in the model's original
+  tool-call order.
 
 ## Tests
 

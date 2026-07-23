@@ -12,7 +12,7 @@ import type {
 } from './types.js';
 import type { RunResult, ToolCall, ToolDefinition, ToolResult } from '@/core/types.js';
 
-type AuthorizedToolCall = {
+type ToolCallScheduleEntry = {
   index: number;
   call: ToolCall;
   tool?: ToolDefinition;
@@ -50,59 +50,60 @@ export class AgentToolTurnService {
     });
 
     const projectedByIndex = new Map<number, ProjectedToolCall>();
-    const authorizedCalls: AuthorizedToolCall[] = [];
-    for (const [index, call] of toolCalls.entries()) {
-      const interrupted = AgentRunFinisher.maybeInterrupted(
-        context,
-        'Agent run interrupted before tool authorization',
-      );
-      if (interrupted) {
-        return interrupted;
-      }
-
-      const tool = context.registry.get(call.tool);
-      const authorization = await AgentToolDispatcher.authorizeToolCall({
-        call,
-        tool,
-        step: context.state.step,
-        now: context.now,
-        approveToolCall: context.approveToolCall,
-        approvalPolicies: context.approvalPolicies,
-        workspaceRoot: context.workspaceRoot,
-        live: context.live,
-        log: context.log,
-      });
-      if (authorization.type === 'denied') {
-        projectedByIndex.set(index, {
-          effectiveCall: call,
-          result: authorization.result,
-          executed: false,
-        });
-        continue;
-      }
-
-      authorizedCalls.push({
-        index,
-        call,
-        tool,
-        autonomyEvaluation: authorization.autonomyEvaluation,
-      });
-    }
-
-    const interrupted = AgentRunFinisher.maybeInterrupted(
+    const scheduledCalls: ToolCallScheduleEntry[] = toolCalls.map((call, index) => ({
+      index,
+      call,
+      tool: context.registry.get(call.tool),
+    }));
+    const interruptedBeforeScheduling = AgentRunFinisher.maybeInterrupted(
       context,
-      'Agent run interrupted before tool execution',
+      'Agent run interrupted before tool scheduling',
     );
-    if (interrupted) {
-      return interrupted;
+    if (interruptedBeforeScheduling) {
+      return interruptedBeforeScheduling;
     }
 
     const executions = await AgentToolConcurrencyService.execute({
-      calls: authorizedCalls,
+      calls: scheduledCalls,
       adapterSupportsParallel:
         context.llm.info?.capabilities.parallelToolCalls === true,
       maxConcurrency: context.maxToolConcurrency,
       isInterrupted: () => AgentRunFinisher.isInterrupted(context),
+      prepareStage: async (calls) => {
+        const authorizedCalls: ToolCallScheduleEntry[] = [];
+        for (const scheduled of calls) {
+          if (AgentRunFinisher.isInterrupted(context)) {
+            break;
+          }
+
+          const authorization = await AgentToolDispatcher.authorizeToolCall({
+            call: scheduled.call,
+            tool: scheduled.tool,
+            step: context.state.step,
+            now: context.now,
+            approveToolCall: context.approveToolCall,
+            approvalPolicies: context.approvalPolicies,
+            workspaceRoot: context.workspaceRoot,
+            live: context.live,
+            log: context.log,
+          });
+          if (authorization.type === 'denied') {
+            projectedByIndex.set(scheduled.index, {
+              effectiveCall: scheduled.call,
+              result: authorization.result,
+              executed: false,
+            });
+            continue;
+          }
+
+          authorizedCalls.push({
+            ...scheduled,
+            autonomyEvaluation: authorization.autonomyEvaluation,
+          });
+        }
+
+        return authorizedCalls;
+      },
       execute: async (authorized) => await AgentToolDispatcher.executeToolCallWithFallback({
         call: authorized.call,
         autonomyEvaluation: authorized.autonomyEvaluation,

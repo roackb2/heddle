@@ -252,13 +252,15 @@ describe('tool policy envelope', () => {
         tool: 'test_tool',
         input: { path: 'README.md' },
       },
-      30_000,
-      controller.signal,
+      {
+        signal: controller.signal,
+        timeoutMs: 30_000,
+      },
     )).resolves.toEqual({ ok: true, output: 'ok' });
 
     expect(execute).toHaveBeenCalledWith(
       { path: 'README.md' },
-      { signal: controller.signal },
+      { signal: expect.any(AbortSignal) },
     );
   });
 
@@ -281,15 +283,17 @@ describe('tool policy envelope', () => {
         tool: 'test_tool',
         input: { path: 'README.md' },
       },
-      30_000,
-      controller.signal,
+      {
+        signal: controller.signal,
+        timeoutMs: 30_000,
+      },
     );
-    controller.abort();
+    controller.abort(new Error('Host cancelled tool execution'));
 
     await expect(execution).resolves.toEqual({
       ok: false,
-      error: 'Tool "test_tool" execution aborted',
+      error: 'Host cancelled tool execution',
     });
-    expect(receivedSignal).toBe(controller.signal);
+    expect(receivedSignal?.aborted).toBe(true);
   });
 });

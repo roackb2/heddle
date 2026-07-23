@@ -2294,6 +2294,68 @@ describe('AgentRunService.run', () => {
     ]);
   });
 
+  it('authorizes serial calls after preceding serial effects', async () => {
+    const approvalSnapshots: string[] = [];
+    const executions: string[] = [];
+    let value = 'initial';
+    let modelCalls = 0;
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'openai',
+        model: 'gpt-test',
+        capabilities: {
+          parallelToolCalls: true,
+          reasoningSummaries: false,
+          systemMessages: true,
+          toolCalls: true,
+        },
+      },
+      async chat(): Promise<LlmResponse> {
+        modelCalls++;
+        return modelCalls === 1
+          ? {
+              toolCalls: [
+                { id: 'call-first', tool: 'serial_edit', input: { value: 'first' } },
+                { id: 'call-second', tool: 'serial_edit', input: { value: 'second' } },
+              ],
+            }
+          : { content: 'Serial edits finished.' };
+      },
+    };
+    const serialEdit: ToolDefinition = {
+      name: 'serial_edit',
+      description: 'Mutates shared state after explicit approval.',
+      requiresApproval: true,
+      parameters: { type: 'object', properties: { value: { type: 'string' } } },
+      async execute(input) {
+        const nextValue = (input as { value: string }).value;
+        executions.push(nextValue);
+        value = nextValue;
+        return { ok: true, output: nextValue };
+      },
+    };
+
+    const result = await AgentRunService.run({
+      goal: 'Apply two serial edits.',
+      llm: fakeLlm,
+      tools: [serialEdit],
+      maxSteps: 2,
+      maxToolConcurrency: 2,
+      logger: silentLogger,
+      approveToolCall: async (call) => {
+        approvalSnapshots.push(`${call.id}:${value}`);
+        return { approved: true };
+      },
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(approvalSnapshots).toEqual([
+      'call-first:initial',
+      'call-second:first',
+    ]);
+    expect(executions).toEqual(['first', 'second']);
+  });
+
   it('aborts all in-flight parallel tool calls and emits one terminal event', async () => {
     const controller = new AbortController();
     const started: string[] = [];
