@@ -2,6 +2,7 @@ import type { Usage } from '@anthropic-ai/sdk/resources/messages';
 import type { Response as OpenAiResponse } from 'openai/resources/responses/responses.js';
 import { describe, expect, it } from 'vitest';
 import { AnthropicCodec } from '../../../core/llm/adapters/anthropic/anthropic-codec.js';
+import { OpenAiCompatibleCodec } from '../../../core/llm/adapters/openai-compatible/openai-compatible-codec.js';
 import { OpenAiCodec } from '../../../core/llm/adapters/openai/openai-codec.js';
 import { LlmUsageService } from '../../../core/llm/usage/index.js';
 
@@ -82,6 +83,45 @@ describe('LlmUsageService', () => {
       byModel: [{
         provider: 'openai',
         model: 'gpt-5.6-sol',
+        inputTokens: 100,
+        billedInputTokens: 75,
+        outputTokens: 20,
+        totalTokens: 120,
+        cachedInputTokens: 25,
+        reasoningTokens: 5,
+        requests: 1,
+        cost: { status: 'unavailable' },
+      }],
+    });
+  });
+
+  it('maps OpenAI-compatible cache reads and reasoning tokens into the normalized contract', () => {
+    const usage = OpenAiCompatibleCodec.extractUsage({
+      model: 'gateway-model',
+      usage: {
+        prompt_tokens: 100,
+        prompt_tokens_details: { cached_tokens: 25 },
+        completion_tokens: 20,
+        completion_tokens_details: { reasoning_tokens: 5 },
+        total_tokens: 120,
+      },
+    }, {
+      provider: 'litellm',
+      model: 'configured-model',
+    });
+
+    expect(usage).toEqual({
+      inputTokens: 100,
+      billedInputTokens: 75,
+      outputTokens: 20,
+      totalTokens: 120,
+      cachedInputTokens: 25,
+      reasoningTokens: 5,
+      requests: 1,
+      cost: { status: 'unavailable' },
+      byModel: [{
+        provider: 'litellm',
+        model: 'gateway-model',
         inputTokens: 100,
         billedInputTokens: 75,
         outputTokens: 20,

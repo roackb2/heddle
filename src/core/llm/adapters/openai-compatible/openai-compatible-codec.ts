@@ -117,12 +117,21 @@ export class OpenAiCompatibleCodec {
 
     const inputTokens = OpenAiCompatibleCodec.numberField(usage, 'prompt_tokens') ?? 0;
     const outputTokens = OpenAiCompatibleCodec.numberField(usage, 'completion_tokens') ?? 0;
+    const promptDetails = OpenAiCompatibleCodec.objectField(usage, 'prompt_tokens_details');
+    const completionDetails = OpenAiCompatibleCodec.objectField(usage, 'completion_tokens_details');
+    const cachedInputTokens = promptDetails
+      ? OpenAiCompatibleCodec.numberField(promptDetails, 'cached_tokens')
+      : undefined;
     return LlmUsageService.fromProviderRequest({
       provider: attribution.provider,
       model: OpenAiCompatibleCodec.stringField(response, 'model') ?? attribution.model,
-      billedInputTokens: inputTokens,
+      billedInputTokens: Math.max(inputTokens - (cachedInputTokens ?? 0), 0),
+      cachedInputTokens,
       outputTokens,
       totalTokens: OpenAiCompatibleCodec.numberField(usage, 'total_tokens') ?? inputTokens + outputTokens,
+      reasoningTokens: completionDetails
+        ? OpenAiCompatibleCodec.numberField(completionDetails, 'reasoning_tokens')
+        : undefined,
     });
   }
 
@@ -157,6 +166,11 @@ export class OpenAiCompatibleCodec {
   private static numberField(value: object, key: string): number | undefined {
     const field = (value as Record<string, unknown>)[key];
     return typeof field === 'number' ? field : undefined;
+  }
+
+  private static objectField(value: object, key: string): object | undefined {
+    const field = (value as Record<string, unknown>)[key];
+    return field && typeof field === 'object' ? field : undefined;
   }
 
   private static stringField(value: object, key: string): string | undefined {
