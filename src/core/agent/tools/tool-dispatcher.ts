@@ -135,6 +135,7 @@ export class AgentToolDispatcher {
     seenToolCalls: Map<string, number>;
     approvalPolicies?: ToolApprovalPolicy[];
     approveToolCall: RunAgentOptions['approveToolCall'];
+    abortSignal?: AbortSignal;
     workspaceRoot?: string;
     live: AgentRunLiveRecorder;
     log: Logger;
@@ -210,6 +211,7 @@ export class AgentToolDispatcher {
       now: () => string;
       registry: ToolRegistry;
       seenToolCalls: Map<string, number>;
+      abortSignal?: AbortSignal;
       live: AgentRunLiveRecorder;
       log: Logger;
     },
@@ -244,7 +246,9 @@ export class AgentToolDispatcher {
     }
 
     const startedAt = Date.now();
-    const rawResult = await ToolExecutionService.execute(registry, call);
+    const rawResult = await ToolExecutionService.execute(registry, call, {
+      signal: args.abortSignal,
+    });
     const audit = AutonomyPostflightAuditService.shouldAudit(args.autonomyEvaluation)
       ? AutonomyPostflightAuditService.create({
         evaluation: args.autonomyEvaluation,

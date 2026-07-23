@@ -27,9 +27,13 @@ export class ConversationAgentService {
   readonly engine: ConversationEngine;
   readonly runtime: ConversationAgentRuntimeContext;
 
+  private readonly activeSends = new Set<Promise<ConversationAgentTurnResult>>();
   private readonly defaultHost?: ConversationEngineHost;
+  private readonly lifecycleController = new AbortController();
   private readonly session: Required<Pick<ConversationAgentSessionOptions, 'id'>>
     & Omit<ConversationAgentSessionOptions, 'id'>;
+  private closePromise?: Promise<void>;
+  private closed = false;
 
   constructor(options: ConversationAgentOptions = {}) {
     const defaults = ConversationSdkRuntimeService.resolveDefaults(options);
@@ -71,10 +75,40 @@ export class ConversationAgentService {
   }
 
   async ensureSession(): Promise<EnsureConversationSessionResult> {
+    this.assertOpen();
     return await this.engine.sessions.ensure(this.session);
   }
 
   async send(input: ConversationAgentSendInput): Promise<ConversationAgentTurnResult> {
+    this.assertOpen();
+    const operation = this.sendOpen(input);
+    this.activeSends.add(operation);
+
+    try {
+      return await operation;
+    } finally {
+      this.activeSends.delete(operation);
+    }
+  }
+
+  /**
+   * Stops accepting work, aborts active turns, and waits for their
+   * operation-scoped resources (including MCP transports) to settle.
+   */
+  close(): Promise<void> {
+    if (this.closePromise) {
+      return this.closePromise;
+    }
+
+    this.closed = true;
+    const error = new Error('Conversation agent service was closed.');
+    error.name = 'AbortError';
+    this.lifecycleController.abort(error);
+    this.closePromise = Promise.allSettled(Array.from(this.activeSends)).then(() => undefined);
+    return this.closePromise;
+  }
+
+  private async sendOpen(input: ConversationAgentSendInput): Promise<ConversationAgentTurnResult> {
     const prompt = input.prompt.trim();
     if (!prompt) {
       throw new Error('Conversation agent prompt cannot be empty.');
@@ -88,6 +122,9 @@ export class ConversationAgentService {
       prompt,
       maxSteps: input.maxSteps ?? this.runtime.maxSteps,
       memoryMaintenanceMode: input.memoryMaintenanceMode ?? this.runtime.memoryMaintenanceMode,
+      abortSignal: input.abortSignal
+        ? AbortSignal.any([this.lifecycleController.signal, input.abortSignal])
+        : this.lifecycleController.signal,
       host: ConversationAgentService.captureActivities(
         input.host ?? this.defaultHost,
         activities,
@@ -99,6 +136,12 @@ export class ConversationAgentService {
       activities,
       sessionCreated: session.created,
     };
+  }
+
+  private assertOpen(): void {
+    if (this.closed) {
+      throw new Error('Conversation agent service is closed.');
+    }
   }
 
   private static captureActivities(

@@ -16,19 +16,25 @@ the agent lifecycle yet:
 import { ConversationAgentService } from '@roackb2/heddle'
 
 const agent = new ConversationAgentService()
-const result = await agent.send({
-  prompt: 'Summarize this project and identify the main verification path.',
-})
+try {
+  const result = await agent.send({
+    prompt: 'Summarize this project and identify the main verification path.',
+  })
 
-console.log(result.summary)
-console.log(result.activities)
+  console.log(result.summary)
+  console.log(result.activities)
+} finally {
+  await agent.close()
+}
 ```
 
 This resolves the workspace, `.heddle` state root, configured model, and
 credential; race-safely ensures the stable `session-1`; and returns Heddle's
 structured turn result plus the ordered conversation activities observed during
 the turn. Repeated `send` calls continue the same durable conversation. Supply
-an explicit stable session ID for product scope:
+an explicit stable session ID for product scope. One-shot processes should
+close the service in `finally`; long-running hosts should close it during
+application shutdown:
 
 ```ts
 const agent = new ConversationAgentService({

@@ -69,18 +69,23 @@ Then send a structured turn through a persisted conversation:
 import { ConversationAgentService } from '@roackb2/heddle'
 
 const agent = new ConversationAgentService()
-const result = await agent.send({
-  prompt: 'Summarize this project and identify the main verification path.',
-})
+try {
+  const result = await agent.send({
+    prompt: 'Summarize this project and identify the main verification path.',
+  })
 
-console.log(result.summary)
-console.log(result.activities)
+  console.log(result.summary)
+  console.log(result.activities)
+} finally {
+  await agent.close()
+}
 ```
 
 The headless service resolves the workspace, local state root, configured
 model, and credential; race-safely ensures one stable durable session; and
 returns structured activities plus Heddle's normal turn result. It does not
-choose a UI, transport, auth system, or product transaction.
+choose a UI, transport, auth system, or product transaction. One-shot hosts
+must await `close()`; long-running hosts should await it during shutdown.
 
 Run the corresponding repository example with:
 

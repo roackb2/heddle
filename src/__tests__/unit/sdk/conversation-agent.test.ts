@@ -147,4 +147,40 @@ describe('ConversationAgentService', () => {
       credential,
     }));
   });
+
+  it('closes idempotently, aborts active turns, and rejects new work', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-conversation-agent-close-'));
+    let turnSignal: AbortSignal | undefined;
+    vi.mocked(EngineConversationTurnService.run).mockImplementationOnce(async (args) => {
+      turnSignal = args.abortSignal;
+      await new Promise<void>((resolve) => {
+        args.abortSignal?.addEventListener('abort', () => resolve(), { once: true });
+      });
+      throw args.abortSignal?.reason;
+    });
+    const agent = new ConversationAgentService({
+      credentialPreflight: false,
+      env: {},
+      workspaceRoot,
+    });
+    const send = agent.send({ prompt: 'Wait for shutdown.' });
+    await vi.waitFor(() => expect(turnSignal).toBeDefined());
+
+    const firstClose = agent.close();
+    const secondClose = agent.close();
+
+    expect(secondClose).toBe(firstClose);
+    await expect(firstClose).resolves.toBeUndefined();
+    await expect(send).rejects.toMatchObject({
+      name: 'AbortError',
+      message: 'Conversation agent service was closed.',
+    });
+    expect(turnSignal?.aborted).toBe(true);
+    await expect(agent.send({ prompt: 'Too late.' })).rejects.toThrow(
+      'Conversation agent service is closed.',
+    );
+    await expect(agent.ensureSession()).rejects.toThrow(
+      'Conversation agent service is closed.',
+    );
+  });
 });

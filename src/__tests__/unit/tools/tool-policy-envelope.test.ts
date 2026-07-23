@@ -80,7 +80,10 @@ describe('tool policy envelope', () => {
       },
     })).resolves.toEqual({ ok: true, output: 'ok' });
 
-    expect(execute).toHaveBeenCalledWith({ path: 'README.md' });
+    expect(execute).toHaveBeenCalledWith(
+      { path: 'README.md' },
+      { signal: expect.any(AbortSignal) },
+    );
   });
 
   it('accepts an envelope with empty targetRoots for non-mutating tools', async () => {
@@ -103,7 +106,10 @@ describe('tool policy envelope', () => {
       },
     })).resolves.toEqual({ ok: true, output: 'ok' });
 
-    expect(execute).toHaveBeenCalledWith({ path: 'README.md' });
+    expect(execute).toHaveBeenCalledWith(
+      { path: 'README.md' },
+      { signal: expect.any(AbortSignal) },
+    );
   });
 
   it('rejects an envelope with empty roots for mutating operations', async () => {
@@ -153,7 +159,10 @@ describe('tool policy envelope', () => {
       },
     })).resolves.toEqual({ ok: true, output: 'ok' });
 
-    expect(execute).toHaveBeenCalledWith({ path: 'README.md' });
+    expect(execute).toHaveBeenCalledWith(
+      { path: 'README.md' },
+      { signal: expect.any(AbortSignal) },
+    );
   });
 
   it('rejects invalid policy envelope before execution', async () => {

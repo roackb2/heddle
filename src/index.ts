@@ -69,6 +69,7 @@ export type {
   RunResult,
   ModelRunFailureCode,
   ToolDefinition,
+  ToolExecutionContext,
   ToolCall,
   ToolResult,
   TraceEvent,

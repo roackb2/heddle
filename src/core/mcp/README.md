@@ -90,7 +90,9 @@ work inside a synchronous toolkit.
   - owns the official `@modelcontextprotocol/sdk` client usage;
   - creates stdio, Streamable HTTP, or legacy SSE transports;
   - lists tools and calls tools;
-  - closes client and transport resources after each operation.
+  - forwards the owning run's abort signal to connection and request calls;
+  - closes client and transport resources after each operation, on both success
+    and failure.
 - `McpService`
   - owns Heddle-level semantics on top of repositories and SDK calls;
   - exposes config document read/create/save methods for control-plane hosts;
@@ -131,6 +133,16 @@ The runtime MCP toolkit exposes:
 The toolkit should stay an adapter. It should not parse config, manage
 enablement, launch servers, or decide policy beyond setting Heddle
 `ToolDefinition` metadata.
+
+## Connection Lifecycle
+
+MCP connections are operation-scoped rather than retained by `McpService`.
+Every discovery or tool call creates one official SDK client and transport,
+then closes both in `finally`. Agent-exposed MCP tools forward
+`ToolExecutionContext.signal`, so run cancellation and
+`ConversationAgentService.close()` can stop in-flight stdio, Streamable HTTP,
+and legacy SSE work before teardown. Do not introduce a persistent client pool
+without a separate ownership, health-check, reconnect, and shutdown design.
 
 ## Slash Commands And Web UI
 

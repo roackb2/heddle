@@ -7,7 +7,7 @@ import {
   shouldMcpToolRequireApproval,
 } from '@/core/mcp/index.js';
 import type { McpServerConfig, McpToolDescriptor } from '@/core/mcp/index.js';
-import type { ToolDefinition, ToolResult } from '@/core/types.js';
+import type { ToolDefinition, ToolExecutionContext, ToolResult } from '@/core/types.js';
 import type { ToolToolkit } from '../../toolkit.js';
 
 const MCP_LIST_TOOLS_NAME = 'mcp_list_tools';
@@ -133,7 +133,7 @@ function createMcpCallToolTool(options: {
       },
       required: ['serverId', 'toolName', 'arguments'],
     },
-    async execute(raw: unknown): Promise<ToolResult> {
+    async execute(raw: unknown, execution?: ToolExecutionContext): Promise<ToolResult> {
       if (!isMcpCallInput(raw)) {
         return { ok: false, error: 'Invalid input for mcp_call_tool. Required fields: serverId, toolName, arguments.' };
       }
@@ -142,7 +142,12 @@ function createMcpCallToolTool(options: {
         return { ok: false, error: `MCP server is not available through default MCP tools: ${raw.serverId}` };
       }
 
-      const result = await mcpService(options).callTool(raw.serverId, raw.toolName, raw.arguments);
+      const result = await mcpService(options).callTool(
+        raw.serverId,
+        raw.toolName,
+        raw.arguments,
+        execution?.signal,
+      );
       return result.ok ? { ok: true, output: result.output } : { ok: false, error: result.error };
     },
   };
@@ -163,11 +168,12 @@ function createMcpServerTool(options: {
       'Calls external MCP capability through Heddle approval and trace boundaries.',
     ].join(' '),
     parameters: options.tool.inputSchema,
-    async execute(raw: unknown): Promise<ToolResult> {
+    async execute(raw: unknown, execution?: ToolExecutionContext): Promise<ToolResult> {
       const result = await mcpService(options).callTool(
         options.server.id,
         options.tool.name,
         isRecord(raw) ? raw : {},
+        execution?.signal,
       );
 
       return result.ok ? { ok: true, output: result.output } : { ok: false, error: result.error };
