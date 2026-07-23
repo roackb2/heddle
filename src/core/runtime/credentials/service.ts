@@ -35,6 +35,7 @@ export class RuntimeCredentialService {
       case 'anthropic':
         return this.firstDefinedNonEmpty(process.env.ANTHROPIC_API_KEY, process.env.PERSONAL_ANTHROPIC_API_KEY);
       case 'google':
+      case 'kimi':
       case 'ollama':
       case 'lmstudio':
       case 'litellm':
@@ -217,6 +218,10 @@ export class RuntimeCredentialService {
 
     if (provider === 'anthropic') {
       return 'Missing Anthropic credential. Set ANTHROPIC_API_KEY for Anthropic models.';
+    }
+
+    if (provider === 'kimi') {
+      return 'Missing Kimi Platform credential. Set MOONSHOT_API_KEY (or KIMI_PLATFORM_API_KEY) to a Kimi Platform API key. Kimi Code membership keys use a separate service and are not supported by this provider.';
     }
 
     return `Missing provider credential for ${provider}.`;

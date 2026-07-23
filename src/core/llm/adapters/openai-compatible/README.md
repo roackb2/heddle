@@ -18,6 +18,12 @@ to show. Runtime credential services resolve concrete endpoint/auth facts, and
 `src/core/llm/models/ModelOptionsService` aggregates discovered models for web
 and TUI pickers.
 
+Provider profiles may still use a specialized execution adapter when their wire
+contract has semantics the shared codec must not flatten. Kimi Platform is one
+such case: it uses the profile for endpoint and model discovery, but its adapter
+privately preserves and replays `reasoning_content` across tool turns. Do not add
+that provider-specific state to the shared compatible codec.
+
 When adding another OpenAI-compatible service, add one profile here first, then
 extend runtime credential tests and model-options discovery tests. Do not add
 provider-specific endpoint parsing to web components, TUI picker services, or

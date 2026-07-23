@@ -21,6 +21,7 @@ export * from './index.js';
 export type {
   LlmAdapter,
   LlmAdapterCreateInput,
+  AssistantProviderContinuation,
   ChatMessage,
   LlmResponse,
   LlmProvider,
@@ -32,6 +33,10 @@ export type {
 export {
   AnthropicAdapter,
   AnthropicProviderAdapter,
+  KimiAdapter,
+  KimiChatCompletionsStreamDecoder,
+  KimiCodec,
+  KimiProviderAdapter,
   LlmAdapterService,
   LlmProviderRegistry,
   OpenAiAdapter,
@@ -47,6 +52,7 @@ export {
 } from './core/llm/index.js';
 export type {
   AnthropicAdapterOptions,
+  KimiAdapterOptions,
   LlmProviderAdapter,
   OpenAiAdapterOptions,
   OpenAiCompatibleAdapterOptions,

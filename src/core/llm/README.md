@@ -17,6 +17,8 @@ choosing providers themselves.
 - `adapters/openai-compatible/` owns the shared provider-profile family for
   `/chat/completions` services such as Ollama, LM Studio, LiteLLM, vLLM,
   Hugging Face, OpenRouter, Together, and Groq.
+- `adapters/kimi/` owns Kimi Platform's specialized chat-completions behavior,
+  including exact replay of provider-private reasoning continuation.
 - `models/` owns the curated model catalog and model policy decisions used by
   hosts.
 
@@ -26,6 +28,13 @@ request-scoped `oauth-access-token` is already resolved by the host/runtime;
 the adapter attaches it to requests, rejects it when expired, and never refreshes
 or persists it. Provider-backed tools must receive the same resolved credential
 as the main model so one run cannot silently change principals.
+
+Some providers require opaque continuation state to be carried between
+model-facing turns. That state belongs on the assistant message's
+`providerContinuation`; it is durable protocol data, not user-facing reasoning
+or commentary. Adapters must never render, trace, or log it. Kimi uses this
+boundary for the raw `reasoning_content` that its API requires callers to replay
+after tool calls.
 
 Provider adapters should follow the local pattern:
 

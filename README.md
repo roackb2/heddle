@@ -234,7 +234,8 @@ layers that match your product.
 - prepared MCP host extensions with curated exposure, overrides, and result
   artifact rules;
 - approval policy chains and host-owned approval decisions;
-- OpenAI, Anthropic, Ollama, and OpenAI-compatible provider profiles.
+- OpenAI, Anthropic, Kimi Platform, Ollama, and OpenAI-compatible provider
+  profiles.
 
 ### Hosted and remote runs
 

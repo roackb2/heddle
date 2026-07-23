@@ -6,6 +6,7 @@ Heddle currently has working provider adapters for:
 
 - OpenAI
 - Anthropic
+- Kimi Platform
 - Ollama
 - LM Studio
 - LiteLLM
@@ -43,6 +44,17 @@ export ANTHROPIC_API_KEY=your_key_here
 
 Heddle does not support Anthropic consumer subscription OAuth. That path is intentionally deferred unless Anthropic documents or approves a third-party auth route.
 
+For Kimi Platform K3, use a Platform API key:
+
+```bash
+export MOONSHOT_API_KEY=your_key_here
+heddle --model kimi/kimi-k3 ask "Reply with exactly: ok"
+```
+
+`KIMI_PLATFORM_API_KEY` is also accepted. Heddle intentionally does not accept
+the ambiguous `KIMI_API_KEY` name or Kimi Code membership keys: Kimi Code has a
+separate endpoint and quota lifecycle from Kimi Platform.
+
 For Ollama, install and start Ollama locally, then select an installed model
 with the `ollama/` prefix:
 
@@ -77,6 +89,7 @@ Supported provider API-key environment variables:
 
 - `OPENAI_API_KEY` for OpenAI models
 - `ANTHROPIC_API_KEY` for Anthropic models
+- `MOONSHOT_API_KEY` or `KIMI_PLATFORM_API_KEY` for Kimi Platform models
 - `HF_TOKEN` or `HUGGINGFACE_API_KEY` for Hugging Face router models
 - `OPENROUTER_API_KEY` for OpenRouter models
 - `TOGETHER_API_KEY` for Together AI models
@@ -102,7 +115,9 @@ Supported hosted gateway endpoint overrides:
 - `OPENROUTER_OPENAI_BASE_URL` or `OPENROUTER_BASE_URL`; default `https://openrouter.ai/api/v1`
 - `TOGETHER_OPENAI_BASE_URL` or `TOGETHER_BASE_URL`; default `https://api.together.ai/v1`
 - `GROQ_OPENAI_BASE_URL` or `GROQ_BASE_URL`; default `https://api.groq.com/openai/v1`
+- `MOONSHOT_BASE_URL` or `KIMI_PLATFORM_BASE_URL`; default `https://api.moonshot.cn/v1`
 - `HUGGINGFACE_MODEL`, `OPENROUTER_MODEL`, `TOGETHER_MODEL`, or `GROQ_MODEL` for explicit provider defaults
+- `KIMI_MODEL` for an explicit Kimi Platform default
 
 For local development inside this repository, fallback env vars are also accepted:
 
@@ -123,6 +138,7 @@ Current defaults:
 
 - OpenAI: `gpt-5.4`
 - Anthropic: `claude-sonnet-4-6`
+- Kimi Platform: `kimi/kimi-k3`
 
 OpenAI-compatible profiles have no hardcoded default model because installed,
 served, and routed model names vary by machine and account. Select a model with
@@ -148,6 +164,15 @@ Anthropic models currently included in the built-in shortlist:
 - `claude-opus-4-1`, `claude-opus-4-0`, `claude-sonnet-4-0`
 - `claude-3-7-sonnet-latest`
 - `claude-3-5-sonnet-latest`, `claude-3-5-haiku-latest`
+
+Kimi Platform models currently included in the built-in shortlist:
+
+- `kimi/kimi-k3`
+
+Kimi K3 supports `low`, `high`, and `max` reasoning effort, with `max` as the
+default. Kimi's raw `reasoning_content` is private model-continuation state. It
+is replayed to Kimi when required by a tool turn, but is not exposed as Heddle
+reasoning summaries, commentary, logs, or traces.
 
 ### GPT-5.6 family
 
@@ -183,6 +208,7 @@ heddle --model gpt-5.4-mini
 heddle chat --model claude-3-5-haiku-latest
 heddle --model ollama/llama3.2:latest ask "Summarize this repository"
 heddle --model lmstudio/local-model ask "Summarize this repository"
+heddle --model kimi/kimi-k3 ask "Summarize this repository"
 heddle --model openrouter/meta-llama/llama-3.3-70b-instruct ask "Summarize this repository"
 ```
 
@@ -201,6 +227,7 @@ the selector, or type it directly with the provider prefix:
 ```text
 /model ollama/llama3.2:latest
 /model lmstudio/local-model
+/model kimi/kimi-k3
 /model openrouter/meta-llama/llama-3.3-70b-instruct
 ```
 
@@ -294,8 +321,11 @@ Use `OPENAI_API_KEY` for other OpenAI Platform models or features that require P
 
 - Provider selection is inferred from the model name prefix.
 - Ollama model names are recognized with `ollama/` or `ollama:` prefixes.
+- Kimi Platform model names are recognized with `kimi/` or `kimi:` prefixes.
 - OpenAI-compatible profile prefixes are `ollama/`, `lmstudio/`, `litellm/`,
-  `vllm/`, `huggingface/` or `hf/`, `openrouter/`, `together/`, and `groq/`.
+  `vllm/`, `huggingface/` or `hf/`, `openrouter/`, `together/`, `groq/`, and
+  `kimi/`. Kimi uses a specialized execution adapter because its continuation
+  replay semantics are provider-specific.
 - Gemini model names are recognized by provider inference, but a Google adapter is not wired yet.
 - You can pass another supported model name with `--model` if the relevant provider adapter can handle it.
 - Hosted web search and image viewing currently require Platform API-key mode for OpenAI.

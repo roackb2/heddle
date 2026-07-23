@@ -4,6 +4,13 @@ export type { AnthropicAdapterOptions } from './adapters/anthropic/index.js';
 export { OllamaAdapter, OllamaProviderAdapter } from './adapters/ollama/index.js';
 export type { OllamaAdapterOptions } from './adapters/ollama/index.js';
 export {
+  KimiAdapter,
+  KimiChatCompletionsStreamDecoder,
+  KimiCodec,
+  KimiProviderAdapter,
+} from './adapters/kimi/index.js';
+export type { KimiAdapterOptions } from './adapters/kimi/index.js';
+export {
   OpenAiCompatibleAdapter,
   OpenAiCompatibleModelDiscoveryService,
   OpenAiCompatibleModelName,
@@ -41,6 +48,7 @@ export type {
   LlmProviderRegistryInput,
 } from './registry/index.js';
 export type {
+  AssistantProviderContinuation,
   ChatMessage,
   LlmAdapter,
   LlmAdapterCapabilities,

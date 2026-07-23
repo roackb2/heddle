@@ -14,7 +14,18 @@ const createSessionRecord = () => ({
   }),
   createdAt: '2026-07-17T01:00:00.000Z',
   updatedAt: '2026-07-17T02:00:00.000Z',
-  history: [{ role: 'user' as const, content: 'Persist this record.' }],
+  history: [
+    { role: 'user' as const, content: 'Persist this record.' },
+    {
+      role: 'assistant' as const,
+      content: '',
+      toolCalls: [{ id: 'call-1', tool: 'inspect', input: {} }],
+      providerContinuation: {
+        provider: 'kimi' as const,
+        reasoningContent: 'Private continuation for exact Kimi replay.',
+      },
+    },
+  ],
   messages: [{ id: 'message-1', role: 'user' as const, text: 'Persist this record.' }],
   turns: [{
     id: 'turn-1',

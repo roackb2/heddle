@@ -102,6 +102,12 @@ const DEFAULT_OPENAI_REASONING_EFFORT: Record<string, ReasoningEffort> = {
   'gpt-5.5': 'medium',
   'gpt-5.5-pro': 'medium',
 };
+const KIMI_REQUEST_REASONING_EFFORTS_BY_MODEL: Record<string, ReasoningEffort[]> = {
+  'kimi/kimi-k3': ['low', 'high', 'max'],
+};
+const DEFAULT_KIMI_REASONING_EFFORT: Record<string, ReasoningEffort> = {
+  'kimi/kimi-k3': 'max',
+};
 
 /**
  * Provider-neutral model policy facade. It centralizes model capability,
@@ -245,7 +251,8 @@ export class ModelPolicyService {
   }
 
   static supportsReasoningEffort(model: string): boolean {
-    return REASONING_EFFORT_CAPABLE_OPENAI_MODELS.includes(model as (typeof REASONING_EFFORT_CAPABLE_OPENAI_MODELS)[number]);
+    return ModelPolicyService.supportedRequestReasoningEfforts(model).length > 0
+      || REASONING_EFFORT_CAPABLE_OPENAI_MODELS.includes(model as (typeof REASONING_EFFORT_CAPABLE_OPENAI_MODELS)[number]);
   }
 
   static supportsOpenAiReasoningSummary(model: string): boolean {
@@ -272,7 +279,7 @@ export class ModelPolicyService {
   }
 
   static buildReasoningEffortOptions(model: string): ReasoningEffortOption[] {
-    const requestSupportedEfforts = new Set(ModelPolicyService.supportedOpenAiRequestReasoningEfforts(model));
+    const requestSupportedEfforts = new Set(ModelPolicyService.supportedRequestReasoningEfforts(model));
     const reasoningSupported = ModelPolicyService.supportsReasoningEffort(model);
     const defaultEffort = ModelPolicyService.resolveDefaultReasoningEffort(model);
     const disabledReason =
@@ -298,7 +305,12 @@ export class ModelPolicyService {
   }
 
   static resolveDefaultReasoningEffort(model: string): ReasoningEffort | undefined {
-    return DEFAULT_OPENAI_REASONING_EFFORT[model];
+    return DEFAULT_KIMI_REASONING_EFFORT[model] ?? DEFAULT_OPENAI_REASONING_EFFORT[model];
+  }
+
+  static supportedRequestReasoningEfforts(model: string): ReasoningEffort[] {
+    return KIMI_REQUEST_REASONING_EFFORTS_BY_MODEL[model]
+      ?? ModelPolicyService.supportedOpenAiRequestReasoningEfforts(model);
   }
 
   static formatOpenAiAccountSignInModels(): string {

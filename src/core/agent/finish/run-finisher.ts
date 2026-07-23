@@ -39,7 +39,11 @@ export class AgentRunFinisher {
       step: context.state.step,
       timestamp: context.now(),
     });
-    context.messages.push({ role: 'assistant', content: response.content });
+    context.messages.push({
+      role: 'assistant',
+      content: response.content,
+      providerContinuation: response.providerContinuation,
+    });
 
     return AgentRunFinisher.finish(context, 'done', response.content, {
       logging: {

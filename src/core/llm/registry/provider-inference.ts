@@ -48,6 +48,7 @@ export class LlmProviderInference {
       || value.startsWith('o4')],
     ['anthropic', (value) => value.startsWith('claude')],
     ['google', (value) => value.startsWith('gemini')],
+    ['kimi', (value) => value.startsWith('kimi/') || value.startsWith('kimi:')],
     ['ollama', (value) => value.startsWith('ollama/') || value.startsWith('ollama:')],
     ['lmstudio', (value) => value.startsWith('lmstudio/') || value.startsWith('lmstudio:')],
     ['litellm', (value) => value.startsWith('litellm/') || value.startsWith('litellm:')],

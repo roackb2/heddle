@@ -145,6 +145,9 @@ export const controlPlaneRouter = router({
         anthropic: ModelPolicyService.credentialModeFromSource(RuntimeCredentialService.resolveCredentialSourceForModel('claude-sonnet-4-6', {
           preferApiKey: ctx.preferApiKey,
         })),
+        kimi: ModelPolicyService.credentialModeFromSource(RuntimeCredentialService.resolveCredentialSourceForModel('kimi/kimi-k3', {
+          preferApiKey: ctx.preferApiKey,
+        })),
         ollama: 'api-key',
       },
       openAiCompatibleSources: RuntimeCredentialService.resolveOpenAiCompatibleModelDiscoverySources(),

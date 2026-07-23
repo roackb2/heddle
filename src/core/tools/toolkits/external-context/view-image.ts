@@ -131,6 +131,7 @@ export function createViewImageTool(options: ViewImageToolOptions = {}): ToolDef
               ok: false,
               error: 'view_image is not wired for Google models yet.',
             };
+          case 'kimi':
           case 'ollama':
           case 'lmstudio':
           case 'litellm':

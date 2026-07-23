@@ -22,6 +22,15 @@ const ToolCallSchema = z.object({
   input: z.unknown().describe('Raw structured input passed to the requested tool.'),
 });
 
+const AssistantProviderContinuationSchema = z.discriminatedUnion('provider', [
+  z.object({
+    provider: z.literal('kimi'),
+    reasoningContent: z.string().describe(
+      'Provider-private Kimi continuation replayed to Kimi for preserved thinking. It is not user-facing reasoning narration.',
+    ),
+  }),
+]);
+
 const ChatMessageSchema = z.union([
   z.object({
     role: z.literal('system').describe('Transcript role for host-provided system instructions.'),
@@ -36,6 +45,9 @@ const ChatMessageSchema = z.union([
     content: z.string().describe('Assistant text content returned by the model.'),
     toolCalls: z.array(ToolCallSchema)
       .describe('Tool calls requested by this assistant message.')
+      .optional(),
+    providerContinuation: AssistantProviderContinuationSchema
+      .describe('Provider-private assistant state retained only for durable model transcript replay.')
       .optional(),
   }),
   z.object({

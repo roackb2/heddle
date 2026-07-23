@@ -39,11 +39,20 @@ export class ConversationCompactionTokenEstimator {
       case 'tool':
         return ConversationCompactionTokenEstimator.estimateText(message.content) + 12;
       case 'assistant':
-        return ConversationCompactionTokenEstimator.estimateText(message.content) + 12 + (message.toolCalls?.length ?? 0) * 24;
+        return ConversationCompactionTokenEstimator.estimateText(message.content)
+          + ConversationCompactionTokenEstimator.estimateProviderContinuation(message)
+          + 12
+          + (message.toolCalls?.length ?? 0) * 24;
     }
   }
 
   static estimateText(text: string): number {
     return Math.ceil(text.length / 4);
+  }
+
+  private static estimateProviderContinuation(message: Extract<ChatMessage, { role: 'assistant' }>): number {
+    return message.providerContinuation?.provider === 'kimi'
+      ? ConversationCompactionTokenEstimator.estimateText(message.providerContinuation.reasoningContent)
+      : 0;
   }
 }

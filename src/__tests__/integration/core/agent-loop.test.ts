@@ -156,6 +156,69 @@ describe('AgentLoopRuntimeService.run', () => {
     });
   });
 
+  it('preserves provider-private continuation through tool and final assistant turns', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    const fakeLlm: LlmAdapter = {
+      info: {
+        provider: 'kimi',
+        model: 'kimi/kimi-k3',
+        capabilities: {
+          toolCalls: true,
+          systemMessages: true,
+          reasoningSummaries: false,
+          parallelToolCalls: false,
+        },
+      },
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(messages);
+        return seenMessages.length === 1 ? {
+          toolCalls: [{ id: 'call-1', tool: 'echo_tool', input: { value: 'repo' } }],
+          providerContinuation: {
+            provider: 'kimi',
+            reasoningContent: 'Inspect before answering.',
+          },
+        } : {
+          content: 'Done.',
+          providerContinuation: {
+            provider: 'kimi',
+            reasoningContent: 'Answer from the result.',
+          },
+        };
+      },
+    };
+    const echoTool: ToolDefinition = {
+      name: 'echo_tool',
+      description: 'Echoes a value.',
+      parameters: { type: 'object', properties: { value: { type: 'string' } } },
+      execute: async (input) => ({ ok: true, output: input }),
+    };
+
+    const result = await AgentLoopRuntimeService.run({
+      goal: 'Use the echo tool.',
+      llm: fakeLlm,
+      tools: [echoTool],
+      includeDefaultTools: false,
+      maxSteps: 3,
+      logger: silentLogger,
+    });
+
+    expect(seenMessages[1]).toContainEqual(expect.objectContaining({
+      role: 'assistant',
+      providerContinuation: {
+        provider: 'kimi',
+        reasoningContent: 'Inspect before answering.',
+      },
+    }));
+    expect(result.transcript).toContainEqual({
+      role: 'assistant',
+      content: 'Done.',
+      providerContinuation: {
+        provider: 'kimi',
+        reasoningContent: 'Answer from the result.',
+      },
+    });
+  });
+
   it('propagates non-retryable quota failures through loop state and terminal activity', async () => {
     const events: AgentLoopEvent[] = [];
     const fakeLlm: LlmAdapter = {

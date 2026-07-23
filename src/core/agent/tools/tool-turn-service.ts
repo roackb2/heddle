@@ -33,6 +33,7 @@ export class AgentToolTurnService {
       role: 'assistant',
       content: response.content ?? '',
       toolCalls,
+      providerContinuation: response.providerContinuation,
     });
 
     for (const call of toolCalls) {

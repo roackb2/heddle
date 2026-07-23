@@ -125,6 +125,31 @@ describe('RuntimeCredentialService', () => {
     });
   });
 
+  it('uses only Kimi Platform credentials for Kimi models', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'openai-key');
+    vi.stubEnv('KIMI_API_KEY', 'kimi-code-key');
+    vi.stubEnv('MOONSHOT_API_KEY', '');
+    vi.stubEnv('KIMI_PLATFORM_API_KEY', '');
+
+    expect(RuntimeCredentialService.resolveCredentialSourceForModel('kimi/kimi-k3')).toEqual({
+      type: 'missing',
+      provider: 'kimi',
+    });
+
+    vi.stubEnv('MOONSHOT_API_KEY', 'moonshot-key');
+
+    expect(RuntimeCredentialService.resolveCredentialSourceForModel('kimi/kimi-k3')).toEqual({
+      type: 'env-api-key',
+      provider: 'kimi',
+    });
+    expect(RuntimeCredentialService.resolveOpenAiCompatibleEndpointRuntime('kimi')).toEqual({
+      baseUrl: 'https://api.moonshot.cn/v1',
+      auth: { type: 'bearer', token: 'moonshot-key' },
+    });
+    expect(RuntimeCredentialService.formatMissingCredentialMessage('kimi/kimi-k3'))
+      .toContain('Kimi Code membership keys use a separate service');
+  });
+
   it('resolves executable runtime endpoint auth for hosted OpenAI-compatible models', () => {
     vi.stubEnv('OPENROUTER_API_KEY', 'openrouter-key');
 
@@ -153,6 +178,8 @@ describe('RuntimeCredentialService', () => {
     vi.stubEnv('HUGGINGFACE_API_KEY', '');
     vi.stubEnv('TOGETHER_API_KEY', '');
     vi.stubEnv('GROQ_API_KEY', '');
+    vi.stubEnv('MOONSHOT_API_KEY', '');
+    vi.stubEnv('KIMI_PLATFORM_API_KEY', '');
 
     const sources = RuntimeCredentialService.resolveOpenAiCompatibleModelDiscoverySources();
 
