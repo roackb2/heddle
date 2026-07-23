@@ -9,13 +9,17 @@
 import { ConversationAgentService } from '../../src/index.js';
 
 const agent = new ConversationAgentService();
-const result = await agent.send({
-  prompt: process.argv.slice(2).join(' ').trim() || 'What does this project do?',
-});
+try {
+  const result = await agent.send({
+    prompt: process.argv.slice(2).join(' ').trim() || 'What does this project do?',
+  });
 
-console.log({
-  activityTypes: result.activities.map((activity) => activity.type),
-  outcome: result.outcome,
-  sessionId: result.session.id,
-  summary: result.summary,
-});
+  console.log({
+    activityTypes: result.activities.map((activity) => activity.type),
+    outcome: result.outcome,
+    sessionId: result.session.id,
+    summary: result.summary,
+  });
+} finally {
+  await agent.close();
+}

@@ -174,7 +174,12 @@ export class McpService {
     );
   }
 
-  async callTool(serverId: string, toolName: string, args: Record<string, unknown>): Promise<McpCallToolResult> {
+  async callTool(
+    serverId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<McpCallToolResult> {
     const config = this.configStore.read();
     const server = config.servers.find((candidate) => candidate.id === serverId);
     if (!server) {
@@ -194,7 +199,7 @@ export class McpService {
       return { ok: false, error: `MCP tool is denied by Heddle config: ${serverId}/${toolName}` };
     }
 
-    return await this.clientService.callTool(server, toolName, args);
+    return await this.clientService.callTool(server, toolName, args, signal);
   }
 
   private buildServerViews(servers: McpServerConfig[]): McpServerView[] {

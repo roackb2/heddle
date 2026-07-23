@@ -75,6 +75,7 @@ export class AgentToolTurnService {
       now: context.now,
       registry: context.registry,
       seenToolCalls: context.seenToolCalls,
+      abortSignal: context.abortSignal,
       approveToolCall: context.approveToolCall,
       approvalPolicies: context.approvalPolicies,
       workspaceRoot: context.workspaceRoot,

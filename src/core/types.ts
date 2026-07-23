@@ -18,13 +18,21 @@ export type RunInput = {
 /**
  * A tool the agent can invoke.
  */
+export type ToolExecutionContext = {
+  /**
+   * Aborted when the owning run is cancelled or the tool execution times out.
+   * Tool implementations should forward this signal to cancellable I/O.
+   */
+  signal?: AbortSignal;
+};
+
 export type ToolDefinition = {
   name: string;
   description: string;
   requiresApproval?: boolean;
   capabilities?: string[];
   parameters: Record<string, unknown>; // JSON Schema object
-  execute: (input: unknown) => Promise<ToolResult>;
+  execute: (input: unknown, context?: ToolExecutionContext) => Promise<ToolResult>;
 };
 
 /**

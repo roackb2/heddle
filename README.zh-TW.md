@@ -63,18 +63,23 @@ npm install @roackb2/heddle
 import { ConversationAgentService } from '@roackb2/heddle'
 
 const agent = new ConversationAgentService()
-const result = await agent.send({
-  prompt: '整理這個專案，並指出主要的驗證路徑。',
-})
+try {
+  const result = await agent.send({
+    prompt: '整理這個專案，並指出主要的驗證路徑。',
+  })
 
-console.log(result.summary)
-console.log(result.activities)
+  console.log(result.summary)
+  console.log(result.activities)
+} finally {
+  await agent.close()
+}
 ```
 
 Headless service 會解析 workspace、本機 state root、已設定的 model 與
 credential，race-safe 地 ensure 一個穩定的 durable session，並回傳
 structured activities 與 Heddle 原本的 turn result。它不會替產品選擇 UI、
-transport、auth system 或 product transaction。
+transport、auth system 或 product transaction。One-shot host 必須 await
+`close()`；長時間運行的 host 則應在關閉應用程式時 await 它。
 
 在此 repository 中執行對應範例：
 

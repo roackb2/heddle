@@ -29,13 +29,19 @@ const agent = new ConversationAgentService({
   systemContext: 'Help the user operate this product.',
 })
 
-const result = await agent.send({ prompt: userPrompt })
+try {
+  const result = await agent.send({ prompt: userPrompt })
+  renderTrustedResult(result)
+} finally {
+  await agent.close()
+}
 ```
 
 This starts with local file-backed conversation state under `.heddle`; it does
 not require a database or web framework. The host owns where `userPrompt` came
 from and how the trusted result is rendered. Do not serialize `result` or its
-activities directly to an untrusted client.
+activities directly to an untrusted client. Long-running hosts may reuse the
+service across turns, but must await `close()` during application shutdown.
 
 Before shipping this shape, decide:
 

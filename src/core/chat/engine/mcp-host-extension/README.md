@@ -25,8 +25,9 @@ MCP config/catalog from `context.stateRoot`. This lets one prepared extension be
 reused across many cheap, per-request engines — e.g. a multi-tenant server that
 builds a fresh engine per request with a per-user API key and per-user storage,
 without any per-engine MCP prep or a per-user `.heddle/` directory. Tool
-execution stays stateless: each call spawns a fresh MCP subprocess via
-`McpClientService` from the embedded config and closes it.
+execution stays stateless: each call creates a fresh MCP client plus its
+configured transport (including a subprocess for stdio) and closes both.
+All three transport paths receive the owning tool execution's abort signal.
 
 A plain `defineMcpHostExtension(options)` with no embedded data keeps the
 original behavior: the toolkit reads the server + catalog from `stateRoot` at

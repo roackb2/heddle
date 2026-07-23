@@ -224,7 +224,12 @@ describe('defineMcpHostExtension', () => {
     expect(result?.ok).toBe(true);
     // Execution went straight to the embedded server config via the client,
     // never through the stateRoot-backed McpService.
-    expect(clientCall).toHaveBeenCalledWith(resolved.server, 'create-deck', { title: 'Quarterly plan' });
+    expect(clientCall).toHaveBeenCalledWith(
+      resolved.server,
+      'create-deck',
+      { title: 'Quarterly plan' },
+      undefined,
+    );
     expect(stateCall).not.toHaveBeenCalled();
   });
 
@@ -357,9 +362,12 @@ describe('defineMcpHostExtension', () => {
     };
 
     expect(result.ok).toBe(true);
-    expect(McpService.prototype.callTool).toHaveBeenCalledWith('deck_service', 'create-deck', {
-      title: 'Quarterly plan',
-    });
+    expect(McpService.prototype.callTool).toHaveBeenCalledWith(
+      'deck_service',
+      'create-deck',
+      { title: 'Quarterly plan' },
+      undefined,
+    );
     expect(output.diagnostics).toEqual({ valid: true });
     expect(output.html).toEqual(expect.objectContaining({
       contentPath: ['html'],

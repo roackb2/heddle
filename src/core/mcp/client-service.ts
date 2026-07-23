@@ -8,9 +8,12 @@ import type { McpCallToolResult, McpClientSessionInfo, McpServerConfig, McpToolD
 const DEFAULT_MCP_TIMEOUT_MS = 30_000;
 
 export class McpClientService {
-  async listTools(server: McpServerConfig): Promise<McpClientSessionInfo> {
+  async listTools(server: McpServerConfig, signal?: AbortSignal): Promise<McpClientSessionInfo> {
     return await this.withClient(server, async (client) => {
-      const tools = await client.listTools({}, { timeout: DEFAULT_MCP_TIMEOUT_MS });
+      const tools = await client.listTools({}, {
+        signal,
+        timeout: DEFAULT_MCP_TIMEOUT_MS,
+      });
       const serverVersion = client.getServerVersion();
 
       return {
@@ -19,26 +22,30 @@ export class McpClientService {
         instructions: client.getInstructions(),
         tools: tools.tools.map(toToolDescriptor),
       };
-    });
+    }, signal);
   }
 
   async callTool(
     server: McpServerConfig,
     toolName: string,
     args: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<McpCallToolResult> {
     try {
       return await this.withClient(server, async (client) => {
         const result = await client.callTool({
           name: toolName,
           arguments: args,
-        }, undefined, { timeout: DEFAULT_MCP_TIMEOUT_MS });
+        }, undefined, {
+          signal,
+          timeout: DEFAULT_MCP_TIMEOUT_MS,
+        });
 
         return {
           ok: true,
           output: normalizeToolResult(result),
         };
-      });
+      }, signal);
     } catch (error) {
       return {
         ok: false,
@@ -50,6 +57,7 @@ export class McpClientService {
   private async withClient<T>(
     server: McpServerConfig,
     callback: (client: Client) => Promise<T>,
+    signal?: AbortSignal,
   ): Promise<T> {
     const client = new Client({
       name: 'heddle',
@@ -58,7 +66,10 @@ export class McpClientService {
     const transport = createTransport(server);
 
     try {
-      await client.connect(transport, { timeout: DEFAULT_MCP_TIMEOUT_MS });
+      await client.connect(transport, {
+        signal,
+        timeout: DEFAULT_MCP_TIMEOUT_MS,
+      });
       return await callback(client);
     } finally {
       await client.close().catch(() => undefined);

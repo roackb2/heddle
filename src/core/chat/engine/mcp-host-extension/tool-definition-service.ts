@@ -7,7 +7,7 @@ import {
 import { McpResultArtifactService } from './result-artifact-service.js';
 import { McpHostValueService } from './value-service.js';
 import type { McpCallToolResult, McpServerCatalogRecord, McpServerConfig } from '@/core/mcp/index.js';
-import type { ToolDefinition } from '@/core/types.js';
+import type { ToolDefinition, ToolExecutionContext } from '@/core/types.js';
 import type { ToolToolkit, ToolToolkitContext } from '@/core/tools/index.js';
 import type {
   DefineMcpHostExtensionOptions,
@@ -96,12 +96,17 @@ export class McpHostToolDefinitionService {
       description: override?.description ?? McpHostToolDefinitionService.describeTool(args.options, args.tool),
       capabilities: override?.capabilities ?? args.options.defaultCapabilities ?? ['mcp.unknown'],
       parameters: args.tool.inputSchema,
-      async execute(raw: unknown) {
+      async execute(raw: unknown, execution?: ToolExecutionContext) {
         const callArgs = McpHostValueService.isRecord(raw) ? raw : {};
         const result = args.resolved
-          ? await McpHostToolDefinitionService.callEmbedded(args.resolved.server, args.tool.name, callArgs)
+          ? await McpHostToolDefinitionService.callEmbedded(
+              args.resolved.server,
+              args.tool.name,
+              callArgs,
+              execution?.signal,
+            )
           : await McpHostToolDefinitionService.createMcpService(args.context)
-              .callTool(args.options.serverId, args.tool.name, callArgs);
+              .callTool(args.options.serverId, args.tool.name, callArgs, execution?.signal);
 
         return result.ok
           ? {
@@ -147,10 +152,11 @@ export class McpHostToolDefinitionService {
     server: McpServerConfig,
     toolName: string,
     args: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<McpCallToolResult> {
     if (!isToolAllowed(server, toolName)) {
       return { ok: false, error: `MCP tool is denied by Heddle config: ${server.id}/${toolName}` };
     }
-    return await new McpClientService().callTool(server, toolName, args);
+    return await new McpClientService().callTool(server, toolName, args, signal);
   }
 }
