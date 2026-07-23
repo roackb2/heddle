@@ -64,6 +64,7 @@ export type QuickstartConversationCliRunnerOptions = {
   oncePrompt?: string;
   prompts?: string[];
   maxSteps?: number;
+  maxToolConcurrency?: number;
   reasoningEffort?: ConversationSdkRuntimeDefaultsInput['reasoningEffort'];
   apiKey?: string;
   credential?: RuntimeProviderCredential;

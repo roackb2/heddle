@@ -30,6 +30,7 @@ export type RunConversationTurnArgs = {
   systemContext?: string;
   traceDir: string;
   maxSteps?: number;
+  maxToolConcurrency?: number;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
   memoryMaintenanceMode?: 'none' | 'background' | 'inline';
@@ -82,6 +83,7 @@ export type TurnSubmitInput = Pick<
   | 'sessionId'
   | 'prompt'
   | 'maxSteps'
+  | 'maxToolConcurrency'
   | 'searchIgnoreDirs'
   | 'includePlanTool'
   | 'abortSignal'
@@ -102,7 +104,7 @@ export type TurnPreflightInput = Pick<
 
 export type AgentLoopTurnInput = Pick<
   RunConversationTurnArgs,
-  'prompt' | 'maxSteps' | 'workspaceRoot' | 'stateRoot' | 'onTraceEvent' | 'approvalPolicies' | 'shouldStop' | 'abortSignal'
+  'prompt' | 'maxSteps' | 'maxToolConcurrency' | 'workspaceRoot' | 'stateRoot' | 'onTraceEvent' | 'approvalPolicies' | 'shouldStop' | 'abortSignal'
 >;
 
 export type TurnPersistenceInput = Pick<

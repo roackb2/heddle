@@ -51,6 +51,7 @@ export class ConversationAgentService {
         'env',
         'host',
         'maxSteps',
+        'maxToolConcurrency',
         'memoryMaintenanceMode',
         'model',
         'reasoningEffort',
@@ -58,7 +59,7 @@ export class ConversationAgentService {
         'stateRoot',
         'workspaceRoot',
       ]),
-      ...omit(defaults, ['maxSteps']),
+      ...omit(defaults, ['maxSteps', 'maxToolConcurrency']),
     } satisfies ConversationEngineConfig;
 
     this.engine = createConversationEngine(engineConfig);
@@ -121,6 +122,8 @@ export class ConversationAgentService {
       sessionId: session.session.id,
       prompt,
       maxSteps: input.maxSteps ?? this.runtime.maxSteps,
+      maxToolConcurrency:
+        input.maxToolConcurrency ?? this.runtime.maxToolConcurrency,
       memoryMaintenanceMode: input.memoryMaintenanceMode ?? this.runtime.memoryMaintenanceMode,
       abortSignal: input.abortSignal
         ? AbortSignal.any([this.lifecycleController.signal, input.abortSignal])

@@ -41,6 +41,7 @@ export type RunAgentOptions = {
   llm: LlmAdapter;
   tools: ToolDefinition[];
   maxSteps?: number;
+  maxToolConcurrency?: number;
   workspaceRoot?: string;
   logger?: Logger;
   history?: ChatMessage[];
@@ -83,6 +84,7 @@ export type AgentRunState = {
 export type AgentRunContext = {
   goal: string;
   maxSteps: number;
+  maxToolConcurrency: number;
   llm: LlmAdapter;
   registry: ToolRegistry;
   workspaceRoot: string;

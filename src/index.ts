@@ -69,6 +69,7 @@ export type {
   RunResult,
   ModelRunFailureCode,
   ToolDefinition,
+  ToolConcurrencyMode,
   ToolExecutionContext,
   ToolCall,
   ToolResult,

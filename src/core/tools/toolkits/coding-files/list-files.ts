@@ -19,6 +19,7 @@ export function createListFilesTool(options: ListFilesToolOptions = {}): ToolDef
 
   return {
     name: 'list_files',
+    concurrency: 'parallel-safe',
     description:
       'List files and directories inside a directory path. Use this to inspect folders, not to read file contents. Prefer this when you need an initial view of the workspace or want to explore an obvious nearby folder before using broader search. Relative paths are resolved from the active workspace root and may also point to nearby parent or sibling folders, such as "..". Defaults to the active workspace root. Returns a flat newline-separated list of entry names; directories end with /. Example inputs: { "path": "." }, { "path": ".." }',
     parameters: {

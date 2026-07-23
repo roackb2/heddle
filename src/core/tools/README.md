@@ -10,7 +10,7 @@ workspace.
 - Toolkit composition and guardrails for duplicate toolkit ids and duplicate
   tool names.
 - Tool registry creation and duplicate-name protection at execution time.
-- Tool execution wrapper and timeout behavior.
+- Tool execution wrapper, timeout behavior, and cooperative cancellation.
 - Shared tool policy-envelope schema injection and input stripping.
 - Coding file tools under `toolkits/coding-files/`.
 - Knowledge and memory-surface tools under `toolkits/knowledge/`.
@@ -55,7 +55,8 @@ workspace.
 - `ToolRegistry`: duplicate-checked registry for the tools in one run.
 - `ToolExecutionService`: executes one tool call against a registry with
   timeout/error normalization. It removes the shared policy envelope before
-  calling the tool implementation.
+  calling the tool implementation and forwards an optional `AbortSignal`
+  through `ToolExecutionContext`.
 - `ToolBundleComposer`: toolkit composition API used by runtime default-tool
   assembly.
 - `policy-envelope/*`: the cross-tool declaration shape used by approval
@@ -79,6 +80,11 @@ workspace.
   family, policy, or composition responsibility.
 - Attach approval policy through approval/toolkit registration rather than
   embedding host approval UI in tool implementations.
+- Tools are serial by default. Declare `concurrency: 'parallel-safe'` only when
+  separate calls can safely overlap. Approval eligibility does not imply
+  concurrency safety.
+- Long-running tools should observe `ToolExecutionContext.signal` so host
+  cancellation can stop in-flight work promptly.
 - Extend the shared `ToolPolicyEnvelope` only when all tool families can use
   the field consistently. Tool-specific arguments stay in each tool schema.
 

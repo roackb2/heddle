@@ -11,3 +11,15 @@ checkpointable loop state.
 Use `AgentLoopCheckpointService` for state/checkpoint conversion and resume
 history extraction. Do not put chat sessions, heartbeat scheduling, or host UI
 logic in this folder.
+
+## Tool Concurrency
+
+`maxToolConcurrency` bounds parallel-safe tool execution for one run. The
+default is `4`, valid values are integers from `1` through `32`, and `1`
+disables overlap.
+
+Calls overlap only when both the active LLM adapter advertises
+`parallelToolCalls` and the tool declares `concurrency: 'parallel-safe'`.
+Authorization for every tool call in one model response finishes before any
+allowed call starts. Undeclared tools remain serial barriers, and results are
+projected back into the transcript in the model's original tool-call order.

@@ -100,6 +100,7 @@ export class AgentLoopRuntimeService {
       tools,
       workspaceRoot,
       maxSteps: options.maxSteps,
+      maxToolConcurrency: options.maxToolConcurrency,
       logger,
       history: AgentLoopCheckpointService.resolveHistory(options),
       systemContext,

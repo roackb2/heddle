@@ -279,6 +279,7 @@ export type SubmitConversationTurnInput = {
   agentProfileId?: string;
   agentSnapshot?: CustomAgentExecutionSnapshot;
   maxSteps?: number;
+  maxToolConcurrency?: number;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
   host?: ConversationEngineHost;
@@ -294,6 +295,7 @@ export type ContinueConversationTurnInput = {
   sessionId: string;
   prompt?: string;
   maxSteps?: number;
+  maxToolConcurrency?: number;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
   host?: ConversationEngineHost;

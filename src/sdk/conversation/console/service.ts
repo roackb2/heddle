@@ -334,6 +334,7 @@ export class QuickstartConversationCliRunnerService {
       sessionId: input.session.id,
       prompt: submittedPrompt,
       maxSteps: input.defaults.maxSteps,
+      maxToolConcurrency: input.defaults.maxToolConcurrency,
       host: input.host,
       memoryMaintenanceMode: input.defaults.memoryMaintenanceMode,
     });

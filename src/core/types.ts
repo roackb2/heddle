@@ -14,6 +14,18 @@ import type { ToolPolicyHostContext } from './tools/policy-envelope/types.js';
 export type RunInput = {
   goal: string;
   maxSteps?: number;
+  maxToolConcurrency?: number;
+};
+
+export type ToolConcurrencyMode = 'serial' | 'parallel-safe';
+
+export type ToolExecutionContext = {
+  /**
+   * Cooperative cancellation for an in-flight tool call. Tool implementations
+   * should pass this signal to cancellable I/O instead of creating a detached
+   * request that outlives the agent run.
+   */
+  signal?: AbortSignal;
 };
 
 /**
@@ -32,6 +44,12 @@ export type ToolDefinition = {
   description: string;
   requiresApproval?: boolean;
   capabilities?: string[];
+  /**
+   * Defaults to `serial`. `parallel-safe` is an explicit guarantee from the
+   * tool owner that separate calls may overlap without conflicting effects or
+   * shared mutable state.
+   */
+  concurrency?: ToolConcurrencyMode;
   parameters: Record<string, unknown>; // JSON Schema object
   /** Immutable execution provenance owned by the host, never by the model. */
   hostPolicy?: ToolPolicyHostContext;

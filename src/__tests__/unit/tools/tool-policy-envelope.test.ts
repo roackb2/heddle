@@ -239,4 +239,57 @@ describe('tool policy envelope', () => {
 
     expect(execute).not.toHaveBeenCalled();
   });
+
+  it('passes cooperative cancellation context to tool execution', async () => {
+    const controller = new AbortController();
+    const execute = vi.fn(async () => ({ ok: true, output: 'ok' }));
+    const registry = new ToolRegistry([tool({ execute })]);
+
+    await expect(ToolExecutionService.execute(
+      registry,
+      {
+        id: 'call-1',
+        tool: 'test_tool',
+        input: { path: 'README.md' },
+      },
+      30_000,
+      controller.signal,
+    )).resolves.toEqual({ ok: true, output: 'ok' });
+
+    expect(execute).toHaveBeenCalledWith(
+      { path: 'README.md' },
+      { signal: controller.signal },
+    );
+  });
+
+  it('returns promptly when an in-flight tool execution is aborted', async () => {
+    const controller = new AbortController();
+    let receivedSignal: AbortSignal | undefined;
+    const registry = new ToolRegistry([
+      tool({
+        async execute(_input, context) {
+          receivedSignal = context?.signal;
+          return await new Promise(() => undefined);
+        },
+      }),
+    ]);
+
+    const execution = ToolExecutionService.execute(
+      registry,
+      {
+        id: 'call-1',
+        tool: 'test_tool',
+        input: { path: 'README.md' },
+      },
+      30_000,
+      controller.signal,
+    );
+    controller.abort();
+
+    await expect(execution).resolves.toEqual({
+      ok: false,
+      error: 'Tool "test_tool" execution aborted',
+    });
+    expect(receivedSignal).toBe(controller.signal);
+  });
 });

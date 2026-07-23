@@ -115,9 +115,11 @@ The default model order is:
 5. `ANTHROPIC_MODEL`
 6. Heddle's built-in OpenAI default
 
-The runner defaults memory maintenance to `none` and leaves `maxSteps`
-unset. Hosts that need background maintenance or a hard turn budget should
-override those values once at this boundary.
+The runner defaults memory maintenance to `none`, leaves `maxSteps` unset, and
+uses the core default `maxToolConcurrency` of `4`. Hosts that need background
+maintenance, a hard turn budget, or a different bound for explicitly
+parallel-safe tools should override those values once at this boundary. Set
+`maxToolConcurrency` to `1` to disable overlapping tool execution.
 
 When a host needs custom UI, routing, approvals, or domain commands, use
 `createConversationEngine` directly and treat this runner as the migration
