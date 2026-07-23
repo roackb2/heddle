@@ -42,6 +42,13 @@ export {
   LlmProviderInference,
   LlmProviderRegistry,
 } from './registry/index.js';
+export {
+  LlmModelUsageSchema,
+  LlmUsageCostSchema,
+  LlmUsageSchema,
+  LlmUsageService,
+} from './usage/index.js';
+export type { LlmProviderRequestUsage } from './usage/index.js';
 export type {
   LlmProviderAdapter,
   LlmProviderDefaultModelContext,
@@ -50,6 +57,7 @@ export type {
 export type {
   AssistantProviderContinuation,
   ChatMessage,
+  LlmModelUsage,
   LlmAdapter,
   LlmAdapterCapabilities,
   LlmAdapterCreateInput,
@@ -63,5 +71,6 @@ export type {
   LlmRuntimeContext,
   LlmStreamEvent,
   LlmUsage,
+  LlmUsageCost,
   ReasoningEffort,
 } from './types.js';

@@ -1,4 +1,5 @@
-import type { ChatMessage, LlmUsage } from '@/core/llm/types.js';
+import { LlmUsageService } from '@/core/llm/usage/index.js';
+import type { ChatMessage, LlmProvider, LlmUsage } from '@/core/llm/types.js';
 import type { ToolCall, ToolDefinition } from '@/core/types.js';
 
 type OpenAiCompatibleChatCompletionMessage = {
@@ -101,7 +102,10 @@ export class OpenAiCompatibleCodec {
     return parsed.length > 0 ? parsed : undefined;
   }
 
-  static extractUsage(response: unknown): LlmUsage | undefined {
+  static extractUsage(
+    response: unknown,
+    attribution: { provider: LlmProvider; model: string },
+  ): LlmUsage | undefined {
     if (!response || typeof response !== 'object') {
       return undefined;
     }
@@ -113,12 +117,22 @@ export class OpenAiCompatibleCodec {
 
     const inputTokens = OpenAiCompatibleCodec.numberField(usage, 'prompt_tokens') ?? 0;
     const outputTokens = OpenAiCompatibleCodec.numberField(usage, 'completion_tokens') ?? 0;
-    return {
-      inputTokens,
+    const promptDetails = OpenAiCompatibleCodec.objectField(usage, 'prompt_tokens_details');
+    const completionDetails = OpenAiCompatibleCodec.objectField(usage, 'completion_tokens_details');
+    const cachedInputTokens = promptDetails
+      ? OpenAiCompatibleCodec.numberField(promptDetails, 'cached_tokens')
+      : undefined;
+    return LlmUsageService.fromProviderRequest({
+      provider: attribution.provider,
+      model: OpenAiCompatibleCodec.stringField(response, 'model') ?? attribution.model,
+      billedInputTokens: Math.max(inputTokens - (cachedInputTokens ?? 0), 0),
+      cachedInputTokens,
       outputTokens,
       totalTokens: OpenAiCompatibleCodec.numberField(usage, 'total_tokens') ?? inputTokens + outputTokens,
-      requests: 1,
-    };
+      reasoningTokens: completionDetails
+        ? OpenAiCompatibleCodec.numberField(completionDetails, 'reasoning_tokens')
+        : undefined,
+    });
   }
 
   private static toToolCall(call: ToolCall): OpenAiCompatibleToolCall {
@@ -152,5 +166,15 @@ export class OpenAiCompatibleCodec {
   private static numberField(value: object, key: string): number | undefined {
     const field = (value as Record<string, unknown>)[key];
     return typeof field === 'number' ? field : undefined;
+  }
+
+  private static objectField(value: object, key: string): object | undefined {
+    const field = (value as Record<string, unknown>)[key];
+    return field && typeof field === 'object' ? field : undefined;
+  }
+
+  private static stringField(value: object, key: string): string | undefined {
+    const field = (value as Record<string, unknown>)[key];
+    return typeof field === 'string' && field.trim() ? field : undefined;
   }
 }

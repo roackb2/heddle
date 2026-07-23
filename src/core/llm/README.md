@@ -21,6 +21,8 @@ choosing providers themselves.
   including exact replay of provider-private reasoning continuation.
 - `models/` owns the curated model catalog and model policy decisions used by
   hosts.
+- `usage/` owns provider-normalized token, cache, cost, request, and model
+  attribution telemetry.
 
 The OpenAI adapter accepts two account-sign-in lifecycles. Stored OAuth
 credentials may refresh through Heddle's credential repository. A
@@ -49,3 +51,28 @@ Provider adapters should follow the local pattern:
 Callers may still choose product semantics such as the active model, but model
 ownership, provider inference, adapter construction, and credential
 compatibility live here.
+
+## Normalized usage
+
+Every built-in adapter reports one `LlmUsage` record per successful provider
+response. The agent runtime aggregates those records across retries and model
+turns without changing their billing categories:
+
+| Heddle field | OpenAI Responses API | Anthropic Messages API |
+| --- | --- | --- |
+| `inputTokens` | `input_tokens` | `input_tokens + cache_creation_input_tokens + cache_read_input_tokens` |
+| `billedInputTokens` | `input_tokens - input_tokens_details.cached_tokens` | `input_tokens` |
+| `cachedInputTokens` | `input_tokens_details.cached_tokens` | `cache_read_input_tokens` |
+| `cacheWriteInputTokens` | unavailable | `cache_creation_input_tokens` |
+| `outputTokens` | `output_tokens` | `output_tokens` |
+| `reasoningTokens` | `output_tokens_details.reasoning_tokens` | unavailable |
+
+`billedInputTokens` is the regular, non-cache input category. Cache writes may
+also be billable, but remain separate because providers price them differently.
+`byModel` preserves the provider and actual model for each aggregate, so helper
+model usage is not silently assigned to the conversation's requested model.
+
+Costs are provider-reported only. Heddle does not estimate cost from a mutable
+pricing table. `cost.status` is therefore `unavailable` when the response does
+not include a monetary amount, `reported` when all represented requests include
+one, and `partial` when an aggregate mixes reported and unavailable requests.

@@ -75,6 +75,11 @@ export type {
   TraceEvent,
   StopReason,
 } from './core/types.js';
+export type {
+  LlmModelUsage,
+  LlmUsage,
+  LlmUsageCost,
+} from './core/llm/types.js';
 
 // Provider-specific credential acquisition remains opt-in. The device-code
 // service is useful to hosted adopters that cannot receive a loopback callback.

@@ -1,4 +1,10 @@
-import type { MessageParam, Tool, ToolResultBlockParam } from '@anthropic-ai/sdk/resources/messages';
+import type {
+  MessageParam,
+  Tool,
+  ToolResultBlockParam,
+  Usage,
+} from '@anthropic-ai/sdk/resources/messages';
+import { LlmUsageService } from '@/core/llm/usage/index.js';
 import type { ChatMessage, LlmUsage } from '@/core/llm/types.js';
 import type { ToolDefinition } from '@/core/types.js';
 
@@ -57,16 +63,18 @@ export class AnthropicCodec {
     };
   }
 
-  static extractUsage(usage: { input_tokens: number; output_tokens: number } | undefined): LlmUsage | undefined {
+  static extractUsage(usage: Usage | undefined, model: string): LlmUsage | undefined {
     if (!usage) {
       return undefined;
     }
 
-    return {
-      inputTokens: usage.input_tokens,
+    return LlmUsageService.fromProviderRequest({
+      provider: 'anthropic',
+      model,
+      billedInputTokens: usage.input_tokens,
+      cachedInputTokens: usage.cache_read_input_tokens ?? undefined,
+      cacheWriteInputTokens: usage.cache_creation_input_tokens ?? undefined,
       outputTokens: usage.output_tokens,
-      totalTokens: usage.input_tokens + usage.output_tokens,
-      requests: 1,
-    };
+    });
   }
 }

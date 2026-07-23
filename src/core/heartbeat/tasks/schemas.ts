@@ -6,19 +6,11 @@
  * the runtime loop does not yet expose a full checkpoint schema.
  */
 import { z } from 'zod';
+import { LlmUsageSchema } from '@/core/llm/usage/index.js';
 
 export const HeartbeatTaskStatusSchema = z.enum(['idle', 'running', 'waiting', 'blocked', 'complete', 'failed']);
 export const HeartbeatDecisionSchema = z.enum(['continue', 'pause', 'complete', 'escalate']);
 export const HeartbeatTaskContinuationModeSchema = z.enum(['operator', 'agent']);
-
-const LlmUsageSchema = z.object({
-  inputTokens: z.number().describe('Prompt tokens reported for the heartbeat run.'),
-  outputTokens: z.number().describe('Completion tokens reported for the heartbeat run.'),
-  totalTokens: z.number().describe('Total tokens reported for the heartbeat run.'),
-  cachedInputTokens: z.number().optional().describe('Provider-reported cached input tokens.'),
-  reasoningTokens: z.number().optional().describe('Provider-reported reasoning tokens.'),
-  requests: z.number().optional().describe('Number of provider requests represented by this usage aggregate.'),
-}).passthrough();
 
 export const HeartbeatTaskSchema = z.object({
   id: z.string().describe('Stable heartbeat task identifier.'),

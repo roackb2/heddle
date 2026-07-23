@@ -5,6 +5,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { AgentRunService } from '../../../core/agent/index.js';
 import type { AgentRunEvent } from '../../../core/agent/index.js';
 import { ToolApprovalPolicies, type AutopilotProfile } from '../../../core/approvals/index.js';
+import { LlmUsageService } from '../../../core/llm/usage/index.js';
 import type { ChatMessage, LlmAdapter, LlmResponse } from '../../../core/llm/types.js';
 import type { ToolDefinition } from '../../../core/types.js';
 import { createLogger } from '../../../core/utils/logger.js';
@@ -352,26 +353,27 @@ describe('AgentRunService.run', () => {
         if (messages.some((message) => message.role === 'tool')) {
           return {
             content: 'Done.',
-            usage: {
-              inputTokens: 140,
+            usage: LlmUsageService.fromProviderRequest({
+              provider: 'anthropic',
+              model: 'claude-sonnet-4-6',
+              billedInputTokens: 100,
+              cachedInputTokens: 40,
               outputTokens: 20,
-              totalTokens: 160,
-              requests: 1,
-            },
+            }),
           };
         }
 
         return {
           content: 'Inspecting first.',
           toolCalls: [{ id: 'call-1', tool: 'list_files', input: { path: '.' } }],
-          usage: {
-            inputTokens: 120,
+          usage: LlmUsageService.fromProviderRequest({
+            provider: 'anthropic',
+            model: 'claude-haiku-4-5',
+            billedInputTokens: 90,
+            cachedInputTokens: 20,
+            cacheWriteInputTokens: 10,
             outputTokens: 30,
-            totalTokens: 150,
-            cachedInputTokens: 10,
-            reasoningTokens: 6,
-            requests: 1,
-          },
+          }),
         };
       },
     };
@@ -395,11 +397,71 @@ describe('AgentRunService.run', () => {
 
     expect(result.usage).toEqual({
       inputTokens: 260,
+      billedInputTokens: 190,
       outputTokens: 50,
       totalTokens: 310,
-      cachedInputTokens: 10,
-      reasoningTokens: 6,
+      cachedInputTokens: 60,
+      cacheWriteInputTokens: 10,
       requests: 2,
+      cost: { status: 'unavailable' },
+      byModel: [
+        expect.objectContaining({
+          provider: 'anthropic',
+          model: 'claude-haiku-4-5',
+          requests: 1,
+        }),
+        expect.objectContaining({
+          provider: 'anthropic',
+          model: 'claude-sonnet-4-6',
+          requests: 1,
+        }),
+      ],
+    });
+  });
+
+  it('includes usage from retryable model responses', async () => {
+    let calls = 0;
+    const fakeLlm: LlmAdapter = {
+      async chat(): Promise<LlmResponse> {
+        calls += 1;
+        return {
+          content: calls === 3 ? 'Recovered.' : undefined,
+          usage: LlmUsageService.fromProviderRequest({
+            provider: 'anthropic',
+            model: 'claude-sonnet-4-6',
+            billedInputTokens: 10,
+            outputTokens: calls === 3 ? 2 : 0,
+          }),
+        };
+      },
+    };
+
+    const result = await runWithRetryTimers(() => AgentRunService.run({
+      goal: 'Retry empty responses.',
+      llm: fakeLlm,
+      tools: [],
+      maxSteps: 1,
+      logger: silentLogger,
+    }));
+
+    expect(calls).toBe(3);
+    expect(result.usage).toMatchObject({
+      inputTokens: 30,
+      billedInputTokens: 30,
+      outputTokens: 2,
+      totalTokens: 32,
+      requests: 3,
+      cost: { status: 'unavailable' },
+      byModel: [{
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-6',
+        inputTokens: 30,
+        billedInputTokens: 30,
+        outputTokens: 2,
+        totalTokens: 32,
+        requests: 3,
+        cost: { status: 'unavailable' },
+      }],
     });
   });
 

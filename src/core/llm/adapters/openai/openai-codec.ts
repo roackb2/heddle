@@ -7,6 +7,7 @@ import type {
 } from 'openai/resources/responses/responses.js';
 import type { ReasoningEffort as OpenAiReasoningEffort } from 'openai/resources/shared.js';
 import { ModelPolicyService } from '@/core/llm/models/index.js';
+import { LlmUsageService } from '@/core/llm/usage/index.js';
 import type { ChatMessage, LlmUsage, ReasoningEffort } from '@/core/llm/types.js';
 import type { AssistantDiagnostics, ToolCall, ToolDefinition } from '@/core/types.js';
 
@@ -158,14 +159,16 @@ export class OpenAiCodec {
       return undefined;
     }
 
-    return {
-      inputTokens: usage.input_tokens,
+    const cachedInputTokens = usage.input_tokens_details?.cached_tokens;
+    return LlmUsageService.fromProviderRequest({
+      provider: 'openai',
+      model: response.model,
+      billedInputTokens: Math.max(usage.input_tokens - (cachedInputTokens ?? 0), 0),
+      cachedInputTokens,
       outputTokens: usage.output_tokens,
       totalTokens: usage.total_tokens,
-      cachedInputTokens: usage.input_tokens_details?.cached_tokens,
       reasoningTokens: usage.output_tokens_details?.reasoning_tokens,
-      requests: 1,
-    };
+    });
   }
 
   static buildResponsesRequest(

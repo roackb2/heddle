@@ -28,7 +28,9 @@ export type {
   ReasoningEffort,
   LlmAdapterCapabilities,
   LlmAdapterInfo,
+  LlmModelUsage,
   LlmUsage,
+  LlmUsageCost,
 } from './core/llm/types.js';
 export {
   AnthropicAdapter,
@@ -46,6 +48,10 @@ export {
   OpenAiCompatibleProviderAdapter,
   OPENAI_COMPATIBLE_PROVIDER_PROFILES,
   OpenAiCompatibleProviderProfileService,
+  LlmModelUsageSchema,
+  LlmUsageCostSchema,
+  LlmUsageSchema,
+  LlmUsageService,
   OpenAiCodexSseService,
   OpenAiOAuthFetchService,
   OpenAiProviderAdapter,
@@ -62,6 +68,7 @@ export type {
   OpenAiCompatibleProviderId,
   OpenAiCompatibleProviderProfile,
   OpenAiOAuthFetchOptions,
+  LlmProviderRequestUsage,
 } from './core/llm/index.js';
 export {
   OPENAI_MODEL_GROUPS,

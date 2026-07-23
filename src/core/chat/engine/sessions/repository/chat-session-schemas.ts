@@ -9,6 +9,7 @@ import { ConversationDirectShellLineResultSchema } from '@/core/chat/engine/dire
 import { ChatArchiveRecordSchema } from '@/core/chat/engine/sessions/archives/schemas.js';
 import { ConversationTurnPresentationSchema } from '@/core/chat/engine/turns/presentation/index.js';
 import { CustomAgentExecutionSnapshotSchema } from '@/core/custom-agents/index.js';
+import { LlmUsageSchema } from '@/core/llm/usage/index.js';
 import { REASONING_EFFORTS } from '@/core/llm/types.js';
 
 const ReasoningEffortSchema = z.enum(REASONING_EFFORTS);
@@ -123,21 +124,6 @@ const TurnSummariesSchema = z.array(z.unknown())
     const parsed = TurnSummaryReadSchema.safeParse(turn);
     return parsed.success ? [parsed.data] : [];
   }));
-
-const LlmUsageSchema = z.object({
-  inputTokens: z.number().describe('Prompt tokens charged or reported for the model request.'),
-  outputTokens: z.number().describe('Completion tokens charged or reported for the model request.'),
-  totalTokens: z.number().describe('Total tokens reported for the model request.'),
-  cachedInputTokens: z.number()
-    .describe('Input tokens served from provider-side prompt cache, when reported.')
-    .optional(),
-  reasoningTokens: z.number()
-    .describe('Reasoning tokens reported by reasoning-capable model providers.')
-    .optional(),
-  requests: z.number()
-    .describe('Number of provider requests represented by this usage aggregate.')
-    .optional(),
-});
 
 const ChatContextStatsSchema = z.object({
   estimatedHistoryTokens: z.number().describe('Estimated token count for the session history currently retained in context.'),

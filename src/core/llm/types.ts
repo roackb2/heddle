@@ -19,19 +19,22 @@ export type LlmStreamEvent =
   | { type: 'reasoning_summary.delta'; delta: string }
   | { type: 'reasoning_summary.done'; text: string };
 
-export type LlmProvider =
-  | 'openai'
-  | 'anthropic'
-  | 'google'
-  | 'kimi'
-  | 'ollama'
-  | 'lmstudio'
-  | 'litellm'
-  | 'vllm'
-  | 'huggingface'
-  | 'openrouter'
-  | 'together'
-  | 'groq';
+export const LLM_PROVIDERS = [
+  'openai',
+  'anthropic',
+  'google',
+  'kimi',
+  'ollama',
+  'lmstudio',
+  'litellm',
+  'vllm',
+  'huggingface',
+  'openrouter',
+  'together',
+  'groq',
+] as const;
+
+export type LlmProvider = (typeof LLM_PROVIDERS)[number];
 
 export const REASONING_EFFORTS = [
   'none',
@@ -57,13 +60,44 @@ export type LlmAdapterInfo = {
   capabilities: LlmAdapterCapabilities;
 };
 
-export type LlmUsage = {
+export type LlmUsageCost =
+  | { status: 'reported'; amountUsd: number }
+  | { status: 'partial'; reportedAmountUsd: number; unavailableRequests: number }
+  | { status: 'unavailable' };
+
+export type LlmModelUsage = {
+  provider: LlmProvider;
+  model: string;
   inputTokens: number;
+  billedInputTokens: number;
   outputTokens: number;
   totalTokens: number;
   cachedInputTokens?: number;
+  cacheWriteInputTokens?: number;
+  reasoningTokens?: number;
+  requests: number;
+  cost: LlmUsageCost;
+};
+
+export type LlmUsage = {
+  /**
+   * All model input tokens, including cache reads and cache writes.
+   */
+  inputTokens: number;
+  /**
+   * Regular provider input tokens, excluding separately reported cache reads
+   * and cache writes.
+   */
+  billedInputTokens?: number;
+  outputTokens: number;
+  totalTokens: number;
+  cachedInputTokens?: number;
+  cacheWriteInputTokens?: number;
   reasoningTokens?: number;
   requests?: number;
+  cost?: LlmUsageCost;
+  byModel?: LlmModelUsage[];
+  unattributedRequests?: number;
 };
 
 /**
