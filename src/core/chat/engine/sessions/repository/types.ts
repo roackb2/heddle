@@ -18,6 +18,7 @@ export type ChatSessionCatalogEntry = {
   lastContinuePrompt?: string;
   context?: ChatContextStats;
   archives?: ChatArchiveRecord[];
+  leaseEpoch?: number;
   lease?: ChatSessionLease;
 };
 

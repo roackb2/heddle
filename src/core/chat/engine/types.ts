@@ -10,7 +10,11 @@ import type {
 import type { AgentLoopEvent, RunAgentLoopOptions } from '../../runtime/loop/index.js';
 import type { ChatMessage, LlmAdapter, ReasoningEffort } from '../../llm/types.js';
 import type { ToolDefinition, TraceEvent } from '../../types.js';
-import type { ChatSessionLeaseOwner } from './sessions/leases/index.js';
+import type {
+  ChatSessionLeaseClaim,
+  ChatSessionLeaseIdentity,
+  ChatSessionLeaseOwner,
+} from './sessions/leases/index.js';
 import type { ChatArchiveRepository } from './sessions/archives/index.js';
 import type {
   ChatSessionCatalogPage,
@@ -138,6 +142,15 @@ export type ConversationSessionService = {
   // Generic mutation escape hatch. The updater may be reapplied after an
   // optimistic-concurrency conflict, so it must not perform external side effects.
   update(id: string, updater: (session: ChatSession) => ChatSession): Promise<ChatSession | undefined>;
+  /**
+   * Lease-protected mutation. The claim is revalidated against the latest
+   * revision before every compare-and-set attempt.
+   */
+  updateWithLease(
+    id: string,
+    claim: ChatSessionLeaseClaim,
+    updater: (session: ChatSession) => ChatSession,
+  ): Promise<ChatSession | undefined>;
 
   // Settings
   updateSettings(id: string, input: UpdateConversationSessionSettingsInput): Promise<ChatSession>;
@@ -166,8 +179,8 @@ export type ConversationSessionService = {
   // Leases
   getLeaseConflict(id: string, owner: ChatSessionLeaseOwner): Promise<string | undefined>;
   acquireLease(id: string, owner: ChatSessionLeaseOwner): Promise<ChatSession>;
-  refreshLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): Promise<ChatSession>;
-  releaseLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): Promise<ChatSession>;
+  refreshLease(id: string, owner: ChatSessionLeaseIdentity): Promise<ChatSession>;
+  releaseLease(id: string, owner: ChatSessionLeaseIdentity): Promise<ChatSession>;
 };
 
 export type CreateConversationSessionInput = {
@@ -261,11 +274,16 @@ export type DequeuedConversationPromptResult = {
 export type MarkConversationCompactionRunningInput = {
   sourceHistory: ChatMessage[];
   archivePath?: string;
+  leaseClaim?: ChatSessionLeaseClaim;
 };
 
-export type ApplyConversationCompactionResultInput = ConversationCompactionResult;
+export type ApplyConversationCompactionResultInput = ConversationCompactionResult & {
+  leaseClaim?: ChatSessionLeaseClaim;
+};
 
-export type RestoreConversationCompactionStateInput = Pick<ChatSession, 'context' | 'archives'>;
+export type RestoreConversationCompactionStateInput = Pick<ChatSession, 'context' | 'archives'> & {
+  leaseClaim?: ChatSessionLeaseClaim;
+};
 
 export type ConversationTurnService = {
   submit(input: SubmitConversationTurnInput): Promise<SubmitConversationTurnResult>;

@@ -36,12 +36,13 @@ export class ConversationTurnPersistenceService {
         await args.sessionService.restoreCompactionState(args.session.id, {
           context: args.session.context,
           archives: args.session.archives,
+          leaseClaim: args.leaseClaim,
         });
       }
       throw error;
     }
 
-    const session = await args.sessionService.update(args.session.id, (latestSession) => ({
+    const session = await args.sessionService.updateWithLease(args.session.id, args.leaseClaim, (latestSession) => ({
         ...persisted.session,
         queuedPrompts: latestSession.queuedPrompts,
       }));
@@ -61,6 +62,7 @@ export class ConversationTurnPersistenceService {
     await args.sessionService.markCompactionRunning(args.session.id, {
       sourceHistory,
       archivePath: args.archivePath,
+      leaseClaim: args.leaseClaim,
     });
   }
 }

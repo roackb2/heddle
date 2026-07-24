@@ -1,4 +1,5 @@
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
+import { ChatSessionLeases } from '@/core/chat/engine/sessions/leases/index.js';
 import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import type { ConversationCompactionResult } from '@/core/chat/engine/compaction/index.js';
 import { ChatArchiveRepositoryError } from '@/core/chat/engine/sessions/archives/index.js';
@@ -31,6 +32,10 @@ export class ConversationTurnPreflightService {
     const leasedSession = persistedSession
       ? await args.sessionService.acquireLease(args.sessionId, args.leaseOwner)
       : undefined;
+    if (!leasedSession) {
+      throw new Error(`Chat session not found: ${args.sessionId}`);
+    }
+    const leaseClaim = ChatSessionLeases.claim(leasedSession);
     const initialHistory = leasedSession?.history ?? args.fallbackHistory;
     const compactionRuntime: PreflightTurnCompactionRuntime = args;
     const compactionRequest: PreflightTurnCompactionRequest = {
@@ -53,6 +58,7 @@ export class ConversationTurnPreflightService {
             await ConversationTurnPreflightService.persistRunningSeed({
               ...args,
               leasedSession,
+              leaseClaim,
               archivePath: event.archivePath,
             });
             runningSeedPersisted = true;
@@ -64,6 +70,7 @@ export class ConversationTurnPreflightService {
         await args.sessionService.restoreCompactionState(args.sessionId, {
           context: leasedSession.context,
           archives: leasedSession.archives,
+          leaseClaim,
         });
       }
       throw error;
@@ -73,6 +80,7 @@ export class ConversationTurnPreflightService {
       ...args,
       session: persistedSession ?? await args.sessionService.require(args.sessionId),
       compacted: preflightCompacted,
+      leaseClaim,
     });
   }
 
@@ -80,13 +88,14 @@ export class ConversationTurnPreflightService {
     await args.sessionService.markCompactionRunning(args.sessionId, {
       sourceHistory: args.leasedSession.history,
       archivePath: args.archivePath,
+      leaseClaim: args.leaseClaim,
     });
   }
 
   static async persistPrepared(
     args: PersistPreparedChatSessionTurnArgs,
   ): Promise<Extract<PrepareChatSessionTurnResult, { ok: true }>> {
-    const preparedSession = await args.sessionService.update(args.session.id, (session) => (
+    const preparedSession = await args.sessionService.updateWithLease(args.session.id, args.leaseClaim, (session) => (
       ChatSessionRecords.applyCompactedHistory({
         session,
         compacted: args.compacted,
@@ -101,6 +110,7 @@ export class ConversationTurnPreflightService {
       ok: true,
       session: preparedSession,
       compacted: args.compacted,
+      leaseClaim: args.leaseClaim,
     };
   }
 

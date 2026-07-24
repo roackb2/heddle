@@ -29,7 +29,7 @@ describe('compaction infrastructure failure restoration', () => {
       stateRoot: fixture.stateRoot,
       toolNames: [],
       summarizer: {},
-      leaseOwner: { ownerKind: 'daemon', ownerId: 'daemon-test' },
+      leaseOwner: { ownerKind: 'daemon', hostId: 'test-host', ownerId: 'daemon-test' },
       host: {},
     })).rejects.toThrow('archive backend unavailable');
 

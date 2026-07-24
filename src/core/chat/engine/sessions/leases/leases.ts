@@ -6,12 +6,16 @@
  * session through the owning service or repository.
  */
 import type { ChatSession, ChatSessionLease } from '@/core/chat/types.js';
-import type { ChatSessionLeaseConflictOptions, ChatSessionLeaseOwner } from './types.js';
+import type {
+  ChatSessionLeaseClaim,
+  ChatSessionLeaseConflictOptions,
+  ChatSessionLeaseIdentity,
+  ChatSessionLeaseOwner,
+} from './types.js';
 import dayjs from 'dayjs';
 
 export const SESSION_LEASE_REFRESH_INTERVAL_MS = 5 * 1000;
 export const SESSION_LEASE_STALE_AFTER_MS = 20 * 1000;
-const LOCAL_PROCESS_LEASE_OWNER_PATTERN = /^(?:tui|ask|submit|daemon)-(\d+)(?:-\d+)?$/;
 
 export class ChatSessionLeases {
   static isFresh(
@@ -30,22 +34,34 @@ export class ChatSessionLeases {
     return dayjs(options?.now ?? Date.now()).diff(lastSeenAt) <= (options?.staleAfterMs ?? SESSION_LEASE_STALE_AFTER_MS);
   }
 
-  static isOwnedByDeadLocalProcess(
+  static isSameOwner(
     lease: ChatSessionLease | undefined,
-    options?: { isProcessAlive?: (pid: number) => boolean },
+    owner: ChatSessionLeaseIdentity,
   ): boolean {
-    if (!lease) {
-      return false;
+    return lease?.hostId === owner.hostId && lease.ownerId === owner.ownerId;
+  }
+
+  static claim(session: Pick<ChatSession, 'id' | 'lease'>): ChatSessionLeaseClaim {
+    const lease = session.lease;
+    if (!lease?.hostId) {
+      throw new Error(`Session ${session.id} does not have a fenced lease.`);
     }
 
-    const match = LOCAL_PROCESS_LEASE_OWNER_PATTERN.exec(lease.ownerId);
-    const pid = match ? Number.parseInt(match[1] ?? '', 10) : NaN;
-    if (!Number.isInteger(pid) || pid <= 0) {
-      return false;
-    }
+    return {
+      hostId: lease.hostId,
+      ownerId: lease.ownerId,
+      fencingToken: lease.fencingToken,
+    };
+  }
 
-    const isProcessAlive = options?.isProcessAlive ?? ChatSessionLeases.defaultIsProcessAlive;
-    return !isProcessAlive(pid);
+  static isHeld(
+    session: Pick<ChatSession, 'lease'>,
+    claim: ChatSessionLeaseClaim,
+    options?: { now?: number; staleAfterMs?: number },
+  ): boolean {
+    return ChatSessionLeases.isFresh(session.lease, options)
+      && ChatSessionLeases.isSameOwner(session.lease, claim)
+      && session.lease?.fencingToken === claim.fencingToken;
   }
 
   static acquire(
@@ -54,12 +70,19 @@ export class ChatSessionLeases {
     options?: { now?: number },
   ): ChatSession {
     const timestamp = dayjs(options?.now ?? Date.now()).toISOString();
+    const continuingOwner = ChatSessionLeases.isSameOwner(session.lease, owner)
+      && ChatSessionLeases.isFresh(session.lease, options);
+    const currentToken = Math.max(session.leaseEpoch ?? 0, session.lease?.fencingToken ?? 0);
+    const fencingToken = continuingOwner ? session.lease?.fencingToken ?? currentToken + 1 : currentToken + 1;
     return {
       ...session,
+      leaseEpoch: Math.max(currentToken, fencingToken),
       lease: {
         ownerKind: owner.ownerKind,
+        hostId: owner.hostId,
         ownerId: owner.ownerId,
-        acquiredAt: session.lease?.ownerId === owner.ownerId ? session.lease.acquiredAt : timestamp,
+        fencingToken,
+        acquiredAt: continuingOwner ? session.lease?.acquiredAt ?? timestamp : timestamp,
         lastSeenAt: timestamp,
         clientLabel: owner.clientLabel,
       },
@@ -68,24 +91,29 @@ export class ChatSessionLeases {
 
   static refresh(
     session: ChatSession,
-    owner: Pick<ChatSessionLeaseOwner, 'ownerId'>,
+    owner: ChatSessionLeaseIdentity,
     options?: { now?: number },
   ): ChatSession {
-    if (!session.lease || session.lease.ownerId !== owner.ownerId) {
+    const lease = session.lease;
+    if (
+      !lease
+      || !ChatSessionLeases.isSameOwner(lease, owner)
+      || !ChatSessionLeases.isFresh(lease, options)
+    ) {
       return session;
     }
 
     return {
       ...session,
       lease: {
-        ...session.lease,
+        ...lease,
         lastSeenAt: dayjs(options?.now ?? Date.now()).toISOString(),
       },
     };
   }
 
-  static release(session: ChatSession, owner?: Pick<ChatSessionLeaseOwner, 'ownerId'>): ChatSession {
-    if (!session.lease || (owner && session.lease.ownerId !== owner.ownerId)) {
+  static release(session: ChatSession, owner?: ChatSessionLeaseIdentity): ChatSession {
+    if (!session.lease || (owner && !ChatSessionLeases.isSameOwner(session.lease, owner))) {
       return session;
     }
 
@@ -102,8 +130,7 @@ export class ChatSessionLeases {
   ): string | undefined {
     if (
       !session.lease ||
-      session.lease.ownerId === owner.ownerId ||
-      ChatSessionLeases.isOwnedByDeadLocalProcess(session.lease, options) ||
+      ChatSessionLeases.isSameOwner(session.lease, owner) ||
       !ChatSessionLeases.isFresh(session.lease, options)
     ) {
       return undefined;
@@ -114,18 +141,5 @@ export class ChatSessionLeases {
       'Continuing from multiple clients in the same session may corrupt the conversation.',
       'Wait for the other client to finish or use a different session.',
     ].join(' ');
-  }
-
-  private static defaultIsProcessAlive(pid: number): boolean {
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch (error) {
-      if (typeof error === 'object' && error && 'code' in error && error.code === 'ESRCH') {
-        return false;
-      }
-
-      return true;
-    }
   }
 }

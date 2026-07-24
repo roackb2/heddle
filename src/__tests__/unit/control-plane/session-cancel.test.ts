@@ -176,6 +176,7 @@ describe('ControlPlaneChatSessionsController run cancellation', () => {
           prompt: 'Stop this run.',
           leaseOwner: {
             ownerKind: 'daemon',
+            hostId: 'test-host',
             ownerId: 'test-daemon',
             clientLabel: 'test',
           },

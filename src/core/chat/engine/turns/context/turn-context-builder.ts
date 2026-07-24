@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { hostname } from 'node:os';
 import { RuntimeToolService } from '@/core/runtime/tools/index.js';
 import { CustomAgentRuntimeContextService } from '@/core/custom-agents/index.js';
 import { ConversationTurnRuntimeResolver } from '../runtime/index.js';
@@ -8,6 +10,9 @@ import type {
   PrepareConversationTurnContextArgs,
 } from './types.js';
 import type { ConversationTurnRuntimeConfig } from '../runtime/index.js';
+
+const DEFAULT_LEASE_HOST_ID = hostname();
+const DEFAULT_LEASE_OWNER_ID = `submit-${randomUUID()}`;
 
 /**
  * Builds the concrete runtime context needed before a persisted turn can run.
@@ -45,7 +50,8 @@ export class ConversationTurnContextBuilder {
       toolNames: tools.map((tool) => tool.name),
       leaseOwner: args.leaseOwner ?? {
         ownerKind: 'ask',
-        ownerId: `submit-${process.pid}`,
+        hostId: DEFAULT_LEASE_HOST_ID,
+        ownerId: DEFAULT_LEASE_OWNER_ID,
         clientLabel: 'another Heddle client',
       },
     };

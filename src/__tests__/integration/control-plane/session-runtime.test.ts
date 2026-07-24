@@ -180,6 +180,7 @@ describe('control-plane session runtime integration', () => {
       prompt: 'inspect file with expanded mention contents',
       leaseOwner: {
         ownerKind: 'daemon',
+        hostId: 'test-host',
         ownerId: 'daemon-test',
         clientLabel: 'control plane',
       },
@@ -192,6 +193,7 @@ describe('control-plane session runtime integration', () => {
       sessionId: session.id,
       leaseOwner: {
         ownerKind: 'daemon',
+        hostId: 'test-host',
         ownerId: 'daemon-test',
         clientLabel: 'control plane',
       },
@@ -245,6 +247,7 @@ describe('control-plane session runtime integration', () => {
       apiKey: 'test-openai-key',
       leaseOwner: {
         ownerKind: 'daemon',
+        hostId: 'test-host',
         ownerId: 'daemon-test',
         clientLabel: 'control plane',
       },
@@ -476,6 +479,7 @@ describe('conversation turn lifecycle', () => {
       artifactsEnabled: true,
       leaseOwner: {
         ownerKind: 'daemon',
+        hostId: 'test-host',
         ownerId: 'daemon-test',
         clientLabel: 'control plane',
       },

@@ -2,7 +2,10 @@ import type { ChatMessage } from '@/core/llm/types.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ConversationCompactionStatus } from '@/core/live/index.js';
-import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
+import type {
+  ChatSessionLeaseClaim,
+  ChatSessionLeaseOwner,
+} from '@/core/chat/engine/sessions/leases/index.js';
 import type { ChatArchiveRepository } from '@/core/chat/engine/sessions/archives/index.js';
 import type { ConversationSessionService } from '@/core/chat/engine/types.js';
 import type { ChatTurnHostPort } from '../host/index.js';
@@ -44,6 +47,7 @@ export type PersistPreflightRunningSeedArgs = Pick<
   'sessionService' | 'sessionId'
 > & {
   leasedSession: ChatSession;
+  leaseClaim: ChatSessionLeaseClaim;
   archivePath?: string;
 };
 
@@ -53,6 +57,7 @@ export type PersistPreparedChatSessionTurnArgs = Pick<
 > & {
   session: ChatSession;
   compacted: ConversationCompactionResult;
+  leaseClaim: ChatSessionLeaseClaim;
 };
 
 export type PrepareChatSessionTurnResult =
@@ -60,6 +65,7 @@ export type PrepareChatSessionTurnResult =
       ok: true;
       session: ChatSession;
       compacted: ConversationCompactionResult;
+      leaseClaim: ChatSessionLeaseClaim;
     }
   | {
       ok: false;

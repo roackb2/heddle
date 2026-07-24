@@ -659,9 +659,12 @@ export class ChatSessionRepositoryConformance {
       lastContinuePrompt: 'Continue.',
       context: { estimatedHistoryTokens: 0 },
       archives: [],
+      leaseEpoch: 1,
       lease: {
         ownerKind: 'daemon',
+        hostId: 'host-a',
         ownerId: 'conformance-owner',
+        fencingToken: 1,
         acquiredAt: timestamp.first,
         lastSeenAt: timestamp.first,
       },
@@ -737,7 +740,9 @@ export class ChatSessionRepositoryConformance {
       }],
       lease: {
         ownerKind: 'daemon',
+        hostId: 'host-a',
         ownerId: 'daemon-1',
+        fencingToken: 1,
         acquiredAt: timestamp.second,
         lastSeenAt: timestamp.third,
         clientLabel: 'Hosted agent',

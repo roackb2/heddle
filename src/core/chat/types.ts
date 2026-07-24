@@ -131,7 +131,12 @@ export type ChatArchiveManifest = {
 
 export type ChatSessionLease = {
   ownerKind: 'tui' | 'daemon' | 'ask';
+  /** Host or replica identity. Legacy persisted leases may not have one. */
+  hostId?: string;
+  /** Unique identity for one runtime instance on the host. */
   ownerId: string;
+  /** Monotonic session-owned token used to fence stale writers. */
+  fencingToken: number;
   acquiredAt: string;
   lastSeenAt: string;
   clientLabel?: string;
@@ -167,6 +172,8 @@ export type ChatSession = {
   lastContinuePrompt?: string;
   context?: ChatContextStats;
   archives?: ChatArchiveRecord[];
+  /** Last fencing token issued for this session, retained after release. */
+  leaseEpoch?: number;
   lease?: ChatSessionLease;
   queuedPrompts: QueuedConversationPrompt[];
 };

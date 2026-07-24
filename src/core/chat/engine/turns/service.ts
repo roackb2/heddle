@@ -168,6 +168,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         summarizer: runtime.summarizer,
         host,
         agentSnapshot,
+        leaseClaim: preflight.leaseClaim,
       });
 
       if (maintenanceMode === 'background') {

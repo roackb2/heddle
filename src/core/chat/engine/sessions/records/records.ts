@@ -40,6 +40,7 @@ export class ChatSessionRecords {
       lastContinuePrompt: undefined,
       context: undefined,
       archives: [],
+      leaseEpoch: 0,
       lease: undefined,
       queuedPrompts: [],
     };

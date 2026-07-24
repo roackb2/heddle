@@ -25,7 +25,13 @@ import type {
   ChatSessionRepository,
   ListChatSessionsInput,
 } from '@/core/chat/engine/sessions/repository/types.js';
-import { ChatSessionLeases, type ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
+import {
+  ChatSessionLeaseLostError,
+  ChatSessionLeases,
+  type ChatSessionLeaseClaim,
+  type ChatSessionLeaseIdentity,
+  type ChatSessionLeaseOwner,
+} from '@/core/chat/engine/sessions/leases/index.js';
 import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
 import { ChatSessionRecords, ChatSessionTitles, ConversationLines } from '@/core/chat/engine/sessions/records/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
@@ -180,12 +186,34 @@ export class FileConversationSessionService implements ConversationSessionServic
     id: string,
     updater: (session: ChatSession) => ChatSession,
   ): Promise<ChatSession | undefined> {
+    return await this.updatePersisted(id, updater);
+  }
+
+  async updateWithLease(
+    id: string,
+    claim: ChatSessionLeaseClaim,
+    updater: (session: ChatSession) => ChatSession,
+  ): Promise<ChatSession | undefined> {
+    return await this.updatePersisted(id, updater, claim);
+  }
+
+  private async updatePersisted(
+    id: string,
+    updater: (session: ChatSession) => ChatSession,
+    leaseClaim?: ChatSessionLeaseClaim,
+  ): Promise<ChatSession | undefined> {
     let conflictCount = 0;
 
     while (true) {
       const record = await this.repository.read(id);
       if (!record) {
         return undefined;
+      }
+      if (leaseClaim && !ChatSessionLeases.isHeld(record.session, leaseClaim)) {
+        throw new ChatSessionLeaseLostError({
+          session: record.session,
+          expected: leaseClaim,
+        });
       }
 
       const nextSession = updater(record.session);
@@ -368,7 +396,7 @@ export class FileConversationSessionService implements ConversationSessionServic
         history: input.sourceHistory,
         lastArchivePath: input.archivePath,
       }),
-    }));
+    }), input.leaseClaim);
   }
 
   async applyCompactionResult(id: string, input: ApplyConversationCompactionResultInput): Promise<ChatSession> {
@@ -378,14 +406,15 @@ export class FileConversationSessionService implements ConversationSessionServic
       context: input.context,
       archives: input.archive.archives,
       messages: ConversationLines.fromHistory(input.history),
-    }));
+    }), input.leaseClaim);
   }
 
   async restoreCompactionState(id: string, input: RestoreConversationCompactionStateInput): Promise<ChatSession> {
     return await this.updateRequiredSession(id, (session) => ({
       ...session,
-      ...input,
-    }));
+      context: input.context,
+      archives: input.archives,
+    }), input.leaseClaim);
   }
 
   async setDriftEnabled(id: string, enabled: boolean): Promise<ChatSession> {
@@ -407,11 +436,19 @@ export class FileConversationSessionService implements ConversationSessionServic
     });
   }
 
-  async refreshLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): Promise<ChatSession> {
-    return await this.updateRequiredSession(id, (session) => ChatSessionLeases.refresh(session, owner));
+  async refreshLease(id: string, owner: ChatSessionLeaseIdentity): Promise<ChatSession> {
+    return await this.updateRequiredSession(id, (session) => {
+      if (
+        !ChatSessionLeases.isSameOwner(session.lease, owner)
+        || !ChatSessionLeases.isFresh(session.lease)
+      ) {
+        throw new ChatSessionLeaseLostError({ session, expected: owner });
+      }
+      return ChatSessionLeases.refresh(session, owner);
+    });
   }
 
-  async releaseLease(id: string, owner: Pick<ChatSessionLeaseOwner, 'ownerId'>): Promise<ChatSession> {
+  async releaseLease(id: string, owner: ChatSessionLeaseIdentity): Promise<ChatSession> {
     return await this.updateRequiredSession(id, (session) => ChatSessionLeases.release(session, owner));
   }
 
@@ -491,8 +528,11 @@ export class FileConversationSessionService implements ConversationSessionServic
   private async updateRequiredSession(
     id: string,
     updater: (session: ChatSession) => ChatSession,
+    leaseClaim?: ChatSessionLeaseClaim,
   ): Promise<ChatSession> {
-    const updated = await this.update(id, updater);
+    const updated = leaseClaim
+      ? await this.updateWithLease(id, leaseClaim, updater)
+      : await this.update(id, updater);
     if (!updated) {
       throw new Error(`Chat session not found: ${id}`);
     }

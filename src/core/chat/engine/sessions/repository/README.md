@@ -59,6 +59,12 @@ Every adapter must:
 - scope all operations to the authenticated product boundary chosen by the
   host. Heddle's record does not invent product-specific account or RLS fields.
 
+The atomic `expectedRevision` condition is also the enforcement point for
+session lease fencing. It must be evaluated in the same storage operation that
+commits the next session record. An adapter that reads a matching revision and
+then performs an unconditional write can let an expired owner overwrite a
+takeover, so it is not conformant or safe for replicated hosts.
+
 The authoring primitives deliberately do not own SQL, transactions, connection
 pooling, migrations, identity, tenant filters, RLS, or database error codes.
 Those stay in the host adapter. `ChatSessionPersistenceCodec.parseRecord(...)`
@@ -94,6 +100,11 @@ query plans, connection pooling, load behavior, process-kill recovery, backups,
 or disaster recovery. Scope isolation proves only that the host-provided
 scope-bound factories do not cross records. The corruption hook is intentionally
 test-only and must not be exposed by production adapter APIs.
+
+The suite's compare-and-set race is a prerequisite for replica-safe leases.
+Hosts should additionally exercise acquisition/renewal races and stale-owner
+commit rejection against their real shared database and transaction settings;
+the default file adapter cannot certify another adapter's deployment topology.
 
 ## Default JSON Layout
 
