@@ -19,6 +19,7 @@ import type { HeddleServerContext } from '@/server/types.js';
 
 const EXTERNAL_TUI_LEASE_OWNER: ChatSessionLeaseOwner = {
   ownerKind: 'tui',
+  hostId: 'external-host',
   ownerId: 'external-tui-client',
   clientLabel: 'terminal chat',
 };

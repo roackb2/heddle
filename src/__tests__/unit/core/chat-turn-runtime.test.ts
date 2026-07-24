@@ -536,6 +536,7 @@ describe('chat turn preparation modules', () => {
       apiKeyPresent: true,
       model: 'gpt-5.4',
     });
+    const leaseTimestamp = new Date().toISOString();
     const leasedSession = {
       ...session,
       history: [
@@ -543,12 +544,15 @@ describe('chat turn preparation modules', () => {
         { role: 'assistant' as const, content: 'Earlier answer' },
       ],
       lease: {
+        hostId: 'test-host',
         ownerId: 'owner-1',
         ownerKind: 'ask' as const,
+        fencingToken: 1,
         clientLabel: 'test client',
-        acquiredAt: '2026-05-03T00:00:00.000Z',
-        lastSeenAt: '2026-05-03T00:00:00.000Z',
+        acquiredAt: leaseTimestamp,
+        lastSeenAt: leaseTimestamp,
       },
+      leaseEpoch: 1,
     };
     const repository = new FileChatSessionRepository({ sessionStoragePath });
     await seedChatSessionRepository(repository, [leasedSession]);
@@ -558,6 +562,11 @@ describe('chat turn preparation modules', () => {
       sessionService,
       sessionId: 'session-1',
       leasedSession,
+      leaseClaim: {
+        hostId: 'test-host',
+        ownerId: 'owner-1',
+        fencingToken: 1,
+      },
       archivePath: '.heddle/chat-sessions/session-1/archives/archive-1.jsonl',
     });
 

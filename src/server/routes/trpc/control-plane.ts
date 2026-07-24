@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { hostname } from 'node:os';
 import dayjs from 'dayjs';
 import type { z } from 'zod';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
@@ -81,6 +83,9 @@ import {
   workspaceRenameInputSchema,
   workspaceSetActiveInputSchema,
 } from './schema.js';
+
+const CONTROL_PLANE_LEASE_HOST_ID = hostname();
+const FALLBACK_CONTROL_PLANE_LEASE_OWNER_ID = `daemon-${randomUUID()}`;
 
 export const controlPlaneRouter = router({
   state: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
@@ -745,7 +750,8 @@ function buildSubmitPromptArgs(ctx: ControlPlaneWorkspaceContext, input: Session
 function resolveControlPlaneLeaseOwner(ctx: Pick<HeddleServerContext, 'runtimeHost'>): ChatSessionLeaseOwner {
   return {
     ownerKind: 'daemon',
-    ownerId: ctx.runtimeHost?.serverId ?? `daemon-${process.pid}`,
+    hostId: CONTROL_PLANE_LEASE_HOST_ID,
+    ownerId: ctx.runtimeHost?.serverId ?? FALLBACK_CONTROL_PLANE_LEASE_OWNER_ID,
     clientLabel: 'control plane',
   };
 }

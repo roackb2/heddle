@@ -123,13 +123,22 @@ That means:
   control-plane/session path;
 - the risky case is multiple live writers touching the same session.
 
-Heddle records a lightweight session lease while a session is being mutated. If
-another client tries to continue that same session while the lease is fresh, the
-run is blocked with a warning about concurrent mutation risk.
+Heddle records a fenced session lease while a session is being mutated. The
+owner identity combines a stable host/replica ID with a globally unique runtime
+ID; a PID is never treated as persisted ownership or liveness evidence. If
+another client tries to continue that same session while the lease is fresh,
+the run is blocked with a warning about concurrent mutation risk.
 
 Active control-plane runs refresh that lease on a short heartbeat. If the owner
 process dies and the heartbeat stops, the lease becomes stale quickly and a new
-run can reclaim the session without manual state-file edits.
+run receives a higher fencing token. The old run loses write authority at
+expiry, so even if it later finishes local work it cannot commit over the new
+owner.
+
+The default file repository provides this guarantee to processes sharing its
+supported local filesystem. A replicated hosted deployment must use one shared
+repository whose revision check and write are one atomic database operation;
+read-then-unconditional-write adapters are unsafe and unsupported.
 
 ## What `heddle ask` Does
 

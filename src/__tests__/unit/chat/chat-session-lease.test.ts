@@ -5,6 +5,14 @@ import {
 } from '../../../core/chat/engine/sessions/leases/index.js';
 import type { ChatSession } from '../../../core/chat/types.js';
 
+const acquiredAt = Date.parse('2026-04-21T01:00:00.000Z');
+const owner = {
+  ownerKind: 'tui' as const,
+  hostId: 'host-a',
+  ownerId: 'tui-runtime-1',
+  clientLabel: 'terminal chat',
+};
+
 function createSession(): ChatSession {
   return {
     id: 'session-1',
@@ -19,166 +27,143 @@ function createSession(): ChatSession {
 }
 
 describe('chat session leases', () => {
-  it('acquires and releases a lease for the same owner', () => {
-    const leased = ChatSessionLeases.acquire(createSession(), {
-      ownerKind: 'tui',
-      ownerId: 'tui-123',
-      clientLabel: 'terminal chat',
-    }, {
-      now: Date.parse('2026-04-21T01:00:00.000Z'),
-    });
+  it('acquires a fenced lease and preserves its epoch after release', () => {
+    const leased = ChatSessionLeases.acquire(createSession(), owner, { now: acquiredAt });
+    const claim = ChatSessionLeases.claim(leased);
 
-    expect(leased.lease).toMatchObject({
-      ownerKind: 'tui',
-      ownerId: 'tui-123',
-      clientLabel: 'terminal chat',
+    expect(leased).toMatchObject({
+      leaseEpoch: 1,
+      lease: {
+        ownerKind: 'tui',
+        hostId: 'host-a',
+        ownerId: 'tui-runtime-1',
+        fencingToken: 1,
+        clientLabel: 'terminal chat',
+      },
     });
-    expect(ChatSessionLeases.isFresh(leased.lease, { now: Date.parse('2026-04-21T01:00:19.000Z') })).toBe(true);
-    expect(ChatSessionLeases.isFresh(leased.lease, { now: Date.parse('2026-04-21T01:00:21.000Z') })).toBe(false);
+    expect(ChatSessionLeases.isHeld(leased, claim, { now: acquiredAt + 1 })).toBe(true);
 
-    const released = ChatSessionLeases.release(leased, { ownerId: 'tui-123' });
+    const released = ChatSessionLeases.release(leased, owner);
     expect(released.lease).toBeUndefined();
+    expect(released.leaseEpoch).toBe(1);
+
+    const reacquired = ChatSessionLeases.acquire(released, {
+      ...owner,
+      ownerId: 'tui-runtime-2',
+    }, { now: acquiredAt + 1 });
+    expect(reacquired.lease?.fencingToken).toBe(2);
+    expect(reacquired.leaseEpoch).toBe(2);
   });
 
-  it('uses a short stale window for crashed control-plane recovery', () => {
-    const leased = ChatSessionLeases.acquire(createSession(), {
-      ownerKind: 'daemon',
-      ownerId: 'embedded-chat-12345-1779894401584',
-      clientLabel: 'control plane',
-    }, {
-      now: Date.parse('2026-04-21T01:00:00.000Z'),
+  it('refreshes the matching owner without changing its fence or acquisition time', () => {
+    const leased = ChatSessionLeases.acquire(createSession(), owner, { now: acquiredAt });
+    const refreshed = ChatSessionLeases.refresh(leased, owner, { now: acquiredAt + 5_000 });
+
+    expect(refreshed.lease).toMatchObject({
+      acquiredAt: '2026-04-21T01:00:00.000Z',
+      lastSeenAt: '2026-04-21T01:00:05.000Z',
+      fencingToken: 1,
     });
-
-    expect(ChatSessionLeases.conflict(leased, {
-      ownerKind: 'daemon',
-      ownerId: 'embedded-chat-99999-1779894500000',
-      clientLabel: 'control plane',
-    }, {
-      now: Date.parse('2026-04-21T01:00:00.000Z') + SESSION_LEASE_STALE_AFTER_MS - 1,
-    })).toContain('already active in control plane');
-
-    expect(ChatSessionLeases.conflict(leased, {
-      ownerKind: 'daemon',
-      ownerId: 'embedded-chat-99999-1779894500000',
-      clientLabel: 'control plane',
-    }, {
-      now: Date.parse('2026-04-21T01:00:00.000Z') + SESSION_LEASE_STALE_AFTER_MS + 1,
-    })).toBeUndefined();
+    expect(ChatSessionLeases.claim(refreshed)).toEqual(ChatSessionLeases.claim(leased));
   });
 
-  it('refreshes lastSeenAt only for the matching owner', () => {
+  it('does not equate identical process-local owner IDs on different hosts', () => {
     const leased = ChatSessionLeases.acquire(createSession(), {
-      ownerKind: 'daemon',
-      ownerId: 'daemon-123',
+      ...owner,
+      ownerId: 'daemon-4686',
+    }, { now: acquiredAt });
+    const collidingOwner = {
+      ...owner,
+      hostId: 'host-b',
+      ownerId: 'daemon-4686',
+    };
+
+    expect(ChatSessionLeases.isSameOwner(leased.lease, collidingOwner)).toBe(false);
+    expect(ChatSessionLeases.conflict(leased, collidingOwner, { now: acquiredAt + 1_000 }))
+      .toContain('already active in terminal chat');
+  });
+
+  it('does not infer lease liveness from a reused PID on the same host', () => {
+    const leased = ChatSessionLeases.acquire(createSession(), {
+      ...owner,
+      ownerId: 'daemon-4686-runtime-a',
+    }, { now: acquiredAt });
+    const restartedOwner = {
+      ...owner,
+      ownerId: 'daemon-4686-runtime-b',
+    };
+
+    expect(ChatSessionLeases.conflict(leased, restartedOwner, { now: acquiredAt + 1_000 }))
+      .toContain('already active in terminal chat');
+  });
+
+  it('allows stale takeover and invalidates the previous owner claim', () => {
+    const leased = ChatSessionLeases.acquire(createSession(), owner, { now: acquiredAt });
+    const previousClaim = ChatSessionLeases.claim(leased);
+    const takeoverAt = acquiredAt + SESSION_LEASE_STALE_AFTER_MS + 1;
+    const replacement = {
+      ownerKind: 'daemon' as const,
+      hostId: 'host-b',
+      ownerId: 'daemon-runtime-1',
       clientLabel: 'control plane',
-    }, {
-      now: Date.parse('2026-04-21T01:00:00.000Z'),
-    });
+    };
 
-    const ignored = ChatSessionLeases.refresh(leased, { ownerId: 'daemon-other' }, {
-      now: Date.parse('2026-04-21T01:00:05.000Z'),
-    });
-    expect(ignored.lease?.lastSeenAt).toBe('2026-04-21T01:00:00.000Z');
+    expect(ChatSessionLeases.conflict(leased, replacement, { now: takeoverAt })).toBeUndefined();
+    const reassigned = ChatSessionLeases.acquire(leased, replacement, { now: takeoverAt });
 
-    const refreshed = ChatSessionLeases.refresh(leased, { ownerId: 'daemon-123' }, {
-      now: Date.parse('2026-04-21T01:00:05.000Z'),
-    });
-    expect(refreshed.lease?.lastSeenAt).toBe('2026-04-21T01:00:05.000Z');
-    expect(refreshed.lease?.acquiredAt).toBe('2026-04-21T01:00:00.000Z');
+    expect(reassigned.lease?.fencingToken).toBe(2);
+    expect(ChatSessionLeases.isHeld(reassigned, previousClaim, { now: takeoverAt })).toBe(false);
+    expect(ChatSessionLeases.isHeld(
+      reassigned,
+      ChatSessionLeases.claim(reassigned),
+      { now: takeoverAt },
+    )).toBe(true);
   });
 
-  it('reports a conflict for a different fresh owner', () => {
-    const leased = ChatSessionLeases.acquire(createSession(), {
-      ownerKind: 'daemon',
-      ownerId: 'daemon-1',
-      clientLabel: 'control plane',
-    }, {
-      now: Date.parse('2026-04-21T01:00:00.000Z'),
+  it('reacquires an expired lease for the same owner with a new fence', () => {
+    const leased = ChatSessionLeases.acquire(createSession(), owner, { now: acquiredAt });
+    const reacquired = ChatSessionLeases.acquire(leased, owner, {
+      now: acquiredAt + SESSION_LEASE_STALE_AFTER_MS + 1,
     });
 
-    expect(ChatSessionLeases.conflict(leased, {
-      ownerKind: 'tui',
-      ownerId: 'tui-123',
-      clientLabel: 'terminal chat',
-    }, {
-      now: Date.parse('2026-04-21T01:00:10.000Z'),
-    })).toContain('Continuing from multiple clients in the same session may corrupt the conversation.');
+    expect(reacquired.lease?.fencingToken).toBe(2);
+    expect(reacquired.lease?.acquiredAt).not.toBe(leased.lease?.acquiredAt);
+    expect(ChatSessionLeases.isHeld(
+      reacquired,
+      ChatSessionLeases.claim(leased),
+      { now: acquiredAt + SESSION_LEASE_STALE_AFTER_MS + 1 },
+    )).toBe(false);
   });
 
-  it('ignores stale leases', () => {
-    const leased = ChatSessionLeases.acquire(createSession(), {
-      ownerKind: 'ask',
-      ownerId: 'ask-123',
-      clientLabel: 'heddle ask',
-    }, {
-      now: Date.parse('2026-04-21T01:00:00.000Z'),
-    });
+  it('treats an expired lease as lost even before another owner takes it over', () => {
+    const leased = ChatSessionLeases.acquire(createSession(), owner, { now: acquiredAt });
 
-    expect(ChatSessionLeases.conflict(leased, {
-      ownerKind: 'tui',
-      ownerId: 'tui-123',
-      clientLabel: 'terminal chat',
-    }, {
-      now: Date.parse('2026-04-21T01:20:00.000Z'),
-    })).toBeUndefined();
+    expect(ChatSessionLeases.isHeld(
+      leased,
+      ChatSessionLeases.claim(leased),
+      { now: acquiredAt + SESSION_LEASE_STALE_AFTER_MS + 1 },
+    )).toBe(false);
   });
 
-  it('ignores fresh leases owned by dead local Heddle processes', () => {
-    const leased = ChatSessionLeases.acquire(createSession(), {
-      ownerKind: 'tui',
-      ownerId: 'tui-4686',
-      clientLabel: 'terminal chat',
-    }, {
-      now: Date.parse('2026-04-21T01:00:00.000Z'),
+  it('does not refresh an expired lease', () => {
+    const leased = ChatSessionLeases.acquire(createSession(), owner, { now: acquiredAt });
+    const refreshed = ChatSessionLeases.refresh(leased, owner, {
+      now: acquiredAt + SESSION_LEASE_STALE_AFTER_MS + 1,
     });
 
-    expect(ChatSessionLeases.isOwnedByDeadLocalProcess(leased.lease, { isProcessAlive: () => false })).toBe(true);
-    expect(ChatSessionLeases.conflict(leased, {
-      ownerKind: 'tui',
-      ownerId: 'tui-123',
-      clientLabel: 'terminal chat',
-    }, {
-      now: Date.parse('2026-04-21T01:01:00.000Z'),
-      isProcessAlive: () => false,
-    })).toBeUndefined();
+    expect(refreshed).toEqual(leased);
   });
 
-  it('recognizes restarted daemon leases as dead local process leases', () => {
-    const leased = ChatSessionLeases.acquire(createSession(), {
-      ownerKind: 'daemon',
-      ownerId: 'daemon-4686-1779894401584',
-      clientLabel: 'control plane',
-    }, {
-      now: Date.parse('2026-04-21T01:00:00.000Z'),
-    });
+  it('ignores release requests from a different host or runtime', () => {
+    const leased = ChatSessionLeases.acquire(createSession(), owner, { now: acquiredAt });
 
-    expect(ChatSessionLeases.isOwnedByDeadLocalProcess(leased.lease, { isProcessAlive: () => false })).toBe(true);
-    expect(ChatSessionLeases.conflict(leased, {
-      ownerKind: 'daemon',
-      ownerId: 'daemon-9999-1779894500000',
-      clientLabel: 'control plane',
-    }, {
-      now: Date.parse('2026-04-21T01:01:00.000Z'),
-      isProcessAlive: () => false,
-    })).toBeUndefined();
-  });
-
-  it('still reports fresh local process leases when the owner is alive', () => {
-    const leased = ChatSessionLeases.acquire(createSession(), {
-      ownerKind: 'tui',
-      ownerId: 'tui-4686',
-      clientLabel: 'terminal chat',
-    }, {
-      now: Date.parse('2026-04-21T01:00:00.000Z'),
-    });
-
-    expect(ChatSessionLeases.conflict(leased, {
-      ownerKind: 'tui',
-      ownerId: 'tui-123',
-      clientLabel: 'terminal chat',
-    }, {
-      now: Date.parse('2026-04-21T01:00:10.000Z'),
-      isProcessAlive: () => true,
-    })).toContain('already active in terminal chat');
+    expect(ChatSessionLeases.release(leased, {
+      hostId: 'host-b',
+      ownerId: owner.ownerId,
+    })).toEqual(leased);
+    expect(ChatSessionLeases.release(leased, {
+      hostId: owner.hostId,
+      ownerId: 'tui-runtime-2',
+    })).toEqual(leased);
   });
 });

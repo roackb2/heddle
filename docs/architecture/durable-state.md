@@ -45,7 +45,7 @@ the same storage, not as remote portability.
 
 | State surface | Current class | Browser refresh | Same-filesystem process restart | Host replacement | Delete and retention behavior |
 | --- | --- | --- | --- | --- | --- |
-| Conversation sessions | **Remote-ready** | Reloaded from the repository | Survives; stale local leases can be recovered | Survives when the host supplies the same remote repository and authenticated scope | Session delete is revision-checked; default files retain superseded and interrupted revision bodies |
+| Conversation sessions | **Remote-ready** | Reloaded from the repository | Survives; expired fenced leases can be reclaimed | Survives when the host supplies the same remote repository and authenticated scope with atomic revision compare-and-set | Session delete is revision-checked; default files retain superseded and interrupted revision bodies |
 | Conversation archives | **Remote-ready** | Reloaded through the session manifest | Survives | Survives when the host supplies the same remote archive repository and scope | Append-only today; default files can retain orphan content and have no archive GC policy |
 | Result artifacts | **Host-replaceable** | Reloaded from catalog and content keys | Survives with the same artifact root | Only if a custom synchronous repository reaches shared storage; not a remote-ready promise | No public delete, retention, or orphan cleanup contract |
 | Raw turn traces | **Workspace-local diagnostic** | Existing trace files remain | Survives | Does not follow the session unless state storage is shared or copied | No retention or GC policy; session summaries can retain a local-only `traceFile` locator |
@@ -113,6 +113,15 @@ Current limits:
   authentication, row-level policy, migrations, query plans, backups, or
   disaster recovery;
 - a host must keep session and archive repositories in the same identity scope.
+
+Persisted leases use a composite host/runtime owner and a monotonic fencing
+token. Turn-owned writes revalidate the exact claim against the latest record
+before each atomic revision update. Expiry therefore revokes write authority:
+after another replica takes over, the stale owner cannot commit its completed
+turn over the new owner. This guarantee depends on the adapter applying
+`expectedRevision` atomically with the write. The default file adapter provides
+that property across processes sharing its supported local filesystem; it does
+not claim generic multi-host or network-filesystem safety.
 
 See the repository's
 [`README`](../../src/core/chat/engine/sessions/repository/README.md) for the full
@@ -337,10 +346,11 @@ approval resolvers in memory. Control-plane event buses, browser windows,
 profile leases, cached loggers, and heartbeat scheduler handles are also
 process-local.
 
-Persisted session leases protect accepted conversation state across competing
-clients, but they do not make an in-flight model/tool execution resumable. A
-process restart must be represented as interruption; replaying a pending tool
-call or approval from partial durable evidence would be unsafe.
+Persisted fenced session leases protect accepted conversation state across
+competing clients and shared-storage replicas. They do not make an in-flight
+model/tool execution resumable. A process restart must be represented as
+interruption; replaying a pending tool call or approval from partial durable
+evidence would be unsafe.
 
 ## Explicitly Excluded Writers
 

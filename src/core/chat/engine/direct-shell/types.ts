@@ -2,6 +2,7 @@ import type { ConversationActivity, ConversationCompactionStatus } from '@/core/
 import type { ConversationDirectShellLineResult } from '@/core/chat/types.js';
 import type { ConversationSessionService } from '../types.js';
 import type { ChatArchiveRepository } from '../sessions/archives/index.js';
+import type { ChatSessionLeaseClaim } from '../sessions/leases/index.js';
 import type { ConversationCompactionOptions } from '../compaction/index.js';
 
 export type DirectShellToolName = 'run_shell_inspect' | 'run_shell_mutate';
@@ -27,6 +28,7 @@ export type ConversationDirectShellInput = {
   systemContext?: string;
   summarizer: ConversationCompactionOptions['summarizer'];
   sessions: ConversationSessionService;
+  leaseClaim: ChatSessionLeaseClaim;
   abortSignal?: AbortSignal;
   onActivity?: (activity: ConversationActivity) => void;
   onCompactionStatus?: (activity: ConversationCompactionStatus) => void;

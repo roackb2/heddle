@@ -176,7 +176,15 @@ const ChatArchiveRecordsSchema = z.array(z.unknown())
 
 const ChatSessionLeaseSchema = z.object({
   ownerKind: ChatSessionLeaseOwnerSchema.describe('Kind of host currently holding the session lease.'),
+  hostId: z.string()
+    .describe('Host or replica identity for the current lease holder.')
+    .optional(),
   ownerId: z.string().describe('Unique owner identifier for the current lease holder.'),
+  fencingToken: z.number()
+    .int()
+    .nonnegative()
+    .describe('Monotonic token that fences stale lease holders.')
+    .default(0),
   acquiredAt: z.string().describe('Timestamp when the current lease was acquired.'),
   lastSeenAt: z.string().describe('Timestamp when the lease holder last refreshed ownership.'),
   clientLabel: z.string()
@@ -261,6 +269,12 @@ export const CatalogEntryReadSchema = z.object({
     .describe('Conversation archives associated with this session.')
     .optional()
     .catch(undefined),
+  leaseEpoch: z.number()
+    .int()
+    .nonnegative()
+    .describe('Last fencing token issued for this session.')
+    .optional()
+    .catch(0),
   lease: ChatSessionLeaseSchema
     .describe('Current session lease held by a TUI, daemon, or ask host.')
     .optional()
@@ -322,6 +336,12 @@ export const SessionBodyReadSchema = z.object({
     .describe('Conversation archives duplicated in the body for session reconstruction.')
     .optional()
     .catch(undefined),
+  leaseEpoch: z.number()
+    .int()
+    .nonnegative()
+    .describe('Last fencing token issued for this session.')
+    .optional()
+    .catch(0),
   lease: ChatSessionLeaseSchema
     .describe('Current session lease duplicated in the body for session reconstruction.')
     .optional()
@@ -352,6 +372,11 @@ export const SessionBodyWriteSchema = z.object({
   archives: z.array(ChatArchiveRecordSchema)
     .describe('Conversation archives duplicated in the body for session reconstruction.')
     .optional(),
+  leaseEpoch: z.number()
+    .int()
+    .nonnegative()
+    .describe('Last fencing token issued for this session.')
+    .optional(),
   lease: ChatSessionLeaseSchema
     .describe('Current session lease duplicated in the body for session reconstruction.')
     .optional(),
@@ -376,6 +401,7 @@ export const ChatSessionRecordSchema = CatalogEntryWriteSchema
     driftEnabled: z.boolean().optional(),
     context: ChatContextStatsSchema.optional(),
     archives: z.array(ChatArchiveRecordSchema).optional(),
+    leaseEpoch: z.number().int().nonnegative().optional(),
     lease: ChatSessionLeaseSchema.optional(),
     history: z.array(ChatMessageSchema),
     messages: z.array(ConversationLineSchema),

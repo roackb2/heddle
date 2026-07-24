@@ -795,11 +795,13 @@ describe('createConversationEngine', () => {
     const session = await engine.sessions.create({ id: 'session-1', name: 'Alpha' });
     const owner = {
       ownerKind: 'tui' as const,
+      hostId: 'host-a',
       ownerId: 'tui-test-client',
       clientLabel: 'terminal chat',
     };
     const otherOwner = {
       ownerKind: 'daemon' as const,
+      hostId: 'host-b',
       ownerId: 'daemon-1',
       clientLabel: 'control plane',
     };
@@ -821,7 +823,10 @@ describe('createConversationEngine', () => {
     const refreshed = await engine.sessions.refreshLease(session.id, owner);
     expect(refreshed.lease?.ownerId).toBe('tui-test-client');
 
-    const stillLeased = await engine.sessions.releaseLease(session.id, { ownerId: 'daemon-1' });
+    const stillLeased = await engine.sessions.releaseLease(session.id, {
+      hostId: 'host-b',
+      ownerId: 'daemon-1',
+    });
     expect(stillLeased.lease?.ownerId).toBe('tui-test-client');
 
     const released = await engine.sessions.releaseLease(session.id, owner);
@@ -998,19 +1003,30 @@ describe('createConversationEngine', () => {
 
     await expect(engine.turns.clearLease({
       sessionId: 'missing',
-      owner: { ownerKind: 'daemon', ownerId: 'daemon-1', clientLabel: 'control plane' },
+      owner: {
+        ownerKind: 'daemon',
+        hostId: 'test-host',
+        ownerId: 'daemon-1',
+        clientLabel: 'control plane',
+      },
     })).resolves.toBeUndefined();
 
     const session = await engine.sessions.create({ id: 'session-leased', name: 'Leased' });
     await engine.sessions.acquireLease(session.id, {
       ownerKind: 'daemon',
+      hostId: 'test-host',
       ownerId: 'daemon-1',
       clientLabel: 'control plane',
     });
 
     await engine.turns.clearLease({
       sessionId: session.id,
-      owner: { ownerKind: 'daemon', ownerId: 'daemon-1', clientLabel: 'control plane' },
+      owner: {
+        ownerKind: 'daemon',
+        hostId: 'test-host',
+        ownerId: 'daemon-1',
+        clientLabel: 'control plane',
+      },
     });
 
     const sessionRepository = new FileChatSessionRepository({

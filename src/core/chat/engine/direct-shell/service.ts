@@ -89,12 +89,18 @@ export class ConversationDirectShellService {
 
     const session = await input.sessions.require(input.sessionId);
     const shellDisplay = `!${command}`;
-    await input.sessions.appendMessage(input.sessionId, {
-      id: `direct-shell-user-${input.runId}`,
-      role: 'user',
-      text: shellDisplay,
-    });
-    await input.sessions.setLastContinuePrompt(input.sessionId, undefined);
+    await input.sessions.updateWithLease(input.sessionId, input.leaseClaim, (current) => ({
+      ...current,
+      messages: [
+        ...current.messages,
+        {
+          id: `direct-shell-user-${input.runId}`,
+          role: 'user',
+          text: shellDisplay,
+        },
+      ],
+      lastContinuePrompt: undefined,
+    }));
 
     const chosenCall = ConversationDirectShellService.createCall(input.runId, preflight.tool ?? 'run_shell_inspect', command);
     const options = chosenCall.tool === 'run_shell_inspect' ? {
@@ -144,7 +150,10 @@ export class ConversationDirectShellService {
       onStatusChange: input.onCompactionStatus,
     });
 
-    await input.sessions.applyCompactionResult(input.sessionId, compacted);
+    await input.sessions.applyCompactionResult(input.sessionId, {
+      ...compacted,
+      leaseClaim: input.leaseClaim,
+    });
     input.onActivity?.(ConversationDirectShellService.createCompletedActivity(input, chosenCall, chosenResult, chosenDurationMs));
 
     return {

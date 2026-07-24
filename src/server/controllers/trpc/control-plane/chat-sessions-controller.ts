@@ -34,6 +34,7 @@ import type {
   ConversationEngineHost,
   UpdateConversationSessionSettingsInput,
 } from '@/core/chat/engine/types.js';
+import { ChatSessionLeases } from '@/core/chat/engine/sessions/leases/index.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import type { ChatSession } from '@/core/chat/types.js';
 import {
@@ -668,7 +669,8 @@ export class ControlPlaneChatSessionsController {
         const sessions = this.createEngine(args).sessions;
         const session = await sessions.require(args.sessionId);
         await this.assertNoLeaseConflict(sessions, args.sessionId, args.leaseOwner);
-        await sessions.acquireLease(args.sessionId, args.leaseOwner);
+        const leasedSession = await sessions.acquireLease(args.sessionId, args.leaseOwner);
+        const leaseClaim = ChatSessionLeases.claim(leasedSession);
 
         try {
           const model = session.model ?? args.model ?? DEFAULT_OPENAI_MODEL;
@@ -694,6 +696,7 @@ export class ControlPlaneChatSessionsController {
               credentialSource: providerRuntime.credentialSource,
             },
             sessions,
+            leaseClaim,
             abortSignal: run.controller.signal,
             onActivity: publisher.publishActivity,
             onCompactionStatus: publisher.publishActivity,

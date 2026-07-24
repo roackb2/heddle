@@ -42,7 +42,9 @@ The intended structure is class-based by responsibility:
   line projection. These are static domain methods because they need no
   service instance.
 - `leases/` owns pure lease policy. Lease acquisition, release, freshness, and
-  conflict semantics live together as static domain methods.
+  conflict semantics live together as static domain methods. A lease owner is
+  identified by both `hostId` and a globally unique runtime `ownerId`; process
+  IDs are not ownership or liveness evidence.
 - `repository/types.ts` defines the async port used by local and hosted
   adapters; `repository/file-chat-session-repository.ts` owns the default JSON
   persistence implementation.
@@ -83,6 +85,41 @@ storage.
 
 Do not introduce a ceremonial repository layer for everything. Extract it when
 it materially simplifies a real flow being changed.
+
+## Lease Safety Invariants
+
+Session leases coordinate accepted conversation writes; they do not resume an
+in-flight model or tool execution.
+
+- Acquisition, renewal, release, and every lease-protected session mutation
+  run through the repository's atomic revision compare-and-set.
+- Every new owner receives a monotonically increasing `fencingToken`. The
+  session retains `leaseEpoch` after release so a later owner cannot reuse an
+  old token.
+- A writer carries the exact `hostId`, `ownerId`, and `fencingToken` claim
+  acquired at preflight. The session service revalidates that claim before
+  every compare-and-set retry.
+- An expired lease has already lost write authority, even before another owner
+  takes it over. A stalled process may finish local work, but its final session
+  commit is rejected.
+- A different host with the same PID-like owner string is still a different
+  owner. Heddle never probes a PID to decide whether persisted remote ownership
+  is alive.
+- Heartbeat failure and process crash recovery happen through expiry and a
+  fenced takeover. There is no accepted dual-writer commit window.
+
+The generic `update` method is intentionally not lease-protected and remains
+appropriate for administration outside an active turn. Turn, compaction, and
+direct-shell state that belongs to an acquired run must use `updateWithLease`
+or a named session operation that accepts its lease claim.
+
+Deployment safety depends on the repository:
+
+| Repository deployment | Lease guarantee |
+| --- | --- |
+| Default file repository on one local filesystem | Safe across local Heddle processes because writes use a cross-process lock plus revision compare-and-set. This is not a generic NFS or multi-host guarantee. |
+| Hosted relational or transactional adapter | Safe across replicas only when create/update/delete implement the repository contract atomically in shared storage and all replicas bind the same authenticated scope. |
+| Adapter that performs read-then-write without atomic revision matching | Unsupported. Fencing in the record cannot prevent stale commits if the adapter ignores compare-and-set. |
 
 ## Session Rule
 

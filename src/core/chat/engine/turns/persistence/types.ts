@@ -7,6 +7,7 @@ import type { ChatSession, TurnSummary } from '@/core/chat/types.js';
 import type { ConversationSessionService } from '@/core/chat/engine/types.js';
 import type { CustomAgentExecutionSnapshot } from '@/core/custom-agents/index.js';
 import type { ChatArchiveRepository } from '@/core/chat/engine/sessions/archives/index.js';
+import type { ChatSessionLeaseClaim } from '@/core/chat/engine/sessions/leases/index.js';
 import type { ChatTurnHostPort } from '../host/index.js';
 import type {
   ConversationCompactionResult,
@@ -75,6 +76,7 @@ export type PersistCompletedChatTurnBase = {
 
 export type PersistCompletedChatTurnArgs = PersistCompletedChatTurnBase & {
   sessionService: ConversationSessionService;
+  leaseClaim: ChatSessionLeaseClaim;
   summarizer: ConversationCompactionOptions['summarizer'];
   host: Pick<ChatTurnHostPort, 'onCompactionStatus'>;
 };

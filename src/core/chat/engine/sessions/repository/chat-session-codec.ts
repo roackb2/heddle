@@ -73,6 +73,7 @@ export class ChatSessionCodec {
       lastContinuePrompt: undefined,
       context: undefined,
       archives: undefined,
+      leaseEpoch: 0,
       lease: undefined,
       ...value,
       revision: value.revision ?? 1,
