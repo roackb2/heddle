@@ -6,7 +6,7 @@ transport primitive used by control-plane subscriptions.
 The service intentionally does not know about tRPC, SSE, conversation activity,
 heartbeat task records, or session metadata. Callers provide event sources such
 as an `EventEmitter` listener, a file watcher, or an interval; the stream owns
-buffering, waiter wakeups, abort handling, and cleanup.
+bounded buffering, waiter wakeups, abort handling, and cleanup.
 
 Use this when a host needs to bridge callback-style runtime/server events into
 a subscription transport. Keep domain vocabulary and event projection in the
@@ -30,9 +30,22 @@ event source callback -> sink.push(event) -> stream buffer/waiter -> for await
 
 If the client is already waiting for the next event, `push` wakes that reader.
 If the client is busy, `push` buffers the event until the reader asks again.
+Each stream retains at most `maxBufferedEvents` payloads (256 by default).
+Exceeding that bound fails the iterator with
+`RuntimeSubscriptionOverflowError`, releases the queued payloads and source
+resources, and invokes the optional `onOverflow` observation hook. Hosts should
+record that hook in their metrics or tracing system.
+
+Overflow never drops events while pretending the subscription is complete.
+When a source has durable replay, the client reconnects from its last consumed
+cursor. Conversation-run streams provide this through `afterSequence`; their
+bounded replay window can reject an older cursor explicitly. Sources without
+durable replay should treat overflow as an invalidation signal and refetch
+their canonical query before opening a new live subscription.
+
 When the browser aborts the request or the consumer stops iterating, the stream
-runs registered cleanups and wakes any pending reader so the subscription can
-finish without leaking listeners.
+discards queued events, runs registered cleanups, and wakes any pending reader
+so the subscription can finish without retaining payloads or listeners.
 
 ## Fanout
 
@@ -49,7 +62,8 @@ publisher.emit(sessionId, event)
   -> TUI stream listener -> TUI tRPC subscription
 ```
 
-No change is needed in this primitive for that fanout model. Change it only if
-we later need shared delivery guarantees across subscribers, durable replay, or
-cross-process distribution; those would be event-source responsibilities rather
-than per-subscription buffer mechanics.
+Each subscriber has an independent bound, so one stalled client can overflow
+and disconnect without slowing or corrupting another subscriber. No change is
+needed in this primitive for that fanout model. Shared delivery guarantees,
+durable replay, and cross-process distribution remain event-source
+responsibilities rather than per-subscription buffer mechanics.
