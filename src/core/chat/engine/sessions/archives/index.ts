@@ -1,12 +1,19 @@
+export { ChatArchiveRepositoryConformance } from './chat-archive-repository-conformance.js';
 export { FileChatArchiveRepository } from './file-chat-archive-repository.js';
 export { ChatArchivePersistenceCodec } from './persistence-codec.js';
 export {
+  ChatArchiveRepositoryConformanceError,
   ChatArchiveStorageCorruptionError,
   ChatArchiveSummaryNotFoundError,
   ChatArchiveRepositoryError,
 } from './errors.js';
 export type { ChatArchiveRepositoryOperation } from './errors.js';
 export { ChatArchiveManifestSchema, ChatArchiveRecordSchema } from './schemas.js';
+export type {
+  ChatArchiveRepositoryConformanceHarness,
+  ChatArchiveRepositoryConformanceScenario,
+  CorruptChatArchiveManifestInput,
+} from './chat-archive-repository-conformance.js';
 export type {
   AppendChatArchiveInput,
   AppendChatArchiveResult,

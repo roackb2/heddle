@@ -56,6 +56,8 @@ export {
   ChatArchivePersistenceCodec,
   ChatArchiveStorageCorruptionError,
   ChatArchiveSummaryNotFoundError,
+  ChatArchiveRepositoryConformance,
+  ChatArchiveRepositoryConformanceError,
   ChatArchiveRepositoryError,
   FileChatArchiveRepository,
 } from './sessions/archives/index.js';
@@ -63,6 +65,9 @@ export type {
   AppendChatArchiveInput,
   AppendChatArchiveResult,
   ChatArchiveRecordDraft,
+  ChatArchiveRepositoryConformanceHarness,
+  ChatArchiveRepositoryConformanceScenario,
+  CorruptChatArchiveManifestInput,
   ChatArchiveRepository,
   ChatArchiveStoragePaths,
   FileChatArchiveRepositoryOptions,

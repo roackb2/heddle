@@ -37,3 +37,17 @@ export class ChatArchiveRepositoryError extends Error {
     this.name = 'ChatArchiveRepositoryError';
   }
 }
+
+/** Raised when an adapter violates the reusable archive repository contract. */
+export class ChatArchiveRepositoryConformanceError extends Error {
+  readonly code = 'CHAT_ARCHIVE_REPOSITORY_CONFORMANCE';
+
+  constructor(
+    readonly scenario: string,
+    detail: string,
+    options?: ErrorOptions,
+  ) {
+    super(`Chat archive repository conformance failed (${scenario}): ${detail}`, options);
+    this.name = 'ChatArchiveRepositoryConformanceError';
+  }
+}

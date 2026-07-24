@@ -339,6 +339,8 @@ export type {
   UpdateChatSessionInput,
 } from './core/chat/engine/sessions/repository/index.js';
 export {
+  ChatArchiveRepositoryConformance,
+  ChatArchiveRepositoryConformanceError,
   ChatArchivePersistenceCodec,
   ChatArchiveStorageCorruptionError,
   ChatArchiveSummaryNotFoundError,
@@ -348,11 +350,14 @@ export {
 export type {
   AppendChatArchiveInput,
   AppendChatArchiveResult,
+  ChatArchiveRepositoryConformanceHarness,
+  ChatArchiveRepositoryConformanceScenario,
   ChatArchiveRecordDraft,
   ChatArchiveRepository,
   ChatArchiveStoragePaths,
   FileChatArchiveRepositoryOptions,
   ChatArchiveRepositoryOperation,
+  CorruptChatArchiveManifestInput,
 } from './core/chat/engine/sessions/archives/index.js';
 export type {
   ChatArchiveManifest,
