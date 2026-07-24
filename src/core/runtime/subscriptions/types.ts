@@ -12,8 +12,17 @@ export type RuntimeSubscriptionSource<Event> = (
   sink: RuntimeSubscriptionSink<Event>
 ) => RuntimeSubscriptionCleanup | void;
 
+export type RuntimeSubscriptionOverflow = {
+  maxBufferedEvents: number;
+  bufferedEvents: number;
+};
+
 // Construction options for one per-client subscription stream.
 export type RuntimeSubscriptionStreamArgs<Event> = {
   signal?: AbortSignal;
   sources?: Array<RuntimeSubscriptionSource<Event>>;
+  /** Maximum number of events retained for a consumer that is not reading. */
+  maxBufferedEvents?: number;
+  /** Host observation hook for metrics, tracing, or structured logs. */
+  onOverflow?: (overflow: RuntimeSubscriptionOverflow) => void;
 };

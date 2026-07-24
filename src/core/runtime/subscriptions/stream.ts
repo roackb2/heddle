@@ -1,11 +1,14 @@
 import type {
   RuntimeSubscriptionCleanup,
+  RuntimeSubscriptionOverflow,
   RuntimeSubscriptionSink,
   RuntimeSubscriptionSource,
   RuntimeSubscriptionStreamArgs,
 } from './types.js';
+import { RuntimeSubscriptionOverflowError } from './errors.js';
 
 const CLOSED = Symbol('runtime-subscription-closed');
+export const DEFAULT_RUNTIME_SUBSCRIPTION_BUFFER_SIZE = 256;
 
 /**
  * Push-to-AsyncIterable bridge for host subscription transports.
@@ -19,7 +22,10 @@ export class RuntimeSubscriptionStream<Event> implements AsyncIterable<Event> {
   private readonly waiters: Array<(event: Event | typeof CLOSED) => void> = [];
   private readonly cleanups: RuntimeSubscriptionCleanup[] = [];
   private readonly abortSignal?: AbortSignal;
-  private readonly abort = () => this.close();
+  private readonly maxBufferedEvents: number;
+  private readonly onOverflow?: (overflow: RuntimeSubscriptionOverflow) => void;
+  private readonly abort = () => this.cancel();
+  private failure?: Error;
   private closed = false;
 
   // Convenience constructor for controllers that create a stream from several
@@ -31,10 +37,12 @@ export class RuntimeSubscriptionStream<Event> implements AsyncIterable<Event> {
   // Starts the stream and attaches abort handling. Sources are registered
   // immediately so callers can return the stream directly to tRPC.
   constructor(args: RuntimeSubscriptionStreamArgs<Event> = {}) {
+    this.maxBufferedEvents = RuntimeSubscriptionStream.resolveMaxBufferedEvents(args.maxBufferedEvents);
+    this.onOverflow = args.onOverflow;
     this.abortSignal = args.signal;
     this.abortSignal?.addEventListener('abort', this.abort, { once: true });
     if (this.abortSignal?.aborted) {
-      this.close();
+      this.cancel();
       return;
     }
 
@@ -88,12 +96,77 @@ export class RuntimeSubscriptionStream<Event> implements AsyncIterable<Event> {
       return;
     }
 
+    if (this.events.length >= this.maxBufferedEvents) {
+      const overflow = {
+        maxBufferedEvents: this.maxBufferedEvents,
+        bufferedEvents: this.events.length,
+      };
+      this.reportOverflow(overflow);
+      this.fail(new RuntimeSubscriptionOverflowError(
+        overflow.maxBufferedEvents,
+        overflow.bufferedEvents,
+      ));
+      return;
+    }
+
     this.events.push(event);
   }
 
   // Stops accepting new events, removes abort handling, runs source cleanups,
   // and wakes pending readers so the AsyncIterator can finish.
   close(): void {
+    this.finish();
+  }
+
+  // Lets tRPC consume the stream with `for await`. The iterator drains buffered
+  // events first, then waits for future pushes until the stream closes.
+  async *[Symbol.asyncIterator](): AsyncIterator<Event> {
+    try {
+      while (true) {
+        if (this.failure) {
+          throw this.failure;
+        }
+
+        if (this.events.length > 0) {
+          yield this.events.shift() as Event;
+          continue;
+        }
+
+        if (this.closed) {
+          return;
+        }
+
+        const event = await new Promise<Event | typeof CLOSED>((resolve) => {
+          this.waiters.push(resolve);
+        });
+        if (event === CLOSED) {
+          if (this.failure) {
+            throw this.failure;
+          }
+          return;
+        }
+
+        yield event;
+      }
+    } finally {
+      this.cancel();
+    }
+  }
+
+  // Cancels a consumer subscription and releases queued payload references.
+  // Graceful source close uses close() so already-buffered events can drain.
+  private cancel(): void {
+    this.events.splice(0);
+    this.finish();
+  }
+
+  private fail(error: Error): void {
+    this.failure = error;
+    this.events.splice(0);
+    this.finish();
+  }
+
+  private finish(): void {
     if (this.closed) {
       return;
     }
@@ -104,25 +177,21 @@ export class RuntimeSubscriptionStream<Event> implements AsyncIterable<Event> {
     this.waiters.splice(0).forEach((waiter) => waiter(CLOSED));
   }
 
-  // Lets tRPC consume the stream with `for await`. The iterator drains buffered
-  // events first, then waits for future pushes until the stream closes.
-  async *[Symbol.asyncIterator](): AsyncIterator<Event> {
+  private reportOverflow(overflow: RuntimeSubscriptionOverflow): void {
     try {
-      while (!this.closed || this.events.length > 0) {
-        const event = this.events.length > 0
-          ? this.events.shift() as Event
-          : await new Promise<Event | typeof CLOSED>((resolve) => {
-            this.waiters.push(resolve);
-          });
-        if (event === CLOSED) {
-          break;
-        }
-
-        yield event;
-      }
-    } finally {
-      this.close();
+      this.onOverflow?.(overflow);
+    } catch {
+      // Diagnostics must never prevent the subscription from failing closed.
     }
+  }
+
+  private static resolveMaxBufferedEvents(value?: number): number {
+    const maxBufferedEvents = value ?? DEFAULT_RUNTIME_SUBSCRIPTION_BUFFER_SIZE;
+    if (!Number.isSafeInteger(maxBufferedEvents) || maxBufferedEvents < 1) {
+      throw new RangeError('Runtime subscription maxBufferedEvents must be a positive safe integer.');
+    }
+
+    return maxBufferedEvents;
   }
 
   // Runs one cleanup defensively so a failed listener/timer cleanup does not
