@@ -9,6 +9,7 @@ import { createConversationEngine } from '@/core/chat/engine/conversation-engine
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import { AgentLoopRuntimeService } from '@/core/runtime/loop/index.js';
 import { RuntimeWorkspaceService, type WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
+import { createLocalHeddleServerRequestAccess } from '@/server/access/index.js';
 import { controlPlaneRouter } from '@/server/routes/trpc/control-plane.js';
 import type {
   ControlPlaneSessionEventEnvelope,
@@ -856,6 +857,7 @@ function createControlPlaneCaller() {
     activeWorkspaceId: activeWorkspace.id,
     activeWorkspace,
     workspaces: resolved.workspaces,
+    requestAccess: createLocalHeddleServerRequestAccess(),
     runtimeHost: null,
     logger: pino({ level: 'silent' }),
   };

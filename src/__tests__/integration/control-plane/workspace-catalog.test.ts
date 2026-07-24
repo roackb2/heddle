@@ -9,6 +9,7 @@ import {
 } from '@/core/runtime/workspaces/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
 import { createConversationEngine } from '@/core/chat/engine/conversation-engine.js';
+import { createLocalHeddleServerRequestAccess } from '@/server/access/index.js';
 import { controlPlaneRouter } from '@/server/routes/trpc/control-plane.js';
 
 describe('workspace catalog', () => {
@@ -54,6 +55,7 @@ describe('workspace catalog', () => {
       activeWorkspaceId: activeWorkspace.id,
       activeWorkspace,
       workspaces: catalog.workspaces,
+      requestAccess: createLocalHeddleServerRequestAccess(),
       runtimeHost: {
         mode: 'daemon',
         serverId: 'embedded-test',
@@ -154,6 +156,7 @@ describe('workspace catalog', () => {
       activeWorkspaceId: activeWorkspace.id,
       activeWorkspace,
       workspaces: catalog.workspaces,
+      requestAccess: createLocalHeddleServerRequestAccess(),
       runtimeHost: {
         mode: 'daemon',
         serverId: 'daemon-test',
@@ -228,6 +231,7 @@ describe('workspace catalog', () => {
       activeWorkspaceId: activeWorkspace.id,
       activeWorkspace,
       workspaces: resolved.workspaces,
+      requestAccess: createLocalHeddleServerRequestAccess(),
       runtimeHost: {
         mode: 'daemon',
         serverId: 'daemon-test',
@@ -307,6 +311,7 @@ describe('workspace catalog', () => {
       activeWorkspaceId: activeWorkspace.id,
       activeWorkspace,
       workspaces: resolved.workspaces,
+      requestAccess: createLocalHeddleServerRequestAccess(),
       runtimeHost: null,
       logger: pino({ level: 'silent' }),
     });
@@ -382,6 +387,7 @@ describe('workspace catalog', () => {
       activeWorkspaceId: resolved.activeWorkspaceId,
       activeWorkspace: resolved.activeWorkspace,
       workspaces: resolved.workspaces,
+      requestAccess: createLocalHeddleServerRequestAccess(),
       runtimeHost: null,
       logger: pino({ level: 'silent' }),
     });
@@ -414,6 +420,7 @@ describe('workspace catalog', () => {
       activeWorkspaceId: activeWorkspace.id,
       activeWorkspace,
       workspaces: catalog.workspaces,
+      requestAccess: createLocalHeddleServerRequestAccess(),
       runtimeHost: {
         mode: 'daemon',
         serverId: 'daemon-test',
@@ -450,6 +457,7 @@ describe('workspace catalog', () => {
       activeWorkspaceId: activeWorkspace.id,
       activeWorkspace,
       workspaces: catalog.workspaces,
+      requestAccess: createLocalHeddleServerRequestAccess(),
       runtimeHost: null,
       logger: pino({ level: 'silent' }),
     });

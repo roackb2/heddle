@@ -3,7 +3,8 @@ import { mkdir } from 'node:fs/promises';
 import { basename, extname, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Request } from 'express';
-import { RuntimeWorkspaceService, type WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
+import type { HeddleServerRequestAccessService } from '@/server/access/index.js';
+import type { WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
 import { controlPlaneChatSessionsController } from '@/server/controllers/trpc/control-plane/chat-sessions-controller.js';
 import { getWorkspaceOperationLogger } from '@/server/logging/workspace-operation-logger.js';
 
@@ -25,8 +26,7 @@ export type ChatSessionImageUploadResult = {
 };
 
 type ChatSessionImageUploadServiceOptions = {
-  workspaceRoot: string;
-  stateRoot: string;
+  requestAccess: HeddleServerRequestAccessService;
 };
 
 const SUPPORTED_IMAGE_TYPES = {
@@ -46,21 +46,20 @@ const SUPPORTED_IMAGE_TYPES = {
 export class ChatSessionImageUploadService {
   constructor(private readonly options: ChatSessionImageUploadServiceOptions) {}
 
-  resolveWorkspace(request: Request): WorkspaceDescriptor {
-    const workspaceContext = RuntimeWorkspaceService.resolveContext({
-      workspaceRoot: this.options.workspaceRoot,
-      stateRoot: this.options.stateRoot,
+  async authorizeUpload(request: Request): Promise<void> {
+    const sessionId = this.readSessionId(request);
+    const workspace = this.resolveWorkspace(request);
+    await this.options.requestAccess.authorizeOperation(request, {
+      name: 'sessionImageUpload',
+      type: 'mutation',
+      workspaceId: workspace.id,
+      sessionId,
     });
-    const workspaceId = this.readWorkspaceId(request);
-    if (!workspaceId) {
-      return workspaceContext.activeWorkspace;
-    }
+  }
 
-    const workspace = workspaceContext.workspaces.find((candidate) => candidate.id === workspaceId);
-    if (!workspace) {
-      throw new ChatSessionUploadError(404, `Workspace not found: ${workspaceId}`);
-    }
-    return workspace;
+  resolveWorkspace(request: Request): WorkspaceDescriptor {
+    const workspaceId = this.readWorkspaceId(request);
+    return this.options.requestAccess.resolveWorkspace(request, workspaceId);
   }
 
   async resolveUploadDirectory(request: Request): Promise<string> {

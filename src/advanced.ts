@@ -13,6 +13,25 @@
 
 export * from './index.js';
 
+// --- Embedded control-plane server -----------------------------------------
+export {
+  createHeddleServerApp,
+  HeddleServerAccessError,
+  startHeddleControlPlaneServer,
+} from './server/index.js';
+export type {
+  HeddleControlPlaneAuditEvent,
+  HeddleControlPlaneOperation,
+  HeddleControlPlaneOperationAuthorization,
+  HeddleControlPlaneServerHandle,
+  HeddleControlPlaneServerOptions,
+  HeddleServerAccessControl,
+  HeddleServerHostedRequestAccess,
+  HeddleServerPrincipal,
+  HeddleServerRequestAccess,
+  HeddleServerWorkspaceScope,
+} from './server/index.js';
+
 // ===========================================================================
 // Building blocks
 // ===========================================================================

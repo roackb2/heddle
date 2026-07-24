@@ -35,6 +35,12 @@ export async function startHeddleControlPlaneServer(
   }
 
   const logger = options.logger ?? createServerLogger({ stateRoot: options.stateRoot });
+  const accessMode = options.accessControl?.mode ?? 'local';
+  if (accessMode === 'local') {
+    logger.warn(
+      'Heddle server uses unauthenticated local-daemon access; do not expose it as a hosted or multi-tenant service',
+    );
+  }
   const registryPath = options.daemonRegistryPath ?? FileDaemonRegistryRepository.resolvePath();
   const serverId = options.serverId ?? `${options.mode}-${process.pid}-${Date.now()}`;
   const startedAt = dayjs().toISOString();
@@ -146,6 +152,7 @@ export async function startHeddleControlPlaneServer(
     registryPath,
     serverId,
     mode: options.mode,
+    accessMode,
     heartbeatSchedulerEnabled,
     heartbeatSchedulerPollIntervalMs: heartbeatSchedulerSettings.pollIntervalMs,
   }, 'Heddle server started');

@@ -1,9 +1,9 @@
 import { Router } from 'express';
+import type { HeddleServerRequestAccessService } from '@/server/access/index.js';
 import { ChatSessionEventsRestController } from '@/server/controllers/restful/control-plane/chat-session-events.js';
 
 type CreateChatSessionEventRouterOptions = {
-  workspaceRoot: string;
-  stateRoot: string;
+  requestAccess: HeddleServerRequestAccessService;
 };
 
 export function createChatSessionEventRouter(options: CreateChatSessionEventRouterOptions): Router {

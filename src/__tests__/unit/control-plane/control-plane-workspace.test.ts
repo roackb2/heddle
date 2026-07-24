@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createLogger } from '@/core/utils/logger.js';
 import type { WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
+import { createLocalHeddleServerRequestAccess } from '@/server/access/index.js';
 import type { HeddleServerContext } from '@/server/types.js';
 import { resolveControlPlaneRequestWorkspace } from '@/server/routes/trpc/control-plane-workspace.js';
 
@@ -71,6 +72,7 @@ function createContext(workspace: WorkspaceDescriptor): HeddleServerContext {
     activeWorkspaceId: workspace.id,
     activeWorkspace: workspace,
     workspaces: [workspace],
+    requestAccess: createLocalHeddleServerRequestAccess(),
     runtimeHost: null,
     logger: silentLogger,
   };

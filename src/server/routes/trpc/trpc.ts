@@ -1,23 +1,22 @@
 import { Router } from 'express';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
-import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
+import type { HeddleServerRequestAccessService } from '@/server/access/index.js';
 import { appRouter } from '../../router.js';
 import type { HeddleRuntimeHostDescriptor, HeddleServerContext } from '../../types.js';
 
 type CreateTrpcExpressRouterOptions = Pick<HeddleServerContext, 'workspaceRoot' | 'stateRoot' | 'logger'>
   & { preferApiKey?: boolean }
-  & { runtimeHost?: HeddleRuntimeHostDescriptor | null };
+  & { runtimeHost?: HeddleRuntimeHostDescriptor | null }
+  & { requestAccess: HeddleServerRequestAccessService };
 
 export function createTrpcExpressRouter(options: CreateTrpcExpressRouterOptions): Router {
   const trpcRouter = Router();
 
   trpcRouter.use('/trpc', createExpressMiddleware({
     router: appRouter,
-    createContext: () => {
-      const workspaceContext = RuntimeWorkspaceService.resolveContext({
-        workspaceRoot: options.workspaceRoot,
-        stateRoot: options.stateRoot,
-      });
+    createContext: ({ req }) => {
+      const workspaceContext = options.requestAccess.resolveWorkspaceContext(req);
+      const requestAccess = options.requestAccess.requireAccess(req);
       return {
         workspaceRoot: options.workspaceRoot,
         stateRoot: options.stateRoot,
@@ -27,6 +26,11 @@ export function createTrpcExpressRouter(options: CreateTrpcExpressRouterOptions)
         workspaces: workspaceContext.workspaces,
         runtimeHost: options.runtimeHost ?? null,
         logger: options.logger,
+        requestAccess,
+        authorizeControlPlaneOperation: ({ operation }) => (
+          options.requestAccess.authorizeOperation(req, operation)
+        ),
+        recordControlPlaneAuditEvent: (event) => options.requestAccess.recordAuditEvent(event),
       };
     },
     onError: ({ error, path, type }) => {

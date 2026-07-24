@@ -58,6 +58,10 @@ export class ControlPlaneStateController {
   }
 
   private static readKnownWorkspaces(context: HeddleServerContext): ControlPlaneState['knownWorkspaces'] {
+    if (context.requestAccess.mode === 'hosted') {
+      return [];
+    }
+
     const registryPath = context.runtimeHost?.registryPath ?? FileDaemonRegistryRepository.resolvePath();
     RuntimeDaemonRegistryService.registerKnownWorkspaces({
       registryPath,
