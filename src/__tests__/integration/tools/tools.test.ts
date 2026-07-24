@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -89,14 +89,14 @@ describe('tool input validation', () => {
 
   it('tool descriptions distinguish directories from files', () => {
     expect(listFilesTool.description).toContain('Use this to inspect folders, not to read file contents');
-    expect(listFilesTool.description).toContain('explore an obvious nearby folder');
-    expect(listFilesTool.description).toContain('may also point to nearby parent or sibling folders');
+    expect(listFilesTool.description).toContain('explore an obvious folder');
+    expect(listFilesTool.description).toContain('canonical path checks reject parent traversal');
     expect(listFilesTool.description).toContain('newline-separated list of entry names');
     expect(readFileTool.description).toContain('not when you want to inspect a directory');
-    expect(readFileTool.description).toContain('may also point to nearby parent or sibling folders');
+    expect(readFileTool.description).toContain('canonical path checks reject parent traversal');
     expect(readFileTool.description).toContain('Returns the file text directly');
     expect(readFileTool.description).toContain('0-based line offset');
-    expect(editFileTool.description).toContain('Edit a file directly without going through shell redirection or heredocs');
+    expect(editFileTool.description).toContain('Edit a file inside the active workspace directly');
     expect(editFileTool.description).toContain('Prefer this over shell commands');
     expect(editFileTool.description).toContain('exact replacement');
     expect(editFileTool.description).toContain('overwrite an existing file or create a new one explicitly');
@@ -105,17 +105,14 @@ describe('tool input validation', () => {
     expect(moveFileTool.description).toContain('Move or rename a file or directory');
     expect(moveFileTool.description).toContain('createParentDirs');
     expect(listFilesTool.description).toContain('{ "path": "." }');
-    expect(listFilesTool.description).toContain('{ "path": ".." }');
     expect(readFileTool.description).toContain('{ "path": "path/to/file.txt" }');
-    expect(readFileTool.description).toContain('{ "path": "../shared-notes/summary.md" }');
     expect(searchFilesTool.description).toContain('locate a specific symbol or text string');
     expect(searchFilesTool.description).toContain('Prefer searching for concrete terms');
-    expect(searchFilesTool.description).toContain('may also point to nearby parent or sibling folders');
+    expect(searchFilesTool.description).toContain('canonical path checks reject parent traversal or symlinks that escape it');
     expect(searchFilesTool.description).toContain('Prefer rg when available');
     expect(searchFilesTool.description).toContain('grep-style path:line:content format');
     expect(searchFilesTool.description).toContain('includeIgnored');
     expect(searchFilesTool.description).toContain('{ "query": "createUser" }');
-    expect(searchFilesTool.description).toContain('{ "query": "incident", "path": "../shared-notes" }');
     expect(projectDashboardTool.description).toContain('Collect the initial coding project dashboard');
     expect(projectDashboardTool.description).toContain('current working-environment state, a bounded workspace tree');
     expect(projectDashboardTool.description).toContain('cheap project signals');
@@ -359,7 +356,7 @@ describe('searchFilesTool', () => {
     await writeFile(join(root, 'dist', 'generated.ts'), 'const needle = true;\n');
     await writeFile(join(root, 'node_modules', 'pkg.ts'), 'const needle = true;\n');
 
-    const result = await createSearchFilesTool({ backend: 'grep' }).execute({ query: 'needle', path: root });
+    const result = await createSearchFilesTool({ backend: 'grep', workspaceRoot: root }).execute({ query: 'needle' });
 
     expect(result.ok).toBe(true);
     expect(result.output).toContain('src/main.ts');
@@ -376,7 +373,7 @@ describe('searchFilesTool', () => {
     await writeFile(join(root, 'dist', 'generated.ts'), 'const needle = true;\n');
     await writeFile(join(root, 'node_modules', 'pkg.ts'), 'const needle = true;\n');
 
-    const result = await createSearchFilesTool({ backend: 'rg' }).execute({ query: 'needle', path: root });
+    const result = await createSearchFilesTool({ backend: 'rg', workspaceRoot: root }).execute({ query: 'needle' });
 
     expect(result.ok).toBe(true);
     expect(result.output).toContain('src/main.ts');
@@ -389,9 +386,8 @@ describe('searchFilesTool', () => {
     await mkdir(join(root, 'src'));
     await writeFile(join(root, 'src', 'main.ts'), 'setCurrentEditPreview();\n');
 
-    const result = await createSearchFilesTool({ backend: 'rg' }).execute({
+    const result = await createSearchFilesTool({ backend: 'rg', workspaceRoot: root }).execute({
       query: 'setCurrentEditPreview()',
-      path: root,
     });
 
     expect(result.ok).toBe(true);
@@ -411,9 +407,9 @@ describe('searchFilesTool', () => {
     await writeFile(join(root, 'packages', 'app', 'dist', 'generated.ts'), 'const needle = true;\n');
     await writeFile(join(root, 'packages', 'app', 'node_modules', 'pkg.ts'), 'const needle = true;\n');
 
-    const result = await createSearchFilesTool({ backend: 'rg' }).execute({
+    const result = await createSearchFilesTool({ backend: 'rg', workspaceRoot: root }).execute({
       query: 'needle',
-      path: join(root, 'packages', 'app'),
+      path: 'packages/app',
     });
 
     expect(result.ok).toBe(true);
@@ -436,7 +432,8 @@ describe('searchFilesTool', () => {
     const result = await createSearchFilesTool({
       backend: 'rg',
       excludedDirs: ['.git', 'dist', 'node_modules', '.heddle'],
-    }).execute({ query: 'needle', path: root });
+      workspaceRoot: root,
+    }).execute({ query: 'needle' });
 
     expect(result.ok).toBe(true);
     expect(result.output).toContain('src/main.ts');
@@ -451,8 +448,8 @@ describe('searchFilesTool', () => {
     await writeFile(join(root, 'src', 'main.ts'), 'const needle = true;\n');
     await writeFile(join(root, 'vendor', 'hidden.ts'), 'const needle = true;\n');
 
-    const tool = createSearchFilesTool({ excludedDirs: ['vendor'] });
-    const result = await tool.execute({ query: 'needle', path: root });
+    const tool = createSearchFilesTool({ excludedDirs: ['vendor'], workspaceRoot: root });
+    const result = await tool.execute({ query: 'needle' });
 
     expect(result.ok).toBe(true);
     expect(result.output).toContain('src/main.ts');
@@ -470,8 +467,8 @@ describe('searchFilesTool', () => {
     await writeFile(join(root, 'src', 'Cargo.toml'), 'needle = "yes"\n');
     await writeFile(join(root, 'dist', 'generated.ts'), 'const needle = true;\n');
 
-    const tool = createSearchFilesTool({ backend: 'grep' });
-    const result = await tool.execute({ query: 'needle', path: root });
+    const tool = createSearchFilesTool({ backend: 'grep', workspaceRoot: root });
+    const result = await tool.execute({ query: 'needle' });
 
     expect(result.ok).toBe(true);
     expect(result.output).toContain('src/main.ts');
@@ -486,8 +483,8 @@ describe('searchFilesTool', () => {
     await mkdir(join(root, 'src'));
     await writeFile(join(root, 'src', 'main.ts'), 'appendMessage(sessionId);\n');
 
-    const tool = createSearchFilesTool({ backend: 'grep' });
-    const result = await tool.execute({ query: 'appendMessage(sessionId)', path: root });
+    const tool = createSearchFilesTool({ backend: 'grep', workspaceRoot: root });
+    const result = await tool.execute({ query: 'appendMessage(sessionId)' });
 
     expect(result.ok).toBe(true);
     expect(result.output).toContain('src/main.ts');
@@ -501,8 +498,8 @@ describe('searchFilesTool', () => {
     await writeFile(join(root, 'src', 'Makefile'), 'needle: all\n');
     await writeFile(join(root, 'src', 'main.ts'), 'const needle = true;\n');
 
-    const tool = createSearchFilesTool({ backend: 'grep' });
-    const result = await tool.execute({ query: 'needle', path: root });
+    const tool = createSearchFilesTool({ backend: 'grep', workspaceRoot: root });
+    const result = await tool.execute({ query: 'needle' });
 
     expect(result.ok).toBe(true);
     expect(result.output).toContain('src/main.ts');
@@ -518,9 +515,8 @@ describe('searchFilesTool', () => {
     await writeFile(join(root, 'src', 'main.ts'), 'const needle = true;\n');
     await writeFile(join(root, 'node_modules', 'pkg.ts'), 'const needle = true;\n');
 
-    const result = await createSearchFilesTool({ backend: 'rg' }).execute({
+    const result = await createSearchFilesTool({ backend: 'rg', workspaceRoot: root }).execute({
       query: 'needle',
-      path: root,
       includeIgnored: true,
     });
 
@@ -538,8 +534,8 @@ describe('searchFilesTool', () => {
     await writeFile(join(root, 'src', 'main.ts'), 'const needle = true;\n');
     await writeFile(join(root, 'node_modules', 'pkg.ts'), 'const needle = true;\n');
 
-    const tool = createSearchFilesTool({ backend: 'grep' });
-    const result = await tool.execute({ query: 'needle', path: root, includeIgnored: true });
+    const tool = createSearchFilesTool({ backend: 'grep', workspaceRoot: root });
+    const result = await tool.execute({ query: 'needle', includeIgnored: true });
 
     expect(result.ok).toBe(true);
     expect(result.output).toContain('src/main.ts');
@@ -555,9 +551,8 @@ describe('searchFilesTool', () => {
     await writeFile(join(root, 'src', 'main.ts'), 'const needle = true;\n');
     await writeFile(join(root, '.heddle', 'traces', 'trace-1.json'), '{"needle":true}\n');
 
-    const result = await createSearchFilesTool({ backend: 'rg' }).execute({
+    const result = await createSearchFilesTool({ backend: 'rg', workspaceRoot: root }).execute({
       query: 'needle',
-      path: root,
       includeIgnored: true,
     });
 
@@ -576,8 +571,8 @@ describe('searchFilesTool', () => {
     await writeFile(join(root, 'src', 'main.ts'), 'const needle = true;\n');
     await writeFile(join(root, '.heddle', 'traces', 'trace-1.json'), '{"needle":true}\n');
 
-    const tool = createSearchFilesTool({ backend: 'grep' });
-    const result = await tool.execute({ query: 'needle', path: root });
+    const tool = createSearchFilesTool({ backend: 'grep', workspaceRoot: root });
+    const result = await tool.execute({ query: 'needle' });
 
     expect(result.ok).toBe(true);
     expect(result.output).toContain('src/main.ts');
@@ -594,8 +589,8 @@ describe('searchFilesTool', () => {
     await writeFile(join(root, 'dist', 'generated.ts'), 'const needle = true;\n');
     await writeFile(join(root, 'node_modules', 'pkg.ts'), 'const needle = true;\n');
 
-    const tool = createSearchFilesTool({ backend: 'grep' });
-    const result = await tool.execute({ query: 'needle', path: root });
+    const tool = createSearchFilesTool({ backend: 'grep', workspaceRoot: root });
+    const result = await tool.execute({ query: 'needle' });
 
     expect(result.ok).toBe(true);
     expect(result.output).toContain('src/main.ts');
@@ -610,7 +605,10 @@ describe('searchFilesTool', () => {
     await mkdir(join(root, '.heddle', 'traces'));
     await writeFile(join(root, '.heddle', 'traces', 'trace-1.json'), '{"needle":true}\n');
 
-    const result = await createSearchFilesTool({ backend: 'rg' }).execute({ query: 'needle', path: join(root, '.heddle') });
+    const result = await createSearchFilesTool({ backend: 'rg', workspaceRoot: root }).execute({
+      query: 'needle',
+      path: '.heddle',
+    });
 
     expect(result.ok).toBe(true);
     expect(result.output).toContain('traces/trace-1.json');
@@ -1260,6 +1258,7 @@ describe('file mutation tools', () => {
   it('deletes a file through delete_file', async () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-delete-file-'));
     const filePath = join(root, 'obsolete.txt');
+    const canonicalFilePath = join(await realpath(root), 'obsolete.txt');
     await writeFile(filePath, 'remove me');
     const tool = createDeleteFileTool({ workspaceRoot: root });
 
@@ -1268,7 +1267,7 @@ describe('file mutation tools', () => {
     expect(result).toEqual({
       ok: true,
       output: {
-        path: filePath,
+        path: canonicalFilePath,
         deleted: true,
         kind: 'file',
         recursive: false,
@@ -1292,6 +1291,7 @@ describe('file mutation tools', () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-move-file-'));
     const fromPath = join(root, 'draft.txt');
     const toPath = join(root, 'docs', 'draft.txt');
+    const canonicalRoot = await realpath(root);
     await writeFile(fromPath, 'move me');
     const tool = createMoveFileTool({ workspaceRoot: root });
 
@@ -1300,8 +1300,8 @@ describe('file mutation tools', () => {
     expect(result).toEqual({
       ok: true,
       output: {
-        from: fromPath,
-        to: toPath,
+        from: join(canonicalRoot, 'draft.txt'),
+        to: join(canonicalRoot, 'docs', 'draft.txt'),
         moved: true,
         kind: 'file',
         createdParentDirs: true,
@@ -1309,6 +1309,122 @@ describe('file mutation tools', () => {
     });
     await expect(readFile(toPath, 'utf8')).resolves.toBe('move me');
     await expect(readFile(fromPath, 'utf8')).rejects.toThrow();
+  });
+
+  it('rejects read, list, and search paths that escape through workspace symlinks', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-read-symlink-root-'));
+    const outside = await mkdtemp(join(tmpdir(), 'heddle-read-symlink-outside-'));
+    await writeFile(join(outside, 'secret.txt'), 'outside\n');
+    await symlink(outside, join(root, 'external'));
+
+    const readTool = createReadFileTool({ workspaceRoot: root });
+    const listTool = createListFilesTool({ workspaceRoot: root });
+    const searchTool = createSearchFilesTool({ workspaceRoot: root, backend: 'grep' });
+
+    await expect(readTool.execute({ path: 'external/secret.txt' })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Workspace path resolves outside the canonical workspace root'),
+    });
+    await expect(listTool.execute({ path: 'external' })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Workspace path resolves outside the canonical workspace root'),
+    });
+    await expect(searchTool.execute({ path: 'external', query: 'outside' })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Workspace path resolves outside the canonical workspace root'),
+    });
+  });
+
+  it('allows canonical reads through a symlink that remains inside the workspace', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-read-symlink-inside-'));
+    await mkdir(join(root, 'src'));
+    await writeFile(join(root, 'src', 'note.txt'), 'inside\n');
+    await symlink('src', join(root, 'current'));
+    const tool = createReadFileTool({ workspaceRoot: root });
+
+    await expect(tool.execute({ path: 'current/note.txt' })).resolves.toEqual({
+      ok: true,
+      output: 'inside\n',
+    });
+  });
+
+  it('rejects edit, delete, and nested create paths that escape through workspace symlinks', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-mutate-symlink-root-'));
+    const outside = await mkdtemp(join(tmpdir(), 'heddle-mutate-symlink-outside-'));
+    const outsideFile = join(outside, 'outside.txt');
+    await writeFile(outsideFile, 'original\n');
+    await symlink(outside, join(root, 'external'));
+    await symlink('external', join(root, 'nested-external'));
+
+    const editTool = createEditFileTool({ workspaceRoot: root });
+    const deleteTool = createDeleteFileTool({ workspaceRoot: root });
+
+    await expect(editTool.execute({
+      path: 'external/outside.txt',
+      oldText: 'original',
+      newText: 'changed',
+    })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Workspace path resolves outside the canonical workspace root'),
+    });
+    await expect(editTool.execute({
+      path: 'nested-external/new/deep.txt',
+      content: 'created\n',
+      createIfMissing: true,
+    })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Workspace path resolves outside the canonical workspace root'),
+    });
+    await expect(deleteTool.execute({ path: 'external/outside.txt' })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Workspace path resolves outside the canonical workspace root'),
+    });
+    await expect(readFile(outsideFile, 'utf8')).resolves.toBe('original\n');
+    await expect(readFile(join(outside, 'new', 'deep.txt'), 'utf8')).rejects.toThrow();
+  });
+
+  it('does not treat a broken symlink as a creatable directory', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-broken-symlink-root-'));
+    await symlink(join(root, 'missing-target'), join(root, 'broken'));
+    const tool = createEditFileTool({ workspaceRoot: root });
+
+    const result = await tool.execute({
+      path: 'broken/nested.txt',
+      content: 'must not be created\n',
+      createIfMissing: true,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('ENOENT'),
+    });
+    await expect(readFile(join(root, 'missing-target', 'nested.txt'), 'utf8')).rejects.toThrow();
+  });
+
+  it('rejects move sources and destinations that escape through workspace symlinks', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'heddle-move-symlink-root-'));
+    const outside = await mkdtemp(join(tmpdir(), 'heddle-move-symlink-outside-'));
+    await writeFile(join(root, 'inside.txt'), 'inside\n');
+    await writeFile(join(outside, 'outside.txt'), 'outside\n');
+    await symlink(outside, join(root, 'external'));
+    const tool = createMoveFileTool({ workspaceRoot: root });
+
+    await expect(tool.execute({
+      from: 'external/outside.txt',
+      to: 'moved.txt',
+    })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Workspace path resolves outside the canonical workspace root'),
+    });
+    await expect(tool.execute({
+      from: 'inside.txt',
+      to: 'external/moved.txt',
+    })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Workspace path resolves outside the canonical workspace root'),
+    });
+    await expect(readFile(join(root, 'inside.txt'), 'utf8')).resolves.toBe('inside\n');
+    await expect(readFile(join(outside, 'outside.txt'), 'utf8')).resolves.toBe('outside\n');
   });
 
   it('creates a new file when explicitly allowed', async () => {
@@ -1398,7 +1514,7 @@ describe('file mutation tools', () => {
     }
   });
 
-  it('allows writing outside the current workspace root when the runtime permits it', async () => {
+  it('rejects writing outside the canonical workspace root', async () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-edit-scope-'));
     const outsidePath = join(root, '..', `outside-${Date.now()}.txt`);
     const previousCwd = process.cwd();
@@ -1411,11 +1527,11 @@ describe('file mutation tools', () => {
         createIfMissing: true,
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.output).toMatchObject({
-        path: outsidePath,
-        action: 'created',
+      expect(result).toMatchObject({
+        ok: false,
+        error: expect.stringContaining('Workspace path resolves outside the canonical workspace root'),
       });
+      await expect(readFile(outsidePath, 'utf8')).rejects.toThrow();
     } finally {
       process.chdir(previousCwd);
     }
@@ -1429,6 +1545,7 @@ describe('file mutation tools', () => {
     process.chdir(root);
 
     try {
+      const canonicalFilePath = await realpath(filePath);
       const preview = await previewEditFileInput({
         path: 'sample.ts',
         oldText: '"old"',
@@ -1436,9 +1553,9 @@ describe('file mutation tools', () => {
       });
 
       expect(preview).toEqual({
-        path: 'sample.ts',
+        path: canonicalFilePath,
         action: 'replaced',
-        diff: ['--- a/sample.ts', '+++ b/sample.ts', '@@ -1 +1 @@', '-const mode = "old";', '+const mode = "new";'].join('\n'),
+        diff: [`--- ${canonicalFilePath}`, `+++ ${canonicalFilePath}`, '@@ -1 +1 @@', '-const mode = "old";', '+const mode = "new";'].join('\n'),
         truncated: false,
       });
     } finally {

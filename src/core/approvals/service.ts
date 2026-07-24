@@ -15,6 +15,11 @@ import {
 import { previewEditFileInput } from '@/core/tools/toolkits/coding-files/edit-file.js';
 import { ToolActivitySummarizer } from '@/core/live/index.js';
 import { ToolPolicyEnvelopeInputService } from '@/core/tools/index.js';
+import {
+  WorkspacePathOutsideRootError,
+  WorkspacePathPolicy,
+  type CanonicalToolTarget,
+} from '@/core/tools/toolkits/coding-files/workspace-path-policy.js';
 import type { ToolApprovalPolicyContext } from './types.js';
 import { AutonomyRootScopeService } from './autonomy/index.js';
 
@@ -108,10 +113,16 @@ export class ToolApprovalService {
       ...args.call,
       input,
     };
+    const workspaceRoot = args.workspaceRoot ?? this.options.workspaceRoot ?? process.cwd();
     const rememberedRule = ProjectApprovalRules.createForCall(call);
+    const canonicalTargets = await this.resolveCanonicalTargets({
+      tool: args.call.tool,
+      input,
+      workspaceRoot,
+    });
     const editPreview =
       args.call.tool === 'edit_file'
-        ? await previewEditFileInput(input, this.options.workspaceRoot)
+        ? await previewEditFileInput(input, workspaceRoot)
         : undefined;
 
     return {
@@ -122,9 +133,10 @@ export class ToolApprovalService {
       summary: ToolActivitySummarizer.summarizeCall(call),
       reason: args.reason,
       editPreview,
+      canonicalTargets: canonicalTargets.length > 0 ? canonicalTargets : undefined,
       autopilotRootApproval: AutonomyRootScopeService.resolveAutoRootApproval({
         evaluation: args.autonomyEvaluation,
-        workspaceRoot: args.workspaceRoot ?? this.options.workspaceRoot ?? process.cwd(),
+        workspaceRoot,
       }),
       rememberProjectApproval: rememberedRule
         ? {
@@ -201,6 +213,28 @@ export class ToolApprovalService {
     return this.options.projectApprovalRulesFile
       ? new FileProjectApprovalRuleRepository(this.options.projectApprovalRulesFile)
       : undefined;
+  }
+
+  private async resolveCanonicalTargets(args: {
+    tool: string;
+    input: unknown;
+    workspaceRoot: string;
+  }): Promise<CanonicalToolTarget[]> {
+    try {
+      return await WorkspacePathPolicy.resolveToolTargets(args);
+    } catch (error) {
+      if (error instanceof WorkspacePathOutsideRootError) {
+        return [{
+          role: error.role,
+          requestedPath: error.requestedPath,
+          canonicalPath: error.canonicalPath,
+          canonicalRoot: error.canonicalRoot,
+          exists: error.exists,
+        }];
+      }
+
+      return [];
+    }
   }
 
   private static withAutonomyEvaluation(

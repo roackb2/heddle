@@ -1,6 +1,7 @@
 import { mkdir, rename, stat } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import type { ToolDefinition, ToolResult } from '../../../types.js';
+import { WorkspacePathPolicy } from './workspace-path-policy.js';
 
 type MoveFileInput = {
   from: string;
@@ -18,7 +19,7 @@ export function createMoveFileTool(options: MoveFileToolOptions = {}): ToolDefin
   return {
     name: 'move_file',
     description:
-      'Move or rename a file or directory within the workspace when you need a direct file operation without shell mv. Use this for renames, relocations, or cleanup moves. Relative paths are resolved from the active workspace root and may also point to nearby parent or sibling folders. Optionally create missing destination parent directories with createParentDirs. Returns a structured move summary.',
+      'Move or rename a file or directory within the active workspace when you need a direct file operation without shell mv. Use this for renames, relocations, or cleanup moves. Canonical path checks reject source or destination symlinks that escape the workspace. Optionally create missing destination parent directories with createParentDirs. Returns a structured move summary.',
     requiresApproval: true,
     parameters: {
       type: 'object',
@@ -48,10 +49,18 @@ export function createMoveFileTool(options: MoveFileToolOptions = {}): ToolDefin
       }
 
       const workspaceRoot = configuredWorkspaceRoot ?? process.cwd();
-      const fromPath = resolve(workspaceRoot, raw.from);
-      const toPath = resolve(workspaceRoot, raw.to);
+      const requestedFromPath = resolve(workspaceRoot, raw.from);
+      const requestedToPath = resolve(workspaceRoot, raw.to);
 
       try {
+        const { canonicalPath: fromPath } = await WorkspacePathPolicy.resolveExisting({
+          workspaceRoot,
+          path: raw.from,
+        });
+        const { canonicalPath: toPath } = await WorkspacePathPolicy.resolveCreatable({
+          workspaceRoot,
+          path: raw.to,
+        });
         const info = await stat(fromPath);
         if (raw.createParentDirs) {
           await mkdir(dirname(toPath), { recursive: true });
@@ -72,7 +81,7 @@ export function createMoveFileTool(options: MoveFileToolOptions = {}): ToolDefin
       } catch (error) {
         return {
           ok: false,
-          error: `Failed to move ${fromPath} to ${toPath}: ${error instanceof Error ? error.message : String(error)}`,
+          error: `Failed to move ${requestedFromPath} to ${requestedToPath}: ${error instanceof Error ? error.message : String(error)}`,
         };
       }
     },

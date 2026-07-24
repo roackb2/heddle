@@ -1,4 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -312,6 +319,51 @@ describe('approval policy chain', () => {
     expect(human).not.toHaveBeenCalled();
   });
 
+  it('evaluates Auto access against a symlink target canonicalized outside the workspace', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-auto-symlink-root-'));
+    const outsideRoot = mkdtempSync(join(tmpdir(), 'heddle-auto-symlink-outside-'));
+    writeFileSync(join(outsideRoot, 'secret.txt'), 'outside\n');
+    symlinkSync(outsideRoot, join(workspaceRoot, 'external'));
+    const canonicalOutsideFile = join(realpathSync(outsideRoot), 'secret.txt');
+    const profile: AutopilotProfile = {
+      mode: 'autopilot',
+      roots: [{
+        path: '.',
+        access: 'autopilot',
+        allow: ['read'],
+      }],
+      environments: {
+        allow: ['local', 'dev'],
+        requireApproval: ['staging', 'production', 'unknown'],
+      },
+    };
+
+    const decision = await ToolApprovalPolicies.autopilot({ profile })(context({
+      call: {
+        id: 'call-read-symlink',
+        tool: 'read_file',
+        input: { path: 'external/secret.txt' },
+      },
+      tool: {
+        name: 'read_file',
+        description: 'reads files',
+        parameters: {},
+        execute: async () => ({ ok: true }),
+      },
+      workspaceRoot,
+    }));
+
+    expect(decision).toEqual(expect.objectContaining({
+      type: 'request',
+      reason: `root is not configured for autopilot: ${canonicalOutsideFile}`,
+      autonomyEvaluation: expect.objectContaining({
+        facts: expect.objectContaining({
+          resolvedKnownTargets: [canonicalOutsideFile],
+        }),
+      }),
+    }));
+  });
+
   it('lets autopilot deny unsafe commands without falling through to human approval', async () => {
     const service = new ToolApprovalService();
     const human = vi.fn(async () => ({ approved: true, reason: 'should not request human approval' }));
@@ -453,6 +505,8 @@ describe('approval policy chain', () => {
       workspaceRoot,
       reason: 'edit_file requires approval',
     }));
+    const canonicalWorkspaceRoot = realpathSync(workspaceRoot);
+    const canonicalFilePath = join(canonicalWorkspaceRoot, 'README.md');
 
     expect(request).toEqual(expect.objectContaining({
       tool: 'edit_file',
@@ -462,8 +516,48 @@ describe('approval policy chain', () => {
       summary: 'edit_file (README.md)',
       reason: 'edit_file requires approval',
     }));
-    expect(request.editPreview?.path).toBe('README.md');
+    expect(request.editPreview?.path).toBe(canonicalFilePath);
+    expect(request.canonicalTargets).toEqual([{
+      role: 'target',
+      requestedPath: join(workspaceRoot, 'README.md'),
+      canonicalPath: canonicalFilePath,
+      canonicalRoot: canonicalWorkspaceRoot,
+      exists: true,
+    }]);
     expect(request.rememberProjectApproval?.label).toBe('allow edit_file for this project');
+  });
+
+  it('labels a canonical move destination that escapes through a symlink', async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-approval-move-root-'));
+    const outsideRoot = mkdtempSync(join(tmpdir(), 'heddle-approval-move-outside-'));
+    writeFileSync(join(workspaceRoot, 'source.txt'), 'source\n');
+    symlinkSync(outsideRoot, join(workspaceRoot, 'external'));
+    const service = new ToolApprovalService({ workspaceRoot });
+
+    const request = await service.createRequest(context({
+      call: {
+        id: 'call-move',
+        tool: 'move_file',
+        input: { from: 'source.txt', to: 'external/moved.txt' },
+      },
+      tool: {
+        name: 'move_file',
+        description: 'moves files',
+        requiresApproval: true,
+        parameters: {},
+        execute: async () => ({ ok: true }),
+      },
+      workspaceRoot,
+      reason: 'move_file requires approval',
+    }));
+
+    expect(request.canonicalTargets).toEqual([{
+      role: 'destination',
+      requestedPath: join(workspaceRoot, 'external', 'moved.txt'),
+      canonicalPath: join(realpathSync(outsideRoot), 'moved.txt'),
+      canonicalRoot: realpathSync(workspaceRoot),
+      exists: false,
+    }]);
   });
 
   it('adds an Auto repo expansion option when autonomy requests approval for a sibling project root', async () => {

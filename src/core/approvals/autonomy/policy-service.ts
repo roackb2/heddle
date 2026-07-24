@@ -131,6 +131,7 @@ export class AutonomyPolicyService {
   }): ToolPolicyFacts {
     const command = AutonomyPolicyService.getShellCommand(args.context.call.tool, args.toolInput);
     const resolvedKnownTargets = AutonomyPolicyService.resolveKnownTargets({
+      context: args.context,
       tool: args.context.call.tool,
       input: args.toolInput,
       workspaceRoot: args.workspaceRoot,
@@ -232,10 +233,15 @@ export class AutonomyPolicyService {
   }
 
   private static resolveKnownTargets(args: {
+    context?: ToolApprovalPolicyContext;
     tool: string;
     input: unknown;
     workspaceRoot: string;
   }): string[] {
+    if (args.context?.canonicalTargetPaths) {
+      return args.context.canonicalTargetPaths;
+    }
+
     const input = args.input;
     if (!isRecord(input)) {
       return [];

@@ -4,6 +4,10 @@ import {
   classifyShellCommandPolicy,
   DEFAULT_MUTATE_RULES,
 } from '@/core/tools/toolkits/shell-process/shell-policy.js';
+import {
+  WorkspacePathOutsideRootError,
+  WorkspacePathPolicy,
+} from '@/core/tools/toolkits/coding-files/workspace-path-policy.js';
 import type { ToolApprovalPolicy, ToolApprovalPolicyContext, ToolApprovalSurface } from './types.js';
 import { AutonomyPolicyService, type AutopilotProfile } from './autonomy/index.js';
 
@@ -24,10 +28,26 @@ export class ToolApprovalPolicies {
   }
 
   static outsideWorkspaceInspection(): ToolApprovalPolicy {
-    return ({ call, workspaceRoot }) =>
-      ToolApprovalPolicies.isOutsideWorkspaceInspectionCall({ call, workspaceRoot }) ?
-        { type: 'request', reason: `${call.tool} targets a path outside the workspace` }
-      : undefined;
+    return async ({ call, workspaceRoot }) => {
+      try {
+        await WorkspacePathPolicy.resolveToolTargets({
+          tool: call.tool,
+          input: call.input,
+          workspaceRoot: workspaceRoot ?? process.cwd(),
+        });
+      } catch (error) {
+        if (error instanceof WorkspacePathOutsideRootError) {
+          return {
+            type: 'request',
+            reason: `${call.tool} targets a canonical path outside the workspace: ${error.canonicalPath}`,
+          };
+        }
+      }
+
+      return ToolApprovalPolicies.isOutsideWorkspaceInspectionCall({ call, workspaceRoot })
+        ? { type: 'request', reason: `${call.tool} targets a path outside the workspace` }
+        : undefined;
+    };
   }
 
   static rememberedProjectRule(args: {
@@ -73,13 +93,28 @@ export class ToolApprovalPolicies {
   }
 
   static autopilot(args: { profile: AutopilotProfile }): ToolApprovalPolicy {
-    return (context) =>
-      AutonomyPolicyService.toApprovalDecision(
+    return async (context) => {
+      let canonicalTargetPaths: string[] | undefined;
+      try {
+        const targets = await WorkspacePathPolicy.resolveToolTargets({
+          tool: context.call.tool,
+          input: context.call.input,
+          workspaceRoot: context.workspaceRoot ?? process.cwd(),
+        });
+        canonicalTargetPaths = targets.map((target) => target.canonicalPath);
+      } catch (error) {
+        if (error instanceof WorkspacePathOutsideRootError) {
+          canonicalTargetPaths = [error.canonicalPath];
+        }
+      }
+
+      return AutonomyPolicyService.toApprovalDecision(
         AutonomyPolicyService.evaluate({
-          context,
+          context: canonicalTargetPaths ? { ...context, canonicalTargetPaths } : context,
           profile: args.profile,
         }),
       );
+    };
   }
 
   static isOutsideWorkspaceInspectionCall(args: {

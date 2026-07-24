@@ -17,3 +17,9 @@ export {
   type SearchFilesOptions,
 } from './search-files.js';
 export { codingFilesToolkit } from './toolkit.js';
+export {
+  WorkspacePathOutsideRootError,
+  WorkspacePathPolicy,
+  type CanonicalToolTarget,
+  type CanonicalWorkspacePath,
+} from './workspace-path-policy.js';

@@ -1,6 +1,10 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, relative } from 'node:path';
 import type { ToolResult } from '../../../types.js';
+import {
+  WorkspacePathOutsideRootError,
+  WorkspacePathPolicy,
+} from './workspace-path-policy.js';
 
 export type ReplaceEditInput = {
   path: string;
@@ -30,7 +34,6 @@ type ScopedEditOptions = {
   rootLabel: string;
   subjectLabel: string;
   creationHint: string;
-  enforceRoot?: boolean;
 };
 
 const DIFF_CONTEXT_LINES = 2;
@@ -75,19 +78,24 @@ export async function executeScopedEdit(raw: unknown, options: ScopedEditOptions
     };
   }
 
-  const targetPath = resolve(options.rootPath, raw.path);
-  if (options.enforceRoot && isOutsideRoot(options.rootPath, targetPath)) {
+  let target: Awaited<ReturnType<typeof resolveEditTarget>>;
+  try {
+    target = await resolveEditTarget(raw, options.rootPath);
+  } catch (error) {
+    const detail = error instanceof WorkspacePathOutsideRootError
+      ? `${options.subjectLabel} paths must stay inside ${options.rootLabel}. ${error.message}`
+      : `Failed to resolve ${options.subjectLabel} path ${raw.path}: ${error instanceof Error ? error.message : String(error)}`;
     return {
       ok: false,
-      error: `${options.subjectLabel} paths must stay inside ${options.rootLabel}: ${options.rootPath}. Refusing to access ${targetPath}.`,
+      error: detail,
     };
   }
 
   if ('content' in raw) {
-    return writeScopedContent(raw, targetPath, options);
+    return writeScopedContent(raw, target.canonicalPath, target.canonicalRoot, options);
   }
 
-  return replaceScopedContent(raw, targetPath, options);
+  return replaceScopedContent(raw, target.canonicalPath, target.canonicalRoot, options);
 }
 
 export async function previewScopedEdit(raw: unknown, options: Omit<ScopedEditOptions, 'creationHint'>): Promise<EditPreview | undefined> {
@@ -95,8 +103,14 @@ export async function previewScopedEdit(raw: unknown, options: Omit<ScopedEditOp
     return undefined;
   }
 
-  const targetPath = resolve(options.rootPath, raw.path);
-  const scopedPath = toScopedPath(options.rootPath, targetPath);
+  let target: Awaited<ReturnType<typeof resolveEditTarget>>;
+  try {
+    target = await resolveEditTarget(raw, options.rootPath);
+  } catch {
+    return undefined;
+  }
+  const targetPath = target.canonicalPath;
+  const scopedPath = targetPath;
 
   if ('content' in raw) {
     const existed = await pathExists(targetPath);
@@ -133,7 +147,12 @@ export async function previewScopedEdit(raw: unknown, options: Omit<ScopedEditOp
   return buildDiffPreview(current, nextContent, scopedPath, 'replaced');
 }
 
-async function writeScopedContent(input: WriteEditInput, targetPath: string, options: ScopedEditOptions): Promise<ToolResult> {
+async function writeScopedContent(
+  input: WriteEditInput,
+  targetPath: string,
+  canonicalRoot: string,
+  options: ScopedEditOptions,
+): Promise<ToolResult> {
   const existed = await pathExists(targetPath);
   let previousContent = '';
   if (existed) {
@@ -160,15 +179,20 @@ async function writeScopedContent(input: WriteEditInput, targetPath: string, opt
   return {
     ok: true,
     output: {
-      path: toScopedPath(options.rootPath, targetPath),
+      path: toScopedPath(canonicalRoot, targetPath),
       action: existed ? 'overwritten' : 'created',
       bytesWritten: Buffer.byteLength(input.content, 'utf8'),
-      diff: buildDiffPreview(previousContent, input.content, toScopedPath(options.rootPath, targetPath), existed ? 'overwritten' : 'created'),
+      diff: buildDiffPreview(previousContent, input.content, toScopedPath(canonicalRoot, targetPath), existed ? 'overwritten' : 'created'),
     },
   };
 }
 
-async function replaceScopedContent(input: ReplaceEditInput, targetPath: string, options: ScopedEditOptions): Promise<ToolResult> {
+async function replaceScopedContent(
+  input: ReplaceEditInput,
+  targetPath: string,
+  canonicalRoot: string,
+  options: ScopedEditOptions,
+): Promise<ToolResult> {
   let current: string;
   try {
     current = await readFile(targetPath, 'utf8');
@@ -202,13 +226,19 @@ async function replaceScopedContent(input: ReplaceEditInput, targetPath: string,
   return {
     ok: true,
     output: {
-      path: toScopedPath(options.rootPath, targetPath),
+      path: toScopedPath(canonicalRoot, targetPath),
       action: 'replaced',
       matchCount,
       bytesWritten: Buffer.byteLength(nextContent, 'utf8'),
-      diff: buildDiffPreview(current, nextContent, toScopedPath(options.rootPath, targetPath), 'replaced'),
+      diff: buildDiffPreview(current, nextContent, toScopedPath(canonicalRoot, targetPath), 'replaced'),
     },
   };
+}
+
+async function resolveEditTarget(input: ScopedEditInput, rootPath: string) {
+  return 'content' in input
+    ? WorkspacePathPolicy.resolveCreatable({ workspaceRoot: rootPath, path: input.path })
+    : WorkspacePathPolicy.resolveExisting({ workspaceRoot: rootPath, path: input.path });
 }
 
 function countOccurrences(content: string, search: string): number {
@@ -250,11 +280,6 @@ function toScopedPath(rootPath: string, targetPath: string): string {
   return rel;
 }
 
-function isOutsideRoot(rootPath: string, targetPath: string): boolean {
-  const rel = relative(rootPath, targetPath);
-  return rel.startsWith('..') || isAbsolute(rel);
-}
-
 async function pathExists(path: string): Promise<boolean> {
   try {
     await access(path);
@@ -281,8 +306,8 @@ function buildDiffPreview(
   const nextContextEnd = Math.min(nextLines.length, nextChangedEnd + DIFF_CONTEXT_LINES);
 
   const lines = [
-    `--- ${action === 'created' ? '/dev/null' : `a/${path}`}`,
-    `+++ b/${path}`,
+    `--- ${action === 'created' ? '/dev/null' : formatDiffPath(path, 'a')}`,
+    `+++ ${formatDiffPath(path, 'b')}`,
     `@@ -${formatHunkRange(contextStart + 1, previousContextEnd - contextStart)} +${formatHunkRange(contextStart + 1, nextContextEnd - contextStart)} @@`,
     ...previousLines.slice(contextStart, prefix).map((line) => ` ${line}`),
     ...previousLines.slice(prefix, previousChangedEnd).map((line) => `-${line}`),
@@ -299,6 +324,10 @@ function buildDiffPreview(
     '... diff preview truncated ...',
   ];
   return { path, action, diff: truncatedLines.join('\n'), truncated: true };
+}
+
+function formatDiffPath(path: string, prefix: 'a' | 'b'): string {
+  return isAbsolute(path) ? path : `${prefix}/${path}`;
 }
 
 function splitLines(content: string): string[] {
