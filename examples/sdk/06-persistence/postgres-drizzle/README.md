@@ -3,7 +3,7 @@
 This runnable SDK reference shows how a TypeScript host can persist Heddle's
 complete conversation sessions and compacted archives in PostgreSQL. It uses
 `drizzle-orm` with the mature `pg` driver, Heddle's public repository contracts,
-and the public session conformance suite.
+and the public session and archive conformance suites.
 
 This is host-owned reference code, not an official Heddle database adapter.
 Copy and adapt it inside the service that already owns authentication,
@@ -21,6 +21,8 @@ PostgreSQL, migrations, connection pooling, and operations.
   one transaction; and
 - another trusted scope can reuse the same session/archive IDs without reading
   or mutating the first scope's records.
+- both repositories pass the same public conformance suites used to certify
+  Heddle's file implementations.
 
 The verification makes no model request and requires no API key.
 
@@ -68,7 +70,7 @@ docker compose \
   postgres-chat-archive-repository.ts    locked manifest + atomic archive append
   migration.ts                           host-callable migration boundary
   migrate.ts                             standalone migration command
-  verify.ts                              conformance + fresh-service recovery
+  verify.ts                              both conformance suites + fresh-service recovery
   compose.yaml                           isolated local PostgreSQL 17 service
 ```
 
@@ -159,8 +161,8 @@ Before adapting this example for production, the host still needs to own:
 
 - migration rollout/rollback and compatibility across mixed application
   versions;
-- TLS, secret rotation, pool sizing, statement/lock timeouts, retry policy, and
-  graceful pool shutdown;
+- encryption in transit and at rest, secret rotation, pool sizing,
+  statement/lock timeouts, retry policy, and graceful pool shutdown;
 - authenticated scope derivation and optional PostgreSQL RLS as defense in
   depth;
 - query-plan/load testing, metrics, slow-query and lock observability;
@@ -169,7 +171,7 @@ Before adapting this example for production, the host still needs to own:
 - process routing for active runs and SSE plus durability for artifacts, traces,
   memory, and any product-visible transcript.
 
-Passing Heddle's conformance suite certifies the exercised repository contract;
+Passing Heddle's conformance suites certifies the exercised repository contracts;
 it does not certify those operational concerns. Keep this reference in host
 code until at least two independent hosts validate the same configuration and
 migration surface. Only then consider extracting an optional maintained adapter

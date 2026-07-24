@@ -7,10 +7,11 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import {
-  ChatArchiveStorageCorruptionError,
+  ChatArchiveRepositoryConformance,
   ChatSessionRepositoryConformance,
   createConversationEngine,
   type AppendChatArchiveInput,
+  type ChatArchiveRepositoryConformanceHarness,
   type ChatSessionRepositoryConformanceHarness,
 } from '../../../../src/index.js';
 import type { PostgresStorageDatabase } from './database.js';
@@ -69,57 +70,32 @@ async function verifySessionRepositoryConformance(
 async function verifyArchiveRepository(
   database: PostgresStorageDatabase,
 ): Promise<void> {
-  const scopeId = `archive-${randomUUID()}`;
-  const sessionId = `archive-session-${randomUUID()}`;
-  const firstRepository = new PostgresChatArchiveRepository({ database, scopeId });
-  const secondRepository = new PostgresChatArchiveRepository({ database, scopeId });
-  const firstInput = createArchiveInput(sessionId, 'archive-a', 'First rolling summary.');
-  const secondInput = createArchiveInput(sessionId, 'archive-b', 'Second rolling summary.');
+  const harness: ChatArchiveRepositoryConformanceHarness = {
+    createRepository: (scopeId) => new PostgresChatArchiveRepository({
+      database,
+      scopeId,
+    }),
+    cleanupScope: async (scopeId) => await cleanupScopes(database, [scopeId]),
+    corruptManifest: async ({ scopeId, sessionId }) => {
+      const changed = await database
+        .update(heddleChatSessionArchiveHeads)
+        .set({
+          manifest: {
+            version: 1,
+            sessionId: 'wrong-session',
+            archives: [],
+          },
+        })
+        .where(and(
+          eq(heddleChatSessionArchiveHeads.scopeId, scopeId),
+          eq(heddleChatSessionArchiveHeads.sessionId, sessionId),
+        ))
+        .returning({ sessionId: heddleChatSessionArchiveHeads.sessionId });
+      assert.equal(changed.length, 1, 'the conformance corruption hook must change one row');
+    },
+  };
 
-  try {
-    const appended = await Promise.all([
-      firstRepository.append(firstInput),
-      secondRepository.append(secondInput),
-    ]);
-    const freshRepository = new PostgresChatArchiveRepository({ database, scopeId });
-    const manifest = await freshRepository.loadManifest(sessionId);
-    assert.deepEqual(
-      manifest.archives.map((archive) => archive.id).sort(),
-      ['archive-a', 'archive-b'],
-      'concurrent appends must not lose either immutable archive',
-    );
-    for (const result of appended) {
-      const expectedSummary = result.archive.id === firstInput.archive.id
-        ? firstInput.summary
-        : secondInput.summary;
-      assert.equal(
-        await freshRepository.readSummary(result.archive.summaryPath),
-        expectedSummary,
-        `archive ${result.archive.id} must resolve its committed summary`,
-      );
-    }
-
-    await database
-      .update(heddleChatSessionArchiveHeads)
-      .set({
-        manifest: {
-          version: 1,
-          sessionId: 'wrong-session',
-          archives: [],
-        },
-      })
-      .where(and(
-        eq(heddleChatSessionArchiveHeads.scopeId, scopeId),
-        eq(heddleChatSessionArchiveHeads.sessionId, sessionId),
-      ));
-    await assert.rejects(
-      () => freshRepository.loadManifest(sessionId),
-      (error) => error instanceof ChatArchiveStorageCorruptionError,
-      'a malformed or session-mismatched manifest must fail loudly',
-    );
-  } finally {
-    await cleanupScopes(database, [scopeId]);
-  }
+  await ChatArchiveRepositoryConformance.runAll(harness);
 }
 
 async function verifyFreshServiceRecovery(
