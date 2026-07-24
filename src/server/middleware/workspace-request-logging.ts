@@ -1,6 +1,7 @@
 import type { Request } from 'express';
 import type { Logger } from 'pino';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
+import type { HeddleServerRequestAccessService } from '@/server/access/index.js';
 import { getWorkspaceOperationLogger } from '@/server/logging/workspace-operation-logger.js';
 import { createRequestLoggingMiddleware } from './request-logging.js';
 
@@ -8,6 +9,7 @@ type WorkspaceRequestLoggingOptions = {
   workspaceRoot: string;
   stateRoot: string;
   logger: Logger;
+  requestAccess?: HeddleServerRequestAccessService;
 };
 
 export function createWorkspaceRequestLoggingMiddleware(options: WorkspaceRequestLoggingOptions) {
@@ -19,11 +21,17 @@ export function createWorkspaceRequestLoggingMiddleware(options: WorkspaceReques
 
 function resolveWorkspaceRequestLogger(options: WorkspaceRequestLoggingOptions & { request: Request }): Logger {
   try {
+    const workspaceId = readWorkspaceIdFromRequest(options.request);
+    if (options.requestAccess) {
+      return getWorkspaceOperationLogger(
+        options.requestAccess.resolveWorkspace(options.request, workspaceId).stateRoot,
+      );
+    }
+
     const workspaceContext = RuntimeWorkspaceService.resolveContext({
       workspaceRoot: options.workspaceRoot,
       stateRoot: options.stateRoot,
     });
-    const workspaceId = readWorkspaceIdFromRequest(options.request);
     const workspace =
       workspaceId ?
         workspaceContext.workspaces.find((candidate) => candidate.id === workspaceId)

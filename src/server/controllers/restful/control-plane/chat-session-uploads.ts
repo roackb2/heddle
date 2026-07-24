@@ -1,5 +1,6 @@
 import type { ErrorRequestHandler, Request, RequestHandler, Response } from 'express';
 import multer from 'multer';
+import { HeddleServerAccessError } from '@/server/access/index.js';
 import {
   CHAT_SESSION_IMAGE_UPLOAD_LIMITS,
   ChatSessionImageUploadService,
@@ -8,9 +9,11 @@ import {
 } from '@/server/services/control-plane/chat-session-image-uploads.js';
 
 export class ChatSessionUploadsRestController {
+  readonly authorizeUpload: RequestHandler;
   readonly uploadImagesMiddleware: RequestHandler;
 
   constructor(private readonly imageUploads: ChatSessionImageUploadService) {
+    this.authorizeUpload = this.createAuthorizeUploadMiddleware();
     this.uploadImagesMiddleware = this.createUploadImagesMiddleware();
   }
 
@@ -21,6 +24,14 @@ export class ChatSessionUploadsRestController {
   handleUploadError: ErrorRequestHandler = (error, _request, response, _next): void => {
     this.sendUploadError(response, error);
   };
+
+  private createAuthorizeUploadMiddleware(): RequestHandler {
+    return (request, _response, next): void => {
+      void this.imageUploads.authorizeUpload(request)
+        .then(() => next())
+        .catch((error: unknown) => next(error));
+    };
+  }
 
   private createUploadImagesMiddleware(): RequestHandler {
     const upload = multer({
@@ -57,6 +68,11 @@ export class ChatSessionUploadsRestController {
 
   private sendUploadError(response: Response, error: unknown): void {
     if (isChatSessionUploadError(error)) {
+      response.status(error.statusCode).json({ error: error.message });
+      return;
+    }
+
+    if (error instanceof HeddleServerAccessError) {
       response.status(error.statusCode).json({ error: error.message });
       return;
     }

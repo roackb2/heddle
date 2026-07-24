@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import dayjs from 'dayjs';
+import { TRPCError } from '@trpc/server';
 import type { z } from 'zod';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import { ModelOptionsService, ModelPolicyService } from '@/core/llm/models/index.js';
@@ -27,7 +28,16 @@ import { CustomAgentService } from '@/core/custom-agents/index.js';
 import { BrowserAutomationIntentContextService } from '@/core/browser/index.js';
 import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import { FileDaemonRegistryRepository, RuntimeDaemonRegistryService } from '@/core/runtime/daemon/index.js';
-import { controlPlaneWorkspaceProcedure, type ControlPlaneWorkspaceContext } from './control-plane-workspace.js';
+import {
+  resolveHeddleServerPermittedSessionIds,
+} from '@/server/access/index.js';
+import type { ChatSessionView } from '@/server/control-plane-types.js';
+import type { HeddleControlPlaneAuditEvent } from '@/server/types.js';
+import {
+  controlPlaneLocalProcedure,
+  controlPlaneWorkspaceProcedure,
+  type ControlPlaneWorkspaceContext,
+} from './control-plane-workspace.js';
 import {
   agentAskInputSchema,
   browserAutomationInputSchema,
@@ -89,13 +99,18 @@ const FALLBACK_CONTROL_PLANE_LEASE_OWNER_ID = `daemon-${randomUUID()}`;
 
 export const controlPlaneRouter = router({
   state: controlPlaneWorkspaceProcedure.query(async ({ ctx }) => {
-    return await ControlPlaneStateController.load(ctx, ctx.requestWorkspace.workspace);
+    const state = await ControlPlaneStateController.load(ctx, ctx.requestWorkspace.workspace);
+    return {
+      ...state,
+      sessions: filterPermittedSessions(ctx, state.activeWorkspaceId, state.sessions),
+    };
   }),
   sessions: controlPlaneWorkspaceProcedure.input(sessionsInputSchema).query(async ({ ctx }) => {
     const requestWorkspace = ctx.requestWorkspace;
+    const sessions = await controlPlaneChatSessionsController.readViews(requestWorkspace.sessionEngineArgs);
     return {
       workspaceId: requestWorkspace.workspace.id,
-      sessions: await controlPlaneChatSessionsController.readViews(requestWorkspace.sessionEngineArgs),
+      sessions: filterPermittedSessions(ctx, requestWorkspace.workspace.id, sessions),
     };
   }),
   sessionsEvents: controlPlaneWorkspaceProcedure.input(sessionsEventsInputSchema).subscription(({ ctx, signal }) => {
@@ -108,6 +123,7 @@ export const controlPlaneRouter = router({
   }),
   sessionCreate: controlPlaneWorkspaceProcedure.input(createSessionInputSchema).mutation(({ ctx, input }) => {
     const { workspace, sessionEngineArgs } = ctx.requestWorkspace;
+    assertSessionCreationAllowed(ctx, workspace.id);
     return controlPlaneChatSessionsController.createSession({
       ...sessionEngineArgs,
       suggestedName: input?.name,
@@ -306,22 +322,48 @@ export const controlPlaneRouter = router({
       }),
     };
   }),
-  sessionResolveApproval: controlPlaneWorkspaceProcedure.input(sessionApprovalDecisionSchema).mutation(({ ctx, input }) => {
+  sessionResolveApproval: controlPlaneWorkspaceProcedure.input(sessionApprovalDecisionSchema).mutation(async ({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;
+    const auditEvent: HeddleControlPlaneAuditEvent = {
+      operation: 'approval.resolve',
+      occurredAt: dayjs().toISOString(),
+      actor: ctx.requestAccess.principal,
+      workspaceId: workspace.id,
+      sessionId: input.sessionId,
+      runId: input.runId,
+      metadata: {
+        decisionType: input.decision.type,
+        ...(input.decision.reason ? { reason: input.decision.reason } : {}),
+      },
+    };
+    await recordPrivilegedControlPlaneOperation(ctx, auditEvent);
+    const resolved = controlPlaneChatSessionsController.resolvePendingApproval({
+      workspaceId: workspace.id,
+      sessionId: input.sessionId,
+    }, input.decision, input.runId);
+    ctx.requestWorkspace.logger.info({ auditEvent, resolved }, 'Control-plane approval resolution completed');
     return {
-      resolved: controlPlaneChatSessionsController.resolvePendingApproval({
-        workspaceId: workspace.id,
-        sessionId: input.sessionId,
-      }, input.decision, input.runId),
+      resolved,
     };
   }),
-  sessionCancel: controlPlaneWorkspaceProcedure.input(sessionCancelInputSchema).mutation(({ ctx, input }) => {
+  sessionCancel: controlPlaneWorkspaceProcedure.input(sessionCancelInputSchema).mutation(async ({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;
+    const auditEvent: HeddleControlPlaneAuditEvent = {
+      operation: 'run.cancel',
+      occurredAt: dayjs().toISOString(),
+      actor: ctx.requestAccess.principal,
+      workspaceId: workspace.id,
+      sessionId: input.id,
+      runId: input.runId,
+    };
+    await recordPrivilegedControlPlaneOperation(ctx, auditEvent);
+    const cancelled = controlPlaneChatSessionsController.cancelRun({
+      workspaceId: workspace.id,
+      sessionId: input.id,
+    }, input.runId);
+    ctx.requestWorkspace.logger.info({ auditEvent, cancelled }, 'Control-plane run cancellation completed');
     return {
-      cancelled: controlPlaneChatSessionsController.cancelRun({
-        workspaceId: workspace.id,
-        sessionId: input.id,
-      }, input.runId),
+      cancelled,
     };
   }),
   sessionSendPrompt: controlPlaneWorkspaceProcedure.input(sessionMessageInputSchema).mutation(async ({ ctx, input }) => {
@@ -659,7 +701,7 @@ export const controlPlaneRouter = router({
       }),
     };
   }),
-  workspaceBrowse: procedure.input(workspaceBrowseInputSchema).query(async ({ input }) => {
+  workspaceBrowse: controlPlaneLocalProcedure.input(workspaceBrowseInputSchema).query(async ({ input }) => {
     return await ControlPlaneWorkspaceFilesController.browseDirectories({
       path: input?.path,
       limit: input?.limit ?? 100,
@@ -680,7 +722,7 @@ export const controlPlaneRouter = router({
       ...await ControlPlaneWorkspaceDiffController.readFileDiff(workspace.workspaceRoot, input.path),
     };
   }),
-  workspaceSetActive: procedure.input(workspaceSetActiveInputSchema).mutation(({ ctx, input }) => {
+  workspaceSetActive: controlPlaneLocalProcedure.input(workspaceSetActiveInputSchema).mutation(({ ctx, input }) => {
     const resolved = RuntimeWorkspaceService.setActive({
       workspaceRoot: ctx.workspaceRoot,
       stateRoot: ctx.stateRoot,
@@ -693,7 +735,7 @@ export const controlPlaneRouter = router({
       workspaces: resolved.workspaces,
     };
   }),
-  workspaceCreate: procedure.input(workspaceCreateInputSchema).mutation(({ ctx, input }) => {
+  workspaceCreate: controlPlaneLocalProcedure.input(workspaceCreateInputSchema).mutation(({ ctx, input }) => {
     const resolved = RuntimeWorkspaceService.createDescriptor({
       workspaceRoot: ctx.workspaceRoot,
       stateRoot: ctx.stateRoot,
@@ -709,7 +751,7 @@ export const controlPlaneRouter = router({
       workspaces: resolved.workspaces,
     };
   }),
-  workspaceRename: procedure.input(workspaceRenameInputSchema).mutation(({ ctx, input }) => {
+  workspaceRename: controlPlaneLocalProcedure.input(workspaceRenameInputSchema).mutation(({ ctx, input }) => {
     const resolved = RuntimeWorkspaceService.rename({
       workspaceRoot: ctx.workspaceRoot,
       stateRoot: ctx.stateRoot,
@@ -730,6 +772,37 @@ export const controlPlaneRouter = router({
 });
 
 type SessionMessageInput = z.infer<typeof sessionMessageInputSchema>;
+
+function filterPermittedSessions(
+  ctx: HeddleServerContext,
+  workspaceId: string,
+  sessions: ChatSessionView[],
+): ChatSessionView[] {
+  const permittedSessionIds = resolveHeddleServerPermittedSessionIds(ctx.requestAccess, workspaceId);
+  if (!permittedSessionIds) {
+    return sessions;
+  }
+
+  const permitted = new Set(permittedSessionIds);
+  return sessions.filter((session) => permitted.has(session.id));
+}
+
+function assertSessionCreationAllowed(ctx: HeddleServerContext, workspaceId: string): void {
+  if (resolveHeddleServerPermittedSessionIds(ctx.requestAccess, workspaceId)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Session creation requires unrestricted access to the workspace session catalog.',
+    });
+  }
+}
+
+async function recordPrivilegedControlPlaneOperation(
+  ctx: ControlPlaneWorkspaceContext,
+  auditEvent: HeddleControlPlaneAuditEvent,
+): Promise<void> {
+  ctx.requestWorkspace.logger.info({ auditEvent }, 'Control-plane privileged operation authorized');
+  await ctx.recordControlPlaneAuditEvent?.(auditEvent);
+}
 
 function buildSubmitPromptArgs(ctx: ControlPlaneWorkspaceContext, input: SessionMessageInput) {
   const { logger, sessionEngineArgs } = ctx.requestWorkspace;

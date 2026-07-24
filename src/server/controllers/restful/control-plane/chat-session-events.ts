@@ -1,34 +1,42 @@
 import { watch } from 'node:fs';
 import type { Request, Response } from 'express';
-import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
+import {
+  HeddleServerAccessError,
+  type HeddleServerRequestAccessService,
+} from '@/server/access/index.js';
+import type { WorkspaceDescriptor } from '@/core/runtime/workspaces/index.js';
 import { controlPlaneChatSessionsController } from '@/server/controllers/trpc/control-plane/chat-sessions-controller.js';
 
 type ChatSessionEventsRestControllerOptions = {
-  workspaceRoot: string;
-  stateRoot: string;
+  requestAccess: HeddleServerRequestAccessService;
 };
 
 export class ChatSessionEventsRestController {
   constructor(private readonly options: ChatSessionEventsRestControllerOptions) {}
 
-  streamEvents = (request: Request, response: Response): void => {
+  streamEvents = async (request: Request, response: Response): Promise<void> => {
     const sessionId = typeof request.params.sessionId === 'string' ? request.params.sessionId.trim() : '';
     if (!sessionId) {
       response.status(400).json({ error: 'Missing sessionId' });
       return;
     }
 
-    const workspaceContext = RuntimeWorkspaceService.resolveContext({
-      workspaceRoot: this.options.workspaceRoot,
-      stateRoot: this.options.stateRoot,
-    });
     const workspaceId = this.readWorkspaceId(request);
-    const workspace = workspaceId
-      ? workspaceContext.workspaces.find((candidate) => candidate.id === workspaceId)
-      : workspaceContext.activeWorkspace;
-    if (!workspace) {
-      response.status(404).json({ error: `Workspace not found: ${workspaceId}` });
-      return;
+    let workspace: WorkspaceDescriptor;
+    try {
+      workspace = this.options.requestAccess.resolveWorkspace(request, workspaceId);
+      await this.options.requestAccess.authorizeOperation(request, {
+        name: 'sessionEvents',
+        type: 'subscription',
+        workspaceId: workspace.id,
+        sessionId,
+      });
+    } catch (error) {
+      if (error instanceof HeddleServerAccessError) {
+        response.status(error.statusCode).json({ error: error.message });
+        return;
+      }
+      throw error;
     }
 
     const sessionFilePath = controlPlaneChatSessionsController.resolveFilePath(

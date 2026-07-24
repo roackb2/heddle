@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
+import { createLocalHeddleServerRequestAccess } from '@/server/access/index.js';
 import { controlPlaneRouter } from '@/server/routes/trpc/control-plane.js';
 import { ControlPlaneWorkspaceDiffController } from '@/server/controllers/trpc/control-plane/workspace-diff.js';
 
@@ -106,6 +107,7 @@ describe('workspace diff review', () => {
       activeWorkspaceId: activeWorkspace.id,
       activeWorkspace,
       workspaces: catalog.workspaces,
+      requestAccess: createLocalHeddleServerRequestAccess(),
       runtimeHost: null,
       logger: pino({ level: 'silent' }),
     });

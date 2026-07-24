@@ -7,6 +7,7 @@ import { MemoryCatalogService } from '../../../core/memory/catalog.js';
 import { MemoryValidationService } from '../../../core/memory/validation.js';
 import { MemoryVisibilityService } from '../../../core/memory/visibility.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
+import { createLocalHeddleServerRequestAccess } from '@/server/access/index.js';
 import { controlPlaneRouter } from '@/server/routes/trpc/control-plane.js';
 
 describe('memory visibility', () => {
@@ -66,6 +67,7 @@ describe('memory visibility', () => {
       activeWorkspaceId: activeWorkspace.id,
       activeWorkspace,
       workspaces: catalog.workspaces,
+      requestAccess: createLocalHeddleServerRequestAccess(),
       runtimeHost: null,
       logger: pino({ level: 'silent' }),
     });

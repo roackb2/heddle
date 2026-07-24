@@ -5,6 +5,7 @@ import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 import { FileHeartbeatTaskService, type HeartbeatTask } from '@/advanced.js';
 import { RuntimeWorkspaceService } from '@/core/runtime/workspaces/index.js';
+import { createLocalHeddleServerRequestAccess } from '@/server/access/index.js';
 import { controlPlaneRouter } from '@/server/routes/trpc/control-plane.js';
 import { ControlPlaneHeartbeatController } from '@/server/controllers/trpc/control-plane/heartbeat.js';
 import type { AgentHeartbeatResult } from '@/core/heartbeat/index.js';
@@ -194,6 +195,7 @@ describe('control-plane heartbeat mutations', () => {
       activeWorkspaceId: activeWorkspace.id,
       activeWorkspace,
       workspaces: catalog.workspaces,
+      requestAccess: createLocalHeddleServerRequestAccess(),
       runtimeHost: null,
       logger: pino({ level: 'silent' }),
     });
@@ -221,6 +223,7 @@ describe('control-plane heartbeat mutations', () => {
       activeWorkspaceId: activeWorkspace.id,
       activeWorkspace,
       workspaces: catalog.workspaces,
+      requestAccess: createLocalHeddleServerRequestAccess(),
       runtimeHost: null,
       logger: pino({ level: 'silent' }),
     });
@@ -310,6 +313,7 @@ describe('control-plane heartbeat mutations', () => {
       activeWorkspaceId: activeWorkspace.id,
       activeWorkspace,
       workspaces: catalog.workspaces,
+      requestAccess: createLocalHeddleServerRequestAccess(),
       runtimeHost: null,
       logger: pino({ level: 'silent' }),
     });
@@ -354,6 +358,7 @@ describe('control-plane heartbeat mutations', () => {
       activeWorkspaceId: activeWorkspace.id,
       activeWorkspace,
       workspaces: catalog.workspaces,
+      requestAccess: createLocalHeddleServerRequestAccess(),
       runtimeHost: null,
       logger: pino({ level: 'silent' }),
     });
