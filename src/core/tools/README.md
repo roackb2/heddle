@@ -37,8 +37,8 @@ workspace.
 - `policy-envelope/`: shared `ToolPolicyEnvelope` contract, model-visible
   schema injection, and execution-time stripping/validation. Tool-specific
   input remains owned by the individual tool.
-- `toolkits/coding-files/`: file/search/edit tool implementations plus shared
-  edit-core behavior.
+- `toolkits/coding-files/`: file/search/edit tool implementations, shared
+  edit-core behavior, and canonical workspace containment.
 - `toolkits/knowledge/`: memory notes, memory checkpoint, and durable knowledge
   recording tools plus the knowledge toolkit composition and memory-mode policy.
 - `toolkits/external-context/`: provider-backed web search and image inspection
@@ -91,7 +91,8 @@ workspace.
 ## Common Changes
 
 - To add a coding workspace tool, place it under `toolkits/coding-files/` when
-  it belongs to the file/search/edit surface.
+  it belongs to the file/search/edit surface, and reuse its canonical path
+  policy rather than adding a lexical containment check.
 - To add a knowledge or memory-surface tool, place it under
   `toolkits/knowledge/` and keep memory-mode behavior centralized in the
   knowledge toolkit.

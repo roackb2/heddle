@@ -1,5 +1,6 @@
 import type { ToolCall, ToolDefinition } from '@/core/types.js';
 import type { EditFilePreview } from '@/core/tools/toolkits/coding-files/edit-file.js';
+import type { CanonicalToolTarget } from '@/core/tools/toolkits/coding-files/workspace-path-policy.js';
 import type { ProjectApprovalRule } from './remembered-rules/index.js';
 import type { AutonomyEvaluation, AutopilotRootApproval } from './autonomy/index.js';
 
@@ -20,6 +21,7 @@ export type ToolApprovalPolicyContext = {
   call: ToolCall;
   tool: ToolDefinition;
   workspaceRoot?: string;
+  canonicalTargetPaths?: string[];
 };
 
 export type ToolApprovalPolicy = (
@@ -51,6 +53,7 @@ export type ToolApprovalRequest = {
   summary: string;
   reason?: string;
   editPreview?: EditFilePreview;
+  canonicalTargets?: CanonicalToolTarget[];
   autopilotRootApproval?: AutopilotRootApproval;
   rememberProjectApproval?: {
     label: string;

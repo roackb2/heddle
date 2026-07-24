@@ -1,6 +1,7 @@
 import { rm, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { ToolDefinition, ToolResult } from '../../../types.js';
+import { WorkspacePathPolicy } from './workspace-path-policy.js';
 
 type DeleteFileInput = {
   path: string;
@@ -17,7 +18,7 @@ export function createDeleteFileTool(options: DeleteFileToolOptions = {}): ToolD
   return {
     name: 'delete_file',
     description:
-      'Delete a file or remove a directory when you explicitly need to clean up or retire workspace content. Prefer this over shell rm for normal file deletion. Use { "path" } for files, or set recursive to true if you intentionally want to remove a directory tree. Relative paths are resolved from the active workspace root and may also point to nearby parent or sibling folders. Returns a structured deletion summary.',
+      'Delete a file or remove a directory inside the active workspace when you explicitly need to clean up or retire workspace content. Prefer this over shell rm for normal file deletion. Use { "path" } for files, or set recursive to true if you intentionally want to remove a directory tree. Canonical path checks reject parent traversal or symlinks that escape the workspace. Returns a structured deletion summary.',
     requiresApproval: true,
     parameters: {
       type: 'object',
@@ -43,9 +44,13 @@ export function createDeleteFileTool(options: DeleteFileToolOptions = {}): ToolD
       }
 
       const workspaceRoot = configuredWorkspaceRoot ?? process.cwd();
-      const targetPath = resolve(workspaceRoot, raw.path);
+      const requestedPath = resolve(workspaceRoot, raw.path);
 
       try {
+        const { canonicalPath: targetPath } = await WorkspacePathPolicy.resolveExisting({
+          workspaceRoot,
+          path: raw.path,
+        });
         const info = await stat(targetPath);
         if (info.isDirectory() && !raw.recursive) {
           return {
@@ -71,7 +76,7 @@ export function createDeleteFileTool(options: DeleteFileToolOptions = {}): ToolD
       } catch (error) {
         return {
           ok: false,
-          error: `Failed to delete ${targetPath}: ${error instanceof Error ? error.message : String(error)}`,
+          error: `Failed to delete ${requestedPath}: ${error instanceof Error ? error.message : String(error)}`,
         };
       }
     },

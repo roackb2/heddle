@@ -57,7 +57,6 @@ export class MemoryNoteService {
       rootLabel: 'memory root',
       subjectLabel: 'memory note',
       creationHint: 'Set createIfMissing to true if you want edit_memory_note to create it.',
-      enforceRoot: true,
     });
   }
 

@@ -227,12 +227,13 @@ describe('ControlPlaneChatSessionsController run cancellation', () => {
         execute: async () => ({ ok: true }),
       },
     });
-    await Promise.resolve();
 
-    expect(controller.getPendingApproval({ workspaceId, sessionId })).toEqual(expect.objectContaining({
-      callId: 'call-approval-state',
-      tool: 'run_shell_mutate',
-    }));
+    await vi.waitFor(() => {
+      expect(controller.getPendingApproval({ workspaceId, sessionId })).toEqual(expect.objectContaining({
+        callId: 'call-approval-state',
+        tool: 'run_shell_mutate',
+      }));
+    });
     expect(publisher.publishApprovalUpdated).toHaveBeenCalledTimes(1);
 
     expect(controller.resolvePendingApproval({ workspaceId, sessionId }, {

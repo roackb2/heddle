@@ -5,6 +5,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { ToolDefinition, ToolResult } from '../../../types.js';
+import { WorkspacePathPolicy } from './workspace-path-policy.js';
 
 type ReadFileInput = {
   path: string;
@@ -23,7 +24,7 @@ export function createReadFileTool(options: ReadFileToolOptions = {}): ToolDefin
     name: 'read_file',
     concurrency: 'parallel-safe',
     description:
-      'Read the contents of a file. Use this when you already know the file path and want its contents, not when you want to inspect a directory. Relative paths are resolved from the active workspace root and may also point to nearby parent or sibling folders. Optionally limit returned lines with maxLines and start from a 0-based line offset with offset, which is useful for paging through long files. Returns the file text directly, or just the selected window when maxLines and/or offset are provided. Example inputs: { "path": "path/to/file.txt" }, { "path": "../shared-notes/summary.md" }, { "path": "src/run-agent.ts", "offset": 200, "maxLines": 120 }',
+      'Read the contents of a file inside the active workspace. Use this when you already know the file path and want its contents, not when you want to inspect a directory. Relative paths are resolved from the active workspace root, and canonical path checks reject parent traversal or symlinks that escape it. Optionally limit returned lines with maxLines and start from a 0-based line offset with offset, which is useful for paging through long files. Returns the file text directly, or just the selected window when maxLines and/or offset are provided. Example inputs: { "path": "path/to/file.txt" }, { "path": "src/run-agent.ts", "offset": 200, "maxLines": 120 }',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -50,9 +51,13 @@ export function createReadFileTool(options: ReadFileToolOptions = {}): ToolDefin
 
       const input: ReadFileInput = raw;
       const workspaceRoot = configuredWorkspaceRoot ?? process.cwd();
-      const filePath = resolve(workspaceRoot, input.path);
+      const requestedPath = resolve(workspaceRoot, input.path);
 
       try {
+        const { canonicalPath: filePath } = await WorkspacePathPolicy.resolveExisting({
+          workspaceRoot,
+          path: input.path,
+        });
         const content = await readFile(filePath, 'utf-8');
 
         const lines = content.split('\n');
@@ -71,9 +76,9 @@ export function createReadFileTool(options: ReadFileToolOptions = {}): ToolDefin
         return { ok: true, output: content };
       } catch (err) {
         if (err instanceof Error && 'code' in err && err.code === 'EISDIR') {
-          return { ok: false, error: `Failed to read ${filePath}: path is a directory, not a file. Use list_files to inspect directories.` };
+          return { ok: false, error: `Failed to read ${requestedPath}: path is a directory, not a file. Use list_files to inspect directories.` };
         }
-        return { ok: false, error: `Failed to read ${filePath}: ${err instanceof Error ? err.message : String(err)}` };
+        return { ok: false, error: `Failed to read ${requestedPath}: ${err instanceof Error ? err.message : String(err)}` };
       }
     },
   };
