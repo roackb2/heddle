@@ -91,8 +91,16 @@ scripts and smoke checks. The harness owns only three integration points:
 The suite checks exact CRUD revisions, concurrent unique-create and CAS races,
 stable cursor pages including binary UTF-8 ties, filters before page boundaries,
 identical-ID isolation across two scopes, complete reopen through fresh adapter
-instances, corruption propagation, and invalid page limits. It invokes cleanup
-for every generated scope even when the adapter or an assertion fails.
+instances, corruption propagation, invalid page limits, and that catalog entries
+carry only the fields the catalog schema defines. It invokes cleanup for every
+generated scope even when the adapter or an assertion fails.
+
+The catalog-projection check exists because an adapter can pass every other
+scenario while building its catalog entry by *removing* known-large record
+fields instead of *selecting* known-catalog fields. Both approaches agree today;
+only the second stays correct when `ChatSession` gains a field. Project with
+`ChatSessionPersistenceCodec.projectCatalogEntry` rather than reproducing the
+field list.
 
 Passing this suite certifies the Heddle repository behavior exercised by the
 scenarios. It does not certify product authentication, RLS policy, migrations,

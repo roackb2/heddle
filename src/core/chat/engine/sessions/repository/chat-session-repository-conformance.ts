@@ -8,6 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import isEqual from 'lodash/isEqual.js';
 import type { ChatSession } from '@/core/chat/types.js';
+import { CatalogEntryWriteSchema } from './chat-session-schemas.js';
 import {
   ChatSessionAlreadyExistsError,
   ChatSessionRepositoryConformanceError,
@@ -63,7 +64,16 @@ const scenarioName = {
   reopen: 'fresh repository instances reopen complete session state',
   corruption: 'malformed stored records propagate as read failures',
   pageLimits: 'invalid page limits are rejected',
+  catalogProjection: 'catalog entries expose only catalog fields',
 } as const;
+
+/**
+ * The complete set of keys a catalog entry may carry, derived from the schema
+ * that owns the projection so the two cannot drift apart.
+ */
+const CATALOG_ENTRY_KEYS: ReadonlySet<string> = new Set(
+  Object.keys(CatalogEntryWriteSchema.shape),
+);
 
 /**
  * Canonical behavioral suite for certifying a custom session repository.
@@ -123,6 +133,12 @@ export class ChatSessionRepositoryConformance {
         harness,
         1,
         ChatSessionRepositoryConformance.verifyPageLimits,
+      ),
+      ChatSessionRepositoryConformance.createScenario(
+        scenarioName.catalogProjection,
+        harness,
+        1,
+        ChatSessionRepositoryConformance.verifyCatalogProjection,
       ),
     ];
   }
@@ -596,6 +612,51 @@ export class ChatSessionRepositoryConformance {
         `list must reject invalid page limit ${limit}`,
       );
     }
+  }
+
+  /**
+   * A catalog entry carries only the fields the catalog schema defines.
+   *
+   * An adapter that projects by removing known-large fields rather than
+   * selecting known-catalog fields passes today and drifts tomorrow: the next
+   * field added to `ChatSession` reaches every session list without anyone
+   * deciding it should. Selecting is the property under test, not the size of
+   * the result.
+   */
+  private static async verifyCatalogProjection(
+    [scopeId]: readonly string[],
+    harness: ChatSessionRepositoryConformanceHarness,
+  ): Promise<void> {
+    const scenario = scenarioName.catalogProjection;
+    const repository = await ChatSessionRepositoryConformance.repository(harness, scopeId);
+    const session = ChatSessionRepositoryConformance.session('catalog-projection-session', {
+      history: [{ role: 'user', content: 'Transcript content must not reach the catalog.' }],
+    });
+    await repository.create(session);
+
+    const page = await repository.list({ limit: 10 });
+    const entry = ChatSessionRepositoryConformance.value(
+      page.items.find((item) => item.id === session.id),
+      scenario,
+      'list must return the created session',
+    );
+
+    const unexpectedKeys = Object.keys(entry)
+      .filter((key) => !CATALOG_ENTRY_KEYS.has(key))
+      .sort();
+    ChatSessionRepositoryConformance.expect(
+      unexpectedKeys.length === 0,
+      scenario,
+      'catalog entries must expose only catalog fields, but this adapter also published '
+      + `${unexpectedKeys.join(', ')}. Project with ChatSessionPersistenceCodec.projectCatalogEntry `
+      + 'rather than removing individual record fields.',
+    );
+    ChatSessionRepositoryConformance.equal(
+      entry.revision,
+      1,
+      scenario,
+      'a catalog entry must carry the stored revision',
+    );
   }
 
   private static async repository(
