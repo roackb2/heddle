@@ -1131,6 +1131,106 @@ describe('memory note tools', () => {
     expect(editResult.error).toContain('memory note paths must stay inside');
   });
 
+  it('refuses to read through a symlink that escapes the memory root', async () => {
+    const base = await mkdtemp(join(tmpdir(), 'heddle-memory-symlink-'));
+    const root = join(base, 'memory');
+    const outside = join(base, 'outside');
+    await mkdir(root, { recursive: true });
+    await mkdir(outside, { recursive: true });
+    await writeFile(join(outside, 'secret.md'), '# Secret\nsensitive value\n');
+    await symlink(outside, join(root, 'escape'));
+
+    const readTool = createReadMemoryNoteTool({ memoryRoot: root });
+    const result = await readTool.execute({ path: 'escape/secret.md' });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Memory note paths must stay inside');
+    expect(result.error).not.toContain('sensitive value');
+  });
+
+  it('refuses to list or search through a symlink that escapes the memory root', async () => {
+    const base = await mkdtemp(join(tmpdir(), 'heddle-memory-symlink-scope-'));
+    const root = join(base, 'memory');
+    const outside = join(base, 'outside');
+    await mkdir(root, { recursive: true });
+    await mkdir(outside, { recursive: true });
+    await writeFile(join(outside, 'secret.md'), '# Secret\nsensitive value\n');
+    await symlink(outside, join(root, 'escape'));
+
+    const listTool = createListMemoryNotesTool({ memoryRoot: root });
+    const searchTool = createSearchMemoryNotesTool({ memoryRoot: root });
+
+    const listResult = await listTool.execute({ path: 'escape' });
+    const searchResult = await searchTool.execute({ path: 'escape', query: 'sensitive' });
+
+    expect(listResult.ok).toBe(false);
+    expect(listResult.error).toContain('Memory note paths must stay inside');
+    expect(searchResult.ok).toBe(false);
+    expect(searchResult.error).toContain('Memory note paths must stay inside');
+  });
+
+  it('does not follow an escaping symlink when listing the whole memory root', async () => {
+    const base = await mkdtemp(join(tmpdir(), 'heddle-memory-symlink-walk-'));
+    const root = join(base, 'memory');
+    const outside = join(base, 'outside');
+    await mkdir(root, { recursive: true });
+    await mkdir(outside, { recursive: true });
+    await writeFile(join(root, 'own-note.md'), '# Own\n');
+    await writeFile(join(outside, 'secret.md'), '# Secret\n');
+    await symlink(outside, join(root, 'escape'));
+
+    const listTool = createListMemoryNotesTool({ memoryRoot: root });
+    const result = await listTool.execute({});
+
+    expect(result).toEqual({ ok: true, output: 'own-note.md' });
+  });
+
+  it('resolves notes correctly when the memory root itself is reached through a symlink', async () => {
+    const base = await mkdtemp(join(tmpdir(), 'heddle-memory-symlinked-root-'));
+    const realRoot = join(base, 'real-memory');
+    const linkedRoot = join(base, 'linked-memory');
+    await mkdir(realRoot, { recursive: true });
+    await mkdir(join(realRoot, 'architecture'), { recursive: true });
+    await writeFile(join(realRoot, 'architecture', 'auth.md'), '# Auth\nsentinel value\n');
+    await symlink(realRoot, linkedRoot);
+
+    const listTool = createListMemoryNotesTool({ memoryRoot: linkedRoot });
+    const readTool = createReadMemoryNoteTool({ memoryRoot: linkedRoot });
+    const searchTool = createSearchMemoryNotesTool({ memoryRoot: linkedRoot });
+
+    // A symlinked root is legitimate: canonicalizing the target must not make
+    // the root's own notes look like escapes.
+    expect(await listTool.execute({})).toEqual({ ok: true, output: 'architecture/auth.md' });
+    expect(await readTool.execute({ path: 'architecture/auth.md' })).toEqual({
+      ok: true,
+      output: '# Auth\nsentinel value\n',
+    });
+    expect(await searchTool.execute({ query: 'sentinel' })).toEqual({
+      ok: true,
+      output: 'architecture/auth.md:2:sentinel value',
+    });
+  });
+
+  it('reports no notes when the memory root does not exist yet', async () => {
+    const base = await mkdtemp(join(tmpdir(), 'heddle-memory-missing-root-'));
+    const root = join(base, 'not-created-yet');
+
+    const listTool = createListMemoryNotesTool({ memoryRoot: root });
+    const searchTool = createSearchMemoryNotesTool({ memoryRoot: root });
+    const readTool = createReadMemoryNoteTool({ memoryRoot: root });
+
+    expect(await listTool.execute({})).toEqual({ ok: true, output: '' });
+    expect(await searchTool.execute({ query: 'anything' })).toEqual({
+      ok: true,
+      output: 'No matches found.',
+    });
+
+    // Containment still applies before the root exists.
+    const escaped = await readTool.execute({ path: '../outside.md' });
+    expect(escaped.ok).toBe(false);
+    expect(escaped.error).toContain('Memory note paths must stay inside');
+  });
+
   it('records knowledge candidates under memory maintenance', async () => {
     const root = await mkdtemp(join(tmpdir(), 'heddle-record-knowledge-'));
     const tool = createRecordKnowledgeTool({
