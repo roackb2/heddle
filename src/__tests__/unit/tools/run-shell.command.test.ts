@@ -1,7 +1,13 @@
 import { EventEmitter } from 'node:events';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { runShellCommand, DEFAULT_INSPECT_RULES, DEFAULT_MUTATE_RULES } from '../../../core/tools/toolkits/shell-process/run-shell.js';
+import {
+  createRunShellInspectTool,
+  createRunShellMutateTool,
+  runShellCommand,
+  DEFAULT_INSPECT_RULES,
+  DEFAULT_MUTATE_RULES,
+} from '../../../core/tools/toolkits/shell-process/run-shell.js';
 
 const spawnMock = vi.fn();
 
@@ -252,5 +258,121 @@ describe('runShellCommand', () => {
     const result = await execution;
     expect(result.ok).toBe(false);
     expect(result.error).toBe('Shell command timed out after 30000ms');
+  });
+
+  it('signals the spawned shell on timeout without supervising its descendants', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+
+    const { child } = createFakeChildProcess();
+    spawnMock.mockReturnValue(child);
+
+    const execution = runShellCommand(
+      { command: 'sleep 1' },
+      {
+        toolName: 'run_shell_mutate',
+        rules: DEFAULT_MUTATE_RULES,
+        allowUnknown: true,
+      },
+    );
+
+    vi.advanceTimersByTime(30000);
+
+    // Current behavior: one SIGTERM to the shell itself. The follow-up SIGKILL
+    // is guarded by child.killed, which Node sets once the signal is delivered,
+    // so the escalation does not fire. Descendants are not signalled at all.
+    // Locked deliberately -- see docs/architecture/execution-boundaries.md.
+    expect((child as any).kill).toHaveBeenCalledTimes(1);
+    expect((child as any).kill).toHaveBeenCalledWith('SIGTERM');
+
+    vi.advanceTimersByTime(1000);
+    expect((child as any).kill).toHaveBeenCalledTimes(1);
+
+    child.emit('close', 0);
+    await execution;
+  });
+
+  it('caps each output stream at 1 MiB and retains the tail without a truncation marker', async () => {
+    const { child, stdout, stderr } = createFakeChildProcess();
+    spawnMock.mockReturnValue(child);
+
+    const execution = runShellCommand(
+      { command: 'git log' },
+      {
+        toolName: 'run_shell_inspect',
+        rules: DEFAULT_INSPECT_RULES,
+        allowUnknown: false,
+      },
+    );
+
+    const limit = 1024 * 1024;
+    stdout.emit('data', 'a'.repeat(limit));
+    stdout.emit('data', `${'b'.repeat(limit - 1)}z`);
+    stderr.emit('data', 'e'.repeat(limit + 10));
+    child.emit('close', 0);
+
+    const result = await execution;
+    const output = result.output as { stdout: string; stderr: string };
+
+    // The head is discarded silently: the model cannot distinguish truncated
+    // output from complete output.
+    expect(output.stdout.length).toBe(limit);
+    expect(output.stdout.startsWith('a')).toBe(false);
+    expect(output.stdout.endsWith('z')).toBe(true);
+    expect(output.stderr.length).toBe(limit);
+  });
+
+  it('does not confine a command to the workspace root', async () => {
+    const { child, stdout } = createFakeChildProcess();
+    spawnMock.mockReturnValue(child);
+
+    const execution = runShellCommand(
+      { command: 'cat /etc/hosts' },
+      {
+        toolName: 'run_shell_mutate',
+        rules: DEFAULT_MUTATE_RULES,
+        allowUnknown: true,
+        cwd: '/workspace/project',
+      },
+    );
+
+    stdout.emit('data', 'contents\n');
+    child.emit('close', 0);
+
+    const result = await execution;
+
+    // The workspace is the initial working directory, not a boundary. An
+    // absolute path outside it is neither rejected nor rewritten. Approval is
+    // the only gate on this command.
+    expect(result.ok).toBe(true);
+    expect(spawnMock).toHaveBeenCalledWith('cat /etc/hosts', {
+      cwd: '/workspace/project',
+      shell: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  });
+});
+
+describe('run shell tool definitions', () => {
+  beforeEach(() => {
+    const { child } = createFakeChildProcess();
+    spawnMock.mockReturnValue(child);
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('gates only the mutate tool behind approval', () => {
+    expect(createRunShellInspectTool().requiresApproval).toBeFalsy();
+    expect(createRunShellMutateTool().requiresApproval).toBe(true);
+  });
+
+  it('describes the workspace as an initial directory rather than a boundary', () => {
+    for (const tool of [createRunShellInspectTool(), createRunShellMutateTool()]) {
+      expect(tool.description).toContain('not an enforced boundary');
+      expect(tool.description).toContain("host user's full authority");
+      expect(tool.description).not.toMatch(/inside the current workspace/);
+    }
   });
 });
