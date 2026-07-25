@@ -48,13 +48,49 @@ describe('ChatSessionRepositoryConformance', () => {
 
   const scenarios = ChatSessionRepositoryConformance.createScenarios(harness);
 
-  it('publishes eight uniquely named scenarios', () => {
-    expect(scenarios).toHaveLength(8);
-    expect(new Set(scenarios.map((scenario) => scenario.name)).size).toBe(8);
+  it('publishes nine uniquely named scenarios', () => {
+    expect(scenarios).toHaveLength(9);
+    expect(new Set(scenarios.map((scenario) => scenario.name)).size).toBe(9);
   });
 
   it.each(scenarios)('$name', async ({ run }) => {
     await run();
+  });
+
+  it('rejects an adapter whose catalog carries transcript state', async () => {
+    // The contract violation this scenario exists to catch: an adapter that
+    // returns the stored record as its catalog entry, so transcript arrays
+    // reach every session list.
+    const leakingHarness: ChatSessionRepositoryConformanceHarness = {
+      ...harness,
+      createRepository: (scopeId) => {
+        const inner = new FileChatSessionRepository({
+          sessionStoragePath: storagePath(scopeId),
+        });
+        return {
+          create: (session) => inner.create(session),
+          read: (sessionId) => inner.read(sessionId),
+          update: (input) => inner.update(input),
+          delete: (input) => inner.delete(input),
+          list: async (input) => {
+            const page = await inner.list(input);
+            const items = await Promise.all(page.items.map(async (item) => {
+              const stored = await inner.read(item.id);
+              return stored
+                ? { ...stored.session, revision: stored.revision }
+                : item;
+            }));
+            return { ...page, items };
+          },
+        };
+      },
+    };
+    const catalogScenario = ChatSessionRepositoryConformance
+      .createScenarios(leakingHarness)
+      .find(({ name }) => name === 'catalog entries expose only catalog fields');
+
+    await expect(catalogScenario?.run()).rejects.toThrow(/history/u);
+    await expect(catalogScenario?.run()).rejects.toThrow(/projectCatalogEntry/u);
   });
 
   it('cleans every generated scope when an adapter operation fails', async () => {
