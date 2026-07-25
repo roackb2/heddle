@@ -36,7 +36,7 @@ whole Heddle process inside mature OS isolation.
 | `run_shell_inspect` | **None.** Workspace is the initial `cwd` only | none — policy allowlist only | Read-oriented rules; redirects, chaining, subshells blocked |
 | `run_shell_mutate` | **None.** Workspace is the initial `cwd` only | `requiresApproval: true` | Arbitrary commands permitted once approved |
 | `edit_memory_note` | **Canonical** — reuses `executeScopedEdit` with the memory root | mutation approval-gated | Same core as coding-files |
-| `read`/`search`/`list` memory notes | **Lexical only** — see gap below | none | `MemoryPathUtils.resolveMemoryPath` |
+| `read`/`search`/`list` memory notes | **Canonical** — `MemoryPathUtils.resolveMemoryPath` delegates to `WorkspacePathPolicy` | none | Same policy as coding-files; memory owns only the error vocabulary |
 | MCP tools | delegated to the server | host-owned policy, remote mutations approval-gated | Out of scope for this document |
 
 The `scope: 'workspace'` value in a shell policy decision classifies what a
@@ -81,20 +81,24 @@ request.
 
 These are real findings from this audit. None are fixed by this document.
 
-### 1. Memory note reads use lexical containment while memory edits use canonical
+### 1. Memory note reads used lexical containment — **fixed**
 
-`MemoryPathUtils.resolveMemoryPath` (`core/memory/path-utils.ts:5`) checks
-containment with `resolve` + `relative` + a `..` prefix test. That is a purely
-lexical check: a symlink inside the memory root that points outside it resolves
-to an in-root relative path and passes.
+`MemoryPathUtils.resolveMemoryPath` previously checked containment with
+`resolve` + `relative` + a `..` prefix test. That is a purely lexical check: a
+symlink inside the memory root pointing outside it resolved to an in-root
+relative path and passed, so `read_memory_note` would follow it and return the
+outside file's contents.
 
-`edit_memory_note` is unaffected because it routes through `executeScopedEdit`,
-which canonicalizes. But `read`, `search`, and `list` go through
-`MemoryNoteService.resolvePath` and do not. The same tool family therefore has
-two different containment strengths.
+It now delegates to `WorkspacePathPolicy`, the same canonical policy the
+coding-files toolkit and `edit_memory_note` already use. The memory module
+keeps only its own error vocabulary. Escapes through an in-root symlink are
+covered by tests for read, list, and search.
 
-The fix is to route memory path resolution through the same canonical policy
-the coding-files toolkit already owns — not to add a second path checker.
+One narrow case remains lexical by necessity: when the memory root does not
+exist yet there is no tree to traverse and no symlink that could redirect the
+path, so `resolveAgainstMissingRoot` performs the `..` check directly. That is
+exact rather than approximate, and it is the only path in the module that does
+its own containment arithmetic.
 
 ### 2. Shell cancellation does not supervise the process tree
 
@@ -118,9 +122,9 @@ model cannot tell truncated output from complete output.
 
 30 seconds, not host-configurable, with no per-profile override.
 
-Gaps 2–5 belong to complete local process-tree supervision. Gap 1 belongs to
-canonical path enforcement. Neither should be addressed by introducing a
-parallel execution backend or a second path-policy implementation.
+Gap 1 is closed. Gaps 2–5 remain and belong together to complete local
+process-tree supervision; they should not be addressed by introducing a
+parallel execution backend beside the current one.
 
 ## What Would Change These Guarantees
 

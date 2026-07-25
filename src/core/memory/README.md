@@ -41,6 +41,13 @@ guidance.
   trace-triggered maintenance scheduling, locking, and lifecycle events.
 - `note-service.ts`: `MemoryNoteService` owns note list/read/search/edit
   behavior. Tool adapters should call this service, not duplicate file logic.
+- `path-utils.ts`: `MemoryPathUtils` owns memory-root path resolution. It
+  delegates containment to `WorkspacePathPolicy` — the same canonical policy
+  the coding-files toolkit uses — so an in-root symlink cannot redirect a read,
+  listing, or search outside the memory root. This module owns the memory-
+  specific error vocabulary, not a second containment implementation. Resolved
+  paths are canonical, so anything relativizing against the root must use
+  `MemoryPathUtils.canonicalRoot(...)` rather than the configured root.
 - `maintainer-tools.ts`: tools used by maintainer mode.
 - `visibility.ts`: `MemoryVisibilityService` owns host-facing status and note
   visibility views.

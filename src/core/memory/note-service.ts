@@ -15,22 +15,25 @@ export class MemoryNoteService {
   constructor(private readonly memoryRoot: string) {}
 
   async list(input: ListMemoryNotesInput = {}): Promise<string[]> {
-    const targetPath = this.resolvePath(input.path ?? '.');
+    const targetPath = await this.resolvePath(input.path ?? '.');
     if (!await MemoryPathUtils.pathExists(targetPath)) {
       return [];
     }
 
+    // Resolved paths are canonical, so listings must be relativized against the
+    // canonical root rather than the configured one.
+    const canonicalRoot = await MemoryPathUtils.canonicalRoot(this.resolveRoot());
     const info = await stat(targetPath);
     if (info.isFile()) {
-      return [MemoryPathUtils.toMemoryRelativePath(this.resolveRoot(), targetPath)];
+      return [MemoryPathUtils.toMemoryRelativePath(canonicalRoot, targetPath)];
     }
 
     const notes = await this.listMarkdownNotes(targetPath);
-    return notes.map((path) => MemoryPathUtils.toMemoryRelativePath(this.resolveRoot(), path)).sort();
+    return notes.map((path) => MemoryPathUtils.toMemoryRelativePath(canonicalRoot, path)).sort();
   }
 
   async read(input: ReadMemoryNoteInput): Promise<string> {
-    const targetPath = this.resolvePath(input.path);
+    const targetPath = await this.resolvePath(input.path);
     try {
       return MemoryNoteService.pageText(await readFile(targetPath, 'utf8'), input.offset, input.maxLines);
     } catch (error) {
@@ -42,7 +45,7 @@ export class MemoryNoteService {
   }
 
   async search(input: SearchMemoryNotesInput): Promise<string> {
-    const targetPath = this.resolvePath(input.path ?? '.');
+    const targetPath = await this.resolvePath(input.path ?? '.');
     if (!await MemoryPathUtils.pathExists(targetPath)) {
       return 'No matches found.';
     }
@@ -60,8 +63,8 @@ export class MemoryNoteService {
     });
   }
 
-  private resolvePath(path: string): string {
-    const result = MemoryPathUtils.resolveMemoryPath(this.resolveRoot(), path);
+  private async resolvePath(path: string): Promise<string> {
+    const result = await MemoryPathUtils.resolveMemoryPath(this.resolveRoot(), path);
     if (!result.ok) {
       throw new Error(result.error);
     }
@@ -91,7 +94,9 @@ export class MemoryNoteService {
   }
 
   private async searchWithCli(targetPath: string, query: string, maxResults: number): Promise<string> {
-    const memoryRoot = this.resolveRoot();
+    // The search runs from the canonical root so its cwd and the relative
+    // target it is given agree with the canonical resolved path.
+    const memoryRoot = await MemoryPathUtils.canonicalRoot(this.resolveRoot());
     const relativeTarget = MemoryPathUtils.toMemoryRelativePath(memoryRoot, targetPath);
     const normalizedTarget = relativeTarget === '.' ? '.' : relativeTarget;
 
