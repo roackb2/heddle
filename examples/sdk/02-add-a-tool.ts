@@ -11,6 +11,9 @@ import { runQuickstartConversationCli, type ToolDefinition } from '../../src/ind
 const currentTimeTool: ToolDefinition = {
   name: 'current_time',
   description: 'Return the current time as an ISO-8601 timestamp.',
+  // Separate reads do not share mutable state, so the host can safely opt this
+  // tool into bounded overlap. Tools without this declaration remain serial.
+  concurrency: 'parallel-safe',
   parameters: {
     type: 'object',
     properties: {},
