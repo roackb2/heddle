@@ -5,6 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProviderCredentialRepository } from '@/core/auth/index.js';
 import { ArtifactService } from '@/core/artifacts/index.js';
 import { EngineConversationTurnService } from '@/core/chat/engine/turns/service.js';
+import { FileConversationSessionService } from '@/core/chat/engine/sessions/service.js';
+import {
+  ChatSessionLeases,
+  SESSION_LEASE_REFRESH_INTERVAL_MS,
+  SESSION_LEASE_STALE_AFTER_MS,
+} from '@/core/chat/engine/sessions/leases/index.js';
 import { ChatSessionRecords } from '@/core/chat/engine/sessions/records/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
 import { readStoredChatSession } from '@/__tests__/helpers/chat-session-repository.js';
@@ -491,6 +497,95 @@ describe('conversation turn lifecycle', () => {
     );
     expect(persisted?.lease).toBeUndefined();
     expect(persisted?.turns).toEqual([]);
+  });
+
+  it('renews the fenced lease while a direct engine turn exceeds the stale window', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-03T00:00:00.000Z'));
+    const storage = await createConversationTurnStorage();
+    let finishLoop: (() => void) | undefined;
+    let markLoopStarted: (() => void) | undefined;
+    const loopStarted = new Promise<void>((resolve) => {
+      markLoopStarted = resolve;
+    });
+    const originalRefreshLease = FileConversationSessionService.prototype.refreshLease;
+    const refreshCompletions: Array<ReturnType<typeof originalRefreshLease>> = [];
+    const refreshSpy = vi
+      .spyOn(FileConversationSessionService.prototype, 'refreshLease')
+      .mockImplementation(function (
+        this: FileConversationSessionService,
+        ...args: Parameters<typeof originalRefreshLease>
+      ) {
+        const completion = originalRefreshLease.apply(this, args);
+        refreshCompletions.push(completion);
+        return completion;
+      });
+    vi.spyOn(agentLoopModule.AgentLoopRuntimeService, 'run').mockImplementation(async () => {
+      markLoopStarted?.();
+      return await new Promise((resolve) => {
+        finishLoop = () => resolve(createLoopResult({
+          workspaceRoot: storage.workspaceRoot,
+          prompt: 'Complete a long turn.',
+          summary: 'Long turn completed.',
+        }) as never);
+      });
+    });
+
+    const turn = EngineConversationTurnService.run({
+      workspaceRoot: storage.workspaceRoot,
+      stateRoot: storage.stateRoot,
+      traceDir: join(storage.stateRoot, 'traces'),
+      sessionStoragePath: storage.sessionStoragePath,
+      sessionId: storage.sessionId,
+      prompt: 'Complete a long turn.',
+      apiKey: 'explicit-key',
+      memoryMaintenanceMode: 'none',
+      artifactRoot: storage.artifactRoot,
+      artifactsEnabled: true,
+    });
+
+    try {
+      await loopStarted;
+      const initiallyLeased = await readStoredChatSession(
+        new FileChatSessionRepository({ sessionStoragePath: storage.sessionStoragePath }),
+        storage.sessionId,
+      );
+      expect(initiallyLeased?.lease).toBeDefined();
+
+      const refreshCount = (
+        SESSION_LEASE_STALE_AFTER_MS + SESSION_LEASE_REFRESH_INTERVAL_MS
+      ) / SESSION_LEASE_REFRESH_INTERVAL_MS;
+      for (let refreshIndex = 0; refreshIndex < refreshCount; refreshIndex += 1) {
+        await vi.advanceTimersByTimeAsync(SESSION_LEASE_REFRESH_INTERVAL_MS);
+        expect(refreshSpy).toHaveBeenCalledTimes(refreshIndex + 1);
+        await refreshCompletions[refreshIndex];
+        await Promise.resolve();
+      }
+
+      const renewed = await readStoredChatSession(
+        new FileChatSessionRepository({ sessionStoragePath: storage.sessionStoragePath }),
+        storage.sessionId,
+      );
+      expect(renewed && ChatSessionLeases.isFresh(renewed)).toBe(true);
+      expect(renewed?.lease?.lastSeenAt).not.toBe(initiallyLeased?.lease?.lastSeenAt);
+
+      finishLoop?.();
+      await expect(turn).resolves.toEqual(expect.objectContaining({
+        outcome: 'done',
+        summary: 'Long turn completed.',
+      }));
+
+      const persisted = await readStoredChatSession(
+        new FileChatSessionRepository({ sessionStoragePath: storage.sessionStoragePath }),
+        storage.sessionId,
+      );
+      expect(persisted?.lease).toBeUndefined();
+      expect(persisted?.turns).toHaveLength(1);
+    } finally {
+      finishLoop?.();
+      await turn.catch(() => undefined);
+      vi.useRealTimers();
+    }
   });
 });
 

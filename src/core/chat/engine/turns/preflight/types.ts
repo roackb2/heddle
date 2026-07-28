@@ -28,6 +28,11 @@ export type PrepareChatSessionTurnArgs = {
   toolNames: string[];
   summarizer: ConversationCompactionOptions['summarizer'];
   leaseOwner: ChatSessionLeaseOwner;
+  /**
+   * Turn-internal lifecycle hook. The engine starts wall-clock renewal as soon
+   * as preflight has acquired the fenced claim, before compaction can block.
+   */
+  onLeaseAcquired?: (claim: ChatSessionLeaseClaim) => void;
   host: Pick<ChatTurnHostPort, 'onCompactionStatus'>;
   agentSnapshot?: CustomAgentExecutionSnapshot;
 };

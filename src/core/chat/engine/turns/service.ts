@@ -19,6 +19,7 @@ import { ConversationTurnContextBuilder } from './context/index.js';
 import { ConversationTurnPreflightService } from './preflight/index.js';
 import { ConversationTurnMemoryMaintenance } from './memory/index.js';
 import type { TurnMemoryMaintenanceRuntimeInput } from './memory/index.js';
+import { ConversationTurnLeaseHeartbeatService } from './lease/index.js';
 import { ConversationTurnPersistenceService } from './persistence/index.js';
 import type { ChatSessionLeaseOwner } from '@/core/chat/engine/sessions/leases/index.js';
 import { FileChatSessionRepository } from '@/core/chat/engine/sessions/repository/index.js';
@@ -102,6 +103,13 @@ export class EngineConversationTurnService implements ConversationTurnService {
       source,
       onEvent: host.onEvent,
     };
+    const leaseHeartbeat = new ConversationTurnLeaseHeartbeatService({
+      sessionService,
+      sessionId: session.id,
+    });
+    const abortSignal = args.abortSignal
+      ? AbortSignal.any([args.abortSignal, leaseHeartbeat.signal])
+      : leaseHeartbeat.signal;
 
     try {
       const preflight = await ConversationTurnPreflightService.prepare({
@@ -114,11 +122,13 @@ export class EngineConversationTurnService implements ConversationTurnService {
         toolNames,
         summarizer: runtime.summarizer,
         leaseOwner,
+        onLeaseAcquired: (claim) => leaseHeartbeat.start(claim),
         host,
       });
       if (!preflight.ok) {
         throw new Error(preflight.message);
       }
+      leaseHeartbeat.throwIfFailed();
 
       const result = await AgentLoopRuntimeService.run({
         ...agentLoopInput,
@@ -135,6 +145,8 @@ export class EngineConversationTurnService implements ConversationTurnService {
         maxToolConcurrency: args.maxToolConcurrency,
         history: preflight.compacted.history,
         systemContext: runtime.systemContext,
+        abortSignal,
+        shouldStop: () => leaseHeartbeat.signal.aborted || args.shouldStop?.() === true,
         onEvent: host.onEvent,
         approveToolCall: host.approveToolCall,
         approvalPolicies: ToolApprovalProfileService.compile({
@@ -146,7 +158,11 @@ export class EngineConversationTurnService implements ConversationTurnService {
             : undefined,
           basePolicies: args.approvalPolicies,
         }),
+      }).catch((error: unknown) => {
+        leaseHeartbeat.throwIfFailed();
+        throw error;
       });
+      leaseHeartbeat.throwIfFailed();
       const maintenanceMode = args.memoryMaintenanceMode ?? 'background';
       const resultForPersistence =
         maintenanceMode === 'inline'
@@ -155,6 +171,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
               result,
             })
           : result;
+      leaseHeartbeat.throwIfFailed();
 
       const persisted = await ConversationTurnPersistenceService.persistCompleted({
         ...persistenceInput,
@@ -170,6 +187,8 @@ export class EngineConversationTurnService implements ConversationTurnService {
         agentSnapshot,
         leaseClaim: preflight.leaseClaim,
       });
+      await leaseHeartbeat.stop();
+      leaseHeartbeat.throwIfFailed();
 
       if (maintenanceMode === 'background') {
         ConversationTurnMemoryMaintenance.scheduleBackground({
@@ -197,6 +216,7 @@ export class EngineConversationTurnService implements ConversationTurnService {
         toolResults: EngineConversationTurnService.summarizeToolResults(resultForPersistence.trace),
       };
     } finally {
+      await leaseHeartbeat.stop();
       await EngineConversationTurnService.clearLeaseFromStorage(sessionService, session.id, leaseOwner);
     }
   }
