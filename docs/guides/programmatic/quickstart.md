@@ -184,7 +184,10 @@ await runQuickstartConversationCli({
 Pass `maxSteps` only when the host intentionally wants a hard turn budget.
 Use `maxToolConcurrency` to bound explicitly parallel-safe tool calls. It
 defaults to `4`; set it to `1` to disable overlapping tool execution. Tools
-remain serial unless both the adapter and the tool opt in.
+remain serial unless both the adapter and the tool opt in by declaring
+`concurrency: 'parallel-safe'` on the `ToolDefinition`. The adapter capability
+only means that a model response may contain multiple calls; it cannot establish
+that arbitrary host-owned tool implementations are safe to overlap.
 
 Use `createConversationEngine` when you are ready to own the host lifecycle,
 commands, approvals, or custom rendering:

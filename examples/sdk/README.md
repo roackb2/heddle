@@ -78,6 +78,13 @@ yarn example:sdk:add-tool
 owns the tool's domain behavior; Heddle owns tool registration, invocation,
 approval integration, and trace visibility.
 
+Tools are serial by default. The example marks `current_time` as
+`concurrency: 'parallel-safe'` because separate invocations do not share mutable
+state or require ordering. Only make that declaration when the same is true for
+your tool. An adapter's `parallelToolCalls` capability means the model can
+request multiple calls in one response; it does not prove that host-owned tool
+implementations are safe to execute concurrently.
+
 ### 03 Add an MCP Server — external capabilities
 
 ```bash
