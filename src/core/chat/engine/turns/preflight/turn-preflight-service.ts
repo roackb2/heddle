@@ -36,6 +36,7 @@ export class ConversationTurnPreflightService {
       throw new Error(`Chat session not found: ${args.sessionId}`);
     }
     const leaseClaim = ChatSessionLeases.claim(leasedSession);
+    args.onLeaseAcquired?.(leaseClaim);
     const initialHistory = leasedSession?.history ?? args.fallbackHistory;
     const compactionRuntime: PreflightTurnCompactionRuntime = args;
     const compactionRequest: PreflightTurnCompactionRequest = {

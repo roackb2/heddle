@@ -582,9 +582,6 @@ export class ControlPlaneChatSessionsController {
         },
         onSettled: () => this.startNextQueuedPrompt(args),
       }),
-      onHeartbeat: async () => {
-        await this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
-      },
       execute: async (run: ConversationRunContext) => {
         const result = process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT === '1'
           ? await ControlPlaneChatSessionBrowserIntegrationFake.run({
@@ -621,9 +618,6 @@ export class ControlPlaneChatSessionsController {
       ...this.runStreams.createLifecycle(args, {
         onSettled: () => this.startNextQueuedPrompt(args),
       }),
-      onHeartbeat: async () => {
-        await this.createEngine(args).sessions.refreshLease(args.sessionId, args.leaseOwner);
-      },
       execute: async (run: ConversationRunContext) => {
         if (process.env.HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT === '1') {
           const session = await this.createEngine(args).sessions.require(args.sessionId);

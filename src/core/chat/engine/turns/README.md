@@ -10,11 +10,13 @@ the class that owns that phase.
 
 ## Folder Roles
 
-- `service.ts`: main submit, continue, and lease cleanup service.
+- `service.ts`: main submit, continue, and lease lifecycle service.
 - `runtime/`: resolves model, provider, credentials, memory path, system
   context, and LLM adapter.
 - `context/`: loads the session and builds the concrete turn context.
 - `preflight/`: owns lease acquisition and pre-run compaction persistence.
+- `lease/`: owns wall-clock renewal for the fenced lease held by an in-flight
+  turn. Engine turns renew themselves; hosts must not duplicate that heartbeat.
 - `persistence/`: builds turn artifacts and writes completed turns back to
   session storage.
 - `memory/`: runs inline/background memory maintenance and records its trace
