@@ -165,6 +165,55 @@ describe('tool policy envelope', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it('executes a rootless domain-state mutation with host-owned write scope', async () => {
+    const messages: string[] = [];
+    const execute = vi.fn(async (input: unknown) => {
+      messages.push((input as { content: string }).content);
+      return { ok: true, output: 'saved' };
+    });
+    const registry = new ToolRegistry([tool({
+      execute,
+      hostPolicy: {
+        authority: {
+          kind: 'host-tool',
+          id: 'test:messages',
+        },
+        transport: {
+          kind: 'in-process',
+          network: false,
+        },
+        environment: 'local',
+        operations: ['write'],
+        writeScope: {
+          kind: 'domain',
+          resources: ['sqlite:messages'],
+        },
+      },
+    })]);
+
+    await expect(ToolExecutionService.execute(registry, {
+      id: 'call-domain-write',
+      tool: 'test_tool',
+      input: {
+        content: 'hello',
+        policy: {
+          operations: ['write'],
+          intent: 'post a shared message',
+          targetRoots: [],
+          expectedEffects: ['append one message row'],
+          environment: 'local',
+          confidence: 'high',
+        },
+      },
+    })).resolves.toEqual({ ok: true, output: 'saved' });
+
+    expect(messages).toEqual(['hello']);
+    expect(execute).toHaveBeenCalledWith(
+      { content: 'hello' },
+      { signal: expect.any(AbortSignal) },
+    );
+  });
+
   it('accepts a mutating envelope when writeRoots are declared without targetRoots', async () => {
     const execute = vi.fn(async () => ({ ok: true, output: 'ok' }));
     const registry = new ToolRegistry([tool({ execute })]);

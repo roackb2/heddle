@@ -13,7 +13,7 @@ const POLICY_ENVELOPE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   description:
-    'Optional agent-declared intent envelope for approval/autopilot policy. Use this to honestly declare the purpose, operation categories, expected impact surface, target roots, proposed environment, and confidence for this tool call. The harness treats this as a claim, reconciles it with immutable host authority, transport, environment, and tenant facts, then decides whether to allow, request approval, or deny the action.',
+    'Optional agent-declared intent envelope for approval/autopilot policy. Use this to honestly declare the purpose, operation categories, expected impact surface, target roots, proposed environment, and confidence for this tool call. The harness treats this as a claim, reconciles it with immutable host authority, transport, environment, tenant, and write-scope facts, then decides whether to allow, request approval, or deny the action.',
   properties: {
     operations: {
       type: 'array',
@@ -31,7 +31,7 @@ const POLICY_ENVELOPE_SCHEMA = {
     targetRoots: {
       type: 'array',
       items: { type: 'string' },
-      description: `Project/workspace roots the agent expects this call to touch. May be empty only for read-only or state-only calls that touch no project root, such as planning tools. Calls that write, delete, move, execute, or run git must declare at least one target or write root. ${ROOT_DESCRIPTION}`,
+      description: `Project/workspace roots the agent expects this call to touch. Leave empty for state-only calls that touch no project root. Mutating filesystem calls must declare at least one target or write root. When an in-process host tool mutates domain state such as a database or queue, leave filesystem roots empty rather than inventing a path; the tool owner supplies its authoritative scope. ${ROOT_DESCRIPTION}`,
     },
     readRoots: {
       type: 'array',

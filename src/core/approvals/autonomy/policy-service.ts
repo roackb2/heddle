@@ -4,6 +4,7 @@ import {
   TOOL_POLICY_MUTATING_OPERATIONS,
   ToolPolicyResolutionService,
   type ToolPolicyEnvelope,
+  type ToolPolicyHostWriteScope,
   type ToolPolicyOperation,
   type ToolPolicyReconciliation,
 } from '@/core/tools/index.js';
@@ -141,12 +142,18 @@ export class AutonomyPolicyService {
       fallback: AutonomyPolicyService.inferOperations(args.context),
     });
     const environment = args.policy.hostOwned?.environment ?? args.envelope?.environment ?? 'unknown';
+    const hostWriteScope = args.policy.hostOwned?.writeScope;
     const claimedReadRoots = AutonomyPolicyService.resolveEnvelopeRoots({
-      roots: args.envelope?.readRoots ?? args.envelope?.targetRoots ?? [],
+      roots: operations.includes('read')
+        ? args.envelope?.readRoots ?? args.envelope?.targetRoots ?? []
+        : [],
       workspaceRoot: args.workspaceRoot,
     });
     const claimedWriteRoots = AutonomyPolicyService.resolveEnvelopeRoots({
-      roots: AutonomyPolicyService.resolveDeclaredWriteRoots(args.envelope),
+      roots: AutonomyPolicyService.resolveDeclaredWriteRoots({
+        envelope: args.envelope,
+        hostWriteScope,
+      }),
       workspaceRoot: args.workspaceRoot,
     });
     const rootsToEvaluate = [...claimedReadRoots, ...claimedWriteRoots, ...resolvedKnownTargets];
@@ -175,6 +182,7 @@ export class AutonomyPolicyService {
       cwd: args.workspaceRoot,
       claimedReadRoots,
       claimedWriteRoots,
+      ...(hostWriteScope ? { hostWriteScope } : {}),
       resolvedKnownTargets,
       rootDecisions,
       hardDenyReasons,
@@ -211,17 +219,24 @@ export class AutonomyPolicyService {
     return context.tool.requiresApproval ? ['unknown'] : ['read'];
   }
 
-  private static resolveDeclaredWriteRoots(envelope: ToolPolicyEnvelope | undefined): string[] {
-    if (!envelope) {
+  private static resolveDeclaredWriteRoots(args: {
+    envelope: ToolPolicyEnvelope | undefined;
+    hostWriteScope: ToolPolicyHostWriteScope | undefined;
+  }): string[] {
+    if (args.hostWriteScope?.kind === 'filesystem') {
+      return [...args.hostWriteScope.roots];
+    }
+
+    if (args.hostWriteScope?.kind === 'domain' || !args.envelope) {
       return [];
     }
 
-    if (envelope.writeRoots) {
-      return envelope.writeRoots;
+    if (args.envelope.writeRoots) {
+      return args.envelope.writeRoots;
     }
 
-    return envelope.operations.some((operation) => TOOL_POLICY_MUTATING_OPERATIONS.has(operation))
-      ? envelope.targetRoots
+    return args.envelope.operations.some((operation) => TOOL_POLICY_MUTATING_OPERATIONS.has(operation))
+      ? args.envelope.targetRoots
       : [];
   }
 

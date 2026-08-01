@@ -2,6 +2,7 @@ import type { ToolCall } from '@/core/types.js';
 import type {
   ToolPolicyEnvelope,
   ToolPolicyEnvironment,
+  ToolPolicyHostWriteScope,
   ToolPolicyOperation,
   ToolPolicyReconciliation,
 } from '@/core/tools/index.js';
@@ -92,6 +93,8 @@ export type ToolPolicyFacts = {
   cwd?: string;
   claimedReadRoots: string[];
   claimedWriteRoots: string[];
+  /** Authoritative non-model write scope declared by the tool owner. */
+  hostWriteScope?: ToolPolicyHostWriteScope;
   resolvedKnownTargets: string[];
   rootDecisions: ToolPolicyRootDecision[];
   hardDenyReasons: string[];

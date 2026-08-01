@@ -17,6 +17,7 @@ export type {
   ToolPolicyHostAuthority,
   ToolPolicyHostContext,
   ToolPolicyHostTransport,
+  ToolPolicyHostWriteScope,
   ToolPolicyEnvironment,
   ToolPolicyOperation,
   ToolPolicyReconciliation,
