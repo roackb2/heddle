@@ -2,10 +2,13 @@
 // Example: Heartbeat Scheduler
 //
 // Usage:
-//   OPENAI_API_KEY=sk-... yarn example:heartbeat-scheduler
+//   heddle auth login openai
+//   yarn example:heartbeat-scheduler
 //
 // Optional:
+//   OPENAI_API_KEY=sk-... yarn example:heartbeat-scheduler
 //   HEDDLE_EXAMPLE_MODEL=claude-3-5-haiku-latest ANTHROPIC_API_KEY=sk-ant-... yarn example:heartbeat-scheduler
+//   HEDDLE_EXAMPLE_PREFER_API_KEY=true OPENAI_API_KEY=sk-... yarn example:heartbeat-scheduler
 //
 // This demonstrates Heddle's local-first scheduler API. It creates or updates
 // one durable heartbeat task under .heddle/examples/heartbeat-scheduler/, runs
@@ -13,8 +16,6 @@
 // ---------------------------------------------------------------------------
 
 import { join } from 'node:path';
-import { LlmAdapterService } from '../src/core/llm/index.js';
-import { RuntimeCredentialService } from '../src/core/runtime/credentials/index.js';
 import {
   FileHeartbeatTaskService,
   HeartbeatSchedulerService,
@@ -29,15 +30,6 @@ const TASK_ID = 'demo-maintenance';
 
 async function main() {
   const model = process.env.HEDDLE_EXAMPLE_MODEL ?? process.env.OPENAI_MODEL ?? DEFAULT_EXAMPLE_MODEL;
-  const provider = LlmAdapterService.inferProvider(model);
-  const apiKey = RuntimeCredentialService.resolveProviderApiKey(provider);
-  if (!apiKey) {
-    throw new Error(
-      `Missing API key for ${provider}. ` +
-      'Set OPENAI_API_KEY for OpenAI models or ANTHROPIC_API_KEY for Claude models before running this example.',
-    );
-  }
-
   const store = new FileHeartbeatTaskService({ dir: STORE_DIR });
   await ensureDemoTask(store, model);
 
@@ -45,12 +37,16 @@ async function main() {
     store,
     now: () => new Date(),
     runtime: {
-      apiKey,
-      apiKeyProvider: 'explicit',
+      model,
+      stateDir: '.heddle',
+      preferApiKey: process.env.HEDDLE_EXAMPLE_PREFER_API_KEY === 'true',
       tools: [],
       includeDefaultTools: false,
       workspaceRoot: process.cwd(),
     },
+    runner: async (task, _checkpoint, context) => context.runAgent({
+      task: `${task.task}\n\nThis instruction was added by a custom host runner without handling credentials.`,
+    }),
     onEvent: (event) => {
       const line = formatSchedulerEvent(event);
       if (line) {

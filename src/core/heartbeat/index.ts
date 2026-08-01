@@ -10,6 +10,8 @@ export type {
   HeartbeatSchedulerEvent,
   HeartbeatSchedulerHandle,
   HeartbeatTaskRunner,
+  HeartbeatTaskRunnerAgentOptions,
+  HeartbeatTaskRunnerContext,
   HeartbeatTaskRunnerRuntimeOptions,
   RunDueHeartbeatTasksOptions,
   RunDueHeartbeatTasksResult,

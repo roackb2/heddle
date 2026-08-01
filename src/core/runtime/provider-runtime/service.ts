@@ -39,7 +39,7 @@ export class LlmProviderRuntimeService {
   private static credentialRuntime(input: LlmProviderRuntimeInput): ApiKeyRuntime {
     return {
       apiKey: input.apiKey,
-      apiKeyProvider: input.apiKey ? 'explicit' : undefined,
+      apiKeyProvider: input.apiKeyProvider ?? (input.apiKey ? 'explicit' : undefined),
       credential: input.credential,
       credentialStorePath: input.credentialStorePath,
       preferApiKey: input.preferApiKey,

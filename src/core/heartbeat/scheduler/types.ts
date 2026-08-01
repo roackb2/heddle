@@ -55,7 +55,45 @@ export type HeartbeatSchedulerEvent =
 export type HeartbeatTaskRunner = (
   task: HeartbeatTask,
   checkpoint: AgentLoopState | AgentLoopCheckpoint | undefined,
+  context: HeartbeatTaskRunnerContext,
 ) => Promise<AgentHeartbeatResult>;
+
+/**
+ * Per-run customization accepted by the framework-owned heartbeat agent path.
+ * Credential fields are intentionally absent: Heddle resolves and refreshes
+ * them inside the standard runtime boundary for every invocation.
+ */
+export type HeartbeatTaskRunnerAgentOptions = Partial<Pick<
+  RunAgentHeartbeatOptions,
+  | 'task'
+  | 'model'
+  | 'reasoningEffort'
+  | 'maxSteps'
+  | 'maxToolConcurrency'
+  | 'tools'
+  | 'extraTools'
+  | 'includeDefaultTools'
+  | 'includePlanTool'
+  | 'searchIgnoreDirs'
+  | 'systemContext'
+  | 'history'
+  | 'logger'
+  | 'onTraceEvent'
+  | 'shouldStop'
+  | 'abortSignal'
+>>;
+
+/**
+ * Framework-owned execution handoff for custom heartbeat runners.
+ *
+ * Hosts can add domain prompts and tools through `runAgent` without receiving
+ * API keys, OAuth tokens, account identifiers, or stored credential records.
+ * The context is valid only for the current task execution and must not be
+ * persisted.
+ */
+export type HeartbeatTaskRunnerContext = {
+  runAgent: (options?: HeartbeatTaskRunnerAgentOptions) => Promise<AgentHeartbeatResult>;
+};
 
 export type HeartbeatTaskRunnerRuntimeOptions = {
   workspaceRoot?: string;

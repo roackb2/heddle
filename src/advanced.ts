@@ -277,6 +277,8 @@ export type {
   HeartbeatSchedulerHandle,
   HeartbeatSchedulerEvent,
   HeartbeatTaskRunner,
+  HeartbeatTaskRunnerAgentOptions,
+  HeartbeatTaskRunnerContext,
   HeartbeatTaskRunnerRuntimeOptions,
   RunDueHeartbeatTasksOptions,
   RunDueHeartbeatTasksResult,

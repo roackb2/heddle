@@ -10,7 +10,6 @@ import { randomUUID } from 'node:crypto';
 import dayjs from 'dayjs';
 import { ToolApprovalPolicies } from '@/core/approvals/index.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
-import { RuntimeCredentialService } from '@/core/runtime/credentials/index.js';
 import type { AgentLoopCheckpoint, AgentLoopState } from '@/core/runtime/loop/index.js';
 import { HeartbeatRunnerAgent } from '../agent/index.js';
 import type { AgentHeartbeatResult, RunAgentHeartbeatOptions } from '../agent/index.js';
@@ -19,6 +18,7 @@ import type { HeartbeatTask, HeartbeatTaskExecution, HeartbeatTaskRunRecord } fr
 import type {
   HeartbeatSchedulerEvent,
   HeartbeatTaskRunner,
+  HeartbeatTaskRunnerAgentOptions,
   HeartbeatTaskRunnerRuntimeOptions,
   RunDueHeartbeatTasksOptions,
   RunDueHeartbeatTasksResult,
@@ -137,9 +137,13 @@ export class HeartbeatTaskRunnerService {
     runtime?: HeartbeatTaskRunnerRuntimeOptions;
     onEvent?: (event: HeartbeatSchedulerEvent) => void;
   }): Promise<AgentHeartbeatResult> {
-    return args.runner ?
-      await args.runner(args.task, args.checkpoint)
-    : await HeartbeatRunnerAgent.run(HeartbeatTaskRunnerService.resolveRunnerAgentOptions(args));
+    const runAgent = async (options?: HeartbeatTaskRunnerAgentOptions) => await HeartbeatRunnerAgent.run(
+      HeartbeatTaskRunnerService.resolveRunnerAgentOptions({ ...args, options }),
+    );
+
+    return args.runner
+      ? await args.runner(args.task, args.checkpoint, { runAgent })
+      : await runAgent();
   }
 
   private static resolveRunnerAgentOptions(args: {
@@ -148,21 +152,15 @@ export class HeartbeatTaskRunnerService {
     runAt: Date;
     runtime?: HeartbeatTaskRunnerRuntimeOptions;
     onEvent?: (event: HeartbeatSchedulerEvent) => void;
+    options?: HeartbeatTaskRunnerAgentOptions;
   }): RunAgentHeartbeatOptions {
-    const model = args.task.runtime?.model ?? args.runtime?.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
-    const credentialOptions = {
-      apiKey: args.runtime?.apiKey,
-      apiKeyProvider: args.runtime?.apiKeyProvider,
-      preferApiKey: args.runtime?.preferApiKey,
-    };
-    if (!RuntimeCredentialService.hasCredentialForModel(model, credentialOptions)) {
-      throw new Error(RuntimeCredentialService.formatMissingCredentialMessage(model));
-    }
+    const model = args.options?.model ?? args.task.runtime?.model ?? args.runtime?.model ?? process.env.OPENAI_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_OPENAI_MODEL;
 
     return {
       ...args.runtime,
       ...args.task.runtime,
-      task: args.task.task,
+      ...args.options,
+      task: args.options?.task ?? args.task.task,
       checkpoint: args.checkpoint,
       runContext: {
         currentDateTime: dayjs(args.runAt).toISOString(),
@@ -173,7 +171,6 @@ export class HeartbeatTaskRunnerService {
         previousRunId: args.task.state?.runId,
       },
       model,
-      apiKey: RuntimeCredentialService.resolveApiKeyForModel(model, credentialOptions),
       workspaceRoot: args.runtime?.workspaceRoot ?? args.task.runtime?.workspaceRoot,
       stateDir: args.runtime?.stateDir ?? args.task.runtime?.stateDir,
       memoryDir: args.runtime?.memoryDir ?? args.task.runtime?.memoryDir,

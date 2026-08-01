@@ -133,6 +133,12 @@ export class RuntimeCredentialService {
 
     const oauthCredential = this.resolveOAuthCredentialForModel(model, { storePath: runtime?.credentialStorePath });
     if (oauthCredential) {
+      if (oauthCredential.provider !== 'openai') {
+        throw new Error(
+          `Stored OAuth credentials are not supported for ${oauthCredential.provider} model ${model}. `
+          + RuntimeCredentialService.formatMissingCredentialMessage(model),
+        );
+      }
       return {
         provider,
         credential: oauthCredential,
