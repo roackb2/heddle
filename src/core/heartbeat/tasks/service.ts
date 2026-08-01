@@ -1,11 +1,14 @@
 import { resolve } from 'node:path';
+import { Mutex } from 'async-mutex';
 import dayjs from 'dayjs';
 import omit from 'lodash/omit.js';
 import orderBy from 'lodash/orderBy.js';
 import { FileHeartbeatTaskRepository } from './repository.js';
+import { HeartbeatTaskStateProjector } from './task-state.js';
 import type {
   FileHeartbeatTaskRepositoryOptions,
   HeartbeatTask,
+  HeartbeatTaskExecution,
   HeartbeatTaskState,
   HeartbeatTaskRunRecord,
   HeartbeatTaskRunRecordEntry,
@@ -56,11 +59,18 @@ export type UpdateHeartbeatTaskInput = {
  * service, not the file repository.
  */
 export class FileHeartbeatTaskService implements HeartbeatTaskStore {
+  private static readonly mutationMutexes = new Map<string, Mutex>();
+  private static readonly activeExecutions = new Set<string>();
+
+  private readonly heartbeatRoot: string;
+  private readonly mutationMutex: Mutex;
   private readonly repository: FileHeartbeatTaskRepository;
 
   constructor(options: FileHeartbeatTaskServiceOptions) {
+    this.heartbeatRoot = FileHeartbeatTaskService.resolveHeartbeatRoot(options);
+    this.mutationMutex = FileHeartbeatTaskService.resolveMutationMutex(this.heartbeatRoot);
     this.repository = new FileHeartbeatTaskRepository({
-      dir: FileHeartbeatTaskService.resolveHeartbeatRoot(options),
+      dir: this.heartbeatRoot,
     });
   }
 
@@ -69,7 +79,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
   }
 
   async saveTask(task: HeartbeatTask) {
-    await this.repository.saveTask(task);
+    await this.mutationMutex.runExclusive(async () => await this.repository.saveTask(task));
   }
 
   async loadCheckpoint(task: HeartbeatTask) {
@@ -77,11 +87,108 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
   }
 
   async saveCheckpoint(task: HeartbeatTask, checkpoint: Parameters<HeartbeatTaskStore['saveCheckpoint']>[1]) {
-    await this.repository.saveCheckpoint(task, checkpoint);
+    await this.mutationMutex.runExclusive(async () => await this.repository.saveCheckpoint(task, checkpoint));
   }
 
   async saveRunRecord(record: Parameters<NonNullable<HeartbeatTaskStore['saveRunRecord']>>[0]) {
-    await this.repository.saveRunRecord?.(record);
+    await this.mutationMutex.runExclusive(async () => await this.repository.saveRunRecord(record));
+  }
+
+  /**
+   * Atomically claims a non-running task for one execution attempt.
+   *
+   * The file adapter serializes claims within one Node.js process. Deployments
+   * with multiple processes or replicas must provide a remote store whose
+   * implementation uses database compare-and-swap or leases.
+   */
+  async claimTaskExecution(input: Parameters<HeartbeatTaskStore['claimTaskExecution']>[0]) {
+    return await this.mutationMutex.runExclusive(async () => {
+      const task = await this.findTask(input.taskId);
+      if (!task) {
+        return { status: 'not-found' } as const;
+      }
+      if (!task.enabled) {
+        return { status: 'disabled' } as const;
+      }
+      if (task.state?.status === 'running') {
+        return { status: 'busy' } as const;
+      }
+
+      const runningTask = HeartbeatTaskStateProjector.markRunning({
+        task,
+        now: input.claimedAt,
+        loadedCheckpoint: input.loadedCheckpoint,
+        execution: input.execution,
+      });
+      await this.repository.saveTask(runningTask);
+      FileHeartbeatTaskService.activeExecutions.add(this.executionKey(input.execution));
+      return { status: 'claimed', task: runningTask } as const;
+    });
+  }
+
+  /**
+   * Persists a successful attempt only while its execution fencing token still
+   * owns the task. A recovered retry therefore cannot be overwritten by a late
+   * result from the interrupted execution.
+   */
+  async completeTaskExecution(input: Parameters<HeartbeatTaskStore['completeTaskExecution']>[0]) {
+    return await this.mutationMutex.runExclusive(async () => {
+      const currentTask = await this.findTask(input.task.id);
+      if (!FileHeartbeatTaskService.executionMatches(currentTask, input.execution)) {
+        FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
+        return { status: 'claim-lost' } as const;
+      }
+
+      const record: HeartbeatTaskRunRecord = {
+        task: input.task,
+        result: input.result,
+        loadedCheckpoint: input.loadedCheckpoint,
+      };
+      await this.repository.saveCheckpoint(input.task, input.checkpoint);
+      await this.repository.saveTask(input.task);
+      await this.repository.saveRunRecord(record);
+      FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
+      return { status: 'saved', task: input.task, record } as const;
+    });
+  }
+
+  /** Persists a failed attempt only while its execution fencing token is current. */
+  async failTaskExecution(input: Parameters<HeartbeatTaskStore['failTaskExecution']>[0]) {
+    return await this.mutationMutex.runExclusive(async () => {
+      const currentTask = await this.findTask(input.task.id);
+      if (!FileHeartbeatTaskService.executionMatches(currentTask, input.execution)) {
+        FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
+        return { status: 'claim-lost' } as const;
+      }
+
+      await this.repository.saveTask(input.task);
+      FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
+      return { status: 'saved', task: input.task } as const;
+    });
+  }
+
+  /**
+   * Makes executions owned by a prior single-host process generation retryable.
+   * Active executions claimed in this process are never recovered. Calling the
+   * method repeatedly is idempotent because recovered tasks are no longer
+   * `running` and no longer carry a current execution.
+   */
+  async recoverInterruptedTasks(input: Parameters<HeartbeatTaskStore['recoverInterruptedTasks']>[0]) {
+    return await this.mutationMutex.runExclusive(async () => {
+      const tasks = await this.repository.listTasks();
+      const recoverableTasks = tasks.filter((task) => this.isRecoverableTask(task, input.ownerId));
+
+      return await Promise.all(recoverableTasks.map(async (task) => {
+        const interruptedTask = task.state?.execution ? task : FileHeartbeatTaskService.withLegacyExecution(task);
+        const recovered = HeartbeatTaskStateProjector.afterRecovery({
+          task: interruptedTask,
+          now: input.recoveredAt,
+          reason: input.reason,
+        });
+        await this.repository.saveTask(recovered.task);
+        return recovered;
+      }));
+    });
   }
 
   async listRunRecords(options?: Parameters<NonNullable<HeartbeatTaskStore['listRunRecords']>>[0]) {
@@ -300,8 +407,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
   }
 
   async requireTask(taskId: string): Promise<HeartbeatTask> {
-    const tasks = await this.listTasks();
-    const task = tasks.find((candidate) => candidate.id === taskId);
+    const task = await this.findTask(taskId);
     if (!task) {
       throw new Error(`Heartbeat task not found: ${taskId}`);
     }
@@ -398,6 +504,58 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
     }
 
     return resolve(options.workspaceRoot, options.stateDir ?? '.heddle', 'heartbeat');
+  }
+
+  private async findTask(taskId: string): Promise<HeartbeatTask | undefined> {
+    return (await this.repository.listTasks()).find((candidate) => candidate.id === taskId);
+  }
+
+  private executionKey(execution: HeartbeatTaskExecution): string {
+    return `${this.heartbeatRoot}:${execution.executionId}`;
+  }
+
+  private isRecoverableTask(task: HeartbeatTask, currentOwnerId: string): boolean {
+    if (task.state?.status !== 'running') {
+      return false;
+    }
+
+    const execution = task.state.execution;
+    return !execution || (
+      execution.ownerId !== currentOwnerId
+      && !FileHeartbeatTaskService.activeExecutions.has(this.executionKey(execution))
+    );
+  }
+
+  private static executionMatches(task: HeartbeatTask | undefined, execution: HeartbeatTaskExecution): boolean {
+    return task?.state?.status === 'running'
+      && task.state.execution?.executionId === execution.executionId
+      && task.state.execution.ownerId === execution.ownerId;
+  }
+
+  private static resolveMutationMutex(heartbeatRoot: string): Mutex {
+    const existing = FileHeartbeatTaskService.mutationMutexes.get(heartbeatRoot);
+    if (existing) {
+      return existing;
+    }
+
+    const mutex = new Mutex();
+    FileHeartbeatTaskService.mutationMutexes.set(heartbeatRoot, mutex);
+    return mutex;
+  }
+
+  private static withLegacyExecution(task: HeartbeatTask): HeartbeatTask {
+    const claimedAt = task.state?.updatedAt ?? task.state?.runAt ?? dayjs(0).toISOString();
+    return {
+      ...task,
+      state: {
+        ...task.state,
+        execution: {
+          executionId: `legacy:${task.id}:${claimedAt}`,
+          ownerId: 'legacy-file-host',
+          claimedAt,
+        },
+      },
+    };
   }
 
   private static createTaskId(value: string, existingIds: string[]): string {

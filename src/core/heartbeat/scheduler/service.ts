@@ -5,6 +5,7 @@
  * not execute tasks directly; selected task execution is delegated to
  * `HeartbeatTaskRunnerService`.
  */
+import { randomUUID } from 'node:crypto';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore.js';
 import { FileHeartbeatTaskService, type HeartbeatTask, type HeartbeatTaskRunRecord } from '../tasks/index.js';
@@ -58,10 +59,11 @@ export class HeartbeatSchedulerService {
     const dueTasks = tasks.filter((task) => HeartbeatSchedulerService.isTaskDue(task, now));
     const records: HeartbeatTaskRunRecord[] = [];
     let failed = 0;
+    const executionOwnerId = options.executionOwnerId ?? HeartbeatSchedulerService.createExecutionOwnerId();
 
     for (const task of dueTasks) {
       options.onEvent?.({ type: 'heartbeat.task.due', taskId: task.id, timestamp });
-      const result = await HeartbeatTaskRunnerService.runTask({ ...options, task, runAt: now });
+      const result = await HeartbeatTaskRunnerService.runTask({ ...options, executionOwnerId, task, runAt: now });
       if (result.record) {
         records.push(result.record);
       }
@@ -80,10 +82,29 @@ export class HeartbeatSchedulerService {
 
   // Repeats due-task checks until the host aborts the loop.
   static async runLoop(options: RunHeartbeatSchedulerOptions): Promise<void> {
-    options.onEvent?.({ type: 'heartbeat.scheduler.started', timestamp: HeartbeatSchedulerService.resolveNowIso(options) });
+    const executionOwnerId = options.executionOwnerId ?? HeartbeatSchedulerService.createExecutionOwnerId();
+    const startedAt = options.now?.() ?? dayjs().toDate();
+    options.onEvent?.({ type: 'heartbeat.scheduler.started', timestamp: dayjs(startedAt).toISOString() });
     try {
+      const recoveries = await options.store.recoverInterruptedTasks({
+        ownerId: executionOwnerId,
+        recoveredAt: startedAt,
+        reason: 'host-restart',
+      });
+      recoveries.forEach(({ task, recovery }) => options.onEvent?.({
+        type: 'heartbeat.task.recovered',
+        taskId: task.id,
+        interruptedExecutionId: recovery.interruptedExecutionId,
+        interruptedOwnerId: recovery.interruptedOwnerId,
+        reason: recovery.reason,
+        status: task.state?.status ?? 'waiting',
+        progress: task.state?.progress ?? '',
+        nextRunAt: task.schedule.nextRunAt,
+        timestamp: recovery.recoveredAt,
+      }));
+
       while (!options.signal?.aborted) {
-        await HeartbeatSchedulerService.runDueTasks(options);
+        await HeartbeatSchedulerService.runDueTasks({ ...options, executionOwnerId });
         await (options.sleep ?? HeartbeatSchedulerService.sleep)(options.pollIntervalMs ?? DEFAULT_SCHEDULER_POLL_INTERVAL_MS, options.signal);
       }
       options.onEvent?.({ type: 'heartbeat.scheduler.stopped', reason: 'aborted', timestamp: HeartbeatSchedulerService.resolveNowIso(options) });
@@ -117,6 +138,10 @@ export class HeartbeatSchedulerService {
 
   private static resolveNowIso(options: Pick<RunDueHeartbeatTasksOptions, 'now'>): string {
     return dayjs(options.now?.() ?? dayjs()).toISOString();
+  }
+
+  private static createExecutionOwnerId(): string {
+    return `heartbeat-worker:${randomUUID()}`;
   }
 
   // Sleeps between polling cycles and resolves early when the host aborts the scheduler.

@@ -6,6 +6,7 @@
  * history persistence. The scheduler decides when a task is due; this service
  * decides how that task is executed and recorded.
  */
+import { randomUUID } from 'node:crypto';
 import dayjs from 'dayjs';
 import { ToolApprovalPolicies } from '@/core/approvals/index.js';
 import { DEFAULT_OPENAI_MODEL } from '@/core/config.js';
@@ -14,7 +15,7 @@ import type { AgentLoopCheckpoint, AgentLoopState } from '@/core/runtime/loop/in
 import { HeartbeatRunnerAgent } from '../agent/index.js';
 import type { AgentHeartbeatResult, RunAgentHeartbeatOptions } from '../agent/index.js';
 import { HeartbeatTaskStateProjector } from '../tasks/index.js';
-import type { HeartbeatTask, HeartbeatTaskRunRecord } from '../tasks/index.js';
+import type { HeartbeatTask, HeartbeatTaskExecution, HeartbeatTaskRunRecord } from '../tasks/index.js';
 import type {
   HeartbeatSchedulerEvent,
   HeartbeatTaskRunner,
@@ -28,58 +29,81 @@ const DEFAULT_FAILURE_RETRY_MS = 5 * 60_000;
 export class HeartbeatTaskRunnerService {
   // Runs one already-selected task and persists the resulting task state, checkpoint, and run record.
   static async runTask(
-    options: Pick<RunDueHeartbeatTasksOptions, 'store' | 'runner' | 'runtime' | 'onEvent' | 'failureRetryMs'> & {
+    options: Pick<RunDueHeartbeatTasksOptions, 'store' | 'runner' | 'runtime' | 'onEvent' | 'failureRetryMs' | 'executionOwnerId'> & {
       task: HeartbeatTask;
       runAt: Date;
     },
   ): Promise<{ record?: HeartbeatTaskRunRecord; failed: boolean }> {
     const { task, runAt } = options;
     const timestamp = dayjs(runAt).toISOString();
-    try {
-      const checkpoint = await options.store.loadCheckpoint(task);
-      const loadedCheckpoint = Boolean(checkpoint);
-      const runningTask = HeartbeatTaskStateProjector.markRunning({
-        task,
-        now: runAt,
-        loadedCheckpoint,
-      });
-      await options.store.saveTask(runningTask);
-      options.onEvent?.(HeartbeatTaskRunnerService.startedEvent(runningTask, loadedCheckpoint, timestamp));
+    const checkpoint = await options.store.loadCheckpoint(task);
+    const loadedCheckpoint = Boolean(checkpoint);
+    const execution: HeartbeatTaskExecution = {
+      executionId: randomUUID(),
+      ownerId: options.executionOwnerId ?? `heartbeat-worker:${randomUUID()}`,
+      claimedAt: timestamp,
+    };
+    const claim = await options.store.claimTaskExecution({
+      taskId: task.id,
+      execution,
+      loadedCheckpoint,
+      claimedAt: runAt,
+    });
+    if (claim.status !== 'claimed') {
+      return { failed: false };
+    }
 
+    const runningTask = claim.task;
+    options.onEvent?.(HeartbeatTaskRunnerService.startedEvent(runningTask, execution, loadedCheckpoint, timestamp));
+
+    try {
       const result = await HeartbeatTaskRunnerService.runAgent({
-        task,
+        task: runningTask,
         checkpoint,
         runAt,
         runner: options.runner,
         runtime: options.runtime,
         onEvent: options.onEvent,
       });
-      await options.store.saveCheckpoint(task, result.checkpoint);
       const nextTask = HeartbeatTaskStateProjector.afterResult({
-        task,
+        task: runningTask,
         result,
         now: runAt,
         loadedCheckpoint,
       });
-      await options.store.saveTask(nextTask);
-      const record = { task: nextTask, result, loadedCheckpoint };
-      await options.store.saveRunRecord?.(record);
+      const completion = await options.store.completeTaskExecution({
+        execution,
+        task: nextTask,
+        checkpoint: result.checkpoint,
+        result,
+        loadedCheckpoint,
+      });
+      if (completion.status === 'claim-lost' || !completion.record) {
+        return { failed: false };
+      }
+
+      const record = completion.record;
       options.onEvent?.({
         type: 'heartbeat.task.finished',
         taskId: task.id,
+        executionId: execution.executionId,
         record,
         timestamp,
       });
       return { record, failed: false };
     } catch (error) {
       const nextTask = HeartbeatTaskStateProjector.afterFailure({
-        task,
+        task: runningTask,
         error,
         now: runAt,
         retryMs: options.failureRetryMs ?? DEFAULT_FAILURE_RETRY_MS,
       });
-      await options.store.saveTask(nextTask);
-      options.onEvent?.(HeartbeatTaskRunnerService.failedEvent(nextTask, error, timestamp));
+      const failure = await options.store.failTaskExecution({ execution, task: nextTask });
+      if (failure.status === 'claim-lost') {
+        return { failed: false };
+      }
+
+      options.onEvent?.(HeartbeatTaskRunnerService.failedEvent(nextTask, execution, error, timestamp));
       return { failed: true };
     }
   }
@@ -172,12 +196,15 @@ export class HeartbeatTaskRunnerService {
 
   private static startedEvent(
     task: HeartbeatTask,
+    execution: HeartbeatTaskExecution,
     loadedCheckpoint: boolean,
     timestamp: string,
   ): HeartbeatSchedulerEvent {
     return {
       type: 'heartbeat.task.started',
       taskId: task.id,
+      executionId: execution.executionId,
+      ownerId: execution.ownerId,
       loadedCheckpoint,
       status: task.state?.status ?? 'running',
       progress: task.state?.progress ?? '',
@@ -187,12 +214,14 @@ export class HeartbeatTaskRunnerService {
 
   private static failedEvent(
     task: HeartbeatTask,
+    execution: HeartbeatTaskExecution,
     error: unknown,
     timestamp: string,
   ): HeartbeatSchedulerEvent {
     return {
       type: 'heartbeat.task.failed',
       taskId: task.id,
+      executionId: execution.executionId,
       error: error instanceof Error ? error.message : String(error),
       status: task.state?.status ?? 'failed',
       progress: task.state?.progress ?? '',

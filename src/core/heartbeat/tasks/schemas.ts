@@ -11,6 +11,20 @@ import { LlmUsageSchema } from '@/core/llm/usage/index.js';
 export const HeartbeatTaskStatusSchema = z.enum(['idle', 'running', 'waiting', 'blocked', 'complete', 'failed']);
 export const HeartbeatDecisionSchema = z.enum(['continue', 'pause', 'complete', 'escalate']);
 export const HeartbeatTaskContinuationModeSchema = z.enum(['operator', 'agent']);
+export const HeartbeatTaskRecoveryReasonSchema = z.enum(['host-restart', 'operator']);
+
+const HeartbeatTaskExecutionSchema = z.object({
+  executionId: z.string().describe('Fencing token for the currently owned execution attempt.'),
+  ownerId: z.string().describe('Scheduler process or worker generation that owns this execution.'),
+  claimedAt: z.string().describe('Timestamp when this execution claimed the task.'),
+});
+
+const HeartbeatTaskRecoverySchema = z.object({
+  interruptedExecutionId: z.string().describe('Fencing token of the interrupted execution.'),
+  interruptedOwnerId: z.string().describe('Scheduler owner whose execution was interrupted.'),
+  recoveredAt: z.string().describe('Timestamp when the task became retryable again.'),
+  reason: HeartbeatTaskRecoveryReasonSchema.describe('Host-owned reason for recovering the execution.'),
+});
 
 export const HeartbeatTaskSchema = z.object({
   id: z.string().describe('Stable heartbeat task identifier.'),
@@ -42,6 +56,8 @@ export const HeartbeatTaskSchema = z.object({
     resumable: z.boolean().describe('Whether this task should be treated as resumable.'),
     result: z.lazy(() => AgentHeartbeatResultSchema).optional().describe('Latest heartbeat runner result.'),
     error: z.string().optional().describe('Latest scheduler or runner error.'),
+    execution: HeartbeatTaskExecutionSchema.optional().describe('Currently owned execution attempt and fencing identity.'),
+    recovery: HeartbeatTaskRecoverySchema.optional().describe('Most recent explicit interrupted-execution recovery.'),
     updatedAt: z.string().optional().describe('Timestamp when this task record was last updated.'),
   }).optional().describe('Latest scheduler/result state for this heartbeat task.'),
 });

@@ -98,6 +98,8 @@ describe('heartbeat Lucid adapter', () => {
     const started = HeartbeatLucidPresenter.schedulerEventToMessages({
       type: 'heartbeat.task.started',
       taskId: 'repo-check',
+      executionId: 'execution-1',
+      ownerId: 'worker-1',
       loadedCheckpoint: true,
       status: 'running',
       progress: 'Resuming heartbeat runner from the last checkpoint.',
@@ -130,6 +132,7 @@ describe('heartbeat Lucid adapter', () => {
     const finished = HeartbeatLucidPresenter.schedulerEventToMessages({
       type: 'heartbeat.task.finished',
       taskId: 'repo-check',
+      executionId: 'execution-1',
       record: createFinishedRecord(),
       timestamp: '2026-04-14T00:00:00.000Z',
     });
@@ -148,6 +151,7 @@ describe('heartbeat Lucid adapter', () => {
     const failed = HeartbeatLucidPresenter.schedulerEventToMessages({
       type: 'heartbeat.task.failed',
       taskId: 'repo-check',
+      executionId: 'execution-1',
       error: 'temporary failure',
       status: 'failed',
       progress: 'Heartbeat runner failed and will retry later.',

@@ -16,10 +16,9 @@ import type {
   HeartbeatTask,
   HeartbeatTaskRunRecord,
   HeartbeatTaskRunRecordEntry,
-  HeartbeatTaskStore,
 } from './types.js';
 
-export class FileHeartbeatTaskRepository implements HeartbeatTaskStore {
+export class FileHeartbeatTaskRepository {
   private readonly tasksDir: string;
   private readonly checkpointsDir: string;
   private readonly runsDir: string;

@@ -240,6 +240,7 @@ function logHeartbeatSchedulerEvent(
     'heartbeat.scheduler.stopped': 'Heddle heartbeat scheduler stopped',
     'heartbeat.task.due': 'Heartbeat task due',
     'heartbeat.task.started': 'Heartbeat task started',
+    'heartbeat.task.recovered': 'Heartbeat task recovered after interrupted execution',
     'heartbeat.task.agent_event': 'Heartbeat task agent event',
     'heartbeat.task.finished': 'Heartbeat task finished',
     'heartbeat.task.failed': 'Heartbeat task failed',

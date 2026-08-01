@@ -9,7 +9,15 @@ import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration.js';
 import type { AgentHeartbeatResult } from '../agent/index.js';
 import { HeartbeatDecisionPolicy } from '../agent/index.js';
-import type { HeartbeatTask, HeartbeatTaskContinuationMode, HeartbeatTaskState, HeartbeatTaskStatus } from './types.js';
+import type {
+  HeartbeatTask,
+  HeartbeatTaskContinuationMode,
+  HeartbeatTaskExecution,
+  HeartbeatTaskRecovery,
+  HeartbeatTaskRecoveryReason,
+  HeartbeatTaskState,
+  HeartbeatTaskStatus,
+} from './types.js';
 
 dayjs.extend(duration);
 
@@ -30,6 +38,7 @@ export class HeartbeatTaskStateProjector {
     task: HeartbeatTask;
     now: Date;
     loadedCheckpoint: boolean;
+    execution: HeartbeatTaskExecution;
   }): HeartbeatTask {
     return HeartbeatTaskStateProjector.normalize({
       ...args.task,
@@ -42,9 +51,49 @@ export class HeartbeatTaskStateProjector {
           : 'Starting a new heartbeat runner cycle.',
         loadedCheckpoint: args.loadedCheckpoint,
         error: undefined,
+        execution: args.execution,
         updatedAt: dayjs(args.now).toISOString(),
       },
     });
+  }
+
+  static afterRecovery(args: {
+    task: HeartbeatTask;
+    now: Date;
+    reason: HeartbeatTaskRecoveryReason;
+  }): { task: HeartbeatTask; recovery: HeartbeatTaskRecovery } {
+    const execution = args.task.state?.execution;
+    if (!execution) {
+      throw new Error(`Heartbeat task ${args.task.id} has no execution to recover.`);
+    }
+
+    const recoveredAt = dayjs(args.now).toISOString();
+    const recovery: HeartbeatTaskRecovery = {
+      interruptedExecutionId: execution.executionId,
+      interruptedOwnerId: execution.ownerId,
+      recoveredAt,
+      reason: args.reason,
+    };
+    const task = HeartbeatTaskStateProjector.normalize({
+      ...args.task,
+      schedule: {
+        ...args.task.schedule,
+        nextRunAt: args.task.enabled ? dayjs(args.now).subtract(1, 'second').toISOString() : undefined,
+      },
+      state: {
+        ...args.task.state,
+        status: args.task.enabled ? 'waiting' : 'idle',
+        progress:
+          args.task.enabled ?
+            'Recovered an interrupted heartbeat execution. Waiting for retry.'
+          : 'Recovered an interrupted heartbeat execution. Task remains disabled.',
+        execution: undefined,
+        recovery,
+        updatedAt: recoveredAt,
+      },
+    });
+
+    return { task, recovery };
   }
 
   static afterResult(args: {
@@ -79,6 +128,7 @@ export class HeartbeatTaskStateProjector {
         resumable: args.result.decision !== 'complete' || continuationMode === 'operator',
         result: args.result,
         error: undefined,
+        recovery: args.task.state?.recovery,
         updatedAt: dayjs(args.now).toISOString(),
       },
     });
@@ -102,6 +152,7 @@ export class HeartbeatTaskStateProjector {
         progress: 'Heartbeat runner failed and will retry later.',
         runAt: dayjs(args.now).toISOString(),
         error: args.error instanceof Error ? args.error.message : String(args.error),
+        execution: undefined,
         updatedAt: dayjs(args.now).toISOString(),
       },
     });

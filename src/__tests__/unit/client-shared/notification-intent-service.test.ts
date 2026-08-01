@@ -69,6 +69,7 @@ describe('ClientSharedNotificationIntentService', () => {
         event: {
           type: 'heartbeat.task.finished',
           taskId: 'task-1',
+          executionId: 'execution-1',
           timestamp: '2026-06-12T00:02:00.000Z',
           record: {
             id: 'record-1',
@@ -108,6 +109,7 @@ describe('ClientSharedNotificationIntentService', () => {
         event: {
           type: 'heartbeat.task.failed',
           taskId: 'task-1',
+          executionId: 'execution-1',
           error: 'boom',
           status: 'failed',
           progress: 'boom',

@@ -18,8 +18,10 @@ operator-facing heartbeat views.
 - `tasks/`: `FileHeartbeatTaskService` is the persistence boundary for durable
   task/checkpoint/run storage and task/run projections. It is the only
   non-repository service that should instantiate `FileHeartbeatTaskRepository`.
-  `HeartbeatTaskStateProjector` owns task state transitions after success or
-  failure.
+  It also owns process-local execution claims, recovery of interrupted
+  single-host executions, and fencing of late completion/failure writes.
+  `HeartbeatTaskStateProjector` owns task state transitions after success,
+  failure, or recovery.
 - `scheduler/`: `HeartbeatSchedulerService` owns due-task selection and the
   periodic scheduler loop. It delegates execution to
   `HeartbeatTaskRunnerService` instead of running tasks itself. Daemon, CLI,
@@ -44,6 +46,21 @@ operator-facing heartbeat views.
 ## Boundary Notes
 
 - Keep scheduler/task persistence concerns here, not in runtime.
+- `executionId` is the fencing token for one task attempt. A store must reject
+  completion or failure when that execution no longer owns the task.
+- `executionOwnerId` identifies one scheduler process/worker generation. Do not
+  reuse it across process restarts: scheduler startup uses it to distinguish a
+  current claim from an execution interrupted by the prior single-host process.
+- The file service serializes claim/recover/complete/fail transitions with a
+  shared in-process mutex and tracks live executions in process memory. This is
+  reliable for one Node.js process owning a state root; it is not a distributed
+  lease. Multiple processes or replicas must provide a remote
+  `HeartbeatTaskStore` that implements atomic claim, fencing, and recovery with
+  database compare-and-swap, leases, or transactions.
+- Recovery preserves the latest checkpoint and run history, records the
+  interrupted execution identity under `task.state.recovery`, and makes an
+  enabled task immediately due. It does not record success or roll back host
+  domain side effects; host tools remain responsible for idempotent mutations.
 - Heartbeat may depend on runtime's public `AgentLoopRuntimeService.run` and checkpoint types.
   Runtime should not import heartbeat.
 - Interface adapters should use `FileHeartbeatTaskService` methods or the
