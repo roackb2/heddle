@@ -134,6 +134,7 @@ export type {
   ToolPolicyEnvironment,
   ToolPolicyEnvelope,
   ToolPolicyHostContext,
+  ToolPolicyHostWriteScope,
   ToolPolicyOperation,
   ToolPolicyReconciliation,
   ToolToolkit,

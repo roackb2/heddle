@@ -54,6 +54,23 @@ export type ToolPolicyHostTransport = {
 };
 
 /**
+ * Authoritative write scope supplied by the tool owner.
+ *
+ * Filesystem scopes continue through the configured root policy. Domain
+ * scopes identify non-filesystem state such as database tables, queues, or
+ * product records and must never be projected into fake filesystem paths.
+ */
+export type ToolPolicyHostWriteScope =
+  | {
+      kind: 'filesystem';
+      roots: readonly string[];
+    }
+  | {
+      kind: 'domain';
+      resources: readonly string[];
+    };
+
+/**
  * Immutable execution facts supplied by the host that owns a tool.
  *
  * Model-authored policy envelopes may describe intent and expected effects,
@@ -64,18 +81,20 @@ export type ToolPolicyHostContext = {
   transport: ToolPolicyHostTransport;
   environment: ToolPolicyEnvironment;
   operations?: readonly ToolPolicyOperation[];
+  writeScope?: ToolPolicyHostWriteScope;
 };
 
 export type ToolPolicyReconciliationDiagnostic = {
   code:
     | 'environment_overridden'
     | 'network_transport_normalized'
-    | 'operations_overridden';
+    | 'operations_overridden'
+    | 'write_scope_reconciled';
   message: string;
 };
 
 export type ToolPolicyFieldOwnership = {
-  hostOwned: Array<'authority' | 'transport' | 'environment' | 'operations'>;
+  hostOwned: Array<'authority' | 'transport' | 'environment' | 'operations' | 'writeScope'>;
   modelProposed: Array<keyof ToolPolicyEnvelope>;
 };
 

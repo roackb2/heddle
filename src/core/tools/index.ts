@@ -14,6 +14,7 @@ export type {
   ToolPolicyEnvelope,
   ToolPolicyEnvelopeExtraction,
   ToolPolicyHostContext,
+  ToolPolicyHostWriteScope,
   ToolPolicyEnvironment,
   ToolPolicyOperation,
   ToolPolicyReconciliation,

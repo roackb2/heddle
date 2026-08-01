@@ -3,11 +3,17 @@ import { ToolPolicyEnvelopeInputService } from './input-service.js';
 import type {
   ToolPolicyEnvelope,
   ToolPolicyHostContext,
+  ToolPolicyHostWriteScope,
   ToolPolicyOperation,
   ToolPolicyReconciliation,
   ToolPolicyReconciliationDiagnostic,
   ToolPolicyResolution,
 } from './types.js';
+import { TOOL_POLICY_MUTATING_OPERATIONS } from './types.js';
+
+const MISSING_MUTATION_SCOPE_ERROR =
+  'Invalid tool policy envelope: mutating operations (write, delete, move, execute, git, unknown) '
+  + 'must declare at least one target or write root unless the tool owner supplies an authoritative write scope';
 
 const MODEL_ENVELOPE_FIELDS: Array<keyof ToolPolicyEnvelope> = [
   'operations',
@@ -42,9 +48,14 @@ export class ToolPolicyResolutionService {
       modelProposed: extraction.envelope,
       hostOwned,
     });
+    const error = extraction.error ?? ToolPolicyResolutionService.validateEffectiveScope({
+      effective,
+      hostOwned,
+    });
 
     return {
       ...extraction,
+      ...(error ? { error } : {}),
       envelope: effective,
       reconciliation: {
         modelProposed: extraction.envelope,
@@ -54,6 +65,7 @@ export class ToolPolicyResolutionService {
           hostOwned: [
             ...(hostOwned ? ['authority', 'transport', 'environment'] as const : []),
             ...(hostOwned?.operations ? ['operations'] as const : []),
+            ...(hostOwned?.writeScope ? ['writeScope'] as const : []),
           ],
           modelProposed: extraction.envelope
             ? MODEL_ENVELOPE_FIELDS.filter((field) => extraction.envelope?.[field] !== undefined)
@@ -97,12 +109,78 @@ export class ToolPolicyResolutionService {
     const operations = args.hostOwned?.operations
       ? [...args.hostOwned.operations]
       : proposedOperations;
+    const effectiveOperations: ToolPolicyOperation[] = operations.length > 0
+      ? operations
+      : ['unknown'];
+    const writeScope = args.hostOwned?.writeScope;
+    const appliesWriteScope = writeScope
+      && effectiveOperations.some((operation) => TOOL_POLICY_MUTATING_OPERATIONS.has(operation));
 
     return {
       ...args.modelProposed,
-      operations: operations.length > 0 ? operations : ['unknown'],
+      operations: effectiveOperations,
       environment: args.hostOwned?.environment ?? args.modelProposed.environment,
+      ...(appliesWriteScope
+        ? ToolPolicyResolutionService.resolveEffectiveRoots({
+            modelProposed: args.modelProposed,
+            operations: effectiveOperations,
+            writeScope,
+          })
+        : {}),
     };
+  }
+
+  private static resolveEffectiveRoots(args: {
+    modelProposed: ToolPolicyEnvelope;
+    operations: ToolPolicyOperation[];
+    writeScope: ToolPolicyHostWriteScope;
+  }): Pick<ToolPolicyEnvelope, 'targetRoots' | 'writeRoots'> {
+    const writeRoots = args.writeScope.kind === 'filesystem'
+      ? [...args.writeScope.roots]
+      : [];
+
+    return {
+      targetRoots: args.operations.includes('read')
+        ? args.modelProposed.targetRoots
+        : writeRoots,
+      writeRoots,
+    };
+  }
+
+  private static validateEffectiveScope(args: {
+    effective?: ToolPolicyEnvelope;
+    hostOwned?: ToolPolicyHostContext;
+  }): string | undefined {
+    if (!args.effective) {
+      return undefined;
+    }
+
+    const mutates = args.effective.operations.some((operation) =>
+      TOOL_POLICY_MUTATING_OPERATIONS.has(operation));
+    if (!mutates) {
+      return undefined;
+    }
+
+    const declaresFilesystemRoot = args.effective.targetRoots.length > 0
+      || (args.effective.writeRoots?.length ?? 0) > 0;
+    // Remote tool authority is already host-owned and remains approval-gated by
+    // autonomy policy. It must not be forced into a local filesystem-root shape.
+    const declaresHostScope = ToolPolicyResolutionService.hasWriteScope(args.hostOwned?.writeScope)
+      || args.hostOwned?.transport.network === true;
+
+    return declaresFilesystemRoot || declaresHostScope
+      ? undefined
+      : MISSING_MUTATION_SCOPE_ERROR;
+  }
+
+  private static hasWriteScope(scope: ToolPolicyHostWriteScope | undefined): boolean {
+    if (!scope) {
+      return false;
+    }
+
+    return scope.kind === 'filesystem'
+      ? scope.roots.length > 0
+      : scope.resources.length > 0;
   }
 
   private static removeTransportOperation(args: {
@@ -149,8 +227,30 @@ export class ToolPolicyResolutionService {
               + 'host operations applied.',
           }]
         : []),
+      ...(args.hostOwned.writeScope
+        ? [{
+            code: 'write_scope_reconciled' as const,
+            message: describeWriteScopeReconciliation({
+              modelProposed: args.modelProposed,
+              hostOwned: args.hostOwned.writeScope,
+            }),
+          }]
+        : []),
     ];
   }
+}
+
+function describeWriteScopeReconciliation(args: {
+  modelProposed: ToolPolicyEnvelope;
+  hostOwned: ToolPolicyHostWriteScope;
+}): string {
+  const modelRoots = args.modelProposed.writeRoots ?? args.modelProposed.targetRoots;
+  const hostScope = args.hostOwned.kind === 'filesystem'
+    ? `filesystem roots [${args.hostOwned.roots.join(', ')}]`
+    : `domain resources [${args.hostOwned.resources.join(', ')}]`;
+
+  return `Model proposed filesystem write roots [${modelRoots.join(', ')}], `
+    + `but the tool owner declares authoritative ${hostScope}; host write scope applied.`;
 }
 
 function sameOperations(

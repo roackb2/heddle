@@ -36,6 +36,11 @@ The agent's envelope is a claim. The autonomy policy uses it as the declared
 scope contract for ambiguous tools, but deterministic hard-deny rules and
 configured root policy remain runtime-owned.
 
+An in-process host tool may declare authoritative `writeScope`. Filesystem
+scopes replace model-proposed write roots and still pass through normal root
+policy. Domain scopes are retained as non-filesystem facts in the autonomy
+evaluation and trace rather than being coerced into a repository path.
+
 The harness must not fully trust the claim, but it also must not block every
 free-form shell command only because static parsing is incomplete. For shell
 commands and scripts, the envelope is the agent's explicit contract about the
@@ -360,6 +365,7 @@ Tool call with optional policy envelope
 The service currently computes:
 
 - declared operations, read roots, and write roots;
+- host-owned filesystem or domain write scope when the tool owner supplies it;
 - known tool targets such as `path`, `from`, and `to`;
 - root decisions for each claimed or known target;
 - hard-deny reasons from root policy and dangerous command patterns;

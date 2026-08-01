@@ -481,6 +481,139 @@ describe('AutonomyPolicyService', () => {
     }));
   });
 
+  it('reconciles model roots with an in-process host-owned domain write scope', () => {
+    const evaluation = AutonomyPolicyService.evaluate({
+      context: context({
+        call: {
+          id: 'call-domain-write',
+          tool: 'post_shared_message',
+          input: {
+            content: 'hello',
+            policy: {
+              operations: ['write'],
+              intent: 'post a shared message',
+              targetRoots: ['../denied'],
+              expectedEffects: ['append one message row'],
+              environment: 'local',
+              confidence: 'high',
+            },
+          },
+        },
+        tool: {
+          name: 'post_shared_message',
+          description: 'writes product-owned domain state',
+          requiresApproval: true,
+          parameters: {},
+          hostPolicy: {
+            authority: {
+              kind: 'host-tool',
+              id: 'test:messages',
+            },
+            transport: {
+              kind: 'in-process',
+              network: false,
+            },
+            environment: 'local',
+            operations: ['write'],
+            writeScope: {
+              kind: 'domain',
+              resources: ['sqlite:messages'],
+            },
+          },
+          execute: async () => ({ ok: true }),
+        },
+      }),
+      profile,
+    });
+
+    expect(evaluation.decision).toEqual(expect.objectContaining({
+      type: 'allow',
+      reason: 'allowed by autopilot profile and declared policy envelope',
+    }));
+    expect(evaluation.envelope).toEqual(expect.objectContaining({
+      targetRoots: [],
+      writeRoots: [],
+    }));
+    expect(evaluation.facts).toEqual(expect.objectContaining({
+      claimedReadRoots: [],
+      claimedWriteRoots: [],
+      rootDecisions: [],
+      hostWriteScope: {
+        kind: 'domain',
+        resources: ['sqlite:messages'],
+      },
+    }));
+    expect(evaluation.policy).toEqual(expect.objectContaining({
+      modelProposed: expect.objectContaining({
+        targetRoots: ['../denied'],
+      }),
+      ownership: {
+        hostOwned: ['authority', 'transport', 'environment', 'operations', 'writeScope'],
+        modelProposed: expect.arrayContaining(['operations', 'targetRoots']),
+      },
+    }));
+    expect(evaluation.facts.claimMismatches).toEqual([
+      expect.stringContaining('domain resources [sqlite:messages]'),
+    ]);
+  });
+
+  it('applies filesystem protections to a host-owned filesystem write scope', () => {
+    const evaluation = AutonomyPolicyService.evaluate({
+      context: context({
+        call: {
+          id: 'call-host-filesystem-write',
+          tool: 'write_generated_file',
+          input: {
+            policy: {
+              operations: ['write'],
+              intent: 'write a generated file',
+              targetRoots: ['.'],
+              expectedEffects: ['write one file'],
+              environment: 'local',
+              confidence: 'high',
+            },
+          },
+        },
+        tool: {
+          name: 'write_generated_file',
+          description: 'writes a host-selected file',
+          requiresApproval: true,
+          parameters: {},
+          hostPolicy: {
+            authority: {
+              kind: 'host-tool',
+              id: 'test:generated-file',
+            },
+            transport: {
+              kind: 'in-process',
+              network: false,
+            },
+            environment: 'local',
+            operations: ['write'],
+            writeScope: {
+              kind: 'filesystem',
+              roots: ['../denied'],
+            },
+          },
+          execute: async () => ({ ok: true }),
+        },
+      }),
+      profile,
+    });
+
+    expect(evaluation.facts.claimedWriteRoots).toEqual(['/workspace/denied']);
+    expect(evaluation.facts.rootDecisions).toEqual([
+      expect.objectContaining({
+        root: '/workspace/denied',
+        access: 'deny',
+      }),
+    ]);
+    expect(evaluation.decision).toEqual(expect.objectContaining({
+      type: 'deny',
+      reason: 'root is hard-denied by autopilot policy: /workspace/denied',
+    }));
+  });
+
   it('does not auto-allow a mutating shell call whose envelope declares no roots', () => {
     const evaluation = AutonomyPolicyService.evaluate({
       context: context({

@@ -1,6 +1,6 @@
 import type { ToolCall, ToolResult } from '@/core/types.js';
 import type { ToolRegistry } from './registry.js';
-import { ToolPolicyEnvelopeInputService } from './policy-envelope/index.js';
+import { ToolPolicyResolutionService } from './policy-envelope/index.js';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -35,11 +35,14 @@ export class ToolExecutionService {
         : timeoutController.signal;
       signal.throwIfAborted();
 
-      const extraction = ToolPolicyEnvelopeInputService.extract(call.input);
-      if (extraction.error) {
+      const resolution = ToolPolicyResolutionService.resolve({
+        tool,
+        input: call.input,
+      });
+      if (resolution.error) {
         return {
           ok: false,
-          error: extraction.error,
+          error: resolution.error,
         };
       }
 
@@ -57,7 +60,7 @@ export class ToolExecutionService {
 
       try {
         return await Promise.race([
-          tool.execute(extraction.toolInput, { signal }),
+          tool.execute(resolution.toolInput, { signal }),
           cancellation,
         ]);
       } finally {

@@ -12,7 +12,8 @@ low-friction intent contract without duplicating schema fragments.
 - Central schema augmentation for object-shaped tool parameters.
 - Input extraction that separates the envelope from tool business input before
   execution.
-- Reconciliation between model-proposed intent and host-owned execution facts.
+- Reconciliation between model-proposed intent and host-owned execution facts,
+  including authoritative filesystem or domain-state write scope.
 
 ## Does Not Own
 
@@ -25,9 +26,11 @@ low-friction intent contract without duplicating schema fragments.
 
 Agents report intent through this envelope. The runtime may use it as a policy
 claim, but it must not treat it as verified fact. A host that owns a tool can
-attach immutable authority, transport, target-environment, and effect
+attach immutable authority, transport, target-environment, effect
 classification through `ToolDefinition.hostPolicy` or
-`ToolDefinition.resolveHostPolicy(...)`.
+`ToolDefinition.resolveHostPolicy(...)`. It can also attach a `writeScope`
+when the tool owner knows where a mutation occurs more reliably than the
+model.
 
 Policy evaluation keeps three views rather than collapsing their provenance:
 
@@ -50,6 +53,21 @@ impact surface of the operation: operation categories, target roots, read/write
 roots, expected effects, environment, destructive scope, and confidence. The
 harness combines that declaration with runtime environment facts and configured
 policy before deciding whether to allow, request approval, or deny the action.
+
+Host write scope uses one of two explicit authority shapes:
+
+```ts
+type ToolPolicyHostWriteScope =
+  | { kind: 'filesystem'; roots: readonly string[] }
+  | { kind: 'domain'; resources: readonly string[] };
+```
+
+Filesystem roots still pass through configured root and capability policy.
+Domain resource identifiers are trace-safe host vocabulary such as
+`sqlite:messages`, `queue:outbound-mail`, or `session:active-draft`; they are
+not converted into fake local paths. Declaring a scope identifies the actual
+impact surface. It does not bypass environment, remote-authority, hard-deny,
+or human-approval policy.
 
 ## Envelope Shape
 
@@ -91,6 +109,43 @@ folder with project config such as `package.json`, `requirements.txt`,
 narrowest project root involved, not an individual file path. For example,
 reading `src/core/tools/registry.ts` should normally claim `targetRoots: ["."]`,
 not `targetRoots: ["src/core/tools/registry.ts"]`.
+
+Do not invent a filesystem root for an in-process tool that only mutates
+host-owned domain state. Such a tool should declare host-owned `writeScope`,
+and the model should leave `targetRoots` empty. Structural envelope validation
+runs first, then effective mutation scope is validated after host
+reconciliation.
+
+## Host-Owned Domain Mutation
+
+```ts
+const postSharedMessage: ToolDefinition = {
+  name: 'post_shared_message',
+  description: 'Append one shared message to product-owned state.',
+  parameters: {
+    type: 'object',
+    properties: { content: { type: 'string' } },
+    required: ['content'],
+    additionalProperties: false,
+  },
+  hostPolicy: {
+    authority: { kind: 'host-tool', id: 'product:shared-messages' },
+    transport: { kind: 'in-process', network: false },
+    environment: 'local',
+    operations: ['write'],
+    writeScope: {
+      kind: 'domain',
+      resources: ['sqlite:shared-messages'],
+    },
+  },
+  execute: async (input) => saveSharedMessage(input),
+};
+```
+
+The trace retains the model-proposed roots, the host-owned domain scope, the
+effective root projection, field ownership, and a reconciliation diagnostic.
+This makes an omitted or mistaken model root inspectable without making a
+known host fact model-dependent.
 
 ## Example Tool Inputs
 
@@ -161,8 +216,10 @@ ToolRegistry.list()
   -> model sees optional policy field
 
 ToolExecutionService.execute(...)
-  -> ToolPolicyEnvelopeInputService.extract(...)
-  -> validate and remove policy
+  -> ToolPolicyResolutionService.resolve(...)
+  -> structurally validate the model envelope
+  -> reconcile host authority, transport, environment, operations, and scope
+  -> validate effective mutation scope and remove policy
   -> execute raw tool with stripped business input
 
 AutonomyPolicyService.evaluate(...)
@@ -199,8 +256,9 @@ presentation boundary.
 - Add fields only when they are useful across tool families, not for one tool's
   private needs.
 - Keep tool-specific validation in the toolkit that owns the tool.
-- Keep server identity, transport, environment, tenant, and verified effect
-  classification host-owned. Never infer authorization from model input.
+- Keep server identity, transport, environment, tenant, verified effect
+  classification, and authoritative write scope host-owned. Never infer
+  authorization from model input.
 - Keep approval decisions in `src/core/approvals`, not here.
 - Keep extraction centralized in `ToolPolicyEnvelopeInputService` so tools,
   approvals, and tests agree on the stripped input shape.
