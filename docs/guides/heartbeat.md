@@ -99,6 +99,38 @@ must keep domain mutations idempotent.
 
 Cron, launchd, systemd, hosted queues, and Lucid-style services should be treated as hosts around this API, not as Heddle's internal scheduler model.
 
+### Custom host work with the standard agent runtime
+
+A host can claim domain work or assemble domain tools in a custom runner, then
+delegate model execution back to Heddle:
+
+```ts
+await HeartbeatSchedulerService.runDueTasks({
+  store,
+  runtime: {
+    workspaceRoot: process.cwd(),
+    stateDir: '.heddle',
+    model: 'gpt-5.4',
+  },
+  runner: async (task, _checkpoint, context) => context.runAgent({
+    task: `${task.task}\n\nReview the host-owned work claim before acting.`,
+    tools: domainTools,
+    includeDefaultTools: false,
+  }),
+});
+```
+
+`context.runAgent()` is the supported credential handoff. It uses the same
+runtime builder as an ordinary heartbeat task and resolves API keys, stored
+OpenAI OAuth login state, and local/OpenAI-compatible endpoints inside Heddle.
+The host does not receive credential records or token fields and must not retain
+the execution context. Set `preferApiKey: true` in `runtime` only when an
+environment API key should take precedence over stored OpenAI OAuth state.
+
+Custom runners still return an agent result today. Domain-level no-work skips,
+execution cancellation, and awaitable custom-runner shutdown are separate
+lifecycle concerns; do not fabricate an agent result to emulate those features.
+
 ## Examples
 
 Try a small local heartbeat example:
@@ -114,6 +146,10 @@ Try the local scheduler API with a real LLM:
 export OPENAI_API_KEY=your_key_here
 yarn example:heartbeat-scheduler
 ```
+
+The scheduler example uses a custom runner and `context.runAgent()` while
+leaving credentials entirely inside Heddle. It works with stored OpenAI login
+state or provider API-key environment variables.
 
 ## Host Notes
 

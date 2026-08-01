@@ -29,7 +29,9 @@ operator-facing heartbeat views.
   instead of constructing task repositories or duplicating loop logic.
 - `scheduler/runner.ts`: `HeartbeatTaskRunnerService` owns one task execution:
   checkpoint loading, runner-agent invocation, checkpoint persistence, task
-  state transitions, and run history persistence.
+  state transitions, and run history persistence. Default and custom runners
+  share its framework-owned `context.runAgent()` path, so hosts can add domain
+  prompts and tools without receiving or translating provider credentials.
 - `views/`: `HeartbeatLucidPresenter` owns Lucid-specific adapter messages.
   Generic task/run view projection belongs to `FileHeartbeatTaskService`,
   because that service owns the task persistence boundary.
@@ -67,6 +69,12 @@ operator-facing heartbeat views.
   control-plane heartbeat API as the public task/run contract. Terminal command
   code should not construct `HeartbeatTask` objects, write heartbeat JSON, or run
   its own scheduler loop.
+- A custom scheduler runner may perform domain work before model execution, but
+  it should delegate model work to the execution-scoped `context.runAgent()`.
+  That callback owns model credential resolution, OAuth refresh, unattended
+  approval defaults, checkpoint continuation, and heartbeat event forwarding.
+  The callback is valid only during the current execution and must never be
+  serialized or retained by the host.
 - `heddle heartbeat run` and `heddle heartbeat start` are server-backed command
   paths. The control-plane server owns recurring scheduler lifetime; CLI
   commands may request due-task execution or keep an embedded server alive, but

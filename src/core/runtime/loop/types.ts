@@ -85,7 +85,9 @@ export type RunAgentLoopOptions = {
   model?: string;
   reasoningEffort?: ReasoningEffort;
   apiKey?: string;
+  apiKeyProvider?: LlmProvider | 'explicit';
   credential?: RuntimeProviderCredential;
+  preferApiKey?: boolean;
   maxSteps?: number;
   maxToolConcurrency?: number;
   workspaceRoot?: string;

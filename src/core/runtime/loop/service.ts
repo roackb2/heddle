@@ -30,14 +30,16 @@ export class AgentLoopRuntimeService {
     const providerRuntime = LlmProviderRuntimeService.resolve({
       model,
       apiKey: options.apiKey,
+      apiKeyProvider: options.apiKeyProvider,
       credential: options.credential,
       credentialStorePath,
+      preferApiKey: options.preferApiKey,
       reasoningEffort: options.reasoningEffort,
     });
     if (!options.llm) {
       LlmProviderRuntimeService.assertRunnable(providerRuntime);
     }
-    const apiKey = options.apiKey ?? providerRuntime.apiKey;
+    const apiKey = providerRuntime.apiKey;
     const llm = options.llm ?? await this.createLoopLlmAdapter({
       model,
       apiKey,
