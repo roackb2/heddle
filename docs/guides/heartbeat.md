@@ -77,6 +77,26 @@ compact display shape for a UI or service integration, use
 `FileHeartbeatTaskService` task/run view methods instead of flattening task
 state yourself.
 
+`HeartbeatSchedulerService.runLoop` assigns one owner identity to the current
+worker generation. On startup it performs one explicit recovery pass before
+polling: a task left `running` by an earlier owner becomes retryable, its last
+checkpoint and run history stay intact, and the scheduler emits
+`heartbeat.task.recovered` with the interrupted execution and owner IDs. A
+recovered attempt never creates a successful run record. Disabled tasks remain
+disabled, and blocked tasks remain blocked until an operator resumes them.
+
+Custom stores implement this protocol through `HeartbeatTaskStore`:
+
+- `claimTaskExecution` atomically establishes the current `executionId` fencing token
+- `completeTaskExecution` and `failTaskExecution` reject a stale token with `claim-lost`
+- `recoverInterruptedTasks` records the interrupted execution and makes only eligible tasks retryable
+
+The built-in file adapter serializes those transitions within one Node.js
+process and identifies executions still active in that process. Multiple
+processes or replicas require a remote store backed by compare-and-swap,
+transactions, or leases. Recovery cannot undo external effects, so host tools
+must keep domain mutations idempotent.
+
 Cron, launchd, systemd, hosted queues, and Lucid-style services should be treated as hosts around this API, not as Heddle's internal scheduler model.
 
 ## Examples

@@ -99,6 +99,8 @@ function formatSchedulerEvent(event: HeartbeatSchedulerEvent): string | undefine
       return `[event] task.due id=${event.taskId}`;
     case 'heartbeat.task.started':
       return `[event] task.started id=${event.taskId} loadedCheckpoint=${event.loadedCheckpoint}`;
+    case 'heartbeat.task.recovered':
+      return `[event] task.recovered id=${event.taskId} interruptedExecutionId=${event.interruptedExecutionId} reason=${event.reason}`;
     case 'heartbeat.task.finished':
       return `[event] task.finished id=${event.taskId} decision=${event.record.result.decision} enabled=${event.record.task.enabled} nextRunAt=${event.record.task.schedule.nextRunAt ?? 'none'}`;
     case 'heartbeat.task.failed':

@@ -27,6 +27,29 @@ export type HeartbeatTaskRuntime = Pick<
   | 'systemContext'
 >;
 
+/**
+ * Identifies one owned attempt to execute a heartbeat task.
+ *
+ * Hosted stores must treat `executionId` as a fencing token: completion and
+ * failure writes are valid only while this exact execution still owns the
+ * task. `ownerId` identifies the scheduler process/worker generation for
+ * operator diagnostics and explicit recovery.
+ */
+export type HeartbeatTaskExecution = {
+  executionId: string;
+  ownerId: string;
+  claimedAt: string;
+};
+
+export type HeartbeatTaskRecoveryReason = 'host-restart' | 'operator';
+
+export type HeartbeatTaskRecovery = {
+  interruptedExecutionId: string;
+  interruptedOwnerId: string;
+  recoveredAt: string;
+  reason: HeartbeatTaskRecoveryReason;
+};
+
 export type HeartbeatTaskState = {
   status?: HeartbeatTaskStatus;
   progress?: string;
@@ -36,6 +59,8 @@ export type HeartbeatTaskState = {
   resumable?: boolean;
   result?: AgentHeartbeatResult;
   error?: string;
+  execution?: HeartbeatTaskExecution;
+  recovery?: HeartbeatTaskRecovery;
   updatedAt?: string;
 };
 
@@ -68,11 +93,46 @@ export type HeartbeatTaskRunRecordEntry = {
   record: HeartbeatTaskRunRecord;
 };
 
+export type HeartbeatTaskClaimResult =
+  | { status: 'claimed'; task: HeartbeatTask }
+  | { status: 'busy' | 'disabled' | 'not-found' };
+
+export type HeartbeatTaskExecutionWriteResult =
+  | { status: 'saved'; task: HeartbeatTask; record?: HeartbeatTaskRunRecord }
+  | { status: 'claim-lost' };
+
+export type HeartbeatTaskRecoveryResult = {
+  task: HeartbeatTask;
+  recovery: HeartbeatTaskRecovery;
+};
+
 export type HeartbeatTaskStore = {
   listTasks: () => Promise<HeartbeatTask[]>;
   saveTask: (task: HeartbeatTask) => Promise<void>;
   loadCheckpoint: (task: HeartbeatTask) => Promise<AgentLoopCheckpoint | undefined>;
   saveCheckpoint: (task: HeartbeatTask, checkpoint: AgentLoopCheckpoint) => Promise<void>;
+  claimTaskExecution: (input: {
+    taskId: string;
+    execution: HeartbeatTaskExecution;
+    loadedCheckpoint: boolean;
+    claimedAt: Date;
+  }) => Promise<HeartbeatTaskClaimResult>;
+  completeTaskExecution: (input: {
+    execution: HeartbeatTaskExecution;
+    task: HeartbeatTask;
+    checkpoint: AgentLoopCheckpoint;
+    result: AgentHeartbeatResult;
+    loadedCheckpoint: boolean;
+  }) => Promise<HeartbeatTaskExecutionWriteResult>;
+  failTaskExecution: (input: {
+    execution: HeartbeatTaskExecution;
+    task: HeartbeatTask;
+  }) => Promise<HeartbeatTaskExecutionWriteResult>;
+  recoverInterruptedTasks: (input: {
+    ownerId: string;
+    recoveredAt: Date;
+    reason: HeartbeatTaskRecoveryReason;
+  }) => Promise<HeartbeatTaskRecoveryResult[]>;
   saveRunRecord?: (record: HeartbeatTaskRunRecord) => Promise<void>;
   listRunRecords?: (options?: { taskId?: string; limit?: number }) => Promise<HeartbeatTaskRunRecordEntry[]>;
   loadRunRecord?: (id: string) => Promise<HeartbeatTaskRunRecordEntry | undefined>;

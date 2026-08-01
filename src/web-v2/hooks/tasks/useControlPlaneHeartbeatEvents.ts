@@ -56,7 +56,7 @@ export function useControlPlaneHeartbeatEvents({
       });
     }
 
-    if (event.type === 'heartbeat.task.failed') {
+    if (event.type === 'heartbeat.task.failed' || event.type === 'heartbeat.task.recovered') {
       void utils.controlPlane.heartbeatTasks.invalidate(workspaceId ? { workspaceId } : undefined);
       void utils.controlPlane.heartbeatTask.invalidate(workspaceId ? { workspaceId, taskId: event.taskId } : { taskId: event.taskId });
       void utils.controlPlane.state.invalidate();
@@ -124,6 +124,12 @@ function projectHeartbeatTaskEvent(
         ...base,
         status: 'running',
         progress: event.progress || 'Heartbeat runner started.',
+      };
+    case 'heartbeat.task.recovered':
+      return {
+        ...base,
+        status: event.status,
+        progress: event.progress || 'Recovered interrupted task. Waiting for retry.',
       };
     case 'heartbeat.task.agent_event':
       return {

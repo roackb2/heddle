@@ -260,6 +260,12 @@ export {
 export type {
   FileHeartbeatTaskServiceOptions,
   HeartbeatTask,
+  HeartbeatTaskClaimResult,
+  HeartbeatTaskExecution,
+  HeartbeatTaskExecutionWriteResult,
+  HeartbeatTaskRecovery,
+  HeartbeatTaskRecoveryReason,
+  HeartbeatTaskRecoveryResult,
   HeartbeatTaskRunRecord,
   HeartbeatTaskRunRecordEntry,
   HeartbeatTaskStore,

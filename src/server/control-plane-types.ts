@@ -297,9 +297,22 @@ export type ControlPlaneHeartbeatEvent =
   | {
     type: 'heartbeat.task.started';
     taskId: string;
+    executionId: string;
+    ownerId: string;
     loadedCheckpoint: boolean;
     status: HeartbeatTaskStatus;
     progress: string;
+    timestamp: string;
+  }
+  | {
+    type: 'heartbeat.task.recovered';
+    taskId: string;
+    interruptedExecutionId: string;
+    interruptedOwnerId: string;
+    reason: 'host-restart' | 'operator';
+    status: HeartbeatTaskStatus;
+    progress: string;
+    nextRunAt?: string;
     timestamp: string;
   }
   | {
@@ -311,12 +324,14 @@ export type ControlPlaneHeartbeatEvent =
   | {
     type: 'heartbeat.task.finished';
     taskId: string;
+    executionId: string;
     record: HeartbeatRunView;
     timestamp: string;
   }
   | {
     type: 'heartbeat.task.failed';
     taskId: string;
+    executionId: string;
     error: string;
     status: HeartbeatTaskStatus;
     progress: string;

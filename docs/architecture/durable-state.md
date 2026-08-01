@@ -72,7 +72,7 @@ storage contract. The current extension surface is:
 | --- | --- | --- | --- |
 | Conversations | `persistence.conversations`, containing `ChatSessionRepository` plus `ChatArchiveRepository` | Revisioned session CRUD/pagination plus atomic archive content/summary/manifest append | **Remote-ready as one capability** when the host binds both ports to the same authenticated scope and completes the readiness checks |
 | Artifacts | `ArtifactRepository` on the conversation engine | Synchronous catalog and text-content calls; no atomic catalog/content commit | **Host-replaceable**, not remote-ready |
-| Heartbeat | `HeartbeatTaskStore` passed to `runDueTasks` or `runLoop` | Async tasks/checkpoints/runs, but no revisions, distributed lease, multi-record transaction, or conformance suite; built-in `start` constructs the file service | **Host-replaceable scheduler primitive**, not a distributed durability promise |
+| Heartbeat | `HeartbeatTaskStore` passed to `runDueTasks` or `runLoop` | Async tasks/checkpoints/runs plus atomic execution claim, fenced completion/failure, and explicit interrupted-execution recovery; no distributed lease or multi-record transaction; built-in `start` constructs the file service | **Single-process recovery with the file adapter; host-replaceable scheduler primitive**, not a distributed durability promise |
 | MCP | `McpConfigStorePort`, `McpActivationStorePort`, and `McpCatalogStorePort` | Synchronous whole-document stores; activation/config authority differs from rebuildable discovery cache | **Host-replaceable for an in-process host**, not remote-ready |
 | Skill activation | `AgentSkillActivationStorePort` | Synchronous consent metadata containing source paths | **Host-replaceable for an in-process host**, not portable skill storage |
 | All other rows | No general injected persistence port | Domain-specific files, diagnostics, secrets, or process coordination | Local/machine/process semantics remain authoritative |
@@ -247,17 +247,28 @@ files during reads. One-off stored heartbeat usage has a separate
 for a caller-selected checkpoint path under the same heartbeat domain.
 
 The exported asynchronous `HeartbeatTaskStore` can be supplied to
-`HeartbeatSchedulerService.runDueTasks` and `runLoop`. It does not define
-compare-and-swap task revisions, distributed execution leases, or an atomic
-task/checkpoint/run transaction, and the built-in `start` path always creates
-the file service. A hosted store is therefore possible for custom scheduler
-code, but is not currently a remote-ready or exactly-once scheduler contract.
+`HeartbeatSchedulerService.runDueTasks` and `runLoop`. Its execution methods
+define an atomic claim and an `executionId` fencing token: completion and
+failure must be rejected after recovery or replacement claim. Scheduler startup
+performs one explicit interrupted-execution recovery pass and emits
+`heartbeat.task.recovered`; task views retain the recovery time, reason, prior
+owner, and interrupted execution identity. Recovery preserves checkpoints and
+history and never creates a successful run record for the interrupted attempt.
 
-Writes replace individual files without atomic rename or cross-process locking.
+The built-in `start` path creates the file service. That adapter serializes
+claim/recover/complete/fail transitions with a shared in-process mutex and can
+identify live attempts in the current process. This is a single-process
+durability boundary, not a cross-process or replica lease. A hosted store must
+implement claim, terminal persistence, and recovery with database
+compare-and-swap/transactions or leases and must fence late writers. The host
+must also keep domain mutations idempotent because recovery does not roll back
+external side effects.
+
+File writes remain individual records rather than a cross-file transaction.
 Run filenames use a timestamp plus task ID and have no explicit collision or
 age-retention policy. Scheduler handles and the currently executing cycle stay
-process-local even though the task and last checkpoint are durable. See the
-heartbeat [`README`](../../src/core/heartbeat/README.md).
+process-local even though the task, execution identity, and last checkpoint are
+durable. See the heartbeat [`README`](../../src/core/heartbeat/README.md).
 
 ### Browser settings, profiles, and evidence
 
