@@ -66,9 +66,9 @@ async function showHeartbeatRun(
 
 export function formatRunListItem(run: ControlPlaneHeartbeatRunView): string {
   return [
-    `Run ${run.runId}`,
+    `Run ${run.runId ?? run.executionId}`,
     `  task: ${run.taskId}`,
-    `  result: ${run.result.decision}, ${run.result.outcome}`,
+    `  result: ${run.result.decision ?? run.result.kind}, ${run.result.outcome}`,
     `  finished: ${formatTimestamp(run.createdAt)}`,
     run.result.usage ? `  usage: ${formatUsage(run.result.usage)}` : undefined,
     `  summary: ${truncate(firstLine(stripHeartbeatDecisionLine(run.result.summary)), 140)}`,
@@ -77,13 +77,13 @@ export function formatRunListItem(run: ControlPlaneHeartbeatRunView): string {
 
 export function formatRunDetail(run: ControlPlaneHeartbeatRunView): string {
   return [
-    `Heartbeat run ${run.runId}`,
+    `Heartbeat run ${run.runId ?? run.executionId}`,
     '',
     formatSection('Overview', [
       `task: ${run.taskId}`,
-      `result: ${run.result.decision}, ${run.result.outcome}`,
+      `result: ${run.result.decision ?? run.result.kind}, ${run.result.outcome}`,
       `finished: ${formatTimestamp(run.createdAt)}`,
-      `checkpoint: ${run.loadedCheckpoint ? 'loaded' : 'not loaded'}`,
+      `checkpoint: ${run.loadedCheckpoint === undefined ? 'not applicable' : run.loadedCheckpoint ? 'loaded' : 'not loaded'}`,
       run.result.usage ? `usage: ${formatUsage(run.result.usage)}` : undefined,
     ]),
     formatSection('Task', [run.task.task]),
@@ -137,5 +137,5 @@ async function findHeartbeatRunById(
     return runs[0] ?? null;
   }
 
-  return runs.find((run) => run.id === id || run.runId === id) ?? null;
+  return runs.find((run) => run.id === id || run.executionId === id || run.runId === id) ?? null;
 }

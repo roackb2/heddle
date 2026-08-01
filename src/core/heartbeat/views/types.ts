@@ -3,7 +3,8 @@ import type { HeartbeatDecision } from '../agent/index.js';
 import type { HeartbeatTask, HeartbeatTaskState, HeartbeatTaskStatus } from '../tasks/index.js';
 
 export type HeartbeatTaskResultView = {
-  decision: HeartbeatDecision;
+  kind: 'agent' | 'skipped' | 'cancelled' | 'failed';
+  decision?: HeartbeatDecision;
   summary: string;
   outcome: string;
   usage?: LlmUsage;
@@ -21,11 +22,12 @@ export type HeartbeatRunView = {
   id: string;
   taskId: string;
   workspaceId?: string;
-  runId: string;
+  executionId: string;
+  runId?: string;
   createdAt: string;
   task: HeartbeatTaskView;
   result: HeartbeatTaskResultView;
-  loadedCheckpoint: boolean;
+  loadedCheckpoint?: boolean;
 };
 
 export type LucidAgentStatus = 'running' | 'paused' | 'asleep' | 'terminated' | 'blocked' | 'failed';

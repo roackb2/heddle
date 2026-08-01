@@ -41,7 +41,7 @@ export function TaskRunList({
         <TaskRunListItem
           key={run.id}
           run={run}
-          selected={run.runId === selectedRunId || run.id === selectedRunId}
+          selected={run.id === selectedRunId || run.executionId === selectedRunId || run.runId === selectedRunId}
           onSelectRun={onSelectRun}
         />
       ))}
@@ -103,14 +103,14 @@ function TaskRunListItem({
         'v2-task-run-row group min-w-0 text-left outline-none transition-colors hover:bg-accent/45 focus-visible:ring-1 focus-visible:ring-ring',
         selected && 'bg-accent/55',
       )}
-      onClick={() => onSelectRun(run.runId)}
+      onClick={() => onSelectRun(run.id)}
     >
       <span className="flex min-w-0 items-center gap-2">
         <span className="v2-type-nav-primary truncate text-foreground">{formatTaskTimestamp(run.createdAt)}</span>
       </span>
       <span className="mt-1 flex min-w-0 items-center gap-2">
         <span className="v2-type-caption shrink-0 rounded-sm border border-border bg-muted/20 px-1.5 py-0.5 text-muted-foreground">
-          {run.result.decision}
+          {run.result.decision ?? run.result.kind}
         </span>
         <span className="v2-type-nav-secondary truncate text-muted-foreground">{runDisplaySummary(run)}</span>
       </span>

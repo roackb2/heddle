@@ -211,7 +211,12 @@ function createTaskView(): HeartbeatTaskView {
       runId: 'run_1',
       loadedCheckpoint: true,
       resumable: true,
-      result: createHeartbeatResult(),
+      result: {
+        kind: 'agent',
+        decision: 'continue',
+        summary: 'Repository check complete.',
+        outcome: 'done',
+      },
     },
   };
 }
@@ -220,10 +225,12 @@ function createRunView(): HeartbeatRunView {
   return {
     id: '2026-04-14T00-00-00.000Z-repo-check',
     taskId: 'repo-check',
+    executionId: 'execution_1',
     runId: 'run_1',
     createdAt: '2026-04-14T00:00:00.000Z',
     task: createTaskView(),
     result: {
+      kind: 'agent',
       decision: 'continue',
       summary: 'Repository check complete.',
       outcome: 'done',
@@ -260,6 +267,12 @@ function createFinishedRecord(): Extract<HeartbeatSchedulerEvent, { type: 'heart
     },
     result: createHeartbeatResult(),
     loadedCheckpoint: true,
+    outcome: {
+      kind: 'agent',
+      executionId: 'execution_1',
+      summary: 'Repository check complete.',
+      finishedAt: '2026-04-14T00:00:00.000Z',
+    },
   };
 }
 

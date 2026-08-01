@@ -95,7 +95,7 @@ export class FileHeartbeatTaskRepository {
 
   async loadRunRecord(id: string): Promise<HeartbeatTaskRunRecordEntry | undefined> {
     const entries = await this.listRunRecords();
-    return entries.find((entry) => entry.id === id || entry.runId === id);
+    return entries.find((entry) => entry.id === id || entry.executionId === id || entry.runId === id);
   }
 
   private async deleteRunRecordsForTask(taskId: string): Promise<void> {
@@ -144,14 +144,33 @@ export class FileHeartbeatTaskRepository {
 
   private static runRecordEntryFromPath(path: string, record: HeartbeatTaskRunRecord): HeartbeatTaskRunRecordEntry {
     const id = basename(path, '.json');
+    const outcome = FileHeartbeatTaskRepository.resolveRecordOutcome(record);
     return {
       id,
       path,
       taskId: record.task.id,
       workspaceId: record.task.workspaceId,
-      runId: record.result.state.runId,
-      createdAt: record.result.state.finishedAt,
+      executionId: outcome.executionId,
+      runId: record.result?.state.runId,
+      createdAt: outcome.finishedAt,
       record,
+    };
+  }
+
+  private static resolveRecordOutcome(record: HeartbeatTaskRunRecord) {
+    if (record.outcome) {
+      return record.outcome;
+    }
+
+    if (!record.result) {
+      throw new Error(`Heartbeat record for task ${record.task.id} has no execution outcome.`);
+    }
+
+    return {
+      kind: 'agent' as const,
+      executionId: record.result.state.runId,
+      summary: record.result.summary,
+      finishedAt: record.result.state.finishedAt,
     };
   }
 }

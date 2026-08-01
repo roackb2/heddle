@@ -37,7 +37,15 @@ describe('custom heartbeat runner credentials', () => {
       agentOptions: { logger: capture.logger },
     });
 
-    expect(execution.contextKeys).toEqual(['runAgent']);
+    expect(execution.contextKeys).toEqual([
+      'task',
+      'checkpoint',
+      'executionId',
+      'runAt',
+      'signal',
+      'runAgent',
+      'skip',
+    ]);
     expect(execution.result).toMatchObject({ checked: 1, ran: 1, failed: 0 });
     expect(createAdapter).toHaveBeenCalledWith(expect.objectContaining({
       model: 'gpt-5.4',
@@ -223,10 +231,10 @@ async function runCustomHeartbeat(input: {
       includeDefaultTools: false,
       ...input.runtime,
     },
-    runner: async (scheduledTask, _checkpoint, context) => {
+    handler: async (context) => {
       contextKeys = Object.keys(context);
       return await context.runAgent({
-        task: `${scheduledTask.task}\n\nUse the custom host context.`,
+        task: `${context.task.task}\n\nUse the custom host context.`,
         maxSteps: 1,
         ...input.agentOptions,
       });

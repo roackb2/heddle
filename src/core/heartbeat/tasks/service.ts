@@ -9,6 +9,7 @@ import type {
   FileHeartbeatTaskRepositoryOptions,
   HeartbeatTask,
   HeartbeatTaskExecution,
+  HeartbeatTaskExecutionOutcome,
   HeartbeatTaskState,
   HeartbeatTaskRunRecord,
   HeartbeatTaskRunRecordEntry,
@@ -138,11 +139,24 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
         FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
         return { status: 'claim-lost' } as const;
       }
+      if (input.signal?.aborted) {
+        return { status: 'cancelled' } as const;
+      }
 
       const record: HeartbeatTaskRunRecord = {
         task: input.task,
         result: input.result,
         loadedCheckpoint: input.loadedCheckpoint,
+        outcome:
+          input.task.state?.lastExecution?.kind === 'agent'
+          && input.task.state.lastExecution.executionId === input.execution.executionId ?
+            input.task.state.lastExecution
+          : {
+              kind: 'agent',
+              executionId: input.execution.executionId,
+              summary: input.result.summary,
+              finishedAt: input.result.state.finishedAt,
+            },
       };
       await this.repository.saveCheckpoint(input.task, input.checkpoint);
       await this.repository.saveTask(input.task);
@@ -160,10 +174,36 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
         FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
         return { status: 'claim-lost' } as const;
       }
+      if (input.signal?.aborted) {
+        return { status: 'cancelled' } as const;
+      }
 
       await this.repository.saveTask(input.task);
       FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
       return { status: 'saved', task: input.task } as const;
+    });
+  }
+
+  /** Persists a claim-fenced non-agent outcome without creating or replacing a checkpoint. */
+  async recordTaskExecutionOutcome(input: Parameters<HeartbeatTaskStore['recordTaskExecutionOutcome']>[0]) {
+    return await this.mutationMutex.runExclusive(async () => {
+      const currentTask = await this.findTask(input.task.id);
+      if (!FileHeartbeatTaskService.executionMatches(currentTask, input.execution)) {
+        FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
+        return { status: 'claim-lost' } as const;
+      }
+      if (input.signal?.aborted) {
+        return { status: 'cancelled' } as const;
+      }
+
+      const record: HeartbeatTaskRunRecord = {
+        task: input.task,
+        outcome: input.outcome,
+      };
+      await this.repository.saveTask(input.task);
+      await this.repository.saveRunRecord(record);
+      FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
+      return { status: 'saved', task: input.task, record } as const;
     });
   }
 
@@ -439,34 +479,68 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
   }
 
   static projectRunRecordView(record: HeartbeatTaskRunRecord): HeartbeatRunView {
-    const runId = record.result.state.runId;
+    const outcome = FileHeartbeatTaskService.resolveRecordOutcome(record);
+    const runId = record.result?.state.runId;
     return {
-      id: runId,
+      id: runId ?? outcome.executionId,
       taskId: record.task.id,
+      executionId: outcome.executionId,
       runId,
       workspaceId: record.task.workspaceId,
-      createdAt: record.result.state.finishedAt,
+      createdAt: outcome.finishedAt,
       task: FileHeartbeatTaskService.projectTaskView(record.task),
-      result: FileHeartbeatTaskService.projectResultView(record.result),
+      result: record.result ?
+        FileHeartbeatTaskService.projectResultView(record.result)
+      : FileHeartbeatTaskService.projectOutcomeView(outcome),
       loadedCheckpoint: record.loadedCheckpoint,
     };
   }
 
   private static projectTaskStateView(state: HeartbeatTaskState | undefined): HeartbeatTaskView['state'] {
-    const result = state?.result;
+    const result =
+      state?.lastExecution && state.lastExecution.kind !== 'agent' ?
+        FileHeartbeatTaskService.projectOutcomeView(state.lastExecution)
+      : state?.result ? FileHeartbeatTaskService.projectResultView(state.result)
+      : state?.lastExecution ? FileHeartbeatTaskService.projectOutcomeView(state.lastExecution)
+      : undefined;
     return {
       ...omit(state ?? {}, ['result']),
       status: state?.status ?? 'idle',
-      result: result ? FileHeartbeatTaskService.projectResultView(result) : undefined,
+      result,
     };
   }
 
   private static projectResultView(result: AgentHeartbeatResult): HeartbeatTaskResultView {
     return {
+      kind: 'agent',
       decision: result.decision,
       summary: result.summary,
       outcome: result.state.outcome,
       usage: result.state.usage,
+    };
+  }
+
+  private static projectOutcomeView(outcome: HeartbeatTaskExecutionOutcome): HeartbeatTaskResultView {
+    return {
+      kind: outcome.kind,
+      summary: outcome.summary,
+      outcome: outcome.kind,
+    };
+  }
+
+  private static resolveRecordOutcome(record: HeartbeatTaskRunRecord): HeartbeatTaskExecutionOutcome {
+    if (record.outcome) {
+      return record.outcome;
+    }
+    if (!record.result) {
+      throw new Error(`Heartbeat record for task ${record.task.id} has no execution outcome.`);
+    }
+
+    return {
+      kind: 'agent',
+      executionId: record.result.state.runId,
+      summary: record.result.summary,
+      finishedAt: record.result.state.finishedAt,
     };
   }
 

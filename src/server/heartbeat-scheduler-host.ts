@@ -26,6 +26,8 @@ type WorkspaceSchedulerHandle = {
 
 export class HeddleHeartbeatSchedulerHost {
   private readonly schedulers = new Map<string, WorkspaceSchedulerHandle>();
+  private readonly stoppingSchedulers = new Map<string, Promise<void>>();
+  private stopPromise?: Promise<void>;
 
   constructor(private readonly options: HeddleHeartbeatSchedulerHostOptions) {}
 
@@ -34,6 +36,10 @@ export class HeddleHeartbeatSchedulerHost {
   }
 
   sync(): void {
+    if (this.stopPromise) {
+      return;
+    }
+
     const context = RuntimeWorkspaceService.resolveContext({
       workspaceRoot: this.options.workspaceRoot,
       stateRoot: this.options.stateRoot,
@@ -44,7 +50,7 @@ export class HeddleHeartbeatSchedulerHost {
     ]));
 
     workspacesByKey.forEach((workspace, key) => {
-      if (!this.schedulers.has(key)) {
+      if (!this.schedulers.has(key) && !this.stoppingSchedulers.has(key)) {
         this.schedulers.set(key, {
           workspace,
           scheduler: this.startWorkspaceScheduler(workspace),
@@ -55,14 +61,13 @@ export class HeddleHeartbeatSchedulerHost {
     [...this.schedulers.entries()]
       .filter(([key]) => !workspacesByKey.has(key))
       .forEach(([key, handle]) => {
-        handle.scheduler.stop();
-        this.schedulers.delete(key);
+        this.stopRemovedWorkspaceScheduler(key, handle);
       });
   }
 
-  stop(): void {
-    this.schedulers.forEach((handle) => handle.scheduler.stop());
-    this.schedulers.clear();
+  stop(): Promise<void> {
+    this.stopPromise ??= this.stopAllSchedulers();
+    return this.stopPromise;
   }
 
   private startWorkspaceScheduler(workspace: WorkspaceDescriptor): HeartbeatSchedulerHandle {
@@ -74,6 +79,27 @@ export class HeddleHeartbeatSchedulerHost {
       onEvent: (event) => this.options.onEvent?.(workspace, event),
       onError: (error) => this.options.onError?.(workspace, error),
     });
+  }
+
+  private stopRemovedWorkspaceScheduler(key: string, handle: WorkspaceSchedulerHandle): void {
+    this.schedulers.delete(key);
+    const stopping = handle.scheduler.stop({ cancelRunning: true })
+      .catch((error: unknown) => {
+        this.options.onError?.(handle.workspace, error);
+      })
+      .finally(() => {
+        this.stoppingSchedulers.delete(key);
+      });
+    this.stoppingSchedulers.set(key, stopping);
+  }
+
+  private async stopAllSchedulers(): Promise<void> {
+    const active = [...this.schedulers.values()];
+    this.schedulers.clear();
+    await Promise.all([
+      ...this.stoppingSchedulers.values(),
+      ...active.map(async (handle) => await handle.scheduler.stop({ cancelRunning: true })),
+    ]);
   }
 
   private static workspaceKey(workspace: WorkspaceDescriptor): string {

@@ -45,14 +45,18 @@ export function useControlPlaneHeartbeatEvents({
     onNotificationIntent?.(ClientSharedNotificationIntentService.projectHeartbeatEnvelope({ workspaceId, envelope }));
     setLiveTasks((current) => applyHeartbeatEvent(current, event));
 
-    if (event.type === 'heartbeat.task.finished') {
+    if (
+      event.type === 'heartbeat.task.finished'
+      || event.type === 'heartbeat.task.skipped'
+      || event.type === 'heartbeat.task.cancelled'
+    ) {
       void utils.controlPlane.heartbeatTasks.invalidate(workspaceId ? { workspaceId } : undefined);
       void utils.controlPlane.heartbeatTask.invalidate(workspaceId ? { workspaceId, taskId: event.taskId } : { taskId: event.taskId });
       void utils.controlPlane.state.invalidate();
       void utils.controlPlane.heartbeatRun.invalidate({
         workspaceId,
         taskId: event.taskId,
-        runId: event.record.runId,
+        runId: event.record.runId ?? event.record.id,
       });
     }
 
@@ -144,6 +148,14 @@ function projectHeartbeatTaskEvent(
         status: event.record.task.state.status,
         progress: event.record.task.state.progress ?? 'Heartbeat runner finished.',
         runId: event.record.runId,
+      };
+    case 'heartbeat.task.skipped':
+    case 'heartbeat.task.cancelled':
+      return {
+        ...base,
+        status: event.record.task.state.status,
+        progress: event.record.task.state.progress ?? event.record.result.summary,
+        runId: undefined,
       };
     case 'heartbeat.task.failed':
       return {

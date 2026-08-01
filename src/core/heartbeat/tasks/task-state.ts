@@ -13,6 +13,7 @@ import type {
   HeartbeatTask,
   HeartbeatTaskContinuationMode,
   HeartbeatTaskExecution,
+  HeartbeatTaskExecutionOutcome,
   HeartbeatTaskRecovery,
   HeartbeatTaskRecoveryReason,
   HeartbeatTaskState,
@@ -98,6 +99,7 @@ export class HeartbeatTaskStateProjector {
 
   static afterResult(args: {
     task: HeartbeatTask;
+    execution: HeartbeatTaskExecution;
     result: AgentHeartbeatResult;
     now: Date;
     loadedCheckpoint: boolean;
@@ -128,6 +130,12 @@ export class HeartbeatTaskStateProjector {
         resumable: args.result.decision !== 'complete' || continuationMode === 'operator',
         result: args.result,
         error: undefined,
+        lastExecution: HeartbeatTaskStateProjector.executionOutcome({
+          kind: 'agent',
+          execution: args.execution,
+          summary: args.result.summary,
+          finishedAt: dayjs(args.now).toISOString(),
+        }),
         recovery: args.task.state?.recovery,
         updatedAt: dayjs(args.now).toISOString(),
       },
@@ -136,10 +144,12 @@ export class HeartbeatTaskStateProjector {
 
   static afterFailure(args: {
     task: HeartbeatTask;
+    execution: HeartbeatTaskExecution;
     error: unknown;
     now: Date;
     retryMs: number;
   }): HeartbeatTask {
+    const summary = args.error instanceof Error ? args.error.message : String(args.error);
     return HeartbeatTaskStateProjector.normalize({
       ...args.task,
       schedule: {
@@ -151,9 +161,83 @@ export class HeartbeatTaskStateProjector {
         status: 'failed',
         progress: 'Heartbeat runner failed and will retry later.',
         runAt: dayjs(args.now).toISOString(),
-        error: args.error instanceof Error ? args.error.message : String(args.error),
+        error: summary,
         execution: undefined,
+        lastExecution: HeartbeatTaskStateProjector.executionOutcome({
+          kind: 'failed',
+          execution: args.execution,
+          summary,
+          finishedAt: dayjs(args.now).toISOString(),
+        }),
         updatedAt: dayjs(args.now).toISOString(),
+      },
+    });
+  }
+
+  static afterSkip(args: {
+    task: HeartbeatTask;
+    execution: HeartbeatTaskExecution;
+    summary: string;
+    now: Date;
+  }): HeartbeatTask {
+    const finishedAt = dayjs(args.now).toISOString();
+    return HeartbeatTaskStateProjector.normalize({
+      ...args.task,
+      schedule: {
+        ...args.task.schedule,
+        nextRunAt: args.task.enabled ? dayjs(args.now).add(args.task.schedule.intervalMs, 'millisecond').toISOString() : undefined,
+      },
+      state: {
+        status: args.task.enabled ? 'waiting' : 'idle',
+        progress: args.task.enabled ?
+          `No work was available. Waiting until the next scheduled run in ${HeartbeatTaskStateProjector.formatDelay(args.task.schedule.intervalMs)}.`
+        : 'No work was available. Task remains disabled.',
+        runAt: finishedAt,
+        resumable: true,
+        error: undefined,
+        execution: undefined,
+        lastExecution: HeartbeatTaskStateProjector.executionOutcome({
+          kind: 'skipped',
+          execution: args.execution,
+          summary: args.summary,
+          finishedAt,
+        }),
+        recovery: args.task.state?.recovery,
+        updatedAt: finishedAt,
+      },
+    });
+  }
+
+  static afterCancellation(args: {
+    task: HeartbeatTask;
+    execution: HeartbeatTaskExecution;
+    summary: string;
+    now: Date;
+  }): HeartbeatTask {
+    const finishedAt = dayjs(args.now).toISOString();
+    return HeartbeatTaskStateProjector.normalize({
+      ...args.task,
+      schedule: {
+        ...args.task.schedule,
+        nextRunAt: args.task.enabled ? dayjs(args.now).subtract(1, 'second').toISOString() : undefined,
+      },
+      state: {
+        status: args.task.enabled ? 'waiting' : 'idle',
+        progress: args.task.enabled ?
+          'Heartbeat execution was cancelled. Waiting for retry.'
+        : 'Heartbeat execution was cancelled. Task remains disabled.',
+        runAt: finishedAt,
+        resumable: true,
+        error: undefined,
+        execution: undefined,
+        lastExecution: HeartbeatTaskStateProjector.executionOutcome({
+          kind: 'cancelled',
+          execution: args.execution,
+          summary: args.summary,
+          finishedAt,
+        }),
+        recovery: args.task.state?.recovery,
+        updatedAt: finishedAt,
       },
     });
   }
@@ -248,5 +332,19 @@ export class HeartbeatTaskStateProjector {
       return `${delay.asSeconds()}s`;
     }
     return `${ms}ms`;
+  }
+
+  private static executionOutcome(args: {
+    kind: HeartbeatTaskExecutionOutcome['kind'];
+    execution: HeartbeatTaskExecution;
+    summary: string;
+    finishedAt: string;
+  }): HeartbeatTaskExecutionOutcome {
+    return {
+      kind: args.kind,
+      executionId: args.execution.executionId,
+      summary: args.summary,
+      finishedAt: args.finishedAt,
+    };
   }
 }

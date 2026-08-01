@@ -318,11 +318,19 @@ export type ControlPlaneHeartbeatEvent =
   | {
     type: 'heartbeat.task.agent_event';
     taskId: string;
+    executionId: string;
     event: ControlPlaneHeartbeatAgentEvent;
     timestamp: string;
   }
   | {
     type: 'heartbeat.task.finished';
+    taskId: string;
+    executionId: string;
+    record: HeartbeatRunView;
+    timestamp: string;
+  }
+  | {
+    type: 'heartbeat.task.skipped' | 'heartbeat.task.cancelled';
     taskId: string;
     executionId: string;
     record: HeartbeatRunView;

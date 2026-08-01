@@ -118,7 +118,7 @@ export function formatTaskListItem(task: ControlPlaneHeartbeatTaskView): string 
     `  prompt: ${truncate(firstTextLine(task.task), 140)}`,
     state.progress ? `  progress: ${truncate(state.progress, 140)}` : undefined,
     state.runId ? `  run: ${state.runId} (${state.resumable === false ? 'not resumable' : 'resumable'}, checkpoint ${state.loadedCheckpoint ? 'loaded' : 'not loaded'})` : undefined,
-    state.result ? `  last: ${state.result.decision}, ${state.result.outcome} at ${formatTimestamp(state.runAt)}` : undefined,
+    state.result ? `  last: ${state.result.decision ?? state.result.kind}, ${state.result.outcome} at ${formatTimestamp(state.runAt)}` : undefined,
     state.result?.usage ? `  usage: ${formatUsage(state.result.usage)}` : undefined,
     state.error ? `  error: ${truncate(state.error, 140)}` : undefined,
   ].filter((line): line is string => Boolean(line)).join('\n');
@@ -139,7 +139,7 @@ export function formatTaskDetail(task: ControlPlaneHeartbeatTaskView): string {
       `next: ${formatTimestamp(task.schedule.nextRunAt)}`,
     ]),
     formatSection('Last Run', [
-      state.result ? `decision: ${state.result.decision}` : 'decision: none',
+      state.result ? `decision: ${state.result.decision ?? state.result.kind}` : 'decision: none',
       state.result ? `outcome: ${state.result.outcome}` : undefined,
       state.runAt ? `time: ${formatTimestamp(state.runAt)}` : undefined,
       state.runId ? `run id: ${state.runId}` : undefined,

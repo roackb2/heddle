@@ -64,7 +64,11 @@ export class ControlPlaneHeartbeatEventsController {
   }
 
   private static projectEvent(event: HeartbeatSchedulerEvent): ControlPlaneHeartbeatEvent {
-    if (event.type === 'heartbeat.task.finished') {
+    if (
+      event.type === 'heartbeat.task.finished'
+      || event.type === 'heartbeat.task.skipped'
+      || event.type === 'heartbeat.task.cancelled'
+    ) {
       return {
         ...event,
         record: FileHeartbeatTaskService.projectRunRecordView(event.record),
