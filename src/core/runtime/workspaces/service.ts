@@ -58,6 +58,35 @@ export class RuntimeWorkspaceService {
     };
   }
 
+  /**
+   * Resolves the descriptor owned by the supplied workspace and state roots
+   * without changing the catalog's persisted active workspace.
+   *
+   * Workspace-scoped command hosts use this path so launching Heddle from one
+   * repository cannot silently attach to a different workspace selected by a
+   * long-running web or daemon host.
+   */
+  static resolveContextForRoot(config: WorkspaceRootConfig): ResolvedWorkspaceContext {
+    const resolved = RuntimeWorkspaceService.resolveContext(config);
+    const workspaceRoot = resolve(config.workspaceRoot);
+    const stateRoot = resolve(config.stateRoot);
+    const workspace = resolved.workspaces.find((candidate) => (
+      resolve(candidate.workspaceRoot) === workspaceRoot
+      && resolve(candidate.stateRoot) === stateRoot
+    ));
+    if (!workspace) {
+      throw new Error(
+        `Workspace catalog ${resolved.catalogPath} does not contain the command workspace ${workspaceRoot} with state root ${stateRoot}.`,
+      );
+    }
+
+    return {
+      ...resolved,
+      activeWorkspaceId: workspace.id,
+      activeWorkspace: workspace,
+    };
+  }
+
   static setActive(input: SetActiveWorkspaceInput): ResolvedWorkspaceContext {
     const resolved = RuntimeWorkspaceService.resolveContext(input);
     if (!resolved.workspaces.some((workspace) => workspace.id === input.workspaceId)) {

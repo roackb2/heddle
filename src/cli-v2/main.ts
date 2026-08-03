@@ -348,7 +348,7 @@ function resolveCliOptions(flags: RootCliOptions): ResolvedCliOptions {
   const workspaceRoot = resolve(flags.cwd ?? process.cwd());
   const projectConfig = ProjectConfigService.read(workspaceRoot);
   const stateRoot = resolve(workspaceRoot, projectConfig.stateDir ?? '.heddle');
-  const workspaceContext = RuntimeWorkspaceService.resolveContext({
+  const workspaceContext = RuntimeWorkspaceService.resolveContextForRoot({
     workspaceRoot,
     stateRoot,
   });
