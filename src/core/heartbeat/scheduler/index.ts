@@ -3,6 +3,9 @@ export { HeartbeatSchedulerService } from './service.js';
 export type {
   HeartbeatSchedulerEvent,
   HeartbeatSchedulerHandle,
+  HeartbeatExecutionContext,
+  HeartbeatHandlerOutcome,
+  HeartbeatTaskHandler,
   HeartbeatTaskRunner,
   HeartbeatTaskRunnerAgentOptions,
   HeartbeatTaskRunnerContext,
@@ -11,4 +14,5 @@ export type {
   RunDueHeartbeatTasksResult,
   RunHeartbeatSchedulerOptions,
   StartHeartbeatSchedulerOptions,
+  StopHeartbeatSchedulerOptions,
 } from './types.js';

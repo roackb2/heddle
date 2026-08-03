@@ -19,7 +19,7 @@ export function useControlPlaneTaskSelection({
 }) {
   const detail = useControlPlaneTaskDetail(workspaceId, navigation.selectedTaskId, navigation.selectedTaskRunId);
   const task = detail.task ? applyLiveTaskState(detail.task, taskEvents.liveTasks[detail.task.taskId]) : undefined;
-  const selectedRunId = navigation.selectedTaskRunId ?? detail.selectedRun?.runId;
+  const selectedRunId = navigation.selectedTaskRunId ?? detail.selectedRun?.id;
   const runDetail = useControlPlaneTaskRunDetail(
     workspaceId,
     navigation.selectedTaskId,

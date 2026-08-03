@@ -19,19 +19,21 @@ operator-facing heartbeat views.
   task/checkpoint/run storage and task/run projections. It is the only
   non-repository service that should instantiate `FileHeartbeatTaskRepository`.
   It also owns process-local execution claims, recovery of interrupted
-  single-host executions, and fencing of late completion/failure writes.
-  `HeartbeatTaskStateProjector` owns task state transitions after success,
-  failure, or recovery.
+  single-host executions, and fencing of late completion/failure/outcome
+  writes. `HeartbeatTaskStateProjector` owns task state transitions after
+  agent success, no-work skip, cancellation, failure, or recovery.
 - `scheduler/`: `HeartbeatSchedulerService` owns due-task selection and the
   periodic scheduler loop. It delegates execution to
   `HeartbeatTaskRunnerService` instead of running tasks itself. Daemon, CLI,
   and future hosts should start or run the scheduler through this service
   instead of constructing task repositories or duplicating loop logic.
 - `scheduler/runner.ts`: `HeartbeatTaskRunnerService` owns one task execution:
-  checkpoint loading, runner-agent invocation, checkpoint persistence, task
-  state transitions, and run history persistence. Default and custom runners
-  share its framework-owned `context.runAgent()` path, so hosts can add domain
-  prompts and tools without receiving or translating provider credentials.
+  checkpoint loading, handler invocation, runner-agent invocation, abort
+  propagation, checkpoint persistence, task state transitions, and execution
+  history persistence. Default and custom handlers share its framework-owned
+  `context.runAgent()` path, so hosts can add domain prompts and tools without
+  receiving or translating provider credentials. `context.skip()` records
+  explicit no-work without fabricating agent state.
 - `views/`: `HeartbeatLucidPresenter` owns Lucid-specific adapter messages.
   Generic task/run view projection belongs to `FileHeartbeatTaskService`,
   because that service owns the task persistence boundary.
@@ -49,7 +51,8 @@ operator-facing heartbeat views.
 
 - Keep scheduler/task persistence concerns here, not in runtime.
 - `executionId` is the fencing token for one task attempt. A store must reject
-  completion or failure when that execution no longer owns the task.
+  completion, failure, skip, or cancellation persistence when that execution
+  no longer owns the task.
 - `executionOwnerId` identifies one scheduler process/worker generation. Do not
   reuse it across process restarts: scheduler startup uses it to distinguish a
   current claim from an execution interrupted by the prior single-host process.
@@ -69,16 +72,23 @@ operator-facing heartbeat views.
   control-plane heartbeat API as the public task/run contract. Terminal command
   code should not construct `HeartbeatTask` objects, write heartbeat JSON, or run
   its own scheduler loop.
-- A custom scheduler runner may perform domain work before model execution, but
-  it should delegate model work to the execution-scoped `context.runAgent()`.
-  That callback owns model credential resolution, OAuth refresh, unattended
-  approval defaults, checkpoint continuation, and heartbeat event forwarding.
-  The callback is valid only during the current execution and must never be
-  serialized or retained by the host.
+- A custom scheduler handler may claim domain work before model execution. It
+  must either delegate model work to execution-scoped `context.runAgent()` or
+  return `context.skip()` when no work exists. The context owns model credential
+  resolution, OAuth refresh, unattended approval defaults, checkpoint
+  continuation, abort propagation, and heartbeat event forwarding. It is valid
+  only during the current execution and must never be serialized or retained by
+  the host. The positional runner API is deprecated and adapted through this
+  same pipeline.
+- `HeartbeatSchedulerService.start()` returns an awaitable, idempotent stop
+  handle. Hosts must await `stop({ cancelRunning: true })` before resetting
+  domain state. A handler that ignores its abort signal delays stop until it
+  settles; final writes remain fenced by the execution claim.
 - `heddle heartbeat run` and `heddle heartbeat start` are server-backed command
   paths. The control-plane server owns recurring scheduler lifetime; CLI
   commands may request due-task execution or keep an embedded server alive, but
   should not own recurring heartbeat execution policy.
 - When this domain is refactored further, follow the `src/core/chat/engine`
   pattern: class-backed owning services/repositories, local `types.ts` contracts,
-  schema-owned persistence validation, and no compatibility wrappers.
+  schema-owned persistence validation, and compatibility adapters only at
+  public boundaries rather than parallel internal pipelines.

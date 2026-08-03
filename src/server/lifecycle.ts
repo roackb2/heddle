@@ -67,7 +67,7 @@ export async function startHeddleControlPlaneServer(
     },
   });
 
-  let cleanedUp = false;
+  let cleanupPromise: Promise<void> | undefined;
   const lifecycleTimers: { heartbeat?: NodeJS.Timeout } = {};
   const registerServer = (lastSeenAt?: string) => {
     const workspaceContext = RuntimeWorkspaceService.resolveContext({
@@ -91,25 +91,30 @@ export async function startHeddleControlPlaneServer(
       },
     });
   };
-  const cleanup = () => {
-    if (cleanedUp) {
-      return;
-    }
-
-    cleanedUp = true;
-    if (lifecycleTimers.heartbeat) {
-      clearInterval(lifecycleTimers.heartbeat);
-    }
-    heartbeatSchedulerHost?.stop();
-    RuntimeDaemonRegistryService.clearLiveServer({
-      registryPath,
-      serverId,
-    });
+  const cleanup = (): Promise<void> => {
+    cleanupPromise ??= (async () => {
+      if (lifecycleTimers.heartbeat) {
+        clearInterval(lifecycleTimers.heartbeat);
+      }
+      try {
+        await heartbeatSchedulerHost?.stop();
+      } finally {
+        RuntimeDaemonRegistryService.clearLiveServer({
+          registryPath,
+          serverId,
+        });
+      }
+    })();
+    return cleanupPromise;
   };
 
   const server = await listen(app, options.host, options.port);
   endpoint.port = resolveListeningPort(server, options.port);
-  server.once('close', cleanup);
+  server.once('close', () => {
+    void cleanup().catch((error: unknown) => {
+      logger.error({ error, serverId }, 'Failed to clean up Heddle server lifecycle');
+    });
+  });
   server.on('error', (error) => {
     logger.error({ error, serverId }, 'Heddle server emitted an error');
   });
@@ -120,6 +125,9 @@ export async function startHeddleControlPlaneServer(
   } catch (error) {
     await closeServer(server).catch((closeError) => {
       logger.error({ error: closeError, serverId }, 'Failed to close Heddle server after startup error');
+    });
+    await cleanup().catch((cleanupError) => {
+      logger.error({ error: cleanupError, serverId }, 'Failed to clean up Heddle server after startup error');
     });
     throw error;
   }
@@ -136,9 +144,17 @@ export async function startHeddleControlPlaneServer(
 
   let closePromise: Promise<void> | undefined;
   const close = () => {
-    closePromise ??= closeServer(server).then(() => {
-      cleanup();
-    });
+    closePromise ??= (async () => {
+      const closeResults = await Promise.allSettled([
+        heartbeatSchedulerHost?.stop() ?? Promise.resolve(),
+        closeServer(server),
+      ]);
+      const [cleanupResult] = await Promise.allSettled([cleanup()]);
+      const failure = [...closeResults, cleanupResult].find((result) => result.status === 'rejected');
+      if (failure?.status === 'rejected') {
+        throw failure.reason;
+      }
+    })();
     return closePromise;
   };
 
@@ -243,6 +259,8 @@ function logHeartbeatSchedulerEvent(
     'heartbeat.task.recovered': 'Heartbeat task recovered after interrupted execution',
     'heartbeat.task.agent_event': 'Heartbeat task agent event',
     'heartbeat.task.finished': 'Heartbeat task finished',
+    'heartbeat.task.skipped': 'Heartbeat task skipped because no work was available',
+    'heartbeat.task.cancelled': 'Heartbeat task execution cancelled',
     'heartbeat.task.failed': 'Heartbeat task failed',
   } satisfies Record<HeartbeatSchedulerEvent['type'], string>;
 

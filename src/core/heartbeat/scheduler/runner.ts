@@ -1,10 +1,9 @@
 /**
  * Heartbeat task runner service.
  *
- * Owns the execution of one durable heartbeat task: checkpoint loading, task
- * state transitions, runner-agent invocation, checkpoint persistence, and run
- * history persistence. The scheduler decides when a task is due; this service
- * decides how that task is executed and recorded.
+ * Owns one durable execution from claim through final claim-fenced persistence.
+ * Custom handlers may discover domain work, but credentials, agent defaults,
+ * cancellation, checkpoints, run records, and framework events stay here.
  */
 import { randomUUID } from 'node:crypto';
 import dayjs from 'dayjs';
@@ -14,9 +13,19 @@ import type { AgentLoopCheckpoint, AgentLoopState } from '@/core/runtime/loop/in
 import { HeartbeatRunnerAgent } from '../agent/index.js';
 import type { AgentHeartbeatResult, RunAgentHeartbeatOptions } from '../agent/index.js';
 import { HeartbeatTaskStateProjector } from '../tasks/index.js';
-import type { HeartbeatTask, HeartbeatTaskExecution, HeartbeatTaskRunRecord } from '../tasks/index.js';
 import type {
+  HeartbeatTask,
+  HeartbeatTaskAgentRunRecord,
+  HeartbeatTaskExecution,
+  HeartbeatTaskExecutionOutcome,
+  HeartbeatTaskNonAgentRunRecord,
+  HeartbeatTaskRunRecord,
+} from '../tasks/index.js';
+import type {
+  HeartbeatExecutionContext,
+  HeartbeatHandlerOutcome,
   HeartbeatSchedulerEvent,
+  HeartbeatTaskHandler,
   HeartbeatTaskRunner,
   HeartbeatTaskRunnerAgentOptions,
   HeartbeatTaskRunnerRuntimeOptions,
@@ -25,23 +34,43 @@ import type {
 } from './types.js';
 
 const DEFAULT_FAILURE_RETRY_MS = 5 * 60_000;
+const CANCELLATION_SUMMARY = 'Heartbeat execution cancelled by its scheduler host.';
 
 export class HeartbeatTaskRunnerService {
-  // Runs one already-selected task and persists the resulting task state, checkpoint, and run record.
+  // Runs one already-selected task and persists its final claim-fenced outcome.
   static async runTask(
-    options: Pick<RunDueHeartbeatTasksOptions, 'store' | 'runner' | 'runtime' | 'onEvent' | 'failureRetryMs' | 'executionOwnerId'> & {
+    options: Pick<RunDueHeartbeatTasksOptions,
+      | 'store'
+      | 'handler'
+      | 'runner'
+      | 'runtime'
+      | 'now'
+      | 'onEvent'
+      | 'failureRetryMs'
+      | 'executionOwnerId'
+      | 'signal'
+    > & {
       task: HeartbeatTask;
       runAt: Date;
     },
   ): Promise<{ record?: HeartbeatTaskRunRecord; failed: boolean }> {
+    HeartbeatTaskRunnerService.assertHandlerConfiguration(options);
+    if (options.signal?.aborted) {
+      return { failed: false };
+    }
+
     const { task, runAt } = options;
-    const timestamp = dayjs(runAt).toISOString();
+    const startedAt = dayjs(runAt).toISOString();
     const checkpoint = await options.store.loadCheckpoint(task);
+    if (options.signal?.aborted) {
+      return { failed: false };
+    }
+
     const loadedCheckpoint = Boolean(checkpoint);
     const execution: HeartbeatTaskExecution = {
       executionId: randomUUID(),
       ownerId: options.executionOwnerId ?? `heartbeat-worker:${randomUUID()}`,
-      claimedAt: timestamp,
+      claimedAt: startedAt,
     };
     const claim = await options.store.claimTaskExecution({
       taskId: task.id,
@@ -54,21 +83,73 @@ export class HeartbeatTaskRunnerService {
     }
 
     const runningTask = claim.task;
-    options.onEvent?.(HeartbeatTaskRunnerService.startedEvent(runningTask, execution, loadedCheckpoint, timestamp));
+    const scopeController = new AbortController();
+    const executionSignal = HeartbeatTaskRunnerService.composeExecutionSignal(options.signal, scopeController.signal);
+    options.onEvent?.(HeartbeatTaskRunnerService.startedEvent(runningTask, execution, loadedCheckpoint, startedAt));
 
     try {
-      const result = await HeartbeatTaskRunnerService.runAgent({
+      const result = await HeartbeatTaskRunnerService.invokeHandler({
         task: runningTask,
         checkpoint,
+        execution,
         runAt,
+        signal: executionSignal,
+        scopeController,
+        handler: options.handler,
         runner: options.runner,
         runtime: options.runtime,
         onEvent: options.onEvent,
       });
+      if (options.signal?.aborted) {
+        return await HeartbeatTaskRunnerService.persistCancellation({
+          ...options,
+          task: runningTask,
+          execution,
+        });
+      }
+
+      const settledAt = options.now?.() ?? dayjs().toDate();
+      if (HeartbeatTaskRunnerService.isSkippedOutcome(result)) {
+        const nextTask = HeartbeatTaskStateProjector.afterSkip({
+          task: runningTask,
+          execution,
+          summary: result.summary,
+          now: settledAt,
+        });
+        const outcome = HeartbeatTaskRunnerService.requireProjectedOutcome(nextTask, 'skipped');
+
+        const completion = await options.store.recordTaskExecutionOutcome({
+          execution,
+          task: nextTask,
+          outcome,
+          signal: options.signal,
+        });
+        if (completion.status === 'cancelled') {
+          return await HeartbeatTaskRunnerService.persistCancellation({
+            ...options,
+            task: runningTask,
+            execution,
+          });
+        }
+        if (completion.status !== 'saved' || !HeartbeatTaskRunnerService.isNonAgentRecord(completion.record, 'skipped')) {
+          return { failed: false };
+        }
+
+        options.onEvent?.({
+          type: 'heartbeat.task.skipped',
+          taskId: task.id,
+          executionId: execution.executionId,
+          record: completion.record,
+          timestamp: outcome.finishedAt,
+        });
+        return { record: completion.record, failed: false };
+      }
+
       const nextTask = HeartbeatTaskStateProjector.afterResult({
         task: runningTask,
+        execution,
         result,
-        now: runAt,
+        now: settledAt,
         loadedCheckpoint,
       });
       const completion = await options.store.completeTaskExecution({
@@ -77,34 +158,64 @@ export class HeartbeatTaskRunnerService {
         checkpoint: result.checkpoint,
         result,
         loadedCheckpoint,
+        signal: options.signal,
       });
-      if (completion.status === 'claim-lost' || !completion.record) {
+      if (completion.status === 'cancelled') {
+        return await HeartbeatTaskRunnerService.persistCancellation({
+          ...options,
+          task: runningTask,
+          execution,
+        });
+      }
+      if (completion.status !== 'saved' || !HeartbeatTaskRunnerService.isAgentRecord(completion.record)) {
         return { failed: false };
       }
 
-      const record = completion.record;
       options.onEvent?.({
         type: 'heartbeat.task.finished',
         taskId: task.id,
         executionId: execution.executionId,
-        record,
-        timestamp,
+        record: completion.record,
+        timestamp: completion.record.outcome?.finishedAt ?? result.state.finishedAt,
       });
-      return { record, failed: false };
+      return { record: completion.record, failed: false };
     } catch (error) {
+      if (options.signal?.aborted) {
+        return await HeartbeatTaskRunnerService.persistCancellation({
+          ...options,
+          task: runningTask,
+          execution,
+        });
+      }
+
+      const settledAt = options.now?.() ?? dayjs().toDate();
       const nextTask = HeartbeatTaskStateProjector.afterFailure({
         task: runningTask,
+        execution,
         error,
-        now: runAt,
+        now: settledAt,
         retryMs: options.failureRetryMs ?? DEFAULT_FAILURE_RETRY_MS,
       });
-      const failure = await options.store.failTaskExecution({ execution, task: nextTask });
+      const failure = await options.store.failTaskExecution({
+        execution,
+        task: nextTask,
+        signal: options.signal,
+      });
+      if (failure.status === 'cancelled') {
+        return await HeartbeatTaskRunnerService.persistCancellation({
+          ...options,
+          task: runningTask,
+          execution,
+        });
+      }
       if (failure.status === 'claim-lost') {
         return { failed: false };
       }
 
-      options.onEvent?.(HeartbeatTaskRunnerService.failedEvent(nextTask, execution, error, timestamp));
+      options.onEvent?.(HeartbeatTaskRunnerService.failedEvent(nextTask, execution, error, dayjs(settledAt).toISOString()));
       return { failed: true };
+    } finally {
+      scopeController.abort();
     }
   }
 
@@ -129,27 +240,108 @@ export class HeartbeatTaskRunnerService {
     };
   }
 
-  private static async runAgent(args: {
+  private static async invokeHandler(args: {
     task: HeartbeatTask;
-    checkpoint: AgentLoopState | AgentLoopCheckpoint | undefined;
+    checkpoint: AgentLoopCheckpoint | undefined;
+    execution: HeartbeatTaskExecution;
     runAt: Date;
+    signal: AbortSignal;
+    scopeController: AbortController;
+    handler?: HeartbeatTaskHandler;
     runner?: HeartbeatTaskRunner;
     runtime?: HeartbeatTaskRunnerRuntimeOptions;
     onEvent?: (event: HeartbeatSchedulerEvent) => void;
-  }): Promise<AgentHeartbeatResult> {
-    const runAgent = async (options?: HeartbeatTaskRunnerAgentOptions) => await HeartbeatRunnerAgent.run(
-      HeartbeatTaskRunnerService.resolveRunnerAgentOptions({ ...args, options }),
+  }): Promise<AgentHeartbeatResult | HeartbeatHandlerOutcome> {
+    let active = true;
+    let agentInvocation: Promise<AgentHeartbeatResult> | undefined;
+    let agentResult: AgentHeartbeatResult | undefined;
+    let skipSelected = false;
+
+    const context: HeartbeatExecutionContext = Object.freeze({
+      task: structuredClone(args.task),
+      checkpoint: args.checkpoint ? structuredClone(args.checkpoint) : undefined,
+      executionId: args.execution.executionId,
+      runAt: new Date(args.runAt),
+      signal: args.signal,
+      runAgent: async (options?: HeartbeatTaskRunnerAgentOptions) => {
+        HeartbeatTaskRunnerService.assertContextActive(active, args.execution.executionId);
+        if (skipSelected) {
+          throw new Error('Cannot run an agent after selecting a skipped heartbeat outcome.');
+        }
+        if (agentInvocation) {
+          throw new Error('Heartbeat execution context runAgent() may be called only once.');
+        }
+
+        agentInvocation = HeartbeatRunnerAgent.run(
+          HeartbeatTaskRunnerService.resolveRunnerAgentOptions({ ...args, options }),
+        );
+        agentResult = await agentInvocation;
+        return agentResult;
+      },
+      skip: (input: { summary: string }) => {
+        HeartbeatTaskRunnerService.assertContextActive(active, args.execution.executionId);
+        if (agentInvocation) {
+          throw new Error('Cannot skip a heartbeat execution after runAgent() has started.');
+        }
+        if (skipSelected) {
+          throw new Error('Heartbeat execution context skip() may be called only once.');
+        }
+
+        const summary = input.summary.trim();
+        if (!summary) {
+          throw new Error('A skipped heartbeat execution requires a non-empty summary.');
+        }
+        skipSelected = true;
+        return Object.freeze({ kind: 'skipped' as const, summary });
+      },
+    });
+
+    const legacyRunner = args.runner;
+    const handler: HeartbeatTaskHandler = args.handler ?? (
+      legacyRunner ?
+        async (handlerContext: HeartbeatExecutionContext) => await legacyRunner(
+          handlerContext.task,
+          handlerContext.checkpoint,
+          handlerContext,
+        )
+      : async (handlerContext: HeartbeatExecutionContext) => await handlerContext.runAgent()
     );
 
-    return args.runner
-      ? await args.runner(args.task, args.checkpoint, { runAgent })
-      : await runAgent();
+    try {
+      const result = await handler(context);
+      if (HeartbeatTaskRunnerService.isSkippedOutcome(result)) {
+        if (!skipSelected || agentInvocation) {
+          throw new Error('Custom heartbeat handlers must return the outcome created by context.skip().');
+        }
+        return result;
+      }
+      if (!HeartbeatTaskRunnerService.isAgentResult(result)) {
+        throw new Error('Custom heartbeat handler returned an unsupported execution outcome.');
+      }
+      if (args.handler && (!agentInvocation || result !== agentResult)) {
+        throw new Error('Custom heartbeat handlers must return the AgentHeartbeatResult produced by context.runAgent().');
+      }
+      if (agentInvocation && result !== agentResult) {
+        throw new Error('Heartbeat handler returned an agent result other than the result produced by context.runAgent().');
+      }
+      return result;
+    } catch (error) {
+      if (agentInvocation && !agentResult) {
+        args.scopeController.abort(error);
+        await agentInvocation.catch(() => undefined);
+      }
+      throw error;
+    } finally {
+      active = false;
+    }
   }
 
   private static resolveRunnerAgentOptions(args: {
     task: HeartbeatTask;
     checkpoint: AgentLoopState | AgentLoopCheckpoint | undefined;
+    execution: HeartbeatTaskExecution;
     runAt: Date;
+    signal: AbortSignal;
     runtime?: HeartbeatTaskRunnerRuntimeOptions;
     onEvent?: (event: HeartbeatSchedulerEvent) => void;
     options?: HeartbeatTaskRunnerAgentOptions;
@@ -177,18 +369,107 @@ export class HeartbeatTaskRunnerService {
       approvalPolicies: [
         ToolApprovalPolicies.unattendedLocalAutomation(),
         ...(args.runtime?.approvalPolicies ?? []),
+        ...(args.options?.approvalPolicies ?? []),
       ],
       approveToolCall: HeartbeatTaskRunnerService.denyInteractiveToolCall,
+      abortSignal: args.signal,
       onEvent: (event) => {
+        args.options?.onEvent?.(event);
         args.runtime?.onAgentEvent?.(event);
         args.onEvent?.({
           type: 'heartbeat.task.agent_event',
           taskId: args.task.id,
+          executionId: args.execution.executionId,
           event,
           timestamp: 'timestamp' in event && typeof event.timestamp === 'string' ? event.timestamp : dayjs().toISOString(),
         });
       },
     };
+  }
+
+  private static async persistCancellation(args: Pick<RunDueHeartbeatTasksOptions, 'store' | 'now' | 'onEvent'> & {
+    task: HeartbeatTask;
+    execution: HeartbeatTaskExecution;
+  }): Promise<{ record?: HeartbeatTaskRunRecord; failed: boolean }> {
+    const settledAt = args.now?.() ?? dayjs().toDate();
+    const nextTask = HeartbeatTaskStateProjector.afterCancellation({
+      task: args.task,
+      execution: args.execution,
+      summary: CANCELLATION_SUMMARY,
+      now: settledAt,
+    });
+    const outcome = HeartbeatTaskRunnerService.requireProjectedOutcome(nextTask, 'cancelled');
+
+    const completion = await args.store.recordTaskExecutionOutcome({
+      execution: args.execution,
+      task: nextTask,
+      outcome,
+    });
+    if (completion.status !== 'saved' || !HeartbeatTaskRunnerService.isNonAgentRecord(completion.record, 'cancelled')) {
+      return { failed: false };
+    }
+
+    args.onEvent?.({
+      type: 'heartbeat.task.cancelled',
+      taskId: args.task.id,
+      executionId: args.execution.executionId,
+      record: completion.record,
+      timestamp: outcome.finishedAt,
+    });
+    return { record: completion.record, failed: false };
+  }
+
+  private static composeExecutionSignal(cancellationSignal: AbortSignal | undefined, scopeSignal: AbortSignal): AbortSignal {
+    return cancellationSignal ? AbortSignal.any([cancellationSignal, scopeSignal]) : scopeSignal;
+  }
+
+  static assertHandlerConfiguration(options: Pick<RunDueHeartbeatTasksOptions, 'handler' | 'runner'>): void {
+    if (options.handler && options.runner) {
+      throw new Error('Configure either heartbeat handler or deprecated runner, not both.');
+    }
+  }
+
+  private static assertContextActive(active: boolean, executionId: string): void {
+    if (!active) {
+      throw new Error(`Heartbeat execution context ${executionId} is no longer active.`);
+    }
+  }
+
+  private static isSkippedOutcome(value: unknown): value is HeartbeatHandlerOutcome {
+    return Boolean(value && typeof value === 'object' && 'kind' in value && value.kind === 'skipped');
+  }
+
+  private static isAgentResult(value: unknown): value is AgentHeartbeatResult {
+    return Boolean(
+      value
+      && typeof value === 'object'
+      && 'decision' in value
+      && 'summary' in value
+      && 'state' in value
+      && 'checkpoint' in value,
+    );
+  }
+
+  private static isAgentRecord(record: HeartbeatTaskRunRecord | undefined): record is HeartbeatTaskAgentRunRecord {
+    return Boolean(record?.result);
+  }
+
+  private static isNonAgentRecord<K extends 'skipped' | 'cancelled'>(
+    record: HeartbeatTaskRunRecord | undefined,
+    kind: K,
+  ): record is HeartbeatTaskNonAgentRunRecord & { outcome: { kind: K } } {
+    return Boolean(record && !record.result && record.outcome?.kind === kind);
+  }
+
+  private static requireProjectedOutcome<K extends HeartbeatTaskExecutionOutcome['kind']>(
+    task: HeartbeatTask,
+    kind: K,
+  ): HeartbeatTaskExecutionOutcome & { kind: K } {
+    const outcome = task.state?.lastExecution;
+    if (outcome?.kind !== kind) {
+      throw new Error(`Heartbeat task ${task.id} did not project a ${kind} execution outcome.`);
+    }
+    return outcome as HeartbeatTaskExecutionOutcome & { kind: K };
   }
 
   private static startedEvent(

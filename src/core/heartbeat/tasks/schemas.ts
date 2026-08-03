@@ -26,6 +26,13 @@ const HeartbeatTaskRecoverySchema = z.object({
   reason: HeartbeatTaskRecoveryReasonSchema.describe('Host-owned reason for recovering the execution.'),
 });
 
+export const HeartbeatTaskExecutionOutcomeSchema = z.object({
+  kind: z.enum(['agent', 'skipped', 'cancelled', 'failed']).describe('How this outer heartbeat execution settled.'),
+  executionId: z.string().describe('Outer heartbeat execution fencing identity.'),
+  summary: z.string().describe('Operator-facing execution outcome summary.'),
+  finishedAt: z.string().describe('Timestamp when the outer heartbeat execution settled.'),
+});
+
 export const HeartbeatTaskSchema = z.object({
   id: z.string().describe('Stable heartbeat task identifier.'),
   workspaceId: z.string().optional().describe('Workspace identifier this task belongs to.'),
@@ -57,6 +64,7 @@ export const HeartbeatTaskSchema = z.object({
     result: z.lazy(() => AgentHeartbeatResultSchema).optional().describe('Latest heartbeat runner result.'),
     error: z.string().optional().describe('Latest scheduler or runner error.'),
     execution: HeartbeatTaskExecutionSchema.optional().describe('Currently owned execution attempt and fencing identity.'),
+    lastExecution: HeartbeatTaskExecutionOutcomeSchema.optional().describe('Latest outer heartbeat execution outcome.'),
     recovery: HeartbeatTaskRecoverySchema.optional().describe('Most recent explicit interrupted-execution recovery.'),
     updatedAt: z.string().optional().describe('Timestamp when this task record was last updated.'),
   }).optional().describe('Latest scheduler/result state for this heartbeat task.'),
@@ -86,8 +94,23 @@ const AgentHeartbeatResultSchema = z.object({
   }).passthrough(),
 }).passthrough();
 
-export const HeartbeatTaskRunRecordSchema = z.object({
+const HeartbeatTaskAgentRunRecordSchema = z.object({
   task: HeartbeatTaskSchema.describe('Task state captured after this run.'),
   result: AgentHeartbeatResultSchema.describe('Heartbeat runner result.'),
   loadedCheckpoint: z.boolean().describe('Whether this run resumed from a stored checkpoint.'),
+  outcome: HeartbeatTaskExecutionOutcomeSchema.extend({
+    kind: z.literal('agent'),
+  }).optional().describe('Outer execution correlation for agent records created by current Heddle versions.'),
 });
+
+const HeartbeatTaskNonAgentRunRecordSchema = z.object({
+  task: HeartbeatTaskSchema.describe('Task state captured after this execution.'),
+  outcome: HeartbeatTaskExecutionOutcomeSchema.extend({
+    kind: z.enum(['skipped', 'cancelled']),
+  }).describe('Lightweight execution outcome with no fabricated agent state.'),
+}).strict();
+
+export const HeartbeatTaskRunRecordSchema = z.union([
+  HeartbeatTaskAgentRunRecordSchema,
+  HeartbeatTaskNonAgentRunRecordSchema,
+]);

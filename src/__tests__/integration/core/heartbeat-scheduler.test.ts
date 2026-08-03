@@ -302,6 +302,7 @@ describe('heartbeat scheduler', () => {
     expect(runs).toHaveLength(1);
     expect(runs?.[0]).toMatchObject({
       taskId: 'local-task',
+      executionId: 'run-pause',
       runId: 'run-pause',
       record: {
         task: {
@@ -599,6 +600,7 @@ describe('heartbeat scheduler', () => {
     const lateResult = createHeartbeatResult('continue');
     const lateTask = HeartbeatTaskStateProjector.afterResult({
       task: interruptedTask,
+      execution: originalExecution,
       result: lateResult,
       now: NOW,
       loadedCheckpoint: false,
@@ -660,7 +662,20 @@ function createMemoryTaskStore(options: {
       if (task?.state?.execution?.executionId !== input.execution.executionId) {
         return { status: 'claim-lost' };
       }
-      const record = { task: input.task, result: input.result, loadedCheckpoint: input.loadedCheckpoint };
+      if (input.signal?.aborted) {
+        return { status: 'cancelled' };
+      }
+      const record = {
+        task: input.task,
+        result: input.result,
+        loadedCheckpoint: input.loadedCheckpoint,
+        outcome: {
+          kind: 'agent' as const,
+          executionId: input.execution.executionId,
+          summary: input.result.summary,
+          finishedAt: input.result.state.finishedAt,
+        },
+      };
       tasks = [...tasks.filter((candidate) => candidate.id !== input.task.id), input.task];
       options.saveTask?.(input.task);
       options.saveCheckpoint?.(input.checkpoint);
@@ -671,9 +686,25 @@ function createMemoryTaskStore(options: {
       if (task?.state?.execution?.executionId !== input.execution.executionId) {
         return { status: 'claim-lost' };
       }
+      if (input.signal?.aborted) {
+        return { status: 'cancelled' };
+      }
       tasks = [...tasks.filter((candidate) => candidate.id !== input.task.id), input.task];
       options.saveTask?.(input.task);
       return { status: 'saved', task: input.task };
+    },
+    async recordTaskExecutionOutcome(input) {
+      const task = tasks.find((candidate) => candidate.id === input.task.id);
+      if (task?.state?.execution?.executionId !== input.execution.executionId) {
+        return { status: 'claim-lost' };
+      }
+      if (input.signal?.aborted) {
+        return { status: 'cancelled' };
+      }
+      const record = { task: input.task, outcome: input.outcome };
+      tasks = [...tasks.filter((candidate) => candidate.id !== input.task.id), input.task];
+      options.saveTask?.(input.task);
+      return { status: 'saved', task: input.task, record };
     },
     async recoverInterruptedTasks() {
       return [];

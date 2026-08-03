@@ -42,5 +42,5 @@ function resolveSelectedRun(
     return runs[0];
   }
 
-  return runs.find((run) => run.runId === selectedRunId || run.id === selectedRunId) ?? runs[0];
+  return runs.find((run) => run.id === selectedRunId || run.executionId === selectedRunId || run.runId === selectedRunId) ?? runs[0];
 }

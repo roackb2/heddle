@@ -95,8 +95,11 @@ export function formatHeartbeatTask(task: HeartbeatTask): string {
     task.task,
     '',
     state?.progress ? `Progress: ${state.progress}` : undefined,
-    `Last decision: ${state?.result?.decision ?? 'none'}`,
-    state?.result ? `Last outcome: ${state.result.state.outcome}` : undefined,
+    `Last decision: ${state?.lastExecution && state.lastExecution.kind !== 'agent' ? state.lastExecution.kind : state?.result?.decision ?? 'none'}`,
+    state?.lastExecution ? `Last execution: ${state.lastExecution.kind}` : undefined,
+    state?.lastExecution && state.lastExecution.kind !== 'agent' ?
+      `Last outcome: ${state.lastExecution.kind}`
+    : state?.result ? `Last outcome: ${state.result.state.outcome}` : undefined,
     state?.runAt ? `Last run: ${state.runAt}` : undefined,
     state?.runId ? `Last run id: ${state.runId}` : undefined,
     state?.runId ? `Resumable: ${state.resumable === false ? 'no' : 'yes'}` : undefined,
@@ -109,6 +112,20 @@ export function formatHeartbeatTask(task: HeartbeatTask): string {
 
 export function formatHeartbeatRun(run: HeartbeatTaskRunRecordEntry): string {
   const result = run.record.result;
+  if (!result) {
+    return [
+      `Heartbeat execution ${run.id}`,
+      `task=${run.taskId} execution=${run.executionId}`,
+      `outcome=${run.record.outcome.kind} finished=${run.createdAt}`,
+      '',
+      'Task:',
+      run.record.task.task,
+      '',
+      'Summary:',
+      run.record.outcome.summary,
+    ].join('\n');
+  }
+
   return [
     `Heartbeat run ${run.id}`,
     `task=${run.taskId} run=${run.runId} loadedCheckpoint=${run.record.loadedCheckpoint}`,
@@ -125,6 +142,9 @@ export function formatHeartbeatRun(run: HeartbeatTaskRunRecordEntry): string {
 
 export function buildHeartbeatContinuationPrompt(run: HeartbeatTaskRunRecordEntry): string {
   const result = run.record.result;
+  if (!result) {
+    throw new Error(`Heartbeat execution ${run.id} has no agent run context to continue.`);
+  }
   return [
     'Continue from this heartbeat run context.',
     '',
@@ -184,6 +204,9 @@ async function continueHeartbeatRun(
   if (!run) {
     return slashMessageResult(`Heartbeat run not found for task ${request.taskId}: ${request.runRef}`);
   }
+  if (!run.record.result) {
+    return slashMessageResult(`Heartbeat execution ${run.id} was ${run.record.outcome.kind} and has no agent context to continue.`);
+  }
 
   return {
     handled: true,
@@ -223,8 +246,13 @@ function formatHeartbeatTaskListItem(task: HeartbeatTask): string {
 }
 
 function formatHeartbeatRunListItem(run: HeartbeatTaskRunRecordEntry): string {
-  const summary = firstLine(stripHeartbeatDecisionLine(run.record.result.summary));
-  return `${run.id}\n  task=${run.taskId} decision=${run.record.result.decision} outcome=${run.record.result.state.outcome} finished=${run.createdAt}\n  summary=${summary}`;
+  const result = run.record.result;
+  if (!result) {
+    return `${run.id}\n  task=${run.taskId} outcome=${run.record.outcome.kind} finished=${run.createdAt}\n  summary=${firstLine(run.record.outcome.summary)}`;
+  }
+
+  const summary = firstLine(stripHeartbeatDecisionLine(result.summary));
+  return `${run.id}\n  task=${run.taskId} decision=${result.decision} outcome=${result.state.outcome} finished=${run.createdAt}\n  summary=${summary}`;
 }
 
 function firstLine(value: string): string {

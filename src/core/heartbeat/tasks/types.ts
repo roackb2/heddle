@@ -30,10 +30,10 @@ export type HeartbeatTaskRuntime = Pick<
 /**
  * Identifies one owned attempt to execute a heartbeat task.
  *
- * Hosted stores must treat `executionId` as a fencing token: completion and
- * failure writes are valid only while this exact execution still owns the
- * task. `ownerId` identifies the scheduler process/worker generation for
- * operator diagnostics and explicit recovery.
+ * Hosted stores must treat `executionId` as a fencing token: completion,
+ * failure, skip, and cancellation writes are valid only while this exact
+ * execution still owns the task. `ownerId` identifies the scheduler process/
+ * worker generation for operator diagnostics and explicit recovery.
  */
 export type HeartbeatTaskExecution = {
   executionId: string;
@@ -50,6 +50,19 @@ export type HeartbeatTaskRecovery = {
   reason: HeartbeatTaskRecoveryReason;
 };
 
+type HeartbeatTaskExecutionOutcomeBase = {
+  executionId: string;
+  summary: string;
+  finishedAt: string;
+};
+
+export type HeartbeatTaskExecutionOutcome = HeartbeatTaskExecutionOutcomeBase & (
+  | { kind: 'agent' }
+  | { kind: 'skipped' }
+  | { kind: 'cancelled' }
+  | { kind: 'failed' }
+);
+
 export type HeartbeatTaskState = {
   status?: HeartbeatTaskStatus;
   progress?: string;
@@ -60,6 +73,7 @@ export type HeartbeatTaskState = {
   result?: AgentHeartbeatResult;
   error?: string;
   execution?: HeartbeatTaskExecution;
+  lastExecution?: HeartbeatTaskExecutionOutcome;
   recovery?: HeartbeatTaskRecovery;
   updatedAt?: string;
 };
@@ -77,18 +91,30 @@ export type HeartbeatTask = {
   state?: HeartbeatTaskState;
 };
 
-export type HeartbeatTaskRunRecord = {
+export type HeartbeatTaskAgentRunRecord = {
   task: HeartbeatTask;
   result: AgentHeartbeatResult;
   loadedCheckpoint: boolean;
+  /** Present on records created after execution correlation was introduced. */
+  outcome?: HeartbeatTaskExecutionOutcome & { kind: 'agent' };
 };
+
+export type HeartbeatTaskNonAgentRunRecord = {
+  task: HeartbeatTask;
+  outcome: HeartbeatTaskExecutionOutcome & { kind: 'skipped' | 'cancelled' };
+  result?: never;
+  loadedCheckpoint?: never;
+};
+
+export type HeartbeatTaskRunRecord = HeartbeatTaskAgentRunRecord | HeartbeatTaskNonAgentRunRecord;
 
 export type HeartbeatTaskRunRecordEntry = {
   id: string;
   path: string;
   taskId: string;
   workspaceId?: string;
-  runId: string;
+  executionId: string;
+  runId?: string;
   createdAt: string;
   record: HeartbeatTaskRunRecord;
 };
@@ -99,7 +125,7 @@ export type HeartbeatTaskClaimResult =
 
 export type HeartbeatTaskExecutionWriteResult =
   | { status: 'saved'; task: HeartbeatTask; record?: HeartbeatTaskRunRecord }
-  | { status: 'claim-lost' };
+  | { status: 'claim-lost' | 'cancelled' };
 
 export type HeartbeatTaskRecoveryResult = {
   task: HeartbeatTask;
@@ -123,10 +149,18 @@ export type HeartbeatTaskStore = {
     checkpoint: AgentLoopCheckpoint;
     result: AgentHeartbeatResult;
     loadedCheckpoint: boolean;
+    signal?: AbortSignal;
   }) => Promise<HeartbeatTaskExecutionWriteResult>;
   failTaskExecution: (input: {
     execution: HeartbeatTaskExecution;
     task: HeartbeatTask;
+    signal?: AbortSignal;
+  }) => Promise<HeartbeatTaskExecutionWriteResult>;
+  recordTaskExecutionOutcome: (input: {
+    execution: HeartbeatTaskExecution;
+    task: HeartbeatTask;
+    outcome: HeartbeatTaskExecutionOutcome & { kind: 'skipped' | 'cancelled' };
+    signal?: AbortSignal;
   }) => Promise<HeartbeatTaskExecutionWriteResult>;
   recoverInterruptedTasks: (input: {
     ownerId: string;

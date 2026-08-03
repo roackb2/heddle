@@ -101,7 +101,7 @@ export class ClientSharedNotificationIntentService {
           'heartbeat-task-finished',
           input.workspaceId ?? input.envelope.workspaceId,
           event.taskId,
-          event.record.runId,
+          event.record.runId ?? event.executionId,
         ].join(':'),
         title: 'Task run finished',
         body: `${taskName}: ${event.record.task.state.progress ?? event.record.task.state.status}`,

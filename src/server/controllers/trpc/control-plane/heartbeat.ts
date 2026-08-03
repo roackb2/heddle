@@ -3,6 +3,7 @@ import {
   HeartbeatSchedulerService,
   HeartbeatTaskRunnerService,
   type HeartbeatSchedulerEvent,
+  type HeartbeatTaskHandler,
   type HeartbeatTaskRunner,
 } from '@/core/heartbeat/index.js';
 
@@ -45,11 +46,12 @@ type RunHeartbeatTaskNowArgs = {
   maxSteps?: number;
   searchIgnoreDirs?: string[];
   systemContext?: string;
+  handler?: HeartbeatTaskHandler;
   runner?: HeartbeatTaskRunner;
   onEvent?: (event: HeartbeatSchedulerEvent) => void;
 };
 
-type RunDueHeartbeatTasksArgs = Omit<RunHeartbeatTaskNowArgs, 'taskId' | 'runner'>;
+type RunDueHeartbeatTasksArgs = Omit<RunHeartbeatTaskNowArgs, 'taskId' | 'handler' | 'runner'>;
 
 export class ControlPlaneHeartbeatController {
   static async listTasks(stateRoot: string) {
@@ -122,9 +124,10 @@ export class ControlPlaneHeartbeatController {
     const result = await HeartbeatTaskRunnerService.runTaskById({
       store: tasks,
       taskId: args.taskId,
+      handler: args.handler,
       runner: args.runner,
       onEvent: args.onEvent,
-      runtime: args.runner ? undefined : {
+      runtime: {
         apiKey: args.apiKey,
         apiKeyProvider: args.apiKey ? 'explicit' : undefined,
         model: args.model,

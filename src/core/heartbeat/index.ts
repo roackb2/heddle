@@ -9,6 +9,9 @@ export { HeartbeatSchedulerService, HeartbeatTaskRunnerService } from './schedul
 export type {
   HeartbeatSchedulerEvent,
   HeartbeatSchedulerHandle,
+  HeartbeatExecutionContext,
+  HeartbeatHandlerOutcome,
+  HeartbeatTaskHandler,
   HeartbeatTaskRunner,
   HeartbeatTaskRunnerAgentOptions,
   HeartbeatTaskRunnerContext,
@@ -17,16 +20,20 @@ export type {
   RunDueHeartbeatTasksResult,
   RunHeartbeatSchedulerOptions,
   StartHeartbeatSchedulerOptions,
+  StopHeartbeatSchedulerOptions,
 } from './scheduler/index.js';
 export { FileHeartbeatTaskService, HeartbeatTaskStateProjector } from './tasks/index.js';
 export type {
   CreateHeartbeatTaskInput,
   FileHeartbeatTaskServiceOptions,
   HeartbeatTask,
+  HeartbeatTaskAgentRunRecord,
   HeartbeatTaskClaimResult,
   HeartbeatTaskContinuationMode,
   HeartbeatTaskExecution,
+  HeartbeatTaskExecutionOutcome,
   HeartbeatTaskExecutionWriteResult,
+  HeartbeatTaskNonAgentRunRecord,
   HeartbeatTaskRecovery,
   HeartbeatTaskRecoveryReason,
   HeartbeatTaskRecoveryResult,

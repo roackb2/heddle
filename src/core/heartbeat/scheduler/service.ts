@@ -25,10 +25,15 @@ dayjs.extend(isSameOrBefore);
 export class HeartbeatSchedulerService {
   // Starts a background scheduler loop for one workspace and returns a handle the host can stop.
   static start(options: StartHeartbeatSchedulerOptions): HeartbeatSchedulerHandle {
-    const controller = new AbortController();
+    HeartbeatTaskRunnerService.assertHandlerConfiguration(options);
+    const loopController = new AbortController();
+    const executionController = new AbortController();
     const store = new FileHeartbeatTaskService({ stateRoot: options.stateRoot });
-    void HeartbeatSchedulerService.runLoop({
+    let loopError: unknown;
+    const settledLoop = HeartbeatSchedulerService.runLoop({
       store,
+      handler: options.handler,
+      runner: options.runner,
       runtime: {
         workspaceRoot: options.workspaceRoot,
         stateDir: options.stateRoot,
@@ -40,28 +45,52 @@ export class HeartbeatSchedulerService {
         onAgentEvent: options.onAgentEvent,
       },
       pollIntervalMs: options.pollIntervalMs ?? DEFAULT_SCHEDULER_POLL_INTERVAL_MS,
-      signal: controller.signal,
+      signal: loopController.signal,
+      executionSignal: executionController.signal,
       onEvent: options.onEvent,
     }).catch((error: unknown) => {
-      options.onError?.(error);
+      loopError = error;
+      try {
+        options.onError?.(error);
+      } catch {
+        // A host error callback must not create an unhandled scheduler promise.
+      }
     });
+    let stopPromise: Promise<void> | undefined;
 
     return {
-      stop: () => controller.abort(),
+      stop: (stopOptions = {}) => {
+        loopController.abort();
+        if (stopOptions.cancelRunning) {
+          executionController.abort();
+        }
+        stopPromise ??= settledLoop.then(() => {
+          if (loopError) {
+            throw loopError;
+          }
+        });
+        return stopPromise;
+      },
     };
   }
 
   // Scans stored tasks once, picks enabled tasks whose nextRunAt is due, and delegates each selected task to the runner service.
   static async runDueTasks(options: RunDueHeartbeatTasksOptions): Promise<RunDueHeartbeatTasksResult> {
+    HeartbeatTaskRunnerService.assertHandlerConfiguration(options);
     const now = options.now?.() ?? dayjs().toDate();
     const timestamp = dayjs(now).toISOString();
     const tasks = await options.store.listTasks();
     const dueTasks = tasks.filter((task) => HeartbeatSchedulerService.isTaskDue(task, now));
     const records: HeartbeatTaskRunRecord[] = [];
+    let checked = 0;
     let failed = 0;
     const executionOwnerId = options.executionOwnerId ?? HeartbeatSchedulerService.createExecutionOwnerId();
 
     for (const task of dueTasks) {
+      if ((options.admissionSignal ?? options.signal)?.aborted) {
+        break;
+      }
+      checked++;
       options.onEvent?.({ type: 'heartbeat.task.due', taskId: task.id, timestamp });
       const result = await HeartbeatTaskRunnerService.runTask({ ...options, executionOwnerId, task, runAt: now });
       if (result.record) {
@@ -73,7 +102,7 @@ export class HeartbeatSchedulerService {
     }
 
     return {
-      checked: dueTasks.length,
+      checked,
       ran: records.length,
       failed,
       records,
@@ -104,7 +133,15 @@ export class HeartbeatSchedulerService {
       }));
 
       while (!options.signal?.aborted) {
-        await HeartbeatSchedulerService.runDueTasks({ ...options, executionOwnerId });
+        await HeartbeatSchedulerService.runDueTasks({
+          ...options,
+          executionOwnerId,
+          admissionSignal: options.signal,
+          signal: options.executionSignal ?? options.signal,
+        });
+        if (options.signal?.aborted) {
+          break;
+        }
         await (options.sleep ?? HeartbeatSchedulerService.sleep)(options.pollIntervalMs ?? DEFAULT_SCHEDULER_POLL_INTERVAL_MS, options.signal);
       }
       options.onEvent?.({ type: 'heartbeat.scheduler.stopped', reason: 'aborted', timestamp: HeartbeatSchedulerService.resolveNowIso(options) });

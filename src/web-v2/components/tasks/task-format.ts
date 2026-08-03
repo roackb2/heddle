@@ -37,7 +37,7 @@ export function formatTaskTimestamp(value: string | undefined): string {
 }
 
 export function runDisplaySummary(run: ControlPlaneHeartbeatRunView): string {
-  return run.result.summary || run.result.outcome || run.task.state.progress || run.result.decision;
+  return run.result.summary || run.result.outcome || run.task.state.progress || run.result.decision || run.result.kind;
 }
 
 export function formatUsage(usage: ControlPlaneHeartbeatRunView['result']['usage']): string {

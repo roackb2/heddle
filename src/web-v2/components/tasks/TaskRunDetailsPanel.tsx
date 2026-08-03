@@ -56,10 +56,10 @@ export function TaskRunDetailsPanel({
             </section>
             <TaskDetailRows
               rows={[
-                ['decision', run.result.decision],
+                ['decision', run.result.decision ?? run.result.kind],
                 ['outcome', run.result.outcome],
                 ['usage', formatUsage(run.result.usage)],
-                ['checkpoint', run.loadedCheckpoint ? 'loaded' : 'not loaded'],
+                ['checkpoint', run.loadedCheckpoint === undefined ? 'not applicable' : run.loadedCheckpoint ? 'loaded' : 'not loaded'],
               ]}
             />
             <TaskMarkdownBlock title="Task result" body={run.result.summary} />

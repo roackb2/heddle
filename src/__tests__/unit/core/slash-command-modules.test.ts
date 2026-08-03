@@ -41,11 +41,18 @@ function testHeartbeatRun(overrides: Partial<HeartbeatTaskRunRecordEntry> = {}):
     id: '2026-04-14T00-00-00.000Z-repo-check',
     path: '/tmp/run.json',
     taskId: 'repo-check',
+    executionId: 'execution_heartbeat_1',
     runId: 'run_heartbeat_1',
     createdAt: '2026-04-14T00:00:00.000Z',
     record: {
       task,
       loadedCheckpoint: true,
+      outcome: {
+        kind: 'agent',
+        executionId: 'execution_heartbeat_1',
+        summary: 'Checked the repository and found one safe next step.',
+        finishedAt: '2026-04-14T00:00:00.000Z',
+      },
       result: {
         decision: 'continue',
         summary: 'Checked the repository and found one safe next step.\n\nHEARTBEAT_DECISION: continue',

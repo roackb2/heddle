@@ -16,10 +16,11 @@ A heartbeat runner cycle:
 - checkpoints the new state
 - returns a decision: `continue`, `pause`, `complete`, or `escalate`
 
-Scheduler state keeps the latest runner result as one nested result object instead
-of copying decision, outcome, summary, and usage into separate task fields. Run
-history stores the same result in a durable run record, so CLI, control-plane,
-and host integrations read the same source of truth.
+Scheduler state records the latest outer execution outcome. Agent executions
+also retain their real agent result and checkpoint. A no-work skip or
+cancellation instead stores a lightweight outcome with the outer `executionId`,
+summary, kind, and timestamp; it does not fabricate an agent run ID, model,
+provider, transcript, or checkpoint.
 
 Task continuation is explicit. A task can be configured for operator-controlled
 continuation or agent-selected continuation, and a blocked or paused task must be
@@ -71,8 +72,9 @@ For repeated runner cycles, Heddle also exposes a local-first scheduler core:
 - `HeartbeatSchedulerService.runLoop`
 - `FileHeartbeatTaskService`
 
-`HeartbeatSchedulerService.runDueTasks` returns durable run records, and
-`heartbeat.task.finished` events include the same run record. If you need a
+`HeartbeatSchedulerService.runDueTasks` returns durable execution records.
+`heartbeat.task.finished`, `heartbeat.task.skipped`, and
+`heartbeat.task.cancelled` events include the corresponding record. If you need a
 compact display shape for a UI or service integration, use
 `FileHeartbeatTaskService` task/run view methods instead of flattening task
 state yourself.
@@ -88,7 +90,7 @@ disabled, and blocked tasks remain blocked until an operator resumes them.
 Custom stores implement this protocol through `HeartbeatTaskStore`:
 
 - `claimTaskExecution` atomically establishes the current `executionId` fencing token
-- `completeTaskExecution` and `failTaskExecution` reject a stale token with `claim-lost`
+- `completeTaskExecution`, `failTaskExecution`, and `recordTaskExecutionOutcome` reject a stale token with `claim-lost`
 - `recoverInterruptedTasks` records the interrupted execution and makes only eligible tasks retryable
 
 The built-in file adapter serializes those transitions within one Node.js
@@ -101,10 +103,33 @@ Cron, launchd, systemd, hosted queues, and Lucid-style services should be treate
 
 ### Custom host work with the standard agent runtime
 
-A host can claim domain work or assemble domain tools in a custom runner, then
-delegate model execution back to Heddle:
+A custom handler owns domain discovery and acknowledgement. Heddle owns the
+execution identity, credential resolution, agent defaults, abort signal,
+checkpoint, execution record, and framework events:
 
 ```ts
+import {
+  HeartbeatSchedulerService,
+  type HeartbeatTaskHandler,
+} from '@roackb2/heddle/advanced';
+
+const handler: HeartbeatTaskHandler = async (context) => {
+  const claim = await domainQueue.claimNext({ signal: context.signal });
+  if (!claim) {
+    return context.skip({ summary: 'No eligible domain work was available.' });
+  }
+
+  const result = await context.runAgent({
+    task: `${context.task.task}\n\nClaimed work: ${claim.instruction}`,
+    systemContext: `Operate only on claim ${claim.id}.`,
+    tools: domainTools,
+    includeDefaultTools: false,
+  });
+
+  await domainQueue.acknowledge(claim.id, { summary: result.summary });
+  return result;
+};
+
 await HeartbeatSchedulerService.runDueTasks({
   store,
   runtime: {
@@ -112,14 +137,12 @@ await HeartbeatSchedulerService.runDueTasks({
     stateDir: '.heddle',
     model: 'gpt-5.4',
   },
-  runner: async (task, _checkpoint, context) => context.runAgent({
-    task: `${task.task}\n\nReview the host-owned work claim before acting.`,
-    tools: domainTools,
-    includeDefaultTools: false,
-  }),
+  handler,
 });
 ```
 
+The context also includes a cloned task and checkpoint, the outer
+`executionId`, scheduled `runAt`, and a framework-owned `AbortSignal`.
 `context.runAgent()` is the supported credential handoff. It uses the same
 runtime builder as an ordinary heartbeat task and resolves API keys, stored
 OpenAI OAuth login state, and local/OpenAI-compatible endpoints inside Heddle.
@@ -127,9 +150,40 @@ The host does not receive credential records or token fields and must not retain
 the execution context. Set `preferApiKey: true` in `runtime` only when an
 environment API key should take precedence over stored OpenAI OAuth state.
 
-Custom runners still return an agent result today. Domain-level no-work skips,
-execution cancellation, and awaitable custom-runner shutdown are separate
-lifecycle concerns; do not fabricate an agent result to emulate those features.
+Call `context.runAgent()` at most once, or return the exact outcome from
+`context.skip()`. Context methods are invalid after the handler settles. The
+older positional `runner(task, checkpoint, context)` callback remains as a
+deprecated compatibility adapter, but it uses this same internal execution and
+persistence pipeline.
+
+### Awaitable shutdown and cancellation
+
+The background scheduler separates admission shutdown from active-work
+cancellation:
+
+```ts
+const scheduler = HeartbeatSchedulerService.start({
+  workspaceRoot,
+  stateRoot,
+  handler,
+});
+
+// Stop polling, abort the active execution, and wait for handler settlement
+// plus Heddle's final claim-fenced persistence.
+await scheduler.stop({ cancelRunning: true });
+```
+
+Calling `stop()` without `cancelRunning` drains the active execution while
+stopping new admissions. Repeated calls return the same stop promise; a later
+call may still upgrade a drain to cancellation. A cancelled execution is
+recorded separately from failure and becomes retryable without using the
+failure-delay path.
+
+Heddle cannot force arbitrary host code to observe `AbortSignal`. If a handler
+ignores cancellation, `stop()` deliberately remains pending until that handler
+settles. The execution fencing token prevents its late result from overwriting
+a replacement claim, and a result that settles after the framework signal was
+aborted is persisted as cancellation rather than agent completion.
 
 ## Examples
 
@@ -147,9 +201,11 @@ export OPENAI_API_KEY=your_key_here
 yarn example:heartbeat-scheduler
 ```
 
-The scheduler example uses a custom runner and `context.runAgent()` while
-leaving credentials entirely inside Heddle. It works with stored OpenAI login
-state or provider API-key environment variables.
+The scheduler example demonstrates claim, no-work skip, dynamic prompt/tools,
+agent execution, and host acknowledgement while leaving credentials entirely
+inside Heddle. It works with stored OpenAI login state or provider API-key
+environment variables. Set `HEDDLE_EXAMPLE_NO_WORK=true` to exercise the
+zero-model skip path.
 
 ## Host Notes
 

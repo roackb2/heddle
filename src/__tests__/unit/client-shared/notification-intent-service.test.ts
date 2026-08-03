@@ -75,10 +75,12 @@ describe('ClientSharedNotificationIntentService', () => {
             id: 'record-1',
             taskId: 'task-1',
             workspaceId: 'workspace-1',
+            executionId: 'execution-1',
             runId: 'run-2',
             createdAt: '2026-06-12T00:02:00.000Z',
             loadedCheckpoint: false,
             result: {
+              kind: 'agent',
               decision: 'complete',
               summary: 'Done.',
               outcome: 'complete',

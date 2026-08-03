@@ -56,6 +56,7 @@ describe('heartbeat task service views', () => {
         loadedCheckpoint: true,
         resumable: true,
         result: {
+          kind: 'agent',
           decision: 'continue',
           outcome: 'done',
           summary: 'Repository check complete.',
@@ -78,6 +79,7 @@ describe('heartbeat task service views', () => {
       id: 'run_1',
       taskId: 'repo-check',
       workspaceId: 'workspace-1',
+      executionId: 'execution_1',
       runId: 'run_1',
       createdAt: '2026-04-14T00:00:00.000Z',
       loadedCheckpoint: true,
@@ -92,6 +94,7 @@ describe('heartbeat task service views', () => {
         },
       },
       result: {
+        kind: 'agent',
         decision: 'continue',
         outcome: 'done',
         summary: 'Repository check complete.',
@@ -103,6 +106,47 @@ describe('heartbeat task service views', () => {
         },
       },
     });
+  });
+
+  it('projects skipped execution records without fabricating an agent run', () => {
+    const service = new FileHeartbeatTaskService({ dir: '/tmp/heddle-heartbeat-view-test' });
+    const outcome = {
+      kind: 'skipped' as const,
+      executionId: 'execution_skip',
+      summary: 'No eligible work was available.',
+      finishedAt: '2026-04-14T00:00:00.000Z',
+    };
+    const task: HeartbeatTask = {
+      ...createTask(),
+      state: {
+        status: 'waiting',
+        progress: 'No work was available.',
+        resumable: true,
+        lastExecution: outcome,
+      },
+    };
+    const view = service.projectRunView({
+      id: '2026-04-14T00-00-00.000Z-repo-check',
+      path: '/tmp/2026-04-14T00-00-00.000Z-repo-check.json',
+      taskId: task.id,
+      workspaceId: task.workspaceId,
+      executionId: outcome.executionId,
+      createdAt: outcome.finishedAt,
+      record: { task, outcome },
+    });
+
+    expect(view).toMatchObject({
+      id: 'execution_skip',
+      executionId: 'execution_skip',
+      runId: undefined,
+      loadedCheckpoint: undefined,
+      result: {
+        kind: 'skipped',
+        outcome: 'skipped',
+        summary: 'No eligible work was available.',
+      },
+    });
+    expect(view.result.decision).toBeUndefined();
   });
 
   it('lists and loads projected views from a store', async () => {
@@ -177,12 +221,19 @@ function createRunEntry(): HeartbeatTaskRunRecordEntry {
     path: '/tmp/2026-04-14T00-00-00.000Z-repo-check.json',
     taskId: 'repo-check',
     workspaceId: 'workspace-1',
+    executionId: 'execution_1',
     runId: 'run_1',
     createdAt: '2026-04-14T00:00:00.000Z',
     record: {
       task: createTask(),
       loadedCheckpoint: true,
       result: createHeartbeatResult(),
+      outcome: {
+        kind: 'agent',
+        executionId: 'execution_1',
+        summary: 'Repository check complete.',
+        finishedAt: '2026-04-14T00:00:00.000Z',
+      },
     },
   };
 }
