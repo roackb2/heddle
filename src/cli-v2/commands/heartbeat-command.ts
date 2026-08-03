@@ -1,5 +1,5 @@
 import type { ParsedHeartbeatArgs } from './heartbeat/args.js';
-import { parseHeartbeatArgs, renderHeartbeatHelp, stringFlag } from './heartbeat/args.js';
+import { parseHeartbeatArgs, parsePositiveIntegerFlag, renderHeartbeatHelp, stringFlag } from './heartbeat/args.js';
 import { parseDurationMs } from './heartbeat/duration.js';
 import { runHeartbeatRunsCli } from './heartbeat/run-commands.js';
 import { runHeartbeatTaskCli } from './heartbeat/task-commands.js';
@@ -45,8 +45,12 @@ export class HeartbeatCliCommandEdgeService {
 
     try {
       process.stdout.write(`${ControlPlaneCommandRuntimeService.formatNotice(runtime, 'heartbeat')}\n`);
-      if (runtime.kind === 'attached' && heartbeatScheduler.enabled && stringFlag(parsed.flags, 'poll')) {
-        throw new Error('--poll only applies when heartbeat start launches an embedded control-plane server.');
+      if (
+        runtime.kind === 'attached'
+        && heartbeatScheduler.enabled
+        && (stringFlag(parsed.flags, 'poll') || stringFlag(parsed.flags, 'concurrency'))
+      ) {
+        throw new Error('--poll and --concurrency only apply when heartbeat start launches an embedded control-plane server.');
       }
 
       const context = {
@@ -89,6 +93,7 @@ export class HeartbeatCliCommandEdgeService {
   private static resolveHeartbeatScheduler(parsed: ParsedHeartbeatArgs): {
     enabled?: boolean;
     pollIntervalMs?: number;
+    maxConcurrentTasks?: number;
   } {
     if (parsed.command !== 'start' || parsed.flags.once) {
       return { enabled: false };
@@ -98,6 +103,7 @@ export class HeartbeatCliCommandEdgeService {
     return {
       enabled: true,
       pollIntervalMs: poll ? parseDurationMs(poll) : undefined,
+      maxConcurrentTasks: parsePositiveIntegerFlag(stringFlag(parsed.flags, 'concurrency'), '--concurrency'),
     };
   }
 }

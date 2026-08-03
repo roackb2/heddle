@@ -401,6 +401,7 @@ describe('control-plane heartbeat mutations', () => {
     const result = await caller.heartbeatRunDueTasks({
       workspaceId: activeWorkspace.id,
       model: 'gpt-5.4',
+      maxConcurrentTasks: 2,
     });
 
     expect(result).toMatchObject({

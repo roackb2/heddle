@@ -51,7 +51,9 @@ type RunHeartbeatTaskNowArgs = {
   onEvent?: (event: HeartbeatSchedulerEvent) => void;
 };
 
-type RunDueHeartbeatTasksArgs = Omit<RunHeartbeatTaskNowArgs, 'taskId' | 'handler' | 'runner'>;
+type RunDueHeartbeatTasksArgs = Omit<RunHeartbeatTaskNowArgs, 'taskId' | 'handler' | 'runner'> & {
+  maxConcurrentTasks?: number;
+};
 
 export class ControlPlaneHeartbeatController {
   static async listTasks(stateRoot: string) {
@@ -169,6 +171,7 @@ export class ControlPlaneHeartbeatController {
   ) {
     return await HeartbeatSchedulerService.runDueTasks({
       store: new FileHeartbeatTaskService({ stateRoot }),
+      maxConcurrentTasks: args.maxConcurrentTasks,
       runtime: {
         apiKey: args.apiKey,
         apiKeyProvider: args.apiKey ? 'explicit' : undefined,

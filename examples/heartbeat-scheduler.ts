@@ -43,6 +43,7 @@ async function main() {
 
   const result = await HeartbeatSchedulerService.runDueTasks({
     store,
+    maxConcurrentTasks: 2,
     now: () => new Date(),
     runtime: {
       model,
@@ -124,7 +125,12 @@ function formatSchedulerEvent(event: HeartbeatSchedulerEvent): string | undefine
     case 'heartbeat.scheduler.awakened':
       return `[event] scheduler.awakened tasks=${event.taskIds.join(',')}`;
     case 'heartbeat.task.due':
-      return `[event] task.due id=${event.taskId}`;
+      return [
+        `[event] task.due id=${event.taskId}`,
+        event.queuePosition ? `position=${event.queuePosition}` : undefined,
+        event.maxConcurrentTasks ? `concurrency=${event.activeTasks ?? 0}/${event.maxConcurrentTasks}` : undefined,
+        event.queuedTasks !== undefined ? `queued=${event.queuedTasks}` : undefined,
+      ].filter(Boolean).join(' ');
     case 'heartbeat.task.run_requested':
       return `[event] task.run_requested id=${event.taskId} generation=${event.generation} disposition=${event.disposition}`;
     case 'heartbeat.task.run_request_claimed':

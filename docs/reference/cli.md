@@ -24,13 +24,13 @@ OpenAI account sign-in is experimental and user-selected. It is not official Ope
 
 ### Heartbeat and scheduling
 
-- `heddle heartbeat start [--every 30m] [--task "<durable task>"] [--poll 60s] [--once]`: create or update a task and keep the server-backed scheduler running, or run once with `--once`
+- `heddle heartbeat start [--every 30m] [--task "<durable task>"] [--poll 60s] [--concurrency 2] [--once]`: create or update a task and keep the server-backed scheduler running, or run once with `--once`
 - `heddle heartbeat task add --id <id> --task "<durable task>" [--every 15m]`: create or update a scheduled heartbeat task
 - `heddle heartbeat task list`: list local heartbeat tasks
 - `heddle heartbeat task show <id>`: show a task's schedule, last decision, and last run summary
 - `heddle heartbeat task enable <id>`: enable a heartbeat task
 - `heddle heartbeat task disable <id>`: disable a heartbeat task
-- `heddle heartbeat run [--task <id>]`: ask the control-plane server to run due heartbeat tasks, or one task when `--task` is provided
+- `heddle heartbeat run [--task <id>] [--concurrency 2]`: ask the control-plane server to run due heartbeat tasks with bounded concurrency, or one task when `--task` is provided
 - `heddle heartbeat runs list [--task <id>] [--limit 10]`: list saved heartbeat run records
 - `heddle heartbeat runs show <run-id|latest> [--task <id>]`: show the final agent output for a saved heartbeat run
 
@@ -104,13 +104,13 @@ After the daemon starts, open the browser control plane to inspect sessions, rev
 Start the server-backed heartbeat scheduler:
 
 ```bash
-heddle heartbeat start --every 30m
+heddle heartbeat start --every 30m --concurrency 2
 ```
 
 Run due heartbeat tasks once:
 
 ```bash
-heddle heartbeat run
+heddle heartbeat run --concurrency 2
 ```
 
 ## Interactive Chat Commands

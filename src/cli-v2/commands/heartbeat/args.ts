@@ -118,6 +118,7 @@ export function buildHeartbeatCommand(onParsed: HeartbeatCommandBuilder = () => 
     .command('run [rest...]')
     .description('ask the server to run due tasks or one task now')
     .option('--task <id>', 'run one heartbeat task immediately')
+    .option('--concurrency <n>', 'maximum due tasks to run concurrently')
     .option('--model <name>', 'override model')
     .option('--max-steps <n>', 'override step limit')
     .addHelpText('after', [
@@ -132,7 +133,7 @@ export function buildHeartbeatCommand(onParsed: HeartbeatCommandBuilder = () => 
       command: 'run',
       subcommand: undefined,
       rest,
-      flags: stringFlags(flags, ['task', 'model', 'maxSteps']),
+      flags: stringFlags(flags, ['task', 'concurrency', 'model', 'maxSteps']),
     }));
 
   const runs = root
@@ -186,6 +187,7 @@ export function buildHeartbeatCommand(onParsed: HeartbeatCommandBuilder = () => 
     .option('--every <duration>', 'schedule interval')
     .option('--interval <duration>', 'alias for --every')
     .option('--poll <duration>', 'embedded scheduler poll interval')
+    .option('--concurrency <n>', 'embedded scheduler task concurrency')
     .option('--model <name>', 'override model')
     .option('--max-steps <n>', 'override step limit')
     .option('--defer', 'skip the immediate first run')
@@ -202,7 +204,7 @@ export function buildHeartbeatCommand(onParsed: HeartbeatCommandBuilder = () => 
       subcommand: rest[0],
       rest: rest.slice(1),
       flags: {
-        ...stringFlags(flags, ['id', 'task', 'goal', 'name', 'every', 'interval', 'poll', 'model', 'maxSteps']),
+        ...stringFlags(flags, ['id', 'task', 'goal', 'name', 'every', 'interval', 'poll', 'concurrency', 'model', 'maxSteps']),
         ...booleanFlags(flags, ['defer', 'once']),
       },
     }));
@@ -253,6 +255,18 @@ export function parsePositiveInt(raw: string | undefined): number | undefined {
 
   const value = Number.parseInt(raw, 10);
   return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+export function parsePositiveIntegerFlag(raw: string | undefined, flag: string): number | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${flag} must be a positive integer.`);
+  }
+  return value;
 }
 
 function normalizeHelpArgs(args: string[]): string[] {
@@ -318,6 +332,7 @@ type HeartbeatTaskIdFlags = {
 
 type HeartbeatRunFlags = {
   task?: string;
+  concurrency?: string;
   model?: string;
   maxSteps?: string;
 };
@@ -340,6 +355,7 @@ type HeartbeatStartFlags = {
   every?: string;
   interval?: string;
   poll?: string;
+  concurrency?: string;
   model?: string;
   maxSteps?: string;
   defer?: boolean;

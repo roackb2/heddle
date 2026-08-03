@@ -15,6 +15,7 @@ export type HeddleHeartbeatSchedulerHostOptions = {
   stateRoot: string;
   preferApiKey?: boolean;
   pollIntervalMs?: number;
+  maxConcurrentTasks?: number;
   onEvent?: (workspace: WorkspaceDescriptor, event: HeartbeatSchedulerEvent) => void;
   onError?: (workspace: WorkspaceDescriptor, error: unknown) => void;
 };
@@ -76,6 +77,7 @@ export class HeddleHeartbeatSchedulerHost {
       stateRoot: workspace.stateRoot,
       preferApiKey: this.options.preferApiKey,
       pollIntervalMs: this.options.pollIntervalMs,
+      maxConcurrentTasks: this.options.maxConcurrentTasks,
       onEvent: (event) => this.options.onEvent?.(workspace, event),
       onError: (error) => this.options.onError?.(workspace, error),
     });

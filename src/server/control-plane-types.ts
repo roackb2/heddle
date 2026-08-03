@@ -294,7 +294,15 @@ export type ControlPlaneHeartbeatEvent =
   | { type: 'heartbeat.scheduler.started'; timestamp: string }
   | { type: 'heartbeat.scheduler.stopped'; reason: 'aborted' | 'completed' | 'error'; timestamp: string }
   | { type: 'heartbeat.scheduler.awakened'; taskIds: string[]; timestamp: string }
-  | { type: 'heartbeat.task.due'; taskId: string; timestamp: string }
+  | {
+      type: 'heartbeat.task.due';
+      taskId: string;
+      timestamp: string;
+      queuePosition?: number;
+      maxConcurrentTasks?: number;
+      activeTasks?: number;
+      queuedTasks?: number;
+    }
   | {
     type: 'heartbeat.task.run_requested';
     taskId: string;
