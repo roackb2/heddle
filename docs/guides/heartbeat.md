@@ -89,8 +89,10 @@ disabled, and blocked tasks remain blocked until an operator resumes them.
 
 Custom stores implement this protocol through `HeartbeatTaskStore`:
 
+- `requestTaskRun` persists a monotonically distinguishable, level-triggered run request
+- `subscribeToRunRequests` optionally wakes a scheduler in the same process; polling remains the cross-process fallback
 - `claimTaskExecution` atomically establishes the current `executionId` fencing token
-- `completeTaskExecution`, `failTaskExecution`, and `recordTaskExecutionOutcome` reject a stale token with `claim-lost`
+- `completeTaskExecution`, `failTaskExecution`, and `recordTaskExecutionOutcome` project from the latest stored task and reject a stale token with `claim-lost`
 - `recoverInterruptedTasks` records the interrupted execution and makes only eligible tasks retryable
 
 The built-in file adapter serializes those transitions within one Node.js
@@ -100,6 +102,40 @@ transactions, or leases. Recovery cannot undo external effects, so host tools
 must keep domain mutations idempotent.
 
 Cron, launchd, systemd, hosted queues, and Lucid-style services should be treated as hosts around this API, not as Heddle's internal scheduler model.
+
+### Durable event-driven run requests
+
+Product hosts should request prompt work through the task service instead of
+editing `schedule.nextRunAt` or polling a running task:
+
+```ts
+import { FileHeartbeatTaskService } from '@roackb2/heddle/advanced';
+
+const heartbeatTasks = new FileHeartbeatTaskService({ stateRoot });
+const request = await heartbeatTasks.requestTaskRun('mailbox-consumer', {
+  reason: 'new-work-available',
+});
+
+console.log(request.disposition); // requested | coalesced
+```
+
+An idle enabled task becomes due immediately. If the task is already running,
+Heddle persists one pending follow-up. Additional requests advance the durable
+generation but coalesce into that same follow-up. The execution claim records
+which generation it consumed, so a request arriving after the claim remains
+pending for the next run. Success, failure, skip, and cancellation settle from
+the latest stored task state and cannot overwrite a newer request.
+
+`HeartbeatSchedulerService.start()` and `runLoop()` subscribe to file-store run
+requests and rescan promptly. `heartbeat.task.run_requested`,
+`heartbeat.task.run_request_claimed`, and `heartbeat.scheduler.awakened` expose
+the lifecycle without carrying credentials or domain payloads. The configured
+poll interval remains the process-restart and external-writer fallback.
+
+Task views expose `state.runRequest.pending`, the latest generation,
+`claimedGeneration`, timestamp, and bounded operator-facing reason. Disabled,
+completed, and blocked tasks reject requests; they must be enabled or resumed
+explicitly instead of retaining hidden work that might run later.
 
 ### Custom host work with the standard agent runtime
 

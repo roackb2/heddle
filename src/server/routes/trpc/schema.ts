@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { REASONING_EFFORTS } from '@/core/llm/types.js';
 import { AUTONOMY_PERMISSION_MODES } from '@/core/approvals/index.js';
+import { MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH } from '@/core/heartbeat/tasks/index.js';
 import {
   CustomAgentApprovalPresetSchema,
   CustomAgentModeAliasSchema,
@@ -185,6 +186,10 @@ export const heartbeatRunsInputSchema = z.object({
 export const heartbeatTaskInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
   taskId: z.string().min(1),
+});
+
+export const heartbeatTaskRunRequestInputSchema = heartbeatTaskInputSchema.extend({
+  reason: z.string().trim().min(1).max(MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH).optional(),
 });
 
 export const heartbeatTaskCreateInputSchema = z.object({

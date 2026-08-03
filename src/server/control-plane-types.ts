@@ -293,7 +293,24 @@ export type ControlPlaneHeartbeatAgentEvent = {
 export type ControlPlaneHeartbeatEvent =
   | { type: 'heartbeat.scheduler.started'; timestamp: string }
   | { type: 'heartbeat.scheduler.stopped'; reason: 'aborted' | 'completed' | 'error'; timestamp: string }
+  | { type: 'heartbeat.scheduler.awakened'; taskIds: string[]; timestamp: string }
   | { type: 'heartbeat.task.due'; taskId: string; timestamp: string }
+  | {
+    type: 'heartbeat.task.run_requested';
+    taskId: string;
+    generation: number;
+    disposition: 'requested' | 'coalesced';
+    requestedAt: string;
+    reason?: string;
+    timestamp: string;
+  }
+  | {
+    type: 'heartbeat.task.run_request_claimed';
+    taskId: string;
+    executionId: string;
+    generation: number;
+    timestamp: string;
+  }
   | {
     type: 'heartbeat.task.started';
     taskId: string;

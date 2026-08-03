@@ -164,8 +164,32 @@ describe('control-plane heartbeat mutations', () => {
 
     await ControlPlaneHeartbeatController.setTaskEnabled(stateRoot, 'repo-check', true);
     const triggered = await ControlPlaneHeartbeatController.triggerTaskRun(stateRoot, 'repo-check');
-    expect(triggered).toMatchObject({ taskId: 'repo-check', enabled: true, state: { status: 'waiting' } });
+    expect(triggered).toMatchObject({
+      taskId: 'repo-check',
+      enabled: true,
+      state: {
+        status: 'waiting',
+        runRequest: {
+          generation: 1,
+          pending: true,
+          reason: 'manual-trigger',
+        },
+      },
+    });
     expect(triggered.schedule.nextRunAt).toBeTruthy();
+
+    const requested = await ControlPlaneHeartbeatController.requestTaskRun(stateRoot, 'repo-check', {
+      reason: 'new-work-available',
+    });
+    expect(requested).toMatchObject({
+      disposition: 'coalesced',
+      generation: 2,
+      reason: 'new-work-available',
+      task: {
+        taskId: 'repo-check',
+        state: { runRequest: { pending: true } },
+      },
+    });
 
     const task = (await store.listTasks())[0];
     expect(task?.schedule.nextRunAt).toBeTruthy();
@@ -236,6 +260,17 @@ describe('control-plane heartbeat mutations', () => {
 
     const triggered = await caller.heartbeatTaskTrigger({ taskId: 'repo-check' });
     expect(triggered.task).toMatchObject({ taskId: 'repo-check', enabled: true, state: { status: 'waiting' } });
+
+    const requested = await caller.heartbeatTaskRequestRun({
+      taskId: 'repo-check',
+      reason: 'router-new-work',
+    });
+    expect(requested).toMatchObject({
+      disposition: 'coalesced',
+      generation: 2,
+      reason: 'router-new-work',
+      task: { taskId: 'repo-check', state: { runRequest: { pending: true } } },
+    });
 
     const created = await caller.heartbeatTaskCreate({
       id: 'router-created',

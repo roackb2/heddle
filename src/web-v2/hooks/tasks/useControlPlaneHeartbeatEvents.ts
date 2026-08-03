@@ -60,7 +60,12 @@ export function useControlPlaneHeartbeatEvents({
       });
     }
 
-    if (event.type === 'heartbeat.task.failed' || event.type === 'heartbeat.task.recovered') {
+    if (
+      event.type === 'heartbeat.task.failed'
+      || event.type === 'heartbeat.task.recovered'
+      || event.type === 'heartbeat.task.run_requested'
+      || event.type === 'heartbeat.task.run_request_claimed'
+    ) {
       void utils.controlPlane.heartbeatTasks.invalidate(workspaceId ? { workspaceId } : undefined);
       void utils.controlPlane.heartbeatTask.invalidate(workspaceId ? { workspaceId, taskId: event.taskId } : { taskId: event.taskId });
       void utils.controlPlane.state.invalidate();
@@ -123,6 +128,20 @@ function projectHeartbeatTaskEvent(
         status: 'waiting',
         progress: 'Task is due. Waiting for the heartbeat runner...',
       };
+    case 'heartbeat.task.run_requested':
+      return {
+        ...base,
+        progress:
+          event.disposition === 'coalesced' ?
+            'A follow-up run is already pending; the latest request was coalesced.'
+          : 'A prompt heartbeat run was requested.',
+      };
+    case 'heartbeat.task.run_request_claimed':
+      return {
+        ...base,
+        status: 'running',
+        progress: `Heartbeat runner claimed request generation ${event.generation}.`,
+      };
     case 'heartbeat.task.started':
       return {
         ...base,
@@ -160,8 +179,8 @@ function projectHeartbeatTaskEvent(
     case 'heartbeat.task.failed':
       return {
         ...base,
-        status: 'failed',
-        progress: event.error,
+        status: event.status,
+        progress: event.progress || event.error,
       };
   }
 }

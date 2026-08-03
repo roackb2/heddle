@@ -121,8 +121,14 @@ async function ensureDemoTask(
 
 function formatSchedulerEvent(event: HeartbeatSchedulerEvent): string | undefined {
   switch (event.type) {
+    case 'heartbeat.scheduler.awakened':
+      return `[event] scheduler.awakened tasks=${event.taskIds.join(',')}`;
     case 'heartbeat.task.due':
       return `[event] task.due id=${event.taskId}`;
+    case 'heartbeat.task.run_requested':
+      return `[event] task.run_requested id=${event.taskId} generation=${event.generation} disposition=${event.disposition}`;
+    case 'heartbeat.task.run_request_claimed':
+      return `[event] task.run_request_claimed id=${event.taskId} generation=${event.generation} execution=${event.executionId}`;
     case 'heartbeat.task.started':
       return `[event] task.started id=${event.taskId} execution=${event.executionId} loadedCheckpoint=${event.loadedCheckpoint}`;
     case 'heartbeat.task.recovered':

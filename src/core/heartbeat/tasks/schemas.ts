@@ -7,6 +7,7 @@
  */
 import { z } from 'zod';
 import { LlmUsageSchema } from '@/core/llm/usage/index.js';
+import { MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH } from './types.js';
 
 export const HeartbeatTaskStatusSchema = z.enum(['idle', 'running', 'waiting', 'blocked', 'complete', 'failed']);
 export const HeartbeatDecisionSchema = z.enum(['continue', 'pause', 'complete', 'escalate']);
@@ -17,6 +18,14 @@ const HeartbeatTaskExecutionSchema = z.object({
   executionId: z.string().describe('Fencing token for the currently owned execution attempt.'),
   ownerId: z.string().describe('Scheduler process or worker generation that owns this execution.'),
   claimedAt: z.string().describe('Timestamp when this execution claimed the task.'),
+  runRequestGeneration: z.number().int().nonnegative().optional().describe('Run-request generation claimed by this execution.'),
+});
+
+const HeartbeatTaskRunRequestSchema = z.object({
+  generation: z.number().int().nonnegative().describe('Latest accepted run-request generation.'),
+  claimedGeneration: z.number().int().nonnegative().describe('Latest generation claimed by an execution.'),
+  requestedAt: z.string().describe('Timestamp of the latest accepted run request.'),
+  reason: z.string().min(1).max(MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH).optional().describe('Bounded operator-facing reason for the latest request.'),
 });
 
 const HeartbeatTaskRecoverySchema = z.object({
@@ -31,6 +40,7 @@ export const HeartbeatTaskExecutionOutcomeSchema = z.object({
   executionId: z.string().describe('Outer heartbeat execution fencing identity.'),
   summary: z.string().describe('Operator-facing execution outcome summary.'),
   finishedAt: z.string().describe('Timestamp when the outer heartbeat execution settled.'),
+  runRequestGeneration: z.number().int().nonnegative().optional().describe('Run-request generation claimed by this execution.'),
 });
 
 export const HeartbeatTaskSchema = z.object({
@@ -64,6 +74,7 @@ export const HeartbeatTaskSchema = z.object({
     result: z.lazy(() => AgentHeartbeatResultSchema).optional().describe('Latest heartbeat runner result.'),
     error: z.string().optional().describe('Latest scheduler or runner error.'),
     execution: HeartbeatTaskExecutionSchema.optional().describe('Currently owned execution attempt and fencing identity.'),
+    runRequest: HeartbeatTaskRunRequestSchema.optional().describe('Durable level-triggered request state for a prompt task run.'),
     lastExecution: HeartbeatTaskExecutionOutcomeSchema.optional().describe('Latest outer heartbeat execution outcome.'),
     recovery: HeartbeatTaskRecoverySchema.optional().describe('Most recent explicit interrupted-execution recovery.'),
     updatedAt: z.string().optional().describe('Timestamp when this task record was last updated.'),

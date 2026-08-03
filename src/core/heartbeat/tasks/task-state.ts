@@ -41,6 +41,13 @@ export class HeartbeatTaskStateProjector {
     loadedCheckpoint: boolean;
     execution: HeartbeatTaskExecution;
   }): HeartbeatTask {
+    const runRequest = args.task.state?.runRequest;
+    const claimsPendingRequest = HeartbeatTaskStateProjector.hasPendingRunRequest(args.task);
+    const execution = claimsPendingRequest && runRequest ? {
+      ...args.execution,
+      runRequestGeneration: runRequest.generation,
+    } : args.execution;
+
     return HeartbeatTaskStateProjector.normalize({
       ...args.task,
       state: {
@@ -52,10 +59,61 @@ export class HeartbeatTaskStateProjector {
           : 'Starting a new heartbeat runner cycle.',
         loadedCheckpoint: args.loadedCheckpoint,
         error: undefined,
-        execution: args.execution,
+        execution,
+        runRequest: claimsPendingRequest && runRequest ? {
+          ...runRequest,
+          claimedGeneration: runRequest.generation,
+        } : runRequest,
         updatedAt: dayjs(args.now).toISOString(),
       },
     });
+  }
+
+  static requestRun(args: {
+    task: HeartbeatTask;
+    now: Date;
+    reason?: string;
+  }): {
+    task: HeartbeatTask;
+    disposition: 'requested' | 'coalesced';
+  } {
+    const previousRequest = args.task.state?.runRequest;
+    const generation = (previousRequest?.generation ?? 0) + 1;
+    if (!Number.isSafeInteger(generation)) {
+      throw new Error(`Heartbeat task ${args.task.id} run-request generation is exhausted.`);
+    }
+
+    const requestedAt = dayjs(args.now).toISOString();
+    const disposition = HeartbeatTaskStateProjector.hasPendingRunRequest(args.task) ? 'coalesced' : 'requested';
+    const running = args.task.state?.status === 'running';
+    const task = HeartbeatTaskStateProjector.normalize({
+      ...args.task,
+      schedule: {
+        ...args.task.schedule,
+        nextRunAt: dayjs(args.now).subtract(1, 'second').toISOString(),
+      },
+      state: {
+        ...args.task.state,
+        status: running ? 'running' : 'waiting',
+        progress: running ?
+          args.task.state?.progress
+        : 'Heartbeat run requested. Waiting for the scheduler.',
+        runRequest: {
+          generation,
+          claimedGeneration: previousRequest?.claimedGeneration ?? 0,
+          requestedAt,
+          reason: args.reason,
+        },
+        updatedAt: requestedAt,
+      },
+    });
+
+    return { task, disposition };
+  }
+
+  static hasPendingRunRequest(task: Pick<HeartbeatTask, 'state'>): boolean {
+    const request = task.state?.runRequest;
+    return Boolean(request && request.generation > request.claimedGeneration);
   }
 
   static afterRecovery(args: {
@@ -114,7 +172,7 @@ export class HeartbeatTaskStateProjector {
     });
     const projection = HeartbeatTaskStateProjector.projectResult(args.result, delayMs);
 
-    return HeartbeatTaskStateProjector.normalize({
+    return HeartbeatTaskStateProjector.afterExecutionSettlement(HeartbeatTaskStateProjector.normalize({
       ...args.task,
       enabled: terminal ? false : args.task.enabled,
       schedule: {
@@ -130,6 +188,7 @@ export class HeartbeatTaskStateProjector {
         resumable: args.result.decision !== 'complete' || continuationMode === 'operator',
         result: args.result,
         error: undefined,
+        runRequest: args.task.state?.runRequest,
         lastExecution: HeartbeatTaskStateProjector.executionOutcome({
           kind: 'agent',
           execution: args.execution,
@@ -139,7 +198,7 @@ export class HeartbeatTaskStateProjector {
         recovery: args.task.state?.recovery,
         updatedAt: dayjs(args.now).toISOString(),
       },
-    });
+    }));
   }
 
   static afterFailure(args: {
@@ -150,7 +209,7 @@ export class HeartbeatTaskStateProjector {
     retryMs: number;
   }): HeartbeatTask {
     const summary = args.error instanceof Error ? args.error.message : String(args.error);
-    return HeartbeatTaskStateProjector.normalize({
+    return HeartbeatTaskStateProjector.afterExecutionSettlement(HeartbeatTaskStateProjector.normalize({
       ...args.task,
       schedule: {
         ...args.task.schedule,
@@ -171,7 +230,7 @@ export class HeartbeatTaskStateProjector {
         }),
         updatedAt: dayjs(args.now).toISOString(),
       },
-    });
+    }));
   }
 
   static afterSkip(args: {
@@ -181,7 +240,7 @@ export class HeartbeatTaskStateProjector {
     now: Date;
   }): HeartbeatTask {
     const finishedAt = dayjs(args.now).toISOString();
-    return HeartbeatTaskStateProjector.normalize({
+    return HeartbeatTaskStateProjector.afterExecutionSettlement(HeartbeatTaskStateProjector.normalize({
       ...args.task,
       schedule: {
         ...args.task.schedule,
@@ -196,6 +255,7 @@ export class HeartbeatTaskStateProjector {
         resumable: true,
         error: undefined,
         execution: undefined,
+        runRequest: args.task.state?.runRequest,
         lastExecution: HeartbeatTaskStateProjector.executionOutcome({
           kind: 'skipped',
           execution: args.execution,
@@ -205,7 +265,7 @@ export class HeartbeatTaskStateProjector {
         recovery: args.task.state?.recovery,
         updatedAt: finishedAt,
       },
-    });
+    }));
   }
 
   static afterCancellation(args: {
@@ -215,7 +275,7 @@ export class HeartbeatTaskStateProjector {
     now: Date;
   }): HeartbeatTask {
     const finishedAt = dayjs(args.now).toISOString();
-    return HeartbeatTaskStateProjector.normalize({
+    return HeartbeatTaskStateProjector.afterExecutionSettlement(HeartbeatTaskStateProjector.normalize({
       ...args.task,
       schedule: {
         ...args.task.schedule,
@@ -230,6 +290,7 @@ export class HeartbeatTaskStateProjector {
         resumable: true,
         error: undefined,
         execution: undefined,
+        runRequest: args.task.state?.runRequest,
         lastExecution: HeartbeatTaskStateProjector.executionOutcome({
           kind: 'cancelled',
           execution: args.execution,
@@ -239,7 +300,7 @@ export class HeartbeatTaskStateProjector {
         recovery: args.task.state?.recovery,
         updatedAt: finishedAt,
       },
-    });
+    }));
   }
 
   private static normalizeState(state: HeartbeatTaskState | undefined): HeartbeatTaskState {
@@ -248,6 +309,63 @@ export class HeartbeatTaskStateProjector {
       status: state?.status ?? 'idle',
       resumable: state?.resumable ?? true,
     };
+  }
+
+  private static afterExecutionSettlement(task: HeartbeatTask): HeartbeatTask {
+    const runRequest = task.state?.runRequest;
+    if (!task.enabled) {
+      const terminal = task.state?.status === 'blocked' || task.state?.status === 'complete';
+      return HeartbeatTaskStateProjector.normalize({
+        ...task,
+        schedule: {
+          ...task.schedule,
+          nextRunAt: undefined,
+        },
+        state: {
+          ...task.state,
+          status: terminal ? task.state?.status : 'idle',
+          progress: terminal ? task.state?.progress : 'Heartbeat execution settled. Task remains disabled.',
+          runRequest: runRequest ? {
+            ...runRequest,
+            claimedGeneration: runRequest.generation,
+          } : undefined,
+        },
+      });
+    }
+
+    if (!runRequest || !HeartbeatTaskStateProjector.hasPendingRunRequest(task)) {
+      return task;
+    }
+
+    if (task.state?.status === 'blocked' || task.state?.status === 'complete') {
+      return HeartbeatTaskStateProjector.normalize({
+        ...task,
+        schedule: {
+          ...task.schedule,
+          nextRunAt: undefined,
+        },
+        state: {
+          ...task.state,
+          runRequest: {
+            ...runRequest,
+            claimedGeneration: runRequest.generation,
+          },
+        },
+      });
+    }
+
+    return HeartbeatTaskStateProjector.normalize({
+      ...task,
+      schedule: {
+        ...task.schedule,
+        nextRunAt: dayjs(runRequest.requestedAt).subtract(1, 'second').toISOString(),
+      },
+      state: {
+        ...task.state,
+        status: 'waiting',
+        progress: 'A newer heartbeat run was requested during this execution. Waiting for an immediate follow-up.',
+      },
+    });
   }
 
   private static projectResult(
@@ -345,6 +463,7 @@ export class HeartbeatTaskStateProjector {
       executionId: args.execution.executionId,
       summary: args.summary,
       finishedAt: args.finishedAt,
+      runRequestGeneration: args.execution.runRequestGeneration,
     };
   }
 }

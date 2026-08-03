@@ -8,7 +8,13 @@
 import { randomUUID } from 'node:crypto';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore.js';
-import { FileHeartbeatTaskService, type HeartbeatTask, type HeartbeatTaskRunRecord } from '../tasks/index.js';
+import {
+  FileHeartbeatTaskService,
+  type HeartbeatTask,
+  type HeartbeatTaskRunRecord,
+  type HeartbeatTaskRunRequestSignal,
+  type HeartbeatTaskStore,
+} from '../tasks/index.js';
 import { HeartbeatTaskRunnerService } from './runner.js';
 import type {
   HeartbeatSchedulerHandle,
@@ -21,6 +27,45 @@ import type {
 const DEFAULT_SCHEDULER_POLL_INTERVAL_MS = 60_000;
 
 dayjs.extend(isSameOrBefore);
+
+class HeartbeatSchedulerWakeController {
+  private readonly pendingRequests = new Map<string, HeartbeatTaskRunRequestSignal>();
+  private readonly unsubscribe?: () => void;
+  private waitController = new AbortController();
+
+  constructor(store: HeartbeatTaskStore) {
+    this.unsubscribe = store.subscribeToRunRequests?.((request) => {
+      this.pendingRequests.set(request.taskId, request);
+      this.waitController.abort();
+    });
+  }
+
+  drain(): HeartbeatTaskRunRequestSignal[] {
+    const requests = [...this.pendingRequests.values()]
+      .sort((left, right) => left.taskId.localeCompare(right.taskId));
+    this.pendingRequests.clear();
+    return requests;
+  }
+
+  async wait(args: {
+    intervalMs: number;
+    signal?: AbortSignal;
+    sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
+  }): Promise<void> {
+    const cycleController = this.waitController;
+    const signal = args.signal ? AbortSignal.any([args.signal, cycleController.signal]) : cycleController.signal;
+    await args.sleep(args.intervalMs, signal);
+    if (this.waitController === cycleController) {
+      this.waitController = new AbortController();
+    }
+  }
+
+  dispose(): void {
+    this.unsubscribe?.();
+    this.waitController.abort();
+    this.pendingRequests.clear();
+  }
+}
 
 export class HeartbeatSchedulerService {
   // Starts a background scheduler loop for one workspace and returns a handle the host can stop.
@@ -113,6 +158,7 @@ export class HeartbeatSchedulerService {
   static async runLoop(options: RunHeartbeatSchedulerOptions): Promise<void> {
     const executionOwnerId = options.executionOwnerId ?? HeartbeatSchedulerService.createExecutionOwnerId();
     const startedAt = options.now?.() ?? dayjs().toDate();
+    const wakeController = new HeartbeatSchedulerWakeController(options.store);
     options.onEvent?.({ type: 'heartbeat.scheduler.started', timestamp: dayjs(startedAt).toISOString() });
     try {
       const recoveries = await options.store.recoverInterruptedTasks({
@@ -133,6 +179,7 @@ export class HeartbeatSchedulerService {
       }));
 
       while (!options.signal?.aborted) {
+        HeartbeatSchedulerService.emitRunRequestWakeEvents(options, wakeController.drain());
         await HeartbeatSchedulerService.runDueTasks({
           ...options,
           executionOwnerId,
@@ -142,7 +189,11 @@ export class HeartbeatSchedulerService {
         if (options.signal?.aborted) {
           break;
         }
-        await (options.sleep ?? HeartbeatSchedulerService.sleep)(options.pollIntervalMs ?? DEFAULT_SCHEDULER_POLL_INTERVAL_MS, options.signal);
+        await wakeController.wait({
+          intervalMs: options.pollIntervalMs ?? DEFAULT_SCHEDULER_POLL_INTERVAL_MS,
+          signal: options.signal,
+          sleep: options.sleep ?? HeartbeatSchedulerService.sleep,
+        });
       }
       options.onEvent?.({ type: 'heartbeat.scheduler.stopped', reason: 'aborted', timestamp: HeartbeatSchedulerService.resolveNowIso(options) });
     } catch (error) {
@@ -153,7 +204,29 @@ export class HeartbeatSchedulerService {
 
       options.onEvent?.({ type: 'heartbeat.scheduler.stopped', reason: 'error', timestamp: HeartbeatSchedulerService.resolveNowIso(options) });
       throw error;
+    } finally {
+      wakeController.dispose();
     }
+  }
+
+  private static emitRunRequestWakeEvents(
+    options: Pick<RunHeartbeatSchedulerOptions, 'onEvent'>,
+    requests: HeartbeatTaskRunRequestSignal[],
+  ): void {
+    if (requests.length === 0) {
+      return;
+    }
+
+    requests.forEach((request) => options.onEvent?.({
+      type: 'heartbeat.task.run_requested',
+      ...request,
+      timestamp: request.requestedAt,
+    }));
+    options.onEvent?.({
+      type: 'heartbeat.scheduler.awakened',
+      taskIds: requests.map((request) => request.taskId),
+      timestamp: requests.at(-1)?.requestedAt ?? dayjs().toISOString(),
+    });
   }
 
   // Decides whether a task should be selected by the scheduler at the current time.
@@ -188,11 +261,13 @@ export class HeartbeatSchedulerService {
     }
 
     return new Promise((resolve) => {
-      const timeout = setTimeout(resolve, ms);
-      signal?.addEventListener('abort', () => {
+      const finish = () => {
         clearTimeout(timeout);
+        signal?.removeEventListener('abort', finish);
         resolve();
-      }, { once: true });
+      };
+      const timeout = setTimeout(finish, ms);
+      signal?.addEventListener('abort', finish, { once: true });
     });
   }
 }

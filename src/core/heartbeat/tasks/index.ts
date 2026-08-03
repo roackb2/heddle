@@ -19,9 +19,14 @@ export type {
   HeartbeatTaskRecoveryResult,
   HeartbeatTaskRunRecord,
   HeartbeatTaskRunRecordEntry,
+  HeartbeatTaskRunRequest,
+  HeartbeatTaskRunRequestResult,
+  HeartbeatTaskRunRequestSignal,
   HeartbeatTaskRuntime,
   HeartbeatTaskSchedule,
   HeartbeatTaskState,
   HeartbeatTaskStatus,
   HeartbeatTaskStore,
+  RequestHeartbeatTaskRunOptions,
 } from './types.js';
+export { MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH } from './types.js';
