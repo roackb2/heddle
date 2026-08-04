@@ -120,6 +120,35 @@ describe('workspace catalog', () => {
     });
   });
 
+  it('resolves the command workspace by root without changing the persisted web selection', () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-command-root-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const primary = RuntimeWorkspaceService.ensureCatalog({ workspaceRoot, stateRoot }).workspaces[0];
+    if (!primary) {
+      throw new Error('expected primary workspace');
+    }
+
+    RuntimeWorkspaceService.createDescriptor({
+      workspaceRoot,
+      stateRoot,
+      name: 'Web-selected workspace',
+      newWorkspaceRoot: join(workspaceRoot, 'web-selected'),
+      setActive: true,
+      nextId: 'workspace-web-selected',
+    });
+
+    const commandContext = RuntimeWorkspaceService.resolveContextForRoot({ workspaceRoot, stateRoot });
+    expect(commandContext.activeWorkspace).toMatchObject({
+      id: primary.id,
+      workspaceRoot,
+      stateRoot,
+    });
+
+    const webContext = RuntimeWorkspaceService.resolveContext({ workspaceRoot, stateRoot });
+    expect(webContext.activeWorkspaceId).toBe('workspace-web-selected');
+    expect(webContext.catalog.activeWorkspaceId).toBe('workspace-web-selected');
+  });
+
   it('can rename a workspace', () => {
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-workspace-rename-'));
     const stateRoot = join(workspaceRoot, '.heddle');
