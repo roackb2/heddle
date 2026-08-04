@@ -14,7 +14,19 @@ export type HeartbeatSchedulerEvent =
   | { type: 'heartbeat.scheduler.started'; timestamp: string }
   | { type: 'heartbeat.scheduler.stopped'; reason: 'aborted' | 'completed' | 'error'; timestamp: string }
   | { type: 'heartbeat.scheduler.awakened'; taskIds: string[]; timestamp: string }
-  | { type: 'heartbeat.task.due'; taskId: string; timestamp: string }
+  | {
+      type: 'heartbeat.task.due';
+      taskId: string;
+      timestamp: string;
+      /** One-based position in the stable due-task selection order. */
+      queuePosition?: number;
+      /** Configured scheduler-wide task concurrency ceiling. */
+      maxConcurrentTasks?: number;
+      /** Active bounded-pool jobs, including this admitted task. */
+      activeTasks?: number;
+      /** Selected jobs still waiting for a bounded-pool slot. */
+      queuedTasks?: number;
+    }
   | {
       type: 'heartbeat.task.run_requested';
       taskId: string;
@@ -182,6 +194,8 @@ export type RunDueHeartbeatTasksOptions = {
   now?: () => Date;
   onEvent?: (event: HeartbeatSchedulerEvent) => void;
   failureRetryMs?: number;
+  /** Maximum independent heartbeat tasks admitted concurrently. Defaults to 1. */
+  maxConcurrentTasks?: number;
   /** Stable only for this scheduler process/worker generation. */
   executionOwnerId?: string;
   /** Cancels task executions selected by this call. */
@@ -227,6 +241,8 @@ export type StartHeartbeatSchedulerOptions = {
   /** @deprecated Use `handler`. */
   runner?: HeartbeatTaskRunner;
   pollIntervalMs?: number;
+  /** Maximum independent heartbeat tasks admitted concurrently. Defaults to 1. */
+  maxConcurrentTasks?: number;
   onEvent?: (event: HeartbeatSchedulerEvent) => void;
   onError?: (error: unknown) => void;
 };

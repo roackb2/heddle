@@ -236,6 +236,7 @@ export const heartbeatTaskRunNowInputSchema = z.object({
 
 export const heartbeatRunDueTasksInputSchema = z.object({
   workspaceId: z.string().min(1).optional(),
+  maxConcurrentTasks: z.number().int().min(1).optional(),
   model: z.string().min(1).optional(),
   maxSteps: z.number().int().min(1).max(500).optional(),
   apiKey: z.string().min(1).optional(),

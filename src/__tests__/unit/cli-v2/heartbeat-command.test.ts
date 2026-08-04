@@ -186,7 +186,7 @@ describe('heartbeat CLI helpers', () => {
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
     try {
-      await HeartbeatCliCommandEdgeService.run(['start', '--id', 'repo-gardener', '--task', 'Maintain the repo', '--poll', '5s'], {
+      await HeartbeatCliCommandEdgeService.run(['start', '--id', 'repo-gardener', '--task', 'Maintain the repo', '--poll', '5s', '--concurrency', '3'], {
         workspaceRoot: '/repo',
         activeWorkspaceId: 'workspace-1',
         stateDir: '.heddle',
@@ -200,6 +200,7 @@ describe('heartbeat CLI helpers', () => {
         heartbeatScheduler: {
           enabled: true,
           pollIntervalMs: 5_000,
+          maxConcurrentTasks: 3,
         },
       }));
     } finally {
@@ -231,13 +232,25 @@ describe('heartbeat CLI helpers', () => {
         stateDir: '.heddle',
         preferApiKey: true,
         runtimeHost: freshRuntimeHost(),
-      })).rejects.toThrow('--poll only applies when heartbeat start launches an embedded control-plane server.');
+      })).rejects.toThrow('--poll and --concurrency only apply when heartbeat start launches an embedded control-plane server.');
       expect(createClient).not.toHaveBeenCalled();
       expect(runtime.close).toHaveBeenCalledTimes(1);
     } finally {
       resolve.mockRestore();
       createClient.mockRestore();
       stdout.mockRestore();
+    }
+  });
+
+  it('rejects invalid heartbeat concurrency before resolving a runtime', async () => {
+    const resolve = vi.spyOn(ControlPlaneCommandRuntimeService, 'resolve');
+
+    try {
+      await expect(HeartbeatCliCommandEdgeService.run(['start', '--concurrency', '1.5']))
+        .rejects.toThrow('--concurrency must be a positive integer.');
+      expect(resolve).not.toHaveBeenCalled();
+    } finally {
+      resolve.mockRestore();
     }
   });
 });

@@ -111,6 +111,7 @@ export type HeddleControlPlaneServerOptions = Omit<HeddleServerOptions, 'runtime
 export type HeddleHeartbeatSchedulerSettings = {
   enabled?: boolean;
   pollIntervalMs?: number;
+  maxConcurrentTasks?: number;
 };
 
 export type HeddleRuntimeHostDescriptor = {

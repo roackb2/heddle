@@ -232,7 +232,7 @@ describe('heartbeat run requests', () => {
     expect((await store.listTasks()).every((task) => task.state?.runRequest === undefined)).toBe(true);
   });
 
-  it('wakes a sleeping scheduler promptly and removes the wake subscription on stop', async () => {
+  it('wakes a sleeping bounded scheduler promptly and removes the wake subscription on stop', async () => {
     const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-heartbeat-run-request-wake-'));
     const tasks = new FileHeartbeatTaskService({ stateRoot });
     await tasks.saveTask(createTask({
@@ -249,6 +249,7 @@ describe('heartbeat run requests', () => {
       workspaceRoot: stateRoot,
       stateRoot,
       pollIntervalMs: 60_000,
+      maxConcurrentTasks: 2,
       handler: async (context) => {
         handlerStarted.resolve();
         await releaseHandler.promise;
@@ -274,6 +275,7 @@ describe('heartbeat run requests', () => {
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'heartbeat.task.run_requested', reason: 'new-mail' }),
       expect.objectContaining({ type: 'heartbeat.scheduler.awakened', taskIds: ['mailbox-consumer'] }),
+      expect.objectContaining({ type: 'heartbeat.task.due', taskId: 'mailbox-consumer', maxConcurrentTasks: 2 }),
       expect.objectContaining({ type: 'heartbeat.task.run_request_claimed', generation: 1 }),
     ]));
 

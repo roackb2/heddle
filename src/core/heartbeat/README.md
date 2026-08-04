@@ -25,7 +25,8 @@ operator-facing heartbeat views.
   state transitions after agent success, no-work skip, cancellation, failure,
   request, claim, or recovery.
 - `scheduler/`: `HeartbeatSchedulerService` owns due-task selection and the
-  periodic scheduler loop. It delegates execution to
+  periodic scheduler loop. It selects due work in stable oldest-due-first order
+  and uses `p-limit` to enforce the configured task concurrency ceiling. It delegates execution to
   `HeartbeatTaskRunnerService` instead of running tasks itself. Daemon, CLI,
   and future hosts should start or run the scheduler through this service
   instead of constructing task repositories or duplicating loop logic.
@@ -66,6 +67,10 @@ operator-facing heartbeat views.
 - `executionOwnerId` identifies one scheduler process/worker generation. Do not
   reuse it across process restarts: scheduler startup uses it to distinguish a
   current claim from an execution interrupted by the prior single-host process.
+- `maxConcurrentTasks` defaults to `1`. The scheduler may run different task IDs
+  concurrently, but every execution still passes through the store's atomic
+  claim and fencing contract. Aggregate records retain selected-task order even
+  when completion events arrive in another order.
 - The file service serializes claim/recover/complete/fail transitions with a
   shared in-process mutex, serializes task control read-transform-write
   transitions, and tracks live executions in process memory. Its process-local
@@ -94,8 +99,9 @@ operator-facing heartbeat views.
   same pipeline.
 - `HeartbeatSchedulerService.start()` returns an awaitable, idempotent stop
   handle. Hosts must await `stop({ cancelRunning: true })` before resetting
-  domain state. A handler that ignores its abort signal delays stop until it
-  settles; final writes remain fenced by the execution claim.
+  domain state. Stop prevents bounded-pool jobs that are still queued from being
+  admitted. A handler that ignores its abort signal delays stop until active
+  work settles; final writes remain fenced by the execution claim.
 - `heddle heartbeat run` and `heddle heartbeat start` are server-backed command
   paths. The control-plane server owns recurring scheduler lifetime; CLI
   commands may request due-task execution or keep an embedded server alive, but

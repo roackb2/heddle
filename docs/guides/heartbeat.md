@@ -37,8 +37,8 @@ heddle heartbeat task add --id repo-gardener --task "Check for safe maintenance 
 heddle heartbeat task list
 heddle heartbeat task show repo-gardener
 heddle heartbeat task enable repo-gardener
-heddle heartbeat run
-heddle heartbeat start --poll 60s
+heddle heartbeat run --concurrency 2
+heddle heartbeat start --poll 60s --concurrency 2
 heddle heartbeat start --once --id repo-gardener
 heddle heartbeat runs list --task repo-gardener
 heddle heartbeat runs show latest --task repo-gardener
@@ -78,6 +78,13 @@ For repeated runner cycles, Heddle also exposes a local-first scheduler core:
 compact display shape for a UI or service integration, use
 `FileHeartbeatTaskService` task/run view methods instead of flattening task
 state yourself.
+
+Due tasks are selected in stable oldest-`nextRunAt` order with task ID as the
+tie-breaker. Set `maxConcurrentTasks` to let independent tasks share a bounded
+worker pool; the default is `1` for serial compatibility. Completion events are
+emitted when each execution actually settles, while the returned `records`
+array stays in selected-task order. The `heartbeat.task.due` event includes its
+one-based queue position and current pool counts.
 
 `HeartbeatSchedulerService.runLoop` assigns one owner identity to the current
 worker generation. On startup it performs one explicit recovery pass before
@@ -168,6 +175,7 @@ const handler: HeartbeatTaskHandler = async (context) => {
 
 await HeartbeatSchedulerService.runDueTasks({
   store,
+  maxConcurrentTasks: 4,
   runtime: {
     workspaceRoot: process.cwd(),
     stateDir: '.heddle',
@@ -202,6 +210,7 @@ const scheduler = HeartbeatSchedulerService.start({
   workspaceRoot,
   stateRoot,
   handler,
+  maxConcurrentTasks: 4,
 });
 
 // Stop polling, abort the active execution, and wait for handler settlement

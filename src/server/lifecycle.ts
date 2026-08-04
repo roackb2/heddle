@@ -171,6 +171,7 @@ export async function startHeddleControlPlaneServer(
     accessMode,
     heartbeatSchedulerEnabled,
     heartbeatSchedulerPollIntervalMs: heartbeatSchedulerSettings.pollIntervalMs,
+    heartbeatSchedulerMaxConcurrentTasks: heartbeatSchedulerSettings.maxConcurrentTasks,
   }, 'Heddle server started');
 
   return {
@@ -193,6 +194,7 @@ function createHeartbeatSchedulerHost(options: HeddleControlPlaneServerOptions):
     stateRoot: options.stateRoot,
     preferApiKey: options.preferApiKey,
     pollIntervalMs: options.heartbeatScheduler?.pollIntervalMs,
+    maxConcurrentTasks: options.heartbeatScheduler?.maxConcurrentTasks,
     onEvent: (workspace, event) => {
       logHeartbeatSchedulerEvent(getWorkspaceOperationLogger(workspace.stateRoot), workspace, event);
       controlPlaneHeartbeatEventsController.publish({

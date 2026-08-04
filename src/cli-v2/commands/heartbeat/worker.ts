@@ -1,5 +1,5 @@
 import type { ParsedHeartbeatArgs } from './args.js';
-import { booleanFlag, parsePositiveInt, stringFlag } from './args.js';
+import { booleanFlag, parsePositiveInt, parsePositiveIntegerFlag, stringFlag } from './args.js';
 import { formatDurationMs, parseDurationMs } from './duration.js';
 import type { HeartbeatCliContext } from './types.js';
 
@@ -30,6 +30,7 @@ export async function runHeartbeatWorkerCli(
 
   const result = await context.client.controlPlane.heartbeatRunDueTasks.mutate({
     workspaceId: context.workspaceId,
+    maxConcurrentTasks: parsePositiveIntegerFlag(stringFlag(parsed.flags, 'concurrency'), '--concurrency'),
     model: stringFlag(parsed.flags, 'model') ?? context.options.model,
     maxSteps: parsePositiveInt(stringFlag(parsed.flags, 'max-steps')) ?? context.options.maxSteps,
     preferApiKey: context.options.preferApiKey,
@@ -89,9 +90,10 @@ export async function startHeartbeatCli(
   }
 
   const poll = stringFlag(parsed.flags, 'poll');
+  const concurrency = stringFlag(parsed.flags, 'concurrency');
   process.stdout.write([
     `Heartbeat scheduler is server-backed for workspace ${context.workspaceId}.`,
-    `task=${task.taskId} status=${task.state.status} every=${formatDurationMs(intervalMs)}${poll ? ` poll=${poll}` : ''}`,
+    `task=${task.taskId} status=${task.state.status} every=${formatDurationMs(intervalMs)}${poll ? ` poll=${poll}` : ''}${concurrency ? ` concurrency=${concurrency}` : ''}`,
     'Use `heddle daemon` for a standalone long-running server, or keep this embedded command running.',
   ].join('\n') + '\n');
 }
