@@ -79,7 +79,7 @@ export class HeartbeatSchedulerService {
     const maxConcurrentTasks = HeartbeatSchedulerService.resolveMaxConcurrentTasks(options.maxConcurrentTasks);
     const loopController = new AbortController();
     const executionController = new AbortController();
-    const store = new FileHeartbeatTaskService({ stateRoot: options.stateRoot });
+    const store = options.store ?? new FileHeartbeatTaskService({ stateRoot: options.stateRoot });
     let loopError: unknown;
     const settledLoop = HeartbeatSchedulerService.runLoop({
       store,

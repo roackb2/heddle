@@ -102,6 +102,12 @@ operator-facing heartbeat views.
   domain state. Stop prevents bounded-pool jobs that are still queued from being
   admitted. A handler that ignores its abort signal delays stop until active
   work settles; final writes remain fenced by the execution claim.
+- `HeartbeatSchedulerService.start({ store })` uses the caller-provided
+  `HeartbeatTaskStore` instance for startup recovery, run-request wakeups, due
+  selection, claims, settlement, and run history. `stateRoot` still locates
+  framework-owned agent runtime state; it only locates heartbeat task files
+  when `store` is omitted. A remote adapter must provide its own atomic claim,
+  fencing, recovery, and cross-process notification guarantees.
 - `heddle heartbeat run` and `heddle heartbeat start` are server-backed command
   paths. The control-plane server owns recurring scheduler lifetime; CLI
   commands may request due-task execution or keep an embedded server alive, but
