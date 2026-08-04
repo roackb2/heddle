@@ -5,10 +5,17 @@ export type {
   RunStoredHeartbeatOptions,
   StoredHeartbeatResult,
 } from './checkpoint/index.js';
-export { HeartbeatSchedulerService, HeartbeatTaskRunnerService } from './scheduler/index.js';
+export {
+  HeartbeatSchedulerService,
+  HeartbeatTaskRunnerService,
+  MAX_HEARTBEAT_CANCELLATION_REASON_LENGTH,
+} from './scheduler/index.js';
 export type {
+  CancelHeartbeatTaskOptions,
   HeartbeatSchedulerEvent,
   HeartbeatSchedulerHandle,
+  HeartbeatTaskCancellationDisposition,
+  HeartbeatTaskCancellationResult,
   HeartbeatExecutionContext,
   HeartbeatHandlerOutcome,
   HeartbeatTaskHandler,

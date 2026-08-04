@@ -7,7 +7,10 @@
  */
 import { z } from 'zod';
 import { LlmUsageSchema } from '@/core/llm/usage/index.js';
-import { MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH } from './types.js';
+import {
+  MAX_HEARTBEAT_CANCELLATION_REASON_LENGTH,
+  MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH,
+} from './types.js';
 
 export const HeartbeatTaskStatusSchema = z.enum(['idle', 'running', 'waiting', 'blocked', 'complete', 'failed']);
 export const HeartbeatDecisionSchema = z.enum(['continue', 'pause', 'complete', 'escalate']);
@@ -39,6 +42,8 @@ export const HeartbeatTaskExecutionOutcomeSchema = z.object({
   kind: z.enum(['agent', 'skipped', 'cancelled', 'failed']).describe('How this outer heartbeat execution settled.'),
   executionId: z.string().describe('Outer heartbeat execution fencing identity.'),
   summary: z.string().describe('Operator-facing execution outcome summary.'),
+  reason: z.string().min(1).max(MAX_HEARTBEAT_CANCELLATION_REASON_LENGTH).optional()
+    .describe('Bounded operator reason for targeted cancellation.'),
   finishedAt: z.string().describe('Timestamp when the outer heartbeat execution settled.'),
   runRequestGeneration: z.number().int().nonnegative().optional().describe('Run-request generation claimed by this execution.'),
 });

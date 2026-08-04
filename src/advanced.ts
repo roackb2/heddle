@@ -280,10 +280,14 @@ export type {
 } from './core/heartbeat/tasks/index.js';
 export {
   HeartbeatSchedulerService,
+  MAX_HEARTBEAT_CANCELLATION_REASON_LENGTH,
 } from './core/heartbeat/scheduler/index.js';
 export type {
+  CancelHeartbeatTaskOptions,
   HeartbeatSchedulerHandle,
   HeartbeatSchedulerEvent,
+  HeartbeatTaskCancellationDisposition,
+  HeartbeatTaskCancellationResult,
   HeartbeatExecutionContext,
   HeartbeatHandlerOutcome,
   HeartbeatTaskHandler,

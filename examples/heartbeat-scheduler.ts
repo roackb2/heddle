@@ -144,7 +144,11 @@ function formatSchedulerEvent(event: HeartbeatSchedulerEvent): string | undefine
     case 'heartbeat.task.skipped':
       return `[event] task.skipped id=${event.taskId} execution=${event.executionId} summary=${event.record.outcome.summary}`;
     case 'heartbeat.task.cancelled':
-      return `[event] task.cancelled id=${event.taskId} execution=${event.executionId}`;
+      return [
+        `[event] task.cancelled id=${event.taskId}`,
+        `execution=${event.executionId}`,
+        `reason=${event.reason ?? 'scheduler-stop'}`,
+      ].join(' ');
     case 'heartbeat.task.failed':
       return `[event] task.failed id=${event.taskId} error=${event.error}`;
     default:

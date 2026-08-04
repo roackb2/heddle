@@ -30,6 +30,11 @@ operator-facing heartbeat views.
   `HeartbeatTaskRunnerService` instead of running tasks itself. Daemon, CLI,
   and future hosts should start or run the scheduler through this service
   instead of constructing task repositories or duplicating loop logic.
+- `scheduler/task-lifecycle.ts`: `HeartbeatSchedulerTaskLifecycle` owns the
+  process-local task admission generation, task-scoped abort delivery, and
+  awaitable settlement registry for one `start()` handle. Durable claims and
+  final fencing remain store responsibilities. It intentionally does not route
+  cancellation to executions owned by another process or scheduler handle.
 - `scheduler/runner.ts`: `HeartbeatTaskRunnerService` owns one task execution:
   checkpoint loading, handler invocation, runner-agent invocation, abort
   propagation, checkpoint persistence, task state transitions, and execution
@@ -102,6 +107,14 @@ operator-facing heartbeat views.
   domain state. Stop prevents bounded-pool jobs that are still queued from being
   admitted. A handler that ignores its abort signal delays stop until active
   work settles; final writes remain fenced by the execution claim.
+- The same handle exposes `cancelTask(taskId, { reason })` for task-scoped
+  quiescence. It invalidates already-queued admissions for that task, aborts an
+  execution only when this handle owns it, and resolves after claim-fenced
+  settlement. Concurrent callers share one cancellation attempt. The method
+  does not disable/delete a task, consume a newer run-request generation, roll
+  back host side effects, or claim remote cancellation delivery; `not-owned`
+  tells an adapter host that another worker must be contacted through its own
+  durable routing mechanism.
 - `HeartbeatSchedulerService.start({ store })` uses the caller-provided
   `HeartbeatTaskStore` instance for startup recovery, run-request wakeups, due
   selection, claims, settlement, and run history. `stateRoot` still locates

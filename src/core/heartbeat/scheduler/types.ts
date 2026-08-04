@@ -89,6 +89,8 @@ export type HeartbeatSchedulerEvent =
       type: 'heartbeat.task.cancelled';
       taskId: string;
       executionId: string;
+      /** Bounded operator reason for targeted cancellation, when supplied. */
+      reason?: string;
       record: HeartbeatTaskNonAgentRunRecord & { outcome: { kind: 'cancelled' } };
       timestamp: string;
     }
@@ -224,8 +226,36 @@ export type StopHeartbeatSchedulerOptions = {
   cancelRunning?: boolean;
 };
 
+export type CancelHeartbeatTaskOptions = {
+  /** Bounded, operator-facing reason. Task input must not be copied here. */
+  reason: string;
+};
+
+export type HeartbeatTaskCancellationDisposition =
+  | 'cancelled'
+  | 'completion-won'
+  | 'not-running'
+  | 'not-owned'
+  | 'not-found'
+  | 'disabled'
+  | 'blocked'
+  | 'completed';
+
+export type HeartbeatTaskCancellationResult = {
+  taskId: string;
+  disposition: HeartbeatTaskCancellationDisposition;
+  reason: string;
+  executionId?: string;
+  record?: HeartbeatTaskRunRecord;
+};
+
 export type HeartbeatSchedulerHandle = {
   stop: (options?: StopHeartbeatSchedulerOptions) => Promise<void>;
+  /** Cancels and awaits only a task execution owned by this scheduler handle. */
+  cancelTask: (
+    taskId: string,
+    options: CancelHeartbeatTaskOptions,
+  ) => Promise<HeartbeatTaskCancellationResult>;
 };
 
 export type StartHeartbeatSchedulerOptions = {

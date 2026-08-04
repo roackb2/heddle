@@ -272,6 +272,7 @@ export class HeartbeatTaskStateProjector {
     task: HeartbeatTask;
     execution: HeartbeatTaskExecution;
     summary: string;
+    reason?: string;
     now: Date;
   }): HeartbeatTask {
     const finishedAt = dayjs(args.now).toISOString();
@@ -295,6 +296,7 @@ export class HeartbeatTaskStateProjector {
           kind: 'cancelled',
           execution: args.execution,
           summary: args.summary,
+          reason: args.reason,
           finishedAt,
         }),
         recovery: args.task.state?.recovery,
@@ -456,14 +458,16 @@ export class HeartbeatTaskStateProjector {
     kind: HeartbeatTaskExecutionOutcome['kind'];
     execution: HeartbeatTaskExecution;
     summary: string;
+    reason?: string;
     finishedAt: string;
   }): HeartbeatTaskExecutionOutcome {
-    return {
+    const outcome = {
       kind: args.kind,
       executionId: args.execution.executionId,
       summary: args.summary,
       finishedAt: args.finishedAt,
       runRequestGeneration: args.execution.runRequestGeneration,
     };
+    return args.kind === 'cancelled' ? { ...outcome, kind: 'cancelled', reason: args.reason } : outcome;
   }
 }

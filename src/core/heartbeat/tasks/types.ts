@@ -17,6 +17,7 @@ export type HeartbeatTaskSchedule = {
 export type HeartbeatTaskContinuationMode = 'operator' | 'agent';
 
 export const MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH = 200;
+export const MAX_HEARTBEAT_CANCELLATION_REASON_LENGTH = 200;
 
 /**
  * Durable level-triggered intent to run a task promptly.
@@ -91,12 +92,15 @@ type HeartbeatTaskExecutionOutcomeBase = {
   runRequestGeneration?: number;
 };
 
-export type HeartbeatTaskExecutionOutcome = HeartbeatTaskExecutionOutcomeBase & (
-  | { kind: 'agent' }
-  | { kind: 'skipped' }
-  | { kind: 'cancelled' }
-  | { kind: 'failed' }
-);
+export type HeartbeatTaskExecutionOutcome =
+  | (HeartbeatTaskExecutionOutcomeBase & { kind: 'agent' })
+  | (HeartbeatTaskExecutionOutcomeBase & { kind: 'skipped' })
+  | (HeartbeatTaskExecutionOutcomeBase & { kind: 'failed' })
+  | (HeartbeatTaskExecutionOutcomeBase & {
+      kind: 'cancelled';
+      /** Bounded, operator-provided reason for targeted cancellation. */
+      reason?: string;
+    });
 
 export type HeartbeatTaskState = {
   status?: HeartbeatTaskStatus;
@@ -206,6 +210,8 @@ export type HeartbeatTaskStore = {
     taskId: string;
     kind: 'skipped' | 'cancelled';
     summary: string;
+    /** Supplied only for a targeted `cancelled` outcome. */
+    reason?: string;
     finishedAt: Date;
     signal?: AbortSignal;
   }) => Promise<HeartbeatTaskExecutionWriteResult>;
