@@ -29,4 +29,7 @@ export type {
   HeartbeatTaskStore,
   RequestHeartbeatTaskRunOptions,
 } from './types.js';
-export { MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH } from './types.js';
+export {
+  MAX_HEARTBEAT_CANCELLATION_REASON_LENGTH,
+  MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH,
+} from './types.js';

@@ -293,6 +293,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
           task: currentTask,
           execution,
           summary: input.summary,
+          reason: input.reason,
           now: input.finishedAt,
         }),
       } satisfies Record<typeof input.kind, () => HeartbeatTask>;

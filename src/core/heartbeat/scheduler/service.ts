@@ -18,6 +18,7 @@ import {
   type HeartbeatTaskStore,
 } from '../tasks/index.js';
 import { HeartbeatTaskRunnerService } from './runner.js';
+import { HeartbeatSchedulerTaskLifecycle } from './task-lifecycle.js';
 import type {
   HeartbeatSchedulerHandle,
   RunDueHeartbeatTasksOptions,
@@ -80,8 +81,9 @@ export class HeartbeatSchedulerService {
     const loopController = new AbortController();
     const executionController = new AbortController();
     const store = options.store ?? new FileHeartbeatTaskService({ stateRoot: options.stateRoot });
+    const taskLifecycle = new HeartbeatSchedulerTaskLifecycle(store);
     let loopError: unknown;
-    const settledLoop = HeartbeatSchedulerService.runLoop({
+    const settledLoop = HeartbeatSchedulerService.runLoopWithTaskLifecycle({
       store,
       handler: options.handler,
       runner: options.runner,
@@ -100,7 +102,7 @@ export class HeartbeatSchedulerService {
       signal: loopController.signal,
       executionSignal: executionController.signal,
       onEvent: options.onEvent,
-    }).catch((error: unknown) => {
+    }, taskLifecycle).catch((error: unknown) => {
       loopError = error;
       try {
         options.onError?.(error);
@@ -111,6 +113,7 @@ export class HeartbeatSchedulerService {
     let stopPromise: Promise<void> | undefined;
 
     return {
+      cancelTask: (taskId, cancelOptions) => taskLifecycle.cancelTask(taskId, cancelOptions),
       stop: (stopOptions = {}) => {
         loopController.abort();
         if (stopOptions.cancelRunning) {
@@ -128,6 +131,13 @@ export class HeartbeatSchedulerService {
 
   // Scans stored tasks once, picks enabled tasks whose nextRunAt is due, and delegates each selected task to the runner service.
   static async runDueTasks(options: RunDueHeartbeatTasksOptions): Promise<RunDueHeartbeatTasksResult> {
+    return await HeartbeatSchedulerService.runDueTasksWithLifecycle(options);
+  }
+
+  private static async runDueTasksWithLifecycle(
+    options: RunDueHeartbeatTasksOptions,
+    taskLifecycle?: HeartbeatSchedulerTaskLifecycle,
+  ): Promise<RunDueHeartbeatTasksResult> {
     HeartbeatTaskRunnerService.assertHandlerConfiguration(options);
     const maxConcurrentTasks = HeartbeatSchedulerService.resolveMaxConcurrentTasks(options.maxConcurrentTasks);
     const now = options.now?.() ?? dayjs().toDate();
@@ -136,27 +146,37 @@ export class HeartbeatSchedulerService {
     const dueTasks = HeartbeatSchedulerService.selectDueTasks(tasks, now);
     const executionOwnerId = options.executionOwnerId ?? HeartbeatSchedulerService.createExecutionOwnerId();
     const limit = pLimit(maxConcurrentTasks);
-    const executions = dueTasks.map((task, index) => limit(async () => {
-      if ((options.admissionSignal ?? options.signal)?.aborted) {
-        return undefined;
-      }
+    const executions = dueTasks.map((task, index) => {
+      const admissionGeneration = taskLifecycle?.createAdmission(task.id);
+      return limit(async () => {
+        const runTask = async (taskSignal?: AbortSignal) => {
+          if ((options.admissionSignal ?? options.signal)?.aborted) {
+            return undefined;
+          }
 
-      options.onEvent?.({
-        type: 'heartbeat.task.due',
-        taskId: task.id,
-        timestamp,
-        queuePosition: index + 1,
-        maxConcurrentTasks,
-        activeTasks: limit.activeCount,
-        queuedTasks: limit.pendingCount,
+          options.onEvent?.({
+            type: 'heartbeat.task.due',
+            taskId: task.id,
+            timestamp,
+            queuePosition: index + 1,
+            maxConcurrentTasks,
+            activeTasks: limit.activeCount,
+            queuedTasks: limit.pendingCount,
+          });
+          return await HeartbeatTaskRunnerService.runTask({
+            ...options,
+            executionOwnerId,
+            task,
+            runAt: now,
+            signal: HeartbeatSchedulerService.composeExecutionSignal(options.signal, taskSignal),
+          });
+        };
+
+        return taskLifecycle && admissionGeneration !== undefined ?
+          await taskLifecycle.runTask(task.id, admissionGeneration, async (signal) => await runTask(signal))
+        : await runTask();
       });
-      return await HeartbeatTaskRunnerService.runTask({
-        ...options,
-        executionOwnerId,
-        task,
-        runAt: now,
-      });
-    }));
+    });
     const settledExecutions = await Promise.allSettled(executions);
     const infrastructureFailures = settledExecutions
       .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
@@ -183,6 +203,13 @@ export class HeartbeatSchedulerService {
 
   // Repeats due-task checks until the host aborts the loop.
   static async runLoop(options: RunHeartbeatSchedulerOptions): Promise<void> {
+    await HeartbeatSchedulerService.runLoopWithTaskLifecycle(options);
+  }
+
+  private static async runLoopWithTaskLifecycle(
+    options: RunHeartbeatSchedulerOptions,
+    taskLifecycle?: HeartbeatSchedulerTaskLifecycle,
+  ): Promise<void> {
     const maxConcurrentTasks = HeartbeatSchedulerService.resolveMaxConcurrentTasks(options.maxConcurrentTasks);
     const executionOwnerId = options.executionOwnerId ?? HeartbeatSchedulerService.createExecutionOwnerId();
     const startedAt = options.now?.() ?? dayjs().toDate();
@@ -208,13 +235,13 @@ export class HeartbeatSchedulerService {
 
       while (!options.signal?.aborted) {
         HeartbeatSchedulerService.emitRunRequestWakeEvents(options, wakeController.drain());
-        await HeartbeatSchedulerService.runDueTasks({
+        await HeartbeatSchedulerService.runDueTasksWithLifecycle({
           ...options,
           executionOwnerId,
           maxConcurrentTasks,
           admissionSignal: options.signal,
           signal: options.executionSignal ?? options.signal,
-        });
+        }, taskLifecycle);
         if (options.signal?.aborted) {
           break;
         }
@@ -309,6 +336,19 @@ export class HeartbeatSchedulerService {
 
   private static createExecutionOwnerId(): string {
     return `heartbeat-worker:${randomUUID()}`;
+  }
+
+  private static composeExecutionSignal(
+    schedulerSignal: AbortSignal | undefined,
+    taskSignal: AbortSignal | undefined,
+  ): AbortSignal | undefined {
+    if (!schedulerSignal) {
+      return taskSignal;
+    }
+    if (!taskSignal) {
+      return schedulerSignal;
+    }
+    return AbortSignal.any([schedulerSignal, taskSignal]);
   }
 
   // Sleeps between polling cycles and resolves early when the host aborts the scheduler.

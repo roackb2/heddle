@@ -30,6 +30,7 @@ import type {
   RunDueHeartbeatTasksOptions,
   RunDueHeartbeatTasksResult,
 } from './types.js';
+import { heartbeatTaskCancellationReason } from './task-lifecycle.js';
 
 const DEFAULT_FAILURE_RETRY_MS = 5 * 60_000;
 const CANCELLATION_SUMMARY = 'Heartbeat execution cancelled by its scheduler host.';
@@ -379,16 +380,18 @@ export class HeartbeatTaskRunnerService {
     };
   }
 
-  private static async persistCancellation(args: Pick<RunDueHeartbeatTasksOptions, 'store' | 'now' | 'onEvent'> & {
+  private static async persistCancellation(args: Pick<RunDueHeartbeatTasksOptions, 'store' | 'now' | 'onEvent' | 'signal'> & {
     task: HeartbeatTask;
     execution: HeartbeatTaskExecution;
   }): Promise<{ record?: HeartbeatTaskRunRecord; failed: boolean }> {
     const settledAt = args.now?.() ?? dayjs().toDate();
+    const reason = heartbeatTaskCancellationReason(args.signal);
     const completion = await args.store.recordTaskExecutionOutcome({
       execution: args.execution,
       taskId: args.task.id,
       kind: 'cancelled',
-      summary: CANCELLATION_SUMMARY,
+      summary: reason ? `${CANCELLATION_SUMMARY} Reason: ${reason}` : CANCELLATION_SUMMARY,
+      reason,
       finishedAt: settledAt,
     });
     if (completion.status !== 'saved' || !HeartbeatTaskRunnerService.isNonAgentRecord(completion.record, 'cancelled')) {
@@ -399,6 +402,7 @@ export class HeartbeatTaskRunnerService {
       type: 'heartbeat.task.cancelled',
       taskId: args.task.id,
       executionId: args.execution.executionId,
+      reason,
       record: completion.record,
       timestamp: completion.record.outcome.finishedAt,
     });
