@@ -108,6 +108,45 @@ processes or replicas require a remote store backed by compare-and-swap,
 transactions, or leases. Recovery cannot undo external effects, so host tools
 must keep domain mutations idempotent.
 
+Pass a custom store directly to the supported background lifecycle instead of
+rebuilding the scheduler controllers around `runLoop()`:
+
+```ts
+import {
+  HeartbeatSchedulerService,
+  type HeartbeatTaskStore,
+} from '@roackb2/heddle/advanced';
+
+declare const postgresHeartbeatTasks: HeartbeatTaskStore;
+
+const scheduler = HeartbeatSchedulerService.start({
+  workspaceRoot,
+  stateRoot,
+  store: postgresHeartbeatTasks,
+  handler,
+  maxConcurrentTasks: 4,
+  onError: (error) => logger.error(error),
+});
+
+await scheduler.stop({ cancelRunning: true });
+```
+
+The scheduler uses that exact instance for startup recovery, request
+subscriptions, due-task reads, claims, claim-fenced settlement, and run
+history. `stateRoot` remains required for framework-owned agent runtime state;
+when `store` is omitted it additionally selects the built-in file-backed
+heartbeat store. Passing a remote task store moves only Heddle heartbeat task,
+checkpoint, and run persistence. It does not move or replace the host's product
+or domain database.
+
+A production remote adapter must make claims and fenced writes atomic, recover
+only executions whose lease or owner is no longer live, and route run-request
+notifications to the scheduler process that can act on them.
+`subscribeToRunRequests` is an optional low-latency hint: if an adapter cannot
+deliver notifications in the current process, the configured poll interval
+remains the correctness fallback. Providing an arbitrary store does not by
+itself make a scheduler safe for multiple workers.
+
 Cron, launchd, systemd, hosted queues, and Lucid-style services should be treated as hosts around this API, not as Heddle's internal scheduler model.
 
 ### Durable event-driven run requests

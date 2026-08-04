@@ -230,7 +230,16 @@ export type HeartbeatSchedulerHandle = {
 
 export type StartHeartbeatSchedulerOptions = {
   workspaceRoot: string;
+  /**
+   * Runtime state used by framework-owned agent execution. When `store` is
+   * omitted, this also locates the built-in file-backed heartbeat store.
+   */
   stateRoot: string;
+  /**
+   * Optional host-owned heartbeat persistence adapter. The scheduler uses this
+   * exact instance for recovery, wake subscriptions, claims, and settlement.
+   */
+  store?: HeartbeatTaskStore;
   preferApiKey?: boolean;
   model?: string;
   maxSteps?: number;
