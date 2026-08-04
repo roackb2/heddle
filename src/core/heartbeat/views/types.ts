@@ -1,6 +1,11 @@
 import type { LlmUsage } from '@/core/llm/types.js';
 import type { HeartbeatDecision } from '../agent/index.js';
-import type { HeartbeatTask, HeartbeatTaskState, HeartbeatTaskStatus } from '../tasks/index.js';
+import type {
+  HeartbeatTask,
+  HeartbeatTaskRunRequest,
+  HeartbeatTaskState,
+  HeartbeatTaskStatus,
+} from '../tasks/index.js';
 
 export type HeartbeatTaskResultView = {
   kind: 'agent' | 'skipped' | 'cancelled' | 'failed';
@@ -10,11 +15,16 @@ export type HeartbeatTaskResultView = {
   usage?: LlmUsage;
 };
 
+export type HeartbeatTaskRunRequestView = HeartbeatTaskRunRequest & {
+  pending: boolean;
+};
+
 export type HeartbeatTaskView = Omit<HeartbeatTask, 'state'> & {
   taskId: string;
-  state: Omit<HeartbeatTaskState, 'result'> & {
+  state: Omit<HeartbeatTaskState, 'result' | 'runRequest'> & {
     status: HeartbeatTaskStatus;
     result?: HeartbeatTaskResultView;
+    runRequest?: HeartbeatTaskRunRequestView;
   };
 };
 

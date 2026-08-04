@@ -256,6 +256,7 @@ export type {
 } from './core/heartbeat/checkpoint/index.js';
 export {
   FileHeartbeatTaskService,
+  MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH,
 } from './core/heartbeat/tasks/index.js';
 export type {
   FileHeartbeatTaskServiceOptions,
@@ -271,7 +272,11 @@ export type {
   HeartbeatTaskRecoveryResult,
   HeartbeatTaskRunRecord,
   HeartbeatTaskRunRecordEntry,
+  HeartbeatTaskRunRequest,
+  HeartbeatTaskRunRequestResult,
+  HeartbeatTaskRunRequestSignal,
   HeartbeatTaskStore,
+  RequestHeartbeatTaskRunOptions,
 } from './core/heartbeat/tasks/index.js';
 export {
   HeartbeatSchedulerService,
@@ -294,6 +299,7 @@ export type {
 } from './core/heartbeat/scheduler/index.js';
 export type {
   HeartbeatRunView,
+  HeartbeatTaskRunRequestView,
   HeartbeatTaskView,
 } from './core/heartbeat/views/index.js';
 export {

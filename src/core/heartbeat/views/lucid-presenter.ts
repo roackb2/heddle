@@ -75,7 +75,11 @@ export class HeartbeatLucidPresenter {
     event: HeartbeatSchedulerEvent,
     options: LucidAdapterOptions = {},
   ): LucidAgentMessage[] {
-    if (event.type === 'heartbeat.scheduler.started' || event.type === 'heartbeat.scheduler.stopped') {
+    if (
+      event.type === 'heartbeat.scheduler.started'
+      || event.type === 'heartbeat.scheduler.stopped'
+      || event.type === 'heartbeat.scheduler.awakened'
+    ) {
       return [];
     }
 
@@ -83,6 +87,8 @@ export class HeartbeatLucidPresenter {
 
     switch (event.type) {
       case 'heartbeat.task.due':
+      case 'heartbeat.task.run_requested':
+      case 'heartbeat.task.run_request_claimed':
         return [];
       case 'heartbeat.task.started':
         return [

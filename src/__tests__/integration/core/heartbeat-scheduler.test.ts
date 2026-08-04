@@ -598,19 +598,13 @@ describe('heartbeat scheduler', () => {
     expect(replacementClaim.status).toBe('claimed');
 
     const lateResult = createHeartbeatResult('continue');
-    const lateTask = HeartbeatTaskStateProjector.afterResult({
-      task: interruptedTask,
-      execution: originalExecution,
-      result: lateResult,
-      now: NOW,
-      loadedCheckpoint: false,
-    });
     await expect(store.completeTaskExecution({
       execution: originalExecution,
-      task: lateTask,
+      taskId: interruptedTask.id,
       checkpoint: lateResult.checkpoint,
       result: lateResult,
       loadedCheckpoint: false,
+      completedAt: NOW,
     })).resolves.toEqual({ status: 'claim-lost' });
     await expect(store.requireTask(interruptedTask.id)).resolves.toMatchObject({
       state: {
@@ -642,6 +636,30 @@ function createMemoryTaskStore(options: {
     async saveCheckpoint(_task, checkpoint) {
       options.saveCheckpoint?.(checkpoint);
     },
+    async requestTaskRun(taskId, requestOptions = {}) {
+      const task = tasks.find((candidate) => candidate.id === taskId);
+      if (!task) throw new Error(`Heartbeat task not found: ${taskId}`);
+      if (!task.enabled || task.state?.status === 'blocked' || task.state?.status === 'complete') {
+        throw new Error(`Heartbeat task ${taskId} cannot accept a run request.`);
+      }
+      const projected = HeartbeatTaskStateProjector.requestRun({
+        task,
+        now: requestOptions.requestedAt ?? NOW,
+        reason: requestOptions.reason,
+      });
+      const request = projected.task.state?.runRequest;
+      if (!request) throw new Error('expected run request');
+      tasks = [...tasks.filter((candidate) => candidate.id !== task.id), projected.task];
+      options.saveTask?.(projected.task);
+      return {
+        task: projected.task,
+        taskId,
+        generation: request.generation,
+        disposition: projected.disposition,
+        requestedAt: request.requestedAt,
+        reason: request.reason,
+      };
+    },
     async claimTaskExecution(input) {
       const task = tasks.find((candidate) => candidate.id === input.taskId);
       if (!task) return { status: 'not-found' };
@@ -658,15 +676,22 @@ function createMemoryTaskStore(options: {
       return { status: 'claimed', task: runningTask };
     },
     async completeTaskExecution(input) {
-      const task = tasks.find((candidate) => candidate.id === input.task.id);
+      const task = tasks.find((candidate) => candidate.id === input.taskId);
       if (task?.state?.execution?.executionId !== input.execution.executionId) {
         return { status: 'claim-lost' };
       }
       if (input.signal?.aborted) {
         return { status: 'cancelled' };
       }
+      const nextTask = HeartbeatTaskStateProjector.afterResult({
+        task,
+        execution: task.state.execution ?? input.execution,
+        result: input.result,
+        now: input.completedAt,
+        loadedCheckpoint: input.loadedCheckpoint,
+      });
       const record = {
-        task: input.task,
+        task: nextTask,
         result: input.result,
         loadedCheckpoint: input.loadedCheckpoint,
         outcome: {
@@ -674,37 +699,61 @@ function createMemoryTaskStore(options: {
           executionId: input.execution.executionId,
           summary: input.result.summary,
           finishedAt: input.result.state.finishedAt,
+          runRequestGeneration: task.state.execution?.runRequestGeneration,
         },
       };
-      tasks = [...tasks.filter((candidate) => candidate.id !== input.task.id), input.task];
-      options.saveTask?.(input.task);
+      tasks = [...tasks.filter((candidate) => candidate.id !== input.taskId), nextTask];
+      options.saveTask?.(nextTask);
       options.saveCheckpoint?.(input.checkpoint);
-      return { status: 'saved', task: input.task, record };
+      return { status: 'saved', task: nextTask, record };
     },
     async failTaskExecution(input) {
-      const task = tasks.find((candidate) => candidate.id === input.task.id);
+      const task = tasks.find((candidate) => candidate.id === input.taskId);
       if (task?.state?.execution?.executionId !== input.execution.executionId) {
         return { status: 'claim-lost' };
       }
       if (input.signal?.aborted) {
         return { status: 'cancelled' };
       }
-      tasks = [...tasks.filter((candidate) => candidate.id !== input.task.id), input.task];
-      options.saveTask?.(input.task);
-      return { status: 'saved', task: input.task };
+      const nextTask = HeartbeatTaskStateProjector.afterFailure({
+        task,
+        execution: task.state.execution ?? input.execution,
+        error: input.error,
+        now: input.failedAt,
+        retryMs: input.retryMs,
+      });
+      tasks = [...tasks.filter((candidate) => candidate.id !== input.taskId), nextTask];
+      options.saveTask?.(nextTask);
+      return { status: 'saved', task: nextTask };
     },
     async recordTaskExecutionOutcome(input) {
-      const task = tasks.find((candidate) => candidate.id === input.task.id);
+      const task = tasks.find((candidate) => candidate.id === input.taskId);
       if (task?.state?.execution?.executionId !== input.execution.executionId) {
         return { status: 'claim-lost' };
       }
       if (input.signal?.aborted) {
         return { status: 'cancelled' };
       }
-      const record = { task: input.task, outcome: input.outcome };
-      tasks = [...tasks.filter((candidate) => candidate.id !== input.task.id), input.task];
-      options.saveTask?.(input.task);
-      return { status: 'saved', task: input.task, record };
+      const execution = task.state.execution ?? input.execution;
+      const nextTask = input.kind === 'skipped' ?
+        HeartbeatTaskStateProjector.afterSkip({
+          task,
+          execution,
+          summary: input.summary,
+          now: input.finishedAt,
+        })
+      : HeartbeatTaskStateProjector.afterCancellation({
+          task,
+          execution,
+          summary: input.summary,
+          now: input.finishedAt,
+        });
+      const outcome = nextTask.state?.lastExecution;
+      if (!outcome || outcome.kind !== input.kind) throw new Error('expected projected outcome');
+      const record = { task: nextTask, outcome };
+      tasks = [...tasks.filter((candidate) => candidate.id !== input.taskId), nextTask];
+      options.saveTask?.(nextTask);
+      return { status: 'saved', task: nextTask, record };
     },
     async recoverInterruptedTasks() {
       return [];

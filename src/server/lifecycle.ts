@@ -254,7 +254,10 @@ function logHeartbeatSchedulerEvent(
   const messages = {
     'heartbeat.scheduler.started': 'Heddle heartbeat scheduler started',
     'heartbeat.scheduler.stopped': 'Heddle heartbeat scheduler stopped',
+    'heartbeat.scheduler.awakened': 'Heddle heartbeat scheduler awakened for requested work',
     'heartbeat.task.due': 'Heartbeat task due',
+    'heartbeat.task.run_requested': 'Heartbeat task run requested',
+    'heartbeat.task.run_request_claimed': 'Heartbeat task run request claimed',
     'heartbeat.task.started': 'Heartbeat task started',
     'heartbeat.task.recovered': 'Heartbeat task recovered after interrupted execution',
     'heartbeat.task.agent_event': 'Heartbeat task agent event',

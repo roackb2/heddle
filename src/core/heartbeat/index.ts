@@ -23,6 +23,7 @@ export type {
   StopHeartbeatSchedulerOptions,
 } from './scheduler/index.js';
 export { FileHeartbeatTaskService, HeartbeatTaskStateProjector } from './tasks/index.js';
+export { MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH } from './tasks/index.js';
 export type {
   CreateHeartbeatTaskInput,
   FileHeartbeatTaskServiceOptions,
@@ -39,8 +40,12 @@ export type {
   HeartbeatTaskRecoveryResult,
   HeartbeatTaskRunRecord,
   HeartbeatTaskRunRecordEntry,
+  HeartbeatTaskRunRequest,
+  HeartbeatTaskRunRequestResult,
+  HeartbeatTaskRunRequestSignal,
   HeartbeatTaskStatus,
   HeartbeatTaskStore,
+  RequestHeartbeatTaskRunOptions,
   UpdateHeartbeatTaskInput,
 } from './tasks/index.js';
 export { HeartbeatDecisionPolicy, HeartbeatRunnerAgent, HeartbeatRunnerAgentPrompt } from './agent/index.js';
@@ -55,6 +60,7 @@ export type {
 export { HeartbeatLucidPresenter } from './views/index.js';
 export type {
   HeartbeatRunView,
+  HeartbeatTaskRunRequestView,
   HeartbeatTaskView,
   LucidAdapterOptions,
   LucidAgentMessage,

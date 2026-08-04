@@ -56,6 +56,7 @@ import {
   heartbeatTaskCreateInputSchema,
   heartbeatTaskDetailInputSchema,
   heartbeatTaskInputSchema,
+  heartbeatTaskRunRequestInputSchema,
   heartbeatTaskRunNowInputSchema,
   heartbeatTaskUpdateInputSchema,
   layoutSnapshotInputSchema,
@@ -636,14 +637,31 @@ export const controlPlaneRouter = router({
   }),
   heartbeatTaskTrigger: controlPlaneWorkspaceProcedure.input(heartbeatTaskInputSchema).mutation(async ({ ctx, input }) => {
     const { workspace } = ctx.requestWorkspace;
+    const requested = await ControlPlaneHeartbeatController.requestTaskRun(
+      workspace.stateRoot,
+      input.taskId,
+      { reason: 'manual-trigger' },
+    );
     return {
-      task: await ControlPlaneHeartbeatController.triggerTaskRun(workspace.stateRoot, input.taskId),
+      task: requested.task,
     };
+  }),
+  heartbeatTaskRequestRun: controlPlaneWorkspaceProcedure.input(heartbeatTaskRunRequestInputSchema).mutation(async ({ ctx, input }) => {
+    const { workspace } = ctx.requestWorkspace;
+    return await ControlPlaneHeartbeatController.requestTaskRun(
+      workspace.stateRoot,
+      input.taskId,
+      { reason: input.reason },
+    );
   }),
   heartbeatTaskRunNow: controlPlaneWorkspaceProcedure.input(heartbeatTaskRunNowInputSchema).mutation(async ({ ctx, input }) => {
     const { logger, workspace } = ctx.requestWorkspace;
     const { workspaceId: _workspaceId, ...runInput } = input;
-    const task = await ControlPlaneHeartbeatController.triggerTaskRun(workspace.stateRoot, input.taskId);
+    const requested = await ControlPlaneHeartbeatController.requestTaskRun(
+      workspace.stateRoot,
+      input.taskId,
+      { reason: 'manual-run-now' },
+    );
     controlPlaneHeartbeatEventsController.publish({
       workspaceId: workspace.id,
       event: {
@@ -668,7 +686,7 @@ export const controlPlaneRouter = router({
 
     return {
       accepted: true,
-      task,
+      task: requested.task,
       run: null,
     };
   }),

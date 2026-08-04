@@ -20,8 +20,10 @@ operator-facing heartbeat views.
   non-repository service that should instantiate `FileHeartbeatTaskRepository`.
   It also owns process-local execution claims, recovery of interrupted
   single-host executions, and fencing of late completion/failure/outcome
-  writes. `HeartbeatTaskStateProjector` owns task state transitions after
-  agent success, no-work skip, cancellation, failure, or recovery.
+  writes. Durable run-request generations and the file adapter's process-local
+  scheduler wake signal also live here. `HeartbeatTaskStateProjector` owns task
+  state transitions after agent success, no-work skip, cancellation, failure,
+  request, claim, or recovery.
 - `scheduler/`: `HeartbeatSchedulerService` owns due-task selection and the
   periodic scheduler loop. It delegates execution to
   `HeartbeatTaskRunnerService` instead of running tasks itself. Daemon, CLI,
@@ -53,11 +55,21 @@ operator-facing heartbeat views.
 - `executionId` is the fencing token for one task attempt. A store must reject
   completion, failure, skip, or cancellation persistence when that execution
   no longer owns the task.
+- Run requests are durable, level-triggered intent. `generation` advances for
+  accepted requests, `claimedGeneration` identifies work already admitted, and
+  an execution records the request generation it claimed. Multiple requests
+  may coalesce into one pending follow-up, but a request after claim belongs to
+  a later execution.
+- Execution settlement must read and project from the latest stored task inside
+  the same atomic store transition. Saving a projection derived from the
+  pre-run snapshot can erase newer run requests or operator control changes.
 - `executionOwnerId` identifies one scheduler process/worker generation. Do not
   reuse it across process restarts: scheduler startup uses it to distinguish a
   current claim from an execution interrupted by the prior single-host process.
 - The file service serializes claim/recover/complete/fail transitions with a
-  shared in-process mutex and tracks live executions in process memory. This is
+  shared in-process mutex, serializes task control read-transform-write
+  transitions, and tracks live executions in process memory. Its process-local
+  wake signal reduces event latency; polling remains the restart fallback. This is
   reliable for one Node.js process owning a state root; it is not a distributed
   lease. Multiple processes or replicas must provide a remote
   `HeartbeatTaskStore` that implements atomic claim, fencing, and recovery with

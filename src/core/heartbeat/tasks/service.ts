@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { resolve } from 'node:path';
 import { Mutex } from 'async-mutex';
 import dayjs from 'dayjs';
@@ -5,6 +6,7 @@ import omit from 'lodash/omit.js';
 import orderBy from 'lodash/orderBy.js';
 import { FileHeartbeatTaskRepository } from './repository.js';
 import { HeartbeatTaskStateProjector } from './task-state.js';
+import { MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH } from './types.js';
 import type {
   FileHeartbeatTaskRepositoryOptions,
   HeartbeatTask,
@@ -13,6 +15,8 @@ import type {
   HeartbeatTaskState,
   HeartbeatTaskRunRecord,
   HeartbeatTaskRunRecordEntry,
+  HeartbeatTaskRunRequestResult,
+  HeartbeatTaskRunRequestSignal,
   HeartbeatTaskStore,
 } from './types.js';
 import type { HeartbeatRunView, HeartbeatTaskResultView, HeartbeatTaskView } from '../views/index.js';
@@ -62,14 +66,17 @@ export type UpdateHeartbeatTaskInput = {
 export class FileHeartbeatTaskService implements HeartbeatTaskStore {
   private static readonly mutationMutexes = new Map<string, Mutex>();
   private static readonly activeExecutions = new Set<string>();
+  private static readonly runRequestEventBuses = new Map<string, EventEmitter>();
 
   private readonly heartbeatRoot: string;
   private readonly mutationMutex: Mutex;
   private readonly repository: FileHeartbeatTaskRepository;
+  private readonly runRequestEventBus: EventEmitter;
 
   constructor(options: FileHeartbeatTaskServiceOptions) {
     this.heartbeatRoot = FileHeartbeatTaskService.resolveHeartbeatRoot(options);
     this.mutationMutex = FileHeartbeatTaskService.resolveMutationMutex(this.heartbeatRoot);
+    this.runRequestEventBus = FileHeartbeatTaskService.resolveRunRequestEventBus(this.heartbeatRoot);
     this.repository = new FileHeartbeatTaskRepository({
       dir: this.heartbeatRoot,
     });
@@ -89,6 +96,67 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
 
   async saveCheckpoint(task: HeartbeatTask, checkpoint: Parameters<HeartbeatTaskStore['saveCheckpoint']>[1]) {
     await this.mutationMutex.runExclusive(async () => await this.repository.saveCheckpoint(task, checkpoint));
+  }
+
+  /**
+   * Persists level-triggered intent for one prompt run and notifies schedulers
+   * sharing this file-backed state root. The durable task record remains the
+   * recovery source of truth across process boundaries.
+   */
+  async requestTaskRun(
+    taskId: string,
+    options: Parameters<HeartbeatTaskStore['requestTaskRun']>[1] = {},
+  ): Promise<HeartbeatTaskRunRequestResult> {
+    const reason = FileHeartbeatTaskService.normalizeRunRequestReason(options.reason);
+    const requestedAt = options.requestedAt ?? dayjs().toDate();
+    if (!dayjs(requestedAt).isValid()) {
+      throw new Error('Heartbeat run-request timestamp must be a valid date.');
+    }
+    const result = await this.mutationMutex.runExclusive(async () => {
+      const task = await this.findTask(taskId);
+      if (!task) {
+        throw new Error(`Heartbeat task not found: ${taskId}`);
+      }
+      FileHeartbeatTaskService.assertTaskAcceptsRunRequest(task);
+
+      const projection = HeartbeatTaskStateProjector.requestRun({
+        task,
+        now: requestedAt,
+        reason,
+      });
+      await this.repository.saveTask(projection.task);
+      const request = projection.task.state?.runRequest;
+      if (!request) {
+        throw new Error(`Heartbeat task ${taskId} did not persist its run request.`);
+      }
+
+      return {
+        task: projection.task,
+        taskId,
+        generation: request.generation,
+        disposition: projection.disposition,
+        requestedAt: request.requestedAt,
+        reason: request.reason,
+      } as const;
+    });
+
+    this.publishRunRequest(FileHeartbeatTaskService.toRunRequestSignal(result));
+    return result;
+  }
+
+  subscribeToRunRequests(listener: (request: HeartbeatTaskRunRequestSignal) => void): () => void {
+    this.runRequestEventBus.on('run-requested', listener);
+    return () => this.runRequestEventBus.off('run-requested', listener);
+  }
+
+  private publishRunRequest(request: HeartbeatTaskRunRequestSignal): void {
+    this.runRequestEventBus.listeners('run-requested').forEach((listener) => {
+      try {
+        (listener as (event: HeartbeatTaskRunRequestSignal) => void)(request);
+      } catch {
+        // A wake-up subscriber cannot roll back or invalidate durable intent.
+      }
+    });
   }
 
   async saveRunRecord(record: Parameters<NonNullable<HeartbeatTaskStore['saveRunRecord']>>[0]) {
@@ -134,8 +202,8 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
    */
   async completeTaskExecution(input: Parameters<HeartbeatTaskStore['completeTaskExecution']>[0]) {
     return await this.mutationMutex.runExclusive(async () => {
-      const currentTask = await this.findTask(input.task.id);
-      if (!FileHeartbeatTaskService.executionMatches(currentTask, input.execution)) {
+      const currentTask = await this.findTask(input.taskId);
+      if (!currentTask || !FileHeartbeatTaskService.executionMatches(currentTask, input.execution)) {
         FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
         return { status: 'claim-lost' } as const;
       }
@@ -143,34 +211,44 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
         return { status: 'cancelled' } as const;
       }
 
+      const currentExecution = currentTask.state?.execution ?? input.execution;
+      const nextTask = HeartbeatTaskStateProjector.afterResult({
+        task: currentTask,
+        execution: currentExecution,
+        result: input.result,
+        now: input.completedAt,
+        loadedCheckpoint: input.loadedCheckpoint,
+      });
+
       const record: HeartbeatTaskRunRecord = {
-        task: input.task,
+        task: nextTask,
         result: input.result,
         loadedCheckpoint: input.loadedCheckpoint,
         outcome:
-          input.task.state?.lastExecution?.kind === 'agent'
-          && input.task.state.lastExecution.executionId === input.execution.executionId ?
-            input.task.state.lastExecution
+          nextTask.state?.lastExecution?.kind === 'agent'
+          && nextTask.state.lastExecution.executionId === input.execution.executionId ?
+            nextTask.state.lastExecution
           : {
               kind: 'agent',
               executionId: input.execution.executionId,
               summary: input.result.summary,
               finishedAt: input.result.state.finishedAt,
+              runRequestGeneration: currentExecution.runRequestGeneration,
             },
       };
-      await this.repository.saveCheckpoint(input.task, input.checkpoint);
-      await this.repository.saveTask(input.task);
+      await this.repository.saveCheckpoint(nextTask, input.checkpoint);
+      await this.repository.saveTask(nextTask);
       await this.repository.saveRunRecord(record);
       FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
-      return { status: 'saved', task: input.task, record } as const;
+      return { status: 'saved', task: nextTask, record } as const;
     });
   }
 
   /** Persists a failed attempt only while its execution fencing token is current. */
   async failTaskExecution(input: Parameters<HeartbeatTaskStore['failTaskExecution']>[0]) {
     return await this.mutationMutex.runExclusive(async () => {
-      const currentTask = await this.findTask(input.task.id);
-      if (!FileHeartbeatTaskService.executionMatches(currentTask, input.execution)) {
+      const currentTask = await this.findTask(input.taskId);
+      if (!currentTask || !FileHeartbeatTaskService.executionMatches(currentTask, input.execution)) {
         FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
         return { status: 'claim-lost' } as const;
       }
@@ -178,17 +256,24 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
         return { status: 'cancelled' } as const;
       }
 
-      await this.repository.saveTask(input.task);
+      const nextTask = HeartbeatTaskStateProjector.afterFailure({
+        task: currentTask,
+        execution: currentTask.state?.execution ?? input.execution,
+        error: input.error,
+        now: input.failedAt,
+        retryMs: input.retryMs,
+      });
+      await this.repository.saveTask(nextTask);
       FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
-      return { status: 'saved', task: input.task } as const;
+      return { status: 'saved', task: nextTask } as const;
     });
   }
 
   /** Persists a claim-fenced non-agent outcome without creating or replacing a checkpoint. */
   async recordTaskExecutionOutcome(input: Parameters<HeartbeatTaskStore['recordTaskExecutionOutcome']>[0]) {
     return await this.mutationMutex.runExclusive(async () => {
-      const currentTask = await this.findTask(input.task.id);
-      if (!FileHeartbeatTaskService.executionMatches(currentTask, input.execution)) {
+      const currentTask = await this.findTask(input.taskId);
+      if (!currentTask || !FileHeartbeatTaskService.executionMatches(currentTask, input.execution)) {
         FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
         return { status: 'claim-lost' } as const;
       }
@@ -196,14 +281,35 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
         return { status: 'cancelled' } as const;
       }
 
+      const execution = currentTask.state?.execution ?? input.execution;
+      const projectors = {
+        skipped: () => HeartbeatTaskStateProjector.afterSkip({
+          task: currentTask,
+          execution,
+          summary: input.summary,
+          now: input.finishedAt,
+        }),
+        cancelled: () => HeartbeatTaskStateProjector.afterCancellation({
+          task: currentTask,
+          execution,
+          summary: input.summary,
+          now: input.finishedAt,
+        }),
+      } satisfies Record<typeof input.kind, () => HeartbeatTask>;
+      const nextTask = projectors[input.kind]();
+      const outcome = nextTask.state?.lastExecution;
+      if (!outcome || outcome.kind !== input.kind) {
+        throw new Error(`Heartbeat task ${input.taskId} did not project a ${input.kind} execution outcome.`);
+      }
+
       const record: HeartbeatTaskRunRecord = {
-        task: input.task,
-        outcome: input.outcome,
+        task: nextTask,
+        outcome,
       };
-      await this.repository.saveTask(input.task);
+      await this.repository.saveTask(nextTask);
       await this.repository.saveRunRecord(record);
       FileHeartbeatTaskService.activeExecutions.delete(this.executionKey(input.execution));
-      return { status: 'saved', task: input.task, record } as const;
+      return { status: 'saved', task: nextTask, record } as const;
     });
   }
 
@@ -253,112 +359,124 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
   }
 
   async createTask(input: CreateHeartbeatTaskInput) {
-    const tasks = await this.listTasks();
-    const now = dayjs();
-    const id = input.id ?? FileHeartbeatTaskService.createTaskId(input.name ?? input.task, tasks.map((task) => task.id));
-    if (tasks.some((task) => task.id === id)) {
-      throw new Error(`Heartbeat task already exists: ${id}`);
-    }
+    return await this.mutationMutex.runExclusive(async () => {
+      const tasks = await this.repository.listTasks();
+      const now = dayjs();
+      const id = input.id ?? FileHeartbeatTaskService.createTaskId(input.name ?? input.task, tasks.map((task) => task.id));
+      if (tasks.some((task) => task.id === id)) {
+        throw new Error(`Heartbeat task already exists: ${id}`);
+      }
 
-    const intervalMs = input.intervalMs ?? 60 * 60_000;
-    const task: HeartbeatTask = {
-      id,
-      workspaceId: input.workspaceId,
-      name: input.name,
-      task: input.task.trim(),
-      enabled: input.enabled ?? true,
-      continuationMode: input.continuationMode ?? 'operator',
-      schedule: {
-        intervalMs,
-        nextRunAt: (input.defer === false ? now.subtract(1, 'second') : now.add(intervalMs, 'millisecond')).toISOString(),
-      },
-      runtime: {
-        model: input.model,
-        maxSteps: input.maxSteps,
-        workspaceRoot: input.workspaceRoot,
-        stateDir: input.stateDir,
-        searchIgnoreDirs: input.searchIgnoreDirs,
-        systemContext: input.systemContext,
-      },
-      state: {
-        status: input.enabled === false ? 'idle' : 'waiting',
-        updatedAt: now.toISOString(),
-      },
-    };
+      const intervalMs = input.intervalMs ?? 60 * 60_000;
+      const task: HeartbeatTask = {
+        id,
+        workspaceId: input.workspaceId,
+        name: input.name,
+        task: input.task.trim(),
+        enabled: input.enabled ?? true,
+        continuationMode: input.continuationMode ?? 'operator',
+        schedule: {
+          intervalMs,
+          nextRunAt: (input.defer === false ? now.subtract(1, 'second') : now.add(intervalMs, 'millisecond')).toISOString(),
+        },
+        runtime: {
+          model: input.model,
+          maxSteps: input.maxSteps,
+          workspaceRoot: input.workspaceRoot,
+          stateDir: input.stateDir,
+          searchIgnoreDirs: input.searchIgnoreDirs,
+          systemContext: input.systemContext,
+        },
+        state: {
+          status: input.enabled === false ? 'idle' : 'waiting',
+          updatedAt: now.toISOString(),
+        },
+      };
 
-    await this.saveTask(task);
-    return FileHeartbeatTaskService.projectTaskView(task);
+      await this.repository.saveTask(task);
+      return FileHeartbeatTaskService.projectTaskView(task);
+    });
   }
 
   async updateTask(taskId: string, input: UpdateHeartbeatTaskInput) {
-    const task = await this.requireTask(taskId);
-    const now = dayjs();
-    const intervalMs = input.intervalMs ?? task.schedule.intervalMs;
-    const running = task.state?.status === 'running';
-    const nextTask: HeartbeatTask = {
-      ...task,
-      name: input.name ?? task.name,
-      task: input.task?.trim() ?? task.task,
-      enabled: input.enabled ?? task.enabled,
-      continuationMode: input.continuationMode ?? task.continuationMode ?? 'operator',
-      schedule: {
-        ...task.schedule,
-        intervalMs,
-        nextRunAt: running ? task.schedule.nextRunAt : now.add(intervalMs, 'millisecond').toISOString(),
-      },
-      runtime: {
-        ...task.runtime,
-        model: input.model === undefined ? task.runtime?.model : input.model ?? undefined,
-        maxSteps: input.maxSteps === undefined ? task.runtime?.maxSteps : input.maxSteps ?? undefined,
-        searchIgnoreDirs: input.searchIgnoreDirs ?? task.runtime?.searchIgnoreDirs,
-        systemContext: input.systemContext ?? task.runtime?.systemContext,
-      },
-      state: {
-        ...task.state,
-        updatedAt: now.toISOString(),
-      },
-    };
-
-    await this.saveTask(nextTask);
+    const nextTask = await this.updateStoredTask(taskId, (task) => {
+      const now = dayjs();
+      const intervalMs = input.intervalMs ?? task.schedule.intervalMs;
+      const running = task.state?.status === 'running';
+      const enabled = input.enabled ?? task.enabled;
+      const pendingRunRequest = HeartbeatTaskStateProjector.hasPendingRunRequest(task);
+      return {
+        ...task,
+        name: input.name ?? task.name,
+        task: input.task?.trim() ?? task.task,
+        enabled,
+        continuationMode: input.continuationMode ?? task.continuationMode ?? 'operator',
+        schedule: {
+          ...task.schedule,
+          intervalMs,
+          nextRunAt:
+            !enabled ? undefined
+            : running || pendingRunRequest ? task.schedule.nextRunAt
+            : now.add(intervalMs, 'millisecond').toISOString(),
+        },
+        runtime: {
+          ...task.runtime,
+          model: input.model === undefined ? task.runtime?.model : input.model ?? undefined,
+          maxSteps: input.maxSteps === undefined ? task.runtime?.maxSteps : input.maxSteps ?? undefined,
+          searchIgnoreDirs: input.searchIgnoreDirs ?? task.runtime?.searchIgnoreDirs,
+          systemContext: input.systemContext ?? task.runtime?.systemContext,
+        },
+        state: {
+          ...task.state,
+          runRequest: !enabled ? FileHeartbeatTaskService.consumePendingRunRequest(task.state?.runRequest) : task.state?.runRequest,
+          updatedAt: now.toISOString(),
+        },
+      };
+    });
     return FileHeartbeatTaskService.projectTaskView(nextTask);
   }
 
   async deleteTask(taskId: string) {
-    const task = await this.requireTask(taskId);
-    if (task.state?.status === 'running') {
-      throw new Error(`Heartbeat task ${taskId} is running. Wait for the run to finish before deleting it.`);
-    }
+    const task = await this.mutationMutex.runExclusive(async () => {
+      const currentTask = await this.findTask(taskId);
+      if (!currentTask) {
+        throw new Error(`Heartbeat task not found: ${taskId}`);
+      }
+      if (currentTask.state?.status === 'running') {
+        throw new Error(`Heartbeat task ${taskId} is running. Wait for the run to finish before deleting it.`);
+      }
 
-    await this.repository.deleteTask(task);
+      await this.repository.deleteTask(currentTask);
+      return currentTask;
+    });
     return FileHeartbeatTaskService.projectTaskView(task);
   }
 
   async resumeTask(taskId: string) {
-    const task = await this.requireTask(taskId);
-    if (task.state?.status === 'running') {
-      throw new Error(`Heartbeat task ${taskId} is already running.`);
-    }
-    if (task.state?.resumable === false) {
-      throw new Error(`Heartbeat task ${taskId} cannot be resumed.`);
-    }
+    const nextTask = await this.updateStoredTask(taskId, (task) => {
+      if (task.state?.status === 'running') {
+        throw new Error(`Heartbeat task ${taskId} is already running.`);
+      }
+      if (task.state?.resumable === false) {
+        throw new Error(`Heartbeat task ${taskId} cannot be resumed.`);
+      }
 
-    const now = dayjs();
-    const nextTask: HeartbeatTask = {
-      ...task,
-      enabled: true,
-      schedule: {
-        ...task.schedule,
-        nextRunAt: now.subtract(1, 'second').toISOString(),
-      },
-      state: {
-        ...omit(task.state, ['error']),
-        status: 'waiting',
-        progress: 'Heartbeat task resumed. Waiting for the next scheduler poll.',
-        updatedAt: now.toISOString(),
-      },
-    };
-
-    await this.saveTask(nextTask);
+      const now = dayjs();
+      return {
+        ...task,
+        enabled: true,
+        schedule: {
+          ...task.schedule,
+          nextRunAt: now.subtract(1, 'second').toISOString(),
+        },
+        state: {
+          ...omit(task.state, ['error']),
+          status: 'waiting',
+          progress: 'Heartbeat task resumed. Waiting for the next scheduler poll.',
+          updatedAt: now.toISOString(),
+        },
+      };
+    });
     return FileHeartbeatTaskService.projectTaskView(nextTask);
   }
 
@@ -388,62 +506,40 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
   }
 
   async setTaskEnabled(taskId: string, enabled: boolean) {
-    const task = await this.requireTask(taskId);
-    const now = dayjs();
-    if (enabled && task.state?.status === 'blocked') {
-      throw new Error(`Heartbeat task ${taskId} is blocked. Use resume to unblock it.`);
-    }
+    const nextTask = await this.updateStoredTask(taskId, (task) => {
+      const now = dayjs();
+      if (enabled && task.state?.status === 'blocked') {
+        throw new Error(`Heartbeat task ${taskId} is blocked. Use resume to unblock it.`);
+      }
 
-    const status = FileHeartbeatTaskService.resolveTaskEnabledStatus(task, enabled);
-    const progress = FileHeartbeatTaskService.resolveTaskEnabledProgress(task, enabled);
-    const nextTask: HeartbeatTask = {
-      ...task,
-      enabled,
-      schedule: {
-        ...task.schedule,
-        nextRunAt:
-          enabled ?
-            task.schedule.nextRunAt ?? now.subtract(1, 'second').toISOString()
-          : undefined,
-      },
-      state: {
-        ...task.state,
-        status,
-        progress,
-        resumable: enabled ? true : task.state?.resumable,
-        updatedAt: now.toISOString(),
-      },
-    };
-    await this.saveTask(nextTask);
+      const status = FileHeartbeatTaskService.resolveTaskEnabledStatus(task, enabled);
+      const progress = FileHeartbeatTaskService.resolveTaskEnabledProgress(task, enabled);
+      return {
+        ...task,
+        enabled,
+        schedule: {
+          ...task.schedule,
+          nextRunAt:
+            enabled ?
+              task.schedule.nextRunAt ?? now.subtract(1, 'second').toISOString()
+            : undefined,
+        },
+        state: {
+          ...task.state,
+          status,
+          progress,
+          resumable: enabled ? true : task.state?.resumable,
+          runRequest: enabled ? task.state?.runRequest : FileHeartbeatTaskService.consumePendingRunRequest(task.state?.runRequest),
+          updatedAt: now.toISOString(),
+        },
+      };
+    });
     return FileHeartbeatTaskService.projectTaskView(nextTask);
   }
 
   async triggerTaskRun(taskId: string) {
-    const task = await this.requireTask(taskId);
-    if (!task.enabled) {
-      throw new Error(`Heartbeat task ${taskId} is disabled. Enable it before triggering a run.`);
-    }
-
-    const now = dayjs();
-    const status = task.state?.status === 'running' ? 'running' : 'waiting';
-    const nextTask: HeartbeatTask = {
-      ...task,
-      schedule: {
-        ...task.schedule,
-        nextRunAt: now.subtract(1, 'second').toISOString(),
-      },
-      state: {
-        ...task.state,
-        status,
-        progress:
-          task.state?.status === 'running' ?
-            task.state.progress
-          : 'Task manually triggered from control plane. Waiting for the next heartbeat worker poll.',
-        updatedAt: now.toISOString(),
-      },
-    };
-    await this.saveTask(nextTask);
-    return FileHeartbeatTaskService.projectTaskView(nextTask);
+    const result = await this.requestTaskRun(taskId, { reason: 'manual-trigger' });
+    return FileHeartbeatTaskService.projectTaskView(result.task);
   }
 
   async requireTask(taskId: string): Promise<HeartbeatTask> {
@@ -504,9 +600,13 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       : state?.lastExecution ? FileHeartbeatTaskService.projectOutcomeView(state.lastExecution)
       : undefined;
     return {
-      ...omit(state ?? {}, ['result']),
+      ...omit(state ?? {}, ['result', 'runRequest']),
       status: state?.status ?? 'idle',
       result,
+      runRequest: state?.runRequest ? {
+        ...state.runRequest,
+        pending: state.runRequest.generation > state.runRequest.claimedGeneration,
+      } : undefined,
     };
   }
 
@@ -580,8 +680,73 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
     return resolve(options.workspaceRoot, options.stateDir ?? '.heddle', 'heartbeat');
   }
 
+  private static assertTaskAcceptsRunRequest(task: HeartbeatTask): void {
+    if (task.state?.status === 'blocked') {
+      throw new Error(`Heartbeat task ${task.id} is blocked. Resume it before requesting a run.`);
+    }
+    if (task.state?.status === 'complete') {
+      throw new Error(`Heartbeat task ${task.id} is complete. Resume it before requesting a run.`);
+    }
+    if (!task.enabled) {
+      throw new Error(`Heartbeat task ${task.id} is disabled. Enable it before requesting a run.`);
+    }
+  }
+
+  private static normalizeRunRequestReason(reason: string | undefined): string | undefined {
+    if (reason === undefined) {
+      return undefined;
+    }
+
+    const normalized = reason.trim();
+    if (!normalized) {
+      throw new Error('Heartbeat run-request reason cannot be empty.');
+    }
+    if (normalized.length > MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH) {
+      throw new Error(`Heartbeat run-request reason must be at most ${MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH} characters.`);
+    }
+    return normalized;
+  }
+
+  private static consumePendingRunRequest(
+    runRequest: HeartbeatTaskState['runRequest'],
+  ): HeartbeatTaskState['runRequest'] {
+    return runRequest ? {
+      ...runRequest,
+      claimedGeneration: runRequest.generation,
+    } : undefined;
+  }
+
+  private static toRunRequestSignal(
+    result: HeartbeatTaskRunRequestResult,
+  ): HeartbeatTaskRunRequestSignal {
+    return {
+      taskId: result.taskId,
+      generation: result.generation,
+      disposition: result.disposition,
+      requestedAt: result.requestedAt,
+      reason: result.reason,
+    };
+  }
+
   private async findTask(taskId: string): Promise<HeartbeatTask | undefined> {
     return (await this.repository.listTasks()).find((candidate) => candidate.id === taskId);
+  }
+
+  /** Serializes one task read-transform-write transition for the file adapter. */
+  private async updateStoredTask(
+    taskId: string,
+    update: (task: HeartbeatTask) => HeartbeatTask,
+  ): Promise<HeartbeatTask> {
+    return await this.mutationMutex.runExclusive(async () => {
+      const task = await this.findTask(taskId);
+      if (!task) {
+        throw new Error(`Heartbeat task not found: ${taskId}`);
+      }
+
+      const nextTask = update(task);
+      await this.repository.saveTask(nextTask);
+      return nextTask;
+    });
   }
 
   private executionKey(execution: HeartbeatTaskExecution): string {
@@ -615,6 +780,17 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
     const mutex = new Mutex();
     FileHeartbeatTaskService.mutationMutexes.set(heartbeatRoot, mutex);
     return mutex;
+  }
+
+  private static resolveRunRequestEventBus(heartbeatRoot: string): EventEmitter {
+    const existing = FileHeartbeatTaskService.runRequestEventBuses.get(heartbeatRoot);
+    if (existing) {
+      return existing;
+    }
+
+    const eventBus = new EventEmitter();
+    FileHeartbeatTaskService.runRequestEventBuses.set(heartbeatRoot, eventBus);
+    return eventBus;
   }
 
   private static withLegacyExecution(task: HeartbeatTask): HeartbeatTask {

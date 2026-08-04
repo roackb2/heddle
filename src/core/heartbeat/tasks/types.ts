@@ -16,6 +16,39 @@ export type HeartbeatTaskSchedule = {
 
 export type HeartbeatTaskContinuationMode = 'operator' | 'agent';
 
+export const MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH = 200;
+
+/**
+ * Durable level-triggered intent to run a task promptly.
+ *
+ * `generation` advances for every accepted request. `claimedGeneration` is the
+ * newest generation already claimed by an execution, so a larger generation
+ * represents one pending follow-up regardless of how many requests coalesced.
+ */
+export type HeartbeatTaskRunRequest = {
+  generation: number;
+  claimedGeneration: number;
+  requestedAt: string;
+  reason?: string;
+};
+
+export type RequestHeartbeatTaskRunOptions = {
+  reason?: string;
+  requestedAt?: Date;
+};
+
+export type HeartbeatTaskRunRequestSignal = {
+  taskId: string;
+  generation: number;
+  disposition: 'requested' | 'coalesced';
+  requestedAt: string;
+  reason?: string;
+};
+
+export type HeartbeatTaskRunRequestResult = HeartbeatTaskRunRequestSignal & {
+  task: HeartbeatTask;
+};
+
 export type HeartbeatTaskRuntime = Pick<
   RunAgentHeartbeatOptions,
   | 'model'
@@ -39,6 +72,7 @@ export type HeartbeatTaskExecution = {
   executionId: string;
   ownerId: string;
   claimedAt: string;
+  runRequestGeneration?: number;
 };
 
 export type HeartbeatTaskRecoveryReason = 'host-restart' | 'operator';
@@ -54,6 +88,7 @@ type HeartbeatTaskExecutionOutcomeBase = {
   executionId: string;
   summary: string;
   finishedAt: string;
+  runRequestGeneration?: number;
 };
 
 export type HeartbeatTaskExecutionOutcome = HeartbeatTaskExecutionOutcomeBase & (
@@ -73,6 +108,7 @@ export type HeartbeatTaskState = {
   result?: AgentHeartbeatResult;
   error?: string;
   execution?: HeartbeatTaskExecution;
+  runRequest?: HeartbeatTaskRunRequest;
   lastExecution?: HeartbeatTaskExecutionOutcome;
   recovery?: HeartbeatTaskRecovery;
   updatedAt?: string;
@@ -137,6 +173,11 @@ export type HeartbeatTaskStore = {
   saveTask: (task: HeartbeatTask) => Promise<void>;
   loadCheckpoint: (task: HeartbeatTask) => Promise<AgentLoopCheckpoint | undefined>;
   saveCheckpoint: (task: HeartbeatTask, checkpoint: AgentLoopCheckpoint) => Promise<void>;
+  requestTaskRun: (
+    taskId: string,
+    options?: RequestHeartbeatTaskRunOptions,
+  ) => Promise<HeartbeatTaskRunRequestResult>;
+  subscribeToRunRequests?: (listener: (request: HeartbeatTaskRunRequestSignal) => void) => () => void;
   claimTaskExecution: (input: {
     taskId: string;
     execution: HeartbeatTaskExecution;
@@ -145,21 +186,27 @@ export type HeartbeatTaskStore = {
   }) => Promise<HeartbeatTaskClaimResult>;
   completeTaskExecution: (input: {
     execution: HeartbeatTaskExecution;
-    task: HeartbeatTask;
+    taskId: string;
     checkpoint: AgentLoopCheckpoint;
     result: AgentHeartbeatResult;
     loadedCheckpoint: boolean;
+    completedAt: Date;
     signal?: AbortSignal;
   }) => Promise<HeartbeatTaskExecutionWriteResult>;
   failTaskExecution: (input: {
     execution: HeartbeatTaskExecution;
-    task: HeartbeatTask;
+    taskId: string;
+    error: unknown;
+    failedAt: Date;
+    retryMs: number;
     signal?: AbortSignal;
   }) => Promise<HeartbeatTaskExecutionWriteResult>;
   recordTaskExecutionOutcome: (input: {
     execution: HeartbeatTaskExecution;
-    task: HeartbeatTask;
-    outcome: HeartbeatTaskExecutionOutcome & { kind: 'skipped' | 'cancelled' };
+    taskId: string;
+    kind: 'skipped' | 'cancelled';
+    summary: string;
+    finishedAt: Date;
     signal?: AbortSignal;
   }) => Promise<HeartbeatTaskExecutionWriteResult>;
   recoverInterruptedTasks: (input: {

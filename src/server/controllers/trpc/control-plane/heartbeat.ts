@@ -116,6 +116,19 @@ export class ControlPlaneHeartbeatController {
     return await new FileHeartbeatTaskService({ stateRoot }).triggerTaskRun(taskId);
   }
 
+  static async requestTaskRun(
+    stateRoot: string,
+    taskId: string,
+    options: { reason?: string } = {},
+  ) {
+    const tasks = new FileHeartbeatTaskService({ stateRoot });
+    const result = await tasks.requestTaskRun(taskId, options);
+    return {
+      ...result,
+      task: tasks.projectTaskView(result.task),
+    };
+  }
+
   static async runTaskNow(
     stateRoot: string,
     args: RunHeartbeatTaskNowArgs,
