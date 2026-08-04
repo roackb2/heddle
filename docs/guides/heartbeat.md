@@ -172,8 +172,8 @@ which generation it consumed, so a request arriving after the claim remains
 pending for the next run. Success, failure, skip, and cancellation settle from
 the latest stored task state and cannot overwrite a newer request.
 
-`HeartbeatSchedulerService.start()` and `runLoop()` subscribe to file-store run
-requests and rescan promptly. `heartbeat.task.run_requested`,
+`HeartbeatSchedulerService.start()` and `runLoop()` subscribe to configured-store
+run requests and rescan promptly. `heartbeat.task.run_requested`,
 `heartbeat.task.run_request_claimed`, and `heartbeat.scheduler.awakened` expose
 the lifecycle without carrying credentials or domain payloads. The configured
 poll interval remains the process-restart and external-writer fallback.
@@ -268,6 +268,57 @@ ignores cancellation, `stop()` deliberately remains pending until that handler
 settles. The execution fencing token prevents its late result from overwriting
 a replacement claim, and a result that settles after the framework signal was
 aborted is persisted as cancellation rather than agent completion.
+
+Long-lived hosts can cancel one task without stopping its peers:
+
+```ts
+const cancellation = await scheduler.cancelTask('participant-agent-42', {
+  reason: 'operator-disabled-participant',
+});
+
+if (cancellation.disposition === 'cancelled') {
+  await heartbeatTasks.setTaskEnabled('participant-agent-42', false);
+}
+```
+
+`cancelTask()` immediately invalidates this handle's already-queued admissions
+for that task. If the handle owns an active execution, it aborts only that
+execution's `HeartbeatExecutionContext.signal` and waits for the runner's
+existing claim-fenced outer settlement. Unrelated active and queued tasks keep
+running. Concurrent calls for the same task share the first caller's
+cancellation attempt and bounded reason; a later call after settlement is a
+new read of current task state and does not create another cancellation record.
+
+The result disposition is explicit:
+
+| Disposition | Meaning |
+| --- | --- |
+| `cancelled` | This handle delivered cancellation and the durable cancelled outcome won. |
+| `completion-won` | Completion or failure persisted before cancellation could win. |
+| `not-running` | The task exists but this handle has no active execution; any queued admission selected before the call was invalidated. |
+| `not-owned` | Stored state says running, but this handle does not own the execution. A remote adapter must route a durable request to its owner. |
+| `disabled` | The task exists, is disabled, and is not running. |
+| `blocked` | The task is waiting for operator input and is not running. |
+| `completed` | The task is terminal and is not running. |
+| `not-found` | No task with that ID exists in the configured store. |
+
+The required operator reason is trimmed, collapsed to one line, limited to 200
+characters, and copied into the cancellation event and run outcome. Do not put
+private task input in it. Cancellation preserves the existing checkpoint and
+run history. It also preserves any run-request generation created after the
+active execution's claim; that request is eligible on a later scheduler cycle.
+The low-level operation deliberately does not invent disable/delete semantics
+or consume that newer intent. Disabling the task after awaited cancellation
+uses the task service's existing behavior to consume pending intent, and a host
+may delete immediately after the await without polling for `running` state.
+
+Task-scoped cancellation is a process-local delivery boundary for executions
+started by this scheduler handle. A custom multi-worker store still needs its
+own persisted cancellation-request and owner-notification protocol; a local
+`not-owned` result is not an acknowledgement from the remote owner. Likewise,
+Heddle cannot roll back host database writes or terminate external work that
+ignores `AbortSignal`. Handlers and tools remain responsible for cooperative
+cancellation and idempotent host-owned side effects.
 
 ## Examples
 
