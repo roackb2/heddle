@@ -75,8 +75,9 @@ export type ClientSharedSessionActivityEffects = {
  *
  * Core/live owns the activity vocabulary and facts. This service owns only the
  * frontend-neutral consequences shared by web-v2 and cli-v2, including active
- * plan lifetime: a plan is visible after `plan.updated` and cleared when a new
- * run starts or the current run finishes.
+ * plan lifetime: a plan is visible after `plan.updated` and cleared when the
+ * first visible final response arrives, a new run starts, or the current run
+ * finishes.
  */
 export class ClientSharedSessionActivityService {
   // Dispatches raw control-plane activity facts into frontend-neutral effects.
@@ -87,6 +88,9 @@ export class ClientSharedSessionActivityService {
   private static readonly effectHandlers: SessionActivityEffectHandlers = {
     'assistant.stream': (activity, effects) => {
       effects.onAssistantStream?.(activity, activity.done ? undefined : 'Receiving assistant response...');
+      if (activity.text.trim().length > 0) {
+        effects.onPlanCleared?.();
+      }
       effects.onCurrentActivityChanged?.(undefined);
     },
     'assistant.commentary': (activity, effects) => {

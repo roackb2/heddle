@@ -1022,6 +1022,84 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('hides the active plan with the first visible final assistant response, but not commentary, reasoning, or tool progress', async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = createClientFixture();
+      const store = new ControlPlaneSessionStore({ client: fixture.client });
+      await store.start();
+
+      fixture.emitRunActivity({
+        source: 'agent-loop',
+        type: 'plan.updated',
+        runId: 'run-1',
+        step: 1,
+        timestamp: new Date().toISOString(),
+        explanation: 'Tracking current work.',
+        items: [{ step: 'Implement', status: 'in_progress' }],
+      });
+      fixture.emitRunActivity({
+        source: 'agent-loop',
+        type: 'assistant.commentary',
+        runId: 'run-1',
+        step: 2,
+        text: 'Checking the implementation.',
+        timestamp: new Date().toISOString(),
+      });
+      fixture.emitRunActivity({
+        source: 'agent-loop',
+        type: 'reasoning.summary',
+        runId: 'run-1',
+        step: 3,
+        text: 'The plan remains useful while the agent reasons.',
+        done: false,
+        timestamp: new Date().toISOString(),
+      });
+      fixture.emitRunActivity({
+        source: 'agent-loop',
+        type: 'tool.calling',
+        runId: 'run-1',
+        step: 4,
+        tool: 'read_file',
+        toolCallId: 'call-1',
+        input: { path: 'README.md' },
+        requiresApproval: false,
+        timestamp: new Date().toISOString(),
+      });
+
+      expect(store.getSnapshot().activePlan).toEqual(expect.objectContaining({
+        items: [{ step: 'Implement', status: 'in_progress' }],
+      }));
+
+      fixture.emitRunActivity({
+        source: 'agent-loop',
+        type: 'assistant.stream',
+        runId: 'run-1',
+        text: 'The implementation is complete.',
+        done: false,
+        timestamp: new Date().toISOString(),
+      });
+
+      await vi.advanceTimersByTimeAsync(75);
+      expect(store.getSnapshot().activeSession?.messages.at(-1)?.text).toBe('The implementation is complete.');
+      expect(store.getSnapshot().activePlan).toBeUndefined();
+
+      fixture.emitRunActivity({
+        source: 'agent-loop',
+        type: 'assistant.stream',
+        runId: 'run-1',
+        text: 'The implementation is complete.',
+        done: true,
+        timestamp: new Date().toISOString(),
+      });
+
+      expect(store.getSnapshot().activePlan).toBeUndefined();
+      store.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps the final run outcome visible after loop completion', async () => {
     const fixture = createClientFixture();
     const store = new ControlPlaneSessionStore({ client: fixture.client });
