@@ -634,6 +634,11 @@ description: Research web pages through a browser.
       });
       await expect(caller.sessionSendPromptAsync({
         sessionId: session.id,
+        prompt: 'Machine prompt requiring an exact run identity',
+        queueIfBusy: false,
+      })).rejects.toThrow('The session is busy. Retry after its active and queued runs have settled.');
+      await expect(caller.sessionSendPromptAsync({
+        sessionId: session.id,
         prompt: 'Second prompt',
       })).resolves.toMatchObject({
         queued: true,

@@ -228,6 +228,8 @@ export type ControlPlaneSessionRunReference = {
 export type ControlPlaneSessionRunResult = {
   outcome?: string;
   summary?: string;
+  traceFile?: string;
+  changedFiles?: Array<Pick<ChangedFileReviewView, 'path' | 'status' | 'source'>>;
 };
 
 export type ControlPlaneSessionRunEventEnvelope = ConversationRunStreamItem<ControlPlaneSessionRunResult>;

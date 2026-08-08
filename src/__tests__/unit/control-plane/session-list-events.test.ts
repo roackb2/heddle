@@ -87,6 +87,17 @@ describe('ControlPlaneChatSessionsController session list events', () => {
 
   it('observes the terminal from run acceptance even when replay trims early activity', async () => {
     const eventBus = new EventEmitter();
+    const traceFile = join(mkdtempSync(join(tmpdir(), 'heddle-run-result-trace-')), 'trace.json');
+    writeFileSync(traceFile, JSON.stringify([{
+      type: 'tool.completed',
+      call: { id: 'call-1', tool: 'edit_file', input: {} },
+      step: 1,
+      timestamp: '2026-06-12T00:00:00.000Z',
+      result: {
+        ok: true,
+        output: { path: 'src/updated.ts', action: 'replaced' },
+      },
+    }]));
     const runService = new ConversationRunService<{ workspaceId: string; sessionId: string }>({
       addressKey: ({ workspaceId, sessionId }) => `${workspaceId}:${sessionId}`,
       replay: { maxEventsPerRun: 2, retentionMs: 60_000 },
@@ -111,7 +122,7 @@ describe('ControlPlaneChatSessionsController session list events', () => {
           done: false,
           timestamp: new Date().toISOString(),
         }));
-        return { outcome: 'done', summary: 'Finished.', internal: 'not public' };
+        return { outcome: 'done', summary: 'Finished.', traceFile, internal: 'not public' };
       },
     });
 
@@ -125,7 +136,12 @@ describe('ControlPlaneChatSessionsController session list events', () => {
         terminal: expect.objectContaining({
           kind: 'result',
           sequence: 4,
-          result: { outcome: 'done', summary: 'Finished.' },
+          result: {
+            outcome: 'done',
+            summary: 'Finished.',
+            traceFile,
+            changedFiles: [{ path: 'src/updated.ts', status: 'modified', source: 'edit_file' }],
+          },
         }),
       }),
       expect.objectContaining({ type: 'session.run.updated', status: 'settled' }),

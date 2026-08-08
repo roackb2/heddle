@@ -55,6 +55,16 @@ If another run already owns the session, a normal prompt can instead return a
 `session.run.updated` when it is admitted later; clients do not invent an ID or
 reuse the preceding run's stream.
 
+Exact-run supervisors may send `queueIfBusy: false`. The server then performs
+a server-side do-not-queue admission check: it either returns an accepted run
+with its exact identity, or rejects while the session has an active or queued
+run.
+This option exists for completion supervisors such as
+`heddle ask --output jsonl`, which cannot safely exit or reconnect to an
+anonymous queue item. The option does not change the default interactive
+queueing behavior and clients must not emulate the check by reading session
+state before submitting.
+
 ### `controlPlane.sessionSendPrompt`
 
 Use this for completion-oriented callers that intentionally want to wait for the

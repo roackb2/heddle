@@ -122,6 +122,7 @@ type SubmitChatPromptArgs = ControlPlaneSessionReadArgs & {
   maxSteps?: number;
   searchIgnoreDirs?: string[];
   includePlanTool?: boolean;
+  queueIfBusy?: boolean;
   leaseOwner: ChatSessionLeaseOwner;
   logger?: Pick<Logger, 'debug'>;
 };
@@ -299,7 +300,11 @@ export class ControlPlaneChatSessionsController {
 
   async submitPromptAsync(args: SubmitChatPromptArgs): Promise<ControlPlaneAcceptedSessionRun> {
     const preparedArgs = this.prepareSubmitPromptArgs(args);
-    if (this.isRunning(preparedArgs) || await this.hasQueuedPrompts(preparedArgs)) {
+    const sessionBusy = this.isRunning(preparedArgs) || await this.hasQueuedPrompts(preparedArgs);
+    if (sessionBusy && preparedArgs.queueIfBusy === false) {
+      throw new Error('The session is busy. Retry after its active and queued runs have settled.');
+    }
+    if (sessionBusy) {
       const queued = await this.enqueuePrompt(preparedArgs);
       if (!this.isRunning(preparedArgs)) {
         await this.startNextQueuedPrompt(preparedArgs);

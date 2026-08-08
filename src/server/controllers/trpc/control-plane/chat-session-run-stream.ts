@@ -11,6 +11,7 @@ import type {
   ControlPlaneSessionRunReference,
   ControlPlaneSessionRunResult,
 } from '@/server/control-plane-types.js';
+import { ControlPlaneChatTurnReviewPresenter } from './chat-turn-review-presenter.js';
 import { ControlPlaneChatSessionEventsController } from './chat-session-events.js';
 
 export type ControlPlaneSessionAddress = {
@@ -128,9 +129,19 @@ export class ControlPlaneChatSessionRunStreamController {
       return {};
     }
 
-    return pickBy(
-      pick(result as Record<string, unknown>, ['outcome', 'summary']),
+    const publicResult = pickBy(
+      pick(result as Record<string, unknown>, ['outcome', 'summary', 'traceFile']),
       isString,
     ) as ControlPlaneSessionRunResult;
+    const review = publicResult.traceFile
+      ? ControlPlaneChatTurnReviewPresenter.load(publicResult.traceFile)
+      : undefined;
+
+    return {
+      ...publicResult,
+      ...(review?.files.length
+        ? { changedFiles: review.files.map((file) => pick(file, ['path', 'status', 'source'])) }
+        : {}),
+    };
   }
 }

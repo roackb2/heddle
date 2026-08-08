@@ -82,6 +82,30 @@ export class ControlPlaneSessionSubscriptionService {
     });
   }
 
+  /**
+   * Observes one already accepted run without depending on session lifecycle
+   * discovery. Completion-oriented command clients use this when the submit
+   * response already supplied the exact run address they must supervise.
+   */
+  subscribeToAcceptedRun(run: ControlPlaneConversationRunReference): void {
+    const sessionAddress = this.sessionAddress;
+    if (
+      !sessionAddress
+      || sessionAddress.workspaceId !== run.workspaceId
+      || sessionAddress.sessionId !== run.sessionId
+    ) {
+      this.sessionSubscription?.unsubscribe();
+      this.stopRunSubscription();
+      this.sessionSubscription = undefined;
+      this.sessionAddress = {
+        workspaceId: run.workspaceId,
+        sessionId: run.sessionId,
+      };
+    }
+
+    this.subscribeToRun(run);
+  }
+
   subscribeToRun(run: ControlPlaneConversationRunReference): void {
     const sessionAddress = this.sessionAddress;
     if (
