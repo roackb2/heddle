@@ -243,6 +243,103 @@ describe('AgentRunService.run', () => {
     expect(result.trace.filter((event) => event.type === 'model.retry')).toHaveLength(2);
   });
 
+  it('recovers one context-window rejection without replaying completed tools', async () => {
+    const seenMessages: ChatMessage[][] = [];
+    let toolExecutions = 0;
+    const recoverModelContext = vi.fn(async ({ messages }: { messages: ChatMessage[] }) => ({ messages }));
+    const fakeLlm: LlmAdapter = {
+      async chat(messages): Promise<LlmResponse> {
+        seenMessages.push(messages);
+
+        if (seenMessages.length === 1) {
+          return {
+            content: 'I will inspect the repository first.',
+            toolCalls: [{ id: 'call-1', tool: 'list_files', input: { path: '.' } }],
+          };
+        }
+
+        if (seenMessages.length === 2) {
+          throw Object.assign(new Error('provider rejected oversized input'), {
+            status: 400,
+            error: { code: 'context_length_exceeded' },
+          });
+        }
+
+        return { content: 'Recovered after compacting the active transcript.' };
+      },
+    };
+    const listFilesTool: ToolDefinition = {
+      name: 'list_files',
+      description: 'Lists files in a directory',
+      parameters: { type: 'object', properties: {} },
+      async execute() {
+        toolExecutions += 1;
+        return { ok: true, output: 'README.md\nsrc/' };
+      },
+    };
+
+    const result = await AgentRunService.run({
+      goal: 'Inspect this repo safely.',
+      llm: fakeLlm,
+      tools: [listFilesTool],
+      maxSteps: 3,
+      logger: silentLogger,
+      recoverModelContext,
+    });
+
+    expect(result.outcome).toBe('done');
+    expect(result.summary).toBe('Recovered after compacting the active transcript.');
+    expect(seenMessages).toHaveLength(3);
+    expect(toolExecutions).toBe(1);
+    expect(recoverModelContext).toHaveBeenCalledOnce();
+    expect(recoverModelContext.mock.calls[0]?.[0]).toMatchObject({
+      failure: { source: 'model', code: 'context_window' },
+      messages: expect.arrayContaining([
+        expect.objectContaining({ role: 'tool', toolCallId: 'call-1' }),
+      ]),
+    });
+    expect(result.transcript.filter((message) => message.role === 'tool')).toHaveLength(1);
+    expect(result.trace.filter((event) => event.type === 'model.retry')).toEqual([
+      expect.objectContaining({
+        type: 'model.retry',
+        reason: 'context_window',
+        attempt: 1,
+        maxAttempts: 2,
+        retryAfterMs: 0,
+      }),
+    ]);
+  });
+
+  it('attempts context recovery only once for the current model step', async () => {
+    let calls = 0;
+    const recoverModelContext = vi.fn(async ({ messages }: { messages: ChatMessage[] }) => ({ messages }));
+    const fakeLlm: LlmAdapter = {
+      async chat(): Promise<LlmResponse> {
+        calls += 1;
+        throw Object.assign(new Error('provider rejected oversized input'), {
+          status: 400,
+          error: { code: 'context_length_exceeded' },
+        });
+      },
+    };
+
+    const result = await AgentRunService.run({
+      goal: 'Respect the model context limit.',
+      llm: fakeLlm,
+      tools: [],
+      maxSteps: 1,
+      logger: silentLogger,
+      recoverModelContext,
+    });
+
+    expect(result.outcome).toBe('error');
+    expect(result.summary).toBe('LLM error: Model context window was exceeded');
+    expect(result.failure).toEqual({ source: 'model', code: 'context_window' });
+    expect(calls).toBe(2);
+    expect(recoverModelContext).toHaveBeenCalledOnce();
+    expect(result.trace.filter((event) => event.type === 'model.retry')).toHaveLength(1);
+  });
+
   it('does not retry a valid tool-call response without assistant text', async () => {
     let calls = 0;
     const fakeLlm: LlmAdapter = {

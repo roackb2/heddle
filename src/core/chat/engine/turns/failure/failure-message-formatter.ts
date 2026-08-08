@@ -9,12 +9,12 @@ export class ConversationTurnFailureMessages {
       return `${message}\n\nThe active model account or credential has no usable provider quota or billing capacity. Check the provider account or switch credentials or providers before retrying.`;
     }
 
-    if (ConversationTurnFailureMessages.looksLikeContextWindowOverload(message)) {
+    if (ConversationTurnFailureMessages.isContextWindowFailure(message, options.failure)) {
       const sizeHint =
         typeof options.estimatedHistoryTokens === 'number' ?
           ` Current session history is estimated at about ${options.estimatedHistoryTokens.toLocaleString()} tokens before the next request.`
         : '';
-      return `${message}\n\nThis failed because the current prompt plus session history exceeded the model context window.${sizeHint} Heddle will automatically compact earlier history for the next retry.`;
+      return `${message}\n\nThis failed because the current prompt plus session history exceeded the model context window.${sizeHint} Heddle's bounded same-turn compaction retry was unavailable or still exceeded the window. Earlier history was compacted when possible for a later retry.`;
     }
 
     if (ConversationTurnFailureMessages.looksLikeAnthropicInputRateLimit(message)) {
@@ -28,8 +28,16 @@ export class ConversationTurnFailureMessages {
     return message;
   }
 
-  static shouldForceCompactionAfterFailure(message: string): boolean {
-    return ConversationTurnFailureMessages.looksLikeContextWindowOverload(message);
+  static shouldForceCompactionAfterFailure(message: string, failure?: ConversationTurnFailureHintOptions['failure']): boolean {
+    return ConversationTurnFailureMessages.isContextWindowFailure(message, failure);
+  }
+
+  private static isContextWindowFailure(
+    message: string,
+    failure?: ConversationTurnFailureHintOptions['failure'],
+  ): boolean {
+    return (failure?.source === 'model' && failure.code === 'context_window')
+      || ConversationTurnFailureMessages.looksLikeContextWindowOverload(message);
   }
 
   private static looksLikeContextWindowOverload(message: string): boolean {

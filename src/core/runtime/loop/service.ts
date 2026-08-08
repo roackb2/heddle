@@ -113,6 +113,7 @@ export class AgentLoopRuntimeService {
       approveToolCall: options.approveToolCall,
       shouldStop: options.shouldStop,
       abortSignal: options.abortSignal,
+      recoverModelContext: options.recoverModelContext,
     });
 
     const finishedAt = now();

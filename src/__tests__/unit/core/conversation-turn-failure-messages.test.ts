@@ -11,8 +11,21 @@ describe('ConversationTurnFailureMessages', () => {
 
     expect(formatted).toContain('exceeded the model context window');
     expect(formatted).toContain('201,163 tokens');
-    expect(formatted).toContain('automatically compact earlier history');
+    expect(formatted).toContain('bounded same-turn compaction retry');
+    expect(formatted).toContain('compacted when possible for a later retry');
     expect(ConversationTurnFailureMessages.shouldForceCompactionAfterFailure(message)).toBe(true);
+  });
+
+  it('uses the structured context-window failure when provider text is sanitized', () => {
+    const failure = { source: 'model' as const, code: 'context_window' as const };
+    const message = 'LLM error: Model context window was exceeded';
+    const formatted = ConversationTurnFailureMessages.format(message, {
+      model: 'gpt-5.6-sol',
+      failure,
+    });
+
+    expect(formatted).toContain('bounded same-turn compaction retry');
+    expect(ConversationTurnFailureMessages.shouldForceCompactionAfterFailure(message, failure)).toBe(true);
   });
 
   it('adds manual compaction guidance for likely input-size TPM failures', () => {

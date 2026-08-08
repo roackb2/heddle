@@ -88,6 +88,7 @@ export type ModelRunFailureCode =
   | 'permission'
   | 'quota'
   | 'rate_limit'
+  | 'context_window'
   | 'request'
   | 'transport'
   | 'empty_response'
@@ -114,7 +115,7 @@ export type TraceEvent =
     }
   | {
       type: typeof HeddleEventType.modelRetry;
-      reason: 'transport_error' | 'empty_response';
+      reason: 'transport_error' | 'empty_response' | 'context_window';
       attempt: number;
       maxAttempts: number;
       retryAfterMs: number;

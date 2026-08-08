@@ -74,6 +74,6 @@ export type PrepareChatSessionTurnResult =
     }
   | {
       ok: false;
-      reason: 'lease_conflict';
+      reason: 'lease_conflict' | 'compaction_failed' | 'request_too_large';
       message: string;
     };

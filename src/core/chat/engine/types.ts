@@ -343,6 +343,7 @@ export type ConversationEngineHost = {
   compaction?: {
     onStatus?: (event: ConversationCompactionStatus) => void;
     onPreflightCompactionStatus?: (event: ConversationCompactionStatus) => void;
+    onRecoveryCompactionStatus?: (event: ConversationCompactionStatus) => void;
     onFinalCompactionStatus?: (event: ConversationCompactionStatus) => void;
   };
   trace?: {

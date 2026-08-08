@@ -65,6 +65,7 @@ export class AgentRunContextBuilder {
       approveToolCall: options.approveToolCall,
       shouldStop: options.shouldStop,
       abortSignal: options.abortSignal,
+      recoverModelContext: options.recoverModelContext,
       state: {
         step: 0,
         consecutiveErrors: 0,

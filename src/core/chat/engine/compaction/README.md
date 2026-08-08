@@ -16,6 +16,14 @@ adapter.
 - Estimating history and request-token pressure for compaction decisions.
 - Keeping summary generation on the active turn's resolved credential principal.
 
+The compaction trigger estimates the complete request—not only persisted
+history—including the active prompt, system context, and tool declarations.
+Crossing the preflight threshold starts compaction, but the estimate is not a
+provider fact: a near-limit request may still proceed. Preflight only rejects
+locally when compaction failed or the recomputed request is still at least as
+large as the catalogued context window. A provider-confirmed overflow instead
+uses the turn recovery boundary for one force-compacted retry.
+
 ## Structure
 
 - `service.ts` is the main service boundary. Callers should enter through

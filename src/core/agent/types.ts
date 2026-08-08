@@ -6,7 +6,7 @@ import type { AutonomyEvaluation } from '@/core/approvals/autonomy/index.js';
 import type { ToolApprovalDecision, ToolApprovalPolicy } from '@/core/approvals/types.js';
 import type { ToolRegistry } from '@/core/tools/index.js';
 import type { PlanItem } from '@/core/tools/toolkits/internal/update-plan.js';
-import type { RunResult, ToolDefinition, ToolCall, TraceEvent, StopReason } from '@/core/types.js';
+import type { RunFailure, RunResult, ToolDefinition, ToolCall, TraceEvent, StopReason } from '@/core/types.js';
 import type { TraceRecorder } from '@/core/trace/index.js';
 import type { AgentStepBudget } from './budget/index.js';
 import type { MutationState } from './mutation/index.js';
@@ -26,6 +26,21 @@ export type AgentRunEvent =
       type: typeof HeddleEventType.trace;
       event: TraceEvent;
     };
+
+export type RecoverAgentModelContextInput = {
+  /** Full provider transcript for the rejected request, including its system message. */
+  messages: ChatMessage[];
+  failure: RunFailure;
+};
+
+export type RecoverAgentModelContextResult = {
+  /** Replacement transcript used to retry only the rejected model request. */
+  messages: ChatMessage[];
+};
+
+export type AgentModelContextRecovery = (
+  input: RecoverAgentModelContextInput,
+) => Promise<RecoverAgentModelContextResult | undefined>;
 
 export type AgentRunLiveRecorder = {
   trace(event: TraceEvent): void;
@@ -51,6 +66,11 @@ export type RunAgentOptions = {
   approveToolCall?: (call: ToolCall, tool: ToolDefinition, autonomyEvaluation?: AutonomyEvaluation) => Promise<ToolApprovalDecision>;
   shouldStop?: () => boolean;
   abortSignal?: AbortSignal;
+  /**
+   * Optional host recovery boundary for a model context-window rejection.
+   * The loop invokes it at most once per model step and never replays tools.
+   */
+  recoverModelContext?: AgentModelContextRecovery;
 };
 
 export type AgentMemoryCheckpointState = {
@@ -100,6 +120,7 @@ export type AgentRunContext = {
   approveToolCall?: RunAgentOptions['approveToolCall'];
   shouldStop?: RunAgentOptions['shouldStop'];
   abortSignal?: AbortSignal;
+  recoverModelContext?: AgentModelContextRecovery;
   state: AgentRunState;
 };
 

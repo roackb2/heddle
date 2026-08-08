@@ -98,7 +98,8 @@ describe('chat turn persistence', () => {
       force: true,
       history: result.transcript,
     }));
-    expect(artifacts.summary).toContain('automatically compact earlier history');
+    expect(artifacts.summary).toContain('bounded same-turn compaction retry');
+    expect(artifacts.summary).toContain('compacted when possible for a later retry');
   });
 
   it('persists the completed turn back to session storage', async () => {

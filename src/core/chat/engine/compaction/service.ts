@@ -11,6 +11,7 @@ import {
 import {
   DEFAULT_CONTEXT_WINDOW_ESTIMATE,
   MAX_HISTORY_RATIO,
+  MAX_REQUEST_RATIO,
   MAX_RECENT_HISTORY_RATIO,
   PREFERRED_FORCED_RECENT_MESSAGES,
   PREFERRED_RECENT_MESSAGES,
@@ -24,6 +25,7 @@ import type {
   BuildSessionCompactionRunningContextOptions,
   ConversationCompactionArchiveState,
   ConversationCompactionOptions,
+  ConversationCompactionRequestAssessment,
   ConversationCompactionResult,
 } from './types.js';
 
@@ -38,12 +40,18 @@ export class ConversationCompactionService {
   static async compact(
     options: ConversationCompactionOptions,
   ): Promise<ConversationCompactionResult> {
-    const estimatedWindow = ModelCatalogService.estimateBuiltInContextWindow(options.runtime.model) ?? DEFAULT_CONTEXT_WINDOW_ESTIMATE;
+    const requestAssessment = ConversationCompactionService.assessRequest(options);
+    const estimatedWindow = requestAssessment.contextWindowTokens;
     const maxHistoryTokens = Math.floor(estimatedWindow * MAX_HISTORY_RATIO);
     const recentTokenBudget = ConversationCompactionSplitPolicy.resolveRecentHistoryTokenBudget(estimatedWindow, MAX_RECENT_HISTORY_RATIO);
     const preferredRecentMessages = options.force ? PREFERRED_FORCED_RECENT_MESSAGES : PREFERRED_RECENT_MESSAGES;
+    const estimatedHistoryTokens = ConversationCompactionTokenEstimator.estimateHistory(options.history);
+    // Provider usage is authoritative only after a successful request. This
+    // estimate is a preflight optimization; overflow recovery remains the
+    // correctness path when provider tokenization differs from it.
     const needsCompaction =
-      ConversationCompactionTokenEstimator.estimateHistory(options.history) > maxHistoryTokens
+      estimatedHistoryTokens > maxHistoryTokens
+      || requestAssessment.exceedsCompactionThreshold
       || (Boolean(options.force) && ConversationCompactionTokenEstimator.countNonCompactedMessages(options.history) > 0);
 
     if (!needsCompaction) {
@@ -64,6 +72,29 @@ export class ConversationCompactionService {
 
   static estimateTokens(history: ConversationCompactionOptions['history']): number {
     return ConversationCompactionTokenEstimator.estimateHistory(history);
+  }
+
+  /**
+   * Estimates the complete provider request, including history, active goal,
+   * system context, and tool declarations. The provider remains authoritative;
+   * callers use this only for preflight compaction and plainly impossible
+   * request rejection before spending a model call.
+   */
+  static assessRequest(
+    options: Pick<ConversationCompactionOptions, 'history' | 'runtime' | 'request'>,
+  ): ConversationCompactionRequestAssessment {
+    const contextWindowTokens = ModelCatalogService.estimateBuiltInContextWindow(options.runtime.model)
+      ?? DEFAULT_CONTEXT_WINDOW_ESTIMATE;
+    const estimatedRequestTokens = ConversationCompactionTokenEstimator.estimateRequest(options);
+    const compactionThresholdTokens = Math.floor(contextWindowTokens * MAX_REQUEST_RATIO);
+
+    return {
+      contextWindowTokens,
+      estimatedRequestTokens,
+      compactionThresholdTokens,
+      exceedsCompactionThreshold: estimatedRequestTokens > compactionThresholdTokens,
+      exceedsContextWindow: estimatedRequestTokens >= contextWindowTokens,
+    };
   }
 
   static isCompactedHistorySummary(message: ConversationCompactionOptions['history'][number]): boolean {

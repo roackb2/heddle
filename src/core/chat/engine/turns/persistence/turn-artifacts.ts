@@ -28,7 +28,10 @@ export class ConversationTurnArtifacts {
       session: args.session,
       archiveRepository: args.archiveRepository,
       request: compactionRequest,
-      force: ConversationTurnFailureMessages.shouldForceCompactionAfterFailure(args.result.summary),
+      force: ConversationTurnFailureMessages.shouldForceCompactionAfterFailure(
+        args.result.summary,
+        args.result.failure,
+      ),
       summarizer: args.summarizer,
       onStatusChange: async (event) => await args.onCompactionStatus?.(event, sourceHistory),
     });
