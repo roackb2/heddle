@@ -82,16 +82,20 @@ async function main() {
     .option('--new-session [name]', 'create a fresh chat session and run this ask inside it')
     .option('--agent <id>', 'custom agent id for this ask turn')
     .option('--mode <mode>', 'built-in custom agent mode: ask, code, or review')
+    .option('--prompt-file <path>', 'read the prompt from a UTF-8 file; use - for stdin')
+    .option('--output <format>', 'output format: text or jsonl', 'text')
     .action(async (goalParts: string[], askOptions: {
       session?: string;
       latest?: boolean;
       newSession?: string | boolean;
       agent?: string;
       mode?: string;
+      promptFile?: string;
+      output?: string;
     }) => {
       const resolved = resolveCliOptions(program.opts<RootCliOptions>());
       chdir(resolved.workspaceRoot);
-      await AskCliV2CommandEdgeService.run(goalParts.join(' ').trim(), {
+      const result = await AskCliV2CommandEdgeService.run(goalParts.join(' ').trim(), {
         workspaceRoot: resolved.workspaceRoot,
         activeWorkspaceId: resolved.activeWorkspaceId,
         model: resolved.model,
@@ -109,7 +113,10 @@ async function main() {
           : askOptions.newSession === true ? ''
           : askOptions.newSession,
         agentProfileId: resolveAskAgentProfileId(askOptions),
+        promptFile: askOptions.promptFile,
+        output: askOptions.output,
       });
+      process.exitCode = result.exitCode;
     });
 
   program
@@ -322,7 +329,7 @@ async function main() {
   if (knownCommand && !isKnownCommand(knownCommand) && !knownCommand.startsWith('-')) {
     const resolved = resolveCliOptions(program.opts<RootCliOptions>());
     chdir(resolved.workspaceRoot);
-    await AskCliV2CommandEdgeService.run(argv.join(' ').trim(), {
+    const result = await AskCliV2CommandEdgeService.run(argv.join(' ').trim(), {
       workspaceRoot: resolved.workspaceRoot,
       activeWorkspaceId: resolved.activeWorkspaceId,
       model: resolved.model,
@@ -334,6 +341,7 @@ async function main() {
       forceOwnerConflict: resolved.forceOwnerConflict,
       preferApiKey: resolved.preferApiKey,
     });
+    process.exitCode = result.exitCode;
     return;
   }
 

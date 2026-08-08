@@ -49,7 +49,7 @@ domain should have:
 | --- | --- | --- |
 | `heddle`, `heddle chat`, `heddle chat-v2` | Already routed to `cli-v2`; attach to a live server or start an embedded control-plane server. | Keep as the reference API-backed runtime command pattern. |
 | `heddle chat-v1` | Removed from the public CLI route; the command edge reports a migration error instead of falling through to `ask`. | Keep the removed-command guard so retired names do not silently become prompts. |
-| `heddle ask` | `cli-v2` command adapter attaches/embeds the control-plane server, selects or creates a session, and submits through session APIs. | API-backed runtime command. Keep one-shot asks on the same session/run path as TUI and web. |
+| `heddle ask` | `cli-v2` command adapter attaches/embeds the control-plane server, selects or creates a session, and submits through session APIs. Text mode waits for the shared completion result; JSONL mode accepts and observes one exact shared run. | API-backed runtime command. Keep one-shot asks on the same session/run path as TUI and web. |
 | Unknown first argument fallback | Unknown non-command text becomes `ask`; removed command names are blocked explicitly. | Keep only if documented as shorthand; do not let retired command names become prompts. |
 | `heddle daemon` | `cli-v2` command adapter over runtime discovery and `src/server` lifecycle. | Direct discovery/lifecycle calls remain acceptable because the command manages the server. |
 | `heddle auth` | `cli-v2` command adapter delegates credential status/login/logout semantics to `ProviderCredentialCommandService`. | Direct management adapter over the core auth command service. |
@@ -61,6 +61,27 @@ domain should have:
 | `heddle heartbeat run` | `cli-v2` command adapter requests task execution or due-task execution through the live/embedded control-plane server. | Server-backed runtime command; no local CLI scheduler worker. |
 | `heddle heartbeat start` | `cli-v2` command adapter creates/updates a task through API and reports the server-backed scheduler. Embedded mode keeps the control-plane server alive until Ctrl+C. | Server-backed lifecycle command; do not run a separate CLI scheduler loop. |
 | `heddle eval` | `cli-v2` command adapter over core eval harness modules. | Direct dev/management adapter unless remote/API evals become a product goal. |
+
+## Scriptable Ask Boundary
+
+`heddle ask --output jsonl` is the zero-code subprocess adapter for hosts that
+cannot or do not want to embed the TypeScript SDK. It deliberately reuses
+`sessionSendPromptAsync` and the ordered `sessionRunEvents` replay contract; it
+must not grow a second agent execution loop, approval policy, or stream cursor.
+
+The command edge owns:
+
+- explicit positional, UTF-8 prompt-file, and `--prompt-file -` stdin input;
+- keeping stdout as a versioned JSONL protocol and sending diagnostics to
+  stderr;
+- converting shared accepted/activity/terminal envelopes into protocol
+  records;
+- process exit status and the exactly-one-terminal-record invariant.
+
+The server still owns session admission, execution, approvals, persistence,
+cancellation, and replay. Machine-mode submissions set `queueIfBusy: false`
+because a subprocess supervisor needs the exact run ID in the admission
+response. Interactive clients keep the default queueing behavior.
 
 ## Migration Order
 

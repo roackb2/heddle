@@ -68,6 +68,69 @@ heddle ask "Summarize the test strategy in this repository"
 
 `ask` still behaves like a one-shot command from the terminal, but Heddle stores the run as a one-off session under `.heddle/` so traces, memory maintenance, and later review use the same persisted conversation path as other session-backed runs.
 
+Pass a multiline prompt without shell quoting:
+
+```bash
+heddle ask --prompt-file implementation-request.md
+heddle ask --prompt-file - < implementation-request.md
+```
+
+`--prompt-file -` is the explicit stdin mode. Heddle never reads stdin merely
+because it is piped, so an accidentally inherited or open stdin stream cannot
+make an otherwise normal invocation hang. A positional prompt and
+`--prompt-file` are mutually exclusive.
+
+For a supervisor process, request the versioned JSON Lines protocol:
+
+```bash
+heddle ask --prompt-file - --output jsonl < implementation-request.md
+```
+
+In `jsonl` mode, stdout contains only one JSON object per line. Diagnostics and
+runtime attachment notices go to stderr. Every record includes
+`schemaVersion: 1`, a `type`, and `terminal`. The current record types are:
+
+- `run.accepted`, containing the exact workspace, session, and run IDs;
+- `run.activity`, containing the shared control-plane activity and its ordered
+  sequence number;
+- `run.stream.reconnecting`, reporting bounded transport recovery;
+- exactly one terminal `run.result`, `run.cancelled`, `run.error`,
+  `run.stream.error`, or `command.error` record.
+
+`run.result` includes the final outcome and summary, the persisted trace path,
+and changed-file paths when the run trace contains edit or Git-diff evidence.
+Heddle intentionally does not label every dirty workspace file as created by
+the run: if a tool did not record per-run evidence, inspect the workspace diff
+after completion instead of treating a shared working-tree snapshot as
+attribution.
+
+The process exits with status `0` only when the terminal run result has
+`outcome: "done"`. Rejected input, a busy target session, cancellation, stream
+failure, provider failure, and other non-done outcomes exit nonzero. A
+scriptable invocation does not enter the interactive prompt queue: when a
+selected reusable session is already running or queued, it fails admission so
+the supervisor never loses the exact run identity it must observe.
+
+Approval policy is unchanged. `run.activity` records can show an approval wait,
+but JSONL mode does not silently auto-approve it. Configure a suitable host
+permission policy before launching, or let another attached TUI/web/API client
+resolve the approval for that session.
+
+Choose the smallest integration surface that fits the host:
+
+- use `heddle ask --output jsonl` for a zero-code subprocess integration;
+- use the conversation SDK for an in-process TypeScript host that needs typed
+  callbacks and lifecycle composition;
+- use the control-plane API for a remote or multi-client product integration.
+
+For a Codex-supervised implementation workflow, let Codex plan or review the
+task, invoke `heddle ask --output jsonl` for the Heddle-owned implementation
+step, and keep consuming records until the single terminal record arrives.
+Treat a zero process exit as completed work, then review the reported trace,
+changed-file evidence, and the repository diff before committing. A nonzero
+exit is not a completed implementation even if earlier activity records showed
+useful progress.
+
 Run against another workspace:
 
 ```bash

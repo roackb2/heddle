@@ -41,7 +41,7 @@ describe('AskCliV2CommandEdgeService integration', () => {
     };
 
     try {
-      await AskCliV2CommandEdgeService.run('describe this workspace', {
+      const result = await AskCliV2CommandEdgeService.run('describe this workspace', {
         workspaceRoot,
         activeWorkspaceId: workspace.id,
         model: 'gpt-5.4',
@@ -50,6 +50,7 @@ describe('AskCliV2CommandEdgeService integration', () => {
         stateDir: '.heddle',
         runtimeHost,
       });
+      expect(result).toEqual({ exitCode: 0 });
     } finally {
       await closeServer(server);
     }
@@ -69,6 +70,68 @@ describe('AskCliV2CommandEdgeService integration', () => {
     });
     expect(stdout).toHaveBeenCalledWith(expect.stringContaining(`Session: ${sessions[0]?.id}`));
     expect(stdout).toHaveBeenCalledWith(expect.stringContaining('Outcome: done'));
+  });
+
+  it('streams an accepted run and one terminal result as JSONL', async () => {
+    vi.stubEnv('HEDDLE_BROWSER_INTEGRATION_FAKE_AGENT', '1');
+    const workspaceRoot = mkdtempSync(join(tmpdir(), 'heddle-ask-cli-v2-jsonl-'));
+    const stateRoot = join(workspaceRoot, '.heddle');
+    const workspace = RuntimeWorkspaceService.resolveContext({
+      workspaceRoot,
+      stateRoot,
+    }).activeWorkspace;
+    const stdoutLines: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutLines.push(String(chunk));
+      return true;
+    });
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const server = createHeddleServerApp({ workspaceRoot, stateRoot }).listen(0, '127.0.0.1');
+    await onceListening(server);
+    const address = server.address() as AddressInfo;
+    const runtimeHost: ResolvedRuntimeHost = {
+      kind: 'server',
+      registryPath: join(workspaceRoot, 'daemon-registry.json'),
+      serverId: 'server-ask-jsonl-test',
+      mode: 'daemon',
+      endpoint: { host: '127.0.0.1', port: address.port },
+      startedAt: '2026-06-03T00:00:00.000Z',
+      lastSeenAt: '2026-06-03T00:00:01.000Z',
+      stale: false,
+      ageMs: 100,
+    };
+
+    try {
+      const result = await AskCliV2CommandEdgeService.run('describe this workspace', {
+        workspaceRoot,
+        activeWorkspaceId: workspace.id,
+        model: 'gpt-5.4',
+        maxSteps: 7,
+        preferApiKey: false,
+        stateDir: '.heddle',
+        runtimeHost,
+        output: 'jsonl',
+      });
+      expect(result).toEqual({ exitCode: 0 });
+    } finally {
+      await closeServer(server);
+    }
+
+    const records = stdoutLines.map((line) => JSON.parse(line));
+    expect(records[0]).toMatchObject({
+      schemaVersion: 1,
+      type: 'run.accepted',
+      terminal: false,
+      workspaceId: workspace.id,
+    });
+    expect(records.some((record) => record.type === 'run.activity')).toBe(true);
+    expect(records.at(-1)).toMatchObject({
+      schemaVersion: 1,
+      type: 'run.result',
+      terminal: true,
+      result: { outcome: 'done' },
+    });
+    expect(records.filter((record) => record.terminal)).toHaveLength(1);
   });
 });
 
