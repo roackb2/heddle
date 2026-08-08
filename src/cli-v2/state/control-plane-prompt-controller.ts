@@ -33,23 +33,24 @@ export class ControlPlanePromptController {
   constructor(private readonly options: ControlPlanePromptControllerOptions) {}
 
   async submitPrompt(prompt: string): Promise<void> {
-    const trimmed = prompt.trim();
-    if (!trimmed || this.options.state.getSnapshot().submitting) {
+    const preservedPrompt = prompt.trim();
+    if (!preservedPrompt || this.options.state.getSnapshot().submitting) {
+      return;
+    }
+    const inlineCommandDraft = ClientSharedPromptInputService.normalizeInlineCommandDraft(preservedPrompt);
+
+    if (SlashCommandAutocompleteService.isSlashDraft(inlineCommandDraft)) {
+      await this.options.slashCommands.execute(inlineCommandDraft);
       return;
     }
 
-    if (SlashCommandAutocompleteService.isSlashDraft(trimmed)) {
-      await this.options.slashCommands.execute(trimmed);
-      return;
-    }
-
-    const directShell = ClientSharedPromptInputService.parseDirectShellDraft(trimmed);
+    const directShell = ClientSharedPromptInputService.parseDirectShellDraft(inlineCommandDraft);
     if (directShell) {
       await this.options.directShell.submit(directShell.command);
       return;
     }
 
-    await this.submitNormalPrompt(trimmed);
+    await this.submitNormalPrompt(preservedPrompt);
   }
 
   private async submitNormalPrompt(prompt: string): Promise<void> {

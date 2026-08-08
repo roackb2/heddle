@@ -61,6 +61,18 @@ describe('ClientSharedPromptInputService', () => {
     expect(ClientSharedPromptInputService.canNavigateHistory('next', { value, cursor: value.length })).toBe(true);
   });
 
+  it('preserves internal line breaks in submitted prompt history', () => {
+    const prompt = 'First step\nSecond step';
+    const history = ClientSharedPromptInputService.recordPrompt({ entries: [] }, `  ${prompt}  `);
+
+    expect(history.entries).toEqual([prompt]);
+    expect(ClientSharedPromptInputService.navigateHistory({
+      state: history,
+      currentDraft: { value: '', cursor: 0 },
+      direction: 'previous',
+    })?.draft).toEqual({ value: prompt, cursor: prompt.length });
+  });
+
   it('tracks prompt undo and redo stacks without recording no-op edits', () => {
     const initial = { value: 'hello', cursor: 5 };
     const edited = { value: 'hello!', cursor: 6 };
@@ -98,5 +110,9 @@ describe('ClientSharedPromptInputService', () => {
       command: '',
     });
     expect(ClientSharedPromptInputService.parseDirectShellDraft('ask normally')).toBeUndefined();
+  });
+
+  it('normalizes whitespace only for inline command routing', () => {
+    expect(ClientSharedPromptInputService.normalizeInlineCommandDraft('  /model\n  gpt-5.4  ')).toBe('/model gpt-5.4');
   });
 });

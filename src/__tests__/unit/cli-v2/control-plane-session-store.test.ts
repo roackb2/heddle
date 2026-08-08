@@ -174,6 +174,41 @@ describe('ControlPlaneSessionStore', () => {
     store.dispose();
   });
 
+  it('preserves multiline normal prompts for the run and accepted user message', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    const prompt = '  Compare the implementation\nwith the tests.  ';
+    const preservedPrompt = 'Compare the implementation\nwith the tests.';
+    await store.start();
+    fixture.calls.sessionQuery.mockResolvedValueOnce({
+      ...createSessionDetail(),
+      messages: [
+        ...createSessionDetail().messages,
+        {
+          id: 'accepted-user-run-1',
+          role: 'user',
+          text: preservedPrompt,
+          isPending: true,
+        },
+      ],
+    });
+
+    await store.submitPrompt(prompt);
+
+    expect(fixture.calls.sessionSendPromptAsyncMutate).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      prompt: preservedPrompt,
+    }));
+    expect(store.getSnapshot().activeSession?.messages.at(-1)).toEqual({
+      id: 'accepted-user-run-1',
+      role: 'user',
+      text: preservedPrompt,
+      isPending: true,
+    });
+    store.dispose();
+  });
+
   it('submits selected file mentions as user-authored @path text', async () => {
     const fixture = createClientFixture();
     const store = new ControlPlaneSessionStore({ client: fixture.client });
@@ -205,6 +240,26 @@ describe('ControlPlaneSessionStore', () => {
       preferApiKey: undefined,
       systemContext: undefined,
     });
+    expect(fixture.calls.sessionSendPromptAsyncMutate).not.toHaveBeenCalled();
+    store.dispose();
+  });
+
+  it('normalizes multiline slash and direct shell commands before routing them', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+
+    await store.submitPrompt('  /model\n  ');
+    await store.submitPrompt(' !echo\n hello ');
+
+    expect(fixture.calls.slashCommandExecuteMutate).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      command: '/model',
+    }, slashCommandRequestOptions());
+    expect(fixture.calls.sessionDirectShellAsyncMutate).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'echo hello',
+    }));
     expect(fixture.calls.sessionSendPromptAsyncMutate).not.toHaveBeenCalled();
     store.dispose();
   });

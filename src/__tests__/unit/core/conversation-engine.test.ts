@@ -976,7 +976,7 @@ describe('createConversationEngine', () => {
     await sessionRepository.update({
       session: {
         ...stored.session,
-        lastContinuePrompt: 'continue investigating',
+        lastContinuePrompt: 'continue investigating\nthen inspect the tests',
         history: [{ role: 'user', content: 'prior' }],
         updatedAt: '2026-05-03T00:00:00.000Z',
       },
@@ -985,7 +985,7 @@ describe('createConversationEngine', () => {
 
     await engine.turns.continue({ sessionId: session.id });
     const runSpy = vi.mocked(EngineConversationTurnService.run);
-    expect(runSpy.mock.calls[0]?.[0]?.prompt).toBe('continue investigating');
+    expect(runSpy.mock.calls[0]?.[0]?.prompt).toBe('continue investigating\nthen inspect the tests');
 
     await engine.turns.continue({ sessionId: session.id, prompt: 'override prompt' });
     expect(runSpy.mock.calls[1]?.[0]?.prompt).toBe('override prompt');
