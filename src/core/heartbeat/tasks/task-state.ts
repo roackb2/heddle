@@ -268,6 +268,82 @@ export class HeartbeatTaskStateProjector {
     }));
   }
 
+  static afterHandlerRetry(args: {
+    task: HeartbeatTask;
+    execution: HeartbeatTaskExecution;
+    summary: string;
+    agentRunId: string;
+    retryMs: number;
+    now: Date;
+  }): HeartbeatTask {
+    const finishedAt = dayjs(args.now).toISOString();
+    return HeartbeatTaskStateProjector.afterExecutionSettlement(HeartbeatTaskStateProjector.normalize({
+      ...args.task,
+      schedule: {
+        ...args.task.schedule,
+        nextRunAt: dayjs(args.now).add(args.retryMs, 'millisecond').toISOString(),
+      },
+      state: {
+        status: 'waiting',
+        progress: `Custom heartbeat handler requested retry in ${HeartbeatTaskStateProjector.formatDelay(args.retryMs)}.`,
+        runAt: finishedAt,
+        loadedCheckpoint: args.task.state?.loadedCheckpoint,
+        resumable: true,
+        result: undefined,
+        error: undefined,
+        execution: undefined,
+        runRequest: args.task.state?.runRequest,
+        lastExecution: HeartbeatTaskStateProjector.executionOutcome({
+          kind: 'retry',
+          execution: args.execution,
+          summary: args.summary,
+          agentRunId: args.agentRunId,
+          finishedAt,
+        }),
+        recovery: args.task.state?.recovery,
+        updatedAt: finishedAt,
+      },
+    }));
+  }
+
+  static afterHandlerBlock(args: {
+    task: HeartbeatTask;
+    execution: HeartbeatTaskExecution;
+    summary: string;
+    agentRunId: string;
+    now: Date;
+  }): HeartbeatTask {
+    const finishedAt = dayjs(args.now).toISOString();
+    return HeartbeatTaskStateProjector.afterExecutionSettlement(HeartbeatTaskStateProjector.normalize({
+      ...args.task,
+      enabled: false,
+      schedule: {
+        ...args.task.schedule,
+        nextRunAt: undefined,
+      },
+      state: {
+        status: 'blocked',
+        progress: 'Custom heartbeat handler blocked this task pending explicit resume.',
+        runAt: finishedAt,
+        loadedCheckpoint: args.task.state?.loadedCheckpoint,
+        resumable: true,
+        result: undefined,
+        error: undefined,
+        execution: undefined,
+        runRequest: args.task.state?.runRequest,
+        lastExecution: HeartbeatTaskStateProjector.executionOutcome({
+          kind: 'blocked',
+          execution: args.execution,
+          summary: args.summary,
+          agentRunId: args.agentRunId,
+          finishedAt,
+        }),
+        recovery: args.task.state?.recovery,
+        updatedAt: finishedAt,
+      },
+    }));
+  }
+
   static afterCancellation(args: {
     task: HeartbeatTask;
     execution: HeartbeatTaskExecution;
@@ -458,16 +534,35 @@ export class HeartbeatTaskStateProjector {
     kind: HeartbeatTaskExecutionOutcome['kind'];
     execution: HeartbeatTaskExecution;
     summary: string;
+    agentRunId?: string;
     reason?: string;
     finishedAt: string;
   }): HeartbeatTaskExecutionOutcome {
-    const outcome = {
-      kind: args.kind,
+    const base = {
       executionId: args.execution.executionId,
       summary: args.summary,
       finishedAt: args.finishedAt,
       runRequestGeneration: args.execution.runRequestGeneration,
     };
-    return args.kind === 'cancelled' ? { ...outcome, kind: 'cancelled', reason: args.reason } : outcome;
+    switch (args.kind) {
+      case 'agent':
+        return { ...base, kind: 'agent' };
+      case 'skipped':
+        return { ...base, kind: 'skipped' };
+      case 'failed':
+        return { ...base, kind: 'failed' };
+      case 'cancelled':
+        return { ...base, kind: 'cancelled', reason: args.reason };
+      case 'retry':
+        if (!args.agentRunId) {
+          throw new Error('Heartbeat retry outcome requires a nested agent run id.');
+        }
+        return { ...base, kind: 'retry', agentRunId: args.agentRunId };
+      case 'blocked':
+        if (!args.agentRunId) {
+          throw new Error('Heartbeat blocked outcome requires a nested agent run id.');
+        }
+        return { ...base, kind: 'blocked', agentRunId: args.agentRunId };
+    }
   }
 }

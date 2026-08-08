@@ -281,7 +281,10 @@ export type {
   RequestHeartbeatTaskRunOptions,
 } from './core/heartbeat/tasks/index.js';
 export {
+  DEFAULT_HEARTBEAT_HANDLER_RETRY_MS,
   HeartbeatSchedulerService,
+  MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH,
+  MAX_HEARTBEAT_HANDLER_RETRY_MS,
   MAX_HEARTBEAT_CANCELLATION_REASON_LENGTH,
 } from './core/heartbeat/scheduler/index.js';
 export type {

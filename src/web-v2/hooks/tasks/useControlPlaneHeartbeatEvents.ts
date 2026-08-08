@@ -49,6 +49,8 @@ export function useControlPlaneHeartbeatEvents({
       event.type === 'heartbeat.task.finished'
       || event.type === 'heartbeat.task.skipped'
       || event.type === 'heartbeat.task.cancelled'
+      || event.type === 'heartbeat.task.retry'
+      || event.type === 'heartbeat.task.blocked'
     ) {
       void utils.controlPlane.heartbeatTasks.invalidate(workspaceId ? { workspaceId } : undefined);
       void utils.controlPlane.heartbeatTask.invalidate(workspaceId ? { workspaceId, taskId: event.taskId } : { taskId: event.taskId });
@@ -170,6 +172,8 @@ function projectHeartbeatTaskEvent(
       };
     case 'heartbeat.task.skipped':
     case 'heartbeat.task.cancelled':
+    case 'heartbeat.task.retry':
+    case 'heartbeat.task.blocked':
       return {
         ...base,
         status: event.record.task.state.status,

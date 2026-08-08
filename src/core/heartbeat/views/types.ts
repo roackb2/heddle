@@ -8,10 +8,12 @@ import type {
 } from '../tasks/index.js';
 
 export type HeartbeatTaskResultView = {
-  kind: 'agent' | 'skipped' | 'cancelled' | 'failed';
+  kind: 'agent' | 'skipped' | 'cancelled' | 'retry' | 'blocked' | 'failed';
   decision?: HeartbeatDecision;
   summary: string;
   outcome: string;
+  /** Nested agent run rejected by a custom retry or blocked outcome. */
+  agentRunId?: string;
   usage?: LlmUsage;
 };
 

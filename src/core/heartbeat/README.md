@@ -109,6 +109,30 @@ operator-facing heartbeat views.
   only during the current execution and must never be serialized or retained by
   the host. The positional runner API is deprecated and adapted through this
   same pipeline.
+- A custom handler can reject a completed nested agent result without throwing
+  by returning `context.retry()` or `context.block()` after `await
+  context.runAgent()`. Retry retains the previous checkpoint, records a
+  claim-fenced non-agent outcome, and schedules one bounded retry delay.
+  Block retains the previous checkpoint, records the nested agent run id for
+  correlation, disables the task, and requires `resumeTask()` before another
+  run. Handler-outcome summaries are durable operator text: keep them concise,
+  non-secret, and free of prompts or domain payloads.
+
+```ts
+handler: async (context) => {
+  const result = await context.runAgent();
+  if (!hostPostconditionsAccept(result)) {
+    return context.retry({
+      summary: 'Host postconditions did not accept this run.',
+      delayMs: 30_000,
+    });
+  }
+  if (requiresExplicitResume(result)) {
+    return context.block({ summary: 'This task requires explicit operator resume.' });
+  }
+  return result;
+}
+```
 - `HeartbeatSchedulerService.start()` returns an awaitable, idempotent stop
   handle. Hosts must await `stop({ cancelRunning: true })` before resetting
   domain state. Stop prevents bounded-pool jobs that are still queued from being

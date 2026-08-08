@@ -266,6 +266,8 @@ function logHeartbeatSchedulerEvent(
     'heartbeat.task.finished': 'Heartbeat task finished',
     'heartbeat.task.skipped': 'Heartbeat task skipped because no work was available',
     'heartbeat.task.cancelled': 'Heartbeat task execution cancelled',
+    'heartbeat.task.retry': 'Heartbeat task retry requested by custom handler',
+    'heartbeat.task.blocked': 'Heartbeat task blocked by custom handler',
     'heartbeat.task.failed': 'Heartbeat task failed',
   } satisfies Record<HeartbeatSchedulerEvent['type'], string>;
 

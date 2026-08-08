@@ -18,6 +18,9 @@ export type HeartbeatTaskContinuationMode = 'operator' | 'agent';
 
 export const MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH = 200;
 export const MAX_HEARTBEAT_CANCELLATION_REASON_LENGTH = 200;
+export const DEFAULT_HEARTBEAT_HANDLER_RETRY_MS = 5 * 60_000;
+export const MAX_HEARTBEAT_HANDLER_RETRY_MS = 24 * 60 * 60_000;
+export const MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH = 500;
 
 /**
  * Durable level-triggered intent to run a task promptly.
@@ -95,6 +98,16 @@ type HeartbeatTaskExecutionOutcomeBase = {
 export type HeartbeatTaskExecutionOutcome =
   | (HeartbeatTaskExecutionOutcomeBase & { kind: 'agent' })
   | (HeartbeatTaskExecutionOutcomeBase & { kind: 'skipped' })
+  | (HeartbeatTaskExecutionOutcomeBase & {
+      kind: 'retry';
+      /** Nested agent run rejected by the custom handler. */
+      agentRunId: string;
+    })
+  | (HeartbeatTaskExecutionOutcomeBase & {
+      kind: 'blocked';
+      /** Nested agent run rejected by the custom handler. */
+      agentRunId: string;
+    })
   | (HeartbeatTaskExecutionOutcomeBase & { kind: 'failed' })
   | (HeartbeatTaskExecutionOutcomeBase & {
       kind: 'cancelled';
@@ -141,7 +154,7 @@ export type HeartbeatTaskAgentRunRecord = {
 
 export type HeartbeatTaskNonAgentRunRecord = {
   task: HeartbeatTask;
-  outcome: HeartbeatTaskExecutionOutcome & { kind: 'skipped' | 'cancelled' };
+  outcome: HeartbeatTaskExecutionOutcome & { kind: 'skipped' | 'cancelled' | 'retry' | 'blocked' };
   result?: never;
   loadedCheckpoint?: never;
 };
@@ -208,8 +221,12 @@ export type HeartbeatTaskStore = {
   recordTaskExecutionOutcome: (input: {
     execution: HeartbeatTaskExecution;
     taskId: string;
-    kind: 'skipped' | 'cancelled';
+    kind: 'skipped' | 'cancelled' | 'retry' | 'blocked';
     summary: string;
+    /** Nested agent run rejected by an explicit custom-handler outcome. */
+    agentRunId?: string;
+    /** Retry delay selected by an explicit custom-handler outcome. */
+    retryMs?: number;
     /** Supplied only for a targeted `cancelled` outcome. */
     reason?: string;
     finishedAt: Date;

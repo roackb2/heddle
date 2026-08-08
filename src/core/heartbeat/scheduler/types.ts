@@ -1,6 +1,11 @@
 import type { AgentLoopCheckpoint, AgentLoopState } from '@/core/runtime/loop/index.js';
 import type { LlmProvider } from '@/core/llm/types.js';
 import type { AgentHeartbeatEvent, AgentHeartbeatResult, RunAgentHeartbeatOptions } from '../agent/index.js';
+export {
+  DEFAULT_HEARTBEAT_HANDLER_RETRY_MS,
+  MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH,
+  MAX_HEARTBEAT_HANDLER_RETRY_MS,
+} from '../tasks/types.js';
 import type {
   HeartbeatTask,
   HeartbeatTaskAgentRunRecord,
@@ -95,6 +100,20 @@ export type HeartbeatSchedulerEvent =
       timestamp: string;
     }
   | {
+      type: 'heartbeat.task.retry';
+      taskId: string;
+      executionId: string;
+      record: HeartbeatTaskNonAgentRunRecord & { outcome: { kind: 'retry' } };
+      timestamp: string;
+    }
+  | {
+      type: 'heartbeat.task.blocked';
+      taskId: string;
+      executionId: string;
+      record: HeartbeatTaskNonAgentRunRecord & { outcome: { kind: 'blocked' } };
+      timestamp: string;
+    }
+  | {
       type: 'heartbeat.task.failed';
       taskId: string;
       executionId: string;
@@ -146,12 +165,24 @@ export type HeartbeatExecutionContext = {
   signal: AbortSignal;
   runAgent: (options?: HeartbeatTaskRunnerAgentOptions) => Promise<AgentHeartbeatResult>;
   skip: (input: { summary: string }) => HeartbeatHandlerOutcome;
+  /**
+   * Rejects the completed nested agent result and schedules a bounded retry.
+   * The summary is persisted and emitted to operators, so it must be concise
+   * and must not include credentials, tokens, prompts, or domain payloads.
+   */
+  retry: (input: { summary: string; delayMs?: number }) => HeartbeatHandlerOutcome;
+  /**
+   * Rejects the completed nested agent result and requires explicit resume.
+   * The summary is persisted and emitted to operators, so it must be concise
+   * and must not include credentials, tokens, prompts, or domain payloads.
+   */
+  block: (input: { summary: string }) => HeartbeatHandlerOutcome;
 };
 
-export type HeartbeatHandlerOutcome = {
-  kind: 'skipped';
-  summary: string;
-};
+export type HeartbeatHandlerOutcome =
+  | { kind: 'skipped'; summary: string }
+  | { kind: 'retry'; summary: string; delayMs: number; agentRunId: string }
+  | { kind: 'blocked'; summary: string; agentRunId: string };
 
 export type HeartbeatTaskHandler = (
   context: HeartbeatExecutionContext,
