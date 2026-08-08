@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import omit from 'lodash/omit.js';
 import orderBy from 'lodash/orderBy.js';
 import { FileHeartbeatTaskRepository } from './repository.js';
+import { HeartbeatTaskExecutionEligibilityPolicy } from './execution-eligibility.js';
 import { HeartbeatTaskStateProjector } from './task-state.js';
 import {
   MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH,
@@ -21,7 +22,7 @@ import type {
   HeartbeatTaskRunRecordEntry,
   HeartbeatTaskRunRequestResult,
   HeartbeatTaskRunRequestSignal,
-  HeartbeatTaskStore,
+  HeartbeatTargetedTaskStore,
 } from './types.js';
 import type { HeartbeatRunView, HeartbeatTaskResultView, HeartbeatTaskView } from '../views/index.js';
 import type { AgentHeartbeatResult } from '../agent/index.js';
@@ -81,7 +82,7 @@ export type ReconcileHeartbeatTasksResult = {
  * run records, and operator-facing task/run projections. Hosts should call this
  * service, not the file repository.
  */
-export class FileHeartbeatTaskService implements HeartbeatTaskStore {
+export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore {
   private static readonly mutationMutexes = new Map<string, Mutex>();
   private static readonly activeExecutions = new Set<string>();
   private static readonly runRequestEventBuses = new Map<string, EventEmitter>();
@@ -104,6 +105,11 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
     return await this.repository.listTasks();
   }
 
+  /** Resolves exactly one task for request-driven workers without scanning the task catalog. */
+  async loadTask(taskId: string) {
+    return await this.repository.loadTask(taskId);
+  }
+
   async saveTask(task: HeartbeatTask) {
     await this.mutationMutex.runExclusive(async () => await this.repository.saveTask(task));
   }
@@ -112,7 +118,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
     return await this.repository.loadCheckpoint(task);
   }
 
-  async saveCheckpoint(task: HeartbeatTask, checkpoint: Parameters<HeartbeatTaskStore['saveCheckpoint']>[1]) {
+  async saveCheckpoint(task: HeartbeatTask, checkpoint: Parameters<HeartbeatTargetedTaskStore['saveCheckpoint']>[1]) {
     await this.mutationMutex.runExclusive(async () => await this.repository.saveCheckpoint(task, checkpoint));
   }
 
@@ -123,7 +129,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
    */
   async requestTaskRun(
     taskId: string,
-    options: Parameters<HeartbeatTaskStore['requestTaskRun']>[1] = {},
+    options: Parameters<HeartbeatTargetedTaskStore['requestTaskRun']>[1] = {},
   ): Promise<HeartbeatTaskRunRequestResult> {
     const reason = FileHeartbeatTaskService.normalizeRunRequestReason(options.reason);
     const requestedAt = options.requestedAt ?? dayjs().toDate();
@@ -177,7 +183,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
     });
   }
 
-  async saveRunRecord(record: Parameters<NonNullable<HeartbeatTaskStore['saveRunRecord']>>[0]) {
+  async saveRunRecord(record: Parameters<NonNullable<HeartbeatTargetedTaskStore['saveRunRecord']>>[0]) {
     await this.mutationMutex.runExclusive(async () => await this.repository.saveRunRecord(record));
   }
 
@@ -188,7 +194,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
    * with multiple processes or replicas must provide a remote store whose
    * implementation uses database compare-and-swap or leases.
    */
-  async claimTaskExecution(input: Parameters<HeartbeatTaskStore['claimTaskExecution']>[0]) {
+  async claimTaskExecution(input: Parameters<HeartbeatTargetedTaskStore['claimTaskExecution']>[0]) {
     return await this.mutationMutex.runExclusive(async () => {
       const task = await this.findTask(input.taskId);
       if (!task) {
@@ -199,6 +205,15 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       }
       if (task.state?.status === 'running') {
         return { status: 'busy' } as const;
+      }
+      if (input.claimMode === 'due') {
+        const eligibility = HeartbeatTaskExecutionEligibilityPolicy.evaluate(task, input.claimedAt);
+        if (!eligibility.eligible) {
+          if (eligibility.reason === 'not-due') {
+            return { status: 'not-due', task } as const;
+          }
+          return { status: eligibility.reason } as const;
+        }
       }
 
       const runningTask = HeartbeatTaskStateProjector.markRunning({
@@ -218,7 +233,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
    * owns the task. A recovered retry therefore cannot be overwritten by a late
    * result from the interrupted execution.
    */
-  async completeTaskExecution(input: Parameters<HeartbeatTaskStore['completeTaskExecution']>[0]) {
+  async completeTaskExecution(input: Parameters<HeartbeatTargetedTaskStore['completeTaskExecution']>[0]) {
     return await this.mutationMutex.runExclusive(async () => {
       const currentTask = await this.findTask(input.taskId);
       if (!currentTask || !FileHeartbeatTaskService.executionMatches(currentTask, input.execution)) {
@@ -263,7 +278,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
   }
 
   /** Persists a failed attempt only while its execution fencing token is current. */
-  async failTaskExecution(input: Parameters<HeartbeatTaskStore['failTaskExecution']>[0]) {
+  async failTaskExecution(input: Parameters<HeartbeatTargetedTaskStore['failTaskExecution']>[0]) {
     return await this.mutationMutex.runExclusive(async () => {
       const currentTask = await this.findTask(input.taskId);
       if (!currentTask || !FileHeartbeatTaskService.executionMatches(currentTask, input.execution)) {
@@ -288,7 +303,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
   }
 
   /** Persists a claim-fenced non-agent outcome without creating or replacing a checkpoint. */
-  async recordTaskExecutionOutcome(input: Parameters<HeartbeatTaskStore['recordTaskExecutionOutcome']>[0]) {
+  async recordTaskExecutionOutcome(input: Parameters<HeartbeatTargetedTaskStore['recordTaskExecutionOutcome']>[0]) {
     return await this.mutationMutex.runExclusive(async () => {
       const currentTask = await this.findTask(input.taskId);
       if (!currentTask || !FileHeartbeatTaskService.executionMatches(currentTask, input.execution)) {
@@ -356,7 +371,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
    * method repeatedly is idempotent because recovered tasks are no longer
    * `running` and no longer carry a current execution.
    */
-  async recoverInterruptedTasks(input: Parameters<HeartbeatTaskStore['recoverInterruptedTasks']>[0]) {
+  async recoverInterruptedTasks(input: Parameters<HeartbeatTargetedTaskStore['recoverInterruptedTasks']>[0]) {
     return await this.mutationMutex.runExclusive(async () => {
       const tasks = await this.repository.listTasks();
       const recoverableTasks = tasks.filter((task) => this.isRecoverableTask(task, input.ownerId));
@@ -374,7 +389,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
     });
   }
 
-  async listRunRecords(options?: Parameters<NonNullable<HeartbeatTaskStore['listRunRecords']>>[0]) {
+  async listRunRecords(options?: Parameters<NonNullable<HeartbeatTargetedTaskStore['listRunRecords']>>[0]) {
     return await this.repository.listRunRecords?.(options) ?? [];
   }
 
@@ -843,7 +858,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
   }
 
   private async findTask(taskId: string): Promise<HeartbeatTask | undefined> {
-    return (await this.repository.listTasks()).find((candidate) => candidate.id === taskId);
+    return await this.repository.loadTask(taskId);
   }
 
   /** Serializes one task read-transform-write transition for the file adapter. */

@@ -174,11 +174,20 @@ export type HeartbeatTaskRunRecordEntry = {
 
 export type HeartbeatTaskClaimResult =
   | { status: 'claimed'; task: HeartbeatTask }
+  | { status: 'not-due'; task: HeartbeatTask }
   | { status: 'busy' | 'disabled' | 'not-found' };
+
+/**
+ * `due` makes the durable store re-check scheduler eligibility atomically with
+ * the claim. `any` is reserved for explicit operator-triggered "run now"
+ * paths that intentionally ignore the stored schedule.
+ */
+export type HeartbeatTaskClaimMode = 'any' | 'due';
 
 export type HeartbeatTaskExecutionWriteResult =
   | { status: 'saved'; task: HeartbeatTask; record?: HeartbeatTaskRunRecord }
-  | { status: 'claim-lost' | 'cancelled' };
+  | { status: 'claim-lost' }
+  | { status: 'cancelled' };
 
 export type HeartbeatTaskRecoveryResult = {
   task: HeartbeatTask;
@@ -200,6 +209,7 @@ export type HeartbeatTaskStore = {
     execution: HeartbeatTaskExecution;
     loadedCheckpoint: boolean;
     claimedAt: Date;
+    claimMode?: HeartbeatTaskClaimMode;
   }) => Promise<HeartbeatTaskClaimResult>;
   completeTaskExecution: (input: {
     execution: HeartbeatTaskExecution;
@@ -240,6 +250,16 @@ export type HeartbeatTaskStore = {
   saveRunRecord?: (record: HeartbeatTaskRunRecord) => Promise<void>;
   listRunRecords?: (options?: { taskId?: string; limit?: number }) => Promise<HeartbeatTaskRunRecordEntry[]>;
   loadRunRecord?: (id: string) => Promise<HeartbeatTaskRunRecordEntry | undefined>;
+};
+
+/**
+ * Store capability required by queue- or request-driven ephemeral workers.
+ * Implementations must resolve one task directly rather than scanning a global
+ * task catalog; claim fencing and all settlement guarantees remain inherited
+ * from `HeartbeatTaskStore`.
+ */
+export type HeartbeatTargetedTaskStore = HeartbeatTaskStore & {
+  loadTask: (taskId: string) => Promise<HeartbeatTask | undefined>;
 };
 
 export type FileHeartbeatTaskRepositoryOptions = {

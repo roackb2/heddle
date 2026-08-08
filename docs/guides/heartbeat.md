@@ -149,6 +149,116 @@ itself make a scheduler safe for multiple workers.
 
 Cron, launchd, systemd, hosted queues, and Lucid-style services should be treated as hosts around this API, not as Heddle's internal scheduler model.
 
+### Targeted one-shot workers
+
+Use `HeartbeatSchedulerService.runTask()` when the host has already routed one
+durable `taskId` to a short-lived worker. It attempts only that task once; it
+does not scan other tasks merely because they are due. This is the appropriate
+boundary for a queue or serverless host that first persists domain input, calls
+`requestTaskRun(taskId)`, and then delivers that task ID at least once.
+
+```ts
+import {
+  HeartbeatSchedulerService,
+  type HeartbeatTaskHandler,
+  type HeartbeatTargetedTaskStore,
+} from '@roackb2/heddle/advanced';
+
+declare const heartbeatTasks: HeartbeatTargetedTaskStore;
+declare const taskId: string;
+declare const invocationId: string;
+declare const handler: HeartbeatTaskHandler;
+
+const outcome = await HeartbeatSchedulerService.runTask({
+  store: heartbeatTasks,
+  taskId,
+  executionOwnerId: invocationId,
+  handler,
+  runtime: {
+    workspaceRoot,
+    stateDir,
+  },
+  signal: workerAbortSignal,
+});
+
+if (outcome.status === 'settled') {
+  await queue.acknowledge(taskId);
+} else if (outcome.status === 'busy' || outcome.status === 'claim-lost') {
+  await queue.retryLater(taskId);
+}
+```
+
+`HeartbeatTargetedTaskStore` extends `HeartbeatTaskStore` with
+`loadTask(taskId)`. A remote adapter must resolve that one task directly; do not
+wrap `listTasks()` with a host-side filter, which would turn a tenant routing and
+authorization boundary into a best-effort convention.
+
+The result is typed so the dispatcher can make an explicit decision:
+
+- `settled`: the claimed task wrote a durable agent, skipped, or blocked outcome and its record is available.
+- `retry`: a custom handler rejected its completed nested agent result and durably scheduled the bounded retry it requested.
+- `failed`: the task ran and entered the normal heartbeat failure/retry state.
+- `not-found`, `disabled`, or `not-due`: this delivery has no currently eligible work.
+- `busy`: another execution currently owns the task.
+- `claim-lost`: the worker lost ownership before final persistence; do not treat it as success.
+- `cancelled`: the worker was aborted before or during its attempt; a post-claim cancellation may include its durable record.
+
+The method deliberately does **not** start a polling loop, subscribe to
+run-request notifications, perform a global task scan, or run interrupted-task
+recovery. Its final `due` claim rechecks durable enabled/running/schedule state,
+so a stale queue delivery cannot bypass an operator change between lookup and
+claim. A duplicate at-least-once delivery is arbitrated by that same claim, but
+hosts must still make their own domain side effects idempotent.
+
+For a long-lived single-host scheduler, `runLoop()` performs one startup
+recovery pass because it owns that process lifecycle. An ephemeral worker must
+not infer that another `ownerId` is dead: an owner mismatch alone is not a lease
+expiry. Remote stores need an explicit lease-expiry or operator recovery policy,
+and `runTask()` never recovers or steals another worker's claim. Late settlement
+writes remain fenced after an explicit recovery.
+
+### Certify a custom targeted store
+
+Before using a remote adapter with ephemeral or replicated workers, run the
+opt-in conformance scenarios against two fresh adapter instances connected to
+the same backend namespace:
+
+```ts
+import {
+  HeartbeatTaskStoreConformance,
+  type HeartbeatTaskStoreConformanceHarness,
+} from '@roackb2/heddle/heartbeat/testing';
+
+const harness: HeartbeatTaskStoreConformanceHarness = {
+  createStore: async (namespace) => createRemoteHeartbeatStore({ namespace }),
+  cleanupNamespace: async (namespace) => deleteRemoteHeartbeatFixture(namespace),
+  now: () => new Date('2026-08-08T00:00:00.000Z'),
+  makeExecutionRecoverable: async ({ namespace, execution, recoverAt }) => {
+    await expireHeartbeatLease({ namespace, executionId: execution.executionId, recoverAt });
+  },
+  capabilities: {
+    runRequestSubscription: true,
+    runHistory: true,
+  },
+};
+
+for (const scenario of HeartbeatTaskStoreConformance.createScenarios(harness)) {
+  test(scenario.name, scenario.run);
+}
+```
+
+The required scenarios verify direct lookup, shared-backend round trips,
+idempotent writes, request coalescing, atomic due claims, competing workers,
+claim-fenced success/failure/skip/cancellation, and explicit recovery. The
+`makeExecutionRecoverable` hook is test-fixture authority: lease-backed stores
+expire a fixture lease there; it does not add recovery authority to production
+workers. Run-request subscriptions and history readback are checked only when
+the adapter declares those optional capabilities.
+
+This suite certifies the store contract, not the surrounding system. It does
+not prove exactly-once domain effects, tenant authorization, queue delivery,
+visibility timeout handling, or infrastructure lease correctness.
+
 ### Durable event-driven run requests
 
 Product hosts should request prompt work through the task service instead of

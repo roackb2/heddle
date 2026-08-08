@@ -32,7 +32,8 @@ distributed-systems guarantee.
 | Embedded TypeScript process | 01 or 03 | Your process owns startup, shutdown, and its state-root filesystem. |
 | Long-lived worker or server | 02 or 04 | Your host owns supervision, signals, deployment, and operational alerts. |
 | Custom persistence | 02 with `store` | The adapter must atomically claim and fence writes; Heddle does not supply distributed leases. |
-| Multiple workers or replicas | Custom store plus your queue/leases | Route payloads, cancellation, recovery, and idempotency through your own durable infrastructure. |
+| Ephemeral queue/serverless worker | 05 with a conforming remote store | Route one task ID; your host owns queue visibility, leases, recovery, and domain idempotency. |
+| Multiple workers or replicas | 05 with a conforming remote store plus your queue/leases | Route payloads, cancellation, recovery, and idempotency through your own durable infrastructure. |
 
 | Customization depth | Stage | What Heddle owns | What the host owns |
 | --- | --- | --- | --- |
@@ -40,6 +41,7 @@ distributed-systems guarantee.
 | Worker lifecycle | [02 long-lived worker](02-long-lived-worker.ts) | Scheduler admissions and claim-fenced settlement | Process supervision and awaited shutdown |
 | Domain work | [03 domain handler](03-domain-handler.ts) | Execution identity, `AbortSignal`, credentials, agent path | Claim, postcondition, acknowledgement |
 | Event-driven work | [04 event-driven wake](04-event-driven-wake.ts) | Durable, coalescible run-request generation | Event payload, delivery, domain idempotency |
+| Targeted execution | [05 ephemeral worker](05-ephemeral-worker.ts) | Exact task lookup, final due claim, fenced settlement | Task routing, queue retry/visibility, lease recovery |
 
 ## Follow the path
 
@@ -59,6 +61,12 @@ distributed-systems guarantee.
    must retain every payload and make its effects idempotent. **Next:** replace
    the built-in store only after designing its atomic claim, fencing, lease
    recovery, and payload-delivery contracts.
+5. `05-ephemeral-worker.ts` demonstrates an at-least-once queue delivery by
+   running exactly one routed task ID. It proves an unrelated due task remains
+   pending and a duplicate delivery does not rerun settled work. The file store
+   keeps the example deterministic; production replicas need a remote store
+   certified with `@roackb2/heddle/heartbeat/testing`. **Next:** implement the
+   host's queue acknowledgement, lease expiry, and domain idempotency policy.
 
 ## Commands
 
@@ -67,6 +75,7 @@ yarn example:heartbeat:one-cycle
 yarn example:heartbeat:worker
 yarn example:heartbeat:domain-handler
 yarn example:heartbeat:events
+yarn example:heartbeat:ephemeral
 yarn example:heartbeat:smoke
 ```
 

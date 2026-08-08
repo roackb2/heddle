@@ -41,6 +41,11 @@ export class FileHeartbeatTaskRepository {
       .sort((left, right) => left.id.localeCompare(right.id));
   }
 
+  async loadTask(taskId: string): Promise<HeartbeatTask | undefined> {
+    const path = join(this.tasksDir, `${FileHeartbeatTaskRepository.safeTaskFileName(taskId)}.json`);
+    return this.readTaskFile(path).at(0);
+  }
+
   async saveTask(task: HeartbeatTask): Promise<void> {
     const path = join(this.tasksDir, `${FileHeartbeatTaskRepository.safeTaskFileName(task.id)}.json`);
     this.writeJsonAtomically(path, HeartbeatTaskSchema.parse(HeartbeatTaskStateProjector.normalize(task)));

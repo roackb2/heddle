@@ -15,6 +15,8 @@ import type { AgentHeartbeatResult, RunAgentHeartbeatOptions } from '../agent/in
 import type {
   HeartbeatTask,
   HeartbeatTaskAgentRunRecord,
+  HeartbeatTaskClaimResult,
+  HeartbeatTaskClaimMode,
   HeartbeatTaskExecution,
   HeartbeatTaskNonAgentRunRecord,
   HeartbeatTaskRunRecord,
@@ -27,6 +29,7 @@ import type {
   HeartbeatTaskRunner,
   HeartbeatTaskRunnerAgentOptions,
   HeartbeatTaskRunnerRuntimeOptions,
+  HeartbeatTaskExecutionResult,
   RunDueHeartbeatTasksOptions,
   RunDueHeartbeatTasksResult,
 } from './types.js';
@@ -56,18 +59,20 @@ export class HeartbeatTaskRunnerService {
     > & {
       task: HeartbeatTask;
       runAt: Date;
+      /** `due` requires the durable store to re-check eligibility while claiming. */
+      claimMode?: HeartbeatTaskClaimMode;
     },
-  ): Promise<{ record?: HeartbeatTaskRunRecord; failed: boolean }> {
+  ): Promise<HeartbeatTaskExecutionResult> {
     HeartbeatTaskRunnerService.assertHandlerConfiguration(options);
     if (options.signal?.aborted) {
-      return { failed: false };
+      return HeartbeatTaskRunnerService.cancelledResult(options.task.id);
     }
 
     const { task, runAt } = options;
     const startedAt = dayjs(runAt).toISOString();
     const checkpoint = await options.store.loadCheckpoint(task);
     if (options.signal?.aborted) {
-      return { failed: false };
+      return HeartbeatTaskRunnerService.cancelledResult(task.id);
     }
 
     const loadedCheckpoint = Boolean(checkpoint);
@@ -81,9 +86,10 @@ export class HeartbeatTaskRunnerService {
       execution: proposedExecution,
       loadedCheckpoint,
       claimedAt: runAt,
+      claimMode: options.claimMode,
     });
     if (claim.status !== 'claimed') {
-      return { failed: false };
+      return HeartbeatTaskRunnerService.claimResult(task.id, claim);
     }
 
     const runningTask = claim.task;
@@ -140,7 +146,10 @@ export class HeartbeatTaskRunnerService {
           });
         }
         if (completion.status !== 'saved' || !HeartbeatTaskRunnerService.isNonAgentRecord(completion.record, 'skipped')) {
-          return { failed: false };
+          if (completion.status === 'claim-lost') {
+            return HeartbeatTaskRunnerService.claimLostResult(task.id, execution.executionId);
+          }
+          throw new Error(`Heartbeat store saved an invalid skipped record for task ${task.id}.`);
         }
 
         options.onEvent?.({
@@ -150,7 +159,7 @@ export class HeartbeatTaskRunnerService {
           record: completion.record,
           timestamp: completion.record.outcome.finishedAt,
         });
-        return { record: completion.record, failed: false };
+        return HeartbeatTaskRunnerService.settledResult(task.id, execution.executionId, completion.record);
       }
 
       if (HeartbeatTaskRunnerService.isExplicitHandlerOutcome(result)) {
@@ -171,13 +180,13 @@ export class HeartbeatTaskRunnerService {
             execution,
           });
         }
-        if (completion.status !== 'saved') {
-          return { failed: false };
+        if (completion.status === 'claim-lost') {
+          return HeartbeatTaskRunnerService.claimLostResult(task.id, execution.executionId);
         }
 
         if (result.kind === 'retry') {
           if (!HeartbeatTaskRunnerService.isNonAgentRecord(completion.record, 'retry')) {
-            return { failed: false };
+            throw new Error(`Heartbeat store saved an invalid retry record for task ${task.id}.`);
           }
           options.onEvent?.({
             type: 'heartbeat.task.retry',
@@ -188,7 +197,7 @@ export class HeartbeatTaskRunnerService {
           });
         } else {
           if (!HeartbeatTaskRunnerService.isNonAgentRecord(completion.record, 'blocked')) {
-            return { failed: false };
+            throw new Error(`Heartbeat store saved an invalid blocked record for task ${task.id}.`);
           }
           options.onEvent?.({
             type: 'heartbeat.task.blocked',
@@ -198,7 +207,7 @@ export class HeartbeatTaskRunnerService {
             timestamp: completion.record.outcome.finishedAt,
           });
         }
-        return { record: completion.record, failed: false };
+        return HeartbeatTaskRunnerService.settledResult(task.id, execution.executionId, completion.record);
       }
 
       const completion = await options.store.completeTaskExecution({
@@ -218,7 +227,10 @@ export class HeartbeatTaskRunnerService {
         });
       }
       if (completion.status !== 'saved' || !HeartbeatTaskRunnerService.isAgentRecord(completion.record)) {
-        return { failed: false };
+        if (completion.status === 'claim-lost') {
+          return HeartbeatTaskRunnerService.claimLostResult(task.id, execution.executionId);
+        }
+        throw new Error(`Heartbeat store saved an invalid agent record for task ${task.id}.`);
       }
 
       options.onEvent?.({
@@ -228,7 +240,7 @@ export class HeartbeatTaskRunnerService {
         record: completion.record,
         timestamp: completion.record.outcome?.finishedAt ?? result.state.finishedAt,
       });
-      return { record: completion.record, failed: false };
+      return HeartbeatTaskRunnerService.settledResult(task.id, execution.executionId, completion.record);
     } catch (error) {
       if (options.signal?.aborted) {
         return await HeartbeatTaskRunnerService.persistCancellation({
@@ -254,12 +266,19 @@ export class HeartbeatTaskRunnerService {
           execution,
         });
       }
-      if (failure.status !== 'saved') {
-        return { failed: false };
+      if (failure.status === 'claim-lost') {
+        return HeartbeatTaskRunnerService.claimLostResult(task.id, execution.executionId);
       }
 
       options.onEvent?.(HeartbeatTaskRunnerService.failedEvent(failure.task, execution, error, dayjs(settledAt).toISOString()));
-      return { failed: true };
+      return {
+        status: 'failed',
+        taskId: task.id,
+        executionId: execution.executionId,
+        error: HeartbeatTaskRunnerService.errorMessage(error),
+        task: failure.task,
+        failed: true,
+      };
     } finally {
       scopeController.abort();
     }
@@ -477,7 +496,7 @@ export class HeartbeatTaskRunnerService {
   private static async persistCancellation(args: Pick<RunDueHeartbeatTasksOptions, 'store' | 'now' | 'onEvent' | 'signal'> & {
     task: HeartbeatTask;
     execution: HeartbeatTaskExecution;
-  }): Promise<{ record?: HeartbeatTaskRunRecord; failed: boolean }> {
+  }): Promise<HeartbeatTaskExecutionResult> {
     const settledAt = args.now?.() ?? dayjs().toDate();
     const reason = heartbeatTaskCancellationReason(args.signal);
     const completion = await args.store.recordTaskExecutionOutcome({
@@ -488,8 +507,14 @@ export class HeartbeatTaskRunnerService {
       reason,
       finishedAt: settledAt,
     });
-    if (completion.status !== 'saved' || !HeartbeatTaskRunnerService.isNonAgentRecord(completion.record, 'cancelled')) {
-      return { failed: false };
+    if (completion.status === 'claim-lost') {
+      return HeartbeatTaskRunnerService.claimLostResult(args.task.id, args.execution.executionId);
+    }
+    if (completion.status === 'cancelled') {
+      return HeartbeatTaskRunnerService.cancelledResult(args.task.id, args.execution.executionId);
+    }
+    if (!HeartbeatTaskRunnerService.isNonAgentRecord(completion.record, 'cancelled')) {
+      throw new Error(`Heartbeat store saved an invalid cancelled record for task ${args.task.id}.`);
     }
 
     args.onEvent?.({
@@ -500,7 +525,53 @@ export class HeartbeatTaskRunnerService {
       record: completion.record,
       timestamp: completion.record.outcome.finishedAt,
     });
-    return { record: completion.record, failed: false };
+    return HeartbeatTaskRunnerService.cancelledResult(
+      args.task.id,
+      args.execution.executionId,
+      completion.record,
+    );
+  }
+
+  private static claimResult(
+    taskId: string,
+    claim: Exclude<HeartbeatTaskClaimResult, { status: 'claimed' }>,
+  ): HeartbeatTaskExecutionResult {
+    if (claim.status === 'not-due') {
+      return {
+        status: 'not-due',
+        taskId,
+        nextRunAt: claim.task.schedule.nextRunAt,
+        failed: false,
+      };
+    }
+    return { status: claim.status, taskId, failed: false };
+  }
+
+  private static settledResult(
+    taskId: string,
+    executionId: string,
+    record: HeartbeatTaskRunRecord,
+  ): HeartbeatTaskExecutionResult {
+    if (HeartbeatTaskRunnerService.isNonAgentRecord(record, 'retry')) {
+      return { status: 'retry', taskId, executionId, record, failed: false };
+    }
+    return { status: 'settled', taskId, executionId, record, failed: false };
+  }
+
+  private static claimLostResult(taskId: string, executionId: string): HeartbeatTaskExecutionResult {
+    return { status: 'claim-lost', taskId, executionId, failed: false };
+  }
+
+  private static cancelledResult(
+    taskId: string,
+    executionId?: string,
+    record?: HeartbeatTaskRunRecord,
+  ): HeartbeatTaskExecutionResult {
+    return { status: 'cancelled', taskId, executionId, record, failed: false };
+  }
+
+  private static errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
   }
 
   private static composeExecutionSignal(cancellationSignal: AbortSignal | undefined, scopeSignal: AbortSignal): AbortSignal {

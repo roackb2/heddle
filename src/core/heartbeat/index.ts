@@ -26,13 +26,17 @@ export type {
   HeartbeatTaskRunnerAgentOptions,
   HeartbeatTaskRunnerContext,
   HeartbeatTaskRunnerRuntimeOptions,
+  HeartbeatTaskExecutionResult,
   RunDueHeartbeatTasksOptions,
   RunDueHeartbeatTasksResult,
+  RunHeartbeatTaskOptions,
+  RunHeartbeatTaskResult,
   RunHeartbeatSchedulerOptions,
   StartHeartbeatSchedulerOptions,
   StopHeartbeatSchedulerOptions,
 } from './scheduler/index.js';
 export { FileHeartbeatTaskService, HeartbeatTaskStateProjector } from './tasks/index.js';
+export { HeartbeatTaskExecutionEligibilityPolicy } from './tasks/index.js';
 export { MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH } from './tasks/index.js';
 export type {
   CreateHeartbeatTaskInput,
@@ -42,6 +46,7 @@ export type {
   HeartbeatTask,
   HeartbeatTaskAgentRunRecord,
   HeartbeatTaskClaimResult,
+  HeartbeatTaskClaimMode,
   HeartbeatTaskContinuationMode,
   HeartbeatTaskExecution,
   HeartbeatTaskExecutionOutcome,
@@ -57,6 +62,8 @@ export type {
   HeartbeatTaskRunRequestSignal,
   HeartbeatTaskStatus,
   HeartbeatTaskStore,
+  HeartbeatTargetedTaskStore,
+  HeartbeatTaskExecutionEligibility,
   RequestHeartbeatTaskRunOptions,
   UpdateHeartbeatTaskInput,
 } from './tasks/index.js';

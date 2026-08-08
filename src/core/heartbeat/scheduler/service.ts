@@ -7,11 +7,11 @@
  */
 import { randomUUID } from 'node:crypto';
 import dayjs from 'dayjs';
-import isSameOrBefore from 'dayjs/plugin/isSameOrBefore.js';
 import orderBy from 'lodash/orderBy.js';
 import pLimit from 'p-limit';
 import {
   FileHeartbeatTaskService,
+  HeartbeatTaskExecutionEligibilityPolicy,
   type HeartbeatTask,
   type HeartbeatTaskRunRecord,
   type HeartbeatTaskRunRequestSignal,
@@ -23,14 +23,14 @@ import type {
   HeartbeatSchedulerHandle,
   RunDueHeartbeatTasksOptions,
   RunDueHeartbeatTasksResult,
+  RunHeartbeatTaskOptions,
+  RunHeartbeatTaskResult,
   RunHeartbeatSchedulerOptions,
   StartHeartbeatSchedulerOptions,
 } from './types.js';
 
 const DEFAULT_SCHEDULER_POLL_INTERVAL_MS = 60_000;
 const DEFAULT_MAX_CONCURRENT_TASKS = 1;
-
-dayjs.extend(isSameOrBefore);
 
 class HeartbeatSchedulerWakeController {
   private readonly pendingRequests = new Map<string, HeartbeatTaskRunRequestSignal>();
@@ -134,6 +134,51 @@ export class HeartbeatSchedulerService {
     return await HeartbeatSchedulerService.runDueTasksWithLifecycle(options);
   }
 
+  /**
+   * Executes exactly one durably due task for a request-driven worker.
+   *
+   * The host must route a task id and own any queue visibility, lease, retry,
+   * and recovery policy. This method intentionally performs no catalog scan,
+   * subscription, polling loop, or interrupted-owner recovery.
+   */
+  static async runTask(options: RunHeartbeatTaskOptions): Promise<RunHeartbeatTaskResult> {
+    HeartbeatTaskRunnerService.assertHandlerConfiguration(options);
+    if (options.signal?.aborted) {
+      return { status: 'cancelled', taskId: options.taskId, failed: false };
+    }
+
+    const now = options.now?.() ?? dayjs().toDate();
+    const task = await options.store.loadTask(options.taskId);
+    if (!task) {
+      return { status: 'not-found', taskId: options.taskId, failed: false };
+    }
+
+    const eligibility = HeartbeatTaskExecutionEligibilityPolicy.evaluate(task, now);
+    if (!eligibility.eligible) {
+      if (eligibility.reason === 'not-due') {
+        return {
+          status: 'not-due',
+          taskId: task.id,
+          nextRunAt: task.schedule.nextRunAt,
+          failed: false,
+        };
+      }
+      return { status: eligibility.reason, taskId: task.id, failed: false };
+    }
+
+    options.onEvent?.({
+      type: 'heartbeat.task.due',
+      taskId: task.id,
+      timestamp: dayjs(now).toISOString(),
+    });
+    return await HeartbeatTaskRunnerService.runTask({
+      ...options,
+      task,
+      runAt: now,
+      claimMode: 'due',
+    });
+  }
+
   private static async runDueTasksWithLifecycle(
     options: RunDueHeartbeatTasksOptions,
     taskLifecycle?: HeartbeatSchedulerTaskLifecycle,
@@ -168,6 +213,7 @@ export class HeartbeatSchedulerService {
             executionOwnerId,
             task,
             runAt: now,
+            claimMode: 'due',
             signal: HeartbeatSchedulerService.composeExecutionSignal(options.signal, taskSignal),
           });
         };
@@ -285,27 +331,10 @@ export class HeartbeatSchedulerService {
     });
   }
 
-  // Decides whether a task should be selected by the scheduler at the current time.
-  private static isTaskDue(task: HeartbeatTask, now: Date): boolean {
-    if (!task.enabled) {
-      return false;
-    }
-    if (task.state?.status === 'running') {
-      return false;
-    }
-
-    if (!task.schedule.nextRunAt) {
-      return true;
-    }
-
-    const nextRunAt = dayjs(task.schedule.nextRunAt);
-    return nextRunAt.isValid() && nextRunAt.isSameOrBefore(dayjs(now));
-  }
-
   /** Selects due work in oldest-due-first order, using task id as the stable tie-breaker. */
   private static selectDueTasks(tasks: HeartbeatTask[], now: Date): HeartbeatTask[] {
     return orderBy(
-      tasks.filter((task) => HeartbeatSchedulerService.isTaskDue(task, now)),
+      tasks.filter((task) => HeartbeatTaskExecutionEligibilityPolicy.isDue(task, now)),
       [
         (task) => HeartbeatSchedulerService.taskDueTime(task),
         (task) => task.id,
