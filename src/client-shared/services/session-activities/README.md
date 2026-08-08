@@ -12,7 +12,9 @@ after they receive API-provided live events.
 - Shared effects for final-answer, commentary, and reasoning-summary streams;
   each remains a distinct activity so clients can present them independently.
 - Active plan lifetime at the client edge: `plan.updated` sets the visible plan,
-  `loop.started` and `loop.finished` clear it.
+  the first non-empty `assistant.stream` chunk clears it as the final answer
+  becomes visible, and `loop.started` or `loop.finished` clear it as lifecycle
+  fallbacks.
 
 ## Does Not Own
 

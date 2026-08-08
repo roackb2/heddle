@@ -180,6 +180,56 @@ describe('ClientSharedSessionActivityService', () => {
     });
   });
 
+  it('clears the active plan only when visible final-answer text starts streaming', () => {
+    const effects: string[] = [];
+    const handlers = {
+      onPlanCleared: () => effects.push('plan cleared'),
+    };
+
+    ClientSharedSessionActivityService.applyActivity({
+      type: 'assistant.commentary',
+      runId: 'run-1',
+      source: 'agent-loop',
+      step: 1,
+      messageId: 'commentary-1',
+      text: 'Checking the implementation.',
+      done: false,
+      timestamp: '2026-06-03T00:00:00.000Z',
+    } as ControlPlaneSessionActivity, handlers);
+    ClientSharedSessionActivityService.applyActivity({
+      type: 'reasoning.summary',
+      runId: 'run-1',
+      source: 'agent-loop',
+      step: 2,
+      text: 'The plan is still useful while reasoning.',
+      done: false,
+      timestamp: '2026-06-03T00:00:01.000Z',
+    } as ControlPlaneSessionActivity, handlers);
+    ClientSharedSessionActivityService.applyActivity({
+      type: 'assistant.stream',
+      runId: 'run-1',
+      source: 'agent-loop',
+      step: 3,
+      text: '',
+      done: false,
+      timestamp: '2026-06-03T00:00:02.000Z',
+    } as ControlPlaneSessionActivity, handlers);
+
+    expect(effects).toEqual([]);
+
+    ClientSharedSessionActivityService.applyActivity({
+      type: 'assistant.stream',
+      runId: 'run-1',
+      source: 'agent-loop',
+      step: 3,
+      text: 'The implementation is complete.',
+      done: false,
+      timestamp: '2026-06-03T00:00:03.000Z',
+    } as ControlPlaneSessionActivity, handlers);
+
+    expect(effects).toEqual(['plan cleared']);
+  });
+
   it('projects recent edit diffs from successful edit_file completions', () => {
     const diffs: string[] = [];
 
