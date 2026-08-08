@@ -30,6 +30,7 @@ import { ControlPlanePromptController } from './control-plane-prompt-controller.
 import { ControlPlaneLiveEventReducer } from './control-plane-live-event-reducer.js';
 import { ControlPlaneApprovalController } from './control-plane-approval-controller.js';
 import { ControlPlaneRunController } from './control-plane-run-controller.js';
+import { ControlPlaneWorkspaceChangesController } from './control-plane-workspace-changes-controller.js';
 
 const ASSISTANT_STREAM_RENDER_INTERVAL_MS = 75;
 const RUN_STATE_POLL_INTERVAL_MS = 750;
@@ -61,6 +62,7 @@ export class ControlPlaneSessionStore {
   private readonly liveEvents: ControlPlaneLiveEventReducer;
   private readonly approvals: ControlPlaneApprovalController;
   private readonly runs: ControlPlaneRunController;
+  private readonly workspaceChanges: ControlPlaneWorkspaceChangesController;
 
   constructor(options: ControlPlaneSessionStoreOptions) {
     this.api = new ControlPlaneSessionApiService(options);
@@ -112,6 +114,11 @@ export class ControlPlaneSessionStore {
       poll: (address) => this.runs.pollRunState(address),
       onError: (error) => this.state.patch({ error: formatError(error) }),
     });
+    this.workspaceChanges = new ControlPlaneWorkspaceChangesController({
+      api: this.api,
+      state: this.state,
+      formatError,
+    });
     this.loader = new ControlPlaneSessionLoader({
       api: this.api,
       state: this.state,
@@ -130,6 +137,7 @@ export class ControlPlaneSessionStore {
       loader: this.loader,
       assistantStreamBuffer: this.assistantStreamBuffer,
       refreshPendingApproval: (sessionId) => this.approvals.refresh(sessionId),
+      refreshWorkspaceChanges: () => this.workspaceChanges.refresh(),
       notificationService: options.notificationService,
     });
     this.runs = new ControlPlaneRunController({
@@ -185,8 +193,11 @@ export class ControlPlaneSessionStore {
       const workspaceId = await this.api.resolveWorkspaceId(input.workspaceId);
       const modelOptions = await this.api.getModelOptions();
 
-      this.state.patch({ workspaceId, modelOptions });
-      await this.refreshSlashCommandCatalog(workspaceId);
+      this.state.patch({ workspaceId, modelOptions, workspaceChanges: [] });
+      await Promise.all([
+        this.refreshSlashCommandCatalog(workspaceId),
+        this.workspaceChanges.refresh(workspaceId),
+      ]);
       this.subscriptions.subscribeToSessionList(workspaceId);
       const sessions = await this.refreshSessions();
       const sessionId = input.sessionId ?? sessions[0]?.id ?? (await this.createSession()).id;

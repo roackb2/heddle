@@ -33,6 +33,10 @@ snapshot and call user-intent methods.
 - `control-plane-live-event-reducer.ts` owns reduction of control-plane live
   events into the TUI snapshot. Shared activity semantics stay in
   `client-shared`.
+- `control-plane-workspace-changes-controller.ts` owns coalesced refresh of the
+  control-plane's canonical Git workspace-change projection after shared
+  workspace-change activity triggers. It does not infer changes from terminal
+  output or create a second mutation ledger.
 
 ## Invariants
 

@@ -16,6 +16,7 @@ type ControlPlaneLiveEventReducerOptions = {
   loader: ControlPlaneSessionLoader;
   assistantStreamBuffer: AssistantStreamBufferService;
   refreshPendingApproval: (sessionId: string) => Promise<void>;
+  refreshWorkspaceChanges: () => Promise<void>;
   notificationService?: ControlPlaneTerminalNotificationService;
 };
 
@@ -141,6 +142,9 @@ export class ControlPlaneLiveEventReducer {
       },
       onPendingApprovalChanged: () => {
         void this.options.refreshPendingApproval(sessionId);
+      },
+      onWorkspaceChanged: () => {
+        void this.options.refreshWorkspaceChanges();
       },
       onPlanUpdated: (plan) => {
         this.options.state.patch({ activePlan: plan });

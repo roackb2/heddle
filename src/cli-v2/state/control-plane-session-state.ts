@@ -15,6 +15,7 @@ import type {
   ControlPlaneSessionView,
   ControlPlaneSlashCommandCatalog,
   ControlPlaneSlashCommandResult,
+  ControlPlaneWorkspaceChangedFile,
 } from '@/client-shared/api/types.js';
 import type { ControlPlaneSessionLatestUpdate } from '../services/activities/session-activity-service.js';
 import type { ControlPlaneTerminalNotificationService } from '../services/notifications/index.js';
@@ -55,6 +56,7 @@ export type ControlPlaneSessionStoreSnapshot = {
   currentActivity?: ClientSharedAgentActivityStatus;
   activePlan?: ClientSharedSessionPlan;
   recentEditDiffs: ClientSharedRecentEditDiff[];
+  workspaceChanges: ControlPlaneWorkspaceChangedFile[];
   latestUpdate?: ControlPlaneSessionLatestUpdate;
   slashCommandCatalog?: ControlPlaneSlashCommandCatalog;
   commandResults: ControlPlaneSlashCommandResult[];
@@ -81,6 +83,7 @@ export const INITIAL_CONTROL_PLANE_SESSION_SNAPSHOT: ControlPlaneSessionStoreSna
   cancelling: false,
   streamConnected: false,
   recentEditDiffs: [],
+  workspaceChanges: [],
   commandResults: [],
   commandResultExpanded: false,
 };

@@ -7,6 +7,7 @@ import { ApprovalPanel } from './components/ApprovalPanel.js';
 import { AgentPlanPanel } from './components/AgentPlanPanel.js';
 import { ComposerPanel } from './components/ComposerPanel.js';
 import { CommandResultPanel } from './components/CommandResultPanel.js';
+import { ChangedFilesPanel } from './components/ChangedFilesPanel.js';
 import { ConversationPanel } from './components/ConversationPanel.js';
 import { DirectShellConfirmationPanel } from './components/DirectShellConfirmationPanel.js';
 import { PromptStatusPanel } from './components/PromptStatusPanel.js';
@@ -149,6 +150,7 @@ export function App({
         onCancel={cancelRun}
       />
       <AgentPlanPanel plan={snapshot.activePlan} />
+      <ChangedFilesPanel files={snapshot.workspaceChanges} />
       <PromptStatusPanel
         currentActivity={snapshot.currentActivity}
         latestActivity={PromptActivityService.build(snapshot)}
