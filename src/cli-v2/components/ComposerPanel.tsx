@@ -57,11 +57,12 @@ export const ComposerPanel = React.memo(function ComposerPanel({
   } = usePromptDraft();
   const submitDisabled = snapshot.loading || snapshot.submitting || Boolean(snapshot.pendingDirectShellConfirmation);
   const inputDisabled = snapshot.loading || Boolean(snapshot.pendingDirectShellConfirmation) || Boolean(snapshot.pendingApproval);
+  const inlineCommandDraft = ClientSharedPromptInputService.normalizeInlineCommandDraft(draft);
   const slashCommandHints = [
-    ...SlashCommandAutocompleteService.filterHints(draft, localSlashCommandHints, { fallback: false }),
-    ...store.getSlashCommandHints(draft),
+    ...SlashCommandAutocompleteService.filterHints(inlineCommandDraft, localSlashCommandHints, { fallback: false }),
+    ...store.getSlashCommandHints(inlineCommandDraft),
   ];
-  const directShellDraft = ClientSharedPromptInputService.parseDirectShellDraft(draft);
+  const directShellDraft = ClientSharedPromptInputService.parseDirectShellDraft(inlineCommandDraft);
   const pickers = usePromptPickers({
     draft,
     snapshot,
@@ -87,10 +88,11 @@ export const ComposerPanel = React.memo(function ComposerPanel({
   });
 
   const submitPrompt = useCallback((value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) {
+    const preservedPrompt = value.trim();
+    if (!preservedPrompt) {
       return;
     }
+    const inlineCommandDraft = ClientSharedPromptInputService.normalizeInlineCommandDraft(preservedPrompt);
 
     if (pickers.submitSelection()) {
       return;
@@ -101,14 +103,14 @@ export const ComposerPanel = React.memo(function ComposerPanel({
     }
 
     clearDraft();
-    if (onLocalSlashCommand?.(trimmed)) {
+    if (onLocalSlashCommand?.(inlineCommandDraft)) {
       return;
     }
 
-    if (!trimmed.startsWith('/')) {
-      recordSubmittedPrompt(trimmed);
+    if (!inlineCommandDraft.startsWith('/')) {
+      recordSubmittedPrompt(preservedPrompt);
     }
-    void store.submitPrompt(value);
+    void store.submitPrompt(preservedPrompt);
   }, [
     clearDraft,
     onLocalSlashCommand,

@@ -32,6 +32,14 @@ const DEFAULT_MAX_PROMPT_UNDO_STATES = 100;
  * draft that was in progress before browsing history.
  */
 export class ClientSharedPromptInputService {
+  /**
+   * Produces the one-line representation used only to recognize and execute
+   * interface commands. Normal prompts must keep their original line breaks.
+   */
+  static normalizeInlineCommandDraft(value: string): string {
+    return value.trim().replace(/\s+/g, ' ');
+  }
+
   static parseDirectShellDraft(value: string): ClientSharedDirectShellDraft | undefined {
     const trimmed = value.trim();
     if (!trimmed.startsWith('!')) {

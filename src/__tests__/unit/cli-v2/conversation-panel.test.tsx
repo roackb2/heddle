@@ -37,7 +37,7 @@ describe('cli-v2 ConversationPanel', () => {
         session={createSessionDetail({
           messages: [
             { id: 'message-1', role: 'assistant', text: 'Ready.' },
-            { id: 'message-2', role: 'user', text: 'What changed?', isPending: true },
+            { id: 'message-2', role: 'user', text: 'What changed?\nThen inspect the tests.', isPending: true },
             {
               id: 'message-3',
               role: 'assistant',
@@ -60,6 +60,7 @@ describe('cli-v2 ConversationPanel', () => {
     expect(view.container.textContent).toContain('You');
     expect(view.container.textContent).not.toContain('You (queued)');
     expect(view.container.textContent).toContain('What changed?');
+    expect(view.container.textContent).toContain('Then inspect the tests.');
     expect(view.container.textContent).toContain('done shell git status --short');
     expect(view.container.textContent).toContain('local workspace inspection');
     expect(view.container.textContent).toContain('stdout');
