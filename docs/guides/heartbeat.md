@@ -322,25 +322,24 @@ cancellation and idempotent host-owned side effects.
 
 ## Examples
 
-Try a small local heartbeat example:
+Follow the [progressive heartbeat SDK examples](../../examples/heartbeat/README.md)
+when embedding heartbeat in a TypeScript host. They start with one durable
+cycle, then add a long-lived worker, domain claim/acknowledgement, and an
+event-driven durable wake-up. Each stage states the Heddle/host ownership split,
+the supported topology, and its next step.
 
 ```bash
-export OPENAI_API_KEY=your_key_here
-yarn example:heartbeat
+yarn example:heartbeat:one-cycle
+yarn example:heartbeat:worker
+yarn example:heartbeat:domain-handler
+yarn example:heartbeat:events
+yarn example:heartbeat:smoke # deterministic; makes no model request
 ```
 
-Try the local scheduler API with a real LLM:
-
-```bash
-export OPENAI_API_KEY=your_key_here
-yarn example:heartbeat-scheduler
-```
-
-The scheduler example demonstrates claim, no-work skip, dynamic prompt/tools,
-agent execution, and host acknowledgement while leaving credentials entirely
-inside Heddle. It works with stored OpenAI login state or provider API-key
-environment variables. Set `HEDDLE_EXAMPLE_NO_WORK=true` to exercise the
-zero-model skip path.
+The legacy `example:heartbeat` and `example:heartbeat-scheduler` commands stay
+as compatibility entrypoints to stages 01 and 03. Stages that call `runAgent()`
+need a configured model credential; set `HEDDLE_EXAMPLE_NO_WORK=true` for the
+stage-03 no-work branch.
 
 ## Host Notes
 
@@ -353,5 +352,6 @@ The built-in heartbeat command edge uses the same control-plane heartbeat APIs a
 ## See Also
 
 - [Programmatic hosts](programmatic/README.md)
+- [Heartbeat SDK examples](../../examples/heartbeat/README.md)
 - [CLI reference](../reference/cli.md)
 - [Control plane](control-plane.md)
