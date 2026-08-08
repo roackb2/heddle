@@ -35,6 +35,9 @@
   compaction/workspace behavior, or when web-v2 and programmatic hosts should
   observe the same command semantics.
 - `components/`: terminal rendering components.
+- The Changed files panel renders the control-plane's canonical Git workspace
+  projection. It refreshes from shared workspace-change activity triggers and
+  deliberately bounds the visible list for terminal readability.
 - `main.ts`: public terminal bootstrap and command routing.
 - `index.tsx`: interactive TUI entrypoint that receives a tRPC URL from
   `main.ts` or another terminal host bootstrap.

@@ -29,6 +29,7 @@ export function PromptStatusPanel({ currentActivity, latestActivity }: PromptSta
 
   return (
     <Box flexDirection="column" marginTop={1}>
+      <Text bold>Current Activity</Text>
       {latestActivity ? <Text color={latestActivity.color}>{latestActivity.text}</Text> : null}
       {currentActivity ? (
         <Text color={currentActivity.tone === 'warning' ? 'yellow' : 'cyan'}>

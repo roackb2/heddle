@@ -10,6 +10,7 @@ import type {
   ControlPlaneSessionSendPromptAsyncResult,
   ControlPlaneSessionView,
   ControlPlaneSessionsEventEnvelope,
+  ControlPlaneWorkspaceChanges,
 } from '../../../client-shared/api/types.js';
 import { createControlPlaneRequestContext } from '../../../client-shared/api/links.js';
 import { SLASH_COMMAND_REQUEST_TIMEOUT_MS } from '../../../cli-v2/services/sessions/control-plane-session-api-service.js';
@@ -28,6 +29,7 @@ describe('ControlPlaneSessionStore', () => {
     expect(fixture.calls.slashCommandCatalogQuery).toHaveBeenCalledTimes(1);
     expect(fixture.calls.slashCommandCatalogQuery).toHaveBeenCalledWith({ workspaceId: 'workspace-1' });
     expect(fixture.calls.sessionsQuery).toHaveBeenCalledWith({ workspaceId: 'workspace-1' });
+    expect(fixture.calls.workspaceChangesQuery).toHaveBeenCalledWith({ workspaceId: 'workspace-1' });
     expect(fixture.calls.sessionQuery).toHaveBeenCalledWith({ id: 'session-1', workspaceId: 'workspace-1' });
     expect(fixture.calls.sessionRuntimeContextQuery).toHaveBeenCalledWith({
       sessionId: 'session-1',
@@ -47,6 +49,35 @@ describe('ControlPlaneSessionStore', () => {
     expect(store.getSnapshot().activeSession?.messages).toEqual([
       { id: 'message-1', role: 'assistant', text: 'Ready.' },
     ]);
+    store.dispose();
+  });
+
+  it('refreshes the canonical workspace change list after a live workspace-changing activity', async () => {
+    const fixture = createClientFixture();
+    const store = new ControlPlaneSessionStore({ client: fixture.client });
+    await store.start();
+    fixture.calls.workspaceChangesQuery.mockResolvedValueOnce(createWorkspaceChanges([
+      { path: 'src/changed.ts', status: 'modified' },
+    ]));
+
+    fixture.emitRunActivity({
+      source: 'agent-loop',
+      type: 'tool.completed',
+      runId: 'run-1',
+      step: 1,
+      tool: 'edit_file',
+      toolCallId: 'call-1',
+      durationMs: 8,
+      result: { path: 'src/changed.ts' },
+      timestamp: new Date().toISOString(),
+    });
+
+    await vi.waitFor(() => {
+      expect(store.getSnapshot().workspaceChanges).toEqual([
+        expect.objectContaining({ path: 'src/changed.ts', status: 'modified' }),
+      ]);
+    });
+    expect(fixture.calls.workspaceChangesQuery).toHaveBeenCalledTimes(2);
     store.dispose();
   });
 
@@ -1095,6 +1126,7 @@ function createClientFixture(options: {
       workspaceId: 'workspace-1',
       files: [{ path: 'src/example.ts' }],
     })),
+    workspaceChangesQuery: vi.fn(async () => createWorkspaceChanges()),
     sessionContinueMutate: vi.fn(async () => ({
       outcome: 'done',
       summary: 'Continued.',
@@ -1140,6 +1172,7 @@ function createClientFixture(options: {
       slashCommandCatalog: { query: calls.slashCommandCatalogQuery },
       slashCommandExecute: { mutate: calls.slashCommandExecuteMutate },
       workspaceFileSearch: { query: calls.workspaceFileSearchQuery },
+      workspaceChanges: { query: calls.workspaceChangesQuery },
       sessionContinue: { mutate: calls.sessionContinueMutate },
       sessionCancel: { mutate: calls.sessionCancelMutate },
       sessionResolveApproval: { mutate: calls.sessionResolveApprovalMutate },
@@ -1365,6 +1398,17 @@ function createAcceptedResult(): ControlPlaneSessionSendPromptAsyncResult {
     sessionId: 'session-1',
     runId: 'session-run-1',
     acceptedAt: '2026-05-27T00:00:00.000Z',
+  };
+}
+
+function createWorkspaceChanges(
+  files: ControlPlaneWorkspaceChanges['files'] = [],
+): ControlPlaneWorkspaceChanges {
+  return {
+    workspaceId: 'workspace-1',
+    vcs: 'git',
+    clean: files.length === 0,
+    files,
   };
 }
 

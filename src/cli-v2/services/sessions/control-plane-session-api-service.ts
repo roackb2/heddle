@@ -104,6 +104,10 @@ export class ControlPlaneSessionApiService {
     return this.client.controlPlane.workspaceFileSearch.query(input);
   }
 
+  async getWorkspaceChanges(workspaceId: string) {
+    return this.client.controlPlane.workspaceChanges.query({ workspaceId });
+  }
+
   async sendPrompt(input: Pick<
     SessionSendPromptInput,
     'workspaceId' | 'sessionId' | 'prompt' | 'agentProfileId' | 'includePlanTool' | 'memoryMaintenanceMode'
