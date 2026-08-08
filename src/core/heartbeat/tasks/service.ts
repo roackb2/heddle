@@ -56,6 +56,20 @@ export type UpdateHeartbeatTaskInput = {
   systemContext?: string;
 };
 
+export type ReconcileHeartbeatTasksInput = {
+  /** Prefix that limits this reconciliation to tasks owned by one host concern. */
+  namespace: string;
+  /** Desired members of the namespace. Existing members retain their stored configuration and state. */
+  desired: readonly HeartbeatTask[];
+};
+
+export type ReconcileHeartbeatTasksResult = {
+  created: HeartbeatTask[];
+  deleted: HeartbeatTask[];
+  /** Running tasks retained without rewriting their execution claim or state. */
+  preservedRunning: HeartbeatTask[];
+};
+
 /**
  * Heartbeat task service.
  *
@@ -399,6 +413,36 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
     });
   }
 
+  /**
+   * Reconciles membership for one host-owned task namespace under the same
+   * mutation boundary used by scheduler claims and task control operations.
+   *
+   * It only creates missing desired tasks and deletes obsolete non-running
+   * tasks. Existing tasks are left intact so reconciliation cannot erase an
+   * operator change, run-request generation, checkpoint association, or live
+   * execution fencing token. Call the explicit task update APIs when a host
+   * needs to change an existing task's configuration.
+   */
+  async reconcileTasks(input: ReconcileHeartbeatTasksInput): Promise<ReconcileHeartbeatTasksResult> {
+    FileHeartbeatTaskService.assertReconciliationInput(input);
+
+    return await this.mutationMutex.runExclusive(async () => {
+      const currentTasks = await this.repository.listTasks();
+      const currentById = new Map(currentTasks.map((task) => [task.id, task]));
+      const desiredById = new Map(input.desired.map((task) => [task.id, task]));
+      const namespaceTasks = currentTasks.filter((task) => task.id.startsWith(input.namespace));
+      const created = [...desiredById.values()].filter((task) => !currentById.has(task.id));
+      const obsolete = namespaceTasks.filter((task) => !desiredById.has(task.id));
+      const preservedRunning = namespaceTasks.filter((task) => task.state?.status === 'running');
+      const deleted = obsolete.filter((task) => task.state?.status !== 'running');
+
+      await Promise.all(created.map(async (task) => await this.repository.saveTask(task)));
+      await Promise.all(deleted.map(async (task) => await this.repository.deleteTask(task)));
+
+      return { created, deleted, preservedRunning };
+    });
+  }
+
   async updateTask(taskId: string, input: UpdateHeartbeatTaskInput) {
     const nextTask = await this.updateStoredTask(taskId, (task) => {
       const now = dayjs();
@@ -671,7 +715,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
 
   private static resolveHeartbeatRoot(options: FileHeartbeatTaskServiceOptions): string {
     if ('dir' in options) {
-      return options.dir;
+      return resolve(options.dir);
     }
 
     if ('stateRoot' in options) {
@@ -706,6 +750,20 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       throw new Error(`Heartbeat run-request reason must be at most ${MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH} characters.`);
     }
     return normalized;
+  }
+
+  private static assertReconciliationInput(input: ReconcileHeartbeatTasksInput): void {
+    if (!input.namespace) {
+      throw new Error('Heartbeat reconciliation namespace cannot be empty.');
+    }
+
+    const desiredIds = input.desired.map((task) => task.id);
+    if (new Set(desiredIds).size !== desiredIds.length) {
+      throw new Error(`Heartbeat reconciliation namespace ${input.namespace} contains duplicate task IDs.`);
+    }
+    if (desiredIds.some((taskId) => !taskId.startsWith(input.namespace))) {
+      throw new Error(`Heartbeat reconciliation desired task IDs must start with namespace ${input.namespace}.`);
+    }
   }
 
   private static consumePendingRunRequest(
