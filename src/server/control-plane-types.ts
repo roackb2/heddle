@@ -355,7 +355,7 @@ export type ControlPlaneHeartbeatEvent =
     timestamp: string;
   }
   | {
-    type: 'heartbeat.task.skipped' | 'heartbeat.task.cancelled';
+    type: 'heartbeat.task.skipped' | 'heartbeat.task.cancelled' | 'heartbeat.task.retry' | 'heartbeat.task.blocked';
     taskId: string;
     executionId: string;
     record: HeartbeatRunView;

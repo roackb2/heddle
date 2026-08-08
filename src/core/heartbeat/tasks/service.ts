@@ -6,7 +6,11 @@ import omit from 'lodash/omit.js';
 import orderBy from 'lodash/orderBy.js';
 import { FileHeartbeatTaskRepository } from './repository.js';
 import { HeartbeatTaskStateProjector } from './task-state.js';
-import { MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH } from './types.js';
+import {
+  MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH,
+  MAX_HEARTBEAT_HANDLER_RETRY_MS,
+  MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH,
+} from './types.js';
 import type {
   FileHeartbeatTaskRepositoryOptions,
   HeartbeatTask,
@@ -296,17 +300,35 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       }
 
       const execution = currentTask.state?.execution ?? input.execution;
+      const summary = input.kind === 'retry' || input.kind === 'blocked' ?
+        FileHeartbeatTaskService.normalizeHandlerOutcomeSummary(input.summary)
+      : input.summary;
       const projectors = {
         skipped: () => HeartbeatTaskStateProjector.afterSkip({
           task: currentTask,
           execution,
-          summary: input.summary,
+          summary,
+          now: input.finishedAt,
+        }),
+        retry: () => HeartbeatTaskStateProjector.afterHandlerRetry({
+          task: currentTask,
+          execution,
+          summary,
+          agentRunId: FileHeartbeatTaskService.requireOutcomeAgentRunId(input),
+          retryMs: FileHeartbeatTaskService.requireOutcomeRetryMs(input),
+          now: input.finishedAt,
+        }),
+        blocked: () => HeartbeatTaskStateProjector.afterHandlerBlock({
+          task: currentTask,
+          execution,
+          summary,
+          agentRunId: FileHeartbeatTaskService.requireOutcomeAgentRunId(input),
           now: input.finishedAt,
         }),
         cancelled: () => HeartbeatTaskStateProjector.afterCancellation({
           task: currentTask,
           execution,
-          summary: input.summary,
+          summary,
           reason: input.reason,
           now: input.finishedAt,
         }),
@@ -670,6 +692,7 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
       kind: outcome.kind,
       summary: outcome.summary,
       outcome: outcome.kind,
+      agentRunId: outcome.kind === 'retry' || outcome.kind === 'blocked' ? outcome.agentRunId : undefined,
     };
   }
 
@@ -764,6 +787,38 @@ export class FileHeartbeatTaskService implements HeartbeatTaskStore {
     if (desiredIds.some((taskId) => !taskId.startsWith(input.namespace))) {
       throw new Error(`Heartbeat reconciliation desired task IDs must start with namespace ${input.namespace}.`);
     }
+  }
+
+  private static requireOutcomeAgentRunId(input: {
+    taskId: string;
+    kind: string;
+    agentRunId?: string;
+  }): string {
+    if (!input.agentRunId) {
+      throw new Error(`Heartbeat task ${input.taskId} ${input.kind} outcome requires its nested agent run id.`);
+    }
+    return input.agentRunId;
+  }
+
+  private static requireOutcomeRetryMs(input: {
+    taskId: string;
+    retryMs?: number;
+  }): number {
+    if (input.retryMs === undefined) {
+      throw new Error(`Heartbeat task ${input.taskId} retry outcome requires a delay.`);
+    }
+    if (!Number.isSafeInteger(input.retryMs) || input.retryMs < 1 || input.retryMs > MAX_HEARTBEAT_HANDLER_RETRY_MS) {
+      throw new Error(`Heartbeat task ${input.taskId} retry delay must be a positive integer no greater than ${MAX_HEARTBEAT_HANDLER_RETRY_MS} milliseconds.`);
+    }
+    return input.retryMs;
+  }
+
+  private static normalizeHandlerOutcomeSummary(summary: string): string {
+    const normalized = summary.trim();
+    if (!normalized || normalized.length > MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH) {
+      throw new Error(`Heartbeat retry and blocked summaries must be non-empty and at most ${MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH} characters.`);
+    }
+    return normalized;
   }
 
   private static consumePendingRunRequest(

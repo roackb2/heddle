@@ -45,6 +45,8 @@ describe('custom heartbeat runner credentials', () => {
       'signal',
       'runAgent',
       'skip',
+      'retry',
+      'block',
     ]);
     expect(execution.result).toMatchObject({ checked: 1, ran: 1, failed: 0 });
     expect(createAdapter).toHaveBeenCalledWith(expect.objectContaining({

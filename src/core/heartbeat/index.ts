@@ -8,6 +8,9 @@ export type {
 export {
   HeartbeatSchedulerService,
   HeartbeatTaskRunnerService,
+  DEFAULT_HEARTBEAT_HANDLER_RETRY_MS,
+  MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH,
+  MAX_HEARTBEAT_HANDLER_RETRY_MS,
   MAX_HEARTBEAT_CANCELLATION_REASON_LENGTH,
 } from './scheduler/index.js';
 export type {

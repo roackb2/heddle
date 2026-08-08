@@ -111,7 +111,9 @@ export class HeartbeatLucidPresenter {
         ];
       }
       case 'heartbeat.task.skipped':
-      case 'heartbeat.task.cancelled': {
+      case 'heartbeat.task.cancelled':
+      case 'heartbeat.task.retry':
+      case 'heartbeat.task.blocked': {
         const { task, outcome } = event.record;
         return [
           HeartbeatLucidPresenter.statusMessage(agentId, HeartbeatLucidPresenter.taskStatusToLucidStatus(task.state?.status ?? 'waiting'), event.timestamp),

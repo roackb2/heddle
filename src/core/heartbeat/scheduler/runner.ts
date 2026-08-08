@@ -30,6 +30,11 @@ import type {
   RunDueHeartbeatTasksOptions,
   RunDueHeartbeatTasksResult,
 } from './types.js';
+import {
+  DEFAULT_HEARTBEAT_HANDLER_RETRY_MS,
+  MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH,
+  MAX_HEARTBEAT_HANDLER_RETRY_MS,
+} from './types.js';
 import { heartbeatTaskCancellationReason } from './task-lifecycle.js';
 
 const DEFAULT_FAILURE_RETRY_MS = 5 * 60_000;
@@ -148,6 +153,54 @@ export class HeartbeatTaskRunnerService {
         return { record: completion.record, failed: false };
       }
 
+      if (HeartbeatTaskRunnerService.isExplicitHandlerOutcome(result)) {
+        const completion = await options.store.recordTaskExecutionOutcome({
+          execution,
+          taskId: task.id,
+          kind: result.kind,
+          summary: result.summary,
+          agentRunId: result.agentRunId,
+          retryMs: result.kind === 'retry' ? result.delayMs : undefined,
+          finishedAt: settledAt,
+          signal: options.signal,
+        });
+        if (completion.status === 'cancelled') {
+          return await HeartbeatTaskRunnerService.persistCancellation({
+            ...options,
+            task: runningTask,
+            execution,
+          });
+        }
+        if (completion.status !== 'saved') {
+          return { failed: false };
+        }
+
+        if (result.kind === 'retry') {
+          if (!HeartbeatTaskRunnerService.isNonAgentRecord(completion.record, 'retry')) {
+            return { failed: false };
+          }
+          options.onEvent?.({
+            type: 'heartbeat.task.retry',
+            taskId: task.id,
+            executionId: execution.executionId,
+            record: completion.record,
+            timestamp: completion.record.outcome.finishedAt,
+          });
+        } else {
+          if (!HeartbeatTaskRunnerService.isNonAgentRecord(completion.record, 'blocked')) {
+            return { failed: false };
+          }
+          options.onEvent?.({
+            type: 'heartbeat.task.blocked',
+            taskId: task.id,
+            executionId: execution.executionId,
+            record: completion.record,
+            timestamp: completion.record.outcome.finishedAt,
+          });
+        }
+        return { record: completion.record, failed: false };
+      }
+
       const completion = await options.store.completeTaskExecution({
         execution,
         taskId: task.id,
@@ -249,6 +302,7 @@ export class HeartbeatTaskRunnerService {
     let agentInvocation: Promise<AgentHeartbeatResult> | undefined;
     let agentResult: AgentHeartbeatResult | undefined;
     let skipSelected = false;
+    let explicitOutcome: HeartbeatHandlerOutcome | undefined;
 
     const context: HeartbeatExecutionContext = Object.freeze({
       task: structuredClone(args.task),
@@ -258,8 +312,8 @@ export class HeartbeatTaskRunnerService {
       signal: args.signal,
       runAgent: async (options?: HeartbeatTaskRunnerAgentOptions) => {
         HeartbeatTaskRunnerService.assertContextActive(active, args.execution.executionId);
-        if (skipSelected) {
-          throw new Error('Cannot run an agent after selecting a skipped heartbeat outcome.');
+        if (skipSelected || explicitOutcome) {
+          throw new Error('Cannot run an agent after selecting a heartbeat execution outcome.');
         }
         if (agentInvocation) {
           throw new Error('Heartbeat execution context runAgent() may be called only once.');
@@ -287,6 +341,37 @@ export class HeartbeatTaskRunnerService {
         skipSelected = true;
         return Object.freeze({ kind: 'skipped' as const, summary });
       },
+      retry: (input: { summary: string; delayMs?: number }) => {
+        HeartbeatTaskRunnerService.assertContextActive(active, args.execution.executionId);
+        const result = HeartbeatTaskRunnerService.requireCompletedAgentResult(agentResult);
+        if (skipSelected || explicitOutcome) {
+          throw new Error('Heartbeat execution context may select only one outcome.');
+        }
+
+        const outcome = Object.freeze({
+          kind: 'retry' as const,
+          summary: HeartbeatTaskRunnerService.normalizeHandlerOutcomeSummary(input.summary),
+          delayMs: HeartbeatTaskRunnerService.normalizeHandlerRetryDelay(input.delayMs),
+          agentRunId: result.state.runId,
+        });
+        explicitOutcome = outcome;
+        return outcome;
+      },
+      block: (input: { summary: string }) => {
+        HeartbeatTaskRunnerService.assertContextActive(active, args.execution.executionId);
+        const result = HeartbeatTaskRunnerService.requireCompletedAgentResult(agentResult);
+        if (skipSelected || explicitOutcome) {
+          throw new Error('Heartbeat execution context may select only one outcome.');
+        }
+
+        const outcome = Object.freeze({
+          kind: 'blocked' as const,
+          summary: HeartbeatTaskRunnerService.normalizeHandlerOutcomeSummary(input.summary),
+          agentRunId: result.state.runId,
+        });
+        explicitOutcome = outcome;
+        return outcome;
+      },
     });
 
     const legacyRunner = args.runner;
@@ -307,6 +392,15 @@ export class HeartbeatTaskRunnerService {
           throw new Error('Custom heartbeat handlers must return the outcome created by context.skip().');
         }
         return result;
+      }
+      if (HeartbeatTaskRunnerService.isExplicitHandlerOutcome(result)) {
+        if (!agentInvocation || !agentResult || result !== explicitOutcome) {
+          throw new Error('Custom heartbeat handlers must return the retry or blocked outcome created by their execution context after runAgent() settles.');
+        }
+        return result;
+      }
+      if (explicitOutcome) {
+        throw new Error('Custom heartbeat handlers must return the retry or blocked outcome created by their execution context after selecting it.');
       }
       if (!HeartbeatTaskRunnerService.isAgentResult(result)) {
         throw new Error('Custom heartbeat handler returned an unsupported execution outcome.');
@@ -429,6 +523,10 @@ export class HeartbeatTaskRunnerService {
     return Boolean(value && typeof value === 'object' && 'kind' in value && value.kind === 'skipped');
   }
 
+  private static isExplicitHandlerOutcome(value: unknown): value is Extract<HeartbeatHandlerOutcome, { kind: 'retry' | 'blocked' }> {
+    return Boolean(value && typeof value === 'object' && 'kind' in value && (value.kind === 'retry' || value.kind === 'blocked'));
+  }
+
   private static isAgentResult(value: unknown): value is AgentHeartbeatResult {
     return Boolean(
       value
@@ -444,11 +542,37 @@ export class HeartbeatTaskRunnerService {
     return Boolean(record?.result);
   }
 
-  private static isNonAgentRecord<K extends 'skipped' | 'cancelled'>(
+  private static isNonAgentRecord<K extends 'skipped' | 'cancelled' | 'retry' | 'blocked'>(
     record: HeartbeatTaskRunRecord | undefined,
     kind: K,
   ): record is HeartbeatTaskNonAgentRunRecord & { outcome: { kind: K } } {
     return Boolean(record && !record.result && record.outcome?.kind === kind);
+  }
+
+  private static requireCompletedAgentResult(result: AgentHeartbeatResult | undefined): AgentHeartbeatResult {
+    if (!result) {
+      throw new Error('Heartbeat execution context retry() and block() require context.runAgent() to settle first.');
+    }
+    return result;
+  }
+
+  private static normalizeHandlerOutcomeSummary(summary: string): string {
+    const normalized = summary.trim();
+    if (!normalized) {
+      throw new Error('A heartbeat retry or blocked outcome requires a non-empty, non-secret summary.');
+    }
+    if (normalized.length > MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH) {
+      throw new Error(`Heartbeat retry and blocked summaries must be at most ${MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH} characters.`);
+    }
+    return normalized;
+  }
+
+  private static normalizeHandlerRetryDelay(delayMs: number | undefined): number {
+    const resolvedDelayMs = delayMs ?? DEFAULT_HEARTBEAT_HANDLER_RETRY_MS;
+    if (!Number.isSafeInteger(resolvedDelayMs) || resolvedDelayMs < 1 || resolvedDelayMs > MAX_HEARTBEAT_HANDLER_RETRY_MS) {
+      throw new Error(`Heartbeat retry delay must be a positive integer no greater than ${MAX_HEARTBEAT_HANDLER_RETRY_MS} milliseconds.`);
+    }
+    return resolvedDelayMs;
   }
 
   private static startedEvent(

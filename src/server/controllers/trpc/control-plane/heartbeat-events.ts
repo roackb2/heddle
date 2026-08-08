@@ -68,6 +68,8 @@ export class ControlPlaneHeartbeatEventsController {
       event.type === 'heartbeat.task.finished'
       || event.type === 'heartbeat.task.skipped'
       || event.type === 'heartbeat.task.cancelled'
+      || event.type === 'heartbeat.task.retry'
+      || event.type === 'heartbeat.task.blocked'
     ) {
       return {
         ...event,

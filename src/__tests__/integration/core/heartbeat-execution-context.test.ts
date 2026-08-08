@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LlmAdapterService } from '@/core/llm/index.js';
 import {
   FileHeartbeatTaskService,
+  DEFAULT_HEARTBEAT_HANDLER_RETRY_MS,
   HeartbeatRunnerAgent,
   HeartbeatSchedulerService,
   type AgentHeartbeatResult,
@@ -311,6 +312,252 @@ describe('heartbeat execution context', () => {
       },
     });
     expect(legacy).toMatchObject({ ran: 1, failed: 0 });
+  });
+
+  it('persists explicit retry outcomes without installing rejected agent results or replacing checkpoints', async () => {
+    const dir = createStateRoot('explicit-retry');
+    const store = new FileHeartbeatTaskService({ dir });
+    const defaultDelayTask = createTask('default-retry');
+    const selectedDelayDir = createStateRoot('selected-retry');
+    const selectedDelayStore = new FileHeartbeatTaskService({ dir: selectedDelayDir });
+    const selectedDelayTask = createTask('selected-retry');
+    const priorCheckpoint = createHeartbeatResult('pause', 'prior-retry-run').checkpoint;
+    await Promise.all([
+      store.saveTask(defaultDelayTask),
+      store.saveCheckpoint(defaultDelayTask, priorCheckpoint),
+      selectedDelayStore.saveTask(selectedDelayTask),
+    ]);
+    const rejectedDefaultResult = createHeartbeatResult('continue', 'rejected-default-agent-run');
+    const rejectedSelectedResult = createHeartbeatResult('continue', 'rejected-selected-agent-run');
+    const runAgent = vi.spyOn(HeartbeatRunnerAgent, 'run')
+      .mockResolvedValueOnce(rejectedDefaultResult)
+      .mockResolvedValueOnce(rejectedSelectedResult);
+    const events: HeartbeatSchedulerEvent[] = [];
+
+    const defaultDelay = await HeartbeatSchedulerService.runDueTasks({
+      store,
+      now: () => NOW,
+      handler: async (context) => {
+        await context.runAgent();
+        return context.retry({ summary: '  Host settlement rejected this run.  ' });
+      },
+      onEvent: (event) => events.push(event),
+    });
+    expect(defaultDelay).toMatchObject({ checked: 1, ran: 1, failed: 0 });
+    expect(runAgent).toHaveBeenCalledOnce();
+
+    await expect(store.loadCheckpoint(defaultDelayTask)).resolves.toEqual(priorCheckpoint);
+    await expect(store.requireTask(defaultDelayTask.id)).resolves.toMatchObject({
+      schedule: { nextRunAt: new Date(NOW.valueOf() + DEFAULT_HEARTBEAT_HANDLER_RETRY_MS).toISOString() },
+      state: {
+        status: 'waiting',
+        lastExecution: {
+          kind: 'retry',
+          summary: 'Host settlement rejected this run.',
+          agentRunId: rejectedDefaultResult.state.runId,
+        },
+      },
+    });
+    const retriedTask = await store.requireTask(defaultDelayTask.id);
+    expect(retriedTask.state?.result).toBeUndefined();
+    expect(retriedTask.state?.runId).toBeUndefined();
+
+    const selectedDelay = await HeartbeatSchedulerService.runDueTasks({
+      store: selectedDelayStore,
+      now: () => NOW,
+      handler: async (context) => {
+        await context.runAgent();
+        return context.retry({ summary: 'Retry after the host settles.', delayMs: 1_234 });
+      },
+    });
+    expect(selectedDelay).toMatchObject({ ran: 1, failed: 0 });
+    expect(runAgent).toHaveBeenCalledTimes(2);
+    await expect(selectedDelayStore.requireTask(selectedDelayTask.id)).resolves.toMatchObject({
+      schedule: { nextRunAt: '2026-08-01T05:00:01.234Z' },
+      state: { lastExecution: { kind: 'retry', agentRunId: rejectedSelectedResult.state.runId } },
+    });
+
+    const [retryRecord] = await store.listRunRecords({ taskId: defaultDelayTask.id });
+    expect(retryRecord).toMatchObject({
+      executionId: expect.any(String),
+      runId: undefined,
+      record: {
+        outcome: {
+          kind: 'retry',
+          agentRunId: rejectedDefaultResult.state.runId,
+          summary: 'Host settlement rejected this run.',
+        },
+      },
+    });
+    expect(retryRecord?.record.result).toBeUndefined();
+    expect(FileHeartbeatTaskService.projectRunRecordView(retryRecord!.record).result).toMatchObject({
+      kind: 'retry',
+      agentRunId: rejectedDefaultResult.state.runId,
+    });
+    expect(events.filter((event) => event.type === 'heartbeat.task.retry')).toHaveLength(1);
+  });
+
+  it('blocks rejected nested agent results until an explicit resume', async () => {
+    const dir = createStateRoot('explicit-block');
+    const store = new FileHeartbeatTaskService({ dir });
+    const task = createTask('block-me');
+    const priorCheckpoint = createHeartbeatResult('pause', 'prior-block-run').checkpoint;
+    const rejectedResult = createHeartbeatResult('escalate', 'rejected-block-agent-run');
+    await Promise.all([
+      store.saveTask(task),
+      store.saveCheckpoint(task, priorCheckpoint),
+    ]);
+    vi.spyOn(HeartbeatRunnerAgent, 'run').mockResolvedValue(rejectedResult);
+    const events: HeartbeatSchedulerEvent[] = [];
+
+    await expect(HeartbeatSchedulerService.runDueTasks({
+      store,
+      now: () => NOW,
+      handler: async (context) => {
+        await context.runAgent();
+        return context.block({ summary: '  Operator acknowledgement is required. ' });
+      },
+      onEvent: (event) => events.push(event),
+    })).resolves.toMatchObject({ ran: 1, failed: 0 });
+
+    await expect(store.loadCheckpoint(task)).resolves.toEqual(priorCheckpoint);
+    await expect(store.requireTask(task.id)).resolves.toMatchObject({
+      enabled: false,
+      state: {
+        status: 'blocked',
+        lastExecution: {
+          kind: 'blocked',
+          summary: 'Operator acknowledgement is required.',
+          agentRunId: rejectedResult.state.runId,
+        },
+      },
+    });
+    const blockedTask = await store.requireTask(task.id);
+    expect(blockedTask.schedule.nextRunAt).toBeUndefined();
+    expect(blockedTask.state?.result).toBeUndefined();
+    expect(blockedTask.state?.runId).toBeUndefined();
+    await expect(store.requestTaskRun(task.id)).rejects.toThrow(/blocked.*resume/i);
+    await expect(store.setTaskEnabled(task.id, true)).rejects.toThrow(/blocked.*resume/i);
+    await expect(store.resumeTask(task.id)).resolves.toMatchObject({
+      enabled: true,
+      state: { status: 'waiting' },
+    });
+    expect(events.map((event) => event.type)).toContain('heartbeat.task.blocked');
+  });
+
+  it('treats cancellation and claim loss as final over explicit handler outcomes', async () => {
+    const cancellationDir = createStateRoot('retry-cancelled');
+    const cancellationStore = new FileHeartbeatTaskService({ dir: cancellationDir });
+    const cancellationTask = createTask('retry-cancelled');
+    const priorCheckpoint = createHeartbeatResult('pause', 'prior-cancelled-retry-run').checkpoint;
+    await Promise.all([
+      cancellationStore.saveTask(cancellationTask),
+      cancellationStore.saveCheckpoint(cancellationTask, priorCheckpoint),
+    ]);
+    const controlledRun = deferred<AgentHeartbeatResult>();
+    vi.spyOn(HeartbeatRunnerAgent, 'run').mockImplementation(async () => await controlledRun.promise);
+    const contextReady = deferred<HeartbeatExecutionContext>();
+    const events: HeartbeatSchedulerEvent[] = [];
+    const handle = HeartbeatSchedulerService.start({
+      workspaceRoot: cancellationDir,
+      stateRoot: cancellationDir,
+      store: cancellationStore,
+      pollIntervalMs: 60_000,
+      handler: async (context) => {
+        contextReady.resolve(context);
+        await context.runAgent();
+        return context.retry({ summary: 'This retry must lose to cancellation.' });
+      },
+      onEvent: (event) => events.push(event),
+    });
+    await contextReady.promise;
+    const stopping = handle.stop({ cancelRunning: true });
+    controlledRun.resolve(createHeartbeatResult('continue', 'cancelled-retry-agent-run'));
+    await stopping;
+    await expect(cancellationStore.loadCheckpoint(cancellationTask)).resolves.toEqual(priorCheckpoint);
+    await expect(cancellationStore.listRunRecords({ taskId: cancellationTask.id })).resolves.toMatchObject([{
+      record: { outcome: { kind: 'cancelled' } },
+    }]);
+    expect(events.some((event) => event.type === 'heartbeat.task.retry')).toBe(false);
+
+    vi.restoreAllMocks();
+    const claimLossDir = createStateRoot('retry-claim-loss');
+    const claimLossStore = new FileHeartbeatTaskService({ dir: claimLossDir });
+    const claimLossTask = createTask('retry-claim-loss');
+    await claimLossStore.saveTask(claimLossTask);
+    const rejectedResult = createHeartbeatResult('continue', 'claim-lost-agent-run');
+    vi.spyOn(HeartbeatRunnerAgent, 'run').mockResolvedValue(rejectedResult);
+    const recordOutcome = vi.spyOn(claimLossStore, 'recordTaskExecutionOutcome')
+      .mockResolvedValueOnce({ status: 'claim-lost' });
+
+    await expect(HeartbeatSchedulerService.runDueTasks({
+      store: claimLossStore,
+      now: () => NOW,
+      handler: async (context) => {
+        await context.runAgent();
+        return context.retry({ summary: 'This retry lost its execution claim.' });
+      },
+    })).resolves.toMatchObject({ ran: 0, failed: 0, records: [] });
+    expect(recordOutcome).toHaveBeenCalledOnce();
+    await expect(claimLossStore.loadCheckpoint(claimLossTask)).resolves.toBeUndefined();
+    await expect(claimLossStore.listRunRecords({ taskId: claimLossTask.id })).resolves.toEqual([]);
+  });
+
+  it('rejects forged, premature, oversized, and invalid-delay handler outcomes as failures', async () => {
+    const cases = [
+      {
+        id: 'premature-retry',
+        handler: async (context: HeartbeatExecutionContext) => context.retry({ summary: 'Too early.' }),
+        error: /runAgent\(\).*settle first/i,
+      },
+      {
+        id: 'forged-outcome',
+        handler: async () => ({ kind: 'blocked', summary: 'Forged.', agentRunId: 'not-a-real-run' } as never),
+        error: /must return the retry or blocked outcome/i,
+      },
+      {
+        id: 'discarded-retry-outcome',
+        handler: async (context: HeartbeatExecutionContext) => {
+          const result = await context.runAgent();
+          context.retry({ summary: 'The rejected result must not be installed.' });
+          return result;
+        },
+        error: /must return the retry or blocked outcome.*after selecting/i,
+      },
+      {
+        id: 'oversized-summary',
+        handler: async (context: HeartbeatExecutionContext) => {
+          await context.runAgent();
+          return context.retry({ summary: 'x'.repeat(501) });
+        },
+        error: /at most 500 characters/i,
+      },
+      {
+        id: 'invalid-delay',
+        handler: async (context: HeartbeatExecutionContext) => {
+          await context.runAgent();
+          return context.retry({ summary: 'Invalid delay.', delayMs: 0 });
+        },
+        error: /positive integer/i,
+      },
+    ];
+
+    for (const testCase of cases) {
+      const dir = createStateRoot(testCase.id);
+      const store = new FileHeartbeatTaskService({ dir });
+      await store.saveTask(createTask(testCase.id));
+      vi.spyOn(HeartbeatRunnerAgent, 'run').mockResolvedValue(createHeartbeatResult('continue', `${testCase.id}-agent-run`));
+
+      await expect(HeartbeatSchedulerService.runDueTasks({
+        store,
+        now: () => NOW,
+        handler: testCase.handler,
+      })).resolves.toMatchObject({ ran: 0, failed: 1 });
+      await expect(store.requireTask(testCase.id)).resolves.toMatchObject({
+        state: { status: 'failed', error: expect.stringMatching(testCase.error) },
+      });
+      vi.restoreAllMocks();
+    }
   });
 
   it('stops idempotently while idle', async () => {
