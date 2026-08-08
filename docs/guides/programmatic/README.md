@@ -86,5 +86,10 @@ product-owned TODOs.
 Runnable versions of the first few rungs live in
 [`examples/sdk/`](../../../examples/sdk/README.md).
 
+Heartbeat is a specialized background runtime rather than a conversation rung.
+For a progressive embedded-worker path, see the
+[heartbeat SDK examples](../../../examples/heartbeat/README.md): one cycle,
+long-lived lifecycle, domain handler, and event-driven durable wake-up.
+
 For contributor-facing module boundaries, see
 [Core Layering](../../architecture/core-layering.md).

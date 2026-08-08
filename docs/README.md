@@ -52,6 +52,7 @@ Task-oriented guides:
 - [Knowledge persistence](guides/knowledge-persistence.md)
 - [Semantic drift](guides/semantic-drift.md)
 - [Heartbeat](guides/heartbeat.md)
+- [Heartbeat SDK examples](../examples/heartbeat/README.md)
 - [Programmatic hosts](guides/programmatic/README.md)
 - [Durability support matrix](guides/programmatic/durability-support.md)
 - [Development and contributing](guides/development.md)

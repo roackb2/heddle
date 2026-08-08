@@ -322,6 +322,7 @@ More:
 - [Custom agents](docs/guides/custom-agents.md)
 - [Knowledge persistence](docs/guides/knowledge-persistence.md)
 - [Heartbeat](docs/guides/heartbeat.md)
+- [Heartbeat SDK examples](examples/heartbeat/README.md)
 - [MCP integrations](docs/reference/mcp.md)
 
 OpenAI account sign-in is an experimental, user-selected transport for Heddle.
@@ -368,6 +369,7 @@ framework, or deployment platform.
 - [Durability support matrix](docs/guides/programmatic/durability-support.md)
 - [Result artifacts](docs/guides/programmatic/result-artifacts.md)
 - [Runnable SDK examples](examples/sdk/README.md)
+- [Heartbeat SDK examples](examples/heartbeat/README.md)
 
 ### Use Heddle locally
 
