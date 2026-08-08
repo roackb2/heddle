@@ -76,12 +76,19 @@ operator-facing heartbeat views.
   concurrently, but every execution still passes through the store's atomic
   claim and fencing contract. Aggregate records retain selected-task order even
   when completion events arrive in another order.
-- The file service serializes claim/recover/complete/fail transitions with a
-  shared in-process mutex, serializes task control read-transform-write
-  transitions, and tracks live executions in process memory. Its process-local
-  wake signal reduces event latency; polling remains the restart fallback. This is
-  reliable for one Node.js process owning a state root; it is not a distributed
-  lease. Multiple processes or replicas must provide a remote
+- The file service serializes task/checkpoint/run mutations with a shared
+  in-process mutex for one resolved heartbeat root. Task, checkpoint, and run
+  JSON files are replaced atomically, so readers see a complete previous or next
+  document rather than a partial write. Concurrent
+  `createTask` calls for the same ID produce one creation and one explicit
+  conflict; distinct IDs are independent. `reconcileTasks({ namespace, desired
+  })` atomically creates missing members and removes obsolete non-running members
+  from one host-owned namespace, while retaining existing configuration/state and
+  never rewriting a live running claim. Use the explicit task update APIs for
+  existing-task configuration changes. Its process-local wake signal reduces event
+  latency; polling remains the restart fallback. This is reliable for one Node.js
+  process owning a state root; it is not a distributed lease. Multiple processes
+  or replicas must provide a remote
   `HeartbeatTaskStore` that implements atomic claim, fencing, and recovery with
   database compare-and-swap, leases, or transactions.
 - Recovery preserves the latest checkpoint and run history, records the

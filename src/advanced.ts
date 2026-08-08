@@ -260,6 +260,8 @@ export {
 } from './core/heartbeat/tasks/index.js';
 export type {
   FileHeartbeatTaskServiceOptions,
+  ReconcileHeartbeatTasksInput,
+  ReconcileHeartbeatTasksResult,
   HeartbeatTask,
   HeartbeatTaskAgentRunRecord,
   HeartbeatTaskClaimResult,

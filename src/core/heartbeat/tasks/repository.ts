@@ -5,7 +5,8 @@
  * Scheduler and host code should depend on this repository contract instead of
  * reading heartbeat JSON files directly.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
 import dayjs from 'dayjs';
 import type { AgentLoopCheckpoint } from '@/core/runtime/loop/index.js';
@@ -42,8 +43,7 @@ export class FileHeartbeatTaskRepository {
 
   async saveTask(task: HeartbeatTask): Promise<void> {
     const path = join(this.tasksDir, `${FileHeartbeatTaskRepository.safeTaskFileName(task.id)}.json`);
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, `${JSON.stringify(HeartbeatTaskSchema.parse(HeartbeatTaskStateProjector.normalize(task)), null, 2)}\n`);
+    this.writeJsonAtomically(path, HeartbeatTaskSchema.parse(HeartbeatTaskStateProjector.normalize(task)));
   }
 
   async deleteTask(task: HeartbeatTask): Promise<void> {
@@ -69,15 +69,16 @@ export class FileHeartbeatTaskRepository {
 
   async saveCheckpoint(task: HeartbeatTask, checkpoint: AgentLoopCheckpoint): Promise<void> {
     const path = this.checkpointPathForTask(task);
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, `${JSON.stringify(AgentLoopCheckpointSchema.parse(checkpoint), null, 2)}\n`);
+    this.writeJsonAtomically(path, AgentLoopCheckpointSchema.parse(checkpoint));
   }
 
   async saveRunRecord(record: HeartbeatTaskRunRecord): Promise<void> {
     const timestamp = dayjs().toISOString().replaceAll(':', '-');
-    const path = join(this.runsDir, `${timestamp}-${FileHeartbeatTaskRepository.safeTaskFileName(record.task.id)}.json`);
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, `${JSON.stringify(HeartbeatTaskRunRecordSchema.parse(record), null, 2)}\n`);
+    const path = join(
+      this.runsDir,
+      `${timestamp}-${FileHeartbeatTaskRepository.safeTaskFileName(record.task.id)}-${randomUUID()}.json`,
+    );
+    this.writeJsonAtomically(path, HeartbeatTaskRunRecordSchema.parse(record));
   }
 
   async listRunRecords(options: { taskId?: string; limit?: number } = {}): Promise<HeartbeatTaskRunRecordEntry[]> {
@@ -133,6 +134,23 @@ export class FileHeartbeatTaskRepository {
       this.checkpointsDir,
       `${FileHeartbeatTaskRepository.safeTaskFileName(task.id)}.json`,
     );
+  }
+
+  /**
+   * Replaces one JSON document through a sibling temporary file so readers see
+   * either the previous complete document or the next complete document.
+   */
+  private writeJsonAtomically(path: string, value: unknown): void {
+    const directory = dirname(path);
+    const temporaryPath = join(directory, `.${basename(path)}.${randomUUID()}.tmp`);
+    mkdirSync(directory, { recursive: true });
+
+    try {
+      writeFileSync(temporaryPath, `${JSON.stringify(value, null, 2)}\n`);
+      renameSync(temporaryPath, path);
+    } finally {
+      rmSync(temporaryPath, { force: true });
+    }
   }
 
   private static safeTaskFileName(id: string): string {
