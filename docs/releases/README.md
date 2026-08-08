@@ -10,6 +10,11 @@ The source of truth for a release is:
 - the actual git range since the previous release tag
 - the verified release commit that gets tagged
 
+`unreleased.md` may stage user-facing notes while features are under review.
+Release preparation must reconcile that draft against the actual git range,
+move the shipped content into the chosen version file, and leave behind only
+items that were not included.
+
 ## Release Convention
 
 For a user-facing release:

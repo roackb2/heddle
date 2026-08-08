@@ -1,5 +1,7 @@
 export { FileHeartbeatTaskService } from './service.js';
+export { HeartbeatTaskExecutionEligibilityPolicy } from './execution-eligibility.js';
 export { HeartbeatTaskStateProjector } from './task-state.js';
+export type { HeartbeatTaskExecutionEligibility } from './execution-eligibility.js';
 export type {
   CreateHeartbeatTaskInput,
   FileHeartbeatTaskServiceOptions,
@@ -11,6 +13,7 @@ export type {
   HeartbeatTask,
   HeartbeatTaskAgentRunRecord,
   HeartbeatTaskClaimResult,
+  HeartbeatTaskClaimMode,
   HeartbeatTaskContinuationMode,
   HeartbeatTaskExecution,
   HeartbeatTaskExecutionOutcome,
@@ -29,6 +32,7 @@ export type {
   HeartbeatTaskState,
   HeartbeatTaskStatus,
   HeartbeatTaskStore,
+  HeartbeatTargetedTaskStore,
   RequestHeartbeatTaskRunOptions,
 } from './types.js';
 export {

@@ -76,6 +76,18 @@ operator-facing heartbeat views.
   concurrently, but every execution still passes through the store's atomic
   claim and fencing contract. Aggregate records retain selected-task order even
   when completion events arrive in another order.
+- `HeartbeatSchedulerService.runTask({ taskId, store, executionOwnerId, ... })`
+  is the targeted one-shot boundary for an ephemeral worker that was already
+  routed one task by its host. It requires `HeartbeatTargetedTaskStore`, whose
+  `loadTask(taskId)` resolves that task directly rather than scanning a global
+  catalog. The method reads durable eligibility and makes the final due claim
+  through the store; its typed result distinguishes settlement, normal failure,
+  missing/disabled/not-due/busy work, a lost claim, and cancellation.
+- Targeted execution does not scan unrelated tasks, start polling, subscribe to
+  run requests, or recover interrupted executions. Queue delivery, tenant
+  authorization, retries, visibility timeouts, and host-domain idempotency stay
+  with the host. The store's atomic claim fences duplicate at-least-once worker
+  deliveries; it does not make host tool side effects exactly once.
 - The file service serializes task/checkpoint/run mutations with a shared
   in-process mutex for one resolved heartbeat root. Task, checkpoint, and run
   JSON files are replaced atomically, so readers see a complete previous or next
@@ -95,6 +107,20 @@ operator-facing heartbeat views.
   interrupted execution identity under `task.state.recovery`, and makes an
   enabled task immediately due. It does not record success or roll back host
   domain side effects; host tools remain responsible for idempotent mutations.
+- Recovery is a lifecycle policy, not a consequence of receiving a different
+  `ownerId`. The built-in file adapter can recover an execution only when its
+  in-process active-execution registry proves it is no longer live. A remote
+  adapter must use its own lease-expiry or operator recovery policy. A targeted
+  invocation never performs recovery or steals another worker's live claim;
+  final writes remain fenced after an explicit recovery.
+- Custom remote adapters should run the executable contract scenarios from
+  `@roackb2/heddle/heartbeat/testing` against two fresh store instances sharing
+  one backend namespace. Required scenarios cover exact lookup, atomic due
+  claims, coalesced requests, settlement, recovery, and stale-write fencing;
+  history and subscription checks are capability-gated. The harness owns a
+  fixture-only hook for expiring a lease or simulating a dead prior process.
+  Passing the suite does not certify host queue delivery or exactly-once domain
+  effects.
 - Heartbeat may depend on runtime's public `AgentLoopRuntimeService.run` and checkpoint types.
   Runtime should not import heartbeat.
 - Interface adapters should use `FileHeartbeatTaskService` methods or the

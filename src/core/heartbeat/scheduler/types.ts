@@ -13,6 +13,7 @@ import type {
   HeartbeatTaskRunRecord,
   HeartbeatTaskStatus,
   HeartbeatTaskStore,
+  HeartbeatTargetedTaskStore,
 } from '../tasks/index.js';
 
 export type HeartbeatSchedulerEvent =
@@ -243,6 +244,49 @@ export type RunDueHeartbeatTasksResult = {
   failed: number;
   records: HeartbeatTaskRunRecord[];
 };
+
+/**
+ * Machine-readable result of one claim-fenced heartbeat execution attempt.
+ *
+ * `settled` covers agent, skipped, and blocked outcomes. An explicit custom
+ * handler retry is surfaced separately so a dispatcher can distinguish it
+ * from successful settlement without inspecting record internals.
+ */
+export type HeartbeatTaskExecutionResult = {
+  taskId: string;
+  failed: boolean;
+  record?: HeartbeatTaskRunRecord;
+} & (
+  | { status: 'settled'; executionId: string; record: HeartbeatTaskRunRecord; failed: false }
+  | {
+      status: 'retry';
+      executionId: string;
+      record: HeartbeatTaskNonAgentRunRecord & { outcome: { kind: 'retry' } };
+      failed: false;
+    }
+  | { status: 'failed'; executionId: string; error: string; task: HeartbeatTask; failed: true }
+  | { status: 'not-found' | 'disabled' | 'busy'; failed: false }
+  | { status: 'not-due'; nextRunAt?: string; failed: false }
+  | { status: 'claim-lost'; executionId: string; failed: false }
+  | { status: 'cancelled'; executionId?: string; record?: HeartbeatTaskRunRecord; failed: false }
+);
+
+/**
+ * One-shot request-driven execution for an already-routed task id.
+ *
+ * This path performs no global task scan, subscription, polling, or automatic
+ * recovery. The host is responsible for dispatch and lease/recovery policy;
+ * Heddle owns the final atomic due claim and standard execution pipeline.
+ */
+export type RunHeartbeatTaskOptions = Omit<
+  RunDueHeartbeatTasksOptions,
+  'store' | 'maxConcurrentTasks' | 'admissionSignal'
+> & {
+  taskId: string;
+  store: HeartbeatTargetedTaskStore;
+};
+
+export type RunHeartbeatTaskResult = HeartbeatTaskExecutionResult;
 
 export type RunHeartbeatSchedulerOptions = RunDueHeartbeatTasksOptions & {
   pollIntervalMs?: number;

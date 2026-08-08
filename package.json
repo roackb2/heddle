@@ -41,6 +41,10 @@
       "types": "./dist/src/advanced.d.ts",
       "import": "./dist/src/advanced.js"
     },
+    "./heartbeat/testing": {
+      "types": "./dist/src/heartbeat-testing.d.ts",
+      "import": "./dist/src/heartbeat-testing.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -121,6 +125,7 @@
     "example:heartbeat:worker": "tsx --no-cache examples/heartbeat/02-long-lived-worker.ts",
     "example:heartbeat:domain-handler": "tsx --no-cache examples/heartbeat/03-domain-handler.ts",
     "example:heartbeat:events": "tsx --no-cache examples/heartbeat/04-event-driven-wake.ts",
+    "example:heartbeat:ephemeral": "tsx --no-cache examples/heartbeat/05-ephemeral-worker.ts",
     "example:heartbeat:smoke": "vitest run src/__tests__/integration/examples/heartbeat-sdk-examples.test.ts",
     "example:browser-runtime-spike": "tsx --no-cache examples/browser-runtime-spike.ts",
     "example:browser-runtime-spike:headless": "tsx --no-cache examples/browser-runtime-spike.ts --headless",
