@@ -15,6 +15,11 @@ Stages that call `runAgent()` use that credential. Their model budget is capped
 at two steps only to keep the examples inexpensive; choose a production budget
 for the work and controls you actually operate.
 
+Every stage uses `reconcileTasks()` at startup. Re-running an example therefore
+creates a missing task without overwriting its durable state, pending request,
+checkpoint association, or operator changes. Use the explicit task update APIs
+when the host intentionally changes an existing task.
+
 ## Choose by two independent axes
 
 First choose the **host topology**. Then choose how deeply the host needs to
@@ -47,11 +52,13 @@ distributed-systems guarantee.
    host postcondition → acknowledgement. Heddle never exposes credential
    records to the handler. **Next:** stage 04 when product events should wake
    work promptly.
-4. `04-event-driven-wake.ts` places event data in a host `Map`; the Heddle
-   task receives only a bounded reason and durable generation. Repeated wakes
-   coalesce, but the host must retain every payload and make its effects
-   idempotent. **Next:** replace the built-in store only after designing its
-   atomic claim, fencing, lease recovery, and payload-delivery contracts.
+4. `04-event-driven-wake.ts` uses an in-memory host `Map` only to illustrate
+   ownership; a production host needs a durable inbox. The Heddle task receives
+   only a bounded reason and durable generation, and the example removes a
+   payload only after the agent succeeds. Repeated wakes coalesce, so the host
+   must retain every payload and make its effects idempotent. **Next:** replace
+   the built-in store only after designing its atomic claim, fencing, lease
+   recovery, and payload-delivery contracts.
 
 ## Commands
 

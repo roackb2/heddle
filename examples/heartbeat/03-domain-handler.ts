@@ -22,14 +22,17 @@ type ClaimedWork = { id: string; instruction: string; status: 'claimed' };
 
 const stateRoot = join(process.cwd(), '.heddle', 'examples', 'heartbeat-domain-handler');
 const store = new FileHeartbeatTaskService({ stateRoot });
-await store.saveTask({
-  id: 'domain-handler',
-  name: 'Domain handler heartbeat',
-  task: 'Complete the host-claimed work with the host-provided constraints.',
-  enabled: true,
-  schedule: { intervalMs: 60_000, nextRunAt: new Date().toISOString() },
-  runtime: { model: process.env.HEDDLE_EXAMPLE_MODEL ?? 'gpt-5.1-codex-mini', maxSteps: 2, workspaceRoot: process.cwd() },
-} satisfies HeartbeatTask);
+await store.reconcileTasks({
+  namespace: 'domain-handler',
+  desired: [{
+    id: 'domain-handler',
+    name: 'Domain handler heartbeat',
+    task: 'Complete the host-claimed work with the host-provided constraints.',
+    enabled: true,
+    schedule: { intervalMs: 60_000, nextRunAt: new Date().toISOString() },
+    runtime: { model: process.env.HEDDLE_EXAMPLE_MODEL ?? 'gpt-5.1-codex-mini', maxSteps: 2, workspaceRoot: process.cwd() },
+  } satisfies HeartbeatTask],
+});
 
 const handler: HeartbeatTaskHandler = async (context) => {
   const claim = claimWork();

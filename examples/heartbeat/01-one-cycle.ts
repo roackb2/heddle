@@ -30,7 +30,7 @@ const task: HeartbeatTask = {
 };
 
 const store = new FileHeartbeatTaskService({ stateRoot });
-await store.saveTask(task);
+await store.reconcileTasks({ namespace: 'one-cycle', desired: [task] });
 
 const result = await HeartbeatSchedulerService.runDueTasks({
   store,

@@ -21,29 +21,34 @@ type IncomingEvent = { id: string; instruction: string };
 
 const stateRoot = join(process.cwd(), '.heddle', 'examples', 'heartbeat-event-wake');
 const store = new FileHeartbeatTaskService({ stateRoot });
+// This in-memory map demonstrates ownership only. Use a durable inbox in a
+// production host so process restarts cannot discard event payloads.
 const pendingEvents = new Map<string, IncomingEvent>();
-await store.saveTask({
-  id: 'event-driven-work',
-  name: 'Event-driven heartbeat',
-  task: 'Process one host-provided event safely and report the result.',
-  enabled: true,
-  schedule: { intervalMs: 60_000, nextRunAt: '2099-01-01T00:00:00.000Z' },
-  runtime: { model: process.env.HEDDLE_EXAMPLE_MODEL ?? 'gpt-5.1-codex-mini', maxSteps: 2, workspaceRoot: process.cwd() },
-} satisfies HeartbeatTask);
+await store.reconcileTasks({
+  namespace: 'event-driven-work',
+  desired: [{
+    id: 'event-driven-work',
+    name: 'Event-driven heartbeat',
+    task: 'Process one host-provided event safely and report the result.',
+    enabled: true,
+    schedule: { intervalMs: 60_000, nextRunAt: '2099-01-01T00:00:00.000Z' },
+    runtime: { model: process.env.HEDDLE_EXAMPLE_MODEL ?? 'gpt-5.1-codex-mini', maxSteps: 2, workspaceRoot: process.cwd() },
+  } satisfies HeartbeatTask],
+});
 
 const handler: HeartbeatTaskHandler = async (context) => {
   const event = pendingEvents.values().next().value as IncomingEvent | undefined;
   if (!event) {
     return context.skip({ summary: 'No host event remained after the coalesced wake-up.' });
   }
-  pendingEvents.delete(event.id);
-
-  return await context.runAgent({
+  const result = await context.runAgent({
     task: `${context.task.task}\n\nHost event: ${event.instruction}`,
     systemContext: `Operate only on host event ${event.id}.`,
     includeDefaultTools: false,
     maxSteps: 2,
   });
+  pendingEvents.delete(event.id); // Acknowledge only after successful agent work.
+  return result;
 };
 
 const scheduler = HeartbeatSchedulerService.start({
@@ -54,6 +59,11 @@ const scheduler = HeartbeatSchedulerService.start({
   maxSteps: 2,
   handler,
   onError: (error) => console.error('Heartbeat scheduler error:', error),
+});
+const shutdownRequested = new Promise<void>((resolve) => {
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.once(signal, () => resolve());
+  }
 });
 
 async function onHostEvent(event: IncomingEvent): Promise<void> {
@@ -67,8 +77,8 @@ await Promise.all([
 ]);
 
 console.log(`Event-driven scheduler started. State: ${stateRoot}`);
-process.once('SIGINT', () => void scheduler.stop({ cancelRunning: true }));
-process.once('SIGTERM', () => void scheduler.stop({ cancelRunning: true }));
+await shutdownRequested;
+await scheduler.stop({ cancelRunning: true });
 
 // Next: keep the payload store and its idempotency keys host-owned. Move to a
 // custom heartbeat store only when its atomic claims, fenced settlement, and
