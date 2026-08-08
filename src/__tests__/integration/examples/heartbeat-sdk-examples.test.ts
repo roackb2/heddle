@@ -10,7 +10,7 @@ import {
 } from '../../../advanced.js';
 
 describe('heartbeat SDK examples', () => {
-  it('creates a task, persists a no-work skip, wakes on a durable request, and stops gracefully without a model', async () => {
+  it('reconciles a task, preserves its state, wakes on a durable request, and stops gracefully without a model', async () => {
     const stateRoot = mkdtempSync(join(tmpdir(), 'heddle-heartbeat-sdk-example-'));
     const store = new FileHeartbeatTaskService({ stateRoot });
     const task: HeartbeatTask = {
@@ -20,7 +20,7 @@ describe('heartbeat SDK examples', () => {
       schedule: { intervalMs: 60_000, nextRunAt: '2000-01-01T00:00:00.000Z' },
       runtime: { model: 'gpt-test', maxSteps: 2, workspaceRoot: stateRoot },
     };
-    await store.saveTask(task);
+    await store.reconcileTasks({ namespace: 'example-', desired: [task] });
     await expect(store.requireTask(task.id)).resolves.toMatchObject({ id: task.id, enabled: true });
 
     const runAgent = vi.spyOn(HeartbeatRunnerAgent, 'run');
@@ -31,6 +31,16 @@ describe('heartbeat SDK examples', () => {
     });
     expect(firstCycle).toMatchObject({ checked: 1, ran: 1, failed: 0 });
     await expect(store.requireTask(task.id)).resolves.toMatchObject({
+      task: task.task,
+      state: { lastExecution: { kind: 'skipped', summary: 'No host work is available.' } },
+    });
+
+    await store.reconcileTasks({
+      namespace: 'example-',
+      desired: [{ ...task, task: 'A startup reconciliation must not replace the stored task.' }],
+    });
+    await expect(store.requireTask(task.id)).resolves.toMatchObject({
+      task: task.task,
       state: { lastExecution: { kind: 'skipped', summary: 'No host work is available.' } },
     });
 

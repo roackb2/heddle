@@ -29,7 +29,7 @@ const task: HeartbeatTask = {
     workspaceRoot: process.cwd(),
   },
 };
-await store.saveTask(task);
+await store.reconcileTasks({ namespace: 'long-lived-worker', desired: [task] });
 
 const scheduler = HeartbeatSchedulerService.start({
   workspaceRoot: process.cwd(),
@@ -40,29 +40,15 @@ const scheduler = HeartbeatSchedulerService.start({
   onError: (error) => console.error('Heartbeat scheduler error:', error),
 });
 
-let stopping: Promise<void> | undefined;
-const stop = () => {
-  stopping ??= scheduler.stop({ cancelRunning: true });
-  return stopping;
-};
-
-for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.once(signal, () => {
-    void stop();
-  });
-}
+const shutdownRequested = new Promise<void>((resolve) => {
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.once(signal, () => resolve());
+  }
+});
 
 console.log(`Heartbeat worker started. State: ${stateRoot}`);
-await new Promise<void>((resolve) => {
-  const waitForStop = () => {
-    if (stopping) {
-      void stopping.finally(resolve);
-      return;
-    }
-    setTimeout(waitForStop, 100);
-  };
-  waitForStop();
-});
+await shutdownRequested;
+await scheduler.stop({ cancelRunning: true });
 
 // Next: 03-domain-handler.ts adds host-owned claim and acknowledgement logic
 // while leaving Heddle's runtime credentials and execution persistence inside Heddle.
