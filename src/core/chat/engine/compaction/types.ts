@@ -70,6 +70,14 @@ export type ConversationCompactionResult = {
   archive: ConversationCompactionArchiveState;
 };
 
+export type ConversationCompactionRequestAssessment = {
+  contextWindowTokens: number;
+  estimatedRequestTokens: number;
+  compactionThresholdTokens: number;
+  exceedsCompactionThreshold: boolean;
+  exceedsContextWindow: boolean;
+};
+
 export type BuildSessionCompactionRunningContextOptions = {
   session: ChatSession;
   history?: ChatMessage[];

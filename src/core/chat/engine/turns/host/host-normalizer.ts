@@ -32,9 +32,17 @@ export class ConversationEngineHostNormalizer {
         host?.compaction?.onStatus?.(event);
         if (phase === 'preflight') {
           host?.compaction?.onPreflightCompactionStatus?.(event);
-        } else {
-          host?.compaction?.onFinalCompactionStatus?.(event);
+          onActivity?.(event);
+          return;
         }
+
+        if (phase === 'recovery') {
+          host?.compaction?.onRecoveryCompactionStatus?.(event);
+          onActivity?.(event);
+          return;
+        }
+
+        host?.compaction?.onFinalCompactionStatus?.(event);
         onActivity?.(event);
       },
     };

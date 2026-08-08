@@ -1,2 +1,8 @@
 export { AgentRunService } from './service.js';
-export type { AgentRunEvent, RunAgentOptions } from './types.js';
+export type {
+  AgentModelContextRecovery,
+  AgentRunEvent,
+  RecoverAgentModelContextInput,
+  RecoverAgentModelContextResult,
+  RunAgentOptions,
+} from './types.js';

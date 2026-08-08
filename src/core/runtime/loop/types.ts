@@ -18,6 +18,7 @@ import type {
 import type { ChatMessage, LlmAdapter, LlmProvider, LlmUsage, ReasoningEffort } from '@/core/llm/types.js';
 import type { RunFailure, RunResult, StopReason, ToolCall, ToolDefinition, TraceEvent } from '@/core/types.js';
 import type { RuntimeProviderCredential } from '@/core/runtime/credentials/index.js';
+import type { AgentModelContextRecovery } from '@/core/agent/index.js';
 
 export type AgentLoopStatus = 'finished';
 
@@ -109,6 +110,7 @@ export type RunAgentLoopOptions = {
   approveToolCall?: (call: ToolCall, tool: ToolDefinition, autonomyEvaluation?: AutonomyEvaluation) => Promise<ToolApprovalDecision>;
   shouldStop?: () => boolean;
   abortSignal?: AbortSignal;
+  recoverModelContext?: AgentModelContextRecovery;
 };
 
 export type AgentLoopResult = RunResult & {

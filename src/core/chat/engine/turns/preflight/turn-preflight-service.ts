@@ -77,12 +77,46 @@ export class ConversationTurnPreflightService {
       throw error;
     }
 
-    return await ConversationTurnPreflightService.persistPrepared({
+    const compactionFailure = preflightCompacted.context.compaction?.status === 'failed'
+      ? {
+          reason: 'compaction_failed' as const,
+          message: ConversationTurnPreflightService.compactionFailureMessage(preflightCompacted),
+        }
+      : undefined;
+    const requestAssessment = ConversationCompactionService.assessRequest({
+      history: preflightCompacted.history,
+      runtime: compactionRuntime,
+      request: compactionRequest,
+    });
+    const capacityFailure = !compactionFailure && requestAssessment.exceedsContextWindow
+      ? {
+          reason: 'request_too_large' as const,
+          message: ConversationTurnPreflightService.capacityFailureMessage(requestAssessment),
+        }
+      : undefined;
+    const failure = compactionFailure ?? capacityFailure;
+    const compactedForPersistence = failure
+      ? ConversationTurnPreflightService.withFailedStatus(preflightCompacted, failure.message)
+      : preflightCompacted;
+
+    if (capacityFailure) {
+      await args.host.onCompactionStatus?.({
+        source: 'compaction',
+        type: 'compaction.failed',
+        status: 'failed',
+        error: capacityFailure.message,
+      }, 'preflight');
+    }
+
+    const prepared = await ConversationTurnPreflightService.persistPrepared({
       ...args,
       session: persistedSession ?? await args.sessionService.require(args.sessionId),
-      compacted: preflightCompacted,
+      compacted: compactedForPersistence,
       leaseClaim,
     });
+    return failure
+      ? { ok: false, ...failure }
+      : prepared;
   }
 
   static async persistRunningSeed(args: PersistPreflightRunningSeedArgs): Promise<void> {
@@ -112,6 +146,37 @@ export class ConversationTurnPreflightService {
       session: preparedSession,
       compacted: args.compacted,
       leaseClaim: args.leaseClaim,
+    };
+  }
+
+  private static compactionFailureMessage(compacted: ConversationCompactionResult): string {
+    const detail = compacted.context.compaction?.error ?? 'The summarizer could not compact this conversation.';
+    return `Preflight compaction failed before the model request: ${detail} `
+      + 'Fix the summarizer credential or archive service, reduce the prompt, or start a new session before retrying.';
+  }
+
+  private static capacityFailureMessage(
+    assessment: ReturnType<typeof ConversationCompactionService.assessRequest>,
+  ): string {
+    return 'Preflight compaction could not reduce the estimated request below the model context window '
+      + `(${assessment.estimatedRequestTokens} estimated tokens; ${assessment.contextWindowTokens} token window). `
+      + 'Remove large prompt, system, or tool content; clear the session; or choose a model with a larger context window.';
+  }
+
+  private static withFailedStatus(
+    compacted: ConversationCompactionResult,
+    message: string,
+  ): ConversationCompactionResult {
+    return {
+      ...compacted,
+      context: {
+        ...compacted.context,
+        compaction: {
+          ...compacted.context.compaction,
+          status: 'failed',
+          error: message,
+        },
+      },
     };
   }
 

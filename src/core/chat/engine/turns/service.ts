@@ -17,6 +17,7 @@ import type {
 import { ConversationEngineHostNormalizer } from './host/index.js';
 import { ConversationTurnContextBuilder } from './context/index.js';
 import { ConversationTurnPreflightService } from './preflight/index.js';
+import { ConversationTurnContextRecoveryService } from './recovery/index.js';
 import { ConversationTurnMemoryMaintenance } from './memory/index.js';
 import type { TurnMemoryMaintenanceRuntimeInput } from './memory/index.js';
 import { ConversationTurnLeaseHeartbeatService } from './lease/index.js';
@@ -158,6 +159,25 @@ export class EngineConversationTurnService implements ConversationTurnService {
             : undefined,
           basePolicies: args.approvalPolicies,
         }),
+        recoverModelContext: async (input) => {
+          leaseHeartbeat.throwIfFailed();
+          const recovered = await ConversationTurnContextRecoveryService.recover({
+            ...input,
+            sessionService,
+            sessionId: session.id,
+            leaseClaim: preflight.leaseClaim,
+            model: runtime.model,
+            stateRoot: args.stateRoot,
+            archiveRepository: args.archiveRepository,
+            systemContext: runtime.systemContext,
+            toolNames,
+            prompt: args.prompt,
+            summarizer: runtime.summarizer,
+            host,
+          });
+          leaseHeartbeat.throwIfFailed();
+          return recovered;
+        },
       }).catch((error: unknown) => {
         leaseHeartbeat.throwIfFailed();
         throw error;

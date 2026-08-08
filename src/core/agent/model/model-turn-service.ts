@@ -24,6 +24,7 @@ export class AgentModelTurnService {
   private static async requestWithRetries(args: RequestAgentModelTurnArgs): Promise<AgentModelTurnResult> {
     const { context } = args;
     let attempt = 1;
+    let contextRecoveryAttempted = false;
 
     while (true) {
       try {
@@ -50,6 +51,24 @@ export class AgentModelTurnService {
         }
 
         const retry = AgentModelTurnRetryService.resolve({ kind: 'error', error });
+        if (
+          retry.failure?.code === 'context_window'
+          && context.recoverModelContext
+          && !contextRecoveryAttempted
+        ) {
+          contextRecoveryAttempted = true;
+          const recovered = await context.recoverModelContext({
+            messages: context.messages,
+            failure: retry.failure,
+          });
+          if (recovered) {
+            context.messages = recovered.messages;
+            AgentModelTurnService.recordContextRecoveryRetry({ context, retry });
+            attempt = 1;
+            continue;
+          }
+        }
+
         if (!retry.retryable || attempt >= retry.maxAttempts) {
           context.log.error({ step: context.state.step, error: retry.message, attempts: attempt }, 'LLM call failed');
           return AgentRunFinisher.finish(
@@ -64,6 +83,27 @@ export class AgentModelTurnService {
         attempt += 1;
       }
     }
+  }
+
+  private static recordContextRecoveryRetry(args: {
+    context: RequestAgentModelTurnArgs['context'];
+    retry: ReturnType<typeof AgentModelTurnRetryService.resolve>;
+  }): void {
+    const { context, retry } = args;
+    context.live.trace({
+      type: HeddleEventType.modelRetry,
+      reason: 'context_window',
+      attempt: 1,
+      maxAttempts: 2,
+      retryAfterMs: 0,
+      message: retry.message,
+      step: context.state.step,
+      timestamp: context.now(),
+    });
+    context.log.warn(
+      { step: context.state.step, attempt: 1, maxAttempts: 2, reason: 'context_window', message: retry.message },
+      'Retrying LLM call after context recovery',
+    );
   }
 
   private static async requestOnce(args: RequestAgentModelTurnArgs) {

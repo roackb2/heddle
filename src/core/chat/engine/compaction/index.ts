@@ -6,6 +6,7 @@ export type {
   ConversationCompactionContextInput,
   ConversationCompactionOptions,
   ConversationCompactionRequest,
+  ConversationCompactionRequestAssessment,
   ConversationCompactionResult,
   ConversationCompactionRuntime,
   ConversationCompactionSummarizerOptions,

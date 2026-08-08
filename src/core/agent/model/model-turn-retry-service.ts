@@ -5,7 +5,7 @@ import isString from 'lodash/isString.js';
 import type { LlmResponse } from '@/core/llm/types.js';
 import type { ModelRunFailureCode, RunFailure } from '@/core/types.js';
 
-export type AgentModelTurnRetryReason = 'transport_error' | 'empty_response';
+export type AgentModelTurnRetryReason = 'transport_error' | 'empty_response' | 'context_window';
 
 export type AgentModelTurnRetryDecision = {
   retryable: boolean;
@@ -28,6 +28,11 @@ const RETRYABLE_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504])
 const NON_RETRYABLE_STATUS_CODES = new Set([400, 401, 403, 404, 422]);
 const MODEL_FAILURE_BY_PROVIDER_CODE = new Map<string, ModelRunFailureCode>([
   ['insufficient_quota', 'quota'],
+  ['context_length_exceeded', 'context_window'],
+  ['context_window_exceeded', 'context_window'],
+  ['max_context_length_exceeded', 'context_window'],
+  ['input_too_long', 'context_window'],
+  ['prompt_too_long', 'context_window'],
 ]);
 const MODEL_FAILURE_BY_STATUS = new Map<number, ModelRunFailureCode>([
   [400, 'request'],
@@ -49,6 +54,7 @@ const MODEL_FAILURE_MESSAGE = new Map<ModelRunFailureCode, string>([
   ['permission', 'Model access was denied'],
   ['quota', 'Model provider quota or billing limit reached'],
   ['rate_limit', 'Model provider rate limit reached'],
+  ['context_window', 'Model context window was exceeded'],
   ['request', 'Model request was rejected'],
   ['transport', 'Model provider is temporarily unavailable'],
   ['empty_response', 'Model returned an empty response'],
@@ -83,6 +89,17 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   'disconnected',
   'temporarily unavailable',
   'rate limit',
+];
+
+const CONTEXT_WINDOW_MESSAGE_PATTERNS = [
+  'exceeds the context window',
+  'exceeded the context window',
+  'context window exceeded',
+  'context length exceeded',
+  'maximum context length',
+  'prompt is too long',
+  'input is too long',
+  'reduce the length of the messages',
 ];
 
 /**
@@ -122,11 +139,15 @@ export class AgentModelTurnRetryService {
     const providerMessage = AgentModelTurnRetryService.formatErrorMessage(error);
     const providerCode = AgentModelTurnRetryService.readProviderErrorCode(error);
     const status = AgentModelTurnRetryService.readStatusCode(error);
-    const failureCode = AgentModelTurnRetryService.resolveFailureCode({ providerCode, status });
+    const failureCode = AgentModelTurnRetryService.resolveFailureCode({
+      providerCode,
+      providerMessage,
+      status,
+    });
     const failure = AgentModelTurnRetryService.modelFailure(failureCode);
     const message = AgentModelTurnRetryService.safeMessage(failureCode);
 
-    if (failureCode === 'quota') {
+    if (failureCode === 'quota' || failureCode === 'context_window') {
       return { retryable: false, failure, maxAttempts: 1, message };
     }
 
@@ -160,18 +181,30 @@ export class AgentModelTurnRetryService {
 
   private static resolveFailureCode(args: {
     providerCode?: string;
+    providerMessage: string;
     status?: number;
   }): ModelRunFailureCode {
     const providerFailure = args.providerCode
       ? MODEL_FAILURE_BY_PROVIDER_CODE.get(args.providerCode)
       : undefined;
-    return providerFailure ?? (
-      args.status === undefined ? 'unknown' : MODEL_FAILURE_BY_STATUS.get(args.status) ?? 'unknown'
-    );
+    if (providerFailure) {
+      return providerFailure;
+    }
+
+    if (AgentModelTurnRetryService.hasContextWindowMessage(args.providerMessage)) {
+      return 'context_window';
+    }
+
+    return args.status === undefined ? 'unknown' : MODEL_FAILURE_BY_STATUS.get(args.status) ?? 'unknown';
   }
 
   private static readProviderErrorCode(error: unknown): string | undefined {
-    const code: unknown = get(error, 'code') ?? get(error, 'error.code') ?? get(error, 'cause.code');
+    const code: unknown = get(error, 'code')
+      ?? get(error, 'error.code')
+      ?? get(error, 'cause.code')
+      ?? get(error, 'body.error.code')
+      ?? get(error, 'response.data.error.code')
+      ?? get(error, 'response.body.error.code');
     return isString(code) ? code.trim().toLowerCase() : undefined;
   }
 
@@ -199,8 +232,21 @@ export class AgentModelTurnRetryService {
     return RETRYABLE_MESSAGE_PATTERNS.some((pattern) => includes(normalized, pattern));
   }
 
+  private static hasContextWindowMessage(message: string): boolean {
+    const normalized = message.toLowerCase();
+    return CONTEXT_WINDOW_MESSAGE_PATTERNS.some((pattern) => includes(normalized, pattern));
+  }
+
   private static formatErrorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
+    const messages = [
+      error instanceof Error ? error.message : undefined,
+      get(error, 'message'),
+      get(error, 'error.message'),
+      get(error, 'body.error.message'),
+      get(error, 'response.data.error.message'),
+      get(error, 'response.body.error.message'),
+    ].filter((message): message is string => isString(message) && message.trim().length > 0);
+    return messages.length ? messages.join('\n') : String(error);
   }
 
   private static modelFailure(code: ModelRunFailureCode): RunFailure {

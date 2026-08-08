@@ -15,6 +15,8 @@ the class that owns that phase.
   context, and LLM adapter.
 - `context/`: loads the session and builds the concrete turn context.
 - `preflight/`: owns lease acquisition and pre-run compaction persistence.
+- `recovery/`: force-compacts a provider-rejected transcript and retries only
+  that model request once, without replaying completed tools.
 - `lease/`: owns wall-clock renewal for the fenced lease held by an in-flight
   turn. Engine turns renew themselves; hosts must not duplicate that heartbeat.
 - `persistence/`: builds turn artifacts and writes completed turns back to

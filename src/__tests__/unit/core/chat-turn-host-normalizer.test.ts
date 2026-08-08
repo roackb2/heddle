@@ -31,11 +31,13 @@ describe('conversation engine host normalizer', () => {
   it('fans out compaction status by phase through the normalized turn host', () => {
     const onStatus = vi.fn();
     const onPreflightCompactionStatus = vi.fn();
+    const onRecoveryCompactionStatus = vi.fn();
     const onFinalCompactionStatus = vi.fn();
     const host = ConversationEngineHostNormalizer.normalize({
       compaction: {
         onStatus,
         onPreflightCompactionStatus,
+        onRecoveryCompactionStatus,
         onFinalCompactionStatus,
       },
     }).turnHost;
@@ -48,13 +50,22 @@ describe('conversation engine host normalizer', () => {
       archivePath: '.heddle/chat-sessions/session-1/archives/archive-final.jsonl',
       summaryPath: '.heddle/chat-sessions/session-1/summary.md',
     };
+    const recoveryEvent = {
+      status: 'running' as const,
+      archivePath: '.heddle/chat-sessions/session-1/archives/archive-recovery.jsonl',
+    };
 
     host?.onCompactionStatus?.(preflightEvent, 'preflight');
+    host?.onCompactionStatus?.(recoveryEvent, 'recovery');
     host?.onCompactionStatus?.(finalEvent, 'final');
 
     expect(onStatus).toHaveBeenCalledWith(preflightEvent);
+    expect(onStatus).toHaveBeenCalledWith(recoveryEvent);
     expect(onStatus).toHaveBeenCalledWith(finalEvent);
     expect(onPreflightCompactionStatus).toHaveBeenCalledWith(preflightEvent);
+    expect(onRecoveryCompactionStatus).toHaveBeenCalledWith(recoveryEvent);
     expect(onFinalCompactionStatus).toHaveBeenCalledWith(finalEvent);
+    expect(onPreflightCompactionStatus).not.toHaveBeenCalledWith(recoveryEvent);
+    expect(onFinalCompactionStatus).not.toHaveBeenCalledWith(recoveryEvent);
   });
 });

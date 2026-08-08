@@ -1,8 +1,9 @@
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ConversationCompactionService } from '@/core/chat/engine/compaction/index.js';
+import { ModelCatalogService } from '@/core/llm/models/index.js';
 import {
   ChatArchivePersistenceCodec,
   ChatArchiveRepositoryError,
@@ -16,6 +17,10 @@ import type { ChatArchiveManifest } from '@/core/chat/types.js';
 import type { ChatMessage, LlmAdapter } from '@/core/llm/types.js';
 
 describe('conversation compaction archive repository', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('preserves the zero-configuration local archive layout', async () => {
     const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-local-archive-compaction-'));
 
@@ -84,6 +89,39 @@ describe('conversation compaction archive repository', () => {
       role: 'system',
       content: expect.stringContaining('Second durable rolling summary'),
     }));
+  });
+
+  it('compacts when the full request estimate is unsafe even if history alone is below its limit', async () => {
+    vi.spyOn(ModelCatalogService, 'estimateBuiltInContextWindow').mockReturnValue(100_000);
+    const stateRoot = await mkdtemp(join(tmpdir(), 'heddle-request-size-compaction-'));
+    const largeHistory: ChatMessage[] = Array.from({ length: 20 }, (_, index) => ({
+      role: index % 2 === 0 ? 'user' as const : 'assistant' as const,
+      content: `history-${index}-${'h'.repeat(10_000)}`,
+    }));
+    const summarizer = vi.fn(async () => ({ content: 'Request-aware rolling summary' }));
+
+    const compacted = await ConversationCompactionService.compact({
+      history: largeHistory,
+      runtime: {
+        model: 'test-model',
+        stateRoot,
+        systemContext: 's'.repeat(100_000),
+      },
+      session: { id: 'session-request-threshold' },
+      request: {
+        goal: 'g'.repeat(50_000),
+        toolNames: ['read_file', 'list_files'],
+      },
+      summarizer: {
+        model: 'test-model',
+        llm: { chat: summarizer },
+      },
+    });
+
+    expect(ConversationCompactionService.estimateTokens(largeHistory)).toBeLessThan(60_000);
+    expect(summarizer).toHaveBeenCalledOnce();
+    expect(compacted.context.compaction?.compactedAt).toEqual(expect.any(String));
+    expect(compacted.history.length).toBeLessThan(largeHistory.length);
   });
 
   it('rejects archive infrastructure failures after emitting a failed status', async () => {

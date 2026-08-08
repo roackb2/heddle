@@ -3,7 +3,7 @@ import type { AgentLoopEvent } from '@/core/runtime/loop/index.js';
 import type { PersistChatTurnCompactionStatus } from '../persistence/index.js';
 import type { ChatTurnPreflightCompactionStatus } from '../preflight/index.js';
 
-export type ChatTurnCompactionPhase = 'preflight' | 'final';
+export type ChatTurnCompactionPhase = 'preflight' | 'recovery' | 'final';
 
 export type ChatTurnCompactionStatus = ChatTurnPreflightCompactionStatus | PersistChatTurnCompactionStatus;
 

@@ -230,7 +230,12 @@ export type {
 
 // --- Specialized runtimes: agent loop --------------------------------------
 export { AgentRunService } from './core/agent/index.js';
-export type { RunAgentOptions } from './core/agent/index.js';
+export type {
+  AgentModelContextRecovery,
+  RecoverAgentModelContextInput,
+  RecoverAgentModelContextResult,
+  RunAgentOptions,
+} from './core/agent/index.js';
 export { AgentLoopCheckpointService, AgentLoopRuntimeService } from './core/runtime/loop/index.js';
 export type { AgentLoopCheckpoint, AgentLoopEvent, AgentLoopResult, AgentLoopState, AgentLoopStatus, RunAgentLoopOptions } from './core/runtime/loop/index.js';
 
