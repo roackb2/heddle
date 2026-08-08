@@ -2,78 +2,47 @@ import { EventEmitter } from 'node:events';
 import { resolve } from 'node:path';
 import { Mutex } from 'async-mutex';
 import dayjs from 'dayjs';
-import omit from 'lodash/omit.js';
-import orderBy from 'lodash/orderBy.js';
+import type {
+  CreateHeartbeatTaskInput,
+  HeartbeatTaskAdministrationService,
+  ListHeartbeatRunViewsOptions,
+  ReadHeartbeatTaskOptions,
+  ReconcileHeartbeatTasksInput,
+  ReconcileHeartbeatTasksResult,
+  UpdateHeartbeatTaskInput,
+} from './administration.js';
+import { HeartbeatTaskControlPolicy } from './control-policy.js';
 import { FileHeartbeatTaskRepository } from './repository.js';
 import { HeartbeatTaskExecutionEligibilityPolicy } from './execution-eligibility.js';
 import { HeartbeatTaskStateProjector } from './task-state.js';
 import {
   MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH,
   MAX_HEARTBEAT_HANDLER_RETRY_MS,
-  MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH,
 } from './types.js';
 import type {
   FileHeartbeatTaskRepositoryOptions,
   HeartbeatTask,
   HeartbeatTaskExecution,
-  HeartbeatTaskExecutionOutcome,
-  HeartbeatTaskState,
   HeartbeatTaskRunRecord,
   HeartbeatTaskRunRecordEntry,
   HeartbeatTaskRunRequestResult,
   HeartbeatTaskRunRequestSignal,
   HeartbeatTargetedTaskStore,
 } from './types.js';
-import type { HeartbeatRunView, HeartbeatTaskResultView, HeartbeatTaskView } from '../views/index.js';
-import type { AgentHeartbeatResult } from '../agent/index.js';
+import { HeartbeatTaskViewProjector } from '../views/projector.js';
+import type { HeartbeatRunView, HeartbeatTaskView } from '../views/types.js';
 
 export type FileHeartbeatTaskServiceOptions =
   | { stateRoot: string }
   | { workspaceRoot: string; stateDir?: string }
   | FileHeartbeatTaskRepositoryOptions;
 
-export type CreateHeartbeatTaskInput = {
-  workspaceId?: string;
-  id?: string;
-  name?: string;
-  task: string;
-  enabled?: boolean;
-  continuationMode?: HeartbeatTask['continuationMode'];
-  intervalMs?: number;
-  defer?: boolean;
-  model?: string;
-  maxSteps?: number;
-  workspaceRoot?: string;
-  stateDir?: string;
-  searchIgnoreDirs?: string[];
-  systemContext?: string;
-};
-
-export type UpdateHeartbeatTaskInput = {
-  name?: string;
-  task?: string;
-  enabled?: boolean;
-  continuationMode?: HeartbeatTask['continuationMode'];
-  intervalMs?: number;
-  model?: string | null;
-  maxSteps?: number | null;
-  searchIgnoreDirs?: string[];
-  systemContext?: string;
-};
-
-export type ReconcileHeartbeatTasksInput = {
-  /** Prefix that limits this reconciliation to tasks owned by one host concern. */
-  namespace: string;
-  /** Desired members of the namespace. Existing members retain their stored configuration and state. */
-  desired: readonly HeartbeatTask[];
-};
-
-export type ReconcileHeartbeatTasksResult = {
-  created: HeartbeatTask[];
-  deleted: HeartbeatTask[];
-  /** Running tasks retained without rewriting their execution claim or state. */
-  preservedRunning: HeartbeatTask[];
-};
+export type {
+  CreateHeartbeatTaskInput,
+  ReconcileHeartbeatTasksInput,
+  ReconcileHeartbeatTasksResult,
+  UpdateHeartbeatTaskInput,
+} from './administration.js';
 
 /**
  * Heartbeat task service.
@@ -82,7 +51,7 @@ export type ReconcileHeartbeatTasksResult = {
  * run records, and operator-facing task/run projections. Hosts should call this
  * service, not the file repository.
  */
-export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore {
+export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore, HeartbeatTaskAdministrationService {
   private static readonly mutationMutexes = new Map<string, Mutex>();
   private static readonly activeExecutions = new Set<string>();
   private static readonly runRequestEventBuses = new Map<string, EventEmitter>();
@@ -131,37 +100,18 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore {
     taskId: string,
     options: Parameters<HeartbeatTargetedTaskStore['requestTaskRun']>[1] = {},
   ): Promise<HeartbeatTaskRunRequestResult> {
-    const reason = FileHeartbeatTaskService.normalizeRunRequestReason(options.reason);
-    const requestedAt = options.requestedAt ?? dayjs().toDate();
-    if (!dayjs(requestedAt).isValid()) {
-      throw new Error('Heartbeat run-request timestamp must be a valid date.');
-    }
     const result = await this.mutationMutex.runExclusive(async () => {
       const task = await this.findTask(taskId);
       if (!task) {
         throw new Error(`Heartbeat task not found: ${taskId}`);
       }
-      FileHeartbeatTaskService.assertTaskAcceptsRunRequest(task);
-
-      const projection = HeartbeatTaskStateProjector.requestRun({
+      const projection = HeartbeatTaskControlPolicy.requestTaskRun({
         task,
-        now: requestedAt,
-        reason,
+        options,
+        now: dayjs().toDate(),
       });
       await this.repository.saveTask(projection.task);
-      const request = projection.task.state?.runRequest;
-      if (!request) {
-        throw new Error(`Heartbeat task ${taskId} did not persist its run request.`);
-      }
-
-      return {
-        task: projection.task,
-        taskId,
-        generation: request.generation,
-        disposition: projection.disposition,
-        requestedAt: request.requestedAt,
-        reason: request.reason,
-      } as const;
+      return projection;
     });
 
     this.publishRunRequest(FileHeartbeatTaskService.toRunRequestSignal(result));
@@ -398,55 +348,25 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore {
   }
 
   async listTaskViews() {
-    return orderBy(
-      (await this.listTasks()).map((task) => FileHeartbeatTaskService.projectTaskView(task)),
-      [(task) => FileHeartbeatTaskService.taskLastRunTime(task)],
-      ['desc'],
-    );
+    return HeartbeatTaskViewProjector.projectTasks(await this.listTasks());
   }
 
-  async listRunViews(options: { taskId?: string; limit?: number } = {}) {
+  async listRunViews(options: ListHeartbeatRunViewsOptions = {}) {
     const runs = await this.listRunRecords(options);
-    return runs.map((run) => FileHeartbeatTaskService.projectRunView(run));
+    return runs.map((run) => HeartbeatTaskViewProjector.projectRun(run));
   }
 
   async createTask(input: CreateHeartbeatTaskInput) {
     return await this.mutationMutex.runExclusive(async () => {
       const tasks = await this.repository.listTasks();
-      const now = dayjs();
-      const id = input.id ?? FileHeartbeatTaskService.createTaskId(input.name ?? input.task, tasks.map((task) => task.id));
-      if (tasks.some((task) => task.id === id)) {
-        throw new Error(`Heartbeat task already exists: ${id}`);
-      }
-
-      const intervalMs = input.intervalMs ?? 60 * 60_000;
-      const task: HeartbeatTask = {
-        id,
-        workspaceId: input.workspaceId,
-        name: input.name,
-        task: input.task.trim(),
-        enabled: input.enabled ?? true,
-        continuationMode: input.continuationMode ?? 'operator',
-        schedule: {
-          intervalMs,
-          nextRunAt: (input.defer === false ? now.subtract(1, 'second') : now.add(intervalMs, 'millisecond')).toISOString(),
-        },
-        runtime: {
-          model: input.model,
-          maxSteps: input.maxSteps,
-          workspaceRoot: input.workspaceRoot,
-          stateDir: input.stateDir,
-          searchIgnoreDirs: input.searchIgnoreDirs,
-          systemContext: input.systemContext,
-        },
-        state: {
-          status: input.enabled === false ? 'idle' : 'waiting',
-          updatedAt: now.toISOString(),
-        },
-      };
+      const task = HeartbeatTaskControlPolicy.createTask({
+        input,
+        existingTasks: tasks,
+        now: dayjs().toDate(),
+      });
 
       await this.repository.saveTask(task);
-      return FileHeartbeatTaskService.projectTaskView(task);
+      return HeartbeatTaskViewProjector.projectTask(task);
     });
   }
 
@@ -461,61 +381,24 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore {
    * needs to change an existing task's configuration.
    */
   async reconcileTasks(input: ReconcileHeartbeatTasksInput): Promise<ReconcileHeartbeatTasksResult> {
-    FileHeartbeatTaskService.assertReconciliationInput(input);
-
     return await this.mutationMutex.runExclusive(async () => {
       const currentTasks = await this.repository.listTasks();
-      const currentById = new Map(currentTasks.map((task) => [task.id, task]));
-      const desiredById = new Map(input.desired.map((task) => [task.id, task]));
-      const namespaceTasks = currentTasks.filter((task) => task.id.startsWith(input.namespace));
-      const created = [...desiredById.values()].filter((task) => !currentById.has(task.id));
-      const obsolete = namespaceTasks.filter((task) => !desiredById.has(task.id));
-      const preservedRunning = namespaceTasks.filter((task) => task.state?.status === 'running');
-      const deleted = obsolete.filter((task) => task.state?.status !== 'running');
+      const reconciliation = HeartbeatTaskControlPolicy.reconcileTasks({ currentTasks, input });
 
-      await Promise.all(created.map(async (task) => await this.repository.saveTask(task)));
-      await Promise.all(deleted.map(async (task) => await this.repository.deleteTask(task)));
+      await Promise.all(reconciliation.created.map(async (task) => await this.repository.saveTask(task)));
+      await Promise.all(reconciliation.deleted.map(async (task) => await this.repository.deleteTask(task)));
 
-      return { created, deleted, preservedRunning };
+      return reconciliation;
     });
   }
 
   async updateTask(taskId: string, input: UpdateHeartbeatTaskInput) {
-    const nextTask = await this.updateStoredTask(taskId, (task) => {
-      const now = dayjs();
-      const intervalMs = input.intervalMs ?? task.schedule.intervalMs;
-      const running = task.state?.status === 'running';
-      const enabled = input.enabled ?? task.enabled;
-      const pendingRunRequest = HeartbeatTaskStateProjector.hasPendingRunRequest(task);
-      return {
-        ...task,
-        name: input.name ?? task.name,
-        task: input.task?.trim() ?? task.task,
-        enabled,
-        continuationMode: input.continuationMode ?? task.continuationMode ?? 'operator',
-        schedule: {
-          ...task.schedule,
-          intervalMs,
-          nextRunAt:
-            !enabled ? undefined
-            : running || pendingRunRequest ? task.schedule.nextRunAt
-            : now.add(intervalMs, 'millisecond').toISOString(),
-        },
-        runtime: {
-          ...task.runtime,
-          model: input.model === undefined ? task.runtime?.model : input.model ?? undefined,
-          maxSteps: input.maxSteps === undefined ? task.runtime?.maxSteps : input.maxSteps ?? undefined,
-          searchIgnoreDirs: input.searchIgnoreDirs ?? task.runtime?.searchIgnoreDirs,
-          systemContext: input.systemContext ?? task.runtime?.systemContext,
-        },
-        state: {
-          ...task.state,
-          runRequest: !enabled ? FileHeartbeatTaskService.consumePendingRunRequest(task.state?.runRequest) : task.state?.runRequest,
-          updatedAt: now.toISOString(),
-        },
-      };
-    });
-    return FileHeartbeatTaskService.projectTaskView(nextTask);
+    const nextTask = await this.updateStoredTask(taskId, (task) => HeartbeatTaskControlPolicy.updateTask({
+      task,
+      input,
+      now: dayjs().toDate(),
+    }));
+    return HeartbeatTaskViewProjector.projectTask(nextTask);
   }
 
   async deleteTask(taskId: string) {
@@ -524,45 +407,23 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore {
       if (!currentTask) {
         throw new Error(`Heartbeat task not found: ${taskId}`);
       }
-      if (currentTask.state?.status === 'running') {
-        throw new Error(`Heartbeat task ${taskId} is running. Wait for the run to finish before deleting it.`);
-      }
+      HeartbeatTaskControlPolicy.assertTaskCanBeDeleted(currentTask);
 
       await this.repository.deleteTask(currentTask);
       return currentTask;
     });
-    return FileHeartbeatTaskService.projectTaskView(task);
+    return HeartbeatTaskViewProjector.projectTask(task);
   }
 
   async resumeTask(taskId: string) {
-    const nextTask = await this.updateStoredTask(taskId, (task) => {
-      if (task.state?.status === 'running') {
-        throw new Error(`Heartbeat task ${taskId} is already running.`);
-      }
-      if (task.state?.resumable === false) {
-        throw new Error(`Heartbeat task ${taskId} cannot be resumed.`);
-      }
-
-      const now = dayjs();
-      return {
-        ...task,
-        enabled: true,
-        schedule: {
-          ...task.schedule,
-          nextRunAt: now.subtract(1, 'second').toISOString(),
-        },
-        state: {
-          ...omit(task.state, ['error']),
-          status: 'waiting',
-          progress: 'Heartbeat task resumed. Waiting for the next scheduler poll.',
-          updatedAt: now.toISOString(),
-        },
-      };
-    });
-    return FileHeartbeatTaskService.projectTaskView(nextTask);
+    const nextTask = await this.updateStoredTask(taskId, (task) => HeartbeatTaskControlPolicy.resumeTask({
+      task,
+      now: dayjs().toDate(),
+    }));
+    return HeartbeatTaskViewProjector.projectTask(nextTask);
   }
 
-  async readTask(taskId: string, options: { runLimit?: number } = {}) {
+  async readTask(taskId: string, options: ReadHeartbeatTaskOptions = {}) {
     const task = await this.requireTask(taskId);
     const runs = await this.listRunViews({
       taskId,
@@ -570,7 +431,7 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore {
     });
 
     return {
-      task: FileHeartbeatTaskService.projectTaskView(task),
+      task: HeartbeatTaskViewProjector.projectTask(task),
       runs,
     };
   }
@@ -584,44 +445,21 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore {
     if (!run || run.taskId !== taskId) {
       return undefined;
     }
-    return FileHeartbeatTaskService.projectRunView(run);
+    return HeartbeatTaskViewProjector.projectRun(run);
   }
 
   async setTaskEnabled(taskId: string, enabled: boolean) {
-    const nextTask = await this.updateStoredTask(taskId, (task) => {
-      const now = dayjs();
-      if (enabled && task.state?.status === 'blocked') {
-        throw new Error(`Heartbeat task ${taskId} is blocked. Use resume to unblock it.`);
-      }
-
-      const status = FileHeartbeatTaskService.resolveTaskEnabledStatus(task, enabled);
-      const progress = FileHeartbeatTaskService.resolveTaskEnabledProgress(task, enabled);
-      return {
-        ...task,
-        enabled,
-        schedule: {
-          ...task.schedule,
-          nextRunAt:
-            enabled ?
-              task.schedule.nextRunAt ?? now.subtract(1, 'second').toISOString()
-            : undefined,
-        },
-        state: {
-          ...task.state,
-          status,
-          progress,
-          resumable: enabled ? true : task.state?.resumable,
-          runRequest: enabled ? task.state?.runRequest : FileHeartbeatTaskService.consumePendingRunRequest(task.state?.runRequest),
-          updatedAt: now.toISOString(),
-        },
-      };
-    });
-    return FileHeartbeatTaskService.projectTaskView(nextTask);
+    const nextTask = await this.updateStoredTask(taskId, (task) => HeartbeatTaskControlPolicy.setTaskEnabled({
+      task,
+      enabled,
+      now: dayjs().toDate(),
+    }));
+    return HeartbeatTaskViewProjector.projectTask(nextTask);
   }
 
   async triggerTaskRun(taskId: string) {
     const result = await this.requestTaskRun(taskId, { reason: 'manual-trigger' });
-    return FileHeartbeatTaskService.projectTaskView(result.task);
+    return HeartbeatTaskViewProjector.projectTask(result.task);
   }
 
   async requireTask(taskId: string): Promise<HeartbeatTask> {
@@ -633,122 +471,23 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore {
   }
 
   projectTaskView(task: HeartbeatTask): HeartbeatTaskView {
-    return FileHeartbeatTaskService.projectTaskView(task);
+    return HeartbeatTaskViewProjector.projectTask(task);
   }
 
   projectRunView(run: HeartbeatTaskRunRecordEntry): HeartbeatRunView {
-    return FileHeartbeatTaskService.projectRunView(run);
+    return HeartbeatTaskViewProjector.projectRun(run);
   }
 
   static projectTaskView(task: HeartbeatTask): HeartbeatTaskView {
-    const state = FileHeartbeatTaskService.projectTaskStateView(task.state);
-    return {
-      ...task,
-      taskId: task.id,
-      state,
-    };
+    return HeartbeatTaskViewProjector.projectTask(task);
   }
 
   static projectRunView(run: HeartbeatTaskRunRecordEntry): HeartbeatRunView {
-    return {
-      ...omit(run, ['record', 'path']),
-      ...FileHeartbeatTaskService.projectRunRecordView(run.record),
-    };
+    return HeartbeatTaskViewProjector.projectRun(run);
   }
 
   static projectRunRecordView(record: HeartbeatTaskRunRecord): HeartbeatRunView {
-    const outcome = FileHeartbeatTaskService.resolveRecordOutcome(record);
-    const runId = record.result?.state.runId;
-    return {
-      id: runId ?? outcome.executionId,
-      taskId: record.task.id,
-      executionId: outcome.executionId,
-      runId,
-      workspaceId: record.task.workspaceId,
-      createdAt: outcome.finishedAt,
-      task: FileHeartbeatTaskService.projectTaskView(record.task),
-      result: record.result ?
-        FileHeartbeatTaskService.projectResultView(record.result)
-      : FileHeartbeatTaskService.projectOutcomeView(outcome),
-      loadedCheckpoint: record.loadedCheckpoint,
-    };
-  }
-
-  private static projectTaskStateView(state: HeartbeatTaskState | undefined): HeartbeatTaskView['state'] {
-    const result =
-      state?.lastExecution && state.lastExecution.kind !== 'agent' ?
-        FileHeartbeatTaskService.projectOutcomeView(state.lastExecution)
-      : state?.result ? FileHeartbeatTaskService.projectResultView(state.result)
-      : state?.lastExecution ? FileHeartbeatTaskService.projectOutcomeView(state.lastExecution)
-      : undefined;
-    return {
-      ...omit(state ?? {}, ['result', 'runRequest']),
-      status: state?.status ?? 'idle',
-      result,
-      runRequest: state?.runRequest ? {
-        ...state.runRequest,
-        pending: state.runRequest.generation > state.runRequest.claimedGeneration,
-      } : undefined,
-    };
-  }
-
-  private static projectResultView(result: AgentHeartbeatResult): HeartbeatTaskResultView {
-    return {
-      kind: 'agent',
-      decision: result.decision,
-      summary: result.summary,
-      outcome: result.state.outcome,
-      usage: result.state.usage,
-    };
-  }
-
-  private static projectOutcomeView(outcome: HeartbeatTaskExecutionOutcome): HeartbeatTaskResultView {
-    return {
-      kind: outcome.kind,
-      summary: outcome.summary,
-      outcome: outcome.kind,
-      agentRunId: outcome.kind === 'retry' || outcome.kind === 'blocked' ? outcome.agentRunId : undefined,
-    };
-  }
-
-  private static resolveRecordOutcome(record: HeartbeatTaskRunRecord): HeartbeatTaskExecutionOutcome {
-    if (record.outcome) {
-      return record.outcome;
-    }
-    if (!record.result) {
-      throw new Error(`Heartbeat record for task ${record.task.id} has no execution outcome.`);
-    }
-
-    return {
-      kind: 'agent',
-      executionId: record.result.state.runId,
-      summary: record.result.summary,
-      finishedAt: record.result.state.finishedAt,
-    };
-  }
-
-  private static taskLastRunTime(task: HeartbeatTaskView): number {
-    const runAt = task.state.runAt ? dayjs(task.state.runAt) : undefined;
-    return runAt?.isValid() ? runAt.valueOf() : 0;
-  }
-
-  private static resolveTaskEnabledStatus(task: HeartbeatTask, enabled: boolean): NonNullable<HeartbeatTaskState['status']> {
-    if (task.state?.status === 'running') {
-      return 'running';
-    }
-    if (!enabled && task.state?.status === 'blocked') {
-      return 'blocked';
-    }
-    return enabled ? 'waiting' : 'idle';
-  }
-
-  private static resolveTaskEnabledProgress(task: HeartbeatTask, enabled: boolean): string | undefined {
-    if (task.state?.status === 'running' || task.state?.status === 'blocked') {
-      return task.state.progress;
-    }
-    return enabled ?
-      'Heartbeat task enabled. Waiting for the next scheduled run.'
-    : 'Heartbeat task paused by operator.';
+    return HeartbeatTaskViewProjector.projectRunRecord(record);
   }
 
   private static resolveHeartbeatRoot(options: FileHeartbeatTaskServiceOptions): string {
@@ -761,47 +500,6 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore {
     }
 
     return resolve(options.workspaceRoot, options.stateDir ?? '.heddle', 'heartbeat');
-  }
-
-  private static assertTaskAcceptsRunRequest(task: HeartbeatTask): void {
-    if (task.state?.status === 'blocked') {
-      throw new Error(`Heartbeat task ${task.id} is blocked. Resume it before requesting a run.`);
-    }
-    if (task.state?.status === 'complete') {
-      throw new Error(`Heartbeat task ${task.id} is complete. Resume it before requesting a run.`);
-    }
-    if (!task.enabled) {
-      throw new Error(`Heartbeat task ${task.id} is disabled. Enable it before requesting a run.`);
-    }
-  }
-
-  private static normalizeRunRequestReason(reason: string | undefined): string | undefined {
-    if (reason === undefined) {
-      return undefined;
-    }
-
-    const normalized = reason.trim();
-    if (!normalized) {
-      throw new Error('Heartbeat run-request reason cannot be empty.');
-    }
-    if (normalized.length > MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH) {
-      throw new Error(`Heartbeat run-request reason must be at most ${MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH} characters.`);
-    }
-    return normalized;
-  }
-
-  private static assertReconciliationInput(input: ReconcileHeartbeatTasksInput): void {
-    if (!input.namespace) {
-      throw new Error('Heartbeat reconciliation namespace cannot be empty.');
-    }
-
-    const desiredIds = input.desired.map((task) => task.id);
-    if (new Set(desiredIds).size !== desiredIds.length) {
-      throw new Error(`Heartbeat reconciliation namespace ${input.namespace} contains duplicate task IDs.`);
-    }
-    if (desiredIds.some((taskId) => !taskId.startsWith(input.namespace))) {
-      throw new Error(`Heartbeat reconciliation desired task IDs must start with namespace ${input.namespace}.`);
-    }
   }
 
   private static requireOutcomeAgentRunId(input: {
@@ -834,15 +532,6 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore {
       throw new Error(`Heartbeat retry and blocked summaries must be non-empty and at most ${MAX_HEARTBEAT_HANDLER_OUTCOME_SUMMARY_LENGTH} characters.`);
     }
     return normalized;
-  }
-
-  private static consumePendingRunRequest(
-    runRequest: HeartbeatTaskState['runRequest'],
-  ): HeartbeatTaskState['runRequest'] {
-    return runRequest ? {
-      ...runRequest,
-      claimedGeneration: runRequest.generation,
-    } : undefined;
   }
 
   private static toRunRequestSignal(
@@ -937,25 +626,4 @@ export class FileHeartbeatTaskService implements HeartbeatTargetedTaskStore {
     };
   }
 
-  private static createTaskId(value: string, existingIds: string[]): string {
-    const base = value
-      .toLowerCase()
-      .replace(/[`'"]/g, '')
-      .replace(/[^a-z0-9._-]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 64)
-      .replace(/-+$/g, '') || 'heartbeat-task';
-    if (!existingIds.includes(base)) {
-      return base;
-    }
-
-    for (let index = 2; index < 1_000; index++) {
-      const candidate = `${base}-${index}`;
-      if (!existingIds.includes(candidate)) {
-        return candidate;
-      }
-    }
-
-    throw new Error(`Unable to create a unique heartbeat task id for ${base}`);
-  }
 }

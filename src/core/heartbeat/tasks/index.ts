@@ -1,14 +1,19 @@
 export { FileHeartbeatTaskService } from './service.js';
+export { HeartbeatTaskControlPolicy } from './control-policy.js';
 export { HeartbeatTaskExecutionEligibilityPolicy } from './execution-eligibility.js';
 export { HeartbeatTaskStateProjector } from './task-state.js';
 export type { HeartbeatTaskExecutionEligibility } from './execution-eligibility.js';
 export type {
   CreateHeartbeatTaskInput,
-  FileHeartbeatTaskServiceOptions,
+  HeartbeatTaskAdministrationService,
+  HeartbeatTaskDetail,
+  ListHeartbeatRunViewsOptions,
+  ReadHeartbeatTaskOptions,
   ReconcileHeartbeatTasksInput,
   ReconcileHeartbeatTasksResult,
   UpdateHeartbeatTaskInput,
-} from './service.js';
+} from './administration.js';
+export type { FileHeartbeatTaskServiceOptions } from './service.js';
 export type {
   HeartbeatTask,
   HeartbeatTaskAgentRunRecord,

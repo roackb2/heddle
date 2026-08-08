@@ -15,15 +15,18 @@ operator-facing heartbeat views.
 - `checkpoint/`: `StoredHeartbeatService` and
   `FileHeartbeatCheckpointRepository` own checkpoint-backed one-off heartbeat
   execution.
-- `tasks/`: `FileHeartbeatTaskService` is the persistence boundary for durable
-  task/checkpoint/run storage and task/run projections. It is the only
-  non-repository service that should instantiate `FileHeartbeatTaskRepository`.
-  It also owns process-local execution claims, recovery of interrupted
-  single-host executions, and fencing of late completion/failure/outcome
-  writes. Durable run-request generations and the file adapter's process-local
-  scheduler wake signal also live here. `HeartbeatTaskStateProjector` owns task
-  state transitions after agent success, no-work skip, cancellation, failure,
-  request, claim, or recovery.
+- `tasks/`: `HeartbeatTaskAdministrationService` is the provider-neutral
+  operator boundary for task creation, updates, pause/resume, deletion,
+  reconciliation, and task/run reads. `HeartbeatTaskControlPolicy` owns the
+  pure task projections behind those operations. `FileHeartbeatTaskService`
+  implements that boundary together with task/checkpoint/run persistence. It is
+  the only non-repository service that should instantiate
+  `FileHeartbeatTaskRepository`. It also owns process-local execution claims,
+  recovery of interrupted single-host executions, fencing of late completion/
+  failure/outcome writes, durable run-request generations, and the file
+  adapter's process-local scheduler wake signal. `HeartbeatTaskStateProjector`
+  owns task state transitions after agent success, no-work skip, cancellation,
+  failure, request, claim, or recovery.
 - `scheduler/`: `HeartbeatSchedulerService` owns due-task selection and the
   periodic scheduler loop. It selects due work in stable oldest-due-first order
   and uses `p-limit` to enforce the configured task concurrency ceiling. It delegates execution to
@@ -43,8 +46,8 @@ operator-facing heartbeat views.
   receiving or translating provider credentials. `context.skip()` records
   explicit no-work without fabricating agent state.
 - `views/`: `HeartbeatLucidPresenter` owns Lucid-specific adapter messages.
-  Generic task/run view projection belongs to `FileHeartbeatTaskService`,
-  because that service owns the task persistence boundary.
+  `HeartbeatTaskViewProjector` owns provider-neutral task/run views and stable
+  task ordering without depending on a persistence adapter.
 
 ## Does Not Own
 
@@ -69,6 +72,16 @@ operator-facing heartbeat views.
 - Execution settlement must read and project from the latest stored task inside
   the same atomic store transition. Saving a projection derived from the
   pre-run snapshot can erase newer run requests or operator control changes.
+- Custom adapters should use the public `HeartbeatTaskStateProjector` exported
+  from `@roackb2/heddle/advanced` for normalization, request, claim,
+  settlement, and recovery transitions. The adapter still owns the backend
+  transaction and fencing predicate; it must not copy Heddle's transition
+  rules into provider-specific persistence code.
+- Operator-facing adapters should implement the public
+  `HeartbeatTaskAdministrationService` and use `HeartbeatTaskControlPolicy`
+  plus `HeartbeatTaskViewProjector`. Every mutation must lock or compare-and-set
+  the latest durable task before applying the policy. The pure policy does not
+  make a separate `loadTask()` followed by `saveTask()` atomic.
 - `executionOwnerId` identifies one scheduler process/worker generation. Do not
   reuse it across process restarts: scheduler startup uses it to distinguish a
   current claim from an execution interrupted by the prior single-host process.
@@ -123,10 +136,11 @@ operator-facing heartbeat views.
   effects.
 - Heartbeat may depend on runtime's public `AgentLoopRuntimeService.run` and checkpoint types.
   Runtime should not import heartbeat.
-- Interface adapters should use `FileHeartbeatTaskService` methods or the
-  control-plane heartbeat API as the public task/run contract. Terminal command
-  code should not construct `HeartbeatTask` objects, write heartbeat JSON, or run
-  its own scheduler loop.
+- Local interface adapters should use `FileHeartbeatTaskService` methods or the
+  control-plane heartbeat API. Remote operator surfaces should depend on
+  `HeartbeatTaskAdministrationService` and keep backend transaction mechanics
+  behind their implementation. Terminal command code should not construct
+  `HeartbeatTask` objects, write heartbeat JSON, or run its own scheduler loop.
 - A custom scheduler handler may claim domain work before model execution. It
   must either delegate model work to execution-scoped `context.runAgent()` or
   return `context.skip()` when no work exists. The context owns model credential

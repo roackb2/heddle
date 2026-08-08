@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   HeartbeatSchedulerService,
+  HeartbeatTaskStateProjector,
   type HeartbeatTask,
   type HeartbeatTaskExecution,
   type HeartbeatTaskRunRecord,
   type HeartbeatTaskRunRequestSignal,
   type HeartbeatTaskStore,
 } from '../../../advanced.js';
-import { HeartbeatTaskStateProjector } from '@/core/heartbeat/index.js';
 
 const NOW = new Date('2026-08-04T06:00:00.000Z');
 

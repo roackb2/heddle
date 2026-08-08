@@ -261,11 +261,18 @@ export type {
 } from './core/heartbeat/checkpoint/index.js';
 export {
   FileHeartbeatTaskService,
+  HeartbeatTaskControlPolicy,
   HeartbeatTaskExecutionEligibilityPolicy,
+  HeartbeatTaskStateProjector,
   MAX_HEARTBEAT_RUN_REQUEST_REASON_LENGTH,
 } from './core/heartbeat/tasks/index.js';
 export type {
+  CreateHeartbeatTaskInput,
   FileHeartbeatTaskServiceOptions,
+  HeartbeatTaskAdministrationService,
+  HeartbeatTaskDetail,
+  ListHeartbeatRunViewsOptions,
+  ReadHeartbeatTaskOptions,
   ReconcileHeartbeatTasksInput,
   ReconcileHeartbeatTasksResult,
   HeartbeatTask,
@@ -288,6 +295,7 @@ export type {
   HeartbeatTargetedTaskStore,
   HeartbeatTaskExecutionEligibility,
   RequestHeartbeatTaskRunOptions,
+  UpdateHeartbeatTaskInput,
 } from './core/heartbeat/tasks/index.js';
 export {
   DEFAULT_HEARTBEAT_HANDLER_RETRY_MS,
@@ -321,10 +329,12 @@ export type {
 export type {
   HeartbeatRunView,
   HeartbeatTaskRunRequestView,
+  HeartbeatTaskResultView,
   HeartbeatTaskView,
 } from './core/heartbeat/views/index.js';
 export {
   HeartbeatLucidPresenter,
+  HeartbeatTaskViewProjector,
 } from './core/heartbeat/views/index.js';
 export type {
   LucidAgentMessage,
