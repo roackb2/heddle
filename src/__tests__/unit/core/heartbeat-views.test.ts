@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   FileHeartbeatTaskService,
+  HeartbeatTaskViewProjector,
   type AgentHeartbeatResult,
   type AgentLoopState,
   type HeartbeatTask,
@@ -12,8 +13,7 @@ import {
 
 describe('heartbeat task service views', () => {
   it('projects heartbeat task state into a host-facing view', () => {
-    const service = new FileHeartbeatTaskService({ dir: '/tmp/heddle-heartbeat-view-test' });
-    const view = service.projectTaskView({
+    const view = HeartbeatTaskViewProjector.projectTask({
       id: 'repo-check',
       workspaceId: 'workspace-1',
       task: 'Inspect repo state',
@@ -72,8 +72,7 @@ describe('heartbeat task service views', () => {
   });
 
   it('projects heartbeat runs into a host-facing view', () => {
-    const service = new FileHeartbeatTaskService({ dir: '/tmp/heddle-heartbeat-view-test' });
-    const view = service.projectRunView(createRunEntry());
+    const view = HeartbeatTaskViewProjector.projectRun(createRunEntry());
 
     expect(view).toMatchObject({
       id: 'run_1',
@@ -109,7 +108,6 @@ describe('heartbeat task service views', () => {
   });
 
   it('projects skipped execution records without fabricating an agent run', () => {
-    const service = new FileHeartbeatTaskService({ dir: '/tmp/heddle-heartbeat-view-test' });
     const outcome = {
       kind: 'skipped' as const,
       executionId: 'execution_skip',
@@ -125,7 +123,7 @@ describe('heartbeat task service views', () => {
         lastExecution: outcome,
       },
     };
-    const view = service.projectRunView({
+    const view = HeartbeatTaskViewProjector.projectRun({
       id: '2026-04-14T00-00-00.000Z-repo-check',
       path: '/tmp/2026-04-14T00-00-00.000Z-repo-check.json',
       taskId: task.id,

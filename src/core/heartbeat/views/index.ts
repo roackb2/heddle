@@ -1,4 +1,5 @@
 export { HeartbeatLucidPresenter } from './lucid-presenter.js';
+export { HeartbeatTaskViewProjector } from './projector.js';
 export type {
   HeartbeatRunView,
   HeartbeatTaskRunRequestView,

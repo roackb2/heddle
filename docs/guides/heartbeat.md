@@ -160,6 +160,7 @@ boundary for a queue or serverless host that first persists domain input, calls
 ```ts
 import {
   HeartbeatSchedulerService,
+  HeartbeatTaskStateProjector,
   type HeartbeatTaskHandler,
   type HeartbeatTargetedTaskStore,
 } from '@roackb2/heddle/advanced';
@@ -192,6 +193,12 @@ if (outcome.status === 'settled') {
 `loadTask(taskId)`. A remote adapter must resolve that one task directly; do not
 wrap `listTasks()` with a host-side filter, which would turn a tenant routing and
 authorization boundary into a best-effort convention.
+
+Inside each backend transaction, use `HeartbeatTaskStateProjector` to derive
+the next task from the latest locked row. The projector owns Heddle's request,
+claim, settlement, recovery, and normalization rules; the adapter owns atomic
+persistence, execution fencing, and lease policy. Do not reimplement those
+framework transitions in the host.
 
 The result is typed so the dispatcher can make an explicit decision:
 
@@ -258,6 +265,43 @@ the adapter declares those optional capabilities.
 This suite certifies the store contract, not the surrounding system. It does
 not prove exactly-once domain effects, tenant authorization, queue delivery,
 visibility timeout handling, or infrastructure lease correctness.
+
+### Provider-neutral task administration
+
+Use `HeartbeatTaskAdministrationService` as the application boundary for task
+creation, configuration, pause/resume, deletion, reconciliation, and
+operator-facing reads. `FileHeartbeatTaskService` implements it for local
+single-process state; a relational adapter can implement the same contract for
+hosted state.
+
+```ts
+import type {
+  HeartbeatTaskAdministrationService,
+} from '@roackb2/heddle/advanced';
+
+declare const heartbeatTasks: HeartbeatTaskAdministrationService;
+
+const task = await heartbeatTasks.createTask({
+  id: 'representative-alice',
+  task: 'Process new information for Alice.',
+  intervalMs: 60_000,
+});
+
+await heartbeatTasks.setTaskEnabled(task.taskId, false);
+```
+
+Remote implementations should reuse `HeartbeatTaskControlPolicy` for task
+projections and `HeartbeatTaskViewProjector` for public views. Apply the control
+policy to the latest locked row inside the same database transaction that
+persists the result. The pure policy deliberately owns no transaction, lease,
+tenant authorization, or notification mechanism; reading through
+`loadTask()` and later writing through `saveTask()` is not an atomic
+administration implementation.
+
+The administration contract is separate from `HeartbeatTargetedTaskStore` so
+execution adapters do not accidentally promise a control plane. One concrete
+class may implement both when it can uphold both atomicity contracts, as the
+built-in file service does for one Node.js process.
 
 ### Durable event-driven run requests
 
