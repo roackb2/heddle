@@ -2,7 +2,10 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type {
+  FetchLike,
+  Transport,
+} from '@modelcontextprotocol/sdk/shared/transport.js';
 import type {
   McpCallToolResult,
   McpClientSessionInfo,
@@ -124,13 +127,22 @@ async function createTransport(
   if (server.transport === 'sse') {
     return new SSEClientTransport(new URL(server.url), {
       requestInit: await resolveHttpRequestInit(server, operation, requestHeaders),
+      fetch: requestHeaders ? rejectRedirectsFetch : undefined,
     });
   }
 
   return new StreamableHTTPClientTransport(new URL(server.url), {
     requestInit: await resolveHttpRequestInit(server, operation, requestHeaders),
+    fetch: requestHeaders ? rejectRedirectsFetch : undefined,
   });
 }
+
+// The MCP SDK does not apply requestInit to every SSE GET, so enforce the
+// capability boundary at the fetch function shared by every HTTP method.
+const rejectRedirectsFetch: FetchLike = (url, init) => fetch(url, {
+  ...init,
+  redirect: 'error',
+});
 
 async function resolveHttpRequestInit(
   server: McpHttpServerConfig,

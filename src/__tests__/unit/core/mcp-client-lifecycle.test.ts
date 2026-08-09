@@ -90,6 +90,7 @@ describe('MCP client lifecycle', () => {
 
   afterEach(() => {
     delete process.env.REQUEST_SCOPED_FALLBACK;
+    vi.unstubAllGlobals();
   });
 
   it.each(servers)('closes client and $transport transport after successful discovery', async (server) => {
@@ -141,6 +142,32 @@ describe('MCP client lifecycle', () => {
     const requestInit = (mocks.transportCreated.mock.calls[0]?.[1] as { requestInit: RequestInit }).requestInit;
     expect(new Headers(requestInit.headers).get('authorization')).toBe('Bearer discovery-capability');
     expect(requestInit.redirect).toBe('error');
+  });
+
+  it.each(servers.slice(1))('rejects redirects through every $transport fetch path', async (server) => {
+    const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+
+    await new McpClientService().listTools(
+      server,
+      undefined,
+      async () => ({ Authorization: 'Bearer request-capability' }),
+    );
+
+    const transportOptions = mocks.transportCreated.mock.calls[0]?.[1] as {
+      fetch?: (url: string | URL, init?: RequestInit) => Promise<Response>;
+    };
+    expect(transportOptions.fetch).toEqual(expect.any(Function));
+
+    await transportOptions.fetch?.('https://redirect.example.com/mcp', {
+      method: 'GET',
+      redirect: 'follow',
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      'https://redirect.example.com/mcp',
+      expect.objectContaining({ method: 'GET', redirect: 'error' }),
+    );
   });
 
   it('resolves fresh headers for every tool-call transport', async () => {
