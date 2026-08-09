@@ -1,19 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { McpSchemas, type McpRawServerConfig } from './schemas.js';
+import { McpSchemas } from './schemas.js';
+import { McpServerConfigService } from './server-config-service.js';
 import type {
   McpActivationStore,
   McpActivationStorePort,
   McpCatalogStore,
   McpCatalogStorePort,
   McpConfigDocument,
-  McpConfigIssue,
   McpConfigLoadResult,
   McpConfigStorePort,
-  McpHttpServerConfig,
-  McpServerConfig,
-  McpServerConfigSource,
-  McpStdioServerConfig,
 } from './types.js';
 
 const CONFIG_FILE_NAME = 'mcp.json';
@@ -46,7 +42,7 @@ export class FileMcpConfigRepository implements McpConfigStorePort {
       const parsed = McpSchemas.parseRawConfig(JSON.parse(readFileSync(configPath, 'utf8')) as unknown);
       return {
         configPath,
-        ...normalizeRawConfig(parsed, {
+        ...McpServerConfigService.normalizeConfig(parsed, {
           configPath,
           workspaceRoot: this.workspaceRoot,
         }),
@@ -161,155 +157,7 @@ export class FileMcpCatalogRepository implements McpCatalogStorePort {
   }
 }
 
-function normalizeRawConfig(
-  config: ReturnType<typeof McpSchemas.parseRawConfig>,
-  options: { configPath: string; workspaceRoot: string },
-): {
-  servers: McpServerConfig[];
-  issues: McpConfigIssue[];
-} {
-  const standardServers = config.mcpServers ?? {};
-  const vscodeServers = config.servers ?? {};
-  const standard = Object.entries(standardServers).map(([id, server]) => normalizeServer(id, server, {
-    source: 'standard',
-    ...options,
-  }));
-  const vscode = Object.entries(vscodeServers)
-    .filter(([id]) => standardServers[id] === undefined)
-    .map(([id, server]) => normalizeServer(id, server, {
-      source: 'vscode',
-      ...options,
-    }));
-  const normalized = [...standard, ...vscode];
-
-  return {
-    servers: normalized.flatMap((result) => result.server ? [result.server] : []),
-    issues: normalized.flatMap((result) => result.issues),
-  };
-}
-
 function formatConfigContent(content: string): string {
   const raw = content.trim().length > 0 ? JSON.parse(content) as unknown : { mcpServers: {} };
   return `${JSON.stringify(McpSchemas.parseRawConfig(raw), null, 2)}\n`;
-}
-
-function normalizeServer(
-  id: string,
-  raw: McpRawServerConfig,
-  options: {
-    configPath: string;
-    source: McpServerConfigSource;
-    workspaceRoot: string;
-  },
-): {
-  server?: McpServerConfig;
-  issues: McpConfigIssue[];
-} {
-  const transport = normalizeTransport(raw.type ?? raw.transport, raw);
-  const path = `${options.configPath}#${id}`;
-
-  if (!isSafeIdentifier(id)) {
-    return {
-      issues: [{
-        code: 'server_invalid',
-        path,
-        message: `MCP server id must use letters, numbers, underscores, or hyphens: ${id}`,
-      }],
-    };
-  }
-
-  if (!transport) {
-    return {
-      issues: [{
-        code: 'unsupported_transport',
-        path,
-        message: 'MCP server must define a supported transport: stdio, http, streamable-http, or sse.',
-      }],
-    };
-  }
-
-  if (transport === 'stdio') {
-    if (!raw.command) {
-      return {
-        issues: [{
-          code: 'server_invalid',
-          path,
-          message: 'Stdio MCP server requires command.',
-        }],
-      };
-    }
-
-    const server: McpStdioServerConfig = {
-      id,
-      transport,
-      source: options.source,
-      command: raw.command,
-      args: raw.args ?? [],
-      cwd: raw.cwd ? resolveTemplatePath(raw.cwd, options.workspaceRoot) : undefined,
-      env: raw.env ?? {},
-      envFile: raw.envFile,
-      environment: raw.environment,
-      tools: raw.tools,
-    };
-    return { server, issues: [] };
-  }
-
-  if (!raw.url) {
-    return {
-      issues: [{
-        code: 'server_invalid',
-        path,
-        message: 'HTTP MCP server requires url.',
-      }],
-    };
-  }
-
-  try {
-    const url = new URL(raw.url);
-    const server: McpHttpServerConfig = {
-      id,
-      transport,
-      source: options.source,
-      url: url.toString(),
-      headers: raw.headers ?? {},
-      environment: raw.environment,
-      tools: raw.tools,
-    };
-    return { server, issues: [] };
-  } catch {
-    return {
-      issues: [{
-        code: 'server_invalid',
-        path,
-        message: `Invalid MCP server URL: ${raw.url}`,
-      }],
-    };
-  }
-}
-
-function normalizeTransport(
-  value: string | undefined,
-  raw: McpRawServerConfig,
-): McpServerConfig['transport'] | undefined {
-  if (!value && raw.command) {
-    return 'stdio';
-  }
-
-  if (value === 'streamable-http') {
-    return 'http';
-  }
-
-  if (value === 'stdio' || value === 'http' || value === 'sse') {
-    return value;
-  }
-
-  return undefined;
-}
-
-function resolveTemplatePath(value: string, workspaceRoot: string): string {
-  return value.replaceAll('${workspaceFolder}', workspaceRoot);
-}
-
-function isSafeIdentifier(value: string): boolean {
-  return /^[A-Za-z0-9_-]+$/.test(value);
 }

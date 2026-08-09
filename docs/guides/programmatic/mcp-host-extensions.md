@@ -55,3 +55,49 @@ description, capability, approval setting, or public tool name.
 return generated source, HTML, JSON, or other large text outputs. Heddle scans
 the MCP result, saves large strings as artifacts, and replaces duplicated
 structured/text mirrors with the same compact artifact reference.
+
+## Short-lived capabilities for hosted products
+
+Use request-scoped preparation when a trusted product backend gives one agent
+invocation a short-lived capability for a fixed remote MCP server:
+
+```ts
+import { prepareMcpHostExtension } from '@roackb2/heddle'
+
+const prepared = await prepareMcpHostExtension({
+  mode: 'request-scoped',
+  id: 'product-capabilities',
+  serverId: 'product_backend',
+  server: {
+    transport: 'http',
+    url: 'https://product.example.com/mcp',
+    tools: {
+      allow: ['read_workspace', 'publish_finding'],
+      approval: 'never',
+    },
+  },
+  includeTools: ['read_workspace', 'publish_finding'],
+  tenantId: verifiedIdentity.tenantId,
+  signal: invocationSignal,
+  resolveRequestHeaders: async ({ operation, serverId, signal }) => ({
+    Authorization: `Bearer ${await capabilities.forMcp({ operation, serverId, signal })}`,
+  }),
+})
+
+if (!prepared.ok) {
+  throw new Error(`MCP setup failed at ${prepared.step}: ${prepared.error}`)
+}
+```
+
+Request-scoped mode supports HTTP and SSE only. The server declaration has no
+`headers` field: `resolveRequestHeaders` returns the complete header set for a
+fresh transport, separately for discovery and each tool call. Heddle does not
+write the server, catalog, callback, or returned headers to `.heddle`, and it
+does not fall back to environment variables when resolution fails.
+
+Create the callback only after the product has authenticated the caller and
+verified an immutable adopter/tenant/user/session scope. Keep that identity in
+the closure rather than tool arguments, and bind the prepared extension to one
+scope (normally one engine invocation). The remote MCP server must independently
+verify expiry, audience, scope, and allowed tools. Heddle transports the
+capability but does not interpret the product's authorization claims.

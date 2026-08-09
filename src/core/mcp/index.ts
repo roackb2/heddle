@@ -27,6 +27,8 @@ export type {
   McpOpenConfigResult,
   McpOverview,
   McpRefreshResult,
+  McpRequestHeadersProvider,
+  McpRequestHeadersProviderInput,
   McpServerActivationRecord,
   McpServerActivationStatus,
   McpServerCatalogRecord,

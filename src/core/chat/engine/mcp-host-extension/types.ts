@@ -1,5 +1,12 @@
 import type { ArtifactKind, RuntimeArtifact } from '@/core/artifacts/index.js';
-import type { McpRefreshResult, McpServerCatalogRecord, McpServerConfig, McpToolDescriptor } from '@/core/mcp/index.js';
+import type {
+  McpRefreshResult,
+  McpRequestHeadersProvider,
+  McpServerCatalogRecord,
+  McpServerConfig,
+  McpToolDescriptor,
+  McpToolPolicy,
+} from '@/core/mcp/index.js';
 import type { ToolPolicyEnvironment, ToolPolicyOperation, ToolToolkitContext } from '@/core/tools/index.js';
 import type {
   ConversationEngineHostArtifactOptions,
@@ -125,6 +132,30 @@ export type PrepareMcpHostExtensionOptions = DefineMcpHostExtensionOptions & {
   server: Record<string, unknown>;
 };
 
+export type McpRequestScopedHttpServer = {
+  transport: 'http' | 'streamable-http' | 'sse';
+  url: string;
+  environment?: ToolPolicyEnvironment;
+  tools?: McpToolPolicy;
+};
+
+export type PrepareRequestScopedMcpHostExtensionOptions = Omit<
+  DefineMcpHostExtensionOptions,
+  'hideDefaultMcpTools'
+> & {
+  mode: 'request-scoped';
+  server: McpRequestScopedHttpServer;
+  resolveRequestHeaders: McpRequestHeadersProvider;
+  /** Owning invocation cancellation for request-scoped catalog discovery. */
+  signal?: AbortSignal;
+  /** The raw state-backed MCP path is always hidden in request-scoped mode. */
+  hideDefaultMcpTools?: true;
+};
+
+export type PrepareMcpHostExtensionInput =
+  | PrepareMcpHostExtensionOptions
+  | PrepareRequestScopedMcpHostExtensionOptions;
+
 export type PrepareMcpHostExtensionCatalogResult =
   | {
       ok: true;
@@ -148,6 +179,20 @@ export type PrepareMcpHostExtensionResult =
     })
   | Extract<PrepareMcpHostExtensionCatalogResult, { ok: false }>;
 
+export type PrepareRequestScopedMcpHostExtensionResult =
+  | {
+      ok: true;
+      serverId: string;
+      toolNames: string[];
+      extension: ConversationEngineHostExtension;
+    }
+  | {
+      ok: false;
+      serverId: string;
+      step: 'validate_server' | 'discover_tools';
+      error: string;
+    };
+
 export type ResolvedMcpTool = {
   server: McpServerConfig;
   tool: McpToolDescriptor;
@@ -163,6 +208,7 @@ export type ResolvedMcpTool = {
 export type ResolvedMcpHostExtensionData = {
   server: McpServerConfig;
   catalog: McpServerCatalogRecord;
+  requestHeaders?: McpRequestHeadersProvider;
 };
 
 export type ResolvedResultArtifactsOptions = {

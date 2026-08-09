@@ -16,6 +16,24 @@ defineMcpHostExtension(...)
 Those helpers are stable entrypoints. The implementation behind them is split
 into services so future changes have one clear owner.
 
+## Request-scoped remote MCP
+
+Hosted products should use `prepareMcpHostExtension({ mode: 'request-scoped' })`
+when an adopter backend authorizes each agent invocation with a short-lived
+capability. This mode validates and discovers the HTTP/SSE server entirely in
+memory. It never writes MCP config, activation, or catalog state.
+
+The host supplies `resolveRequestHeaders`, which runs immediately before
+discovery and before every tool-call transport. The callback returns the
+complete header set: request-scoped mode never falls back to static config or
+`process.env`. Provider failures are redacted, redirects are rejected, and the
+generic state-backed MCP surface is always hidden.
+
+Bind one prepared request-scoped extension to one verified adopter scope and
+normally one engine/invocation. Identity belongs in the host's closure and in
+the backend-verified capability, never in model-visible tool arguments. Heddle
+transports the capability; it does not decide adopter authorization.
+
 ## Self-contained (stateless) extensions
 
 `prepareMcpHostExtension(...)` returns a **self-contained** extension: it embeds
@@ -67,7 +85,8 @@ model claim.
 - `McpHostExtensionService` composes the Heddle host extension shell. Keep this
   as the facade only.
 - `McpHostExtensionPreparationService` owns setup state: write MCP config,
-  activate server, refresh catalog, and return a prepared extension.
+  activate server, refresh catalog, and return a prepared extension; or perform
+  the equivalent request-scoped discovery entirely in memory.
 - `McpHostToolDefinitionService` owns converting cached MCP descriptors into
   Heddle `ToolDefinition`s: filtering, host tool names, descriptions, approval
   defaults, host-owned policy provenance, and wrapping tool execution.

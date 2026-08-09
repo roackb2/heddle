@@ -5,13 +5,19 @@ to user-configured MCP servers for services such as Notion, Anytype, GitHub, or
 other ecosystem tools without Heddle building a bespoke integration for each
 service.
 
-MCP support is workspace-scoped and operator-controlled:
+The local MCP surface is workspace-scoped and operator-controlled:
 
 1. configure servers in `.heddle/mcp.json` or Settings -> MCP;
 2. enable the server for the workspace;
 3. refresh its cached tool catalog;
 4. let the agent call cached MCP tools through Heddle's normal tool, approval,
    and trace path.
+
+Hosted products can instead use request-scoped MCP host extensions. That path
+discovers a fixed HTTP/SSE server in memory and obtains short-lived headers from
+a host callback immediately before each connection. It does not create or read
+the workspace MCP files described below. See
+[MCP host extensions](../guides/programmatic/mcp-host-extensions.md#short-lived-capabilities-for-hosted-products).
 
 ## Config
 
@@ -102,3 +108,8 @@ server.
 
 MCP tool descriptions, resources, prompts, and outputs are external content.
 Treat them as untrusted input, especially when connecting to community servers.
+
+Do not place per-request capabilities in `.heddle/mcp.json` or environment
+variables available to an agent shell. Use request-scoped host-extension
+preparation, keep the endpoint fixed by deployment configuration, and let the
+remote MCP server verify the signed capability independently.

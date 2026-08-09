@@ -45,10 +45,15 @@ export type {
   McpHostResultArtifactRule,
   McpHostResultArtifactsOptions,
   McpHostToolOverride,
+  McpRequestHeadersProvider,
+  McpRequestHeadersProviderInput,
+  McpRequestScopedHttpServer,
   PrepareMcpHostExtensionOptions,
   PrepareMcpHostExtensionResult,
   PrepareMcpHostExtensionCatalogOptions,
   PrepareMcpHostExtensionCatalogResult,
+  PrepareRequestScopedMcpHostExtensionOptions,
+  PrepareRequestScopedMcpHostExtensionResult,
 } from './mcp-host-extension.js';
 export { EngineConversationTurnService } from './turns/service.js';
 export type { RunConversationTurnArgs, RunConversationTurnResult } from './turns/types.js';
